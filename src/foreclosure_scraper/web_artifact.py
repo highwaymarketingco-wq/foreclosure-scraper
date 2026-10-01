@@ -3509,6 +3509,60 @@ def reseal_board(docs_dir: Path | str = "docs", *, resplit: bool = False,
 _BACKUP_KEEP = max(1, int(os.environ.get("BOARD_BACKUP_KEEP", "3")))
 
 
+def _backup_listings_board(listings_path: Path, backup_dir: Path, ts: str) -> Path:
+    """Copy whatever on-disk representation of docs/listings.json currently exists into
+    backup_dir, tagged with timestamp `ts`, WITHOUT ever parsing/materializing the board into
+    memory -- that would turn a cheap file copy into a ~1GB-in-RAM operation on the Mac's 8GB
+    budget (see _BACKUP_KEEP's comment on why even keeping a few whole-board copies on disk is
+    already tight).
+
+    docs/listings.json has three possible on-disk shapes, all already understood by the READ
+    side (_choose_board_source, which this reuses rather than re-deriving source selection):
+      - "plain"  docs/listings.json itself (the local runner regenerates this every write).
+      - "gz"     docs/listings.json.gz, a single-file compressed twin (the pre-split layout).
+      - "parts"  docs/listings_part_NNN.json.gz shards named by docs/board.manifest.json --
+                 the current layout, because the uncompressed board (~1GB+) exceeds GitHub's
+                 100MB/file limit even gzipped as one file. THIS is the shape a fresh
+                 `git clone` produces: plain and single-gz are both gitignored/uncommitted
+                 (see .gitignore), so only the manifest + parts exist until something writes a
+                 fresh plain copy locally.
+
+    Returns the path the backup landed at: a file for "plain"/"gz", a directory for "parts".
+
+    Fixes the 2026-09-30 VM finding: the old code here did a bare
+    `shutil.copy2(listings_path, ...)`, which only ever succeeds for the "plain" shape. On a
+    fresh VM clone (parts only, no plain, no single .gz) it raised FileNotFoundError, which the
+    caller's `except Exception: log.warning(...)` swallows -- so every write against a freshly
+    cloned working tree ran with NO real backup, silently, while looking identical in the logs
+    to a normal successful backup (a `web_artifact.backup_failed` warning line is easy to miss
+    among the rest of a run's output). A real vision-grading write on the VM that day hit
+    exactly this.
+    """
+    used, role, res = _choose_board_source(listings_path)
+    if role == "plain":
+        dest = backup_dir / f"listings_{ts}.json"
+        shutil.copy2(used, dest)
+        return dest
+    if role == "gz":
+        dest = backup_dir / f"listings_{ts}.json.gz"
+        shutil.copy2(used, dest)
+        return dest
+    # role == "parts": the shard set is already small, gzip-compressed files on disk -- copying
+    # all of them (manifest + every part) is still a cheap set of file copies, never a parse.
+    # Kept together in their own timestamped directory so a restore just points board_parts at
+    # it (it is a self-contained docs/ dir: manifest + parts, same layout board_parts.resolve()
+    # expects).
+    dest_dir = backup_dir / f"listings_{ts}_parts"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = listings_path.parent / _bp.MANIFEST_NAME
+    if manifest_path.exists():
+        shutil.copy2(manifest_path, dest_dir / _bp.MANIFEST_NAME)
+    parts = res.paths if res is not None else _bp.list_part_files(listings_path.parent)
+    for part in parts:
+        shutil.copy2(part, dest_dir / part.name)
+    return dest_dir
+
+
 def _count_guard_and_backup(docs: Path, listings_path: Path, new_count: int, summary: dict) -> int:
     """BACKUP-BEFORE-OVERWRITE + COUNT GUARD, extracted from write_artifact (2026-09-29) so
     append_new_rows() can share this exact, incident-hardened logic instead of re-implementing
@@ -3609,15 +3663,14 @@ def _count_guard_and_backup(docs: Path, listings_path: Path, new_count: int, sum
         # --- timestamped backup ---
         _ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         try:
-            import shutil as _sh
-            _sh.copy2(listings_path, _backup_dir / f"listings_{_ts}.json")
+            _dest = _backup_listings_board(listings_path, _backup_dir, _ts)
             if (docs / "listings_detail.json").exists():
-                _sh.copy2(docs / "listings_detail.json",
-                          _backup_dir / f"listings_detail_{_ts}.json")
+                shutil.copy2(docs / "listings_detail.json",
+                             _backup_dir / f"listings_detail_{_ts}.json")
             elif (docs / "listings_detail.json.gz").exists():
-                _sh.copy2(docs / "listings_detail.json.gz",
-                          _backup_dir / f"listings_detail_{_ts}.json.gz")
-            log.info("web_artifact.backup_saved", path=str(_backup_dir / f"listings_{_ts}.json"))
+                shutil.copy2(docs / "listings_detail.json.gz",
+                             _backup_dir / f"listings_detail_{_ts}.json.gz")
+            log.info("web_artifact.backup_saved", path=str(_dest))
         except Exception:  # noqa: BLE001 - backup failure must not block the write
             log.warning("web_artifact.backup_failed", exc_info=True)
         # --- prune old backups (keep the newest _BACKUP_KEEP of each) ---
@@ -3633,12 +3686,23 @@ def _count_guard_and_backup(docs: Path, listings_path: Path, new_count: int, sum
         # next atomic write). Prune both patterns independently by their own
         # recency now, instead of relying on one glob's leftovers to also
         # catch the other's files.
+        #
+        # 2026-09-30: added a third pattern for the "parts" backup shape (a
+        # directory, not a file -- _backup_listings_board's fresh-clone fix) so
+        # those don't grow unbounded the same way the 2026-09-17 bug let the
+        # detail pattern grow: _BACKUP_KEEP directories of small gzipped shards
+        # is still bounded, but ungoverned growth on an always-fresh-clone host
+        # (the VM) would otherwise repeat that incident.
         try:
-            for _pattern in ("listings_2*.json", "listings_detail_2*.json*"):
+            for _pattern in ("listings_2*.json*", "listings_detail_2*.json*"):
                 _old = sorted(_backup_dir.glob(_pattern),
                               key=lambda p: p.stat().st_mtime, reverse=True)[_BACKUP_KEEP:]
                 for _f in _old:
                     _f.unlink(missing_ok=True)
+            _old_dirs = sorted(_backup_dir.glob("listings_2*_parts"),
+                               key=lambda p: p.stat().st_mtime, reverse=True)[_BACKUP_KEEP:]
+            for _d in _old_dirs:
+                shutil.rmtree(_d, ignore_errors=True)
         except Exception:  # noqa: BLE001
             pass
     return _accepted_intentional
