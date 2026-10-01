@@ -676,6 +676,28 @@ def enrich_board_qa(listings) -> dict:
         if calc.get("arv_withheld") is not None:
             flags.append("arv_withheld")
 
+        # equity-on-arv_outlier (extraction_gaps.md: 35 rows measured) —
+        # enrichment_data_quality.py's "arv_outlier" flag (an ARV whose
+        # magnitude is implausible: > $2M/$1.5M, or < $15k on a sized
+        # property) runs BEFORE this pass and only ever adds a caveat string;
+        # it never reaches enrich_equity, which already published a dollar
+        # figure and percentage off that same implausible ARV before the
+        # outlier was known. "Verify before bidding" in the caption is not the
+        # same guarantee as the ARV trust gate above gives every OTHER
+        # contradicted ARV, where equity is actually withheld, not just
+        # captioned — this is that same guarantee, applied to the one
+        # ARV-distrust signal that was never wired to it. Mirrors the
+        # assessor-row-across-parcels retraction above: detect late, withhold
+        # late, rerank late (retract_equity_rank), same as that established
+        # pattern, not a new mechanism.
+        dq_flags = (raw.get("data_quality") or {}).get("flags") or []
+        if "arv_outlier" in dq_flags:
+            flags.append("arv_outlier")
+            if withhold_equity(li, "contradicted", ["arv_outlier"]):
+                summary["equity_withheld_arv_outlier"] += 1
+                if retract_equity_rank(li):
+                    summary["arv_outlier_distress_reranked"] += 1
+
         # ---- ARV trust tripwires (all three must read ZERO) -----------------
         # valuation.grading.apply_arv_trust_gate strips these fields before the
         # calc block is serialized. This does not re-do that work — it checks

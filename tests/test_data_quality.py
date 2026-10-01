@@ -247,6 +247,45 @@ def test_board_qa_clean_case_no_arv_flag():
     assert "qa_flags" not in li.raw
 
 
+def test_board_qa_withholds_equity_published_on_an_arv_outlier():
+    """extraction_gaps.md: "equity-on-arv_outlier (35) -> withhold". A row that
+    enrichment_data_quality already flagged `arv_outlier` (an implausible ARV
+    magnitude) must not keep a derived equity figure sitting unwithheld next
+    to that caveat -- enrich_equity ran before data_quality and had no way to
+    know the ARV would be judged an outlier."""
+    li = _li(
+        source="counties_sc.x", source_url="http://x",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        street_address="123 Real St",
+        raw={"calc": {"arv_expected": 9_000_000},
+             "data_quality": {"flags": ["arv_outlier"], "arv_confidence": "MEDIUM"},
+             "equity": {"value": 7_500_000.0, "pct": 0.83, "arv_used": 9_000_000.0}},
+    )
+    summary = enrich_board_qa([li])
+    assert li.raw["equity"].get("value") is None
+    assert li.raw["equity"].get("withheld") is True
+    assert "arv_outlier" in li.raw["equity"].get("arv_flags", [])
+    assert "arv_outlier" in li.raw["qa_flags"]
+    assert summary.get("equity_withheld_arv_outlier") == 1
+
+
+def test_board_qa_does_not_touch_equity_without_arv_outlier():
+    """A normal equity figure (no arv_outlier flag present) must survive
+    enrich_board_qa untouched -- this is a narrow, flag-gated retraction, not a
+    blanket one."""
+    li = _li(
+        source="counties_sc.x", source_url="http://x",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        street_address="123 Real St",
+        raw={"calc": {"arv_expected": 300000.0},
+             "data_quality": {"flags": [], "arv_confidence": "HIGH"},
+             "equity": {"value": 100000.0, "pct": 0.33}},
+    )
+    summary = enrich_board_qa([li])
+    assert li.raw["equity"]["value"] == 100000.0
+    assert summary.get("equity_withheld_arv_outlier", 0) == 0
+
+
 def test_board_qa_flags_rehab_vs_condition():
     """Good condition (cosmetic) but a heavy rehab tier (gut) is a contradiction."""
     li = _li(
