@@ -23,18 +23,35 @@ from ...models import Listing, ListingType, PropertyKind
 PAGE_URL = "https://www.co.pickens.sc.us/departments/master_in_equity/sales_rosters.php"
 
 CASE_RE = re.compile(r"\b\d{2,4}-CP-\d{2}-\d{4,6}\b", re.I)
+# Lazy quantifier + \b around the suffix alternation: without the \b, the old
+# pattern matched "Rd"/"St" as bare substrings of ordinary words ("CARDINAL"
+# -> "CARD", "STATE" -> "ST") and also swallowed the case-number's own
+# trailing digits as a fake house number ("00468 CARDINAL..." -> "00468
+# CARD"). \w\s (not just a literal space) in the body lets an address that
+# PDF-extraction wrapped across a line break ("333 SLAB BRIDGE\nRD.,...")
+# still match as one address. Same fix shipped to the sibling
+# anderson_master_in_equity.py 2026-10-01.
 ADDR_RE = re.compile(
-    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
-    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    r"(\d+[ \t]+[A-Z][\w\s.'\-]+?\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
+    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\b\.?)",
     re.I,
 )
+# South Carolina TMS/PIN: four hyphen-separated digit groups ("5029-11-66-6731"),
+# printed right after the address on every Pickens MIE roster row and RESULTS
+# row alike. The strongest parcel-keyed dedupe/resolution id these rows carry,
+# and it was never captured at all before 2026-10-01.
+TMS_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2}-\d{4,6})\b")
 DATE_RE = re.compile(r"\b(?:\d{1,2}/\d{1,2}/\d{2,4})\b")
-# Caption split "Plaintiff v. Defendant" — same shape the sibling
-# anderson_master_in_equity uses. Party names are digit-free so the match stops
-# at the address house-number that follows the defendant, and we run it on the
-# text AFTER the case number so the case#/attorney-code never leaks in.
+# Caption split "Plaintiff V Defendant" / "Plaintiff v. Defendant" — Pickens
+# PDFs use a bare capital "V" with NO period ("CORP. V JOHN K. SHIVERS"), not
+# the "v." the sibling anderson_master_in_equity.py uses. The old pattern
+# required a literal lowercase "v." and had no re.I flag, so it NEVER matched
+# on this source -- confirmed live 2026-10-01: 34/34 real rows came back with
+# plaintiff=defendant=None. Accepts either shape now.
 PARTIES_RE = re.compile(
-    r"([A-Za-z][A-Za-z &.,'-]{3,80}?)\s+v\.\s+([A-Za-z][A-Za-z &.,'-]{2,80})"
+    r"([A-Za-z][A-Za-z\s&.,'-]{3,80}?)\s+v\.?\s+([A-Za-z][A-Za-z\s&.,'-]{2,100}?)"
+    r"(?=,?\s*ET\.?\s*AL\b|\s*\d|\s*$)",
+    re.I,
 )
 _ETAL_RE = re.compile(r"\bet\.?\s*al\b.*$", re.I)
 # Attorney short-code legend (firm codes only — BR/WD status codes excluded so
@@ -275,16 +292,23 @@ class PickensMasterInEquity(BaseScraper):
                     case_m = CASE_RE.search(chunk)
                     if not case_m:
                         continue
-                    addr_m = ADDR_RE.search(chunk)
+                    # Search everything AFTER the case number, never the case
+                    # number text itself -- "2026-CP-39-00559 SOUTH STATE..."
+                    # otherwise lets the case number's own trailing digits
+                    # ("00559") masquerade as the address's house number, with
+                    # the whole caption dragged along as a "street name" until
+                    # the next real suffix match.
+                    region = _LEADING_ATTY_RE.sub("", chunk[case_m.end():])
+                    addr_m = ADDR_RE.search(region)
+                    tms_m = TMS_RE.search(region)
 
                     # Parties + attorney firm from the roster chunk (the sibling
                     # anderson/spartanburg parsers do this; pickens dropped it).
                     plaintiff = defendant = None
-                    region = _LEADING_ATTY_RE.sub("", chunk[case_m.end():])
                     pm = PARTIES_RE.search(region)
                     if pm:
-                        plaintiff = pm.group(1).strip(" ,.") or None
-                        defendant = pm.group(2).strip().split("\n")[0]
+                        plaintiff = re.sub(r"\s+", " ", pm.group(1)).strip(" ,.") or None
+                        defendant = re.sub(r"\s+", " ", pm.group(2)).strip()
                         defendant = _ETAL_RE.sub("", defendant).strip(" ,.") or None
                     atty = None
                     for code, full in ATTORNEY_LEGEND.items():
@@ -310,7 +334,8 @@ class PickensMasterInEquity(BaseScraper):
                             source_url=url,
                             listing_type=ListingType.FORECLOSURE_SALE,
                             property_kind=PropertyKind.UNKNOWN,
-                            street_address=addr_m.group(1) if addr_m else None,
+                            street_address=re.sub(r"\s+", " ", addr_m.group(1)).strip() if addr_m else None,
+                            parcel_id=tms_m.group(1) if tms_m else None,
                             state="SC",
                             county="Pickens",
                             case_number=case_m.group(0),
