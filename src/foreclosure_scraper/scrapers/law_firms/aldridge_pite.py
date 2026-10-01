@@ -65,20 +65,51 @@ def _parse_listings(html: str, url: str, state: str, slug: str) -> list[Listing]
     if not table:
         return []
 
+    # Map columns by header name rather than a fixed position. Live-verified
+    # 2026-10-01: the real header is File Number | Address | City | State |
+    # Zip | County | Date Listed | Current Bid | hf:tax:county — a 9th,
+    # `data-visible="false"` taxonomy-filter column WordPress Posts Table Pro
+    # still server-renders a <td> for. The old code read `cells[-1]` for the
+    # bid, which that hidden trailing column would silently turn into the
+    # bid (reading a taxonomy term as a dollar amount) the next time this
+    # table actually has rows — a latent "silent success" bug, not yet
+    # tripped only because the table is empty right now. It also never read
+    # "Date Listed" at all, so sale_date was always None.
+    header_row = table.css_first("thead tr")
+    header = [th.text(strip=True).lower() for th in header_row.css("th,td")] if header_row else []
+    idx: dict[str, int] = {}
+    for i, h in enumerate(header):
+        if "file" in h: idx.setdefault("file", i)
+        elif "address" in h: idx.setdefault("addr", i)
+        elif "city" in h: idx.setdefault("city", i)
+        elif h == "state": idx.setdefault("state", i)
+        elif "zip" in h: idx.setdefault("zip", i)
+        elif "county" in h and not h.startswith("hf"): idx.setdefault("county", i)
+        elif "date" in h: idx.setdefault("date", i)
+        elif "bid" in h: idx.setdefault("bid", i)
+    # Fallback to the documented positional layout if no thead was found
+    # (defensive only — every live fetch so far has had one).
+    if not idx:
+        idx = {"file": 0, "addr": 1, "city": 2, "state": 3, "zip": 4, "county": 5, "date": 6, "bid": 7}
+
     out: list[Listing] = []
     for tr in table.css("tbody tr"):
         cells = [td.text(strip=True) for td in tr.css("td")]
-        if len(cells) < 6:
+        if len(cells) <= max(idx.values(), default=0):
             continue
-        # Column layout (verified 2026-04 NC): File# | Address | City | State | Zip | County | Sale Date | Bid
-        # Different page versions vary; try positional then keyword-fallback.
-        file_no = cells[0] if len(cells) > 0 else ""
-        addr = cells[1] if len(cells) > 1 else ""
-        city = cells[2] if len(cells) > 2 else ""
-        state_cell = cells[3] if len(cells) > 3 else state
-        zip_code = cells[4] if len(cells) > 4 else ""
-        county = cells[5] if len(cells) > 5 else ""
-        bid_raw = cells[-1]  # Bid is always last column
+
+        def cell(key: str) -> str:
+            i = idx.get(key)
+            return cells[i] if i is not None and i < len(cells) else ""
+
+        file_no = cell("file")
+        addr = cell("addr")
+        city = cell("city")
+        state_cell = cell("state") or state
+        zip_code = cell("zip")
+        county = cell("county")
+        bid_raw = cell("bid")
+        date_raw = cell("date")
         if not addr or not file_no:
             continue
 
@@ -89,6 +120,17 @@ def _parse_listings(html: str, url: str, state: str, slug: str) -> list[Listing]
                 bid = float(bm.group(1).replace(",", ""))
             except ValueError:
                 pass
+
+        sale_date = None
+        if date_raw:
+            try:
+                sale_date = datetime.fromisoformat(date_raw)
+            except ValueError:
+                try:
+                    from dateutil import parser as dateparser
+                    sale_date = dateparser.parse(date_raw)
+                except (ValueError, TypeError, OverflowError):
+                    sale_date = None
 
         out.append(
             Listing(
@@ -102,10 +144,12 @@ def _parse_listings(html: str, url: str, state: str, slug: str) -> list[Listing]
                 zip_code=zip_code or None,
                 county=(county or "").replace(" County", "") or None,
                 case_number=file_no or None,
+                sale_date=sale_date,
                 opening_bid=bid,
                 description=f"Aldridge Pite trustee sale — file {file_no}",
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),
+                raw={"aldridge_pite": {"date_listed_raw": date_raw or None}},
             )
         )
     return out

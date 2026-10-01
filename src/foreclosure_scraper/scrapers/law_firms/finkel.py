@@ -172,7 +172,7 @@ class Finkel(BaseScraper):
         out: list[Listing] = []
         for url in PDF_URLS:
             try:
-                data = await get_bytes(url, timeout=60.0)
+                data = await get_bytes(url, timeout=60.0, impersonate=True)
             except Exception:
                 continue
             text = _extract_pdf_text(data)

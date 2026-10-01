@@ -51,25 +51,12 @@ def _money(s: str) -> float | None:
         return None
 
 
-class IngleFirm(BaseScraper):
-    slug = "law_firms.ingle_firm"
-    name = "The Ingle Firm (NC trustee)"
-    category = "law_firm"
-    expected_min_count = 0
-    timeout_s = 120.0
-
-    async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
-        try:
-            async with client(timeout=40.0, follow_redirects=True) as c:
-                r = await c.get(URL, headers={"User-Agent": "Mozilla/5.0"})
-        except Exception:
-            return []
-        if r.status_code != 200:
-            return []
-
-        tree = HTMLParser(r.text)
-        for table in tree.css("table"):
+def _parse_html(html: str, slug: str) -> list[Listing]:
+    out: list[Listing] = []
+    if not html:
+        return out
+    tree = HTMLParser(html)
+    for table in tree.css("table"):
             rows = table.css("tr")
             if not rows:
                 continue
@@ -91,9 +78,21 @@ class IngleFirm(BaseScraper):
                 if len(cells) < max(idx.values(), default=0) + 1:
                     continue
 
+                # This docket is MULTI-STATE (confirmed live 2026-10-01: AL rows
+                # mixed in with NC), and the County cell is always "County, ST".
+                # Several in-scope NC county NAMES collide with real counties in
+                # other states this firm also covers (Rutherford County TN, Polk
+                # County GA/TN, Lincoln County GA/TN/MS, Henderson County TN,
+                # Burke/Mitchell County GA) — matching on the bare county name
+                # alone would silently relabel an out-of-state property as NC.
+                # Require the cell's own state suffix to actually be NC first.
                 county_raw = cells[idx.get("county", 0)]
-                county = re.sub(r",?\s*NC$", "", county_raw, flags=re.I).strip()
-                if county.lower() not in IN_SCOPE:
+                cm = re.match(r"^(.*?),\s*([A-Za-z]{2})\s*$", county_raw)
+                if cm:
+                    county, row_state = cm.group(1).strip(), cm.group(2).upper()
+                else:
+                    county, row_state = county_raw.strip(), "NC"  # no suffix: assume NC (legacy shape)
+                if row_state != "NC" or county.lower() not in IN_SCOPE:
                     continue
 
                 case = cells[idx["case"]] if "case" in idx else ""
@@ -126,7 +125,7 @@ class IngleFirm(BaseScraper):
 
                 out.append(
                     Listing(
-                        source=self.slug,
+                        source=slug,
                         source_url=URL,
                         listing_type=ListingType.FORECLOSURE_SALE,
                         property_kind=PropertyKind.UNKNOWN,
@@ -143,4 +142,22 @@ class IngleFirm(BaseScraper):
                         raw={"ingle_firm": {"county_raw": county_raw, "bid_raw": cells[idx["bid"]] if "bid" in idx else None}},
                     )
                 )
-        return out
+    return out
+
+
+class IngleFirm(BaseScraper):
+    slug = "law_firms.ingle_firm"
+    name = "The Ingle Firm (NC trustee)"
+    category = "law_firm"
+    expected_min_count = 0
+    timeout_s = 120.0
+
+    async def fetch(self) -> Iterable[Listing]:
+        try:
+            async with client(timeout=40.0, follow_redirects=True) as c:
+                r = await c.get(URL, headers={"User-Agent": "Mozilla/5.0"})
+        except Exception:
+            return []
+        if r.status_code != 200:
+            return []
+        return _parse_html(r.text, self.slug)

@@ -466,26 +466,123 @@ async def get_text(
         raise
 
 
-async def get_bytes(url: str, *, timeout: float = 60.0) -> bytes:
-    """GET raw bytes (images/PDFs), with the same transient-error retry as text."""
+async def _impersonate_fetch_bytes(
+    url: str,
+    *,
+    timeout: float,
+    headers: dict | None,
+    referer: str | None,
+    impersonate: str,
+) -> bytes:
+    """Byte-returning twin of `_impersonate_fetch` — same curl-cffi Chrome
+    JA3/TLS fingerprint tier, for PDFs/binary downloads a WAF blocks on the
+    plain-httpx handshake (e.g. a Cloudflare-fronted PDF link)."""
+    from curl_cffi.requests import AsyncSession  # local import: keep dep optional
+
+    h = dict(DEFAULT_HEADERS)
+    if headers:
+        h.update(headers)
+    if referer:
+        h["Referer"] = referer
+    proxy = os.environ.get("PROXY_URL") or None
+    proxies = {"http": proxy, "https": proxy} if proxy else None
+
+    await _throttle(_host_of(url))
+    async with AsyncSession() as s:
+        r = await s.get(
+            url,
+            headers=h,
+            impersonate=impersonate,
+            timeout=timeout,
+            proxies=proxies,
+            allow_redirects=True,
+        )
+        if r.status_code == 406:
+            h2 = dict(h)
+            h2["Accept"] = "*/*"
+            r = await s.get(
+                url, headers=h2, impersonate=impersonate, timeout=timeout,
+                proxies=proxies, allow_redirects=True,
+            )
+    code = r.status_code
+    if code in _BLOCK_CODES or 500 <= code < 600:
+        holder = _block_holder.get()
+        if holder is not None:
+            reason = ("rate-limited" if code == 429
+                      else "blocked/forbidden" if code in (401, 403, 406, 409)
+                      else "server error / possible WAF")
+            holder.append((code, f"HTTP {code} ({reason}) from {_host_of(url)} [impersonate]"))
+        raise RuntimeError(f"impersonate got {code} for {url}")
+    if code >= 400:
+        raise RuntimeError(f"impersonate got {code} for {url}")
+    return r.content
+
+
+async def get_bytes_impersonate(
+    url: str,
+    *,
+    timeout: float = 60.0,
+    headers: dict | None = None,
+    referer: str | None = None,
+    impersonate: str = "chrome",
+) -> bytes:
+    """GET raw bytes via the curl-cffi browser-impersonation tier only, with retry.
+
+    Use directly when a host is known to need a real TLS fingerprint. For the
+    automatic plain->impersonate escalation, prefer `get_bytes(..., impersonate=True)`.
+    """
     async for attempt in AsyncRetrying(
         stop=stop_after_attempt(3),
         wait=wait_exponential_jitter(initial=1, max=10),
-        retry=retry_if_exception_type(
-            (httpx.TransportError, httpx.HTTPStatusError, httpx.TimeoutException)
-        ),
         reraise=True,
     ):
         with attempt:
-            async with client(timeout=timeout) as c:
-                r = await c.get(url)
-                if r.status_code in (429, 500, 502, 503, 504):
-                    raise httpx.HTTPStatusError(
-                        f"transient {r.status_code}", request=r.request, response=r
-                    )
-                r.raise_for_status()
-                return r.content
+            return await _impersonate_fetch_bytes(
+                url, timeout=timeout, headers=headers,
+                referer=referer, impersonate=impersonate,
+            )
     raise RuntimeError("unreachable")
+
+
+async def get_bytes(url: str, *, timeout: float = 60.0, impersonate: bool = False) -> bytes:
+    """GET raw bytes (images/PDFs), with the same transient-error retry as text.
+
+    Pass ``impersonate=True`` to escalate to the curl-cffi Chrome-fingerprint
+    tier (see `get_text`'s docstring) when plain httpx gets a block code
+    (401/403/406/409/429) — e.g. a Cloudflare-fronted PDF link. Default is
+    False so every existing plain-httpx caller is unchanged.
+    """
+    host = _host_of(url)
+    if impersonate and host is not None and host in _impersonate_hosts:
+        return await get_bytes_impersonate(url, timeout=timeout)
+
+    try:
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=10),
+            retry=retry_if_exception_type(
+                (httpx.TransportError, httpx.HTTPStatusError, httpx.TimeoutException)
+            ),
+            reraise=True,
+        ):
+            with attempt:
+                async with client(timeout=timeout) as c:
+                    r = await c.get(url)
+                    if r.status_code in (429, 500, 502, 503, 504):
+                        raise httpx.HTTPStatusError(
+                            f"transient {r.status_code}", request=r.request, response=r
+                        )
+                    r.raise_for_status()
+                    return r.content
+        raise RuntimeError("unreachable")
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code if exc.response is not None else None
+        if not (impersonate and (code in _BLOCK_CODES)):
+            raise
+        log.info("get_bytes.escalate_impersonate", host=host, code=code)
+        if host:
+            _impersonate_hosts.add(host)
+        return await get_bytes_impersonate(url, timeout=timeout)
 
 
 async def get_wayback_text(url: str, *, timeout: float = 45.0) -> str | None:

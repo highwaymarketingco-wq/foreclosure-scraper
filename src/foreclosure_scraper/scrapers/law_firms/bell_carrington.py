@@ -18,6 +18,12 @@ from ...base_scraper import BaseScraper
 from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
+# The "Notes" column sometimes carries the real court case number for NC rows
+# (e.g. "26SP000141-280") rather than a free-text note — live-verified
+# 2026-10-01. When it matches, promote it to case_number instead of only
+# description, same as every other law_firms.* scraper.
+CASE_NO_RE = re.compile(r"^\d{2}SP\d{5,7}-\d{2,4}$")
+
 CSV_URL = (
     "https://docs.google.com/spreadsheets/d/e/"
     "2PACX-1vSIUFqSQg76o_XFa1uQePxCuubohTs9JG4ptdzpR7dqTZj1JwkjracxTF9IPqqPExAADyxzuWS8teaD"
@@ -77,6 +83,8 @@ class BellCarrington(BaseScraper):
                 except ValueError:
                     pass
 
+            case_number = notes if (notes and CASE_NO_RE.match(notes)) else None
+
             out.append(
                 Listing(
                     source=self.slug,
@@ -90,8 +98,9 @@ class BellCarrington(BaseScraper):
                     county=county or None,
                     sale_date=sale_date,
                     opening_bid=bid,
+                    case_number=case_number,
                     trustee="Bell Carrington Price & Gregg",
-                    description=notes[:300] or None,
+                    description=None if case_number else (notes[:300] or None),
                     first_seen=datetime.utcnow(),
                     last_seen=datetime.utcnow(),
                 )
