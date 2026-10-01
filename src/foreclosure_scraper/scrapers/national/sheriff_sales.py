@@ -21,6 +21,37 @@ Robots.txt is checked per host; if disallowed, that county is skipped
 (fail-closed compliance — never query a robots-banned path).
 
 Listing type: SHERIFF_SALE.
+
+CONFIRMED-LIVE FALSE-POSITIVE BUG, FOUND AND FIXED 2026-10-01 (the "silent
+success" failure mode CLAUDE.md warns about: a believable, non-zero count
+that is simply wrong). `_fetch_county`'s sub-page crawl decided whether to
+follow a link by checking `("sale", "auction", "foreclosure", "pending",
+"sheriff") in href.lower()` against the FULL href -- but every single page
+on sheriffclevelandcounty.com contains "sheriff" as a substring of its own
+HOSTNAME, so that check matched literally every link on the site (verified
+live: 60 unrelated URLs matched on one page, including a LinkedIn
+share-article link for an unrelated felony drug-arrest press release, the
+Facebook page, an App Store listing, concealed-carry-permit and funeral-
+escort forms). The generic text-block fallback parser then ran over
+"careers", "crimestoppers", "missing-persons", "fallen-heroes", and
+"sex-offender-registry" and pattern-matched the department's own street
+address and random digits out of unrelated boilerplate as if they were
+sale listings. Live result before the fix: 6 fabricated "Cleveland County"
+Listings, none of them real. The county's ACTUAL, correctly-published state
+(verified live via its own PDF, `.../uploads/2025/05/No-Public-Auction-8.5-
+x-11-in.pdf`, which says literally "NO PUBLIC AUCTION at this time") is
+ZERO -- `expected_min_count = 0` already allows for this, so the right fix
+is to stop fabricating rows, not to find something to report.
+
+Fixed two ways: (1) the sub-page keyword check now runs against the URL
+PATH only (host stripped) and skips non-HTML file extensions (pdf/jpg/png/
+...), so it can no longer match on the domain name itself; (2) the
+free-text fallback parser in all three county parsers now also requires an
+explicit sale-context phrase (_SALE_CONTEXT_RE: "sheriff sale", "public
+auction", "execution sale", "foreclosure sale", "notice of sale", "pending
+sale(s)") inside the same text block before treating an address/case-number
+match as a real listing, so an unrelated page with a stray address or
+docket-shaped number can no longer manufacture a fake sale.
 """
 from __future__ import annotations
 
@@ -77,6 +108,17 @@ _ADDR_RE = re.compile(
     re.I,
 )
 _UPSET_BID_RE = re.compile(r"upset\s+bid", re.I)
+#: Required before the free-text fallback parser will treat an address/
+#: case-number match as a real sale listing — see the module docstring's
+#: 2026-10-01 false-positive writeup for why this guard exists.
+_SALE_CONTEXT_RE = re.compile(
+    r"sheriff'?s?\s+sale|public\s+auction|execution\s+sale|foreclosure\s+sale|"
+    r"notice\s+of\s+sale|pending\s+sales?|civil\s+sale",
+    re.I,
+)
+#: File extensions that are never worth HTML-parsing as a sub-page (a PDF
+#: fed through HTMLParser produces no real rows, just wasted fetches).
+_NON_HTML_EXT = (".pdf", ".jpg", ".jpeg", ".png", ".gif", ".doc", ".docx", ".xls", ".xlsx")
 
 
 def _parse_money(text: str | None) -> float | None:
@@ -347,6 +389,10 @@ def _parse_brunswick(html: str, source_url: str) -> list[Listing]:
             text = el.text(strip=True)
             if not text or len(text) < 15:
                 continue
+            # 2026-10-01: require explicit sale-context phrasing in the same
+            # text block -- see module docstring's false-positive writeup.
+            if not _SALE_CONTEXT_RE.search(text):
+                continue
             addr = _extract_address(text)
             case = _extract_case_number(text)
             if not addr and not case:
@@ -405,6 +451,10 @@ def _parse_charleston(html: str, source_url: str) -> list[Listing]:
         for el in tree.css("p, div.sale, div.listing, div.content div"):
             text = el.text(strip=True)
             if not text or len(text) < 20:
+                continue
+            # 2026-10-01: require explicit sale-context phrasing in the same
+            # text block -- see module docstring's false-positive writeup.
+            if not _SALE_CONTEXT_RE.search(text):
                 continue
             addr = _extract_address(text)
             case = _extract_case_number(text)
@@ -465,6 +515,10 @@ def _parse_cleveland(html: str, source_url: str) -> list[Listing]:
         for el in tree.css("p, li, div.entry, div.auction, div.content div, article"):
             text = el.text(strip=True)
             if not text or len(text) < 15:
+                continue
+            # 2026-10-01: require explicit sale-context phrasing in the same
+            # text block -- see module docstring's false-positive writeup.
+            if not _SALE_CONTEXT_RE.search(text):
                 continue
             addr = _extract_address(text)
             case = _extract_case_number(text)
@@ -532,17 +586,28 @@ async def _fetch_county(
         log.info("sheriff_sales.empty_html", county=county, url=url)
         return []
 
-    # Also follow links to sub-pages that may contain sale listings
+    # Also follow links to sub-pages that may contain sale listings.
+    # BUG FIXED 2026-10-01: this used to check the keyword list against the
+    # FULL href, but every page on e.g. sheriffclevelandcounty.com contains
+    # "sheriff" as a substring of its own hostname -- that matched literally
+    # every link on the site (see module docstring). Check the PATH only
+    # (host stripped) and skip non-HTML files (a PDF fed through HTMLParser
+    # yields nothing real and is a wasted fetch).
     tree = HTMLParser(html)
     sub_urls: list[str] = [url]
     for a in tree.css("a[href]"):
         href = a.attributes.get("href", "")
         if not href:
             continue
-        href_lower = href.lower()
-        if any(kw in href_lower for kw in
-               ("sale", "auction", "foreclosure", "pending", "sheriff")):
-            full = urljoin(base_url, href)
+        full = urljoin(base_url, href)
+        try:
+            path_lower = httpx.URL(full).path.lower()
+        except Exception:
+            continue
+        if path_lower.endswith(_NON_HTML_EXT):
+            continue
+        if any(kw in path_lower for kw in
+               ("sale", "auction", "foreclosure", "pending", "civil")):
             if full not in sub_urls:
                 sub_urls.append(full)
 
