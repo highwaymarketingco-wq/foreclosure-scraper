@@ -28,7 +28,7 @@ QUERY_URL = (
 _WHERE = "UPPER(ownname) LIKE '%DECEASED%' OR UPPER(ownname2) LIKE '%DECEASED%'"
 _OUT = ("parno,ownname,ownname2,mailadd,mcity,mstate,mzip,siteadd,scity,sstate,szip,"
         "improvval,landval,parval,parvaltype,gisacres,struct,parusedesc,structyear,"
-        "sourceref,saledatetx")
+        "sourceref,saledatetx,legdecfull")
 _PAGE = 2000
 
 
@@ -144,6 +144,12 @@ class McDowellProbate(BaseScraper):
                             "deed_book_page": (a.get("sourceref") or "").strip() or None,
                             "last_sale_date": (a.get("saledatetx") or "").strip() or None,
                             "parcel_use": use or None,
+                            # 2026-10-01: live-verified legdecfull (Full Legal
+                            # Description) populated on 65% (268/414) of
+                            # deceased-owner parcels in this layer and was
+                            # previously dropped. Valuable when siteadd is
+                            # vague/missing (e.g. "HWY 221 OFF").
+                            "legal_description": (a.get("legdecfull") or "").strip() or None,
                         }},
                     ))
                 got = len(feats)
