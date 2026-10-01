@@ -364,18 +364,35 @@ class CherokeeDelinquentTaxScraper(BaseScraper):
                 continue
             seen.add(tms)
 
+            # Audited 2026-10-01: owner_name and street_address were never
+            # set here even though both are already correctly parsed --
+            # owner only reached `defendant` (owner_name is the field most
+            # enrichers across this codebase read, e.g. the name->parcel
+            # resolver, skip-trace, GIS backfill; defendant alone is not a
+            # universal substitute), and `description` (which the module's
+            # own docstring example shows IS the situs, e.g. "946 N LOGAN
+            # ST") was only kept in raw. Live-verified before the fix:
+            # 0/528 rows had owner_name or street_address despite both being
+            # correctly parsed into the row dict already. Not every
+            # description is house-number-led (e.g. "GREEN ST", "W BIRNIE
+            # ST" for a lot with no visible number), so this does not gate
+            # on a leading digit -- Spartanburg's FLC list audit this same
+            # session found that guard incorrectly nulls real situs text.
+            desc = row.get("description")
             yield Listing(
                 source=self.slug,
                 source_url=WP_MEDIA_URL,
                 county="Cherokee",
                 state="SC",
                 parcel_id=tms,
+                owner_name=owner,
                 defendant=owner,
+                street_address=desc,
                 listing_type=ListingType.TAX_SALE,
                 property_kind=PropertyKind.UNKNOWN,
                 raw={
                     "sale_type": "delinquent_tax",
-                    "description": row.get("description"),
+                    "description": desc,
                     "item_number": row.get("item"),
                 },
             )
