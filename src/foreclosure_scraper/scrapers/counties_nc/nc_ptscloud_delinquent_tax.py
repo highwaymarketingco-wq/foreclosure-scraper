@@ -107,6 +107,49 @@ def _money(v) -> float | None:
 # numeric and treat it as acreage. Anything non-numeric (blank, "0", junk) -> None.
 _ACRES_RE = re.compile(r"([0-9]+(?:\.[0-9]+)?)")
 
+# PARCEL_NUM is usually a Farragut-internal sequence number that genuinely stays
+# stable for ONE physical property across tax years (live-verified: Madison's
+# "183" ties 14 years of bills to the same owner + the same embedded PIN). But
+# at least one tenant exports a literal "0" for any bill whose internal parcel
+# link was never backfilled -- not a real parcel number (no property's parcel
+# id is zero) -- and live-pulling Hyde's current export found 532 DISTINCT
+# properties (different owners, different legal descriptions) sharing that one
+# value. The old code used PARCEL_NUM as both the aggregation key AND the
+# published parcel_id, so those 532 real delinquent-tax leads were silently
+# collapsing into a single Listing (531 destroyed, not just a dropped field).
+# DESCRIPTION is the field that actually stays per-property and stable across
+# years on these rows (live-verified: the same owner+description recurs across
+# up to 13 tax years for one real Hyde parcel), so it stands in for identity
+# whenever PARCEL_NUM is this placeholder.
+_PLACEHOLDER_PARCELS = {"0"}
+
+# "PIN: 09706955900" embedded in DESCRIPTION is the real county GIS parcel
+# identifier -- far more useful for cross-source parcel matching than
+# Farragut's own internal sequence number -- so prefer it for the PUBLISHED
+# parcel_id whenever it is present, on every row, not only placeholder ones.
+_PIN_IN_DESC_RE = re.compile(r"\bPIN:\s*([0-9]{5,20})\b", re.I)
+
+
+def _row_identity(parcel: str, description: str) -> tuple[str, str]:
+    """(aggregation_key, parcel_id_to_publish) for one delinquent-tax row.
+
+    aggregation_key is what multi-year bills on the same real property are
+    summed under. parcel_id_to_publish is what reaches the Listing. A real,
+    non-placeholder PARCEL_NUM is kept as the aggregation key (it already
+    correctly ties multi-year bills together -- do not disturb working
+    behavior), but a cleaner embedded GIS PIN is still preferred for display
+    when one exists. A placeholder PARCEL_NUM falls back to DESCRIPTION (or
+    the embedded PIN, when the placeholder row happens to carry one) for BOTH,
+    so distinct properties stop colliding.
+    """
+    pin_m = _PIN_IN_DESC_RE.search(description or "")
+    pin = pin_m.group(1) if pin_m else None
+    if parcel in _PLACEHOLDER_PARCELS:
+        desc_key = (description or "").strip()
+        key = pin or desc_key or parcel
+        return key, (pin or desc_key or parcel)
+    return parcel, (pin or parcel)
+
 
 def _acres(v) -> float | None:
     m = _ACRES_RE.search(str(v or ""))
@@ -187,8 +230,9 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
     if "\x00" in text:
         text = text.replace("\x00", "")
     rows = list(csv.DictReader(io.StringIO(text)))
-    # Aggregate REI rows by parcel: sum amount owed across tax years, keep the
-    # latest year + the richest owner/assess/mailing snapshot.
+    # Aggregate REI rows by parcel identity: sum amount owed across tax years,
+    # keep the latest year + the richest owner/assess/mailing snapshot. The
+    # identity key is NOT always the raw PARCEL_NUM -- see _row_identity.
     agg: dict[str, dict] = {}
     for r in rows:
         if (r.get("BILL_TYPE") or "").strip().upper() != "REI":
@@ -199,16 +243,22 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
         owed = _money(r.get("TOTAL_DUE_AMOUNT"))
         if not owed:
             continue
-        a = agg.setdefault(parcel, {"owed": 0.0, "year": "", "row": r})
+        description_raw = (r.get("DESCRIPTION") or "").strip()
+        identity_key, parcel_id = _row_identity(parcel, description_raw)
+        if not identity_key:
+            continue
+        a = agg.setdefault(identity_key, {"owed": 0.0, "year": "", "row": r,
+                                           "parcel_id": parcel_id, "parcel_raw": parcel})
         a["owed"] += owed
         yr = (r.get("TAX_YEAR") or "").strip()
         if yr >= a["year"]:
-            a["year"], a["row"] = yr, r
+            a["year"], a["row"], a["parcel_id"], a["parcel_raw"] = yr, r, parcel_id, parcel
 
     out: list[Listing] = []
     now = datetime.utcnow()
-    for parcel, a in agg.items():
+    for _identity_key, a in agg.items():
         r = a["row"]
+        parcel = a["parcel_id"]
         owner = _clean_owner(r.get("OWNER_NAME"))
         assessed = _money(r.get("ABSTRACT_ASSESS_VALUE"))
         legal = (r.get("DESCRIPTION") or "").strip() or None
@@ -256,6 +306,9 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
                 "nc_ptscloud_delinquent_tax": {
                     "tenant": tenant,
                     "parcel": parcel,
+                    # raw Farragut PARCEL_NUM before the placeholder/PIN substitution
+                    # above -- kept for provenance even when `parcel` differs from it.
+                    "parcel_raw": a.get("parcel_raw"),
                     # back-tax OWED (summed across years) -> tax_owed, NOT value
                     "principal_tax_due": round(a["owed"], 2),
                     "assessed_value": assessed,
