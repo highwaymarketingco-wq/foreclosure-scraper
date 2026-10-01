@@ -1,7 +1,7 @@
 {
  "schema": "board-manifest-v1",
- "written_at": "2026-10-01T15:30:04.352406Z",
- "run_time": "2026-10-01T15:30:03.638856Z",
+ "written_at": "2026-10-01T15:46:55.319239Z",
+ "run_time": "2026-10-01T15:46:54.599734Z",
  "count": 219143,
  "detail_count": 219143,
  "slim_count": 217773,
@@ -14,8 +14,8 @@
  },
  "files": {
   "listings.json": {
-   "bytes": 2526345296,
-   "sha256": "8dd8ceecc0005aecfac1ec430914e48d21f86139889b85a69d0375f6a77cba30",
+   "bytes": 2526568465,
+   "sha256": "0b991abd2c95563832bdac33e96645eeabe627aafd1f873bea499d11367186fe",
    "records": 219143
   },
   "listings_detail.json": {
@@ -39,19 +39,19 @@
    "records": 217773
   },
   "run_meta.json": {
-   "bytes": 32545,
-   "sha256": "e63b09f39121df754245c1e60fdb09416aeeac858d290b612040ef136668b97c"
+   "bytes": 32544,
+   "sha256": "abf74d3978694231d169642c999c5618b663b6a5d7b66a557e33f9c406f4a203"
   },
   "listings_part_000.json.gz": {
-   "bytes": 12265844,
-   "sha256": "4b1fd5f6cfc262e0b420a61b50a5c04f13d5616945de5ba0d26e1d84808c9164",
+   "bytes": 12271086,
+   "sha256": "cc9d19a656d23939d8cbcef00324471f9a7d6f4e863894f9447ca1ad754a4f20",
    "records": 9500,
    "start": 0,
    "end": 9500
   },
   "listings_part_001.json.gz": {
-   "bytes": 8286044,
-   "sha256": "151bb9e6cf65aaf9a72a2eba5dee313bb4aa4b98950a1955e921ad904a4ba0df",
+   "bytes": 8286512,
+   "sha256": "d19e1515df4922cb7a29c55618f4da1de289f08c132b6ee9112de77893812294",
    "records": 9500,
    "start": 9500,
    "end": 19000
@@ -1095,16 +1095,16 @@
     "start": 0,
     "end": 9500,
     "records": 9500,
-    "bytes": 12265844,
-    "sha256": "4b1fd5f6cfc262e0b420a61b50a5c04f13d5616945de5ba0d26e1d84808c9164"
+    "bytes": 12271086,
+    "sha256": "cc9d19a656d23939d8cbcef00324471f9a7d6f4e863894f9447ca1ad754a4f20"
    },
    {
     "name": "listings_part_001.json.gz",
     "start": 9500,
     "end": 19000,
     "records": 9500,
-    "bytes": 8286044,
-    "sha256": "151bb9e6cf65aaf9a72a2eba5dee313bb4aa4b98950a1955e921ad904a4ba0df"
+    "bytes": 8286512,
+    "sha256": "d19e1515df4922cb7a29c55618f4da1de289f08c132b6ee9112de77893812294"
    },
    {
     "name": "listings_part_002.json.gz",
