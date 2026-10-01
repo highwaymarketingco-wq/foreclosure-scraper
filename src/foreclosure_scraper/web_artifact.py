@@ -405,6 +405,14 @@ BOARD_PATCH_MAX_SOURCE_MB = 2300.0
 # only raised after real supervised runs, never on reasoning alone.
 BOARD_MERGE_MAX_SOURCE_MB = 2300.0
 
+# The delete-only counterpart of BOARD_MERGE_MAX_SOURCE_MB, for delete_rows() (task_board_dedupe_
+# stream, 2026-10-01): removing a SMALL, KNOWN set of rows by row_identity_hash() (no fold, no
+# Listing.merge(), not even Listing.model_validate() for the dropped rows -- a match is simply
+# never re-emitted) is at least as cheap per untouched row as merge_duplicate_rows(), which this
+# inherits its ceiling from unchanged -- same "argument, not a measurement" caveat as
+# BOARD_MERGE_MAX_SOURCE_MB's own comment: raise only after a real measured trial.
+BOARD_DELETE_MAX_SOURCE_MB = 2300.0
+
 # run_meta health older than this is nulled (audit O4).
 HEALTH_MAX_AGE_HOURS = 48.0
 
@@ -1431,6 +1439,41 @@ def _raise_if_board_too_large_to_merge(docs: Path) -> None:
         f"board's size, and this board is over its ceiling. BOARD_MERGE_ALLOW_LARGE=1 overrides "
         f"for one supervised run; BOARD_MERGE_MAX_SOURCE_MB raises the ceiling once a larger "
         f"size is measured safe on this machine."
+    )
+
+
+def board_delete_size_state(docs_dir: Path | str, *, max_mb: float | None = None) -> dict:
+    """Would delete_rows() be safe to run against this board, judging ONLY by its on-disk size --
+    the delete-only counterpart of board_merge_size_state(), against BOARD_DELETE_MAX_SOURCE_MB's
+    own ceiling. Same shape as the other four: {source_mb, max_mb, ok, reason}; source_mb is None
+    when no board was found (treated as ok -- nothing to delete from yet)."""
+    n = _board_source_bytes(Path(docs_dir))
+    limit = float(max_mb if max_mb is not None
+                  else os.environ.get("BOARD_DELETE_MAX_SOURCE_MB", BOARD_DELETE_MAX_SOURCE_MB))
+    if n is None:
+        return {"source_mb": None, "max_mb": limit, "ok": True, "reason": ""}
+    source_mb = n / (1024 * 1024)
+    ok = source_mb <= limit
+    reason = "" if ok else f"board source is {source_mb:.0f} MB, over the {limit:.0f} MB ceiling"
+    return {"source_mb": source_mb, "max_mb": limit, "ok": ok, "reason": reason}
+
+
+def _raise_if_board_too_large_to_delete(docs: Path) -> None:
+    """The delete-only counterpart of _raise_if_board_too_large_to_merge(): called eagerly by
+    delete_rows() before it does any work. BOARD_DELETE_ALLOW_LARGE=1 overrides for one run;
+    BOARD_DELETE_MAX_SOURCE_MB (see its comment above BOARD_MERGE_MAX_SOURCE_MB) is the ceiling."""
+    if os.environ.get("BOARD_DELETE_ALLOW_LARGE", "").strip().lower() in ("1", "true", "yes"):
+        return
+    size_state = board_delete_size_state(docs)
+    if size_state["ok"]:
+        return
+    log.error("board.delete_too_large", **size_state, docs_dir=str(docs))
+    raise BoardLoadTooLarge(
+        f"delete_rows refused to load {docs}: {size_state['reason']}. delete_rows is measurably "
+        f"cheap per untouched row (see BOARD_DELETE_MAX_SOURCE_MB's comment) but is still "
+        f"proportional to the existing board's size, and this board is over its ceiling. "
+        f"BOARD_DELETE_ALLOW_LARGE=1 overrides for one supervised run; BOARD_DELETE_MAX_SOURCE_MB "
+        f"raises the ceiling once a larger size is measured safe on this machine."
     )
 
 
@@ -5047,5 +5090,300 @@ def merge_duplicate_rows(merge_groups: list[list[str]], summary: dict,
 
     log.info("web_artifact.merged", existing=existing_total, groups=len(merge_groups),
              rows_dropped=rows_dropped, total=total, bytes=listings_path.stat().st_size)
+    stats["written"] = True
+    return stats
+
+
+# ===========================================================================
+# delete_rows: remove a SMALL, KNOWN set of existing board rows entirely -- no survivor, no
+# fold -- without materializing the board (task_board_dedupe_stream, 2026-10-01).
+#
+# THE GAP THIS CLOSES. append_new_rows() adds, patch_existing_rows() mutates a known subset in
+# place, merge_duplicate_rows() folds a known set of duplicate GROUPS into one survivor each --
+# none of the three can remove a row with NO survivor. `daily_api_refresh.py`'s stale-REO prune
+# (`enrichment_reo_freshness.prune_stale_reo`: a property that has sold/left inventory, confirmed
+# by consecutive daily misses against the live feed) is exactly this shape: a row that should
+# simply stop existing, not be folded into anything. Until this function, the only way to drop a
+# row at all was load_board() -> filter -> write_artifact(), the same whole-board materialization
+# every other primitive in this file exists to avoid.
+# ===========================================================================
+
+class BoardDeleteMismatch(RuntimeError):
+    """delete_rows() refused: at least one requested row_identity_hash() did not resolve to
+    EXACTLY one row on the CURRENT board -- not found at all (the board changed since the caller
+    computed `hashes`: a later scrape/patch/append touched the target row, or its
+    row_identity_hash() shifted), or matched MORE than one row (the hash is not unique on this
+    board, or the same row was listed twice).
+
+    Deletion is irreversible (a backup is taken first -- see _count_guard_and_backup -- but
+    nothing in the normal publish path un-deletes a row), so this mirrors
+    BoardMergeGroupMismatch's all-or-nothing refusal exactly, rather than patch_existing_rows()'s
+    "apply the same update to every match" tolerance: a destructive call that cannot tell which
+    single physical row was meant must refuse the WHOLE batch, not guess, and not delete the
+    unambiguous majority while silently skipping the ambiguous few -- a caller that asked to
+    delete 40 stale REO rows and got back "38 deleted, 2 skipped" with no exception has no reason
+    to notice the 2, and a wrong guess here is unrecoverable in a way a wrong patch is not."""
+
+
+def board_delete_hash_fields() -> tuple[str, ...]:
+    """The identity-key type delete_rows() expects: row_identity_hash() (see that function's own
+    docstring for why -- a narrow, stable, "as scraped" field subset, not dedupe_key(), not
+    source_url, not any single field). Exposed as a function (not a re-export of the constant)
+    so a caller introspects the contract without depending on _MERGE_HASH_FIELDS' name."""
+    return _MERGE_HASH_FIELDS
+
+
+def delete_rows(hashes: list[str], summary: dict, docs_dir: Path | str = "docs") -> dict:
+    """Remove a SMALL, KNOWN set of EXISTING board rows entirely -- identified by
+    row_identity_hash(), the SAME narrow "as scraped, rarely revised" content fingerprint
+    merge_duplicate_rows() uses (see that function's docstring for why no single existing field,
+    and no dedupe_key(), is safe to use as a destructive op's identity key) -- WITHOUT
+    materializing the (potentially hundreds of thousands of) other, untouched rows into Listing
+    objects or even a full parsed-dict list.
+
+    HOW. `hashes` is a flat list of row_identity_hash() values, each naming exactly one row to
+    drop. The existing board is streamed EXACTLY ONCE via _iter_board_records() (the same
+    incremental JSON-array decoder append_new_rows()/patch_existing_rows()/merge_duplicate_rows()
+    use). For each row: LAZY_DETAIL_KEYS are popped from `raw` (mirroring every other write
+    path's round-trip, so listings_detail.json stays correct for every row that survives) and
+    row_identity_hash() is computed on the result. A row whose hash is not requested is re-encoded
+    and passed straight through -- untouched, exactly like the other three writers. A row whose
+    hash IS requested is held (not yet dropped, not yet written) until the whole board has been
+    scanned, so every hash's match count is known before anything is decided.
+
+    SAFETY INVARIANT (same all-or-nothing shape as merge_duplicate_rows(), see
+    BoardDeleteMismatch's docstring for why a DESTRUCTIVE op gets this instead of
+    patch_existing_rows()'s "apply to every match" tolerance). Before ANYTHING is written:
+      1. `hashes` itself has no repeats (ValueError otherwise -- a caller bug, the same hash
+         cannot name two different "this one row" deletions).
+      2. After the streaming pass, EVERY requested hash must have matched EXACTLY ONE row. Zero
+         matches or more than one match for the same hash (BoardDeleteMismatch) refuses the
+         ENTIRE call -- no partial delete, nothing written.
+      3. The existing board's streamed row count is checked against the board manifest's own
+         last-sealed record count for listings.json (when a manifest exists), the same
+         corruption check patch_existing_rows()/merge_duplicate_rows() run.
+
+    WHAT THIS DELIBERATELY DOES NOT DO (same reasoning as merge_duplicate_rows(), see its
+    docstring):
+      * Does NOT regenerate listings_slim.json / detail_shards/ -- carried forward unchanged.
+      * Does NOT decide WHICH rows are stale -- that is a separate, caller-owned judgment (e.g.
+        enrichment_reo_freshness.prune_stale_reo's consecutive-miss count). This function only
+        removes rows the caller already named.
+      * The high-water mark IS allowed to move DOWN here, via the same `off_footprint_removed`
+        rebase mechanism merge_duplicate_rows() uses (write_artifact()'s own "this shrink is
+        intentional" plumbing) -- a deletion is definitionally a shrink.
+      * Is gated by its OWN size ceiling, BOARD_DELETE_MAX_SOURCE_MB, separate from the other
+        four -- see that constant's comment for why it currently just inherits
+        BOARD_MERGE_MAX_SOURCE_MB's number pending a dedicated measured trial.
+
+    Returns {existing, requested, matched, deleted, not_found, written, total_after} -- when
+    `hashes` is empty, {existing: None, requested: 0, matched: 0, deleted: 0, not_found: 0,
+    written: False, total_after: None} without touching the board at all. When the board has no
+    rows yet (no listings.json present), every hash is reported `not_found` and nothing is
+    written -- there is nothing to delete FROM.
+
+    Refuses (BoardLockNotHeld) unless the caller holds the board lock, exactly like
+    write_artifact()/append_new_rows()/patch_existing_rows()/merge_duplicate_rows(); refuses
+    (BoardChangedSinceLoad) if listings.json changed since this process last loaded it; refuses
+    (BoardLoadTooLarge) if the existing board is over BOARD_DELETE_MAX_SOURCE_MB
+    (BOARD_DELETE_ALLOW_LARGE=1 overrides for one supervised run); refuses (ValueError) on a
+    `hashes` list with a repeated entry; refuses (BoardDeleteMismatch) if any hash fails to
+    resolve to exactly one row on the current board.
+    """
+    docs = Path(docs_dir)
+    docs.mkdir(parents=True, exist_ok=True)
+    listings_path = docs / "listings.json"
+
+    require_board_lock(docs)
+    _check_not_changed_since_load(listings_path)
+
+    if not hashes:
+        return {"existing": None, "requested": 0, "matched": 0, "deleted": 0, "not_found": 0,
+                "written": False, "total_after": None}
+
+    seen_hashes: set = set()
+    for h in hashes:
+        if h in seen_hashes:
+            raise ValueError(f"delete_rows: identity hash {h!r} appears more than once in "
+                             f"`hashes` -- each row should be named once")
+        seen_hashes.add(h)
+    target_set = set(hashes)
+
+    if not _board_file_present(listings_path):
+        # Nothing to delete FROM. Every hash is unmatched by definition.
+        return {"existing": 0, "requested": len(hashes), "matched": 0, "deleted": 0,
+                "not_found": len(hashes), "written": False, "total_after": 0}
+
+    _raise_if_board_too_large_to_delete(docs)
+
+    # --- ONE streaming pass: untouched rows pass straight through; targets are HELD (not yet
+    # dropped) until the whole board is scanned, so every hash's match count is known first ---
+    row_enc = json.JSONEncoder(ensure_ascii=False, default=str)
+    listing_blobs: list[bytes] = []
+    details: list[dict] = []
+    by_state: collections.Counter = collections.Counter()
+    by_source: collections.Counter = collections.Counter()
+    existing_total = 0
+    found: dict[str, int] = collections.defaultdict(int)   # hash -> match count, targets only
+
+    for rec in _iter_board_records(docs):
+        existing_total += 1
+        raw = rec.get("raw")
+        d: dict = {}
+        if isinstance(raw, dict):
+            for k in LAZY_DETAIL_KEYS:
+                if k in raw:
+                    d[k] = raw.pop(k)
+        h = row_identity_hash(rec) if target_set else None
+        if h in target_set:
+            found[h] += 1
+            continue  # held (and its popped sidecar `d` discarded) -- the row is being deleted
+        by_state[str(rec.get("state") or "").strip() or "unknown"] += 1
+        by_source[str(rec.get("source") or "").strip() or "unknown"] += 1
+        details.append(d)
+        listing_blobs.append(row_enc.encode(rec).encode("utf-8"))
+
+    # --- verify EVERY requested hash resolved to EXACTLY one row before deciding anything ---
+    _missing = [h for h in hashes if found.get(h, 0) == 0]
+    _ambiguous = [h for h in hashes if found.get(h, 0) > 1]
+    if _missing or _ambiguous:
+        raise BoardDeleteMismatch(
+            f"delete_rows refused: {len(_missing)} hash(es) not found, {len(_ambiguous)} "
+            f"hash(es) matched more than one row -- it likely changed since `hashes` was "
+            f"computed (another scrape/patch/append touched a target row, or its "
+            f"row_identity_hash() shifted), or two distinct rows genuinely collide on this "
+            f"narrow hash. Nothing written. Re-derive `hashes` from the current board before "
+            f"retrying. First few missing: {_missing[:5]}; first few ambiguous: {_ambiguous[:5]}"
+        )
+
+    deleted = len(target_set)
+    total = existing_total - deleted
+    assert total == len(listing_blobs) == len(details), (
+        f"delete_rows internal invariant broken: total={total}, "
+        f"len(listing_blobs)={len(listing_blobs)}, len(details)={len(details)}"
+    )
+
+    stats: dict = {
+        "existing": existing_total, "requested": len(hashes), "matched": deleted,
+        "deleted": deleted, "not_found": 0, "written": False, "total_after": total,
+    }
+
+    # --- manifest count check (same corruption guard the other three writers run) ---
+    _manifest_now = load_manifest(docs)
+    if _manifest_now:
+        _expected = ((_manifest_now.get("files") or {}).get("listings.json") or {}).get("records")
+        if isinstance(_expected, int) and existing_total != _expected:
+            raise BoardPatchCountMismatch(
+                f"delete_rows refused: streamed {existing_total:,} rows off {listings_path}, "
+                f"but {docs / MANIFEST_NAME} records {_expected:,} for it. Verify with "
+                f"`scripts/board_manifest.py --verify` before retrying."
+            )
+
+    # --- shared backup-before-overwrite + count guard. The shrink is intentional (this
+    # function's whole job): flagged via off_footprint_removed, same mechanism
+    # merge_duplicate_rows() uses, so the high-water mark can rebase down by exactly this much. ---
+    _summary = dict(summary)
+    _summary["off_footprint_removed"] = int(_summary.get("off_footprint_removed") or 0) + deleted
+    _accepted_intentional = _count_guard_and_backup(docs, listings_path, total, _summary)
+
+    # --- write listings.json + gzipped parts (the SAME low-level writers the other writers use) ---
+    _manifest_pre: dict = {
+        "listings.json": {**_write_plain_array(listings_path, listing_blobs), "records": total},
+    }
+    detail_path = docs / "listings_detail.json"
+    detail_count = len(details)
+    detail_bytes = json.dumps(details, ensure_ascii=False, default=str).encode("utf-8")
+    del details
+    _manifest_pre["listings_detail.json"] = {"bytes": len(detail_bytes),
+                                             "sha256": hashlib.sha256(detail_bytes).hexdigest(),
+                                             "records": detail_count}
+    _atomic_write_bytes(detail_path, detail_bytes)
+    _prior_parts = _bp.manifest_parts_block(_bp.read_manifest(docs)) or {}
+    _parts = _bp.write_parts(docs, listing_blobs, hint_rows=_prior_parts.get("rows_per_part"))
+    _parts_block = _bp.make_block(_parts["entries"], rows_per_part=_parts["rows_per_part"],
+                                  cap=_parts["cap"])
+    del listing_blobs
+    import gzip
+    detail_gz = gzip.compress(detail_bytes, compresslevel=9, mtime=0)
+    _manifest_pre["listings_detail.json.gz"] = {"bytes": len(detail_gz),
+                                                "sha256": hashlib.sha256(detail_gz).hexdigest(),
+                                                "records": detail_count}
+    _atomic_write_bytes(docs / "listings_detail.json.gz", detail_gz)
+    detail_digest = hashlib.sha256(detail_gz).hexdigest()[:16]
+    del detail_gz, detail_bytes
+
+    # --- run_meta.json: same shape the other three writers write ---
+    meta_path = docs / "run_meta.json"
+    prior_meta: dict = {}
+    if meta_path.exists():
+        try:
+            prior_meta = json.loads(meta_path.read_text())
+        except Exception:  # noqa: BLE001 - a corrupt prior file must not block the write
+            prior_meta = {}
+        if not isinstance(prior_meta, dict):
+            prior_meta = {}
+    prior_board_block = prior_meta.get("board")
+    if not isinstance(prior_board_block, dict):
+        prior_board_block = None
+    slim_count = prior_board_block.get("count") if prior_board_block else None
+    shard_meta = prior_board_block.get("detail_shards") if prior_board_block else None
+
+    _now = datetime.utcnow()
+    _now_iso = _now.isoformat() + "Z"
+    meta = dict(prior_meta)
+    meta.update({
+        "run_time": _now_iso,
+        "total": total,
+        "by_state": dict(sorted(by_state.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "by_source_on_board": dict(sorted(by_source.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "notes": summary.get("notes", prior_meta.get("notes", "")),
+        "detail_count": detail_count,
+        "detail_digest": detail_digest,
+        "board_parts": _parts_block,
+    })
+    if summary.get("by_source"):
+        meta["by_source"] = summary["by_source"]
+    if prior_board_block is not None:
+        meta["board"] = prior_board_block
+    _apply_health_freshness(meta, prior_meta, summary, _now_iso, _now)
+    _atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False, default=str, indent=2).encode("utf-8"))
+
+    # --- high-water mark: CAN move down here, via the same rebase mechanism
+    # merge_duplicate_rows() uses for an accepted intentional shrink ---
+    try:
+        _hw_path = docs / "board_highwater.json"
+        _prev_hw = 0
+        if _hw_path.exists():
+            _prev_hw = json.loads(_hw_path.read_text()).get("count", 0)
+        if total > _prev_hw:
+            _atomic_write_bytes(_hw_path, json.dumps({
+                "count": total, "updated_at": _now_iso,
+            }, indent=2).encode("utf-8"))
+            log.info("web_artifact.highwater_updated", old=_prev_hw, new=total)
+        elif _accepted_intentional > 0 and total >= _prev_hw - _accepted_intentional:
+            _atomic_write_bytes(_hw_path, json.dumps({
+                "count": total, "updated_at": _now_iso, "rebased_from": _prev_hw,
+                "reason": f"{_accepted_intentional:,} rows deleted",
+            }, indent=2).encode("utf-8"))
+            log.warning("web_artifact.highwater_rebased", old=_prev_hw, new=total,
+                        rows_deleted=_accepted_intentional)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # THE MANIFEST, last (same reasoning as the other three writers).
+    try:
+        write_manifest(docs, _manifest_pre, meta, slim_count=slim_count, shard_meta=shard_meta,
+                       parts_block=_parts_block)
+    except Exception:  # noqa: BLE001
+        try:
+            (docs / MANIFEST_NAME).unlink(missing_ok=True)
+        except OSError:
+            pass
+        log.error("web_artifact.manifest_failed", exc_info=True)
+    if str(listings_path.resolve()) in _LOAD_STAMPS:
+        _remember_load(docs, listings_path)
+
+    log.info("web_artifact.deleted", existing=existing_total, deleted=deleted, total=total,
+             bytes=listings_path.stat().st_size)
     stats["written"] = True
     return stats

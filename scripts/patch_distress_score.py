@@ -1,114 +1,102 @@
 """Apply the stacked-distress score (HOT/WARM/COLD tiers) to docs/listings.json
-and republish. Pure computation over existing signals — no scraping."""
+and republish. Pure computation over existing signals -- no scraping.
+
+MIGRATED 2026-10-01 (task_board_dedupe_stream) off read_board_json() + a hand-rolled
+path.write_text(json.dumps(data)) + reseal_board(resplit=True) -- the same "manual trap" shape
+already fixed for patch_vision_gemini.py/patch_owner_mailing.py/patch_court_detail.py (see
+docs/HANDOFF.md items 21-25), which this script was explicitly flagged (item 24) as NOT sharing
+in, because distress_score.score_board() groups every listing by parcel key first and scores each
+group from the union of signals across every listing in it -- a whole-board, cross-row operation
+none of the existing per-row-bounded primitives (board_stream.iter_board_rows() +
+patch_existing_rows()) could support UNCHANGED.
+
+board_dedupe_stream.stream_score_board() closes that gap: it runs the REAL, UNMODIFIED
+score_board() -- not a reimplementation -- over a population of LIGHTWEIGHT Listings built by
+streaming the board once (only the ~15 scalar fields and ~33 raw sub-keys scoring actually reads;
+see that module's own docstring for the full design and the grep that produced the whitelist),
+then diffs each row's new distress_stack against the one already published and returns ONLY the
+rows that actually changed, ready for web_artifact.patch_existing_rows(). This script never holds
+the whole board as full Listing objects, and the write at the end is a targeted patch, not a
+whole-file rewrite -- patch_existing_rows() itself regenerates docs/listings.json + the gzipped
+parts + the manifest in one streaming pass, so the separate reseal_board(resplit=True) call this
+script used to need is gone too (patch_existing_rows() already does that job).
+
+Still does NOT publish the slim payload or detail shards (same disclosed gap
+patch_existing_rows() itself has, which this script already lived with before this migration) --
+see the closing message below.
+"""
 from __future__ import annotations
 
-import json
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from foreclosure_scraper.models import Listing, ListingType, PropertyKind
-from foreclosure_scraper.distress_score import score_board
-from foreclosure_scraper.web_artifact import (
-    BoardLockBusy, _to_dict, board_lock, read_board_json,
-)
+from foreclosure_scraper.board_dedupe_stream import stream_score_board
+from foreclosure_scraper.distress_score import ScoreBoardError
+from foreclosure_scraper.web_artifact import BoardLockBusy, board_lock, patch_existing_rows
 
 REPO = Path(__file__).resolve().parent.parent
 
 
-def _hydrate(d: dict) -> Listing | None:
-    fields = {k: v for k, v in d.items() if k in Listing.model_fields}
-    for ef, enum in (("listing_type", ListingType), ("property_kind", PropertyKind)):
-        if isinstance(fields.get(ef), str):
-            try:
-                fields[ef] = enum(fields[ef])
-            except ValueError:
-                fields.pop(ef, None)
-    try:
-        li = Listing.model_validate(fields)
-    except Exception:
-        return None
-    li.raw = d.get("raw") or {}
-    return li
-
-
 def main() -> int:
-    # THE LOCK. This script rewrites docs/listings.json in place, so it is a
-    # board writer like any other and must not run beside one — the loser's
-    # work is silently reverted, with no error anywhere. See
-    # web_artifact.board_lock.
+    # THE LOCK. This script patches docs/listings.json in place, so it is a board writer like
+    # any other and must not run beside one -- the loser's work is silently reverted, with no
+    # error anywhere. See web_artifact.board_lock.
     try:
         with board_lock(REPO, owner="patch_distress_score.py"):
             return _run()
     except BoardLockBusy as exc:
-        print(f"{exc} — skipping.", flush=True)
+        print(f"{exc} -- skipping.", flush=True)
         return 0
 
 
 def _run() -> int:
-    path = Path("docs/listings.json")
-    # read_board_json, not json.loads: on a fresh clone (or any checkout where
-    # the >100MB uncompressed twin has not been rebuilt) only the committed
-    # listings.json.gz exists, and reading the plain path raises there.
-    data = read_board_json(path)
-    listings, by_id = [], {}
-    for d in data:
-        li = _hydrate(d)
-        if li:
-            listings.append(li)
-            by_id[id(li)] = d
-    hist = score_board(listings)
-    print(f"[{time.strftime('%H:%M:%S')}] tiers: {hist}", flush=True)
+    docs = REPO / "docs"
+    try:
+        result = stream_score_board(docs)
+    except ScoreBoardError as exc:
+        # Never leave a partially-scored board on disk: score_board()'s own convention (mirrored
+        # by daily_api_refresh.py/main.py) is that a scoring failure aborts the write entirely.
+        print(f"[{time.strftime('%H:%M:%S')}] SCORE_BOARD_FAILED: {exc} -- not patching.",
+              flush=True)
+        return 6
 
-    for li in listings:
-        by_id[id(li)]["raw"] = _to_dict(li)["raw"]
+    print(f"[{time.strftime('%H:%M:%S')}] scanned {result['scanned']:,} rows "
+          f"({result['skipped']} unparseable skipped) | tiers: {result['tiers']}", flush=True)
+    if result["dropped_key_collisions"]:
+        print(f"  dropped {result['dropped_key_collisions']} dedupe_key collision(s) "
+              f"(ambiguous across >1 board row -- never guessed)", flush=True)
 
-    path.write_text(json.dumps(data, ensure_ascii=False, default=str), encoding="utf-8")
-    hot = sum(1 for x in data if (x.get("raw") or {}).get("distress_stack", {}).get("tier") == "HOT")
-    warm = sum(1 for x in data if (x.get("raw") or {}).get("distress_stack", {}).get("tier") == "WARM")
-    print(f"[{time.strftime('%H:%M:%S')}] wrote — {hot} HOT, {warm} WARM", flush=True)
-    # the published board is docs/listings_part_NNN.json.gz now (audit O1), not one
-    # listings.json.gz: re-cut the parts from the plain file just written (streaming) and reseal
-    # run_meta.board_parts and the manifest (listings.json itself is gitignored)
-    from foreclosure_scraper.web_artifact import reseal_board
-    _p = Path("docs/listings.json")
-    reseal_board(_p.parent, resplit=True)
+    patches = result["patches"]
+    if not patches:
+        print(f"[{time.strftime('%H:%M:%S')}] every row's distress_stack already matches -- "
+              f"nothing to patch.", flush=True)
+        return 0
 
-    # THIS SCRIPT DOES NOT PUBLISH. Unconditionally, by design, always.
-    #
-    # It is a board writer that BYPASSES write_artifact(): it mutates
-    # docs/listings.json in place and regenerates only listings.json.gz, so it
-    # cannot regenerate docs/listings_slim.json.gz or docs/detail_shards/ — the
-    # index-aligned mobile payloads write_artifact() emits from the same call.
-    # Pushing the board without them ships a fresh board beside a slim file and
-    # a shard set describing the PREVIOUS one: phones render stale tiers, and
-    # because a shard is joined to the board BY ARRAY INDEX, any change to the
-    # record count or order hands one lead's comps, vision and CAMA to a
-    # different lead's address. Desktop looks perfect throughout.
-    #
-    # WHAT USED TO BE HERE was `if (docs/listings_slim.json.gz).exists() or
-    # (docs/detail_shards).exists(): return 0`, followed by a git add/commit/push
-    # block gated on STACK_PUBLISH. The comment described that as a conditional
-    # guard. It has not been conditional since both payloads started shipping on
-    # every publish — both always exist, the branch always fires, and the publish
-    # block below it was dead code that nothing had reached in months. A guard
-    # whose comment claims it sometimes lets you through is worse than no
-    # comment: it sends the next reader looking for the run where it did.
-    #
-    # NOTHING IS LOST BY NOT PUBLISHING. The mutation is persisted to
-    # docs/listings.json, and the next write_artifact() caller (the daily vision
-    # pass, the noon lrcpwa pass, run_local.sh, recompute_valuation.py) loads it
-    # through load_board() and re-emits board + detail + slim + shards together
-    # from one payload. The score ships on the next publish, joined correctly.
-    print(f"[{time.strftime('%H:%M:%S')}] docs/listings.json updated in place "
-          f"({hot} HOT, {warm} WARM). NOT PUBLISHING — this script cannot "
-          "regenerate docs/listings_slim.json.gz or docs/detail_shards/, and "
-          "shipping the board without them mis-joins every phone.\n"
-          "  It will go live on the next write_artifact() publish (the daily "
-          "vision pass, the noon lrcpwa pass, or run_local.sh).\n"
-          "  To publish now:  uv run python scripts/recompute_valuation.py",
+    stats = patch_existing_rows(
+        patches,
+        {"notes": f"stream_score_board: {result['changed']} distress_stack change(s) "
+                  f"({result['stack_removed']} removed)"},
+        docs_dir=docs,
+    )
+    print(f"[{time.strftime('%H:%M:%S')}] patched {stats['applied']:,} row(s) "
+          f"({stats['matched']:,} matched, {stats['not_found']} not found, "
+          f"{stats['duplicate_key_matches']} keys shared by >1 row) -- "
+          f"board now {stats['total_after']:,} rows.", flush=True)
+
+    # THIS SCRIPT DOES NOT FULLY PUBLISH. patch_existing_rows() regenerates docs/listings.json,
+    # the gzipped parts, listings_detail.json(.gz) and the manifest -- but, like
+    # append_new_rows()/merge_duplicate_rows(), deliberately does NOT regenerate
+    # docs/listings_slim.json.gz or docs/detail_shards/ (the index-aligned mobile payloads only
+    # the full write_artifact() pipeline emits). Pushing a board without them ships a fresh board
+    # beside a slim file and a shard set describing the PREVIOUS one, so this script leaves them
+    # exactly as they were and lets the next write_artifact() caller (the daily vision pass, the
+    # noon lrcpwa pass, run_local.sh) re-emit all four payloads together, joined correctly.
+    print(f"[{time.strftime('%H:%M:%S')}] NOT PUBLISHING listings_slim.json.gz/detail_shards/ -- "
+          "this script cannot regenerate them; they ship correctly on the next write_artifact() "
+          "publish.\n  To publish now:  uv run python scripts/recompute_valuation.py",
           flush=True)
     return 0
 
