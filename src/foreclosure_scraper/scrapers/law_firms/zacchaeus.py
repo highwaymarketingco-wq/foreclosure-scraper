@@ -11,13 +11,39 @@ this scraper drives a real stealth browser (Scrapling StealthyFetcher,
 the same render tier mcmichael_taylor_gray uses): load -> click I AGREE ->
 wait for the grid -> page through every page collecting rows.
 
-Grid columns (verified live 2026-06-26):
+Grid columns (verified live 2026-06-26, re-verified + extended 2026-10-01):
   0 Tax Office (county)   1 Parcel #   2 Status   3 Sale Date
   4 Upset Bidding Deadline   5 Opening Bid   6 Current Bid
-  7 Notice (link)   8 Address ("⚠️ STREET, CITY, NC ZIP")   9 (empty)
+  7 Notice of Sale   8 Address ("⚠️ STREET, CITY, NC ZIP")   9 (empty)
 
 There is NO case-number column. The grid is paginated (~11 rows/page,
 ~21 pages); we click the "Next page" pager button until it disables.
+
+THREE LINKS FOUND ON 2026-10-01 RE-AUDIT, two wired, one confirmed dead:
+  * Column 1 (Parcel #) is itself an `<a href>` to the county's own GIS
+    parcel-detail page (e.g. "https://gis.moorecountync.gov/mooreinfo2010/
+    Parcel.aspx?PARID=00025637") -- the real assessor record for that
+    parcel. Captured as raw["zls"]["parcel_gis_url"].
+  * Column 8 (Address) is an `<a href>` to a Google Maps place link that
+    embeds exact coordinates in its path ("/@35.2451071,-79.5659757,19z/").
+    Live-verified: 0/207 rows had latitude/longitude before this fix. Parsed
+    out and set as first-class Listing.latitude/longitude.
+  * Column 7 ("Notice of Sale", labeled "Notice (link)" in the original
+    2026-06-26 audit) is NOT an `<a href>` any more -- it is now a
+    `<button>` with no href at all, that presumably triggers a server-side
+    Blazor action (a WebSocket postback, not a static URL) when clicked.
+    Live-verified 2026-10-01: 0 of 207 real rows carry a notice_url with the
+    existing `tds[7].querySelector('a[href]')` extraction, confirming this
+    is a genuine site change (the column WAS a link on 2026-06-26), not an
+    extraction bug. Actually opening it would mean clicking a button on
+    every one of ~207 rows and intercepting whatever response/download that
+    triggers -- a much larger, separately-scoped piece of work, not a
+    same-shape fix. Left as a documented, confirmed-real, not-cheaply-closed
+    gap; the extraction attempt is harmless and kept in case a future row
+    renders it as a plain link again.
+  * Column 0 (Tax Office) is also an `<a href>` to the county's own tax-
+    department homepage (not parcel-specific) -- low marginal value, but
+    free to capture, so it rides along as raw["zls"]["tax_office_url"].
 
 STATUS FILTER: emit only still-actionable leads. A property whose status
 shows it is paid off (Redeemed) or already sold (Sale Confirmed / Deed
@@ -54,6 +80,21 @@ _ADDR_TAIL_RE = re.compile(
     r"^(.*?),\s*([A-Za-z .'-]+?),?\s+([A-Z]{2}),?\s+(\d{5})(?:-\d{4})?\s*$"
 )
 _BID_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
+#: Exact coordinates embedded in the Google Maps place link the Address
+#: column links to: ".../@35.2451071,-79.5659757,19z/data=...".
+_MAPS_LATLNG_RE = re.compile(r"/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+),")
+
+
+def _latlng_from_maps_url(url: str | None) -> tuple[float | None, float | None]:
+    if not url:
+        return None, None
+    m = _MAPS_LATLNG_RE.search(url)
+    if not m:
+        return None, None
+    try:
+        return float(m.group(1)), float(m.group(2))
+    except ValueError:
+        return None, None
 
 
 def _clean_money(raw: str | None) -> float | None:
@@ -177,14 +218,19 @@ def _row_to_listing(row: dict, slug: str) -> Listing | None:
     if upset_dt is not None and (sale_dt is None or upset_dt > sale_dt):
         actionable_date = upset_dt
 
+    lat, lng = _latlng_from_maps_url(row.get("maps_url"))
+
     zls_raw = {
         "status": status,
         "tax_office": (row.get("office") or "").strip() or None,
+        "tax_office_url": (row.get("tax_office_url") or "").strip() or None,
+        "parcel_gis_url": (row.get("parcel_gis_url") or "").strip() or None,
         "municipality": municipality,
         "sale_date": (row.get("sale") or "").strip() or None,
         "upset_deadline": (row.get("upset") or "").strip() or None,
         "current_bid": (row.get("current_bid") or "").strip() or None,
         "notice_url": (row.get("notice_url") or "").strip() or None,
+        "maps_url": (row.get("maps_url") or "").strip() or None,
     }
 
     return Listing(
@@ -198,6 +244,8 @@ def _row_to_listing(row: dict, slug: str) -> Listing | None:
         street_address=street,
         city=city,
         zip_code=zip_code,
+        latitude=lat,
+        longitude=lng,
         sale_date=actionable_date,
         upset_bid_deadline=upset_dt,
         opening_bid=_clean_money(row.get("opening_bid")),
@@ -218,24 +266,33 @@ def _row_to_listing(row: dict, slug: str) -> Listing | None:
 _GRID_JS = """
 () => {
   const rows = [...document.querySelectorAll('table.dxbl-grid-table tbody tr')];
+  const hrefOf = (td) => {
+    if (!td) return '';
+    const a = td.querySelector('a[href]');
+    return a ? a.href : '';
+  };
   return rows.map(r => {
     const tds = [...r.querySelectorAll('td')];
     const txt = i => (tds[i] ? tds[i].innerText.trim() : '');
-    let notice = '';
-    if (tds[7]) {
-      const a = tds[7].querySelector('a[href]');
-      if (a) notice = a.href;
-    }
     return {
       office: txt(0),
+      tax_office_url: hrefOf(tds[0]),
       parcel: txt(1),
+      parcel_gis_url: hrefOf(tds[1]),
       status: txt(2),
       sale: txt(3),
       upset: txt(4),
       opening_bid: txt(5),
       current_bid: txt(6),
-      notice_url: notice,
+      // Notice of Sale (col 7) is a Blazor <button> with no href as of
+      // 2026-10-01 (it was a plain link on 2026-06-26) -- this is kept in
+      // case a row ever renders it as a link again, but confirmed live to
+      // be empty for all 207 current rows.
+      notice_url: hrefOf(tds[7]),
       addr: txt(8),
+      // The Address cell links to a Google Maps place URL that embeds
+      // exact coordinates in its path.
+      maps_url: hrefOf(tds[8]),
     };
   });
 }

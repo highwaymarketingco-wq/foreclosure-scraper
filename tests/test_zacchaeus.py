@@ -28,6 +28,7 @@ from foreclosure_scraper.scrapers.law_firms.zacchaeus import (
     _clean_county,
     _clean_money,
     _is_dead,
+    _latlng_from_maps_url,
     _municipality,
     _parse_date,
     _row_to_listing,
@@ -185,6 +186,76 @@ def test_no_footprint_counties_in_current_capture(listings):
         "Transylvania", "McDowell", "Lincoln", "Mitchell", "Burke",
     }
     assert not ({li.county for li in listings} & footprint)
+
+
+# ---- links found on the 2026-10-01 re-audit: Google Maps coords + GIS url ----
+
+def test_latlng_parsed_from_google_maps_place_url():
+    """The Address column links to a Google Maps place URL that embeds exact
+    coordinates in its path -- previously completely unused (0/207 live rows
+    had latitude/longitude before this fix)."""
+    url = (
+        "https://www.google.com/maps/place/210+Woodlawn+St,+West+End,+NC+27376/"
+        "@35.2451071,-79.5659757,19z/data=!4m6!3m5"
+    )
+    lat, lng = _latlng_from_maps_url(url)
+    assert lat == 35.2451071
+    assert lng == -79.5659757
+
+
+def test_latlng_from_maps_url_handles_missing_or_malformed():
+    assert _latlng_from_maps_url(None) == (None, None)
+    assert _latlng_from_maps_url("") == (None, None)
+    assert _latlng_from_maps_url("https://example.com/not-a-maps-link") == (None, None)
+
+
+def test_row_to_listing_sets_latitude_longitude_from_maps_url():
+    row = {
+        "office": "Moore County Tax Office",
+        "parcel": "00025637",
+        "status": "Pending Confirmation",
+        "sale": "6/8/2026",
+        "addr": "⚠️ 210 Woodlawn St, West End, NC 27376",
+        "maps_url": (
+            "https://www.google.com/maps/place/210+Woodlawn+St/"
+            "@35.2451071,-79.5659757,19z/data=!4m6"
+        ),
+    }
+    li = _row_to_listing(row, SLUG)
+    assert li is not None
+    assert li.latitude == 35.2451071
+    assert li.longitude == -79.5659757
+    assert li.raw["zls"]["maps_url"] == row["maps_url"]
+
+
+def test_row_to_listing_captures_parcel_gis_url_and_tax_office_url():
+    row = {
+        "office": "Moore County Tax Office",
+        "tax_office_url": "https://www.moorecountync.gov/202/Tax",
+        "parcel": "00025637",
+        "parcel_gis_url": "https://gis.moorecountync.gov/mooreinfo2010/Parcel.aspx?PARID=00025637",
+        "status": "Pending Confirmation",
+        "addr": "⚠️ 210 Woodlawn St, West End, NC 27376",
+    }
+    li = _row_to_listing(row, SLUG)
+    assert li is not None
+    assert li.raw["zls"]["parcel_gis_url"] == row["parcel_gis_url"]
+    assert li.raw["zls"]["tax_office_url"] == row["tax_office_url"]
+
+
+def test_row_without_maps_url_leaves_latlng_none():
+    """Regression guard: a row missing the new optional keys (the shape every
+    pre-2026-10-01 fixture row has) must not crash and must leave
+    latitude/longitude unset rather than inventing a value."""
+    row = {
+        "office": "Guilford County Tax Office",
+        "parcel": "0021388",
+        "status": "Upset Bidding in Progress",
+        "addr": "⚠️ 100 Main St, Greensboro, NC 27401",
+    }
+    li = _row_to_listing(row, SLUG)
+    assert li is not None
+    assert li.latitude is None and li.longitude is None
 
 
 # ---- BaseScraper metadata ----
