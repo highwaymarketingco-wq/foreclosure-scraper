@@ -93,6 +93,31 @@ def _looks_like_nc_court_case(s: str) -> bool:
 # polite + avoid Tyler rate limits.
 DEFAULT_CAP = int(os.environ.get("NC_ECOURTS_AUTH_CAP", "50"))
 
+#: Source slugs this enricher skips outright -- federal bankruptcy filings run through
+#: PACER/CourtListener, not the NC state-court Smart Search this module drives.
+_EXCLUDED_SOURCES = ("national.courtlistener_bankruptcy",)
+
+
+def is_already_enriched(li: Listing) -> bool:
+    """True if `li` already carries a court status from a prior run."""
+    r = li.raw if isinstance(li.raw, dict) else {}
+    return bool(r.get("nc_case_status") or r.get("court_sale_status"))
+
+
+def is_target(li: Listing, incremental: bool) -> bool:
+    """The exact targeting predicate enrich_with_nc_case_status_authenticated() filters its
+    working set by. Pulled out to a free function (2026-10-01, docs/HANDOFF.md memory-profile
+    fix) so patch_court_detail.py's streaming board pass can apply this SAME filter per-row --
+    on a cheap, partially-built Listing -- instead of re-deriving a second copy of this logic,
+    which could silently drift from this one the next time the exclusion/incremental rules
+    change. Same reuse-not-duplicate pattern enrichment_owner_mailing.is_target() already uses
+    for patch_owner_mailing.py."""
+    return (li.state == "NC"
+            and bool(li.case_number)
+            and li.source not in _EXCLUDED_SOURCES
+            and not (incremental and is_already_enriched(li)))
+
+
 # Sold-price patterns mirrored from the legacy regex-based extractor.
 # Order matters: most-specific first so judgment amounts don't outrank
 # the actual hammer price.
@@ -1016,18 +1041,7 @@ async def enrich_with_nc_case_status_authenticated(
     # builds across the whole ~3,900 over successive runs (like the vision pass).
     incremental = os.environ.get("NC_ECOURTS_INCREMENTAL") == "1"
 
-    def _already_enriched(li: Listing) -> bool:
-        r = li.raw if isinstance(li.raw, dict) else {}
-        return bool(r.get("nc_case_status") or r.get("court_sale_status"))
-
-    targets = [
-        li
-        for li in listings
-        if li.state == "NC"
-        and li.case_number
-        and li.source not in ("national.courtlistener_bankruptcy",)
-        and not (incremental and _already_enriched(li))
-    ]
+    targets = [li for li in listings if is_target(li, incremental)]
 
     # Prioritize: recent past sales (upset-bid window) first, then
     # scheduled-soon, then everything else.

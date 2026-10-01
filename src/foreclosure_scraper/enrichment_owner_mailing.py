@@ -898,43 +898,68 @@ async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
     return res
 
 
+def is_reachable(li: Listing) -> bool:
+    """Dedicated county layer, OR an NC OneMap / SCDOT statewide fallback.
+
+    Pulled out of enrich_owner_mailing() as a top-level function (2026-10-01,
+    docs/HANDOFF.md memory-profile-fix item) so patch_owner_mailing.py's bounded
+    streaming pass can reuse this EXACT targeting predicate against a cheap
+    per-row dict/light-Listing check -- instead of re-deriving the same logic a
+    second time, which would risk silently drifting out of sync with this
+    function the next time a county is added here. Same reuse-not-duplicate
+    pattern lrcpwa_refresh.py's _is_parcel_target()/_is_photo_target() already
+    use against enrichment_lrcpwa_parcel._county()/
+    enrichment_lrcpwa_photo._worth_photo()/_has_image()."""
+    if _county_key(li) in COUNTY_GIS:
+        return True
+    if li.state == "NC" and li.county:
+        return True  # NC OneMap covers all 100 NC counties
+    if li.state == "SC" and not scdot_walled() and _scdot_spec(li.county or "") is not None:
+        return True  # SCDOT covers all 46 SC counties (unless the token wall is up)
+    return False
+
+
+def has_mailing(li) -> bool:
+    """True if `li` already carries a resolved mailing address.
+
+    owner_mailing is usually a dict but some sources (spartanburg_vacant,
+    spartanburg_condemned, spartanburg_delinquent_tax) emit a bare string
+    that IS the mailing address. `or {}` can't rescue a truthy str, so an
+    unguarded .get() raised AttributeError and killed the whole pass.
+    Pulled out of enrich_owner_mailing() for the same reuse reason as
+    is_reachable() above."""
+    om = (li.raw or {}).get("owner_mailing")
+    if isinstance(om, dict):
+        return bool(om.get("mailing"))
+    return bool(om)
+
+
+def is_target(li: Listing) -> bool:
+    """The exact `targets` predicate enrich_owner_mailing() filters its working
+    set by. A free function (not a closure inside enrich_owner_mailing()) so a
+    caller like patch_owner_mailing.py can apply this SAME filter per-row
+    during a streaming board pass, before ever building a full list -- see
+    this module's is_reachable()/has_mailing() docstrings for why reuse matters
+    here over a second hand-written copy."""
+    return (is_reachable(li)
+            and bool(li.street_address or li.parcel_id)
+            and not has_mailing(li)
+            # TAX_SALE_OVERAGE: the GIS record at this parcel_id/address
+            # describes whoever owns the property NOW, a different person
+            # from the overage claimant the listing is about (the claimant
+            # lost the parcel AT the tax sale the claim came from). A live
+            # GIS resolve here would silently attach a stranger's mailing
+            # address under the claimant's name.
+            and li.listing_type != ListingType.TAX_SALE_OVERAGE)
+
+
 async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 12) -> dict:
     """Fill owner + mailing + absentee/out-of-state + parcel_id from county GIS.
 
     Concurrency raised from 4 to 12 — the sequential 4-concurrent pattern caused
     900s+ timeouts on the full board (40K listings). 12 concurrent keeps us well
     under county ArcGIS rate limits while cutting wall time ~3x."""
-    def _reachable(li: Listing) -> bool:
-        # Dedicated county layer, OR an NC OneMap / SCDOT statewide fallback.
-        if _county_key(li) in COUNTY_GIS:
-            return True
-        if li.state == "NC" and li.county:
-            return True  # NC OneMap covers all 100 NC counties
-        if li.state == "SC" and not scdot_walled() and _scdot_spec(li.county or "") is not None:
-            return True  # SCDOT covers all 46 SC counties (unless the token wall is up)
-        return False
-
-    def _has_mailing(li) -> bool:
-        # owner_mailing is usually a dict but some sources (spartanburg_vacant,
-        # spartanburg_condemned, spartanburg_delinquent_tax) emit a bare string
-        # that IS the mailing address. `or {}` can't rescue a truthy str, so an
-        # unguarded .get() raised AttributeError and killed the whole pass.
-        om = (li.raw or {}).get("owner_mailing")
-        if isinstance(om, dict):
-            return bool(om.get("mailing"))
-        return bool(om)
-
-    targets = [li for li in listings
-               if _reachable(li)
-               and (li.street_address or li.parcel_id)
-               and not _has_mailing(li)
-               # TAX_SALE_OVERAGE: the GIS record at this parcel_id/address
-               # describes whoever owns the property NOW, a different person
-               # from the overage claimant the listing is about (the claimant
-               # lost the parcel AT the tax sale the claim came from). A live
-               # GIS resolve here would silently attach a stranger's mailing
-               # address under the claimant's name.
-               and li.listing_type != ListingType.TAX_SALE_OVERAGE]
+    targets = [li for li in listings if is_target(li)]
     if not targets:
         return {"queried": 0, "resolved": 0}
     sem = asyncio.Semaphore(max_concurrency)

@@ -88,12 +88,84 @@ field and a deep copy of raw) is taken before anything runs, diffed against
 each row's post-mutation state, and only rows that actually changed land via
 web_artifact.patch_existing_rows() -- which MERGES `raw` rather than
 replacing it, so an existing row's comps/skip_trace/etc. survive untouched.
-Not a true constant-memory redesign (unlike lrcpwa_refresh.py's bespoke
-single-pass target collection): re-deriving both enrichers' own internal
-targeting/capping logic externally, just to avoid holding the full list, was
-judged not worth the duplication risk for this migration -- the same
-tradeoff _dq_common.run_apply()'s _light_rows() documents making for its own
-nine callers.
+(SUPERSEDED 2026-10-01 -- see "MEMORY-PROFILE FIX" below: this paragraph
+described the FULL materialization this script carried until a live test the
+same day found it. It is kept, struck through in spirit, because the
+reasoning it gave -- "not worth the duplication risk" -- is exactly the
+reasoning the fix below had to overturn, and why: enrichment_owner_mailing.py
+already had to overturn the same reasoning for patch_owner_mailing.py's
+sibling migration that day.)
+
+MEMORY-PROFILE FIX (2026-10-01, same day as the rewrite above -- a live test
+found the rewrite above did not actually achieve memory safety, the exact
+finding that also prompted patch_owner_mailing.py's own memory-profile fix).
+This script hydrated a FULL Listing, WITH the sidecar merge (the heaviest
+read shape on the board), for literally every row -- not just the ~110
+(DEFAULT_CAP=50 NC + SC_COURT_CAP=60 SC) rows either enricher would ever
+actually touch over the network, and not just the rows that already carried
+a court status and needed a calc/grade recompute. There was no bound of any
+kind: a board where more sources start carrying case numbers could only make
+this worse.
+
+THE FIX reuses, not re-derives, each enricher's own targeting predicate --
+avoiding exactly the duplication risk the superseded paragraph above declined
+to take on, by pulling each predicate out to a top-level function instead of
+hand-copying it: enrichment_nc_case_status_tyler.is_target(li, incremental)
+and enrichment_case_detail.is_target(li, incremental) are the SAME filters
+enrich_with_nc_case_status_authenticated() / enrich_case_detail_addresses()
+apply internally, now callable from here too (same reuse-not-duplicate
+pattern enrichment_owner_mailing.is_target() already established for
+patch_owner_mailing.py same day). This script's single _iter_board_records()
+pass applies each predicate on a cheap Listing.model_construct() (not a full
+model_validate(), and critically not the sidecar merge) per row: a row that
+is neither an NC/SC target NOR already carries a court status costs nothing
+more than that one cheap check and is immediately discarded -- the large
+majority of a board where most listing types (tax rolls, probate notices,
+elderly/disabled exemptions, obituary cross-ref, …) never carry a
+case_number at all.
+
+A row that passes either predicate is fully hydrated (WITH the sidecar
+merge -- still required; see "THE LAZY-DETAIL SUBTLETY" above, unchanged by
+this fix) and added to nc_candidates/sc_candidates. These two lists are
+handed to the SAME TWO REAL, UNCHANGED enricher functions as before --
+deliberately NOT pre-capped to DEFAULT_CAP/SC_COURT_CAP at this script's own
+level, because enrich_with_nc_case_status_authenticated() sorts its own
+targets by sale-date priority (recent/soon sales first) BEFORE capping, and
+only THEN picks the best `cap` candidates; capping the candidate list before
+handing it over would have let arbitrary board order, not priority, decide
+which ~50 cases this run actually queries -- a real behavior change, not
+just a memory one. So each enricher's own internal is_target()+sort+cap logic
+runs exactly as it always has, just no longer over listings this script
+never needed to hydrate in the first place.
+
+A row that already carries a court status (from a prior run) and is NOT a
+target this run is finished immediately, right there in the loop --
+recomputed, diffed, discarded -- one row alive at a time, the same
+constant-memory shape lrcpwa_refresh.py's own non-target rows get.
+
+WHAT THIS DOES NOT BOUND, HONESTLY. This is not a hard O(small-constant) fix
+the way patch_owner_mailing.py's OM_MAX is: nc_candidates/sc_candidates hold
+EVERY NC/SC row with a case_number that is eligible this run (board-wide),
+not just the ~110 that will actually get queried -- because that full
+candidate set is exactly what the NC enricher's own priority sort needs to
+choose correctly from. In practice this is a small fraction of the board
+(court-related listing types only, not the whole 212K+), a large reduction
+from "everything, sidecar-merged" even without a hard ceiling -- but if the
+NC/SC case_number-bearing population ever grew to approach the whole board,
+this would need an LRCPWA_MAX-style ceiling too. Flagged here rather than
+silently assumed safe at any size, the same way lrcpwa_refresh.py's own
+docstring is scrupulous about what it does and does not bound.
+
+DISCLOSED NARROWING of the `dropped` diagnostic's scope (not a correctness
+change -- a malformed row this no longer counts was never acted on by the
+OLD code either, since it could never appear in either enricher's targets
+nor carry a court status). The OLD code attempted _hydrate() on every board
+row and counted every failure toward `dropped`. This version only attempts
+_hydrate() on a row that is a candidate or already-tagged, so `dropped` now
+counts malformed rows among THOSE, not malformed rows anywhere on the board.
+A row that is malformed AND irrelevant to court detail was already left
+exactly as-is by the old code (nothing in either enricher's targets or the
+recompute branch would have touched it); only the printed count narrows.
 
 THIS SCRIPT STILL DOES NOT FULLY PUBLISH. patch_existing_rows() does not
 regenerate docs/listings_slim.json.gz or docs/detail_shards/ (see its own
@@ -141,6 +213,38 @@ DOCS = REPO / "docs"
 #: web_artifact.RAW_KEEP before touching anything, same defensive preflight
 #: _dq_common.run_apply() uses (all are already registered; this just keeps it that way).
 REQUIRED_RAW_KEYS = ("court_sale_status", "nc_case_status", "calc", "grade")
+
+#: Fields the NC/SC targeting predicates (enrichment_nc_case_status_tyler.is_target() /
+#: enrichment_case_detail.is_target()) and the "already carries a court status" check actually
+#: read -- enough to build a Listing.model_construct() CHEAPLY (no validation, no sidecar
+#: concerns) for every board row's eligibility check, without paying full
+#: Listing.model_validate() cost for the rows that are neither a target nor already tagged this
+#: run (see this module's "MEMORY-PROFILE FIX" docstring).
+_LIGHT_FIELDS = ("state", "case_number", "source", "street_address", "raw")
+
+
+def _light(rec: dict) -> Listing:
+    return Listing.model_construct(**{k: rec.get(k) for k in _LIGHT_FIELDS})
+
+
+def _already_tagged(raw) -> bool:
+    return bool(isinstance(raw, dict) and (raw.get("court_sale_status") or raw.get("nc_case_status")))
+
+
+def _recompute_calc_grade(li: Listing) -> None:
+    """Same unconditional calc/grade recompute the original script ran over every listing
+    carrying a court status -- pulled into one place since this module's streaming pass now
+    calls it from two different sites (the non-candidate "already tagged" branch, and the
+    post-enrichment candidate finish step) instead of one shared loop."""
+    try:
+        c = vcalc.compute(li)
+        g = vgrade.grade(li, c)
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["calc"] = vcalc.to_dict(c)
+        li.raw["grade"] = vgrade.to_dict(g)
+    except Exception:  # noqa: BLE001 - matches the original script's own bare except here
+        pass
 
 
 def _hydrate(d: dict) -> Listing | None:
@@ -205,33 +309,85 @@ async def _run() -> int:
     os.environ.setdefault("SC_COURT_INCREMENTAL", "1")
     budget = float(os.environ.get("COURT_MAX_SECONDS", "3600"))
 
-    listings: list[Listing] = []
-    pre: list[tuple[str | None, dict, dict | None]] = []
+    from foreclosure_scraper.enrichment_nc_case_status_tyler import (
+        enrich_with_nc_case_status_authenticated, is_target as _nc_is_target)
+    from foreclosure_scraper.enrichment_case_detail import (
+        enrich_case_detail_addresses, is_target as _sc_is_target)
+
+    nc_incremental = os.environ.get("NC_ECOURTS_INCREMENTAL") == "1"
+    sc_incremental = os.environ.get("SC_COURT_INCREMENTAL") == "1"
+
+    # ONE streaming pass. A row is only ever fully hydrated (with the sidecar merge
+    # calc.compute() needs) if it is EITHER an NC/SC enrichment target this run (via the real
+    # enrichers' own is_target() predicates, applied here on a cheap Listing.model_construct())
+    # OR already carries a court status from a prior run (so the unconditional calc/grade
+    # recompute still applies to it, same as the original). Every other row -- the large
+    # majority of a board where most listing types never carry a case_number at all -- costs
+    # only that one cheap model_construct() and is immediately discarded. See this module's
+    # "MEMORY-PROFILE FIX" docstring for what this does and does not bound.
+    nc_candidates: list[Listing] = []
+    sc_candidates: list[Listing] = []
+    # id(li) -> (dedupe_key, pre-mutation scalar dump, pre-mutation raw copy), captured BEFORE
+    # either enricher can mutate street_address -- an identity field Listing.dedupe_key() reads
+    # -- same hazard lrcpwa_refresh.py's own migration documents and handles the same way.
+    candidate_pre: dict[int, tuple[str | None, dict, dict | None]] = {}
+    patches: dict[str, dict] = {}
+    stream_total = 0
     dropped = 0
+    tagged = 0  # listings carrying a court status by the end of this run (matches the original)
+
     for rec in _iter_board_records(DOCS):
+        stream_total += 1
+        li_light = _light(rec)
+        is_nc = _nc_is_target(li_light, nc_incremental)
+        is_sc = (not is_nc) and _sc_is_target(li_light, sc_incremental)  # mutually exclusive by state
+
+        if is_nc or is_sc:
+            li = _hydrate(rec)
+            if li is None:
+                dropped += 1
+                continue
+            try:
+                key = li.dedupe_key()
+            except Exception:  # noqa: BLE001 - a row too malformed to key is simply unpatchable
+                key = None
+            candidate_pre[id(li)] = (key, li.model_dump(mode="json", exclude={"raw"}),
+                                      copy.deepcopy(li.raw) if isinstance(li.raw, dict) else None)
+            (nc_candidates if is_nc else sc_candidates).append(li)
+            continue  # finished below, after the court enrichers run on it
+
+        if not _already_tagged(li_light.raw):
+            continue  # neither a target nor already tagged -- nothing to do this row, this run
+
+        # Already carries a court status from a prior run and is not a target this run: the
+        # original script's own unconditional "if either status is set" branch still recomputes
+        # calc/grade for it every run (picking up any vision/comps/cama change since the status
+        # was set). Finish it right here, one row alive at a time -- never added to a list.
         li = _hydrate(rec)
         if li is None:
             dropped += 1
             continue
-        listings.append(li)
-        try:
-            key = li.dedupe_key()
-        except Exception:  # noqa: BLE001 - a row too malformed to key is simply unpatchable
-            key = None
-        pre.append((key, li.model_dump(mode="json", exclude={"raw"}),
-                    copy.deepcopy(li.raw) if isinstance(li.raw, dict) else None))
-    print(f"[{time.strftime('%H:%M:%S')}] loaded {len(listings)} listings"
-          + (f" (dropped {dropped})" if dropped else ""), flush=True)
+        before_scalars = li.model_dump(mode="json", exclude={"raw"})
+        before_raw = copy.deepcopy(li.raw) if isinstance(li.raw, dict) else None
+        _recompute_calc_grade(li)
+        tagged += 1
+        update = _diff_row(li, before_scalars, before_raw)
+        if update:
+            try:
+                key = li.dedupe_key()
+            except Exception:  # noqa: BLE001
+                continue
+            patches[key] = update
 
-    from foreclosure_scraper.enrichment_nc_case_status_tyler import (
-        enrich_with_nc_case_status_authenticated)
-    from foreclosure_scraper.enrichment_case_detail import enrich_case_detail_addresses
+    print(f"[{time.strftime('%H:%M:%S')}] streamed {stream_total:,} listings | nc candidates "
+          f"{len(nc_candidates):,} | sc candidates {len(sc_candidates):,}"
+          + (f" | dropped {dropped}" if dropped else ""), flush=True)
 
     t0 = time.time()
     try:
         await asyncio.wait_for(asyncio.gather(
-            enrich_with_nc_case_status_authenticated(listings),
-            enrich_case_detail_addresses(listings),
+            enrich_with_nc_case_status_authenticated(nc_candidates),
+            enrich_case_detail_addresses(sc_candidates),
         ), timeout=budget)
     except asyncio.TimeoutError:
         print(f"[{time.strftime('%H:%M:%S')}] court pass hit cap ({budget:.0f}s) — writing partial",
@@ -240,20 +396,16 @@ async def _run() -> int:
         print(f"[{time.strftime('%H:%M:%S')}] court pass error: {str(exc)[:160]}", flush=True)
     print(f"[{time.strftime('%H:%M:%S')}] court pass done in {int(time.time() - t0)}s", flush=True)
 
-    tagged = 0
-    for li in listings:
-        if (li.raw or {}).get("court_sale_status") or (li.raw or {}).get("nc_case_status"):
-            try:
-                c = vcalc.compute(li)
-                g = vgrade.grade(li, c)
-                li.raw["calc"] = vcalc.to_dict(c)
-                li.raw["grade"] = vgrade.to_dict(g)
-            except Exception:  # noqa: BLE001 - matches the original script's own bare except here
-                pass
+    # Finish the (bounded-by-what-the-enrichers-themselves-capped) candidate set: either
+    # enricher may have tagged some of these with a status; recompute calc/grade for any that
+    # now carry one (same unconditional check as the non-candidate branch above) and diff
+    # against each one's PRE-enrichment snapshot so the status fill and this recompute land in
+    # one combined patch per row.
+    for li in (*nc_candidates, *sc_candidates):
+        if _already_tagged(li.raw):
+            _recompute_calc_grade(li)
             tagged += 1
-
-    patches: dict[str, dict] = {}
-    for li, (key, before_scalars, before_raw) in zip(listings, pre):
+        key, before_scalars, before_raw = candidate_pre[id(li)]
         if key is None:
             continue
         update = _diff_row(li, before_scalars, before_raw)

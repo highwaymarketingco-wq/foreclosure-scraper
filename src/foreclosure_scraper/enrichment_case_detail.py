@@ -340,6 +340,30 @@ def _apply_court_detail(li: Listing, html: str) -> bool:
     return True
 
 
+def is_placeholder_address(li: Listing) -> bool:
+    """True if `li`'s street_address is the synthesized "Lis Pendens ..." placeholder this
+    module's own address resolution exists to replace."""
+    return bool(li.street_address and li.street_address.startswith("Lis Pendens ")
+                and "lis_pendens" in (li.source or "").lower())
+
+
+def needs_court_detail(li: Listing) -> bool:
+    """True if `li` has not yet had a court_sale_status captured."""
+    r = li.raw if isinstance(li.raw, dict) else {}
+    return not r.get("court_sale_status")
+
+
+def is_target(li: Listing, incremental: bool) -> bool:
+    """The exact targeting predicate enrich_case_detail_addresses() filters its working set by.
+    Pulled out to a free function (2026-10-01, docs/HANDOFF.md memory-profile fix) so
+    patch_court_detail.py's streaming board pass can apply this SAME filter per-row instead of
+    re-deriving a second copy of it -- same reuse-not-duplicate pattern
+    enrichment_nc_case_status_tyler.is_target() uses for its NC counterpart."""
+    if li.state != "SC" or not li.case_number:
+        return False
+    return is_placeholder_address(li) or (incremental and needs_court_detail(li))
+
+
 async def enrich_case_detail_addresses(listings: list[Listing]) -> None:
     """Render SC case-detail pages to (a) resolve placeholder "Lis Pendens"
     addresses and (b) capture court detail (judgment / sale documents /
@@ -354,20 +378,10 @@ async def enrich_case_detail_addresses(listings: list[Listing]) -> None:
     incremental = os.environ.get("SC_COURT_INCREMENTAL") == "1"
     cap = int(os.environ.get("SC_COURT_CAP", "60"))
 
-    def _placeholder(li: Listing) -> bool:
-        return bool(li.street_address and li.street_address.startswith("Lis Pendens ")
-                    and "lis_pendens" in (li.source or "").lower())
-
-    def _needs_court(li: Listing) -> bool:
-        r = li.raw if isinstance(li.raw, dict) else {}
-        return not r.get("court_sale_status")
-
     seen: set[int] = set()
     targets: list[Listing] = []
     for li in listings:
-        if li.state != "SC" or not li.case_number:
-            continue
-        if _placeholder(li) or (incremental and _needs_court(li)):
+        if is_target(li, incremental):
             if id(li) not in seen:
                 seen.add(id(li))
                 targets.append(li)

@@ -28,6 +28,24 @@ Covers:
      rows) even though neither enricher re-touches its status field -- and a pre-existing
      unrelated raw key survives alongside it (merge, not replace).
   5. A second run is idempotent: nothing left to patch.
+
+MEMORY-PROFILE FIX (2026-10-01, docs/HANDOFF.md): a live test found this script -- despite the
+rewrite above -- still fully materialized the WHOLE board (WITH the sidecar merge, the heaviest
+read shape) before ever filtering to the ~110 rows either court enricher would actually touch.
+The fix pulled each enricher's own targeting predicate out to a top-level is_target(li,
+incremental) function (enrichment_nc_case_status_tyler.py / enrichment_case_detail.py) so this
+script's streaming pass could apply the SAME filter per-row on a cheap
+Listing.model_construct(), splitting the board into nc_candidates/sc_candidates WITHOUT holding
+anything else. Deliberately NOT pre-capped at this script's level (see its own docstring): the
+NC enricher sorts its own targets by sale-date priority before capping, so the full NC-eligible
+candidate set must still reach it for that sort to pick the right rows -- this is the one
+property most worth a regression test, since a naive pre-cap here would have silently changed
+which cases get queried (board order instead of priority) without failing any existing test
+(the fakes below don't replicate the real sort/cap).
+
+  6. The candidate lists this script hands to the enrichers are NOT truncated before the real
+     enrichers would see them -- proven with fakes that record how many listings they receive,
+     independent of the tagging fakes used above.
 """
 from __future__ import annotations
 
@@ -159,3 +177,38 @@ def test_second_run_is_idempotent(scratch_repo, capsys):
     out = capsys.readouterr().out
     assert "nothing to patch" in out
     assert (docs / "listings.json").read_bytes() == before
+
+
+def test_candidates_reach_the_enrichers_without_being_pre_capped(scratch_repo, monkeypatch):
+    """The memory-profile fix's one real behavior-preservation risk: enrich_with_nc_case_status_
+    authenticated() sorts its OWN targets by sale-date priority before applying NC_ECOURTS_AUTH_CAP,
+    so patch_court_detail.py must hand it every NC-eligible candidate, not an arbitrary board-order
+    prefix -- otherwise this script's own cap, not the real priority sort, would silently decide
+    which cases get queried. Verified here with fakes that just record the list length they were
+    called with (independent of the status-tagging fakes used by the other tests above), seeding
+    more NC and SC targets than either real per-run cap (NC_ECOURTS_AUTH_CAP=50 / SC_COURT_CAP=60
+    by default) to make a silent pre-cap visible if one were reintroduced."""
+    docs = scratch_repo / "docs"
+    nc_rows = [_row(i, case_number=f"26SP{i:06d}-320") for i in range(5)]
+    sc_rows = [_row(100 + i, state="SC", county="Richland", case_number=f"2026CP4{i:06d}",
+                     street_address=f"{200 + i} Elm St") for i in range(4)]
+    wa.write_artifact(nc_rows + sc_rows, {"notes": "no-pre-cap test seed"}, docs_dir=docs)
+
+    seen: dict[str, int] = {}
+
+    async def _record_nc(listings, max_cases=None):
+        seen["nc"] = len(listings)
+        return 0
+
+    async def _record_sc(listings):
+        seen["sc"] = len(listings)
+
+    monkeypatch.setattr(
+        "foreclosure_scraper.enrichment_nc_case_status_tyler.enrich_with_nc_case_status_authenticated",
+        _record_nc)
+    monkeypatch.setattr(
+        "foreclosure_scraper.enrichment_case_detail.enrich_case_detail_addresses", _record_sc)
+
+    assert asyncio.run(pcd.main()) == 0
+    assert seen["nc"] == 5
+    assert seen["sc"] == 4
