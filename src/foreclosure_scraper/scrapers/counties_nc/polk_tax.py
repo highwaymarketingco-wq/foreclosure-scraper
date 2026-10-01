@@ -27,9 +27,19 @@ HEADERS = {
 _TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"\s+")
 _ENTITIES = re.compile(r"&(?:nbsp|amp|lt|gt|times);")
+# Live-verified 2026-10-01: the page currently reads "Auction Date:" with no
+# "Upcoming" prefix (the posted Sept 1 2026 auction was CANCELLED, with no
+# parcel rows left -- a genuine, correct zero, not a bug), unlike the
+# "Upcoming Auction Date:" wording this regex was originally verified
+# against. Made the prefix word optional so a real future auction isn't
+# silently missed if the county keeps the shorter wording once a new sale is
+# actually posted.
 DATE_RE = re.compile(
-    r"Upcoming Auction Date[:\s]*([A-Z][a-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})", re.I
+    r"(?:Upcoming\s+)?Auction Date[:\s]*([A-Z][a-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})", re.I
 )
+# A cancelled auction's date/parcels are stale -- don't stamp a sale_date that
+# reads as a live upcoming event when the page itself says otherwise.
+CANCELLED_RE = re.compile(r"\bCANCELLED\b", re.I)
 TIME_RE = re.compile(r"(\d{1,2}\s*(?:AM|PM|a\.?m\.?|p\.?m\.?))", re.I)
 LOCATION_RE = re.compile(r"Location[:\s]*([^A]+(?:Courthouse|Court House)[^$]+?)(?:The|PARCEL)", re.I | re.S)
 # Each row: <parcel> <whitespace incl. nbsp>* $<amount>
@@ -65,9 +75,15 @@ class PolkTaxAuction(BaseScraper):
         # Strip tags + decode common HTML entities (Polk page is full of `&nbsp;`)
         flat = _ENTITIES.sub(" ", _TAG.sub(" ", html))
         flat = _WS.sub(" ", flat)
+        # Detect a CANCELLED notice near the date (within the same short
+        # window the page prints it in, e.g. "...2026&nbsp;&nbsp; CANCELLED
+        # 11 AM..."). If the auction itself was pulled, any parcel rows left
+        # on the page are stale leftovers, not a live sale -- withhold
+        # sale_date so they don't read as an upcoming auction.
+        cancelled = bool(CANCELLED_RE.search(flat[:2000]))
         sale_date = None
         date_m = DATE_RE.search(flat)
-        if date_m:
+        if date_m and not cancelled:
             try:
                 # strip "th"/"nd"/"st"/"rd" before parse
                 clean = re.sub(r"(\d+)(st|nd|rd|th)", r"\1", date_m.group(1))
@@ -102,10 +118,12 @@ class PolkTaxAuction(BaseScraper):
                     sale_date=sale_date,
                     sale_location=sale_location,
                     opening_bid=bid,
-                    description=f"Polk County tax auction parcel {parcel} (Kania Law Firm)",
+                    description=f"Polk County tax auction parcel {parcel} (Kania Law Firm)"
+                                + (" [auction cancelled]" if cancelled else ""),
+                    auction_status="cancelled" if cancelled else None,
                     first_seen=datetime.utcnow(),
                     last_seen=datetime.utcnow(),
-                    raw={"polk_tax": {"parcel": parcel, "opening_bid": bid}},
+                    raw={"polk_tax": {"parcel": parcel, "opening_bid": bid, "cancelled": cancelled}},
                 )
             )
         return out

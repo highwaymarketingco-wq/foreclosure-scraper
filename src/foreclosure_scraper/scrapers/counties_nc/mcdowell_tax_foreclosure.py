@@ -45,7 +45,17 @@ PAGE_URL = (
 ENV_OFF = "FORECLOSURE_MCDOWELL_FCL"
 
 # Rows that are the county's "nothing scheduled" placeholder, not real data.
-_PLACEHOLDER_RE = re.compile(r"no\s+foreclosure\s+sales?\s+scheduled", re.I)
+# Audited 2026-10-01: the page actually has THREE separate tables (scheduled
+# sales / upset-bid-period sales / pending-not-yet-upset-bid foreclosures),
+# each with its OWN placeholder wording when empty -- "NO FORECLOSURE SALES
+# SCHEDULED AT THIS TIME" for the first, "NO PENDING FORECLOSURES AT THIS
+# TIME" for the third. The old regex only matched the first phrasing, so the
+# third table's placeholder leaked through as a fake Listing (parcel=None,
+# case_number="NO PENDING FORECLOSURES AT THIS TIME") every time that table
+# was empty -- confirmed live. Matching the shared "no ... at this time"
+# shape instead of one literal phrase catches both today and is robust to a
+# future fourth table using the same convention with yet another phrasing.
+_PLACEHOLDER_RE = re.compile(r"\bno\s+.{0,60}\s+at\s+this\s+time\b", re.I)
 
 
 def _clean(v: object) -> str:

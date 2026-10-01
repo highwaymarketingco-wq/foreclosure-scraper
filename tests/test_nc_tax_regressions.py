@@ -79,6 +79,53 @@ def test_polk_still_parses_a_numeric_bid():
     assert rows[0].opening_bid == pytest.approx(1234.56)
 
 
+def test_polk_date_without_upcoming_prefix_still_parses():
+    """Live-verified 2026-10-01: the page currently reads 'Auction Date:' with
+    no 'Upcoming' prefix (a cancelled posting). The date regex must not
+    silently miss this shorter wording if a real future auction ever uses it
+    too."""
+    html = (
+        "<html><body>Auction Date: March 10th, 2026 11 AM "
+        "Location: Polk County Courthouse 1 Courthouse St. Columbus N.C. "
+        "PARCEL OPENING BID P12-34 &nbsp; $1,234.56</body></html>"
+    )
+    rows = _polk_rows(html)
+    assert len(rows) == 1
+    assert rows[0].sale_date is not None
+    assert rows[0].sale_date.month == 3 and rows[0].sale_date.day == 10
+
+
+def test_polk_cancelled_auction_withholds_sale_date_and_flags_raw():
+    """Live-verified 2026-10-01: the real page text is 'Auction Date:
+    September 1st, 2026&nbsp;&nbsp; CANCELLED 11 AM ...' with zero parcel
+    rows left (a genuine, correct empty result). This covers the defensive
+    case where a parcel row is left on the page under a cancelled notice --
+    it must not read as a live upcoming sale."""
+    html = (
+        "<html><body>Auction Date: September 1st, 2026&nbsp;&nbsp; CANCELLED "
+        "11 AM Location: Polk County Courthouse 1 Courthouse St. Columbus N.C. "
+        "PARCEL OPENING BID P99-01 &nbsp; $5,000.00</body></html>"
+    )
+    rows = _polk_rows(html)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.sale_date is None
+    assert row.auction_status == "cancelled"
+    assert row.raw["polk_tax"]["cancelled"] is True
+    assert "cancelled" in row.description.lower()
+
+
+def test_polk_non_cancelled_auction_unaffected_by_cancelled_check():
+    html = (
+        "<html><body>Auction Date: March 10th, 2026 11 AM "
+        "Location: Polk County Courthouse 1 Courthouse St. Columbus N.C. "
+        "PARCEL OPENING BID P12-34 &nbsp; $1,234.56</body></html>"
+    )
+    rows = _polk_rows(html)
+    assert rows[0].auction_status is None
+    assert rows[0].raw["polk_tax"]["cancelled"] is False
+
+
 # --- buncombe_tax -----------------------------------------------------------
 
 def _buncombe_rows(events: list[dict]) -> list:
