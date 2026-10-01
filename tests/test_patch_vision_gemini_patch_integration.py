@@ -156,3 +156,106 @@ def test_nothing_to_patch_when_no_candidates(scratch_repo, monkeypatch):
     rc = pvg.main()
     assert rc == 0
     assert (docs / "listings.json").read_bytes() == before
+
+
+# --- pending-patch cache (2026-10-01 fix for the BoardLoadTooLarge data-loss bug) ------------
+#
+# Confirmed live on 2026-10-01 09:30: patch_existing_rows() computed 27 real vision reports
+# (API quota genuinely spent), then raised BoardLoadTooLarge before writing anything because the
+# real board is over BOARD_PATCH_MAX_SOURCE_MB -- the exception propagated out of main()
+# uncaught and all 27 results were discarded. These tests cover the fix: cache on failure,
+# skip re-scoring what's already cached, and drain + clear the cache on a later success.
+
+
+def test_cache_round_trip(tmp_path):
+    repo = tmp_path / "repo2"
+    assert pvg._load_pending_cache(repo) == {}  # missing file -> empty, never raises
+
+    patches = {"k1": {"raw": {"vision": {"_provider": "gemini"}}}}
+    pvg._save_pending_cache(repo, patches)
+    path = pvg._pending_cache_path(repo)
+    assert path.exists()
+    assert pvg._load_pending_cache(repo) == patches
+
+    pvg._clear_pending_cache(repo)
+    assert not path.exists()
+    assert pvg._load_pending_cache(repo) == {}  # still safe after clearing
+    pvg._clear_pending_cache(repo)  # clearing an already-absent cache must not raise
+
+
+def test_corrupt_cache_file_is_treated_as_empty(tmp_path):
+    repo = tmp_path / "repo3"
+    path = pvg._pending_cache_path(repo)
+    path.parent.mkdir(parents=True)
+    path.write_text("{not valid json")
+    assert pvg._load_pending_cache(repo) == {}
+
+
+def test_board_too_large_caches_computed_patches_instead_of_losing_them(scratch_repo, monkeypatch):
+    docs = scratch_repo / "docs"
+    seed = _seed_board(docs)
+    before = (docs / "listings.json").read_bytes()
+    monkeypatch.setattr(sys, "argv", ["patch_vision_gemini.py"])
+
+    def _raise_too_large(patches, summary, docs_dir):
+        raise wa.BoardLoadTooLarge("board source is 9999 MB, over the 2300 MB ceiling")
+    monkeypatch.setattr(pvg, "patch_existing_rows", _raise_too_large)
+
+    rc = pvg.main()
+    assert rc == 2
+    # the refusal happens inside patch_existing_rows(), before it writes anything
+    assert (docs / "listings.json").read_bytes() == before
+
+    cache = pvg._load_pending_cache(scratch_repo)
+    assert len(cache) == 1  # only seed[0] was actually scored by the fake pass
+    key = seed[0].dedupe_key()
+    assert key in cache
+    assert cache[key]["raw"]["vision"]["_provider"] == "gemini"
+    assert "calc" in cache[key]["raw"] and "grade" in cache[key]["raw"]
+
+
+def test_cached_candidate_is_not_rescored_and_drains_on_next_success(scratch_repo, monkeypatch):
+    docs = scratch_repo / "docs"
+    seed = _seed_board(docs)
+
+    # Pre-seed the cache as if a PRIOR run already vision-scored seed[1] (the "NOT reached this
+    # run" row in _seed_board) but could not persist it.
+    cached_raw = {
+        "vision": {"_provider": "gemini", "condition_tier": "C4", "confidence": "HIGH"},
+        "condition_tier": "C4", "condition_source": "vision-HIGH",
+        "calc": {"arv_expected": 123456}, "grade": {"overall": "B"},
+    }
+    pvg._save_pending_cache(scratch_repo, {seed[1].dedupe_key(): {"raw": cached_raw}})
+
+    seen_addresses: list[str] = []
+
+    async def _fake_enrich_records_then_scores_first(listings, max_listings=None):
+        seen_addresses.extend(li.street_address for li in listings)
+        if listings:
+            li = listings[0]
+            li.raw["vision"] = {"_provider": "gemini", "condition_tier": "C2", "confidence": "HIGH"}
+            li.raw["condition_tier"] = "C2"
+            li.raw["condition_source"] = "vision-HIGH"
+    monkeypatch.setattr(pvg, "enrich_with_vision", _fake_enrich_records_then_scores_first)
+    monkeypatch.setattr(sys, "argv", ["patch_vision_gemini.py"])
+
+    rc = pvg.main()
+    assert rc == 0
+
+    # seed[1] already had a cached result -- it must NOT have been handed to the vision pass
+    # again (that would mean re-spending API quota on a row already scored).
+    assert seed[1].street_address not in seen_addresses
+    assert seed[0].street_address in seen_addresses  # the only remaining un-cached candidate
+
+    rows = wa.load_board(docs)
+    by_addr = {li.street_address: li for li in rows}
+    # the cached-from-a-prior-run patch landed on the board this run, via the merge into
+    # combined_patches, even though seed[1] was never touched by THIS run's vision pass
+    assert by_addr[seed[1].street_address].raw["vision"]["_provider"] == "gemini"
+    assert by_addr[seed[1].street_address].raw["vision"]["condition_tier"] == "C4"
+    assert by_addr[seed[1].street_address].raw["calc"]["arv_expected"] == 123456
+    # this run's own fresh pass also landed normally
+    assert by_addr[seed[0].street_address].raw["vision"]["condition_tier"] == "C2"
+
+    # the write succeeded, so the cache that fed it must be cleared -- nothing left to drain
+    assert pvg._load_pending_cache(scratch_repo) == {}

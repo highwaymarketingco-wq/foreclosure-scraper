@@ -80,6 +80,7 @@ BOARD I/O CONTRACT (do not regress):
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 import time
@@ -95,12 +96,86 @@ from foreclosure_scraper.valuation import calc as valuation_calc  # noqa: E402
 from foreclosure_scraper.valuation import grading as valuation_grading  # noqa: E402
 from foreclosure_scraper.publish import board_seal_pathspec  # noqa: E402
 from foreclosure_scraper.web_artifact import (  # noqa: E402
-    BoardLockBusy, _iter_board_records, board_lock, patch_existing_rows,
+    BoardLoadTooLarge, BoardLockBusy, _iter_board_records, board_lock, patch_existing_rows,
 )
 from foreclosure_scraper.publish import manifest_pathspec, push_deferred, push_with_retries  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 DOCS = REPO / "docs"
+
+# --- pending-patch cache (2026-10-01) -------------------------------------------------------
+#
+# WHY THIS EXISTS. patch_existing_rows() refuses with BoardLoadTooLarge whenever the board's
+# on-disk size (listings.json + listings_detail.json) is over BOARD_PATCH_MAX_SOURCE_MB
+# (2,300 MB) -- confirmed (web_artifact.py's own comment above that constant, and this
+# script's own 2026-10-01 09:30 run) to be proportional to the EXISTING BOARD'S total size, not
+# to how many rows this run's `patches` dict actually touches: the streaming pass re-encodes
+# and holds EVERY row (patched or not) before writing, so a 27-row patch against a 2,645 MB
+# board costs the same order of memory as a 1,475-row one (both measured in the 3.5-4.1 GiB
+# footprint range -- see BOARD_PATCH_MAX_SOURCE_MB's comment). Capping how many candidates
+# this script vision-scores per run (VISION_MAX_LISTINGS, already the existing knob) therefore
+# does NOT make the WRITE safer or more likely to succeed -- it only limits how much Gemini/
+# Cloudflare/NVIDIA/Groq quota gets spent calling vision in the first place.
+#
+# Before this fix, a board over the ceiling meant: real vision reports get computed (API quota
+# genuinely spent), then patch_existing_rows() raises before writing anything, the exception
+# propagates out of main() uncaught, and every computed result is thrown away -- the next
+# scheduled run re-selects the same un-scored rows and pays for the same API calls again,
+# forever, until a human runs a supervised BOARD_PATCH_ALLOW_LARGE=1 patch.
+#
+# THE FIX. On BoardLoadTooLarge, the patches this run already computed (plus any carried over
+# from a previous run that hit the same wall) are written to a small local JSON file instead of
+# being discarded. A later run of this same script first loads that cache, (a) skips
+# re-vision-scoring any candidate whose dedupe_key() already has a cached, unapplied result
+# (no wasted API call), and (b) folds the cached patches into this run's patch_existing_rows()
+# attempt, so they are not lost and get applied automatically the moment the board shrinks back
+# under the ceiling, or a human runs a supervised BOARD_PATCH_ALLOW_LARGE=1 pass. The cache is
+# cleared only once patch_existing_rows() actually succeeds. This does NOT change
+# BOARD_PATCH_MAX_SOURCE_MB, does NOT set BOARD_PATCH_ALLOW_LARGE, and does NOT make the
+# unattended daily cron run the heavy write any more often than it safely can -- it only stops
+# wasting quota and silently losing work while that heavier, genuinely-board-size-bound problem
+# stays unsolved (see docs/HANDOFF.md).
+PENDING_CACHE_NAME = "vision_pending_patches.json"
+
+
+def _pending_cache_path(repo: Path) -> Path:
+    return repo / "logs" / PENDING_CACHE_NAME
+
+
+def _load_pending_cache(repo: Path) -> dict[str, dict]:
+    """Previously-computed, not-yet-applied vision patches from a run that hit
+    BoardLoadTooLarge. Never raises: a missing, unreadable or malformed cache is treated as
+    empty (the cache is a pure optimization/safety-net, never a source of truth the rest of
+    the script depends on)."""
+    path = _pending_cache_path(repo)
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+    except Exception:  # noqa: BLE001
+        return {}
+    patches = data.get("patches") if isinstance(data, dict) else None
+    return patches if isinstance(patches, dict) else {}
+
+
+def _save_pending_cache(repo: Path, patches: dict[str, dict]) -> None:
+    """Persist `patches` (same shape patch_existing_rows() takes) so a future run can retry
+    them without recomputing. Written atomically (tmp file + rename) so a crash mid-write
+    cannot leave a torn cache that _load_pending_cache has to guess about."""
+    path = _pending_cache_path(repo)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"saved_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "count": len(patches),
+               "patches": patches}
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False))
+    tmp.replace(path)
+
+
+def _clear_pending_cache(repo: Path) -> None:
+    try:
+        _pending_cache_path(repo).unlink()
+    except FileNotFoundError:
+        pass
 
 #: raw keys a vision + recompute pass can possibly touch -- anything else on a
 #: candidate's raw is left exactly as it streamed in (patch_existing_rows()
@@ -185,11 +260,32 @@ async def _run() -> int:
 
     candidates, total_rows, unscored_total = _collect_candidates(DOCS)
     already = total_rows - unscored_total
+
+    # Any candidate whose dedupe_key() already has a cached-but-not-yet-applied patch (a
+    # previous run computed it, then patch_existing_rows() refused with BoardLoadTooLarge) is
+    # left out of this run's vision pass: the result already exists, so scoring it again would
+    # only burn more API quota for no new information. It still rides along in
+    # `combined_patches` below so it gets another chance to land on the board this run.
+    cached_patches = _load_pending_cache(REPO)
+    skipped_cached = 0
+    if cached_patches:
+        def _has_cached_patch(li: Listing) -> bool:
+            try:
+                return li.dedupe_key() in cached_patches
+            except Exception:  # noqa: BLE001
+                return False
+        before_n = len(candidates)
+        candidates = [li for li in candidates if not _has_cached_patch(li)]
+        skipped_cached = before_n - len(candidates)
+
     n_hot = sum(1 for li in candidates if _distress_tier(li) == "HOT")
     n_warm = sum(1 for li in candidates if _distress_tier(li) == "WARM")
+    cache_note = (f" | {skipped_cached} more already have a computed-but-unpublished vision "
+                  f"result cached from a prior board-too-large run (not re-scored)"
+                  if skipped_cached else "")
     print(f"[{time.strftime('%H:%M:%S')}] scanned {total_rows} board rows (sidecar merged) | "
           f"{already} already vision-scored; {unscored_total} un-scored, of which "
-          f"{len(candidates)} have a photo ({n_hot} HOT, {n_warm} WARM). Running "
+          f"{len(candidates)} have a photo ({n_hot} HOT, {n_warm} WARM){cache_note}. Running "
           f"{os.environ.get('VISION_PROVIDER','?')} vision (wall clock "
           f"{vision_max_seconds():.0f}s) on the photo rows, HOT then WARM first…", flush=True)
 
@@ -251,14 +347,39 @@ async def _run() -> int:
     print(f"[{time.strftime('%H:%M:%S')}] touched {len(touched)}/{len(candidates)} candidates "
           f"this run; {newly_gained} newly gained a vision report", flush=True)
 
-    if not pending_patches:
+    # Fold in anything still waiting from a previous BoardLoadTooLarge run. This run's fresh
+    # results win on key collision (a row could in principle get re-touched -- e.g. an upgrade
+    # pass -- while an older cached result for it is still unapplied).
+    combined_patches: dict[str, dict] = {**cached_patches, **pending_patches}
+
+    if not combined_patches:
         print(f"[{time.strftime('%H:%M:%S')}] nothing to patch this run", flush=True)
         return 0
 
     summary = {"notes": (f"daily vision pass: {scored_now_estimate} of {total_rows} listings "
                          f"have a vision report (+{newly_gained} this run)")}
-    stats = patch_existing_rows(pending_patches, summary, docs_dir=DOCS)
-    print(f"[{time.strftime('%H:%M:%S')}] patched {stats['applied']}/{len(pending_patches)} rows "
+    try:
+        stats = patch_existing_rows(combined_patches, summary, docs_dir=DOCS)
+    except BoardLoadTooLarge as exc:
+        # The write itself refused -- cost is proportional to the EXISTING board's total size,
+        # not to len(combined_patches) (confirmed in BOARD_PATCH_MAX_SOURCE_MB's own comment and
+        # today's log), so a smaller patch would not have helped. Cache what was computed
+        # (API quota already spent on it) instead of discarding it on an uncaught traceback.
+        _save_pending_cache(REPO, combined_patches)
+        cache_path = _pending_cache_path(REPO)
+        print(f"[{time.strftime('%H:%M:%S')}] board too large to patch right now ({exc}); "
+              f"cached {len(combined_patches)} already-computed vision result(s) to "
+              f"{cache_path} instead of discarding them. A future supervised "
+              f"BOARD_PATCH_ALLOW_LARGE=1 run (see docs/HANDOFF.md) will apply them with no "
+              f"further vision API calls. {newly_gained} of those were computed this run.",
+              flush=True)
+        return 2
+
+    # The write succeeded (board was under the ceiling, or a human ran this with
+    # BOARD_PATCH_ALLOW_LARGE=1) -- anything that was cached is now durably on the board.
+    if cached_patches:
+        _clear_pending_cache(REPO)
+    print(f"[{time.strftime('%H:%M:%S')}] patched {stats['applied']}/{len(combined_patches)} rows "
           f"(existing board: {stats['existing']:,}) — vision now ≈{scored_now_estimate} "
           f"of {total_rows} listings", flush=True)
 
