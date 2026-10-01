@@ -2777,11 +2777,25 @@ async def run() -> int:
         _divorce_phases["nc_divorce"] = enrich_nc_divorce(enriched)
     except Exception:
         log.error("nc_divorce.failed", traceback=traceback.format_exc())
-    try:
-        from .enrichment_sc_divorce import enrich_sc_divorce
-        _divorce_phases["sc_divorce"] = enrich_sc_divorce(enriched)
-    except Exception:
-        log.error("sc_divorce.failed", traceback=traceback.format_exc())
+    # DISABLED 2026-10-01: portal.fccms.sccourts.org serves a mandatory
+    # click-through Terms page banning "a site data scraper or any similar
+    # software intended to discover and extract data from a website through
+    # automated, repetitive querying" - a click-through ToS wall under this
+    # project's own compliance rule (CLAUDE.md, decided 2026-09-20).
+    # enrichment_sc_divorce.py calls the portal's internal API directly,
+    # bypassing that disclaimer. Confirmed live 2026-10-01; this project's own
+    # docs/walls_register.md and docs/gap_ledger.md already documented this
+    # portal as ToS-walled before this enricher was built against it anyway.
+    # A prior backfill (logs/sc_divorce_supervisor.log, 2026-09-19/20) already
+    # ran ~4,000+ automated queries and wrote matches onto ~585+ board rows -
+    # that is a past-exposure/data-retention question for the owner to decide,
+    # separate from stopping it from running again. Do NOT re-enable without
+    # either a compliant access method or explicit owner sign-off.
+    # try:
+    #     from .enrichment_sc_divorce import enrich_sc_divorce
+    #     _divorce_phases["sc_divorce"] = enrich_sc_divorce(enriched)
+    # except Exception:
+    #     log.error("sc_divorce.failed", traceback=traceback.format_exc())
     _divorce_results = await _gather_phases(_divorce_phases)
     for _dv_name in ("nc_divorce", "sc_divorce"):
         _ds = _divorce_results.get(_dv_name)
