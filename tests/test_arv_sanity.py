@@ -972,7 +972,10 @@ def test_a_contradicted_lead_cannot_reach_hot_but_its_records_still_rank():
                         # an unexplained number and can only help a lead reach WARM.
                         "equity": {"pct": 0.80, "value": 400_000,
                                    "payoff_source": "recorded_deed_of_trust", "confidence": "high"},
-                        "probate": True, "code_enforcement": True,
+                        # audit 2026-10-01: raw['probate'] must name a real decedent/case
+                        # (has_real_probate) to count -- a bare True is not a shape any real
+                        # scraper writes.
+                        "probate": {"case_number": "22E001234"}, "code_enforcement": True,
                         # CHANGED 2026-09-21 (audit F18): the fixture is a foreclosure_sale, and a
                         # foreclosure with no title_risk block (party unknown) is no longer
                         # HOT-eligible; a KNOWN-clean senior-lien foreclosure still is.

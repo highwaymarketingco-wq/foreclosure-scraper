@@ -141,6 +141,27 @@ def _parse_detail(page_html: str) -> dict:
     out["land_value"] = _f(_label_value(lines, "Land Value :"))
     out["parcel_value_total"] = _f(_label_value(lines, "Parcel Value Total :"))
     out["current_balance"] = _f(_label_value(lines, "Current Balance :"))
+    # 2026-10-01 (per-source extraction audit, HERMES sec 8): ViewTaxBill
+    # publishes several more fields that were never read. outbuilding_value
+    # flags a barn/shed/second structure the building_value alone misses
+    # (CAMA-spec gap, HERMES sec 9: "only 32% have real CAMA specs"). The two
+    # dates are a real distress-severity signal: a bill with no last_payment_
+    # date at all has NEVER been paid (worse than a lapsed payer), and a
+    # recent last_transaction_date on a delinquent bill flags a new owner
+    # already behind. Live-verified 2026-10-01 against account 70094770.
+    out["outbuilding_value"] = _f(_label_value(lines, "Outbuilding Value :"))
+    # A blank "Last Payment Date :" line is followed by the NEXT section
+    # header ("Taxes/fees"), not an empty string -- live-verified 2026-10-01
+    # (account 70094770 has never made a payment, so this field is blank on
+    # the live page). _label_value has no way to tell "blank" from "the next
+    # real line", so guard both dates with a date-shape check; a non-match
+    # means the field was genuinely empty, which is itself the signal (a
+    # delinquent bill with NO last_payment_date at all has never been paid).
+    _date_shape = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")
+    last_txn = _label_value(lines, "Last Transaction Date :")
+    out["last_transaction_date"] = last_txn if last_txn and _date_shape.match(last_txn) else None
+    last_pmt = _label_value(lines, "Last Payment Date :")
+    out["last_payment_date"] = last_pmt if last_pmt and _date_shape.match(last_pmt) else None
     return out
 
 
@@ -307,6 +328,9 @@ class TransylvaniaDelinquentTax(BaseScraper):
                                 "building_value": building,
                                 "land_value": land,
                                 "parcel_value_total": det.get("parcel_value_total"),
+                                "outbuilding_value": det.get("outbuilding_value"),
+                                "last_transaction_date": det.get("last_transaction_date"),
+                                "last_payment_date": det.get("last_payment_date"),
                                 "owner_mailing_full": det.get("mailing_full"),
                                 "mailing_state": mail_state,
                                 "signal": "delinquent_property_tax",

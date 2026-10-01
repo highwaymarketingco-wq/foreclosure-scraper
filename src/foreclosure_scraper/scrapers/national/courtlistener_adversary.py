@@ -57,6 +57,7 @@ from .courtlistener_bankruptcy import (
     COURT_STATE,
     _county_from_text,
     _load_token,
+    _split_caption,
 )
 
 log = structlog.get_logger()
@@ -122,6 +123,23 @@ REALTY_RE = re.compile(
     r"\bpremises\b|\bland\b|lot\s+\d)\b",
     re.I,
 )
+
+
+def _as_name(value) -> str | None:
+    """Normalize a RECAP search-hit name field to a single string.
+
+    `trustee_str` is a flattened single string, but `attorney`/`firm` on a
+    type=r result are ARRAYS (every name that ever appeared on any document
+    in the docket). Join so the result is always a plain string, never a
+    list -- the top-level `Listing.trustee` field is typed `str | None`.
+    """
+    if not value:
+        return None
+    if isinstance(value, (list, tuple)):
+        names = [str(v).strip() for v in value if v and str(v).strip()]
+        return "; ".join(dict.fromkeys(names))[:200] or None
+    v = str(value).strip()
+    return v or None
 
 
 def _result_blob(result: dict) -> str:
@@ -319,6 +337,38 @@ class CourtListenerAdversary(BaseScraper):
                             "absolute_url": rd.get("absolute_url"),
                         })
 
+                    # Split the caption -- same reasoning as
+                    # courtlistener_bankruptcy.py: this feed mixes true
+                    # "<Plaintiff> v. <Defendant>" adversary captions in among
+                    # plain "In re <Debtor>" ones, and a lift-stay motion is
+                    # VERY often brought by the mortgage servicer, so the
+                    # un-split case_name regularly put the servicer's own name
+                    # where a homeowner's name belongs.
+                    cap_plaintiff, cap_defendant = _split_caption(case_name)
+
+                    # 2026-10-01 (per-source extraction audit, HERMES sec 8):
+                    # trustee/attorney/firm were already pulled off the search
+                    # hit into raw below but never promoted to the top-level
+                    # `trustee` field -- the one enrichment_title_risk.py and
+                    # enrichment_courts.py actually read. Prefer the true
+                    # bankruptcy trustee (authoritative for a §363 sale: they
+                    # are literally the seller), then the attorney/firm of
+                    # record as a fallback, same priority order already used
+                    # by the raw dict two lines below.
+                    #
+                    # Live-verified 2026-10-01: unlike trustee_str (a single
+                    # flattened string), `attorney`/`firm` on a type=r RECAP
+                    # result are ARRAYS (every attorney who ever appeared on
+                    # any document in the docket, e.g. a lift-stay search
+                    # against ncwb returned up to 25 names on one case) --
+                    # `trustee` is a plain `str | None` Pydantic field, so a
+                    # raw list must be joined, not assigned directly.
+                    trustee_name = _as_name(
+                        res.get("trustee_str")
+                        or res.get("attorney") or res.get("attorney_str")
+                        or res.get("firm") or res.get("firm_str")
+                    )
+
                     out.append(Listing(
                         source=self.slug,
                         source_url=source_url,
@@ -327,7 +377,9 @@ class CourtListenerAdversary(BaseScraper):
                         state=state_default,
                         county=county_match,
                         case_number=docket_no or None,
-                        defendant=case_name[:200] or None,
+                        plaintiff=cap_plaintiff[:200] if cap_plaintiff else None,
+                        defendant=cap_defendant[:200] if cap_defendant else None,
+                        trustee=trustee_name,
                         description=desc,
                         first_seen=datetime.utcnow(),
                         last_seen=datetime.utcnow(),

@@ -36,7 +36,10 @@ def _lead(i: int, **kw) -> Listing:
 def _seed_board(docs: Path) -> list[Listing]:
     rows = [
         _lead(0),  # plain foreclosure -- WARM/COLD depending on contactability, some stack
-        _lead(1, raw={"probate": True, "owner_mailing": {"mailing": "1 X St", "absentee": True}}),
+        # audit 2026-10-01: raw['probate'] must name a real decedent/case (has_real_probate)
+        # to count -- a bare True is not a shape any real scraper writes.
+        _lead(1, raw={"probate": {"case_number": "22E001234"},
+                      "owner_mailing": {"mailing": "1 X St", "absentee": True}}),
         _lead(2, raw={}),  # nothing special
     ]
     wa.write_artifact(rows, {"notes": "patch_distress_score integration seed"}, docs_dir=docs)

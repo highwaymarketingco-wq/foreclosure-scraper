@@ -43,6 +43,7 @@ import structlog
 from typing import Optional
 
 from .models import Listing, ListingType
+from .signal_freshness import has_real_probate
 
 log = structlog.get_logger()
 
@@ -268,8 +269,10 @@ def _categorize(li: Listing) -> Optional[dict]:
         if dflags.get("divorce"):
             distressed_signals.append("divorce_flag")
 
-    # Probate / estate
-    if raw.get("probate") or raw.get("estate"):
+    # Probate / estate. has_real_probate (audit 2026-10-01): raw['probate'] is an always-
+    # written "notice seen" wrapper on several scrapers; bare presence counted a notice that
+    # names no decedent and no case number.
+    if has_real_probate(raw.get("probate")) or has_real_probate(raw.get("estate")):
         distressed_signals.append("probate")
     rs = raw.get("relationship_signal")
     if isinstance(rs, dict) and rs.get("kind"):

@@ -51,7 +51,8 @@ from .mailing_shape import mailing_of
 from .distress_score import SIGNAL_CATEGORY, _storm_signal, _upset_open, _vacant_structure
 from .enrichment_equity import is_countable_debt
 from .signal_freshness import (
-    bankruptcy_lapsed, code_enforcement_open, custody_ended, owner_names_a_death,
+    bankruptcy_lapsed, code_enforcement_open, custody_ended, has_real_probate,
+    owner_names_a_death,
 )
 
 log = structlog.get_logger()
@@ -123,7 +124,10 @@ def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
         out.add("incarceration")
 
     # --- LIFE_EVENT ---
-    if _truthy(raw.get("probate")) or _truthy(raw.get("estate")):
+    # has_real_probate, not _truthy (audit 2026-10-01): raw['probate'] is an always-written
+    # "notice seen" wrapper on several scrapers, so bare presence inflated signal_stack/
+    # intent_score on a notice that names no decedent and no case number.
+    if has_real_probate(raw.get("probate")) or has_real_probate(raw.get("estate")):
         out.add("probate")
     tags = raw.get("life_events")
     if isinstance(tags, (list, tuple, set)):

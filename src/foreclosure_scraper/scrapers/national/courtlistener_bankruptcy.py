@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -136,6 +137,78 @@ def _county_from_text(text: str, state: str) -> str | None:
             if county:
                 return county
     return None
+
+
+# A CourtListener case_name is NOT always "In re <Debtor>" — the /search/
+# endpoint's RECAP results for a bankruptcy COURT also surface true adversary-
+# proceeding-style captions, "<Plaintiff> v. <Defendant>" (live-verified
+# 2026-10-01 against ncwb: "Taylor v. Honeycutt", "United States v. Bingham").
+# The old code dumped the WHOLE case_name into `defendant` -- the field nearly
+# every name-resolution enricher reads as "the person to search"
+# (enrichment_free_phones, enrichment_probate_search, enrichment_nc_doj,
+# enrichment_resolve_name_to_property, ...) -- so a two-party caption became a
+# single nonsense name ("United States v. Bingham"), and worse: when a
+# mortgage servicer or federal agency is itself the captioned party, that
+# institution's own name could land where a homeowner's name belongs
+# (extraction_gaps.md: "servicer/GSE as owner_name ... SERVICEMAC/FNMA/
+# case-caption"). Split the caption, and never let an institution occupy a
+# name-resolution field regardless of which side of "v." it was on.
+_CAPTION_RE = re.compile(r"^(.*?)\s+vs?\.\s+(.*)$", re.I)
+_IN_RE_RE = re.compile(r"^\s*in\s+re[:\s]+", re.I)
+_CAPTION_ETAL_RE = re.compile(r"\bet\.?\s*al\.?\b.*$", re.I)
+_INSTITUTION_RE = re.compile(
+    r"\b(mortgage|\bbank\b|n\.?a\.?\b|servicing|financial\s+corp|funding\s+(?:llc|corp)|"
+    r"capital\s+(?:llc|corp)|credit\s+union|trust\s+co(?:mpany)?|"
+    r"federal\s+national\s+mortgage|federal\s+home\s+loan\s+mortgage|"
+    r"fannie\s+mae|freddie\s+mac|\bfnma\b|\bfhlmc\b|\bfdic\b|\bhud\b|"
+    r"united\s+states(?:\s+of\s+america)?|department\s+of\b|internal\s+revenue|"
+    # Named mortgage servicers/GSEs that carry no generic keyword of their own
+    # (a brand like "NewRez" or "ServiceMac" would otherwise slip the keyword
+    # gate above) -- live-verified 2026-10-01 against a real federal
+    # real-property caption, "Washington v. NewRez, LLC". Not exhaustive; the
+    # keyword gate above catches most new ones ("X Mortgage LLC", "Y Bank").
+    r"servicemac|newrez|nationstar|\bocwen\b|pennymac|carrington\s+mortgage|"
+    r"rushmore\s+loan|selene\s+finance|freedom\s+mortgage|\bloancare\b|"
+    r"specialized\s+loan\s+servicing|\bshellpoint\b|\bphh\b|\bcenlar\b|"
+    r"\bflagstar\b|planet\s+home\s+lending|\bditech\b|lakeview\s+loan|"
+    r"select\s+portfolio\s+servicing|fay\s+servicing|\bmidfirst\b|"
+    r"mr\.?\s*cooper|wells\s+fargo|jpmorgan|\bchase\b|deutsche\s+bank|"
+    r"citimortgage|\bcitibank\b|\bpnc\b|\bsuntrust\b|\btruist\b|\bhsbc\b|"
+    r"wilmington\s+(?:savings|trust)|\bmers\b|mortgage\s+electronic\s+registration)\b",
+    re.I,
+)
+
+
+def _is_institution(name: str | None) -> bool:
+    """True when `name` looks like a bank / servicer / GSE / government party
+    rather than an individual — such a name must never be treated as the
+    owner/debtor to search."""
+    return bool(name) and bool(_INSTITUTION_RE.search(name))
+
+
+def _split_caption(case_name: str | None) -> tuple[str | None, str | None]:
+    """(plaintiff, defendant) parsed from a CourtListener case_name.
+
+    Handles both real shapes this feed returns: a true two-party caption
+    ("<Plaintiff> v. <Defendant>") and a plain bankruptcy caption ("In re
+    <Debtor>", no "v." at all — the common case, left exactly as the old
+    code's behavior for it). An institution is never returned on either side
+    of a name-resolution field.
+    """
+    text = (case_name or "").strip()
+    if not text:
+        return None, None
+    m = _CAPTION_RE.match(text)
+    if not m:
+        debtor = _IN_RE_RE.sub("", text).strip() or None
+        return None, (None if _is_institution(debtor) else debtor)
+    plaintiff = m.group(1).strip(" ,.") or None
+    defendant = _CAPTION_ETAL_RE.sub("", m.group(2)).strip(" ,.") or None
+    if _is_institution(plaintiff):
+        plaintiff = None
+    if _is_institution(defendant):
+        defendant = None
+    return plaintiff, defendant
 
 
 def _chapter_from_text(*texts: str) -> str:
@@ -350,6 +423,11 @@ class CourtListenerBankruptcy(BaseScraper):
                         {"date_filed": date_filed, "date_terminated": d.get("date_terminated")}
                     )
 
+                    # Split the caption so a two-party case_name doesn't become
+                    # one nonsense `defendant`, and so a bank/servicer/GSE/
+                    # government party never lands in a name-resolution field.
+                    cap_plaintiff, cap_defendant = _split_caption(case_name)
+
                     out.append(
                         Listing(
                             source=self.slug,
@@ -359,7 +437,8 @@ class CourtListenerBankruptcy(BaseScraper):
                             state=state,
                             county=county,
                             case_number=docket_no,
-                            defendant=case_name[:200] or None,
+                            plaintiff=cap_plaintiff[:200] if cap_plaintiff else None,
+                            defendant=cap_defendant[:200] if cap_defendant else None,
                             trustee=d.get("trustee") or None,  # §363 seller / disposition trustee
                             description=desc,
                             first_seen=datetime.utcnow(),

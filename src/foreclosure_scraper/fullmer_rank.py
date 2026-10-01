@@ -56,6 +56,7 @@ from typing import Optional
 
 from .mailing_shape import mailing_of
 from .models import Listing
+from .signal_freshness import has_real_probate
 
 # ---------------------------------------------------------------- thresholds
 # Every constant below is a quote, kept as a named POINT weight rather than a
@@ -433,10 +434,13 @@ def score(li: Listing, msa_tier: dict | None = None) -> dict:
         add("some_owners", 8, f"multi_owner_{oc}")
 
     raw = _raw(li)
+    # has_real_probate, not bare presence (audit 2026-10-01): raw['probate'] is an always-
+    # written "notice seen" wrapper on several scrapers, so bare presence awarded the
+    # probate_heirs points on a notice that names no decedent and no case number.
     blob_probate = any(
         t in (str(li.owner_name or "") + str(li.defendant or "")).lower()
         for t in ("estate of", "heirs", "deceased")
-    ) or bool(raw.get("probate")) or "probate" in src
+    ) or has_real_probate(raw.get("probate")) or "probate" in src
     if blob_probate:
         # "Heirship ... this is where 70% of our deals live."
         add("probate_heirs", 16, "probate_or_heirs")

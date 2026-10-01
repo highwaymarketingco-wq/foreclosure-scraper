@@ -365,8 +365,10 @@ def test_dedupe_key_collision_with_different_scores_is_dropped_not_misapplied(tm
     # Two rows with NO parcel_id sharing the exact same normalized address+zip -> the SAME
     # dedupe_key() (address branch), but DIFFERENT county -> DIFFERENT _parcel_key() groups ->
     # can score differently. One gets a probate signal, the other does not.
+    # audit 2026-10-01: raw['probate'] must name a real decedent/case (has_real_probate) to
+    # count -- a bare True is not a shape any real scraper writes.
     a = _lead(0, parcel_id=None, street_address="77 Collision Rd", zip_code="28052",
-             county="Gaston", raw={"probate": True})
+             county="Gaston", raw={"probate": {"case_number": "22E001234"}})
     b = _lead(1, parcel_id=None, street_address="77 Collision Rd", zip_code="28052",
              county="Cleveland", raw={})
     assert a.dedupe_key() == b.dedupe_key()  # confirm the premise

@@ -62,7 +62,7 @@ from .enrichment_equity import (
     equity_is_evidenced, is_countable_debt, valuation_ran_without_arv,
 )
 from .signal_freshness import (
-    bankruptcy_lapsed, code_enforcement_open, custody_ended, to_date,
+    bankruptcy_lapsed, code_enforcement_open, custody_ended, has_real_probate, to_date,
 )
 from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 
@@ -729,7 +729,11 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
         sig.append(("incarceration", "LEGAL", 8, NO))  # low-conf name-only signal
 
     # ---- life events -----------------------------------------------------------------
-    if r.get("probate") or r.get("estate"):
+    # has_real_probate (audit 2026-10-01): raw['probate'] is an always-written "notice seen"
+    # wrapper on several scrapers (sc_public_notices.py, column_legal_notices.py), so a bare
+    # presence check scored a notice that names no decedent and no case number. Measured 135 of
+    # 555 raw['probate'] dicts board-wide had neither, 14 of them riding this signal to WARM.
+    if has_real_probate(r.get("probate")) or has_real_probate(r.get("estate")):
         # an estate case record (notice or court file). It is name-based only when the lead's
         # PARCEL came from the name-to-property resolver (`by_name`), the case audit F6 names.
         sig.append(("probate", "LIFE_EVENT", 20, NJ if by_name else REC))

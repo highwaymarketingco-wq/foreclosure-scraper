@@ -20,7 +20,7 @@ from typing import Any, Optional
 
 __all__ = [
     "to_date", "stamp", "is_stale", "code_enforcement_open", "bankruptcy_lapsed",
-    "bankruptcy_case_age", "custody_ended", "owner_names_a_death",
+    "bankruptcy_case_age", "custody_ended", "owner_names_a_death", "has_real_probate",
     "BK_TTL_DAYS_CH7", "BK_TTL_DAYS_OTHER", "LONG_OPEN_THRESHOLD_DAYS",
 ]
 
@@ -179,3 +179,31 @@ _DEATH_NAME_RE = re.compile(r"\bHEIRS?\b|\bEST(?:ATE)?\s+OF\b", re.I)
 
 def owner_names_a_death(owner_name: Any) -> bool:
     return bool(_DEATH_NAME_RE.search(str(owner_name or "")))
+
+
+# Audit 2026-10-01: raw['probate'] is written by several scrapers as an ALWAYS-PRESENT
+# "we searched this notice" wrapper, the same bug class as the Greenville `distressed=True`
+# stamp (commits d1fe4056/2190aa5a/8081e57b) and the SC `divorce` case_count:0 wrapper
+# (distress_score._divorce_signal already guards on case_count for exactly this reason).
+# sc_public_notices.py writes {"decedent": defendant or None, "es_case_number": ... or None,
+# ...} for EVERY "probate" notice kind, whether or not a decedent name or case number was
+# actually captured; column_legal_notices.py's SC probate path writes a dict with only
+# date_of_death / personal_representative, never a decedent name or case number at all. A
+# bare `if raw.get("probate")` reads that empty wrapper as a hit. Measured board-wide
+# (2026-10-01): 135 of 555 raw['probate'] dicts carry none of the identifiers below --
+# mostly column_legal_notices (83) and sc_public_notices (45) -- and 14 of those 135 were
+# riding the scorer to a WARM tier on a notice that names no one.
+_PROBATE_IDENTIFIERS = ("decedent", "case_number", "es_case_number", "nc_estate_file_no")
+
+
+def has_real_probate(p: Any) -> bool:
+    """True when raw['probate'] (or the raw['estate'] alias some readers also check) names an
+    actual decedent or a real case/file number, not just an empty "notice seen, nothing
+    matched" wrapper. A dict holding only `date_of_death` / `personal_representative` /
+    `match_confidence` with no decedent name and no case number is not an actionable probate
+    lead: there is no name or docket to work. Every current reader of raw['probate']
+    (distress_score, enrichment_strategy_fit, enrichment_property_category,
+    enrichment_lead_signals, fullmer_rank) should gate on this instead of bare presence."""
+    if not isinstance(p, dict):
+        return False
+    return any(str(p.get(k) or "").strip() for k in _PROBATE_IDENTIFIERS)

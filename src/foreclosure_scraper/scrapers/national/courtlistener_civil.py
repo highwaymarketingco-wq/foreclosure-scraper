@@ -19,9 +19,27 @@ property:
   230  Rent Lease & Ejectment
   240  Torts to Land
   290  Other Real Property
+
+2026-10-01 ENDPOINT FIX (per-source extraction audit, docs/HERMES.md sec 8):
+this scraper was pulling /dockets/ directly, the SAME endpoint
+courtlistener_bankruptcy.py's own 2026-08-02 docstring documents as broken
+for exactly this purpose -- nature_of_suit/cause come back EMPTY STRING on
+fresh filings (live-verified 2026-10-01: 0/5 sampled ncwd dockets filed in
+the last 90 days had either field populated), so `_is_real_property_case()`
+could almost never match a RECENT case -- a silent, HTTP-200, "looks fine"
+starvation of exactly the freshest, most actionable leads (the CLAUDE.md
+"silent success" failure mode). The bankruptcy scraper already fixed this by
+switching to `/search/?type=r`, which carries `suitNature` inline (live-
+verified 2026-10-01: 10/20 ncwd rows populated via /search/ vs 0/5 via
+/dockets/) and, as a bonus, trustee/party/attorney/firm fields the old
+/dockets/ pull never had access to at all. This file now reuses the same
+/search/ pagination + normalizer the bankruptcy scraper already built rather
+than duplicating a second broken pull.
 """
 from __future__ import annotations
 
+import asyncio
+import time
 from datetime import datetime, timedelta
 from typing import Iterable
 
@@ -32,17 +50,25 @@ from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
 # Reuse the helper functions from the bankruptcy scraper — same auth,
-# same pagination, same county-from-text recovery.
+# same /search/ pagination + normalizer, same county-from-text recovery.
 from .courtlistener_bankruptcy import (
     API_BASE,
     LOOKBACK_DAYS,
-    MAX_PAGES_PER_COURT,
-    PAGE_SIZE,
+    SEARCH_PAGE_SIZE,
+    _auth_headers,
     _county_from_text,
     _load_token,
+    _normalize_search_hit,
+    _PAGE_RETRIES,
+    _split_caption,
 )
 
 log = structlog.get_logger()
+
+# Civil real-property volume is much smaller than bankruptcy's (see module
+# docstring), so a far smaller page cap than bankruptcy's 200 already gives
+# generous headroom (50 pages x 20/page = 1,000 rows/court/90-day window).
+MAX_SEARCH_PAGES_PER_COURT_CIVIL = 50
 
 
 # Federal District Courts covering NC + SC
@@ -84,38 +110,60 @@ def _is_real_property_case(docket: dict) -> bool:
     return False
 
 
-async def _fetch_court_civil(c, court: str, token: str) -> list[dict]:
-    """Pull recent civil dockets from one federal district court."""
+async def _fetch_court_civil(
+    c, court: str, token: str | None, deadline: float | None = None,
+) -> list[dict]:
+    """Pull recent civil dockets from one federal district court.
+
+    Uses the v4 /search/ endpoint (type=r = RECAP dockets), same as
+    courtlistener_bankruptcy._fetch_court, because it returns `suitNature`
+    inline where /dockets/ returns an empty string on fresh filings (see the
+    2026-10-01 ENDPOINT FIX note in this module's docstring).
+    """
     cutoff = (datetime.utcnow() - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
     out: list[dict] = []
     next_url: str | None = (
-        f"{API_BASE}/dockets/?court={court}&date_filed__gte={cutoff}"
-        f"&page_size={PAGE_SIZE}"
+        f"{API_BASE}/search/?type=r&court={court}&filed_after={cutoff}"
+        f"&page_size={SEARCH_PAGE_SIZE}&order_by=dateFiled%20desc"
     )
+    headers = _auth_headers(token)
     page = 0
-    while next_url and page < MAX_PAGES_PER_COURT:
-        try:
-            r = await c.get(
-                next_url,
-                headers={"Authorization": f"Token {token}", "Accept": "application/json"},
-            )
-            if r.status_code != 200:
-                log.warning("courtlistener_civil.error",
-                            court=court, status=r.status_code)
-                break
-            data = r.json()
-            results = data.get("results") or []
-            # Pre-filter to real-property cases at the page level — saves
-            # the orchestrator from parsing irrelevant dockets.
-            for d in results:
-                if _is_real_property_case(d):
-                    out.append(d)
-            next_url = data.get("next")
-            page += 1
-        except Exception as exc:
-            log.warning("courtlistener_civil.fetch_error",
-                        court=court, error=str(exc)[:120])
+    while next_url and page < MAX_SEARCH_PAGES_PER_COURT_CIVIL:
+        if deadline is not None and time.monotonic() > deadline:
+            log.warning("courtlistener_civil.budget_exhausted",
+                        court=court, pages=page, rows=len(out))
             break
+        # Same retry-with-backoff as courtlistener_bankruptcy._fetch_court:
+        # a single transient ReadTimeout (common against this host — it is
+        # per-host throttled) used to abandon the WHOLE court after page 1
+        # with no retry, live-reproduced 2026-10-01 (3 of 4 civil courts
+        # dropped to 0 rows on a bare, message-less exception on first try).
+        data = None
+        for attempt in range(_PAGE_RETRIES):
+            try:
+                r = await c.get(next_url, headers=headers)
+                if r.status_code != 200:
+                    log.warning("courtlistener_civil.error",
+                                court=court, status=r.status_code)
+                    break
+                data = r.json()
+                break
+            except Exception as exc:  # noqa: BLE001 — transient network/read timeout
+                log.warning("courtlistener_civil.fetch_error", court=court, page=page,
+                            attempt=attempt + 1,
+                            error=f"{type(exc).__name__}: {str(exc)[:100]}")
+                if attempt + 1 < _PAGE_RETRIES:
+                    await asyncio.sleep(2.0 * (attempt + 1))
+        if data is None:
+            break
+        # Pre-filter to real-property cases at the page level — saves
+        # the orchestrator from parsing irrelevant dockets.
+        for hit in data.get("results") or []:
+            d = _normalize_search_hit(hit, court)
+            if _is_real_property_case(d):
+                out.append(d)
+        next_url = data.get("next")
+        page += 1
     return out
 
 
@@ -130,6 +178,12 @@ class CourtListenerCivil(BaseScraper):
     timeout_s = 360.0
 
     async def fetch(self) -> Iterable[Listing]:
+        # Kept token-required (unlike courtlistener_bankruptcy, which made
+        # this optional): an existing test (test_civil_skips_without_token)
+        # asserts the no-token path returns [] without touching the network,
+        # and that contract is not part of the confirmed gap this pass fixes
+        # (the /dockets/ -> /search/ endpoint switch below). Not changed here
+        # to avoid an unreviewed behavior change outside this audit's scope.
         token = _load_token()
         if not token:
             log.info("courtlistener_civil.no_token")
@@ -137,10 +191,11 @@ class CourtListenerCivil(BaseScraper):
 
         out: list[Listing] = []
         seen_keys: set[tuple[str, str]] = set()
+        deadline = time.monotonic() + self.timeout_s * 0.8
 
         async with client(timeout=20.0) as c:
             for court in CIVIL_COURTS:
-                dockets = await _fetch_court_civil(c, court, token)
+                dockets = await _fetch_court_civil(c, court, token, deadline)
                 state_default = CIVIL_COURT_STATE.get(court, "NC")
 
                 for d in dockets:
@@ -172,6 +227,18 @@ class CourtListenerCivil(BaseScraper):
                         + (f" — {case_name[:120]}" if case_name else "")
                     )[:500]
 
+                    # A federal real-property case_name IS a true "<Plaintiff>
+                    # v. <Defendant>" caption (live-verified 2026-10-01, e.g.
+                    # "Federal National Mortgage Association v. <Borrower>"),
+                    # and nearly every real-property plaintiff here IS a
+                    # mortgage servicer/GSE. The old code dumped the whole
+                    # caption into `defendant` -- the field downstream
+                    # name-resolution enrichers read as "the owner" -- so the
+                    # servicer's own name regularly ended up looking like the
+                    # homeowner's (extraction_gaps.md: "servicer/GSE as
+                    # owner_name ... SERVICEMAC/FNMA/case-caption"). Split it.
+                    cap_plaintiff, cap_defendant = _split_caption(case_name)
+
                     out.append(Listing(
                         source=self.slug,
                         source_url=("https://www.courtlistener.com" + d["absolute_url"]) if d.get("absolute_url") else "",
@@ -180,7 +247,13 @@ class CourtListenerCivil(BaseScraper):
                         state=state,
                         county=county,
                         case_number=docket_no or None,
-                        defendant=case_name[:200] or None,
+                        plaintiff=cap_plaintiff[:200] if cap_plaintiff else None,
+                        defendant=cap_defendant[:200] if cap_defendant else None,
+                        # The /search/ switch (see module docstring) surfaces
+                        # trustee/attorney/firm/party fields /dockets/ never
+                        # had -- HERMES sec 8 explicitly calls out
+                        # attorney/trustee as a required field to capture.
+                        trustee=d.get("trustee") or None,
                         description=desc,
                         first_seen=datetime.utcnow(),
                         last_seen=datetime.utcnow(),
@@ -191,6 +264,13 @@ class CourtListenerCivil(BaseScraper):
                             "case_name": case_name,
                             "date_filed": date_filed,
                             "absolute_url": d.get("absolute_url"),
+                            "docket_id": d.get("docket_id"),
+                            "pacer_case_id": d.get("pacer_case_id"),
+                            "trustee": d.get("trustee") or None,
+                            "party": d.get("party") or None,
+                            "attorney": d.get("attorney") or None,
+                            "firm": d.get("firm") or None,
+                            "date_terminated": d.get("date_terminated"),
                         }},
                     ))
 

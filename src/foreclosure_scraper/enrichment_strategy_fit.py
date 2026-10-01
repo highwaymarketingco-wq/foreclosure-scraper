@@ -25,7 +25,7 @@ import os
 from typing import Iterable
 
 from .models import Listing
-from .signal_freshness import owner_names_a_death
+from .signal_freshness import has_real_probate, owner_names_a_death
 
 _ENABLED = os.environ.get("STRATEGY_FIT") != "0"
 
@@ -34,7 +34,10 @@ _ROUGH_CONDITION = {"major", "gut"}
 
 
 def _is_probate(li: Listing, lt: str, raw: dict) -> bool:
-    if "probate" in lt or lt in ("estate_lead",) or raw.get("probate") or raw.get("estate"):
+    # has_real_probate (audit 2026-10-01): raw['probate'] is an always-written "notice seen"
+    # wrapper on several scrapers; a bare presence check counted a notice naming no decedent.
+    if ("probate" in lt or lt in ("estate_lead",)
+            or has_real_probate(raw.get("probate")) or has_real_probate(raw.get("estate"))):
         return True
     tags = raw.get("life_events")
     # only the estate_probate tag, and only when the owner name really names a death
