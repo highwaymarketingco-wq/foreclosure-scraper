@@ -7,6 +7,27 @@ linked from that page as "Notice of Tax Foreclosure Sales".  Each posting
 carries the sale date and a DocumentCenter link to the scanned notice PDF;
 owner/parcel/address come from the document-OCR enricher.
 
+FIXED 2026-10-01 (batch-5 extraction-completeness audit): two misses found
+live. (1) The DocumentCenter PDF link is almost never on the Bids LIST page
+itself (confirmed live: the one active posting, bidID=263, carries no doc
+link in its list-page block at all) -- it is only on the posting's OWN
+detail page (``bids.aspx?bidID=N``). The scraper never fetched that detail
+page, so the notice PDF -- the one thing this source exists to surface, per
+this module's own docstring -- was never found in practice. (2) Even when a
+pdf_url WAS found, it was stashed only at
+``raw['haywood_tax_foreclosures']['pdf_url']``, a nested key
+`enrichment_doc_ocr._DOC_FIELDS` never looks at (it reads top-level
+``raw['document_url']`` / ``raw['documents']`` / ``raw['pdf_url']``) -- so
+the OCR pass that is supposed to backfill owner/parcel/address from this PDF
+was silently never running. Fixed by best-effort fetching each posting's
+detail page and routing its content through the shared
+``harvest_document_links`` + ``stamp_documents`` helpers (same pattern as
+``counties_sc.meares_auctions``), restricted to PDF/image so detail-page
+chrome/logos are never mistaken for the notice scan. The DocumentCenter
+filename often carries the owner's surname (e.g.
+"/DocumentCenter/View/7948/Conner") -- captured as a raw hint since it is a
+real, free signal this source previously discarded entirely.
+
 Free, public, no login.
 Slug: counties_nc.haywood_tax_foreclosures
 Category: county_tax
@@ -14,6 +35,7 @@ ListingType: TAX_SALE
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime
 from typing import Iterable
@@ -22,6 +44,7 @@ from urllib.parse import urljoin
 import structlog
 
 from ...base_scraper import BaseScraper
+from ...document_links import harvest_document_links, stamp_documents
 from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
@@ -155,6 +178,49 @@ def _parse_bid_rows(html: str) -> list[Listing]:
     return out
 
 
+# DocumentCenter filenames on this county's site commonly carry the owner's
+# surname, e.g. "/DocumentCenter/View/7948/Conner" -- a real, free signal this
+# scraper previously threw away entirely (the old regex only kept the numeric
+# view id). Best-effort only: no filename, no hint.
+_DOC_FILENAME_HINT_RE = re.compile(r"/DocumentCenter/View/\d+/([^/?#]+)", re.I)
+
+#: Postings are typically few (a handful of active tax-sale notices at a
+#: time); still bounded so a future bulk relist can't blow up the run.
+_MAX_DETAIL_FETCH = 25
+
+
+async def _enrich_from_detail(li: Listing) -> None:
+    """Fetch this posting's own bids.aspx detail page: the DocumentCenter
+    notice-PDF link lives there, almost never on the list page (confirmed
+    live 2026-10-01 -- the one active posting's list-page block carries no
+    doc link at all). Routes the PDF through the shared harvester so
+    enrich_doc_ocr (which only reads TOP-LEVEL raw['document_url'] /
+    raw['documents'] / raw['pdf_url'], never the nested
+    raw['haywood_tax_foreclosures'] blob below) actually sees it."""
+    detail_url = li.raw.get("haywood_tax_foreclosures", {}).get("bid_detail_url")
+    if not detail_url:
+        return
+    try:
+        html = await get_text(detail_url, impersonate=True, timeout=40.0)
+    except Exception as exc:  # noqa: BLE001 — enrichment is best-effort
+        log.info("haywood_tax.detail_failed", url=detail_url, error=str(exc)[:160])
+        return
+    if not html:
+        return
+    docs = [
+        u for u in harvest_document_links(html, base_url=detail_url)
+        if re.search(r"\.(pdf|tiff?|jpe?g|png)(?:[?#]|$)", u, re.I)
+        or "documentcenter/view" in u.lower()
+    ]
+    if docs:
+        stamp_documents(li, docs)
+        li.raw["haywood_tax_foreclosures"]["pdf_url"] = docs[0]
+        li.raw["haywood_tax_foreclosures"]["is_pdf_link"] = True
+        m = _DOC_FILENAME_HINT_RE.search(docs[0])
+        if m:
+            li.raw["haywood_tax_foreclosures"]["document_filename_hint"] = m.group(1)
+
+
 class HaywoodTaxForeclosures(BaseScraper):
     slug = "counties_nc.haywood_tax_foreclosures"
     name = "Haywood County NC Tax Foreclosures"
@@ -176,7 +242,15 @@ class HaywoodTaxForeclosures(BaseScraper):
             if bids_html and len(bids_html) >= 200:
                 out.extend(_parse_bid_rows(bids_html))
         if out:
-            log.info("haywood_tax.done", count=len(out), lane="bids")
+            # Best-effort per-posting detail fetch: this is where the actual
+            # notice PDF link lives (see _enrich_from_detail docstring).
+            await asyncio.gather(
+                *(_enrich_from_detail(li) for li in out[:_MAX_DETAIL_FETCH]),
+                return_exceptions=True,
+            )
+            log.info("haywood_tax.done", count=len(out), lane="bids",
+                     with_pdf=sum(1 for li in out
+                                  if li.raw.get("haywood_tax_foreclosures", {}).get("pdf_url")))
             return out
 
         try:
