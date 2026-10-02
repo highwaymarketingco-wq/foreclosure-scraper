@@ -66,6 +66,21 @@ class LiensNCScraper(BaseScraper):
     expected_min_count = 0  # May be 0 if no recent filings
     requires_apify = False
     timeout_s = 180.0
+    # DISABLED 2026-10-01 (national/reo per-source audit): fetch() already
+    # hardcoded `return []` (see module docstring: login-gated since the real
+    # search moved to /search-for-filings.html) but never set disabled=True,
+    # so every run reported OUTCOME_ZERO ("ran clean but returned 0 rows")
+    # instead of OUTCOME_DORMANT -- an ambiguous zero that looks identical to
+    # a real search finding nothing, which is exactly the "silent success"
+    # failure mode CLAUDE.md warns about. No behavior change (fetch() already
+    # never touched the network); this only makes the run report honest about
+    # WHY it is zero. counties_generic.liensnc is the real, working pipeline
+    # for this signal (56K+ rows).
+    disabled = True
+    disabled_reason = (
+        "login-gated since the real search moved to /search-for-filings.html; "
+        "counties_generic.liensnc is the working replacement pipeline"
+    )
 
     async def fetch(self) -> Iterable[Listing]:
         # Disabled — see module docstring. The real search is login-gated;

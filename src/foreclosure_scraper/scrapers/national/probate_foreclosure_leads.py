@@ -28,6 +28,17 @@ class ProbateForeclosureLeads(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 30.0
+    # DISABLED 2026-10-01 (national/reo per-source audit): fetch() already
+    # hardcoded `return []` (paid Apify actor, opted out) but never set
+    # disabled=True, so every run reported OUTCOME_ZERO ("ran clean but
+    # returned 0 rows") instead of OUTCOME_DORMANT -- an ambiguous zero that
+    # looks identical to a real search finding nothing. No behavior change;
+    # this only makes the run report honest about WHY it is zero.
+    disabled = True
+    disabled_reason = (
+        "paid Apify actor (jungle_synthesizer/probate-foreclosure-leads-scraper), "
+        "opted out; signal captured via law_firms.* + public_notices.ncnotices instead"
+    )
 
     async def fetch(self) -> Iterable[Listing]:
         log.info("probate.skipped",
