@@ -275,6 +275,20 @@ def _build_listing(state: str, lot: dict) -> Listing | None:
     cm = _COUNTY_RE.search(desc) or _COUNTY_RE.search(lead)
     if cm:
         county = cm.group(1).strip()
+    if not county:
+        # FIXED 2026-10-01 (national-auction-tier audit, batch 4): most lots
+        # never spell out "<X> County" in the title/description at all (they
+        # just say "Lincolnton NC" or "Rutherfordton, NC") so the regex above
+        # misses the majority of in-footprint hits -- live-verified two NC
+        # rows (Lincolnton, Rutherfordton -- both in-footprint) came back
+        # with county=None despite the city alone being enough to resolve
+        # it. Fall back to the shared WNC/upstate-SC gazetteer already used
+        # by national.gsa_realproperty for exactly this.
+        try:
+            from ..._upstate_city_to_county import upstate_county_for
+            county = upstate_county_for(city, auction.get("eventState") or state)
+        except Exception:  # noqa: BLE001
+            pass
 
     cat_name = None
     for c in (lot.get("category") or []):
