@@ -118,6 +118,40 @@ def _case_id_from_doc(doc: RodDoc) -> str | None:
     return None
 
 
+def _all_grantor_names(doc: RodDoc) -> str | None:
+    """Every grantor-side party name on this recording, joined and deduped.
+
+    CCHS-sourced docs (Burke/Cleveland/Lincoln/Henderson) serve ONE ROW PER
+    PARTY (see this module's `_former_owner` docstring, `deed_index.py`'s
+    module docstring -- "Burke 2025: 166 party rows for 55 documents" -- and
+    `rod/cchs.py`'s own sweep docstring) and the vendor adapter already
+    collapses them into `raw['grantors']`. `_former_owner` (below) reads that
+    full list for the POST-sale path, but this PRE-sale path used to read
+    only the single `doc.grantor` -- the FIRST party's name -- which silently
+    dropped every co-owner on a multi-grantor Notice of Sale / Lis Pendens
+    (a husband-and-wife or multi-heir filing). Aumentum/Cott docs don't
+    populate `raw['grantors']`, so this falls back to plain `doc.grantor`
+    for those exactly as before -- no behavior change there.
+    """
+    raw = doc.raw if isinstance(doc.raw, dict) else {}
+    names = raw.get("grantors")
+    if names:
+        seen: set[str] = set()
+        out: list[str] = []
+        for n in names:
+            n = (n or "").strip()
+            if not n:
+                continue
+            key = n.upper()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(n)
+        if out:
+            return "; ".join(out)
+    return doc.grantor
+
+
 def _doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
     """Convert a PRE-sale recording (NOD / Notice of Sale / Lis Pendens)
     into a LIS_PENDENS Listing — early-warning lead, not a sold comp."""
@@ -131,7 +165,7 @@ def _doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
         parcel_id=doc.parcel_id,
         legal_description=doc.notes,
         case_number=_case_id_from_doc(doc),
-        defendant=doc.grantor,
+        defendant=_all_grantor_names(doc),
         plaintiff=doc.grantee,
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
@@ -144,6 +178,7 @@ def _doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
                 "page": doc.page,
                 "instrument_no": doc.instrument_no,
                 "grantor": doc.grantor,
+                "grantors": (doc.raw or {}).get("grantors") if isinstance(doc.raw, dict) else None,
                 "grantee": doc.grantee,
                 "kind": "pre_sale",
             },

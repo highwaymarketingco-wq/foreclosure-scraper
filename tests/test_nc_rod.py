@@ -13,6 +13,7 @@ from foreclosure_scraper.rod.models import RodDoc
 from foreclosure_scraper.scrapers.counties_nc.nc_rod_substitute_trustee import (
     SOURCES,
     NCRodSubstituteTrustee,
+    _all_grantor_names,
     _doc_to_listing,
 )
 
@@ -138,6 +139,54 @@ def test_doc_listing_type_is_lis_pendens():
     )
     li = _doc_to_listing(doc, vendor_label="cchs")
     assert li.listing_type == ListingType.LIS_PENDENS
+
+
+# ---- multi-grantor (CCHS "one row per party") pre-sale listings ----
+
+def test_pre_sale_defendant_joins_all_cchs_grantors_not_just_the_first():
+    """rod/cchs.py serves one <r> row per PARTY and collapses them into
+    raw['grantors'] (module docstring: 'Burke 2025: 166 party rows for 55
+    documents'). The old code used only doc.grantor (the first party),
+    silently dropping every co-owner on a multi-grantor Notice of Sale."""
+    doc = RodDoc(
+        county="Burke", state="NC",
+        doc_type="NOTICE OF SALE",
+        recorded_date=datetime(2026, 5, 1),
+        instrument_no="20260099999",
+        grantor="Hardin Clarence",   # first party row CCHS happened to emit
+        grantee="Trustee Acme",
+        raw={"grantors": ["Hardin Clarence", "Hardin Oma"]},
+    )
+    li = _doc_to_listing(doc, vendor_label="cchs")
+    assert li.defendant == "Hardin Clarence; Hardin Oma"
+    assert li.raw["nc_rod"]["grantors"] == ["Hardin Clarence", "Hardin Oma"]
+
+
+def test_pre_sale_defendant_dedupes_repeated_grantor_rows():
+    doc = RodDoc(
+        county="Cleveland", state="NC",
+        doc_type="LIS PENDENS",
+        grantor="Smith John",
+        raw={"grantors": ["Smith John", "Smith John", "Smith John"]},
+    )
+    assert _all_grantor_names(doc) == "Smith John"
+
+
+def test_pre_sale_defendant_falls_back_to_plain_grantor_without_a_list():
+    """Aumentum/Cott docs never populate raw['grantors'] — behavior for
+    those vendors must be unchanged (single doc.grantor, as before)."""
+    doc = RodDoc(
+        county="Buncombe", state="NC",
+        doc_type="NOTICE OF SALE",
+        grantor="Smith John",
+        raw={},
+    )
+    assert _all_grantor_names(doc) == "Smith John"
+
+
+def test_all_grantor_names_handles_no_raw_dict_at_all():
+    doc = RodDoc(county="Polk", state="NC", doc_type="LIS PENDENS", grantor="Brown Jane")
+    assert _all_grantor_names(doc) == "Brown Jane"
 
 
 # ---- scraper class metadata ----
