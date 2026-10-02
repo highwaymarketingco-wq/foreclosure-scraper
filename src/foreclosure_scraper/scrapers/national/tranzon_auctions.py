@@ -35,27 +35,16 @@ HEADERS = {
     ),
 }
 
-# State → county mapping for NC/SC cities we expect to see
-NC_CITIES = {
-    "wilson": "Wilson",
-    "raleigh": "Wake",
-    "asheville": "Buncombe",
-    "charlotte": "Mecklenburg",
-    "fayetteville": "Cumberland",
-    "greensboro": "Guilford",
-    "winston-salem": "Forsyth",
-    "durham": "Durham",
-    "wilmington": "New Hanover",
-}
-SC_CITIES = {
-    "spartanburg": "Spartanburg",
-    "greenville": "Greenville",
-    "columbia": "Richland",
-    "charleston": "Charleston",
-    "anderson": "Anderson",
-    "florence": "Florence",
-    "sumter": "Sumter",
-}
+# FIXED 2026-10-01 (national-auction-tier audit, batch 4): this hardcoded
+# city->county map only covered ~9 big-metro cities per state, NONE of
+# which are in the 18-county footprint (Wilson/Raleigh/Charlotte/.../
+# Durham for NC; Greenville/Columbia/Charleston/... for SC are all
+# out-of-footprint or outright DENIED). A real in-footprint hit (e.g.
+# Rutherfordton, Hendersonville, Spartanburg itself was the one accidental
+# overlap) would have silently gotten county=None. Use the shared
+# WNC/upstate-SC gazetteer instead (same helper national.gsa_realproperty,
+# national.hibid_real_estate and national.gsa_surplus already use) via
+# _county_for() below.
 
 
 def _parse_address(raw: str) -> tuple[str | None, str | None, str | None, str | None]:
@@ -103,6 +92,18 @@ def _parse_date(raw: str) -> datetime | None:
     return None
 
 
+def _county_for(city: str | None, state: str) -> str | None:
+    """Best-effort city -> in-footprint county via the shared gazetteer.
+    Returns None when unknown (the row is still emitted)."""
+    if not city:
+        return None
+    try:
+        from ..._upstate_city_to_county import upstate_county_for
+        return upstate_county_for(city, state)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 async def _fetch_tranzon() -> list[Listing]:
     out: list[Listing] = []
     try:
@@ -123,6 +124,13 @@ async def _fetch_tranzon() -> list[Listing]:
     addr_spans = tree.css("span[id^='ContentPlaceHolder1_SearchGrid_lbladdress1_']")
     date_spans = tree.css("span[id^='ContentPlaceHolder1_SearchGrid_lblAuctionDate1_']")
     city_spans = tree.css("span[id^='ContentPlaceHolder1_SearchGrid_lblcitysate_']")
+    # FIXED 2026-10-01 (national-auction-tier audit, batch 4): both of these
+    # carry the same per-row index N as the fields above but were never
+    # read -- source_url pointed every single row at the generic search
+    # page instead of its own listing, and a real per-property photo
+    # (propertyimagesmedium/{id}.jpg) was dropped on the floor.
+    img_cells = tree.css("img[id^='ContentPlaceHolder1_SearchGrid_Propimgcell_']")
+    detail_links = tree.css("a[id^='ContentPlaceHolder1_SearchGrid_lnkproperty_']")
 
     # Build index → data maps
     addr_map: dict[int, str] = {}
@@ -146,6 +154,24 @@ async def _fetch_tranzon() -> list[Listing]:
         if m:
             city_map[int(m.group(1))] = span.text()
 
+    img_map: dict[int, str] = {}
+    for img in img_cells:
+        sid = img.attributes.get("id", "")
+        m = re.search(r"Propimgcell_(\d+)$", sid)
+        src = (img.attributes.get("src") or "").strip()
+        if m and src:
+            img_map[int(m.group(1))] = src if src.startswith("http") else f"https://www.tranzon.com{src}"
+
+    detail_map: dict[int, str] = {}
+    for a in detail_links:
+        sid = a.attributes.get("id", "")
+        m = re.search(r"lnkproperty_(\d+)$", sid)
+        href = (a.attributes.get("href") or "").strip()
+        if m and href:
+            detail_map[int(m.group(1))] = (
+                href if href.startswith("http") else f"https://www.tranzon.com{href}"
+            )
+
     for idx, raw_addr in sorted(addr_map.items()):
         # Use lblcitysate for clean city/state separation
         city_state = city_map.get(idx, "")
@@ -168,11 +194,7 @@ async def _fetch_tranzon() -> list[Listing]:
         if state not in ("NC", "SC"):
             continue
 
-        county = None
-        if state == "NC" and city:
-            county = NC_CITIES.get(city.lower())
-        elif state == "SC" and city:
-            county = SC_CITIES.get(city.lower())
+        county = _county_for(city, state)
 
         raw_date = date_map.get(idx, "")
         auction_dt = _parse_date(raw_date) if raw_date else None
@@ -181,10 +203,13 @@ async def _fetch_tranzon() -> list[Listing]:
         if auction_dt:
             desc_parts.append(f"on {auction_dt.strftime('%Y-%m-%d %H:%M')}")
 
+        photo = img_map.get(idx)
+        detail_url = detail_map.get(idx) or AUCTION_URL
+
         out.append(
             Listing(
                 source="national.tranzon",
-                source_url=AUCTION_URL,
+                source_url=detail_url,
                 listing_type=ListingType.AUCTION,
                 property_kind=PropertyKind.UNKNOWN,
                 state=state,
@@ -200,7 +225,8 @@ async def _fetch_tranzon() -> list[Listing]:
                         "auction_date": auction_dt.isoformat() if auction_dt else None,
                         "raw_address": raw_addr,
                         "raw_date": raw_date,
-                    }
+                    },
+                    "images": {"real": [photo]} if photo else {},
                 },
             )
         )
