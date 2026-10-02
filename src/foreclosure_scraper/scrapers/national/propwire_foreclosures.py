@@ -26,6 +26,18 @@ class Propwire(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 30.0
+    # DISABLED 2026-10-01 (national/reo per-source audit): fetch() already
+    # hardcoded `return []` (paid Apify actor, opted out) but never set
+    # disabled=True, so every run reported OUTCOME_ZERO ("ran clean but
+    # returned 0 rows") instead of OUTCOME_DORMANT -- an ambiguous zero. No
+    # behavior change. Separately, Propwire's own site is DataDome-walled
+    # (docs/HERMES.md Section 12 WONT list) even past the paid-actor
+    # question, so this stays off either way.
+    disabled = True
+    disabled_reason = (
+        "paid Apify actor, opted out; site itself is also DataDome-walled "
+        "(docs/HERMES.md Section 12 WONT)"
+    )
 
     async def fetch(self) -> Iterable[Listing]:
         log.info("propwire.skipped", reason="paid service; user opted out of spend")
