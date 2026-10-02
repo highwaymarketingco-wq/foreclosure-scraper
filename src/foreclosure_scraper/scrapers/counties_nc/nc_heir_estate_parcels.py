@@ -66,13 +66,28 @@ _ENTITY_SUFFIX = re.compile(
     r"DEVELOP|VENTURES?|GROUP|FARMS?|ENTERPRISE|BANK)\b", re.I)
 
 
-def _is_decedent(owner: str) -> bool:
-    u = (owner or "").upper()
+def _field_is_decedent(field_value: str) -> bool:
+    """Does this ONE owner subfield, on its own, carry a decedent token?
+
+    Checked per-field (not on a joined multi-field string) so a co-owner /
+    care-of subfield that happens to be an entity name (a bank trust dept, a
+    law firm) can never mask a genuine HEIRS/ESTATE token sitting in a
+    DIFFERENT subfield of the same row.
+    """
+    u = (field_value or "").upper()
     # An entity that merely contains HEIR/ESTATE in its NAME (e.g. "HEIRS LAW LLC",
     # "REAL ESTATE HOLDINGS") is never a decedent — exclude entities from BOTH tokens.
-    if _ENTITY_SUFFIX.search(owner or ""):
+    if _ENTITY_SUFFIX.search(field_value or ""):
         return False
     return "HEIR" in u or "ESTATE" in u
+
+
+def _is_decedent(owner_fields: list[str]) -> bool:
+    """A row is a decedent/heir lead when AT LEAST ONE owner subfield (not
+    necessarily the first) carries the token. See `_owner()` below for why
+    this must look at every subfield, not just the combined/first one.
+    """
+    return any(_field_is_decedent(f) for f in owner_fields)
 
 
 def _county_name(key: str) -> str:
@@ -112,12 +127,44 @@ def _stitch(spec: dict, attrs: dict, fields_key: str) -> str | None:
     return re.sub(r"\s+", " ", out) or None
 
 
-def _owner(spec: dict, attrs: dict) -> str | None:
+def _owner_fields(spec: dict, attrs: dict) -> list[str]:
+    """Every populated owner-name subfield, cleaned, in spec order.
+
+    Several target counties store owner-of-record across MULTIPLE subfields
+    (Gaston CURR_NAME1/CURR_NAME2, Polk OWNAM1/2/3, McDowell/Cleveland
+    ownname/ownname2, Lincoln/Pickens NAME1/NAME2, Mitchell Owner1/Owner2) —
+    this is where a second heir's name, or a care-of/trustee contact line,
+    lives. A single-field `_owner()` that returned only the first non-empty
+    value both dropped real second heirs (live-confirmed, Gaston: CURR_NAME1
+    "HARDIN CLARENCE HEIRS" / CURR_NAME2 "HARDIN OMA HEIRS" -> only the first
+    survived) AND, worse, could drop the WHOLE row when the HEIR/ESTATE token
+    landed on a later field (live-confirmed, McDowell: ownname "SWOFFORD
+    RONALD TRUSTEE 1/2" has no token, ownname2 "SWOFFORD LEONARD HEIRS 1/2"
+    does -- the old code checked only ownname and discarded a real heir row
+    the SQL WHERE clause had already matched). See `_is_decedent` below.
+    """
+    out: list[str] = []
     for f in spec.get("owner") or []:
         v = attrs.get(f)
-        if v and str(v).strip():
-            return re.sub(r"\s+", " ", _html(str(v))).strip()
-    return None
+        if v is None:
+            continue
+        cleaned = re.sub(r"\s+", " ", _html(str(v))).strip()
+        if cleaned:
+            out.append(cleaned)
+    return out
+
+
+def _owner_display(owner_fields: list[str]) -> str | None:
+    """Join every subfield (deduped) so no co-owner/heir name is dropped."""
+    seen: set[str] = set()
+    parts: list[str] = []
+    for f in owner_fields:
+        key = f.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        parts.append(f)
+    return "; ".join(parts) if parts else None
 
 
 class NCHeirEstateParcels(BaseScraper):
@@ -149,8 +196,11 @@ class NCHeirEstateParcels(BaseScraper):
                     continue
                 kept = 0
                 for attrs in rows:
-                    owner = _owner(spec, attrs)
-                    if not owner or not _is_decedent(owner):
+                    owner_fields = _owner_fields(spec, attrs)
+                    if not owner_fields or not _is_decedent(owner_fields):
+                        continue
+                    owner = _owner_display(owner_fields)
+                    if not owner:
                         continue
                     situs = _stitch(spec, attrs, "situs")
                     mail = _stitch(spec, attrs, "mail")
