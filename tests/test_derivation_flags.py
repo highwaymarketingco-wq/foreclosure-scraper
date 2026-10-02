@@ -160,6 +160,91 @@ def test_enrich_derivation_flags_counts_unreleased_mortgage():
     assert listings[0].raw["derivation_flags"]["unreleased_mortgage"]["flag"] is True
 
 
+def _mortgage_instrument(date, grantee, book="B1", page="P1"):
+    return {"date": date, "type": "DEED OF TRUST", "grantor": "OWNER NAME",
+            "grantee": grantee, "book": book, "page": page}
+
+
+def test_subordinate_lien_foreclosure_flags_junior_mortgage_match():
+    """Two active mortgages on file; the foreclosing plaintiff's name matches
+    the grantee of the newer (junior) one -> subordinate_lien_foreclosure."""
+    li = _mk(
+        plaintiff="PennyMac Loan Services LLC",
+        raw={"rod": {
+            "instrument_count": 2, "has_mortgage": True, "open_mortgages_est": 2,
+            "source": "cchs_rod",
+            "instruments": [
+                _mortgage_instrument("2020-06-01", "PennyMac Loan Services LLC", page="P2"),
+                _mortgage_instrument("2015-01-01", "Wells Fargo Bank NA", page="P1"),
+            ],
+        }},
+    )
+    from foreclosure_scraper.enrichment_derivation_flags import _subordinate_lien_foreclosure
+    result = _subordinate_lien_foreclosure(li)
+    assert result is not None
+    assert result["flag"] is True
+    assert result["foreclosing_position"] == 2
+    assert result["senior_lien_count"] == 1
+
+
+def test_subordinate_lien_foreclosure_no_match_stays_unflagged():
+    """Same lien stack, but the plaintiff is the SENIOR lender (Wells Fargo),
+    not the most-recently-recorded mortgage PennyMac infers to. The name
+    mismatch must suppress the flag rather than trust the date-order guess."""
+    li = _mk(
+        plaintiff="Wells Fargo Bank NA",
+        raw={"rod": {
+            "instrument_count": 2, "has_mortgage": True, "open_mortgages_est": 2,
+            "source": "cchs_rod",
+            "instruments": [
+                _mortgage_instrument("2020-06-01", "PennyMac Loan Services LLC", page="P2"),
+                _mortgage_instrument("2015-01-01", "Wells Fargo Bank NA", page="P1"),
+            ],
+        }},
+    )
+    from foreclosure_scraper.enrichment_derivation_flags import _subordinate_lien_foreclosure
+    assert _subordinate_lien_foreclosure(li) is None
+
+
+def test_subordinate_lien_foreclosure_single_mortgage_is_not_subordinate():
+    """Only one mortgage on file -> nothing to be subordinate to."""
+    li = _mk(
+        plaintiff="PennyMac Loan Services LLC",
+        raw={"rod": {
+            "instrument_count": 1, "has_mortgage": True, "open_mortgages_est": 1,
+            "source": "cchs_rod",
+            "instruments": [_mortgage_instrument("2020-06-01", "PennyMac Loan Services LLC")],
+        }},
+    )
+    from foreclosure_scraper.enrichment_derivation_flags import _subordinate_lien_foreclosure
+    assert _subordinate_lien_foreclosure(li) is None
+
+
+def test_subordinate_lien_foreclosure_no_instruments_list():
+    """rod dict present but no instruments array (summary-only shape) -> None."""
+    li = _mk(plaintiff="PennyMac Loan Services LLC",
+              raw={"rod": {"instrument_count": 2, "has_mortgage": True, "open_mortgages_est": 2}})
+    from foreclosure_scraper.enrichment_derivation_flags import _subordinate_lien_foreclosure
+    assert _subordinate_lien_foreclosure(li) is None
+
+
+def test_enrich_derivation_flags_counts_subordinate_lien():
+    from foreclosure_scraper.enrichment_derivation_flags import enrich_derivation_flags
+    listings = [
+        _mk(plaintiff="PennyMac Loan Services LLC", raw={"rod": {
+            "instrument_count": 2, "has_mortgage": True, "open_mortgages_est": 2,
+            "source": "cchs_rod",
+            "instruments": [
+                _mortgage_instrument("2020-06-01", "PennyMac Loan Services LLC", page="P2"),
+                _mortgage_instrument("2015-01-01", "Wells Fargo Bank NA", page="P1"),
+            ],
+        }}),
+    ]
+    stats = enrich_derivation_flags(listings)
+    assert stats["subordinate_lien_foreclosure"] == 1
+    assert listings[0].raw["derivation_flags"]["subordinate_lien_foreclosure"]["flag"] is True
+
+
 def test_mechanic_lien_detection():
     """ROD classify counts mechanic liens."""
     from foreclosure_scraper.rod.classify import classify_rod_docs
