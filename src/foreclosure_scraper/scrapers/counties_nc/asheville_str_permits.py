@@ -1,18 +1,41 @@
 """Asheville lapsed short-term-rental (homestay) permits — motivated-landlord signal.
 
 The City of Asheville publishes its homestay (STR) permit register as a free,
-public ArcGIS layer. A permit in status Expired or Revoked flags a property whose
-owner just LOST the ability to legally short-term-rent it — a direct income shock
-and a common reason to sell (especially where whole-house STRs are banned, so the
-income can't simply be replaced). Each row carries the situs address, the owner
-(record_name), and the parcel number — property-keyed out of the box.
+public ArcGIS layer. A permit in status Expired or Revoked CAN flag a property
+whose owner just LOST the ability to legally short-term-rent it — a direct
+income shock and a common reason to sell (especially where whole-house STRs
+are banned, so the income can't simply be replaced). Each row carries the
+situs address, the owner (record_name), and the parcel number — property-keyed
+out of the box.
+
+IS THIS A REAL SIGNAL? CHECKED, NOT ASSUMED (2026-10-01 per-source audit)
+    `record_comments` (the city's own case notes, free text) was never
+    captured, and reading it live across all 690 current Expired/Revoked rows
+    shows the "lost income" framing above does not hold for every row:
+      * 8 rows read "...permit was never actually issued" / "never inspected,
+        so permit was never actually issued" -- the homestay never earned a
+        dollar, so there is no income to have lost. Excluded outright
+        (`_NEVER_ISSUED_RE`): counting these as a financial-distress signal
+        would be fabricating one from a paperwork non-event.
+      * 252 of 690 (36%) read "failed to renew" with no further action noted
+        -- a genuine administrative lapse, consistent with the module's
+        "common reason to sell" framing but not dramatic proof of it. Kept
+        (not a false positive, just a softer one), and now the actual comment
+        text rides along in `raw` so any future scoring refinement, or a
+        human reviewing a lead, has the real reason instead of a bare status.
+      * 29 of 690 carry a nonzero `balance_due` (recorded live, typically
+        $208, an unpaid renewal fee) -- a small but real financial fact,
+        now captured.
+    Net: this source is a real (if sometimes administrative) signal, kept, and
+    its extraction gap is fixed by wiring the fields below.
 
 Free + compliant: public ArcGIS REST, no login/CAPTCHA/pay. Buncombe County
 (Asheville + Arden). Dateless standing status -> DATELESS_OK_SOURCES.
 """
 from __future__ import annotations
 
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from typing import Iterable
 
 import structlog
@@ -27,6 +50,22 @@ LAYER = ("https://gis.ashevillenc.gov/server/rest/services/Permits/"
          "HomestayPermitsView/MapServer/5/query")
 
 _LAPSED = ("Expired", "Revoked")
+
+#: Live-confirmed 2026-10-01: a handful of "Revoked" rows are for a homestay
+#: that was never actually issued / never inspected -- no STR income was ever
+#: earned, so there is no income shock to flag. Not a real lapsed-permit lead.
+_NEVER_ISSUED_RE = re.compile(r"never\s+(?:actually\s+)?(?:issued|inspected)", re.I)
+
+
+def _epoch_ms_to_iso(v) -> str | None:
+    """ArcGIS date fields are epoch-milliseconds (or None); several here
+    (date_opened, record_status_date) were being dropped entirely."""
+    if not v:
+        return None
+    try:
+        return datetime.fromtimestamp(int(v) / 1000, tz=timezone.utc).date().isoformat()
+    except (TypeError, ValueError, OSError):
+        return None
 
 
 def _split_addr(full: str) -> tuple[str | None, str | None]:
@@ -55,7 +94,9 @@ class AshevilleSTRPermits(BaseScraper):
             params = {
                 "where": where,
                 "outFields": "record_name,address,parcel_number,apn,record_status,"
-                             "record_status_date,business_name,record_type",
+                             "record_status_date,business_name,record_type,"
+                             "record_id,license_number,balance_due,date_opened,"
+                             "record_comments",
                 "returnGeometry": "false", "resultRecordCount": "1500", "f": "json",
             }
             try:
@@ -71,12 +112,20 @@ class AshevilleSTRPermits(BaseScraper):
                 street, city = _split_addr((a.get("address") or "").strip())
                 parcel = (str(a.get("parcel_number") or a.get("apn") or "").strip() or None)
                 status = (a.get("record_status") or "").strip()
+                comments = (a.get("record_comments") or "").strip() or None
                 if not (street or parcel):
+                    continue
+                if comments and _NEVER_ISSUED_RE.search(comments):
+                    # No STR income was ever earned on this parcel -- not an
+                    # income-shock lead (live-confirmed: 8/690 current rows).
                     continue
                 key = (street or "", parcel or "", (owner or "").upper())
                 if key in seen:
                     continue
                 seen.add(key)
+                balance_due = a.get("balance_due")
+                record_id = (a.get("record_id") or "").strip() or None
+                license_number = (str(a.get("license_number") or "").strip() or None)
                 li = Listing(
                     source=self.slug,
                     source_url="https://gis.ashevillenc.gov/server/rest/services/Permits/HomestayPermitsView/MapServer/5",
@@ -87,6 +136,7 @@ class AshevilleSTRPermits(BaseScraper):
                     city=city or "Asheville",
                     street_address=street,
                     parcel_id=parcel,
+                    case_number=record_id,
                     defendant=owner,
                     sale_date=None,
                     description=f"{status} short-term-rental permit (Asheville homestay) — {owner or 'owner'}",
@@ -97,7 +147,17 @@ class AshevilleSTRPermits(BaseScraper):
                         "str_permit_lapsed": {
                             "status": status,
                             "status_date": a.get("record_status_date"),
+                            "status_date_iso": _epoch_ms_to_iso(a.get("record_status_date")),
+                            "date_opened_iso": _epoch_ms_to_iso(a.get("date_opened")),
                             "business_name": (a.get("business_name") or "").strip() or None,
+                            "record_id": record_id,
+                            "license_number": license_number,
+                            # the city's own reason text -- "failed to renew" is an
+                            # administrative lapse, not proof of financial distress;
+                            # keeping the real text lets a reviewer (or a future
+                            # scoring refinement) tell the difference.
+                            "comments": comments,
+                            **({"balance_due": balance_due} if balance_due else {}),
                         },
                     },
                 )
