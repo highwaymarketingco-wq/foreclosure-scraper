@@ -50,6 +50,13 @@ notice classes:
       NC estate lane, and the SC Pee Dee counties (Florence, Marion, Marlboro) ride the
       SC probate lane.
 
+  (5) PROBATE-LANE BREADTH EXTENSION (added 2026-10-02): 55 more NC counties
+      (NC_ESTATE_EXTRA_COUNTIES) and 3 more SC counties (SC_PROBATE_EXTRA_COUNTIES),
+      probed live and confirmed to carry real estate/probate notices, were added to
+      the estate/probate queries in steps (2)/(3) ONLY -- the foreclosure lanes
+      (steps 1/4) are untouched. See the constants' own comments for the probe
+      methodology and the full zero-hit list.
+
 Endpoint behavior (verified live 2026-06-26):
   - POST https://us-central1-enotice-production.cloudfunctions.net/api/search/public-notices
   - body keys: search (""), allFilters (array of single-key objects:
@@ -118,6 +125,40 @@ NC_DISTRESSED_ONLY = ("Washington", "Hertford", "Bertie", "Gates", "Martin")
 #: fetch()) and its mortgage foreclosures in non-footprint counties are flips, dropped by
 #: the scope gate; SC tax sales are not court foreclosures and do not appear there.
 SC_DISTRESSED_ONLY = ("Florence", "Marion", "Marlboro")
+
+#: PROBATE-LANE-ONLY breadth extension (2026-10-02). Column's estate/creditor-notice
+#: mechanism is the SAME one already built for NC_FOOTPRINT/SC_FOOTPRINT -- it is a single
+#: stateless endpoint where "which county" is just a query parameter, so the only reason
+#: these counties weren't read before is that nobody had asked. Found while closing the
+#: project-wide probate/heir-estate breadth gap (28/148 counties had any probate signal):
+#: every NC county NOT already in NC_FOOTPRINT/NC_DISTRESSED_ONLY, and every SC county NOT
+#: already in SC_FOOTPRINT/SC_DISTRESSED_ONLY, was probed LIVE 2026-10-02 against
+#: NC_ESTATE_TYPES / SC_PROBATE_TYPE over a 365-day window. These are the ones that came
+#: back with real notices (23 NC counties returned zero and are NOT listed: Alleghany, Ashe,
+#: Camden, Cherokee, Currituck, Edgecombe, Graham, Greene, Harnett, Hoke, Hyde, Jackson,
+#: Jones, Macon, Northampton, Orange, Pamlico, Perquimans, Person, Surry, Swain, Tyrrell,
+#: Yancey; 28 SC counties returned zero and are likewise not listed). Several NC counties hit
+#: the 500-row page cap in the probe (Wake, Guilford, Forsyth, Mecklenburg, Cabarrus,
+#: Johnston, Robeson, Rockingham, Sampson, Richmond, Granville) -- their real volume is
+#: undercounted, not overcounted. These are PROBATE_NOTICE leads (never a flip), so every one
+#: of them is admissible under config.in_scope_distressed regardless of the 18-county flip
+#: footprint or SCOPE_DENY_COUNTIES (which only binds flip-type listings -- see main.py
+#: _county_in_scope). Read ONLY by the estate/probate lane in fetch() (steps 2 and 3); the
+#: NC foreclosure lane (step 1) and the SC statewide foreclosure lane (step 4) are untouched,
+#: so this cannot turn a mortgage foreclosure in e.g. Wake or Mecklenburg into a flip lead.
+NC_ESTATE_EXTRA_COUNTIES = (
+    "Cabarrus", "Forsyth", "Granville", "Guilford", "Johnston", "Richmond", "Robeson",
+    "Rockingham", "Sampson", "Wake", "Wilson", "Columbus", "Iredell", "Bladen", "Catawba",
+    "Scotland", "Haywood", "Anson", "Mecklenburg", "Durham", "Chatham", "Nash", "Cumberland",
+    "Craven", "Alamance", "Randolph", "Davidson", "Franklin", "Union", "Lee", "Lenoir",
+    "Wayne", "Duplin", "Pitt", "Halifax", "Moore", "Rowan", "Caswell", "Stanly", "Watauga",
+    "Caldwell", "Davie", "Montgomery", "Vance", "Wilkes", "Stokes", "Alexander", "Beaufort",
+    "Chowan", "Clay", "Madison", "Pasquotank", "Yadkin", "Avery", "Warren",
+)
+#: Same probe, SC side (Darlington 75 probate notices/year, Greenville 17, Chesterfield 3).
+#: Greenville is SCOPE_DENY'd for FLIP leads only; a probate notice here is a distressed lead
+#: and is unaffected by that deny entry (see main._in_scope / _is_flip).
+SC_PROBATE_EXTRA_COUNTIES = ("Darlington", "Greenville", "Chesterfield")
 
 NC_FORECLOSURE_TYPE = "Foreclosure Sale"
 
@@ -1086,7 +1127,15 @@ class ColumnLegalNotices(BaseScraper):
     # foreclosure notices. A true regression (endpoint down / shape change) is
     # surfaced via the block-signal + outcome classifier, not this floor.
     expected_min_count = 0
-    timeout_s = 240.0
+    # Raised 240 -> 420 on 2026-10-02 when NC_ESTATE_EXTRA_COUNTIES (55 counties) and
+    # SC_PROBATE_EXTRA_COUNTIES (3) were added to the estate/probate lane: the shared
+    # http_client per-host throttle serializes every request to this one API host at
+    # ~0.8-1.5s/request regardless of concurrency (measured live: ~1.14s/query average),
+    # and this source makes one query per (county, noticetype) pair -- the 58 new
+    # counties add ~113 more sequential queries (55*2 NC + 3 SC), ~130s. Old baseline
+    # (~82 queries) ran in ~90-100s; new total is ~210-230s, too close to the old 240s
+    # ceiling to leave safety margin for network variance.
+    timeout_s = 420.0
 
     #: True reads ONLY the counties added 2026-09-21 (NC_DISTRESSED_ONLY / SC_DISTRESSED_ONLY)
     #: and skips the footprint lanes and the statewide SC foreclosure query. Used by
@@ -1100,7 +1149,19 @@ class ColumnLegalNotices(BaseScraper):
         nc_fp = () if self.only_new_counties else NC_FOOTPRINT
         sc_fp = () if self.only_new_counties else SC_FOOTPRINT
 
-        out: list[Listing] = []
+        # Bank rows as they're fetched: `self.partial` is what base_scraper.safe_run
+        # ships if the soft timeout (`timeout_s` above) fires mid-run instead of
+        # discarding everything fetched so far. This source never banked incrementally
+        # before (`out` was a bare local list returned only at the end) -- harmless
+        # while the whole fetch comfortably beat the timeout, but the 2026-10-02
+        # breadth extension made a mid-run timeout realistic for the first time (see
+        # the timeout_s comment above), so a bare local list would now risk the exact
+        # "gather-then-extend defeats self.partial" loss class
+        # counties_sc.sc_probate_notices / counties_sc.qpaybill_delinquent_roll
+        # document fixing. `out` may carry pre-dedup duplicates if a timeout lands
+        # mid-county; the final `deduped` pass below still runs on whatever is in
+        # `out` on a normal (non-timeout) completion.
+        out = self.partial
         seen_ids: set[str] = set()
 
         async with client(timeout=60.0) as c:
@@ -1121,7 +1182,7 @@ class ColumnLegalNotices(BaseScraper):
             # per county. Emitted as PROBATE_NOTICE leads (decedent = owner_name,
             # address-less OK). Base-id dedup below collapses any overlap between
             # the two noticetypes / publication runs.
-            for county in nc_fp + NC_DISTRESSED_ONLY:
+            for county in nc_fp + NC_DISTRESSED_ONLY + NC_ESTATE_EXTRA_COUNTIES:
                 for ntype in NC_ESTATE_TYPES:
                     items = await _query(c, _NC, county, ntype, from_ms, now_ms)
                     for it in items:
@@ -1153,7 +1214,7 @@ class ColumnLegalNotices(BaseScraper):
                      mortgage_foreclosures_dropped=_mortgage_dropped,
                      counties=len(NC_DISTRESSED_ONLY))
             # (3) SC estate/probate filings across the SC footprint.
-            for county in sc_fp + SC_DISTRESSED_ONLY:
+            for county in sc_fp + SC_DISTRESSED_ONLY + SC_PROBATE_EXTRA_COUNTIES:
                 items = await _query(
                     c, _SC, county, SC_PROBATE_TYPE, from_ms, now_ms
                 )

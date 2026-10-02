@@ -154,3 +154,119 @@ def test_entity_owner_is_still_excluded(canned):
     table[_url("NC:Gaston")] = [GASTON_ENTITY_NOT_A_DECEDENT]
     out = asyncio.run(m.NCHeirEstateParcels().fetch())
     assert [li for li in out if li.county == "Gaston"] == []
+
+
+# --------------------------------------------------------------------------- 2026-10-02 extension
+# (1) word-boundary fix, (2) new SC counties, (3) NC statewide OneMap fallback.
+
+def test_field_is_decedent_no_longer_false_positives_on_a_surname_containing_heir():
+    """Live-found (York SC roll): 'PINHEIRO ...' contains the substring 'HEIR' with
+    no word boundary on either side -- a living owner, not a decedent."""
+    assert not m._field_is_decedent("PINHEIRO GUILHON DANILO WILLIAM ETAL")
+    # Real tokens, same shapes the existing tests already cover, must still match.
+    assert m._field_is_decedent("HARDIN CLARENCE HEIRS")
+    assert m._field_is_decedent("WALKER SALLY ESTATE")
+    assert m._field_is_decedent("GARDNER ISRAEL HEIRS OF")
+
+
+def test_field_is_decedent_estate_token_still_excludes_the_plural():
+    """\\bESTATE\\b must not match inside 'ESTATES' -- the SQL-side _EXCLUDE list
+    already filters this, but the Python gate should agree rather than rely only
+    on the SQL side."""
+    assert not m._field_is_decedent("SOME ESTATES")
+    assert not m._field_is_decedent("STILL FAMILY AMENDED AND RESTATE TRUST")
+
+
+def test_heir_counties_includes_the_new_sc_additions_and_still_excludes_dead_ends():
+    assert "SC:Oconee" in m._HEIR_COUNTIES      # 2026-10-02 correction: real hits, not 0
+    assert "SC:York" in m._HEIR_COUNTIES
+    assert "SC:Charleston" in m._HEIR_COUNTIES
+    assert "SC:Beaufort" in m._HEIR_COUNTIES
+    # Still genuinely unfixable via this technique -- no owner column / no ArcGIS layer.
+    assert "SC:Anderson" not in m._HEIR_COUNTIES
+    assert "SC:Cherokee" not in m._HEIR_COUNTIES
+
+
+def test_nc_statewide_fallback_excludes_dedicated_counties_and_covers_the_rest():
+    fallback = set(m.NC_STATEWIDE_FALLBACK_COUNTIES)
+    dedicated = set(m._NC_DEDICATED_COUNTIES)
+    assert dedicated == {
+        "Buncombe", "Henderson", "Rutherford", "Gaston", "Transylvania",
+        "Polk", "Lincoln", "Mitchell", "Burke", "McDowell", "Cleveland",
+    }
+    assert not (fallback & dedicated)
+    # Live-verified sample counties (module docstring) must be in the fallback set.
+    for c in ("Catawba", "Watauga", "Avery", "Yadkin", "Surry", "Wilkes",
+              "Caldwell", "Madison", "Ashe", "Alexander", "Iredell", "Yancey"):
+        assert c in fallback, c
+    # Sanity: every real NC county is accounted for exactly once between the two sets.
+    from foreclosure_scraper.validation import NC_COUNTIES
+    assert dedicated | fallback == set(NC_COUNTIES)
+    assert len(fallback) == len(NC_COUNTIES) - len(dedicated)
+
+
+@pytest.fixture
+def canned_statewide(monkeypatch):
+    """Drive fetch() offline for the STATEWIDE fallback, where every county shares
+    the SAME COUNTY_GIS url -- the plain `canned` fixture above (keyed by url only)
+    can't distinguish counties here, so this fakes `_query` keyed by the county name
+    parsed back out of the WHERE clause's `UPPER(cntyname) = 'X'` fragment, exactly
+    as `_where()` generates it."""
+    import re as _re
+    table: dict[str, list[dict]] = {}
+    calls: list[str] = []
+
+    async def fake_query(http, url, where, out_fields="*", count=80):
+        m2 = _re.search(r"UPPER\(cntyname\) = '([A-Z ]+)'", where)
+        county = m2.group(1).title() if m2 else None
+        calls.append(county)
+        return list(table.get(county, []))
+
+    @asynccontextmanager
+    async def fake_client(*a, **kw):
+        yield object()
+
+    monkeypatch.setattr(m, "_query", fake_query)
+    monkeypatch.setattr(m, "client", fake_client)
+    # Shrink the dedicated-layer loop to nothing so assertions are purely about the
+    # statewide fallback path.
+    monkeypatch.setattr(m, "_HEIR_COUNTIES", [])
+    return table, calls
+
+
+CATAWBA_HEIR = {
+    "ownname": "DOVER MARY HOLHOUSER HEIRS", "ownname2": "",
+    "siteadd": "2136 STOVE DR", "parno": "366903111618",
+}
+
+
+def test_statewide_fallback_is_queried_for_a_non_dedicated_county(canned_statewide):
+    table, calls = canned_statewide
+    table["Catawba"] = [CATAWBA_HEIR]
+    out = asyncio.run(m.NCHeirEstateParcels().fetch())
+    rows = [li for li in out if li.county == "Catawba"]
+    assert len(rows) == 1
+    assert rows[0].state == "NC"
+    assert rows[0].listing_type == ListingType.ESTATE_LEAD
+    assert "DOVER MARY HOLHOUSER HEIRS" in rows[0].defendant
+    assert rows[0].street_address == "2136 STOVE DR"
+    assert rows[0].parcel_id == "366903111618"
+    # Every NC statewide-fallback county was actually asked (not just Catawba).
+    assert set(calls) >= {"Catawba", "Wake", "Mecklenburg"}
+
+
+def test_statewide_fallback_never_double_queries_a_dedicated_county(canned_statewide):
+    """Cleveland has its OWN COUNTY_GIS entry (also the onemap url) -- it must not
+    also appear in NC_STATEWIDE_FALLBACK_COUNTIES."""
+    assert "Cleveland" not in m.NC_STATEWIDE_FALLBACK_COUNTIES
+
+
+def test_partial_is_populated_for_soft_timeout_salvage(canned_statewide):
+    """`out` must be `self.partial`, or a soft-timeout mid-sweep (89 counties) would
+    silently discard every row already fetched."""
+    table, _ = canned_statewide
+    table["Catawba"] = [CATAWBA_HEIR]
+    s = m.NCHeirEstateParcels()
+    out = asyncio.run(s.fetch())
+    assert len(s.partial) >= len(out) > 0
+    assert any(li.county == "Catawba" for li in s.partial)

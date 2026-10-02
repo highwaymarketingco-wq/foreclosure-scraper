@@ -32,13 +32,28 @@ address-less Listings — ``owner_name`` = decedent (probate) or the couple
 backfilled to a property by the downstream owner→GIS enricher. Dateless: a
 filing/appointment date is recorded in ``raw`` but there is no sale date.
 
-In-footprint counties only. As of build time Charleston Probate + Charleston
-Marriage are the only in-footprint courts that actually post here; Colleton,
-Georgetown, Oconee, and Cherokee return "no records" (those courts don't feed
-this aggregator). They're still queried every run so they auto-light-up if the
-court starts publishing. To surface a broad set without a per-name guessing
-game, we sweep a short list of common SC surnames per county and dedupe on the
-case/license number.
+As of build time Charleston Probate + Charleston Marriage are the only
+in-footprint courts that actually post here; Colleton, Georgetown, Oconee, and
+Cherokee return "no records" (those courts don't feed this aggregator). They're
+still queried every run so they auto-light-up if the court starts publishing. To
+surface a broad set without a per-name guessing game, we sweep a short list of
+common SC surnames per county and dedupe on the case/license number.
+
+BREADTH EXTENSION (2026-10-02): this aggregator's county dropdown lists every
+court that participates, statewide, NOT only the 18-county flip footprint --
+verified live by reading the real ``ddlCounties`` <select> (Aiken, Bamberg,
+Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence,
+Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York).
+Probed every one of those NOT already in COUNTIES with a single "Smith" search:
+Dorchester Probate returned 20 real hits and York Probate returned 3; Aiken,
+Bamberg, Barnwell, Chester, Kershaw, Lancaster, Orangeburg, Sumter, Florence and
+Marlboro all came back "no records" (same legit-empty shape as Colleton/
+Georgetown/Oconee/Cherokee above -- these courts don't feed this aggregator
+either, so they are NOT added; re-check if that ever changes). Dorchester and
+York are added below, Marriage variant included (same pattern as Charleston) so
+a future marriage-license signal needs no further wiring. Neither is in the
+18-county flip footprint, but PROBATE_NOTICE is a distressed-type lead, not a
+flip, so both are admissible per config.in_scope_distressed regardless.
 """
 from __future__ import annotations
 
@@ -72,6 +87,12 @@ COUNTIES: tuple[tuple[str, str, str, bool], ...] = (
     ("Oconee", "Oconee", "SC", False),
     ("Cherokee", "Cherokee", "SC", False),
     ("Charleston Marriage", "Charleston", "SC", True),
+    # 2026-10-02 BREADTH EXTENSION — verified live (see module docstring): both
+    # return real estates/marriages today, unlike the legit-empty courts above.
+    ("Dorchester Probate", "Dorchester", "SC", False),
+    ("Dorchester Marriage", "Dorchester", "SC", True),
+    ("York Probate", "York", "SC", False),
+    ("York Marriage", "York", "SC", True),
 )
 
 # Common SC surnames swept per county. Each is a separate name search; the
@@ -396,7 +417,7 @@ class SCProbateNet(BaseScraper):
     slug = "counties_sc.sc_probate_net"
     name = "SC Probate Net (centralized probate + marriage)"
     category = "probate"
-    expected_min_count = 0  # only Charleston posts here today; others legit-empty
+    expected_min_count = 0  # Charleston/Dorchester/York post here today; the rest legit-empty
     requires_apify = False
     timeout_s = 600.0
 
