@@ -7,7 +7,33 @@ This is an ENRICHMENT scraper, not a lead source. It is called by the
 enrichment_sos_sc module when a listing has an LLC/Inc defendant or owner.
 The scraper does a name search and returns entity status.
 
-Free, public, no login required. Server-rendered HTML with a form POST.
+WALLED-CONFIRMED-DEAD (2026-10-01 per-source audit), matches the operator's
+own prior note ("SC SoS captcha-walled"):
+
+  1. _SEARCH_URL below (the old /BusinessFiling/Web/Reporting/SearchByName
+     POST endpoint) is itself dead -- confirmed live HTTP 404. The real
+     current site flow is businessfilings.sc.gov -> "Search Existing
+     Entities" -> /BusinessFiling/Entity/ExistingFiling (302) ->
+     /BusinessFiling/Entity/Search, a server-rendered form with
+     input#SearchTextBox (name="EntityName") and
+     button#EntitySearchButton.
+  2. That form IS gated by a real Google reCAPTCHA on submission --
+     confirmed live: the results page returned after filling the name and
+     clicking Search contains a populated div.g-recaptcha with a real
+     data-sitekey (6Leb4xEUAAAAABb-cJNQHgSXe100c1ch58rsqKJh), not an
+     invisible/managed Cloudflare-style challenge a stealth browser can run
+     through on its own. Per this codebase's compliance line a CAPTCHA is a
+     wall: do not solve it, do not route around it.
+
+Fixing the stale URL alone would not restore function -- it would only
+trade a 404 for a reCAPTCHA wall at the next step. search_entity() below is
+left as-is (it already fails safely, returning None rather than crashing
+or fabricating a result) rather than "fixed" into something that still
+cannot complete a real search. NC's equivalent (enrichment_sos_agent.py)
+remains the free path for entity/agent lookups; this one does not have one.
+
+Free, public, no login required for the search ITSELF -- but gated by a
+CAPTCHA. Server-rendered HTML with a form POST.
 """
 from __future__ import annotations
 
