@@ -288,6 +288,58 @@ def test_daily_courier_parses_the_current_notice_layout():
     assert li.raw["daily_courier"]["deed_of_trust"] == {"book": "2001", "page": "1234", "dated": "January 5, 2022"}
 
 
+def _wrap_notice(title: str, body: str) -> str:
+    return f'<h1>{title}</h1><div itemprop="description">{body}</div>'
+
+
+def test_daily_courier_owner_sentence_style_label_2026_10_01():
+    """Live-verified 2026-10-01: a 'RECORD OWNERS OF THE REAL PROPERTY:' label
+    opens a full sentence ('...is or are <names>.') rather than putting the
+    name(s) right after the colon -- the old pattern only matched 'Record
+    Owners:'/'Present Owner(s):' and left owner_name/defendant silently None
+    on this real notice shape."""
+    body = (
+        "NOTICE OF FORECLOSURE SALE File No. 26SP000047-800. "
+        "RECORD OWNERS OF THE REAL PROPERTY: The record owner(s) of the "
+        "subject real property as reflected on the records of the "
+        "Rutherford County Register of Deeds not more than 10 days prior "
+        "to the posting of this Notice is or are Chelsie Sherel Littlejohn "
+        "and Avery Vincent Harris. DATE, TIME AND PLACE OF SALE: The sale "
+        "will be held on October 7, 2026. PROPERTY TO BE SOLD: believed to "
+        "have the address of 115 Lake Hill Farm Rd, Mooresboro, NC 28114."
+    )
+    li = dc.parse_notice(_wrap_notice("NORTH CAROLINA RUTHERFORD COUNTY", body), "u")
+    assert li.defendant == "Chelsie Sherel Littlejohn and Avery Vincent Harris"
+    assert li.owner_name == li.defendant
+    assert li.street_address == "115 Lake Hill Farm Rd,"
+
+
+def test_daily_courier_present_record_owners_and_bare_address_label_2026_10_01():
+    """Live-verified 2026-10-01: 'PRESENT RECORD OWNER(S):' (an extra 'RECORD'
+    the old pattern didn't account for) and a bare 'ADDRESS:' label (no
+    'Property'/'of the Property' prefix) both left fields silently None."""
+    body = (
+        "NOTICE OF FORECLOSURE SALE FILE NUMBER: 26SP000102-800 "
+        "PARCEL IDENTIFICATION NUMBER(S): 420719 "
+        "ADDRESS: 165 FERNWOOD DR FOREST CITY, NC 28043 "
+        "PRESENT RECORD OWNER(S): UNKNOWN HEIRS OF STEVEN DWAYNE TILLER "
+        "THE LAND DESCRIBED HEREIN IS SITUATED IN THE STATE OF NORTH CAROLINA."
+    )
+    li = dc.parse_notice(_wrap_notice("NOTICE OF FORECLOSURE SALE", body), "u")
+    assert li.defendant == "UNKNOWN HEIRS OF STEVEN DWAYNE TILLER"
+    assert li.street_address == "165 FERNWOOD DR"
+    assert li.city == "Forest City" and li.zip_code == "28043"
+
+
+def test_daily_courier_middle_initial_owner_name_not_truncated_at_period():
+    """Regression guard: the sentence-mode period-stop must not also apply to
+    the direct label:-NAME shape, or a real middle initial ('Sample T.
+    Ownerperson') gets cut down to 'Sample T.' — this is exactly the fixture
+    case in test_daily_courier_parses_the_current_notice_layout above."""
+    m = dc.OWNERS_LABEL_RE.search("Record Owners: Sample T. Ownerperson Address of Property: 1 Main St")
+    assert (m.group("sentence") or m.group("direct")).strip() == "Sample T. Ownerperson"
+
+
 def test_daily_courier_reads_the_full_notice_not_the_truncated_meta():
     """The meta description is ~270 chars with the words run together and stops before the address."""
     from selectolax.parser import HTMLParser

@@ -79,8 +79,16 @@ MAX_ADS = 14
 #: with an optional ``-NNN`` county code that is not part of the case identity.
 FILE_RE = re.compile(
     r"\b(\d{2})\s*(SP|M|CVD|CVS|CVM)\s*(\d{1,7})(?:\s*-\s*(\d{3}))?\b", re.I)
+# Live-verified 2026-10-01: 2 more label variants beyond the 2026-09-21
+# revival's "Address of Property:" -- a bare "ADDRESS:" label, and "...is
+# believed to have the address of <addr>" (no colon at all). Both left
+# street_address silently None on real notices (2 of 3 fetched that day).
+# The capture group's own shape (digit-led, ending "NC #####") keeps the
+# bare "ADDRESS" trigger from matching unrelated uses of that common word.
 ADDR_LABEL_RE = re.compile(
-    r"(?:Address\s+of\s+(?:the\s+)?Property|Property\s+address|known\s+as|located\s+at)\s*[:\s]\s*"
+    r"(?:Address\s+of\s+(?:the\s+)?Property|Property\s+address|"
+    r"believed\s+to\s+have\s+the\s+address\s+of|"
+    r"\bADDRESS\b|known\s+as|located\s+at)\s*[:\s]\s*"
     r"([0-9][^\n]*?\bNC\s*\d{5})", re.I)
 ADDR_FALLBACK_RE = re.compile(
     r"(?:Property\s+address|known\s+as|located\s+at)[:\s]+([0-9][^.\n<]*?(?:NC\s*\d{5})?)", re.I)
@@ -113,9 +121,31 @@ PLAINTIFF_RE = re.compile(
     r"(?:Lien\s+filed[^.]*?by|secured\s+by[^.]*?lien\s+held\s+by|in\s+favor\s+of)\s+([A-Z][A-Za-z0-9 &,.'-]+(?:LLC|Inc|Bank|N\.?A\.?|Trust|Association|Mortgage|Servicing)[^.,\n]*)",
     re.I,
 )
+# Live-verified 2026-10-01: Rutherford County notices (different substitute
+# trustees/law firms) use at least 3 distinct label phrasings for the same
+# field -- "Present Record Owners:", "RECORD OWNERS OF THE REAL PROPERTY:",
+# "PRESENT RECORD OWNER(S):" -- only the first of which the old pattern
+# matched; the other two left owner_name/defendant silently None (2 of 3 real
+# notices fetched that day). The "...OF THE REAL PROPERTY:" and longer-label
+# forms also don't put the name(s) right after the colon -- they open a full
+# sentence ("...is or are Chelsie Sherel Littlejohn and Avery Vincent
+# Harris.") that ends at the next period, rather than at one of the usual
+# keyword boundaries. Two named alternatives handle this: "sentence" mode
+# (triggered by an "is or are" lead-in, stops at the next period) and
+# "direct" mode (the original label:-NAME shape, stops only at a keyword --
+# NOT at a bare period, which would wrongly cut a real name's middle-initial
+# "Sample T. Ownerperson" down to "Sample T.").
 OWNERS_LABEL_RE = re.compile(
-    r"(?:Record\s+Owners?|Present\s+Owner\(?s?\)?|Owners?\s+of\s+Record)\s*:\s*(.+?)"
-    r"(?=\s+(?:Address|Deed|Description|Grantors?|Original|CONDITIONS|The\s+sale)\b|$)", re.I)
+    r"(?:Record\s+Owners?\s+of\s+the\s+Real\s+Property|"
+    r"Present\s+Record\s+Owners?\(?s?\)?|"
+    r"Record\s+Owners?|"
+    r"Present\s+Owner\(?s?\)?|"
+    r"Owners?\s+of\s+Record)"
+    r"\s*:?\s*"
+    r"(?:[^.:]*?\bis\s+or\s+are\s+(?P<sentence>.+?)\.|"
+    r"(?P<direct>.+?)(?=\s+(?:Address|Deed|Description|Grantors?|Original|CONDITIONS|"
+    r"The\s+(?:sale|terms|land)|THE\s+(?:LAND|SALE))\b|$))",
+    re.I | re.S)
 DEED_RE = re.compile(
     r"Deed\s+of\s+Trust\s*:\s*Book\s*:?\s*(\d+)\s*Page\s*:?\s*(\d+)"
     r"(?:\s*Dated\s*:?\s*((?:January|February|March|April|May|June|July|August|September|October|"
@@ -270,7 +300,8 @@ def parse_notice(html: str, ad_url: str, now: datetime | None = None) -> Listing
     defendant = None
     o_m = OWNERS_LABEL_RE.search(body)
     if o_m:
-        defendant = o_m.group(1).strip(" .,")[:200] or None
+        owner_text = o_m.group("sentence") or o_m.group("direct")
+        defendant = (owner_text or "").strip(" .,")[:200] or None
 
     deed = None
     dd = DEED_RE.search(body)
