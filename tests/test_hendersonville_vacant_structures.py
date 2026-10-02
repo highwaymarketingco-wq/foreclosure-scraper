@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from foreclosure_scraper import arcgis_webmap as agw
 from foreclosure_scraper.models import ListingType, PropertyKind
 from foreclosure_scraper.scrapers.counties_nc import hendersonville_vacant_structures as mod
 
@@ -347,3 +348,40 @@ def test_live():
           f"confirmed_vacant={sum(1 for li in rows if li.raw['vacancy']['vacant'])} "
           f"condemned={sum(1 for li in rows if li.raw.get('condemned'))} "
           f"absentee={sum(1 for li in rows if li.raw.get('absentee_owner'))}")
+
+
+@pytest.mark.skipif(not os.environ.get("RUN_LIVE"), reason="live smoke; set RUN_LIVE=1")
+def test_live_register_has_no_per_row_recency_signal_2026_10_02():
+    """2026-10-02 staleness investigation (see the module docstring): a validation
+    sample found only 27.3% of this register's rows still genuinely vacant, and the
+    question was whether the source gives us anything to detect/expire a stale row
+    with (the F12 signal_freshness.stamp/is_stale pattern already used for
+    code-enforcement blocks). It does not: the layer carries no ArcGIS
+    editFieldsInfo (no last-edited tracking) and its own name
+    (VACANT_STRUCTURES_7_24_24) is a publish date, not a live feed. This asserts
+    that live finding directly, so if the city ever starts refreshing the layer
+    with materially newer dates, this test starts failing and the
+    "operational re-check, not a code fix" conclusion in the docstring should be
+    revisited rather than silently going stale itself.
+    """
+    from datetime import date
+
+    async def _fetch_dates():
+        async with mod.client(timeout=45.0) as http:
+            feats = await agw.query_features(
+                http, mod.LAYER, where="1=1", out_fields="DATE",
+                return_geometry=False, out_sr=4326, page=mod._PAGE, max_records=5000)
+        return [mod._date_in(f.get("attributes", {}).get("DATE")) for f in feats]
+
+    dates = [d for d in asyncio.run(_fetch_dates()) if d]
+    assert dates, "expected at least one dated row on the live layer"
+    newest = max(dates)
+    age_days = (date.today() - date.fromisoformat(newest)).days
+    print(f"live hendersonville vacant-structures newest DATE={newest} age_days={age_days} "
+          f"dated={len(dates)}")
+    # 18 months: generous enough that a genuinely-refreshed feed would clear it easily;
+    # tight enough that today's frozen 2024-07 snapshot fails it, which is the point.
+    assert age_days > 540, (
+        "the register's newest row is no longer ~2 years stale -- the city may be "
+        "refreshing this layer now; revisit the staleness conclusion in the module "
+        "docstring and HANDOFF.md before assuming it is still a one-time snapshot")

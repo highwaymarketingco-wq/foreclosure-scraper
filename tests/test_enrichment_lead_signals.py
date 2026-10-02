@@ -85,6 +85,38 @@ def test_facet_relationship_divorce():
     assert "divorce" in _facet_signals(li)
 
 
+# 2026-10-02 population-scale validation (n=50/846 Buncombe liensnc rows, 176 RoD
+# instruments pulled): 0% were a genuine lien anywhere in the sample -- liensnc is a
+# lien-AGENT filing system, not a lien registry (project memory "liensnc re-parse and
+# lead class"). distress_score._is_liensnc() already keeps the base listing-type signal
+# from scoring a liensnc row (A8); this facet is the second, previously-unguarded path
+# that read raw['builder_distress'] directly regardless of source.
+def test_facet_builder_distress_discounted_for_liensnc_source():
+    li = _li(source="counties_generic.liensnc",
+             raw={"builder_distress": {"related_filings": True, "cluster": True}})
+    assert "builder_distress" not in _facet_signals(li)
+
+
+def test_facet_builder_distress_still_counts_off_a_non_liensnc_source():
+    """The gate is source-scoped (mirrors _is_liensnc), not a blanket ban on the
+    signal name -- a future source with real evidence would still count."""
+    li = _li(source="test", raw={"builder_distress": {"cluster": True}})
+    assert "builder_distress" in _facet_signals(li)
+
+
+def test_liensnc_builder_distress_does_not_inflate_signal_stack_or_intent():
+    """A liensnc row with NO other distress evidence must not read as a stacked,
+    FINANCIAL-category lead purely off the lien-agent cluster flag."""
+    li = _li(source="counties_generic.liensnc",
+             listing_type=ListingType.DISTRESSED,
+             raw={"builder_distress": {"related_filings": True, "cluster": True}})
+    ss = _signal_stack(li)
+    assert "builder_distress" not in ss["signals"]
+    assert ss["count"] == 0
+    assert "FINANCIAL" not in ss["categories"]
+    assert _intent_score(li) == 0
+
+
 # ---- _signal_stack: superset of the distress-stack signal list ----
 
 def test_signal_stack_is_superset_of_distress_signals():

@@ -7,9 +7,26 @@ parcel owner's name, the situs address, the received date, and the violation
 type (Nuisance, Solid Waste, Vehicle Graveyard, Junkyard, Manufactured Home
 Graveyard, Zoning, Minimum Housing).
 
-An OPEN violation is a direct property-distress signal: the owner has been told
-in writing to fix something and hasn't. Stacked on a tax or estate signal at the
-same parcel it is one of the strongest tells in the book.
+An OPEN violation is a direct property-distress signal for the categories that
+genuinely describe physical deterioration or dumping (Nuisance, Solid Waste,
+Vehicle/Manufactured-Home Graveyard, Junkyard, Minimum Housing). Stacked on a tax
+or estate signal at the same parcel it is one of the strongest tells in the book.
+
+2026-10-02 validation (n=60/238 sampled via this exact ArcGIS feed): only 46.9%
+of open-case hits were genuinely vacancy-adjacent. The majority (53.1%) were a
+DIFFERENT case category riding the same flat "any open case counts" rule --
+live-queried category breakdown of the feed's `violationType` coded domain
+(2026-10-02): Nuisance, Solid Waste, Junkyard, Vehicle Graveyard, Manufactured
+Home Graveyard, Minimum Housing Complaint are physical-condition categories;
+Zoning (and the uncoded "General"/blank rows) is not -- a zoning case (setback,
+home occupation, unpermitted use) says nothing about vacancy or condemnation.
+`severe` already classified this distinction for the `distressed` flag but did
+not gate the `code_enforcement` PROPERTY signal itself, so a property whose ONLY
+open case was Zoning scored exactly like one with an open Junkyard case. Fixed by
+setting `vacancy_adjacent` = `severe` on the block (`signal_freshness.
+code_enforcement_open` now reads it): a Zoning/General-only case still ships on
+the board as context (has_open stays true, so it keeps its place at the parcel
+and in the UI), it just adds no PROPERTY credit.
 
 Because it is PIN-keyed it JOINS rather than duplicates — ``parcel_id`` puts every
 row on the ``parcel:<state>:<county>:<pin>`` dedupe key, so an open violation
@@ -82,8 +99,11 @@ _OPEN_WHERE = " AND ".join(f"dispositionStatus NOT LIKE '{p}'" for p in _CLOSED_
 _CLOSED_RE = re.compile(
     r"(no further action|^resolved|^inactive|^nfa|^refer.*authority)", re.I)
 
-#: Violation types that imply physical deterioration/dumping rather than
-#: paperwork. Used only to label severity in raw — everything open is kept.
+#: Violation types that imply physical deterioration/dumping rather than paperwork
+#: (Zoning, "General", blank/uncoded rows do not match -- confirmed live 2026-10-02
+#: against the layer's own `violationType` coded-value domain). Everything open still
+#: ships on the board; this gates the `distressed` flag AND (2026-10-02) the
+#: `code_enforcement`/`vacancy_adjacent` PROPERTY-scoring signal, not just a label.
 _SEVERE = re.compile(
     r"(junk\s*yard|junkyard|vehicle graveyard|manufactured home graveyard|"
     r"solid waste|minimum housing|nuisance)", re.I)
@@ -200,6 +220,13 @@ def build_listing(feats: list[dict], history: dict[str, dict] | None = None,
             "severe": severe,
             "violations": violations[:8],
             "has_open": True,
+            # 2026-10-02: has_open stays literally true (there IS an open case, and
+            # nothing else reads has_open as anything but that) -- vacancy_adjacent is
+            # the separate, explicit answer to "does any open case's CATEGORY actually
+            # indicate vacancy/condemnation/structural distress", which is what
+            # signal_freshness.code_enforcement_open() now gates PROPERTY credit on.
+            # A Zoning/General-only property still ships with its real case data.
+            "vacancy_adjacent": severe,
             "opened": opened.date().isoformat() if opened else None,
             "source": "henderson_ordinance_violations_tracking",
         },

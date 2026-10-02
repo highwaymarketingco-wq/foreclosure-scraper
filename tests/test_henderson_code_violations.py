@@ -294,6 +294,70 @@ def test_code_enforcement_signal_is_scored():
     assert "code_enforcement" in names
 
 
+# 2026-10-02 validation (n=60/238 live via this exact feed): only 46.9% of open-case
+# hits were genuinely vacancy-adjacent; the majority were a different case category
+# (mostly Zoning) scoring full PROPERTY credit purely because the rule was "any open
+# case counts," with no regard for what the case is actually about.
+def test_non_severe_category_is_open_but_not_vacancy_adjacent():
+    """204 Gull Ave / PIN 9577984987 carries a single open 'General' case -- not one
+    of the physical-condition categories. It must still ship (has_open stays true,
+    the case data is real) but must not grant code_enforcement PROPERTY credit."""
+    from foreclosure_scraper.distress_score import _signals_for
+    from foreclosure_scraper.signal_freshness import code_enforcement_open
+
+    li = next(li for li in _run() if li.parcel_id == "9577984987")
+    ce = li.raw["code_enforcement"]
+    assert ce["violation_types"] == ["General"]
+    assert ce["severe"] is False
+    assert ce["vacancy_adjacent"] is False
+    assert ce["has_open"] is True                 # still a real, visible open case
+    assert "distressed" not in li.raw
+    assert code_enforcement_open(ce) is False
+    names = [n for n, _b, _w in _signals_for(li)]
+    assert "code_enforcement" not in names         # no PROPERTY credit from this alone
+
+
+def test_zoning_only_case_does_not_score_either():
+    """The live feed's actual coded violationType domain includes 'Zoning' --
+    confirmed 2026-10-02 against the real ArcGIS layer (39 of 182 open cases that
+    day). A zoning complaint (setback, home occupation, unpermitted use) says
+    nothing about vacancy or condemnation."""
+    from foreclosure_scraper.distress_score import _signals_for
+    from foreclosure_scraper.signal_freshness import code_enforcement_open
+
+    li = mod.build_listing([{"attributes": {
+        "OBJECTID": 1, "caseID": "900", "PIN": "1112223334",
+        "address": "9 ZONING WAY", "parcelOwner": "SOMEONE",
+        "violationType": "Zoning", "dispositionStatus": "Notice of Violation Issued",
+        "dateReceived": 1_770_000_000_000}}])
+    ce = li.raw["code_enforcement"]
+    assert ce["severe"] is False and ce["vacancy_adjacent"] is False
+    assert ce["has_open"] is True
+    assert code_enforcement_open(ce) is False
+    assert "code_enforcement" not in [n for n, _b, _w in _signals_for(li)]
+
+
+def test_a_severe_case_alongside_a_zoning_case_still_scores():
+    """A property with BOTH an open Nuisance case and an open Zoning case is
+    vacancy-adjacent on the strength of the Nuisance case; mixing in a zoning
+    complaint must not suppress real evidence."""
+    from foreclosure_scraper.distress_score import _signals_for
+
+    li = mod.build_listing([
+        {"attributes": {"OBJECTID": 1, "caseID": "1", "PIN": "2223334445",
+                        "address": "10 MIXED WAY", "violationType": "Zoning",
+                        "dispositionStatus": "Notice of Violation Issued",
+                        "dateReceived": 1_770_000_000_000}},
+        {"attributes": {"OBJECTID": 2, "caseID": "2", "PIN": "2223334445",
+                        "address": "10 MIXED WAY", "violationType": "Nuisance",
+                        "dispositionStatus": "15 Day Notice Issued",
+                        "dateReceived": 1_770_000_000_001}},
+    ])
+    ce = li.raw["code_enforcement"]
+    assert ce["vacancy_adjacent"] is True
+    assert "code_enforcement" in [n for n, _b, _w in _signals_for(li)]
+
+
 def test_env_gate_skips_without_fetching(monkeypatch):
     monkeypatch.setenv(mod.ENV_OFF, "0")
     http = _http()
@@ -333,6 +397,14 @@ def test_live():
     assert all(li.raw["code_enforcement"]["has_open"] for li in rows)
     assert sum(1 for li in rows if li.parcel_id) / len(rows) > 0.95   # PIN-keyed
     assert any(li.raw["code_enforcement"]["repeat_offender"] for li in rows)
+    # 2026-10-02: live categories must include a non-severe lane (Zoning/General) that
+    # the validation flagged -- confirms this isn't a severe-only feed by coincidence.
+    from foreclosure_scraper.distress_score import _signals_for
+    non_vacancy_adjacent = [li for li in rows if li.raw["code_enforcement"]["vacancy_adjacent"] is False]
+    assert non_vacancy_adjacent, "expected at least one open Zoning/General-only property live"
+    assert all("code_enforcement" not in [n for n, _b, _w in _signals_for(li)]
+               for li in non_vacancy_adjacent)
     print(f"live henderson open code violations parcels={len(rows)} "
           f"cases={sum(li.raw['code_enforcement']['open_violations'] for li in rows)} "
-          f"repeat={sum(1 for li in rows if li.raw['code_enforcement']['repeat_offender'])}")
+          f"repeat={sum(1 for li in rows if li.raw['code_enforcement']['repeat_offender'])} "
+          f"not_vacancy_adjacent={len(non_vacancy_adjacent)}")

@@ -48,7 +48,9 @@ import structlog
 
 from .models import Listing
 from .mailing_shape import mailing_of
-from .distress_score import SIGNAL_CATEGORY, _storm_signal, _upset_open, _vacant_structure
+from .distress_score import (
+    SIGNAL_CATEGORY, _is_liensnc, _storm_signal, _upset_open, _vacant_structure,
+)
 from .enrichment_equity import is_countable_debt
 from .signal_freshness import (
     bankruptcy_lapsed, code_enforcement_open, custody_ended, has_real_probate,
@@ -159,7 +161,21 @@ def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
         out.add("vacant_structure")
     if _truthy(raw.get("vacant_lot")):
         out.add("vacant_lot")
-    if _truthy(raw.get("builder_distress")):
+    # 2026-10-02 population-scale validation (n=50/846 Buncombe liensnc rows, 176 RoD
+    # instruments pulled): 0% were a genuine mechanic's/contractor's lien anywhere in the
+    # sample. liensnc is a lien-AGENT filing system (a title company/agent recording a
+    # Notice to Lien Agent on behalf of a construction lender), not a lien-filing registry --
+    # see project memory "liensnc re-parse + lead class" (56K rows = lien-agent filings, not
+    # distress). distress_score._is_liensnc() already keeps this source's own listing-type
+    # signal from scoring (A8), but this facet read raw['builder_distress'] directly and gave
+    # it a full FINANCIAL category credit regardless of source -- the same "stack of two"
+    # fabricated-signal bug already fixed today for zombie_properties.py and
+    # greenville_hard_distress.py (distress_score._CONTEXT_ONLY_DISTRESSED_SOURCES), just on
+    # a second, previously-unguarded code path for the same source. builder_distress is set
+    # ONLY by scripts/ingest_liensnc.py and scripts/backfill_builder_distress.py, both
+    # exclusively on liensnc rows, so this is the exact same source-level discount applied
+    # the same way, not a new judgment call.
+    if _truthy(raw.get("builder_distress")) and not _is_liensnc(li):
         out.add("builder_distress")   # LiensNC cluster: over-leveraged flipper / stalled build
     if _storm_signal(raw.get("storm_damage")):
         out.add("storm_damage")

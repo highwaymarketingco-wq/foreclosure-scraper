@@ -49,6 +49,37 @@ property and both miss real merges and invent false ones.
 Free + compliant: anonymous ArcGIS REST, no key, no login, no CAPTCHA/WAF.
 Dateless standing register -> the slug must be in ``main.DATELESS_OK_SOURCES``
 or every row is filtered out. Gate with FORECLOSURE_HENDERSONVILLE_VACANT=0.
+
+STALENESS -- INVESTIGATED 2026-10-02, NOT A CODE BUG, NO FIX APPLIED HERE:
+    A validation sample (11 rows) found only 27.3% still genuinely vacant today.
+    Checked live whether this module could detect/expire a stale row the way
+    ``signal_freshness.stamp``/``is_stale`` already do for code-enforcement blocks
+    (the F12 pattern): it cannot, and forcing that pattern here would misfire.
+
+    Live-queried 2026-10-02: the WHOLE layer is 52 rows (``returnCountOnly``), the
+    ``DATE`` column (the only date-like field on the layer) is populated on 42 of
+    them (80.8%) and blank on the rest, and the newest populated value is
+    2024-06-18 -- already ~2.3 years old as of today. The service's own metadata
+    carries no ``editFieldsInfo`` (ArcGIS Online's last-edited tracking is off for
+    this layer), and the layer's own name -- ``VACANT_STRUCTURES_7_24_24`` -- is
+    literally its publish date, July 24 2024: this reads as a frozen snapshot the
+    city published once, not a feed it keeps current. So DATE is best read as
+    "when the officer wrote the case up," not "last confirmed still vacant," and
+    even taken at face value every row is already past any TTL short enough to be
+    meaningful.
+
+    Why a TTL still would not fit: with a 2024 vintage, ANY reasonable cutoff
+    (12-24 months) zeroes almost the entire register -- but the validation found
+    27.3% are STILL actually vacant despite the age, so a blanket age cutoff would
+    throw away real leads the dated ones that are wrong alongside the ones that
+    are right, with no way to tell which from DATE alone. Unlike the Henderson
+    code-enforcement category gate in this same package (where the source hands
+    us a field -- violationType -- that actually DISCRIMINATES the two cases),
+    there is no per-row field here that distinguishes "still vacant" from "was
+    vacant in 2022-2024." That can only be learned by re-checking the property,
+    which is an OPERATIONAL re-verification cadence (a periodic spot-check pass,
+    or watching for the city to publish a newer-dated layer), not a one-time code
+    change. See docs/HANDOFF.md for the open item.
 """
 from __future__ import annotations
 

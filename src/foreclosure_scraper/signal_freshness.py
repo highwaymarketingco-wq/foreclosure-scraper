@@ -81,9 +81,24 @@ def code_enforcement_open(ce: Any, today: Optional[date] = None) -> bool:
     keys, a list of violation dicts each with a `status`, and a bare truthy marker. An
     explicit `has_open` wins; then `open_violations`; then the per-violation statuses;
     a shape that says nothing about status is kept (the old behaviour), because
-    dropping a real case on a field the source never wrote is the worse error."""
+    dropping a real case on a field the source never wrote is the worse error.
+
+    `vacancy_adjacent` (optional, dict shape only): 2026-10-02 Henderson County
+    validation (n=60/238 sampled via the county's own ArcGIS dashboard feed) found
+    only 46.9% of open code-enforcement hits were genuinely vacancy/condemnation/
+    structural -- the majority were a DIFFERENT case category (mostly Zoning) riding
+    the same flat "any open case counts" rule, because the signal is read off
+    `has_open`/`open_violations` with no regard for what the case is actually about.
+    A source that reads the real category from its feed (e.g.
+    `counties_nc.henderson_code_violations`, off the ArcGIS `violationType` field)
+    can set `vacancy_adjacent=False` to say "there IS an open case here, but none of
+    them is a category that indicates vacancy/condemnation/structural distress" --
+    an explicit opt-in key, absent on every source that never computed the
+    distinction, so this changes nothing for them."""
     if isinstance(ce, dict):
         if is_stale(ce, today):
+            return False
+        if ce.get("vacancy_adjacent") is False:
             return False
         if "has_open" in ce:
             return bool(ce.get("has_open"))
