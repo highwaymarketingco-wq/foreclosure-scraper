@@ -4,6 +4,16 @@ Edgefield County publishes delinquent tax sale properties on its county
 website. Annual tax sale lists with owner names, TMS numbers, addresses.
 
 Free, public, no login.
+
+DISABLED 2026-10-01: confirmed live this page is office-contact info only
+(no table of any kind) with a "Pay Your Property Taxes Here" link out to the
+real portal. That portal IS the same treasurer system
+counties_sc.qpaybill_delinquent_roll.py already sweeps for Edgefield
+(QPAYBILL_SUBS["Edgefield"] = "edgefieldcountysc", added 2026-09-23, verified
+via the county's own "Online Tax Payment Center" link). Found via the
+2026-10-01 counties_sc per-source extraction audit. Do not re-enable without
+a different, real per-parcel source at this URL.
+
 Slug: counties_sc.edgefield_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -28,6 +38,9 @@ PAGE_URL = "https://edgefieldcounty.sc.gov/treasurer/"
 class EdgefieldDelinquentTax(BaseScraper):
     slug = "counties_sc.edgefield_delinquent_tax"
     name = "Edgefield County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("target page is office-contact info only, no table - "
+                       "superseded by counties_sc.qpaybill_delinquent_roll (Edgefield) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

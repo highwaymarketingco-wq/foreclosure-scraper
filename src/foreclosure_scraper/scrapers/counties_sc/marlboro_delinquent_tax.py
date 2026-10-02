@@ -19,11 +19,16 @@ gate happens to currently exclude September -- neither is a real
 protection, and "fix" attempts that just widen the gate or add the
 whitelist entry would ship this garbage straight onto the board.
 
-`fetch()` is disabled (returns []) until this is rewritten against a
-real, dedicated tax-sale page/document (none has been located yet;
-Marlboro's site does not appear to publish one anywhere reachable) or
-gets a genuine per-row validator that can tell a tax-sale row from a
-budget row.
+`fetch()` was disabled (returned []) pending a real, dedicated tax-sale
+page/document. AUDITED 2026-10-01: that real source turned out to already
+exist elsewhere in this codebase rather than on Marlboro's own site --
+counties_sc.qpaybill_delinquent_roll.py covers Marlboro's actual delinquent
+roll (QPAYBILL_SUBS["Marlboro"] = "marlborocountytax") with owner, situs,
+balance and years-delinquent, something this budget/meetings page was never
+going to produce safely. Converted to the standard disabled=True/
+disabled_reason so this reads correctly in run reports (DORMANT, not an
+ambiguous silent zero) instead of the ad hoc `return []` the 2026-09-15 fix
+used.
 
 Free, public, no login.
 Slug: counties_sc.marlboro_delinquent_tax
@@ -47,14 +52,14 @@ PAGE_URL = "https://www.marlborocounty.sc.gov/government_/meeting_publications.p
 class MarlboroDelinquentTax(BaseScraper):
     slug = "counties_sc.marlboro_delinquent_tax"
     name = "Marlboro County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("PAGE_URL is a generic meetings/publications page (budget tables, not "
+                       "tax-sale data) - superseded by counties_sc.qpaybill_delinquent_roll "
+                       "(Marlboro) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0
     optional = True
 
     async def fetch(self) -> Iterable[Listing]:
-        # Disabled -- see the module docstring. PAGE_URL is a generic
-        # meetings/publications page that currently carries a BUDGET table,
-        # not a tax-sale list, and the old parser could not tell them apart.
-        log.info("marlboro_tax.disabled", note="awaiting a real dedicated tax-sale source or a row validator")
         return []

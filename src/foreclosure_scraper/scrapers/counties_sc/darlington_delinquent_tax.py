@@ -5,6 +5,18 @@ website. Annual tax sale lists with owner names, TMS numbers, addresses,
 and bid amounts.
 
 Free, public, no login.
+
+DISABLED 2026-10-01: confirmed live the only <tr> tables on this page are the
+office-hours widget (the exact hazard test_darlington_junk_rows.py already
+guards against -- parse_rows() keeps correctly refusing it, there's just
+never anything else on the page for it to parse). Darlington's real
+delinquent roll is already covered by counties_sc.qpaybill_delinquent_roll.py
+(QPAYBILL_SUBS["Darlington"] = "darlingtontreasurer", with owner/situs/
+balance/years-delinquent). Found via the 2026-10-01 counties_sc per-source
+extraction audit. parse_rows() and its guards are left in place (correct,
+tested code) -- only the scraper is disabled. Do not re-enable without a
+different, real per-parcel source at this URL.
+
 Slug: counties_sc.darlington_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -106,6 +118,9 @@ def parse_rows(html: str) -> list[Listing]:
 class DarlingtonDelinquentTax(BaseScraper):
     slug = "counties_sc.darlington_delinquent_tax"
     name = "Darlington County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("target page carries only an office-hours table, never a delinquent list - "
+                       "superseded by counties_sc.qpaybill_delinquent_roll (Darlington) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

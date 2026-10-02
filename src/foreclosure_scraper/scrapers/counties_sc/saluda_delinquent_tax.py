@@ -16,6 +16,18 @@ Dec 3. Outside that window the page carries only the schedule of events, so
 a clean 0 in, say, September is the source being correct, not broken.
 
 Free, public, no login.
+
+DISABLED 2026-10-01: NOT a broken-page case -- this page is correct as
+documented above and really does only carry the property list for ~3 weeks
+before the Dec sale. The reason to disable it anyway: counties_sc.qpaybill_
+delinquent_roll.py already covers Saluda year-round (QPAYBILL_SUBS["Saluda"]
+= "saludacountytreasurer") with owner, situs, balance AND years-delinquent --
+a strictly richer, continuously-available dataset than this page's brief
+newspaper-publication window could ever be even at its best. Found via the
+2026-10-01 counties_sc per-source extraction audit. Its shared junk-row gate
+(is_usable_row, see test_sc_tax_table_guards.py) and the Schedule-of-Events
+filter are left in place -- only the scraper is disabled.
+
 Slug: counties_sc.saluda_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -52,6 +64,9 @@ _EVENT_TABLE_RE = re.compile(r"<t[dh][^>]*>\s*(?:<[^>]+>\s*)*events?\b", re.I)
 class SaludaDelinquentTax(BaseScraper):
     slug = "counties_sc.saluda_delinquent_tax"
     name = "Saluda County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("seasonal (~3wk/year) newspaper mirror, fully superseded by the "
+                       "year-round counties_sc.qpaybill_delinquent_roll (Saluda) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

@@ -5,6 +5,19 @@ properties with delinquent taxes. Tax sale is held the first Monday in
 November. The page references an online delinquent tax search (free to view).
 
 Free, public, no login. WordPress/CivicPlus site.
+
+DISABLED 2026-10-01: confirmed live this page carries no delinquent-property
+table at all -- it is an office-contact + FAQ page ("Properties classified as
+delinquent will be advertised in The Press & Banner for three consecutive
+weeks prior to the tax sale") with a link out to the county's "Online Taxes"
+search portal, never a bulk list. That portal IS the SAME treasurer system
+counties_sc.qpaybill_delinquent_roll.py already sweeps for Abbeville
+(QPAYBILL_SUBS["Abbeville"] = "abbevilletreasurer", verified live since
+2026-09-10) -- with owner, situs, balance and years-delinquent, which this
+page structurally could never produce. Found via the 2026-10-01 counties_sc
+per-source extraction audit. Do not re-enable without a different, real
+per-parcel source at this URL.
+
 Slug: counties_sc.abbeville_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -28,6 +41,9 @@ PAGE_URL = "https://abbevillecountysc.com/delinquent-tax-collector/"
 class AbbevilleDelinquentTax(BaseScraper):
     slug = "counties_sc.abbeville_delinquent_tax"
     name = "Abbeville County SC Delinquent Tax"
+    disabled = True
+    disabled_reason = ("target page has no delinquent-property list (office/FAQ page only) - "
+                       "superseded by counties_sc.qpaybill_delinquent_roll (Abbeville) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 60.0
     expected_min_count = 0

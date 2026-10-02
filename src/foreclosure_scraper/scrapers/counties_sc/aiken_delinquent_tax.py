@@ -9,6 +9,15 @@ CivicPlus is a widely-used CMS for SC counties — this scraper pattern
 can be reused for other CivicPlus counties.
 
 Free, public, no login.
+
+DISABLED 2026-10-01: confirmed live this page carries ZERO <tr> table rows at
+all (93KB of CivicPlus boilerplate, no list markup of any kind). Aiken's real
+delinquent roll is already covered by counties_sc.sc_catalis_delinquent_roll.py
+(CATALIS_COUNTIES["Aiken"], owner mailing address included -- something this
+page could never carry even if it had a list). Found via the 2026-10-01
+counties_sc per-source extraction audit. Do not re-enable without a different,
+real per-parcel source at this URL.
+
 Slug: counties_sc.aiken_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -34,6 +43,9 @@ PAGE_URL = "https://sc-aikencounty.civicplus.com/309/Tax-Foreclosures"
 class AikenDelinquentTax(BaseScraper):
     slug = "counties_sc.aiken_delinquent_tax"
     name = "Aiken County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("target page has zero table rows (no delinquent-property list) - "
+                       "superseded by counties_sc.sc_catalis_delinquent_roll (Aiken) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

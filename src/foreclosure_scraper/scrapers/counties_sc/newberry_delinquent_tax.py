@@ -4,6 +4,17 @@ Newberry County publishes delinquent tax sale properties on its county
 website. Annual tax sale lists with owner names, TMS numbers, addresses.
 
 Free, public, no login.
+
+DISABLED 2026-10-01: confirmed live this page links only a 2-page "Tax Sale
+Information" PDF of general auction procedures (registration, bidding rules)
+-- no per-parcel table, no table markup on the page at all. Newberry's real
+delinquent roll is already covered by counties_sc.qpaybill_delinquent_roll.py
+(QPAYBILL_SUBS["Newberry"] = "newberrytreasurer"). Found via the 2026-10-01
+counties_sc per-source extraction audit. parse_rows()'s shared junk-row gate
+(is_usable_row, see test_sc_tax_table_guards.py) is left in place -- only the
+scraper is disabled. Do not re-enable without a different, real per-parcel
+source at this URL.
+
 Slug: counties_sc.newberry_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -29,6 +40,9 @@ PAGE_URL = "https://www.newberrycounty.gov/delinquent-tax/tax-sales"
 class NewberryDelinquentTax(BaseScraper):
     slug = "counties_sc.newberry_delinquent_tax"
     name = "Newberry County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("target page links only a general-procedures PDF, no per-parcel table - "
+                       "superseded by counties_sc.qpaybill_delinquent_roll (Newberry) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

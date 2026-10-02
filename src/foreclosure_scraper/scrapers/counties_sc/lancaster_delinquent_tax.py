@@ -19,6 +19,20 @@ delinquency date and roughly mid-October these pages carry the notice only and
 this source is legitimately listless.
 
 Free, public, no login.
+
+DISABLED 2026-10-01: NOT a broken-page case like several sibling scrapers --
+this page is correct as documented above and really does only carry the
+property list for ~3 weeks before the Nov sale. The reason to disable it
+anyway: counties_sc.qpaybill_delinquent_roll.py already covers Lancaster
+year-round (QPAYBILL_SUBS["Lancaster"] = "lancastersctax") with owner, situs,
+balance AND years-delinquent -- a strictly richer, continuously-available
+dataset than this page's brief, text-only newspaper mirror could ever be even
+at its best. Running this scraper every week for ~11 months of guaranteed
+zero, for a ~3-week window whose content is already covered better elsewhere,
+is not worth the cycle. Found via the 2026-10-01 counties_sc per-source
+extraction audit. Its shared junk-row gate (is_usable_row, see
+test_sc_tax_table_guards.py) is left in place -- only the scraper is disabled.
+
 Slug: counties_sc.lancaster_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -66,6 +80,9 @@ _NOT_A_LIST_RE = re.compile(
 class LancasterDelinquentTax(BaseScraper):
     slug = "counties_sc.lancaster_delinquent_tax"
     name = "Lancaster County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("seasonal (~3wk/year) newspaper mirror, fully superseded by the "
+                       "year-round counties_sc.qpaybill_delinquent_roll (Lancaster) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

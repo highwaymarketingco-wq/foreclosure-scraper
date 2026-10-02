@@ -5,6 +5,15 @@ website. The page lists parcels scheduled for tax sale with owner names,
 TMS numbers, and property addresses.
 
 Free, public, no login.
+
+DISABLED 2026-10-01: PAGE_URL now redirects (confirmed live: a GET resolves
+to the county's bare homepage, chestercountysc.gov/ -- a CMS migration dead
+link, not a seasonal empty list). Chester's real delinquent roll is already
+covered by counties_sc.sc_catalis_delinquent_roll.py (CATALIS_COUNTIES
+["Chester"], includes the current-vs-billed owner split and owner mailing
+address). Found via the 2026-10-01 counties_sc per-source extraction audit.
+Do not re-enable without a correct live URL.
+
 Slug: counties_sc.chester_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -29,6 +38,9 @@ PAGE_URL = "https://www.chestercountysc.gov/treasurer/delinquent-tax-sale"
 class ChesterDelinquentTax(BaseScraper):
     slug = "counties_sc.chester_delinquent_tax"
     name = "Chester County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("PAGE_URL now redirects to the county homepage (dead CMS-migration link) - "
+                       "superseded by counties_sc.sc_catalis_delinquent_roll (Chester) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

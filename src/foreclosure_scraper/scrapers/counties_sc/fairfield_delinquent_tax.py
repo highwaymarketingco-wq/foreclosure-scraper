@@ -4,6 +4,15 @@ Fairfield County publishes delinquent tax sale properties on its county
 website. Annual tax sale lists with owner names, TMS numbers, addresses.
 
 Free, public, no login.
+
+DISABLED 2026-10-01: confirmed live this page is office-contact info only
+(no table) with a "Search & Pay Taxes Online" link out to the real portal.
+Fairfield's real delinquent roll is already covered by
+counties_sc.sc_catalis_delinquent_roll.py (CATALIS_COUNTIES["Fairfield"],
+owner mailing address included). Found via the 2026-10-01 counties_sc
+per-source extraction audit. Do not re-enable without a different, real
+per-parcel source at this URL.
+
 Slug: counties_sc.fairfield_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -29,6 +38,9 @@ PAGE_URL = "https://www.fairfieldsc.com/departments/treasurer"
 class FairfieldDelinquentTax(BaseScraper):
     slug = "counties_sc.fairfield_delinquent_tax"
     name = "Fairfield County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("target page is office-contact info only, no table - "
+                       "superseded by counties_sc.sc_catalis_delinquent_roll (Fairfield) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0
