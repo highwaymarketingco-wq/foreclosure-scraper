@@ -192,6 +192,21 @@ async def enrich_with_sos_dissolution(listings: list[Listing], max_check: int = 
                 if not isinstance(li.raw, dict):
                     li.raw = {}
                 li.raw["sos_status"] = info
+                # Found 2026-10-02 investigating why the sos_dissolution board
+                # column sits at 0/148 counties despite this check running (and
+                # being re-enabled per owner direction the same day): this
+                # function has only ever written `sos_status`. web_artifact.py's
+                # RAW_KEEP allowlists BOTH "sos_status" AND "sos_dissolution"
+                # (same comment, "NC SOS LLC dissolution status" -- a leftover
+                # duplicate key from whenever this field was renamed), and every
+                # downstream coverage/audit check (scripts/comprehensive_audit.py,
+                # scripts/merge_title_search.py's title-search field list) reads
+                # "sos_dissolution", never "sos_status" -- so a real, successful
+                # dissolution hit was silently invisible to every counter. Also
+                # writing "sos_dissolution" (same shape) alongside the original
+                # key rather than renaming it, so nothing that already reads
+                # "sos_status" (its own test included) breaks.
+                li.raw["sos_dissolution"] = info
 
     try:
         # Hard overall backstop in case the per-call timeout + breaker still leave

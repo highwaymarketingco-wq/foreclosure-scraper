@@ -42,6 +42,23 @@ def test_successful_lookup_tags_dissolved(monkeypatch):
     assert li.raw.get("sos_status", {}).get("status") == "admin_dissolved"
 
 
+def test_successful_lookup_also_tags_sos_dissolution(monkeypatch):
+    """Regression for the 2026-10-02 key-mismatch found investigating why the
+    sos_dissolution board column sat at 0/148 counties: this enrichment only
+    ever wrote `sos_status`, while web_artifact.py's RAW_KEEP and every
+    downstream coverage counter (comprehensive_audit.py, merge_title_search.py)
+    read `sos_dissolution` instead -- so a real hit was invisible to every
+    count. Both keys must carry the same info dict now."""
+    async def fake_lookup(name, cache):
+        return {"checked": True, "status": "dissolved"}
+
+    monkeypatch.setattr(sos, "_lookup_nc_sos", fake_lookup)
+    li = _biz(1)
+    asyncio.run(sos.enrich_with_sos_dissolution([li], max_check=5))
+    assert li.raw.get("sos_dissolution") == li.raw.get("sos_status")
+    assert li.raw["sos_dissolution"]["status"] == "dissolved"
+
+
 def test_active_status_not_tagged(monkeypatch):
     async def fake_lookup(name, cache):
         return {"checked": True, "status": "active"}
@@ -50,6 +67,7 @@ def test_active_status_not_tagged(monkeypatch):
     li = _biz(1)
     asyncio.run(sos.enrich_with_sos_dissolution([li], max_check=5))
     assert "sos_status" not in (li.raw or {})
+    assert "sos_dissolution" not in (li.raw or {})
 
 
 def test_non_business_defendants_skipped(monkeypatch):
