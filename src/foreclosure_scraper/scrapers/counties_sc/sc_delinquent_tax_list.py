@@ -13,6 +13,18 @@ live Cherokee 2023 list (format: `item# NAME TMS description`).
 Free, plain HTTP PDF (pdfplumber), no anti-bot, ToS-OK (county treasurer pages).
 Extensible: add Pickens/Spartanburg by dropping their URL + TMS pattern in
 SC_DELINQUENT once their current-year list URL is confirmed.
+
+DISABLED 2026-10-01: SC_DELINQUENT only ever grew to one county (Cherokee),
+and Cherokee's delinquent-tax data now has TWO other live sources in this
+same codebase: counties_sc.qpaybill_delinquent_roll.py (QPAYBILL_SUBS
+["Cherokee"] = "cherokeecountysctax", with balance + years-delinquent) and
+the sibling counties_sc.cherokee_delinquent_tax.py (fixed the same day,
+owner_name + street_address wired 0/528 -> 528/528 on the county's own PDF
+list). Verified live this scraper itself returns 0 against the
+cherokeecountysc.gov tax-sale-bidders page right now. Running a third,
+narrower, currently-empty scraper for data two siblings already cover better
+is not worth the cycle. Do not re-enable without adding a genuinely new
+county the siblings above don't already reach.
 """
 from __future__ import annotations
 
@@ -121,6 +133,9 @@ def _pdf_text(data: bytes) -> str:
 class SCDelinquentTaxList(BaseScraper):
     slug = "counties_sc.sc_delinquent_tax_list"
     name = "SC County Delinquent Tax Sale Lists (annual PDF)"
+    disabled = True
+    disabled_reason = ("only ever covered Cherokee, which two siblings (qpaybill_delinquent_roll "
+                       "and cherokee_delinquent_tax) already cover better - confirmed 2026-10-01")
     category = "county_tax"
     expected_min_count = 0
     requires_render = False

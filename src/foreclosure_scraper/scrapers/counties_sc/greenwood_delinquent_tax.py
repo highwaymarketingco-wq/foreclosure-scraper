@@ -4,6 +4,18 @@ Greenwood County publishes delinquent tax sale properties on its county
 website. Annual tax sale lists with owner names, TMS numbers, addresses.
 
 Free, public, no login.
+
+DISABLED 2026-10-01: confirmed live this page is Treasurer-office info only
+(budget, FOIA, contact details, a "Pay Taxes online" link) -- no delinquent
+list, no table of any kind. Greenwood's real delinquent-tax system lives
+entirely on corebtpay.com (confirmed by counties_sc.qpaybill_delinquent_roll.
+py's own 2026-09-23 research note: no qPayBill/Catalis subdomain exists for
+Greenwood anywhere on greenwoodcounty-sc.gov), which is exactly what the
+sibling counties_sc.greenwood_corebtpay_delinquent_tax.py scrapes -- verified
+live the same day: that scraper is actively sweeping real unpaid parcels.
+Found via the 2026-10-01 counties_sc per-source extraction audit. Do not
+re-enable without a different, real per-parcel source at this URL.
+
 Slug: counties_sc.greenwood_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -28,6 +40,9 @@ PAGE_URL = "https://www.greenwoodcounty-sc.gov/treasurer/delinquent-tax-sale"
 class GreenwoodDelinquentTax(BaseScraper):
     slug = "counties_sc.greenwood_delinquent_tax"
     name = "Greenwood County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("target page is Treasurer office info only, no delinquent list - "
+                       "superseded by counties_sc.greenwood_corebtpay_delinquent_tax - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0
