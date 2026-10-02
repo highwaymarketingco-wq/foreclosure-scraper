@@ -138,6 +138,14 @@ def _parse_item(item: dict, slug: str) -> Listing | None:
     agent_name = (offered_by.get("name") or "").strip() or None
     agent_phone = (offered_by.get("telephone") or "").strip() or None
     brokerage = ((offered_by.get("worksFor") or {}).get("name") or "").strip() or None
+    # Found 2026-10-01 (national/reo per-source audit): confirmed live,
+    # offeredBy never carries a telephone field at all anymore (not blank --
+    # absent), but DOES carry a profile URL (e.g.
+    # landwatch.com/profile/billy-may/332405) that was never captured. Costs
+    # nothing to keep (already in the fetched JSON-LD, no extra request) and
+    # gives a human operator a clickable path to the agent's own contact
+    # info when agent_phone comes back empty.
+    agent_profile_url = (offered_by.get("url") or "").strip() or None
 
     # Image
     image = (item.get("image") or "").strip() or None
@@ -169,6 +177,7 @@ def _parse_item(item: dict, slug: str) -> Listing | None:
                 "title": name,
                 "agent_name": agent_name,
                 "agent_phone": agent_phone,
+                "agent_profile_url": agent_profile_url,
                 "brokerage": brokerage,
                 "listing_id": _extract_pid(url),
             },

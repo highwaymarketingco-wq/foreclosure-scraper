@@ -168,6 +168,13 @@ def _parse_item(item: dict, slug: str) -> Listing | None:
     agent_name = (offered_by.get("name") or "").strip() or None
     agent_phone = (offered_by.get("telephone") or "").strip() or None
     brokerage = ((offered_by.get("worksFor") or {}).get("name") or "").strip() or None
+    # Found 2026-10-01 (national/reo per-source audit): confirmed live,
+    # offeredBy never carries a telephone field at all anymore (not blank --
+    # absent), but DOES carry a profile URL that was never captured. Costs
+    # nothing to keep (already in the fetched JSON-LD, no extra request) and
+    # gives a human operator a clickable path to the agent's own contact
+    # info when agent_phone comes back empty.
+    agent_profile_url = (offered_by.get("url") or "").strip() or None
 
     image = (item.get("image") or "").strip() or None
     photos = [image] if image and image.startswith("http") else []
@@ -198,6 +205,7 @@ def _parse_item(item: dict, slug: str) -> Listing | None:
                 "title": name,
                 "agent_name": agent_name,
                 "agent_phone": agent_phone,
+                "agent_profile_url": agent_profile_url,
                 "brokerage": brokerage,
                 "listing_id": _extract_listing_id(url),
             },
@@ -243,9 +251,22 @@ async def _fetch_county(
             if isinstance(body, bytes)
             else str(body or "")
         )
-        if not html or len(html) < 5000:
+        # Detect the Akamai challenge page BEFORE the generic length gate --
+        # found 2026-10-01 (national/reo per-source audit): confirmed live,
+        # the real behavioral-challenge page land.com serves is ~2.6KB, well
+        # under the old `len(html) < 5000` cutoff below, so that generic
+        # short-page break always fired FIRST and silently swallowed every
+        # walled response -- this function's own _is_akamai_challenge() call
+        # was unreachable dead code for the single most common failure shape
+        # (confirmed live: land.com's Akamai sensor challenge, "harder" than
+        # the sibling landwatch.com/landandfarm.com sites per this function's
+        # own comment above, which DO render real content through the same
+        # StealthyFetcher call). No behavior change to compliance (still
+        # solve_cloudflare=False, still just walks away on a challenge) --
+        # this only makes the run log WHY it is zero instead of looking like
+        # an ordinary empty county.
+        if not html:
             break
-        # Detect Akamai challenge page
         if _is_akamai_challenge(html):
             log.warning(
                 "landsofamerica.akamai_challenge",
@@ -253,6 +274,8 @@ async def _fetch_county(
                 page=page,
                 html_len=len(html),
             )
+            break
+        if len(html) < 5000:
             break
         listings = _extract_listings(html, slug)
         if not listings:
@@ -282,6 +305,28 @@ class LandsOfAmerica(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 600.0
+    # DISABLED 2026-10-01 (national/reo per-source audit): confirmed live,
+    # deterministically, on 2 different counties (Buncombe NC, Spartanburg
+    # SC) -- land.com serves a real Akamai Sensor behavioral-challenge page
+    # (sec-if-cpt-container / behavioral-content markup) to StealthyFetcher
+    # every time, never the real listing grid. This is harder than the
+    # sibling landwatch.com / landandfarm.com sites (same Land.com network,
+    # same fetch approach, both confirmed live to render real content fine)
+    # -- this function's own code comment already called land.com's
+    # challenge "harder" and already sets solve_cloudflare=False, i.e. a
+    # prior session already chose not to push further here, correctly: an
+    # interactive bot-sensor challenge is a wall per CLAUDE.md, not a
+    # fingerprint gate to clear harder. Disabled rather than left to spend
+    # ~90s x up to MAX_PAGES x 26 counties failing the same way every run.
+    disabled = True
+    disabled_reason = (
+        "land.com serves a real Akamai Sensor interactive challenge "
+        "(not a fingerprint-only gate) to every request, confirmed live "
+        "2026-10-01 on 2 counties/states; a wall per CLAUDE.md, not a "
+        "stealth-harder target. Siblings landwatch.com/landandfarm.com "
+        "(national.landwatch, national.landandfarm) are NOT walled and "
+        "remain active."
+    )
 
     async def fetch(self) -> Iterable[Listing]:
         # Bank rows as they are collected: if the soft timeout fires,
