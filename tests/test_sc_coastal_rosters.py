@@ -167,3 +167,94 @@ def test_select_sale_rosters_excludes_hearings_picks_newest():
     assert not _is_sale_roster("CPNJ Motions")
     assert not _is_sale_roster("SETTLEMENT HEARINGS")
     assert _roster_date("Foreclosure Sale - July 6, 2026").date().isoformat() == "2026-07-06"
+
+
+# ---- _geo_enrich -> _apply_attrs street_address wiring (2026-10-02 audit) --------
+#
+# _geo_enrich() resolves a roster row's bare TMS via SCDOT and calls
+# enrichment_arcgis._apply_attrs(li, attrs) directly -- with no address of its
+# own to seed from, unlike every other _apply_attrs caller (enrichment_
+# address_backfill / enrichment_parcel_lookup both duplicate a site_address
+# pick-and-fill locally before calling it). Confirmed live 2026-10-01: lat/lng
+# resolved on sampled rows while street_address stayed null on all of them.
+# Fixed centrally in _apply_attrs itself. SCDOT_BASE (smpesri.scdot.org) is
+# itself live-confirmed token-walled again today (2026-10-02, HTTP 200 +
+# {"error":{"code":499,"message":"Token Required"}} on every coastal layer),
+# so SCCoastalRosters().fetch() can't demonstrate this end-to-end against live
+# data right now -- these two tests pin the fix directly against the real
+# field shapes docs/sc_gis_endpoints_coastal.md captured live for Beaufort
+# (single GisFile_-prefixed column) and Georgetown (split StreetNumber +
+# StreetName, no single situs column) before that doc's SCDOT replacement
+# effort. Both shapes are already in enrichment_arcgis.FIELD_ALIASES /
+# _stitch_situs's fallback.
+
+def test_apply_attrs_fills_street_address_from_beaufort_situs():
+    from foreclosure_scraper.enrichment_arcgis import _apply_attrs
+    from foreclosure_scraper.models import Listing, ListingType
+
+    li = Listing(source="counties_sc.sc_coastal_rosters", source_url="https://x", listing_type=ListingType.FORECLOSURE_SALE,
+                 state="SC", county="Beaufort")
+    assert li.street_address is None
+    filled = _apply_attrs(li, {"GisFile_Owner1": "PRYOR JULIUS E",
+                                "GisFile_SitusAddre": "20 SMITH RD",
+                                "GisFile_Appraised": 185000})
+    assert li.street_address == "20 SMITH RD"
+    assert filled > 0
+
+
+def test_apply_attrs_fills_street_address_from_georgetown_split_situs():
+    """No single situs column -- StreetNumber + StreetName must stitch."""
+    from foreclosure_scraper.enrichment_arcgis import _apply_attrs
+    from foreclosure_scraper.models import Listing, ListingType
+
+    li = Listing(source="counties_sc.sc_coastal_rosters", source_url="https://x", listing_type=ListingType.FORECLOSURE_SALE,
+                 state="SC", county="Georgetown")
+    filled = _apply_attrs(li, {"Owner1": "MCCONNELL PATRICIA W LIFE ESTATE",
+                                "StreetNumber": "615", "StreetName": "S CEDAR AVE",
+                                "TMS": "123-45-67-890"})
+    assert li.street_address == "615 S CEDAR AVE"
+    assert filled > 0
+
+
+def test_apply_attrs_never_overwrites_an_existing_street_address():
+    from foreclosure_scraper.enrichment_arcgis import _apply_attrs
+    from foreclosure_scraper.models import Listing, ListingType
+
+    li = Listing(source="counties_sc.sc_coastal_rosters", source_url="https://x", listing_type=ListingType.FORECLOSURE_SALE,
+                 state="SC", county="Beaufort", street_address="1 REAL ST")
+    _apply_attrs(li, {"GisFile_SitusAddre": "20 SMITH RD"})
+    assert li.street_address == "1 REAL ST"
+
+
+def test_apply_attrs_skips_gis_placeholder_addresses():
+    from foreclosure_scraper.enrichment_arcgis import _apply_attrs
+    from foreclosure_scraper.models import Listing, ListingType
+
+    li = Listing(source="counties_sc.sc_coastal_rosters", source_url="https://x", listing_type=ListingType.FORECLOSURE_SALE,
+                 state="SC", county="Beaufort")
+    _apply_attrs(li, {"GisFile_SitusAddre": "NO ADDRESS ASSIGNED"})
+    assert li.street_address is None
+
+
+def test_scdot_base_token_wall_confirmed_live():
+    """Live pin for why SCCoastalRosters().fetch() can't demonstrate the fix
+    end-to-end today -- the shared SCDOT host it still queries is walled.
+    Network-dependent; skip offline rather than fail."""
+    import httpx
+
+    from foreclosure_scraper.enrichment_arcgis import SCDOT_BASE
+
+    try:
+        r = httpx.get(f"{SCDOT_BASE}/7/query",
+                      params={"where": "1=1", "outFields": "*",
+                              "resultRecordCount": "1", "f": "json"},
+                      timeout=15.0)
+    except httpx.HTTPError:
+        pytest.skip("network unavailable")
+    if r.status_code != 200:
+        pytest.skip(f"unexpected status {r.status_code}, not asserting wall state")
+    data = r.json()
+    err = data.get("error")
+    if not err:
+        pytest.skip("SCDOT is unwalled right now -- informational only, not a regression")
+    assert err.get("code") == 499

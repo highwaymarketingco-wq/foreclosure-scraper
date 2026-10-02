@@ -989,6 +989,46 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
                 li.latitude, li.longitude = new_lat, new_lng
                 filled += 2
 
+    # Situs street address. 2026-10-02 audit: _apply_attrs NEVER wrote this,
+    # despite FIELD_ALIASES["site_address"] carrying every county's situs-style
+    # column name -- every caller that needed it (enrichment_address_backfill,
+    # enrichment_parcel_lookup) duplicated the same pick-and-filter logic
+    # locally instead, and the one caller that didn't (sc_coastal_rosters.py's
+    # _geo_enrich, which resolves a bare TMS via SCDOT and calls _apply_attrs
+    # directly with no address of its own to start from) was confirmed live to
+    # leave street_address null on 4/4 sampled rows even after a successful
+    # lat/lng resolve. Centralizing the fill here closes that gap for every
+    # current and future caller. Falls back to _stitch_situs for the two known
+    # split-column layouts (Brunswick-style HouseNumber/StreetDirection/
+    # StreetName/StreetType, Georgetown-style StreetNumber/StreetName) when no
+    # single situs column is present. The two layouts share a "StreetName"
+    # field name, so this must gate on which HOUSE-NUMBER field is actually
+    # present (HouseNumber vs StreetNumber) rather than `or`-chaining the two
+    # _stitch_situs calls -- an `or` would let the Brunswick-default call match
+    # on "StreetName" alone against Georgetown-shaped attrs (no "HouseNumber"
+    # key) and silently return the street name with the house number dropped.
+    if not li.street_address:
+        site = _pick(attrs, FIELD_ALIASES["site_address"])
+        if not site:
+            if "HouseNumber" in attrs:
+                site = _stitch_situs(attrs)
+            elif "StreetNumber" in attrs:
+                site = _stitch_situs(attrs, ("StreetNumber", "StreetName"))
+        if site:
+            site_str = str(site).strip()
+            site_upper = site_str.upper()
+            # Same placeholder filter as enrichment_address_backfill._populate_from_attrs
+            # (GIS placeholders for parcels with no registered address: raw land,
+            # easements, ROW) -- kept identical so the two paths agree.
+            is_placeholder = (
+                "NO ADDRESS" in site_upper
+                or site_upper in ("UNKNOWN", "NONE", "N/A", "TBD", "0")
+                or site_upper.startswith("0 NO ")
+                or site_str.strip() in ("", "0")
+            )
+            if not is_placeholder:
+                maybe("street_address", site_str)
+
     # Only write parcel_id when we're confident in the address match. A wrong
     # parcel_id silently corrupts the dedupe key (which prefers parcel over
     # address) and can cause unrelated listings to merge.
