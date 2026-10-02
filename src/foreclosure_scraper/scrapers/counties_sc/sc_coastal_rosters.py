@@ -35,16 +35,30 @@ coordinates it falls back to a 2-of-3 keyword/street heuristic that MIE roster
 rows (parcel# only, no address text) can never satisfy. So a coastal roster row
 with only a TMS would be DENIED before geocoding ever runs.
 
-Fix: we resolve each TMS -> lat/lng (+ address/owner/assessed) AT SCRAPE TIME
-via the free statewide SCDOT parcel MapServer (the same SC_LAYER the
-parcel-lookup enricher uses). Every emitted Listing therefore already carries
-coordinates when it hits the scope gate, so the near-beach ones pass and the
-inland ones (e.g. a Conway foreclosure 4 km from the ocean) are correctly
-rejected — exactly the owner's "on the beach or within 2-3 blocks, hard pass on
-anything outside" rule.
+Fix: we resolve each TMS -> lat/lng (+ address/owner/assessed) AT SCRAPE TIME.
+
+2026-06-24 ... 2026-08-12 this went through the shared statewide SCDOT parcel
+MapServer (enrichment_arcgis.SCDOT_BASE / SC_LAYER). SCDOT went TOKEN-WALLED
+2026-08-12 (HTTP 200 + ``{"error":{"code":499,"message":"Token Required"}}`` on
+every layer, re-confirmed live 2026-10-02) and has stayed walled since —
+_resolve_tms's old SCDOT-only implementation treated the wall identically to a
+genuine "TMS not found" miss, so this scraper's geo-enrichment silently
+returned 0 resolved for ~2 months while still reporting success.
+
+2026-10-02 rebuild: each coastal county now resolves against its OWN
+county-native, token-free ArcGIS endpoint instead (_COASTAL_SC_GIS below),
+live-verified against real roster TMS values this session (see that dict's
+docstring for per-county hit rates and residual gaps). Horry — previously
+scoped (this file already carried a dedicated test fixture for its MO roster
+layout) but never actually wired into COASTAL_COUNTIES, and excluded "per
+scope" from the 2026-08-12 county-native discovery doc because nobody had
+looked yet — gets a working two-layer resolver (county's own public
+parcelapp/HorryCountyGISApp MapServer) and is added to the crawled counties
+for the first time here.
 
 Free + compliant: publicindex via the stealth browser (no CAPTCHA/login/WAF
-defeat — just the public Disclaimer accept), SCDOT via plain HTTP. No paid APIs.
+defeat — just the public Disclaimer accept), every GIS endpoint via plain HTTP,
+no token, no paid APIs.
 """
 from __future__ import annotations
 
@@ -59,7 +73,7 @@ from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
-from ...enrichment_arcgis import SCDOT_BASE, SC_LAYER, _apply_attrs
+from ...enrichment_arcgis import _apply_attrs
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 from .sc_county_rosters import ACCEPT_BTN, HOST
@@ -69,8 +83,12 @@ log = structlog.get_logger()
 # Coastal county-url-slug -> display name. Only the counties whose publicindex
 # RosterSelection exposes a Master-in-Equity SALE roster (verified live
 # 2026-06-24). Charleston omitted on purpose (no Master roster at all — see
-# module docstring).
+# module docstring). Horry added 2026-10-02 (verified live: real "Foreclosure
+# 420" rows under RosterCode=MO today) — it was scoped from day one (the MO
+# layout test fixture below predates this change) but never actually added to
+# this dict, so it was never crawled.
 COASTAL_COUNTIES: dict[str, str] = {
+    "horry": "Horry",
     "beaufort": "Beaufort",
     "georgetown": "Georgetown",
     "colleton": "Colleton",
@@ -85,6 +103,7 @@ COASTAL_COUNTIES: dict[str, str] = {
 # We try every listed code per county and keep whatever yields Foreclosure-420
 # rows with a parcel identifier. Order matters only for de-dupe stability.
 COUNTY_SALE_CODES: dict[str, tuple[str, ...]] = {
+    "horry": ("MO",),
     "beaufort": ("SALE", "MO"),
     "georgetown": ("SALE", "MO"),
     "colleton": ("SALE", "MO"),
@@ -94,22 +113,109 @@ COUNTY_SALE_CODES: dict[str, tuple[str, ...]] = {
 # Coastal counties run frequent sales, so 4 covers ~the next month of dates.
 MAX_ROSTERS_PER_COUNTY = 4
 
-# Per-county SCDOT parcel layer id (subset of SC_LAYER for our coastal set).
-# Charleston(10) kept here too so a future Charleston source can reuse the
-# resolver, even though we don't crawl its roster.
-_COASTAL_SC_LAYER = {c: SC_LAYER[c] for c in
-                     ("Horry", "Beaufort", "Georgetown", "Colleton", "Charleston")}
+# ---- TMS/PIN -> lat/lng (+ owner/situs/value/deed) resolvers, per county ---------
+#
+# Replaces the token-walled shared SCDOT MapServer (enrichment_arcgis.SCDOT_BASE,
+# dead since 2026-08-12 — see module docstring) with each county's OWN free,
+# token-free ArcGIS endpoint. This is an EXACT-match lookup on the parcel id
+# field(s), NOT the address-LIKE matching enrichment_arcgis.SC_GIS/enrich() does
+# elsewhere — a roster row has only a bare TMS/PIN at this point, no address to
+# seed an address search from. We deliberately do NOT reuse SC_GIS/enrich()'s
+# address-matching code path here for that reason, even though the config
+# SHAPE below (url + which field(s) to match) mirrors it.
+#
+# Live-verified 2026-10-02 against REAL roster rows pulled this session:
+#   Beaufort:   4/4 real roster PINs resolved (ParcelPIN, grouped R-PIN format;
+#               _tms_candidates' existing regrouping logic handles it unchanged).
+#   Horry:      14/19 real roster TMS values resolved against HorryCountyGISApp
+#               layer 24 (owner/mailing/deed/sale/value + geometry), 9 of those
+#               14 also got a situs address from layer 22 ("Addresses", joined
+#               by the same TMS). The 5 misses were either a 4-digit-not-3
+#               trailing dash segment or otherwise didn't match any candidate
+#               form tried — plausible GIS-layer lag on a recently split/platted
+#               lot, not chased further this session.
+#   Georgetown / Colleton: COULD NOT be demonstrated against a real roster row
+#               today — both counties had zero active MO/SALE rosters when this
+#               was built (roster cadence varies; see expected_min_count=0 on
+#               SCCoastalRosters below). The endpoints themselves are live and
+#               return real owner/situs data for a known parcel from
+#               docs/sc_gis_endpoints_coastal.md's own live samples — only the
+#               roster-TMS-to-GIS-field format match is unverified. The LIKE
+#               fallback in _query_layer exists specifically as a safety net
+#               for these two until a real roster row can confirm the exact
+#               format.
+#   Charleston: kept for parity / a future Charleston source, NOT live-tested
+#               this session — the host returned HTTP 200 +
+#               {"error":{"code":500,"message":"...not started"}} on 2026-10-02
+#               (a transient ArcGIS Server stop, not a token wall). Its layer
+#               (61) has no situs column at all regardless (owner+mailing only
+#               — see enrichment_arcgis.SC_GIS["Charleston"]).
+_COASTAL_SC_GIS: dict[str, dict[str, Any]] = {
+    "Horry": {
+        "layers": (
+            # CAMA: owner/mailing/deed/sale/value + the parcel polygon (the
+            # geometry we actually need for lat/lng). No situs column.
+            {
+                "url": "https://www.horrycounty.org/parcelapp/rest/services/HorryCountyGISApp/MapServer/24/query",
+                "id_fields": ("TMS",),
+            },
+            # Situs address only, joined by the same TMS. No useful geometry.
+            {
+                "url": "https://www.horrycounty.org/parcelapp/rest/services/HorryCountyGISApp/MapServer/22/query",
+                "id_fields": ("TMS",),
+            },
+        ),
+    },
+    "Beaufort": {
+        "layers": (
+            {
+                "url": "https://gis.beaufortcountysc.gov/server/rest/services/EnerGov/MapServer/1/query",
+                "id_fields": ("ParcelPIN", "GisFile_PIN"),
+            },
+        ),
+    },
+    "Georgetown": {
+        "layers": (
+            {
+                "url": "https://gis1.georgetowncountysc.org/portal/rest/services/GCGIS_Energov/MapServer/2/query",
+                "id_fields": ("TMS",),
+            },
+        ),
+    },
+    "Colleton": {
+        "layers": (
+            {
+                "url": "https://services1.arcgis.com/m0cnLGKdhwao8WvM/arcgis/rest/services/Public_Data/FeatureServer/2/query",
+                "id_fields": ("PIN",),
+            },
+        ),
+    },
+    "Charleston": {
+        "layers": (
+            {
+                "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/GIS_VIEWER/New_Parcel_Search/MapServer/61/query",
+                "id_fields": ("PID",),
+            },
+        ),
+    },
+}
 
 
 def _tms_candidates(raw: str) -> list[str]:
-    """Generate the parcel-id forms SCDOT might store for a roster TMS/PIN.
+    """Generate the parcel-id forms a county-native GIS layer might store for
+    a roster TMS/PIN.
 
-    Two coastal formats seen live 2026-06-24:
+    Formats seen live (2026-06-24 against SCDOT; re-confirmed 2026-10-02
+    against the county-native replacements — the same grouping logic matched
+    4/4 real Beaufort roster PINs unchanged):
       * Numeric TMS (Horry/Georgetown/Colleton) — dashed ``267-12-03-0046`` or
-        bare ``1860801332``; SCDOT stores the dash-free digits.
-      * R-prefixed grouped PIN (Beaufort) — roster gives ``R60002500000480000``
-        (R + 17 digits) but SCDOT stores it spaced as ``R600 025 000 0048 0000``
-        (R + 3-3-3-4-4 groups). We re-emit the grouped form so it matches.
+        bare ``1860801332``; the GIS layer typically stores the dash-free
+        digits (Horry confirmed live).
+      * Letter-prefixed grouped PIN (Beaufort uses "R"; the live county layer
+        also has "M"-prefixed parcels elsewhere in its roll, so this is not
+        hardcoded to R) — roster gives ``R60002500000480000`` (R + 17 digits)
+        but the layer stores it spaced as ``R600 025 000 0048 0000``
+        (letter + 3-3-3-4-4 groups). We re-emit the grouped form so it matches.
     Yields raw + normalized variants, de-duped in order.
     """
     raw = (raw or "").strip()
@@ -123,23 +229,25 @@ def _tms_candidates(raw: str) -> list[str]:
             out.append(v)
 
     add(raw)
-    # R-prefixed Beaufort PIN: regroup the digits as 3-3-3-4-4. The roster
-    # sometimes truncates the trailing group to 2 chars ("...0887 00") while
-    # SCDOT stores the full 4 ("...0887 0000"), so pad the last group to 4.
-    rm = re.match(r"^[Rr]\s*([\d ]+)$", raw)
+    # Letter-prefixed grouped PIN (Beaufort's live roll uses "R", "M", ...):
+    # regroup the digits as 3-3-3-4-4. The roster sometimes truncates the
+    # trailing group to 2 chars ("...0887 00") while the GIS layer stores the
+    # full 4 ("...0887 0000"), so pad the last group to 4.
+    rm = re.match(r"^([A-Za-z])\s*([\d ]+)$", raw)
     if rm:
-        groups = rm.group(1).split()
-        d = re.sub(r"\D", "", rm.group(1))
+        prefix = rm.group(1).upper()
+        groups = rm.group(2).split()
+        d = re.sub(r"\D", "", rm.group(2))
         if groups:
             groups[-1] = groups[-1].ljust(4, "0")
-            add("R" + " ".join(groups))
+            add(prefix + " " + " ".join(groups))
         if len(d) >= 16:
-            add(f"R{d[0:3]} {d[3:6]} {d[6:9]} {d[9:13]} {d[13:17]}")
-            add(f"R{d}")
+            add(f"{prefix}{d[0:3]} {d[3:6]} {d[6:9]} {d[9:13]} {d[13:17]}")
+            add(f"{prefix}{d}")
         # Padded-last-group canonical (handles "...0185 00" -> "...0185 0000").
         if len(d) >= 13:
             tail = d[13:].ljust(4, "0")[:4]
-            add(f"R{d[0:3]} {d[3:6]} {d[6:9]} {d[9:13]} {tail}")
+            add(f"{prefix}{d[0:3]} {d[3:6]} {d[6:9]} {d[9:13]} {tail}")
     # Numeric TMS variants.
     digits = re.sub(r"\D", "", raw)
     add(digits)
@@ -147,57 +255,38 @@ def _tms_candidates(raw: str) -> list[str]:
     return out
 
 
-# Parcel-id field-name candidates. SCDOT's per-county layers vary a lot:
-#   Horry      -> string TMS + string PINtext + integer PIN
-#   Beaufort   -> string PIN_ + string PIN (R-prefixed grouped value)
-#   others     -> string TMS + string PINtext
-# We must only put a field in the WHERE clause if it EXISTS on that layer —
-# referencing a missing column makes ArcGIS reject the whole query (HTTP 200,
-# error code 400), which is why a naive "TMS=.. OR PARCEL=.." clause silently
-# returned 0. We also can't know a priori whether PIN is string or integer, so
-# the resolver tries a quoted (string) match for every present field and, when
-# the candidate is all-digits, ALSO an unquoted (numeric) match. Bad-type
-# combinations error out and are skipped; a good one returns the feature.
-_PARCEL_FIELDS = ("TMS", "PINtext", "PIN_", "PIN", "PARCEL", "PARCELNUMBER",
-                  "PARNO", "PARID")
+async def _query_layer(
+    c: httpx.AsyncClient, url: str, id_fields: tuple[str, ...], tms: str,
+) -> Optional[dict[str, Any]]:
+    """Try every (candidate, field) pair as an EXACT match against one
+    county-native layer, returning the first hit's attributes (+ a
+    ``_centroid`` (lat, lng) when the layer returned polygon/point geometry).
+    None on a miss against every candidate.
 
-# layer-id -> set of field names present (cached after first metadata fetch).
-_LAYER_FIELDS: dict[int, set[str]] = {}
+    We can't know a priori whether the id column is typed as text or a
+    number, so a quoted (string) match is tried for every field and, when the
+    candidate is all-digits, ALSO an unquoted (numeric) match — mirroring the
+    old SCDOT resolver's approach. Bad type combinations error out (HTTP 200 +
+    an ``error`` body) and are skipped rather than raising.
 
-
-async def _layer_fields(c: httpx.AsyncClient, layer: int) -> set[str]:
-    if layer in _LAYER_FIELDS:
-        return _LAYER_FIELDS[layer]
-    fields: set[str] = set()
-    try:
-        r = await c.get(f"{SCDOT_BASE}/{layer}?f=json", timeout=20.0)
-        if r.status_code == 200:
-            fields = {f["name"] for f in r.json().get("fields", []) if "name" in f}
-    except (httpx.HTTPError, ValueError):
-        fields = set()
-    _LAYER_FIELDS[layer] = fields
-    return fields
-
-
-async def _resolve_tms(c: httpx.AsyncClient, layer: int, tms: str) -> Optional[dict[str, Any]]:
-    """Query the SCDOT parcel layer for a TMS, returning the first feature's
-    attributes with a ``_centroid`` (lat, lng) of the parcel polygon. None on
-    miss. Builds the WHERE only from columns that actually exist on the layer.
+    Last resort: a LIKE match on the candidate's raw digits, wrapped in
+    wildcards, for a county whose roster TMS format doesn't exactly match the
+    GIS layer's own dash/zero-padding convention (Georgetown/Colleton were NOT
+    confirmable against a live roster row this session — see _COASTAL_SC_GIS's
+    docstring). Only accepted when it returns EXACTLY one feature; an
+    ambiguous multi-hit is treated as a miss rather than risk a wrong parcel.
     """
-    base = f"{SCDOT_BASE}/{layer}/query"
-    present = await _layer_fields(c, layer)
-    fields = [f for f in _PARCEL_FIELDS if f in present] or ["TMS", "PINtext"]
 
-    async def _query(where: str) -> Optional[dict[str, Any]]:
+    async def _query(where: str, limit: int = 1) -> Optional[list[dict[str, Any]]]:
         try:
             r = await c.get(
-                base,
+                url,
                 params={
                     "where": where,
                     "outFields": "*",
                     "returnGeometry": "true",
                     "outSR": "4326",
-                    "resultRecordCount": "1",
+                    "resultRecordCount": str(limit),
                     "f": "json",
                 },
                 timeout=20.0,
@@ -208,36 +297,70 @@ async def _resolve_tms(c: httpx.AsyncClient, layer: int, tms: str) -> Optional[d
             if "error" in data:  # e.g. quoting a string against an int column
                 return None
             feats = data.get("features") or []
-            if not feats:
-                return None
-            f0 = feats[0]
-            attrs = dict(f0.get("attributes") or {})
-            geom = f0.get("geometry") or {}
-            if "x" in geom and "y" in geom:
-                attrs["_centroid"] = (geom["y"], geom["x"])
-            elif geom.get("rings"):
-                pts = [p for ring in geom["rings"] for p in ring]
-                if pts:
-                    cx = sum(p[0] for p in pts) / len(pts)
-                    cy = sum(p[1] for p in pts) / len(pts)
-                    attrs["_centroid"] = (cy, cx)
-            attrs["_match_confident"] = True
-            return attrs if attrs.get("_centroid") else None
+            return feats or None
         except (httpx.HTTPError, ValueError):
             return None
 
-    # Per-field, per-candidate. ONE query each so a type mismatch on one column
-    # (string value vs integer column) can't poison the rest of the search.
+    def _to_attrs(feat: dict[str, Any]) -> dict[str, Any]:
+        attrs = dict(feat.get("attributes") or {})
+        geom = feat.get("geometry") or {}
+        if "x" in geom and "y" in geom:
+            attrs["_centroid"] = (geom["y"], geom["x"])
+        elif geom.get("rings"):
+            pts = [p for ring in geom["rings"] for p in ring]
+            if pts:
+                cx = sum(p[0] for p in pts) / len(pts)
+                cy = sum(p[1] for p in pts) / len(pts)
+                attrs["_centroid"] = (cy, cx)
+        return attrs
+
+    # Per-field, per-candidate exact match. ONE query each so a type mismatch
+    # on one column can't poison the rest of the search.
     for cand in _tms_candidates(tms):
         esc = cand.replace("'", "''")
-        for fld in fields:
-            attrs = await _query(f"{fld}='{esc}'")
-            if attrs:
-                return attrs
+        for fld in id_fields:
+            feats = await _query(f"{fld}='{esc}'")
+            if feats:
+                return _to_attrs(feats[0])
             if cand.isdigit():
-                attrs = await _query(f"{fld}={cand}")
-                if attrs:
-                    return attrs
+                feats = await _query(f"{fld}={cand}")
+                if feats:
+                    return _to_attrs(feats[0])
+
+    digits = re.sub(r"\D", "", tms)
+    if len(digits) >= 6:
+        for fld in id_fields:
+            feats = await _query(f"{fld} LIKE '%{digits}%'", limit=2)
+            if feats and len(feats) == 1:
+                return _to_attrs(feats[0])
+    return None
+
+
+async def _resolve_tms(c: httpx.AsyncClient, county: str, tms: str) -> Optional[dict[str, Any]]:
+    """Resolve a roster TMS/PIN to lat/lng (+ owner/situs/value/deed) via the
+    county-native endpoint(s) configured in ``_COASTAL_SC_GIS``. Most counties
+    are a single layer; Horry's CAMA and situs-address data live on two
+    separate layers keyed by the same TMS, so every configured layer is
+    queried and the hits merged (first layer's non-empty values and geometry
+    win on any key collision). None when every configured layer misses.
+    """
+    cfg = _COASTAL_SC_GIS.get(county)
+    if not cfg:
+        return None
+    merged: Optional[dict[str, Any]] = None
+    for layer in cfg["layers"]:
+        attrs = await _query_layer(c, layer["url"], layer["id_fields"], tms)
+        if not attrs:
+            continue
+        if merged is None:
+            merged = attrs
+        else:
+            for k, v in attrs.items():
+                if k not in merged or merged[k] in (None, "", "<Null>"):
+                    merged[k] = v
+    if merged is not None and merged.get("_centroid"):
+        merged["_match_confident"] = True
+        return merged
     return None
 
 
@@ -456,14 +579,15 @@ def parse_sale_roster(html: str, roster_url: str, county: str,
 
 async def _geo_enrich(listings: list[Listing]) -> int:
     """Resolve TMS -> lat/lng (+ address/owner/assessed) for each listing via
-    SCDOT, IN PLACE, so coordinates are present before the scope gate. Returns
-    the number of listings that got coordinates."""
+    each county's own county-native GIS endpoint(s) (_COASTAL_SC_GIS), IN
+    PLACE, so coordinates are present before the scope gate. Returns the
+    number of listings that got coordinates."""
     by_county: dict[str, list[Listing]] = {}
     for li in listings:
         if not li.parcel_id:
             continue
         cn = (li.county or "").replace(" County", "").strip().title()
-        if cn in _COASTAL_SC_LAYER:
+        if cn in _COASTAL_SC_GIS:
             by_county.setdefault(cn, []).append(li)
     if not by_county:
         return 0
@@ -473,9 +597,8 @@ async def _geo_enrich(listings: list[Listing]) -> int:
 
     async def one(c: httpx.AsyncClient, county: str, li: Listing) -> None:
         nonlocal resolved
-        layer = _COASTAL_SC_LAYER[county]
         async with sem:
-            attrs = await _resolve_tms(c, layer, li.parcel_id or "")
+            attrs = await _resolve_tms(c, county, li.parcel_id or "")
         if attrs:
             had_geo = li.latitude is not None and li.longitude is not None
             _apply_attrs(li, attrs)
@@ -483,6 +606,11 @@ async def _geo_enrich(listings: list[Listing]) -> int:
                 resolved += 1
             if not isinstance(li.raw, dict):
                 li.raw = {}
+            # NOTE: key name kept as "scdot_parcel_resolved" even though SCDOT
+            # itself is no longer queried here — it's in web_artifact.py's
+            # RAW_KEEP publish allowlist under that name, and renaming it would
+            # need a matching RAW_KEEP change to avoid the key being silently
+            # dropped at publish. Not worth the churn for a bookkeeping flag.
             li.raw["scdot_parcel_resolved"] = True
 
     async with client(timeout=25.0) as c:

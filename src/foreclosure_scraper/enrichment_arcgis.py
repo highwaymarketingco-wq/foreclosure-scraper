@@ -465,7 +465,16 @@ FIELD_ALIASES = {
                      # Gaston county layer 11 = CURR_ADDR1 (owner mailing, NOT
                      # the situs — PHYSSTRADD is the situs);
                      # Cleveland Basemap = COUNTY_MAILING_ADDRESS.
-                     "CURR_ADDR1", "COUNTY_MAILING_ADDRESS"),
+                     "CURR_ADDR1", "COUNTY_MAILING_ADDRESS",
+                     # Coastal SC county-native (2026-10-02, docs/
+                     # sc_gis_endpoints_coastal.md): Beaufort=GisFile_MailingAdd,
+                     # Georgetown=BillingAddress, Colleton=OwnerAddress1,
+                     # Horry(HorryCountyGISApp layer 24)=OwnerStreet. Charleston's
+                     # mailing is split across MAIL_ST_NO/MAIL_ST_NAME/MAIL_ST_TYPE
+                     # (no single field) — handled by a _stitch_situs fallback in
+                     # _apply_attrs, not a plain alias here.
+                     "GisFile_MailingAdd", "BillingAddress", "OwnerAddress1",
+                     "OwnerStreet"),
     "site_address": ("PropertyLocation", "siteadd", "Property_Address", "LocAddr",
                      "LOCATION_ADDR", "PHYS_ADDR", "PHYADDR",
                      "PHYSICAL_STREET_ADDRESS", "SITUS_ADDR", "ADDRESS_1",
@@ -480,7 +489,12 @@ FIELD_ALIASES = {
                      # SC county-native (2026-08-12): Pickens=LOCADD,
                      # Beaufort=GisFile_SitusAddre (pinned as addr_field but must
                      # also be readable back here).
-                     "LOCADD", "GisFile_SitusAddre"),
+                     "LOCADD", "GisFile_SitusAddre",
+                     # Horry (2026-10-02): HorryCountyGISApp layer 22 ("Addresses")
+                     # publishes the full situs as a single ADDRESS field, joined
+                     # to the CAMA layer (24) by TMS — see
+                     # sc_coastal_rosters._COASTAL_SC_GIS.
+                     "ADDRESS"),
     "acreage": ("Acreage", "ACRES", "gisacres", "ACREAGE", "LegalAc",
                 "DEEDED_ACRES", "Acres", "ACRE", "Acres_Calc",
                 # Gaston county layer 11 = CALCAC/DEEDAC; Cleveland = COUNTY_ACRES
@@ -514,7 +528,13 @@ FIELD_ALIASES = {
                   # figure on the older city layer); Cleveland = COUNTY_TOTAL_VALUE.
                   "FMV_TOTAL", "TOTVAL", "COUNTY_TOTAL_VALUE",
                   # SC county-native (2026-08-12): Beaufort=GisFile_Appraised.
-                  "GisFile_Appraised"),
+                  "GisFile_Appraised",
+                  # Horry (2026-10-02): HorryCountyGISApp layer 24 total market
+                  # value (AssessedProp is the taxable/assessed figure, lower by
+                  # SC's 4%/6% assessment ratio — MarketProp matches the "total
+                  # appraised" semantics of the other GisFile_Appraised-style
+                  # aliases above).
+                  "MarketProp"),
     "deed_book": ("DEEDBK", "Deed_Book", "DEED_BK", "DeedBook", "DB",
                   # SC SCDOT: Charleston=DEED_BOOK_, Anderson=DBOOK,
                   # Beaufort=Book, Laurens=DEEDBOOK
@@ -534,14 +554,21 @@ FIELD_ALIASES = {
                   # Laurens=TransferDa. (Beaufort/Georgetown SaleDate already above.)
                   # Epoch-ms values stringify to a 13-digit value that
                   # valuation.amortize._as_date already parses.
-                  "SALEDT", "RECORDED_D", "SALE_YEAR", "TransferDa"),
+                  "SALEDT", "RECORDED_D", "SALE_YEAR", "TransferDa",
+                  # Coastal SC county-native (2026-10-02): Beaufort=GisFile_SaleDate
+                  # (string "m/d/yyyy"); Charleston's county-native layer (61) uses
+                  # RECORDED_DATE (epoch-ms) — a DIFFERENT, differently-prefixed
+                  # field from the dead SCDOT-era RECORDED_D already aliased above.
+                  "GisFile_SaleDate", "RECORDED_DATE"),
     "sale_amount": ("SaleAmount", "SALEAMT", "SalePrice", "Sale_Price",
                     # SC SCDOT: Pickens=SALEP, Charleston/Anderson=SALE_PRICE,
                     # Laurens=Considerat (True_Sale is a Y/N flag, not an amount).
                     # (Beaufort/Georgetown SalePrice already above.)
                     "SALEP", "SALE_PRICE", "Considerat",
                     # Gaston county layer 11
-                    "SALESAMT"),
+                    "SALESAMT",
+                    # Beaufort county-native (2026-10-02)
+                    "GisFile_SalePrice"),
     "zoning": ("Zoning", "ZONING", "ZONE", "ZoneCode", "zone_code", "PRIM_ZONE"),
     "land_value": ("landval", "Land", "LANDVAL", "LandValue", "Land_Val",
                    "FMV_LAND", "COUNTY_LAND_VALUE"),
@@ -550,6 +577,18 @@ FIELD_ALIASES = {
                           "FMV_IMPRV", "COUNTY_BUILDING_VALUE"),
     "city": ("CITY", "City", "PROP_CITY", "MAIL_CITY"),
     "zip": ("ZIP", "Zip", "PROP_ZIP", "ZIPCODE", "ZipCode", "MAIL_ZIP"),
+    # Beaufort county-native only (2026-10-02, docs/sc_gis_endpoints_coastal.md):
+    # a senior/legal-residence exemption code. No other county layer audited so
+    # far publishes an equivalent column, so this is a single-alias role for now.
+    # "0" (no exemption on file) is already filtered out by _pick's "falsy"
+    # check below, so only a genuine non-zero exemption code is ever written.
+    "exemption": ("GisFile_Exemption",),
+    # Combined "book-page" deed references that are a SINGLE field (not separate
+    # deed_book/deed_page columns) and must be split on '-' before use: Georgetown
+    # LegalReference ("4964-237") and Charleston DEED_BOOK_PAGE ("1152-771").
+    # Only consulted by _apply_attrs when the plain deed_book/deed_page aliases
+    # above found nothing.
+    "deed_combined": ("LegalReference", "DEED_BOOK_PAGE"),
 }
 
 
@@ -599,6 +638,23 @@ def _stitch_situs(
     if not name_val:
         return None
     return " ".join(parts)
+
+
+def _split_combined_deed(val: str) -> tuple[str | None, str | None]:
+    """Split a combined 'book-page' deed reference on its FIRST '-'.
+
+    Georgetown's LegalReference ("4964-237") and Charleston's DEED_BOOK_PAGE
+    ("1152-771") each publish book+page as one field instead of two separate
+    columns. Returns (book, page), or (None, None) when the value has no
+    dash to split on (so a malformed/blank value never produces a bogus book
+    with an empty page).
+    """
+    v = (val or "").strip()
+    if "-" not in v:
+        return None, None
+    book, _, page = v.partition("-")
+    book, page = book.strip(), page.strip()
+    return (book or None, page or None)
 
 
 def _repair_cleveland(attrs: dict[str, Any]) -> None:
@@ -1114,6 +1170,12 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
     # Owner / mailing → carried in raw for now (we don't have first-class fields)
     owner = _pick(attrs, FIELD_ALIASES["owner_name"])
     mailing = _pick(attrs, FIELD_ALIASES["mailing_addr"])
+    # Charleston's county-native layer has NO single mailing field — it's split
+    # across MAIL_ST_NO/MAIL_ST_NAME/MAIL_ST_TYPE. _stitch_situs is generic
+    # enough to reuse here unchanged (it just needs a component whose name
+    # contains "name", which MAIL_ST_NAME satisfies).
+    if not mailing and "MAIL_ST_NO" in attrs:
+        mailing = _stitch_situs(attrs, ("MAIL_ST_NO", "MAIL_ST_NAME", "MAIL_ST_TYPE"))
     if owner or mailing:
         gis = li.raw.setdefault("gis", {})
         if owner and not gis.get("owner"):
@@ -1121,6 +1183,16 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
             filled += 1
         if mailing and not gis.get("mailing"):
             gis["mailing"] = str(mailing).strip()
+            filled += 1
+
+    # Senior/legal-residence exemption code (Beaufort county-native only, see
+    # FIELD_ALIASES["exemption"]). A lead signal, carried the same way owner/
+    # mailing are — no first-class Listing field for it yet.
+    exemption = _pick(attrs, FIELD_ALIASES["exemption"])
+    if exemption is not None:
+        gis = li.raw.setdefault("gis", {})
+        if "exemption" not in gis:
+            gis["exemption"] = str(exemption).strip()
             filled += 1
 
     # Vacant / absentee / owner-changed cohorts. These are lead SIGNALS, not
@@ -1138,6 +1210,12 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
     # Recorded deed/book/page + last sale info
     deed_b = _pick(attrs, FIELD_ALIASES["deed_book"])
     deed_p = _pick(attrs, FIELD_ALIASES["deed_page"])
+    if not deed_b and not deed_p:
+        # Georgetown (LegalReference) / Charleston (DEED_BOOK_PAGE) publish
+        # book+page as one combined "book-page" field instead of two columns.
+        combined = _pick(attrs, FIELD_ALIASES["deed_combined"])
+        if combined:
+            deed_b, deed_p = _split_combined_deed(str(combined))
     sale_d = _pick(attrs, FIELD_ALIASES["sale_date"])
     sale_a = _pick(attrs, FIELD_ALIASES["sale_amount"])
     if deed_b or deed_p or sale_d or sale_a:

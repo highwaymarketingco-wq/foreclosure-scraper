@@ -1,23 +1,31 @@
-"""Coastal SC Master-in-Equity sale-roster scraper (publicindex + SCDOT geo).
+"""Coastal SC Master-in-Equity sale-roster scraper (publicindex + county-native
+GIS geo-resolution).
 
 Added 2026-06-24 for the COASTAL track. Feeds the previously-empty oceanfront /
 downtown-Charleston gate (main._check_oceanfront) by scraping the coastal SC
 counties' Master-in-Equity foreclosure-SALE rosters and resolving each parcel
-TMS/PIN to lat/lng via SCDOT at scrape time, so the near-beach ones can pass the
-ingest-time scope gate (which needs coordinates, not just an address).
+TMS/PIN to lat/lng at scrape time, so the near-beach ones can pass the
+ingest-time scope gate (which needs coordinates, not just an address). Geo
+resolution moved off the shared, token-walled SCDOT MapServer onto each
+county's own free endpoint on 2026-10-02 (_COASTAL_SC_GIS) -- see that dict's
+docstring in the module for per-county live-verification notes.
 """
 from __future__ import annotations
 
 import asyncio
 import os
 
+import httpx
 import pytest
 
 from foreclosure_scraper.scrapers.counties_sc.sc_coastal_rosters import (
     COASTAL_COUNTIES,
     COUNTY_SALE_CODES,
     SCCoastalRosters,
+    _COASTAL_SC_GIS,
     _PARCEL_CELL_RE,
+    _query_layer,
+    _resolve_tms,
     _tms_candidates,
     parse_sale_roster,
 )
@@ -117,6 +125,26 @@ def test_charleston_excluded():
 
 def test_county_codes_cover_every_county():
     assert set(COUNTY_SALE_CODES) == set(COASTAL_COUNTIES)
+
+
+def test_horry_now_crawled():
+    """2026-10-02: Horry was documented (this file's own _HORRY_ROW fixture
+    predates this test) but never actually added to COASTAL_COUNTIES /
+    COUNTY_SALE_CODES, so it was never crawled. Added once a working
+    county-native geo-resolver existed for it (_COASTAL_SC_GIS["Horry"])."""
+    assert COASTAL_COUNTIES.get("horry") == "Horry"
+    assert COUNTY_SALE_CODES.get("horry") == ("MO",)
+
+
+def test_tms_candidates_generalizes_beyond_r_prefix():
+    """Beaufort's live parcel roll has non-R letter-prefixed PINs too (e.g.
+    "M100 006 000 0611 0000", confirmed live 2026-10-02) even though every
+    roster TMS sampled this session happened to be R-prefixed -- the regrouping
+    logic must not be hardcoded to the letter R."""
+    c = _tms_candidates("M60002500000480000")
+    assert "M600 025 000 0048 0000" in c
+    c2 = _tms_candidates("M100 006 000 0611 00")
+    assert "M100 006 000 0611 0000" in c2
 
 
 def test_scraper_registered():
@@ -237,9 +265,11 @@ def test_apply_attrs_skips_gis_placeholder_addresses():
 
 
 def test_scdot_base_token_wall_confirmed_live():
-    """Live pin for why SCCoastalRosters().fetch() can't demonstrate the fix
-    end-to-end today -- the shared SCDOT host it still queries is walled.
-    Network-dependent; skip offline rather than fail."""
+    """Live pin for WHY this scraper no longer queries SCDOT at all (2026-10-02
+    rebuild moved geo-resolution onto _COASTAL_SC_GIS's county-native
+    endpoints instead) -- the shared SCDOT host is still walled, re-confirmed
+    the same day the county-native replacement shipped. Network-dependent;
+    skip offline rather than fail."""
     import httpx
 
     from foreclosure_scraper.enrichment_arcgis import SCDOT_BASE
@@ -258,3 +288,151 @@ def test_scdot_base_token_wall_confirmed_live():
     if not err:
         pytest.skip("SCDOT is unwalled right now -- informational only, not a regression")
     assert err.get("code") == 499
+
+
+# ---- _COASTAL_SC_GIS / _query_layer / _resolve_tms (2026-10-02 rebuild) ----------
+#
+# Replaces the token-walled SCDOT resolver with per-county county-native
+# endpoints. Live-verified this session against REAL roster rows: Beaufort
+# 4/4 and Horry 14/19 TMS values resolved (see _COASTAL_SC_GIS's docstring for
+# the full account, including the two counties -- Georgetown/Colleton -- that
+# had zero active rosters today and so couldn't be checked against a real
+# roster TMS). The tests below pin the merge/matching LOGIC deterministically
+# against mock transports rather than depending on live roster cadence.
+
+def test_coastal_sc_gis_covers_every_crawled_county():
+    """Every county this scraper actually crawls must have a geo-resolver
+    entry, and every configured layer must carry the fields _query_layer
+    needs."""
+    for county in COASTAL_COUNTIES.values():
+        cfg = _COASTAL_SC_GIS.get(county)
+        assert cfg, f"no _COASTAL_SC_GIS entry for crawled county {county!r}"
+        assert cfg["layers"], f"{county} has no layers configured"
+        for layer in cfg["layers"]:
+            assert layer["url"].startswith("https://")
+            assert layer["id_fields"]
+
+
+def test_resolve_tms_merges_horry_cama_and_address_layers():
+    """Horry splits CAMA (owner/mailing/deed/sale/value + parcel geometry) and
+    situs address across two separate layers joined by the same TMS
+    (confirmed live 2026-10-02 -- see module docstring). _resolve_tms must
+    query both and merge them into one attrs dict without the second layer's
+    lack of geometry clobbering the first layer's centroid."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "/24/query" in str(request.url):
+            return httpx.Response(200, json={
+                "features": [{
+                    "attributes": {"TMS": "1791604022", "OwnerName": "GOMEZ IGNACIO MANUEL",
+                                   "OwnerStreet": "1 MAIN ST", "DeedBook": "1234",
+                                   "DeedPage": "56", "SaleDate": 1600000000000,
+                                   "MarketProp": 150000},
+                    "geometry": {"rings": [[[-78.97, 33.67], [-78.98, 33.68], [-78.97, 33.67]]]},
+                }]
+            })
+        if "/22/query" in str(request.url):
+            return httpx.Response(200, json={
+                "features": [{
+                    "attributes": {"TMS": "1791604022", "ADDRESS": "181 DRY VALLEY LP",
+                                   "CITY": "Myrtle Beach", "STATE": "SC", "ZIPCODE": 29588},
+                }]
+            })
+        return httpx.Response(200, json={"features": []})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await _resolve_tms(c, "Horry", "1791604022")
+
+    attrs = asyncio.run(run())
+    assert attrs is not None
+    assert attrs["_match_confident"] is True
+    assert attrs["_centroid"] is not None            # from layer 24 (CAMA)
+    assert attrs["OwnerName"] == "GOMEZ IGNACIO MANUEL"  # from layer 24
+    assert attrs["ADDRESS"] == "181 DRY VALLEY LP"       # from layer 22 (join)
+
+    from foreclosure_scraper.enrichment_arcgis import _apply_attrs
+    from foreclosure_scraper.models import Listing, ListingType
+
+    li = Listing(source="counties_sc.sc_coastal_rosters", source_url="https://x",
+                 listing_type=ListingType.FORECLOSURE_SALE, state="SC", county="Horry",
+                 parcel_id="1791604022")
+    _apply_attrs(li, attrs)
+    assert li.latitude is not None and li.longitude is not None
+    assert li.street_address == "181 DRY VALLEY LP"
+    assert li.tax_value == 150000.0
+    assert li.raw["gis"]["owner"] == "GOMEZ IGNACIO MANUEL"
+    assert li.raw["gis"]["mailing"] == "1 MAIN ST"
+    assert li.raw["gis"]["last_sale"]["book"] == "1234"
+
+
+def test_resolve_tms_returns_none_when_every_layer_misses():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"features": []})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await _resolve_tms(c, "Beaufort", "R999999999999999999")
+
+    assert asyncio.run(run()) is None
+
+
+def test_resolve_tms_unknown_county_returns_none():
+    async def run():
+        async with httpx.AsyncClient() as c:
+            return await _resolve_tms(c, "Nowhere County", "12345")
+
+    assert asyncio.run(run()) is None
+
+
+def test_query_layer_regrouped_candidate_matches_beaufort_style_pin():
+    """Beaufort's roster gives a bare R-PIN; the live layer stores it spaced
+    3-3-3-4-4. _query_layer must try the regrouped form, not just the raw
+    roster string."""
+    seen_wheres: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        where = request.url.params.get("where", "")
+        seen_wheres.append(where)
+        if "ParcelPIN='R600 025 000 0048 0000'" in where:
+            return httpx.Response(200, json={
+                "features": [{
+                    "attributes": {"ParcelPIN": "R600 025 000 0048 0000"},
+                    "geometry": {"x": -80.7, "y": 32.2},
+                }]
+            })
+        return httpx.Response(200, json={"features": []})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await _query_layer(c, _COASTAL_SC_GIS["Beaufort"]["layers"][0]["url"],
+                                       ("ParcelPIN", "GisFile_PIN"), "R60002500000480000")
+
+    attrs = asyncio.run(run())
+    assert attrs is not None
+    assert attrs["_centroid"] == (32.2, -80.7)
+    assert any("R600 025 000 0048 0000" in w for w in seen_wheres)
+
+
+def test_query_layer_like_fallback_rejects_ambiguous_multi_hit():
+    """The last-resort LIKE fallback must not pick a result when it's
+    ambiguous (more than one feature matched) -- better to leave a lead
+    ungeocoded than silently attach the wrong parcel's coordinates."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        where = request.url.params.get("where", "")
+        if "LIKE" in where:
+            return httpx.Response(200, json={
+                "features": [
+                    {"attributes": {"TMS": "01-0101-001-00-00"}},
+                    {"attributes": {"TMS": "99-0101-001-00-99"}},
+                ]
+            })
+        return httpx.Response(200, json={"features": []})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await _query_layer(c, _COASTAL_SC_GIS["Georgetown"]["layers"][0]["url"],
+                                       ("TMS",), "01-0101-001-00-00")
+
+    assert asyncio.run(run()) is None
