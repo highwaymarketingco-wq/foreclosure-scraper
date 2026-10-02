@@ -8,12 +8,18 @@ embed NESTED <table>s (which is why a naive <tr>-regex parser undercounts cells)
 and one row has a MASKED date ('**/**/2026', a protected DTH doc) that the parser
 must KEEP with recorded_date=None. CI never hits the network.
 """
+import asyncio
+from datetime import datetime, timedelta
+from types import SimpleNamespace
+
+from foreclosure_scraper.rod import aumentum
 from foreclosure_scraper.rod.aumentum import (
     _parse_instruments_grid,
     _is_nod,
     _is_post_sale,
     _split_book_page,
     _parse_date,
+    _result_count,
 )
 from foreclosure_scraper.rod.classify import classify_rod_docs
 from foreclosure_scraper.enrichment_aumentum_rod import _owner_doc, _name_parts
@@ -120,3 +126,195 @@ def test_helpers():
 def test_empty():
     assert _parse_instruments_grid("", "Buncombe", "NC") == []
     assert _parse_instruments_grid("<html><body>no grid</body></html>", "Buncombe", "NC") == []
+
+
+# --------------------------------------------------------------------------- #
+# 2026-10-02 Date-Range sweep fix: 30-day vendor cap + 500-row page cap.      #
+# Live-verified root cause (module docstring): the GET/nav/search POST never  #
+# had a missing field — the vendor silently bounces a >30-calendar-day search #
+# back to the New-Search tab, and a window's own "Your search returned X      #
+# results" banner can exceed the grid's 500-row page cap even within a legal  #
+# <=29-day-span window (Buncombe: 3,805 results in one real 30-day window).   #
+# --------------------------------------------------------------------------- #
+
+def test_result_count_parses_the_real_banner_text():
+    html = ('<div class="searchCriteriaSummary">Your search returned <strong>\n'
+            '    3,805</strong> results on <strong>10/2/2026</strong></div>')
+    assert _result_count(html) == 3805
+    assert _result_count("<html>no banner here</html>") is None
+
+
+def _grid_html(rows: list[tuple[str, str, str]], total: int) -> str:
+    """A minimal real-shape cpgvInstruments grid (see SAMPLE above) carrying
+    `total` in the "Your search returned" banner and one <tr> per (date,
+    book/page, grantor) row — enough for _parse_instruments_grid + the sweep's
+    cap-detection to both work against."""
+    trs = "".join(
+        f'<tr class="cottPagedGridViewRowStyle"><td>1</td><td>{d}</td><td>CRP</td>'
+        f'<td>DEED OF TRUST</td><td><table><tr><td>{g}</td></tr></table></td>'
+        f'<td><table><tr><td>BANK</td></tr></table></td><td></td><td>{bp.replace("/", "")}</td>'
+        f'<td>{bp}</td><td></td><td>1</td><td></td><td></td><td></td></tr>'
+        for d, bp, g in rows
+    )
+    return (
+        '<div class="searchCriteriaSummary">Your search returned <strong>\n'
+        f'    {total}</strong> results</div>'
+        '<table id="ctl00_cphMain_tcMain_tpInstruments_ucInstrumentsGridV2_cpgvInstruments">'
+        f'{trs}</table>'
+    )
+
+
+class _FakeDateSession:
+    """Routes _sweep_date_window's POSTs by the (txtFiledFrom, txtFiledThru)
+    pair embedded in the body, exactly as aumentum._date_search_body builds
+    it — no real network, no curl_cffi."""
+
+    def __init__(self, by_window: dict[tuple[str, str], tuple[int, list[tuple[str, str, str]]]]):
+        self.by_window = by_window
+        self.calls: list[tuple[str, str]] = []
+
+    async def post(self, url, data, headers, allow_redirects, timeout):
+        key = (data[aumentum._P_DATE + "txtFiledFrom"], data[aumentum._P_DATE + "txtFiledThru"])
+        self.calls.append(key)
+        total, rows = self.by_window.get(key, (0, []))
+        return SimpleNamespace(text=_grid_html(rows, total))
+
+
+def test_sweep_date_window_bisects_a_capped_window_and_keeps_both_halves():
+    """A window whose OWN result count is >= the 500-row page cap is the head
+    of a longer list — _sweep_date_window must split it rather than accept
+    whatever that one page happened to return, down to leaf windows that are
+    under the cap."""
+    a, b = datetime(2026, 9, 1), datetime(2026, 9, 30)   # span 29, legal per-call
+    mid = a + timedelta(days=(b - a).days // 2)          # 2026-09-15
+    fmt = "%m/%d/%Y"
+    session = _FakeDateSession({
+        (a.strftime(fmt), b.strftime(fmt)): (600, [("09/01/2026", "1/1", "DECOY ONE")]),
+        (a.strftime(fmt), mid.strftime(fmt)): (2, [("09/02/2026", "100/1", "ALPHA ONE"),
+                                                   ("09/03/2026", "100/2", "ALPHA TWO")]),
+        ((mid + timedelta(days=1)).strftime(fmt), b.strftime(fmt)):
+            (2, [("09/20/2026", "200/1", "BETA ONE"), ("09/21/2026", "200/2", "BETA TWO")]),
+    })
+    out: list = []
+    seen: set = set()
+    asyncio.run(aumentum._sweep_date_window(session, "https://x", "Buncombe", "NC", a, b, out, seen))
+
+    # 3 POSTs: the capped top-level window, then its two halves.
+    assert len(session.calls) == 3
+    names = sorted(d.grantor for d in out)
+    assert names == ["ALPHA ONE", "ALPHA TWO", "BETA ONE", "BETA TWO"]
+    assert "DECOY ONE" not in names        # the capped page's own rows are discarded, not kept
+
+
+def test_sweep_date_window_accepts_a_window_under_the_cap_without_bisecting():
+    a, b = datetime(2026, 9, 1), datetime(2026, 9, 3)
+    fmt = "%m/%d/%Y"
+    session = _FakeDateSession({
+        (a.strftime(fmt), b.strftime(fmt)): (3, [("09/01/2026", "1/1", "ONE"),
+                                                 ("09/02/2026", "1/2", "TWO")]),
+    })
+    out: list = []
+    seen: set = set()
+    asyncio.run(aumentum._sweep_date_window(session, "https://x", "Buncombe", "NC", a, b, out, seen))
+    assert len(session.calls) == 1         # no bisection: 3 < _RESULTS_PAGE_CAP
+    assert sorted(d.grantor for d in out) == ["ONE", "TWO"]
+
+
+def test_sweep_date_window_dedupes_across_sub_windows():
+    """A document straddling a bisection boundary (same book/page/instrument
+    seen from two different sub-window POSTs) must be kept once."""
+    a, b = datetime(2026, 9, 1), datetime(2026, 9, 2)
+    out: list = []
+    seen: set = set()
+    fmt = "%m/%d/%Y"
+    session = _FakeDateSession({
+        (a.strftime(fmt), b.strftime(fmt)): (1, [("09/01/2026", "9/9", "DUP")]),
+    })
+    asyncio.run(aumentum._sweep_date_window(session, "https://x", "Buncombe", "NC", a, b, out, seen))
+    asyncio.run(aumentum._sweep_date_window(session, "https://x", "Buncombe", "NC", a, b, out, seen))
+    assert len(out) == 1
+
+
+def test_date_swept_docs_at_raw_row_cap_none_scans_the_full_window(monkeypatch):
+    """2026-10-02 regression: passing a small raw_row_cap (the OLD max_docs*6
+    behavior) could early-exit after the FIRST ~29-day chunk's recursive
+    bisection alone (hundreds of rows from just a few calendar days), silently
+    returning a biased sample that happened to contain zero NOD-type docs even
+    though real ones existed later in the window. raw_row_cap=None must sweep
+    every top-level chunk regardless of how many raw rows the first one had."""
+    windows_seen: list[tuple] = []
+
+    async def fake_sweep(session, date_url, county, state, a, b, out, seen):
+        windows_seen.append((a.date(), b.date()))
+        out.append(object())  # one row per window call, just to prove it ran
+
+    monkeypatch.setattr(aumentum, "_sweep_date_window", fake_sweep)
+
+    class _FakeResp:
+        def __init__(self, url=""):
+            self.url = url
+            self.text = ""
+
+    class _FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            return _FakeResp(url)
+
+        async def post(self, url, **kw):
+            return _FakeResp(url)
+
+    monkeypatch.setattr(
+        "curl_cffi.requests.AsyncSession", lambda **kw: _FakeSession())
+
+    out = asyncio.run(aumentum._date_swept_docs_at(
+        "https://x", "Buncombe", "NC", days_back=60, raw_row_cap=None))
+
+    # 60 days / 29-day-span chunks = 3 top-level windows (29 + 29 + 2), and
+    # EVERY one of them must have been swept, not just the first.
+    assert len(windows_seen) == 3
+    assert len(out) == 3
+
+
+def test_date_swept_docs_at_raw_row_cap_stops_early(monkeypatch):
+    """cash_buyer_deeds.py's use case: an early-stop sample of ANY doc type is
+    fine (deed/DOT rows are common), so raw_row_cap=N must still short-circuit
+    once N raw rows are collected — this is the ONE caller that wants that."""
+    call_count = {"n": 0}
+
+    async def fake_sweep(session, date_url, county, state, a, b, out, seen):
+        call_count["n"] += 1
+        out.extend([object(), object(), object()])  # 3 rows per window
+
+    monkeypatch.setattr(aumentum, "_sweep_date_window", fake_sweep)
+
+    class _FakeResp:
+        def __init__(self, url=""):
+            self.url = url
+            self.text = ""
+
+    class _FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            return _FakeResp(url)
+
+        async def post(self, url, **kw):
+            return _FakeResp(url)
+
+    monkeypatch.setattr(
+        "curl_cffi.requests.AsyncSession", lambda **kw: _FakeSession())
+
+    out = asyncio.run(aumentum._date_swept_docs_at(
+        "https://x", "Buncombe", "NC", days_back=60, raw_row_cap=5))
+
+    assert call_count["n"] == 2            # stops after the 2nd window (3, then 6 >= 5)
+    assert len(out) == 5                   # sliced to the cap

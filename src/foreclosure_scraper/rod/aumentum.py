@@ -35,17 +35,52 @@ assumed dxgv/DevExpress and a flat <tr> and matched 0 rows on real data):
 
 COMPLIANCE: public records, free, read-only index lookups; no login, no CAPTCHA
 solve, no paid image order, real-Chrome TLS fingerprint only (not a WAF defeat).
+
+2026-10-02 RE-VERIFIED LIVE: the Date-Range search (_date_swept_docs, used by
+discover_recent_nods / discover_recent_sold_recordings) was returning 0 rows
+for every default call. Root cause (confirmed by instrumenting the real POST
+response, not guessed): the GET/nav/search POST sequence itself was never
+broken — no missing postback field — the vendor enforces a HARD 30-CALENDAR-DAY
+MAX on a single Date-Range search. A wider range (the 60/90-day defaults this
+module requests) gets silently bounced back to the New-Search tab with no HTTP-
+level error (ActiveTabIndex resets to 0; the page embeds a client-side
+`alert('Please enter a valid date range. The maximum range allowed is 30...')`
+that only a real browser would ever show — an httpx/curl-cffi POST just gets
+the inert HTML with that string baked into a <script> block). Live-measured on
+Buncombe: a 29-day-span window (30 calendar days, the largest that works)
+returns up to the grid's own page-size cap of 500 rows — and THAT cap is real
+too (one 30-day window had 3,805 total matches per the page's own "Your search
+returned X results" banner, confirmed by paging). _date_swept_docs now chunks
+the requested days_back into <=29-day-span windows (reusing one session/date_
+url — re-navigating to the Date tab is NOT needed per window, confirmed live)
+and bisects any window whose own result count is >= the 500-row page cap,
+mirroring rod/cchs.py's sweep-bisection pattern, down to a 1-day floor.
+
+Polk/Rutherford (rod/cott.py) run the IDENTICAL Cott eSearch v4 app on
+cotthosting.com instead of a county .gov domain — live-confirmed 2026-10-02 by
+running this module's own search_by_name against Polk's base URL directly (real
+results, real recent 2026 recordings). cott.py's own parallel implementation
+(real __VIEWSTATE/__EVENTVALIDATION extraction, `ctl00$cphMain$txtLastName`
+field names) was built against a generic ASP.NET WebForms template that does
+not match this vendor: __VIEWSTATE is empty/absent here exactly like Buncombe/
+Gaston (the session lives in cookies, not viewstate) and those field names
+don't exist on the real page, so every one of its POSTs just re-rendered the
+blank search form. cott.py now delegates to the `*_at()` entry points below
+instead of maintaining a second, broken copy of this vendor's protocol.
 """
 from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta
 
+import structlog
 from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
 
 from . import deed_stamp
 from .models import RodDoc, normalize_doc_type
+
+log = structlog.get_logger()
 
 AUMENTUM_COUNTIES = {
     ("NC", "Mecklenburg"): "https://meckrod.manatron.com/External/LandRecords/protected/v4",
@@ -372,26 +407,42 @@ def _split_name(name: str) -> tuple[str, str]:
 # --------------------------------------------------------------------------- #
 # Public API                                                                   #
 # --------------------------------------------------------------------------- #
-async def search_by_name(state: str, county: str, name: str, max_docs: int = 400) -> list[RodDoc]:
-    """Cott/Aumentum v4 name-index search (live-verified 2026-07-01).
+
+# The vendor's own hard cap on a single Date-Range search (live-verified
+# 2026-10-02 — see module docstring): a window with a (end - start) SPAN of 29
+# days (= 30 calendar days inclusive) works; 30 fails silently. And the results
+# grid's own page-size selector tops out at 500 (<option value="500">, the
+# live-observed default) — a window whose own "Your search returned X results"
+# count is >= this is the head of a longer list, not the whole list.
+_MAX_WINDOW_SPAN_DAYS = 29
+_RESULTS_PAGE_CAP = 500
+
+
+async def _search_by_name_at(
+    base: str, county: str, state: str, name: str, max_docs: int = 400,
+) -> list[RodDoc]:
+    """Cott/Aumentum v4 name-index search (live-verified 2026-07-01, and again
+    2026-10-02 against both a county .gov tenant and cott.py's cotthosting.com
+    tenants — same app, same protocol).
 
     GET SrchName.aspx to seed the session cookies + server-side search context,
     then POST the ucSrchNames tab with btnInstruments='Search (All Matches)'
     (__VIEWSTATE intentionally empty). curl_cffi chrome impersonation + verify=
     False (Buncombe/Gaston SSL chains). Returns parsed grid rows (surname-broad;
-    the caller filters to the target owner)."""
-    if (state, county) not in AUMENTUM_COUNTIES:
-        return []
+    the caller filters to the target owner). Parameterized by `base` so
+    rod/cott.py's Polk/Rutherford tenants can call straight into this instead
+    of keeping a second, broken implementation of the same vendor."""
     if not name or not name.strip():
         return []
-    base = AUMENTUM_COUNTIES[(state, county)]
     url = f"{base}/SrchName.aspx"
     last, first = _split_name(name.strip())
     if not last:
         return []
     try:
         from curl_cffi.requests import AsyncSession
-    except Exception:  # pragma: no cover
+    except Exception as exc:  # pragma: no cover  # noqa: BLE001
+        log.warning("aumentum.curl_cffi_unavailable", base=base, county=county,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return []
     try:
         async with AsyncSession(verify=False, impersonate="chrome") as s:
@@ -409,26 +460,86 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 400
                 r3 = await s.post(final, data=_name_body(last, first, "01/01/2005", today),
                                   headers={"Referer": final}, allow_redirects=True, timeout=60)
                 rows = _parse_instruments_grid(r3.text, county, state)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        log.warning("aumentum.search_by_name_failed", base=base, county=county,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return []
     return rows[:max_docs]
 
 
-async def _date_swept_docs(state: str, county: str, days_back: int, max_docs: int) -> list[RodDoc]:
-    """Shared Date-Range index sweep: nav to the Date tab, then POST a
-    [today-days_back, today] Filed-date search and parse the grid. Doc-type
-    filtering happens in the caller via the grid Type column (the vendor's date
-    ddlType is an index CATEGORY, not fine-grained doc types)."""
+async def search_by_name(state: str, county: str, name: str, max_docs: int = 400) -> list[RodDoc]:
     if (state, county) not in AUMENTUM_COUNTIES:
         return []
-    base = AUMENTUM_COUNTIES[(state, county)]
+    return await _search_by_name_at(AUMENTUM_COUNTIES[(state, county)], county, state, name, max_docs)
+
+
+async def _sweep_date_window(
+    session, date_url: str, county: str, state: str,
+    a: datetime, b: datetime, out: list[RodDoc], seen: set[tuple],
+) -> None:
+    """One <=29-day-span Date-Range search, bisecting further if the page's
+    own result count is at/over the _RESULTS_PAGE_CAP (the head of a longer
+    list, not the whole list) — same cap-detection shape as rod/cchs.py's
+    sweep. Appends newly-seen rows into `out`/`seen` in place."""
+    span = (b - a).days
+    body = _date_search_body(a.strftime("%m/%d/%Y"), b.strftime("%m/%d/%Y"))
+    r = await session.post(date_url, data=body, headers={"Referer": date_url},
+                           allow_redirects=True, timeout=90)
+    total = _result_count(r.text)
+    if total is not None and total >= _RESULTS_PAGE_CAP and span >= 1:
+        mid = a + timedelta(days=span // 2)
+        await _sweep_date_window(session, date_url, county, state, a, mid, out, seen)
+        await _sweep_date_window(session, date_url, county, state,
+                                 mid + timedelta(days=1), b, out, seen)
+        return
+    for d in _parse_instruments_grid(r.text, county, state):
+        key = (d.book, d.page, (d.instrument_no or "").upper())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(d)
+
+
+# A fully-unbounded sweep (raw_row_cap=None) still needs SOME circuit breaker
+# against a pathological county/days_back combination — this is far above any
+# real observed volume (Buncombe: 8,055 rows / 60 days) so it never engages in
+# normal operation.
+_RAW_SWEEP_SAFETY_CEILING = 25_000
+
+
+async def _date_swept_docs_at(
+    base: str, county: str, state: str, days_back: int,
+    raw_row_cap: int | None,
+) -> list[RodDoc]:
+    """Shared Date-Range index sweep: nav to the Date tab ONCE, then POST a
+    series of <=29-day-span Filed-date searches covering [today-days_back,
+    today] over that SAME session (re-navigating per window is not needed —
+    live-confirmed 2026-10-02). Doc-type filtering happens in the caller via
+    the grid Type column (the vendor's date ddlType is an index CATEGORY, not
+    fine-grained doc types). Parameterized by `base` — see _search_by_name_at.
+
+    `raw_row_cap`: stop once this many RAW rows (any doc type) have been
+    collected — fine for a caller that wants a quick sample of recent
+    recordings regardless of type (cash_buyer_deeds.py: deed/DOT rows are
+    common, so an early sample is representative). Pass **None** to always
+    sweep the FULL days_back window instead: required for a doc-type KEYWORD
+    filter (discover_recent_nods / discover_recent_sold_recordings) — a NOD-
+    style doc is a small fraction of total volume (0.5% live-measured on
+    Buncombe: 41 of 8,055 rows over 60 days), so stopping on raw row count
+    would silently return a biased, often-empty sample from whichever few
+    calendar days happened to fill the quota first — the exact silent-wrong-
+    success shape this project's CLAUDE.md warns about."""
     url = f"{base}/SrchName.aspx"
     today = datetime.now()
     from_date = today - timedelta(days=max(1, days_back))
     try:
         from curl_cffi.requests import AsyncSession
-    except Exception:  # pragma: no cover
+    except Exception as exc:  # pragma: no cover  # noqa: BLE001
+        log.warning("aumentum.curl_cffi_unavailable", base=base, county=county,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return []
+    out: list[RodDoc] = []
+    seen: set[tuple] = set()
     try:
         async with AsyncSession(verify=False, impersonate="chrome") as s:
             r = await s.get(url, allow_redirects=True, timeout=30)
@@ -436,20 +547,39 @@ async def _date_swept_docs(state: str, county: str, days_back: int, max_docs: in
             rnav = await s.post(final, data=_date_nav_body(),
                                 headers={"Referer": final}, allow_redirects=True, timeout=45)
             date_url = str(rnav.url)
-            body = _date_search_body(from_date.strftime("%m/%d/%Y"), today.strftime("%m/%d/%Y"))
-            r2 = await s.post(date_url, data=body,
-                              headers={"Referer": date_url}, allow_redirects=True, timeout=90)
-            return _parse_instruments_grid(r2.text, county, state)[:max_docs]
-    except Exception:  # noqa: BLE001
+            b = today
+            while b >= from_date and len(out) < _RAW_SWEEP_SAFETY_CEILING:
+                if raw_row_cap is not None and len(out) >= raw_row_cap:
+                    break
+                a = max(from_date, b - timedelta(days=_MAX_WINDOW_SPAN_DAYS))
+                await _sweep_date_window(s, date_url, county, state, a, b, out, seen)
+                b = a - timedelta(days=1)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("aumentum.date_sweep_failed", base=base, county=county,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}")
+        # partial `out` is still useful to the caller's keyword post-filter
+    return out[:raw_row_cap] if raw_row_cap is not None else out
+
+
+async def _date_swept_docs(state: str, county: str, days_back: int, max_docs: int) -> list[RodDoc]:
+    """Per-(state, county) wrapper kept for scrapers.national.cash_buyer_deeds,
+    which wants an early-stop sample of ALL recent doc types (deeds/DOTs are
+    common, so `max_docs` raw rows is a representative sample) — see
+    _date_swept_docs_at's docstring for why discover_recent_nods/sold_
+    recordings below do NOT use this early-stop behavior."""
+    if (state, county) not in AUMENTUM_COUNTIES:
         return []
+    return await _date_swept_docs_at(
+        AUMENTUM_COUNTIES[(state, county)], county, state, days_back, raw_row_cap=max_docs)
 
 
-async def discover_recent_nods(
-    state: str, county: str, days_back: int = 60, max_docs: int = 100,
+async def discover_recent_nods_at(
+    base: str, county: str, state: str, days_back: int = 60, max_docs: int = 100,
 ) -> list[RodDoc]:
     """Recent-recordings sweep filtered to NOD-style doc types (Notice of Sale /
-    Default, Lis Pendens, Substitute Trustee) via the Date-Range index."""
-    docs = await _date_swept_docs(state, county, days_back, max_docs * 6)
+    Default, Lis Pendens, Substitute Trustee) via the Date-Range index.
+    Parameterized by `base` — see _search_by_name_at."""
+    docs = await _date_swept_docs_at(base, county, state, days_back, raw_row_cap=None)
     from_date = datetime.now() - timedelta(days=max(1, days_back))
     out: list[RodDoc] = []
     seen: set[tuple] = set()
@@ -468,14 +598,24 @@ async def discover_recent_nods(
     return out
 
 
-async def discover_recent_sold_recordings(
-    state: str, county: str, days_back: int = 90, max_docs: int = 100,
+async def discover_recent_nods(
+    state: str, county: str, days_back: int = 60, max_docs: int = 100,
+) -> list[RodDoc]:
+    if (state, county) not in AUMENTUM_COUNTIES:
+        return []
+    return await discover_recent_nods_at(
+        AUMENTUM_COUNTIES[(state, county)], county, state, days_back, max_docs)
+
+
+async def discover_recent_sold_recordings_at(
+    base: str, county: str, state: str, days_back: int = 90, max_docs: int = 100,
 ) -> list[RodDoc]:
     """Sweep post-sale doc types (Trustee's Deed Upon Sale and equivalents) via
     the Date-Range index. NOTE: the name/date index grid does NOT expose a
     consideration/excise column for these NC tenants, so sold-price recovery from
-    this path is not available — records surface as leads, priced downstream."""
-    docs = await _date_swept_docs(state, county, days_back, max_docs * 6)
+    this path is not available — records surface as leads, priced downstream.
+    Parameterized by `base` — see _search_by_name_at."""
+    docs = await _date_swept_docs_at(base, county, state, days_back, raw_row_cap=None)
     from_date = datetime.now() - timedelta(days=max(1, days_back))
     out: list[RodDoc] = []
     seen: set[tuple] = set()
@@ -492,3 +632,12 @@ async def discover_recent_sold_recordings(
         if len(out) >= max_docs:
             break
     return out
+
+
+async def discover_recent_sold_recordings(
+    state: str, county: str, days_back: int = 90, max_docs: int = 100,
+) -> list[RodDoc]:
+    if (state, county) not in AUMENTUM_COUNTIES:
+        return []
+    return await discover_recent_sold_recordings_at(
+        AUMENTUM_COUNTIES[(state, county)], county, state, days_back, max_docs)

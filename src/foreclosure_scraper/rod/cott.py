@@ -1,20 +1,31 @@
 """Cott Systems / cotthosting.com — Polk and Rutherford NC.
 
-Same ASP.NET form pattern as Aumentum (Cott OEMs Manatron) — share the parser.
+Same Cott eSearch v4 ASP.NET WebForms app as rod/aumentum.py (Cott OEMs/powers
+Aumentum's county deployments too — Buncombe/Gaston run the identical app on a
+county .gov domain). Polk/Rutherford just happen to be hosted on
+cotthosting.com instead.
+
+2026-10-02 RE-VERIFIED LIVE, REWRITTEN: this module used to carry its own
+separate POST flow (real __VIEWSTATE/__EVENTVALIDATION tokens scraped from the
+page, field names like `ctl00$cphMain$txtLastName`/`ctl00$cphMain$btnSearch`)
+built against a generic ASP.NET WebForms template. Live-probed against Polk:
+__VIEWSTATE is EMPTY/absent on this app exactly like Buncombe/Gaston (the
+session lives in cookies — ASP.NET_SessionId + CottSqlAuthCookie — not
+viewstate; see aumentum.py's module docstring for the full handshake), and
+none of the field names this module posted actually exist on the real page —
+so every POST here just re-rendered the blank search form and both
+search_by_name and discover_recent_nods silently returned [] for both
+counties. Confirmed the fix by calling rod.aumentum's OWN (live-verified)
+protocol straight against Polk's base URL: real 2026 recordings came back
+immediately. This module now delegates entirely to the `*_at()` entry points
+in rod/aumentum.py instead of maintaining a second, broken copy of the same
+vendor's protocol — including aumentum's October 2026 fix for the Date-Range
+sweep's 30-day vendor cap + 500-row page cap (see aumentum.py's docstring),
+which Polk/Rutherford share too.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-
-from .aumentum import (
-    _extract_hidden,
-    _parse_grid,
-    AUMENTUM_NOD_DOC_TYPES,
-    AUMENTUM_POST_SALE_DOC_TYPES,
-    _is_nod,
-    _is_post_sale,
-)
-from ..http_client import client
+from . import aumentum
 from .models import RodDoc
 
 COTT_COUNTIES = {
@@ -27,44 +38,7 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 50)
     if (state, county) not in COTT_COUNTIES:
         return []
     base = COTT_COUNTIES[(state, county)]
-    form_url = f"{base}/SrchName.aspx"
-
-    try:
-        async with client(timeout=30.0) as c:
-            r = await c.get(form_url)
-            if r.status_code != 200:
-                return []
-            html = r.text
-            viewstate = _extract_hidden(html, "__VIEWSTATE")
-            generator = _extract_hidden(html, "__VIEWSTATEGENERATOR")
-            event_val = _extract_hidden(html, "__EVENTVALIDATION")
-            if not viewstate:
-                return []
-
-            last = name
-            first = ""
-            if "," in name:
-                parts = [p.strip() for p in name.split(",", 1)]
-                last, first = parts[0], parts[1] if len(parts) > 1 else ""
-            elif " " in name:
-                parts = name.split()
-                last = parts[0]
-                first = " ".join(parts[1:])
-
-            data = {
-                "__VIEWSTATE": viewstate,
-                "__VIEWSTATEGENERATOR": generator,
-                "__EVENTVALIDATION": event_val,
-                "ctl00$cphMain$txtLastName": last,
-                "ctl00$cphMain$txtFirstName": first,
-                "ctl00$cphMain$btnSearch": "Search",
-            }
-            r2 = await c.post(form_url, data=data, headers={"Referer": form_url})
-            if r2.status_code != 200:
-                return []
-    except Exception:
-        return []
-    return _parse_grid(r2.text, county, state)[:max_docs]
+    return await aumentum._search_by_name_at(base, county, state, name, max_docs)
 
 
 async def discover_recent_nods(
@@ -73,77 +47,13 @@ async def discover_recent_nods(
     days_back: int = 60,
     max_docs: int = 100,
 ) -> list[RodDoc]:
-    """Cott (Manatron OEM) recent-recordings sweep filtered by NOD doc types."""
+    """Cott (Cott eSearch v4) recent-recordings sweep filtered by NOD doc
+    types, via rod/aumentum.py's Date-Range sweep (see that module's
+    docstring for the 30-day vendor cap + 500-row page cap it now handles)."""
     if (state, county) not in COTT_COUNTIES:
         return []
     base = COTT_COUNTIES[(state, county)]
-    form_url = f"{base}/SrchDocType.aspx"
-    fallback_url = f"{base}/SrchName.aspx"
-    today = datetime.utcnow()
-    from_date = today - timedelta(days=max(1, days_back))
-
-    out: list[RodDoc] = []
-    seen: set[tuple[str | None, str | None, str | None]] = set()
-
-    def _accept(rows: list[RodDoc]) -> bool:
-        for d in rows:
-            if not _is_nod(d.doc_type):
-                continue
-            if d.recorded_date and d.recorded_date < from_date:
-                continue
-            key = (d.book, d.page, (d.instrument_no or "").upper())
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append(d)
-            if len(out) >= max_docs:
-                return True
-        return False
-
-    try:
-        async with client(timeout=30.0) as c:
-            r = await c.get(form_url)
-            if r.status_code != 200:
-                r = await c.get(fallback_url)
-                if r.status_code != 200:
-                    return []
-                form_url = fallback_url
-
-            html = r.text
-            viewstate = _extract_hidden(html, "__VIEWSTATE")
-            generator = _extract_hidden(html, "__VIEWSTATEGENERATOR")
-            event_val = _extract_hidden(html, "__EVENTVALIDATION")
-            if not viewstate:
-                return []
-
-            for doc_label in AUMENTUM_NOD_DOC_TYPES:
-                data = {
-                    "__VIEWSTATE": viewstate,
-                    "__VIEWSTATEGENERATOR": generator,
-                    "__EVENTVALIDATION": event_val,
-                    "ctl00$cphMain$ddlDocType": doc_label,
-                    "ctl00$cphMain$lstDocType": doc_label,
-                    "ctl00$cphMain$txtFromDate": from_date.strftime("%m/%d/%Y"),
-                    "ctl00$cphMain$txtThroughDate": today.strftime("%m/%d/%Y"),
-                    "ctl00$cphMain$txtFromRecordDate": from_date.strftime("%m/%d/%Y"),
-                    "ctl00$cphMain$txtThroughRecordDate": today.strftime("%m/%d/%Y"),
-                    "ctl00$cphMain$btnSearch": "Search",
-                }
-                try:
-                    r2 = await c.post(form_url, data=data, headers={"Referer": form_url})
-                except Exception:
-                    continue
-                if r2.status_code != 200:
-                    continue
-                rows = _parse_grid(r2.text, county, state)
-                if _accept(rows) and len(out) >= max_docs:
-                    return out[:max_docs]
-                viewstate = _extract_hidden(r2.text, "__VIEWSTATE") or viewstate
-                generator = _extract_hidden(r2.text, "__VIEWSTATEGENERATOR") or generator
-                event_val = _extract_hidden(r2.text, "__EVENTVALIDATION") or event_val
-    except Exception:
-        return out[:max_docs]
-    return out[:max_docs]
+    return await aumentum.discover_recent_nods_at(base, county, state, days_back, max_docs)
 
 
 async def discover_recent_sold_recordings(
@@ -152,78 +62,9 @@ async def discover_recent_sold_recordings(
     days_back: int = 90,
     max_docs: int = 100,
 ) -> list[RodDoc]:
-    """Cott (Manatron OEM) — same form pattern as Aumentum but for
-    POST-sale recordings (Trustee's Deed Upon Sale and equivalents).
-    Each carries a deed-tax stamp encoding hammer price."""
+    """Cott (Cott eSearch v4) — post-sale recordings (Trustee's Deed Upon Sale
+    and equivalents) via rod/aumentum.py's Date-Range sweep."""
     if (state, county) not in COTT_COUNTIES:
         return []
     base = COTT_COUNTIES[(state, county)]
-    form_url = f"{base}/SrchDocType.aspx"
-    fallback_url = f"{base}/SrchName.aspx"
-    today = datetime.utcnow()
-    from_date = today - timedelta(days=max(1, days_back))
-
-    out: list[RodDoc] = []
-    seen: set[tuple[str | None, str | None, str | None]] = set()
-
-    def _accept(rows: list[RodDoc]) -> bool:
-        for d in rows:
-            if not _is_post_sale(d.doc_type):
-                continue
-            if d.recorded_date and d.recorded_date < from_date:
-                continue
-            if d.consideration_amount is None and d.excise_tax_stamp is None:
-                continue
-            key = (d.book, d.page, (d.instrument_no or "").upper())
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append(d)
-            if len(out) >= max_docs:
-                return True
-        return False
-
-    try:
-        async with client(timeout=30.0) as c:
-            r = await c.get(form_url)
-            if r.status_code != 200:
-                r = await c.get(fallback_url)
-                if r.status_code != 200:
-                    return []
-                form_url = fallback_url
-
-            html = r.text
-            viewstate = _extract_hidden(html, "__VIEWSTATE")
-            generator = _extract_hidden(html, "__VIEWSTATEGENERATOR")
-            event_val = _extract_hidden(html, "__EVENTVALIDATION")
-            if not viewstate:
-                return []
-
-            for doc_label in AUMENTUM_POST_SALE_DOC_TYPES:
-                data = {
-                    "__VIEWSTATE": viewstate,
-                    "__VIEWSTATEGENERATOR": generator,
-                    "__EVENTVALIDATION": event_val,
-                    "ctl00$cphMain$ddlDocType": doc_label,
-                    "ctl00$cphMain$lstDocType": doc_label,
-                    "ctl00$cphMain$txtFromDate": from_date.strftime("%m/%d/%Y"),
-                    "ctl00$cphMain$txtThroughDate": today.strftime("%m/%d/%Y"),
-                    "ctl00$cphMain$txtFromRecordDate": from_date.strftime("%m/%d/%Y"),
-                    "ctl00$cphMain$txtThroughRecordDate": today.strftime("%m/%d/%Y"),
-                    "ctl00$cphMain$btnSearch": "Search",
-                }
-                try:
-                    r2 = await c.post(form_url, data=data, headers={"Referer": form_url})
-                except Exception:
-                    continue
-                if r2.status_code != 200:
-                    continue
-                rows = _parse_grid(r2.text, county, state)
-                if _accept(rows) and len(out) >= max_docs:
-                    return out[:max_docs]
-                viewstate = _extract_hidden(r2.text, "__VIEWSTATE") or viewstate
-                generator = _extract_hidden(r2.text, "__VIEWSTATEGENERATOR") or generator
-                event_val = _extract_hidden(r2.text, "__EVENTVALIDATION") or event_val
-    except Exception:
-        return out[:max_docs]
-    return out[:max_docs]
+    return await aumentum.discover_recent_sold_recordings_at(base, county, state, days_back, max_docs)

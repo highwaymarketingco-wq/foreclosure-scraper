@@ -1,0 +1,48 @@
+{
+  "_comment": "Two REAL byHash entries from Oconee SC's live @kofile/FETCH_DOCUMENTS_FULFILLED/v6 WS reply (wss://oconee.sc.publicsearch.us/ws), captured 2026-10-02 against the current (post-REST-migration) API. Trimmed to the fields rod/kofile.py._doc_to_rod reads; unused vendor fields (legals, images, ocrText, etc.) dropped for size. See rod/kofile.py's module docstring for the full protocol.",
+
+  "plain_doc": {
+    "docId": 324829969,
+    "docType": "FORECLOSURE DEED",
+    "docTypeCode": "FORECLOS DEED",
+    "recordedDate": "7/31/2026",
+    "book": "DEED",
+    "volume": "4930",
+    "page": "168",
+    "bookVolumePage": "DEED/4930/168",
+    "instrumentNumber": "20260001907",
+    "docNumber": "20260001907",
+    "grantor": ["CLERK OF COURT-MELISSA C BURTON", "CARLSON JOSEPH R BY COURT", "CARLSON KATELYN BY COURT", ""],
+    "grantee": ["RIDDERING WAYNE W TRS", "RIDDERING DEANNA R TRS", "RIDDERING WAYNE W REVOCABLE LIVING TRUST", "RIDDERING DEANNA R REVOCABLE LIVING TRUST", ""]
+  },
+
+  "highlighted_doc": {
+    "docId": 321198328,
+    "docType": "DEED AFFIDAVIT",
+    "docTypeCode": "DEED",
+    "recordedDate": "1/10/2002",
+    "book": "DEED",
+    "volume": "1195",
+    "page": "202",
+    "bookVolumePage": "DEED/1195/202",
+    "instrumentNumber": "1195202",
+    "docNumber": "1195202",
+    "grantor": ["MCFADDEN KATHERINE", ""],
+    "grantee": ["<em>SMITH</em> EVAN", "<em>SMITH</em> OUIDA", ""]
+  },
+
+  "correction_foreclosure_doc": {
+    "_comment": "A 'FORECLOS' (bare) doc type — docType label 'CORRECT FORECLOSURES', a rare post-sale correction (grantor = Clerk of Court on an already-completed foreclosure), NOT a pre-foreclosure notice. Must NOT match _is_nod.",
+    "docId": 313883897,
+    "docType": "CORRECT FORECLOSURES",
+    "docTypeCode": "FORECLOS",
+    "recordedDate": "2/1/2022",
+    "book": "DEED",
+    "volume": "2774",
+    "page": "307",
+    "instrumentNumber": "2774307",
+    "docNumber": "2774307",
+    "grantor": ["CLERK OF COURT-MELISSA C BURTON", "BROOKINS KEVIN F AKA BY COURT", "BROOKINS KEVIN FLOYD AKA BY COURT", ""],
+    "grantee": ["FLAT ROCK HOLDING COMPANY LLC", "FLATROCK HOLDING COMPANY LLC", "RESURGENS PROPERTIES LLC", ""]
+  }
+}

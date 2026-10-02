@@ -36,6 +36,21 @@ recursive _sweep_window helper now goes through the same get_text_impersonate
 tier for search/getall via the _get_search_text() wrapper, which translates
 get_text_impersonate's RuntimeError-on-bad-status into the sweep's CchsWall so
 the existing wall-stops-the-host contract is unchanged.
+
+2026-10-02 RE-PROBED LIVE, FLIPPED (still not a wall, confirmed intermittent):
+the paragraph above has it backwards TODAY. Plain httpx now clears
+SearchService.asp on the first try (Burke/Lincoln/Cleveland all answered 200
+with a real <SearchResponse>), while curl-cffi's "chrome" impersonation now
+gets the 403 ("Just a moment...") on the exact same request/URL. Cloudflare's
+fingerprint rule here flips which tier it blocks between runs — the only thing
+that has stayed true across both probes is that ONE of the two tiers clears it
+with no login/cookies/CAPTCHA-solve. Locking onto either tier alone is
+therefore itself the bug: SearchService.asp calls now go through
+`get_text(..., impersonate=True)` (plain first, auto-escalate to the curl-cffi
+tier only on a block status code) — the same plain-then-escalate behavior
+`get_text` already offers every other caller — instead of a tier hard-coded
+from whichever side of the flip happened to be true on the day it was last
+probed.
 """
 from __future__ import annotations
 
@@ -45,14 +60,18 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
+import httpx
+import structlog
 from dateutil import parser as dateparser
 
 from ..deed_index import DeedInstrument, Party, derive_loss
-from ..http_client import client, get_text_impersonate
+from ..http_client import client, get_text
 from ..name_normalize import normalize_name
 from . import deed_stamp
 from .inst_class import LOSS_CLASSES, classify_instrument
 from .models import RodDoc, normalize_doc_type
+
+log = structlog.get_logger()
 
 # (state, county) -> (host, app_slug, root_slug). Burke + Cleveland share the
 # us5 classic-ASP install. Lincoln runs the SAME classic-ASP SearchService.asp
@@ -188,29 +207,32 @@ async def _cchs_fetch(state: str, county: str, instrument_types: str, from_date:
             for u in (f"https://{host}.courthousecomputersystems.com/{root}/",
                       f"{base}/application.asp?resize=true", f"{base}/realestatesearch.asp"):
                 await c.get(u, follow_redirects=True)
-        # 2) search — SearchService.asp is Cloudflare-fronted and 403s plain httpx
-        # ("Just a moment...") even though the bootstrap pages above 200 fine; a
-        # real Chrome TLS/JA3 fingerprint clears it with no cookies/session needed
-        # (verified live 2026-09-28, all 5 counties). Not a CAPTCHA/WAF defeat —
-        # see http_client.py's tier docstring.
+        # 2) search — SearchService.asp is Cloudflare-fronted and blocks WHICHEVER
+        # of plain-httpx / curl-cffi-impersonate its fingerprint rule currently
+        # targets (live-confirmed flips between runs — see module docstring);
+        # get_text(..., impersonate=True) tries plain first and auto-escalates
+        # to the curl-cffi tier only on a block status code, so this clears
+        # either direction of the flip without hard-coding one tier.
         q = {"cmd": "search", "last": "", "given": "", "searchtype": 3, "indextype": 3,
              "codetype": 3, "fromdate": from_date.strftime("%m/%d/%Y"),
              "todate": today.strftime("%m/%d/%Y"), "instrumenttypes": instrument_types,
              "description": "", "docnumber": "", "booknumber": "", "pagenumber": "",
              "resultstype": 1, "maxrecordcount": max_docs, "sortorder": 1,
              "sortfield": "docno", "rangetype": "doc"}
-        search_text = await get_text_impersonate(
-            f"{base}/SearchService.asp?{urlencode(q)}", headers=xhr, timeout=40.0)
+        search_text = await get_text(
+            f"{base}/SearchService.asp?{urlencode(q)}", headers=xhr, timeout=40.0, impersonate=True)
         m = re.search(r"<recordcount>(\d+)</recordcount>", search_text, re.I)
         count = int(m.group(1)) if m else 0
         if count <= 0:
             return []
         # 3) getall
-        getall_text = await get_text_impersonate(
+        getall_text = await get_text(
             f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}",
-            headers=xhr, timeout=40.0)
+            headers=xhr, timeout=40.0, impersonate=True)
         return _parse_rows(getall_text, state, county, sold=sold)
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.warning("cchs.fetch_failed", host=host, county=county, sold=sold,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return []
 
 
@@ -252,18 +274,21 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 50)
              "codetype": 0, "fromdate": "", "todate": "", "instrumenttypes": "",
              "resultstype": 1, "maxrecordcount": max_docs, "sortorder": 1,
              "sortfield": "docno", "rangetype": "name"}
-        # See _cchs_fetch: SearchService.asp needs the Chrome-fingerprint tier.
-        search_text = await get_text_impersonate(
-            f"{base}/SearchService.asp?{urlencode(q)}", headers=xhr, timeout=40.0)
+        # See _cchs_fetch: plain-first, auto-escalate (tier the host blocks flips
+        # between runs — see module docstring).
+        search_text = await get_text(
+            f"{base}/SearchService.asp?{urlencode(q)}", headers=xhr, timeout=40.0, impersonate=True)
         m = re.search(r"<recordcount>(\d+)</recordcount>", search_text, re.I)
         count = int(m.group(1)) if m else 0
         if count <= 0:
             return []
-        getall_text = await get_text_impersonate(
+        getall_text = await get_text(
             f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}",
-            headers=xhr, timeout=40.0)
+            headers=xhr, timeout=40.0, impersonate=True)
         return _parse_rows(getall_text, state, county, sold=False)[:max_docs]
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.warning("cchs.search_by_name_failed", host=host, county=county,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return []
 
 
@@ -307,20 +332,26 @@ _IMPERSONATE_STATUS_RE = re.compile(r"impersonate got (\d+)")
 
 
 async def _get_search_text(host: str, url: str, xhr: dict, what: str) -> str:
-    """SearchService.asp needs the Chrome-fingerprint tier (see _cchs_fetch's
-    docstring): get_text_impersonate, not the plain-httpx `client()`. Unlike an
-    httpx response, it has no `.status_code`/`.text` for `_check_wall` — it
-    raises RuntimeError on a bad status and returns plain text on success — so
-    this wrapper adapts it to the same CchsWall contract the sweep already
-    relies on: a bad status becomes CchsWall, and a 200 still gets the
+    """SearchService.asp calls go through get_text(..., impersonate=True):
+    plain httpx first, auto-escalating to the curl-cffi Chrome-fingerprint tier
+    only on a block status code — live probing shows Cloudflare's fingerprint
+    rule here FLIPS which tier it blocks between runs (see module docstring),
+    so hard-coding either tier alone is itself a bug. A failure here can
+    surface as either an httpx.HTTPStatusError (a non-block code, or the plain
+    tier's own retries exhausted) or a RuntimeError (the curl-cffi escalation
+    tier also got a block code) — this wrapper adapts both to the same
+    CchsWall contract the sweep already relies on, and a 200 still gets the
     WALL_TITLE/WALL_MARKER check in case Cloudflare ever serves a soft
     challenge with a 200 status."""
     try:
-        text = await get_text_impersonate(url, headers=xhr, timeout=40.0)
+        text = await get_text(url, headers=xhr, timeout=40.0, impersonate=True)
     except RuntimeError as exc:
         m = _IMPERSONATE_STATUS_RE.search(str(exc))
         reason = f"HTTP {m.group(1)}" if m else str(exc)
         raise CchsWall(f"{host} {what}: {reason}") from exc
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code if exc.response is not None else None
+        raise CchsWall(f"{host} {what}: HTTP {code}") from exc
     reason = _wall_reason(200, text)
     if reason:
         raise CchsWall(f"{host} {what}: {reason}")
