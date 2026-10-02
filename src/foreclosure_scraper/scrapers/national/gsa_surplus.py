@@ -96,6 +96,26 @@ def _parse_card(card, source_url: str) -> Listing | None:
 
     date_m = _DATE_RE.search(body_text)
 
+    # FIXED 2026-10-01 (national-auction-tier audit, batch 4): every card
+    # carries a real listing photo (`<div class="usa-card__img"><img
+    # src="...">`) that was never captured -- confirmed live, e.g. the
+    # Anderson, SC courthouse card links a real
+    # gsa.gov/system/files/Disposition-*.jpg. Also wired `county` via the
+    # shared WNC/upstate-SC gazetteer (same helper national.gsa_realproperty
+    # and national.hibid_real_estate already use) since a card never states
+    # the county itself.
+    img_el = card.css_first("div.usa-card__img img")
+    photo = (img_el.attributes.get("src") or "").strip() if img_el else ""
+    if photo and not photo.startswith("http"):
+        photo = f"https://www.gsa.gov{photo}" if photo.startswith("/") else ""
+    county = None
+    if city:
+        try:
+            from ..._upstate_city_to_county import upstate_county_for
+            county = upstate_county_for(city, state)
+        except Exception:  # noqa: BLE001
+            pass
+
     return Listing(
         source="national.gsa_surplus",
         source_url=maps_url or source_url,
@@ -105,6 +125,7 @@ def _parse_card(card, source_url: str) -> Listing | None:
         city=city,
         state=state,
         zip_code=zip_code,
+        county=county,
         living_sqft=area_sqft,
         description=f"GSA accelerated disposition — {name or 'federal property'}"
                     + (f" ({prop_type})" if prop_type else ""),
@@ -112,7 +133,8 @@ def _parse_card(card, source_url: str) -> Listing | None:
         last_seen=datetime.utcnow(),
         raw={"gsa_surplus": {"name": name, "type": prop_type,
                               "date_listed": date_m.group(1) if date_m else None,
-                              "maps_url": maps_url}},
+                              "maps_url": maps_url},
+             "images": {"real": [photo]} if photo else {}},
         # No sale_date: this is a negotiated disposition, not a scheduled
         # auction -- "Date listed" is when GSA started marketing it, not a
         # sale date. Dateless by nature; see DATELESS_OK_SOURCES.

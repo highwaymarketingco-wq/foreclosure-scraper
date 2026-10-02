@@ -17,6 +17,7 @@ _REAL_SC_CARD = """
 <li class="usa-card js-filterable" data-area='"1"' data-state='"SC"' data-type='["Office" , "Courthouse"]'>
   <div class="usa-card__container">
     <div class="usa-card__header"><h3 class="usa-card__heading">G. ROSS ANDERSON JR. FEDERAL BUILDING AND COURTHOUSE</h3></div>
+    <div class="usa-card__media usa-card__media--exdent"><div class="usa-card__img"><img src="https://www.gsa.gov/system/files/Disposition-G_Ross_CH_final.jpg" alt="" class=" img-responsive"></div></div>
     <div class="usa-card__body">
       <p><a class="usa-link--external" href="https://maps.app.goo.gl/GmwCmYwA5LGsQnmM8">315 S. McDuffie St, Anderson, SC 29624</a></p>
       <p class="margin-top-1">Type: <strong>Office, Courthouse</strong><br>Rentable Area: <strong>28,567 ft<sup>2</sup></strong></p>
@@ -73,3 +74,38 @@ def test_sold_card_is_dropped():
 
 def test_out_of_footprint_state_is_dropped():
     assert _parse_card(_card(_TX_CARD), "https://gsa.gov/x") is None
+
+
+def test_card_photo_is_captured():
+    """FIXED 2026-10-01: every card carries a real listing photo
+    (usa-card__img > img) that was never captured."""
+    li = _parse_card(_card(_REAL_SC_CARD), "https://gsa.gov/x")
+    assert li.raw["images"]["real"] == [
+        "https://www.gsa.gov/system/files/Disposition-G_Ross_CH_final.jpg"
+    ]
+
+
+def test_card_without_photo_sets_no_images_key():
+    assert _parse_card(_card(_SOLD_CARD), "https://gsa.gov/x") is None  # closed, N/A
+    li = _parse_card(_card(_TX_CARD), "https://gsa.gov/x")
+    assert li is None  # out of footprint, N/A -- use a minimal in-footprint, photo-less card
+    minimal = """
+    <li class="usa-card js-filterable" data-area='"1"' data-state='"SC"' data-type='"Office"'>
+      <div class="usa-card__container">
+        <div class="usa-card__header"><h3 class="usa-card__heading">X</h3></div>
+        <div class="usa-card__body">
+          <p><a class="usa-link--external" href="https://maps.app.goo.gl/x">1 Main St, Anderson, SC 29621</a></p>
+        </div>
+      </div>
+    </li>
+    """
+    li2 = _parse_card(_card(minimal), "https://gsa.gov/x")
+    assert li2 is not None
+    assert li2.raw.get("images") == {}
+
+
+def test_county_resolves_via_gazetteer():
+    """FIXED 2026-10-01: a card never states its own county -- Anderson, SC
+    is a known in-footprint city in the shared WNC/upstate-SC gazetteer."""
+    li = _parse_card(_card(_REAL_SC_CARD), "https://gsa.gov/x")
+    assert li.county == "Anderson"
