@@ -78,6 +78,25 @@ def parse(html: str) -> list[Listing]:
             desc = cells[idx["description"]] if "description" in idx else ""
             price = _money(cells[idx["price"]]) if "price" in idx else None
             broker = cells[idx["broker"]] if "broker" in idx else ""
+            # Found 2026-10-01 (national/reo per-source audit): the broker
+            # cell's live markup is two separate anchors --
+            # <a href="mailto:...">Name</a><br><a href="tel:+1...">phone</a>
+            # -- that .text() flattens with NO separator ("Rob
+            # Cuccinello239-537-5533"), and the mailto: address (a free,
+            # direct contact channel -- HERMES's whole mission is finding a
+            # free way to reach the owner/broker) was dropped on the floor
+            # entirely. Pulled straight from the href attributes instead of
+            # the flattened display text, which also sidesteps that text's
+            # aria-label-driven digit spacing ("2 3 9. 5 3 7. 5 5 3 3.").
+            broker_cell = tr.css("th,td")[idx["broker"]] if "broker" in idx else None
+            broker_email = broker_phone = None
+            if broker_cell is not None:
+                mailto = broker_cell.css_first("a[href^='mailto:']")
+                if mailto is not None:
+                    broker_email = (mailto.attributes.get("href") or "")[7:].strip() or None
+                tel = broker_cell.css_first("a[href^='tel:']")
+                if tel is not None:
+                    broker_phone = (tel.attributes.get("href") or "")[4:].strip() or None
 
             kind = PropertyKind.UNKNOWN
             for k, v in _TYPE_MAP.items():
@@ -99,7 +118,11 @@ def parse(html: str) -> list[Listing]:
                     description=(f"{ptype}: {desc}".strip(": ") or None),
                     first_seen=datetime.utcnow(),
                     last_seen=datetime.utcnow(),
-                    raw={"first_citizens_reo": {"broker": broker, "type": ptype}},
+                    raw={"first_citizens_reo": {
+                        "broker": broker, "type": ptype,
+                        "broker_email": broker_email,
+                        "broker_phone": broker_phone,
+                    }},
                 )
             )
     return out
