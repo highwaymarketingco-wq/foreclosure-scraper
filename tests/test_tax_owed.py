@@ -128,6 +128,33 @@ def test_georgetown_flc_opening_bid_is_normalized():
     assert li.raw["tax_owed"]["basis"] == "own_record"
 
 
+def test_years_delinquent_promoted_from_multi_year_sibling_block():
+    # Depth audit 2026-10-02: raw['multi_year_delinquent_tax'] already carries
+    # years_delinquent (and the full per-year breakdown) but it never reached the
+    # unified raw['tax_owed'] every downstream reader actually consults.
+    li = _li("counties_nc.buncombe_delinquent_tax", parcel="9608-10-8745",
+             raw={"buncombe_delinquent_tax": {"principal_tax_due": 1920.86, "tax_year": 2026},
+                  "multi_year_delinquent_tax": {"years": [2025, 2026], "years_delinquent": 2,
+                                                "total_due": 1920.86}})
+    enrich_tax_owed([li])
+    assert li.raw["tax_owed"]["years_delinquent"] == 2
+
+
+def test_years_delinquent_falls_back_to_years_list_length():
+    # qpaybill_roll states a list of unpaid years, not an explicit count.
+    li = _li("counties_sc.qpaybill_delinquent_roll", county="Cherokee", state="SC",
+             raw={"qpaybill_roll": {"balance_owed": 2506.55, "years_unpaid": ["2024", "2025"]}})
+    enrich_tax_owed([li])
+    assert li.raw["tax_owed"]["years_delinquent"] == 2
+
+
+def test_years_delinquent_absent_when_no_source_states_one():
+    li = _li("counties_sc.sc_state_tax_lien", county="Spartanburg", state="SC",
+             raw={"sc_state_tax_lien": {"balance": 12500.0}})
+    enrich_tax_owed([li])
+    assert "years_delinquent" not in li.raw["tax_owed"]
+
+
 def test_georgetown_tax_sale_doc_has_no_amount_and_is_not_stamped():
     # The Tax-Sale list (a DIFFERENT doc under the same source/raw-block key) has
     # no dollar figure at all on Georgetown's public PDF (confirmed live 2026-09-29:

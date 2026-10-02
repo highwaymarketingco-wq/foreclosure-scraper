@@ -9,7 +9,10 @@ real taxes-OWED number lands.
 
 Two passes, both free + pure-Python + idempotent:
   1. Normalize: each tax lead's own amount -> raw['tax_owed'] =
-     {balance, kind, source, year, basis:'own_record'}.
+     {balance, kind, source, year, basis:'own_record', years_delinquent?} —
+     years_delinquent is promoted from a sibling source block when that source
+     already states a multi-year count (raw['multi_year_delinquent_tax'],
+     raw['qpaybill_roll']), never invented.
   2. Cross-reference: build a (state, county, parcel) -> tax_owed index from those,
      then stamp it onto ANY lead (court/probate/foreclosure) resolved to the same
      parcel that doesn't already carry one (basis:'parcel_cross_ref'). A court lead
@@ -94,6 +97,19 @@ def _county_county_key(li: Listing) -> tuple:
 
 _YEAR_KEYS = ("year", "tax_year", "taxyear", "bill_year", "bill_years",
               "year_span", "latest_cycle", "first_cycle")
+
+# Depth audit 2026-10-02 (per-signal completeness check, not the 2026-09-21 per-
+# source extraction audit): raw['tax_owed'] normalizes a balance + a single year
+# but drops the multi-year delinquency history that several source blocks sitting
+# right next to it already carry -- raw['multi_year_delinquent_tax']['years_delinquent']
+# (Buncombe-area multi-year engine) and raw['qpaybill_roll']['years_delinquent']
+# (19 SC counties via qPayBill) are both already on the board, just never promoted.
+# Measured: 46,037 of 88,927 raw['tax_owed'] rows are sourced from one of these
+# multi-year-capable blocks; none of them exposed years_delinquent before this.
+# A plain int count, when the source states one directly; _YEARS_LIST_KEYS is the
+# fallback (count the years a source lists, e.g. qpaybill_roll['years_unpaid']).
+_YEARS_DELINQUENT_KEYS = ("years_delinquent", "matured_years_delinquent")
+_YEARS_LIST_KEYS = ("years_unpaid", "years")
 
 
 def _coerce_year(val) -> Optional[int]:
@@ -191,6 +207,28 @@ def _extract(li: Listing) -> tuple[Optional[float], Optional[str], object]:
     return None, None, None
 
 
+def _find_years_delinquent(raw: dict) -> Optional[int]:
+    """How many years delinquent, read from whichever sibling source block already
+    carries it (same "don't trust a single block name, scan them all" shape as the
+    year search above) -- never computed/invented, only promoted from what a source
+    already states. An explicit count key wins; a years-list key's length is the
+    fallback (qpaybill_roll['years_unpaid'] is a list of year strings, not a count)."""
+    if not isinstance(raw, dict):
+        return None
+    for blk_name, blk in raw.items():
+        if blk_name == "tax_owed" or not isinstance(blk, dict):
+            continue
+        for k in _YEARS_DELINQUENT_KEYS:
+            v = blk.get(k)
+            if isinstance(v, (int, float)) and v > 0:
+                return int(v)
+        for k in _YEARS_LIST_KEYS:
+            v = blk.get(k)
+            if isinstance(v, list) and v:
+                return len(v)
+    return None
+
+
 def enrich_tax_owed(listings: Iterable[Listing]) -> dict:
     if os.environ.get("FORECLOSURE_TAX_OWED", "1") == "0":
         return {"stamped": 0, "skipped": "disabled"}
@@ -211,14 +249,23 @@ def enrich_tax_owed(listings: Iterable[Listing]) -> dict:
                 year = prev["year"]
         if not isinstance(li.raw, dict):
             li.raw = {}
+        years_delinquent = _find_years_delinquent(li.raw)
+        if years_delinquent is None:
+            prev = li.raw.get("tax_owed")
+            if isinstance(prev, dict) and prev.get("years_delinquent"):
+                years_delinquent = prev["years_delinquent"]
         li.raw["tax_owed"] = {
             "balance": bal, "kind": kind, "source": li.source,
             "year": year, "basis": "own_record",
         }
+        if years_delinquent is not None:
+            li.raw["tax_owed"]["years_delinquent"] = years_delinquent
         stamped += 1
         if (li.parcel_id or "").strip():
-            index.setdefault(_county_county_key(li),
-                             {"balance": bal, "kind": kind, "source": li.source, "year": year})
+            entry = {"balance": bal, "kind": kind, "source": li.source, "year": year}
+            if years_delinquent is not None:
+                entry["years_delinquent"] = years_delinquent
+            index.setdefault(_county_county_key(li), entry)
 
     # Pass 2 — cross-reference onto same-parcel leads from other sources.
     xref = 0
