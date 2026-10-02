@@ -329,8 +329,8 @@ def _signal_waf_block() -> None:
         from ...http_client import _block_holder  # type: ignore
         holder = _block_holder.get()
         if holder is not None:
-            holder.append((403, "AWS WAF image-grid CAPTCHA unsolved "
-                                "(set GEMINI_API_KEY_* / CAPSOLVER_API_KEY)"))
+            holder.append((403, "AWS WAF image-grid CAPTCHA wall "
+                                "(compliance: not attempted, see _solve_waf)"))
     except Exception:  # noqa: BLE001
         pass
 
@@ -358,27 +358,26 @@ async def _waf_present(page) -> bool:
 
 
 async def _solve_waf(page) -> bool:
-    try:
-        from ...enrichment_waf_oss import solve_waf_via_browser
-    except Exception as exc:  # noqa: BLE001
-        log.warning("nc_ecourts_estates.waf_import_fail", error=str(exc)[:160])
-        return False
-    solved = await solve_waf_via_browser(page)
-    if not solved and os.environ.get("CAPSOLVER_API_KEY"):
-        try:
-            from ...enrichment_capsolver import solve_aws_waf
-            token = await solve_aws_waf(page.url)
-            if token:
-                await page.context.add_cookies([{
-                    "name": "aws-waf-token", "value": token,
-                    "domain": ".tylerhost.net", "path": "/",
-                    "httpOnly": False, "secure": True, "sameSite": "None",
-                }])
-                await page.reload(wait_until="networkidle", timeout=45000)
-                solved = True
-        except Exception as exc:  # noqa: BLE001
-            log.warning("nc_ecourts_estates.capsolver_fail", error=str(exc)[:160])
-    return bool(solved)
+    """Never attempt to solve the AWS-WAF "Human Verification" image-grid
+    CAPTCHA. It IS a CAPTCHA (HERMES.md sec 2 rule 2 / CLAUDE.md "the
+    compliance line": a CAPTCHA is a wall, do not defeat it, a smarter model
+    does not change this) regardless of which solver answers it.
+
+    COMPLIANCE FIX 2026-10-01 (HERMES sec 8 per-source audit): this function
+    previously called enrichment_waf_oss.solve_waf_via_browser (an AI
+    vision model clicking the human-verification tiles) and, on failure,
+    fell through to enrichment_capsolver.solve_aws_waf -- a PAID third-party
+    CAPTCHA-solving service (capsolver.com, $0.001/solve, reads
+    CAPSOLVER_API_KEY) -- which is a second, independent violation of the
+    FREE-only rule on top of the CAPTCHA-defeat violation. Both calls are
+    removed outright rather than left dormant behind an unset env var /
+    missing dependency: this scraper is already `disabled = True` so
+    safe_run() never reaches this code in a real run (confirmed in
+    base_scraper.py), but a direct fetch() call -- exactly what this audit's
+    own live-verification step does, and what a future re-enable would do --
+    must not have a live path to a CAPTCHA solve sitting behind it. Treat any
+    detected WAF challenge as an immediate, unconditional wall."""
+    return False
 
 
 async def _wait_search_form(page) -> bool:
