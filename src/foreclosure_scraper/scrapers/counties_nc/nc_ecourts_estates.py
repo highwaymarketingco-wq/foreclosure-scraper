@@ -114,6 +114,31 @@ _EXECUTOR_ROLE_RE = re.compile(
     re.I,
 )
 _DECEDENT_ROLE_RE = re.compile(r"decedent|deceased|estate\s+of|respondent", re.I)
+# 2026-10-02 — heir-list gap (owner: "if its multiple heirs and who they are
+# ... i want ALL data"). Beyond decedent + the single PR/executor, Tyler's
+# own party model can carry further named parties on an estate case: heirs,
+# devisees, "interested parties", next-of-kin entries a court added when it
+# could not locate everyone individually. The hitlist row's full `parties`
+# list was ALREADY kept verbatim in raw (see `_row_to_listing` below), so no
+# name was ever silently dropped -- but it was never promoted to its own
+# field, so nothing downstream could answer "who are the heirs" without
+# re-reading the whole flat party list and guessing which entries are heirs.
+# `_HEIR_ROLE_RE` below promotes any party the court itself labelled this way
+# into `raw['nc_ecourts_estates']['heirs']`, a real list of names.
+#
+# IMPORTANT caveat, confirmed live (not assumed): a real captured Tyler
+# Odyssey case-summary page already in this repo's own test fixtures
+# (tests/fixtures/tyler_roa_25M000272.txt, Henderson County tax-judgment
+# case "Henderson County VS Julia Taylor Heirs") shows NC courts frequently
+# caption multiple heirs as ONE collective party ("<Surname> Heirs"), not as
+# individually-enumerated rows -- the same collective-naming pattern already
+# seen in nc_heir_estate_parcels.py's GIS owner-of-record field. When that
+# happens there is no list to extract; `decedent`/`defendant` already carries
+# the collective name and `heirs` below is correctly empty. This function
+# promotes whatever the court's OWN data model gives us -- it cannot invent
+# individual names a case caption never separated out.
+_HEIR_ROLE_RE = re.compile(
+    r"\bheir(s)?\b|devisee|interested\s+part|next\s+of\s+kin|beneficiar", re.I)
 
 
 def _strip_court_suffix(loc: str) -> str:
@@ -172,6 +197,7 @@ def _row_to_listing(row: dict, slug: str) -> Optional[Listing]:
     parties = row.get("parties") or []
     decedent = None
     executor = None
+    heirs: list[str] = []
     for p in parties:
         name = _clean_name(p.get("name", ""))
         role = p.get("role", "") or ""
@@ -181,6 +207,8 @@ def _row_to_listing(row: dict, slug: str) -> Optional[Listing]:
             decedent = name
         elif executor is None and _EXECUTOR_ROLE_RE.search(role):
             executor = name
+        elif _HEIR_ROLE_RE.search(role) and not _looks_like_org(name):
+            heirs.append(name)
 
     # Fallbacks when Tyler doesn't label roles: the case title is usually
     # "In re: Estate of <Decedent>" or "<Decedent>, Deceased". The first
@@ -197,6 +225,20 @@ def _row_to_listing(row: dict, slug: str) -> Optional[Listing]:
             if cand and cand != decedent and not _looks_like_org(cand):
                 executor = cand
                 break
+    # Role-labelled heirs already collected above. When Tyler ships NO role
+    # labels at all (the fallback branches just above had to guess decedent/
+    # executor from bare position), `heirs` is still empty here even though
+    # the row may carry further distinct named parties beyond those first
+    # two -- pick those up too rather than silently dropping them.
+    if not heirs:
+        for p in parties:
+            cand = _clean_name(p.get("name", ""))
+            if cand and cand not in (decedent, executor) and not _looks_like_org(cand):
+                heirs.append(cand)
+    # Dedupe, case-insensitive, preserving first-seen order.
+    seen_heir: set[str] = set()
+    heirs = [h for h in heirs
+             if h.lower() not in seen_heir and not seen_heir.add(h.lower())]
 
     # The decedent is the record owner whose name GIS will resolve to an
     # address. Without it there's nothing to enrich, so skip.
@@ -247,6 +289,13 @@ def _row_to_listing(row: dict, slug: str) -> Optional[Listing]:
                 "filed_date_iso": filed_iso,
                 "decedent": decedent,
                 "executor": executor,
+                # 2026-10-02: additional named parties beyond decedent/
+                # executor the court itself labelled heir/devisee/interested-
+                # party (or, when no role labels exist at all, any further
+                # distinct named party). A real list, not a re-parse of
+                # `parties` below. See the module's _HEIR_ROLE_RE comment
+                # for the live-confirmed collective-naming caveat.
+                "heirs": heirs or None,
                 "parties": parties,
             }
         },

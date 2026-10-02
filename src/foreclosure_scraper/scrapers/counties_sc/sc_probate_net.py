@@ -44,6 +44,32 @@ court that participates, statewide, NOT only the 18-county flip footprint --
 verified live by reading the real ``ddlCounties`` <select> (Aiken, Bamberg,
 Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence,
 Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York).
+2026-10-02 EXTENSION — gvDocket (the per-case document/activity log). Every
+case's response ALSO ships a third sub-grid, `..._gvDocket`, positioned right
+after `..._gvParties` -- fetched on every run already (same response), but
+never parsed at all until now. Live-verified (Charleston Probate, "Smith"):
+it is a two-column (Activity, Description) log of every filed document/court
+activity, e.g. "DEATH CERTIFICATE", "CREDITORS NOTICE",
+"INVENTORY/APPRAISEMENT", "INFORMATION TO HEIRS AND DEVISEES" (SC's statutory
+notice to known heirs/devisees -- Probate Code 62-3-705/-706), "BOND WAIVER",
+"RENUNCIATION FORM". Checked precisely, not assumed: across 20 real docket
+tables / ~800 rows sampled live, NOT ONE row anywhere on this site carries a
+dollar figure or any value/bond-amount column -- the grid is a pure
+document-TYPE log (what was filed, occasionally when), never the filed
+document's own content. The actual Inventory & Appraisement dollar total,
+and the actual names on an "Information to Heirs" filing, live only inside
+the scanned PDF itself -- on Charleston's shape there is no link to it at
+all; on York/Dorchester's shape (see `_docket_entries()`'s own docstring)
+there IS a per-document link, but it opens a PAID viewer, confirmed live, so
+neither shape yields the content for free either way. So `_docket_entries()`
+below gives the closest
+FREE, LIVE-CONFIRMED signal this source has for either ask: whether an
+inventory/appraisement was filed at all (the nearest free proxy to "does this
+estate have a known asset value", never the value itself) and whether a
+formal notice to heirs was filed at all (confirms heirs were identified and
+notified, never their names). Both are real, previously-uncaptured facts,
+not approximations of a number/name we are choosing not to show.
+
 Probed every one of those NOT already in COUNTIES with a single "Smith" search:
 Dorchester Probate returned 20 real hits and York Probate returned 3; Aiken,
 Bamberg, Barnwell, Chester, Kershaw, Lancaster, Orangeburg, Sumter, Florence and
@@ -58,6 +84,7 @@ flip, so both are admissible per config.in_scope_distressed regardless.
 from __future__ import annotations
 
 import asyncio
+import re
 from datetime import datetime
 from typing import Iterable
 
@@ -220,6 +247,90 @@ def _pr_from_parties(party_table) -> tuple[str | None, dict | None, str | None, 
     return pr_name, pr_addr, atty_name, atty_addr
 
 
+#: Document/activity "Description" text patterns in the gvDocket log that map
+#: to a real, free, live-confirmed signal (see the module docstring's
+#: 2026-10-02 EXTENSION note for exactly what each one does and does NOT
+#: prove -- never a dollar figure, never a heir's name).
+_DOCKET_INVENTORY_RE = re.compile(r"\bINVENTORY\b", re.I)
+_DOCKET_INFO_TO_HEIRS_RE = re.compile(
+    r"INFO(?:RMATION)?\s*(?:TO)?\s*HEIRS|HEIRS\s+AND\s+DEVISEES", re.I)
+_DOCKET_BOND_WAIVER_RE = re.compile(r"\bBOND\s+WAIVER\b", re.I)
+_DOCKET_RENUNCIATION_RE = re.compile(r"\bRENUNCIATION\b", re.I)
+
+
+def _docket_entries(docket_table) -> list[dict]:
+    """Parse one case's gvDocket sub-grid into a real list of {activity,
+    description[, document_url]} entries.
+
+    Header-driven, not positional: Charleston's docket is 2 columns
+    (Activity, Description), but York/Dorchester's is 3 (Document, Activity,
+    Description) -- live-verified 2026-10-02, a column-position read would
+    have silently misaligned every York/Dorchester row. Description is the
+    document/activity TYPE string (never its dollar content -- see module
+    docstring); Activity is usually blank (the row is just a filed-document
+    marker) but occasionally carries a date for a court-ordered event.
+
+    When a "Document" column is present it links to a per-document viewer --
+    live-verified 2026-10-02 (York, a real "PAID NOTICE TO CREDITORS FEE"
+    row's link) that this is a GleamTech DocumentUltimate viewer gated behind
+    "Add to Cart" / "Add all pages to Cart" with a watermarked preview
+    ("All watermarks on images will be removed upon purchase.") -- a PAID
+    document purchase, not a free document image. Per this project's FREE-
+    only rule the link is kept ONLY as an informational pointer for a human;
+    it is never auto-followed/fetched here.
+    """
+    if docket_table is None:
+        return []
+    rows = docket_table.css("tr")
+    if len(rows) < 2:
+        return []
+    header = [c.text(strip=True).lower() for c in rows[0].css("th, td")]
+
+    def idx(name: str) -> int | None:
+        for i, h in enumerate(header):
+            if name in h:
+                return i
+        return None
+
+    i_doc, i_act, i_desc = idx("document"), idx("activity"), idx("description")
+
+    def cell(cells, i: int | None) -> str:
+        return cells[i].text(strip=True) if i is not None and i < len(cells) else ""
+
+    out: list[dict] = []
+    for tr in rows[1:]:          # skip the header row
+        cells = tr.css("td")
+        if not cells:
+            continue
+        activity = cell(cells, i_act) or None
+        description = cell(cells, i_desc) or None
+        if not activity and not description:
+            continue
+        entry = {"activity": activity, "description": description}
+        if i_doc is not None and i_doc < len(cells):
+            a = cells[i_doc].css_first("a")
+            href = a.attributes.get("href") if a is not None else None
+            if href:
+                entry["document_url"] = href  # PAID viewer -- never fetched
+        out.append(entry)
+    return out
+
+
+def _docket_flags(entries: list[dict]) -> dict:
+    """Derived booleans from the docket log -- the closest free signal this
+    source exposes for an estate's financial/heir posture. Never a dollar
+    figure, never a heir's name (neither exists anywhere on this site; see
+    the module docstring's 2026-10-02 EXTENSION note, checked precisely
+    against ~800 live docket rows, not assumed)."""
+    joined = " | ".join(e.get("description") or "" for e in entries)
+    return {
+        "has_inventory_appraisement": bool(_DOCKET_INVENTORY_RE.search(joined)),
+        "has_info_to_heirs": bool(_DOCKET_INFO_TO_HEIRS_RE.search(joined)),
+        "has_bond_waiver": bool(_DOCKET_BOND_WAIVER_RE.search(joined)),
+        "has_renunciation": bool(_DOCKET_RENUNCIATION_RE.search(joined)),
+    }
+
+
 def _parse_probate(html: str, county: str, state: str) -> list[Listing]:
     """Parse the cgvCases probate grid into decedent/PR distress leads."""
     out: list[Listing] = []
@@ -237,6 +348,14 @@ def _parse_probate(html: str, county: str, state: str) -> list[Listing]:
         if (tb.attributes.get("id") or "").startswith(
             "ctl00_ContentPlaceHolder1_cgvCases_"
         ) and (tb.attributes.get("id") or "").endswith("_gvParties")
+    ]
+    # Same per-case positional pairing as party_tables (gvParties and gvDocket
+    # share one "ctlNN" index per case, confirmed live 2026-10-02).
+    docket_tables = [
+        tb for tb in tree.css("table")
+        if (tb.attributes.get("id") or "").startswith(
+            "ctl00_ContentPlaceHolder1_cgvCases_"
+        ) and (tb.attributes.get("id") or "").endswith("_gvDocket")
     ]
 
     case_i = 0
@@ -256,8 +375,11 @@ def _parse_probate(html: str, county: str, state: str) -> list[Listing]:
         status = cells[-1].text(strip=True) or None
 
         party_table = party_tables[case_i] if case_i < len(party_tables) else None
+        docket_table = docket_tables[case_i] if case_i < len(docket_tables) else None
         case_i += 1
         pr_name, pr_addr, atty_name, atty_addr = _pr_from_parties(party_table)
+        docket = _docket_entries(docket_table)
+        docket_flags = _docket_flags(docket)
 
         desc = f"SC probate estate {case_number} ({county} County)"
         if case_name:
@@ -297,6 +419,14 @@ def _parse_probate(html: str, county: str, state: str) -> list[Listing]:
                     "status": status,
                     "personal_representative": pr_addr,
                     "attorney": atty_addr,
+                    # 2026-10-02: the per-case filed-document/activity log,
+                    # never parsed before (see module docstring). A real
+                    # list, not a joined string; the derived booleans are
+                    # the closest free signal for estate value / heir
+                    # notice this source has -- never the dollar figure or
+                    # the heirs' names, neither of which exists here.
+                    "docket": docket or None,
+                    **docket_flags,
                 }},
             )
         )

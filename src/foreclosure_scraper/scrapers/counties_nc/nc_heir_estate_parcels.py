@@ -246,6 +246,64 @@ def _owner_display(owner_fields: list[str]) -> str | None:
     return "; ".join(parts) if parts else None
 
 
+# 2026-10-02 — heir-list breadth gap (owner: "if its multiple heirs and who
+# they are. i dont just want a name i want ALL data"). `_owner_display()`
+# above has ALWAYS joined every owner subfield into one "A HEIRS; B HEIRS"
+# string for `defendant` -- that join already preserves every name (nothing
+# was silently dropped), but it is not machine-readable as a LIST: nothing
+# downstream can answer "who are the heirs" without re-splitting a free-text
+# string. `_parse_owner_field()` below parses each raw subfield into a clean
+# name + the role token the county roll encoded inline with it, so
+# raw['heir_estate']['heir_names'] is a real list of {raw, name, role} dicts,
+# not a second copy of the same joined string.
+_ROLE_TOKENS: tuple[tuple[re.Pattern, str], ...] = (
+    (re.compile(r"\bHEIRS?\b", re.I), "heir"),
+    (re.compile(r"\bESTATE\b", re.I), "estate"),
+    (re.compile(r"\bTRUSTEE\b", re.I), "trustee"),
+)
+# Trailing fractional-interest ("1/2") or Latin co-owner noise ("ET AL") left
+# over once the role token itself is stripped out of the middle/end of the
+# string (McDowell: "SWOFFORD LEONARD HEIRS 1/2" -> role-strip -> "SWOFFORD
+# LEONARD  1/2" -> this strip -> "SWOFFORD LEONARD").
+_TRAILING_NOISE_RE = re.compile(r"(?:\d+\s*/\s*\d+|ET\s*AL\.?|\bOF)\s*$", re.I)
+
+
+def _parse_owner_field(field: str) -> dict:
+    """One raw owner-of-record subfield -> a clean name + its encoded role.
+
+    County rolls fold the role into the name text itself rather than a
+    separate column, in three shapes seen live: trailing ("<NAME> HEIRS",
+    "<NAME> ESTATE", "<NAME> TRUSTEE 1/2") and leading ("ESTATE OF <NAME>").
+    Returns {"raw": <original>, "name": <role token stripped>, "role":
+    "heir"|"estate"|"trustee"|"other"} -- "other" for a plain co-owner/agent
+    subfield (e.g. "HUNTER LINDA PACE ET VIR") that carries no role token at
+    all; it still gets a dict here so NO subfield is silently dropped from
+    the structured list, matching what `_owner_display()` already does for
+    the joined string.
+    """
+    f = (field or "").strip()
+    m = re.match(r"^ESTATE\s+OF\s+(.+)$", f, re.I)
+    if m:
+        name, role = m.group(1), "estate"
+    else:
+        name, role = f, "other"
+        for pat, r in _ROLE_TOKENS:
+            if pat.search(f):
+                name, role = pat.sub(" ", f), r
+                break
+    name = _TRAILING_NOISE_RE.sub("", name).strip()
+    name = re.sub(r"\s+", " ", name).strip(" ,;")
+    return {"raw": field, "name": name or field, "role": role}
+
+
+def _heir_names(owner_fields: list[str]) -> list[dict]:
+    """Every owner subfield parsed into the structured {raw,name,role} shape,
+    in the SAME order as `owner_fields` (which is already spec-field order) --
+    no name is dropped or re-ordered relative to the joined `owner_of_record`
+    string this sits alongside in `raw['heir_estate']`."""
+    return [_parse_owner_field(f) for f in owner_fields]
+
+
 class NCHeirEstateParcels(BaseScraper):
     slug = "counties_nc.nc_heir_estate_parcels"
     name = "Heir / Estate Owner-of-Record Parcels (NC statewide + Upstate/broader SC GIS)"
@@ -310,6 +368,10 @@ class NCHeirEstateParcels(BaseScraper):
                 raw={
                     "heir_estate": {
                         "owner_of_record": owner,
+                        # Structured list (NOT the joined string above) so
+                        # "who are the heirs" has real distinct names to read,
+                        # not a ";"-delimited blob to re-parse downstream.
+                        "heir_names": _heir_names(owner_fields),
                         "mailing": mail,
                         "care_of": care_of,
                         "match": "heirs" if _HEIR_TOKEN.search(owner) else "estate",

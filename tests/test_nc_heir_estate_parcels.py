@@ -64,6 +64,71 @@ def test_owner_display_joins_and_dedupes():
     assert m._owner_display([]) is None
 
 
+# --------------------------------------------------------------------------- 2026-10-02
+# structured heir_names (owner: "if its multiple heirs and who they are. i
+# dont just want a name i want ALL data") -- `defendant`/`owner_of_record`
+# stayed a single ";"-joined string; this adds a real list.
+
+def test_parse_owner_field_strips_trailing_heirs_token():
+    assert m._parse_owner_field("HARDIN CLARENCE HEIRS") == {
+        "raw": "HARDIN CLARENCE HEIRS", "name": "HARDIN CLARENCE", "role": "heir",
+    }
+
+
+def test_parse_owner_field_strips_trailing_estate_token():
+    assert m._parse_owner_field("WALKER SALLY ESTATE") == {
+        "raw": "WALKER SALLY ESTATE", "name": "WALKER SALLY", "role": "estate",
+    }
+
+
+def test_parse_owner_field_strips_leading_estate_of():
+    assert m._parse_owner_field("ESTATE OF JOHN SMITH") == {
+        "raw": "ESTATE OF JOHN SMITH", "name": "JOHN SMITH", "role": "estate",
+    }
+
+
+def test_parse_owner_field_strips_trailing_fraction_after_role_token():
+    """McDowell live shape: 'SWOFFORD LEONARD HEIRS 1/2' -- the fractional
+    interest sits AFTER the role token, not at the very end of the string
+    before stripping."""
+    assert m._parse_owner_field("SWOFFORD LEONARD HEIRS 1/2") == {
+        "raw": "SWOFFORD LEONARD HEIRS 1/2", "name": "SWOFFORD LEONARD", "role": "heir",
+    }
+    assert m._parse_owner_field("SWOFFORD RONALD TRUSTEE 1/2") == {
+        "raw": "SWOFFORD RONALD TRUSTEE 1/2", "name": "SWOFFORD RONALD", "role": "trustee",
+    }
+
+
+def test_parse_owner_field_keeps_a_no_token_subfield_as_role_other():
+    """A plain co-owner line with no HEIR/ESTATE/TRUSTEE token still gets a
+    dict (nothing silently dropped from the structured list)."""
+    assert m._parse_owner_field("HUNTER LINDA PACE ET VIR") == {
+        "raw": "HUNTER LINDA PACE ET VIR", "name": "HUNTER LINDA PACE ET VIR", "role": "other",
+    }
+
+
+def test_heir_names_preserves_order_and_every_subfield():
+    out = m._heir_names(["HARDIN CLARENCE HEIRS", "HARDIN OMA HEIRS"])
+    assert [h["name"] for h in out] == ["HARDIN CLARENCE", "HARDIN OMA"]
+    assert all(h["role"] == "heir" for h in out)
+
+
+def test_gaston_multi_heir_row_gets_a_real_list_not_just_the_joined_string(canned):
+    """The exact live-captured Gaston shape: two distinct heirs in one row.
+    `defendant` stays the joined string (unchanged); `raw['heir_estate']
+    ['heir_names']` must resolve each one to its own clean name."""
+    table, _ = canned
+    table[_url("NC:Gaston")] = [GASTON_MULTI_HEIR]
+    out = asyncio.run(m.NCHeirEstateParcels().fetch())
+    rows = [li for li in out if li.county == "Gaston"]
+    assert len(rows) == 1
+    names = rows[0].raw["heir_estate"]["heir_names"]
+    assert [h["name"] for h in names] == ["HARDIN CLARENCE", "HARDIN OMA"]
+    assert all(h["role"] == "heir" for h in names)
+    # The raw originals are kept too, not just the stripped name.
+    assert names[0]["raw"] == "HARDIN CLARENCE HEIRS"
+
+
 # --------------------------------------------------------------------------- live-shaped fixtures
 
 # gis.gastoncountync.gov .../Parcels/FeatureServer/11 — CURR_NAME1/CURR_NAME2.
