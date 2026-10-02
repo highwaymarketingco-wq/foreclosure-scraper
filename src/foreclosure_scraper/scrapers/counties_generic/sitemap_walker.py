@@ -57,10 +57,16 @@ KEYWORDS = (
     "notice-of-sale", "notice_of_sale", "lis-pendens", "lis_pendens",
 )
 
-# Address regex (street + optional city + state)
+# Address regex (street + optional city + state). The \b before the suffix
+# alternation is load-bearing: without it, re.I lets the alternation match a
+# SUBSTRING inside an unrelated word ("Addr" in "Address" satisfies "...Dr"),
+# which is exactly how this scraper was fabricating addresses like "103685
+# Physical Addr" out of a Gaston County page's own "Physical Address:" label
+# (live-confirmed 2026-10-01; the identical bug was also found and fixed in
+# counties_nc.nc_civicplus_tax_sale's copy of this pattern the same day).
 ADDR_RE = re.compile(
-    r"(\d+\s+[A-Z][\w .'\-]+(?:Rd|Road|St|Street|Dr|Drive|Ln|Lane|Ave|Avenue|"
-    r"Hwy|Highway|Cir|Circle|Ct|Court|Way|Pl|Place|Trl|Trail|Pkwy|Parkway|Blvd))",
+    r"(\d+\s+[A-Z][\w .'\-]+\b(?:Rd|Road|St|Street|Dr|Drive|Ln|Lane|Ave|Avenue|"
+    r"Hwy|Highway|Cir|Circle|Ct|Court|Way|Pl|Place|Trl|Trail|Pkwy|Parkway|Blvd)\b)",
     re.I,
 )
 # NC Special Proceedings "23 M 258" / "21 SP 34" / "26CV001033-220"
@@ -154,16 +160,33 @@ def _parse_listings(text: str, source_url: str, state: str, county: str) -> list
     # Split into chunks: look for repeating separators or paragraph breaks
     chunks = re.split(r"\*{20,}|={20,}|-{20,}|\n{2,}", flat)
     if len(chunks) < 2:
-        # Fallback: split by case-number pattern (each case = one listing)
-        cases = list(NC_CASE_RE.finditer(flat)) + list(SC_CASE_RE.finditer(flat))
+        # Fallback: split by case-number pattern (each case = one listing).
+        cases = sorted(list(NC_CASE_RE.finditer(flat)) + list(SC_CASE_RE.finditer(flat)),
+                       key=lambda m: m.start())
         if not cases:
             return []
-        # Build chunks centered on each case occurrence (300 chars each side)
+        # Build each chunk as the FULL gap flanking this case match -- back to
+        # the previous case's end, forward to the next case's start -- rather
+        # than a fixed +-200/400 char window centered on the match. A
+        # same-direction fixed window reaches into a NEIGHBOR's own fields
+        # whenever records run back-to-back with no separator (live-confirmed
+        # on Gaston's foreclosure-sale page: the real layout is "Owner /
+        # Parcel / Address / ... / File Number: <CASE>" with the case number
+        # at the END of its own record and the next record's Owner/Parcel
+        # starting immediately after -- a +400-char forward window pulled in
+        # the NEXT record's parcel number: "File Number: 24 M 867" paired its
+        # own correctly-matched address "2508 Gardner St" with parcel 120452,
+        # which actually belongs to the following record). The two-sided gap
+        # still resolves correctly for a page whose fields TRAIL the case
+        # number instead, because regex .search() returns the leftmost match
+        # and this record's own trailing fields sit textually before the next
+        # case's leading text.
+        cases = cases[:30]
         chunks = []
-        for m in cases[:30]:
-            s = max(0, m.start() - 200)
-            e = min(len(flat), m.end() + 400)
-            chunks.append(flat[s:e])
+        for i, m in enumerate(cases):
+            left = cases[i - 1].end() if i > 0 else max(0, m.start() - 600)
+            right = cases[i + 1].start() if i + 1 < len(cases) else min(len(flat), m.end() + 600)
+            chunks.append(flat[left:right])
 
     out: list[Listing] = []
     seen: set[str] = set()
