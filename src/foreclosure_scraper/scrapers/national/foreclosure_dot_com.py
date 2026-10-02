@@ -22,6 +22,7 @@ by listing ID. When a listing appears in both, the city-page data wins.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -389,6 +390,27 @@ class ForeclosureDotCom(BaseScraper):
     timeout_s = 900.0  # 15 min for full search + city pagination
 
     async def fetch(self) -> Iterable[Listing]:
+        # The whole body below is synchronous: _fetch_search/_fetch_city call
+        # curl_cffi's `cf.get()` (a blocking requests-style call, not an async
+        # session) and sleep between pages with `time.sleep()`, not
+        # `asyncio.sleep()`. With up to 2 search URLs and ~20 city URLs each
+        # paginating up to 50-100 pages at REQUEST_DELAY=0.5s apart, this
+        # coroutine previously had ZERO `await` points for its whole run --
+        # the identical bug class fixed in zombie_properties.py and
+        # wnc_rod_foreclosure_starts.py (asyncio.wait_for cannot interrupt a
+        # coroutine that never yields, so this scraper's own timeout_s=900
+        # would not just apply to itself: it would freeze the event loop for
+        # EVERY sibling scraper in the same run for up to 15 minutes). This
+        # is the exact starvation mechanism docs/full_run_execution_audit_
+        # 2026-09-23.md independently observed around this scraper's run
+        # window on 2026-09-22/23 (national.fannie_homepath timing out
+        # nearby) without the root cause having been fixed at the time.
+        # Running the synchronous body in a worker thread via
+        # asyncio.to_thread lets safe_run's own asyncio.wait_for(...,
+        # timeout=self.timeout_s) actually apply.
+        return await asyncio.to_thread(self._fetch_sync)
+
+    def _fetch_sync(self) -> list[Listing]:
         # Step 1: Search view (broadest coverage)
         by_id: dict[str, Listing] = {}
         for state, url in SEARCH_URLS:
