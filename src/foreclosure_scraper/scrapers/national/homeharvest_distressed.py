@@ -118,10 +118,21 @@ def _to_listing(row: dict, county: str, matches: list[str]) -> Listing | None:
     elif "land" in style or "lot" in style:
         kind = PropertyKind.LAND
 
+    # Found 2026-10-01 (national/reo per-source audit): this sibling scraper
+    # (national.homeharvest) already fixed this exact gap -- alt_photos
+    # (homeharvest's comma-separated extra-photo column) and office_email
+    # were captured there but never backported here. Every row here was
+    # shipping with only ever ONE photo and no office-level fallback email,
+    # despite homeharvest's own dataframe already carrying both for free (no
+    # extra request).
     photos: list[str] = []
     primary = row.get("primary_photo") or ""
     if primary and not (isinstance(primary, float) and primary != primary):
         photos.append(str(primary))
+    extra_photos = row.get("alt_photos") or ""
+    if isinstance(extra_photos, str) and extra_photos:
+        # alt_photos is comma-separated; keep up to 5 more (6 total max).
+        photos.extend([p.strip() for p in extra_photos.split(",") if p.strip()][:5])
 
     return Listing(
         source="national.distressed",
@@ -158,7 +169,9 @@ def _to_listing(row: dict, county: str, matches: list[str]) -> Listing | None:
                 "agent_phones": _clean(row.get("agent_phones")),
                 "broker_name": _clean(row.get("broker_name")),
                 "office_phones": _clean(row.get("office_phones")),
+                "office_email": _clean(row.get("office_email")),
                 "half_baths": _num(row.get("half_baths")),
+                "tax": _num(row.get("tax")),  # annual property-tax $ (Realtor.com tax_history latest)
             },
             "zillow": {
                 "photo": photos[0] if photos else None,
