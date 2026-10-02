@@ -26,6 +26,11 @@ def test_built_dateless_sources_are_whitelisted():
         # over-the-counter roster (never sets sale_date, per its own docstring),
         # same as every other _flc source, but had been left off this list.
         "counties_sc.horry_flc",
+        # national.williams (rewritten 2026-10-02): most rows carry a real
+        # courthouse sale_date, but a sale that has already happened reports no
+        # date at all -- only an auction_status of "upset_bid_period" (NC's
+        # statutory 10-day post-sale window). Same shape as nc_upset_bids below.
+        "national.williams",
     }
     missing = required - DATELESS_OK_SOURCES
     assert not missing, f"dateless sources dropped from DATELESS_OK_SOURCES (leads will 0-out): {missing}"
@@ -48,3 +53,22 @@ def test_horry_flc_dateless_row_survives_active_only():
         raw={},
     )
     assert _active_only(li, horizon_days=120, now=datetime(2026, 9, 29)) is True
+
+
+def test_williams_upset_bid_row_survives_active_only():
+    """A completed-sale/upset-bid-period national.williams row has no
+    sale_date at all (the page gives no date for it, only a status
+    sentence). Without the whitelist, _active_only would drop it as a
+    'dateless historic roster' even though the lead is still live."""
+    li = Listing(
+        source="national.williams",
+        source_url="https://bid.auctionnetwork.com/Listing/Details/8463529/x",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        state="NC",
+        county="Guilford County",
+        street_address="614 SEBASTIAN LN",
+        sale_date=None,
+        auction_status="upset_bid_period",
+        raw={},
+    )
+    assert _active_only(li, horizon_days=120, now=datetime(2026, 10, 2)) is True

@@ -854,6 +854,15 @@ DATELESS_OK_SOURCES = {
     "national.estate_sales",                      # Estate sale events (dateless)
     "national.sheriff_sales",                     # Sheriff sale listings (dateless)
     "national.nc_upset_bids",                     # NC upset bid period listings (dateless)
+    # national.williams (REWRITTEN 2026-10-02): most rows carry a real courthouse
+    # sale_date, but a sale that has already happened reports no date at all on
+    # the page -- only a status sentence normalized to auction_status=
+    # "upset_bid_period" (NC's statutory 10-day post-sale window). Without this,
+    # _active_only drops those rows as a "dateless historic roster" even though
+    # the upset-bid window is still open and the lead is still actionable --
+    # same shape as national.nc_upset_bids just above, which is why this sits
+    # right next to it.
+    "national.williams",
     "national.jail_bookings",                     # County jail booking rosters (dateless)
     # Meares Property Advisors (SC upstate auctions). Live lots carry an auction
     # END date, but brokered "real-estate-listings" rows + between-cycle items are

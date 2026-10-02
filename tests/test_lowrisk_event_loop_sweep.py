@@ -9,6 +9,12 @@ concurrent scraper for as long as that one call takes, not just this
 scraper's own declared timeout_s.
 
 national.williams_auctions: 2 sequential curl_cffi cf.get() calls, no loop.
+  (REWRITTEN 2026-10-02: this source no longer touches curl_cffi directly --
+  it was rebuilt from scratch against bid.auctionnetwork.com and now goes
+  through http_client.get_text(impersonate=True), which is natively async
+  via curl_cffi's AsyncSession. The test below was updated to patch that
+  entry point instead of the now-nonexistent module-level `cf` import --
+  same shape as the cherokee_delinquent_tax test just below it.)
 national.sc_public_index (_curl_search_county): a curl_cffi Session reused
   across a loop of search-prefix POSTs; already yields between iterations
   via `await asyncio.sleep(REQUEST_DELAY)`, so never a total freeze, but each
@@ -63,12 +69,12 @@ def _fake_cf_response(text: str, status_code: int = 200) -> Mock:
 async def test_williams_auctions_fetch_does_not_block_event_loop():
     from foreclosure_scraper.scrapers.national.williams_auctions import WilliamsAuctions
 
-    def _slow_get(url, **kw):
-        time.sleep(0.05)
-        return _fake_cf_response("<html>" + "x" * 5000 + "</html>")
+    async def _slow_get_text(url, **kw):
+        await asyncio.sleep(0.05)
+        return "<html>" + "x" * 5000 + "</html>"  # no /Listing/Details hrefs -> clean empty result
 
-    with patch("foreclosure_scraper.scrapers.national.williams_auctions.cf.get",
-               side_effect=_slow_get):
+    with patch("foreclosure_scraper.scrapers.national.williams_auctions.get_text",
+               side_effect=_slow_get_text):
         n = await _race_heartbeat(WilliamsAuctions().fetch())
 
     assert n > 3, f"only {n} heartbeats ticked -- event loop was blocked"
