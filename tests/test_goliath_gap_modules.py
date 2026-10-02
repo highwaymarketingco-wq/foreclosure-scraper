@@ -73,28 +73,47 @@ class TestMarriageLicense:
         assert callable(enrich_marriage_licenses)
 
     def test_marriage_parse_name(self):
-        from foreclosure_scraper.enrichment_marriage_license import _parse_name
-        # No comma: last word = last name (First Last format)
-        assert _parse_name("SMITH JOHN") == ("JOHN", "SMITH")
-        assert _parse_name("Doe, Jane") == ("DOE", "JANE")
-        assert _parse_name("John Smith") == ("SMITH", "JOHN")
-        assert _parse_name("") is None
-        assert _parse_name(None) is None
+        # 2026-10-02 rewrite: the lookup path moved to reusing rod/aumentum.py
+        # (see enrichment_marriage_license.py's module docstring for why), and
+        # name parsing moved with it to `_name_parts`. The OLD `_parse_name`
+        # this test used to check had the no-comma branch BACKWARDS -- it
+        # returned ('JOHN', 'SMITH') for 'SMITH JOHN', i.e. (given, surname),
+        # when the board's own ALL-CAPS convention is SURNAME-first (same
+        # convention `enrichment_aumentum_rod.py._name_parts` already uses
+        # correctly for the live Buncombe ROD lien lookup). That bug would
+        # have silently misidentified every all-caps owner's spouse even if
+        # the old network probe had worked. Fixed here along with the rewrite.
+        from foreclosure_scraper.enrichment_marriage_license import _name_parts
+        assert _name_parts("SMITH JOHN") == ("SMITH", "JOHN")
+        assert _name_parts("Doe, Jane") == ("DOE", "JANE")
+        assert _name_parts("John Smith") == ("SMITH", "JOHN")   # Title Case court convention
+        assert _name_parts("") is None
+        assert _name_parts(None) is None
 
-    def test_marriage_match_confidence(self):
-        from foreclosure_scraper.enrichment_marriage_license import _match_confidence
-        assert _match_confidence("SMITH", "JOHN", {"spouse_name": "JOHN SMITH"}) == "high"
-        assert _match_confidence("SMITH", "JOHN", {"spouse_name": "SMITH"}) == "medium"
-        assert _match_confidence("SMITH", "JOHN", {"spouse_name": "JONES"}) == "low"
+    def test_marriage_spouse_match_confidence(self):
+        # Replaces the old `_match_confidence(last, first, result_dict)` helper,
+        # which rated a regex-scraped blob of HTML text. The rewrite rates
+        # confidence off a real RodDoc's grantor/grantee (the two spouses on a
+        # vendor marriage-index row) instead -- see test_marriage_license_rod.py
+        # for the full live-shape coverage. This just checks the import still
+        # resolves to a real confidence-rating function post-rewrite.
+        from foreclosure_scraper.enrichment_marriage_license import _spouse_from_doc
+        from foreclosure_scraper.rod.models import RodDoc
+        doc = RodDoc(county="Buncombe", state="NC", doc_type="MARRIED",
+                     grantor="SMITH, JOHN", grantee="JONES, JANE")
+        assert _spouse_from_doc(doc, "SMITH", "JOHN")["match_confidence"] == "high"
+        assert _spouse_from_doc(doc, "SMITH", "NOTJOHN")["match_confidence"] == "medium"
+        assert _spouse_from_doc(doc, "NOTASURNAME", "JOHN") is None
 
     def test_marriage_idempotent(self):
         """Listings with existing marriage_license data should be skipped."""
+        import asyncio
         from foreclosure_scraper.enrichment_marriage_license import enrich_marriage_licenses
         listing = _make_listing(
             owner_name="SMITH JOHN",
             raw={"marriage_license": {"spouse_name": "JANE SMITH"}}
         )
-        result = enrich_marriage_licenses([listing])
+        result = asyncio.run(enrich_marriage_licenses([listing]))
         assert result["skipped_existing"] == 1
 
 
