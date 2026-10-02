@@ -47,6 +47,23 @@ def _date(v):
         return None
 
 
+def _photo_url(v) -> str | None:
+    """The JSON's imageUrl is protocol-relative ("//image-prod.hubzu.com/...")
+    -- found 2026-10-01 (national/reo per-source audit): the API response
+    already carries a real per-property photo (confirmed live, photoCount
+    matches a working image URL) plus the listing agent/broker name, and
+    neither was captured, same miss class already fixed today in
+    national.gsa_surplus / servicelink_auction / tranzon_auctions."""
+    s = (v or "").strip()
+    if not s:
+        return None
+    if s.startswith("//"):
+        return f"https:{s}"
+    if s.startswith("http"):
+        return s
+    return None
+
+
 def _parse_item(item: dict, state: str) -> Listing | None:
     pa = item.get("propAddress") or {}
     street = f"{(pa.get('streetNumber') or '').strip()} {(pa.get('streetName') or '').strip()}".strip()
@@ -54,7 +71,8 @@ def _parse_item(item: dict, state: str) -> Listing | None:
     if not street or not url:
         return None
     cat = (item.get("propertyCategory") or "").strip().upper()
-    return Listing(
+    photo = _photo_url(item.get("imageUrl"))
+    li = Listing(
         source="national.hubzu",
         source_url=f"https://www.hubzu.com{url}",
         listing_type=_TYPE.get(cat, ListingType.AUCTION),
@@ -73,8 +91,13 @@ def _parse_item(item: dict, state: str) -> Listing | None:
         sale_date=_date(item.get("listingEndDate")),
         raw={"hubzu": {"category": cat, "subtype": item.get("propertySubType"),
                        "listing_id": item.get("listingId"), "current_bid": item.get("currentBid"),
-                       "status": item.get("listingStatus")}},
+                       "status": item.get("listingStatus"),
+                       "broker": (item.get("agentCompanyName") or "").strip() or None,
+                       "photo_count": item.get("photoCount")}},
     )
+    if photo:
+        li.raw["images"] = {"real": [photo]}
+    return li
 
 
 class Hubzu(BaseScraper):
