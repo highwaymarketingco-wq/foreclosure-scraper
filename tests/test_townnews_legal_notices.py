@@ -248,3 +248,134 @@ def test_live_feeds_return_foreclosure_rows():
         assert li.case_number  # SC notices always carry a C/A number
     for li in list(cc):
         assert li.state == "NC"
+
+
+# --- Regressions found live 2026-10-01 on newspapers.aiken_standard / --------
+# --- newspapers.carolina_coast (HERMES sec 8 per-source audit, newspaper tier)
+
+# Real captured item (Aiken Standard, "master in equity" query): TownNews
+# repeats the ENTIRE title as the first sentence of its own <description>, so
+# the case number appears TWICE in the combined title+description text. The
+# parser used to strip only the FIRST occurrence before scanning for a street
+# address/ZIP, leaving the second, un-stripped copy of "2026-CP-02-01967" for
+# ZIP_RE to mistake for a ZIP code ("01967").
+DUP_CASE_RSS = """<rss><channel>
+<item>
+<title>STATE OF SOUTH CAROLINA IN THE COURT OF COMMON PLEAS COUNTY OF AIKEN SUMMONS AND NOTICE OF FILING OF COMPLAINT (NON-JURY MORTGAGE FORECLOSURE) C/A NO: 2026-CP-02-01967 DEFICIENCY WAIVED</title>
+<link>https://www.postandcourier.com/aikenstandard/classifieds/community/announcements/legal/ad_dupcase.html</link>
+<description>STATE OF SOUTH CAROLINA IN THE COURT OF COMMON PLEAS COUNTY OF AIKEN SUMMONS AND NOTICE OF FILING OF COMPLAINT (NON-JURY MORTGAGE FORECLOSURE) C/A NO: 2026-CP-02-01967 DEFICIENCY WAIVED Onity Mortgage Corporation f/k/a PHH Mortgage Corporation, PLAINTIFF, vs. Laura J Vanderhorst, Defendant(s)</description>
+<pubDate>Tue, 29 Sep 2026 01:00:08 -0400</pubDate>
+</item>
+</channel></rss>"""
+
+# Real captured item (Aiken Standard, "master in equity" query): a SC "NOTICE
+# OF SALE" (post-judgment, Master-in-Equity) caption, which uses PERIODS, not
+# hyphens, in the C/A number, and never says the literal word "Plaintiff" or
+# "Defendant" at all -- it names the parties as "...in the case of: <Plaintiff>
+# vs./against <Defendant>...". Before the fix: case_number was dropped
+# entirely (the hyphen-only regex didn't match), the un-stripped period-form
+# case number got mistaken for a ZIP ("00605"), owner_name/defendant was
+# always None for this caption shape, and the plaintiff lender's own name got
+# mislabeled as "trustee" (TRUSTEE_RE matches anything ending "...LLC").
+NOTICE_OF_SALE_RSS = """<rss><channel>
+<item>
+<title>NOTICE OF SALE C/A</title>
+<link>https://www.postandcourier.com/aikenstandard/classifieds/community/announcements/legal/ad_notice_of_sale.html</link>
+<description>NOTICE OF SALE C/A No. 2026.CP.02.00605 BY VIRTUE of a decree heretofore granted in the case of: Pennymac Loan Services, LLC vs. Alisha Shelman; Powderhouse Landing Property Owners' Association, Inc.; The United States of America acting by and through its agency</description>
+<pubDate>Mon, 28 Sep 2026 01:00:08 -0400</pubDate>
+</item>
+</channel></rss>"""
+
+
+def test_duplicated_case_number_does_not_leak_into_zip():
+    rows = list(
+        parse_rss_items(
+            DUP_CASE_RSS,
+            source_slug="newspapers.aiken_standard",
+            default_state="SC",
+            default_county="Aiken",
+            allowed_states=("SC",),
+        )
+    )
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.case_number == "2026-CP-02-01967"
+    # The case-number suffix ("01967") must NOT be read as a ZIP code.
+    assert row.zip_code is None
+
+
+def test_notice_of_sale_period_case_number_and_parties():
+    rows = list(
+        parse_rss_items(
+            NOTICE_OF_SALE_RSS,
+            source_slug="newspapers.aiken_standard",
+            default_state="SC",
+            default_county="Aiken",
+            allowed_states=("SC",),
+        )
+    )
+    assert len(rows) == 1
+    row = rows[0]
+    # Period-separated C/A number is now captured (previously dropped).
+    assert row.case_number == "2026.CP.02.00605"
+    # The un-stripped case digits must NOT be read as a ZIP code.
+    assert row.zip_code is None
+    # The owner/defendant is wired from the "in the case of: X vs. Y" caption.
+    assert row.plaintiff == "Pennymac Loan Services, LLC"
+    assert row.defendant == "Alisha Shelman"
+    assert row.owner_name == "Alisha Shelman"
+    # The plaintiff lender must NOT be mislabeled as the trustee -- SC has no
+    # substitute-trustee role at all (judicial-only foreclosure state).
+    assert row.trustee is None
+
+
+# Real captured item (Carolina Coast / Carteret NC): the owner is named only
+# as the grantor of the foreclosed Deed of Trust ("...executed by Joni O.
+# Mattson dated..."), never via a "PRESENT RECORD OWNER(S):" label. Before the
+# fix, owner_name/defendant was always None for this (very common) NC
+# power-of-sale shape.
+GRANTOR_RSS = """<rss><channel>
+<item>
+<title>NOTICE OF FORECLOSURE SALE NORTH CAROLINA, CARTERET COUNTY 26SP000015-150 135 CONNIE LN BEAUFORT, NC</title>
+<link>https://www.carolinacoastonline.com/classifieds/community/announcements/legal/ad_grantor.html</link>
+<description>NOTICE OF FORECLOSURE SALE NORTH CAROLINA, CARTERET COUNTY 26SP000015-150 135 CONNIE LN BEAUFORT, NC Under and by virtue of a Power of Sale contained in that certain Deed of Trust executed by Joni O. Mattson dated August 15, 2017, recorded in the office of the Register of Deeds</description>
+<pubDate>Mon, 28 Sep 2026 09:00:00 -0400</pubDate>
+</item>
+</channel></rss>"""
+
+
+def test_grantor_fallback_fills_owner_when_no_record_owner_label():
+    rows = list(
+        parse_rss_items(
+            GRANTOR_RSS,
+            source_slug="newspapers.carolina_coast",
+            default_state="NC",
+            default_county="Carteret",
+            allowed_states=("NC",),
+        )
+    )
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.owner_name == "Joni O. Mattson"
+    assert row.defendant == "Joni O. Mattson"
+
+
+def test_trailing_ellipsis_does_not_block_end_anchored_capture():
+    """Regression: TownNews appends a literal "…" when it truncates a
+    title/description. Left in place, it sits between the real content and
+    the string's true end, breaking any regex here that relies on `$` to
+    terminate a capture for a name that is the very last thing before the
+    cutoff (found live on newspapers.carolina_coast: "...executed by DARRELL
+    G. BUTNER…" failed to capture the surname at all before this fix)."""
+    xml = """<rss><channel><item>
+<title>NOTICE OF SALE Deed of Trust executed by DARRELL G.</title>
+<link>https://x/ad_ellipsis.html</link>
+<description>NOTICE OF SALE IN THE GENERAL COURT OF JUSTICE Deed of Trust executed by DARRELL G. BUTNER…</description>
+<pubDate>Mon, 28 Sep 2026 09:00:00 -0400</pubDate>
+</item></channel></rss>"""
+    rows = list(parse_rss_items(
+        xml, source_slug="newspapers.carolina_coast",
+        default_state="NC", default_county="Onslow", allowed_states=("NC",),
+    ))
+    assert len(rows) == 1
+    assert rows[0].owner_name == "DARRELL G. BUTNER"

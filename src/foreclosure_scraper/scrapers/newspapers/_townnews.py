@@ -59,9 +59,14 @@ NC_CASE_RE = re.compile(
     r"\b(\d{2,4}\s?-?\s?(?:SP|CVD|CVS|CV|M)\s?-?\s?\d{1,6}(?:-\d{2,4})?)\b",
     re.I,
 )
-# SC: 2026-CP-10-01481 / 2026CP1001636 / "Case No: 2025-CP-10-01481"
+# SC: 2026-CP-10-01481 / 2026CP1001636 / "Case No: 2025-CP-10-01481" / the
+# "NOTICE OF SALE" post-judgment form, which uses PERIODS not hyphens
+# ("C/A No. 2026.CP.02.00605" — found live 2026-10-01 on the Aiken Standard
+# feed). A period separator was previously unmatched, which silently dropped
+# case_number AND let the un-stripped case digits get picked up by ZIP_RE as
+# a fake ZIP code (e.g. "2026.CP.02.00605" -> zip_code="00605").
 SC_CASE_RE = re.compile(
-    r"\b(\d{4}\s?-?\s?CP\s?-?\s?\d{2}\s?-?\s?\d{3,6})\b",
+    r"\b(\d{4}\s?[-.]?\s?CP\s?[-.]?\s?\d{2}\s?[-.]?\s?\d{3,6})\b",
     re.I,
 )
 ZIP_RE = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
@@ -157,6 +162,44 @@ RECORD_OWNER_RE = re.compile(
     r"PRESENT RECORD OWNER\(?S?\)?\s*:?\s*"
     r"([A-Z][A-Za-z.'\- ]{2,70}?)(?:\)|,|\s+to\s+|$)", re.I
 )
+# Many NC power-of-sale notices never use the "PRESENT RECORD OWNER(S)" label
+# at all -- they name the current owner only as the grantor of the foreclosed
+# Deed of Trust ("...Deed of Trust executed by Joni O. Mattson dated...").
+# Found live 2026-10-01 on newspapers.carolina_coast (Onslow/Carteret NC): 6 of
+# 7 live rows had this exact shape and owner_name/defendant were silently None
+# for ALL of them even though the name is right there in the RSS text -- the
+# same grantor pattern coastland_times.py already solved for its own (non-
+# TownNews) parser; reused here verbatim as a fallback for every TownNews NC
+# paper. Known limitation carried over unchanged from that original: a name
+# containing "a/k/a"/"f/k/a" (a '/' character, not in the class) still breaks
+# the match at that point, same as the existing coastland_times.py behavior.
+GRANTOR_RE = re.compile(
+    r"(?:executed(?:\s+and\s+delivered)?|made|given)\s+by\s+"
+    r"([A-Z][A-Za-z0-9.'\- ]{2,70}?)"
+    r"(?:\s*\(|,|;|\s+(?:dated|to\s+[A-Z]|and\s+recorded|in\s+favor|"
+    r"as\s+grantor|Trustee)|$)",
+    re.I,
+)
+# SC "NOTICE OF SALE" (post-judgment, Master-in-Equity) captions never use the
+# literal words "Plaintiff"/"Defendant" that PLAINTIFF_RE/DEFENDANT_RE require
+# -- they instead read "...heretofore granted in the case of: <Plaintiff>
+# against/v. <Defendant>; <other parties>...". Found live 2026-10-01 on the
+# Aiken Standard feed: this shape is 62/86 (72%) of rows, and before this
+# regex, EVERY one of them had defendant/owner_name silently None even though
+# the name sits in plain text within the RSS feed's ~250-char truncation
+# window (unlike the SUMMONS caption, where the defendant name usually falls
+# AFTER the truncation point and genuinely can't be recovered from RSS alone).
+# Self-anchored on "in the case of:" so it can't bleed backward into the
+# preceding case-number/caption boilerplate the way a bare PLAINTIFF_RE/
+# DEFENDANT_RE scan could.
+NOTICE_OF_SALE_PARTIES_RE = re.compile(
+    r"in\s+the\s+case\s+of:?\s*"
+    r"(?P<plaintiff>[A-Z][A-Za-z0-9 &,./'\-]{2,90}?)\s+"
+    r"(?:against|vs?\.)\s+"
+    r"(?P<defendant>[A-Z][A-Za-z0-9 .&'\-]{2,90}?)"
+    r"(?=\s+and\s+(?:[Tt]he\s+)?[Uu]nited\s+[Ss]tates|;|,|$)",
+    re.I,
+)
 # Boilerplate that may cling to the FRONT of a captured party name — trimmed off.
 _CAPTION_BOILER_RE = re.compile(
     r".*\b(?:COMMON PLEAS|SUMMONS(?:\s+AND\s+NOTICES?)?|NOTICES?|CIVIL ACTION|"
@@ -182,7 +225,18 @@ FORECLOSURE_HINTS = (
 
 
 def _clean(s: str) -> str:
-    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
+    out = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
+    # TownNews appends a literal ellipsis ("…", from the RSS entity &#8230;)
+    # when it truncates a title/description at its character cap. Left in
+    # place, it sits between the last real word and the string's true end,
+    # silently breaking every name-capture regex in this module that relies
+    # on `$` (end of string) as a valid stop token for a name that happens to
+    # be the very last thing before the cutoff. Found live 2026-10-01 on
+    # newspapers.carolina_coast: GRANTOR_RE failed to capture "DARRELL G.
+    # BUTNER" purely because of the trailing "…", even though the full name
+    # was present right up to it. Stripping it moves the string's real end
+    # back to the last real character, as if no truncation marker were there.
+    return out.rstrip("…").rstrip()
 
 
 def _strip_caption(name: str | None) -> str | None:
@@ -301,8 +355,15 @@ def parse_rss_items(
 
         # Remove the literal case number from the text before address parsing —
         # otherwise the case suffix digits (e.g. "...053-150 294 CAPE LOOKOUT
-        # DR") glue onto the house number and corrupt the address.
-        addr_blob = blob.replace(case_raw, " ", 1) if case_raw else blob
+        # DR") glue onto the house number and corrupt the address. TownNews
+        # descriptions commonly repeat the ENTIRE title as their own opening
+        # sentence, so the case number usually appears TWICE in `blob`; a
+        # count=1 replace only strips the first copy and leaves the second
+        # one intact. Found live 2026-10-01 on the Aiken Standard feed: 20 of
+        # 49 case-bearing items (41%) then had ZIP_RE match the leftover
+        # case-number suffix (e.g. "2026-CP-02-01967" -> zip_code="01967") as
+        # if it were a real ZIP code. Replace ALL occurrences, not just one.
+        addr_blob = blob.replace(case_raw, " ") if case_raw else blob
 
         addr_m = ADDR_RE.search(addr_blob)
         street = addr_m.group(1).strip() if addr_m else None
@@ -365,12 +426,52 @@ def parse_rss_items(
                     defendant = cand
                     owner_name = cand
 
+        # Fallback: SC "NOTICE OF SALE" judicial caption (no literal
+        # "Plaintiff"/"Defendant" words -- see NOTICE_OF_SALE_PARTIES_RE).
+        # Only fills whichever of plaintiff/defendant the shapes above missed.
+        nos_m = NOTICE_OF_SALE_PARTIES_RE.search(blob)
+        if nos_m:
+            if plaintiff is None:
+                cand = _strip_caption(nos_m.group("plaintiff"))
+                if cand:
+                    plaintiff = cand
+            if defendant is None:
+                cand = _strip_caption(nos_m.group("defendant"))
+                if cand:
+                    defendant = cand
+                    owner_name = cand
+
+        # Fallback: NC Deed-of-Trust grantor clause (see GRANTOR_RE above).
+        if defendant is None:
+            g_m = GRANTOR_RE.search(blob)
+            if g_m:
+                cand = _strip_caption(g_m.group(1))
+                if cand:
+                    defendant = cand
+                    owner_name = cand
+
+        # TRUSTEE_RE is written for NC substitute-trustee notices, where an
+        # "...LLC"/"...Trustee Services, Inc." entity really is the party
+        # conducting a non-judicial sale. SC has no such role at all -- SC
+        # mortgages aren't deeds of trust and every SC foreclosure is a
+        # judicial Master-in-Equity sale (see _process(): state=="SC" is
+        # always "judicial") -- so on SC notices TRUSTEE_RE was instead
+        # matching the PLAINTIFF lender's own "...LLC" name (e.g. "ROCKET
+        # MORTGAGE LLC") or the law-firm caption's "...LLC" name and
+        # mislabeling it as the trustee. Found live 2026-10-01 on the Aiken
+        # Standard feed: 41 of 86 rows (48%) had a "trustee" that was really
+        # the plaintiff, sometimes with a huge chunk of caption boilerplate
+        # glued on ("BY VIRTUE OF A DECREE of the Court of Common Pleas for
+        # Aiken County, South Carolina, heretofore issued in the case of
+        # Movement Mortgage, LLC"). Skip TRUSTEE_RE for SC notices and for the
+        # judicial "in the case of" caption shape regardless of state.
         trustee = None
-        tr_m = TRUSTEE_RE.search(desc) or TRUSTEE_RE.search(title)
-        if tr_m:
-            cand = tr_m.group(1).strip()[:160]
-            if len(cand) > 4 and cand.lower() not in {"the", "this"}:
-                trustee = cand
+        if st != "SC" and nos_m is None:
+            tr_m = TRUSTEE_RE.search(desc) or TRUSTEE_RE.search(title)
+            if tr_m:
+                cand = tr_m.group(1).strip()[:160]
+                if len(cand) > 4 and cand.lower() not in {"the", "this"}:
+                    trustee = cand
 
         listing_type = _classify(blob)
         proc = _process(blob, st)
