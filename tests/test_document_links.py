@@ -58,6 +58,19 @@ def test_walled_rod_image_vendors_excluded():
     assert urls == ["https://county.gov/notices/notice-of-sale-1.pdf"]
 
 
+def test_harvest_catches_wp_download_manager_data_downloadurl():
+    """WP Download Manager (used by Swain County NC's "Notice of Foreclosure
+    Sales" page, among other .gov sites) renders a JS-triggered button whose
+    visible href is '#' -- the real file lives only in data-downloadurl."""
+    html = (
+        '<a class="download-on-click" href="#" '
+        'data-downloadurl="https://county.gov/download/tax-notice-of-foreclosure/'
+        '?wpdmdl=9278&refresh=abc123">Download</a>'
+    )
+    urls = harvest_document_links(html, base_url="https://county.gov/x")
+    assert urls == ["https://county.gov/download/tax-notice-of-foreclosure/?wpdmdl=9278&refresh=abc123"]
+
+
 def test_stamp_respects_existing_doc_field():
     li = _li()
     li.raw = {"deed_url": "https://already/set.pdf"}

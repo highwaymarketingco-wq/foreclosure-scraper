@@ -570,6 +570,11 @@ DATELESS_OK_SOURCES = {
     # lead (case number + parcel + address are already public), same
     # reasoning as Wake/Edgecombe above.
     "counties_nc.stokes_delinquent_tax",
+    # The scanned notice PDF this scraper stamps for doc-OCR carries no
+    # structured sale_date of its own (fixed 2026-10-01 -- see the module
+    # docstring); the lead is "a current notice exists, pending OCR", not a
+    # scheduled event.
+    "counties_nc.swain_tax_foreclosures",
     # A freshly-filed foreclosure summons has no sale date yet (the case has
     # only just been filed) -- same reasoning as sc_public_index_lis_pendens
     # above: filed but no sale date yet is a real, valid early-warning signal,

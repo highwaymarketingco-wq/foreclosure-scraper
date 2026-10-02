@@ -59,7 +59,14 @@ def harvest_document_links(html: str, base_url: str = "") -> list[str]:
     if not html:
         return []
     out: list[str] = []
-    for m in re.finditer(r"""(?:href|src|data-url|data-href)\s*=\s*["']([^"'>\s]+)["']""", html, re.I):
+    # data-downloadurl: the WP Download Manager plugin's real-file link (e.g.
+    # Swain County NC's "Notice of Foreclosure Sales" page) -- the visible
+    # <a href="#"> is a JS-triggered button; the actual URL only exists in
+    # this attribute. Found 2026-10-01 auditing counties_nc.swain_tax_foreclosures.
+    for m in re.finditer(
+        r"""(?:href|src|data-url|data-href|data-downloadurl)\s*=\s*["']([^"'>\s]+)["']""",
+        html, re.I,
+    ):
         u = m.group(1).strip()
         if not u or u.startswith(("#", "javascript:", "mailto:", "data:")):
             continue
