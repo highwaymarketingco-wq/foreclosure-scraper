@@ -106,10 +106,26 @@ def _surname_first_reading(owner_name: str):
     return orderings[1] if len(orderings) > 1 else orderings[0]
 
 
+def _is_entity_like(li: Listing) -> bool:
+    """True when li.owner_name reads as anything other than an individual.
+
+    Prefers the persisted raw['entity_type'] (enrichment_entity_type.py,
+    main.py's phase sequence runs it before this enricher) over recomputing
+    is_entity() -- falls back to a fresh compute when the field is absent, so
+    a standalone/offline call into this module (e.g. the dry-run its own
+    module docstring describes) still works unchanged on listings that never
+    passed through that phase."""
+    raw = li.raw if isinstance(li.raw, dict) else None
+    entity_type = raw.get("entity_type") if raw else None
+    if entity_type is not None:
+        return entity_type != "individual"
+    return is_entity(li.owner_name)
+
+
 def _cluster_key(li: Listing) -> tuple[str, str, str, str] | None:
     if not li.owner_name or not li.county or not li.state:
         return None
-    if is_entity(li.owner_name) or _NOT_A_PERSON.search(li.owner_name):
+    if _is_entity_like(li) or _NOT_A_PERSON.search(li.owner_name):
         return None
     person = _surname_first_reading(li.owner_name)
     if person is None or not person.given:

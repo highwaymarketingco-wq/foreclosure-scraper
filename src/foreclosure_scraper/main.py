@@ -3099,6 +3099,22 @@ async def run() -> int:
     except Exception:
         log.error("court_owner_verify.failed", traceback=traceback.format_exc())
 
+    # Owner entity-type classification (individual/entity/trust/estate/government) —
+    # computed ONCE here and persisted to raw['entity_type'] so the ~10 call sites that
+    # used to recompute name_normalize.is_entity() independently can read it instead.
+    # Deliberately placed AFTER every owner_name-mutating phase above (enrich_gis,
+    # enrich_gis_attrs, enrich_lrcpwa_parcel, enrich_promote_owner, and
+    # enrich_court_owner_verify just above, which runs latest of all of them) so the
+    # persisted value reflects the FINAL owner_name for this run. See
+    # enrichment_entity_type.py's module docstring for the full call-site audit.
+    try:
+        from .enrichment_entity_type import enrich_entity_type
+        s = enrich_entity_type(enriched)
+        if s:
+            enrichment_stats["entity_type"] = s
+    except Exception:
+        log.error("entity_type.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     valuation_failures = 0
     for li in enriched:

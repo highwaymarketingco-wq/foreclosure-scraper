@@ -124,6 +124,63 @@ def is_entity(name: Optional[str]) -> bool:
     return bool(_ENTITY_MARKERS & set(_raw_tokens(name)))
 
 
+# ---------------------------------------------------------------------------
+# entity_type classification (richer than is_entity()'s flat True/False)
+# ---------------------------------------------------------------------------
+# is_entity() only answers "does this read as ANY kind of entity" with one
+# yes/no, by design (every one of its ~10 call sites across the codebase
+# needs exactly that). classify_entity_type() answers the richer "WHAT KIND"
+# question the persisted raw['entity_type'] field (enrichment_entity_type.py)
+# needs. It calls is_entity() internally rather than re-implementing it, and
+# adds two categories is_entity() does not distinguish at all -- estate and
+# government -- mirroring the supplemental heuristics
+# enrichment_sc_phone.owner_is_non_person() and enrichment_owner_cluster.
+# _NOT_A_PERSON already carry independently (both documented in their own
+# files as deliberate additions on top of is_entity(), not a disagreement
+# with it) instead of inventing a third, different word list.
+_ESTATE_MARKERS = {"ESTATE", "HEIRS", "HEIR", "DECEASED", "DECD"}
+_GOV_TOKENS = {"COUNTY"}
+_GOV_OF_RE = re.compile(r"\b(?:CITY|TOWN|STATE|VILLAGE)\s+OF\b")
+# AUTHORITY/AUTHORITY and DISTRICT are already in _ENTITY_MARKERS (so
+# is_entity() already returns True for them); checked here FIRST so a
+# housing/school/fire authority or district reads as 'government' rather than
+# falling into the flat 'entity' bucket below.
+_GOV_ENTITY_MARKERS = {"AUTHORITY", "DISTRICT"}
+
+
+def classify_entity_type(name: Optional[str]) -> str:
+    """'individual' | 'entity' | 'trust' | 'estate' | 'government' | 'unknown'.
+
+    'unknown' only for an empty/missing name -- never a guess. 'entity' is the
+    flat LLC/Inc/Corp/bank/church/... bucket is_entity() detects; the marker-set
+    approach cannot tell a specific entity TYPE apart (an LLC from a
+    foundation from a partnership), so this does not pretend to either.
+    """
+    toks = _raw_tokens(name)
+    if not toks:
+        return "unknown"
+    tokset = set(toks)
+
+    if "TRUST" in tokset:
+        return "trust"
+
+    # "LIFE ESTATE" is an interest held by a LIVING person, not a decedent's
+    # estate -- same exception enrichment_sc_phone.owner_is_non_person applies.
+    live_toks = [t for i, t in enumerate(toks)
+                 if not (t == "ESTATE" and i > 0 and toks[i - 1] == "LIFE")]
+    if _ESTATE_MARKERS & set(live_toks):
+        return "estate"
+
+    raw_upper = str(name or "").upper()
+    if (tokset & _GOV_TOKENS) or _GOV_OF_RE.search(raw_upper) or (tokset & _GOV_ENTITY_MARKERS):
+        return "government"
+
+    if is_entity(name):
+        return "entity"
+
+    return "individual"
+
+
 def core_tokens(name: Optional[str], *, keep_initials: bool = False) -> list[str]:
     """Identity-bearing tokens: no titles, generational/entity suffixes,
     boilerplate, or bare initials. Order preserved, duplicates dropped."""

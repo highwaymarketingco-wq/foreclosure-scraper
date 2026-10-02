@@ -2292,6 +2292,11 @@ RAW_KEEP = {
                                   # are already first-class Listing fields; this is the supporting raw)
     "nc_county_tax_foreclosure": "*",  # county tag alongside the first-class tax_sale_status/upset_bid_deadline
 
+    # 2026-10-02 entity_type gap closure (docs/HANDOFF.md): one shared classification of
+    # owner_name (individual/entity/trust/estate/government/unknown), computed once by
+    # enrichment_entity_type.py instead of recomputed independently by ~10 call sites.
+    "entity_type": "*",
+
 }
 
 
