@@ -207,12 +207,34 @@ _SALE_DATE_FALLBACK = re.compile(
     re.I,
 )
 
-# Record owner(s) — stop at the next label or a comma-clause boundary.
+# Record owner(s) — stop at the next label or a comma-clause boundary. Also
+# stop at a closing paren: a common live template reads "...Deed of Trust
+# made by Robert R. Taylor (Deceased) (PRESENT RECORD OWNER(S): Robert R.
+# Taylor) to Jennifer Grant, Trustee(s)..." -- found live 2026-10-01 on Burke
+# County notices (a large share of that county's 41 live foreclosure
+# notices use this exact parenthetical form). Before adding `\)` as a stop
+# token, the capture had no label/EOL boundary to latch onto before hitting
+# the disallowed ")" character, so the WHOLE match failed and owner_name was
+# silently None even though the name is right there, explicitly re-labelled.
 _RECORD_OWNERS = re.compile(
     r"Record Owner(?:\(s\)|s)?[:\s]*"
     r"([A-Z][A-Za-z.,'&/\- ]+?)"
-    r"(?=\s+(?:Address of Property|Property Address|ADDRESS|Deed of Trust|"
+    r"(?=\)|\s+(?:Address of Property|Property Address|ADDRESS|Deed of Trust|"
     r"CONDITIONS|Place of Sale|Description of Property)\b|,?\s*$)",
+    re.I,
+)
+# Fallback for notices with NO "Record Owner(s)" label at all -- the owner is
+# named only as the grantor of the foreclosed Deed of Trust ("...executed and
+# delivered by Kenneth Sprouse and Adele Sprouse dated..."). Found live
+# 2026-10-01: a real, non-trivial share of Burke County's "SUBSTITUTE
+# TRUSTEE'S ... NOTICE OF SALE" bodies use only this prose form. Same proven
+# pattern already used in _townnews.py / coastland_times.py for the identical
+# NC Deed-of-Trust grantor clause.
+_GRANTOR_RE = re.compile(
+    r"(?:executed(?:\s+and\s+delivered)?|made)\s+by\s+"
+    r"([A-Z][A-Za-z0-9.'\- ]{2,70}?)"
+    r"(?:\s*\(|,|;|\s+(?:dated|to\s+[A-Z]|and\s+recorded|in\s+favor|"
+    r"as\s+grantor|Trustee)|$)",
     re.I,
 )
 
@@ -254,16 +276,34 @@ _PROPERTY_ADDRESS = re.compile(
     r"(\d+[A-Za-z0-9 .,'#\-]+?,\s*[A-Za-z .]+,\s*NC\s*\d{5})",
     re.I,
 )
+# Also stop at a parenthetical aside ("149 Shenandoah Drive (PIN
+# 1630-21-5228)...") or a direct "PIN" label with no other boundary before
+# it. Found live 2026-10-01 on Rutherford County: the opening "(" isn't in
+# the capture's character class, and neither alternative stop word occurred
+# before it, so the whole match failed and street_address was silently None
+# even on a notice that states the address cleanly up front.
 _ADDRESS_OF_PROPERTY = re.compile(
     r"Address of Property[:\s]*"
     r"(\d+[A-Za-z0-9 .,'#\-]+?)"
-    r"(?=\s+(?:CONDITIONS|Deed of Trust|Description|Record Owner|$))",
+    r"(?=\s*\(|\s+(?:CONDITIONS|Deed of Trust|Description|Record Owner|PIN)\b|,?\s*$)",
     re.I,
 )
 # Hutchens "ADDRESS/LOCATION: 1245 Harrison Loop, ..." form.
 _ADDRESS_LOCATION = re.compile(
     r"ADDRESS\s*/?\s*LOCATION[:\s]*"
     r"(\d+[A-Za-z0-9 .,'#\-]+?)(?=\s+(?:Present Record|Deed|Trustee|$))",
+    re.I,
+)
+# Prose fallback for notices with NO address label at all (none of the three
+# above): "...Together with improvements located thereon; said property
+# being located at 2101 Wildwood Drive, Hickory, North Carolina." Found live
+# 2026-10-01: 13 of 25 Burke County notices missing a street_address used
+# this exact Substitute Trustee Services / Hutchens-affiliate phrasing, with
+# the address sitting in plain prose near the end of the legal description.
+# Same proven pattern already used in _townnews.py / coastland_times.py.
+_LOCATED_AT = re.compile(
+    r"located\s+at\s+(\d{1,6}\s+[A-Za-z0-9][\w .'\-]*?),\s*"
+    r"([A-Za-z][A-Za-z .'\-]+?),\s*(?:North Carolina|NC)\b",
     re.I,
 )
 
@@ -463,6 +503,12 @@ def _parse_nc_foreclosure(text: str) -> dict:
     m = _RECORD_OWNERS.search(t)
     if m:
         out["owner_name"] = _clean_name(m.group(1))
+    if not out.get("owner_name"):
+        m = _GRANTOR_RE.search(t)
+        if m:
+            cand = _clean_name(m.group(1))
+            if cand:
+                out["owner_name"] = cand
 
     # Trustee — the clean value is the header "Trustee: <Name>" form; the
     # bottom-of-notice "..., Substitute Trustee <FirmName>" is the signature
@@ -503,6 +549,15 @@ def _parse_nc_foreclosure(text: str) -> dict:
         out["street_address"] = street
         out["city"] = city
         out["zip_code"] = zip_code
+    else:
+        # No labelled address at all -- fall back to the "...said property
+        # being located at <street>, <city>, North Carolina" prose form.
+        m = _LOCATED_AT.search(t)
+        if m:
+            out["street_address"] = m.group(1).strip().rstrip(".,")
+            cand_city = m.group(2).strip().rstrip(".,")
+            if 2 <= len(cand_city) <= 40:
+                out["city"] = cand_city
 
     m = _PIN.search(t)
     if m:
