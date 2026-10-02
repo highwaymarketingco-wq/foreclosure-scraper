@@ -9,6 +9,25 @@ property cards. No login required for basic search results (detail pages
 may require a free account, but the search results page has enough data).
 
 Free, public. Uses impersonation for Cloudflare/TLS fingerprint matching.
+
+DISABLED 2026-10-01 (national/reo per-source audit): confirmed live, both
+ways this module reaches LoopNet are dead --
+  * https://www.loopnet.com/ itself (and /north-carolina/commercial-real-
+    estate-for-sale/) returns HTTP 403 via curl_cffi Chrome impersonation --
+    an active WAF block, not a fingerprint-only gate curl_cffi can clear.
+  * Every per-city URL this module actually requests
+    (/<city>-<state>/commercial-real-estate/, all 10 footprint cities
+    tested) returns HTTP 404 -- the URL pattern itself no longer exists on
+    the live site, a platform redesign since this module was written.
+This reconfirms docs/HERMES.md Section 12's existing CANT entry ("LoopNet
+res+MF / auction.com MF (403/login -> Crexi is the only free MF)") for the
+commercial channel too. Separately (not the reason for disabling, but worth
+noting for any future rebuild against a real URL): this module's fallback
+path free-text-scans flattened body text for an address-shaped string within
+500 chars of a distress keyword with no structural card requirement -- the
+same "keyword matching catches boilerplate" pattern this audit found and
+fixed elsewhere, and would need hardening before re-enabling even once a
+live URL exists again.
 """
 from __future__ import annotations
 
@@ -67,6 +86,13 @@ class LoopNetScraper(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 180.0
+    disabled = True
+    disabled_reason = (
+        "confirmed live 2026-10-01: loopnet.com homepage is HTTP 403 "
+        "(active WAF block) and every per-city URL this module requests is "
+        "HTTP 404 (dead URL pattern, platform redesign); reconfirms "
+        "docs/HERMES.md Section 12's existing LoopNet CANT entry"
+    )
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
