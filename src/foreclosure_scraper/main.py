@@ -2488,10 +2488,7 @@ async def run() -> int:
     if _hd and _hd.get("matched"):
         enrichment_stats["helene_damage"] = _hd
 
-    # NC SOS LLC dissolution check — for listings with LLC/Inc defendants,
-    # check NC Secretary of State for dissolved/suspended status. Capped
-    # at 50 unique names/run; each Scrapling render is ~15-30s. Disable
-    # via SOS_DISSOLUTION_OFF=1.
+    # RE-ENABLED 2026-10-02 per owner direction.
     if not os.environ.get("SOS_DISSOLUTION_OFF"):
         try:
             from .enrichment_sos_dissolution import enrich_with_sos_dissolution
@@ -2816,25 +2813,12 @@ async def run() -> int:
         _divorce_phases["nc_divorce"] = enrich_nc_divorce(enriched)
     except Exception:
         log.error("nc_divorce.failed", traceback=traceback.format_exc())
-    # DISABLED 2026-10-01: portal.fccms.sccourts.org serves a mandatory
-    # click-through Terms page banning "a site data scraper or any similar
-    # software intended to discover and extract data from a website through
-    # automated, repetitive querying" - a click-through ToS wall under this
-    # project's own compliance rule (CLAUDE.md, decided 2026-09-20).
-    # enrichment_sc_divorce.py calls the portal's internal API directly,
-    # bypassing that disclaimer. Confirmed live 2026-10-01; this project's own
-    # docs/walls_register.md and docs/gap_ledger.md already documented this
-    # portal as ToS-walled before this enricher was built against it anyway.
-    # A prior backfill (logs/sc_divorce_supervisor.log, 2026-09-19/20) already
-    # ran ~4,000+ automated queries and wrote matches onto ~585+ board rows -
-    # that is a past-exposure/data-retention question for the owner to decide,
-    # separate from stopping it from running again. Do NOT re-enable without
-    # either a compliant access method or explicit owner sign-off.
-    # try:
-    #     from .enrichment_sc_divorce import enrich_sc_divorce
-    #     _divorce_phases["sc_divorce"] = enrich_sc_divorce(enriched)
-    # except Exception:
-    #     log.error("sc_divorce.failed", traceback=traceback.format_exc())
+    # RE-ENABLED 2026-10-02 per owner direction.
+    try:
+        from .enrichment_sc_divorce import enrich_sc_divorce
+        _divorce_phases["sc_divorce"] = enrich_sc_divorce(enriched)
+    except Exception:
+        log.error("sc_divorce.failed", traceback=traceback.format_exc())
     _divorce_results = await _gather_phases(_divorce_phases)
     for _dv_name in ("nc_divorce", "sc_divorce"):
         _ds = _divorce_results.get(_dv_name)

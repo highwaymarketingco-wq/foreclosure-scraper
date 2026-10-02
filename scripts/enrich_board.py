@@ -497,7 +497,7 @@ async def main():
     except ImportError:
         print("  [dew_liens] SKIP - module not found")
 
-    # 3e. SOS dissolution (NC SOS, free)
+    # 3e. SOS dissolution (NC SOS, free) - RE-ENABLED 2026-10-02 per owner direction.
     from foreclosure_scraper.enrichment_sos_dissolution import enrich_with_sos_dissolution
     print("  [sos_dissolution]...", end=" ", flush=True)
     try:
