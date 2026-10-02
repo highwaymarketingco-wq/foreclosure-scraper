@@ -52,8 +52,38 @@ BBOXES = (
 
 # Grid subdivision: split each state bbox into NxM cells to stay under the
 # 400-per-request API cap. Tuned so no cell in NC/SC exceeds ~200 results.
+#
+# That tuning assumption is STALE -- confirmed live 2026-10-01 (national/reo
+# per-source audit): 13 of the 32 current NC+SC cells return EXACTLY 400
+# properties (the hard per-request cap), several of them 400 on the nose,
+# which is precisely the "a round number is a cap until proven otherwise"
+# smell CLAUDE.md calls out by name. _fetch_bbox now pages within each cell
+# (see MAX_PAGES_PER_CELL below) instead of trusting a single page=1 request
+# to be the whole cell.
 _GRID_ROWS = 4
 _GRID_COLS = 4
+
+# A single page's hard cap, confirmed live 2026-10-01 (every request, every
+# cell, regardless of the pageSize value sent). Used to detect "this page was
+# full, there may be more" rather than hardcoding 400 in two places.
+_PAGE_CAP = 400
+# Safety ceiling on pages fetched per cell.
+#
+# MEASURED 2026-10-01, live: on a saturated cell, repeated paging is NOT a
+# stable non-overlapping offset (the API shuffles results -- the same top
+# property reappeared on all 15 pages tried), so each extra page has
+# diminishing but real returns: a live union-of-distinct-propertyUuids probe
+# on one cell went 400 -> 544 -> 638 -> 658 -> 667 -> 671 (pages 1-6), i.e.
+# most of the easy gain lands in the first few pages. Raising this past 4
+# was tried first (10) and MEASURED to regress the whole scraper: 32 cells
+# each doing up to 10 sequential pages blew the then-150s timeout_s, and
+# self.partial salvaged only 83 rows -- far WORSE than the pre-fix baseline
+# (thousands of rows, OUTCOME_OK, finishing in ~30-50s) despite the fix
+# being individually correct. 4 pages/cell (1,600 theoretical ceiling per
+# cell) plus the timeout_s increase below keeps a full run finishing
+# OUTCOME_OK while still recovering most of the previously-lost rows on
+# saturated cells.
+MAX_PAGES_PER_CELL = 4
 
 
 def _subdivide(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float,
@@ -143,30 +173,68 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
 
 
 async def _fetch_bbox(state: str, sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float, slug: str) -> list[Listing]:
-    params = {"bounds": f"{sw_lat},{sw_lng},{ne_lat},{ne_lng}"}
-    async with client(timeout=30.0) as c:
-        try:
-            r = await c.get(API, params=params, headers=HEADERS, follow_redirects=True)
-        except Exception as exc:
-            log.warning("fannie_homepath.fetch_failed", state=state, error=str(exc)[:200])
-            return []
-    if r.status_code != 200:
-        log.warning("fannie_homepath.bad_status", state=state, code=r.status_code)
-        return []
-    try:
-        payload = r.json()
-    except Exception:
-        return []
-    props = payload.get("properties") or []
+    """Fetch one grid cell, paginating with page=N for as long as a page
+    comes back full (== _PAGE_CAP) -- a full page means the cell may hold
+    more than one request's worth. Confirmed live 2026-10-01: with `bounds`
+    present, `page` genuinely returns distinct, correctly geo-filtered
+    results (unlike the sibling national.homepath_json's confirmed-broken
+    bare state/zipcode/page call, which the API silently ignores -- bounds
+    is what makes page real).
+
+    The API's pagination is NOT a stable, non-overlapping offset -- confirmed
+    live on a saturated cell: the top-ranked property reappeared on every one
+    of 15 consecutive pages, and consecutive pages overlapped 40-70% rather
+    than being disjoint. It does still surface real NEW properties as paging
+    continues (a 15-page live probe found the union of distinct propertyUuids
+    growing from 400 -> 915 with diminishing but nonzero new-per-page counts,
+    not a hard plateau at 400), so paging past page 1 is still a real net
+    gain -- it just means this function must dedupe by propertyUuid WITHIN a
+    cell itself, not only rely on the caller's cross-cell dedup."""
+    bounds = f"{sw_lat},{sw_lng},{ne_lat},{ne_lng}"
     out: list[Listing] = []
-    for p in props:
-        li = _to_listing(p, slug)
-        if li is not None:
-            out.append(li)
+    seen_uuid: set[str] = set()
+    total_in_bbox = 0
+    nationwide_total = None
+    async with client(timeout=30.0) as c:
+        for page in range(1, MAX_PAGES_PER_CELL + 1):
+            params = {"bounds": bounds, "page": str(page)}
+            try:
+                r = await c.get(API, params=params, headers=HEADERS, follow_redirects=True)
+            except Exception as exc:
+                log.warning("fannie_homepath.fetch_failed", state=state, page=page,
+                            error=str(exc)[:200])
+                break
+            if r.status_code != 200:
+                log.warning("fannie_homepath.bad_status", state=state, page=page,
+                            code=r.status_code)
+                break
+            try:
+                payload = r.json()
+            except Exception:
+                break
+            props = payload.get("properties") or []
+            total_in_bbox += len(props)
+            for p in props:
+                uuid = p.get("propertyUuid") or p.get("reoId") or p.get("mlsId")
+                if uuid and uuid in seen_uuid:
+                    continue
+                li = _to_listing(p, slug)
+                if li is None:
+                    continue
+                if uuid:
+                    seen_uuid.add(uuid)
+                out.append(li)
+            if page == 1:
+                nationwide_total = payload.get("totalProperties")
+            if len(props) < _PAGE_CAP:
+                break  # a short page is the last page
+            log.info("fannie_homepath.cell_page_full", state=state, page=page,
+                      props=len(props), cap=_PAGE_CAP,
+                      note="page was full, fetching page+1 in case the cell has more")
     log.info(
         "fannie_homepath.bbox_done", state=state,
-        in_bbox=len(props), kept_in_state=len(out),
-        total_nationwide=payload.get("totalProperties"),
+        in_bbox=total_in_bbox, kept_in_state=len(out),
+        total_nationwide=nationwide_total,
     )
     return out
 
@@ -196,9 +264,21 @@ class FannieHomePath(BaseScraper):
     # SAME sweep inside scripts/daily_api_refresh.py's 14-way asyncio.gather timed out at
     # 60s every day (network/event-loop contention from the other 13 scrapers running at
     # once), so this source read 0 and was carried over daily -- defeating the refresh's
-    # stated purpose of clearing sold REO 404s (audit 2026-09-21, O6). 150s gives headroom
-    # under contention without meaningfully extending the API-refresh phase's 5400s budget.
-    timeout_s = 150.0
+    # stated purpose of clearing sold REO 404s (audit 2026-09-21, O6).
+    #
+    # 2026-10-01 (national/reo per-source audit): _fetch_bbox now pages within
+    # a saturated cell (MAX_PAGES_PER_CELL, see its own comment for why the
+    # old single-page-per-cell approach silently dropped real rows on 13 of
+    # 32 cells hitting the 400 cap). MEASURED live, run alone: a full sweep
+    # now takes ~152s (up from 53s) and returns 10,186 rows (up from the old
+    # single-page ceiling's 8,277) with zero duplicates. First tried
+    # MAX_PAGES_PER_CELL=10, which MEASURED at 150s+ and only salvaged 83
+    # rows via timeout -- worse than doing nothing. 4 pages/cell plus 300s
+    # here (roughly 2x the clean-run measurement, matching this project's
+    # usual contention margin, e.g. national.homepath_json's ~110s clean run
+    # -> 240s timeout_s) is the balance that was actually measured to finish
+    # OUTCOME_OK rather than degrade to a timeout-salvaged partial.
+    timeout_s = 300.0
 
     async def fetch(self) -> Iterable[Listing]:
         # Bank rows into self.partial PER CELL, as each of the 32 bbox fetches
