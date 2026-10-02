@@ -359,6 +359,16 @@ _CONTEXT_ONLY_DISTRESSED_SOURCES = frozenset({
     # environmental and dam registries: regulated facilities, mostly commercial, not owner pressure
     "nc_ust_incidents", "sc_ust_registry", "nc_dam_safety", "nc_inactive_hazardous",
     "sc_des_brownfields", "sems", "acres",
+    # 2026-10-01 Pattern-A sweep: nc_land_use_restrictions is the FOURTH registry in
+    # state_contamination.py's own REGISTRIES tuple -- the sibling of nc_ust_incidents/
+    # nc_dam_safety/nc_inactive_hazardous right above, built from the exact same file,
+    # the exact same Registry() shape, and the exact same "WHY THIS IS A DISTRESS
+    # SIGNAL" framing in the module docstring ("A recorded restriction that runs with
+    # the land" -- a legal encumbrance on the deed, not a measured fact about the
+    # building's physical condition). It was present in the tuple from the start but
+    # missing from this set, so it alone of the four kept scoring a full-confidence
+    # PROPERTY signal off a land-use-restriction filing.
+    "nc_land_use_restrictions",
     # federal contract and listing records with no condition evidence
     "hud_section8_contracts", "crexi_multifamily",
     # hazard-zone and program context

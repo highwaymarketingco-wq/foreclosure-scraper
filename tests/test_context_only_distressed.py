@@ -26,7 +26,7 @@ def _cats(li):
     "nc_inactive_hazardous", "sc_des_brownfields", "sems", "acres", "hud_section8_contracts",
     "crexi_multifamily", "fema_disasters", "hendersonville_flood_zone_structures",
     "buncombe_hmgp_buyout", "buncombe_county_owned", "laurens_county_owned", "any_new_county_owned",
-    "zombie_properties",
+    "zombie_properties", "nc_land_use_restrictions",
 ])
 def test_context_only_sources_add_no_property_signal(slug):
     li = _lead(f"counties_generic.{slug}")
@@ -97,3 +97,21 @@ def test_zombie_property_with_no_other_facts_scores_nothing():
     li = _lead("counties_sc.zombie_properties", county="Spartanburg",
                raw={"zombie_property": {"months_stalled": 14}})
     assert _cats(li) == set()
+
+
+def test_nc_land_use_restrictions_is_the_missing_fourth_sibling_registry():
+    """2026-10-01 Pattern-A sweep: state_contamination.py's REGISTRIES tuple defines
+    FOUR registries built from the identical Registry() shape and the identical "runs
+    with the land, not a condition fact" rationale -- nc_ust_incidents, nc_dam_safety,
+    nc_inactive_hazardous (already excluded) and nc_land_use_restrictions (the one that
+    was missing). A land-use-restriction filing is a recorded legal encumbrance, not a
+    measured observation of the structure's physical condition, so it must not score
+    PROPERTY either -- same reasoning, same file, same tuple as its three siblings."""
+    li = _lead("counties_generic.state_contamination.nc_land_use_restrictions", county="Transylvania")
+    assert _context_only_distressed(li)
+    assert "PROPERTY" not in _cats(li)
+    # a real condition fact (e.g. a CAMA/code-enforcement finding) on the SAME source
+    # still scores, exactly as it does for its already-excluded siblings.
+    li2 = _lead("counties_generic.state_contamination.nc_land_use_restrictions",
+                county="Transylvania", raw={"distressed": True})
+    assert "PROPERTY" in _cats(li2)
