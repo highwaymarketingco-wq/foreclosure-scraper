@@ -30,6 +30,21 @@ DATELESS_OK_SOURCES entries for "filed but no sale date yet is a real
 early-warning signal, not a data gap." This source needs that same
 whitelist entry (see main.py) or every TBA row gets dropped.
 
+FIXED 2026-10-01 (batch-5 extraction-completeness audit): the accordion row
+links each Tax ID# to its own Account.asp detail page -- already used as
+source_url, but never actually fetched. That detail page (confirmed live)
+carries the owner name(s) (often multiple heirs -- a strong motivated-seller
+signal the accordion never shows at all), the owner's mailing address
+(separate from the property address when absentee), heated square footage,
+acreage, zoning, land class, and the county's assessed land+building value.
+This is exactly the project's #1 documented ceiling (contactability /
+owner-mailing-address) plus the CAMA-specs gap (HERMES Section 9), sitting
+one hop away on a page this scraper already links to but never reads. Fixed
+by best-effort fetching each Account.asp page and promoting these fields
+(same raw['owner_mailing'] shape enrichment_owner_mailing.py itself writes,
+so a listing this scraper already resolved is correctly skipped by that
+enricher's has_mailing() gate instead of being re-resolved over GIS).
+
 Free, public, no login.
 Slug: counties_nc.wake_tax_foreclosure
 Category: county_tax
@@ -37,6 +52,7 @@ ListingType: TAX_SALE
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime
 from typing import Iterable
@@ -87,6 +103,157 @@ def _parse_sale_date(text: str) -> datetime | None:
         except ValueError:
             continue
     return None
+
+
+# --- Account.asp detail-page extraction -------------------------------------
+# Classic-ASP, table-based markup (no semantic classes). Every single-value
+# field shares one shape: "<label></FONT></TD> ... <DIV ALIGN=right>(optional
+# empty FONT)<B><FONT ...>VALUE</FONT></B>(/DIV)</TD>". `.*?` (not `[^<]*`) on
+# the value group because at least one real field (Land Class, "R-<10-HS")
+# contains a literal unescaped "<" in the source HTML -- a `[^<]*` capture
+# would silently truncate at it.
+def _account_field(html: str, label: str) -> str | None:
+    m = re.search(
+        re.escape(label) + r"</FONT></TD>\s*<TD[^>]*>(?:<DIV[^>]*>)?"
+        r"(?:<FONT[^>]*></FONT>)?<B><FONT[^>]*>(.*?)</FONT></B>(?:</DIV>)?</TD>",
+        html, re.I | re.S,
+    )
+    if not m:
+        return None
+    val = re.sub(r"&nbsp;", " ", m.group(1))
+    val = re.sub(r"\s+", " ", val).strip()
+    return val or None
+
+
+def _account_money(html: str, label: str) -> float | None:
+    v = _account_field(html, label)
+    if not v:
+        return None
+    try:
+        return float(v.replace("$", "").replace(",", ""))
+    except ValueError:
+        return None
+
+
+def _account_block_lines(html: str, start_label: str, end_label: str) -> list[str]:
+    """Owner / mailing-address / property-location-address are each a run of
+    sibling `<TR>` rows (one name or address line per row) between two known
+    section labels, not a single-value field. Return the cleaned, non-empty
+    `<B><FONT>` line values in that span, in document order."""
+    start = html.find(start_label)
+    if start == -1:
+        return []
+    end = html.find(end_label, start)
+    chunk = html[start:end] if end != -1 else html[start:start + 2000]
+    lines = re.findall(r"<B>\s*<FONT[^>]*>(.*?)</FONT>\s*</B>", chunk, re.I | re.S)
+    out = []
+    for raw_line in lines:
+        v = re.sub(r"&nbsp;", " ", raw_line)
+        v = re.sub(r"\s+", " ", v).strip()
+        if v:
+            out.append(v)
+    return out
+
+
+#: Account.asp fetches are cheap (one tiny classic-ASP page per property) and
+#: this source typically has only a handful of active foreclosures at once,
+#: but still bounded so a future bulk relist can't blow up the run.
+_MAX_DETAIL_FETCH = 60
+
+
+async def _enrich_from_account_page(li: Listing) -> None:
+    """Best-effort fetch this property's own Account.asp detail page and
+    promote owner / mailing / CAMA-spec fields the accordion list never
+    carries at all. Never raises -- a failure just leaves the row as the
+    accordion alone produced it."""
+    try:
+        html = await get_text(li.source_url, impersonate=True, timeout=30.0)
+    except Exception as exc:  # noqa: BLE001 — enrichment is best-effort
+        log.info("wake_tax.account_fetch_failed", url=li.source_url, error=str(exc)[:160])
+        return
+    if not html or "Property Owner" not in html:
+        return
+
+    owners = _account_block_lines(html, "Property Owner", "Owner's Mailing Address")
+    # Drop the page's own boilerplate aside, not a real owner line.
+    owners = [o for o in owners if "deeds link" not in o.lower()]
+    mailing_lines = _account_block_lines(html, "Owner's Mailing Address", "Property Location Address")
+    situs_lines = _account_block_lines(html, "Property Location Address", "Administrative Data")
+
+    owner = "; ".join(owners) or None
+    mailing = ", ".join(mailing_lines) or None
+    situs = ", ".join(situs_lines) or None
+
+    acreage_s = _account_field(html, "Acreage")
+    zoning = _account_field(html, "Zoning")
+    land_class = _account_field(html, "Land Class")
+    heated_area_s = _account_field(html, "Heated Area")
+    deed_date = _account_field(html, "Deed Date")
+    book_page = _account_field(html, "Book &amp; Page") or _account_field(html, "Book & Page")
+    land_value = _account_money(html, "Land Value Assessed")
+    bldg_value = _account_money(html, "Bldg. Value Assessed")
+    total_value = _account_money(html, "Total Value Assessed*") or _account_money(html, "Total Value Assessed")
+
+    if owner and not li.owner_name:
+        li.owner_name = owner
+    if zoning and not li.zoning:
+        li.zoning = zoning
+    if acreage_s:
+        try:
+            if not li.acreage:
+                li.acreage = float(acreage_s)
+        except ValueError:
+            pass
+    if heated_area_s:
+        try:
+            sqft = float(heated_area_s.replace(",", ""))
+            if sqft and not li.living_sqft:
+                li.living_sqft = sqft
+        except ValueError:
+            pass
+    if total_value:
+        if not li.assessed_value:
+            li.assessed_value = total_value
+        if not li.market_value:
+            li.market_value = total_value
+
+    # Mailing-address block in the exact shape enrichment_owner_mailing.py's
+    # own has_mailing()/is_target() gate checks for, so a property this
+    # scraper already resolved from the primary source is correctly skipped
+    # by that enricher instead of being re-resolved (and possibly missed)
+    # over county GIS.
+    if owner or mailing:
+        mail_state = None
+        if mailing:
+            sm = re.search(r"\b([A-Z]{2})\s+\d{5}", mailing)
+            mail_state = sm.group(1) if sm else None
+        absentee = bool(mailing and situs and mailing.replace(" ", "").upper()
+                        != situs.replace(" ", "").upper())
+        li.raw["owner_mailing"] = {
+            "owner": owner,
+            "mailing": mailing,
+            "situs": situs,
+            "parcel_id": li.parcel_id,
+            "mail_state": mail_state,
+            "absentee": absentee,
+            "out_of_state": bool(mail_state and li.state and mail_state != li.state),
+            "source": "wake_account_detail",
+        }
+
+    li.raw.setdefault("wake_tax_foreclosure", {}).update({
+        "owners": owners,
+        "mailing_address": mailing,
+        "property_location_address": situs,
+        "acreage": acreage_s,
+        "zoning": zoning,
+        "land_class": land_class,
+        "heated_area_sqft": heated_area_s,
+        "deed_date": deed_date,
+        "book_page": book_page,
+        "land_value_assessed": land_value,
+        "bldg_value_assessed": bldg_value,
+        "total_value_assessed": total_value,
+    })
 
 
 class WakeTaxForeclosure(BaseScraper):
@@ -146,5 +313,12 @@ class WakeTaxForeclosure(BaseScraper):
                     }},
                 ))
 
-        log.info("wake_tax.done", count=len(out))
+        if out:
+            await asyncio.gather(
+                *(_enrich_from_account_page(li) for li in out[:_MAX_DETAIL_FETCH]),
+                return_exceptions=True,
+            )
+
+        log.info("wake_tax.done", count=len(out),
+                 with_owner=sum(1 for li in out if li.owner_name))
         return out
