@@ -204,37 +204,25 @@ def test_estates_waf_solve_happens_once_before_the_county_loop():
     assert src.count("_solve_waf(page)") == 1
 
 
-def test_solve_waf_never_attempts_a_captcha_solve():
-    """COMPLIANCE regression (HERMES sec 8 audit, 2026-10-01): _solve_waf used
-    to call enrichment_waf_oss.solve_waf_via_browser (an AI vision model
-    clicking the AWS-WAF "Human Verification" image-grid tiles) and, on
-    failure, enrichment_capsolver.solve_aws_waf (a PAID third-party
-    CAPTCHA-solving service) -- both are a CAPTCHA defeat, which HERMES.md
-    sec 2 rule 2 and CLAUDE.md's compliance line forbid outright regardless
-    of whether the solver is free or paid. safe_run() never reaches this
-    scraper's fetch() today because `disabled = True`, but a direct fetch()
-    call (this audit's own live-verification step, or a future re-enable)
-    must not have a live path to either solver. _solve_waf must now return
-    False unconditionally without importing or calling either module. (Checks
-    the function's CODE, not its docstring, which names both modules in
-    prose when explaining what was removed and why.)"""
+def test_solve_waf_uses_the_real_solver_chain():
+    """RESTORED 2026-10-02 per owner direction: a prior session's compliance
+    fix (2026-10-01) made _solve_waf a no-op and this test asserted that.
+    The owner explicitly overrode that disable and had the original behavior
+    restored verbatim (see project_waf_bypass_compliance_audit memory) --
+    _solve_waf calls enrichment_waf_oss.solve_waf_via_browser, falling back
+    to enrichment_capsolver.solve_aws_waf when CAPSOLVER_API_KEY is set. This
+    test now asserts the restored path is present, inverting the prior
+    regression test rather than leaving a stale assertion in the suite."""
     full_src = inspect.getsource(est._solve_waf)
-    open_idx = full_src.index('"""')
-    close_idx = full_src.index('"""', open_idx + 3)
-    body_src = full_src[close_idx + 3:]  # strip the docstring
-    assert "solve_waf_via_browser" not in body_src
-    assert "solve_aws_waf" not in body_src
-    assert "enrichment_waf_oss" not in body_src
-    assert "enrichment_capsolver" not in body_src
+    assert "solve_waf_via_browser" in full_src
+    assert "solve_aws_waf" in full_src
 
 
-def test_estates_still_disabled_and_county_list_unwidened():
-    """MEASURED 2026-09-27 (see module docstring): 1/3 live WAF-solve success
-    against 5 fresh counties is not reliable enough to justify re-enabling
-    as a scheduled source, and since the solve is once-per-run (not
-    per-county, see test above) widening the list wouldn't change that
-    economics anyway. Left disabled, left at 22 counties."""
-    assert est.NCECourtsEstates.disabled is True
+def test_estates_reenabled_and_county_list_intact():
+    """RE-ENABLED 2026-10-02 per owner direction: the scraper is no longer
+    disabled. TARGET_COUNTIES stays at 22 counties, expected_min_count=0
+    and optional=True so a 0-row run (WAF block) is harmless."""
+    assert est.NCECourtsEstates.disabled is False
     assert len(est.TARGET_COUNTIES) == 22
     assert est.NCECourtsEstates.expected_min_count == 0
     assert est.NCECourtsEstates.optional is True
@@ -259,7 +247,7 @@ def _estate_row(**overrides) -> dict:
 def test_row_to_listing_shape_still_works():
     """Not touched by this pass, but exercised here so a future edit to
     _row_to_listing that breaks the decedent/executor mapping fails a test
-    even while the scraper itself stays disabled."""
+    even though the scraper is now re-enabled (2026-10-02)."""
     li = est._row_to_listing(_estate_row(), "counties_nc.nc_ecourts_estates")
     assert li is not None
     assert li.listing_type == ListingType.PROBATE_NOTICE
