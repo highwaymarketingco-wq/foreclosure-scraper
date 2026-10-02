@@ -57,7 +57,7 @@ import structlog
 
 from .mailing_shape import mailing_dict
 from .models import Listing
-from .name_normalize import party_middle_conflict
+from .name_normalize import party_middle_verdict
 from .enrichment_equity import (
     equity_is_evidenced, is_countable_debt, valuation_ran_without_arv,
 )
@@ -220,14 +220,26 @@ _DIVORCE_W_WINDOW = 6
 
 def _divorce_signal(r: dict, today: Optional[date] = None, owner_name: Optional[str] = None) -> Optional[tuple[str, str, int]]:
     """(name, category, weight) from raw['divorce'], or None. A case row with no
-    role is kept (role unknown); a row whose role is not a party role is skipped."""
+    role is kept (role unknown); a row whose role is not a party role is skipped.
+
+    Fixed 2026-10-02: used to score any hit that was not a PROVEN middle-initial
+    conflict, which let 'unverified' hits (46% of all hits -- no middle initial
+    on one side, so nothing corroborates the match either way) through
+    uncorroborated. A live population-scale check against SC's own court index
+    found 0% real matches at n=58/5,052. Tightened to require a POSITIVE
+    middle-initial agreement (`party_middle_verdict(...) == "agrees"`), matching
+    enrichment_sc_divorce._apply's own gate on distress_stack.categories and
+    this project's established convention for a common-name, thin-match signal
+    (name_normalize.party_middle_verdict, also applied today to jail_booking_new
+    and the SC-divorce enricher itself). A row whose owner_name is not even
+    passed in (pre-this-fix callers, if any remain) still gets no signal,
+    same fail-closed direction as before.
+    """
     dv = r.get("divorce")
     if not isinstance(dv, dict) or not dv.get("case_count"):
         return None
-    if owner_name and party_middle_conflict(
-            owner_name, [c.get("parties") for c in (dv.get("cases") or []) if isinstance(c, dict)]):
-        # Same first and last name as the court party but a DIFFERENT middle initial:
-        # another person. 41% of comparable hits were like this (audit 2026-09-21).
+    if party_middle_verdict(
+            owner_name, [c.get("parties") for c in (dv.get("cases") or []) if isinstance(c, dict)]) != "agrees":
         return None
     newest: Optional[date] = None
     for c in dv.get("cases") or []:

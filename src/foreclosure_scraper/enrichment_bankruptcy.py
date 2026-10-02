@@ -40,6 +40,68 @@ long-open) gets `case_age_days` / `case_age_years` / `is_long_open` computed
 from the docket's own date_filed (+ date_terminated when present) via
 `signal_freshness.bankruptcy_case_age` — cheap, since the date was already
 being captured and simply not surfaced as an age signal.
+
+MATCH-ACCURACY FIX (2026-10-02). A live population-scale check found 234
+board rows with comparable owner-name-vs-debtor-case-name data: only 56%
+strong real matches, 38.5% weak/likely-wrong-person, 5.6% a confirmed
+different real person (e.g. property owner "Jones Ray" matched to real
+debtor "Billy Ray Jones" -- a different person sharing one name token).
+Root cause, confirmed by re-reading the matcher AND re-deriving concrete
+examples from the live board (`li.defendant` paired with the `case_name` it
+had actually been matched to): the old "STRICT subset" check below tokenized
+BOTH names into unordered bags (>=3-letter, non-stopword words) and required
+only that every token of the (shorter) defendant name appear SOMEWHERE in the
+case_name's token set -- no position, and for a joint ("X and Y") filing, no
+separation between the two real debtors. Two distinct failure modes, both
+reproduced live:
+  * position-blind: 'DAVIS, DAVID' matched 'Bryan David Davis' -- "David" is
+    Bryan Davis's MIDDLE name, not his first name; 'LEWIS WILLIAM' matched
+    'Lewis William Hedgepeth' -- "Lewis" is Hedgepeth's FIRST name, not his
+    surname.
+  * joint-filer composite phantom (the more severe mode): a joint filing's
+    two debtors were pooled into ONE token set, so tokens from two
+    UNRELATED real people combined into a phantom third name that matched
+    neither debtor: 'JONES, ROBERT' matched 'Robert Curtis Best and Shannon
+    Marie Jones' -- there is no "Robert Jones" anywhere in that case; it is
+    debtor #1's first name plus debtor #2's last name.
+  * cross-state leak: `by_token` pools ALL listings (NC and SC together) and
+    the per-court loop never checked a candidate listing's own `li.state`
+    against the court's state, so an SC listing could match an NC filing (or
+    vice versa) with no jurisdiction check at all.
+
+Fix: `name_normalize.debtor_positional_match` (new) splits a case_name into
+INDIVIDUAL one-person segments on a bare 'and' and requires a POSITIONAL
+first/last match on ONE of them -- never a pooled bag of tokens across joint
+filers. This alone rejects every one of the concrete false positives above
+(position-blind AND composite-phantom), independent of whether either side
+even carries a middle name, and is now a HARD requirement. `_match_filings`
+additionally rejects a PROVEN middle-initial conflict via the sibling
+`debtor_middle_verdict` (a sibling of `party_middle_verdict`, built for the
+SC-divorce party match and also reused today by the jail_booking_new fix),
+plus a hard `_COURT_STATE` check so a court's own state must equal the
+candidate listing's `li.state` (315 of 617 existing matches on the live
+board fail this -- the cross-state leak above is not hypothetical).
+
+NOT required: `debtor_middle_verdict(...) == "agrees"`. Unlike the SC-divorce
+fix (that population's own live court-index check found 0% real matches, so
+divorce requires a POSITIVE middle-initial agreement, full stop),
+bankruptcy's `defendant` field is sourced from tax rolls/GIS and very often
+carries no middle name at all even on a genuinely correct match -- an
+independent live validation of 234 comparable board rows found 56% were
+ALREADY strong, correct matches. Requiring "agrees" outright would reject
+most of those good matches alongside the bad ones (measured: 94% of the 617
+existing matches, overwhelmingly on real positional candidates that simply
+lack a middle on one side -- not evidence of being wrong). So a real
+positional candidate (`debtor_positional_match`) plus "not a proven
+conflict" is the bar here, matching this project's ORIGINAL divorce-gate
+policy (pre-2026-10-02) rather than its newly-tightened one -- see
+`debtor_positional_match`'s own docstring for why the two signals warrant
+different bars despite sharing the same underlying tool.
+
+The old token-subset index (`by_token`) is kept as a cheap, recall-
+preserving CANDIDATE pre-filter only -- every genuine positional match is
+also a bag-of-tokens superset, so nothing real is lost narrowing candidates
+this way; the pre-filter no longer decides the match by itself.
 """
 from __future__ import annotations
 
@@ -55,6 +117,7 @@ import structlog
 
 from .http_client import client
 from .models import Listing
+from .name_normalize import debtor_middle_verdict, debtor_positional_match
 from .scrapers.national.courtlistener_bankruptcy import _normalize_search_hit
 from .signal_freshness import bankruptcy_case_age
 
@@ -64,6 +127,11 @@ API_BASE = "https://www.courtlistener.com/api/rest/v4"
 COURTS = ("ncwb", "nceb", "scb")
 LOOKBACK_DAYS = 180
 PAGE_SIZE = 200
+# A bankruptcy court's state, for the jurisdiction check `_match_filings` now
+# enforces (see module docstring, "MATCH-ACCURACY FIX"): the old matcher
+# pooled every listing (NC + SC) into one global index with no check at all
+# that a candidate listing's own state matched the filing court's state.
+_COURT_STATE = {"ncwb": "NC", "nceb": "NC", "ncmb": "NC", "scb": "SC"}
 
 # --- long-open window: cases FILED 10-15 years ago, per the synthesis's own framing ---
 LONG_OPEN_MIN_YEARS = 10
@@ -325,38 +393,63 @@ async def enrich_with_bankruptcy(listings: list[Listing]) -> None:
             if len(f_toks) < 2:
                 continue
 
-            # Find any listing whose defendant tokens overlap with this
-            # filing's STRICTLY: every distinctive token of the listing's
-            # defendant must appear in the filing's case_name. This kills
-            # the false positives where "Smith Holdings LLC" was matching
-            # "Anderson Holdings LLC" via just two stopword tokens.
-            #
-            # Lazily fetch chapter only when we hit a real match — most
-            # filings don't match anything, so we save ~99% of API calls.
+            # STAGE 1 -- cheap candidate pre-filter (recall, not a decision):
+            # every distinctive token of the listing's defendant must appear
+            # SOMEWHERE in the filing's case_name token bag. This is strictly
+            # necessary for a real positional match (if defendant's first+last
+            # really are the debtor's first+last, both tokens are trivially
+            # present), so it never drops a true positive; it's kept only to
+            # avoid running the positional check below against every listing
+            # for every filing.
             from itertools import combinations
             f_toks_frozen = frozenset(f_toks)
-            hit_listings: set[int] = set()
-            hit_lis_for_chapter: list[Listing] = []
+            candidate_ids: set[int] = set()
+            candidates: list[Listing] = []
             for combo in combinations(sorted(f_toks), 2):
                 key = frozenset(combo)
                 if key in by_token:
                     for li, li_toks in by_token[key]:
-                        if id(li) in hit_listings:
+                        if id(li) in candidate_ids:
                             continue
-                        # STRICT subset check: every distinctive token of
-                        # the foreclosure defendant must appear in the
-                        # bankruptcy case_name. This eliminates the LLC-
-                        # token noise without missing real matches.
                         if not li_toks.issubset(f_toks_frozen):
                             continue
-                        hit_listings.add(id(li))
-                        if not isinstance(li.raw, dict):
-                            li.raw = {}
-                        # Only keep most-recent match
-                        existing = li.raw.get("bankruptcy")
-                        if existing and existing.get("date_filed", "") > (f.get("date_filed") or ""):
-                            continue
-                        hit_lis_for_chapter.append(li)
+                        candidate_ids.add(id(li))
+                        candidates.append(li)
+
+            if not candidates:
+                continue
+
+            # STAGE 2 -- the actual decision (see module docstring,
+            # "MATCH-ACCURACY FIX", for why bankruptcy's bar differs from
+            # SC-divorce's despite sharing the same tool):
+            #   1. debtor_positional_match: a REAL candidate debtor, in the
+            #      right first/last ORDER, checked one person at a time (never
+            #      a pooled bag of tokens across a joint filing's two debtors).
+            #      HARD requirement -- this alone rejects every concrete false
+            #      positive found live.
+            #   2. debtor_middle_verdict != "conflict": reject a PROVEN
+            #      different person (same first+last, disagreeing middle).
+            #      "unverified" (no middle on one side) is accepted here,
+            #      unlike the SC-divorce gate -- see the docstring for why.
+            #   3. a jurisdiction check: the filing court's own state must
+            #      equal the candidate listing's state -- the old code never
+            #      checked this at all.
+            hit_lis_for_chapter: list[tuple[Listing, str]] = []
+            for li in candidates:
+                if _COURT_STATE.get(court) and li.state and li.state != _COURT_STATE[court]:
+                    continue
+                if not debtor_positional_match(li.defendant, [case_name]):
+                    continue
+                verdict = debtor_middle_verdict(li.defendant, [case_name])
+                if verdict == "conflict":
+                    continue
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                # Only keep most-recent match
+                existing = li.raw.get("bankruptcy")
+                if existing and existing.get("date_filed", "") > (f.get("date_filed") or ""):
+                    continue
+                hit_lis_for_chapter.append((li, verdict))
 
             if not hit_lis_for_chapter:
                 continue
@@ -368,7 +461,7 @@ async def enrich_with_bankruptcy(listings: list[Listing]) -> None:
             age_flags = bankruptcy_case_age(
                 {"date_filed": f.get("date_filed"), "date_terminated": f.get("date_terminated")}
             )
-            for li in hit_lis_for_chapter:
+            for li, verdict in hit_lis_for_chapter:
                 li.raw["bankruptcy"] = {
                     "court": court,
                     "case_name": case_name,
@@ -377,7 +470,17 @@ async def enrich_with_bankruptcy(listings: list[Listing]) -> None:
                     "date_terminated": f.get("date_terminated"),
                     "chapter": chapter,
                     "absolute_url": f.get("absolute_url"),
-                    "match_strategy": "strict_subset",
+                    # Renamed 2026-10-02 from "strict_subset" (see module
+                    # docstring, "MATCH-ACCURACY FIX"): a match now requires a
+                    # POSITIONAL first/last match on one real debtor (never a
+                    # pooled bag of tokens across joint filers), so the old
+                    # tag would misrepresent it as the bag-of-tokens-only
+                    # match it no longer is. `match_verdict` carries whether
+                    # the middle initial also corroborated ("agrees") or
+                    # simply wasn't comparable ("unverified" -- "conflict" is
+                    # never stored here, it is rejected above).
+                    "match_strategy": "positional_match",
+                    "match_verdict": verdict,
                     "signal": signal,
                     **age_flags,
                 }

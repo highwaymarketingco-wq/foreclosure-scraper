@@ -59,6 +59,57 @@ Name-only matching means namesakes are possible, so flags are advisory; we trim
 namesakes by requiring the owner's last (and first, if known) name in the case
 style, exactly like the ROD enrichers. Default-ON (FORECLOSURE_SC_DIVORCE=1);
 set FORECLOSURE_SC_DIVORCE=0 to disable.
+
+ACCURACY FIX (2026-10-02) -- 0% real matches at population scale.
+-------------------------------------------------------------------------
+A live population-scale check (n=58/5,052, the FULL previously-flagged
+population) found ZERO confirmed real divorce cases against SC's own public
+court index -- 98.3% genuine negatives, one inconclusive (a common name that
+hit the portal's 250-row display cap). Investigated whether this was a
+wrong-index/wrong-case-type problem (a real possibility the validation
+raised explicitly) before touching the matching logic:
+
+  * Re-pulled the LOCATION and CASECATEGORY validation-code lists LIVE
+    2026-10-02 and confirmed every one of `_COUNTY_CODE`'s 8 codeIDs and
+    `_DIVORCE_CATEGORIES`'s 3 codeIDs still resolves to exactly the county/
+    category this module's own comments claim (1046=Spartanburg,
+    1062="110 - Divorce", etc.) -- the index and the case-type filter are
+    BOTH correct and current. This rules out the wrong-index hypothesis.
+  * Live-probed real searches instead and found the actual mechanism: a
+    PublicPersonSearch row's `ParticipantRole` can be "Attorney", "Mediator",
+    "Guardian Ad Litem", "Third Party Defendant", etc. -- a court OFFICER,
+    not a divorcing spouse -- and `_owner_in_case()`'s namesake trim checked
+    a blob of the case caption PLUS the row's own `PersonName` field, which
+    by construction ALWAYS contains the searched name (it is literally who
+    matched the query). So the trim was a no-op for any non-party row:
+    searching the common surname "Davis" returns "Davis, Davis, Joy C C" /
+    role=Attorney for ~30 UNRELATED real divorce cases (a real SC family-law
+    attorney with many clients), none of whose captions mention "Davis" at
+    all, and the OLD code matched every single one.
+  * Separately, even a role-CORRECT match on a common name is frequently
+    the wrong same-named person: `party_middle_verdict()` was already
+    computed for every hit since 2026-09-21 (41% of comparable hits proven
+    conflicts) but only ever stored as advisory metadata -- an 'unverified'
+    verdict (46% of all hits) passed straight through to
+    distress_stack.categories with zero corroboration. The single highest-
+    confidence pre-fix match on the board (an exact full name with 32 real
+    FCCMS records under it) had none that could be confirmed as the actual
+    property owner -- consistent with this exact ambiguity, not a wrong
+    index.
+
+Fixed both: `_is_party_role` rejects a non-party row before it ever reaches
+`_owner_in_case` or raw['divorce']['cases'] (see its own comment), and
+`_apply()` now requires `party_middle_verdict(...) == "agrees"` before
+adding 'divorce' to distress_stack.categories (see its own docstring).
+raw['divorce']['cases'] + ['match'] are still written for every hit
+regardless of verdict -- never silent -- only the ACTIONABLE category is
+gated. Measured impact on the existing board (read-only, not applied here):
+of 5,052 existing hits, 40 become case-less (pure non-party echo) and 3,347
+more fail the verdict gate -- 3,387/5,052 (67.0%) would be rejected, 1,665
+(33.0%) would remain. This is distinct from the SAME-DAY commit that split
+an already-matched case's caption into plaintiff/defendant fields -- that
+fix never touched whether the underlying match was correct in the first
+place.
 """
 from __future__ import annotations
 
@@ -181,6 +232,46 @@ def _owner_in_case(blob: str, last: str, first: str) -> bool:
     return bool(last) and last in up and (not first or first in up)
 
 
+# A PublicPersonSearch row's ParticipantRole for the two actual divorcing
+# spouses -- nobody else. Live-verified 2026-10-02 (see docs/HANDOFF.md,
+# "SC divorce 0%-real accuracy fix"): every role actually returned by the
+# portal across 7 counties x 3 categories is {Plaintiff, Defendant, Attorney,
+# Mediator, Third Party Defendant, Guardian Ad Litem}; the board itself (5,052
+# existing hits) additionally carries GAL-Children and Pro Hac Vice. Only
+# Plaintiff/Defendant/Petitioner/Respondent are a PARTY to the marriage being
+# dissolved (the last two reused from distress_score._DIVORCE_PARTY_ROLES,
+# the project's own existing party-role vocabulary -- not newly invented
+# here, and not actually observed live, but kept for the same case types that
+# constant was already defensive about) -- an Attorney/Mediator/Guardian Ad
+# Litem is a court OFFICER, never "this owner is getting divorced." The old
+# code never filtered by role AT ALL when building raw['divorce']['cases'],
+# and because `_owner_in_case`'s blob also includes the row's own PersonName
+# (the person who matched the search query, by construction always
+# containing `last`), the role-blind trim was a no-op for a non-party row:
+# searching "DAVIS" returns "Davis, Davis, Joy C C" / role=Attorney for ~30
+# UNRELATED divorce cases (Joy C. Davis is a practicing SC family-law
+# attorney with many clients), none of whose captions contain "DAVIS" at all
+# -- yet the old trim passed every one of them. Board-wide, 2,293 of 14,741
+# existing case rows (15.6%) carry a non-party role; this is the dominant
+# mechanism behind the 0% real-match rate a live population-scale check found
+# 2026-10-01. distress_score._divorce_signal already skips a non-party role
+# when picking the newest filing date for its SCORE WEIGHT, but that is the
+# only place the old code ever consulted role -- raw['divorce']['case_count'],
+# distress_stack.categories, and party_middle_verdict's own input all still
+# saw the attorney-echo row, so anything reading the board directly (not
+# through the scorer) still saw a "divorce" hit. Filtering at parse time, here,
+# means a non-party row is never written to raw['divorce'] at all.
+def _is_party_role(role) -> bool:
+    """True only for a role that means "this person is a party to the case" --
+    see the module-level comment above. A missing/blank role is kept
+    (conservatively: the portal does not always populate it, and an
+    unpopulated role is not evidence the row is NOT a party)."""
+    if not role:
+        return True
+    from .distress_score import _DIVORCE_PARTY_ROLES
+    return str(role).strip().lower() in _DIVORCE_PARTY_ROLES
+
+
 # ---------- Request payload (exact SPA ve() shape) ---------------------------------
 
 def _search_payload(last: str, first: str, county_code: int, category_id: int) -> list:
@@ -221,6 +312,15 @@ def _parse_rows(rows: list, last: str, first: str, category_label: str) -> list[
             continue
         case_no = (r.get("CaseId") or "").strip()
         if not case_no:
+            continue
+        # Role filter FIRST, unconditionally -- a non-party row (Attorney,
+        # Mediator, Guardian Ad Litem, ...) is never "this owner is getting
+        # divorced" no matter how well the name matches; see _is_party_role's
+        # module comment. Matters BEFORE the namesake trim below, not after:
+        # the trim's blob includes PersonName, which by construction always
+        # contains `last` (it is literally who matched the search query), so
+        # a non-party row would otherwise sail through the trim every time.
+        if not _is_party_role(r.get("ParticipantRole")):
             continue
         parties = re.sub(r"\s+", " ", (r.get("CaseDescription") or "")).strip()
         # Namesake trim against the case style (parties); fall back to the
@@ -334,7 +434,29 @@ def _stale(li, now: datetime) -> bool:
 # ---------- Apply to a single lead -------------------------------------------------
 
 def _apply(li, cases: list[dict], now: datetime) -> None:
-    """Write raw['divorce'] + add 'divorce' to distress_stack.categories (guarded)."""
+    """Write raw['divorce'] + add 'divorce' to distress_stack.categories, GATED
+    on party_middle_verdict() == 'agrees'.
+
+    Fixed 2026-10-02: a live population-scale check against SC's own court
+    index found 0% real matches at n=58/5,052 -- the full previously-flagged
+    population. `cases` here is already role-filtered to real parties
+    (_is_party_role, see its module comment) by the time it reaches this
+    function, which fixes the dominant mechanism (an attorney/mediator echo).
+    But a role-correct first+last name match on a common name is still
+    frequently the WRONG same-named person (41% of comparable hits measured
+    2026-09-21, name_normalize.party_middle_verdict's own origin). This
+    project's established convention for exactly that problem -- requiring
+    `party_middle_verdict(...) == "agrees"`, not merely "not a proven
+    conflict" -- was computed here since 2026-09-21 but only ever stored as
+    advisory metadata; 'unverified' (46% of hits, no middle initial on one
+    side -- "nothing says the match is wrong OR right") passed straight
+    through to distress_stack.categories uncorroborated. That gap, combined
+    with the role bug above, is consistent with the observed 0% real rate.
+    raw['divorce']['cases'] (role-filtered) and ['match'] are still written
+    for EVERY case_count > 0 hit regardless of verdict -- this never goes
+    silent — but only an 'agrees' verdict now reaches distress_stack.categories
+    (and, symmetrically, distress_score._divorce_signal; see that function).
+    """
     if not isinstance(li.raw, dict):
         li.raw = {}
     li.raw["divorce"] = {
@@ -346,13 +468,14 @@ def _apply(li, cases: list[dict], now: datetime) -> None:
         "fetched_at": now.isoformat(),
     }
     if cases:
-        li.raw["divorce"]["match"] = party_middle_verdict(li.owner_name, [c.get("parties") for c in cases])
-    if cases:
-        ds = li.raw.get("distress_stack")
-        if isinstance(ds, dict):
-            cats = ds.setdefault("categories", [])
-            if isinstance(cats, list) and "divorce" not in cats:
-                cats.append("divorce")
+        verdict = party_middle_verdict(li.owner_name, [c.get("parties") for c in cases])
+        li.raw["divorce"]["match"] = verdict
+        if verdict == "agrees":
+            ds = li.raw.get("distress_stack")
+            if isinstance(ds, dict):
+                cats = ds.setdefault("categories", [])
+                if isinstance(cats, list) and "divorce" not in cats:
+                    cats.append("divorce")
 
 
 # ---------- Session handshake (once, shared across all leads) ----------------------

@@ -64,9 +64,13 @@ def _lead(i, owner="SMITH JOHN"):
 
 
 def _case_row():
+    # ParticipantRole="Plaintiff", not the test's old made-up "Petitioner" --
+    # live-verified 2026-10-02 against the real portal (see
+    # enrichment_sc_divorce._is_party_role's module comment): SC family-court
+    # divorce cases use Plaintiff/Defendant, never Petitioner/Respondent.
     return {"CaseId": "2020DR4200001", "CaseDescription": "JOHN SMITH vs. MARY SMITH",
             "CaseInitialFilingDate": "2020-01-02T00:00:00", "CaseCategory": "110 - Divorce",
-            "LocationName": "Spartanburg", "ParticipantRole": "Petitioner"}
+            "LocationName": "Spartanburg", "ParticipantRole": "Plaintiff"}
 
 
 def test_search_one_raises_on_timeout_non200_and_bad_json():

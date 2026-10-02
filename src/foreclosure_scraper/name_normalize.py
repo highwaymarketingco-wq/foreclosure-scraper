@@ -279,21 +279,39 @@ def owner_last_first_middle(owner: Optional[str]) -> Optional[tuple[str, str, st
     return toks[0], toks[1], (toks[2][0] if len(toks) > 2 else "")   # SURNAME FIRST [MIDDLE]
 
 
-def party_middle_verdict(owner: Optional[str], party_strings) -> str:
-    """'agrees' | 'conflict' | 'unverified' for a court match on `owner`.
+_VS_SPLIT_RE = re.compile(r"\s+vs\.?\s+", re.I)
+# Bare, whitespace-bounded 'and' -- how PACER joins JOINT bankruptcy filers in
+# one case_name ('Robert Lee Newman and Sharon Elaine Newman'). Bounded by
+# \s so it can never fire inside a word (no name token is literally "and").
+_AND_SPLIT_RE = re.compile(r"\s+and\s+", re.I)
 
-    conflict: a party shares the owner's FIRST and LAST name, every such party carries a middle
-    initial, and none matches the owner's. That is a different person with the same name
-    (measured 2026-09-21: 41% of comparable SC divorce hits).
-    agrees: a matching party carries the same middle initial as the owner.
-    unverified: no middle initial on one side, so nothing says the match is wrong OR right."""
+
+def _party_split_verdict(owner: Optional[str], strings, split_re: "re.Pattern[str]") -> str:
+    """Shared core of `party_middle_verdict`/`debtor_middle_verdict`.
+
+    Splits each string in `strings` on `split_re` into ONE-PERSON segments,
+    then requires that segment's LAST token equal the owner's last name AND
+    its FIRST token equal the owner's first name -- POSITION, not bag-of-
+    tokens. Position is what rejects the shape found live on the board
+    2026-10-02: an owner 'JONES, RAY' (surname JONES, given RAY) is NOT a
+    match for debtor 'Billy Ray Jones' just because both names contain a
+    'RAY' and a 'JONES' token somewhere -- 'Ray' sits in Billy Jones's MIDDLE
+    slot, not his first-name slot, and position catches that a bag-of-tokens
+    check cannot. Splitting BEFORE the positional check also means a joint
+    filing's two debtors are never pooled into one token set: 'Robert Curtis
+    Best and Shannon Marie Jones' is checked as two separate one-person
+    strings, so it can never be mistaken for a phantom third person "Robert
+    Jones" assembled from debtor #1's first name and debtor #2's last name
+    (the exact false positive the old bankruptcy matcher produced live).
+    See `party_middle_verdict`/`debtor_middle_verdict` for the verdict policy.
+    """
     parts = owner_last_first_middle(owner)
     if not parts or not parts[2]:
         return "unverified"
     last, first, mid = parts
     matched = agreed = 0
-    for ps in party_strings or ():
-        for side in re.split(r"\s+vs\.?\s+", str(ps or ""), flags=re.I):
+    for ps in strings or ():
+        for side in split_re.split(str(ps or "")):
             toks = [t for t in re.sub(r"[^A-Za-z ]", " ", side).upper().split() if t not in _FL_SUFFIXES]
             if len(toks) >= 2 and toks[-1] == last and toks[0] == first:
                 if len(toks) > 2:
@@ -306,9 +324,83 @@ def party_middle_verdict(owner: Optional[str], party_strings) -> str:
     return "agrees" if agreed else "conflict"
 
 
+def party_middle_verdict(owner: Optional[str], party_strings) -> str:
+    """'agrees' | 'conflict' | 'unverified' for a COURT-CAPTION match on `owner`
+    ('X vs. Y' divorce-caption style; see `debtor_middle_verdict` for the PACER
+    bankruptcy sibling, which splits joint filers on a bare 'and' instead).
+
+    conflict: a party shares the owner's FIRST and LAST name, every such party carries a middle
+    initial, and none matches the owner's. That is a different person with the same name
+    (measured 2026-09-21: 41% of comparable SC divorce hits).
+    agrees: a matching party carries the same middle initial as the owner.
+    unverified: no middle initial on one side, so nothing says the match is wrong OR right."""
+    return _party_split_verdict(owner, party_strings, _VS_SPLIT_RE)
+
+
+def debtor_middle_verdict(owner: Optional[str], debtor_strings) -> str:
+    """'agrees' | 'conflict' | 'unverified' for a PACER bankruptcy DEBTOR-NAME
+    match on `owner`. Same verdict policy as `party_middle_verdict` (see its
+    docstring) -- the only difference is the separator: a bankruptcy
+    case_name joins joint filers with a bare 'and' ('Robert Lee Newman and
+    Sharon Elaine Newman'), not a divorce caption's 'X vs. Y', and may name
+    just one debtor at all (no separator present, same as a lone party).
+
+    Fixed 2026-10-02 alongside the matching rewrite in enrichment_bankruptcy.py:
+    live board audit found the OLD bag-of-tokens matcher there pooled a joint
+    filing's two debtors into one token set, producing phantom matches like
+    'JONES, ROBERT' <- 'Robert Curtis Best and Shannon Marie Jones' (neither
+    real debtor is named Robert Jones) and position-blind matches like
+    'DAVIS, DAVID' <- 'Bryan David Davis' ('David' is Bryan Davis's MIDDLE
+    name, not his first name). Splitting on 'and' into one-person segments
+    before the shared positional check in `_party_split_verdict` fixes both.
+    """
+    return _party_split_verdict(owner, debtor_strings, _AND_SPLIT_RE)
+
+
 def party_middle_conflict(owner: Optional[str], party_strings) -> bool:
     """True only on a proven middle-initial conflict; see party_middle_verdict."""
     return party_middle_verdict(owner, party_strings) == "conflict"
+
+
+def debtor_positional_match(owner: Optional[str], debtor_strings) -> bool:
+    """True when at least one one-person segment of `debtor_strings` (split on
+    a bare 'and', same as `debtor_middle_verdict`) has its LAST token equal
+    the owner's last name AND its FIRST token equal the owner's first name --
+    i.e. there is a REAL candidate debtor in the right name-order, regardless
+    of whether either side even carries a middle name.
+
+    A deliberately separate, simpler primitive from `debtor_middle_verdict`:
+    that function's 'unverified' lumps together two very different
+    situations -- (a) NO debtor segment positionally matches the owner at
+    all (the dominant real bug found live 2026-10-02: 'JONES, ROBERT' has no
+    positional candidate in 'Robert Curtis Best and Shannon Marie Jones' --
+    matched==0), and (b) a real positional candidate exists but neither side
+    has a middle name to compare ('TALLANT, BRYAN' <-> 'Bryan Christopher
+    Tallant' has owner mid=='', so party_middle_verdict never even reaches
+    the loop). Treating both alike was right for the SC-divorce fix (that
+    population's own live court-index check found 0% real matches, so
+    `party_middle_verdict(...) == "agrees"` is required there, full stop).
+    It is NOT right for bankruptcy: an independent live validation of 234
+    board rows found 56% were ALREADY strong, correct matches, and the
+    GIS/tax-roll `defendant` field this signal matches against very often
+    carries no middle name at all (even on a correct match) -- requiring
+    'agrees' there would reject most of the genuinely good matches along
+    with the bad ones. `enrichment_bankruptcy.py` therefore gates on THIS
+    function (a real positional candidate must exist -- this alone rejects
+    every concrete false positive found live) plus
+    `debtor_middle_verdict(...) != "conflict"` (reject a PROVEN different
+    person), rather than requiring 'agrees' outright.
+    """
+    parts = owner_last_first_middle(owner)
+    if not parts:
+        return False
+    last, first, _mid = parts
+    for ps in debtor_strings or ():
+        for side in _AND_SPLIT_RE.split(str(ps or "")):
+            toks = [t for t in re.sub(r"[^A-Za-z ]", " ", side).upper().split() if t not in _FL_SUFFIXES]
+            if len(toks) >= 2 and toks[-1] == last and toks[0] == first:
+                return True
+    return False
 
 
 def person_orderings(name: Optional[str]) -> list[PersonName]:

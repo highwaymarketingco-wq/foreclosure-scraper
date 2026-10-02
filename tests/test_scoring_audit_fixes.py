@@ -555,8 +555,15 @@ def test_f6_name_based_categories_do_count_once_two_record_categories_exist():
 
 
 def test_f6_bankruptcy_and_court_divorce_are_name_only_and_a_resolved_parcel_is_name_joined():
-    dv = {"case_count": 1, "cases": [{"role": "Plaintiff", "filed_date": (TODAY - timedelta(days=100)).isoformat()}]}
-    li = L(LT.TAX_LIEN, parcel="P600003", raw={"bankruptcy": dict(_BK), "divorce": dv})
+    # Fixed 2026-10-02: _divorce_signal now requires party_middle_verdict() ==
+    # "agrees" before scoring anything (SC divorce accuracy fix -- a live
+    # population-scale check found 0% real matches without this), so this
+    # fixture needs a real owner_name + an agreeing `parties` caption to
+    # still reach the scorer at all; this test is about the evidence-tag
+    # classification below, not about match correctness.
+    dv = {"case_count": 1, "cases": [{"role": "Plaintiff", "filed_date": (TODAY - timedelta(days=100)).isoformat(),
+                                       "parties": "SANDRA D BYRD vs. ROBERT BYRD"}]}
+    li = L(LT.TAX_LIEN, parcel="P600003", owner_name="BYRD SANDRA D", raw={"bankruptcy": dict(_BK), "divorce": dv})
     ds = ds_of(li)
     assert ds["evidence"] == {"bankruptcy": "name_only", "divorce": "name_only"}
     assert ds["stack"] == 1
@@ -582,10 +589,14 @@ def test_f6_a_probate_notice_is_a_record_unless_its_parcel_came_from_a_name_sear
 
 
 def test_f6_nc_divorce_dates_in_the_us_format_are_read():
-    """BEFORE: date.fromisoformat inside `except ValueError: continue` scored every NC hit (MM/DD/YYYY) 0."""
+    """BEFORE: date.fromisoformat inside `except ValueError: continue` scored every NC hit (MM/DD/YYYY) 0.
+    owner_name/parties added 2026-10-02: _divorce_signal now requires an
+    agreeing party_middle_verdict() before scoring (see that function's
+    docstring) -- unrelated to the US-date parsing this test actually covers."""
     us = (TODAY - timedelta(days=90)).strftime("%m/%d/%Y")
-    dv = {"case_count": 1, "cases": [{"role": "Defendant", "filed_date": us}]}
-    assert dsm._divorce_signal({"divorce": dv}, TODAY) == ("divorce", "LIFE_EVENT", 12)
+    dv = {"case_count": 1, "cases": [{"role": "Defendant", "filed_date": us,
+                                       "parties": "SANDRA D BYRD vs. ROBERT BYRD"}]}
+    assert dsm._divorce_signal({"divorce": dv}, TODAY, owner_name="BYRD SANDRA D") == ("divorce", "LIFE_EVENT", 12)
 
 
 def test_f6_incarceration_stops_counting_when_the_booking_says_released():
