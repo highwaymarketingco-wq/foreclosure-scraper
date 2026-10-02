@@ -22,7 +22,9 @@ from __future__ import annotations
 import asyncio
 import re
 from datetime import datetime
+from html import unescape as html_unescape
 from typing import Iterable
+from urllib.parse import urljoin
 
 from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
@@ -57,13 +59,53 @@ _ADDR_RE = re.compile(
 
 
 def _clean(s: str) -> str:
+    """Strip tags and collapse whitespace. Audited 2026-10-01: this used to skip
+    ``html.unescape``, so every owner/plaintiff/description string carried literal
+    entities straight off the ASP.NET grid -- "U.S. Bank &amp; Trust Company"
+    instead of "U.S. Bank & Trust Company", "&nbsp;" instead of a space. That is
+    not cosmetic: it breaks name matching against any other source (voter file,
+    county GIS owner, resolver) that normalizes real ampersands, and it ships an
+    HTML entity straight onto a lead's description. Unescape BEFORE stripping
+    tags so an entity that happens to look like a tag delimiter (none observed,
+    but cheap to be safe about) cannot be misread."""
+    s = html_unescape(s)
     s = re.sub(r"<[^>]+>", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
 def parse_roster(html: str, roster_url: str, county: str, base: str) -> list[Listing]:
     """Parse one RosterDetails page into foreclosure Listings. County-
-    parameterized version of the Greenville MIE parser."""
+    parameterized version of the Greenville MIE parser.
+
+    AUDITED 2026-10-01. Two layout bugs fixed, both because the original code
+    assumed every county's MO roster has the SAME number of columns:
+
+    * Oconee/Cherokee/Union render a 13-column row (seq, date, time, ?,
+      description, filing party, date, case, subtype, TMS/Map#, plaintiff
+      attorney, defendant attorney, notes). Laurens renders only 12 -- it has
+      NO separate TMS column, so the attorney blocks shift one column left and
+      land at the old hard-coded notes index (12), which is simply absent
+      (``len(cells) > 12`` is False), so every Laurens row's notes -- the ONLY
+      place this roster ever carries a street address or dollar amount --
+      were silently dropped. Verified live: a Laurens foreclosure row's real
+      notes cell ("Continued per email from Mr. Brown") sits at index 11, one
+      column left of where Oconee's sits. Fixed by locating the notes cell by
+      its CSS class (``td.notesTD``, present and in the same position
+      relative to the END of the row on every county checked) instead of a
+      fixed index, so it survives a column-count difference instead of
+      silently returning "".
+    * The TMS/parcel cell was read from a hard-coded index (9) with a regex
+      guard that rejects non-numeric text (so Laurens' attorney names in that
+      slot were already correctly discarded, not mis-filed as a parcel id --
+      that part was fine). Changed to scan the candidate cells for the first
+      one matching the TMS shape instead of trusting one fixed index, so a
+      future county with yet another column count is read the same way
+      rather than by coincidence of where index 9 happens to land.
+
+    ``_clean()`` itself was also fixed (see its docstring) to unescape HTML
+    entities, which used to ship literal ``&amp;``/``&nbsp;`` into every
+    owner/plaintiff/description string.
+    """
     out: list[Listing] = []
     tree = HTMLParser(html)
     for tr in tree.css("tr.standardRow, tr.altRow"):
@@ -78,9 +120,21 @@ def parse_roster(html: str, roster_url: str, county: str, base: str) -> list[Lis
         description = _clean(cells[4].html or "")
         filing_party = _clean(cells[5].html or "")
         case_cell_html = cells[7].html or ""
-        tms_raw = _clean(cells[9].html or "")
-        tms = tms_raw if _TMS_RE.match(tms_raw) else ""
-        notes = _clean(cells[12].html or "") if len(cells) > 12 else ""
+
+        # TMS/Map#: scan rather than trust a fixed index, so a county whose
+        # roster has a different column count (Laurens has no TMS column at
+        # all) is read correctly instead of by coincidence. Stop before the
+        # notes cell so a numeric-looking note never gets mistaken for a TMS.
+        notes_node = tr.css_first("td.notesTD")
+        notes_idx = cells.index(notes_node) if notes_node in cells else len(cells) - 1
+        tms = ""
+        for c in cells[9:notes_idx]:
+            cand = _clean(c.html or "")
+            if _TMS_RE.match(cand):
+                tms = cand
+                break
+
+        notes = _clean((notes_node or cells[-1]).html or "") if cells else ""
 
         m = re.search(r">(\d{4}CP\d{4,8})</a>", case_cell_html)
         case_number = m.group(1) if m else None
@@ -91,11 +145,23 @@ def parse_roster(html: str, roster_url: str, county: str, base: str) -> list[Lis
         def_m = re.search(r"\bvs\.?\s+(.+?)(?:,?\s*defendant|,?\s*et al|$)", caption, re.I)
         defendant = def_m.group(1).strip() if def_m else None
 
+        # Resolved against the actual page URL with a real urljoin, not a
+        # hand-rolled lstrip. AUDITED 2026-10-01: the live grid's link is
+        # "../PublicIndex/CaseDetails.aspx?..." (one directory UP from
+        # .../courtrosters/), and the old `f"{base}/" + href.lstrip("./")`
+        # dropped the "up one level" and glued it back onto .../courtrosters/,
+        # producing a URL that 404s. (This CaseDetails.aspx page itself sits
+        # behind the SAME F5/Shape WAF challenge that
+        # sc_public_index_lis_pendens.py was disabled over on 2026-10-01 --
+        # confirmed live, the page renders blank with no stealth browser
+        # driving it -- so it is recorded here only as a correct reference
+        # link for a human operator; this scraper does not and must not fetch
+        # it automatically.)
         detail_m = re.search(r'href="([^"]+CaseDetails[^"]+)"', case_cell_html)
-        source_url = detail_m.group(1) if detail_m else roster_url
-        if source_url.startswith(".."):
-            source_url = f"{base}/" + source_url.lstrip("./")
-        source_url = source_url.replace("&amp;", "&")
+        if detail_m:
+            source_url = urljoin(roster_url, html_unescape(detail_m.group(1)))
+        else:
+            source_url = roster_url
 
         auction_status = "completed" if "Completed-" in notes else "active"
 

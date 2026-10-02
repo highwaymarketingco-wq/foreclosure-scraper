@@ -25,15 +25,29 @@ _SEL = f"{_BASE}/RosterSelection.aspx"
 _FORECLOSURE_ROW = """<table><tr class="standardRow">
 <td>1</td><td>06/19/2026</td><td>11:00 AM</td><td></td><td>Master Sale</td>
 <td>Bank of America-PLT</td><td>05/01/2026</td>
-<td><a href="CaseDetails.aspx?CaseID=123">2024CP3700456</a><br/>Bank of America vs John Smith</td>
+<td><a href="../PublicIndex/CaseDetails.aspx?CourtAgency=37003&amp;Casenum=2024CP3700456&amp;CaseType=V&amp;Org=CR">2024CP3700456</a><br/>Bank of America vs John Smith</td>
 <td>Foreclosure 420</td><td>0123.45-67-890.00</td><td>Atty One</td><td>Atty Two</td>
-<td>Completed-06/19/2026 Sale # 1 142 Oak Street, Walhalla $85,000.00</td></tr></table>"""
+<td class="notesTD"><div class="notesCell">Completed-06/19/2026 Sale # 1 142 Oak Street, Walhalla $85,000.00</div></td></tr></table>"""
 
 _NON_FORECLOSURE_ROW = """<table><tr class="standardRow">
 <td>1</td><td>06/19/2026</td><td>11:00 AM</td><td></td><td>Partition</td>
 <td>Someone-PLT</td><td>05/01/2026</td>
-<td><a href="CaseDetails.aspx?CaseID=9">2024CP3700999</a><br/>X vs Y</td>
-<td>Partition 300</td><td>0123.45-67-890.00</td><td>A</td><td>B</td><td>notes</td></tr></table>"""
+<td><a href="../PublicIndex/CaseDetails.aspx?CaseID=9">2024CP3700999</a><br/>X vs Y</td>
+<td>Partition 300</td><td>0123.45-67-890.00</td><td>A</td><td>B</td><td class="notesTD"><div class="notesCell">notes</div></td></tr></table>"""
+
+#: Laurens' real shape: 12 cells, NO separate TMS/Map# column (the attorney
+#: blocks shift one column left of Oconee's layout and notes lands at index
+#: 11, not 12). Verified live 2026-10-01 against publicindex.sccourts.org/
+#: laurens/courtrosters/. Regression for the column-count bug fixed the same day.
+_LAURENS_12COL_ROW = """<table><tr class="standardRow">
+<td>10</td><td>10/21/2026</td><td>9:30 AM</td><td></td>
+<td>Motion/Dismiss &amp; Judgment on the Pleadings</td>
+<td>U.S. Bank &amp; Trust Company-PLT</td><td>04/27/2026</td>
+<td><a href="../PublicIndex/CaseDetails.aspx?CourtAgency=30002&amp;Casenum=2026CP3000125&amp;CaseType=V&amp;Org=CR">2026CP3000125</a><br/>U.S. Bank &amp; Trust Company vs Randall J Owens , defendant, et al</td>
+<td>Foreclosure 420</td>
+<td>B. Lindsay Crawford III&nbsp;&nbsp;(803) 790-2626</td>
+<td>Rodney M. Brown&nbsp;&nbsp;(864) 862-2528</td>
+<td class="notesTD"><div class="notesCell">Continued per email from Mr. Brown</div></td></tr></table>"""
 
 
 def test_parser_extracts_foreclosure_fields():
@@ -49,6 +63,46 @@ def test_parser_extracts_foreclosure_fields():
     assert li.opening_bid == 85000.0
     assert li.auction_status == "completed"
     assert li.source == "counties_sc.sc_county_rosters"
+    # AUDITED 2026-10-01: the live href is "../PublicIndex/CaseDetails.aspx..."
+    # (one directory UP from .../courtrosters/) and must resolve there, not
+    # back into .../courtrosters/PublicIndex/... (the old string-hack bug).
+    assert li.source_url == (
+        "https://publicindex.sccourts.org/oconee/PublicIndex/CaseDetails.aspx"
+        "?CourtAgency=37003&Casenum=2024CP3700456&CaseType=V&Org=CR"
+    )
+
+
+def test_parser_unescapes_html_entities():
+    """AUDITED 2026-10-01: _clean() used to skip html.unescape, so every
+    owner/plaintiff/description string shipped literal '&amp;' straight off
+    the ASP.NET grid."""
+    out = parse_roster(_LAURENS_12COL_ROW, _SEL, "Laurens", _BASE)
+    assert len(out) == 1
+    li = out[0]
+    assert "&amp;" not in (li.plaintiff or "")
+    assert li.plaintiff == "U.S. Bank & Trust Company"
+    assert "&amp;" not in (li.description or "")
+
+
+def test_parser_handles_laurens_12column_layout_no_tms():
+    """AUDITED 2026-10-01: Laurens' MO roster has no TMS/Map# column at all --
+    one less column than Oconee/Cherokee/Union -- which used to silently drop
+    the real notes cell (hard-coded at index 12, which doesn't exist on a
+    12-cell row) and left attorney-block text sitting where the fixed TMS
+    index expected a parcel id (that part degraded safely via the existing
+    regex guard). Fixed by locating cells by CSS class / scanning rather than
+    a fixed index, so the real notes text and the absence of a TMS are both
+    read correctly instead of either being silently lost or risking a
+    false-positive parcel id from attorney text."""
+    out = parse_roster(_LAURENS_12COL_ROW, _SEL, "Laurens", _BASE)
+    assert len(out) == 1
+    li = out[0]
+    assert li.county == "Laurens"
+    # No TMS column on this layout -- must stay None, never an attorney name.
+    assert li.parcel_id is None
+    # The real notes text, previously dropped entirely for this county.
+    assert li.description == "Continued per email from Mr. Brown"
+    assert li.defendant == "Randall J Owens"
 
 
 def test_parser_skips_non_foreclosure_rows():
