@@ -556,6 +556,35 @@ class SCPublicIndexBulk(BaseScraper):
 
     slug = SLUG
     name = "SC Public Index — Bulk Court Records (civil + criminal)"
+    # DISABLED 2026-10-01: same WAF-defeat violation as the sibling
+    # sc_public_index_lis_pendens.py, disabled the same day (commit b45e3e79).
+    # This module's OWN docstring documents driving Scrapling's StealthyFetcher
+    # specifically to clear PISearch.aspx's F5 Distributed Cloud / Shape
+    # "Client Challenge" JS bot detector ("We do not defeat the challenge" is
+    # asserted in the docstring, but running a real browser to mint the
+    # challenge's clearance cookie IS defeating it -- CLAUDE.md draws no
+    # exception for "a real browser did it instead of a solver"). It also
+    # auto-clicks the disclaimer's Accept button, and that disclaimer's live
+    # text (confirmed 2026-10-01 on every /PublicIndex/ instance checked)
+    # reads: "Access to the South Carolina Judicial Department Public Index
+    # web sites by a site data scraper or any similar software intended to
+    # discover and extract data from a website through automated, repetitive
+    # querying for the purpose of collecting such data is expressly
+    # prohibited." This module's whole purpose is exactly that: an automated,
+    # repetitive, blank-name sweep of 7 counties x 2 case types every run.
+    # Both the WAF-challenge and the ToS-prohibition are wall categories
+    # CLAUDE.md lists explicitly ("a Cloudflare or other WAF challenge, and
+    # click-through terms still are walls: do not defeat them"). Found via
+    # the 2026-10-01 counties_sc per-source extraction audit, cross-checking
+    # every scraper touching publicindex.sccourts.org after the sibling was
+    # disabled. Left disabled pending an owner decision; do not re-enable
+    # without either a compliant access method (the manual lane: an operator
+    # logs in, saves the page, an offline parser ingests it -- see
+    # docs/HERMES.md Section 11) or explicit sign-off.
+    disabled = True
+    disabled_reason = ("F5/Shape WAF challenge + explicit ToS scraper-prohibition on "
+                       "PISearch.aspx - same violation class as sc_public_index_lis_pendens "
+                       "(disabled 2026-10-01, commit b45e3e79) - confirmed 2026-10-01")
     category = "motivated_seller"
     timeout_s = 900.0
     expected_min_count = 10

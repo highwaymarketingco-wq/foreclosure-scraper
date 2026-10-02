@@ -22,6 +22,30 @@ from .models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
+#: AUDITED 2026-10-01 (counties_sc per-source extraction audit). Every
+#: publicindex.sccourts.org /PublicIndex/ endpoint (search AND detail) is
+#: gated behind an F5 Distributed Cloud / Shape "Client Challenge" JS bot
+#: detector, and its own disclaimer page states: "Access to the South
+#: Carolina Judicial Department Public Index web sites by a site data
+#: scraper or any similar software intended to discover and extract data
+#: from a website through automated, repetitive querying for the purpose of
+#: collecting such data is expressly prohibited." CLAUDE.md's wall rule lists
+#: both a WAF challenge and click-through terms as walls that must not be
+#: defeated, with no exception for an operator's direction (the removed code
+#: here was previously justified as "operator's legal call" -- that stance
+#: is exactly what the 2026-09-20 compliance ruling superseded). The sibling
+#: registry scraper counties_sc.sc_public_index(_lis_pendens) is disabled
+#: the same day for the identical reason; this module's two SC code paths
+#: (enrich_with_court_records's per-county backfill and
+#: discover_lis_pendens's per-county search) called that scraper's internals
+#: directly, so disabling the registry entry alone would not have stopped
+#: either from still running the wall-defeat on every full run.
+SC_PUBLIC_INDEX_WALLED = (
+    "publicindex.sccourts.org/PublicIndex is F5/Shape WAF-challenged and its own "
+    "disclaimer expressly prohibits automated scraping - do not defeat it "
+    "(confirmed 2026-10-01, see counties_sc.sc_public_index's disabled_reason)"
+)
+
 
 # ---------- URL templates ----------------------------------------------------------
 
@@ -197,63 +221,20 @@ async def enrich_with_court_records(listings: list[Listing]) -> list[Listing]:
                 if isinstance(li.raw, dict) and li.raw.get("court_record"):
                     counts["court_records"] += 1
 
-    # ---- SC: batch search-page enrichment (replaces per-case detail pages) ----
-    # The SC Public Index case DETAIL pages (CaseDetails.aspx) are F5/Shape WAF-
-    # protected and return ERR_HTTP_RESPONSE_CODE_FAILURE even with a stealth
-    # browser.  The SEARCH page (PISearch.aspx) loads fine (200 OK) and returns
-    # plaintiff/defendant in the results grid's title attributes — same data the
-    # scraper already captures.  Instead of making one failing request per case,
-    # we run the scraper's _scrape_county() once per county and build a
-    # case-number → {plaintiff, defendant} map, then backfill all SC listings.
+    # ---- SC: DISABLED 2026-10-01, see SC_PUBLIC_INDEX_WALLED below ----
+    # This used to run the scraper's _scrape_county() once per county (via
+    # counties_sc.sc_public_index, which is itself now disabled=True for the
+    # same reason) and backfill plaintiff/defendant from the result. That
+    # path is a WAF-defeat + ToS-prohibited-scraper violation: see
+    # SC_PUBLIC_INDEX_WALLED's docstring. sc_targets is still counted so a
+    # run's logs show how many SC listings COULD have been enriched here,
+    # distinct from an empty count meaning "no SC case numbers this run".
     sc_targets = [li for li in listings if li.state == "SC" and li.case_number]
     counts["sc_queried"] = len(sc_targets)
-
     if sc_targets:
-        try:
-            from .scrapers.counties_sc.sc_public_index import (
-                _scrape_county as _scpi_scrape,
-                _format_cp_case as _scpi_fmt,
-                COUNTIES as _SCPI_COUNTIES,
-            )
-
-            # Determine which counties we need to search
-            needed = set()
-            for li in sc_targets:
-                c = (li.county or "").replace(" County", "").strip().split(",")[0].strip()
-                if c and c in _SCPI_COUNTIES:
-                    needed.add(c)
-
-            sc_case_map: dict[str, dict] = {}
-            for county in sorted(needed):
-                try:
-                    results = await _scpi_scrape(county)
-                    for r in results:
-                        cn = (r.case_number or "").replace(" ", "").upper()
-                        if cn:
-                            sc_case_map[cn] = {
-                                "plaintiff": r.plaintiff,
-                                "defendant": r.defendant,
-                            }
-                except Exception as exc:  # noqa: BLE001
-                    log.warning("courts.enrich.sc_county_fail", county=county, error=str(exc)[:200])
-                    counts["sc_failed"] += 1
-                await asyncio.sleep(2.5)  # polite pause between counties
-
-            # Backfill: only fill EMPTY fields (never clobber existing data)
-            for li in sc_targets:
-                cn = (li.case_number or "").replace(" ", "").upper()
-                hit = sc_case_map.get(cn)
-                if not hit:
-                    continue
-                counts["sc_matched"] += 1
-                if hit.get("plaintiff") and not li.plaintiff:
-                    li.plaintiff = hit["plaintiff"]
-                    counts["fields_filled"] += 1
-                if hit.get("defendant") and not li.defendant:
-                    li.defendant = hit["defendant"]
-                    counts["fields_filled"] += 1
-        except ImportError:
-            log.warning("courts.enrich.sc_scaper_unavailable")
+        counts["sc_skipped_walled"] = len(sc_targets)
+        log.info("courts.enrich.sc_skipped_walled", count=len(sc_targets),
+                 reason=SC_PUBLIC_INDEX_WALLED)
     log.info("courts.enrich.done", **counts)
     return listings
 
@@ -275,19 +256,26 @@ async def discover_lis_pendens() -> list[Listing]:
 
     async def search_county(state: str, county: str) -> None:
         if state == "SC":
-            url = (
-                f"https://publicindex.sccourts.org/{county}/PublicIndex/"
-                "CaseSearchResults.aspx?casetype=CP&casesubtype=Foreclosure"
-            )
-            case_re = SC_CASE_RE
-            ltype = ListingType.LIS_PENDENS
-        else:
-            url = (
-                "https://portal-nc.tylertech.cloud/Portal/Home/WorkspaceMode?"
-                f"p=0&q=foreclosure+{county}&caseType=SP"
-            )
-            case_re = NC_CASE_RE
-            ltype = ListingType.LIS_PENDENS
+            # DISABLED 2026-10-01: CaseSearchResults.aspx is the same
+            # publicindex.sccourts.org /PublicIndex/ app as SC_PUBLIC_INDEX_WALLED
+            # describes (F5/Shape WAF challenge + an explicit ToS scraper
+            # prohibition). It also carried a SEPARATE, non-compliance bug: it
+            # was fetched directly with no prior disclaimer-accept session, so
+            # live this was returning the disclaimer/challenge page, not case
+            # data, on top of being a wall this engine must not be hitting at
+            # all. SC lis-pendens discovery lives in the compliant, registered
+            # scrapers instead (counties_sc.sc_county_rosters,
+            # counties_sc.sc_catalis_delinquent_roll, etc.) -- do not
+            # re-enable this branch without a compliant access method.
+            log.info("courts.lis_pendens.sc_skipped_walled", county=county,
+                     reason=SC_PUBLIC_INDEX_WALLED)
+            return
+        url = (
+            "https://portal-nc.tylertech.cloud/Portal/Home/WorkspaceMode?"
+            f"p=0&q=foreclosure+{county}&caseType=SP"
+        )
+        case_re = NC_CASE_RE
+        ltype = ListingType.LIS_PENDENS
 
         async with sem:
             content = await fetch_rendered(url, token=token)
