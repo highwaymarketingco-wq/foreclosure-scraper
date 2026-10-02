@@ -1,18 +1,41 @@
 """NC Secretary of State UCC fixture-filing search.
 
-sosnc.gov sits behind a Cloudflare managed JS challenge (NOT a CAPTCHA).
-Scrapling's StealthyFetcher renders the page in a real headless browser that
-runs Cloudflare's own JS challenge script — the same compliant approach already
-proven by enrichment_sos_dissolution.py and enrichment_sos_agent.py.
+DISABLED 2026-10-01 (per-source extraction-completeness audit) — confirmed
+dead AND confirmed never worked as designed. Two separate live findings:
 
-UCC fixture filings (UCC-1 where collateral includes real-property fixtures)
-are a motivated-seller signal: the owner has pledged the property as collateral
-for a non-mortgage debt.  Each fixture filing becomes a DISTRESSED listing.
+1. The target URL (_UCC_SEARCH_URL) 307-redirects into sosnc.gov's generic
+   "Business Registration" search widget. The landing page's HTML contains
+   zero occurrences of "UCC", "Uniform Commercial Code", "financing
+   statement", "debtor", or "secured party" anywhere -- confirmed by a full
+   text search of the live page. The CorpSearchType dropdown on that widget
+   only offers four modes (Company By Name / SOSID / Company Officials /
+   Registered Agents), none of them UCC. Whatever dedicated UCC-filing
+   search sosnc.gov once hosted at this path is gone; the URL now serves an
+   unrelated generic entity search.
 
-The search supports date-range browsing ("filed in last N days") so we can
-discover filings broadly without knowing debtor names in advance.
+2. This module's own premise was already broken independent of (1): the
+   docstring used to claim "the search supports date-range browsing ('filed
+   in last N days')", but the live page has NO date-range input of any
+   kind -- only a free-text organization/individual NAME search (Words:
+   Starting With / All / Any / Exact Match). There was never a way to
+   "discover filings broadly without knowing debtor names in advance" on
+   this site; the whole broad-discovery design this scraper was built
+   around does not match how sosnc.gov's search actually works. Even before
+   finding (1), filling the search box with a wildcard like "a" and
+   submitting correctly (the old page_action's button-selector guesses all
+   missed the real #SubmitButton, so it silently never submitted at all --
+   confirmed the returned HTML was always the untouched blank form, 42,063
+   bytes every time) would only ever have searched the wrong record type.
 
-Free, no auth, public record, Scrapling stealth.
+_fetch_ucc_page/_parse_results/_is_fixture are kept below as
+_disabled_fetch for reference. A real rebuild would need to find whether
+NC SOS exposes a genuine UCC-filing browse/bulk-export anywhere (unverified
+either way) rather than retrying this page.
+
+Free, no auth, public record, Scrapling stealth — the approach itself
+(running Cloudflare's own JS challenge via a real headless browser) is
+compliant and still proven elsewhere (enrichment_sos_dissolution.py,
+enrichment_sos_agent.py); it is this page's actual content that is dead.
 """
 from __future__ import annotations
 
@@ -256,6 +279,13 @@ class NcSosUccScraper(BaseScraper):
     timeout_s = 300.0
 
     async def fetch(self) -> Iterable[Listing]:
+        # Disabled — see module docstring. Confirmed dead (the URL redirects
+        # to an unrelated generic business-search page with zero UCC
+        # content) and confirmed the broad date-range discovery this
+        # scraper was designed around never existed on this site.
+        return []
+
+    async def _disabled_fetch(self) -> Iterable[Listing]:
         html = await _fetch_ucc_page(days_back=90)
         if not html:
             log.warning("nc_sos_ucc.empty_html")
