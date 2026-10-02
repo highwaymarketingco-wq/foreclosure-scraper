@@ -315,3 +315,23 @@ def test_scraper_in_known_fixed():
     from scripts.patch_run_scrapers import KNOWN_FIXED  # noqa
 
     assert "law_firms.kania" in KNOWN_FIXED
+
+
+def test_kania_raw_block_survives_the_publish_slim():
+    """Regression pin, 2026-10-02 statewide audit: raw["kania"] (our_file,
+    court_file, property_type, current_bid, sale_status, row_id) was never
+    registered in web_artifact.RAW_KEEP. The scraper's own
+    `raw_common = {"kania": {...}}` / `raw=dict(raw_common)` indirection (see
+    _row_to_listings) doesn't match test_raw_keep_covers_enrichers.py's simpler
+    `raw = {...}` / `raw["x"] = ` regex scan, so the gap went undetected since
+    the scraper was built 2026-07-31 -- every row's current_bid/case/status detail
+    was silently dropped at every board publish. Fixed by adding "kania": "*" to
+    RAW_KEEP; this pins it against regressing."""
+    from foreclosure_scraper.web_artifact import RAW_KEEP, _slim_raw
+
+    assert "kania" in RAW_KEEP
+    raw = {"kania": {"our_file": "23567", "court_file": "25CVD001289-110",
+                      "property_type": "Residential Vacant Lot",
+                      "current_bid": 34728.75, "sale_status": None, "row_id": 1}}
+    kept = _slim_raw(raw)
+    assert kept["kania"] == raw["kania"]

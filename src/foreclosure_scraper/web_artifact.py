@@ -2217,6 +2217,16 @@ RAW_KEEP = {
     "helene": "*", "henderson_tax": "*", "hendersonville_delinquent_tax": "*",
     "hendersonville_lightning": "*", "hibid": "*", "homeharvest": "*",
     "horry_flc": "*", "hubzu": "*", "ingle_firm": "*",
+    # 2026-10-02 Kania-statewide follow-up audit: law_firms.kania (built 2026-07-31,
+    # still live and correct today -- 190 rows across 24 counties) stamps
+    # raw={"kania": {our_file, court_file, property_type, current_bid, sale_status,
+    # row_id}} via an indirection (`raw_common = {"kania": {...}}; raw=dict(raw_common)`)
+    # that test_raw_keep_covers_enrichers.py's scraper-key regex scan does not match
+    # (it only catches `raw = {"key": ...}` and `raw["key"] = ...` literally), so this
+    # key was never registered and _slim_raw() has been silently dropping the entire
+    # block at every publish since the scraper was built. Same failure shape as the
+    # landed_by/liensnc_related losses documented elsewhere in this dict.
+    "kania": "*",
     "kershaw_flc": "*", "lancaster_delinquent_tax": "*", "landandfarm": "*",
     "landsofamerica": "*", "landwatch": "*", "laurens_delinquent_tax": "*",
     "lincoln_code": "*", "lincoln_vacant": "*", "marlboro_delinquent_tax": "*", "mccormick_flc": "*",
