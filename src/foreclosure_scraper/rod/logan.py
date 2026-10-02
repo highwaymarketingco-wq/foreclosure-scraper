@@ -67,6 +67,7 @@ DISTRESS_CODES = (
 _TOKEN_RE = re.compile(r"content\.php\?(\d+)")
 _LINK_RE = re.compile(r'id="link_(\d+)"[^>]*>\s*(\d{2}/\d{2}/\d{4})')
 _CELL_RE = re.compile(r'<td class="summary" id="(\d+)">(.*?)</td>', re.S)
+_ROW_CELL_RE = re.compile(r'<td class="summary"[^>]*>(.*?)</td>', re.S)
 
 
 def _clean(s: str) -> str:
@@ -92,31 +93,95 @@ def _split_book_page(book_info: str) -> tuple[str | None, str | None]:
 
 
 def _parse_records(html: str, state: str, county: str) -> list[RodDoc]:
-    links = dict(_LINK_RE.findall(html))
-    cells: dict[str, list[str]] = defaultdict(list)
-    for inst, val in _CELL_RE.findall(html):
-        cells[inst].append(_clean(val))
-    out: list[RodDoc] = []
-    for inst, date in links.items():
-        c = cells.get(inst, [])
-        c = (c + [""] * 6)[:6]
-        book_info, doc_type, legal, party_type, searched, reverse = c
-        # Party Type tells which side the Searched Party is on.
-        if "GRANTEE" in (party_type or "").upper() or "INDIRECT" in (party_type or "").upper():
-            grantor, grantee = reverse, searched
+    """Parse Logan's embedded result rows.
+
+    Logan renders ONE ROW PER PARTY, not one row per document: a judgment or
+    distribution deed naming several debtors/heirs repeats the SAME
+    instrument id across many consecutive rows. Live-confirmed on McDowell
+    (2026-10-01): one JGMT instrument spanned 18 rows naming 9 distinct
+    people, including "THE UNKNOWN HEIRS OF MAXINE SOUTHER ROBINSON" and
+    five of her relatives -- a textbook probate/heir lead this scraper
+    exists to catch. Each such row carries 5 "summary" cells (Book Info,
+    Doc Type, Legal Desc, Party Type, Name), not the 6-cell single-row
+    shape (Book Info, Doc Type, Legal Desc, Party Type, Searched Party,
+    Reverse Party) this function used to assume unconditionally.
+
+    The OLD code built a dict keyed by instrument id from `_LINK_RE`
+    (silently collapsing every duplicate-id link match down to the LAST
+    occurrence) and a flat per-id cell list from `_CELL_RE`, then always
+    sliced `[:6]` off that flat list. For a multi-row instrument this both
+    (a) discarded every party but the first, and (b) because real rows are
+    5 cells wide here, bled the START of the SECOND row's book-info into a
+    bogus 6th "reverse party" value -- corrupting even the one row it kept.
+
+    Fixed by pairing each link anchor with ONLY the cells that appear
+    before the NEXT link anchor (i.e. that row's own cells), then
+    accumulating every (role, name) pair per instrument across however
+    many rows it has, instead of overwriting. `grantor`/`grantee` on the
+    returned RodDoc are now "; "-joined, deduped name lists (never just the
+    first party); the full lists also land in `raw['logan']['grantors']`/
+    `['grantees']` for any downstream consumer that wants the raw list
+    (the same `raw['grantors']` convention `rod/cchs.py` already uses).
+    """
+    links = list(_LINK_RE.finditer(html))
+    groups: dict[str, dict] = {}
+    order: list[str] = []
+    for i, m in enumerate(links):
+        inst = m.group(1)
+        date_str = m.group(2)
+        end = links[i + 1].start() if i + 1 < len(links) else len(html)
+        row_cells = [_clean(c) for c in _ROW_CELL_RE.findall(html[m.end():end])]
+        if len(row_cells) >= 6:
+            # Classic single-row shape: both sides of ONE transaction
+            # (Searched Party / Reverse Party) in the same row.
+            book_info, doc_type, legal, party_type, searched, reverse = row_cells[:6]
+            pairs = []
+            if searched:
+                pairs.append((party_type, searched))
+            if reverse:
+                opposite = ("GRANTOR" if "GRANTEE" in (party_type or "").upper()
+                            or "INDIRECT" in (party_type or "").upper() else "GRANTEE")
+                pairs.append((opposite, reverse))
         else:
-            grantor, grantee = searched, reverse
-        book, page = _split_book_page(book_info)
+            # One-party-per-row shape (live-confirmed on multi-party
+            # instruments): Book Info, Doc Type, Legal, Party Type, Name.
+            row_cells = (row_cells + [""] * 5)[:5]
+            book_info, doc_type, legal, party_type, name = row_cells
+            pairs = [(party_type, name)] if name else []
+        g = groups.setdefault(inst, {
+            "date": date_str, "book_info": book_info, "doc_type": doc_type,
+            "legal": legal, "grantors": [], "grantees": [],
+            "_seen_grantors": set(), "_seen_grantees": set(),
+        })
+        if inst not in order:
+            order.append(inst)
+        for role, name in pairs:
+            name = (name or "").strip()
+            if not name:
+                continue
+            is_grantee = "GRANTEE" in (role or "").upper() or "INDIRECT" in (role or "").upper()
+            bucket, seen_key = ("grantees", "_seen_grantees") if is_grantee else ("grantors", "_seen_grantors")
+            key = name.upper()
+            if key in g[seen_key]:
+                continue
+            g[seen_key].add(key)
+            g[bucket].append(name)
+    out: list[RodDoc] = []
+    for inst in order:
+        g = groups[inst]
+        book, page = _split_book_page(g["book_info"])
         try:
-            rec = datetime.strptime(date, "%m/%d/%Y")
+            rec = datetime.strptime(g["date"], "%m/%d/%Y")
         except ValueError:
             rec = None
         out.append(RodDoc(
-            county=county, state=state, doc_type=(doc_type or "").strip(),
+            county=county, state=state, doc_type=(g["doc_type"] or "").strip(),
             recorded_date=rec, book=book, page=page,
-            grantor=grantor or None, grantee=grantee or None,
-            instrument_no=inst, notes=(legal or None),
-            raw={"logan": {"book_info": book_info, "party_type": party_type}},
+            grantor="; ".join(g["grantors"]) or None,
+            grantee="; ".join(g["grantees"]) or None,
+            instrument_no=inst, notes=(g["legal"] or None),
+            raw={"logan": {"book_info": g["book_info"],
+                           "grantors": g["grantors"], "grantees": g["grantees"]}},
         ))
     return out
 

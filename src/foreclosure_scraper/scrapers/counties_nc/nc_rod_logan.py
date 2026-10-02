@@ -65,35 +65,60 @@ def _is_institutional(name: str | None) -> bool:
     return bool(toks & _BUSINESS_STOPWORDS) or bool(toks & _INSTITUTION_WORDS)
 
 
+def _split_parties(s: str | None) -> list[str]:
+    """rod/logan.py now joins every party sharing a role with '; ' (a
+    multi-grantor/heir instrument can have many) -- split back out so each
+    name is filtered on its OWN merits, never on the whole joined string.
+    A single plain name (no '; ') round-trips through this unchanged."""
+    return [p.strip() for p in (s or "").split("; ") if p.strip()]
+
+
+def _dedupe(names: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for n in names:
+        key = n.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(n)
+    return out
+
+
 def _resolve_defendant(doc) -> str | None:
-    """Pick the real owner from a Logan record, never a junk/lender token.
+    """Pick the real owner(s) from a Logan record, never a junk/lender token.
 
     Logan puts the searched/reverse parties in grantor/grantee in either order,
     and on distress recordings one side is the homeowner while the other is the
-    lender/trustee or a junk book-page token ("DOC 1186 608"). Behaviour by
+    lender/trustee or a junk book-page token ("DOC 1186 608"). An instrument
+    can also name SEVERAL people on the owner side (co-owners, multiple heirs)
+    -- rod/logan.py's `grantor`/`grantee` are "; "-joined lists of every
+    distinct name seen for that role, not a single name. Behaviour by
     instrument class:
       * deed codes (TR/D, C/TR/D, SHF/D, TD) and lis-pendens codes (S/TR, FCL,
-        N/SUB, ...): choose the party that looks like a person; if neither does
-        (both lender/junk — common on S/TR & FCL) emit None rather than a
-        guaranteed-unresolvable lender name.
-      * probate / lien codes: the grantor IS the owner (decedent/estate), so
-        keep it as-is per the spartan_weekly_legals pattern (defendant=decedent),
-        only rejecting a junk book-page token.
-    Result is always a real name or None, never a BK/PG/DOC structural token.
+        N/SUB, ...): keep EVERY party (either side) that looks like a person,
+        filtered name-by-name so one institutional co-party (a trustee, an
+        HOA) can't mask a real co-owner's name elsewhere in the same list;
+        if none looks like a person (all lender/junk — common on S/TR & FCL)
+        emit None rather than a guaranteed-unresolvable lender name.
+      * probate / lien codes: the grantor side IS the owner (decedent/estate/
+        heirs), so keep every grantor name as-is per the spartan_weekly_legals
+        pattern (defendant=decedent), only rejecting junk book-page tokens —
+        never institutional-filtered, so "THE UNKNOWN HEIRS OF ..." and an
+        "... EST" decedent name are never thrown away for containing stopword
+        tokens like "the"/"of".
+    Result is always real name(s) or None, never a BK/PG/DOC structural token.
     """
     code = (doc.doc_type or "").strip().upper()
     if code in _SALE or code in _PRE:
-        for name in (doc.grantor, doc.grantee):
-            candidate = (name or "").strip()
-            if not candidate or _is_junk_party(candidate) or _is_institutional(candidate):
-                continue
-            return candidate
-        return None
-    # probate / lien (or anything else): owner is the grantor; drop only junk.
-    grantor = (doc.grantor or "").strip()
-    if not grantor or _is_junk_party(grantor):
-        return None
-    return grantor
+        candidates = _split_parties(doc.grantor) + _split_parties(doc.grantee)
+        keepers = [c for c in candidates if not _is_junk_party(c) and not _is_institutional(c)]
+        keepers = _dedupe(keepers)
+        return "; ".join(keepers) if keepers else None
+    # probate / lien (or anything else): owner side is the grantor; drop only junk.
+    names = [g for g in _split_parties(doc.grantor) if not _is_junk_party(g)]
+    names = _dedupe(names)
+    return "; ".join(names) if names else None
 
 _PRE = {"FCL", "LIS/P", "S/TR", "N/SUB", "R/TR"}
 _SALE = {"TR/D", "TD", "C/TR/D", "SHF/D"}
