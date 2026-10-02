@@ -40,6 +40,7 @@ from typing import Iterable
 
 import structlog
 
+from ...document_links import harvest_document_links, stamp_documents
 from ...http_client import get_text
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -79,6 +80,30 @@ _SALE_RE = re.compile(r"Sale Number:\s*(?:</[^>]+>\s*)?([A-Z0-9-]+)", re.I)
 _SQFT_RE = re.compile(r"Square Footage:\s*</strong>\s*([\d,]+)", re.I)
 _YEAR_RE = re.compile(r"Year Built:\s*</strong>\s*(\d{4})", re.I)
 _ACRE_RE = re.compile(r"Lot Size:\s*</strong>\s*([\d.]+)\s*Acres", re.I)
+# Real property photos live under /property_image/ on GSA's own asset hosts
+# (verified live 2026-10-01: both a CloudFront distribution and an S3
+# bucket are used; survey/deed/IFB PDFs sit right next to them under
+# /property_document/ -- see harvest_document_links() call in parse_detail,
+# the actual "most common miss" fix). The domain is anchored right after
+# ``https://`` so this can't over-match a share-button URL that merely
+# EMBEDS a real image link in its query string (confirmed live: a Pinterest
+# "pin/create/bookmarklet/?media=https://...jpg" button on the page would
+# otherwise greedily match as one giant fake "image" URL). Excludes the
+# site's own "resauclogo.png" chrome, which lives in the same path.
+_IMG_RE = re.compile(
+    r"https://[a-z0-9.-]+\.(?:cloudfront\.net|amazonaws\.com)"
+    r"/property_image/[^\s\"'<>]+\.(?:jpe?g|png)",
+    re.I,
+)
+# Only pass through genuine document/image file URLs to stamp_documents --
+# harvest_document_links()'s shared `document` keyword also matches
+# "documentation" in unrelated chrome (confirmed live: a Google Maps JS
+# library URL under .../javascript/.../markerclusterer.js got pulled in
+# because its path contains "documentation"). That is a cross-cutting
+# imprecision in the shared helper (used by dozens of scrapers), out of
+# scope to change here -- cheaper and safer to filter to a real file
+# extension on this source's own output.
+_REAL_DOC_EXT_RE = re.compile(r"\.(?:pdf|tiff?|jpe?g|png)(?:[?#]|$)", re.I)
 
 
 def _meta(html: str, key: str) -> str | None:
@@ -141,8 +166,16 @@ def parse_detail(html: str, pid: str, url: str) -> Listing | None:
     if cm:
         city = cm.group(1).strip()
 
-    ptype = (_PTYPE_RE.search(html) or [None, None])
-    ptype_val = ptype.group(1).strip().lower() if ptype else None
+    # FIXED 2026-10-01: `_PTYPE_RE.search(html) or [None, None]` falls back
+    # to a plain LIST (truthy, non-empty) when the regex finds nothing, so
+    # `ptype.group(1)` below crashed with AttributeError on any page that
+    # has "Asset Type:" but no "Property Type:" label (confirmed live:
+    # property_id=27's lighthouse listing). fetch()'s own try/except turned
+    # that into a silently-dropped row (`gsa.parse_fail`), never a visible
+    # error -- exactly the "silent success" failure mode CLAUDE.md warns
+    # about.
+    ptype_m = _PTYPE_RE.search(html)
+    ptype_val = ptype_m.group(1).strip().lower() if ptype_m else None
     atype = _ATYPE_RE.search(html)
     atype_val = atype.group(1).strip() if atype else None
     kind = (
@@ -167,7 +200,22 @@ def parse_detail(html: str, pid: str, url: str) -> Listing | None:
     county = _county_for(city, state)
     label = atype_val or (ptype_val.title() if ptype_val else "Real Property")
 
-    return Listing(
+    # FIXED 2026-10-01 (national-auction-tier audit, batch 4): the detail
+    # page HTML is already fetched here -- it was being parsed for text
+    # fields only and the photo + PDF links sitting right next to that text
+    # (survey, deed, IFB, easement/baseline documentation under
+    # /property_document/, real listing photos under /property_image/) were
+    # dropped on the floor. THE most common miss per the audit protocol, and
+    # free here since no extra request is needed.
+    photos = sorted(set(m for m in _IMG_RE.findall(html) if "logo" not in m.lower()))
+    # Exclude /property_image/ from the document set -- those are real
+    # listing photos (captured above into raw["images"]), not scanned
+    # notices/deeds, and would otherwise waste an OCR call for no signal.
+    doc_urls = [u for u in harvest_document_links(html, base_url=url)
+                if _REAL_DOC_EXT_RE.search(u) and "/property_image/" not in u
+                and "realestatesales.gov/" not in u]  # site chrome (icons), not a document
+
+    li = Listing(
         source="national.gsa_realproperty",
         source_url=url,
         listing_type=ListingType.REO,
@@ -194,6 +242,11 @@ def parse_detail(html: str, pid: str, url: str) -> Listing | None:
             "auction_style": style,
         }},
     )
+    if photos:
+        li.raw["images"] = {"real": photos}
+    if doc_urls:
+        stamp_documents(li, doc_urls)
+    return li
 
 
 class GSARealProperty(BaseScraper):
