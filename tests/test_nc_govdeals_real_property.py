@@ -38,6 +38,7 @@ _YADKIN_COMMERCIAL = {
     "assetAuctionEndDate": "2026-07-27T08:00:00",
     "latitude": None,
     "longitude": None,
+    "photo": "27746_8_7c1e6dc3-4c4c-4756-b98d-570f1d609e4b.jpg?cb=260515154115",
 }
 
 # --- REAL-shape row: a land parcel whose street lives only in the description,
@@ -96,6 +97,29 @@ def test_parse_asset_yadkin_commercial_real_row():
     assert li.sale_date is not None and li.sale_date.year == 2026
     # Detail URL matches the SPA asset link (asset/{assetId}/{accountId}).
     assert li.source_url == "https://www.govdeals.com/asset/8/27746"
+
+
+def test_parse_asset_captures_real_photo_url():
+    """Found 2026-10-01 (HERMES sec 8 audit): the search API's own asset dict
+    carries a 'photo' filename that nothing resolved into a real URL before
+    this fix. Verified live via browser devtools network inspection that the
+    asset page resolves it against the Liquidity Services CDN as
+    webassets.lqdt1.com/assets/photos/<accountId>/<photo> (confirmed 200,
+    image/webp, real bytes)."""
+    li = parse_asset(_YADKIN_COMMERCIAL)
+    assert li is not None
+    assert li.raw["images"] == {
+        "real": ["https://webassets.lqdt1.com/assets/photos/27746/"
+                 "27746_8_7c1e6dc3-4c4c-4756-b98d-570f1d609e4b.jpg?cb=260515154115"]
+    }
+
+
+def test_parse_asset_no_photo_field_omits_images_key():
+    row = dict(_YADKIN_COMMERCIAL)
+    row.pop("photo", None)
+    li = parse_asset(row)
+    assert li is not None
+    assert "images" not in li.raw
 
 
 def test_parse_asset_land_parcel_street_and_pin_from_description():

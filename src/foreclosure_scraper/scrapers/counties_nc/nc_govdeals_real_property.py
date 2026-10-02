@@ -289,6 +289,23 @@ def _seller_account_body(page: int, account_id: int) -> dict[str, Any]:
     return body
 
 
+def _photo_url(photo: Any, account_id: Any) -> Optional[str]:
+    """The search API's own asset dict carries a real per-listing photo
+    filename ('photo': '<accountId>_<assetId>_<uuid>.jpg?cb=...') that
+    nothing captured before this fix (found 2026-10-01, HERMES sec 8 audit
+    -- same miss class as national.hubzu/gsa_surplus/servicelink_auction/
+    tranzon_auctions, fixed the same day). It isn't a full URL: the asset
+    page (a browser-rendered Angular SPA, confirmed via live devtools
+    network inspection 2026-10-01) resolves it against the Liquidity
+    Services CDN as
+    ``https://webassets.lqdt1.com/assets/photos/<accountId>/<photo>`` --
+    verified live (200, image/webp, 127KB) against a real GovDeals NC lot."""
+    photo = (photo or "").strip()
+    if not photo or account_id in (None, ""):
+        return None
+    return f"https://webassets.lqdt1.com/assets/photos/{account_id}/{photo}"
+
+
 def parse_asset(d: dict[str, Any]) -> Optional[Listing]:
     """Turn one GovDeals search-result asset into a Listing carrying county/state,
     or None when it isn't NC/SC real property we can attribute to a county.
@@ -373,7 +390,9 @@ def parse_asset(d: dict[str, Any]) -> Optional[Listing]:
     except (TypeError, ValueError):
         lat = lng = None
 
-    return Listing(
+    photo = _photo_url(d.get("photo"), account_id)
+
+    li = Listing(
         source=SLUG,
         source_url=url,
         listing_type=ListingType.AUCTION,
@@ -406,6 +425,9 @@ def parse_asset(d: dict[str, Any]) -> Optional[Listing]:
             }
         },
     )
+    if photo:
+        li.raw["images"] = {"real": [photo]}
+    return li
 
 
 # ---------------------------------------------------------------------------
