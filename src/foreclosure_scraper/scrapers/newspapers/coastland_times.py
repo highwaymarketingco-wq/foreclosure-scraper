@@ -151,6 +151,41 @@ GRANTOR_RE = re.compile(
     r"as\s+grantor|Trustee)|$)",
     re.I,
 )
+# Many NC substitute-trustee notices use a labeled-field template instead of
+# the "said property being located at <street>" prose LOCATED_AT_RE expects:
+#   "... Record Owners: Heirs of Janson Fros Address of Property: 4013 Mill
+#   Landing Road Wanchese, NC 27981 ... Grantors: Janson Fros, unmarried ..."
+# Found live 2026-10-01: before these labels were read, LOCATED_AT_RE/ADDR_RE
+# fell through to matching "10:30 a.m. Place of Sale" as if it were a street
+# address ("30 a.m. Place") -- a fabricated, wrong value in a REAL listing --
+# while the genuine address sat a few words later under its own clean label.
+# These labels are unambiguous, so they take priority over the prose/fallback
+# patterns when present.
+RECORD_OWNERS_LABEL_RE = re.compile(
+    r"Record\s+Owners?:\s*(.+?)\s*(?=Address\s+of\s+Property:|$)", re.I
+)
+ADDRESS_OF_PROPERTY_LABEL_RE = re.compile(
+    rf"Address\s+of\s+Property:\s*(\d{{1,6}}\s+[\w .'\-]*?(?:{_SUFFIX}))\.?,?\s+"
+    r"([A-Za-z][A-Za-z .'\-]*?),?\s*(?:NC|North Carolina)\s+(\d{5})",
+    re.I,
+)
+GRANTORS_LABEL_RE = re.compile(
+    r"Grantors?:\s*(.+?)\s*(?=Original\s+Beneficiary:|Dated:|Book\s*:|$)", re.I
+)
+# Tax-foreclosure notices (Commissioner's sale, not a substitute trustee) date
+# the sale as an ordinal clause instead of "on <Month> <day>, <year>":
+#   "...will on the 17th day of July, 2026, offer for sale..."
+# plus an "o'clock" time form ("at 12:00 o'clock, noon").
+ORDINAL_DATE_RE = re.compile(
+    r"\bon\s+the\s+(\d{1,2})(?:st|nd|rd|th)\s+day\s+of\s+"
+    r"(January|February|March|April|May|June|July|August|September|"
+    r"October|November|December)\s*,?\s*(\d{4})",
+    re.I,
+)
+OCLOCK_TIME_RE = re.compile(
+    r"\bat\s+(\d{1,2}(?::\d{2})?)\s*o.?clock,?\s*(noon|midnight|[ap]\.?m\.?)?",
+    re.I,
+)
 
 
 def _clean(s: str) -> str:
@@ -190,27 +225,50 @@ def _parse_detail(html: str, url: str, slug: str) -> Listing | None:
     if not blob or not _is_foreclosure(blob):
         return None
 
-    # Address: prefer the explicit "located at <street>, <city>, NC" phrasing.
+    # Address: prefer the unambiguous "Address of Property:" LABEL when the
+    # notice uses that template -- checked FIRST, before the prose/fallback
+    # patterns, because those were matching "10:30 a.m. Place of Sale" as a
+    # fabricated street address ("30 a.m. Place") on this template (found
+    # live 2026-10-01) while the genuine address sat a few words later under
+    # its own clean label.
     street = city = None
-    m = LOCATED_AT_RE.search(body)
-    if m:
-        street = _clean(m.group(1)).rstrip(".,")
-        cand_city = _clean(m.group(2)).rstrip(".,")
+    zip_code = None
+    aop_m = ADDRESS_OF_PROPERTY_LABEL_RE.search(body)
+    if aop_m:
+        street = _clean(aop_m.group(1)).rstrip(".,")
+        cand_city = _clean(aop_m.group(2)).rstrip(".,")
         if cand_city.isupper():
             cand_city = cand_city.title()
         if 2 <= len(cand_city) <= 40:
             city = cand_city
+        zip_code = aop_m.group(3)
+    if not street:
+        m = LOCATED_AT_RE.search(body)
+        if m:
+            street = _clean(m.group(1)).rstrip(".,")
+            cand_city = _clean(m.group(2)).rstrip(".,")
+            if cand_city.isupper():
+                cand_city = cand_city.title()
+            if 2 <= len(cand_city) <= 40:
+                city = cand_city
     if not street:
         am = ADDR_RE.search(body)
         if am:
             cand = _clean(am.group(1)).rstrip(".,")
-            if len(cand) >= 6 and re.search(r"[A-Za-z]{3,}", cand):
+            # Reject the "10:30 a.m. Place of Sale" boilerplate phrase this
+            # template's own time-of-sale clause produces ("30 a.m. Place")
+            # -- a fabricated address this ADDR_RE fallback would otherwise
+            # accept on any notice using this time/place wording that lacks
+            # the "Address of Property:" label handled above.
+            if len(cand) >= 6 and re.search(r"[A-Za-z]{3,}", cand) and not re.search(
+                r"^\d+\s*[ap]\.?m\.?\s+Place\b", cand, re.I
+            ):
                 street = cand
 
-    zip_code = None
-    zm = ZIP_RE.search(body)
-    if zm:
-        zip_code = zm.group(1)
+    if zip_code is None:
+        zm = ZIP_RE.search(body)
+        if zm:
+            zip_code = zm.group(1)
 
     parcel = None
     pm = PARCEL_RE.search(body)
@@ -237,10 +295,35 @@ def _parse_detail(html: str, url: str, slug: str) -> Listing | None:
                 sale_date = dateparser.parse(dm.group(1), fuzzy=True)
             except (ValueError, TypeError, OverflowError):
                 sale_date = None
+    if sale_date is None:
+        # Tax-foreclosure (Commissioner's sale) notices date the sale as an
+        # ordinal clause ("...will on the 17th day of July, 2026, offer for
+        # sale...") rather than "on <Month> <day>, <year>" -- found live
+        # 2026-10-01 on a Tyrrell County tax-foreclosure notice, where
+        # sale_date was silently None despite the date being plainly stated.
+        om = ORDINAL_DATE_RE.search(body)
+        if om:
+            try:
+                sale_date = dateparser.parse(f"{om.group(2)} {om.group(1)}, {om.group(3)}")
+            except (ValueError, TypeError, OverflowError):
+                sale_date = None
     if sale_time is None:
         tm = SALE_TIME_RE.search(body)
         if tm:
             sale_time = _clean(tm.group(1)).upper()
+    if sale_time is None:
+        # "...at 12:00 o'clock, noon" -- the ordinal-date template's own time
+        # form, distinct from the "10:30 AM" form SALE_TIME_RE expects.
+        ocm = OCLOCK_TIME_RE.search(body)
+        if ocm:
+            hm = ocm.group(1)
+            suffix = (ocm.group(2) or "").strip().upper().rstrip(".")
+            if suffix == "NOON":
+                sale_time = "12:00 PM" if hm.startswith("12") else f"{hm} PM"
+            elif suffix == "MIDNIGHT":
+                sale_time = "12:00 AM" if hm.startswith("12") else f"{hm} AM"
+            elif suffix in {"AM", "PM"}:
+                sale_time = f"{hm} {suffix}"
 
     trustee = None
     tr_m = TRUSTEE_NAMED_RE.search(body) or TRUSTEE_LABEL_RE.search(body)
@@ -257,15 +340,31 @@ def _parse_detail(html: str, url: str, slug: str) -> Listing | None:
     if cn_m:
         case_number = re.sub(r"\s+", "", cn_m.group(1)).upper()
 
-    # Grantor of the foreclosed Deed of Trust = the current record owner.
+    # Owner/grantor of the foreclosed Deed of Trust = the current record
+    # owner. Prefer the explicit "Record Owners:" label (most direct), then
+    # "Grantors:" (also labeled), then the "executed by <name>" prose form.
     owner_name = None
     defendant = None
-    g_m = GRANTOR_RE.search(body)
-    if g_m:
-        cand = _clean(g_m.group(1)).rstrip(",.;: ")
+    ro_m = RECORD_OWNERS_LABEL_RE.search(body)
+    if ro_m:
+        cand = _clean(ro_m.group(1)).rstrip(",.;: ")
         if len(cand) >= 3 and re.search(r"[A-Za-z]{2}", cand):
             owner_name = cand
             defendant = cand
+    if owner_name is None:
+        gr_m = GRANTORS_LABEL_RE.search(body)
+        if gr_m:
+            cand = _clean(gr_m.group(1)).rstrip(",.;: ")
+            if len(cand) >= 3 and re.search(r"[A-Za-z]{2}", cand):
+                owner_name = cand
+                defendant = cand
+    if owner_name is None:
+        g_m = GRANTOR_RE.search(body)
+        if g_m:
+            cand = _clean(g_m.group(1)).rstrip(",.;: ")
+            if len(cand) >= 3 and re.search(r"[A-Za-z]{2}", cand):
+                owner_name = cand
+                defendant = cand
 
     # Attorney/trustee phone + email printed in the notice foot (a reachable
     # case contact, NOT the owner). Reuses the Column gold-standard extractor
