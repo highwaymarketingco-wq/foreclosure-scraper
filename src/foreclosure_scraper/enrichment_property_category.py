@@ -231,9 +231,13 @@ def _categorize(li: Listing) -> Optional[dict]:
     if raw.get("mortgage_default") or raw.get("notice_of_default"):
         pre_signals.append("mortgage_default")
 
-    # Child support lien (financial distress, pre-foreclosure)
-    court_detail = raw.get("court_detail") or {}
-    if isinstance(court_detail, dict) and court_detail.get("child_support"):
+    # Child support lien (financial distress, pre-foreclosure). raw['child_support']
+    # is the real top-level key enrichment_case_detail._apply_court_detail writes
+    # (RAW_KEEP-allowlisted) -- this used to read a raw['court_detail'] key that is
+    # never set anywhere in the codebase, so this branch never fired. Fixed
+    # 2026-10-02 alongside the _apply_court_detail integration-gap fix.
+    cs = raw.get("child_support")
+    if isinstance(cs, dict) and cs.get("flag"):
         pre_signals.append("child_support")
 
     if pre_signals:

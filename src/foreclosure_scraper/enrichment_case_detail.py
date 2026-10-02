@@ -336,6 +336,16 @@ def _apply_court_detail(li: Listing, html: str) -> bool:
                 li.street_address = addr.strip()
     if roa.get("associated_cases"):
         li.raw["court_associated_cases"] = roa["associated_cases"]
+    # court_detail_parser.parse_sc_case_detail / parse_register_of_actions both
+    # compute this (docket/judgment/caption text scanned for CHILD SUPPORT /
+    # ALIMONY / ARREARS etc., {flag, hits, count}) but it was never copied onto
+    # li.raw here -- every neighboring court_* key above had its own line, this
+    # one didn't, so it was silently dropped before RAW_KEEP (which already
+    # allowlists "child_support") ever got a chance to run. Found 2026-10-02
+    # investigating why the child_support board column sits at 0/148 counties
+    # despite the parser detecting real hits.
+    if roa.get("child_support"):
+        li.raw["child_support"] = roa["child_support"]
 
     return True
 

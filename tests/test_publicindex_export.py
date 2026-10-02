@@ -126,6 +126,17 @@ def test_lane_for_subtype_mapping():
     assert lane_for_subtype("") is None
 
 
+def test_lane_for_subtype_quiet_title_and_adverse_possession():
+    """2026-10-02: before this lane existed, "Quiet Title" matched no needle and
+    rows with that Case Sub-Type were silently skipped by parse_publicindex_html
+    (keep_all_subtypes defaults False) rather than ingested -- scoped 2026-10-01,
+    confirmed never implemented, fixed here. "Adverse Possession" needs no
+    separate lane entry: it already matches the pre-existing "possession" needle."""
+    assert lane_for_subtype("Quiet Title") == ListingType.LIS_PENDENS
+    assert lane_for_subtype("Quiet Title Action") == ListingType.LIS_PENDENS
+    assert lane_for_subtype("Adverse Possession") == ListingType.LIS_PENDENS
+
+
 def test_listing_type_per_lane():
     by_case = {li.case_number: li for li in parse_publicindex_html(MIXED_HTML)}
     assert by_case["2026-CP-42-01547"].listing_type == ListingType.LIS_PENDENS  # foreclosure

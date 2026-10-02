@@ -130,6 +130,15 @@ _SUBTYPE_LANES: tuple[tuple[str, ListingType], ...] = (
     # not a tax lien. There is no JUDGMENT member, so map to LIS_PENDENS (the
     # generic court-distress lane) and rely on the captured judgment amount.
     ("judgment", ListingType.LIS_PENDENS),
+    # Quiet title action (title/ownership dispute, often naming heirs by
+    # publication — same "cloud on title forcing a resolution" shape as
+    # partition above). No dedicated enum member; closest fit is LIS_PENDENS.
+    # Scoped 2026-10-01 (adverse-possession research), implemented 2026-10-02:
+    # before this entry a "Quiet Title" Case Sub-Type matched no lane and was
+    # silently dropped (`continue` in parse_publicindex_html, keep_all_subtypes
+    # defaults False) rather than ingested. NB "adverse possession" needs no
+    # separate entry — it already matches the "possession" substring above.
+    ("quiet title", ListingType.LIS_PENDENS),
 )
 
 # Sub-types we consider "known lanes" worth ingesting when the operator exported
