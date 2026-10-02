@@ -44,6 +44,23 @@ _DATE_RE = re.compile(r"(\d{1,2}/\d{1,2}/\d{2,4})")
 class SCDORDelinquentTaxpayers(BaseScraper):
     slug = "counties_sc.sc_dor_delinquent_taxpayers"
     name = "SC DOR Delinquent Taxpayers"
+    # DISABLED 2026-10-01: confirmed-broken duplicate of counties_sc.sc_state_
+    # tax_lien, which targets this SAME mydorway.dor.sc.gov Top-Delinquent-
+    # Taxpayers page. Verified live: this module's plain get_text(impersonate=
+    # True) + regex-table parse returns 0 rows, because the page is a "Fast"
+    # GenTax-style SPA that renders its grid via client-side JS -- a plain
+    # HTTP fetch only ever sees the pre-render app shell, never the data (the
+    # exact "silent zero after a site redesign" failure class this audit was
+    # looking for). counties_sc.sc_state_tax_lien already solves this
+    # correctly with a stealth-render + pager-click driver (fixed the same
+    # day to also read all 3 pages of both the Individual AND Business tabs:
+    # 333 SC rows live, up from 80), and running two scrapers against the
+    # identical page would only re-add duplicate leads once this one were
+    # also fixed. Disabled rather than fixed-in-place to avoid exactly that.
+    disabled = True
+    disabled_reason = ("duplicate of counties_sc.sc_state_tax_lien (same mydorway.dor.sc.gov "
+                       "page); this module's plain-HTTP parse returns 0 against the live "
+                       "JS-rendered SPA - confirmed 2026-10-01")
     category = "state_tax"
     timeout_s = 120.0
     expected_min_count = 0
