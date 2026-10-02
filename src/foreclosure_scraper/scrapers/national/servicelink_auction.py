@@ -33,6 +33,30 @@ Pagination: ``limit`` maxes at 100 (>=150 -> HTTP 400). Pass the prior page's
 when the token is empty. NC ~145, SC ~67 statewide; we keep only our CORE
 Western-NC + Upstate-SC counties (~28 live). No auth, no cookie, no render —
 100% free public data, peer of the existing hubzu.py JSON scraper.
+
+FIXED 2026-10-01 (national-auction-tier audit, batch 4) — two real issues,
+both confirmed live against the actual response, not guessed:
+
+1. ``auction_status`` was the raw free-text ``listingStatus.statusText``
+   verbatim (e.g. "Status: Cancelled", "Status: Auctioned - Sold to 3rd
+   Party"). ``main.py``'s own shared terminal-status filter
+   (``_active_only()``) checks ``li.auction_status.lower() in
+   TERMINAL_AUCTION_STATUSES`` — an EXACT match against bare words like
+   "cancelled"/"sold" — so the "Status: " prefix and free-text suffix meant
+   it never matched, and a confirmed live, in-footprint row (403 W
+   Rustling Leaves Ln, Spartanburg SC, status "Status: Cancelled") was
+   shipping as an apparently-live lead. ``listingStatus.isAuctionClosed``
+   looked like the obvious authoritative flag instead but is NOT reliable
+   for this — verified live, it was ``False`` on that same cancelled
+   listing. ``_normalize_status()`` now maps to the bare canonical
+   vocabulary so the existing shared filter actually works for this source
+   (no local drop-logic added, to keep ServiceLink and every other source
+   checking the SAME list, the whole point of that shared filter existing).
+2. The API response already carries real per-property ``images`` and
+   ``documents`` arrays (confirmed live: an actual "Property Report" PDF,
+   a purchase-and-sale agreement, a lead-paint disclosure pamphlet, a
+   state-specific agent-disclosure form) right next to the fields already
+   being read — neither was ever captured.
 """
 from __future__ import annotations
 
@@ -43,6 +67,7 @@ import structlog
 from dateutil import parser as dateparser
 
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
@@ -78,6 +103,37 @@ _PROGRAM_TYPE = {
 }
 
 _MAX_PAGES = 20  # safety cap; NC+SC each resolve in 1-2 pages (<=200 rows)
+
+# FIXED 2026-10-01 (national-auction-tier audit, batch 4): auction_status
+# used to be the raw free-text `listingStatus.statusText` verbatim (e.g.
+# "Status: Cancelled", "Status: Auctioned - Sold to 3rd Party"). Confirmed
+# live this slips straight through main.py's own terminal-status safety net
+# (`_active_only()` checks `li.auction_status.lower() in
+# TERMINAL_AUCTION_STATUSES`, an EXACT match against bare words like
+# "cancelled"/"sold" -- the "Status: " prefix and free-text suffix meant it
+# never matched) -- confirmed a live, in-footprint row (403 W Rustling
+# Leaves Ln, Spartanburg SC, status "Status: Cancelled") was shipping as an
+# apparently-live lead. `listingStatus.isAuctionClosed` looked like the
+# obvious authoritative flag but is NOT reliable for this (verified live:
+# it was `False` on that same cancelled listing). Normalize to the bare
+# canonical vocabulary from models.TERMINAL_AUCTION_STATUSES instead, so
+# main.py's existing shared filter actually works for this source.
+_TERMINAL_KEYWORDS = (
+    ("cancel", "cancelled"),
+    ("withdraw", "withdrawn"),
+    ("rescind", "rescinded"),
+    ("redeem", "redeemed"),
+    ("sold", "sold"),
+    ("auctioned", "sold"),
+)
+
+
+def _normalize_status(status_text: str | None, status_srp: str | None) -> str | None:
+    blob = f"{status_text or ''} {status_srp or ''}".lower()
+    for kw, canon in _TERMINAL_KEYWORDS:
+        if kw in blob:
+            return canon
+    return (status_srp or status_text or "").strip() or None
 
 
 def _kind(raw: str | None) -> PropertyKind:
@@ -145,12 +201,28 @@ def _parse_item(item: dict, state: str) -> Listing | None:
     lstatus = item.get("listingStatus") or {}
     status_text = (lstatus.get("statusText") if isinstance(lstatus, dict) else None) \
         or item.get("status") or item.get("stage")
+    status_srp = lstatus.get("statusTextSRP") if isinstance(lstatus, dict) else None
+    auction_status = _normalize_status(status_text, status_srp)
 
     bid = _money(item.get("openingBid")) or _money(item.get("tpsOpenBid"))
 
     attorney = (item.get("foreclosureAttorneyName") or "").strip() or None
 
-    return Listing(
+    # FIXED 2026-10-01: the API already returns real per-property photos
+    # and documents (e.g. a "Property Report" PDF) right in this same
+    # response -- confirmed live, neither was ever captured.
+    photos = [
+        (im.get("mediaUrl") or im.get("url") or "").strip()
+        for im in (item.get("images") or []) if isinstance(im, dict)
+    ]
+    photos = [p for p in photos if p.startswith("http")]
+    doc_urls = [
+        (d.get("mediaUrl") or d.get("url") or "").strip()
+        for d in (item.get("documents") or []) if isinstance(d, dict)
+    ]
+    doc_urls = [d for d in doc_urls if d.startswith("http")]
+
+    li = Listing(
         source="national.servicelink_auction",
         source_url=url,
         listing_type=ltype,
@@ -169,7 +241,7 @@ def _parse_item(item: dict, state: str) -> Listing | None:
         living_sqft=_money(pi.get("interiorSqFt")),
         lot_size_sqft=(_money(pi.get("lotSize")) * 43560) if _money(pi.get("lotSize")) else None,
         year_built=int(pi["yearBuilt"]) if str(pi.get("yearBuilt") or "").isdigit() else None,
-        auction_status=str(status_text)[:120] if status_text else None,
+        auction_status=auction_status[:120] if auction_status else None,
         trustee=attorney,  # foreclosure attorney/trustee handling the sale
         case_number=f"slauction-{item.get('listingId')}" if item.get("listingId") else None,
         description=(f"ServiceLink Auction — {program}" if program else "ServiceLink Auction").strip(),
@@ -182,6 +254,8 @@ def _parse_item(item: dict, state: str) -> Listing | None:
             "auction_program": item.get("auctionProgram"),
             "status": item.get("status"),
             "stage": item.get("stage"),
+            "status_text": status_text,
+            "status_text_srp": status_srp,
             "occupancy": pi.get("occupancyStatus"),
             "auction_number": ari.get("auctionNumber"),
             "auction_name": ari.get("auctionName"),
@@ -194,6 +268,11 @@ def _parse_item(item: dict, state: str) -> Listing | None:
             "is_financible": item.get("isFinancible"),
         }},
     )
+    if photos:
+        li.raw["images"] = {"real": photos}
+    if doc_urls:
+        stamp_documents(li, doc_urls)
+    return li
 
 
 async def _fetch_state(c, state: str) -> list[Listing]:
