@@ -57,6 +57,20 @@ class EPASuperfund(BaseScraper):
     timeout_s = 90.0
     expected_min_count = 0
     optional = True
+    # DISABLED 2026-09-15 (see module docstring: dead endpoint, redundant
+    # with counties_generic.epa_frs_sites.py). fetch() already hardcoded
+    # `return []` but never set disabled=True, so every run reported
+    # OUTCOME_ZERO ("ran clean but returned 0 rows") instead of
+    # OUTCOME_DORMANT -- an ambiguous zero. Found via the 2026-10-01
+    # national/reo per-source audit, same pattern as national.liensnc /
+    # national.probate_foreclosure_leads / national.propwire /
+    # national.legacy_obituaries. No behavior change.
+    disabled = True
+    disabled_reason = (
+        "dead endpoint (data.epa.gov/ef/seplan 403s, route no longer "
+        "exists) and redundant with counties_generic.epa_frs_sites.py, "
+        "which already covers this signal via a working path"
+    )
 
     async def fetch(self) -> Iterable[Listing]:
         # Disabled — see module docstring. Confirmed dead endpoint AND

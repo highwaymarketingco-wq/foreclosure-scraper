@@ -88,6 +88,20 @@ class SeeClickFixScraper(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 240.0
+    # DISABLED 2026-09-15 (see module docstring: confirmed garbage emitter,
+    # geo-filter silently ignored + city/state hardcoded from the query).
+    # fetch() already hardcoded `return []` but never set disabled=True, so
+    # every run reported OUTCOME_ZERO instead of OUTCOME_DORMANT -- an
+    # ambiguous zero. Found via the 2026-10-01 national/reo per-source
+    # audit, same pattern as national.liensnc / national.epa_superfund /
+    # national.legacy_obituaries. No behavior change.
+    disabled = True
+    disabled_reason = (
+        "confirmed garbage emitter 2026-09-15: the v2 API's lat/lng/radius "
+        "geo-filter is silently ignored and city/state get hardcoded from "
+        "the query dict rather than the real result (produced 1,239 "
+        "fabricated-geography rows in one live run)"
+    )
 
     async def _fetch_city(self, c: dict) -> list[Listing]:
         out: list[Listing] = []
