@@ -1920,6 +1920,7 @@ RAW_KEEP = {
     "pickens_mie": "*",               # Pickens MIE results PDF parse provenance
     "anderson_mie_results": "*",      # Anderson MIE Sale-Results parse provenance
     "anderson_mie": "*",              # Anderson MIE Sale-List (upcoming) parse provenance: legal_description, sale_notes
+    "anderson_acpass": "*",           # Anderson ACPASS deed-search (POA/COURT ORDER) instrument provenance: parties, book/page, image_url
     "spartanburg_pdf": "*",           # Spartanburg MIE PDF parse provenance (now includes is_results_pdf)
     "assessor_card": "*",             # on-demand per-parcel card: recorded sale price + history + sqft source
     "pulled_sale": "*",               # cross-run withdrawn/pulled-sale aging counter

@@ -834,6 +834,11 @@ DATELESS_OK_SOURCES = {
     # END date, but brokered "real-estate-listings" rows + between-cycle items are
     # routinely dateless; without this, _active_only would drop those.
     "counties_sc.meares_auctions",
+    # Anderson SC ACPASS deed-search (POA + COURT ORDER instrument-type codes):
+    # a recorded POA or a judicially-adjudicated heir order is a standing
+    # legal-record event with a FILE date, not a scheduled auction -- same
+    # reasoning as every other court/probate source in this list.
+    "counties_sc.anderson_acpass_deeds",
 }
 
 

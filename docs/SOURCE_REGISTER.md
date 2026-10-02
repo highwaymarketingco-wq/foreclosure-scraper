@@ -1,19 +1,10 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-28 09:05 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-10-01 23:57 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-**Two rows hand-added 2026-09-30** (`counties_sc.greenwood_corebtpay_delinquent_tax`
-and, later the same day, `counties_nc.gastonia_code_enforcement`, both in section 2
-below) to keep `tests/test_source_docs_current.py` green without re-running the
-generator — which streams the full live board into memory, and both sessions were
-scoped to stay off the board entirely for memory-safety reasons (other agent
-sessions were active on an 8GB Mac; see each scraper's own commit message).
-Re-run `scripts/gen_source_register.py` in a later session to fold these back into
-a real regeneration; the counts below do not include either hand-add.
-
-- Scrapers in the registry: **236**
-- Producing rows on the board: **129**
-- Registered but contributing ZERO rows: **107**
+- Scrapers in the registry: **238**
+- Producing rows on the board: **128**
+- Registered but contributing ZERO rows: **110**
 - Confirmed real and not yet built: **3**
 - Board read: `data/checkpoint/board.json.gz` (197,890 rows)
 
@@ -54,7 +45,6 @@ Live row counts are what the source actually contributed to the board read above
 | `national.hud_reac_inspection` | 1,260 | Mecklenburg NC (134), Richland SC (83), Wake NC (82) | `https://www.hud.gov/sites/default/files/Housing/documents/MF-Inspection-Report.xls```<br>`https://www.hud.gov/sites/default/files/Housing/documents/`<br>`https://www.hud.gov/stat/mfh/inspection-scores` |
 | `counties_sc.charleston_delinquent_tax` | 1,217 | Charleston SC (1217) | `https://charlestoncounty.gov/departments/delinquent-tax/`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/RP-Tax-Sale-Listing.pdf`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/MH-Tax-Sale-Listing.pdf` |
 | `public_notices.nc_notices_counties` | 925 | Buncombe NC (242), Gaston NC (121), Brunswick NC (83) | `https://www.ncnotices.com/Search.aspx`<br>`https://www.ncnotices.com/Details.aspx?ID={` |
-| `counties_sc.dorchester_billtrax_delinquent_tax` | 897 | Dorchester SC (897) | `https://dorchestercountyscdelinquenttaxapi.billtrax.com`<br>`https://dorchestercountyscdelinquenttax.billtrax.com/` |
 | `national.fannie_homepath` | 874 | Spartanburg SC (343), Laurens SC (122), Anderson SC (100) | `https://homepath.fanniemae.com/cfl/property-inventory/search`<br>`https://homepath.fanniemae.com/`<br>`https://homepath.fanniemae.com/property/{uuid` |
 | `counties_nc.buncombe_delinquent_tax` | 828 | Buncombe NC (828) | `https://media.buncombenc.gov/common/tax/buncombe-county-tax-department-advertisement-of-tax-liens.pdf`<br>`https://media.buncombenc.gov/common/tax/` |
 | `counties_sc.sc_public_notices` | 824 | Cherokee SC (142), Charleston SC (135), Pickens SC (128) | `https://www.scpublicnotices.com/Search.aspx`<br>`https://www.scpublicnotices.com/Details.aspx?ID={n[` |
@@ -71,7 +61,7 @@ Live row counts are what the source actually contributed to the board read above
 | `national.landwatch` | 488 | Burke NC (46), Brunswick NC (37), Pender NC (35) | `https://www.landwatch.com/{state_slug` |
 | `counties_sc.oconee_forfeited_land` | 451 | Oconee SC (451) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
 | `counties.multi_year_delinquent_tax` | 418 | Buncombe NC (366), Oconee SC (49), Pickens SC (3) | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services`<br>`https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services`<br>`https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>_+3 more_ |
-| `counties_sc.georgetown_civicengage` | 397 | Georgetown SC (397) | `https://www.gtcountysc.gov` |
+| `counties_sc.georgetown_civicengage` | 397 | Georgetown SC (397) | `https://georgetowncountysctax.com/#/`<br>`https://www.gtcountysc.gov` |
 | `counties_nc.rutherford_wildfire_tax` | 367 | Rutherford NC (367) | `https://www.rutherfordcountync.gov/tax_search/index.php`<br>`https://d1ebsyxxbc7tep.cloudfront.net`<br>`https://{m.group(1` |
 | `counties_nc.transylvania_delinquent_tax` | 336 | Transylvania NC (335), Henderson NC (1) | `https://tax.transylvaniacounty.org/TaxBillSearch`<br>`https://tax.transylvaniacounty.org` |
 | `counties_sc.sc_public_index_lis_pendens` | 325 | Anderson SC (126), Spartanburg SC (95), Laurens SC (27) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
@@ -99,7 +89,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.sc_flc` | 73 | Anderson SC (73) | `https://www.spartanburgcounty.gov/216/Tax-Collector`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>`https://www.pickenscountysc.gov/treasurer/tax-sale`<br>_+6 more_ |
 | `counties_sc.sc_des_brownfields` | 64 | Statewide SC (64) | `https://des.sc.gov/programs/bureau-land-waste-management/`<br>`https://des.sc.gov/community/environmental-sites-projects` |
 | `law_firms.hutchens` | 59 | Spartanburg SC (14), Gaston NC (6), Cherokee SC (6) | `https://sales.hutchenslawfirm.com/NCfcSalesList.aspx`<br>`https://sales.hutchenslawfirm.com/SCfcSalesList.aspx` |
-| `law_firms.zacchaeus` | 59 | Guilford NC (8), Cabarrus NC (8), Robeson NC (7) | `https://www.zls-nc.com/listings` |
+| `law_firms.zacchaeus` | 59 | Guilford NC (8), Cabarrus NC (8), Robeson NC (7) | `https://www.zls-nc.com/listings`<br>`https://gis.moorecountync.gov/mooreinfo2010/` |
 | `national.auction_dot_com` | 57 | Anderson SC (7), Spartanburg SC (6), McDowell NC (2) | `https://www.auction.com/residential/nc/`<br>`https://www.auction.com/residential/sc/`<br>`https://www.auction.com/details/{slug` |
 | `national.estate_sales` | 57 | Cleveland NC (11), Buncombe NC (8), Mecklenburg NC (8) | `https://www.estatesales.net`<br>`https://www.estatesale.com`<br>`https://{host` |
 | `national.zillow_bulk` | 55 | Spartanburg SC (2), Gaston NC (1), Greenville SC (1) | `https://www.zillow.com/{state.lower(` |
@@ -175,7 +165,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_nc.cumberland_tax_foreclosure` | `https://www.co.cumberland.nc.us/departments/tax/tax-administration/tax-foreclosures` |
 | `counties_nc.gaston_surplus_properties` | `https://www.gastongov.com/709/Surplus-Properties`<br>`https://www.gastongov.com`<br>_+1 more_ |
 | `counties_nc.gaston_tax_foreclosures` | `https://www.gastongov.com/669`<br>`https://www.gastongov.com/671` |
-| `counties_nc.gastonia_code_enforcement` | `https://devsvcs.gastonianc.gov/CodeEnforcement/Locator`<br>`https://devsvcs.gastonianc.gov/CodeEnforcement/LocatorResultsPolygon`<br>_+1 more_ |
+| `counties_nc.gastonia_code_enforcement` | `https://devsvcs.gastonianc.gov`<br>`https://gis.gastoncountync.gov/publicgis/rest/services/` |
 | `counties_nc.henderson_tax` | `https://www.hendersoncountync.gov/tax/page/tax-foreclosure-sales` |
 | `counties_nc.lincoln_code_violations` | `https://arcgisserver.lincolncountync.gov/arcgis/rest/services/` |
 | `counties_nc.mcdowell_tax_foreclosure` | `https://mcdowellnc.gov/departments/tax-collections/` |
@@ -195,6 +185,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_nc.wnc_tax_foreclosures` | `https://www.wataugacounty.org/`<br>`https://www.averycounty.com/`<br>_+3 more_ |
 | `counties_sc.abbeville_delinquent_tax` | `https://abbevillecountysc.com/delinquent-tax-collector/` |
 | `counties_sc.aiken_delinquent_tax` | `https://sc-aikencounty.civicplus.com/309/Tax-Foreclosures` |
+| `counties_sc.anderson_acpass_deeds` | `https://acpass.andersoncountysc.org` |
 | `counties_sc.anderson_sheriff` | `https://www.andersonsheriff.com/sheriff-sales` |
 | `counties_sc.bamberg_sheriff` | `https://www.bambergcounty.sc.gov/public-safety/sheriffs-office` |
 | `counties_sc.barnwell_sheriff` | `https://www.barnwellcounty.com/sheriff/sheriff-sales` |
@@ -205,9 +196,10 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.colleton_tax_sale` | `https://www.colletoncounty.org/delinquent-tax`<br>`https://www.colletoncounty.org/delinquent-tax/tax-sale`<br>_+1 more_ |
 | `counties_sc.darlington_delinquent_tax` | `https://www.darcosc.com/government/treasurer/index.php` |
 | `counties_sc.dillon_sheriff` | `https://dilloncountysc.org/services/public_safety/sheriffs_office.php` |
+| `counties_sc.dorchester_billtrax_delinquent_tax` | `https://dorchestercountyscdelinquenttaxapi.billtrax.com`<br>`https://dorchestercountyscdelinquenttax.billtrax.com/` |
 | `counties_sc.edgefield_delinquent_tax` | `https://edgefieldcounty.sc.gov/treasurer/` |
 | `counties_sc.fairfield_delinquent_tax` | `https://www.fairfieldsc.com/departments/treasurer` |
-| `counties_sc.greenwood_corebtpay_delinquent_tax` | `https://greenwoodco.corebtpay.com/egov/apps/bill/pay.egov` |
+| `counties_sc.greenwood_corebtpay_delinquent_tax` | `https://greenwoodco.corebtpay.com/egov/apps/payment/center.egov`<br>`https://greenwoodco.corebtpay.com/egov/apps/bill/pay.egov` |
 | `counties_sc.greenwood_delinquent_tax` | `https://www.greenwoodcounty-sc.gov/treasurer/delinquent-tax-sale` |
 | `counties_sc.kershaw_flc` | `https://www.kershaw.sc.gov/treasurer/forfeited-land-commission` |
 | `counties_sc.lancaster_delinquent_tax` | `https://www.lancastercountysc.gov` |
