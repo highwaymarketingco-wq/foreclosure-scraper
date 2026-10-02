@@ -83,7 +83,8 @@ SERVICE_URL = (
 )
 FIELDS = (
     "CaseNumber,ParcelId,CaseType,FullAddress,CaseStatus,"
-    "DateCreated,CouncilDistrict,DetailedDescription"
+    "DateCreated,CouncilDistrict,DetailedDescription,"
+    "FOFOrdered,CaseOrigin,ReqNum311"
 )
 _PAGE = 2000
 
@@ -144,7 +145,7 @@ def _parse_address(full: str) -> tuple[str | None, str | None, str | None]:
     return _usable_street(full), None, None
 
 
-def _to_listing(attrs: dict) -> Listing | None:
+def _to_listing(attrs: dict, geometry: dict | None = None) -> Listing | None:
     case_num = attrs.get("CaseNumber")
     full_addr = attrs.get("FullAddress")
     if not case_num or not full_addr:
@@ -157,8 +158,33 @@ def _to_listing(attrs: dict) -> Listing | None:
     created_ms = attrs.get("DateCreated")
     created = datetime.utcfromtimestamp(created_ms / 1000) if created_ms else None
 
-    desc = (attrs.get("DetailedDescription") or "").replace("\r\n", " ")[:400]
+    full_desc = (attrs.get("DetailedDescription") or "").replace("\r\n", " ").strip()
+    # DetailedDescription is a chronological letter log that can run to dozens of
+    # entries over several years (confirmed live: case 20190055069 has 54 letters
+    # spanning 2019-2026). Truncating from the front (the old [:400] slice) keeps
+    # only the OLDEST history and silently drops the most recent — and most
+    # relevant — letters. Show the tail (most recent activity) in the short
+    # description instead, and keep the full untruncated log in raw.
+    desc_tail = full_desc[-400:] if len(full_desc) > 400 else full_desc
     case_type = attrs.get("CaseType") or "Code Enforcement"
+
+    # FOFOrdered ("Findings of Fact" demolition order issued) is the strongest
+    # severity signal this service carries — confirmed live on case 20190055069
+    # (FOFOrdered=1, with "FOF Demo Letter" entries in its description) versus
+    # FOFOrdered=0 on ordinary open cases. Not in the old FIELDS list, so every
+    # row shipped with no way to distinguish a demolition-track case from a
+    # routine one.
+    fof_raw = attrs.get("FOFOrdered")
+    fof_ordered = bool(fof_raw) if fof_raw is not None else None
+
+    lat = lng = None
+    if geometry:
+        y, x = geometry.get("y"), geometry.get("x")
+        if y is not None and x is not None:
+            try:
+                lat, lng = float(y), float(x)
+            except (TypeError, ValueError):
+                lat = lng = None
 
     return Listing(
         source="city_websites.charlotte_open_data",
@@ -170,16 +196,24 @@ def _to_listing(attrs: dict) -> Listing | None:
         state="NC",
         county="Mecklenburg",
         zip_code=zip_code,
+        latitude=lat,
+        longitude=lng,
         parcel_id=(attrs.get("ParcelId") or "").strip() or None,
         case_number=str(case_num),
-        description=f"Charlotte code enforcement — {case_type}: {desc}"[:500],
+        description=(f"Charlotte code enforcement — {case_type}"
+                     + (" (demolition order issued)" if fof_ordered else "")
+                     + f": {desc_tail}")[:500],
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
         raw={"charlotte_code_enforcement": {
             "case_type": case_type,
             "case_status": attrs.get("CaseStatus"),
+            "case_origin": attrs.get("CaseOrigin"),
             "council_district": attrs.get("CouncilDistrict"),
             "date_created": created.isoformat() if created else None,
+            "fof_ordered": fof_ordered,
+            "req_num_311": attrs.get("ReqNum311"),
+            "detailed_description_full": full_desc[:4000] or None,
         }},
     )
 
@@ -201,6 +235,8 @@ class CharlotteOpenData(BaseScraper):
                     r = await c.get(SERVICE_URL, params={
                         "where": "CaseStatus='Open'",
                         "outFields": FIELDS,
+                        "returnGeometry": "true",
+                        "outSR": "4326",
                         "resultOffset": offset,
                         "resultRecordCount": _PAGE,
                         "f": "json",
@@ -214,7 +250,7 @@ class CharlotteOpenData(BaseScraper):
                         break
                     feats = data.get("features") or []
                     for f in feats:
-                        li = _to_listing(f.get("attributes") or {})
+                        li = _to_listing(f.get("attributes") or {}, f.get("geometry"))
                         if li:
                             out.append(li)
                     if len(feats) < _PAGE or not data.get("exceededTransferLimit"):

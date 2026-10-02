@@ -54,6 +54,69 @@ def test_real_row_converts_with_no_privacy_leak():
     assert "phone" not in str(li.raw).lower()
 
 
+def test_fof_ordered_and_geometry_captured():
+    """Live case 20190055069 (pulled 2026-10-01) has FOFOrdered=1 (a Findings
+    of Fact demolition order) and a real lat/lng from the service's own
+    geometry -- both were previously dropped: FOFOrdered wasn't in FIELDS at
+    all, and the query never requested geometry/outSR=4326."""
+    li = _to_listing(
+        {
+            "CaseNumber": "20190055069",
+            "ParcelId": "06916309",
+            "CaseType": "Housing",
+            "FullAddress": "2601 ABELWOOD RD CHARLOTTE, NC 28216",
+            "CaseStatus": "Open",
+            "DateCreated": 1570744875000,
+            "CouncilDistrict": "2",
+            "CaseOrigin": "Field Observation",
+            "ReqNum311": "7785678",
+            "FOFOrdered": 1,
+            "DetailedDescription": "Violations Cited (98):\r\nContact Inspector",
+        },
+        {"x": -80.86032565877606, "y": 35.268429256032796},
+    )
+    assert li is not None
+    assert li.latitude == 35.268429256032796
+    assert li.longitude == -80.86032565877606
+    assert li.raw["charlotte_code_enforcement"]["fof_ordered"] is True
+    assert li.raw["charlotte_code_enforcement"]["case_origin"] == "Field Observation"
+    assert li.raw["charlotte_code_enforcement"]["req_num_311"] == "7785678"
+    assert "demolition order issued" in li.description
+
+
+def test_fof_not_ordered_is_false_not_none():
+    li = _to_listing({
+        "CaseNumber": "20200011476",
+        "FullAddress": "1 MAIN ST CHARLOTTE, NC 28202",
+        "FOFOrdered": 0,
+    })
+    assert li.raw["charlotte_code_enforcement"]["fof_ordered"] is False
+    assert "demolition order issued" not in li.description
+
+
+def test_missing_geometry_leaves_lat_lng_none():
+    li = _to_listing({
+        "CaseNumber": "20200011476",
+        "FullAddress": "1 MAIN ST CHARLOTTE, NC 28202",
+    })
+    assert li.latitude is None
+    assert li.longitude is None
+
+
+def test_long_description_tail_kept_not_head():
+    """A multi-year letter log should show its MOST RECENT entries in the
+    short description (and keep the full log in raw), not its oldest."""
+    long_desc = "OLD-LETTER-FROM-2019 " + ("x" * 450) + " NEWEST-LETTER-FROM-2026"
+    li = _to_listing({
+        "CaseNumber": "20190055069",
+        "FullAddress": "1 MAIN ST CHARLOTTE, NC 28202",
+        "DetailedDescription": long_desc,
+    })
+    assert "NEWEST-LETTER-FROM-2026" in li.description
+    assert "NEWEST-LETTER-FROM-2026" in li.raw["charlotte_code_enforcement"]["detailed_description_full"]
+    assert "OLD-LETTER-FROM-2019" in li.raw["charlotte_code_enforcement"]["detailed_description_full"]
+
+
 def test_missing_address_is_dropped():
     assert _to_listing({"CaseNumber": "1", "FullAddress": None}) is None
 
