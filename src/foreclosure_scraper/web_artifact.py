@@ -2168,6 +2168,12 @@ RAW_KEEP = {
     # these were flat top-level raw keys with no RAW_KEEP entry (silently
     # dropped at publish; only govdeals_asset_id below survived).
     "govdeals": "*",
+    # national.xome raw payload (transaction_type, auction_date_text,
+    # status_text, bid_type, flags) -- added 2026-10-01 (national-auction-
+    # tier audit, batch 4) alongside the scraper's rewrite against the
+    # site's new server-rendered card markup. xome_listing_id below is the
+    # older, separate flat key and is unaffected.
+    "xome": "*",
 
     # third-party listing / property identifiers, needed to re-find a lead upstream
     "fc_listing_id": "*", "govdeals_asset_id": "*", "homesteps_kind": "*",

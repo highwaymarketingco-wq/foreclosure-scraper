@@ -1,36 +1,47 @@
-"""Xome auctions via Scrapling stealth.
+"""Xome auctions — now plain server-rendered HTML, no browser needed.
 
-Xome's `/auctions/bank-owned/{ST}` state-filtered URL renders only an
-empty state-landing shell — no real listings. The unfiltered
-`/auctions/bank-owned` and `/auctions/foreclosure-homes` pages DO render
-real cards across all states; we filter to NC + SC post-fetch.
+REWRITTEN 2026-10-01 (national-auction-tier audit, batch 4). The site was
+redesigned since this scraper was last built:
 
-Card structure (verified 2026-05-14):
-  <div class="srp-property-card"
-       listingkey="{id}"
-       detail-href="/auctions/{slug}-{id}"
-       listing-lat="..."  listing-lng="...">
-    .property-bidding $price
-    .bank-type / .auction-type (REO / Auction / etc.)
-    <span id="streetAddress-{id}">...
-    <span id="city-{id}">...
-    <span id="stateOrProvinceCode-{id}">{ST}
-    + bare <span>{zip}
+  * The old URLs (`/auctions/bank-owned`, `/auctions/foreclosure-homes`)
+    301-redirect to a single `/auctions?bank-owned` / `/auctions?foreclosure-
+    homes` query-flag form (confirmed live: the flag genuinely filters —
+    `?bank-owned` returns only "Bank Owned" cards, `?foreclosure-homes`
+    only "Foreclosure Homes" cards). The third old URL,
+    `/auctions/foreclosuresales`, is now a dead/empty category (200 OK,
+    zero property cards) — replaced with the real `?non-bank-owned` flag.
+  * Pagination is now a plain `&page=N` query param (confirmed live through
+    page 164) instead of the old JS "click next, cards accumulate in the
+    DOM" control — no more `#newPaginationHolder`/`#right-navigation`.
+  * Card markup is a completely different (Next.js/SSR) structure:
+    `[data-testid="auction-property-card-container"]` per card, with
+    `[class*="addressLine1"]` / `[class*="addressLine2"]` text nodes, not
+    the old `#streetAddress-{id}` id-per-field spans.
+  * MOST IMPORTANTLY: confirmed live that a PLAIN httpx/curl_cffi GET (NO
+    Scrapling, no headless browser, no page-click loop) already returns
+    every card's full text content — address, price, beds/baths/sqft,
+    transaction type, auction date, status, and flags (Cash Only/Reported
+    Vacant/No Buyers Premium) are all in the raw server HTML. The old
+    Scrapling StealthyFetcher + click-pagination approach is no longer
+    needed at all, which also drops this source's runtime from a
+    `timeout_s=600` full-browser multi-page-click session to a handful of
+    fast plain GETs.
 
-Pagination (verified 2026-06-24):
-  The SRP shows 50 cards/page with a JS-driven control inside
-  ``#newPaginationHolder`` — total pages live in ``#maxPageCount`` (e.g. 11)
-  and the running count in ``#totalEntry`` (e.g. 518). There is NO
-  URL-addressable page param; clicking ``#right-navigation`` APPENDS the next
-  page's cards to the DOM (cumulative 100 -> 150 -> 200 ...). So we click
-  "next" page-by-page inside the render session until the control disables or
-  ``#maxPageCount`` is reached (capped at PAGES_CAP), then parse the final
-  accumulated DOM once. NC/SC cards are sparse per page but accumulate across
-  all pages — materially more than the page-1-only ~3.
+AUDITED, NOT WIRED (scoped out, documented rather than guessed): real
+listing photos (`xomeauction.propertiescdn.com/ListingImages/...jpg`) DO
+exist on this site, but confirmed live they are NOT present inside any
+card's own HTML in the server response (0 of 96 cards on a sampled page
+had an image URL inside their own card boundary) — the card only ships an
+"animate-pulse" skeleton placeholder server-side; the real `<img src>` is
+hydrated client-side after page load from a mechanism this audit didn't
+find (no embedded `__NEXT_DATA__`/JSON state blob in the page). Wiring
+photos would mean reintroducing the stealth browser this rewrite just
+eliminated, for photos alone — flagged rather than done here.
+
+Free, no login, no CAPTCHA/WAF challenge encountered.
 """
 from __future__ import annotations
 
-import os
 import re
 from datetime import datetime
 from typing import Iterable
@@ -39,18 +50,31 @@ import structlog
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-URLS = (
-    "https://www.xome.com/auctions/bank-owned",
-    "https://www.xome.com/auctions/foreclosure-homes",
-    "https://www.xome.com/auctions/foreclosuresales",
+BASE = "https://www.xome.com/auctions"
+# Real, currently-live category flags (verified live 2026-10-01 -- each
+# genuinely filters server-side to its own transaction type). The old third
+# URL (`/auctions/foreclosuresales`) is now a dead/empty category.
+CATEGORY_URLS = (
+    f"{BASE}?bank-owned",
+    f"{BASE}?foreclosure-homes",
+    f"{BASE}?non-bank-owned",
 )
+_CORE_STATES = {"NC", "SC"}
+PAGES_CAP = 20  # breadth cap, same posture as this batch's other national
+                # sources (auction_dot_com PAGES_CAP=25, hibid PAGES_CAP=10)
+                # -- ~15.7k listings site-wide across ~164 pages is too much
+                # to exhaustively crawl every run; this trades completeness
+                # for a bounded, polite runtime.
+CARDS_PER_PAGE = 96  # observed live; used only to detect the last page
 
-PRICE_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
-PAGES_CAP = 25
+_PRICE_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
+_ADDR2_RE = re.compile(r"^(.*?),\s*([A-Z]{2})\s+(\d{5})(?:-\d{4})?\s*$")
+_ID_RE = re.compile(r"-(\d+)$")
 
 
 def _ltype(text: str) -> ListingType:
@@ -65,60 +89,82 @@ def _ltype(text: str) -> ListingType:
 
 
 def _parse_card(card, slug: str) -> Listing | None:
-    attrs = card.attributes or {}
-    listing_id = (attrs.get("listingkey") or "").strip() or None
-    detail_href = (attrs.get("detail-href") or "").strip()
-    if not listing_id or not detail_href:
-        return None
-    lat = attrs.get("listing-lat")
-    lng = attrs.get("listing-lng")
-
-    street_node = card.css_first(f"#streetAddress-{listing_id}")
-    city_node = card.css_first(f"#city-{listing_id}")
-    state_node = card.css_first(f"#stateOrProvinceCode-{listing_id}")
-    if street_node is None or state_node is None:
-        return None
-    state = (state_node.text(strip=True) or "").strip().upper()
-    if state not in ("NC", "SC"):
+    link_el = card.css_first('a[href^="/auctions/"]')
+    href = (link_el.attributes.get("href") or "").strip() if link_el else ""
+    if not href:
         return None
 
-    street = street_node.text(strip=True) or None
-    if not street:
+    addr1_el = card.css_first('[class*="addressLine1"]')
+    addr2_el = card.css_first('[class*="addressLine2"]')
+    street = addr1_el.text(strip=True) if addr1_el else None
+    addr2 = addr2_el.text(strip=True) if addr2_el else ""
+    if not street or not addr2:
         return None
-    city = city_node.text(strip=True) if city_node else None
 
-    # ZIP — the bare <span> after stateOrProvinceCode
-    zip_code = None
-    addr_block = card.css_first("address")
-    if addr_block is not None:
-        m = re.search(r"\b(\d{5})\b", addr_block.text())
-        zip_code = m.group(1) if m else None
+    m = _ADDR2_RE.match(addr2)
+    if not m:
+        return None
+    city, state, zip_code = m.group(1).strip(), m.group(2).upper(), m.group(3)
+    if state not in _CORE_STATES:
+        return None
 
-    # Price
+    amt_el = card.css_first('[data-testid="property-card-amt"] p')
+    amt_text = amt_el.text(strip=True) if amt_el else ""
     price = None
-    price_node = card.css_first(".property-bidding")
-    if price_node is not None:
-        pm = PRICE_RE.search(price_node.text())
-        if pm:
+    pm = _PRICE_RE.search(amt_text)
+    if pm:
+        try:
+            price = float(pm.group(1).replace(",", ""))
+        except ValueError:
+            price = None
+
+    type_el = card.css_first('[class*="transactionText"]')
+    type_text = type_el.text(strip=True) if type_el else ""
+
+    bb_el = card.css_first('[data-testid="property-card-beds-and-bath"]')
+    beds = baths = sqft = None
+    if bb_el is not None:
+        bolds = [b.text(strip=True) for b in bb_el.css('[class*="detailBold"]')]
+        bb_text = bb_el.text(separator=" ").lower()
+        if "bed" in bb_text and bolds:
             try:
-                price = float(pm.group(1).replace(",", ""))
+                beds = float(bolds[0])
+            except (ValueError, IndexError):
+                pass
+        if "bath" in bb_text and len(bolds) > 1:
+            try:
+                baths = float(bolds[1])
             except ValueError:
-                price = None
+                pass
+        if "sq" in bb_text and len(bolds) > 2:
+            try:
+                sqft = float(bolds[2].replace(",", ""))
+            except ValueError:
+                pass
 
-    # Photo: <img class="lazyload" data-src="...">
-    photos: list[str] = []
-    img_node = card.css_first("img.lazyload, img[data-src]")
-    if img_node is not None:
-        src = (img_node.attributes.get("data-src") or img_node.attributes.get("src") or "").strip()
-        if src.startswith("http"):
-            photos.append(src)
+    date_el = card.css_first('[class*="timelineDate"]')
+    auction_date_text = date_el.text(strip=True) if date_el else None
+    status_el = card.css_first('[class*="primaryBoldText"]')
+    status_text = status_el.text(strip=True) if status_el else None
+    bidtype_el = card.css_first('[data-testid="property-card-bid-type"]')
+    bid_type = bidtype_el.text(strip=True) if bidtype_el else None
+    flags = [f.text(strip=True) for f in card.css('[class*="flagChipContent"]')]
+    # The flag chip list repeats itself (an overflow "+1 More" duplicate
+    # rendering) in the live markup -- de-dupe while preserving order.
+    seen_flags: list[str] = []
+    for fl in flags:
+        if fl and fl not in seen_flags:
+            seen_flags.append(fl)
 
-    # Listing type from bank-type / auction-type chips
-    type_chip_text = ""
-    for sel in (".bank-type", ".auction-type", ".property-auction-type"):
-        n = card.css_first(sel)
-        if n is not None:
-            type_chip_text += " " + n.text()
+    idm = _ID_RE.search(href)
+    case_number = f"xome-{idm.group(1)}" if idm else f"xome-{href.strip('/').split('/')[-1]}"
+
+    county = None
+    try:
+        from ..._upstate_city_to_county import upstate_county_for
+        county = upstate_county_for(city, state)
+    except Exception:  # noqa: BLE001
+        pass
 
     def _flt(v):
         try:
@@ -128,106 +174,71 @@ def _parse_card(card, slug: str) -> Listing | None:
 
     return Listing(
         source=slug,
-        source_url=f"https://www.xome.com{detail_href}",
-        listing_type=_ltype(type_chip_text),
+        source_url=f"https://www.xome.com{href}",
+        listing_type=_ltype(type_text),
         property_kind=PropertyKind.UNKNOWN,
         state=state,
         city=city,
         zip_code=zip_code,
+        county=county,
         street_address=street,
-        case_number=f"xome-{listing_id}",
-        latitude=_flt(lat),
-        longitude=_flt(lng),
+        case_number=case_number,
         opening_bid=price,
-        description=(type_chip_text or "Xome auction").strip(),
+        bedrooms=_flt(beds),
+        bathrooms=_flt(baths),
+        living_sqft=_flt(sqft),
+        description=(type_text or "Xome auction").strip(),
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
         raw={
-            "xome_listing_id": listing_id,
-            "images": {"real": photos} if photos else {},
+            "xome": {
+                "transaction_type": type_text or None,
+                "auction_date_text": auction_date_text,
+                "status_text": status_text,
+                "bid_type": bid_type,
+                "flags": seen_flags or None,
+            },
         },
     )
 
 
-async def _fetch_page(url: str, slug: str, pages_cap: int) -> list[Listing]:
-    try:
-        from scrapling.fetchers import StealthyFetcher
-    except ImportError:
-        return []
-
-    async def page_action(page):
-        try:
-            await page.wait_for_selector(".srp-property-card", timeout=30000)
-        except Exception:
-            return
-        # Read the total page count from the rendered pagination control;
-        # fall back to the cap if the marker is missing/garbled.
-        max_pages = pages_cap
-        try:
-            txt = await page.eval_on_selector(
-                "#maxPageCount", "el => el.textContent"
-            )
-            n = int(re.sub(r"[^\d]", "", txt or ""))
-            if n > 0:
-                max_pages = min(n, pages_cap)
-        except Exception:
-            pass
-        # Click "next" — Xome APPENDS each page's cards to the DOM, so after
-        # the loop the page holds every card. Stop when the control disables.
-        for _ in range(1, max_pages):
-            try:
-                nxt = await page.query_selector("#right-navigation")
-                if nxt is None:
-                    break
-                cls = (await nxt.get_attribute("class")) or ""
-                if "disable" in cls.lower():
-                    break
-                prev = await page.eval_on_selector_all(
-                    ".srp-property-card", "els => els.length"
-                )
-                await nxt.click()
-                await page.wait_for_timeout(1500)
-                cur = await page.eval_on_selector_all(
-                    ".srp-property-card", "els => els.length"
-                )
-                if cur <= prev:  # no growth -> reached the end
-                    break
-            except Exception:
-                break
-        # Final settle + lazy-load nudge.
-        try:
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(1500)
-        except Exception:
-            pass
-
-    try:
-        result = await StealthyFetcher.async_fetch(
-            url, headless=True, network_idle=False, timeout=180000,
-            page_action=page_action, solve_cloudflare=False,
-        )
-    except Exception as exc:
-        log.warning("xome.fetch_failed", url=url, error=str(exc)[:200])
-        return []
-    body = getattr(result, "body", b"")
-    html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
-    if not html or len(html) < 5000:
-        return []
-    tree = HTMLParser(html)
+async def _fetch_category(category_url: str, slug: str, pages_cap: int) -> list[Listing]:
     out: list[Listing] = []
     seen: set[str] = set()
-    for card in tree.css(".srp-property-card"):
+    for page in range(1, pages_cap + 1):
+        url = category_url if page == 1 else f"{category_url}&page={page}"
         try:
-            li = _parse_card(card, slug)
-        except Exception:
-            continue
-        if li is None:
-            continue
-        # Dedupe within this (accumulated) page by detail-URL.
-        if li.source_url in seen:
-            continue
-        seen.add(li.source_url)
-        out.append(li)
+            html = await get_text(url, impersonate=True, timeout=30.0)
+        except Exception as exc:
+            log.warning("xome.page_failed", url=url, error=str(exc)[:200])
+            break
+        if not html or len(html) < 5000:
+            break
+
+        tree = HTMLParser(html)
+        cards = tree.css('[data-testid="auction-property-card-container"]')
+        if not cards:
+            break
+
+        kept = 0
+        for card in cards:
+            try:
+                li = _parse_card(card, slug)
+            except Exception:
+                continue
+            if li is None:
+                continue
+            if li.source_url in seen:
+                continue
+            seen.add(li.source_url)
+            out.append(li)
+            kept += 1
+
+        log.info("xome.page_done", url=category_url, page=page,
+                 cards=len(cards), kept=kept, running=len(out))
+        if len(cards) < CARDS_PER_PAGE:
+            break  # last page
+
     return out
 
 
@@ -237,20 +248,17 @@ class Xome(BaseScraper):
     category = "national_auction"
     expected_min_count = 0
     requires_apify = False
-    requires_render = True
-    timeout_s = 600.0
+    requires_render = False  # FIXED 2026-10-01: plain HTML now, no browser needed
+    timeout_s = 180.0
 
     async def fetch(self) -> Iterable[Listing]:
-        pages_cap = int(os.environ.get("XOME_PAGES", str(PAGES_CAP)))
-        # Bank rows as they are collected: if the soft timeout fires,
-        # base_scraper ships self.partial instead of discarding the run.
         out = self.partial
         seen: set[str] = set()
-        for url in URLS:
+        for category_url in CATEGORY_URLS:
             try:
-                rows = await _fetch_page(url, self.slug, pages_cap)
+                rows = await _fetch_category(category_url, self.slug, PAGES_CAP)
             except Exception as exc:
-                log.warning("xome.page_failed", url=url, error=str(exc)[:200])
+                log.warning("xome.category_failed", url=category_url, error=str(exc)[:200])
                 continue
             kept = 0
             for li in rows:
@@ -260,5 +268,5 @@ class Xome(BaseScraper):
                 seen.add(k)
                 out.append(li)
                 kept += 1
-            log.info("xome.page_done", url=url, found=len(rows), kept=kept)
+            log.info("xome.category_done", url=category_url, found=len(rows), kept=kept)
         return out
