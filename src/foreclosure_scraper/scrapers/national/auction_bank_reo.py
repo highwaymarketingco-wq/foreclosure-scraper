@@ -52,6 +52,7 @@ from datetime import datetime
 from typing import Iterable, Optional
 
 import structlog
+from selectolax.parser import HTMLParser, Node
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -170,17 +171,157 @@ def parse_properties(text: str, source: str, source_url: str,
     return out
 
 
+def _real_image_urls(card: Node, *, base: str,
+                      allow_relative_prefix: Optional[str] = None) -> list[str]:
+    """This card's own real per-property photo URLs, in document order,
+    de-duplicated, excluding theme/icon chrome.
+
+    FOUND 2026-10-01 (national/reo per-source audit), fixed 2026-10-02: both
+    pages interleave real photos with generic icon images, and neither
+    regex-over-flattened-body-text parsing (parse_properties, below) nor a
+    page-wide image scan can tell them apart -- only looking at where in the
+    DOM an <img> sits distinguishes them:
+      * Williams & Williams: the real photo is an ABSOLUTE URL on the
+        auctionnetworkimages.blob.core.windows.net CDN
+        (".../assets/media/<uuid>_fullsize.jpg"); every icon on the same card
+        (wheart.png, double-bed.png, bath.png, measure.png, LotSize.png) is a
+        bare RELATIVE path "Content/Images/<name>.png" with no scheme and no
+        leading slash, so requiring an absolute (http/https/protocol-relative)
+        src already excludes every one of them -- confirmed live 2026-10-02
+        against all 25 active cards on the page.
+      * Founders FCU: real photos are root-relative "/_s3/foundersfcu-com/
+        files/image/<name>.webp" (the property's own photo gallery); icons
+        (camera.png placeholder, site logos, app-store badges, NCUA/EHL seals)
+        are all under "/sites/default/themes/foundersfcu/...". Gated by
+        allow_relative_prefix="/_s3/" so only the gallery path resolves.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for img in card.css("img"):
+        src = (img.attributes.get("src") or "").strip()
+        if not src:
+            continue
+        if src.startswith("//"):
+            abs_url = f"https:{src}"
+        elif src.startswith("http"):
+            abs_url = src
+        elif allow_relative_prefix and src.startswith(allow_relative_prefix):
+            abs_url = base.rstrip("/") + src
+        else:
+            continue  # a bare icon path (no scheme, no matching relative prefix)
+        if "Content/Images/" in abs_url or abs_url in seen:
+            continue
+        seen.add(abs_url)
+        out.append(abs_url)
+    return out
+
+
+def _parse_cards(html_text: str, source: str, page_url: str,
+                  listing_type: ListingType, *, card_selector: str,
+                  image_base: str, allow_relative_image_prefix: Optional[str] = None,
+                  detail_selector: Optional[str] = None,
+                  detail_base: Optional[str] = None,
+                  want_price: bool = False) -> list[Listing]:
+    """DOM-based per-card parser: walk each real listing card in the page so
+    its own photo pairs RELIABLY with its own address, instead of
+    parse_properties()'s page-wide proximity heuristic (nearest street line
+    above a city match, nearest dollar figure in a +/-300-char window) which
+    has no way to attach a photo to a specific property at all.
+
+    Returns [] -- never raises -- when the selector matches no cards, so
+    callers can fall back to parse_properties() if a future site redesign
+    changes the markup (the HERMES "silent success" failure mode: a selector
+    miss must degrade to the old path, not silently zero the source).
+    """
+    try:
+        tree = HTMLParser(html_text)
+    except Exception:  # noqa: BLE001
+        return []
+    cards = tree.css(card_selector)
+    out: list[Listing] = []
+    seen: set[str] = set()
+    now = datetime.utcnow()
+    for card in cards:
+        text = body_text(card.html or "")
+        m = _CITY_ST_ZIP.search(text)
+        if not m:
+            continue
+        city, state, zc = m.group(1).strip(), m.group(2), m.group(3)
+        streets = _STREET.findall(text[:m.start()])
+        street = streets[-1].strip() if streets else None
+        key = f"{(street or '').upper()}|{city.upper()}|{zc}"
+        if key in seen:
+            continue
+        seen.add(key)
+
+        detail_url = page_url
+        if detail_selector:
+            a = card.css_first(detail_selector)
+            href = (a.attributes.get("href") or "").strip() if a else ""
+            if href:
+                detail_url = href if href.startswith("http") else (
+                    (detail_base or image_base).rstrip("/") + "/" + href.lstrip("/")
+                )
+
+        li = Listing(
+            source=source, source_url=detail_url,
+            listing_type=listing_type,
+            property_kind=PropertyKind.UNKNOWN,
+            state=state, county=None,          # resolved downstream from the address
+            street_address=street, city=city, zip_code=zc,
+            foreclosure_process="reo",
+            description=f"{listing_type.value} — "
+                        f"{' '.join(x for x in (street, f'{city}, {state} {zc}') if x)}"[:300],
+            first_seen=now, last_seen=now,
+            raw={"auction_bank_reo": {
+                "seller": source.rsplit(".", 1)[-1],
+                "city": city, "state": state, "zip": zc,
+                "street": street,
+                "price": _price_in(text) if want_price else None,
+            }},
+        )
+        photos = _real_image_urls(card, base=image_base,
+                                  allow_relative_prefix=allow_relative_image_prefix)
+        if photos:
+            li.raw["images"] = {"real": photos}
+        out.append(li)
+    return out
+
+
+#: Williams & Williams listing card: <div class="row" data-listingid="...">,
+#: the real photo lives in its own img-container, the detail link in its h1.
+_WW_CARD_SELECTOR = "div.row[data-listingid]"
+_WW_DETAIL_SELECTOR = "h1.title a"
+
+#: Founders FCU listing card: Drupal "foreclosures-section-view" repeats one
+#: <div class="repo foreclosure"> per property; real photos sit in its orbit
+#: carousel (/_s3/... gallery), icons/chrome live under /sites/default/themes/.
+_FOUNDERS_CARD_SELECTOR = "div.repo.foreclosure"
+
+
 async def _fetch_williams(c) -> list[Listing]:
     # NB: no state param. The server ignores it and returns the full active
-    # list either way, so the footprint filter is applied by parse_properties
-    # only matching NC/SC city lines.
+    # list either way, so the footprint filter is applied by only matching
+    # NC/SC city lines (both the DOM card parser and its text-regex fallback
+    # do this via _CITY_ST_ZIP).
     r = await c.get(WW_URL, params=WW_PARAMS, timeout=90.0)
     if r.status_code != 200:
         raise RuntimeError(f"williams: HTTP {r.status_code}")
-    rows = parse_properties(body_text(r.text),
-                            "national.auction_bank_reo.williams_williams",
-                            WW_PAGE, ListingType.AUCTION, want_price=False)
-    log.info("auction_bank_reo.williams", leads=len(rows))
+    slug = "national.auction_bank_reo.williams_williams"
+    rows = _parse_cards(r.text, slug, WW_PAGE, ListingType.AUCTION,
+                        card_selector=_WW_CARD_SELECTOR,
+                        image_base=WW_URL, detail_selector=_WW_DETAIL_SELECTOR,
+                        detail_base="https://bid.auctionnetwork.com",
+                        want_price=False)
+    if not rows:
+        # Defensive fallback: a future markup change must degrade to the old
+        # page-wide text parser, not silently zero the source. parse_properties
+        # never carried a photo even for a real row, so this path still works,
+        # just without raw["images"].
+        rows = parse_properties(body_text(r.text), slug, WW_PAGE,
+                                ListingType.AUCTION, want_price=False)
+    log.info("auction_bank_reo.williams", leads=len(rows),
+             with_photo=sum(1 for li in rows if li.raw.get("images", {}).get("real")))
     return rows
 
 
@@ -188,10 +329,17 @@ async def _fetch_founders(c) -> list[Listing]:
     r = await c.get(FOUNDERS_URL, timeout=90.0)
     if r.status_code != 200:
         raise RuntimeError(f"founders: HTTP {r.status_code}")
-    rows = parse_properties(body_text(r.text),
-                            "national.auction_bank_reo.founders_fcu",
-                            FOUNDERS_URL, ListingType.REO, want_price=True)
-    log.info("auction_bank_reo.founders", leads=len(rows))
+    slug = "national.auction_bank_reo.founders_fcu"
+    rows = _parse_cards(r.text, slug, FOUNDERS_URL, ListingType.REO,
+                        card_selector=_FOUNDERS_CARD_SELECTOR,
+                        image_base="https://www.foundersfcu.com",
+                        allow_relative_image_prefix="/_s3/",
+                        want_price=True)
+    if not rows:
+        rows = parse_properties(body_text(r.text), slug, FOUNDERS_URL,
+                                ListingType.REO, want_price=True)
+    log.info("auction_bank_reo.founders", leads=len(rows),
+             with_photo=sum(1 for li in rows if li.raw.get("images", {}).get("real")))
     return rows
 
 
