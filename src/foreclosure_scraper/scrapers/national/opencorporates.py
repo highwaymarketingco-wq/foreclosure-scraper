@@ -1,15 +1,29 @@
-"""OpenCorporates API — free tier entity enrichment.
+"""OpenCorporates API — PAID, OUT OF SCOPE for this free-only engine.
 
-OpenCorporates (opencorporates.com) provides a free API tier (rate-limited
-to ~500 req/month) for company data lookups. Used as an enrichment source
-to cross-reference LLC/Inc owner names against corporate registries.
+WALLED-CONFIRMED-DEAD / OUT OF SCOPE (2026-10-01 per-source audit).
 
-This is an ENRICHMENT scraper, not a lead source. Called by the enrichment
-pipeline to check entity status (active/dissolved) and registered agent info.
+This module's own docstring used to claim a usable anonymous free tier
+("No key required for basic searches"). That is no longer true -- confirmed
+live: an unauthenticated request to the exact endpoint below now returns
+HTTP 401 with body {"error": {"message": "Invalid Api Token. Please check
+your OpenCorporates account"}}. OpenCorporates requires a paid API token
+for every request now, with no free/anonymous fallback.
 
-Free API: https://api.opencorporates.com/v0.4/
-No key required for basic searches (rate-limited). With a free API token
-(OC_API_TOKEN in .env), rate limit increases.
+This also means the module was already in direct conflict with this repo's
+own hard rule before this audit: CLAUDE.md / HERMES.md section 2 rule 1
+names OpenCorporates explicitly as a PAID broker service that is "out of
+scope for the engine" ("No paid APIs ... no paid broker data (PropStream,
+ATTOM, OpenCorporates, NCOALink, Trepp, UniCourt, Trellis)"). Acquiring or
+paying for an OC_API_TOKEN would violate that rule directly, so this is not
+a gap to fill -- there is no free path here, by the project's own design,
+and now also confirmed by the live API itself.
+
+This is an ENRICHMENT scraper, not a lead source (fetch() has always been
+a no-op). search_entity() is left as-is -- it already fails safely (no
+token set -> request goes out unauthenticated -> 401 -> returns None,
+never raises, never fabricates a result) rather than being "fixed" into
+something that would require paying for API access this engine is not
+allowed to buy.
 """
 from __future__ import annotations
 
