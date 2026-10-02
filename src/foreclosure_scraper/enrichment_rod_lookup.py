@@ -145,6 +145,22 @@ def _session(host: str):
     return s
 
 
+#: The "Image?" column (cell index 9) carries a real scanned-document link —
+#: <a href='view_image.php?key=<hex>&type=tif'> — when the county has an image
+#: for that instrument. Live-confirmed 2026-10-01 against Haywood: fetching
+#: view_image.php?key=...&type=tif returns a real 200 image/tiff body, but
+#: ONLY within the SAME session (PHPSESSID) that ran the search — a fresh
+#: session on the identical key returns a 23-byte "Image not found on f[ile]"
+#: body. rod/doc_images.py's `LoganImageSession` already documents and
+#: handles this exact scoping (`view_image.php?key=` hash is scoped to the
+#: PHPSESSID that produced it). This module therefore captures the key/type
+#: per row (so nothing is silently thrown away and a session-aware consumer
+#: — this module's own session, or doc_images.py's LoganImageSession reusing
+#: the same key shape — can fetch it later) rather than emitting a bare URL
+#: that would silently 404-equivalent for any caller using a new session.
+_IMAGE_RE = re.compile(r"href=['\"]view_image\.php\?key=([0-9a-f]+)&(?:amp;)?type=(\w+)['\"]", re.I)
+
+
 def _rows(html: str) -> list[dict]:
     """Parse the result table. Column order confirmed live:
     Date | Book Info | Doc Type | Property Desc | Search Party Type |
@@ -156,12 +172,18 @@ def _rows(html: str) -> list[dict]:
             .replace("&nbsp;", " ").strip()
             for c in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)
         ]
+        raw_cells = re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)
         if len(cells) < 7 or not cells[0]:
             continue
         # The header row survives the <td> filter on this platform.
         if cells[0].lower().startswith("date") or cells[2] == "Party Type":
             continue
         m = re.match(r"(\d{8})\s+(\d{2}/\d{2}/\d{4})", cells[0])
+        image_key = image_type = None
+        if len(raw_cells) > 9:
+            im = _IMAGE_RE.search(raw_cells[9])
+            if im:
+                image_key, image_type = im.group(1), im.group(2)
         out.append({
             "recorded": m.group(2) if m else cells[0],
             "book_info": cells[1],
@@ -171,6 +193,8 @@ def _rows(html: str) -> list[dict]:
             "party": cells[5],
             "reverse_party": cells[6],
             "kind": DISTRESS_DOC_TYPES.get(cells[2].upper().strip()),
+            "image_key": image_key,
+            "image_type": image_type,
         })
     return out
 

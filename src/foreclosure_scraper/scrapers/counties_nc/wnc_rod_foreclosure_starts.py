@@ -37,6 +37,7 @@ ONE DOCUMENT IS MANY ROWS
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime, timedelta
 from typing import Iterable
@@ -111,6 +112,17 @@ def _to_listing(slug: str, county: str, state: str, key: tuple,
     lenders = [p["party"] for p in parties if not _is_person(p["party"])]
     host = LOOKUP_HOSTS[(county, state)]
     now = datetime.utcnow()
+    # The "Image?" column on this platform links a real scanned copy of the
+    # recorded instrument (view_image.php?key=...&type=tif/pdf) -- confirmed
+    # live 2026-10-01, a real image/tiff body. It is NOT a standalone public
+    # URL: the key only resolves within the SAME session (PHPSESSID) that ran
+    # the search (rod/doc_images.py's LoganImageSession already documents and
+    # handles this exact scoping for the sibling Logan platform). Capturing
+    # key/type here means a session-aware consumer (this scraper's own future
+    # OCR pass, or LoganImageSession reusing the key shape) can still fetch
+    # it; emitting a bare document_url would silently fail for any caller
+    # using a fresh session, which is worse than not emitting one at all.
+    image = next((p for p in parties if p.get("image_key")), None)
     if kind == "substitution_of_trustee":
         label, stage = "Substitution of trustee", "begins"
     else:
@@ -134,6 +146,12 @@ def _to_listing(slug: str, county: str, state: str, key: tuple,
             "borrowers": sorted(set(borrowers)),
             "institutions": sorted(set(lenders))[:8],
             "party_count": len(parties),
+            **({"image_key": image["image_key"], "image_type": image.get("image_type"),
+                "image_url_path": f"view_image.php?key={image['image_key']}"
+                                   f"&type={image.get('image_type') or 'tif'}",
+                "image_note": "session-scoped: requires the PHPSESSID cookie "
+                               "from the search that produced this key"}
+               if image else {}),
         }},
     )
 
@@ -148,6 +166,22 @@ class WNCRodForeclosureStarts(BaseScraper):
     timeout_s = 900.0
 
     async def fetch(self) -> Iterable[Listing]:
+        # enrichment_rod_lookup.bulk_by_date() is entirely synchronous
+        # (curl_cffi.requests.Session, not AsyncSession; time.sleep, not
+        # asyncio.sleep, in its own per-host throttle) and was being awaited
+        # with zero `await` points inside this coroutine. That is the exact
+        # bug zombie_properties.py's own docstring documents and fixes
+        # (confirmed live 2026-10-01 on this scraper: asyncio.wait_for on a
+        # direct fetch() call could not interrupt it even past 3x its
+        # intended bound -- a wedged/slow host here would freeze the whole
+        # event loop for every sibling scraper in a real run, the identical
+        # failure mode that froze run_local.sh for 41m50s before the
+        # zombie_properties fix). Running the whole body in a worker thread
+        # via asyncio.to_thread lets safe_run's own asyncio.wait_for(...,
+        # timeout=self.timeout_s) actually apply.
+        return await asyncio.to_thread(self._fetch_sync)
+
+    def _fetch_sync(self) -> list[Listing]:
         end = datetime.utcnow()
         start = end - timedelta(days=LOOKBACK_DAYS)
         a, b = start.strftime("%m/%d/%Y"), end.strftime("%m/%d/%Y")

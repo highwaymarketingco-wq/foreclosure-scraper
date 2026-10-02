@@ -173,3 +173,36 @@ def test_uncapped_window_is_not_split(monkeypatch):
 
     lookup.bulk_by_date("haywood", "NC", "08/01/2026", "08/03/2026")
     assert seen == [("08/01/2026", "08/03/2026")]
+
+
+# --- the "Image?" column (cell index 9) -------------------------------------
+#
+# Live-confirmed 2026-10-01 against Haywood: fetching view_image.php?key=...
+# &type=tif with the SAME session that ran the search returns a real 200
+# image/tiff body -- a scanned copy of the recorded instrument. The old
+# _rows() only read cells[0:7] and threw this away entirely.
+
+_ROW_WITH_IMAGE = (
+    "<tr><td>20260911 09/11/2026</td><td>RB 1161  815</td><td>S/INS</td>"
+    "<td>PD:GRAVE REMOVAL</td><td>GRANTOR</td><td>ARUNDEL ANNE</td>"
+    "<td>ARUNDEL ANNE</td><td></td><td></td>"
+    "<td><a id='0' onclick='linkColorChange(0)' "
+    "href='view_image.php?key=1dcca814cdcff1363cbf5bee602dce00&amp;type=tif'>"
+    "view</a></td></tr>"
+)
+
+
+def test_rows_captures_the_image_key_and_type():
+    rows = lookup._rows(_ROW_WITH_IMAGE)
+    assert len(rows) == 1
+    assert rows[0]["image_key"] == "1dcca814cdcff1363cbf5bee602dce00"
+    assert rows[0]["image_type"] == "tif"
+
+
+def test_rows_without_an_image_cell_has_none_not_a_crash():
+    row = ("<tr><td>19860911 08/01/2026</td><td>RB 1 1</td><td>S/T</td>"
+           "<td></td><td>GRANTOR</td><td>DOE JANE</td><td>BANK</td></tr>")
+    rows = lookup._rows(row)
+    assert len(rows) == 1
+    assert rows[0]["image_key"] is None
+    assert rows[0]["image_type"] is None
