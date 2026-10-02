@@ -92,6 +92,74 @@ def test_enrich_derivation_flags_runs():
     assert stats["rows"] == 2
 
 
+def test_unreleased_mortgage_with_open_mortgage():
+    """ROD showing an open (unsatisfied) mortgage -> unreleased_mortgage flag."""
+    li = _mk(raw={
+        "rod": {
+            "instrument_count": 3,
+            "has_mortgage": True,
+            "open_mortgages_est": 1,
+            "mortgage_count": 1,
+            "satisfaction_count": 0,
+            "source": "spartanburg",
+        }
+    })
+    from foreclosure_scraper.enrichment_derivation_flags import _unreleased_mortgage
+    result = _unreleased_mortgage(li)
+    assert result is not None
+    assert result["flag"] is True
+    assert result["open_mortgages_est"] == 1
+
+
+def test_unreleased_mortgage_free_and_clear_is_not_flagged():
+    """Zero open mortgages -> NOT unreleased_mortgage (the free_and_clear case)."""
+    li = _mk(raw={
+        "rod": {
+            "instrument_count": 5,
+            "has_mortgage": False,
+            "open_mortgages_est": 0,
+            "source": "spartanburg",
+        }
+    })
+    from foreclosure_scraper.enrichment_derivation_flags import _unreleased_mortgage
+    assert _unreleased_mortgage(li) is None
+
+
+def test_unreleased_mortgage_no_rod_data():
+    """No ROD data -> can't claim unreleased_mortgage either."""
+    li = _mk(raw={})
+    from foreclosure_scraper.enrichment_derivation_flags import _unreleased_mortgage
+    assert _unreleased_mortgage(li) is None
+
+
+def test_unreleased_mortgage_respects_name_order_suspect_guard():
+    """Same surname-first-parser guard as free_and_clear: a Title Case owner
+    name fetched by a surname-first ROD parser before the 2026-09-18 fix must
+    not produce either claim."""
+    li = _mk(owner_name="Joshua D Smith", raw={
+        "rod": {
+            "instrument_count": 2,
+            "has_mortgage": True,
+            "open_mortgages_est": 1,
+            "source": "spartanburg_rod_render",
+            "fetched_at": "2026-09-01T00:00:00+00:00",
+        }
+    })
+    from foreclosure_scraper.enrichment_derivation_flags import _unreleased_mortgage
+    assert _unreleased_mortgage(li) is None
+
+
+def test_enrich_derivation_flags_counts_unreleased_mortgage():
+    from foreclosure_scraper.enrichment_derivation_flags import enrich_derivation_flags
+    listings = [
+        _mk(raw={"rod": {"instrument_count": 3, "has_mortgage": True, "open_mortgages_est": 2,
+                          "source": "spartanburg"}}),
+    ]
+    stats = enrich_derivation_flags(listings)
+    assert stats["unreleased_mortgage"] == 1
+    assert listings[0].raw["derivation_flags"]["unreleased_mortgage"]["flag"] is True
+
+
 def test_mechanic_lien_detection():
     """ROD classify counts mechanic liens."""
     from foreclosure_scraper.rod.classify import classify_rod_docs

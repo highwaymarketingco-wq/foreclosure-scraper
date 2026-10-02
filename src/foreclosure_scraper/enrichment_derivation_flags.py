@@ -1,20 +1,25 @@
 """FREE derivation flags — pure computation over data already on the board.
 
-Three motivated-seller signals that cost nothing to derive:
+Four motivated-seller signals that cost nothing to derive:
 
 1. free_and_clear — no mortgage recordings in ROD history. A property with
    zero open mortgages is owned outright, making it a prime wholesale /
    subject-to target (no lender payoff to negotiate, clean title transfer).
 
-2. tired_landlord — absentee owner (mailing address different from property
+2. unreleased_mortgage — the inverse of free_and_clear: ROD history shows at
+   least one mortgage/DOT recording with no matching satisfaction
+   (open_mortgages_est >= 1). A genuine lender-payoff-required signal, the
+   mirror image of (1), and just as free to compute from the same ROD data.
+
+3. tired_landlord — absentee owner (mailing address different from property
    address) who has owned the property for 10+ years. Long-tenure absentee
    owners are the classic "tired landlord" motivated-seller profile.
 
-3. divorce_flag — NC eCourts FAM case filings already on the board via
+4. divorce_flag — NC eCourts FAM case filings already on the board via
    the nc_ecourts_divorce scraper. This flag also cross-references any
    listing whose owner name matches a party in a divorce filing.
 
-All three are read-only computations over existing raw[] fields. No I/O.
+All four are read-only computations over existing raw[] fields. No I/O.
 """
 from __future__ import annotations
 
@@ -62,6 +67,32 @@ def _free_and_clear(li: Listing) -> Optional[dict]:
         return {
             "flag": True,
             "reason": "no_mortgage_recordings",
+            "instrument_count": rod.get("instrument_count"),
+            "source": rod.get("source"),
+        }
+    return None
+
+
+def _unreleased_mortgage(li: Listing) -> Optional[dict]:
+    """At least one open (unsatisfied) mortgage/DOT recorded — the inverse of
+    free_and_clear. Mirrors _free_and_clear's exact pattern/guards."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    rod = raw.get("rod")
+    if not isinstance(rod, dict):
+        return None
+    if _rod_name_order_suspect(li, rod):
+        return None
+    # Need ROD data to make the claim — absence of ROD is NOT evidence of a mortgage
+    if not rod.get("instrument_count"):
+        return None
+    open_mtg = rod.get("open_mortgages_est", 0)
+    has_mtg = rod.get("has_mortgage", False)
+    if has_mtg and open_mtg >= 1:
+        return {
+            "flag": True,
+            "open_mortgages_est": open_mtg,
+            "mortgage_count": rod.get("mortgage_count"),
+            "satisfaction_count": rod.get("satisfaction_count"),
             "instrument_count": rod.get("instrument_count"),
             "source": rod.get("source"),
         }
@@ -173,13 +204,17 @@ def enrich_derivation_flags(listings: list[Listing]) -> dict:
 
     Pure compute over ROD + GIS + court data already on the board.
     """
-    n_fcl = n_tl = n_div = n_any = n_dropped = 0
+    n_fcl = n_um = n_tl = n_div = n_any = n_dropped = 0
     for li in listings:
         out: dict = {}
         fcl = _free_and_clear(li)
         if fcl:
             out["free_and_clear"] = fcl
             n_fcl += 1
+        um = _unreleased_mortgage(li)
+        if um:
+            out["unreleased_mortgage"] = um
+            n_um += 1
         tl = _tired_landlord(li)
         if tl:
             out["tired_landlord"] = tl
@@ -202,10 +237,12 @@ def enrich_derivation_flags(listings: list[Listing]) -> dict:
             del li.raw["derivation_flags"]
             n_dropped += 1
 
-    log.info("derivation_flags.done", free_and_clear=n_fcl, tired_landlord=n_tl,
-             divorce=n_div, any=n_any, dropped_stale=n_dropped, total=len(listings))
+    log.info("derivation_flags.done", free_and_clear=n_fcl, unreleased_mortgage=n_um,
+             tired_landlord=n_tl, divorce=n_div,
+             any=n_any, dropped_stale=n_dropped, total=len(listings))
     return {
         "free_and_clear": n_fcl,
+        "unreleased_mortgage": n_um,
         "tired_landlord": n_tl,
         "divorce": n_div,
         "rows": n_any,
