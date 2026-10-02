@@ -12,6 +12,27 @@ Free, public, no login.
 Slug: national.va_acquired
 Category: reo
 ListingType: REO
+
+DISABLED 2026-10-01 (national/reo per-source audit): confirmed live, BOTH
+candidate URLs are dead, and the one the code actually fetches is the more
+dangerous kind of dead -- a silent fake-404:
+  * VA_URL (the one this docstring names as the real source,
+    va.gov/va-forms/real-property/properties/) returns a genuine HTTP 404.
+    The code never even fetches it.
+  * BANK_REO_URL (the one fetch() actually requests) returns HTTP 200 but
+    the body is VA's own generic site-wide 404 template
+    (<meta name="dcterms.subject" content="Page Not Found" />,
+    dcterms.dateAccepted 2025-04-16) -- a 200-status page that IS a 404,
+    exactly the "silent success" shape CLAUDE.md warns about. The regex
+    <tr> scanner below "cleanly" finds 0 matching rows on this error page,
+    which looks identical to a legitimate empty search in the logs
+    (OUTCOME_ZERO either way).
+Also redundant: reo.vrm_va_reo (VRM Properties, the VA's current REO
+servicing vendor) already covers this exact signal via a live, working
+path -- confirmed live the same day, 193 real NC+SC rows with photos and
+prices. Disabled rather than chasing a new URL for a signal the board
+already has, same reasoning as national.epa_superfund's redundant-source
+disable earlier this audit.
 """
 from __future__ import annotations
 
@@ -38,6 +59,14 @@ class VAAcquired(BaseScraper):
     timeout_s = 60.0
     expected_min_count = 0
     optional = True
+    disabled = True
+    disabled_reason = (
+        "both candidate URLs confirmed dead 2026-10-01 (VA_URL is a genuine "
+        "404; BANK_REO_URL returns HTTP 200 but the body is VA's own "
+        "site-wide 404 template) and redundant with reo.vrm_va_reo, which "
+        "already covers VA REO via a live, working path (193 real NC+SC "
+        "rows confirmed the same day)"
+    )
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
