@@ -51,12 +51,30 @@ _YEARISH = ("year", "tax_year", "first_cycle", "latest_cycle", "bill_year",
 
 
 def _keys(rec: dict) -> list:
-    """Identity keys, most specific first. dict for checkpoint rows, obj for board."""
+    """Identity keys, most specific first. dict for checkpoint rows, obj for board.
+
+    BUG (found 2026-10-02, see docs/HANDOFF.md): `source_url` used to be listed
+    FIRST, ahead of parcel_id. That is backwards for any bulk single-document
+    source — every row scraped from one county PDF/CSV/API page shares the exact
+    same source_url (e.g. every counties_nc.buncombe_delinquent_tax row carries
+    the one PDF_URL), so `("u", source_url)` is the LEAST specific key available
+    for those sources, not the most. With it tried first, every board row from
+    such a source that still needed a year matched the SAME donor's "u" index
+    entry (whichever checkpoint row happened to be indexed there first) and had
+    THAT donor's principal_tax_due/tax_owed copied onto it — live-confirmed on
+    the real board: 610 of 829 Buncombe tax-delinquency rows carried the
+    IDENTICAL principal_tax_due ($775.59, one single real parcel's own value)
+    despite being 610 genuinely different parcels, each with its own different
+    real amount on today's live advertisement. Reordered so parcel_id (genuinely
+    near-unique per real-world parcel) and the other per-record keys are tried
+    BEFORE the coarse, often-shared source_url -- "most specific first" is now
+    true, not just stated. `_build_index` below adds a second, independent
+    guard: an identity key that maps to more than one DISTINCT donor payload
+    (source_url being the one known to do this, but not the only one that
+    could) is never used at all, rather than silently keeping "whichever donor
+    happened to be inserted first."""
     g = rec.get if isinstance(rec, dict) else (lambda k, d=None: getattr(rec, k, d))
     out = []
-    su = g("source_url")
-    if isinstance(su, str) and len(su) > 20:
-        out.append(("u", su))
     pid, cty = g("parcel_id"), g("county")
     if isinstance(pid, str) and len(pid) >= 5:
         out.append(("p", pid.strip().upper(), str(cty or "").strip().lower()))
@@ -66,7 +84,33 @@ def _keys(rec: dict) -> list:
     cn = g("case_number")
     if isinstance(cn, str) and len(cn) >= 6:
         out.append(("c", cn.strip().upper()))
+    su = g("source_url")
+    if isinstance(su, str) and len(su) > 20:
+        out.append(("u", su))
     return out
+
+
+def _build_index(donors: list[tuple[list, dict]]) -> dict:
+    """donors: [(keys_for_this_record, payload)]. Returns {key: payload}, but a
+    key that more than one donor maps to a DIFFERENT payload under is dropped
+    entirely rather than resolved by first-insert-wins -- an ambiguous key is
+    worse than no key, since using it means guessing which donor it meant and
+    copying that guess's dollar figures onto an unrelated parcel. Two donors
+    sharing a key with an IDENTICAL payload (a true duplicate row) are not
+    ambiguous and the key is kept."""
+    idx: dict = {}
+    ambiguous: set = set()
+    for keys, payload in donors:
+        for k in keys:
+            if k in ambiguous:
+                continue
+            cur = idx.get(k)
+            if cur is None:
+                idx[k] = payload
+            elif cur != payload:
+                ambiguous.add(k)
+                del idx[k]
+    return idx
 
 
 def _year_of(raw: dict) -> int | None:
@@ -103,7 +147,7 @@ def main() -> int:
     print(f"checkpoint rows: {len(cp):,}")
 
     # index checkpoint rows that actually carry tax data worth copying
-    idx: dict = {}
+    donor_entries: list[tuple[list, dict]] = []
     donors = 0
     for rec in cp:
         raw = rec.get("raw") or {}
@@ -114,8 +158,8 @@ def main() -> int:
         if not payload:
             continue
         donors += 1
-        for k in _keys(rec):
-            idx.setdefault(k, payload)
+        donor_entries.append((_keys(rec), payload))
+    idx = _build_index(donor_entries)
     print(f"  donor rows with tax data: {donors:,}  (index keys {len(idx):,})")
 
     def stats(board):

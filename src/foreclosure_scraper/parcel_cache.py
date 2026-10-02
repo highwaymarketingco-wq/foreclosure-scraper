@@ -914,6 +914,57 @@ def _db_path(county: str, state: str | None = None) -> Path:
     return CACHE_DIR / f"{stem}.sqlite"
 
 
+# Freshness bound for VALUE fields specifically (market_value/tax_value).
+#
+# PROVEN STALE 2026-10-02 (Buncombe, see docs/HANDOFF.md): refresh_parcel_cache.py
+# does a full, completeness-gated rebuild every run (scripts/refresh_parcel_cache.py,
+# weekly Sun 4am per project cadence) — so this is NOT a broken-refresh bug, every
+# county cache really is at most ~1 refresh cycle old. The problem is that a county's
+# OWN published VALUE fields can move between refreshes (a reappraisal cycle lands,
+# an appeal posts, a correction syncs TaxValue to TotalMarketValue) while owner /
+# address / sqft / acreage essentially never do on that timescale. Live-verified:
+# Buncombe parcel 9608108745 (owner CONNER RICKEY DEWAYNE) cached market_value=
+# 269400/tax_value=72600 from the 2026-09-27 refresh, but the live
+# gis.buncombecounty.org property_bc_dis/MapServer/1 service returns
+# TotalMarketValue=AppraisedValue=TaxValue=130600 for the SAME parcel today — a
+# 1.80x overstatement riding straight onto the board via enrichment_arcgis.py's
+# cache fast path, which previously trusted market_value/tax_value from the cache
+# with NO freshness check at all, unlike every other field that path can fill.
+# A 60-of-1,176 live population sample (Buncombe tax-delinquency leads, 2026-10-02)
+# found 39/41 owner-matched rows overstated at a tight median ratio of 1.78x —
+# consistent with this exact mechanism, not random noise.
+#
+# `CACHE_VALUE_MAX_AGE_DAYS` bounds how old a cache snapshot may be before its
+# market_value/tax_value are trusted at all; `cache_is_stale()` is the single
+# predicate every value-trusting caller should check. Owner/address/sqft/acreage are
+# NOT gated by this — those fields' cost of staleness is far lower than a dollar
+# figure a bid decision gets made against, and gating them too would silently regress
+# the ~6.8h-saved fast path's whole purpose for a staleness class that does not apply
+# to them.
+CACHE_VALUE_MAX_AGE_DAYS = 10.0   # weekly (7-day) cadence + slack for one missed run
+
+
+def cache_age_days(county: str, state: str | None = None) -> Optional[float]:
+    """Age in days of this county's cached snapshot (file mtime), or None if no
+    cache exists for it (or the name needs a state and none was given)."""
+    try:
+        p = _db_path(county, state)
+    except ValueError:
+        return None
+    if not p.exists():
+        return None
+    return (time.time() - p.stat().st_mtime) / 86400.0
+
+
+def cache_is_stale(county: str, state: str | None = None,
+                    max_age_days: float = CACHE_VALUE_MAX_AGE_DAYS) -> bool:
+    """True when this county's cache is older than `max_age_days`, or missing
+    entirely. Callers that publish market_value/tax_value from the cache should
+    skip doing so (falling through to a live query instead) when this is True."""
+    age = cache_age_days(county, state)
+    return age is None or age > max_age_days
+
+
 def cached_counties() -> set[str]:
     out = set()
     for c in PARCEL_LAYERS:
@@ -1282,17 +1333,41 @@ def _zero_prefix_candidates(v) -> list[tuple[str, str]]:
     return [(f"{int(m.group(1)):05d}{m.group(2)}{m.group(3)}", "zero_prefix")] if m else []
 
 
+#: Columns this module will not hand out from a cache snapshot older than
+#: CACHE_VALUE_MAX_AGE_DAYS — see that constant's comment for why value fields
+#: specifically need a freshness bound and owner/address/sqft/acreage don't.
+_STALE_DROPPED_COLS = ("market_value", "tax_value")
+
+
+def _row_to_dict(row: tuple, *, drop_value: bool) -> dict:
+    cols = _COLS
+    if drop_value:
+        return {c: v for c, v in zip(cols, row)
+                if v not in (None, "") and c not in _STALE_DROPPED_COLS}
+    return {c: v for c, v in zip(cols, row) if v not in (None, "")}
+
+
 def lookup_with_tier(county: str, parcel_id: str,
                      state: str | None = None) -> tuple[Optional[dict], Optional[str]]:
     """lookup() plus WHICH id form matched: 'exact' (the forms this module has always
     tried), 'zero_suffix' or 'zero_pad' (see _lookup_candidates), or None on a miss.
-    Scripts use the tier to report how many hits the tolerance added."""
+    Scripts use the tier to report how many hits the tolerance added.
+
+    PROVEN STALE 2026-10-02 (see CACHE_VALUE_MAX_AGE_DAYS): market_value/tax_value
+    are omitted from the returned dict when this county's cache is older than that
+    bound, so a caller filling from this result never silently publishes a dollar
+    figure the next weekly refresh would have corrected — it falls through to its
+    own live-query path instead, the same as a cache MISS already does. Every
+    current caller already treats these keys as optional (`pc.get("market_value")`),
+    so an absent key is a safe, backward-compatible no-op for them.
+    """
     try:
         p = _db_path(county, state)
     except ValueError:
         return None, None   # dual-state name, caller had no state — refuse to guess
     if not p.exists() or not (parcel_id or "").strip():
         return None, None
+    drop_value = cache_is_stale(county, state)
     ckey = p.name
     con = _CONN.get(ckey)
     if con is None:
@@ -1312,9 +1387,9 @@ def lookup_with_tier(county: str, parcel_id: str,
         if tier == "zero_pad":
             pad_rows.append(row)     # never take the first: prove there is only one parcel
             continue
-        return {c: v for c, v in zip(_COLS, row) if v not in (None, "")}, tier
+        return _row_to_dict(row, drop_value=drop_value), tier
     if pad_rows:
         ident = {(r[0], r[1], r[2]) for r in pad_rows}   # owner, address, owner_mailing
         if len(ident) == 1:
-            return {c: v for c, v in zip(_COLS, pad_rows[0]) if v not in (None, "")}, "zero_pad"
+            return _row_to_dict(pad_rows[0], drop_value=drop_value), "zero_pad"
     return None, None

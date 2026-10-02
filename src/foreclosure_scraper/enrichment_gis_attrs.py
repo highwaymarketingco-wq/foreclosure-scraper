@@ -568,10 +568,19 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
                     if pc.get("sale_date") and not ls.get("date"):
                         ls["date"] = pc["sale_date"]
                 # Skip the live GIS query ONLY when we now have a situs address (the main thing
-                # the live point/parcel query resolves). If the cache row had no address, fall
-                # through to the live query to try for one via gis_attrs' own layer — we keep
-                # the owner/value/sqft/acre just filled either way (they won't be overwritten).
-                if (li.street_address or "").strip():
+                # the live point/parcel query resolves) AND the cache's VALUE fields were trusted
+                # (not withheld for staleness — lookup_with_tier() omits market_value/tax_value
+                # once this county's cache is older than parcel_cache.CACHE_VALUE_MAX_AGE_DAYS).
+                # A stale-value cache row still needs the live query below, same as a cache
+                # miss, so this lead's market_value/tax_value come from the CURRENT county data
+                # instead of silently staying empty forever. Proven live 2026-10-02: a Buncombe
+                # lead whose cache hit left market_value/tax_value unfilled for exactly this
+                # reason, but street_address filled, would otherwise return here and never get a
+                # value at all (the OLD code returned on street_address alone).
+                from .parcel_cache import cache_is_stale as _pcache_stale
+                value_still_missing = not (li.market_value or li.tax_value)
+                value_withheld = value_still_missing and _pcache_stale(li.county or "", li.state)
+                if (li.street_address or "").strip() and not value_withheld:
                     stats["parcel_cache_hit"] = stats.get("parcel_cache_hit", 0) + 1
                     li.raw.setdefault("gis", {})["queried"] = True
                     li.raw["gis"]["source"] = "parcel_cache"
