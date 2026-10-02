@@ -1,16 +1,33 @@
-"""Fannie Mae HomePath — state/zipcode JSON search API (complement to bbox).
+"""Fannie Mae HomePath — paginated-depth complement to the bbox grid scraper.
 
-The existing ``fannie_homepath`` scraper queries the property-inventory
-endpoint by geographic bounding box. HomePath ALSO exposes a state/zipcode
-search endpoint that returns richer, text-query-filtered results:
+REWRITTEN 2026-10-01 (national/reo per-source audit). This module's original
+premise -- a separate ``search-listings`` endpoint taking ``state`` /
+``zipcode`` / ``page`` params -- is confirmed FALSE two ways, live:
 
-  GET https://homepath.fanniemae.com/cfl/property-inventory/search-listings
-      ?state=NC&zipcode=&page=1&pageSize=100
+1. ``GET .../cfl/property-inventory/search-listings`` (the documented URL)
+   returns HTTP 404 (RFC7807 problem+json). It does not exist.
+2. The URL this module actually called instead -- plain
+   ``.../cfl/property-inventory/search`` with ``state``/``zipcode``/``page``
+   params and NO ``bounds`` -- silently IGNORES all four of those params:
+   page 1, 2 and 3 for "NC" each returned the byte-identical first 400
+   properties of an unfiltered 648,044-row NATIONWIDE list (confirmed via
+   matching propertyUuids across pages). ``_to_listing``'s own state filter
+   then dropped everything outside NC/SC, so this scraper was returning
+   22 near-random rows (whatever happened to be NC/SC in that arbitrary
+   400-row slice) instead of a genuine state-wide paginated sweep -- a
+   "silently returns wrong/incomplete data" bug, not a crash.
 
-This endpoint returns a paginated JSON response keyed on state/zip rather
-than lat/lng bounds, so it catches listings that the bbox grid might miss
-at the edges and provides a cross-check on the bbox results. The response
-shape:
+Also confirmed live: THIS endpoint (the real, only working one, same host
+``fannie_homepath.py``'s bbox scraper uses) honors ``page``/``pageSize``
+pagination CORRECTLY as long as ``bounds`` is present -- different pages
+return different, real, geographically-filtered properties. So the genuine
+complementary value this module can add over the sibling bbox scraper
+(which fetches only PAGE 1 of each of its 4x4 grid cells, no further
+pagination within a cell) is PAGINATION DEPTH: this module queries the same
+NC/SC state bboxes WITHOUT subdividing them into a grid, and pages through
+as many results as PAGES_CAP allows, which independently re-covers the
+state and would catch anything a saturated (>400 properties) grid cell in
+the sibling might miss. Response shape (unchanged):
 
   {
     "properties": [
@@ -22,15 +39,14 @@ shape:
         "primHiResImageUrl", "onlineOfferOnly", "firstLookProgramIndicator"
       }, ...
     ],
-    "total": N,
-    "page": 1,
-    "pageSize": 100
+    "totalProperties": N,
   }
 
-We page through NC and SC, dedupe by reoId/propertyUuid, and return Listing
-objects with listing_type=REO. The bbox scraper remains the primary; this
-module is a complementary channel whose results merge in via the normal
-dedupe path (case_number collision).
+case_number now uses the SAME "fannie-{uuid}" prefix as
+``fannie_homepath.py`` (was "homepath-json-{uuid}", a mismatch that broke
+this module's own docstring claim that overlapping properties "merge in via
+the normal dedupe path (case_number collision)" -- they never could, with
+two different id schemes for the same propertyUuid).
 """
 from __future__ import annotations
 
@@ -47,8 +63,8 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-# The state/zipcode search endpoint (distinct from the bbox endpoint used
-# by fannie_homepath.py).
+# The SAME endpoint fannie_homepath.py's bbox scraper uses -- confirmed live
+# 2026-10-01 to be the only one that actually exists and actually filters.
 API = "https://homepath.fanniemae.com/cfl/property-inventory/search"
 
 HEADERS = {
@@ -61,6 +77,14 @@ HEADERS = {
 }
 
 STATES = ("NC", "SC")
+# Same state bboxes as fannie_homepath.py's BBOXES (sw_lat, sw_lng, ne_lat,
+# ne_lng), duplicated here (not imported) so this module stays independent
+# of the sibling's internals -- only the confirmed-stable host/URL/response
+# shape is shared knowledge, not code.
+_STATE_BBOX: dict[str, tuple[float, float, float, float]] = {
+    "NC": (33.75, -84.50, 36.60, -75.30),
+    "SC": (32.00, -83.40, 35.25, -78.50),
+}
 PAGE_SIZE = 100
 # Hard cap on pages per state. HomePath nationwide has ~27k listings; NC+SC
 # combined are ~500-800, so 20 pages (2000 listings) is a generous ceiling.
@@ -141,7 +165,7 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
         city=(p.get("city") or "").title() or None,
         zip_code=(p.get("zipCode") or "").strip() or None,
         street_address=addr,
-        case_number=f"homepath-json-{uuid}" if uuid else None,
+        case_number=f"fannie-{uuid}" if uuid else None,
         latitude=lat,
         longitude=lng,
         opening_bid=price,
@@ -169,20 +193,46 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
     )
 
 
-async def _fetch_state(state: str, slug: str) -> list[Listing]:
-    """Page through the HomePath search-listings endpoint for one state.
+async def _fetch_state(
+    state: str, slug: str, partial_sink: list[Listing] | None = None
+) -> list[Listing]:
+    """Page through the HomePath property-inventory endpoint for one state's
+    FULL (un-gridded) bbox.
 
-    Paginates with ?page=N&pageSize=100 until a page returns fewer than
-    PAGE_SIZE rows (last page) or we hit PAGES_CAP. Dedupes by case_number
-    (propertyUuid) within this state's results."""
+    Paginates with ?bounds=<state bbox>&page=N&pageSize=100 until a page
+    returns fewer than PAGE_SIZE rows (last page) or we hit PAGES_CAP.
+    ``bounds`` is required -- confirmed live 2026-10-01, without it the API
+    silently ignores page/state/zipcode and returns the same fixed,
+    unfiltered nationwide slice on every call (see module docstring).
+    Dedupes by case_number (propertyUuid) within this state's results; the
+    state-wide (not gridded) bbox means a single saturated page here would
+    show up as exactly PAGES_CAP pages all full, which is its own signal the
+    cap needs raising -- unlike the sibling's per-cell single page, which has
+    no such signal if a cell saturates silently.
+
+    NOTE: the server returns up to 400 properties per page regardless of the
+    requested pageSize (confirmed live) -- PAGE_SIZE's `len(props) <
+    PAGE_SIZE` check therefore never fires as a "that was the last page"
+    signal in practice; termination instead relies on `new_this_page == 0`
+    (every row on this page was already seen) or PAGES_CAP, both of which
+    are exercised and confirmed live (NC stopped at page 12, SC at page 14,
+    2026-10-01, both via the dedupe path).
+
+    If `partial_sink` is given (the scraper's own self.partial), each page's
+    newly-kept rows are appended to it immediately, so a soft-timeout
+    cancellation mid-sweep still ships whatever pages already completed
+    instead of discarding the whole state -- this rewrite made a full sweep
+    take ~2 minutes (up from the old, broken ~5s no-op), so that salvage path
+    is no longer theoretical."""
     out: list[Listing] = []
     seen: set[str] = set()
+    bbox = _STATE_BBOX[state]
+    bounds = f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}"
 
     async with client(timeout=30.0) as c:
         for page in range(1, PAGES_CAP + 1):
             params = {
-                "state": state,
-                "zipcode": "",
+                "bounds": bounds,
                 "page": str(page),
                 "pageSize": str(PAGE_SIZE),
             }
@@ -233,6 +283,8 @@ async def _fetch_state(state: str, slug: str) -> list[Listing]:
                     continue
                 seen.add(key)
                 out.append(li)
+                if partial_sink is not None:
+                    partial_sink.append(li)
                 new_this_page += 1
 
             total = payload.get("total")
@@ -254,32 +306,48 @@ async def _fetch_state(state: str, slug: str) -> list[Listing]:
 class HomePathJSON(BaseScraper):
     """Fannie Mae HomePath REO via state/zipcode JSON search API.
 
-    A complement to ``fannie_homepath`` (which uses the bbox endpoint).
-    Queries the search-listings endpoint by state, paginates, and returns
-    REO Listings for NC and SC.
+    A complement to ``fannie_homepath`` (the per-cell, single-page bbox grid
+    scraper): this module paginates DEPTH-first through each state's full,
+    un-gridded bbox, so it independently re-covers the state and would catch
+    anything a saturated grid cell in the sibling misses.
     """
 
     slug = "national.homepath_json"
-    name = "Fannie Mae HomePath (REO, state/zipcode JSON API)"
+    name = "Fannie Mae HomePath (REO, paginated bbox depth sweep)"
     category = "national_reo"
     expected_min_count = 0
     requires_apify = False
     requires_render = False
-    timeout_s = 120.0
+    # MEASURED 2026-10-01, live, right after this module's rewrite from a
+    # broken no-op (ignored params, ~5s, 22 near-random rows) to a real
+    # paginated full-state sweep (4,605 real rows): one full NC+SC sweep took
+    # ~120s wall-clock -- right at the old timeout_s=120 floor, so a slightly
+    # slower day would have silently lost the whole run to OUTCOME_TIMEOUT.
+    # 240s gives real headroom; self.partial below (see _fetch_state's
+    # partial_sink param) means even a timeout past that ships whatever pages
+    # had already completed instead of discarding everything.
+    timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:
         # Fetch both states concurrently — each state does its own pagination
         # but the two states are independent, so we parallelize them.
-        tasks = [_fetch_state(state, self.slug) for state in STATES]
+        # self.partial is the SAME list both _fetch_state calls append into
+        # as each page completes (see its partial_sink param), so
+        # base_scraper.safe_run()'s existing timeout-salvage path has real
+        # rows to ship if timeout_s fires mid-sweep.
+        out = self.partial
+        tasks = [_fetch_state(state, self.slug, out) for state in STATES]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        out: list[Listing] = []
+        # NOTE: each _fetch_state call already appended its rows into `out`
+        # (== self.partial) as it went via partial_sink -- do NOT also
+        # out.extend(result) here, that would double every row (once from
+        # the live partial_sink append, once more from the returned list).
+        # `results` is only inspected for exceptions below.
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 log.warning(
                     "homepath_json.state_failed",
                     state=STATES[i], error=str(result)[:200],
                 )
-                continue
-            out.extend(result)
         log.info("homepath_json.done", total=len(out))
         return out
