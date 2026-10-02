@@ -84,12 +84,30 @@ def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
     home_info = (item.get("hdpData") or {}).get("homeInfo") or {}
     img = item.get("imgSrc") or ""
     photos = [img] if isinstance(img, str) and img.startswith("http") else []
-    # Zillow's hdpData.homeInfo doesn't carry county for most listings.
-    # Try the field, then fall back to a city->county lookup for our
-    # coastal scope so the oceanfront override in main._in_scope can fire.
+    # Zillow's hdpData.homeInfo doesn't carry county for most listings --
+    # confirmed live 2026-10-01 (national/reo per-source audit): 282/310 NC
+    # rows (91%) had no county at all. FORECLOSURE_SALE/AUCTION/REO are all
+    # "flip" listing types (main._FLIP_LISTING_TYPES), which gate on the
+    # NARROW in_scope(county, state) check -- and in_scope(None, state) is
+    # unconditionally False. That silently dropped real in-footprint leads
+    # at the scope gate with no county to even try matching against, e.g.
+    # "208 S Ransom St, Gastonia NC" (Gaston county) and "71 Laurel Ridge
+    # Dr, Spruce Pine NC" (Mitchell county) -- both live-confirmed present
+    # in a real fetch, both in our 18-county footprint, both losing their
+    # one shot at admission for want of a county string. Only a coastal
+    # fallback existed before; upstate_county_for (the same WNC/upstate-SC
+    # gazetteer already used by national.crexi_multifamily and
+    # national.estate_sales for this exact problem) is tried FIRST since
+    # that is our actual core footprint, coastal second.
     county = (home_info.get("county") or "").strip() or None
     if county and county.lower().endswith(" county"):
         county = county[:-7].strip()
+    if not county:
+        from ..._upstate_city_to_county import upstate_county_for
+        county = upstate_county_for(
+            (item.get("addressCity") or "").strip(),
+            region,
+        )
     if not county:
         from ..._coastal_city_to_county import coastal_county_for
         county = coastal_county_for(

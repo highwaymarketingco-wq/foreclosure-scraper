@@ -66,9 +66,25 @@ def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
     home_info = (item.get("hdpData") or {}).get("homeInfo") or {}
     img = item.get("imgSrc") or ""
     photos = [img] if isinstance(img, str) and img.startswith("http") else []
+    # Zillow's hdpData.homeInfo doesn't carry county for most listings --
+    # same gap confirmed live 2026-10-01 in the sibling national.
+    # zillow_foreclosures (282/310 NC rows, 91%, had no county at all),
+    # which silently drops real in-footprint leads at the scope gate
+    # (FORECLOSURE_SALE/AUCTION/REO are "flip" types that need a county to
+    # even attempt in_scope() matching). This scraper feeds the sold-comp
+    # pool rather than the active-leads pool, but the same county-blank
+    # admission problem applies, so the same two-tier fallback is used:
+    # upstate_county_for (our actual core WNC/upstate-SC footprint) first,
+    # coastal second.
     county = (home_info.get("county") or "").strip() or None
     if county and county.lower().endswith(" county"):
         county = county[:-7].strip()
+    if not county:
+        from ..._upstate_city_to_county import upstate_county_for
+        county = upstate_county_for(
+            (item.get("addressCity") or "").strip(),
+            region,
+        )
     if not county:
         from ..._coastal_city_to_county import coastal_county_for
         county = coastal_county_for(
