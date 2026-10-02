@@ -2162,6 +2162,13 @@ RAW_KEEP = {
     "status": "*", "tax_sale_status": "*", "tms": "*",
     "upset_bid_deadline": "*", "violation_type": "*", "zombie_property": "*",
 
+    # national.govdeals raw payload (lot_id, auction_id, bid_count, category,
+    # seller_name, start/end dates, is_sold, has_reserve) -- namespaced under
+    # one key 2026-10-01 (national-auction-tier audit, batch 4) after finding
+    # these were flat top-level raw keys with no RAW_KEEP entry (silently
+    # dropped at publish; only govdeals_asset_id below survived).
+    "govdeals": "*",
+
     # third-party listing / property identifiers, needed to re-find a lead upstream
     "fc_listing_id": "*", "govdeals_asset_id": "*", "homesteps_kind": "*",
     "hud_property_id": "*", "reo_id": "*", "trulia_id": "*",

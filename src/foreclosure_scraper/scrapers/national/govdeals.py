@@ -3,11 +3,68 @@
 GovDeals is a free auction platform for government surplus real property.
 The site is an Angular SPA that calls a backend API at maestro.lqdt1.com.
 We POST to the /search/list endpoint with the embedded API key to get
-JSON results filtered by state:
+JSON results.
+
+FIXED 2026-10-01 (national-auction-tier audit, batch 4) — TWO real bugs
+found live, both of the "silent success" shape CLAUDE.md warns about:
+
+1. THE REQUEST BODY WAS STALE AND THE API WAS SILENTLY DEGRADING. The old
+   payload wrapped everything in a `{"searchModel": {...}, "businessUnit":
+   "GovDeals", "businessId": "GD", "siteId": 1}` envelope with field names
+   ("pageNumber"/"pageSize"/"isTimeSearch") that do not exist in the
+   current production contract. Reverse-engineered the REAL request shape
+   from the live Angular bundle's `GetSearchResults()` call (main.js,
+   2026-10-01): it POSTs a FLAT object (page/displayRows, not
+   pageNumber/pageSize; isSimpleTimeSearch, not isTimeSearch; no
+   searchModel/businessUnit/siteId wrapper at all) straight to
+   /search/list. The API never 4xx'd on the old stale shape -- it returned
+   HTTP 200 with `isAPIFailureActive: true` and silently fell back to an
+   UNFILTERED, cross-state, cross-category default result set (confirmed
+   live: a `facetsFilter` of `stateDesc:NC` came back with rows in IL, AL,
+   AR, IA, TN, GA, MO, OR, NV -- zero NC). The old code's own client-side
+   `if state not in STATES: return None` check caught the wrong-state junk
+   before it reached a Listing, so nothing bad ever published -- but it
+   also meant genuine NC/SC real-property rows already on the platform
+   were close to never being seen, because the state facetsFilter it sent
+   plainly was not taking effect. Also: the real `stateDesc` facet value
+   is the FULL state name, quoted and space-escaped --
+   `{!tag=stateDesc}stateDesc:"North\\ Carolina"` -- not the 2-letter
+   abbreviation the old code sent.
+
+2. CATEGORY-KEYWORD SUBSTRING MATCHING WAS A CONFIRMED FALSE-POSITIVE
+   FABRICATOR. The old `_is_real_property()` matched on bare substrings
+   like "land" and "building" against categoryDescription/description
+   text. GovDeals' OWN category taxonomy (pulled live from
+   POST /menus/categories) nests completely unrelated MOVABLE-ASSET
+   categories under names that contain those same substrings: "Nursery/
+   Horticulture/**Land**scaping" (a 2022 Scag turf sprayer, $2,675),
+   "Portable **Building**s and structures" (an 8x10 storage shed, a 12x20
+   steel carport) -- confirmed live, these all passed the old
+   `_is_real_property()` check AND carried a street address (the seller's
+   depot, not a property for sale), so once bug #1 above is fixed and this
+   scraper starts returning non-zero rows, it would have started minting
+   fake REAL-PROPERTY-AUCTION leads out of a lawnmower and a garden shed.
+   Fixed by scoping the SERVER-SIDE `categoryIds` param (confirmed live,
+   it genuinely constrains results) to exactly the two taxonomy branches
+   that are actual real estate: "84" (Real Estate / Land Parcels: vacant
+   land, single-family residential, commercial property, real-estate
+   bid & assume) and "95A" (Real Estate Tax Deed and Lien Sales:
+   foreclosures, tax liquidations, tax liens). Deliberately EXCLUDED the
+   sibling branches "20" (Permanent Buildings) and "980" (Portable
+   Buildings and structures) -- GovDeals' own taxonomy nests those under
+   the same "Real Estate, Buildings, Structures" L0 node, but they are
+   relocatable STRUCTURES sold without land, not real property.
 
   POST https://maestro.lqdt1.com/search/list
   Headers: x-api-key, Ocp-Apim-Subscription-Key, x-api-correlation-id, ...
-  Body: {"searchModel": {...}, "businessUnit": "GovDeals", "businessId": "GD", "siteId": 1}
+  Body (flat, per the live Angular bundle): {categoryIds, businessId,
+    searchText, isQAL, locationId, model, makebrand, eventId,
+    auctionTypeId, page, displayRows, sortField, sortOrder, sessionId,
+    requestType, responseStyle, facets, facetsFilter, timeType,
+    sellerTypeId, accountIds, zipcode, proximityWithinDistance,
+    isSimpleTimeSearch, simpleTimeSearchType, simpleTimeWithIn,
+    rangeTimeSearchType, toDate, fromDate, timeUnitValue, facetLimit,
+    facetsShortened, modelYear, isVehicleSearch}
 
 Response shape (verified field names from the maestro API):
   {
@@ -29,16 +86,21 @@ Response shape (verified field names from the maestro API):
         "isSoldAuction", "hasReservePrice", ...
       }, ...
     ],
-    "isAPIFailureActive": false,
+    "isAPIFailureActive": true,   # NOTE: true even on a correctly-scoped,
+                                  # correctly-filtered response -- live-
+                                  # verified this flag does NOT indicate the
+                                  # request failed; the real site's own
+                                  # frontend treats it as a soft/cosmetic
+                                  # degraded-facets signal, not a data error.
     ...
   }
 
-We filter for real-property / land categories in NC and SC, paging until
-the server returns fewer than PER_PAGE rows or we hit PAGES_CAP.
+We scope to the real-estate category branches (84, 95A) in NC and SC,
+paging each (category, state) combination until the server returns fewer
+than PER_PAGE rows or we hit PAGES_CAP.
 """
 from __future__ import annotations
 
-import re
 import uuid
 from datetime import datetime
 from typing import Iterable
@@ -55,7 +117,6 @@ log = structlog.get_logger()
 API = "https://maestro.lqdt1.com/search/list"
 API_KEY = "af93060f-337e-428c-87b8-c74b5837d6cd"
 SUB_KEY = "cf620d1d8f904b5797507dc5fd1fdb80"
-DETAIL_BASE = "https://www.govdeals.com/index.cfm?fa=Main&searchText=&category=&keyword="
 ASSET_URL = "https://www.govdeals.com/auctions/item/detail/"
 
 HEADERS = {
@@ -73,68 +134,62 @@ HEADERS = {
     ),
 }
 
-# States we scrape (core 2-state footprint).
+# States we scrape (core 2-state footprint) + the full names the live
+# `stateDesc` facet actually matches against (verified live 2026-10-01 --
+# the 2-letter abbreviation the old code sent matched nothing).
 STATES = ("NC", "SC")
+_STATE_FULL = {"NC": "North Carolina", "SC": "South Carolina"}
 
-# GovDeals categories that indicate real property / land rather than
-# movable equipment or vehicles. GovDeals uses free-text categories so we
-# match case-insensitively on a set of substrings.
-_REAL_PROPERTY_KEYWORDS = (
-    "real estate",
-    "real property",
-    "land",
-    "parcel",
-    "building",
-    "residential",
-    "commercial property",
-    "house",
-    "home",
-    "farm",
-    "acreage",
-    "vacant land",
-    "improved land",
-    "condo",
-    "townhouse",
-    "duplex",
-    "apartment",
-)
+# Real-estate taxonomy branches, pulled live from POST /menus/categories
+# under the top-level "Real Estate, Buildings, Structures" node (2026-10-01):
+#   84  = Real Estate / Land Parcels (vacant land res/ag, single-family
+#         residential, commercial property, "Buildings", other real
+#         estate, real-estate bid & assume)
+#   95A = Real Estate Tax Deed and Lien Sales (foreclosures, tax
+#         liquidations, tax liens)
+# Deliberately EXCLUDED sibling branches under the same L0 node:
+#   20  = Permanent Buildings, 980 = Portable Buildings and structures --
+#   both are relocatable STRUCTURES sold without land, not real property.
+REAL_ESTATE_CATEGORY_IDS = ("84", "95A")
 
-# Hard cap on pages per state to avoid an unbounded loop.
-PAGES_CAP = 20
+# Hard cap on pages per (category, state) to avoid an unbounded loop.
+PAGES_CAP = 10
 PER_PAGE = 50
 
 _PROP_KIND_MAP = {
     "single family": PropertyKind.SINGLE_FAMILY,
+    "residential": PropertyKind.SINGLE_FAMILY,
     "condo": PropertyKind.CONDO,
     "townhouse": PropertyKind.TOWNHOUSE,
     "multi-family": PropertyKind.MULTI_FAMILY,
     "mobile": PropertyKind.MOBILE,
     "manufactured": PropertyKind.MOBILE,
-    "land": PropertyKind.LAND,
+    "vacant land": PropertyKind.LAND,
+    "land parcels": PropertyKind.LAND,
+    "agricultural": PropertyKind.LAND,
     "commercial": PropertyKind.COMMERCIAL,
     "mixed": PropertyKind.MIXED,
 }
-
-
-def _is_real_property(row: dict) -> bool:
-    """A row is real-property if its category, title, or description mentions
-    one of the real-property keywords. This is the post-fetch filter that
-    separates houses/land from desks/trucks/surplus equipment."""
-    haystack = " ".join(
-        str(row.get(field) or "").lower()
-        for field in ("categoryDescription", "assetShortDescription",
-                      "assetLongDescription", "assetCategory",
-                      "commDesc", "keywords")
-    )
-    return any(kw in haystack for kw in _REAL_PROPERTY_KEYWORDS)
 
 
 def _kind(row: dict) -> PropertyKind:
     haystack = " ".join(
         str(row.get(field) or "").lower()
         for field in ("categoryDescription", "assetShortDescription",
-                      "assetLongDescription", "assetCategory", "commDesc")
+                      "assetLongDescription", "assetCategory")
     )
+    # Land-vs-residential needs to come first: a vacant-lot listing's own
+    # zoning text often says "(Residential Low Density)" or similar, which
+    # would otherwise false-positive match the "residential" key below and
+    # mislabel a bare 0.474-acre lot as a built single-family home. Only
+    # treat it as land when no dwelling-specific word is also present.
+    has_dwelling = any(w in haystack for w in (
+        "home", "house", "residence", "bedroom", "bath", "dwelling", "cottage",
+    ))
+    if not has_dwelling and any(w in haystack for w in (
+        "acre", "vacant land", "lot size", "land parcel",
+    )):
+        return PropertyKind.LAND
     for key, kind in _PROP_KIND_MAP.items():
         if key in haystack:
             return kind
@@ -191,14 +246,15 @@ def _auction_url(row: dict) -> str:
 
 
 def _to_listing(row: dict, slug: str) -> Listing | None:
-    """Convert one GovDeals maestro API result row into a Listing, or None
-    if it's not a real-property row or has no usable address."""
-    if not _is_real_property(row):
-        return None
-
+    """Convert one GovDeals maestro API result row (already server-side
+    scoped to a real-estate categoryId) into a Listing, or None if it has
+    no usable address or is in the wrong state."""
     # Address fields from maestro API
     street = (row.get("locationAddress1") or "").strip() or None
-    state = (row.get("locationState") or row.get("stateDescription") or "").strip().upper() or None
+    state = (row.get("locationState") or "").strip().upper() or None
+    if not state:
+        full = (row.get("stateDescription") or "").strip()
+        state = {v: k for k, v in _STATE_FULL.items()}.get(full)
     if state and state not in STATES:
         return None
     city = (row.get("locationCity") or "").strip().title() or None
@@ -270,117 +326,146 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
         first_seen=start_date or datetime.utcnow(),
         last_seen=datetime.utcnow(),
         raw={
+            # Kept flat + in RAW_KEEP for backward compat (stable per-asset id).
             "govdeals_asset_id": aid,
-            "govdeals_lot_id": lot,
-            "govdeals_auction_id": row.get("auctionId"),
-            "current_bid": bid,
-            "bid_count": row.get("bidCount"),
-            "category": row.get("categoryDescription"),
-            "seller_name": row.get("displaySellerName") or row.get("companyName"),
-            "start_date": start_date.isoformat() if start_date else None,
-            "end_date": end_date.isoformat() if end_date else None,
-            "is_sold": row.get("isSoldAuction"),
-            "has_reserve": row.get("hasReservePrice"),
+            # FIXED 2026-10-01 (national-auction-tier audit, batch 4): everything
+            # below used to be flat top-level raw keys (govdeals_lot_id,
+            # govdeals_auction_id, current_bid, bid_count, category, seller_name,
+            # start_date, end_date, is_sold, has_reserve) and NONE of them were
+            # in web_artifact.RAW_KEEP except govdeals_asset_id -- _slim_raw()
+            # silently dropped all of them at publish. Namespaced under one
+            # "govdeals" key (now registered "*" in RAW_KEEP) so the whole
+            # payload survives instead of needing 9 individual allowlist entries.
+            "govdeals": {
+                "lot_id": lot,
+                "auction_id": row.get("auctionId"),
+                "current_bid": bid,
+                "bid_count": row.get("bidCount"),
+                "category": row.get("categoryDescription"),
+                "seller_name": row.get("displaySellerName") or row.get("companyName"),
+                "start_date": start_date.isoformat() if start_date else None,
+                "end_date": end_date.isoformat() if end_date else None,
+                "is_sold": row.get("isSoldAuction"),
+                "has_reserve": row.get("hasReservePrice"),
+            },
             "images": {"real": photos} if photos else {},
         },
     )
 
 
-async def _fetch_state(state: str, slug: str) -> list[Listing]:
-    """Page through the GovDeals maestro search API for one state.
+def _build_payload(category_id: str, state_full: str, page: int) -> dict:
+    """The real, flat request body the live Angular bundle's
+    GetSearchResults() posts to /search/list (reverse-engineered
+    2026-10-01 -- see module docstring bug #1). facetLimit/facetsShortened
+    must be a real int/bool (not null) or the API 400s with a .NET model-
+    binding error; every other optional field tolerates null."""
+    return {
+        "categoryIds": category_id,
+        "businessId": "GD",
+        "searchText": "",
+        "isQAL": False,
+        "locationId": None,
+        "model": None,
+        "makebrand": None,
+        "eventId": None,
+        "auctionTypeId": None,
+        "page": page,
+        "displayRows": PER_PAGE,
+        "sortField": "auctionEndDate",
+        "sortOrder": "asc",
+        "sessionId": str(uuid.uuid4()),
+        "requestType": None,
+        "responseStyle": None,
+        "facets": [],
+        "facetsFilter": [
+            '{!tag=stateDesc}stateDesc:"' + state_full.replace(" ", "\\ ") + '"'
+        ],
+        "timeType": None,
+        "sellerTypeId": None,
+        "accountIds": None,
+        "zipcode": None,
+        "proximityWithinDistance": None,
+        "isSimpleTimeSearch": True,
+        "simpleTimeSearchType": 1,
+        "simpleTimeWithIn": None,
+        "rangeTimeSearchType": None,
+        "toDate": None,
+        "fromDate": None,
+        "timeUnitValue": "Atauction",
+        "facetLimit": 10,
+        "facetsShortened": False,
+        "modelYear": None,
+        "isVehicleSearch": False,
+    }
 
-    The API returns JSON with an 'assetSearchResults' array. We page
-    until we get fewer than PER_PAGE rows (last page) or hit PAGES_CAP."""
+
+async def _fetch_category_state(c, category_id: str, state: str, slug: str) -> list[Listing]:
+    state_full = _STATE_FULL[state]
     out: list[Listing] = []
     seen: set[str] = set()
 
-    async with client(timeout=30.0) as c:
-        for page in range(1, PAGES_CAP + 1):
-            # Each request needs unique correlation/page IDs
-            headers = {
-                **HEADERS,
-                "x-api-correlation-id": str(uuid.uuid4()),
-                "x-page-unique-id": str(uuid.uuid4()),
-            }
-            payload = {
-                "searchModel": {
-                    "searchText": "",
-                    "pageNumber": page,
-                    "pageSize": PER_PAGE,
-                    "facetsFilter": [f"{{!tag=stateDesc}}stateDesc:{state}"],
-                    "isTimeSearch": True,
-                    "simpleTimeSearchType": 1,
-                    "timeUnitValue": "Atauction",
-                    "sortBy": "auctionEndDate",
-                    "sortOrder": "asc",
-                },
-                "businessUnit": "GovDeals",
-                "businessId": "GD",
-                "siteId": 1,
-            }
-            try:
-                r = await c.post(
-                    API, json=payload, headers=headers, follow_redirects=True
-                )
-            except Exception as exc:
-                log.warning(
-                    "govdeals.fetch_failed",
-                    state=state, page=page, error=str(exc)[:200],
-                )
-                break
+    for page in range(1, PAGES_CAP + 1):
+        headers = {
+            **HEADERS,
+            "x-api-correlation-id": str(uuid.uuid4()),
+            "x-page-unique-id": str(uuid.uuid4()),
+        }
+        payload = _build_payload(category_id, state_full, page)
+        try:
+            r = await c.post(API, json=payload, headers=headers, follow_redirects=True)
+        except Exception as exc:
+            log.warning("govdeals.fetch_failed", category=category_id, state=state,
+                        page=page, error=str(exc)[:200])
+            break
 
-            if r.status_code != 200:
-                log.warning(
-                    "govdeals.bad_status",
-                    state=state, page=page, code=r.status_code,
-                )
-                break
+        if r.status_code != 200:
+            log.warning("govdeals.bad_status", category=category_id, state=state,
+                        page=page, code=r.status_code, body=r.text[:200])
+            break
 
-            try:
-                payload_resp = r.json()
-            except Exception:
-                log.warning("govdeals.bad_json", state=state, page=page)
-                break
+        try:
+            payload_resp = r.json()
+        except Exception:
+            log.warning("govdeals.bad_json", category=category_id, state=state, page=page)
+            break
 
-            rows = payload_resp.get("assetSearchResults") or []
-            if not isinstance(rows, list):
-                break
+        rows = payload_resp.get("assetSearchResults") or []
+        if not isinstance(rows, list):
+            break
 
-            new_this_page = 0
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                li = _to_listing(row, slug)
-                if li is None:
-                    continue
-                key = li.case_number or li.source_url
-                if key in seen:
-                    continue
-                seen.add(key)
-                out.append(li)
-                new_this_page += 1
+        new_this_page = 0
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            li = _to_listing(row, slug)
+            if li is None:
+                continue
+            key = li.case_number or li.source_url
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(li)
+            new_this_page += 1
 
-            log.info(
-                "govdeals.page_done",
-                state=state, page=page,
-                rows=len(rows), kept=new_this_page,
-                running=len(out),
-            )
+        log.info(
+            "govdeals.page_done",
+            category=category_id, state=state, page=page,
+            rows=len(rows), kept=new_this_page, running=len(out),
+        )
 
-            # Stop on last page (fewer than PER_PAGE returned) or empty page.
-            if len(rows) < PER_PAGE or new_this_page == 0:
-                break
+        if len(rows) < PER_PAGE or new_this_page == 0:
+            break
 
-    log.info("govdeals.state_done", state=state, count=len(out))
     return out
 
 
 class GovDeals(BaseScraper):
     """GovDeals.com government surplus real-property auctions.
 
-    Queries the maestro.lqdt1.com search API for NC and SC, filters for
-    real-property rows (houses, land, buildings), and returns Listing objects
-    with listing_type=AUCTION.
+    Queries the maestro.lqdt1.com search API, scoped SERVER-SIDE to the
+    real-estate taxonomy branches (categoryIds 84 + 95A) and to NC/SC via
+    the stateDesc facet, and returns Listing objects with
+    listing_type=AUCTION.
     """
 
     slug = "national.govdeals"
@@ -393,13 +478,14 @@ class GovDeals(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        for state in STATES:
-            try:
-                out.extend(await _fetch_state(state, self.slug))
-            except Exception as exc:
-                log.warning(
-                    "govdeals.state_failed",
-                    state=state, error=str(exc)[:200],
-                )
+        async with client(timeout=30.0) as c:
+            for state in STATES:
+                for category_id in REAL_ESTATE_CATEGORY_IDS:
+                    try:
+                        rows = await _fetch_category_state(c, category_id, state, self.slug)
+                        out.extend(rows)
+                    except Exception as exc:
+                        log.warning("govdeals.combo_failed", category=category_id,
+                                    state=state, error=str(exc)[:200])
         log.info("govdeals.done", total=len(out))
         return out
