@@ -234,6 +234,17 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
     balance = _money(row.get("BalanceAmount"))
     lien_amt = _money(row.get("LeinAmount"))  # NB: backend misspells "Lein"
     filed = _parse_date(row.get("LienDateFiled"))
+    # 2026-10-01 per-source audit: the bulk Export_All_Ind response carries a full
+    # debt breakdown that was being thrown away. Live-verified on an 8,000-row
+    # export: TaxAmount populated on 7,445/8,000, InterestAmount on 7,342/8,000,
+    # PenaltyAmount on 7,961/8,000 (Cost_FeesAmount is almost always 0 but kept
+    # for completeness). LienID/LienStatus/LienDateFiled/LienDocument are ALL
+    # null on every one of those 8,000 rows on this export endpoint -- not a
+    # parsing gap, the bulk-export view genuinely does not populate them.
+    tax_principal = _money(row.get("TaxAmount"))
+    interest = _money(row.get("InterestAmount"))
+    penalty = _money(row.get("PenaltyAmount"))
+    cost_fees = _money(row.get("Cost_FeesAmount"))
 
     street, city, addr_state, zipc, county = _split_address(row.get("EmployerAddress"))
     state = (addr_state or "SC").upper()
@@ -311,6 +322,10 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
                 "status": status,
                 "lien_amount": lien_amt,
                 "balance": balance,
+                "tax_principal": tax_principal,
+                "interest": interest,
+                "penalty": penalty,
+                "cost_fees": cost_fees,
                 "dba_name": (row.get("DBAName") or None),
                 "employer_account_id": row.get("EmployerAccountId") or None,
                 "employer_fein": row.get("EmployerFEIN") or None,

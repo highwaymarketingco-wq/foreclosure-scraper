@@ -1751,6 +1751,13 @@ RAW_KEEP = {
     "multi_year_delinquent_tax": "*",   # delinquent tax roll: total_due + year
     "spartanburg_delinquent_tax": "*",  # SC delinquent tax: balance
     "sc_state_tax_lien": "*",           # SC DeptRev state tax lien: balance
+    # 2026-10-01 per-source audit hardening: the scraper itself is disabled=True
+    # on the board (cross-reference only, read in-memory by enrichment_dew_liens,
+    # which never persists this key -- so this was not a LIVE drop). Added as a
+    # defensive completeness measure per the same RAW_KEEP-omission pattern this
+    # file's own comments document repeatedly, in case the slug is ever
+    # re-enabled as a board source.
+    "sc_dew_lien_registry": "*",        # SC DEW UI-tax/benefit lien: balance + tax/interest/penalty breakdown
     "deed_chain": "*",                  # synthesized ownership transfer timeline + summary
     # 2026-09-13. Lexington's assessment ratio (4% owner-occupied vs 6% everything
     # else) plus fmv. Added the same hour the enricher was written, because the

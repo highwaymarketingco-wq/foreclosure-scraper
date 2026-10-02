@@ -121,3 +121,24 @@ def test_row_with_no_name_is_still_dropped():
     row = _row("Chester", name="")
     row["DBAName"] = ""
     assert _to_listing(row, _SLUG) is None
+
+
+def test_debt_breakdown_fields_are_captured():
+    # 2026-10-01 per-source audit: live-verified against an 8,000-row real
+    # Export_All_Ind pull that TaxAmount/InterestAmount/PenaltyAmount are
+    # populated on the large majority of rows (7445/7342/7961 of 8000) but were
+    # never read by _to_listing, even though BalanceAmount/LeinAmount already
+    # were. LienID/LienStatus/LienDateFiled are genuinely null on every one of
+    # those 8,000 rows on the bulk export endpoint -- not a parsing gap.
+    row = _row("Chester")
+    row["TaxAmount"] = "300.00"
+    row["InterestAmount"] = "150.00"
+    row["PenaltyAmount"] = "50.00"
+    row["Cost_FeesAmount"] = "0.00"
+    li = _to_listing(row, _SLUG)
+    assert li is not None
+    d = li.raw["sc_dew_lien_registry"]
+    assert d["tax_principal"] == 300.0
+    assert d["interest"] == 150.0
+    assert d["penalty"] == 50.0
+    assert d["cost_fees"] is None  # 0.00 -> falsy, _money() returns None by design
