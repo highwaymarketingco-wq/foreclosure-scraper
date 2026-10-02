@@ -109,6 +109,14 @@ def parse(html: str, page_url: str = PAGE_URL) -> list[Listing]:
         # --- per-<li> field extraction -------------------------------------
         parcels: list[str] = []
         addresses: list[str] = []
+        # Per-address county GIS/CAMA "property card" link (the <a href> on
+        # each "View the <ADDRESS> property card" line) -- found 2026-10-01
+        # (batch-5 extraction-completeness audit): `ul.text()`/`li.text()`
+        # strip every tag including the href, so this direct link to the
+        # assessor record (etax.nhcgov.com Datalet, carries beds/baths/sqft/
+        # assessed value) was being thrown away for every property on every
+        # row. Kept in raw (no enricher consumes it yet) so it isn't lost.
+        property_card_urls: list[str] = []
         case_number: Optional[str] = None
         sale_date: Optional[datetime] = None
         sale_date_text: Optional[str] = None
@@ -129,6 +137,10 @@ def parse(html: str, page_url: str = PAGE_URL) -> list[Listing]:
                 addr = re.sub(r"\s*-\s*R\d.*$", "", addr, flags=re.I).strip()
                 if addr and addr not in addresses:
                     addresses.append(addr)
+                    anchor = li.css_first("a")
+                    href = (anchor.attributes.get("href") if anchor else None) or None
+                    if href:
+                        property_card_urls.append(href)
                 continue
 
             # Parcel line(s): "Parcel Number(s): R..., R..., & R..."
@@ -204,6 +216,7 @@ def parse(html: str, page_url: str = PAGE_URL) -> list[Listing]:
                         "county": COUNTY,
                         "all_parcels": parcels,
                         "all_addresses": addresses,
+                        "property_card_urls": property_card_urls,
                         "civil_number": case_number,
                         "sale_date_text": sale_date_text,
                         "administrator": "Kania Law Firm, P.A.",
