@@ -4158,10 +4158,14 @@ def append_new_rows(new_listings: list[Listing], summary: dict,
 
     THE PROBLEM THIS SOLVES. The normal pattern -- load_board() (validates EVERY row into a
     Listing), mutate/append in Python, write_artifact() (re-serializes EVERY row) -- is exactly
-    right for a full rescrape or an in-place enrichment pass, where every row genuinely might
-    change (run_pending_signal_enrichers.py is that shape: it re-tags EXISTING rows, so it
-    still needs load_board()/write_artifact(), unchanged, still gated by
-    BOARD_LOAD_MAX_SOURCE_MB). It is the wrong tool for "scrape a handful of new listings,
+    right for a full rescrape where every row genuinely might change and the whole thing is
+    rewritten anyway. An in-place enrichment pass that re-tags EXISTING rows but only actually
+    CHANGES a few of them (run_pending_signal_enrichers.py was this shape until its 2026-10-02
+    migration -- docs/HANDOFF.md item 42 -- off load_board()/write_artifact() onto
+    board_stream.iter_board_rows() + a pre/post snapshot diff + patch_existing_rows(), the same
+    double-materialization fix run_tax_owed_normalize.py/backfill_derivation_flags.py/
+    lrcpwa_refresh.py/_dq_common.run_apply() already got) is a better fit for patch_existing_rows()
+    (below), not this function -- it is still the wrong tool for "scrape a handful of new listings,
     check they are not already on the board, add them"
     (scripts/run_scoped_scrapers.py --apply's real use case): the existing rows never need to
     be parsed into a mutable Listing, or even held as a parsed dict for the whole pass, at all.
