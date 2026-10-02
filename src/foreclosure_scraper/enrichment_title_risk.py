@@ -139,15 +139,41 @@ _SENIOR_PATTERNS: tuple[tuple[str, str], ...] = (
 #
 # NOTE: the HOA pattern requires a HOA-specific qualifier so it never swallows a
 # bank trustee that happens to carry "national association" in its name.
+#
+# _OWNER_POSS matches "owner"/"owners"/"owner's"/"owners'" uniformly — found
+# live on the board (2026-10-02, HOA-plaintiff classifier investigation):
+# "South Wind Villas Homeowner's Association" and "Maxwell Commons Home
+# Owner's Association, Inc." both carry the singular possessive ("owner's",
+# apostrophe BEFORE the s) and fell through the old `owners?` patterns (which
+# only matched a trailing, apostrophe-less "s"), silently landing in
+# kind='unknown' instead of 'junior_lien_foreclosure'.
 # ---------------------------------------------------------------------------
-_JUNIOR_PATTERNS: tuple[tuple[str, str], ...] = (
-    # HOA / POA / condo / community / townhome associations
-    (r"home\s*owners?\s+association|homeowners\b", "homeowners association"),
-    (r"property\s+owners?\s+association|\bp\.?o\.?a\.?\b", "property owners association"),
+_OWNER_POSS = r"owner(?:s'|'s|s)?"
+
+#: HOA / POA / condo / community / townhome associations ONLY — split out from
+#: the broader junior-lien table below so a caller that wants "is this
+#: specifically an HOA/POA/COA plaintiff" (see classify_hoa_plaintiff) doesn't
+#: also have to filter out credit unions / municipalities / tax bodies, which
+#: are junior-lien risks but not HOA entities.
+_HOA_PATTERNS: tuple[tuple[str, str], ...] = (
+    (rf"home\s*{_OWNER_POSS}\s+association|homeowners\b", "homeowners association"),
+    # NOTE: deliberately no bare \bp\.?o\.?a\.?\b acronym branch here (there
+    # used to be one). Live-board check (2026-10-02, HOA-plaintiff classifier
+    # investigation): the bare acronym's ONLY live match across the entire
+    # board was "Angela Maria Rogers Individually And As Poa For Shirley
+    # Stewart Burges" — POA there means Power of Attorney, not a Property
+    # Owners Association, a 100% false-positive rate for that branch. Every
+    # real POA-type HOA entity on the live board spells out "Property Owners
+    # Association" in full (e.g. "Rock At Jocassee Property Owners
+    # Association"), so dropping the bare acronym costs zero true positives.
+    (rf"property\s+{_OWNER_POSS}\s+association", "property owners association"),
     (r"community\s+association|\bh\.?o\.?a\.?\b", "community / HOA"),
     (r"condominium(?:\s+(?:owners?|association))?|condo\s+association", "condominium association"),
     (r"townh(?:ome|ouse)s?\s+(?:owners?\s+)?association", "townhome association"),
-    (r"\bowners'?\s+association\b", "owners association"),
+    (rf"\b{_OWNER_POSS}\s+association\b", "owners association"),
+)
+
+_JUNIOR_PATTERNS: tuple[tuple[str, str], ...] = _HOA_PATTERNS + (
     # Credit unions (foreclose on signature / 2nd-lien loans junior to a bank 1st)
     (r"credit\s+union|\bf\.?c\.?u\.?\b|\bc\.?u\.?\b(?!\s*stom)", "credit union"),
     # Municipal tax / code-fine bodies (priority varies — verify the senior debt)
@@ -207,6 +233,47 @@ _PERSON_LIKE = re.compile(r"^[a-z][a-z.\-' ]+$", re.I)
 
 _COMPILED_SENIOR = tuple((re.compile(p, re.I), label) for p, label in _SENIOR_PATTERNS)
 _COMPILED_JUNIOR = tuple((re.compile(p, re.I), label) for p, label in _JUNIOR_PATTERNS)
+_COMPILED_HOA = tuple((re.compile(p, re.I), label) for p, label in _HOA_PATTERNS)
+
+
+def classify_hoa_plaintiff(party: str | None) -> dict:
+    """Classify a plaintiff / foreclosing-party STRING as HOA/POA/COA-type vs.
+    bank/mortgage/other. The shared classifier referenced by
+    enrichment_hoa_plaintiff_signal.py (per-listing enrichment pass) and
+    reusable by any other caller that just has a name string.
+
+    Returns {"is_hoa": bool, "matched": str | None}. `matched` names which
+    pattern fired: an `_SENIOR_PATTERNS` brand label when the SENIOR bank/
+    servicer/trustee table hits (is_hoa=False — real example: "U.S. Bank Trust
+    National Association"), an `_HOA_PATTERNS` label when an HOA-specific
+    qualifier hits (is_hoa=True — real example: "Rock At Jocassee Property
+    Owners Association, Inc."), or None when nothing matched (conservative
+    default — covers bare, unqualified "... Association" names like "Harbor
+    Town Association, Inc." or "Tall Ship Association Inc", real live-board
+    plaintiffs that are NOT demonstrably an HOA).
+
+    SENIOR is checked FIRST, exactly as in _classify() above and for the same
+    reason: real data has dozens of live rows like "U.S. Bank National
+    Association" / "PNC Bank, National Association" / "JPMorgan Chase Bank,
+    National Association" sitting right next to real HOA rows like "Amherst
+    Homeowners Association Inc" — a bare "association" substring match would
+    mis-flag every one of those banks as an HOA. The _HOA_PATTERNS table never
+    matches a bare "association": each pattern requires a HOA-specific
+    qualifier (homeowners/property owners/community/HOA/condominium/townhome/
+    owners'), which no real bank, credit union, or MERS name carries.
+    """
+    if not party or not str(party).strip():
+        return {"is_hoa": False, "matched": None}
+    norm = _normalize_party(str(party))
+    if not norm:
+        return {"is_hoa": False, "matched": None}
+    for rx, label in _COMPILED_SENIOR:
+        if rx.search(norm):
+            return {"is_hoa": False, "matched": label}
+    for rx, label in _COMPILED_HOA:
+        if rx.search(norm):
+            return {"is_hoa": True, "matched": label}
+    return {"is_hoa": False, "matched": None}
 
 
 def _party_text(li: Listing) -> str:

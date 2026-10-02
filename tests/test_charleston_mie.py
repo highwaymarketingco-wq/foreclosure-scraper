@@ -14,8 +14,10 @@ import asyncio
 import os
 
 import pytest
+import structlog
 
-from foreclosure_scraper.models import ListingType
+from foreclosure_scraper.models import Listing, ListingType, PropertyKind
+from foreclosure_scraper.scrapers.counties_sc import charleston_mie as cmie_module
 from foreclosure_scraper.scrapers.counties_sc.charleston_mie import (
     CharlestonMasterInEquity,
     _norm_case,
@@ -124,3 +126,145 @@ def test_scraper_registered():
 def test_hearing_roster_requires_pdfplumber_gracefully():
     # Non-PDF bytes must not raise — parser returns [] on bad input.
     assert parse_hearing_roster(b"not a pdf") == []
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-02 fixes: bare `except: pass` -> real logging, and the dedup rule
+# that used to discard the HOA tag when a case also appears on the richer
+# auction list (the lt_hoa_sale investigation; see
+# enrichment_hoa_plaintiff_signal.py's module docstring for the full context).
+# ---------------------------------------------------------------------------
+
+def _fake_client_factory(get_impl):
+    """Build a `client`-shaped async context-manager factory, mirroring the
+    established pattern in tests/test_buncombe_tax_foreclosure.py."""
+    class _FakeHTTPClient:
+        async def get(self, url, **kw):
+            return await get_impl(url, **kw)
+
+    class _CM:
+        async def __aenter__(self):
+            return _FakeHTTPClient()
+
+        async def __aexit__(self, *a):
+            return False
+
+    def _factory(**kw):
+        return _CM()
+
+    return _factory
+
+
+class _FakeResp:
+    def __init__(self, status_code: int, content: bytes):
+        self.status_code = status_code
+        self.content = content
+
+
+def test_fetch_logs_failures_instead_of_swallowing_them(monkeypatch):
+    """Both network calls used to be `except Exception: pass` — a real outage
+    (bad cert, DNS flake, a changed URL) left zero rows with zero trace of
+    why. Each must now log a real line carrying the actual exception text."""
+    async def _raise(url, **kw):
+        raise RuntimeError("boom: connection reset")
+
+    monkeypatch.setattr(cmie_module, "client", _fake_client_factory(_raise))
+
+    with structlog.testing.capture_logs() as logs:
+        out = asyncio.run(CharlestonMasterInEquity().fetch())
+
+    assert out == []  # both sources failed; fetch() still must not raise
+    blob = str(logs)
+    assert "charleston_mie.auction_list_failed" in blob
+    assert "charleston_mie.hearing_roster_failed" in blob
+    assert "boom: connection reset" in blob
+
+
+def test_hoa_tag_preserved_when_case_deduped_into_richer_auction_row(monkeypatch):
+    """Before this fix: a case on BOTH the hearing roster (HOA-tagged, via the
+    "HOA FORECLOSURES" section -> ListingType.HOA_SALE) and the auction list
+    (always generic FORECLOSURE_SALE — the auction list carries no HOA
+    section at all) kept only the auction-list row, and the HOA fact was
+    silently lost: `continue` dropped the roster row with no trace. Now the
+    surviving richer row must carry the HOA flag instead."""
+    auction_row = Listing(
+        source="counties_sc.charleston_mie",
+        source_url=cmie_module.AUCTION_LIST_URL,
+        listing_type=ListingType.FORECLOSURE_SALE,
+        property_kind=PropertyKind.UNKNOWN,
+        state="SC", county="Charleston",
+        parcel_id="3501400030",
+        case_number="25-06873",
+        street_address="1906 Capri Drive",
+        raw={"charleston_mie": {"method": "auction_list", "tms": "3501400030", "reopened": False}},
+    )
+    # Roster's case# is unpadded ("25-6873" vs the auction list's "25-06873")
+    # — exactly the padding mismatch _norm_case exists to collapse.
+    hoa_roster_row = Listing(
+        source="counties_sc.charleston_mie",
+        source_url=cmie_module.HEARING_ROSTER_URL,
+        listing_type=ListingType.HOA_SALE,
+        property_kind=PropertyKind.UNKNOWN,
+        state="SC", county="Charleston",
+        case_number="25-6873",
+        plaintiff="Attenborough Townes Hoa, Inc.",
+        raw={"charleston_mie": {"method": "hearing_roster", "hoa": True}},
+    )
+    monkeypatch.setattr(cmie_module, "parse_auction_list", lambda data, url: [auction_row])
+    monkeypatch.setattr(cmie_module, "parse_hearing_roster", lambda data, url: [hoa_roster_row])
+
+    async def _get(url, **kw):
+        if url == cmie_module.AUCTION_LIST_URL:
+            return _FakeResp(200, b"<html>auction</html>")
+        return _FakeResp(200, b"%PDF-fake")
+
+    monkeypatch.setattr(cmie_module, "client", _fake_client_factory(_get))
+
+    out = asyncio.run(CharlestonMasterInEquity().fetch())
+
+    # Exactly one row survives — the richer auction-list row, not a duplicate.
+    assert len(out) == 1
+    survivor = out[0]
+    assert survivor.listing_type == ListingType.FORECLOSURE_SALE
+    assert survivor.parcel_id == "3501400030"
+    assert survivor.raw["charleston_mie"]["hoa"] is True
+    assert survivor.raw["charleston_mie"]["hoa_from_hearing_roster"] is True
+
+
+def test_non_hoa_roster_dup_is_still_silently_deduped(monkeypatch):
+    """Regression guard the other way: an ORDINARY (non-HOA) roster case that
+    also appears on the auction list must still be dropped with no patch —
+    only an HOA-tagged roster row triggers the raw['charleston_mie']['hoa']
+    patch onto the survivor."""
+    auction_row = Listing(
+        source="counties_sc.charleston_mie",
+        source_url=cmie_module.AUCTION_LIST_URL,
+        listing_type=ListingType.FORECLOSURE_SALE,
+        property_kind=PropertyKind.UNKNOWN,
+        state="SC", county="Charleston",
+        parcel_id="3400000043",
+        case_number="26-00297",
+        raw={"charleston_mie": {"method": "auction_list", "tms": "3400000043", "reopened": False}},
+    )
+    ordinary_roster_row = Listing(
+        source="counties_sc.charleston_mie",
+        source_url=cmie_module.HEARING_ROSTER_URL,
+        listing_type=ListingType.LIS_PENDENS,
+        property_kind=PropertyKind.UNKNOWN,
+        state="SC", county="Charleston",
+        case_number="26-0297",
+        raw={"charleston_mie": {"method": "hearing_roster", "hoa": False}},
+    )
+    monkeypatch.setattr(cmie_module, "parse_auction_list", lambda data, url: [auction_row])
+    monkeypatch.setattr(cmie_module, "parse_hearing_roster", lambda data, url: [ordinary_roster_row])
+
+    async def _get(url, **kw):
+        if url == cmie_module.AUCTION_LIST_URL:
+            return _FakeResp(200, b"<html>auction</html>")
+        return _FakeResp(200, b"%PDF-fake")
+
+    monkeypatch.setattr(cmie_module, "client", _fake_client_factory(_get))
+
+    out = asyncio.run(CharlestonMasterInEquity().fetch())
+    assert len(out) == 1
+    assert "hoa" not in out[0].raw["charleston_mie"]

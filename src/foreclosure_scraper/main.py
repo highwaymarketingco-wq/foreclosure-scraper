@@ -3312,6 +3312,21 @@ async def run() -> int:
     except Exception:
         log.error("co_defendant_signal.failed", traceback=traceback.format_exc())
 
+    # HOA/POA/COA plaintiff signal (2026-10-02 lt_hoa_sale investigation) — the
+    # board's own charleston_mie.py scraper proves real HOA foreclosures exist,
+    # but ListingType.HOA_SALE shows ~0 board-wide because almost every HOA
+    # foreclosure lands under the generic foreclosure_sale/lis_pendens type
+    # instead. No network; reads the SAME plaintiff text already collected by
+    # dozens of scrapers and reuses enrichment_title_risk.classify_hoa_plaintiff()
+    # (its SENIOR-bank-table-wins-ties guard, already proven live), so it can run
+    # anywhere that module is already imported.
+    try:
+        from .enrichment_hoa_plaintiff_signal import enrich_hoa_plaintiff_signal
+        s = enrich_hoa_plaintiff_signal(enriched)
+        if s: enrichment_stats["hoa_plaintiff_signal"] = s
+    except Exception:
+        log.error("hoa_plaintiff_signal.failed", traceback=traceback.format_exc())
+
     # Same-owner parcel clustering (Dirty Deeds Tier A #2) — one death/owner
     # touching many parcels is worth more than the same parcels scored alone.
     # No network; reads owner_name + county/state + parcel_id already on the lead.

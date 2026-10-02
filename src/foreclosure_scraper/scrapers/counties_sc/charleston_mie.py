@@ -53,9 +53,13 @@ import re
 from datetime import datetime
 from typing import Iterable, Optional
 
+import structlog
+
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
 
 AUCTION_LIST_URL = "https://charlestoncounty.gov/foreclosure/runninglist.html"
 HEARING_ROSTER_URL = (
@@ -407,6 +411,11 @@ class CharlestonMasterInEquity(BaseScraper):
         out: list[Listing] = []
         seen_tms: set[str] = set()
         seen_case: set[str] = set()
+        # Normalized case# -> index in `out`, auction-list rows only. Lets the
+        # hearing-roster pass (2) patch the HOA flag onto the richer surviving
+        # row instead of silently losing it when a case is deduped away (see
+        # that pass's comment below).
+        case_row_idx: dict[str, int] = {}
 
         async with client(timeout=60.0) as c:
             # (1) Auction list — primary, richest rows.
@@ -421,23 +430,42 @@ class CharlestonMasterInEquity(BaseScraper):
                         nc = _norm_case(li.case_number)
                         if nc:
                             seen_case.add(nc)
+                            case_row_idx[nc] = len(out)
                         out.append(li)
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning("charleston_mie.auction_list_failed", error=str(exc)[:160])
 
             # (2) Hearing roster — earliest-signal leads; skip any case already
-            # captured (richer) from the auction list.
+            # captured (richer) from the auction list, but if the roster flagged
+            # it HOA (the "HOA FORECLOSURES" section -> ListingType.HOA_SALE),
+            # don't just drop that fact: stamp it onto the surviving auction-list
+            # row instead. Before this fix, a case appearing on BOTH the hearing
+            # roster (HOA-tagged) and the auction list (always generic
+            # FORECLOSURE_SALE, since the auction list carries no HOA section)
+            # kept only the auction-list row, which had no way to show it was an
+            # HOA matter at all — exactly the silent loss
+            # enrichment_hoa_plaintiff_signal.py's docstring documents as part of
+            # the 2026-10-02 lt_hoa_sale investigation.
             try:
                 r = await c.get(HEARING_ROSTER_URL, headers={"User-Agent": "Mozilla/5.0"})
                 if r.status_code == 200 and r.content[:4] == b"%PDF":
                     for li in parse_hearing_roster(r.content, HEARING_ROSTER_URL):
                         nc = _norm_case(li.case_number)
                         if nc and nc in seen_case:
+                            if li.listing_type == ListingType.HOA_SALE:
+                                idx = case_row_idx.get(nc)
+                                if idx is not None:
+                                    richer = out[idx]
+                                    if not isinstance(richer.raw, dict):
+                                        richer.raw = {}
+                                    cm = richer.raw.setdefault("charleston_mie", {})
+                                    cm["hoa"] = True
+                                    cm["hoa_from_hearing_roster"] = True
                             continue
                         if nc:
                             seen_case.add(nc)
                         out.append(li)
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning("charleston_mie.hearing_roster_failed", error=str(exc)[:160])
 
         return out

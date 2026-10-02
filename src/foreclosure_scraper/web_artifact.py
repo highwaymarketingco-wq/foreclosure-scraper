@@ -2030,6 +2030,11 @@ RAW_KEEP = {
     # scrapers surface -- roughly 7x, for a regex over a column already stored.
     "owner_name_signal": "*",
     "co_defendant_signal": "*",         # SC judicial-foreclosure co-defendants: junior lienholders / gov liens / HOA / estate, read off court/sc_public_index co_defendants
+    # 2026-10-02 lt_hoa_sale investigation: HOA/POA/COA plaintiff classifier over
+    # already-collected foreclosure_sale/lis_pendens plaintiff text. Registered
+    # BEFORE enrichment_hoa_plaintiff_signal.py's first run, same lesson as
+    # heir_naming_publication / landlocked / lexington_assessment above.
+    "hoa_plaintiff_signal": "*",
     "sc_probate_notice": "*",
     "life_event": "*",                  # death / divorce marker the resolver keys off
     "estimated_monthly_rent_acs": "*",  # ACS $/sqft rent estimate — the rental-exit number
