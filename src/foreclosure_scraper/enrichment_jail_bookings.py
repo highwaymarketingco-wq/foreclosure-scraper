@@ -111,6 +111,76 @@ persists that diff, so a real run afterward still sees the same bookings as
 new. `scripts/run_pending_signal_enrichers.py` and
 `scripts/catchup_failed_enrichers.py` both now pass their own `--dry-run` flag
 through to this call.
+
+CROSS-COUNTY NAME-ONLY FANOUT (fixed 2026-10-02). A real backfill run on
+2026-10-02 found 12,337 board rows carrying raw['jail_booking_new'] against a
+run-log "matched" figure of 639 — a ~19x gap. Root cause, confirmed by reading
+`match_cross_county` as originally written (commit 9c16d8ee, 2026-09-29) and
+its git history (unchanged since): the SAME-COUNTY tier (`match_rosters`,
+confidence "name_only_low") only ever searches ONE county's roster against
+THAT county's own leads, so its blast radius is capped by county population.
+`match_cross_county` instead takes `_owner_name_index` -- every NC/SC listing
+on the WHOLE BOARD keyed by (state, normalized last, normalized first) -- and
+flags EVERY listing whose owner shares an exact first+last name with ANYONE
+newly booked on ANY covered county's roster, with NO other corroborating
+field: no middle name, no DOB, no county adjacency, nothing. This was true
+from the moment the tier was introduced (2026-09-29); it is not a regression.
+A common name (e.g. "JAMES HARRIS") newly booked in one county can sit on the
+board under thousands of unrelated owners statewide, and the whole-board
+index turns that one booking into thousands of false "this owner may be
+incarcerated" stamps in a single run. The 639-vs-12,337 gap is consistent with
+`scripts/run_pending_signal_enrichers.py` printing `jail_bookings`' own
+"matched" key (the bounded same-county tier) as the headline number while
+`cross_county` (printed in the same line, and again in the before/after delta
+for raw key jail_booking_new) carried the real, much larger figure; it is
+also consistent with the 2026-09-29-to-2026-10-02 window including the first
+real run of this step against a cold (empty or near-empty)
+`data/jail_roster_history.db` on the Oracle VM (idle since 2026-09-03, see
+project_oracle_vm_revival note) -- `jail_roster_history.diff_and_record` marks
+a name "is_new" on its FIRST-EVER INSERT for that (state, county, name) key,
+so a sidecar with little or no prior history makes most or all of a county's
+CURRENT roster register as "new" in one run, not just genuinely fresh
+bookings -- amplifying the already-uncorroborated fanout further. Both
+factors are explicitly called out as a follow-up verification, not asserted
+as the full explanation: the fix below removes the structural cause (the
+missing corroboration requirement) regardless of which amplified it on any
+given run.
+
+Fix: this project already has an established convention for exactly this
+"common name, thin match" problem --
+`name_normalize.party_middle_verdict`/`owner_last_first_middle`, built for
+the SC-divorce party match (41% of comparable hits were a different person
+with the same first+last name, audit 2026-09-21) and reused by
+`enrichment_sc_phone.py`'s voter-phone identity gate, where an "unverified"
+(no middle on one side) match is explicitly NOT good enough to dial.
+`match_cross_county` never used it. It now does, via `_cross_county_corroborated`:
+a cross-county stamp requires the booking's middle name (now captured by
+`_split_zuercher_name` / `_split_comma_name`, previously parsed and thrown
+away) to POSITIVELY AGREE with the board owner's middle initial --
+`party_middle_verdict(...) == "agrees"`, not merely "not a conflict." This is
+stricter than the divorce gate on purpose: that gate treats "unverified" as
+passable (a county-matched voter phone can still corroborate); this tier has
+no analogous second signal, so "unverified" is now rejected outright, the
+same fail-closed default `name_normalize`'s own module docstring states as
+this codebase's policy ("errs toward committing nothing"). The confidence tag
+changes from "name_only_low_cross_county" to "middle_corroborated_cross_county"
+so it reads as what it now is, and so no downstream code can confuse it with
+the old, uncorroborated tier. `match_rosters`' same-county tier (confidence
+"name_only_low") is deliberately left as-is: it is the tier the module's own
+earlier docstring already discloses and accepts as a bounded, low-confidence
+STACK signal (weight 8 in distress_score.py); it was not the source of this
+incident and this fix does not change its behavior.
+
+Checked whether any scorer compounds this: as of this fix, raw['jail_booking_new']
+is read by nothing outside this module, its own tests, and
+`scripts/run_pending_signal_enrichers.py` (which only counts/patches it) --
+`distress_score.py` scores raw['jail_booking']/raw['incarceration'] (the
+same-county tier) only, confirmed by grepping every reference to
+"jail_booking_new" in the repo. So the already-written rows are inert for
+scoring today; the risk is a human reading raw['jail_booking_new'] directly
+off the board, or a future scorer wiring it in uncorroborated. See
+docs/HANDOFF.md / the 2026-10-02 follow-up note for the precise scope of
+correcting the rows this already wrote on the Oracle VM's uncommitted board.
 """
 from __future__ import annotations
 
@@ -126,6 +196,7 @@ from . import jail_roster_history
 
 from .models import Listing
 from .enrichment_incarceration import _name_parts, _owner_of
+from .name_normalize import party_middle_verdict
 # The Citizen Connect / Tyler fetchers are shared verbatim with the standalone
 # jail-bookings scraper rather than duplicated here.
 from .scrapers.national.jail_bookings import (
@@ -189,15 +260,22 @@ def _norm_key(last: str, first: str) -> tuple[str, str]:
             re.sub(r"[^A-Z]", "", (first or "").upper()))
 
 
-def _split_zuercher_name(name: str) -> Optional[tuple[str, str]]:
-    """'Adams, Bruce Edward' -> ('ADAMS', 'BRUCE')."""
+def _split_zuercher_name(name: str) -> Optional[tuple[str, str, str]]:
+    """'Adams, Bruce Edward' -> ('ADAMS', 'BRUCE', 'EDWARD').
+
+    Middle is '' when the roster only carries one given name. Previously
+    returned a 2-tuple and threw the middle token away; it is now kept so
+    `match_cross_county` can require it as corroboration (see module
+    docstring, "CROSS-COUNTY NAME-ONLY FANOUT").
+    """
     if not name or "," not in name:
         return None
     last, _, rest = name.partition(",")
     toks = rest.strip().split()
     if not toks or not last.strip():
         return None
-    return last.strip().upper(), toks[0].strip().upper()
+    middle = toks[1].strip().upper() if len(toks) > 1 else ""
+    return last.strip().upper(), toks[0].strip().upper(), middle
 
 
 async def _fetch_zuercher(subdomain: str) -> list[dict]:
@@ -220,11 +298,11 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
         parts = _split_zuercher_name(rec.get("name") or "")
         if not parts:
             continue
-        last, first = parts
+        last, first, middle = parts
         charges = rec.get("hold_reasons") or rec.get("charges") or ""
         if isinstance(charges, list):
             charges = "; ".join(str(x) for x in charges)[:300]
-        out.append({"last": last, "first": first, "dob": rec.get("dob"),
+        out.append({"last": last, "first": first, "middle": middle, "dob": rec.get("dob"),
                     "arrest_date": rec.get("arrest_date"), "charge": str(charges)[:300]})
     return out
 
@@ -334,15 +412,20 @@ def _cell_text(cell_html: str) -> str:
         "&nbsp;", " ").replace("&quot;", '"').strip()
 
 
-def _split_comma_name(name: str) -> Optional[tuple[str, str]]:
-    """'Smith, Christopher Michael' -> ('SMITH', 'CHRISTOPHER')."""
+def _split_comma_name(name: str) -> Optional[tuple[str, str, str]]:
+    """'Smith, Christopher Michael' -> ('SMITH', 'CHRISTOPHER', 'MICHAEL').
+
+    Middle is '' when only one given name is present. See
+    `_split_zuercher_name`'s docstring for why this is now a 3-tuple.
+    """
     if not name or "," not in name:
         return None
     last, _, rest = name.partition(",")
     toks = rest.strip().split()
     if not toks or not last.strip():
         return None
-    return last.strip().upper(), toks[0].strip().upper()
+    middle = toks[1].strip().upper() if len(toks) > 1 else ""
+    return last.strip().upper(), toks[0].strip().upper(), middle
 
 
 _GVL_ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S)
@@ -417,9 +500,9 @@ async def _search_lansa(entry: str, last: str, first: str = "") -> list[dict]:
         parts = _split_comma_name(cells[0])
         if not parts or not re.match(r"\d{1,2}/\d{1,2}/\d{4}$", cells[1]):
             continue
-        last_n, first_n = parts
+        last_n, first_n, middle_n = parts
         age = cells[4] if len(cells) > 4 and cells[4].isdigit() else None
-        out.append({"last": last_n, "first": first_n, "dob": None,
+        out.append({"last": last_n, "first": first_n, "middle": middle_n, "dob": None,
                     "age": age, "arrest_date": cells[1],  # Book Date
                     "race": cells[2] if len(cells) > 2 else "",
                     "sex": cells[3] if len(cells) > 3 else "", "charge": ""})
@@ -587,6 +670,30 @@ def _owner_name_index(listings: list[Listing]) -> dict[tuple, list[Listing]]:
     return idx
 
 
+def _cross_county_corroborated(owner: Optional[str], hit: dict) -> bool:
+    """True only when the booking's middle name POSITIVELY AGREES with the
+    board owner's middle initial — this tier's one corroborating signal.
+
+    Reuses `name_normalize.party_middle_verdict`, this project's existing
+    convention for the "common name, thin match" problem (built for the
+    SC-divorce party match; also the voter-phone identity gate in
+    enrichment_sc_phone.py). `match_cross_county` searches the WHOLE board
+    for an exact first+last match with no county bound at all, so it is the
+    single highest-fanout tier in this module — see module docstring,
+    "CROSS-COUNTY NAME-ONLY FANOUT" — and unlike the divorce/voter-phone
+    gates, it has no second corroborating channel (no county match possible
+    by construction) if middle name fails, so "unverified" (no middle on one
+    side — including every roster vendor that does not carry one, e.g.
+    p2c_jqgrid/p2c_centralsquare/citizen_connect/tyler today) is REJECTED
+    here, not passed through the way those other gates allow.
+    """
+    middle = (hit.get("middle") or "").strip()
+    if not middle:
+        return False
+    party = f"{hit.get('first', '')} {middle} {hit.get('last', '')}"
+    return party_middle_verdict(owner, [party]) == "agrees"
+
+
 def match_cross_county(listings: list[Listing], rosters: dict) -> list[Listing]:
     """Flag a listing whose owner turns up on a covered county's roster that is
     NOT the listing's own property county — the ep 069 "fugitive heir" case
@@ -599,6 +706,12 @@ def match_cross_county(listings: list[Listing], rosters: dict) -> list[Listing]:
     — it fires once, the run that pairing first appears, exactly the "standing
     re-query" the synthesis asks for.
 
+    REQUIRES middle-name corroboration (`_cross_county_corroborated`) on top
+    of the exact first+last match — fixed 2026-10-02 after a bare name-only
+    whole-board match fanned one common booked name out to thousands of
+    unrelated listings (see module docstring). A candidate pair that fails
+    corroboration is counted but never written to the board.
+
     Writes a SEPARATE key, raw['jail_booking_new'], never raw['jail_booking'] or
     raw['incarceration'] — this must not change an existing same-county match or
     silently inflate distress_score's LEGAL incarceration count; it is a new,
@@ -606,6 +719,7 @@ def match_cross_county(listings: list[Listing], rosters: dict) -> list[Listing]:
     """
     owner_idx = _owner_name_index(listings)
     flagged: list[Listing] = []
+    rejected_unverified = 0
     for (state, county), idx in rosters.items():
         for (last, first), hit in idx.items():
             if not hit.get("is_new_booking"):
@@ -615,6 +729,9 @@ def match_cross_county(listings: list[Listing], rosters: dict) -> list[Listing]:
                     continue                                  # same-county lane's job
                 if (li.raw or {}).get("jail_booking_new"):
                     continue                                  # already flagged this run
+                if not _cross_county_corroborated(_owner_of(li), hit):
+                    rejected_unverified += 1
+                    continue                                  # no/conflicting middle name
                 raw = li.raw if isinstance(li.raw, dict) else {}
                 raw["jail_booking_new"] = {
                     "county": county, "state": state,
@@ -625,10 +742,18 @@ def match_cross_county(listings: list[Listing], rosters: dict) -> list[Listing]:
                     "facility_type": "jail",
                     "cross_county": True,
                     "first_detected_at": hit.get("first_detected_at"),
-                    "confidence": "name_only_low_cross_county",
+                    # Renamed 2026-10-02 from "name_only_low_cross_county": a
+                    # match now requires an agreeing middle name, so the old
+                    # tag would misrepresent it as the uncorroborated tier it
+                    # no longer is, and would let downstream code conflate
+                    # pre-fix and post-fix rows written under the same string.
+                    "confidence": "middle_corroborated_cross_county",
+                    "middle_verdict": "agrees",
                 }
                 li.raw = raw
                 flagged.append(li)
+    if rejected_unverified:
+        log.info("jail.cross_county_rejected_unverified", count=rejected_unverified)
     return flagged
 
 

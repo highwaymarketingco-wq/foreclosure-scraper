@@ -95,9 +95,12 @@ async def test_cross_county_flags_an_owner_whose_property_county_has_no_roster(m
     # ROSTERS' own docstring); a property sitting there whose owner turns up
     # booked in Cherokee must still be caught. A second listing whose OWN
     # county IS Cherokee is what makes the pipeline fetch Cherokee's roster in
-    # the first place (bulk_needed is driven by listing counties).
+    # the first place (bulk_needed is driven by listing counties). The owner's
+    # middle name ("ANNE") must agree with the booking's — fixed 2026-10-02,
+    # see enrichment_jail_bookings.py's "CROSS-COUNTY NAME-ONLY FANOUT" —
+    # or this match is no longer stamped at all (see the rejection tests below).
     _patch_zuercher(monkeypatch, {"cherokee-so-sc": [_rec("Fugitive, Heir Anne")]})
-    home = _li("SC", "Spartanburg", "FUGITIVE HEIR")        # property county: no roster
+    home = _li("SC", "Spartanburg", "FUGITIVE HEIR ANNE")   # property county: no roster
     trigger = _li("SC", "Cherokee", "NOBODY MATCHES HERE")  # forces Cherokee's roster fetch
     res = await enrich_jail_bookings([home, trigger])
     assert res["cross_county"] == 1
@@ -105,13 +108,43 @@ async def test_cross_county_flags_an_owner_whose_property_county_has_no_roster(m
     assert jn["county"] == "Cherokee"
     assert jn["home_county"] == "Spartanburg"
     assert jn["cross_county"] is True
-    assert jn["confidence"] == "name_only_low_cross_county"
+    assert jn["confidence"] == "middle_corroborated_cross_county"
+    assert jn["middle_verdict"] == "agrees"
     assert jn["facility_type"] == "jail"
     assert jn["first_detected_at"]
     # must NOT touch the same-county / scored keys
     assert "jail_booking" not in home.raw
     assert "incarceration" not in home.raw
     assert "jail_booking_new" not in trigger.raw
+
+
+@pytest.mark.asyncio
+async def test_cross_county_rejects_a_common_name_with_no_middle_corroboration(monkeypatch):
+    """The actual 2026-10-02 incident, reproduced: an exact first+last match
+    with NO other corroborating field (no middle name on the owner side) must
+    NOT be stamped — this is what fanned one common booked name out to 12,337
+    unrelated board rows in the real run. Same fixture as the accept-case test
+    above, minus the owner's middle name, is the whole difference."""
+    _patch_zuercher(monkeypatch, {"cherokee-so-sc": [_rec("Fugitive, Heir Anne")]})
+    home = _li("SC", "Spartanburg", "FUGITIVE HEIR")         # no middle name at all
+    trigger = _li("SC", "Cherokee", "NOBODY MATCHES HERE")
+    res = await enrich_jail_bookings([home, trigger])
+    assert res["cross_county"] == 0
+    assert "jail_booking_new" not in home.raw
+
+
+@pytest.mark.asyncio
+async def test_cross_county_rejects_a_conflicting_middle_name(monkeypatch):
+    """Same first+last, but the owner's middle name provably disagrees with the
+    booking's — a different person who happens to share a common name, same
+    class of false positive name_normalize.party_middle_conflict exists to
+    catch for the SC-divorce match (41% of comparable hits, audit 2026-09-21)."""
+    _patch_zuercher(monkeypatch, {"cherokee-so-sc": [_rec("Fugitive, Heir Anne")]})
+    home = _li("SC", "Spartanburg", "FUGITIVE HEIR ZOE")     # middle initial Z != A
+    trigger = _li("SC", "Cherokee", "NOBODY MATCHES HERE")
+    res = await enrich_jail_bookings([home, trigger])
+    assert res["cross_county"] == 0
+    assert "jail_booking_new" not in home.raw
 
 
 @pytest.mark.asyncio
@@ -127,7 +160,7 @@ async def test_a_booking_in_its_own_property_county_is_never_also_flagged_cross_
 @pytest.mark.asyncio
 async def test_cross_county_pairing_does_not_refire_once_no_longer_new(monkeypatch):
     _patch_zuercher(monkeypatch, {"cherokee-so-sc": [_rec("Fugitive, Heir Anne")]})
-    home = _li("SC", "Spartanburg", "FUGITIVE HEIR")
+    home = _li("SC", "Spartanburg", "FUGITIVE HEIR ANNE")   # middle agrees — see accept-case test
     trigger = _li("SC", "Cherokee", "NOBODY MATCHES HERE")
     res1 = await enrich_jail_bookings([home, trigger])
     assert res1["cross_county"] == 1
@@ -137,7 +170,7 @@ async def test_cross_county_pairing_does_not_refire_once_no_longer_new(monkeypat
     # now reports is_new_booking=False for this name — the pairing already
     # fired once and must not fire again on a fresh listing (match_cross_county's
     # own already-flagged guard only covers the SAME run/listing).
-    home2 = _li("SC", "Spartanburg", "FUGITIVE HEIR")
+    home2 = _li("SC", "Spartanburg", "FUGITIVE HEIR ANNE")
     trigger2 = _li("SC", "Cherokee", "NOBODY MATCHES HERE")
     res2 = await enrich_jail_bookings([home2, trigger2])
     assert res2["cross_county"] == 0
