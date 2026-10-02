@@ -10,10 +10,10 @@ from __future__ import annotations
 import foreclosure_scraper.scrapers.counties_generic.epa_frs_sites as E
 
 
-def _row(county="BUNCOMBE", addr="9 REED STREET", name="GLEN ROCK HOTEL"):
+def _row(county="BUNCOMBE", addr="9 REED STREET", name="GLEN ROCK HOTEL", registry_id="110038733109"):
     return {"county_name": county, "location_address": addr,
             "primary_name": name, "city_name": "ASHEVILLE",
-            "pgm_sys_id": "NCD986178141"}
+            "pgm_sys_id": "NCD986178141", "registry_id": registry_id}
 
 
 def test_out_of_footprint_counties_are_dropped():
@@ -68,3 +68,22 @@ def test_row_maps_to_a_usable_lead():
     assert li.street_address == "9 REED STREET"
     assert li.owner_name == "GLEN ROCK HOTEL"
     assert li.raw["epa_frs"]["program"] == "ACRES"
+
+
+def test_registry_id_builds_a_per_facility_detail_link():
+    """Every row used to ship the same generic 'https://www.epa.gov/frs'
+    source_url no matter which facility it was. registry_id is FRS's own
+    cross-program key and resolves to a real per-facility detail page
+    (verified live 2026-10-01, HTTP 200, no auth) -- use it."""
+    li = E._to_listing(_row(registry_id="110038733109"), "NC", "ACRES")
+    assert li.raw["epa_frs"]["registry_id"] == "110038733109"
+    assert li.source_url == (
+        "https://ofmpub.epa.gov/frs_public2/fii_query_dtl.disp_program_facility"
+        "?p_registry_id=110038733109"
+    )
+
+
+def test_missing_registry_id_falls_back_to_generic_url():
+    li = E._to_listing(_row(registry_id=None), "NC", "ACRES")
+    assert li.raw["epa_frs"]["registry_id"] is None
+    assert li.source_url == "https://www.epa.gov/frs"

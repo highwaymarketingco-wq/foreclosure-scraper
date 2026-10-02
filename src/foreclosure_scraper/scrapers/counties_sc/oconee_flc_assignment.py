@@ -87,7 +87,11 @@ _PAGE_SIZE = 1000
 _MAX_ROWS = 20000
 
 #: Dispositions meaning the parcel has left the buyable FLC inventory.
-_DEPARTED = {"SOLD", "REDEEMED", "ASSIGNED", "CANCELED", "CANCELLED"}
+#: "REMOVED" added 2026-10-01: seen on the sibling Assignment_Availability
+#: service's Assignment layer (shared via ``is_departed``/``_DEPARTED`` with
+#: ``oconee_forfeited_land``), same meaning as CANCELED -- no longer in
+#: inventory.
+_DEPARTED = {"SOLD", "REDEEMED", "ASSIGNED", "CANCELED", "CANCELLED", "REMOVED"}
 #: Set True to emit departed parcels too (money trail + status still captured).
 EMIT_DEPARTED = False
 

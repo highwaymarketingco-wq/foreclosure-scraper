@@ -24,6 +24,17 @@ _LAYERS), page through with resultOffset (layer 0 holds ~948 features, over the
 lat/lng, and emit one Listing per parcel. Losing either layer fails the run
 rather than halving the inventory (see layer_guard).
 
+2026-10-01 per-source audit fix: this module used to emit EVERY feature with no
+status filter at all, including parcels the county's own Status/Redeem_Assign
+field says have already left the inventory. Live-verified the same day: layer 1
+("FLC", nominally "available forfeited land") is 76 features but 52 of them
+(68%) are already Status=SOLD, and layer 0 ("Assignment") has 3 REDEEMED + 26
+ASSIGNED + 1 REMOVED among 948 -- so roughly 15% of this source's 533 published
+rows were already-gone parcels presented as live buy-direct leads. The sibling
+module ``oconee_flc_assignment`` (a different FeatureServer, ``Assignment_FLC``,
+publishing the full cost buildup for the same program) already filters these
+out; reusing its exact departed-status set here for consistency.
+
 Dateless: this is a standing inventory, not a seasonal sale list, so there is
 no active_months window — the layers carry parcels year-round.
 
@@ -42,6 +53,7 @@ from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...layer_guard import LayerHarvest
 from ...models import Listing, ListingType, PropertyKind
+from .oconee_flc_assignment import is_departed
 
 log = structlog.get_logger()
 
@@ -225,6 +237,7 @@ class OconeeForfeitedLand(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         seen: set[str] = set()
+        departed = 0
         # Both layers are declared: losing one has to fail the run rather than
         # halve the inventory, because half the FLC roll is a believable number.
         guard = LayerHarvest(self.slug, [label for _id, label, _f in _LAYERS])
@@ -242,5 +255,15 @@ class OconeeForfeitedLand(BaseScraper):
                             continue
                         if key:
                             seen.add(key)
+                        # 2026-10-01 fix: a parcel whose Status/Redeem_Assign says
+                        # SOLD / REDEEMED / ASSIGNED / CANCELED is no longer in the
+                        # buyable inventory -- live-verified 52/76 (68%) of layer 1
+                        # is already SOLD. Presenting it as an available buy-direct
+                        # lead would be wrong, not just incomplete.
+                        if is_departed(li.auction_status):
+                            departed += 1
+                            continue
                         out.append(li)
+        if departed:
+            log.info("oconee_forfeited_land.departed_skipped", count=departed)
         return out

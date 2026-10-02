@@ -579,6 +579,14 @@ DATELESS_OK_SOURCES = {
     # 2026-06 expansion — new FLC/tax/probate/estate/lien/surplus sources whose
     # rows are long-runway (pre-sale) and routinely carry no sale_date.
     "counties_sc.oconee_forfeited_land",         # Oconee FLC available + assignment lists
+    # 2026-10-01 per-source audit: the published sale-list CSV carries one
+    # county-wide auction date in free text on its own placeholder rows (e.g.
+    # "The 2026 Tax Sale is scheduled for Monday, November 9, 2026"), which the
+    # scraper now parses and stamps onto every real row's sale_date. This entry
+    # is a backstop only -- if that text format ever changes and parsing fails,
+    # sale_date reverts to None and _active_only() would otherwise silently
+    # delete every row the live November sale list produces.
+    "counties_sc.oconee_tax_sale",               # Oconee delinquent-tax sale list (sale_date best-effort)
     "counties_sc.spartanburg_flc",               # Spartanburg FLC assignable-surplus PDF (dateless)
     # An FLC holding is a STANDING condition (county owns the parcel until it is
     # assigned/sold), so this scraper never sets sale_date. Verified 2026-09-10:

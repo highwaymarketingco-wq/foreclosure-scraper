@@ -42,6 +42,56 @@ def test_out_fields_are_enumerated_per_layer_never_star():
     assert "Redeem_Assign" not in by_label["FLC"]
 
 
+def test_departed_parcels_are_filtered_out():
+    """2026-10-01 fix: a SOLD/REDEEMED/ASSIGNED/CANCELED parcel has left the
+    buyable FLC inventory and must not ship as a live "available" lead.
+
+    Live-verified the same day: layer 1 ("FLC") was 76 features but 52 (68%)
+    were already Status=SOLD; layer 0 ("Assignment") had 3 REDEEMED + 26
+    ASSIGNED + 1 REMOVED among 948. Before this fix the module emitted every
+    feature with no status filter at all.
+    """
+    import asyncio
+
+    from foreclosure_scraper.scrapers.counties_sc import oconee_forfeited_land as mod
+
+    from tests._arcgis_fakes import FakeHttp
+
+    class _ctx:
+        def __init__(self, http):
+            self.http = http
+
+        async def __aenter__(self):
+            return self.http
+
+        async def __aexit__(self, *a):
+            return False
+
+    flc_feats = [
+        {"attributes": {"OBJECTID": 1, "TMS": "AAA", "Status": "SOLD"}, "geometry": None},
+        {"attributes": {"OBJECTID": 2, "TMS": "BBB", "Status": None}, "geometry": None},
+    ]
+    assign_feats = [
+        {"attributes": {"OBJECTID": 3, "TMS": "CCC", "Redeem_Assign": "ASSIGNED"}, "geometry": None},
+        {"attributes": {"OBJECTID": 4, "TMS": "DDD", "Redeem_Assign": "REDEEMED"}, "geometry": None},
+        {"attributes": {"OBJECTID": 5, "TMS": "EEE", "Redeem_Assign": "REMOVED"}, "geometry": None},
+        {"attributes": {"OBJECTID": 6, "TMS": "FFF", "Redeem_Assign": None}, "geometry": None},
+    ]
+    http = FakeHttp(routes={
+        "FeatureServer/1": {"features": flc_feats, "exceededTransferLimit": False},
+        "FeatureServer/0": {"features": assign_feats, "exceededTransferLimit": False},
+    })
+    original = mod.client
+    mod.client = lambda *a, **kw: _ctx(http)      # noqa: E731
+    try:
+        rows = asyncio.run(mod.OconeeForfeitedLand().fetch())
+    finally:
+        mod.client = original
+
+    tms_out = {li.parcel_id for li in rows}
+    assert tms_out == {"BBB", "FFF"}
+
+
 def test_a_dead_layer_fails_the_run_instead_of_halving_the_inventory():
     """Half the FLC roll is a believable number, so it must not be shippable.
 

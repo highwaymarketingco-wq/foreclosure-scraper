@@ -29,10 +29,50 @@ PAGE_URL = "https://oconeesc.com/delinquent-tax/sale-list"
 
 _MONEY = re.compile(r"[\d,]+(?:\.\d{2})?")
 
+# The sheet's own announcement placeholder rows (no Item/Map number) state the
+# county-wide auction date in free text, e.g. "The 2026 Tax Sale is scheduled
+# for Monday, November 9, 2026." Every real item on the list shares that one
+# sale date (it is not published per-row), so we parse it once from whichever
+# placeholder row carries it and stamp it onto every real row. Without this,
+# sale_date is never set at all and the horizon filter in main.py's
+# _active_only() needs a DATELESS_OK_SOURCES entry just to keep the rows (kept
+# as a backstop below in case this text format ever changes and parsing fails).
+_SALE_DATE_RE = re.compile(
+    r"scheduled for\s+\w+,?\s+([A-Za-z]+ \d{1,2},?\s*\d{4})", re.I
+)
+
+
+def _parse_sale_date(text: str) -> datetime | None:
+    m = _SALE_DATE_RE.search(text)
+    if not m:
+        return None
+    raw = m.group(1).replace(",", "")
+    for fmt in ("%B %d %Y", "%b %d %Y"):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    return None
+
 
 def _parse_csv(text: str) -> list[Listing]:
+    rows = list(csv.DictReader(io.StringIO(text)))
+
+    # First pass: find the county-wide sale date from the announcement text,
+    # wherever it appears among the columns of any row.
+    sale_date: datetime | None = None
+    for row in rows:
+        for val in row.values():
+            if not val:
+                continue
+            sale_date = _parse_sale_date(str(val))
+            if sale_date:
+                break
+        if sale_date:
+            break
+
     out: list[Listing] = []
-    for row in csv.DictReader(io.StringIO(text)):
+    for row in rows:
         item = (row.get("Item Number") or "").strip()
         tms = (row.get("Map Number") or "").strip()
         # A real listing has BOTH an item number and a map (TMS) number; the
@@ -53,9 +93,13 @@ def _parse_csv(text: str) -> list[Listing]:
             listing_type=ListingType.TAX_SALE, property_kind=PropertyKind.UNKNOWN,
             state="SC", county="Oconee",
             parcel_id=tms, defendant=owner, judgment_amount=amount,
+            sale_date=sale_date,
             description="Oconee tax sale item " + item + (f" — {desc}" if desc else ""),
             first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
-            raw={"oconee_tax_sale": {"item": item, "tax_due": amount, "owner": owner}},
+            raw={"oconee_tax_sale": {
+                "item": item, "tax_due": amount, "owner": owner,
+                "sale_date": sale_date.date().isoformat() if sale_date else None,
+            }},
         ))
     return out
 

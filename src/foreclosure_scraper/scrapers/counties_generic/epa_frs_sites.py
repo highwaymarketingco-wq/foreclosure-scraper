@@ -74,9 +74,24 @@ def _to_listing(row: dict, state: str, program: str) -> Optional[Listing]:
     label, process = PROGRAMS[program]
     name = _clean(row.get("primary_name")) or _clean(row.get("pgm_sys_id"))
     now = datetime.utcnow()
+    # registry_id is FRS's own cross-program facility key. It resolves to a
+    # real, free, public per-facility detail page (verified live 2026-10-01:
+    # https://ofmpub.epa.gov/frs_public2/fii_query_dtl.disp_program_facility
+    # ?p_registry_id=<id>, HTTP 200, no auth) carrying fields this list
+    # endpoint doesn't return at all: SIC/NAICS codes, alternative names,
+    # responsible-party organizations, and -- for SEMS rows -- NPL vs
+    # non-NPL status. Every row used to ship the same generic
+    # "https://www.epa.gov/frs" source_url regardless of which facility it
+    # was, so there was no way to click through to the specific site.
+    registry_id = _clean(row.get("registry_id"))
+    detail_url = (
+        f"https://ofmpub.epa.gov/frs_public2/fii_query_dtl.disp_program_facility"
+        f"?p_registry_id={registry_id}"
+        if registry_id else "https://www.epa.gov/frs"
+    )
     return Listing(
         source=f"counties_generic.epa_frs.{program.lower()}",
-        source_url="https://www.epa.gov/frs",
+        source_url=detail_url,
         listing_type=ListingType.DISTRESSED,
         property_kind=PropertyKind.UNKNOWN,
         state=state, county=county,
@@ -92,6 +107,7 @@ def _to_listing(row: dict, state: str, program: str) -> Optional[Listing]:
         raw={"epa_frs": {
             "program": program,
             "pgm_sys_id": _clean(row.get("pgm_sys_id")),
+            "registry_id": registry_id,
             "site_name": name,
             "county_name": _clean(row.get("county_name")),
             "location_description": _clean(row.get("location_description")),
