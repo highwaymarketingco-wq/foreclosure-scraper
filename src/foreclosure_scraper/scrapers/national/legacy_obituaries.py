@@ -67,6 +67,19 @@ class LegacyObituariesScraper(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 300.0  # Multiple city searches
+    # DISABLED 2026-09-15 (see module docstring: confirmed garbage emitter,
+    # stateId doesn't scope results). fetch() already hardcoded `return []`
+    # but never set disabled=True, so every run reported OUTCOME_ZERO ("ran
+    # clean but returned 0 rows") instead of OUTCOME_DORMANT -- an ambiguous
+    # zero. Found via the 2026-10-01 national/reo per-source audit, same
+    # pattern as national.liensnc / national.probate_foreclosure_leads /
+    # national.propwire. No behavior change.
+    disabled = True
+    disabled_reason = (
+        "confirmed garbage emitter 2026-09-15: stateId does not scope "
+        "results (NC search returned FL/CT/NZ obituaries); needs the real "
+        "numeric stateId values before this can be re-enabled"
+    )
 
     async def _fetch_city(self, city: str, state: str) -> list[Listing]:
         out: list[Listing] = []
