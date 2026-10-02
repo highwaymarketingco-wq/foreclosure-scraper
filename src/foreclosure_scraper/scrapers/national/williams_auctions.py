@@ -5,6 +5,34 @@ but none in NC/SC footprint as of 2026-08-20. Scraper checks dynamically.
 
 URLs with NC/SC properties have historically appeared — the scraper will
 catch them if they show up.
+
+AUDITED 2026-10-01 (national-auction-tier audit, batch 4) -- confirmed live
+why this is zero right now, and it is NOT the same "zero" the file's
+original author expected:
+  * The homepage's JSON-LD `ItemList` no longer lists individual property
+    auctions at all. Live-checked: its 4 current items are generic
+    MARKETING CATEGORY pages ("Online Auctions Oct 1 - 5, 2026", "Land
+    Auctions Nationwide - October 2026", "Houston, TX Commercial Building
+    Auctions Oct 19 - 21, 2026") with `item.url: null` -- there is
+    structurally nothing here for `_parse_address_from_title()` to extract
+    any more (it correctly yields nothing rather than fabricating a row
+    from one of these, so this is not a fabrication risk, just dead
+    volume).
+  * The real per-property search/listings have moved to a SEPARATE
+    platform linked from the homepage footer: bid.auctionnetwork.com
+    (e.g. `/Home/Auctions?listingTypes=Auction&searchStatus=Active`,
+    `/Home/AuctionsByStates`). That site is free/public/no-login (checked
+    live, no CAPTCHA/WAF), but its results are not present in the initial
+    server HTML at all -- it is populated client-side from an AJAX call
+    this audit did not find within its time budget (no `/api/*` path, no
+    Vue/Knockout data-binding markers, and its own bundled JS is a large,
+    unminified ASP.NET MVC + SignalR stack, not a simple REST endpoint).
+    Building against it is a real, separate reverse-engineering task (the
+    same shape as this batch's bid4assets.py and usmarshals_realproperty.py
+    rewrites), flagged as a follow-up rather than guessed at here.
+  * The sitemap-scan fallback below is unchanged and still functions as
+    originally designed/documented (49 URLs, mostly generic landing pages
+    like "landing-muskogee-dec-2024" -- still none NC/SC as of this audit).
 """
 from __future__ import annotations
 
