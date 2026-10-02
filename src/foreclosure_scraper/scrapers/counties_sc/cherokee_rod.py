@@ -1,13 +1,38 @@
-"""Cherokee County SC Register of Deeds — sclandrecords.net.
+"""Cherokee County SC Register of Deeds.
 
-Cherokee County SC uses the statewide SC ROD portal at sclandrecords.net
-(hosted by Cott Systems). We search for mortgage satisfactions, deed transfers,
-and lien filings by owner name for properties in Cherokee County.
+STATUS (re-verified live 2026-10-01): WALLED-CONFIRMED-DEAD, and the target
+URL below is additionally just wrong/stale. Both facts, traced in full:
 
-This is an ENRICHMENT scraper called by enrichment_cchs_rod or a dedicated
-enrichment module. When run standalone, it returns [].
+  1. `_CHEROKEE_SEARCH` (https://www.sclandrecords.com/cherokee/) 404s --
+     "File or directory not found." It was never a Cherokee-specific search
+     path; it was a guessed URL shape.
+  2. The real site (`https://www.sclandrecords.com/`) redirects to
+     `/sclr/`, a legacy Xerox/Avenu "Real Property Official Records Search"
+     portal whose own county picker's JS (`clickCounty('sc021')`, sc021 =
+     Cherokee) sends Cherokee straight to
+     `https://cherokeesc.avenuinsights.com` -- a host already identified
+     in docs/ROD_PORTAL_ACCESS.md as a ToS-prohibited ("forbids data
+     mining, robots, spiders, data harvesting") Avenu property.
+  3. That host has since been rebranded "Neumo Records Management
+     (formerly known as Avenu Records)" and both its "Office" and "Public /
+     Search" buttons now point to the SAME unified platform at
+     `https://grids.avenuinsights.com/` -- the GRIDS system. This is the
+     same Avenu/GRIDS platform underlying the separate, already-partially-
+     blocked SC ROD rebuild workstream (`sc_rod_acclaim` / `sc_rod_cott`),
+     not a distinct, independently fixable target. Per that workstream's
+     own scoping, this is flagged rather than re-investigated here.
 
-Free, public, no login. Server-rendered HTML with ASP.NET form POST.
+No login/CAPTCHA screen was reached in this probe (the public "Search"
+button leads into what looks like a JS-driven SPA search, not yet mapped),
+so this is recorded as WALLED-CONFIRMED-DEAD on the stale-URL finding plus
+"same underlying rebuild blocker" rather than a freshly-confirmed CAPTCHA/
+login wall of its own -- a future session revisiting the SC ROD rebuild
+should treat Cherokee as one more county on that same GRIDS platform, not
+reopen this file's old sclandrecords.com path.
+
+`search_owner()` below has NO caller anywhere in this codebase (confirmed by
+grep) -- it has always been dead code, not an active enrichment dependency.
+`fetch()` correctly returns [] either way.
 """
 from __future__ import annotations
 
