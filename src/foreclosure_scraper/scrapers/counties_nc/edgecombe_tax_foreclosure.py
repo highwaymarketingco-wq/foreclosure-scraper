@@ -46,7 +46,16 @@ log = structlog.get_logger()
 
 PAGE_URL = "https://www.edgecombecountync.gov/businesses/tax_collector/tax_foreclosure_list.php"
 
-_PARCEL_RE = re.compile(r"\b\d{4}-\d{2}-\d{4}(?:-\d{2})?\b")
+# Most Edgecombe parcel numbers are 4-2-4(-2) digit groups
+# ("4738-71-6101-00"), but a real live row (26CV002193-320, "1739 Thru St.")
+# carries a 4-4-4-2 grouping ("3759-7002-2140-00") -- the strict 4-2-4 shape
+# silently dropped that entire row (a genuine, dated "Sale 10/14/2026" lead,
+# the highest-priority status this source carries) because the per-row loop
+# treats "no parcel match" as "not a data row" and skips it. Widened the
+# middle/third group widths to tolerate this without opening up to matching
+# unrelated hyphenated tokens elsewhere (still only ever applied to the
+# dedicated PARCEL column, never searched across the whole row).
+_PARCEL_RE = re.compile(r"\b\d{3,4}-\d{2,4}-\d{3,4}(?:-\d{2,3})?\b")
 _CASE_RE = re.compile(r"\b\d{2}CV\d{6}-\d{2,4}\b", re.I)
 # STATUS sometimes carries the actual scheduled auction date directly
 # ("Sale 9/16/2026") rather than just a case-progress note -- a real,
