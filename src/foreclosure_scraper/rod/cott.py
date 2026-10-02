@@ -20,8 +20,17 @@ protocol straight against Polk's base URL: real 2026 recordings came back
 immediately. This module now delegates entirely to the `*_at()` entry points
 in rod/aumentum.py instead of maintaining a second, broken copy of the same
 vendor's protocol — including aumentum's October 2026 fix for the Date-Range
-sweep's 30-day vendor cap + 500-row page cap (see aumentum.py's docstring),
-which Polk/Rutherford share too.
+sweep's 30-day vendor cap + 500-row page cap (see aumentum.py's docstring).
+
+RUTHERFORD REMAINS WALLED, SEPARATELY FROM THE BUG ABOVE: live-probed
+2026-10-02, every path under Rutherford's cotthosting.com tenant redirects to
+a real "Account Sign In" page with a password field — Polk, on the identical
+vendor app, has no such redirect. aumentum.py's `_is_login_wall()` detects
+this and short-circuits both `search_by_name` and `discover_recent_nods`/
+`discover_recent_sold_recordings` to `[]` with a logged warning rather than
+posting to a login form. Per CLAUDE.md a login wall is not defeated and no
+credentials are held — Rutherford via this vendor is a manual-lane candidate.
+Polk is fully fixed and live-verified working end to end.
 """
 from __future__ import annotations
 

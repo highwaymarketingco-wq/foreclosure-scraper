@@ -67,6 +67,18 @@ Gaston (the session lives in cookies, not viewstate) and those field names
 don't exist on the real page, so every one of its POSTs just re-rendered the
 blank search form. cott.py now delegates to the `*_at()` entry points below
 instead of maintaining a second, broken copy of this vendor's protocol.
+
+RUTHERFORD IS SEPARATELY WALLED (not fixed by the above, and not a code bug):
+live-probed 2026-10-02, EVERY path under Rutherford's
+cotthosting.com/NCRUTHERFORDEXTERNAL/.../protected/v4/ 302s to
+`/User/Login.aspx?ReturnUrl=...` — a real "eSearch | Account Sign In" page with
+a password field. Polk, on the exact same vendor app, has no such redirect.
+_is_login_wall() below detects this (compares the bootstrap GET's final URL)
+and short-circuits to `[]` with a log.warning instead of posting a search body
+to a login form and silently reading 0 rows back as if it were a real empty
+result. Per CLAUDE.md this is a genuine login wall: not defeated, no
+credentials held — Rutherford via this vendor is a manual-lane candidate, not
+a bypass target.
 """
 from __future__ import annotations
 
@@ -404,6 +416,18 @@ def _split_name(name: str) -> tuple[str, str]:
     return name.strip(), ""
 
 
+def _is_login_wall(final_url: str) -> bool:
+    """True if the bootstrap GET to SrchName.aspx/SrchDate.aspx got redirected
+    to this tenant's own sign-in page (live-confirmed 2026-10-02: Rutherford
+    NC's cotthosting.com tenant requires an account — every protected/v4/*
+    path 302s to /User/Login.aspx?ReturnUrl=... with a real password field —
+    while Polk/Buncombe/Gaston on the SAME vendor app are open, no login).
+    This is a genuine compliance wall (CLAUDE.md: a login wall is not defeated,
+    no credentials held) — not a parsing bug, so callers must stop here rather
+    than post a search body to a login form and silently read 0 rows back."""
+    return "/User/Login.aspx" in final_url
+
+
 # --------------------------------------------------------------------------- #
 # Public API                                                                   #
 # --------------------------------------------------------------------------- #
@@ -448,6 +472,9 @@ async def _search_by_name_at(
         async with AsyncSession(verify=False, impersonate="chrome") as s:
             r = await s.get(url, allow_redirects=True, timeout=30)
             final = str(r.url)
+            if _is_login_wall(final):
+                log.warning("aumentum.login_wall", base=base, county=county, final_url=final)
+                return []
             r2 = await s.post(final, data=_name_body(last, first),
                               headers={"Referer": final}, allow_redirects=True, timeout=60)
             rows = _parse_instruments_grid(r2.text, county, state)
@@ -544,6 +571,9 @@ async def _date_swept_docs_at(
         async with AsyncSession(verify=False, impersonate="chrome") as s:
             r = await s.get(url, allow_redirects=True, timeout=30)
             final = str(r.url)
+            if _is_login_wall(final):
+                log.warning("aumentum.login_wall", base=base, county=county, final_url=final)
+                return []
             rnav = await s.post(final, data=_date_nav_body(),
                                 headers={"Referer": final}, allow_redirects=True, timeout=45)
             date_url = str(rnav.url)

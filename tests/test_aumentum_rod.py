@@ -137,6 +137,22 @@ def test_empty():
 # <=29-day-span window (Buncombe: 3,805 results in one real 30-day window).   #
 # --------------------------------------------------------------------------- #
 
+def test_is_login_wall():
+    """Rutherford's cotthosting.com tenant redirects every protected/v4/* path
+    to its own sign-in page (live-confirmed 2026-10-02) — Polk, on the same
+    vendor app, does not."""
+    assert aumentum._is_login_wall(
+        "https://cotthosting.com/NCRUTHERFORDEXTERNAL/User/Login.aspx"
+        "?ReturnUrl=%2fNCRUTHERFORDEXTERNAL%2fLandRecords%2fprotected%2fv4%2fSrchName.aspx"
+    ) is True
+    assert aumentum._is_login_wall(
+        "https://cotthosting.com/ncpolkexternal/LandRecords/protected/v4/SrchName.aspx"
+    ) is False
+    assert aumentum._is_login_wall(
+        "https://registerofdeeds.buncombenc.gov/External/LandRecords/protected/v4/SrchName.aspx"
+    ) is False
+
+
 def test_result_count_parses_the_real_banner_text():
     html = ('<div class="searchCriteriaSummary">Your search returned <strong>\n'
             '    3,805</strong> results on <strong>10/2/2026</strong></div>')
@@ -278,6 +294,42 @@ def test_date_swept_docs_at_raw_row_cap_none_scans_the_full_window(monkeypatch):
     # EVERY one of them must have been swept, not just the first.
     assert len(windows_seen) == 3
     assert len(out) == 3
+
+
+def test_search_by_name_at_short_circuits_on_a_login_wall(monkeypatch):
+    """A tenant that redirects the bootstrap GET to its own sign-in page must
+    return [] WITHOUT ever posting a search body to that login form."""
+    posted = {"called": False}
+
+    class _FakeResp:
+        def __init__(self, url):
+            self.url = url
+            self.text = ""
+
+    class _FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            return _FakeResp(
+                "https://cotthosting.com/NCRUTHERFORDEXTERNAL/User/Login.aspx"
+                "?ReturnUrl=%2fNCRUTHERFORDEXTERNAL%2fLandRecords%2fprotected%2fv4%2fSrchName.aspx")
+
+        async def post(self, url, **kw):
+            posted["called"] = True
+            return _FakeResp(url)
+
+    monkeypatch.setattr("curl_cffi.requests.AsyncSession", lambda **kw: _FakeSession())
+
+    out = asyncio.run(aumentum._search_by_name_at(
+        "https://cotthosting.com/NCRUTHERFORDEXTERNAL/LandRecords/protected/v4",
+        "Rutherford", "NC", "SMITH", max_docs=10))
+
+    assert out == []
+    assert posted["called"] is False
 
 
 def test_date_swept_docs_at_raw_row_cap_stops_early(monkeypatch):
