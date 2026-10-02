@@ -55,6 +55,22 @@ Free, public, no login. The document itself needs no impersonation (plain
 httpx 200s it), unlike the rest of dilloncountysc.org's HTML pages, which
 needed get_text(impersonate=True) just to render the link to it.
 
+AUDITED 2026-10-01 -- THE COUNTY MIGRATED THE EXPORT FORMAT, SILENTLY ZEROING
+THIS SOURCE. The link text/filename changed from "PAPER.XLS" (the proprietary
+tagged-binary format decoded above) to "PAPER.xlsx" -- a REAL OOXML/zip
+workbook this time (confirmed live: magic bytes ``PK\\x03\\x04``). The old
+``parse_paper_xls()`` binary-token scanner correctly refuses to guess at a
+file whose first tokens don't match ``_HEADERS`` (see its own "not the
+expected layout" comment) and returns ``[]`` -- so the scraper had been
+silently reporting ZERO_RESULT, not a fetch failure, exactly the "silent
+success" failure mode this repo's audits watch for. Verified live: the new
+file has the IDENTICAL 16 column headers as the old one, just packaged as a
+real spreadsheet instead of a custom binary stream (344 rows live). Both
+readers are kept: the new ``parse_xlsx_rows()`` handles the current format,
+and ``parse_paper_xls()`` stays as a fallback in case the county reverts or
+some other export still ships the old format -- ``fetch()`` picks by magic
+bytes rather than assuming either one.
+
 Slug: counties_sc.dillon_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -71,6 +87,7 @@ import structlog
 from ...base_scraper import BaseScraper
 from ...http_client import get_bytes, get_text
 from ...models import Listing, ListingType, PropertyKind
+from .._xlsx_stdlib import read_rows
 
 log = structlog.get_logger()
 
@@ -122,6 +139,25 @@ def parse_paper_xls(data: bytes) -> list[dict]:
     return [rows[k] for k in sorted(rows)]
 
 
+def parse_xlsx_rows(data: bytes) -> list[dict]:
+    """Decode the CURRENT real-.xlsx export into the same {header: value} dict
+    shape parse_paper_xls() produces, so fetch() does not need two record
+    formats downstream. Matches headers by exact (trimmed) text, the same
+    order _HEADERS lists, since that is what the live file uses."""
+    rows = read_rows(data)
+    if not rows:
+        return []
+    header = [str(h or "").strip() for h in rows[0]]
+    if header[:len(_HEADERS)] != _HEADERS:
+        return []  # unexpected layout -- refuse to guess, same posture as parse_paper_xls
+    out: list[dict] = []
+    for row in rows[1:]:
+        rec = {_HEADERS[i]: (row[i] if i < len(row) else "") for i in range(len(_HEADERS))}
+        if any(v for v in rec.values()):
+            out.append(rec)
+    return out
+
+
 class DillonDelinquentTax(BaseScraper):
     slug = "counties_sc.dillon_delinquent_tax"
     name = "Dillon County SC Delinquent Tax Sale List"
@@ -157,13 +193,18 @@ class DillonDelinquentTax(BaseScraper):
             log.warning("dillon_tax.download_fail", url=doc_url, error=str(exc)[:160])
             return out
 
+        # AUDITED 2026-10-01: the county migrated this export from the custom
+        # tagged-binary format to a real .xlsx (OOXML/zip). Pick the reader by
+        # the file's own magic bytes rather than assuming either format.
+        is_real_xlsx = data[:2] == b"PK"
         try:
-            records = parse_paper_xls(data)
+            records = parse_xlsx_rows(data) if is_real_xlsx else parse_paper_xls(data)
         except Exception as exc:
-            log.warning("dillon_tax.parse_fail", error=str(exc)[:160])
+            log.warning("dillon_tax.parse_fail", error=str(exc)[:160], format="xlsx" if is_real_xlsx else "legacy_binary")
             return out
         if not records:
-            log.warning("dillon_tax.unexpected_layout", bytes=len(data))
+            log.warning("dillon_tax.unexpected_layout", bytes=len(data),
+                        format="xlsx" if is_real_xlsx else "legacy_binary")
             return out
 
         now = datetime.utcnow()

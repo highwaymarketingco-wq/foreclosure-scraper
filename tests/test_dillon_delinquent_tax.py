@@ -1,9 +1,61 @@
-"""Tests for Dillon County SC's proprietary tagged-binary delinquent-tax parser."""
+"""Tests for Dillon County SC's delinquent-tax parsers.
+
+Covers BOTH export formats the live county site has used: the original
+proprietary tagged-binary stream (parse_paper_xls) and the real .xlsx the
+county migrated to on or before 2026-10-01 (parse_xlsx_rows) -- see the
+module docstring's "AUDITED 2026-10-01" note for why both must stay.
+"""
+import io
 import struct
+import zipfile
+from xml.sax.saxutils import escape
 
 from foreclosure_scraper.scrapers.counties_sc.dillon_delinquent_tax import (
-    _HEADERS, parse_paper_xls,
+    _HEADERS, parse_paper_xls, parse_xlsx_rows,
 )
+
+
+def _col(i: int) -> str:
+    s = ""
+    i += 1
+    while i:
+        i, r = divmod(i - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+
+def make_xlsx(rows: list[list]) -> bytes:
+    """A minimal real .xlsx (shared strings + a single sheet), same builder
+    shape as tests/test_charleston_horry_xlsx.py uses for the sibling xlsx
+    sources, so parse_xlsx_rows() is exercised against the SAME on-disk
+    format the live stdlib reader (_xlsx_stdlib.read_rows) actually parses,
+    not a hand-rolled list of lists."""
+    sst: list[str] = []
+
+    def sid(t: str) -> int:
+        if t not in sst:
+            sst.append(t)
+        return sst.index(t)
+
+    body = []
+    for r, row in enumerate(rows, 1):
+        cells = []
+        for c, v in enumerate(row):
+            if v is None or v == "":
+                continue
+            ref = f"{_col(c)}{r}"
+            cells.append(f'<c r="{ref}" t="s"><v>{sid(str(v))}</v></c>')
+        body.append(f'<row r="{r}">{"".join(cells)}</row>')
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    sheet_xml = f'<?xml version="1.0"?><worksheet xmlns="{ns}"><sheetData>{"".join(body)}</sheetData></worksheet>'
+    sst_xml = (f'<?xml version="1.0"?><sst xmlns="{ns}">'
+               + "".join(f"<si><t>{escape(t)}</t></si>" for t in sst) + "</sst>")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+        z.writestr("xl/sharedStrings.xml", sst_xml)
+    return buf.getvalue()
 
 
 def _str_tok(text: str) -> bytes:
@@ -103,6 +155,64 @@ def test_finds_link_despite_stray_space_before_quote():
          patch("foreclosure_scraper.scrapers.counties_sc.dillon_delinquent_tax.get_bytes", fake_get_bytes):
         rows = list(asyncio.run(DillonDelinquentTax().fetch()))
     assert len(rows) == 1
+
+
+def test_parse_xlsx_rows_matches_live_header_order():
+    """AUDITED 2026-10-01: the live file's header row is the SAME 16 columns,
+    in the SAME order, as the old binary format's _HEADERS -- the county only
+    changed the container, not the schema."""
+    data = make_xlsx([_HEADERS,
+                      ["00001", "ABDULLAH BARBARA", "", "3", "104-16-12-018",
+                       "117 LEGARE ST", ".00", "1", "1", "", "", "R",
+                       "000012253", "3  $17482", "000006243", "1,157.80"]])
+    recs = parse_xlsx_rows(data)
+    assert len(recs) == 1
+    assert recs[0]["Owner Name"] == "ABDULLAH BARBARA"
+    assert recs[0]["Map Number"] == "104-16-12-018"
+    assert recs[0]["Total Tax Due"] == "1,157.80"
+
+
+def test_parse_xlsx_rows_skips_blank_rows():
+    data = make_xlsx([_HEADERS, [], ["00001", "ABDULLAH BARBARA", "", "3",
+                                     "104-16-12-018"]])
+    recs = parse_xlsx_rows(data)
+    assert len(recs) == 1
+
+
+def test_parse_xlsx_rows_refuses_unexpected_header():
+    data = make_xlsx([["Totally", "Different", "Columns"], ["a", "b", "c"]])
+    assert parse_xlsx_rows(data) == []
+
+
+def test_fetch_picks_xlsx_reader_when_the_county_serves_a_real_workbook():
+    """AUDITED 2026-10-01 regression: the live link's filename/content changed
+    from the proprietary binary PAPER.XLS to a real PAPER.xlsx. fetch() must
+    detect this by the downloaded bytes' own magic number, not the filename,
+    and route to parse_xlsx_rows() instead of silently returning 0 via the
+    legacy binary scanner (which correctly refuses to guess at a real zip)."""
+    import asyncio
+    from unittest.mock import patch
+
+    from foreclosure_scraper.scrapers.counties_sc.dillon_delinquent_tax import DillonDelinquentTax
+
+    html = '<a href="Documents/Departments/Treasurer/PAPER.xlsx">Delinquent Tax Sale List</a>'
+    data = make_xlsx([_HEADERS,
+                      ["00001", "ABDULLAH BARBARA", "", "3", "104-16-12-018",
+                       "117 LEGARE ST", ".00", "1", "1", "", "", "R",
+                       "000012253", "3  $17482", "000006243", "1,157.80"]])
+
+    async def fake_get_text(*a, **k):
+        return html
+
+    async def fake_get_bytes(*a, **k):
+        return data
+
+    with patch("foreclosure_scraper.scrapers.counties_sc.dillon_delinquent_tax.get_text", fake_get_text), \
+         patch("foreclosure_scraper.scrapers.counties_sc.dillon_delinquent_tax.get_bytes", fake_get_bytes):
+        rows = list(asyncio.run(DillonDelinquentTax().fetch()))
+    assert len(rows) == 1
+    assert rows[0].owner_name == "ABDULLAH BARBARA"
+    assert rows[0].parcel_id == "104-16-12-018"
 
 
 def test_end_to_end_listing_shape():
