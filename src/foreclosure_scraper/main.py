@@ -3264,6 +3264,20 @@ async def run() -> int:
     except Exception:
         log.error("owner_name_signal.failed", traceback=traceback.format_exc())
 
+    # SC judicial-foreclosure co-defendants (second mortgagee / HUD-USDA junior
+    # lien / HOA assessment lien / estate standing in for a dead co-owner) --
+    # already collected by sc_public_index.py / sc_public_index_lis_pendens.py
+    # into raw['court']['co_defendants'] / raw['sc_public_index']['co_defendants']
+    # but never read back out before. No network; reuses
+    # enrichment_owner_name_signal.classify() for the estate-token check, so
+    # runs right after it.
+    try:
+        from .enrichment_co_defendant_signal import enrich_co_defendant_signal
+        s = enrich_co_defendant_signal(enriched)
+        if s: enrichment_stats["co_defendant_signal"] = s
+    except Exception:
+        log.error("co_defendant_signal.failed", traceback=traceback.format_exc())
+
     # Same-owner parcel clustering (Dirty Deeds Tier A #2) — one death/owner
     # touching many parcels is worth more than the same parcels scored alone.
     # No network; reads owner_name + county/state + parcel_id already on the lead.

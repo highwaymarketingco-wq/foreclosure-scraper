@@ -2022,6 +2022,7 @@ RAW_KEEP = {
     # probate or obituary source (1,352 in-footprint) against 358 the dedicated
     # scrapers surface -- roughly 7x, for a regex over a column already stored.
     "owner_name_signal": "*",
+    "co_defendant_signal": "*",         # SC judicial-foreclosure co-defendants: junior lienholders / gov liens / HOA / estate, read off court/sc_public_index co_defendants
     "sc_probate_notice": "*",
     "life_event": "*",                  # death / divorce marker the resolver keys off
     "estimated_monthly_rent_acs": "*",  # ACS $/sqft rent estimate — the rental-exit number
