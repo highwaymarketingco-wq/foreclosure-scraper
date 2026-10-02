@@ -3,6 +3,20 @@
 Barnwell County Sheriff's Office posts real estate auction listings
 for properties being sold via court-ordered sheriff sales.
 
+AUDITED 2026-10-01: the old PAGE_URL (barnwellcounty.com) is a LAPSED DOMAIN --
+confirmed live, it now resolves to a GoDaddy "this domain is for sale"
+parking page, not any county content at all. Repointed to the sheriff
+office's actual current site, barnwellcountysheriff.com (a small Homestead-
+built site; the county's own site is barnwellcountysc.us). Also confirmed
+live: that current site's only sheriff-adjacent content is a Civil Process
+FEE SCHEDULE (service costs for claim & delivery / writs / subpoenas, no
+property listings at all) -- there is no sheriff-sale property roster
+published online anywhere for this county. So this scraper correctly returns
+0 against the fixed URL, same as it incorrectly "correctly" returned 0
+against the dead domain -- the fix here is pointing at a live host instead of
+a domain squatter, not a new source of rows. Do not re-enable a different
+URL without confirming it actually carries a per-sale property list.
+
 Free, public, no login.
 Slug: counties_sc.barnwell_sheriff
 Category: sheriff_sale
@@ -22,7 +36,7 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-PAGE_URL = "https://www.barnwellcounty.com/sheriff/sheriff-sales"
+PAGE_URL = "http://www.barnwellcountysheriff.com/services.html"
 
 
 class BarnwellSheriff(BaseScraper):
