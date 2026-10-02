@@ -76,6 +76,18 @@ def _parse_date(text: str | None) -> datetime | None:
     if not text:
         return None
     text = text.strip()
+    # Found 2026-10-01 (national/reo per-source audit): the schema.org
+    # SaleEvent JSON-LD path (_saleevent_to_listing, the dominant source of
+    # rows live-verified today) hands this full ISO-8601 datetimes
+    # ("2026-10-01T12:00:00.000Z") straight from startDate/endDate -- none of
+    # the formats below ever matched that shape, so sale_date silently came
+    # back None on every JSON-LD-sourced row despite the real date sitting
+    # right there in raw.estate_sales.start_date. Tried first since it is the
+    # most specific/unambiguous format.
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        pass
     for fmt in (
         "%B %d, %Y", "%b %d, %Y",
         "%B %d %Y", "%b %d %Y",
@@ -89,8 +101,20 @@ def _parse_date(text: str | None) -> datetime | None:
     m = DATE_RE.search(text)
     if m:
         s = m.group(1)
-        # Handle date ranges like "Jul 15-17, 2026" — take first date
-        s = re.split(r"[-–to]+", s)[0].strip()
+        # Handle date ranges like "Jul 15-17, 2026" or "Jul 15 to 17, 2026"
+        # -- take the first day only, keep the month/year.
+        #
+        # Found 2026-10-01 (national/reo per-source audit) alongside the
+        # ISO-8601 gap above: re.split(r"[-–to]+", s) is a CHARACTER CLASS,
+        # not the literal word "to" -- it matches any of '-', '–', 't', 'o'
+        # individually. On "Jul 15-17, 2026" it split before ever reaching
+        # the comma (neither 'J','u','l' nor the digits contain those chars,
+        # but splitting on bare '-' alone already cuts the string to "Jul 15"
+        # / "17, 2026"), discarding the YEAR along with the second day, so
+        # every strptime attempt below failed and this whole fallback path
+        # silently returned None for ANY date-range string. Range removed
+        # by substitution instead, which keeps the month/comma/year intact.
+        s = re.sub(r"(\d+)\s*(?:-|–|\bto\b)\s*\d+", r"\1", s).strip()
         for fmt in (
             "%B %d, %Y", "%b %d, %Y",
             "%B %d %Y", "%b %d %Y",
@@ -700,7 +724,36 @@ async def _fetch_estatesales_net(zip_code: str, city: str, state: str,
 
 async def _fetch_estatesale_com(zip_code: str, city: str, state: str,
                                 county: str) -> list[Listing]:
-    """Search estatesale.com by zip code."""
+    """Search estatesale.com by zip code.
+
+    DISABLED 2026-10-01 (national/reo per-source audit): /search?zip=...
+    is a dead path -- confirmed live, HTTP 404 on every one of the 7 footprint
+    zips, every time. The site has migrated to a client-rendered SPA: both
+    the homepage and the new /sales/advanceSearch/ path return HTTP 200 with
+    only ~950 bytes (a bare JS-bundle shell, no server-rendered listings), so
+    a plain httpx fetch can no longer see real content here even at a correct
+    URL -- confirmed via robots.txt, which documents the live paths as
+    /sales/view/ and /sales/advanceSearch/, neither matching the old /search
+    this module targeted. Recovering this source would need a stealth-browser
+    render (requires_render), which was not worth building for what is only
+    the secondary of two estate-sale sources: estatesales.net alone already
+    returns real rows across the footprint (34 live 2026-10-01) and is
+    unaffected. Returns [] immediately so every run stops wasting 7 guaranteed
+    404s (one per SEARCH_ZIPS entry) and the log noise that came with them.
+    See _fetch_estatesale_com_disabled_reference below for the pre-404
+    implementation, kept for a future StealthyFetcher rebuild.
+    """
+    return []
+
+
+async def _fetch_estatesale_com_disabled_reference(
+    zip_code: str, city: str, state: str, county: str
+) -> list[Listing]:
+    """Dead reference implementation -- see _fetch_estatesale_com's
+    docstring. Not called anywhere; kept only so a future rebuild (with a
+    stealth-browser render instead of a plain fetch) does not start from
+    scratch on the parsing side (_parse_estatesale_com is unaffected and
+    still correct for whatever HTML a render eventually produces)."""
     host = "www.estatesale.com"
     search_path = f"/search"
     if not await _robots_allows(host, search_path):
