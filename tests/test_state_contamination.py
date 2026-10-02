@@ -117,12 +117,72 @@ def test_dam_out_of_range_coordinate_is_dropped_not_trusted():
     assert li.latitude is None and li.longitude == -82.6
 
 
-def test_a_registry_without_a_coordinate_field_is_unaffected():
-    """The 3 real-situs registries (ust/lur/hazardous) never had lat_field/
-    id_field set and must keep requiring a real address for a lead."""
+def test_none_of_the_registries_have_a_per_record_id_field():
+    """id_field is only meaningful for nc_dam_safety's NID_ID -- the other 3
+    registries key off a real address (or, for ust/hazardous, their own
+    coordinate) and have no independent per-record id."""
     for slug in ("nc_ust_incidents", "nc_land_use_restrictions", "nc_inactive_hazardous"):
         reg = next(r for r in S.REGISTRIES if r.slug == slug)
-        assert reg.lat_field is None and reg.lon_field is None and reg.id_field is None
+        assert reg.id_field is None
+
+
+def test_lur_still_has_no_coordinate_field():
+    """nc_land_use_restrictions is walled (Token Required, verified live
+    2026-10-01) so its own field list has never been inspected; it keeps
+    relying on Prj_Address alone."""
+    reg = next(r for r in S.REGISTRIES if r.slug == "nc_land_use_restrictions")
+    assert reg.lat_field is None and reg.lon_field is None
+
+
+def test_ust_and_hazardous_use_their_own_coordinate_not_a_geocode():
+    """2026-10-01 fix, same pattern as nc_dam_safety: nc_ust_incidents
+    (LatDec/LongDec) and nc_inactive_hazardous (LATITUDE/LONGITUDE) both
+    publish their own authoritative site coordinate -- verified live against
+    the FeatureServer field lists and real rows. Previously neither field
+    was requested at all, so every row relied entirely on the downstream
+    Census-geocode backfill of a sometimes-unparseable address (e.g.
+    "SR 3495-GLENN BRIDGE RD")."""
+    ust = next(r for r in S.REGISTRIES if r.slug == "nc_ust_incidents")
+    assert ust.lat_field == "LatDec" and ust.lon_field == "LongDec"
+    haz = next(r for r in S.REGISTRIES if r.slug == "nc_inactive_hazardous")
+    assert haz.lat_field == "LATITUDE" and haz.lon_field == "LONGITUDE"
+
+
+def test_ust_row_captures_its_own_coordinate_and_doc_link():
+    reg = next(r for r in S.REGISTRIES if r.slug == "nc_ust_incidents")
+    li = S._to_listing({
+        "IncidentName": "asbury residence", "Address": "15 Beaver Valley Road",
+        "County": "BUNCO", "LatDec": 35.563539, "LongDec": -82.51285,
+        "DocsLink": "http://edocs.deq.nc.gov/WasteManagement/Search.aspx?dbid=0"
+                    "&searchcommand=%7B%5BWM%5D%3A%5BProgram_ID%5D%3D%22%2AAS-7%2A%22%7D",
+    }, reg)
+    assert li.latitude == 35.563539 and li.longitude == -82.51285
+    assert li.raw["state_contamination"]["DocsLink"].startswith("http")
+
+
+def test_hazardous_row_captures_its_own_coordinate_and_doc_link():
+    reg = next(r for r in S.REGISTRIES if r.slug == "nc_inactive_hazardous")
+    li = S._to_listing({
+        "SITENAME": "ERWIN HILLS ROAD PFAS", "SITEADDR": "180 ERWIN HILLS RD",
+        "SITECOUNTY": "BUNCOMBE", "LATITUDE": 35.6209884, "LONGITUDE": -82.6215064,
+        "Laserfiche": "https://edocs.deq.nc.gov/WasteManagement/Search.aspx?dbid=0"
+                      "&searchcommand=%7B%5BWM%5D:%5BProgram_ID%5D%20%3D%20%22*NONCD0003384*%22%7D",
+    }, reg)
+    assert li.latitude == 35.6209884 and li.longitude == -82.6215064
+    assert li.raw["state_contamination"]["Laserfiche"].startswith("https")
+
+
+def test_dam_phone_is_captured_under_owner_mailing():
+    """Phone is a real, frequently-populated owner contact number (verified
+    live, including individual owners, not just HOAs) that was being
+    dropped entirely. It belongs alongside the rest of the owner's contact
+    block, not street_address/city/zip."""
+    reg = next(r for r in S.REGISTRIES if r.slug == "nc_dam_safety")
+    li = S._to_listing({
+        "Owner": "Jane Shuttleworth", "COUNTY": "TRANS", "NID_ID": "NC00196",
+        "LATITUDE": 35.3028, "LONGITUDE": -82.6358, "Phone": "8286930015",
+    }, reg)
+    assert li.raw["state_contamination"]["owner_mailing"]["Phone"] == "8286930015"
 
 
 def test_registries_cover_the_thin_counties():

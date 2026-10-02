@@ -103,15 +103,27 @@ DEQ = "https://services2.arcgis.com/kCu40SDxsCGcuUWO/arcgis/rest/services"
 REGISTRIES: tuple[Registry, ...] = (
     # 4,468 in-footprint. 560 have no CloseOut date, meaning the release is
     # still open and the owner is carrying an active remediation obligation.
+    #
+    # LatDec/LongDec/DocsLink/DateOccurred/LUR_State verified live 2026-10-01
+    # (field list + sample rows pulled directly from the FeatureServer):
+    # LatDec/LongDec are the layer's OWN authoritative coordinate for the
+    # tank site, not a geocode of Address -- same "use the registry's own
+    # coordinate, don't trust the downstream geocode backfill" fix already
+    # applied to nc_dam_safety below. DocsLink is a real, free, no-login NC
+    # DEQ edocs (Laserfiche) search link scoped to this incident's own
+    # Program_ID -- a working document-search entry point this scraper was
+    # dropping entirely (confirmed live: HTTP 302, resolves).
     Registry(
         slug="nc_ust_incidents", state="NC",
         url=f"{DEQ}/Underground_Storage_Tank_Incidents/FeatureServer/0/query",
         where=_prefix("County", NC_PREFIX),
         fields=("IncidentNumber", "IncidentName", "Address", "CityTown",
-                "County", "ZipCode", "DateReported", "Risk", "CurrStatus",
-                "CloseOut", "LURFiled", "LUR_Resc"),
+                "County", "ZipCode", "DateReported", "DateOccurred", "Risk",
+                "CurrStatus", "CloseOut", "LURFiled", "LUR_Resc", "LUR_State",
+                "LatDec", "LongDec", "DocsLink"),
         county_field="County", situs="Address", owner="IncidentName",
         city="CityTown", zip_="ZipCode", detail="CurrStatus",
+        lat_field="LatDec", lon_field="LongDec",
         source_page="https://www.deq.nc.gov/about/divisions/waste-management/underground-storage-tanks",
     ),
     # 550 in-footprint. A recorded restriction that runs with the land.
@@ -127,14 +139,24 @@ REGISTRIES: tuple[Registry, ...] = (
         source_page="https://www.deq.nc.gov/about/divisions/waste-management",
     ),
     # 2,086 statewide; filtered to the footprint below.
+    #
+    # LATITUDE/LONGITUDE/Laserfiche verified live 2026-10-01, same pattern as
+    # nc_ust_incidents above: LATITUDE/LONGITUDE is the layer's own
+    # authoritative site coordinate (not a geocode of SITEADDR, which is
+    # frequently a state-road description like "SR 3495-GLENN BRIDGE RD"
+    # that a geocoder would struggle with anyway), and Laserfiche is a real
+    # per-site NC DEQ edocs document-search link (e.g. the PFAS site at 180
+    # Erwin Hills Rd, Buncombe) that was never being captured.
     Registry(
         slug="nc_inactive_hazardous", state="NC",
         url=f"{DEQ}/Inactive_Hazardous_Sites/FeatureServer/0/query",
         where=_prefix("SITECOUNTY", NC_PREFIX),
         fields=("EPAID", "SITENAME", "SITEADDR", "SITECITY", "SITECOUNTY",
-                "Land_Use_R", "Vol_Cleanu", "SOURCE"),
+                "Land_Use_R", "Vol_Cleanu", "SOURCE", "LATITUDE", "LONGITUDE",
+                "Laserfiche"),
         county_field="SITECOUNTY", situs="SITEADDR", owner="SITENAME",
         city="SITECITY", detail="SOURCE",
+        lat_field="LATITUDE", lon_field="LONGITUDE",
         source_page="https://www.deq.nc.gov/about/divisions/waste-management",
     ),
     # 917 in-footprint. ADDR_LINE1/2 + CITY/STATE/ZIP are the DAM OWNER'S MAILING
@@ -154,18 +176,26 @@ REGISTRIES: tuple[Registry, ...] = (
     # instead of ever geocoding the mailing address. The mailing block still has value
     # (who to contact about the liability) so it is kept, but under raw.owner_mailing,
     # never as street_address/city/zip_code.
+    # Phone/NOD_DATE/DSO_DATE verified live 2026-10-01: Phone is a real,
+    # frequently-populated contact number for the dam owner -- including
+    # individuals, not just HOAs/companies (e.g. "Jane Shuttleworth", Mother
+    # Earth Dam, a personal phone number) -- and was being dropped entirely
+    # despite contactability being this engine's #1 ceiling. NOD_DATE/
+    # DSO_DATE (Notice of Deficiency / Dam Safety Order dates) are a real
+    # open-enforcement severity signal when populated (confirmed live on
+    # Mother Earth Dam Lower, Transylvania County, NOD_DATE 03/04/2024).
     Registry(
         slug="nc_dam_safety", state="NC",
         url=f"{DEQ}/dam_inv_20201012/FeatureServer/0/query",
         where=_prefix("COUNTY", NC_PREFIX),
         fields=("Dam_Name", "Owner", "Owner_Type", "ADDR_LINE1", "ADDR_LINE2",
-                "CITY", "STATE", "ZIP", "COUNTY", "DAM_STATUS", "NID_ID",
-                "LATITUDE", "LONGITUDE",
+                "CITY", "STATE", "ZIP", "Phone", "COUNTY", "DAM_STATUS",
+                "NID_ID", "LATITUDE", "LONGITUDE", "NOD_DATE", "DSO_DATE",
                 "DAM_HAZARD_POTENTIAL_DESCRIPTI"),
         county_field="COUNTY",
         owner="Owner",
         lat_field="LATITUDE", lon_field="LONGITUDE", id_field="NID_ID",
-        mailing_fields=("ADDR_LINE1", "ADDR_LINE2", "CITY", "STATE", "ZIP"),
+        mailing_fields=("ADDR_LINE1", "ADDR_LINE2", "CITY", "STATE", "ZIP", "Phone"),
         detail="DAM_HAZARD_POTENTIAL_DESCRIPTI", process="dam_liability",
         source_page="https://www.deq.nc.gov/about/divisions/energy-mineral-land-resources/dam-safety",
     ),
