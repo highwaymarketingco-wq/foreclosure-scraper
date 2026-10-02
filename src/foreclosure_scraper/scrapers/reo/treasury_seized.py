@@ -80,7 +80,27 @@ def _normalize_state(raw: str) -> str | None:
 DATE_RE = re.compile(
     r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b"
 )
+# Found 2026-10-01 (national/reo per-source audit): the live page's real
+# auction-date label ("ONLINE AUCTION DATE: Thursday, November 19, 2026")
+# is a written-month date, which DATE_RE above (numeric-only, e.g.
+# "11/19/2026") never matches -- confirmed live, sale_date came back None
+# on every current listing despite the real date sitting a few lines below
+# the address, well within the 400-char forward-scan window.
+WRITTEN_DATE_RE = re.compile(
+    r"\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|"
+    r"Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|"
+    r"Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2},?\s+\d{4}\b",
+    re.I,
+)
 PRICE_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
+# "Sale # 27-66-109" -- the Treasury's own per-auction case identifier,
+# printed on every listing, never captured.
+SALE_NUM_RE = re.compile(r"Sale\s*#\s*([\w-]+)", re.I)
+# "2,835 ± sq. ft. home with 4 bedrooms, 2.1 baths" -- beds/baths/sqft are
+# free text in the description but were never parsed into structured fields.
+SQFT_RE = re.compile(r"([\d,]+)\s*±?\s*sq\.?\s*ft", re.I)
+BEDS_RE = re.compile(r"(\d+)\s*bed(?:room)?s?\b", re.I)
+BATHS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*baths?\b", re.I)
 
 
 class TreasurySeizedRealProperty(BaseScraper):
@@ -129,11 +149,15 @@ class TreasurySeizedRealProperty(BaseScraper):
             # price/date when listings are stacked in the same page.
             block = body[m.end():m.end() + 400]
             sale_date = None
-            dm = DATE_RE.search(block)
+            # Try the written-month format first ("November 19, 2026") --
+            # confirmed live to be the ONLY format the real page uses; the
+            # numeric DATE_RE below is kept as a defensive fallback in case
+            # a future listing ever uses it instead.
+            dm = WRITTEN_DATE_RE.search(block) or DATE_RE.search(block)
             if dm:
                 from dateutil import parser as dp
                 try:
-                    sale_date = dp.parse(dm.group(1), fuzzy=True)
+                    sale_date = dp.parse(dm.group(0), fuzzy=True)
                 except (ValueError, TypeError):
                     sale_date = None
             price = None
@@ -143,6 +167,36 @@ class TreasurySeizedRealProperty(BaseScraper):
                     price = float(pm.group(1).replace(",", ""))
                 except ValueError:
                     price = None
+
+            # Found 2026-10-01 (national/reo per-source audit): beds/baths/
+            # sqft and the Treasury's own "Sale #" case identifier are free
+            # text in the same block already fetched -- confirmed live on
+            # real listings -- but were never parsed into structured fields.
+            case_number = None
+            sm = SALE_NUM_RE.search(block)
+            if sm:
+                case_number = sm.group(1).strip()
+            sqft = None
+            sqm = SQFT_RE.search(block)
+            if sqm:
+                try:
+                    sqft = float(sqm.group(1).replace(",", ""))
+                except ValueError:
+                    sqft = None
+            beds = None
+            bm = BEDS_RE.search(block)
+            if bm:
+                try:
+                    beds = float(bm.group(1))
+                except ValueError:
+                    beds = None
+            baths = None
+            bam = BATHS_RE.search(block)
+            if bam:
+                try:
+                    baths = float(bam.group(1))
+                except ValueError:
+                    baths = None
 
             out.append(Listing(
                 source=self.slug,
@@ -155,6 +209,10 @@ class TreasurySeizedRealProperty(BaseScraper):
                 zip_code=zip_code,
                 opening_bid=price,
                 sale_date=sale_date,
+                case_number=case_number,
+                living_sqft=sqft,
+                bedrooms=beds,
+                bathrooms=baths,
                 description=f"US Treasury seized real-property auction ({state})",
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),
