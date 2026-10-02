@@ -13,6 +13,7 @@ Free, no API key. Uses stealth browser for JS-rendered pages.
 from __future__ import annotations
 
 import asyncio
+import html as _html
 import re
 from datetime import datetime
 from typing import Iterable, Optional
@@ -108,11 +109,18 @@ TAX_SALE_KEYWORDS = re.compile(
     re.IGNORECASE
 )
 
-# Address regex (simple street address)
+# Address regex (simple street address). A trailing \b on the suffix word is
+# required — without it, re.IGNORECASE lets the alternation match a SUBSTRING
+# inside an unrelated word ("Addr" in "Address" satisfies "...Dr", "au[ct]ion"
+# satisfies "...Ct"), which is exactly how this scraper was fabricating
+# addresses like "103685 Physical Addr" and "00 will be due at the time of
+# auction" out of page boilerplate (live-confirmed on Gaston and Cherokee
+# County pages, 2026-10-01 audit). See also counties.sitemap_walker, which had
+# the identical bug in its own copy of this pattern.
 ADDR_RE = re.compile(
-    r"(\d{2,6}\s+[A-Z][\w\s]{2,30}(?:Street|St|Avenue|Ave|Road|Rd|Lane|Ln|"
+    r"(\d{2,6}\s+[A-Z][\w\s.]{2,30}(?:Street|St|Avenue|Ave|Road|Rd|Lane|Ln|"
     r"Drive|Dr|Boulevard|Blvd|Place|Pl|Court|Ct|Way|Trail|Trl|"
-    r"Circle|Cir|Highway|Hwy)[\w\s.]*?)(?:\s|$|,|\n|\.)",
+    r"Circle|Cir|Highway|Hwy)\b[\w\s.]*?)(?:\s|$|,|\n|\.)",
     re.IGNORECASE
 )
 
@@ -122,11 +130,154 @@ MONEY_RE = re.compile(r"\$[\d,]+(?:\.\d{2})?")
 # Parcel ID regex (NC PINs are typically 10-15 chars alphanumeric)
 PARCEL_RE = re.compile(r"\b(\d{6,15}[A-Z]?|\d{3,4}[A-Z]\d{3,4}[A-Z]?)\b")
 
+# Hyphenated NC PIN, e.g. "4595-00-04-4495-000" (seen on Kania Law Firm /
+# courthouse-vendor tax-sale tables — Cherokee and others use this format;
+# PARCEL_RE above never matches it because of the embedded hyphens).
+PIN_HYPHEN_RE = re.compile(r"\b(\d{3,4}-\d{2}-\d{2}-\d{3,4}-\d{2,4})\b")
+
+# NC tax-foreclosure case numbers in either the short "25 M 388" / "26-CVD-178"
+# form or the long eCourts "26CV000240-190" form (both seen across NC CivicPlus
+# county tax pages).
+NC_CASE_RE = re.compile(
+    r"\b(\d{2}\s?-?\s?(?:CVD?|SP|M)\s?-?\s?\d{2,8}(?:-\d{2,4})?)\b", re.IGNORECASE
+)
+
+# "<County> vs. <Defendant>," / "<County> vs. <Defendant>-" (the defendant name
+# in a prose tax-foreclosure announcement, e.g. Alamance's <li> list).
+VS_RE = re.compile(
+    r"\bvs\.?\s+([A-Z][^,]*?)(?:,|\s*[-–—]\s*(?:a |an )?"
+    r"(?:house|vacant|lot|tract|parcel|land))", re.IGNORECASE
+)
+
+# "located at/on <description>" — the free-text location clause that follows
+# the defendant name in the same prose format.
+LOCATED_RE = re.compile(r"located\s+(?:at|on)\s+([^,\n]+(?:,\s*[A-Za-z .]+)?)", re.IGNORECASE)
+
+# "Parcel ID#<id>" / "Parcel ID #<id>" anchor used by the prose <li> format.
+PARCEL_ID_HASH_RE = re.compile(r"Parcel\s*ID\s*#\s*([0-9A-Z]{4,15})", re.IGNORECASE)
+
+_LI_RE = re.compile(r"<li[^>]*>(.*?)</li>", re.DOTALL | re.IGNORECASE)
+
 # Date regex
 DATE_RE = re.compile(
     r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+\w{3,9}\s+\d{4}|"
     r"\w{3,9}\s+\d{1,2},?\s+\d{4})"
 )
+
+
+def _strip_tags(raw_html: str) -> str:
+    # unescape FIRST: a bare "&nbsp;" run (used as column padding on pages
+    # like Cherokee's) is not whitespace to \s until it is decoded to U+00A0,
+    # so decoding after the regex sub would leave entity text sitting inside
+    # an owner-name capture and silently break the None/len(60) sanity check.
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", _html.unescape(raw_html))).strip()
+
+
+def _parse_li_blocks(html: str, county: str, url: str) -> list[Listing]:
+    """Prose '<li>' tax-foreclosure announcements, one property per item, e.g.
+    Alamance: "Alamance County vs. Marshall Yarbrough, Jr., Heirs- a house
+    located at 728 Rainbow Ave., Burlington, NC- Parcel ID#132044."
+
+    Parsed PER LIST ITEM so the defendant/address/parcel of one property can
+    never bleed into another's (the free-text Pattern 2 fallback below works
+    off a fixed character window and was pairing an address from one <li>
+    with the parcel ID of the NEXT <li> — live-confirmed on Alamance, where
+    "728 Rainbow Ave" belongs to parcel 132044 but was emitted with parcel
+    172225, a vacant lot on a different street entirely)."""
+    out: list[Listing] = []
+    for li_html in _LI_RE.findall(html):
+        text = _strip_tags(li_html)
+        pid_m = PARCEL_ID_HASH_RE.search(text)
+        if not pid_m:
+            continue
+        parcel = pid_m.group(1)
+        vs_m = VS_RE.search(text)
+        defendant = vs_m.group(1).strip(" ,.-") if vs_m else None
+        addr_m = ADDR_RE.search(text)
+        address = addr_m.group(1).strip(" ,.-") if addr_m else None
+        loc_m = LOCATED_RE.search(text)
+        location_text = loc_m.group(1).strip(" ,.-") if loc_m else None
+        case_m = NC_CASE_RE.search(text)
+        desc_bits = [p for p in (defendant and f"vs. {defendant}", location_text) if p]
+        out.append(Listing(
+            source="counties_nc.nc_civicplus_tax_sale",
+            source_url=url,
+            street_address=address,
+            legal_description=None if address else location_text,
+            county=county,
+            state="NC",
+            listing_type=ListingType.TAX_SALE,
+            property_kind=PropertyKind.LAND if (not address and location_text
+                                                and "vacant" in text.lower()) else PropertyKind.UNKNOWN,
+            parcel_id=parcel,
+            case_number=(re.sub(r"\s+", "", case_m.group(1)).upper() if case_m else None),
+            owner_name=defendant,
+            defendant=defendant,
+            description=(f"{county} County NC tax foreclosure" +
+                         (f": {' — '.join(desc_bits)}" if desc_bits else ""))[:400],
+            raw={
+                "nc_civicplus_tax_sale": {
+                    "county": county,
+                    "page_url": url,
+                    "parcel_id": parcel,
+                    "defendant": defendant,
+                    "location_text": location_text,
+                    "pattern": "li_prose",
+                }
+            },
+        ))
+    return out
+
+
+def _parse_case_table_blocks(text: str, county: str, url: str) -> list[Listing]:
+    """A flat 'Case# ... Owner ... PIN#' table with no real <table>/<tr> markup
+    (Cherokee's Kania-Law-Firm-style page: the three columns are &nbsp;-padded
+    plain text, so Pattern 1's <tr> regex finds nothing and the free-text
+    Pattern 2 fallback was fabricating a street address out of unrelated
+    boilerplate ("00 will be due at the time of auction") because the page
+    genuinely has no street address to find. Anchored on repeating case-number
+    matches so a single stray case-shaped number elsewhere on the page can't
+    produce a fake one-row "table"."""
+    out: list[Listing] = []
+    case_matches = list(NC_CASE_RE.finditer(text))
+    if len(case_matches) < 2:
+        return out
+    for i, m in enumerate(case_matches):
+        start = m.end()
+        end = case_matches[i + 1].start() if i + 1 < len(case_matches) else min(len(text), start + 300)
+        block = text[start:end]
+        pin_m = PIN_HYPHEN_RE.search(block) or PARCEL_RE.search(block)
+        if not pin_m:
+            continue
+        owner_part = block[:pin_m.start()]
+        owner = re.sub(r"[|\s]+", " ", owner_part).strip(" |.-")
+        owner = owner if owner and len(owner) < 60 and re.search(r"[A-Za-z]", owner) else None
+        case_no = re.sub(r"\s+", "", m.group(1)).upper()
+        out.append(Listing(
+            source="counties_nc.nc_civicplus_tax_sale",
+            source_url=url,
+            county=county,
+            state="NC",
+            listing_type=ListingType.TAX_SALE,
+            property_kind=PropertyKind.UNKNOWN,
+            parcel_id=pin_m.group(1),
+            case_number=case_no,
+            owner_name=owner,
+            defendant=owner,
+            description=(f"{county} County NC tax foreclosure: case {case_no}, "
+                         f"PIN {pin_m.group(1)}" + (f", owner {owner}" if owner else ""))[:400],
+            raw={
+                "nc_civicplus_tax_sale": {
+                    "county": county,
+                    "page_url": url,
+                    "parcel_id": pin_m.group(1),
+                    "case_number": case_no,
+                    "owner": owner,
+                    "pattern": "case_table",
+                }
+            },
+        ))
+    return out
 
 
 async def _fetch_text(url: str) -> str:
@@ -200,9 +351,25 @@ def _parse_tax_sale_page(html: str, county: str, url: str) -> list[Listing]:
     if not html:
         return []
 
-    # Strip tags for text extraction
-    text = re.sub(r"<[^>]+>", " ", html)
+    # Strip tags for text extraction (unescape first — see _strip_tags)
+    text = re.sub(r"<[^>]+>", " ", _html.unescape(html))
     text = re.sub(r"\s+", " ", text)
+
+    # Tier 0a: prose <li> announcements, one property per item (Alamance style).
+    # Tried first and returned immediately when it finds anything — this page
+    # shape carries a defendant name and a Parcel ID# per item that the
+    # looser table/free-text patterns below cannot reliably attribute to the
+    # right property, so once this shape is detected it is authoritative.
+    li_listings = _parse_li_blocks(html, county, url)
+    if li_listings:
+        return li_listings
+
+    # Tier 0b: a flat, un-tagged "Case# / Owner / PIN#" table (Cherokee /
+    # Kania-Law-Firm-vendor style — no <table> markup at all, so Tier 1 below
+    # never sees it).
+    case_table_listings = _parse_case_table_blocks(text, county, url)
+    if case_table_listings:
+        return case_table_listings
 
     # Try to find table rows (common for tax sale listings)
     listings = []
@@ -379,6 +546,7 @@ class NcCivicplusTaxSaleScraper(BaseScraper):
                     found = _parse_tax_sale_page(html, county, page_url)
                     all_listings.extend(found)
                     if found:
+                        self.partial.extend(found)
                         log.info("nc_civicplus.found", county=county, url=page_url, listings=len(found))
 
                 if not sale_pages:
