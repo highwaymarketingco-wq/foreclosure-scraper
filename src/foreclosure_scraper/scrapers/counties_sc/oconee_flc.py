@@ -19,11 +19,14 @@ post-fix: still 4 fake rows, all four with street_address literally
 repeated once per contact block on the page (address / hours / phone /
 fax), not four different properties.
 
-`fetch()` is disabled (returns []) until this has a real way to
-distinguish an FLC property listing from the page's own contact
-boilerplate -- e.g. a dedicated FLC inventory page/document, if Oconee
-publishes one, rather than scraping oconeesc.com/treasurer-home's
-free text for address-shaped substrings.
+`fetch()` was disabled (returned []) pending a real FLC inventory source.
+AUDITED 2026-10-01: that real source already exists as sibling scrapers in
+this same package -- counties_sc.oconee_forfeited_land and counties_sc.
+oconee_flc_assignment both read Oconee's actual FLC inventory off the
+county's own ArcGIS layer (services1.arcgis.com/UOvRn2Rvzysthh3i), not free
+text. Converted to the standard disabled=True/disabled_reason so this reads
+correctly in run reports (DORMANT, not an ambiguous silent zero) instead of
+the ad hoc `return []` the 2026-09-15 fix used.
 
 Free, public, no login.
 Slug: counties_sc.oconee_flc
@@ -47,14 +50,14 @@ PAGE_URL = "https://oconeesc.com/treasurer-home"
 class OconeeFLC(BaseScraper):
     slug = "counties_sc.oconee_flc"
     name = "Oconee County SC Forfeited Land Commission"
+    disabled = True
+    disabled_reason = ("free-text address/parcel scraping of a contact page can't tell the "
+                       "courthouse's own address from a real listing - superseded by sibling "
+                       "counties_sc.oconee_forfeited_land / oconee_flc_assignment (ArcGIS) - confirmed 2026-10-01")
     category = "county_tax"
     timeout_s = 90.0
     expected_min_count = 0
     optional = True
 
     async def fetch(self) -> Iterable[Listing]:
-        # Disabled -- see the module docstring. The free-text address/parcel
-        # regex approach cannot tell the county office's own contact address
-        # from a real FLC property listing.
-        log.info("oconee_flc.disabled", note="awaiting a real FLC inventory source, not free-text address scraping")
         return []
