@@ -26,6 +26,7 @@ def _cats(li):
     "nc_inactive_hazardous", "sc_des_brownfields", "sems", "acres", "hud_section8_contracts",
     "crexi_multifamily", "fema_disasters", "hendersonville_flood_zone_structures",
     "buncombe_hmgp_buyout", "buncombe_county_owned", "laurens_county_owned", "any_new_county_owned",
+    "zombie_properties",
 ])
 def test_context_only_sources_add_no_property_signal(slug):
     li = _lead(f"counties_generic.{slug}")
@@ -77,3 +78,22 @@ def test_only_the_distressed_listing_type_is_affected():
 def test_source_without_a_dotted_prefix_and_missing_source():
     assert _context_only_distressed(_lead("nc_ust_incidents"))
     assert not _context_only_distressed(_lead("gaston_vacant"))
+
+
+def test_zombie_property_plus_its_carried_over_financial_facts_is_not_stack_two():
+    """zombie_properties.py model_copy()s the underlying lis-pendens Listing and
+    only overwrites listing_type -- every raw field (relationship_signal,
+    recorded_debt, etc.) survives into the zombie row. Those facts correctly
+    score their own category; the derived 'distressed' type must not ALSO
+    grant a free PROPERTY signal on top of them (the same stack-of-two bug
+    class HANDOFF item 14 fixed for greenville_hard_distress.py)."""
+    li = _lead("counties_sc.zombie_properties", county="Spartanburg",
+               raw={"zombie_property": {"months_stalled": 14},
+                    "relationship_signal": {"kind": "probate"}})
+    assert _cats(li) == {"LIFE_EVENT"}  # from relationship_signal only, no PROPERTY
+
+
+def test_zombie_property_with_no_other_facts_scores_nothing():
+    li = _lead("counties_sc.zombie_properties", county="Spartanburg",
+               raw={"zombie_property": {"months_stalled": 14}})
+    assert _cats(li) == set()

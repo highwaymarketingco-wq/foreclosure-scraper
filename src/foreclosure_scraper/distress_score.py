@@ -363,6 +363,19 @@ _CONTEXT_ONLY_DISTRESSED_SOURCES = frozenset({
     "hud_section8_contracts", "crexi_multifamily",
     # hazard-zone and program context
     "fema_disasters", "hendersonville_flood_zone_structures", "buncombe_hmgp_buyout",
+    # 2026-10-01 per-source audit (zombie_properties.py): a "zombie property" is a
+    # DERIVED case-status inference -- a lis pendens >12 months old with no sale and
+    # no terminal disposition -- not a measured observation of the building's
+    # physical condition. zombie_properties.model_copy()s the underlying lis-pendens
+    # Listing and only overwrites listing_type to "distressed", so every one of its
+    # raw fields (relationship_signal, recorded_debt, etc.) survives into the
+    # zombie row too; those already score their own FINANCIAL/LIFE_EVENT signal from
+    # the same underlying facts. Letting the derived "distressed" type ALSO grant a
+    # full-confidence PROPERTY signal is exactly the stack-of-two fabrication this
+    # exclusion set exists to prevent (same bug class as greenville_hard_distress.py,
+    # HANDOFF item 14) -- a stalled case is a FINANCIAL/procedural fact, not evidence
+    # the structure itself is in bad shape.
+    "zombie_properties",
 })
 
 # Sources whose rows carry a listing type that does not say what the record is (audit F10 and
