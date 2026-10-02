@@ -18,6 +18,32 @@ Capture model (verified 2026-06-24):
     auction.com's path-pagination token as a best-effort, dedupe by
     detail-URL, and stop as soon as a page yields no new hrefs.
 
+FIXED 2026-10-01 (national-auction-tier audit, batch 4): the JSON-LD
+``address.addressLocality`` field is actually the COUNTY name, not the city
+(verified live against every row on both state pages — e.g.
+``addressLocality: "Gaston"`` for a Bessemer City, NC property) -- so
+``city`` was silently wrong on every enriched row, and ``county`` (a real
+Listing field) was never populated at all. ``node["name"]`` carries the
+correct full line instead (``"<street> <City>, <ST> <ZIP>, <County>
+County"``); see ``_parse_name_city_county``.
+
+AUDITED, NOT FIXED (scoped out, documented rather than silently skipped):
+  * ``opening_bid`` is null on every current row. This is NOT a parsing bug
+    -- live-checked the raw JSON-LD on both state pages (100 rows) and
+    NONE carry an ``offers`` key any more (confirmed previously-working
+    extraction code is simply fed no data to extract). There is also no
+    embedded JS state blob with pricing on the list page. The price now
+    only appears to show on the per-LISTING DETAIL page, which this
+    scraper does not fetch (only the two state list pages). Also found on
+    the detail page: real, per-property PDFs under
+    ``propertyDocuments/{id}/PURCHASE_AGREEMENT/`` and
+    ``.../LOCAL_DISCLOSURE/`` (plus boilerplate ``globalDocuments/`` PDFs
+    shared across every listing, not property-specific). Wiring either of
+    these means fetching ~100+ individual detail pages per run through
+    Scrapling's full stealth browser (several seconds each) -- a real
+    architecture/runtime-cost change, not a field left unwired by mistake,
+    so left as a flagged follow-up rather than rushed into this batch.
+
 Free, no auth required.
 """
 from __future__ import annotations
@@ -134,6 +160,32 @@ def _jsonld_index(html: str, state: str) -> dict[str, dict]:
     return idx
 
 
+def _parse_name_city_county(name: str | None, street: str | None) -> tuple[str | None, str | None]:
+    """auction.com's JSON-LD ``address.addressLocality`` is populated with
+    the COUNTY name, not the city (verified live 2026-10-01 against every
+    row on both state pages, e.g. ``addressLocality: "Gaston"`` for a
+    Bessemer City, NC property) -- so ``city`` was silently wrong on every
+    row, and ``county`` (a real Listing field) was never populated at all.
+    The node's ``name`` field carries the correct, full line instead:
+    ``"<street> <City>, <ST> <ZIP>, <County> County"``. Strip the already-
+    known ``street`` prefix (case-insensitively -- ``name`` and
+    ``address.streetAddress`` don't always match casing) and parse the
+    remainder. Returns (city, county), either/both None if the shape
+    doesn't match."""
+    if not name:
+        return None, None
+    remainder = name.strip()
+    if street and remainder.lower().startswith(street.strip().lower()):
+        remainder = remainder[len(street.strip()):].strip()
+    m = re.match(
+        r"^(?P<city>.+?),\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?,\s*(?P<county>.+?)\s+County\s*$",
+        remainder,
+    )
+    if not m:
+        return None, None
+    return m.group("city").strip() or None, m.group("county").strip() or None
+
+
 def _node_listing(detail_id: str, slug: str, state: str,
                   node: dict | None) -> Listing | None:
     """Build a Listing for one detail-id, preferring JSON-LD ``node`` data
@@ -142,7 +194,7 @@ def _node_listing(detail_id: str, slug: str, state: str,
         f"https://www.auction.com/details/{slug}-{state.lower()}-{detail_id}"
     )
 
-    street = city = zip_code = None
+    street = city = zip_code = county = None
     price = None
     images: list[str] = []
     kind = PropertyKind.UNKNOWN
@@ -155,6 +207,13 @@ def _node_listing(detail_id: str, slug: str, state: str,
             street = addr.get("streetAddress") or None
             city = addr.get("addressLocality") or None
             zip_code = addr.get("postalCode") or None
+        # FIXED 2026-10-01: addressLocality above is actually the county
+        # (see _parse_name_city_county docstring) -- recover the real city
+        # and the county (previously never captured) from node["name"].
+        name_city, name_county = _parse_name_city_county(node.get("name"), street)
+        if name_city:
+            city = name_city
+        county = name_county
         geo = node.get("geo") or {}
         if isinstance(geo, dict):
             lat = geo.get("latitude")
@@ -224,6 +283,7 @@ def _node_listing(detail_id: str, slug: str, state: str,
         property_kind=kind,
         street_address=street,
         city=city,
+        county=county,
         state=state,
         zip_code=zip_code,
         opening_bid=price,
