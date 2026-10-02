@@ -211,6 +211,18 @@ async def _search_county(c, state: str, kind: str, county_code: str) -> list[Lis
                 detail_href = href
                 break
 
+        # Found 2026-10-01 (national/reo per-source audit): the Photo cell
+        # (column 0) carries a real listing thumbnail
+        # (<img src="https://www.resales.usda.gov.../SFH_INTRANET/....png">)
+        # that was never captured, despite this table already being in hand
+        # (no extra request). Confirmed live.
+        photo_url = None
+        img = row.css_first("img[src]")
+        if img is not None:
+            src = (img.attributes.get("src") or "").strip()
+            if src.startswith("http"):
+                photo_url = src
+
         # Columns: 0 Photo, 1 Listing Type, 2 Street, 3 City, 4 State,
         #          5 County, 6 Zip, 7 Price/Bid, 8 Beds, 9 Baths, 10 Sq.Ft.
         # The Street cell also carries a "Map" link + text; take the first
@@ -278,7 +290,8 @@ async def _search_county(c, state: str, kind: str, county_code: str) -> list[Lis
                 "kind": kind,
                 "listing_label": listing_label,
                 "county_code": county_code,
-            }},
+            },
+            "images": {"real": [photo_url]} if photo_url else {}},
         ))
     log.info("usda_rd.county_done", state=state, kind=kind,
              county=county_code, count=len(out))
