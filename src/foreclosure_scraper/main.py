@@ -575,6 +575,11 @@ DATELESS_OK_SOURCES = {
     # docstring); the lead is "a current notice exists, pending OCR", not a
     # scheduled event.
     "counties_nc.swain_tax_foreclosures",
+    # A DSCA compliance-tracking status (active/inactive/closed) is a
+    # standing condition, not a scheduled event -- rebuilt 2026-10-01
+    # against the real Excel source (see the module docstring); same
+    # reasoning as every delinquent-tax roll above.
+    "counties_nc.nc_deq_dsca",
     # A freshly-filed foreclosure summons has no sale date yet (the case has
     # only just been filed) -- same reasoning as sc_public_index_lis_pendens
     # above: filed but no sale date yet is a real, valid early-warning signal,
