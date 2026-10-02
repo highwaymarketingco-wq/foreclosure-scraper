@@ -254,6 +254,59 @@ def test_error_kinds_absent_when_nothing_failed(monkeypatch):
     assert "error_kinds" not in stats
 
 
+# ---- caption split lands on each case dict (real board shapes, 2026-10-02) -----
+
+@pytest.mark.parametrize("case_description,last,first,expect_plaintiff,expect_defendant,expect_extra", [
+    # Plain two-party caption (the common shape: 14,741/14,741 live rows use
+    # 'vs.'/'vs').
+    ("JIMMIE LEE GLENN vs. JAMES L GLENN", "GLENN", "JAMES",
+     "JIMMIE LEE GLENN", "JAMES L GLENN", False),
+    # Title Case also appears live (not every SC row is ALL-CAPS).
+    ("Irina Popov vs. Zhenia Popov", "POPOV", "ZHENIA",
+     "Irina Popov", "Zhenia Popov", False),
+    # "et al." on one side -- the named person is kept, flagged as incomplete.
+    ("TERESA COLLINS STILWELL, et al. vs. WILLIAM PATRICK STILWELL, et al.",
+     "STILWELL", "WILLIAM",
+     "TERESA COLLINS STILWELL", "WILLIAM PATRICK STILWELL", True),
+    # A bare "AND" folding a second defendant onto one side with no further
+    # delimiter -- kept whole, flagged.
+    ("WALTER L NIX vs. PEARL T AND ROGER NIX", "NIX", "ROGER",
+     "WALTER L NIX", "PEARL T AND ROGER NIX", True),
+])
+def test_parse_rows_splits_caption_into_plaintiff_defendant(
+    case_description, last, first, expect_plaintiff, expect_defendant, expect_extra,
+):
+    rows = [{
+        "CaseId": "2024DR4200001",
+        "CaseDescription": case_description,
+        "CaseInitialFilingDate": "2024-01-15T00:00:00",
+        "CaseCategory": "110 - Divorce",
+        "ParticipantRole": "Defendant",
+    }]
+    out = m._parse_rows(rows, last, first, "110-Divorce")
+    assert len(out) == 1
+    case = out[0]
+    assert case["parties"] == case_description
+    assert case["plaintiff"] == expect_plaintiff
+    assert case["defendant"] == expect_defendant
+    assert case["additional_parties"] is expect_extra
+
+
+def test_parse_rows_split_is_none_when_caption_has_no_separator():
+    rows = [{
+        "CaseId": "2024DR4200002",
+        "CaseDescription": "SMITH JOHN SOLE FILING",  # malformed/degenerate: no vs./v.
+        "CaseInitialFilingDate": "2024-01-15T00:00:00",
+        "CaseCategory": "110 - Divorce",
+        "ParticipantRole": "Plaintiff",
+    }]
+    out = m._parse_rows(rows, "SMITH", "JOHN", "110-Divorce")
+    assert len(out) == 1
+    assert out[0]["plaintiff"] is None
+    assert out[0]["defendant"] is None
+    assert out[0]["additional_parties"] is None
+
+
 def test_defaults_match_the_portals_measured_parallel_limit():
     # 2026-09-19: FCCMS serves ~3 searches in parallel at ~11s; a 4th queues to
     # ~21s. More workers than that only adds timeouts, and a call timeout under

@@ -69,6 +69,7 @@ from datetime import datetime, timezone
 
 import structlog
 
+from .divorce_caption import split_divorce_caption
 from .name_normalize import first_last_parts, is_entity, party_middle_verdict
 
 try:
@@ -236,10 +237,18 @@ def _parse_rows(rows: list, last: str, first: str, category_label: str) -> list[
             filed = None
         elif isinstance(filed, str):
             filed = filed[:10]  # YYYY-MM-DD
+        split = split_divorce_caption(parties)
         out.append({
             "case_number": case_no,
             "filed_date": filed,
             "parties": parties or None,
+            # Structured spouse names split from `parties` (divorce_caption.py).
+            # None when the caption carries no recognized separator — has not
+            # happened live (every SC CaseDescription has one) but is possible
+            # on a malformed/truncated row, so this is defensive, not a cap.
+            "plaintiff": split["plaintiff"] if split else None,
+            "defendant": split["defendant"] if split else None,
+            "additional_parties": split["additional_parties"] if split else None,
             "category": r.get("CaseCategory") or category_label,
             "role": r.get("ParticipantRole"),
         })

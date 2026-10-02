@@ -71,6 +71,7 @@ from datetime import datetime, timezone
 import structlog
 
 from .render import fetch_rendered
+from .divorce_caption import split_divorce_caption
 from .name_normalize import first_last_parts
 
 log = structlog.get_logger()
@@ -202,9 +203,18 @@ def _parse_divorce_cases(text: str, last: str, first: str) -> list[dict]:
         dm = _DATE_RE.search(rest)
         parties = re.sub(r"\s+", " ", rest[: dm.start()] if dm else rest).strip()[:200]
         filed = dm.group(0) if dm else None
+        # Structured spouse names split from `parties` (divorce_caption.py).
+        # This parse window is a raw text cut (not a clean API field like SC's
+        # CaseDescription — see module docstring), so a split failure here is
+        # more plausible than on the SC path; None means no recognized
+        # separator, not an error.
+        split = split_divorce_caption(parties)
         cases.append({
             "case_number": case_no,
             "parties": parties or None,
+            "plaintiff": split["plaintiff"] if split else None,
+            "defendant": split["defendant"] if split else None,
+            "additional_parties": split["additional_parties"] if split else None,
             "filed_date": filed,
             "case_type": "CVD",
         })
