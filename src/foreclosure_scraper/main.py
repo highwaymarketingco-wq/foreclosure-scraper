@@ -563,6 +563,13 @@ DATELESS_OK_SOURCES = {
     # sale date ("Sale 9/16/2026" in the status text itself, parsed into
     # sale_date directly), so this entry only matters for the rest.
     "counties_nc.edgecombe_tax_foreclosure",
+    # Stokes's rows come from the Kania Law Firm statewide tax-foreclosure
+    # table (fixed 2026-10-01 -- the county's own page carried no data at
+    # all). Most rows there carry the literal "Sale date not yet set" until
+    # the upset-bid clock starts; a filed-but-undated case is still a real
+    # lead (case number + parcel + address are already public), same
+    # reasoning as Wake/Edgecombe above.
+    "counties_nc.stokes_delinquent_tax",
     # A freshly-filed foreclosure summons has no sale date yet (the case has
     # only just been filed) -- same reasoning as sc_public_index_lis_pendens
     # above: filed but no sale date yet is a real, valid early-warning signal,
