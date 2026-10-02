@@ -22,6 +22,49 @@ Mechanism (browserless, verified 2026-06-24):
   for sale notices, the sale date/amount. We page until a page adds no new rows,
   then best-effort enrich each kept notice from its detail page (failures are
   non-fatal — list-row data already yields address + case# + type).
+
+AUDITED 2026-10-01 -- THE SITE CAME BACK, REDESIGNED, AND BROKE TWO THINGS.
+    www.spartanweeklyonline.com was marked DEAD 2026-08-24 (404 everywhere).
+    Confirmed live: it is back, with real fresh notices (checked: October 1,
+    2026 probate filings on page 1) -- re-verifying a DEAD source before
+    trusting it, per this repo's own standing rule, is what caught this.
+
+    But the template changed since this module was built, in two ways that
+    together made every row silently wrong rather than silently empty:
+
+    1. THE "ADDRESS" ANCHOR TEXT IS NOW A CATEGORY LABEL, NOT AN ADDRESS.
+       <h4><a href="...">{STREET ADDRESS}</a></h4> used to hold the real
+       address. Live now it holds things like "Legal Notice", "Abandoned
+       vehicle", "Summons and Notices", "Notice of Hearing" -- a restatement
+       of the notice's own sub-type, not a street. The old code took this
+       text as `street_address` unconditionally, so EVERY row shipped a
+       fabricated address (the literal string "Summons and Notices" as a
+       mailable address). Fixed: `address` is only kept when the text looks
+       like a real address (anchored on a leading house number); otherwise
+       it is None, same posture as every other SC source audited today that
+       won't fabricate an address from legal-description-shaped or label-
+       shaped text.
+
+    2. THE TYPE TAXONOMY COLLAPSED, SILENTLY DROPPING FORECLOSURE CLASSIFICATION.
+       The old h6 TYPE ("Master In Equity") is GONE from live output --
+       checked 5 pages, every row is now "Probate Court" or "All Other
+       Notices". A live detail page filed under "All Other Notices" /
+       "Summons and Notices" reads, in full: "STATE OF SOUTH CAROLINA COUNTY
+       OF SPARTANBURG IN THE COURT OF COMMON PLEAS C/A No.: 2026-CP-42-02855
+       MidFirst Bank, Plaintiff, v. Michael Ronald Pressley; Granite St. Land
+       Trust, Defendant(s). Summons and Notices (Non-Jury) Foreclosure of
+       Real Estate Mortgage" -- an ordinary mortgage-foreclosure summons that
+       the old code could never recognize as one, because `_classify()` only
+       ever looked at the h6 label, never the body. kind stayed "other" and
+       lt stayed UNKNOWN for every foreclosure notice on the site, and the
+       sale-date/judgment-amount/plaintiff extraction block (gated on
+       `kind == "foreclosure"`, set only from the stale label) never ran even
+       though the enrichment pass had the real body in hand. Fixed:
+       `_reclassify_from_body()` re-derives kind/lt from the fetched body's
+       own language (independent of the row's h6 label) during enrichment, so
+       a real foreclosure notice is recognized and gets the sale-date/amount/
+       plaintiff pass regardless of which generic bucket the site filed it
+       under.
 """
 from __future__ import annotations
 
@@ -133,6 +176,38 @@ def _classify(notice_type: str) -> tuple[ListingType, str]:
     return ListingType.UNKNOWN, "other"
 
 
+# AUDITED 2026-10-01: the site's h6 TYPE taxonomy collapsed to just "Probate
+# Court" / "All Other Notices" -- it no longer labels a row "Master In
+# Equity", so _classify() (label-only) can no longer recognize a real
+# foreclosure notice at all. The notice BODY still says so in plain language
+# every time, so a real foreclosure summons/sale notice is detected from the
+# fetched text instead of trusting the (now uninformative) label.
+_FORECLOSURE_TOPIC_RE = re.compile(
+    r"\bforeclosur\w+|deed\s+of\s+trust|master[\s-]in[\s-]equity|master'?s\s+sale|"
+    r"special\s+referee|order\s+of\s+reference\b", re.I)
+
+
+def _reclassify_from_body(lt: ListingType, kind: str, body: str) -> tuple[ListingType, str]:
+    """Upgrade (lt, kind) using the notice's own body text, independent of
+    the row's (possibly uninformative) h6 label. Never downgrades probate or
+    tax, which the label already identifies reliably."""
+    if kind in ("probate", "tax"):
+        return lt, kind
+    if _FORECLOSURE_TOPIC_RE.search(body or ""):
+        return ListingType.LIS_PENDENS, "foreclosure"
+    return lt, kind
+
+
+# A real address is anchored on a leading house number; the site's current
+# anchor text is a category restatement ("Legal Notice", "Summons and
+# Notices", "Abandoned vehicle", "Notice of Hearing") with no digits at all.
+_ADDR_SHAPE_RE = re.compile(r"^\d{1,6}\b")
+
+
+def _looks_like_address(text: str | None) -> bool:
+    return bool(text and _ADDR_SHAPE_RE.match(text.strip()))
+
+
 def _defendant(body: str, kind: str) -> str | None:
     m = _ESTATE_RE.search(body) if kind == "probate" else _VS_RE.search(body)
     return _clean(m.group(1)) if m else None
@@ -236,7 +311,13 @@ class SpartanWeeklyLegals(BaseScraper):
         meta = _clean(row["meta"])
         case_m = _CASE_RE.search(meta)
         date_m = _DATE_RE.search(meta)
-        address = _clean(row["addr"])
+        # AUDITED 2026-10-01: the anchor text is now a category restatement
+        # ("Summons and Notices", "Abandoned vehicle", ...), not a street --
+        # see the module docstring. Only keep it when it is actually
+        # address-shaped; otherwise this field has no real value to offer
+        # before enrichment runs.
+        addr_raw = _clean(row["addr"])
+        address = addr_raw if _looks_like_address(addr_raw) else None
         source_url = _HOST + row["href"]
 
         body, defendant, sale_date, amount = "", None, None, None
@@ -250,6 +331,13 @@ class SpartanWeeklyLegals(BaseScraper):
                 d = await c.get(source_url)
                 if d.status_code == 200:
                     body = _clean(d.text)
+                    # AUDITED 2026-10-01: the site's TYPE taxonomy collapsed
+                    # (see module docstring), so re-derive kind/lt from the
+                    # body BEFORE using kind for anything below -- otherwise
+                    # a real foreclosure notice filed under "All Other
+                    # Notices" never gets its sale-date/amount/plaintiff
+                    # extraction, which is gated on kind == "foreclosure".
+                    lt, kind = _reclassify_from_body(lt, kind, body)
                     defendant = _defendant(body, kind)
                     if kind == "foreclosure" and _SALE_RE.search(body):
                         lt = ListingType.FORECLOSURE_SALE

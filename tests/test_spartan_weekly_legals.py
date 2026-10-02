@@ -72,3 +72,51 @@ def test_probate_extracts_decedent_pr_and_case():
     # estate case number (ES, not the CP foreclosure pattern)
     assert sw._ES_CASE_RE.search(_PROBATE_BODY).group(1) == "2026ES4200344"
     assert sw._PROBATE_DOD.search(_PROBATE_BODY).group(1) == "January 31, 2026"
+
+
+# ---- AUDITED 2026-10-01: site redesign regression tests ----
+# The site went DEAD 2026-08-24 and came back with a changed template: the
+# anchor "address" text is now a category restatement, and the h6 TYPE
+# taxonomy collapsed so a real foreclosure notice no longer self-identifies
+# by label. See the module docstring for the live evidence.
+
+def test_category_labels_are_not_treated_as_addresses():
+    """Live now, the anchor text holds things like "Summons and Notices" /
+    "Abandoned vehicle" / "Notice of Hearing" / "Legal Notice" -- none of
+    these may ever become street_address."""
+    for label in ("Summons and Notices", "Abandoned vehicle",
+                  "Notice of Hearing", "Legal Notice"):
+        assert sw._looks_like_address(label) is False
+
+
+def test_a_real_address_still_passes():
+    assert sw._looks_like_address("142 Oak Street, Walhalla") is True
+
+
+def test_reclassify_from_body_recognizes_foreclosure_under_the_generic_label():
+    """Live example (case 2026-CP-42-02855): a notice the site files under
+    'All Other Notices' is actually a mortgage-foreclosure summons. The body
+    must drive the classification, not the now-uninformative h6 label."""
+    body = (
+        "STATE OF SOUTH CAROLINA COUNTY OF SPARTANBURG IN THE COURT OF COMMON "
+        "PLEAS C/A No.: 2026-CP-42-02855 MidFirst Bank, Plaintiff, v. Michael "
+        "Ronald Pressley; Granite St. Land Trust, Defendant(s). Summons and "
+        "Notices (Non-Jury) Foreclosure of Real Estate Mortgage"
+    )
+    lt, kind = sw._reclassify_from_body(sw.ListingType.UNKNOWN, "other", body)
+    assert kind == "foreclosure"
+    assert lt == sw.ListingType.LIS_PENDENS
+
+
+def test_reclassify_from_body_leaves_a_real_non_foreclosure_notice_alone():
+    body = "Notice of Hearing regarding custody of a minor child in Family Court."
+    lt, kind = sw._reclassify_from_body(sw.ListingType.UNKNOWN, "other", body)
+    assert kind == "other"
+    assert lt == sw.ListingType.UNKNOWN
+
+
+def test_reclassify_from_body_never_downgrades_probate():
+    body = "Foreclosure of Real Estate Mortgage mentioned only in passing."
+    lt, kind = sw._reclassify_from_body(sw.ListingType.PROBATE_NOTICE, "probate", body)
+    assert kind == "probate"
+    assert lt == sw.ListingType.PROBATE_NOTICE
