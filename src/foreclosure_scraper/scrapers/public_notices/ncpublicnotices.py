@@ -747,6 +747,20 @@ def _parse_results_html(html: str, query: str, category: str) -> list[Listing]:
                 state="NC",
                 county=county,
                 defendant=defendant,
+                # Mirror onto owner_name too. Found live 2026-10-01: ~20
+                # enrichers (enrichment_voter_phone.py -- explicitly "the one
+                # free personal-phone source" per HERMES -- plus
+                # enrichment_county_phone.py, enrichment_images.py,
+                # enrichment_owner_cluster.py and others) read li.owner_name
+                # with no defendant fallback of their own; the resolver's own
+                # owner_name-then-defendant fallback (_best_name_candidate in
+                # enrichment_resolve_name_to_property.py) is NOT universal.
+                # Every sibling scraper in this package (column_legal_notices,
+                # nc_notices_counties, funeral_home_rss) already sets both
+                # fields redundantly -- this file was the one exception,
+                # silently excluding every one of its rows from those ~20
+                # enrichers even though the party name is right there.
+                owner_name=defendant,
                 plaintiff=plaintiff,
                 case_number=case_number,
                 sale_date=sale_date,

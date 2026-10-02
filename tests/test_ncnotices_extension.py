@@ -158,6 +158,31 @@ def test_parse_foreclosure_still_works():
     assert "Main" in li.street_address
 
 
+def test_probate_named_party_also_lands_in_owner_name():
+    """Regression found live 2026-10-01: this parser set `defendant` from the
+    named party but never mirrored it onto `owner_name`, unlike every sibling
+    scraper in this package. ~20 enrichers (enrichment_voter_phone.py --
+    explicitly "the one free personal-phone source" -- enrichment_county_phone,
+    enrichment_images, enrichment_owner_cluster, etc.) read li.owner_name with
+    no defendant fallback of their own, so every row from this source was
+    silently invisible to them despite carrying a real party name."""
+    out = _parse_results_html(PROBATE_HTML, query="notice to creditors", category="probate")
+    assert len(out) >= 1
+    li = out[0]
+    assert li.defendant is not None
+    assert li.owner_name == li.defendant
+
+
+def test_foreclosure_named_party_also_lands_in_owner_name():
+    """Same regression, foreclosure branch (has its own `if require_address`
+    code path that independently needed the same fix)."""
+    out = _parse_results_html(FORECLOSURE_HTML, query="substitute trustee", category="foreclosure")
+    assert len(out) >= 1
+    li = out[0]
+    if li.defendant is not None:
+        assert li.owner_name == li.defendant
+
+
 def test_parse_skips_ui_chrome():
     """Login / nav / chrome text must not become listings."""
     html = """
