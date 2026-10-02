@@ -4,8 +4,13 @@ Every fixture below is trimmed from a page that was actually fetched on
 2026-08-06, including the field-layout differences between the three papers and
 the two junk values that sit exactly where a representative's name sits.
 """
+import asyncio
+
+import pytest
+
+from foreclosure_scraper.scrapers.counties_sc import sc_probate_notices as m
 from foreclosure_scraper.scrapers.counties_sc.sc_probate_notices import (
-    SC_COUNTY_CODE, body_text, parse_estates,
+    SC_COUNTY_CODE, Paper, body_text, parse_estates,
 )
 
 HEADER = (
@@ -152,6 +157,43 @@ def test_body_text_preserves_line_breaks():
 
 def test_body_text_unescapes_entities():
     assert "Smith & Jones" in body_text("<p>Smith &amp; Jones</p>")
+
+
+def test_fetch_salvages_fast_papers_when_a_slow_one_is_still_running(monkeypatch):
+    """AUDITED 2026-10-01: fetch() used to `asyncio.gather()` all three papers
+    before extending self.partial, so self.partial stayed EMPTY for the whole
+    run -- including the entire time the fast papers (Pickens/Laurens) had
+    already finished. Verified live the same day: a real run hit the 180s
+    soft timeout while the (documented, expected-slow) Gaffney Ledger was
+    still going and shipped outcome=TIMEOUT, n=0, discarding 667 already-
+    fetched Pickens+Laurens rows. fetch() must now bank each paper's rows
+    into self.partial as ITS OWN task completes, not when the slowest does."""
+
+    async def fake_fetch_paper(c, paper: Paper):
+        if paper.host == "www.gaffneyledger.com":
+            await asyncio.sleep(10)  # never resolves inside this test's budget
+            return []
+        e = {"estate": f"Test Decedent {paper.host}", "case_number": "2026ES3900001",
+             "county": "Pickens", "date_of_death": None,
+             "personal_representative": None, "pr_address": None}
+        return [m._to_listing(e, f"https://{paper.host}/x", m.SCProbateNotices.slug)]
+
+    monkeypatch.setattr(m, "_fetch_paper", fake_fetch_paper)
+    scraper = m.SCProbateNotices()
+    scraper.partial = []
+
+    async def _drive():
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(scraper.fetch(), timeout=1.0)
+
+    asyncio.run(_drive())
+    # The two fast papers (Pickens, Laurens) must have landed in self.partial
+    # even though the slow (tolerated) Gaffney Ledger never finished.
+    assert len(scraper.partial) == 2
+    assert {li.source_url for li in scraper.partial} == {
+        "https://www.yourpickenscounty.com/x",
+        "https://www.laurenscountyadvertiser.net/x",
+    }
 
 
 def test_footprint_codes_only():

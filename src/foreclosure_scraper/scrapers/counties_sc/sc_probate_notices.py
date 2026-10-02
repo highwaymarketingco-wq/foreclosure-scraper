@@ -344,6 +344,12 @@ class SCProbateNotices(BaseScraper):
     name = "SC Notice to Creditors probate notices (upstate county papers)"
     category = "probate"
     expected_min_count = 0
+    # AUDITED 2026-10-01: raised from the 180s default. The Gaffney Ledger
+    # alone measures 222.9s (see the docstring below) -- with the OLD 180s
+    # default AND the gather-then-extend bug this source timed out on every
+    # single run while Gaffney was still going, see that fix for why this
+    # alone would not have been enough.
+    timeout_s = 300.0
 
     async def fetch(self) -> Iterable[Listing]:
         if os.environ.get("FORECLOSURE_SC_PROBATE_NOTICES") == "0":
@@ -364,22 +370,45 @@ class SCProbateNotices(BaseScraper):
         # Laurens 135 in 2.3s, but the Gaffney Ledger takes 222.9s on its own because
         # it is read one article page at a time. Run in series that is ~230s against a
         # 180s soft timeout, so the source timed out and reported ALARM every run.
-        # Run concurrently, the two fast papers land in seconds and are banked in
-        # self.partial, so even if Gaffney is still going when the timeout fires,
-        # base_scraper ships 655 rows instead of nothing. Gaffney is already in the
-        # guard's `tolerate` set, so its slowness cannot fail the source either.
+        #
+        # AUDITED 2026-10-01 -- THE "banked in self.partial" CLAIM ABOVE WAS FALSE.
+        # This used to be `harvested = await asyncio.gather(*(guard.harvest(...) for
+        # paper in PAPERS), return_exceptions=True)` followed by a loop that only
+        # THEN extended `out` (== self.partial). asyncio.gather does not resolve
+        # until EVERY task finishes, so self.partial stayed an empty list for the
+        # ENTIRE run -- including the whole time Pickens' 525 rows and Laurens' 142
+        # had ALREADY completed and logged success. Verified live the same day: a
+        # run against the real sites hit the soft timeout while Gaffney was still
+        # going and shipped outcome=TIMEOUT, n=0 -- the 667 already-fetched Pickens
+        # + Laurens rows were discarded, the exact loss this comment claimed could
+        # not happen. This is the identical "gather-then-extend defeats self.partial"
+        # bug class counties_sc.qpaybill_delinquent_roll's fetch() already documents
+        # fixing (see that module's "SALVAGE AS EACH COUNTY COMPLETES" comment) --
+        # fixed here the same way, with asyncio.as_completed so each paper's rows
+        # land in self.partial the moment ITS OWN task resolves, not when the
+        # slowest one does.
         async with client(timeout=60.0) as c:
             with guard:
-                harvested = await asyncio.gather(
-                    *(guard.harvest(paper.host, self._one(c, paper)) for paper in PAPERS),
-                    return_exceptions=True,
-                )
-        for res in harvested:
-            if isinstance(res, BaseException):
-                # The guard already logged and classified it; a tolerated host that
-                # blew up must not take the other two papers' rows down with it.
-                continue
-            out.extend(res)
+                tasks = [asyncio.ensure_future(guard.harvest(paper.host, self._one(c, paper)))
+                         for paper in PAPERS]
+                for finished in asyncio.as_completed(tasks):
+                    try:
+                        res = await finished
+                    except asyncio.CancelledError:
+                        # MUST propagate, not be swallowed: a CancelledError here is
+                        # an outer caller (safe_run()'s own wait_for, or an
+                        # orchestrator-level _await_capped) stopping this scraper.
+                        # Catching it as an ordinary failure would make wait_for()
+                        # see a normal return instead of a cancellation and silently
+                        # defeat the timeout this exact fix depends on elsewhere.
+                        raise
+                    except Exception:
+                        # guard.harvest() already banks a real failure for verify()
+                        # to re-raise; this only catches something stranger. A
+                        # tolerated host blowing up must not take the other papers'
+                        # rows down with it.
+                        continue
+                    out.extend(res)
         return out
 
     @staticmethod
