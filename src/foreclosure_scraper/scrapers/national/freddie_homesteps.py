@@ -37,6 +37,20 @@ HEADERS = {
 _PRICE_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
 _NUM_RE = re.compile(r"([\d,]+)")
 _ADDR_RE = re.compile(r"^(.+?),\s*([A-Za-z .'-]+),\s*([A-Z]{2})\s*(\d{5})?")
+# "2 beds, 2 baths, 1,296 sq. ft." -- the only place beds/baths/sqft live on
+# the card; found 2026-10-01 (national/reo per-source audit) never parsed
+# into the Listing's own structured bedrooms/bathrooms/living_sqft fields
+# (only kept as free text inside description).
+_BBS_RE = re.compile(
+    r"(\d+)\s*beds?,\s*(\d+(?:\.\d+)?)\s*baths?,\s*([\d,]+)\s*sq\.?\s*ft",
+    re.I,
+)
+# The property-type badge this selector originally targeted is gone from the
+# live markup (confirmed 2026-10-01: a kind_node match never fires on any of
+# 26 live NC+SC cards, site redesign). The MLS photo filename still encodes
+# it ("mls-homes/single-family-property/...", "mobile-manufactured-property",
+# "condo-property", ...), so that is the fallback source for property type.
+_IMG_KIND_RE = re.compile(r"/([a-z][a-z-]*-property)/")
 
 
 def _kind(label: str | None) -> PropertyKind:
@@ -56,6 +70,26 @@ def _kind(label: str | None) -> PropertyKind:
     if "land" in s:
         return PropertyKind.LAND
     return PropertyKind.UNKNOWN
+
+
+def _photo_and_kind(row) -> tuple[str | None, str | None]:
+    """The card's real listing photo (div.property-image img) and, as a
+    fallback for the now-missing type badge, the MLS-feed type slug baked
+    into that same image's filename. "no_photos.svg" is the site's own
+    generic placeholder for a listing with no photo on file -- confirmed
+    live on several SC rows -- and must not be reported as a real image."""
+    img = row.css_first("div.property-image img, [class*='property-image'] img")
+    if img is None:
+        return None, None
+    src = (img.attributes.get("src") or "").strip()
+    if not src or src.endswith(".svg") or "no_photos" in src.lower():
+        return None, None
+    if src.startswith("//"):
+        src = f"https:{src}"
+    elif src.startswith("/"):
+        src = f"https://www.homesteps.com{src}"
+    km = _IMG_KIND_RE.search(src)
+    return src, (km.group(1) if km else None)
 
 
 def _wrapping_href(row) -> str | None:
@@ -118,27 +152,50 @@ def _parse_row(row, state: str) -> Listing | None:
     kind_node = row.css_first("[class*='type'], [class*='property-type']")
     kind_text = kind_node.text(strip=True) if kind_node is not None else None
 
+    photo, img_kind_slug = _photo_and_kind(row)
+    # The badge kind_node was looking for no longer exists on the live page
+    # (see _IMG_KIND_RE's comment) -- fall back to the type slug baked into
+    # the photo filename so property_kind isn't UNKNOWN on every single row.
+    kind_for_mapping = kind_text or img_kind_slug
+
+    beds = baths = sqft = None
+    bm = _BBS_RE.search(details_text or "")
+    if bm:
+        try:
+            beds = int(bm.group(1))
+            baths = float(bm.group(2))
+            sqft = float(bm.group(3).replace(",", ""))
+        except ValueError:
+            beds = baths = sqft = None
+
     link = _wrapping_href(row) or "https://www.homesteps.com/"
     if link and not link.startswith("http"):
         link = f"https://www.homesteps.com{link}"
 
-    return Listing(
+    li = Listing(
         source="national.freddie_homesteps",
         source_url=link,
         listing_type=ListingType.REO,
-        property_kind=_kind(kind_text),
+        property_kind=_kind(kind_for_mapping),
         state=st,
         city=city,
         zip_code=z,
         street_address=street,
         opening_bid=price,
+        bedrooms=beds,
+        bathrooms=baths,
+        living_sqft=sqft,
         description=" ".join(
             p for p in ("Freddie Mac HomeSteps REO.", kind_text, details_text) if p
         ).strip(),
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
-        raw={"homesteps_kind": kind_text, "homesteps_details": details_text},
+        raw={"homesteps_kind": kind_text, "homesteps_details": details_text,
+             "homesteps_img_kind_slug": img_kind_slug},
     )
+    if photo:
+        li.raw["images"] = {"real": [photo]}
+    return li
 
 
 async def _fetch_state(state: str, url: str) -> list[Listing]:
