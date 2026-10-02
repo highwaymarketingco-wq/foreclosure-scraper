@@ -2182,6 +2182,16 @@ RAW_KEEP = {
     # older, separate flat key and is unaffected.
     "xome": "*",
 
+    # national.fdic_failed_banks raw payload -- added 2026-10-01 (batch-5
+    # extraction-completeness audit). bank_name was already RAW_KEEP'd above,
+    # but cert_number/acquiring_institution/failure_date/fund_number are flat
+    # top-level keys on the same raw dict that had no entry here and were
+    # being silently stripped at publish since the scraper's first commit.
+    # fund_number is new (the scraper previously dropped the table's 7th
+    # column outright; now captured).
+    "cert_number": "*", "acquiring_institution": "*", "failure_date": "*",
+    "fund_number": "*",
+
     # third-party listing / property identifiers, needed to re-find a lead upstream
     "fc_listing_id": "*", "govdeals_asset_id": "*", "homesteps_kind": "*",
     "hud_property_id": "*", "reo_id": "*", "trulia_id": "*",

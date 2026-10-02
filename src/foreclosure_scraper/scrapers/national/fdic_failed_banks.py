@@ -12,6 +12,18 @@ indicator for REO inventory — the acquiring institution typically offloads
 the failed bank's REO portfolio within 6-12 months. This scraper captures
 the bank failure data as a distress signal.
 
+FIXED 2026-10-01 (batch-5 extraction-completeness audit): this docstring
+already named the real 7th column (Fund #) but the code never captured it
+(it only ever read clean[0:5]) -- wired it into raw. Also: the Bank Name
+cell carries an <a href="/bank-failures/failed-bank-list/<slug>"> to that
+bank's own FDIC detail page, but every row shipped the same generic
+source_url (the list page) regardless of which bank it was -- same bug
+class fixed in counties_generic.epa_frs_sites earlier today. Spot-checked
+the detail page itself (Nano Banc): it is consumer FAQ / press-release
+boilerplate about deposit-insurance continuity, no address or REO-portfolio
+data, so it is captured as the real per-row source_url for provenance but
+not worth an extra per-row fetch.
+
 Free, public, no login.
 Slug: national.fdic_failed_banks
 Category: reo
@@ -22,6 +34,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from typing import Iterable
+from urllib.parse import urljoin
 
 import structlog
 
@@ -81,9 +94,23 @@ class FDICFailedBanks(BaseScraper):
             cert_num = clean[3]
             acquiring = clean[4]
             fail_date_str = clean[5]
+            # 7th column, present on the live table even though older captures
+            # of this page may not have had it -- tolerate its absence.
+            fund_number = clean[6] if len(clean) > 6 and clean[6] else None
 
             if not bank_name or not state:
                 continue
+
+            # Bank Name is itself "<a href='/bank-failures/failed-bank-list/
+            # <slug>'>Name</a>" -- a real per-bank detail page. Captured as the
+            # row's actual source_url (every row previously shared the same
+            # generic list-page URL) for provenance; not worth a per-row
+            # fetch (spot-checked: consumer FAQ/press-release boilerplate,
+            # no address or REO-portfolio data).
+            detail_url = PAGE_URL
+            dm = re.search(r'href="(/bank-failures/failed-bank-list/[^"]+)"', cells[0], re.I)
+            if dm:
+                detail_url = urljoin(PAGE_URL, dm.group(1))
 
             try:
                 fail_date = datetime.strptime(fail_date_str, "%B %d, %Y")
@@ -106,12 +133,13 @@ class FDICFailedBanks(BaseScraper):
                 "cert_number": cert_num,
                 "acquiring_institution": acquiring,
                 "failure_date": fail_date_str,
+                "fund_number": fund_number,
             }
 
             out.append(
                 Listing(
                     source=self.slug,
-                    source_url=PAGE_URL,
+                    source_url=detail_url,
                     listing_type=ListingType.REO,
                     street_address=f"{bank_name}",
                     city=city,
