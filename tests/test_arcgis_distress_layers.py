@@ -18,7 +18,46 @@ from unittest.mock import MagicMock
 import pytest
 
 import foreclosure_scraper.scrapers.counties_generic.arcgis_distress_layers as M
+from foreclosure_scraper import layer_guard
 from foreclosure_scraper.layer_guard import PartialHarvest
+
+# ROOT CAUSE (2026-10-03, confirmed with pytest's faulthandler_timeout and a
+# real stack-trace dump -- see project_test_arcgis_hang_fix for the session
+# that found this): this file was measured to take ~192s standalone, which
+# reads exactly like an indefinite hang if you check on it with a short
+# timeout -- the process sits at ~0% CPU inside asyncio's `selectors.select`,
+# indistinguishable at a glance from blocked I/O.
+#
+# ArcgisDistressLayers.fetch() builds its LayerHarvest with attempts=3 and
+# never exposes retry_delay_s (default 2.0s, real `asyncio.sleep`, never
+# mocked) to the caller. Three of the tests below deliberately make every
+# layer (or several) fail to exercise the hard-fail contract, and each
+# failing layer pays two REAL sleeps (2s then 4s) before it is recorded dead
+# -- 25 layers failing at once (test_arcgis_200_with_an_error_body_is_a_failure)
+# alone accounts for ~150s of real wall time that has nothing to do with what
+# the test is actually asserting. tests/test_layer_guard.py already treats
+# this as a known seam and passes retry_delay_s=0 to every LayerHarvest it
+# constructs directly -- this file has no such injection point because the
+# guard is built *inside* fetch(), so the same discipline has to be applied
+# by neutralizing the sleep itself.
+#
+# This autouse fixture is the regression guard: it keeps retry COUNT/behavior
+# intact (so test_http_error_on_one_layer_hard_fails etc. still exercise real
+# retry attempts) while removing the real wall-clock cost, for every test in
+# this module, present and future.
+@pytest.fixture(autouse=True)
+def _no_real_retry_backoff(monkeypatch):
+    async def _instant_sleep(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr(layer_guard.asyncio, "sleep", _instant_sleep)
+
+
+# Backstop for the backstop: if a future change reintroduces a real sleep on
+# this path (or any other blocking call), fail loudly in seconds instead of
+# silently costing minutes. Every test below runs in well under 1s once the
+# fixture above is in place.
+pytestmark = pytest.mark.timeout(15)
 
 
 def _resp(status=200, body=None):
