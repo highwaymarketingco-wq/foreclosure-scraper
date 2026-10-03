@@ -100,6 +100,7 @@ def main():
             continue
         if li.zip_code and li.zip_code in zip_median:
             li.living_sqft = zip_median[li.zip_code]
+            li.living_sqft_estimated = True  # zip-median guess, not a sourced value
             raw = li.raw if isinstance(li.raw, dict) else {}
             raw.setdefault("sqft_source", "zip_median")
             li.raw = raw
@@ -132,6 +133,7 @@ def main():
             estimated_sqft = int(lot_acres * 43560 * 0.20)
             if 500 <= estimated_sqft <= 8000:  # sanity check
                 li.living_sqft = estimated_sqft
+                li.living_sqft_estimated = True  # lot-footprint guess, not a sourced value
                 raw = li.raw if isinstance(li.raw, dict) else {}
                 raw.setdefault("sqft_source", "lot_estimate")
                 li.raw = raw
