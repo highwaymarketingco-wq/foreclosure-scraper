@@ -36,6 +36,7 @@ import structlog
 
 from .http_client import client
 from .models import Listing
+from .name_normalize import is_entity
 
 log = structlog.get_logger()
 
@@ -65,19 +66,20 @@ _DETAIL_URL = "https://www.sosnc.gov/online_services/search/by_title/_Business_R
 
 _SEMAPHORE = asyncio.Semaphore(3)  # be polite, SOS rate limits
 
-# Reuse the business-entity detection already proven by sos_dissolution /
-# sos_agent so we only query SOS for names that are actually entities.
-_BUSINESS_MARKERS = (
-    "llc", "l.l.c.", "inc", "inc.", "corp", "corp.", "corporation",
-    "company", "co.", "ltd", "ltd.", "lp", "l.p.", "llp",
-)
-
-
+# Bug found live 2026-10-02 (byte-for-byte duplicate of the bug fixed the same
+# day in enrichment_sos_dissolution.py): despite the comment below claiming
+# this "reuses" the business-entity detection proven there, it actually
+# duplicated a bare, unanchored substring scan -- `any(m in name.lower() for m
+# in MARKERS)` -- so "inc" and "lp" as raw substrings matched ordinary
+# surnames/given names ("Vincent", "Lincoln", "Prince", "Alphonso", "Randolph",
+# "Delphine" all contain one), misrouting real people into NC SOS entity
+# lookups. Now actually delegates to name_normalize.is_entity(), the
+# word-boundary-safe token check this codebase already uses for exactly this
+# question at ~10 other call sites (enrichment_sos_dissolution, enrichment_sc_phone,
+# enrichment_owner_cluster, enrichment_repeat_tax_loss, enrichment_notice_service_defect,
+# enrichment_resolve_name_to_property, deed_index, sc_parcel_mailing, enrichment_sc_divorce).
 def _is_business(name: str) -> bool:
-    if not name:
-        return False
-    n = name.lower()
-    return any(m in n for m in _BUSINESS_MARKERS)
+    return is_entity(name)
 
 
 def _entity_of(listing: Listing) -> Optional[str]:
