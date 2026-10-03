@@ -64,6 +64,15 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/foreclosure_scraper", "src/porsche_scraper"]
 
+[tool.pytest.ini_options]
+# Default retention (3 sessions, policy="all") let pytest's own tmp_path
+# fixture accumulate to 57GB in /private/var/.../T across one day's many
+# separate agent-run invocations (2026-10-03). Keep tmp dirs only for
+# failed tests, and only the most recent session, so routine green runs
+# never pile up.
+tmp_path_retention_count = 1
+tmp_path_retention_policy = "failed"
+
 [dependency-groups]
 dev = [
     "pytest>=8.2",
