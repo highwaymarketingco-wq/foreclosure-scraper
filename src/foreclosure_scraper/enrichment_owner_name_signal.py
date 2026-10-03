@@ -44,21 +44,41 @@ import re
 import structlog
 
 from .models import Listing
+from .name_normalize import is_entity
 
 log = structlog.get_logger()
 
 # Ordered most-specific first. `_classify` returns every token that matches, so
 # order matters only for the reported primary token.
+#
+# `\d*` on the heirs pattern catches a GIS fractional-interest concatenation seen
+# live on the board (Rutherford NC: "HOFFMAN, CARL V HEIRS1", "ONEAL, O W JR
+# HEIRS1") -- the county appends an interest number directly onto the token with
+# no separator, which `\bHEIRS?\b` alone cannot see past (no word boundary
+# between "S" and "1"). `ALS?` on et_al catches the same no-separator-plural shape
+# for "et al." -- live-verified real board rows spell it "ETALS" with no space or
+# period at all (84 rows / 10 counties: Dillon SC alone accounts for 16, plus
+# Brunswick/Hyde/Pitt NC and Darlington/Lexington SC among others).
 _TOKENS: tuple[tuple[str, str, re.Pattern], ...] = (
     ("estate_of", "strong", re.compile(r"\bEST(?:ATE)?\s+OF\b", re.I)),
     ("deceased", "strong", re.compile(r"\b(?:DECEASED|DEC'?D)\b", re.I)),
     ("life_estate", "strong", re.compile(r"\bLIFE\s+EST", re.I)),
-    ("heirs", "strong", re.compile(r"\bHEIRS?\b", re.I)),
-    ("et_al", "medium", re.compile(r"\bET\.?\s*AL\b", re.I)),
+    ("heirs", "strong", re.compile(r"\bHEIRS?\d*\b", re.I)),
+    ("et_al", "medium", re.compile(r"\bET\.?\s*ALS?\b", re.I)),
     ("unknown_owner", "weak", re.compile(r"\bUNKNOWN\b", re.I)),
     ("trust", "weak", re.compile(r"\bTRUST(?:EE)?\b", re.I)),
     ("care_of", "weak", re.compile(r"\bC\s*/\s*O\b|\bC/O\b", re.I)),
 )
+
+# "HRS" is a bare abbreviation for "heirs" used live on the board by at least 2
+# counties' own systems (NC Orange: 127 rows, SC Georgetown: 24 rows -- e.g.
+# "SHERIDAN SAMUEL HRS", "GREEN TOM JR HRS") that the full-word `heirs` pattern
+# above cannot see at all ("HRS" shares no substring with "HEIR"). It is handled
+# separately, not folded into the `heirs` regex, because 3 letters alone is a real
+# collision risk a full word is not: "HRS Property Group, LLC" (NC Yadkin, a real
+# board row) is an unrelated company name, not an heir. Gated on `not is_entity()`
+# so the abbreviation only ever fires on what reads as a person.
+_HRS_ABBR = re.compile(r"\bHRS\b", re.I)
 
 _GRADE_RANK = {"strong": 3, "medium": 2, "weak": 1}
 
@@ -79,6 +99,8 @@ def classify(owner_name: str | None) -> dict | None:
     if not name:
         return None
     matched = [(tok, grade) for tok, grade, rx in _TOKENS if rx.search(name)]
+    if not any(tok == "heirs" for tok, _ in matched) and _HRS_ABBR.search(name) and not is_entity(name):
+        matched.append(("heirs", "strong"))
     if not matched:
         return None
     institutional = bool(_INSTITUTIONAL.search(name))

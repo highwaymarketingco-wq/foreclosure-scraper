@@ -43,6 +43,85 @@ def test_et_al_is_medium_not_strong():
     assert sig["grade"] == "medium"
 
 
+# ===========================================================================
+# ABBREVIATION/CONCATENATION VARIANTS LIVE-FOUND ON THE REAL BOARD, 2026-10-03
+#
+# name_heirs (52/148) and name_et_al (57/148) were live-verified against
+# board_stream.iter_board_rows() and reproduced exactly -- not stale. But the
+# live sweep also turned up real owner_name shapes the original regexes could
+# not see at all:
+#   - "HEIRS1" / "HEIR2" -- a GIS fractional-interest concatenation (Rutherford
+#     NC: "HOFFMAN, CARL V HEIRS1") with no word boundary between the token
+#     and the appended digit.
+#   - "ETALS" / "ET ALS" -- the plural Latin form with no separator, the
+#     dominant shape in Dillon SC's own roll (16 of 84 live rows) and present
+#     in 9 other counties.
+#   - bare "HRS" -- a standalone abbreviation for "heirs" with no HEIR
+#     substring at all, live-found in NC Orange (127 rows) and SC Georgetown
+#     (24 rows) -- e.g. "SHERIDAN SAMUEL HRS".
+# ===========================================================================
+
+@pytest.mark.parametrize("name", [
+    "HOFFMAN, CARL V HEIRS1",
+    "ONEAL, O W JR HEIRS1",
+])
+def test_heirs_digit_suffix_concatenation_matches(name):
+    """A county GIS system concatenates a fractional-interest number directly
+    onto the token with no separator -- the plain word must still be seen."""
+    sig = classify(name)
+    assert sig is not None
+    assert "heirs" in sig["tokens"]
+    assert sig["grade"] == "strong"
+
+
+@pytest.mark.parametrize("name", [
+    "HOELLMAN JOHN R JR ETALS",
+    "BRUNSON WHITNEY A ETALS",
+    "RIGGSBEE, MYRTLE L HRS ET AL",
+])
+def test_et_al_plural_and_no_separator_variants_match(name):
+    sig = classify(name)
+    assert sig is not None
+    assert "et_al" in sig["tokens"]
+
+
+@pytest.mark.parametrize("name", [
+    "SHERIDAN SAMUEL HRS",
+    "GREEN TOM JR HRS",
+    "JACOBS, HIAWATHA H HRS",
+])
+def test_bare_hrs_abbreviation_matches_heirs(name):
+    sig = classify(name)
+    assert sig is not None
+    assert "heirs" in sig["tokens"]
+    assert sig["grade"] == "strong"
+
+
+@pytest.mark.parametrize("name", [
+    "HRS Property Group, LLC",
+    "HRS Property Group, LLC, a North Carolina Limited Liability Company",
+])
+def test_bare_hrs_abbreviation_is_suppressed_for_a_real_business_name(name):
+    """The real board carries this exact company (NC Yadkin) -- "HRS" is only 3
+    letters and collides with a real business name, unlike the full word
+    "HEIRS", so the abbreviation must not fire on anything that reads as an
+    entity."""
+    assert classify(name) is None
+
+
+@pytest.mark.parametrize("name,false_positive", [
+    ("Gayle A Heiring", "heirs"),       # surname contains HEIR with no boundary
+    ("MYNHEIR KIMBERLY A", "heirs"),
+    ("CARVALHEIRA, MICHAEL", "heirs"),
+    ("Julia Heironymus", "heirs"),
+])
+def test_heir_substring_inside_an_unrelated_surname_does_not_match(name, false_positive):
+    """Same word-boundary guard as the existing PINHEIRO/HEIR fix -- a surname
+    that merely contains the letters must never imply a death."""
+    sig = classify(name)
+    assert sig is None or false_positive not in sig["tokens"]
+
+
 @pytest.mark.parametrize("name", [
     "SMITH FAMILY REVOCABLE TRUST",
     "JOHN SMITH TRUSTEE",
