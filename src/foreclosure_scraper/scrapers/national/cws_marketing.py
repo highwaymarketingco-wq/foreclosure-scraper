@@ -184,6 +184,17 @@ def _parse(html: str) -> list[Listing]:
                 }
             },
         )
+        # FIXED 2026-10-03 (batch extraction-completeness audit): the card's
+        # own photo (bid.cwsmarketing.com/images/auction/<id>_m.jpg, confirmed
+        # live -- 14/14 cards carry one) was captured into image_url above but
+        # only ever stashed at raw['cws']['image_url'], a key the Vision
+        # enrichment pass never reads (enrichment_vision.py /
+        # enrichment_images.py only read raw['images']['real']). Promote it to
+        # the shared convention (same as national.servicelink_auction) so
+        # enrich_images/enrich_vision actually see the real property photo
+        # instead of leaving these leads to a synthesized aerial/map fallback.
+        if image_url:
+            li.raw["images"] = {"real": [image_url]}
         # Detail pages live behind AWS-WAF (bidpath); the static card carries no
         # Notice-of-Sale PDF. Wire the harvester anyway so if CWS ever links a
         # notice PDF on the card, enrich_doc_ocr picks it up automatically.
