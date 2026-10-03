@@ -105,6 +105,43 @@ _IMG_RE = re.compile(
 # extension on this source's own output.
 _REAL_DOC_EXT_RE = re.compile(r"\.(?:pdf|tiff?|jpe?g|png)(?:[?#]|$)", re.I)
 
+# EXTRACTION-COMPLETENESS AUDIT 2026-10-03: every live detail page carries a
+# named GSA "Listed By" contact (direct agent name + mobile phone + email) in
+# a `listed-agent` block -- confirmed on all 3 currently-active listings
+# (RI/NJ/VT, verified 2026-10-03). This is a real, reachable, per-listing
+# contact (the actual GSA realty specialist running that sale) that was
+# parsed nowhere -- not into a Listing field, not into raw, not even into
+# `description` where enrich_surface_contacts.py's text scan could pick it
+# up. Capture into raw["notice_contact"], the same key coastland_times.py /
+# column_legal_notices.py already use for an attorney/trustee contact, so
+# enrich_surface_contacts.py's existing phone+email surfacing picks it up
+# for free (no enricher change needed).
+_AGENT_BLOCK_RE = re.compile(
+    r'class="listed-agent">(.*?)</div>\s*</div>\s*</div>', re.I | re.S)
+_AGENT_NAME_RE = re.compile(
+    r"<h5[^>]*>\s*([A-Za-z][A-Za-z .'-]+?)\s*</h5>\s*<small>", re.I | re.S)
+_AGENT_PHONE_RE = re.compile(r"\((\d{3})\)\s*(\d{3})[-.\s](\d{4})")
+_AGENT_EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+
+
+def _listed_agent_contact(html: str) -> dict | None:
+    """Parse the GSA 'Listed By' agent block into a notice_contact dict, or
+    None if the block/name isn't present (template sometimes omits it)."""
+    bm = _AGENT_BLOCK_RE.search(html)
+    block = bm.group(1) if bm else html
+    nm = _AGENT_NAME_RE.search(block)
+    if not nm:
+        return None
+    out: dict = {"name": nm.group(1).strip(), "contact_role": "GSA listing agent",
+                 "source": "gsa_listed_by"}
+    pm = _AGENT_PHONE_RE.search(block)
+    if pm:
+        out["phone"] = f"({pm.group(1)}) {pm.group(2)}-{pm.group(3)}"
+    em = _AGENT_EMAIL_RE.search(block)
+    if em:
+        out["email"] = em.group(0).lower()
+    return out
+
 
 def _meta(html: str, key: str) -> str | None:
     """Return a twitter:/og: meta content value, or None."""
@@ -246,6 +283,9 @@ def parse_detail(html: str, pid: str, url: str) -> Listing | None:
         li.raw["images"] = {"real": photos}
     if doc_urls:
         stamp_documents(li, doc_urls)
+    contact = _listed_agent_contact(html)
+    if contact:
+        li.raw["notice_contact"] = contact
     return li
 
 

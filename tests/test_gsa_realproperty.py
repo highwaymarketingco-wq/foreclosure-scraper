@@ -46,6 +46,24 @@ _PAGE_WITH_PROPERTY_TYPE = """
 <a href="https://pinterest.com/pin/create/bookmarklet/?media=https://d2m3yrz4x1yefr.cloudfront.net/property_image/1747250353.6403239_Light_House.jpg&amp;description=x">Pin it</a>
 <script src="https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/markerclusterer.js"></script>
 <a href="https://realestatesales.gov/asset-details/images/green-check.png">check</a>
+<div class="listed-agent">
+  <div class="item">
+    <div class="block">
+      <h5 style="white-space: nowrap;">
+        Samantha Tremaine
+      </h5>
+      <small>GSA</small>
+    </div>
+  </div>
+  <div class="item">
+    <h6>
+      <i class="fa-solid fa-mobile-screen" role="presentation"></i> (202) 549-9646
+    </h6>
+    <h5>
+      samantha.tremaine@gsa.gov
+    </h5>
+  </div>
+</div>
 </body></html>
 """
 
@@ -102,6 +120,31 @@ def test_photos_are_not_duplicated_into_the_document_set():
     li = parse_detail(_PAGE_WITH_PROPERTY_TYPE, "27", _URL)
     docs = li.raw["documents"]
     assert not any("/property_image/" in d for d in docs)
+
+
+def test_listed_agent_contact_is_captured_into_notice_contact():
+    """EXTRACTION-COMPLETENESS 2026-10-03: every live detail page carries a
+    named GSA "Listed By" agent (name + direct mobile phone + email) that
+    was parsed nowhere. Confirmed live on all 3 currently-active listings
+    (property_id 27/43/70, RI/NJ/VT). Must land in raw["notice_contact"] --
+    the same key coastland_times.py/column_legal_notices.py use for an
+    attorney/trustee contact -- so enrich_surface_contacts.py's existing
+    phone+email surfacing picks it up with no enricher change needed."""
+    li = parse_detail(_PAGE_WITH_PROPERTY_TYPE, "27", _URL)
+    nc = li.raw["notice_contact"]
+    assert nc["name"] == "Samantha Tremaine"
+    assert nc["phone"] == "(202) 549-9646"
+    assert nc["email"] == "samantha.tremaine@gsa.gov"
+    assert nc["contact_role"] == "GSA listing agent"
+
+
+def test_missing_listed_agent_block_does_not_crash():
+    """A page with no listed-agent block (template sometimes omits it) must
+    not raise and must simply omit notice_contact."""
+    page = _PAGE_WITH_PROPERTY_TYPE.split('<div class="listed-agent">')[0] + "</body></html>"
+    li = parse_detail(page, "27", _URL)
+    assert li is not None
+    assert "notice_contact" not in li.raw
 
 
 def test_text_fields_still_parse_correctly():

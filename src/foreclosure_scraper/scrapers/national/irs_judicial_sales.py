@@ -30,6 +30,25 @@ verified live 2026-08-17, root reachable ~40 KB, my older "walled" note is STALE
 Verified 2026-08-17: 9 active lots (NM, FL, MA×4, PA, AR×2, plus one TX personal-
 property lot). No NC/SC currently active, so a clean 0 is the expected off-
 footprint outcome (ZERO_RESULT, not an error).
+
+EXTRACTION-COMPLETENESS AUDIT 2026-10-03: the above was STALE. Live re-check
+found the site's Drupal template now renders most attributes UNQUOTED
+(`href=/ad/foo` not `href="/ad/foo"`), which silently zeroed out the
+`href="..."` / `datetime="..."` regexes below -- fetch() returned 0 on every
+state, not just an empty NC/SC footprint. Fixed every such regex to accept
+an optional quote. A live re-check the same day recovered a REAL,
+currently-active, in-footprint lot: 340 Cedar Grove Dr, Henderson, NC 27537
+(auction_datetime 2026-10-28, min bid $81,480) -- also carrying a 4-photo
+real gallery (`field--name-field-asset-photos`) that this scraper never had
+an image path for at all; now wired into raw["images"]["real"] following
+the national.servicelink_auction / counties_sc.terry_howe_auctions
+convention. NOTE (out of this audit's scope, flagged separately): the
+resolved county for this lead, "Henderson", is WRONG -- the shared
+`_upstate_city_to_county.py` gazetteer collides the city of Henderson, NC
+(seat of Vance County, outside the 18-county footprint) with Henderson
+COUNTY, NC (the western mountain county, in-footprint) because it lists
+the county's own name as one of its city aliases. That is a shared-module
+geocoding bug, not an extraction-completeness bug in this file.
 """
 from __future__ import annotations
 
@@ -53,7 +72,18 @@ _INDEX = f"{_BASE}/auction/items"
 # Only emit rows in our core states. (City->county is best-effort below.)
 _CORE_STATES = {"NC", "SC"}
 
-_AD_RE = re.compile(r'href="(/ad/[^"#?]+)"', re.I)
+# EXTRACTION-COMPLETENESS AUDIT 2026-10-03: live-confirmed the site's Drupal
+# template now renders most attributes UNQUOTED (e.g. `href=/ad/foo-bar` not
+# `href="/ad/foo-bar"`) -- a markup change from when this scraper was last
+# verified (2026-08-17 docstring still describes the old quoted form). The
+# strict `href="..."` regexes below silently matched ZERO items: a live
+# fetch() today returns 0 total, not because NC/SC has no active lots, but
+# because the index-discovery regex itself never fires, on ANY state. A live
+# re-check (2026-10-03) found a REAL in-footprint hit sitting on the index
+# the old regex could never see: 340 Cedar Grove Dr, Henderson, NC 27537
+# (auction_datetime 2026-10-28). Every attribute regex below now accepts an
+# optional quote so it matches both the old and new markup.
+_AD_RE = re.compile(r'href=["\']?(/ad/[^"\'#?\s>]+)', re.I)
 _ADDR_BLOCK_RE = re.compile(
     r"field-property-address.*?<address[^>]*>(.*?)</address>", re.I | re.S
 )
@@ -63,7 +93,7 @@ _SALE_LOC_RE = re.compile(
 _BR_RE = re.compile(r"<br\s*/?>", re.I)
 _TAG_RE = re.compile(r"<[^>]+>")
 _AUCTION_DATE_RE = re.compile(
-    r"Date of Auction.*?<time datetime=\"([^\"]+)\"", re.I | re.S
+    r"Date of Auction.*?<time datetime=[\"']?([^\"'\s>]+)", re.I | re.S
 )
 _MIN_BID_RE = re.compile(
     r"field-minimum-bid.*?field__item[^>]*>\s*\$?\s*([\d,]+(?:\.\d+)?)", re.I | re.S
@@ -167,8 +197,27 @@ def _parse_sale_date(html: str) -> datetime | None:
 
 
 def _pdf_in(html: str, field: str) -> str | None:
-    m = re.search(re.escape(field) + r'.*?href="([^"]+\.pdf[^"]*)"', html, re.I | re.S)
+    m = re.search(
+        re.escape(field) + r'.*?href=["\']?([^"\'\s>]+\.pdf[^"\'\s>]*)', html, re.I | re.S
+    )
     return urljoin(_BASE, m.group(1)) if m else None
+
+
+# Real per-property photo gallery -- a `field--name-field-asset-photos`
+# photoswipe block links full-size /sites/default/files/... images (live-
+# confirmed 2026-10-03: 4 real photos on the Henderson NC house-and-acreage
+# listing, 1 on the Lakeville MN listing). Never captured before this fix.
+_GALLERY_RE = re.compile(
+    r"field--name-field-asset-photos.*?</div>\s*</div>\s*</div>", re.I | re.S
+)
+_GALLERY_IMG_RE = re.compile(r'src=["\']?([^"\'\s>]+\.(?:jpe?g|png|gif))', re.I)
+
+
+def _asset_photos(html: str) -> list[str]:
+    gm = _GALLERY_RE.search(html)
+    if not gm:
+        return []
+    return sorted({urljoin(_BASE, u) for u in _GALLERY_IMG_RE.findall(gm.group(0))})
 
 
 def _kind_for(*texts: str | None) -> PropertyKind:
@@ -270,6 +319,10 @@ def parse_detail(html: str, url: str) -> Listing | None:
         if order_pdf:
             li.raw["notice_url"] = order_pdf  # scanned by enrich_doc_ocr as primary
         stamp_documents(li, ordered)
+
+    photos = _asset_photos(html)
+    if photos:
+        li.raw["images"] = {"real": photos}
     return li
 
 
