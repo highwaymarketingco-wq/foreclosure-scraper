@@ -793,6 +793,31 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     if dvs:
         sig.append((*dvs, NO))
 
+    # life_estate (2026-10-02 audit dd19fa6a): SIGNAL_CATEGORY has carried a "life_estate" ->
+    # LIFE_EVENT entry since before this fix with no code path here ever reading it -- the
+    # same gap as vacant_lot below. raw['life_events'] (enrichment_life_events.py) tags
+    # "life_estate" off a `\bLIFE\s*EST` match against the OWNER-OF-RECORD name text; it is
+    # the SAME underlying concept as the coverage ledger's name_life_estate column (37/148
+    # counties as of today). raw['owner_name_signal'] (enrichment_owner_name_signal.py)
+    # detects the identical token, but that enricher runs AFTER score_board in main.py's
+    # pipeline order (life_events ~line 2991, owner_name_signal ~line 3295, score_board ~line
+    # 3264), so it is never populated yet when the scorer runs -- life_events is the only one
+    # of the two that is actually live at scoring time.
+    # Evidence INF, not REC: this is a regex read of free text on the owner-name field (a
+    # heuristic over a deed/tax-roll naming pattern), the same evidence class already used for
+    # the deed-derived zero-consideration-quitclaim divorce read a few lines up -- not a
+    # second record and not a name-to-property join (no identity-matching risk: the name
+    # belongs to the record for THIS parcel already).
+    # Weight 8, the same bucket as senior_exemption: a life estate describes who currently
+    # holds the interest (often an elderly owner-occupant), not a death, sale or any event
+    # already in progress -- the remainder interest only vests on death, so it is suggestive
+    # of FUTURE distress, not a distress event today. Discounted the same way
+    # builder_distress/liensnc_related were discounted for being a weak signal rather than
+    # scored at probate's full 20.
+    life_tags = r.get("life_events")
+    if isinstance(life_tags, (list, tuple, set)) and "life_estate" in life_tags:
+        sig.append(("life_estate", "LIFE_EVENT", 8, INF))
+
     # ---- property --------------------------------------------------------------------
     ce = r.get("code_enforcement")
     # F12: a code-enforcement block is written even when every case is closed
@@ -811,6 +836,22 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
         sig.append((*st, REC))
     if _vacant_structure(r):
         sig.append(("vacant_structure", "PROPERTY", 12, REC))
+    if r.get("vacant_lot"):
+        # vacant_lot (2026-10-02 audit dd19fa6a): SIGNAL_CATEGORY has carried a "vacant_lot" ->
+        # PROPERTY entry since before this fix with no code path here ever reading it, even
+        # though raw['vacant_lot'] (enrichment_vacant_landuse.py) is a real, already-wired,
+        # already-scraped signal (7/148 counties) -- a parcel-cache land_use field saying the
+        # LOT is VACANT/UNDEVELOPED. main.py's own comment on the enricher call says it
+        # "stamps a vacant_lot signal on undeveloped lots so it stacks into distress ... below"
+        # (main.py ~3222); it never did. Evidence REC: the county's own land-class field, a
+        # record, not an inference over free text. Weight 10 -- the generic 'distressed'
+        # baseline -- sits BELOW vacant_structure's 12: a boarded/decaying HOUSE
+        # (`_vacant_structure`, a code officer's confirmed-vacant finding) is a stronger
+        # seller-pressure tell than an idle undeveloped lot, which costs an owner nothing to
+        # leave alone and often reflects deliberate land-banking rather than distress. It still
+        # stacks normally with absentee/tax signals (the LAND_WHOLESALE lane this enricher
+        # feeds), the same as every other PROPERTY signal here.
+        sig.append(("vacant_lot", "PROPERTY", 10, REC))
     return c
 
 
