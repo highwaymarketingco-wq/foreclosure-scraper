@@ -990,6 +990,46 @@ def get_last_run_status() -> dict:
     return dict(LAST_RUN_STATUS)
 
 
+def _promote_court_detail(li: Listing, info: dict) -> None:
+    """Copy the rich court-detail dict (`info["detail"]`, produced by
+    court_detail_parser.parse_register_of_actions via _parse_case_detail_html)
+    onto `li.raw` / `li.judgment_amount`: real debt figures, the sale paper
+    trail, and a sold/confirmed flag for downstream filtering.
+
+    Pulled out to a free function (2026-10-02) so the copy step can be unit
+    tested without a live Tyler/scrapling round trip -- same reuse-not-inline
+    reasoning as is_target() above. Also fixes the child_support copy-gap:
+    every neighboring court_* key here had its own copy line, but
+    child_support didn't, so the parser's hit was silently dropped before
+    RAW_KEEP (which already allowlists "child_support") ever got a chance to
+    run. Parallel bug to the one fixed the same day in
+    enrichment_case_detail._apply_court_detail (commit f443ce25) for the SC
+    path -- same parser (court_detail_parser.parse_register_of_actions), same
+    copy-gap, same fix, applied here for the NC eCourts/Tyler path.
+    """
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    det = info.get("detail") or {}
+    if det.get("judgment_amount") and not li.judgment_amount:
+        li.judgment_amount = det["judgment_amount"]  # feeds amount_owed waterfall
+    if det.get("balance_due"):
+        li.raw["court_balance_due"] = det["balance_due"]
+        li.raw["court_balance_due_as_of"] = det.get("balance_due_as_of")
+    if det.get("documents"):
+        li.raw["court_documents"] = det["documents"]
+    if det.get("court_record_url") or info.get("detail_url"):
+        li.raw["court_record_url"] = det.get("court_record_url") or info.get("detail_url")
+    ss = det.get("sale_status")
+    if ss:
+        li.raw["court_sale_status"] = ss
+        # "confirmed" = sold at auction AND confirmed by the court → it is
+        # no longer an available opportunity. Flag for downstream filtering.
+        if ss == "confirmed":
+            li.raw["sold_confirmed"] = True
+    if det.get("child_support"):
+        li.raw["child_support"] = det["child_support"]
+
+
 async def enrich_with_nc_case_status_authenticated(
     listings: list[Listing], max_cases: Optional[int] = None
 ) -> int:
@@ -1126,24 +1166,10 @@ async def enrich_with_nc_case_status_authenticated(
         tagged += 1
 
         # Promote the rich court detail onto the listing: real debt figures,
-        # the sale paper trail, and a sold/confirmed flag for filtering.
-        det = info.get("detail") or {}
-        if det.get("judgment_amount") and not li.judgment_amount:
-            li.judgment_amount = det["judgment_amount"]  # feeds amount_owed waterfall
-        if det.get("balance_due"):
-            li.raw["court_balance_due"] = det["balance_due"]
-            li.raw["court_balance_due_as_of"] = det.get("balance_due_as_of")
-        if det.get("documents"):
-            li.raw["court_documents"] = det["documents"]
-        if det.get("court_record_url") or info.get("detail_url"):
-            li.raw["court_record_url"] = det.get("court_record_url") or info.get("detail_url")
-        ss = det.get("sale_status")
-        if ss:
-            li.raw["court_sale_status"] = ss
-            # "confirmed" = sold at auction AND confirmed by the court → it is
-            # no longer an available opportunity. Flag for downstream filtering.
-            if ss == "confirmed":
-                li.raw["sold_confirmed"] = True
+        # the sale paper trail, a sold/confirmed flag for filtering, and the
+        # child_support signal (see _promote_court_detail's docstring).
+        _promote_court_detail(li, info)
+
         # Hammer-price promotion: tag actual_sold_price so the
         # promote-to-sold-pool pass routes this listing into
         # foreclosure_sold_comps. Mirrors the legacy Tyler scraper's
