@@ -2,6 +2,34 @@
 
 SC report: clean PDF table parsed via pdfplumber.extract_tables().
 NC report: 'NC_Listings.pdf' is actually served as HTML despite the .pdf extension.
+
+EXTRACTION-COMPLETENESS AUDIT, 2026-10-03 (live-verified):
+  * SC_URL is fully live and complete. Live-pulled 2026-10-03: a clean 7-column
+    pdfplumber table (County | Street Address | City | Tax Map No. | Sale Date |
+    DJ Demand | Bid), 2 pages, real upcoming sale dates (e.g. 10/5/2026,
+    11/2/2026). All 6 read columns are captured EXCEPT "DJ Demand"
+    (row[5], never read) -- checked every row on both pages live: it is a bare
+    Y/N deficiency-judgment-demand flag (e.g. "N", "Y"), never a dollar amount,
+    so there is no debt/judgment $ silently being dropped here; nothing of
+    analytical value is being lost by not capturing it.
+  * NC_URL ("https://rogerstownsend.com/reports/NC_Listings.pdf") is a DEAD
+    LINK -- confirmed live 2026-10-03: HTTP 404 (the response body is the
+    site's normal 404 HTML page, served with content-type text/html, which is
+    why the existing `if r.status_code == 200` guard matters -- without it,
+    the 404 page's content-type would pass the "html" sniff below and get
+    mis-parsed as a listings table). Rogers Townsend's own
+    https://rogerstownsend.com/reports/ directory listing no longer contains
+    an "NC_Listings.pdf" at all; as of 2026-10-03 it serves exactly 4 files:
+    NC_Bids.pdf, SC_Bids.pdf, SC_Listings.pdf, Sales_Report.pdf. Checked all
+    three NC-adjacent candidates as a possible replacement and none is one:
+    NC_Bids.pdf is a SALES-RESULTS report (Sold To / Sale Price / Sale Confirm
+    Date / Upset Bid Date columns, not an upcoming-sale listing), SC_Bids.pdf
+    is an empty results-report placeholder (header only, no rows), and
+    Sales_Report.pdf's rows are stale 2020-dated historical sales. None
+    carries a live upcoming NC sale the way NC_Listings.pdf used to. This is a
+    genuine external wall (the firm discontinued/renamed the live NC feed),
+    not a code bug -- no fix applied; flagged here with evidence so a future
+    audit pass doesn't re-discover the same dead link from scratch.
 """
 from __future__ import annotations
 
