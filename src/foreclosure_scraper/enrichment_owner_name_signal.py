@@ -67,7 +67,25 @@ _TOKENS: tuple[tuple[str, str, re.Pattern], ...] = (
     ("et_al", "medium", re.compile(r"\bET\.?\s*ALS?\b", re.I)),
     ("unknown_owner", "weak", re.compile(r"\bUNKNOWN\b", re.I)),
     ("trust", "weak", re.compile(r"\bTRUST(?:EE)?\b", re.I)),
-    ("care_of", "weak", re.compile(r"\bC\s*/\s*O\b|\bC/O\b", re.I)),
+    # "C/O" is not the only mailing-contact shorthand on the board. Two more
+    # real variants are folded into the SAME "weak" grade (same rationale as
+    # plain C/O -- a property manager or caretaker is as common here as an
+    # heir, so neither must ever outrank it): a bare "%" used as SC tax-roll
+    # shorthand for "care of" (live-verified 202 rows / 10 counties, Dillon
+    # SC dominant: "ADAMS EARLINE BETHEA ETAL % EARLINE ADAMS"), and "ATTN"
+    # (23 rows / 7 counties: "WATTS JACKSON ATTN. PARTIN CHRIS"). The "%"
+    # half is deliberately NOT a bare `%` match: `(?<!\d)` rules out the
+    # ownership-INTEREST shape "51% INT" / "1% INT" (3 live rows, a
+    # different real meaning -- a fractional ownership share, not a mailing
+    # contact) by requiring whitespace before the `%` with no digit before
+    # that whitespace; every real ownership-interest row on this board
+    # writes the number tight against the `%` ("51%") while every genuine
+    # care-of "%" has a space before it ("BETHEA ... % EARLINE ADAMS").
+    # Spelled-out "CARE OF" was tested and deliberately EXCLUDED: all 6 live
+    # hits ("Home Care of the Upstate LLC", "Autumn Care of Drexel") are
+    # real entity names that happen to contain the phrase, not an owner
+    # routed to a contact -- adding it would be 100% false positive here.
+    ("care_of", "weak", re.compile(r"\bC\s*/\s*O\b|\bC/O\b|\bATTN\b|(?<!\d)\s%\s*[A-Z]", re.I)),
 )
 
 # "HRS" is a bare abbreviation for "heirs" used live on the board by at least 2

@@ -109,6 +109,80 @@ def test_bare_hrs_abbreviation_is_suppressed_for_a_real_business_name(name):
     assert classify(name) is None
 
 
+# ===========================================================================
+# "C/O" MAILING-CONTACT VARIANTS LIVE-FOUND ON THE REAL BOARD, 2026-10-03
+#
+# name_care_of (42/148) is the same "weak" grade as plain C/O for the same
+# reason -- a property manager or caretaker is as common as an heir here, so
+# neither must ever outrank a real death/fracture token. The live sweep
+# found two more real mailing-contact shapes the original "C/O"-only regex
+# could not see:
+#   - a bare "%" used as SC tax-roll shorthand for "care of" (202 rows / 10
+#     counties, Dillon SC dominant: "ADAMS EARLINE BETHEA ETAL % EARLINE
+#     ADAMS"), deliberately distinguished from the DIFFERENT real meaning of
+#     "51% INT" / "1% INT" (a fractional ownership share, not a mailing
+#     contact -- 3 live rows ruled out) by requiring a space before the `%`
+#     with no digit before that space.
+#   - "ATTN" (23 rows / 7 counties: "WATTS JACKSON ATTN. PARTIN CHRIS").
+# Spelled-out "CARE OF" was tested and deliberately NOT added: all 6 live
+# hits are real entity names that happen to contain the phrase ("Home Care
+# of the Upstate LLC", "Autumn Care of Drexel"), not an owner routed to a
+# contact.
+# ===========================================================================
+
+@pytest.mark.parametrize("name", [
+    "ALFORD MELVIN C %OCTAVIA ALFORD",
+    "BETHEA LESSIE %KENNETH CARMICHAEL",
+    "WATTS JACKSON ATTN. PARTIN CHRIS",
+    "DEFUSCO VELMA C ATTN: CANDICE SMITH",
+])
+def test_care_of_mailing_contact_variants_match(name):
+    sig = classify(name)
+    assert sig is not None
+    assert "care_of" in sig["tokens"]
+    assert sig["grade"] == "weak"
+
+
+def test_care_of_percent_variant_coexists_with_a_stronger_token():
+    """Real board row: the '%' shorthand and ETAL both fire on the same name --
+    care_of must still be recorded (for the richer tokens list) even though
+    the overall grade is won by the stronger et_al token, same precedent as
+    the existing strong-beats-weak test."""
+    sig = classify("ADAMS EARLINE BETHEA ETAL % EARLINE ADAMS")
+    assert sig is not None
+    assert {"et_al", "care_of"} <= set(sig["tokens"])
+    assert sig["grade"] == "medium"
+
+
+@pytest.mark.parametrize("name", [
+    "MCGUGAN LAURA LYNN 1% INT & BELL KAY F 99% INT HEIRS",
+    "CHARLES ANTHONY HUFFSTETLER REVOCABLE TRUST 51% INT & BINGHAM PATRICIA L 49% INT",
+    "KING ROGER 99% INTEREST &",
+])
+def test_percent_ownership_interest_is_not_read_as_care_of(name):
+    """'N% INT' is a fractional ownership share, a completely different real
+    meaning from the tax-roll '%' mailing-contact shorthand -- the board
+    never writes this shape with a space before the '%', which is exactly
+    what the care_of pattern requires."""
+    sig = classify(name)
+    assert sig is None or "care_of" not in sig["tokens"]
+
+
+@pytest.mark.parametrize("name", [
+    "AUTUMN CARE OF DREXEL",
+    "Xtreme Home Care of the Upstate LLC",
+    "HELPING HANDS HOME CARE OF SPARTANBURG I",
+    "HOLISTIC CARE OF CHARLESTON LLC",
+])
+def test_spelled_out_care_of_is_not_matched(name):
+    """These are real entity names that happen to contain the phrase 'care
+    of' -- not an owner being routed to a mailing contact. Adding a
+    spelled-out 'CARE OF' pattern would be 100% false positive on this
+    board, so it is deliberately not matched."""
+    sig = classify(name)
+    assert sig is None or "care_of" not in sig["tokens"]
+
+
 @pytest.mark.parametrize("name,false_positive", [
     ("Gayle A Heiring", "heirs"),       # surname contains HEIR with no boundary
     ("MYNHEIR KIMBERLY A", "heirs"),
