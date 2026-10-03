@@ -176,6 +176,7 @@ def test_open_case_produces_a_listing_with_the_right_shape():
     # Public Nuisance is on the severe list -> raw['distressed'] follows,
     # matching the PROPERTY-signal shape distress_score.py reads.
     assert ce["severe"] is True
+    assert ce["vacancy_adjacent"] is True
     assert li.raw["distressed"] is True
 
 
@@ -191,6 +192,7 @@ def test_repeat_offender_grouping_at_the_same_parcel():
     # Vegetation/Weeds is NOT on the severe list -- a weeds complaint alone
     # should not fabricate a PROPERTY distress flag.
     assert ce["severe"] is False
+    assert ce["vacancy_adjacent"] is False
     assert "distressed" not in li.raw
 
 
@@ -290,3 +292,175 @@ def test_query_bbox_splits_into_quadrants_when_capped():
     # root call capped -> split into 4 quadrants, each returns 1 real row
     assert call_count["n"] == 5
     assert len(result) == 4
+
+
+# --------------------------------------------------------------------------- #
+# vacancy_adjacent gating (2026-10-03 fix, mirrors henderson_code_violations.py
+# commit 19d3888e) -- this feed's own ApplicationTypeDescription vocabulary is
+# NOT Henderson's ArcGIS violationType domain, so it was independently live-
+# verified: full-city crawl 2026-10-03, 3,304 open cases / 1,493 properties
+# with >=1 open case. Under the OLD _SEVERE_RE (pre-fix), 729/1,493 (48.8%)
+# were non-severe; the live case-Description sample additionally moved
+# Abandoned Vehicle onto _SEVERE (genuine junk/debris, 3/3 sampled), landing
+# the final split at 719/1,493 (48.2%) non-vacancy-adjacent -- essentially the
+# same scale of over-crediting Henderson had (53.1%).
+# --------------------------------------------------------------------------- #
+
+#: Real case (captured live 2026-10-03): genuine junk/debris, same concept as
+#: Junk Vehicles under a different label. AKPAR/MapPoint are not the verbatim
+#: captured values (not recorded at sample time) but the category, reference
+#: number, address, and status are real.
+ABANDONED_VEHICLE_OPEN = {
+    "ApplicationTypeDescription": "Abandoned Vehicle",
+    "LinkText": "CEABDV20262402:Abandoned Vehicle",
+    "LinkUri": "https://devsvcs.gastonianc.gov/CodeEnforcement/StatusReference?referenceNumber=CEABDV20262402",
+    "MapRelationValue": {"LayerName": "Parcels", "AttributeName": "AKPAR", "AttributeValue": "102925"},
+    "MapPoint": {"X": -9037000.0, "Y": 4198000.0, "WKID": 3857},
+    "Module": "CE",
+    "PrimaryLocation": "512 OLIVER ST, GASTONIA, NC 28052",
+    "ReferenceNumber": "CEABDV20262402",
+    "Status": "Open",
+}
+
+#: Constructed-but-realistic (not a verbatim capture): Zoning/Land Use is a
+#: real, common open-case category at this feed (299/3,304 open cases live
+#: 2026-10-03) -- sampled Historic District/Fence/Building Code cases under
+#: this same "paperwork, not property condition" umbrella were confirmed via
+#: live detail-page Descriptions; this shape matches the feed's real markers.
+ZONING_LAND_USE_OPEN = {
+    "ApplicationTypeDescription": "Zoning/Land Use",
+    "LinkText": "CEZON20260900:Zoning/Land Use",
+    "LinkUri": "https://devsvcs.gastonianc.gov/CodeEnforcement/StatusReference?referenceNumber=CEZON20260900",
+    "MapRelationValue": {"LayerName": "Parcels", "AttributeName": "AKPAR", "AttributeValue": "199999"},
+    "MapPoint": {"X": -9037500.0, "Y": 4198500.0, "WKID": 3857},
+    "Module": "CE",
+    "PrimaryLocation": "9 ZONING WAY, GASTONIA, NC 28052",
+    "ReferenceNumber": "CEZON20260900",
+    "Status": "Notice/Order Sent",
+}
+
+
+def test_abandoned_vehicle_is_severe_and_vacancy_adjacent():
+    """Live-sampled 2026-10-03: all 3 real Abandoned Vehicle cases pulled
+    described genuine junk/debris left on the property, the same concept as
+    Junk Vehicles under a different label."""
+    li = mod.build_listing([ABANDONED_VEHICLE_OPEN])
+    ce = li.raw["code_enforcement"]
+    assert ce["violation_types"] == ["Abandoned Vehicle"]
+    assert ce["severe"] is True
+    assert ce["vacancy_adjacent"] is True
+    assert ce["has_open"] is True
+    assert li.raw["distressed"] is True
+
+
+def test_zoning_land_use_only_case_is_open_but_not_vacancy_adjacent():
+    """The live feed's real category vocabulary includes 'Zoning/Land Use'
+    (299 of 3,304 open cases, 2026-10-03) -- a land-use/zoning complaint says
+    nothing about vacancy or condemnation, same reasoning as Henderson's
+    Zoning exclusion."""
+    from foreclosure_scraper.distress_score import _signals_for
+    from foreclosure_scraper.signal_freshness import code_enforcement_open
+
+    li = mod.build_listing([ZONING_LAND_USE_OPEN])
+    ce = li.raw["code_enforcement"]
+    assert ce["severe"] is False
+    assert ce["vacancy_adjacent"] is False
+    assert ce["has_open"] is True                 # still a real, visible open case
+    assert "distressed" not in li.raw
+    assert code_enforcement_open(ce) is False
+    names = [n for n, _b, _w in _signals_for(li)]
+    assert "code_enforcement" not in names         # no PROPERTY credit from this alone
+
+
+def test_vegetation_weeds_only_case_does_not_score_either():
+    """Vegetation/Weeds is the single largest open-case category at this feed
+    (1,533 of 3,304 open cases live 2026-10-03) and was already excluded from
+    _SEVERE before this fix; this pins that it also withholds PROPERTY credit
+    via the new vacancy_adjacent gate, not just the severe/distressed label."""
+    from foreclosure_scraper.distress_score import _signals_for
+    from foreclosure_scraper.signal_freshness import code_enforcement_open
+
+    li = mod.build_listing([DOFFIN_OPEN])
+    ce = li.raw["code_enforcement"]
+    assert ce["vacancy_adjacent"] is False
+    assert code_enforcement_open(ce) is False
+    assert "code_enforcement" not in [n for n, _b, _w in _signals_for(li)]
+
+
+def test_a_severe_case_alongside_a_non_severe_case_still_scores():
+    """A property with BOTH an open Public Nuisance case and an open Zoning/
+    Land Use case is vacancy-adjacent on the strength of the Nuisance case;
+    mixing in a zoning complaint must not suppress real evidence."""
+    from foreclosure_scraper.distress_score import _signals_for
+
+    nuisance_same_parcel = dict(PNU_OPEN)
+    zoning_same_parcel = dict(ZONING_LAND_USE_OPEN)
+    zoning_same_parcel["MapRelationValue"] = nuisance_same_parcel["MapRelationValue"]
+    zoning_same_parcel["PrimaryLocation"] = nuisance_same_parcel["PrimaryLocation"]
+
+    li = mod.build_listing([zoning_same_parcel, nuisance_same_parcel])
+    ce = li.raw["code_enforcement"]
+    assert ce["vacancy_adjacent"] is True
+    assert "code_enforcement" in [n for n, _b, _w in _signals_for(li)]
+
+
+def test_code_enforcement_signal_is_scored_when_vacancy_adjacent():
+    from foreclosure_scraper.distress_score import _signals_for
+    li = mod.build_listing([PNU_OPEN])
+    names = [n for n, _b, _w in _signals_for(li)]
+    assert "code_enforcement" in names
+
+
+# --------------------------------------------------------------------------- #
+# live smoke
+# --------------------------------------------------------------------------- #
+
+def test_live():
+    """Opt-in live smoke test against the real devsvcs.gastonianc.gov feed.
+
+    Set RUN_LIVE=1 to run. A full crawl takes ~70-90s (recursive quadrant
+    splitter over the whole city extent), so this is not run by default.
+    """
+    import os
+
+    if not os.environ.get("RUN_LIVE"):
+        import pytest
+        pytest.skip("live smoke; set RUN_LIVE=1")
+
+    import asyncio as _asyncio
+
+    from foreclosure_scraper.distress_score import _signals_for
+    from foreclosure_scraper.http_client import client
+
+    async def _crawl():
+        async with client(timeout=30.0) as http:
+            await http.get(mod.LOCATOR_URL)
+            markers = await mod._query_bbox(
+                http, mod.CITY_XMIN, mod.CITY_XMAX, mod.CITY_YMIN, mod.CITY_YMAX)
+        by_ref = {}
+        for m in markers:
+            ref = m.get("ReferenceNumber")
+            if ref:
+                by_ref[ref] = m
+        groups: dict = {}
+        for m in by_ref.values():
+            key = mod._group_key(m)
+            if key:
+                groups.setdefault(key, []).append(m)
+        rows = [li for feats in groups.values()
+                if (li := mod.build_listing(feats)) is not None]
+        return rows
+
+    rows = _asyncio.run(_crawl())
+    assert len(rows) >= mod.GastoniaCodeEnforcement.expected_min_count
+    assert all(li.raw["code_enforcement"]["has_open"] for li in rows)
+    # 2026-10-03: live categories must include a non-vacancy-adjacent lane
+    # (Vegetation/Weeds, Zoning/Land Use, etc.) that the validation flagged --
+    # confirms this isn't a severe-only feed by coincidence.
+    non_vacancy_adjacent = [li for li in rows
+                            if li.raw["code_enforcement"]["vacancy_adjacent"] is False]
+    assert non_vacancy_adjacent, "expected at least one open non-vacancy-adjacent property live"
+    assert all("code_enforcement" not in [n for n, _b, _w in _signals_for(li)]
+               for li in non_vacancy_adjacent)
+    print(f"live gastonia open code-enforcement properties={len(rows)} "
+          f"not_vacancy_adjacent={len(non_vacancy_adjacent)}")

@@ -82,6 +82,61 @@ THE SITE (verified live 2026-09-30)
     `2026`, sequence `2400`) — used only as `latest_case_year` context; there is
     no per-case filed/received date in this API, unlike Henderson's ArcGIS layer.
 
+2026-10-03 validation (live full-city crawl, 19,429 unique cases / 3,304 open /
+1,493 properties with >=1 open case): this module had the identical bug SHAPE
+Henderson's code-enforcement scraper had before its 2026-10-02 fix (commit
+19d3888e) — every open case granted full PROPERTY `code_enforcement` credit
+regardless of `ApplicationTypeDescription`, because `vacancy_adjacent` was never
+wired. Gastonia's own category taxonomy is NOT the same vocabulary as
+Henderson's ArcGIS `violationType` domain (confirmed live; this is a different
+CityView `ApplicationTypeDescription` field, free text, no coded domain), so the
+category list had to be independently live-verified rather than reused.
+
+Live category breakdown of the 3,304 OPEN cases that day, with each real case's
+free-text `Description` field pulled from the `StatusReference` detail page to
+disambiguate "paperwork" from "physical condition" wherever the bare category
+label alone was ambiguous:
+  - Vegetation/Weeds (1,533, the single largest category) — already excluded
+    before this validation (see `_SEVERE` below); confirmed correctly excluded,
+    same reasoning as Henderson's Zoning: too common and too low-specificity
+    (both occupied and vacant properties get weed complaints) to be real
+    evidence on its own.
+  - Public Nuisance (857), Housing (262), Unauthorized Encampment (41), Junk
+    Vehicles (21), Commercial Maintenance Code (7) — already on `_SEVERE`;
+    sampled detail pages confirm genuine physical-condition/blight language
+    (one Commercial Maintenance Code case: "Old funeral home. Carport falling
+    down... paint peeling... homeless people sleeping between hotel and garage
+    building" — textbook vacant/blighted structure).
+  - Abandoned Vehicle (11 open) — NOT previously on `_SEVERE`; all 3 sampled
+    cases describe genuine junk/debris ("Junk trash debris in yard", "Abandoned
+    Vehicles, tow truck... never move", "Abandoned 18 wheelers, cabs, cars, RV.
+    Bunch of junk") — the same concept as Junk Vehicles, just a different label.
+    Added to `_SEVERE`.
+  - Zoning/Land Use (299), Street/Sidewalk Obstruction (79), Building Code (63),
+    Fence/Wall (43), Signage (39), Tree Removal (23), Livestock (8), Historic
+    District (8), Graffiti (7), Drought Violation (3) — sampled detail pages
+    confirm these are paperwork/permit/right-of-way/animal-nuisance categories,
+    NOT property condition: Building Code samples were a lapsed fire-alarm
+    monitoring contract, a vague "code violations" report, and an unlicensed-
+    contractor complaint; Historic District samples were a resident installing
+    a pool and running underground utility lines (actively improving the
+    property, the opposite of vacant); Fence/Wall samples were height/placement
+    disputes; Street/Sidewalk Obstruction samples were a trash can, a
+    basketball goal, and a dirt pile in the road, none about the subject
+    structure. Graffiti (7 open) was deliberately left OFF `_SEVERE` despite one
+    sample describing graffiti "on this vacant residence" — 2 of the 3 sampled
+    cases were graffiti on a stop sign and a utility line, unrelated to the
+    subject parcel's own condition, too noisy a category on this small a sample
+    to trust.
+
+Net: of the 1,493 properties with at least one open case that day, 719 (48.2%)
+carry ONLY non-vacancy-adjacent open cases — essentially the same scale of
+over-crediting Henderson had (53.1%). Fixed the same way: `vacancy_adjacent` is
+now wired from `severe` (which `signal_freshness.code_enforcement_open()`
+already knows how to read, per the Henderson/Lincoln precedent) so a
+Vegetation/Weeds- or Zoning/Land-Use-only property still ships on the board
+truthfully (`has_open` stays true) but withholds PROPERTY credit.
+
 Free, public, anonymous. No CAPTCHA, no login, no WAF. Gate with
 FORECLOSURE_GASTONIA_CODE=0.
 """
@@ -134,7 +189,21 @@ PARCEL_LAYER = ("https://gis.gastoncountync.gov/publicgis/rest/services/"
                 "PublicGIS/Parcels/FeatureServer/11")
 
 _CLOSED_RE = re.compile(r"^\s*closed", re.I)
-_SEVERE_RE = re.compile(r"(housing|nuisance|junk|encampment|commercial maintenance)", re.I)
+
+#: ApplicationTypeDescription values that imply physical deterioration/dumping
+#: rather than paperwork (confirmed live 2026-10-03 against this feed's own
+#: category vocabulary and real case Descriptions -- NOT the same vocabulary as
+#: Henderson's ArcGIS violationType domain, so reused only in spirit, not
+#: literally). Zoning/Land Use, Street/Sidewalk Obstruction, Building Code,
+#: Fence/Wall, Signage, Tree Removal, Livestock, Historic District, Graffiti,
+#: Drought Violation, and (deliberately, see module docstring) Vegetation/Weeds
+#: do NOT match -- everything open still ships on the board; this gates the
+#: `distressed` flag AND the `code_enforcement`/`vacancy_adjacent` PROPERTY-
+#: scoring signal, not just a label (same convention as
+#: henderson_code_violations._SEVERE).
+_SEVERE_RE = re.compile(
+    r"(housing|nuisance|junk|encampment|commercial maintenance|abandoned vehicle)",
+    re.I)
 _CASE_YEAR_RE = re.compile(r"^CE[A-Z]+(\d{4})\d+$")
 
 _POLY_FLAGS = {
@@ -329,6 +398,14 @@ def build_listing(markers: list[dict], parcels: dict[str, dict] | None = None,
             "severe": severe,
             "violations": cases[:8],
             "has_open": True,
+            # 2026-10-03: has_open stays literally true (there IS an open case) --
+            # vacancy_adjacent is the separate, explicit answer to "does any open
+            # case's CATEGORY actually indicate vacancy/condemnation/structural
+            # distress", which signal_freshness.code_enforcement_open() now gates
+            # PROPERTY credit on (same convention as henderson_code_violations.py's
+            # 2026-10-02 fix, commit 19d3888e). A Zoning/Land-Use- or Vegetation/
+            # Weeds-only property still ships with its real case data.
+            "vacancy_adjacent": severe,
             "latest_case_year": max(years) if years else None,
             "source": "gastonia_cityview_locator",
         },
