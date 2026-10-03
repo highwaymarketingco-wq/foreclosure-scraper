@@ -2110,6 +2110,14 @@ RAW_KEEP = {
     "red_flags": "*",                  # unified red flag array [{severity, type, description, source}]
     "sos_dissolution": "*",            # NC SOS LLC dissolution status
     "tax_aging_surfaced": "*",         # surfaced tax aging status for all listings
+    # 2026-10-03: real sibling key scripts/surface_tax_aging.py always wrote alongside
+    # tax_aging_surfaced, read directly by enrichment_equity.py's 0.70-vs-0.60 payoff-
+    # estimate branch -- but never registered here, so every value was silently dropped
+    # at publish (confirmed: 0 of 219,143 live rows carried it; that branch has therefore
+    # always taken 0.60, never 0.70). Same bug class as dd19fa6a/6e00d55b/b88e81a5. Now
+    # written every pipeline run by enrichment_tax_aging.enrich_tax_aging(), not just the
+    # old one-shot script.
+    "tax_aging_high": "*",             # 2yr+ delinquent flag read by enrichment_equity.py
     "two_year_delinquent": "*",        # 2yr+ delinquent flag for all listings
 
     # ------------------------------------------------------------------

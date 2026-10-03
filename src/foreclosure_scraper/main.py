@@ -2941,6 +2941,23 @@ async def run() -> int:
     except Exception:
         log.error("amount_owed_tax_owed_promotion.failed", traceback=traceback.format_exc())
 
+    # Tax-aging surfacing — promotes raw['tax_owed']/raw['nc_ptscloud_delinquent_tax']
+    # into raw['tax_aging_surfaced']/raw['tax_aging_high'], the two fields
+    # fullmer_rank.py's years_delinquent()/delinq_ripeness_points() ramp and
+    # enrichment_equity.py's 0.70-vs-0.60 payoff branch actually read. Previously
+    # only a one-shot script (scripts/surface_tax_aging.py) did this, so it went
+    # stale the moment the board grew past that one snapshot (11/148 counties
+    # credited vs. 49 counties' worth of real raw['tax_owed']['year'] already on
+    # the board, measured 2026-10-03). Must run AFTER enrich_tax_owed (just above),
+    # whose output it reads. Idempotent, no network.
+    try:
+        from .enrichment_tax_aging import enrich_tax_aging
+        s = enrich_tax_aging(enriched)
+        if s:
+            enrichment_stats["tax_aging"] = s
+    except Exception:
+        log.error("tax_aging.failed", traceback=traceback.format_exc())
+
     # Bankruptcy + large delinquent-tax-balance combo (Dirty Deeds Tier B #28,
     # second half). Pure join of two signals that both now exist: must run
     # AFTER both enrich_with_bankruptcy (much earlier above) and enrich_tax_owed
