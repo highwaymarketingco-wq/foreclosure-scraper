@@ -49,6 +49,7 @@ from pathlib import Path
 
 from .enrichment_arcgis import NC_GIS, SCDOT_BASE, SC_LAYER, SC_GIS, host_walled
 from .http_client import client
+from . import owner_freshness
 
 # ---------------------------------------------------------------------------
 # Persistent parcel/point -> GIS-attrs cache (Phase-2 hang/volume fix)
@@ -422,13 +423,19 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
             li.assessed_value = av
             flags["assessed_value"] = 1
 
-    if not li.owner_name:
-        ow = _pick(norm, OWNER_FIELDS)
-        if ow:
-            s = re.sub(r"\s+", " ", str(ow).strip())
-            if len(s) >= 3 and not s.replace(" ", "").isdigit():
-                li.owner_name = s
-                flags["owner_name"] = 1
+    ow = _pick(norm, OWNER_FIELDS)
+    if ow:
+        s = re.sub(r"\s+", " ", str(ow).strip())
+        # Quality gate unchanged from the original missing-only fill (len >= 3,
+        # not pure digits). On top of that, owner_freshness.should_refresh_owner_name
+        # allows this to act as a REFRESH (not just a blank-fill) when li.owner_name
+        # is already set but old enough/unstamped -- see owner_freshness.py docstring
+        # for why this field specifically (current-state GIS owner) is safe to
+        # refresh while e.g. a court-caption defendant name is not.
+        if len(s) >= 3 and not s.replace(" ", "").isdigit() and \
+                owner_freshness.should_refresh_owner_name(li, s):
+            owner_freshness.stamp_owner_name(li, s)
+            flags["owner_name"] = 1
 
     if not li.living_sqft:
         sq = _num(_pick(norm, LIVING_SQFT_FIELDS))
@@ -534,12 +541,23 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
         #   (b) a prior run already ATTEMPTED this lead (same lat/lng -> same GIS result),
         #       marked raw['gis']['queried']. FORECLOSURE_GIS_FORCE=1 re-attempts all.
         raw = li.raw if isinstance(li.raw, dict) else {}
+        # owner_name may be "complete" (non-empty) yet STALE -- see owner_freshness.py
+        # (live-confirmed 2026-10-02/03: 25.4% of a Buncombe sample show a DIFFERENT
+        # current owner than the board for the same parcel_id). owner_refresh_due is
+        # deliberately gated on li.parcel_id too: the only recheck cheap enough to run
+        # on every pass is the FREE, local parcel_cache lookup a few lines down, not a
+        # live network query -- a lead with no parcel_id would otherwise fall through
+        # past these skips straight into the (expensive) live GIS query below, which
+        # these two skip gates exist specifically to avoid paying for on every run.
+        owner_refresh_due = bool(li.parcel_id) and bool(li.owner_name) and \
+            owner_freshness.is_owner_refreshable(li)
         # FORCE re-attempts all (per docstring) — needed so coded fields like the exemption
         # signal get read even on leads whose core attrs are already complete.
-        if not _force and (li.assessed_value or li.market_value) and li.owner_name and li.living_sqft:
+        if not _force and (li.assessed_value or li.market_value) and li.owner_name and \
+                li.living_sqft and not owner_refresh_due:
             stats["skipped_done"] += 1
             return
-        if not _force and (raw.get("gis") or {}).get("queried"):
+        if not _force and (raw.get("gis") or {}).get("queried") and not owner_refresh_due:
             stats["skipped_done"] += 1
             return
         # TAX_SALE_OVERAGE: every field this function fills (owner, mailing,
@@ -560,8 +578,10 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
             if pc:
                 if not isinstance(li.raw, dict):
                     li.raw = {}
-                if not li.owner_name and pc.get("owner"):
-                    li.owner_name = pc["owner"]; stats["filled_owner"] += 1
+                owner_cand = pc.get("owner")
+                if owner_cand and owner_freshness.should_refresh_owner_name(li, owner_cand):
+                    owner_freshness.stamp_owner_name(li, owner_cand)
+                    stats["filled_owner"] += 1
                 if not li.market_value and pc.get("market_value"):
                     li.market_value = pc["market_value"]; stats["filled_market"] += 1
                 if not li.tax_value and pc.get("tax_value"):
@@ -617,6 +637,15 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
                     stats["matched"] += 1
                     return
                 stats["parcel_cache_partial"] = stats.get("parcel_cache_partial", 0) + 1
+            elif owner_refresh_due and li.market_value:
+                # pc was a MISS and the only reason this lead reached this point at all
+                # is a stale-owner recheck (owner_refresh_due) with everything else
+                # already complete (li.market_value here mirrors the first skip gate's
+                # condition above). A local cache miss is not grounds to pay for a live
+                # network re-query just to re-verify an owner name -- bail; this lead
+                # gets another free chance to refresh next time its county's
+                # parcel_cache carries a row for it.
+                return
         base = _resolve_layer(li)
         if not base:
             return

@@ -22,6 +22,7 @@ import structlog
 
 from .http_client import client
 from .models import Listing, ListingType, PropertyKind
+from . import owner_freshness
 
 log = structlog.get_logger()
 
@@ -1270,16 +1271,28 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
         # PER LEAD across ~48k address-having leads (it ran ~6.8h uncapped on 2026-08-14).
         # When a lead already carries a parcel_id in a bulk-cached county, fill owner/value/
         # sqft/acre from the local table and skip the network entirely. Only short-circuits
-        # when owner or value is still missing (else fall through to refresh minor fields).
-        if li.parcel_id and not (li.owner_name and li.market_value):
+        # when owner or value is still missing (else fall through to refresh minor fields) --
+        # OR when owner_name is present but STALE (see owner_freshness.py / 2026-10-02/03
+        # validation: live-confirmed 25.4% of a Buncombe tax-delinquency sample show a
+        # DIFFERENT current owner than the board for the identical parcel_id, because this
+        # exact "if not li.owner_name" gate never re-checked an already-set value against a
+        # since-refreshed cache snapshot sitting right next to it). owner_refresh_due is
+        # deliberately gated on li.parcel_id (a free, local recheck) -- it must NOT be true
+        # for a lead without one, or it would fall through to the live query below for
+        # staleness alone and reintroduce the exact multi-hour cost this fast path exists to
+        # avoid.
+        owner_refresh_due = bool(li.parcel_id) and bool(li.owner_name) and \
+            owner_freshness.is_owner_refreshable(li)
+        if li.parcel_id and (not (li.owner_name and li.market_value) or owner_refresh_due):
             try:
                 from .parcel_cache import lookup as _pc_lookup
                 pcr = _pc_lookup(li.county or "", li.parcel_id, li.state)
             except Exception:  # noqa: BLE001 — cache is best-effort; never break the phase
                 pcr = None
             if pcr:
-                if not li.owner_name and pcr.get("owner"):
-                    li.owner_name = pcr["owner"]
+                owner_cand = pcr.get("owner")
+                if owner_cand and owner_freshness.should_refresh_owner_name(li, owner_cand):
+                    owner_freshness.stamp_owner_name(li, owner_cand)
                 if not li.market_value and pcr.get("market_value"):
                     li.market_value = pcr["market_value"]
                 if not li.tax_value and pcr.get("tax_value"):
@@ -1289,6 +1302,15 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                 if not li.acreage and pcr.get("acreage"):
                     li.acreage = pcr["acreage"]
                 counts["cache_hit"] = counts.get("cache_hit", 0) + 1
+                return
+            if owner_refresh_due and li.market_value:
+                # Entered ONLY for a stale-owner recheck (owner+value both already
+                # present; a real cache MISS otherwise would have `pcr` falsy here too,
+                # but there is nothing more this phase needs for this lead) -- bail
+                # without falling through to the live query below. A local cache miss
+                # is not grounds to pay for a live network re-query just to re-verify
+                # an owner name; this lead's owner gets another free chance to refresh
+                # whenever its county's parcel_cache next carries a row for it.
                 return
         # Normalize county: strip "County", trailing ", NC" or ", SC", whitespace
         county_clean = li.county.replace(" County", "").strip()

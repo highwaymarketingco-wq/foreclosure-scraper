@@ -1895,6 +1895,13 @@ RAW_KEEP = {
     "probate": "*",                   # probate court case search result: case_number, filing_date, court, decedent, status
     "gis_exempt": "*",                # statutory tax-relief exemption (ELD/DIS/BLD/VET) -> hard elderly/disabled signal
     "owner_name_source": "*",         # provenance when owner_name was promoted from tax/GIS
+    "owner_name_as_of": "*",          # freshness stamp (ISO date) for the CURRENT-state owner_name refresh
+                                       # policy — see owner_freshness.py. Without this RAW_KEEP entry
+                                       # _slim_raw() silently drops the stamp at publish and every board
+                                       # row's owner_name would look permanently unstamped (= always
+                                       # "unknown age") the very next run after this landed, defeating the
+                                       # whole point of the staleness gate (same failure mode this file's
+                                       # own landed_by/entity_type comments above already warn about).
     "notice_contact": "*",            # attributable attorney/trustee email from the legal-notice body
     "incarceration": "*",             # owner matched a state corrections roster (NC DAC) — low-conf stack signal
     "incarceration_check": "*",       # answered NO-match stamp {checked_at, name, source, result}: lets the enricher rotate past checked leads instead of re-querying the same 150
