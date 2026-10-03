@@ -26,6 +26,7 @@ from typing import Optional
 import structlog
 
 from .models import Listing
+from .name_normalize import is_entity
 
 log = structlog.get_logger()
 
@@ -39,17 +40,25 @@ _SOS_MAX_SECONDS = float(os.environ.get("SOS_MAX_SECONDS", "240"))
 _SOS_BREAKER_FAILS = int(os.environ.get("SOS_BREAKER_FAILS", "5"))
 
 
-_BUSINESS_MARKERS = (
-    "llc", "l.l.c.", "inc", "inc.", "corp", "corp.", "corporation",
-    "company", "co.", "ltd", "ltd.", "lp", "l.p.", "llp",
-)
-
-
+# Bug found live 2026-10-02: this used to be a bare substring scan over
+# ("llc", "inc", "corp", "co.", "lp", ...), with no word boundary. "inc" and
+# "lp" as raw substrings match plenty of real surnames/given names --
+# "Vincent", "Lincoln", "Prince", "Alphonso", "Randolph", "Delphine" all
+# contain one -- so real people were flagged as businesses. Live board audit
+# (docs/listings.json, 2026-10-03) found 7,552 defendant/owner_name row
+# occurrences (2,065 unique names) misclassified this way -- 8.4% of every
+# name the old check called a business.
+#
+# name_normalize.is_entity() is the one correct, word-boundary-safe entity
+# detector this codebase already uses for exactly this check (~10 call sites:
+# enrichment_sc_phone, enrichment_owner_cluster, enrichment_repeat_tax_loss,
+# enrichment_notice_service_defect, enrichment_resolve_name_to_property,
+# deed_index, sc_parcel_mailing, enrichment_sc_divorce, ...). It tokenizes the
+# name and checks the TOKEN set against a marker set, so "Vincent" (one token,
+# not equal to "INC") and "Lincoln" never match. This function now reuses that
+# shared logic instead of re-implementing a narrower, buggy version of it.
 def _is_business(name: str) -> bool:
-    if not name:
-        return False
-    n = name.lower()
-    return any(m in n for m in _BUSINESS_MARKERS)
+    return is_entity(name)
 
 
 def _strip_business_suffix(name: str) -> str:

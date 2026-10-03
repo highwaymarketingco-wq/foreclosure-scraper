@@ -82,3 +82,29 @@ def test_non_business_defendants_skipped(monkeypatch):
                  state="NC", county="Gaston", defendant="John Q. Smith")
     asyncio.run(sos.enrich_with_sos_dissolution([li], max_check=5))
     assert called["n"] == 0  # individual person, not an entity
+
+
+def test_is_business_no_substring_false_positives():
+    """Regression for the bug found live 2026-10-02: the old _is_business()
+    was a bare `any(marker in name.lower() for marker in MARKERS)` substring
+    scan, so "inc" and "lp" (unanchored) matched ordinary surnames/given
+    names -- "Vincent", "Lincoln", "Prince", "Alphonso", "Randolph",
+    "Delphine" all contain one of those substrings. A live board audit
+    (docs/listings.json) found 7,552 defendant/owner_name row occurrences
+    (2,065 unique names) misclassified this way. _is_business() now defers
+    to name_normalize.is_entity(), the word-boundary-safe token check this
+    codebase already uses for the same question everywhere else."""
+    not_businesses = [
+        "Vincent, James", "John Vincent", "Lincoln, Mary", "Mary Lincoln",
+        "St Vincent de Paul", "Randolph, Carter", "Alphonso Gaines",
+        "Delphine Walton", "Prince, Keisha", "Anderson Myron Vincent",
+    ]
+    for name in not_businesses:
+        assert sos._is_business(name) is False, f"{name!r} is a person, not a business"
+
+    real_businesses = [
+        "Smith LLC", "Jones Inc", "Principal Investments LLC", "Marcos Inc",
+        "Smith Corp", "ABC Co", "Acme Holdings LLC",
+    ]
+    for name in real_businesses:
+        assert sos._is_business(name) is True, f"{name!r} should still read as a business"
