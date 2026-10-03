@@ -360,6 +360,22 @@ def _parse_detail(html: str, detail_url: str) -> Listing | None:
     doc_urls = sorted({urljoin(f"{_BASE}/", h) for h in _PDF_LINK_RE.findall(html)})
     if doc_urls:
         stamp_documents(li, doc_urls)
+    # EXTRACTION-COMPLETENESS AUDIT 2026-10-03: auction_phone was already
+    # parsed (live-verified on 2 NC listings, byte-identical "800-801-8003"
+    # both times -- a company auction-info line, not a per-case trustee
+    # number, same posture as the per-listing PDF this module already
+    # describes as "GENERIC boilerplate... still captured, it is a real
+    # linked document"). It was stashed only under raw["williams"], a key
+    # no contactability enricher reads. Promote into raw["notice_contact"]
+    # too (the key enrich_surface_contacts.py's phone surfacer reads, same
+    # as national.gsa_realproperty / national.usmarshals_realproperty) so a
+    # real, dialable number for this specific foreclosure actually surfaces.
+    if auction_phone:
+        li.raw["notice_contact"] = {
+            "phone": auction_phone,
+            "contact_role": "Williams & Williams auction desk",
+            "source": "williams_auction_info",
+        }
     return li
 
 

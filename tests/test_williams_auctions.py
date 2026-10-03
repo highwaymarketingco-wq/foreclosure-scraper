@@ -141,6 +141,17 @@ def test_pending_sale_gallery_is_both_largesize_images_in_order():
     ]
 
 
+def test_auction_info_phone_is_surfaced_into_notice_contact():
+    """EXTRACTION-COMPLETENESS 2026-10-03: auction_info_phone was already
+    parsed but only stashed under raw["williams"], a key nothing downstream
+    reads for contactability. Must also land in raw["notice_contact"] (the
+    key enrich_surface_contacts.py's existing phone surfacer reads) so this
+    real, dialable auction-desk number actually surfaces."""
+    li = _parse_detail(_DETAIL_PENDING, _PENDING_URL)
+    assert li.raw["notice_contact"]["phone"] == "800-801-8003"
+    assert li.raw["notice_contact"]["contact_role"] == "Williams & Williams auction desk"
+
+
 def test_pending_sale_document_is_the_pdf_link_only_not_the_sites_own_chrome():
     """The bug: the favicon .ico, the site logo .jpg, and the pdficon/
     exclamation/printer .png button images all satisfy document_links.py's
