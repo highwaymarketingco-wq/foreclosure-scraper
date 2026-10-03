@@ -98,6 +98,45 @@ _TOKENS: tuple[tuple[str, str, re.Pattern], ...] = (
 # so the abbreviation only ever fires on what reads as a person.
 _HRS_ABBR = re.compile(r"\bHRS\b", re.I)
 
+# "TR"/"TRST" are bare abbreviations for "trust"/"trustee" live-verified on the
+# board 2026-10-03: 116 rows across 23 counties the full `\bTRUST(?:EE)?\b`
+# pattern cannot see at all ("MARY W HEROLD TR", "BLASSENGALE HERBERT A III
+# TRST", "GALLIHER JAMES DENNIS (TR)", "ANDERSON BERNADINE ANN TR ETAL"). Unlike
+# the HRS/heirs abbreviation this is NOT gated on `not is_entity()` -- an
+# institutional or entity-owned trust ("HIGH POINT BANK & CO TR ANGUS G
+# SARGEANT", "JOSHUA UN METH CH TR") is still a real trust reference, exactly
+# like the main `trust` token above, which is also ungated; the existing
+# `_INSTITUTIONAL` check downstream already demotes those to "weak" (a no-op
+# here, "trust" is weak already) without discarding the signal outright.
+# The real collision risk is two live counterexamples where "TR" is a
+# PREFIX, not a suffix -- "TR Easley Creek Plaza LLC" and "TR Gateway LLC"
+# (both SC, both plainly a company name that happens to start with the
+# letters "TR", not a trustee designation). Every one of the 116 genuine
+# hits has "TR"/"TRST" as a suffix or mid-string marker, never the first
+# token, so `_has_trust_abbr` below requires at least one match that is NOT
+# at position 0 rather than a blanket entity gate (which would also wrongly
+# exclude a truncated "...HOLDINGS TRU" below, since HOLDINGS is itself an
+# entity marker).
+_TRUST_ABBR = re.compile(r"\bTRST\b|\bTR\b", re.I)
+
+
+def _has_trust_abbr(name: str) -> bool:
+    return any(m.start() > 0 for m in _TRUST_ABBR.finditer(name))
+
+
+# Several county tax/GIS exports hard-truncate the owner_name field at a fixed
+# width -- live-verified 2026-10-03: 16 rows across 7 counties (SC Spartanburg/
+# Greenville/Darlington/Lexington/Jasper, NC Lincoln/Catawba) sit at EXACTLY
+# 30 characters (one outlier at 27/28/40 from a different source width) and
+# end mid-word one or two letters short of completing "TRUST" -- "...LIVING
+# TRU", "...REVOCABLE TRUS", "...FAMILY TRU", "...HOLDINGS TRU". `\b` before
+# the fragment requires a real word boundary immediately before it, which a
+# surname that merely happens to end in the same letters would not have (a
+# hypothetical "...PETRUS" keeps no boundary before "TRUS" since it is
+# mid-word, not a separate truncated token) -- so this cannot fire on a name
+# that was never going to say TRUST in the first place.
+_TRUST_TRUNCATED = re.compile(r"\bTRUS?$", re.I)
+
 _GRADE_RANK = {"strong": 3, "medium": 2, "weak": 1}
 
 # A government or institutional owner is not a motivated seller. These strings turn
@@ -119,6 +158,10 @@ def classify(owner_name: str | None) -> dict | None:
     matched = [(tok, grade) for tok, grade, rx in _TOKENS if rx.search(name)]
     if not any(tok == "heirs" for tok, _ in matched) and _HRS_ABBR.search(name) and not is_entity(name):
         matched.append(("heirs", "strong"))
+    if not any(tok == "trust" for tok, _ in matched) and (
+        _has_trust_abbr(name) or _TRUST_TRUNCATED.search(name.strip())
+    ):
+        matched.append(("trust", "weak"))
     if not matched:
         return None
     institutional = bool(_INSTITUTIONAL.search(name))

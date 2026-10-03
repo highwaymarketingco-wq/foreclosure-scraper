@@ -196,6 +196,85 @@ def test_heir_substring_inside_an_unrelated_surname_does_not_match(name, false_p
     assert sig is None or false_positive not in sig["tokens"]
 
 
+# ===========================================================================
+# "TR"/"TRST" ABBREVIATION AND MID-WORD TRUNCATION VARIANTS LIVE-FOUND ON THE
+# REAL BOARD, 2026-10-03 -- name_trust (89/148), the highest-fill of the
+# name-pattern family, still had the same shape of gap as heirs/et_al/care_of
+# above.
+#
+# Live sweep found two distinct real mechanisms the full-word
+# `\bTRUST(?:EE)?\b` pattern cannot see at all:
+#   - bare "TR"/"TRST" -- a standalone trustee abbreviation, 116 rows / 23
+#     counties ("MARY W HEROLD TR", "BLASSENGALE HERBERT A III TRST",
+#     "GALLIHER JAMES DENNIS (TR)", "ANDERSON BERNADINE ANN TR ETAL").
+#   - mid-word truncation -- several county GIS/tax exports hard-cut the
+#     owner_name field at a fixed width (commonly 30 characters), slicing
+#     "TRUST" down to "TRU"/"TRUS" one or two letters short: 16 rows / 7
+#     counties ("MCKINNEY LARRY A SR LIVING TRU", "REDDING SPENCER
+#     REVOCABLE TRUS", "GREENSTONE LEGACY HOLDINGS TRU").
+# ===========================================================================
+
+@pytest.mark.parametrize("name", [
+    "MARY W HEROLD TR",
+    "ANDERSON BERNADINE ANN TR",
+    "GALLIHER JAMES DENNIS (TR)",
+    "BLASSENGALE HERBERT A III TRST",
+    "RUTH H STOWE REVC LIVING TRST",
+])
+def test_bare_tr_abbreviation_matches_trust(name):
+    sig = classify(name)
+    assert sig is not None
+    assert "trust" in sig["tokens"]
+    assert sig["grade"] == "weak"
+
+
+def test_bare_tr_abbreviation_coexists_with_a_stronger_token():
+    """Real board row (SC Horry): "TR" and ETAL both fire on the same name --
+    trust must still be recorded even though et_al's medium grade wins,
+    same precedent as the existing care_of/et_al coexistence test."""
+    sig = classify("ASSELIN PHILIPPE TR ETAL")
+    assert sig is not None
+    assert {"et_al", "trust"} <= set(sig["tokens"])
+    assert sig["grade"] == "medium"
+
+
+@pytest.mark.parametrize("name", [
+    "TR Easley Creek Plaza LLC",
+    "TR Gateway LLC",
+])
+def test_tr_abbreviation_as_a_name_prefix_is_not_read_as_trust(name):
+    """Real board rows (SC Pickens/Greenville) -- "TR" here is the first token
+    of a company name, not a trustee suffix. Every genuine trustee hit on the
+    board has "TR"/"TRST" as a suffix or mid-string marker, never the first
+    word, so the abbreviation only fires on a match that is not at position 0."""
+    sig = classify(name)
+    assert sig is None or "trust" not in sig["tokens"]
+
+
+@pytest.mark.parametrize("name", [
+    "MCKINNEY LARRY A SR LIVING TRU",
+    "REDDING SPENCER REVOCABLE TRUS",
+    "CLEMENT GLENDA FAYE FAMILY TRU",
+    "GREENSTONE LEGACY HOLDINGS TRU",
+    "SCIPIO HELEN & LIVINGSTON TRUS",
+])
+def test_truncated_trust_word_matches(name):
+    """A county export hard-truncated the owner_name field mid-word, one or
+    two letters short of completing TRUST -- the signal must still fire."""
+    sig = classify(name)
+    assert sig is not None
+    assert "trust" in sig["tokens"]
+    assert sig["grade"] == "weak"
+
+
+def test_truncation_guard_does_not_fire_on_an_unrelated_surname_ending():
+    """The truncation pattern requires a word boundary immediately before the
+    TRU/TRUS fragment -- a hypothetical surname that merely ends in the same
+    letters (no preceding space, mid-word) must not match."""
+    sig = classify("JOHN PETRUS")
+    assert sig is None or "trust" not in sig["tokens"]
+
+
 @pytest.mark.parametrize("name", [
     "SMITH FAMILY REVOCABLE TRUST",
     "JOHN SMITH TRUSTEE",
