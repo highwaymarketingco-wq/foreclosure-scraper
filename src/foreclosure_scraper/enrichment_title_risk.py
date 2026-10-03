@@ -40,9 +40,56 @@ from typing import Optional
 
 import structlog
 
-from .models import Listing
+from .models import Listing, ListingType
 
 log = structlog.get_logger()
+
+# ---------------------------------------------------------------------------
+# Listing types where `plaintiff`/`trustee` genuinely mean "the party
+# foreclosing this property" / "the officer running THIS sale" -- the only
+# reading _classify() below is entitled to make. 2026-10-03 live-board audit
+# (title_risk 41/148-county check) found raw['title_risk'] already being
+# computed, and FED INTO distress_score.py's -20-point "title-wipeout trap"
+# penalty, on three non-foreclosure types where those fields mean something
+# else entirely:
+#   * BANKRUPTCY  -- `trustee` is the court-APPOINTED BANKRUPTCY TRUSTEE (the
+#     officer administering the debtor's estate), not a foreclosure-sale
+#     trustee. Live example: trustee="Mays, Robert" -> _classify() treats any
+#     bare personal name with no corporate suffix as a "private individual"
+#     junior lienholder and stamps junior_lien_foreclosure/
+#     surviving_senior_debt_risk=True on a lead where no foreclosure sale
+#     exists at all.
+#   * DIVORCE_NOTICE -- `plaintiff` is the spouse who FILED the divorce
+#     petition, not a foreclosing creditor. Same bare-name fallthrough
+#     mislabels ~3% of all divorce_notice rows (board-wide) as a junior-lien
+#     trap.
+#   * ESTATE_LEAD -- `trustee` is repurposed by national.estate_sales to hold
+#     the ESTATE-SALE COMPANY name ("Blue Ridge Estate Liquidators LLC",
+#     "Private Listing"), not a foreclosure trustee.
+# None of PROBATE_NOTICE / ELDERLY_DISABLED / TAX_LIEN / DISTRESSED /
+# TAX_SALE_OVERAGE / REO carry a pending foreclosure sale either (no lawsuit,
+# or — for REO — the foreclosure already happened and resolved), so they are
+# withheld too rather than waiting for a live false-positive to prove it, per
+# this module's own "an honest unknown beats a false signal" design.
+#
+# This mirrors enrichment_hoa_plaintiff_signal.TARGET_LISTING_TYPES exactly
+# (same false-positive class, same fix shape — an explicit allowlist, not a
+# denylist, so a future new ListingType defaults to EXCLUDED until someone
+# deliberately opts it in rather than silently inheriting this classifier).
+_TITLE_RISK_LISTING_TYPES = frozenset({
+    ListingType.FORECLOSURE_SALE,
+    ListingType.LIS_PENDENS,
+    ListingType.SHERIFF_SALE,
+    ListingType.HOA_SALE,
+    ListingType.AUCTION,
+    ListingType.TAX_SALE,
+    # UNKNOWN is deliberately KEPT IN: it means the TYPE classifier couldn't
+    # bucket the row, not that it provably isn't a foreclosure sale, and this
+    # function ran unscoped on it long before today — narrowing it now with
+    # no live false-positive evidence (unlike the three excluded types above)
+    # would be a guess, not a fix.
+    ListingType.UNKNOWN,
+})
 
 
 # ---------------------------------------------------------------------------
@@ -397,11 +444,23 @@ def enrich_title_risk(listings: list[Listing]) -> dict:
       }
       raw['title_risk'] = {kind: 'unknown', party: '...'}   # too ambiguous to bank
 
+    Only runs on listing types where plaintiff/trustee can actually mean "the
+    party foreclosing this property" (see _TITLE_RISK_LISTING_TYPES) — a
+    bankruptcy-case trustee, a divorce petitioner, or an estate-sale company
+    name is not a foreclosing party, and classifying those as one is a false
+    signal distress_score.py then acts on (-20 points, keeps the lead out of
+    HOT). Rows of an out-of-scope type are left alone entirely (no
+    raw['title_risk'] key at all, not even 'unknown' — nothing to classify
+    means nothing to report).
+
     Returns a coverage histogram for the run report.
     """
     stats = {"senior": 0, "junior_risk": 0, "unknown": 0, "no_party": 0,
-             "rows": len(listings)}
+             "out_of_scope_type": 0, "rows": len(listings)}
     for li in listings:
+        if li.listing_type not in _TITLE_RISK_LISTING_TYPES:
+            stats["out_of_scope_type"] += 1
+            continue
         party = _party_text(li)
         result = _classify(party)
         if result is None:
