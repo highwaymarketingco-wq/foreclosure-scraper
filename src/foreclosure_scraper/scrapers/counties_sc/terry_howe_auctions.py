@@ -138,6 +138,20 @@ _STARTING_BID = re.compile(r"Starting\s+Bid:?\s*\$?\s*([\d,]+(?:\.\d{2})?)", re.
 _PREMIUM = re.compile(r"(?:Internet|Buyer'?s?|Buyer)\s+Premium\s*:?\s*([\d.]+\s*%)", re.I)
 _EARNEST = re.compile(r"Earnest\s+Money(?:\s+Deposit)?\s*:?\s*(\$?\s*[\d,]+[^<\n.]{0,40})", re.I)
 
+# Real property-photo gallery on the detail page (JetEngine gallery slider).
+# Confirmed live 2026-10-03 on two different auctions: every photo in the
+# gallery is a distinct property shot named after the actual street address
+# ("9-Reese-St-Sumter-SC-<n>-768x576.jpeg"), never a logo/icon (the site logo
+# carries a different class, "attachment-full size-full wp-image-25", which
+# this pattern does not match). Previously discovered nowhere -- only sale
+# terms + PDFs were harvested from the detail page.
+_GALLERY_IMG_RE = re.compile(
+    r'<img[^>]*\bsrc="([^"]+)"[^>]*\bclass="jet-engine-gallery-slider__item-img"',
+    re.I,
+)
+#: Cap per-auction photo capture so a very large gallery doesn't bloat raw.
+_MAX_PHOTOS = 12
+
 _LEAD_ITEMNO = re.compile(r"^\s*\d{1,4}\*?\s+(?=\d)")  # "101 147 Center St" -> "147 Center St"
 # SC TMS / parcel id sometimes leads a tax-deed portfolio row:
 #   6-24-10-040.02  (upstate dashed)  |  069-02-03-014-000 (long dotted-zero)
@@ -256,7 +270,7 @@ class _Auction:
     """A kept catalog post, pre-parsed; detail fields are filled in best-effort."""
     __slots__ = ("id", "title", "link", "body", "state", "addresses",
                  "sale_date", "sale_time", "bidding_starts", "detail_street",
-                 "detail_city", "detail_state", "docs", "terms")
+                 "detail_city", "detail_state", "docs", "terms", "photos")
 
     def __init__(self, aid, title, link, body):
         self.id = aid
@@ -273,6 +287,7 @@ class _Auction:
         self.detail_state: str | None = None
         self.docs: list[str] = []
         self.terms: dict = {}
+        self.photos: list[str] = []
 
 
 def _is_flc_or_bulk(title: str, body: str) -> bool:
@@ -332,6 +347,22 @@ async def _enrich_from_detail(auction: _Auction) -> None:
         if re.search(r"\.(pdf|tiff?)(?:[?#]|$)", u, re.I)
     ]
 
+    # Real property-photo gallery (FIXED 2026-10-03) -> raw.images.real so the
+    # Vision enrichment pass gets the actual listing photos instead of a
+    # synthesized aerial/map fallback. Dedup (the slider repeats each image
+    # for its thumbnail strip) and cap.
+    seen_photos: set[str] = set()
+    photos: list[str] = []
+    for src in _GALLERY_IMG_RE.findall(page):
+        u = src.strip()
+        if not u or u in seen_photos:
+            continue
+        seen_photos.add(u)
+        photos.append(u)
+        if len(photos) >= _MAX_PHOTOS:
+            break
+    auction.photos = photos
+
 
 def _opening_bid(terms: dict) -> float | None:
     raw = terms.get("starting_bid")
@@ -388,6 +419,8 @@ def _build_listings(auction: _Auction, slug: str) -> list[Listing]:
             )
             if auction.docs:
                 stamp_documents(li, auction.docs)
+            if auction.photos:
+                li.raw["images"] = {"real": auction.photos}
             out.append(li)
         return out
 
@@ -412,6 +445,8 @@ def _build_listings(auction: _Auction, slug: str) -> list[Listing]:
         )
         if auction.docs:
             stamp_documents(li, auction.docs)
+        if auction.photos:
+            li.raw["images"] = {"real": auction.photos}
         out.append(li)
     return out
 
