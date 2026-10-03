@@ -36,6 +36,14 @@ Access path (free, public, server-rendered, no login, no CAPTCHA):
      harvest_document_links()/stamp_documents().
 
 Free, no login, no CAPTCHA, no Akamai/WAF challenge encountered.
+
+EXTRACTION-COMPLETENESS AUDIT 2026-10-03: live-reverified against 5 current
+SC hits (no NC currently active). Photos (24-35/listing) and the brochure
+PDF were already complete. One real gap: broker_name/broker_phone were
+parsed but only ever written to raw["usmarshals"], a key no contactability
+enricher reads -- promoted into raw["notice_contact"] too (the same key
+national.gsa_realproperty / coastland_times.py use) so
+enrich_surface_contacts.py's existing phone surfacer actually picks it up.
 """
 from __future__ import annotations
 
@@ -241,6 +249,22 @@ def _parse_detail(html: str, href: str, list_addr: str) -> Listing | None:
         li.raw["images"] = {"real": photos}
     if doc_urls:
         stamp_documents(li, doc_urls)
+    # EXTRACTION-COMPLETENESS AUDIT 2026-10-03: broker_name/broker_phone were
+    # already parsed off the real detail page (live-verified on 2 active SC
+    # listings) but only ever stashed under raw["usmarshals"], a key nothing
+    # downstream reads for contactability. enrich_surface_contacts.py's
+    # phone/email surfacer reads raw["notice_contact"]["phone"/"name"] (the
+    # same key coastland_times.py/column_legal_notices.py/
+    # national.gsa_realproperty use for an attorney/trustee/agent contact).
+    # Promote it there too so this real, reachable listing-broker phone
+    # actually surfaces instead of sitting unused.
+    if broker_name or broker_phone:
+        li.raw["notice_contact"] = {
+            "name": broker_name,
+            "phone": broker_phone,
+            "contact_role": "listing broker",
+            "source": "reallook_broker",
+        }
     return li
 
 

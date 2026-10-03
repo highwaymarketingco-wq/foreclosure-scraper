@@ -116,6 +116,20 @@ def test_broker_name_and_phone_are_cleanly_separated():
     assert "Broker ID" not in li.trustee
 
 
+def test_broker_contact_is_surfaced_into_notice_contact():
+    """EXTRACTION-COMPLETENESS 2026-10-03: broker_name/broker_phone were
+    already parsed but only stashed under raw["usmarshals"], a key nothing
+    downstream reads for contactability. Must also land in
+    raw["notice_contact"] -- the key enrich_surface_contacts.py's existing
+    phone surfacer reads -- so this real, reachable broker phone actually
+    surfaces instead of sitting unused."""
+    li = _parse_detail(_DETAIL_ON_MARKET, "/properties/11182-0", _ADDR)
+    nc = li.raw["notice_contact"]
+    assert nc["name"] == "Brendon Payne"
+    assert nc["phone"] == "+1 (843) 222-5771"
+    assert nc["contact_role"] == "listing broker"
+
+
 def test_brochure_pdf_is_wired_not_dropped_by_shared_junk_filter():
     """Regression pin: the shared harvest_document_links() junk-denylist
     excludes "brochure" by default (reasonable for other sources), but it
