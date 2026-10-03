@@ -128,6 +128,95 @@ def test_stamps_tax_relief_on_a_matching_lead(monkeypatch):
         "kind": "use_value_deferral", "basis": "present_use_rollback_lien",
         "deferred_value": 73300.0, "county": "Rutherford",
     }
+    # 2026-10-02 breadth fix: a use_value_deferral hit also promotes into
+    # raw['rollback_exposure'] -- the key enrichment_rollback_deferral.py and the
+    # county-signal coverage tracker actually read.
+    re_block = li.raw["rollback_exposure"]
+    assert re_block["deferred_value"] == 73300.0
+    assert re_block["rollback_years"] == 4  # NC
+    assert re_block["basis"] == "present_use_rollback_lien"
+    assert re_block["county"] == "Rutherford" and re_block["state"] == "NC"
+    # No invented tax rate: this layer carries a deferred VALUE, not a bill amount.
+    assert re_block["annual_deferred_tax"] is None
+    assert re_block["estimated_rollback"] is None
+    assert re_block["tax_rate_source"] == "unavailable_no_bill_layer"
+
+
+def test_senior_exemption_hit_does_not_promote_rollback_exposure(monkeypatch):
+    """A senior/disabled/blind exemption is not a rollback liability -- only
+    use_value_deferral hits should ever stamp raw['rollback_exposure']."""
+    async def fake_query(http, url, where, out_fields=None, count=1):
+        return [{"Exempt": "ELD"}]
+
+    monkeypatch.setattr(mod, "_query", fake_query)
+    li = _lead(state="NC", county="Buncombe", parcel_id="1234567890")
+    stats = _run([li])
+    assert stats == {"queried": 1, "tagged": 1}
+    assert li.raw["tax_relief"]["kind"] == "elderly"
+    assert "rollback_exposure" not in li.raw
+
+
+def test_burke_use_value_deferral_reuses_henderson_shape():
+    """Burke carries the identical schema as Henderson (same regional CAMA
+    vendor) -- live-verified 2026-10-02: 1,560 real parcels, TOTAL_DEFERRED_VALUE
+    a genuine dollar amount (not a flag)."""
+    cfg = mod._RELIEF_LAYERS[("NC", "Burke")]
+    hit = mod._classify(cfg, {"TOTAL_DEFERRED_VALUE": "225888"})
+    assert hit == {"kind": "use_value_deferral", "basis": "present_use_rollback_lien",
+                   "deferred_value": 225888.0}
+    assert mod._classify(cfg, {"TOTAL_DEFERRED_VALUE": "0"}) is None
+
+
+def test_lincoln_landeferred_is_a_flag_not_a_dollar_amount():
+    """THE bug this config exists to prevent: Lincoln's LANDEFERRED reads -1 for
+    every real deferred parcel (live-verified 2026-10-02, old FoxPro/dBase
+    boolean-TRUE convention), never a real dollar figure. _classify must report
+    the flag only, exactly like Gaston's LUV_YES_NO, and never treat -1 as $-1
+    or as a magnitude."""
+    cfg = mod._RELIEF_LAYERS[("NC", "Lincoln")]
+    hit = mod._classify(cfg, {"LANDEFERRED": -1})
+    assert hit == {"kind": "use_value_deferral", "basis": "present_use_rollback_lien",
+                   "deferred_value": None}
+    assert mod._classify(cfg, {"LANDEFERRED": 0}) is None
+    assert mod._classify(cfg, {"LANDEFERRED": None}) is None
+
+
+def test_lincoln_query_uses_the_insecure_tls_client(monkeypatch):
+    """arcgisserver.lincolncountync.gov has an incomplete TLS chain -- the SAME
+    host counties_nc.lincoln_code_violations.py already works around with a
+    scoped verify=False client. Confirm enrich_tax_relief routes Lincoln's
+    query through the insecure client, not the shared (verify=True) one."""
+    from contextlib import asynccontextmanager
+
+    created = []
+
+    class _FakeClient:
+        def __init__(self, *a, verify=True, **kw):
+            self.verify = verify
+            created.append(self)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+    monkeypatch.setattr(mod.httpx, "AsyncClient", _FakeClient)
+
+    seen = {"secure": [], "insecure": []}
+
+    async def fake_query(http, url, where, out_fields=None, count=1):
+        seen["insecure" if http.verify is False else "secure"].append(url)
+        return [{"LANDEFERRED": -1}]
+
+    monkeypatch.setattr(mod, "_query", fake_query)
+    li = _lead(state="NC", county="Lincoln", parcel_id="2646891349")
+    stats = _run([li])
+    assert stats == {"queried": 1, "tagged": 1}
+    assert seen["insecure"] and not seen["secure"]
+    # Both clients are always opened (cheap: httpx doesn't connect until first
+    # request), one per verify mode.
+    assert {c.verify for c in created} == {True, False}
 
 
 def test_no_query_hit_leaves_the_lead_untagged(monkeypatch):

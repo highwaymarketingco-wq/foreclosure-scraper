@@ -184,3 +184,71 @@ def test_same_parcel_two_addressed_units_is_not_a_parse_bug_case_08114106():
         assert street in ("912 PARKWOOD AV", "914 PARKWOOD AV")
         assert city == "Charlotte"
         assert zip_code == "28205"
+
+
+# --------------------------------------------------------------------------
+# 2026-10-02 county-breadth fix: this scraper's own raw['charlotte_code_
+# enforcement'] key was never bridged into raw['code_enforcement'], the key
+# distress_score.py's PROPERTY signal and the county-signal coverage tracker
+# actually read -- so all 3,139 real, live, currently-open Mecklenburg cases
+# (live-verified 2026-10-02) contributed nothing to either. fof_ordered (a
+# demolition order) also now stamps raw['condemned'].
+# --------------------------------------------------------------------------
+
+def _row(case_type="Housing", fof_ordered=0, case_num="20190055069"):
+    return {
+        "CaseNumber": case_num,
+        "ParcelId": "06916309",
+        "CaseType": case_type,
+        "FullAddress": "2601 ABELWOOD RD CHARLOTTE, NC 28216",
+        "CaseStatus": "Open",
+        "DateCreated": 1570744875000,
+        "FOFOrdered": fof_ordered,
+    }
+
+
+def test_housing_and_nuisance_cases_earn_code_enforcement_property_credit():
+    for case_type in ("Housing", "Nuisance"):
+        li = _to_listing(_row(case_type=case_type))
+        ce = li.raw["code_enforcement"]
+        assert ce["has_open"] is True
+        assert ce["severe"] is True, case_type
+        assert ce["vacancy_adjacent"] is True, case_type
+        assert li.raw["distressed"] is True
+        # Original detail key is preserved alongside the bridge.
+        assert li.raw["charlotte_code_enforcement"]["case_type"] == case_type
+
+
+def test_zoning_parking_graffiti_commercial_cases_do_not_earn_property_credit():
+    """These still ship (has_open stays True, real case data is present) but
+    score no PROPERTY credit -- the same conservative split
+    henderson_code_violations.py draws for Zoning in its own county."""
+    for case_type in ("Zoning", "Parking", "Graffiti", "Commercial"):
+        li = _to_listing(_row(case_type=case_type))
+        ce = li.raw["code_enforcement"]
+        assert ce["has_open"] is True, case_type
+        assert ce["severe"] is False, case_type
+        assert ce["vacancy_adjacent"] is False, case_type
+        assert "distressed" not in li.raw, case_type
+
+
+def test_fof_ordered_case_is_always_severe_and_stamps_condemned():
+    """A Findings-of-Fact demolition order is severe regardless of CaseType,
+    and is Charlotte's own closest equivalent to a legal condemnation."""
+    li = _to_listing(_row(case_type="Zoning", fof_ordered=1))
+    ce = li.raw["code_enforcement"]
+    assert ce["severe"] is True
+    assert li.raw["condemned"] is True
+
+
+def test_non_fof_case_does_not_stamp_condemned():
+    li = _to_listing(_row(case_type="Housing", fof_ordered=0))
+    assert "condemned" not in li.raw
+
+
+def test_code_enforcement_violation_detail_carries_case_number_and_status():
+    li = _to_listing(_row(case_type="Housing", case_num="20190055069"))
+    v = li.raw["code_enforcement"]["violations"][0]
+    assert v["case_id"] == "20190055069"
+    assert v["violation"] == "Housing"
+    assert v["status"] == "Open"

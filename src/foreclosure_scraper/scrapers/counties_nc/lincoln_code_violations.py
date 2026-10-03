@@ -95,6 +95,21 @@ _ENTITY_RE = re.compile(
     r"group|services?|management|rentals?|realty|homes?|trust|bank|"
     r"church|ministries|hoa|partners?|development|dev\b)\b", re.I)
 
+#: VIOLATETYPE is NULL on every row (live-verified 2026-10-02, all 3,465 rows) --
+#: a promising-looking but dead field, same pattern seen elsewhere in this repo
+#: (Greenville's RESGRADE, Buncombe tax-history's Exemption). VIOLATEDESC free
+#: text is the only usable category signal. Live-sampled 2026-10-02 against the
+#: 66 currently-open cases: the clear physical deterioration/dumping categories
+#: (Solid waste, Junkyard, Junk vehicles, Abandoned structure) are the majority;
+#: paperwork/cosmetic categories (Sign, Use violation, Setback encroachment,
+#: Accessory/Addition - No permit, Commercial vehicles, Underpinning, RV used as
+#: residence) do not indicate vacancy or structural distress -- same severe/
+#: not-severe split henderson_code_violations._SEVERE already draws for its own
+#: county, applied to Lincoln's own vocabulary rather than reused verbatim.
+_SEVERE = re.compile(
+    r"(solid\s*waste|junk\s*yard|junkyard|junk\s*vehicle|abandoned\s*structure)",
+    re.I)
+
 _PAGE = 1000
 
 
@@ -216,6 +231,20 @@ def build_listing(feats: list[dict], now: datetime | None = None) -> Listing | N
                 "needs_dnc_scrub": True,
             })
 
+    # 2026-10-02 breadth fix: this scraper has NEVER written raw['code_enforcement']
+    # (only its own 'lincoln_code' key) since it was built -- so every one of its
+    # real, live, open-case leads (63 properties / 66 cases as of the original
+    # 2026-09-15 build) was invisible to distress_score.py's code_enforcement
+    # PROPERTY signal and to the county-signal coverage tracker, which both read
+    # raw['code_enforcement'] specifically. Same raw-key naming gap as the
+    # arcgis_distress_layers.py bridge added the same day. `severe` reuses the
+    # Henderson precedent: an open case is still shown either way (has_open stays
+    # True), it just only earns PROPERTY credit when the category is one of the
+    # VIOLATEDESC-matched physical-deterioration/dumping types, not a paperwork/
+    # cosmetic one (Sign, Use violation, Setback encroachment, ...).
+    types = sorted({v["description"] for v in violations if v["description"]})
+    severe = any(_SEVERE.search(t) for t in types)
+
     raw: dict[str, Any] = {
         "lincoln_code": {
             "county": "Lincoln",
@@ -230,9 +259,30 @@ def build_listing(feats: list[dict], now: datetime | None = None) -> Listing | N
             "opened": opened.date().isoformat() if opened else None,
             "source": "lincoln_county_code_violations_archive",
         },
+        "code_enforcement": {
+            "county": "Lincoln",
+            "open_violations": len(violations),
+            "total_violations": len(violations),
+            "prior_cases": 0,
+            "repeat_offender": len(violations) >= 2,
+            "violation_types": types,
+            "severe": severe,
+            "violations": [{
+                "violation": v["description"] or v["type"] or "unknown",
+                "status": v["status"] or "unknown",
+                "date": v["date"],
+                "case_id": v["violation_id"],
+            } for v in violations[:8]],
+            "has_open": True,
+            "vacancy_adjacent": severe,
+            "opened": opened.date().isoformat() if opened else None,
+            "source": "lincoln_county_code_violations_archive",
+        },
     }
     if contacts:
         raw["lincoln_code"]["contacts"] = contacts
+    if severe:
+        raw["distressed"] = True
 
     return Listing(
         source=LincolnCodeViolations.slug,

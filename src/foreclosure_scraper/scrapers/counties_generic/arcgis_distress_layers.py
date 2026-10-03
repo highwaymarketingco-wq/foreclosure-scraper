@@ -110,6 +110,26 @@ class Layer(NamedTuple):
     #: Without it a delinquent-roll layer carries its bill only under a source-specific
     #: column name (Greenville's is TOTTAX) that nothing downstream knows.
     amount: Optional[str] = None
+    #: process="code_enforcement" ONLY (2026-10-02 breadth fix). Until this date
+    #: _to_listing() wrote raw["arcgis_distress"] + foreclosure_process="code_enforcement"
+    #: but NEVER raw["code_enforcement"] -- the key distress_score.py's PROPERTY
+    #: signal and the county-signal coverage tracker actually read -- so 5 already-
+    #: live, already-wired layers (columbia_code_vacant_boarded, greensboro_code_housing,
+    #: durham_open_code_violations, rockhill_code_housing, rockhill_code_exterior_major;
+    #: live-verified 2026-10-02 counts 1,020/665/1,110/17/15) contributed NOTHING to
+    #: either, despite being real and current. Fixed generically for every
+    #: process="code_enforcement" layer: when None (the default), the layer's own
+    #: `where`/sub-layer-choice already restricts to a structurally-severe category
+    #: (true for all 4 of those above except Durham), so severe=True unconditionally.
+    #: When set, `detail`'s value is tested against this pattern instead -- Durham's
+    #: "Open Landuse Code Violation Cases" layer admits ALL Topics unfiltered, mixing
+    #: real structural ones (Repair Only/Repair or Demolish/Unsafe Building/B-C
+    #: Abatement) with yard-nuisance ones (Weedy/Junked Lot, Vehicle, Weedy Chronic
+    #: Violator) this module's OWN comments elsewhere already reject as "weaker"/
+    #: "yard-nuisance" for Greensboro and Rock Hill -- same conservative severe/
+    #: not-severe split henderson_code_violations.py draws for its own county,
+    #: applied here rather than claiming every open Durham case is vacancy-adjacent.
+    ce_severe_re: Optional[re.Pattern] = None
 
 
 LAYERS: tuple[Layer, ...] = (
@@ -474,6 +494,11 @@ LAYERS: tuple[Layer, ...] = (
                 "AptSuite", "PropertyCity", "PropertyState", "PropertyZip"),
         situs_parts=("AddressNum", "Street"), city="PropertyCity", zip_="PropertyZip",
         detail="Topic", process="code_enforcement",
+        # Topic breakdown (see comment above): Repair Only/Repair or Demolish/
+        # Unsafe Building/B-C Abatement are structural-condition categories;
+        # Weedy/Junked Lot, Vehicle, Weedy Chronic Violator are yard-nuisance,
+        # not admitted as severe (see Layer.ce_severe_re docstring).
+        ce_severe_re=re.compile(r"repair|demolish|unsafe|abatement", re.I),
         source_page="https://www.durhamnc.gov/1303/Custom-Maps-and-Data-Layers",
     ),
     # City of Rock Hill (York County) "Open Cases" code-enforcement service -- a MapServer split
@@ -708,6 +733,43 @@ def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     bits = [b for b in (owner, situs, detail) if b]
     raw: dict = {"arcgis_distress": _raw_block(a, lay)}
+    if lay.process == "code_enforcement":
+        # 2026-10-02 breadth fix -- see Layer.ce_severe_re docstring. One row here
+        # is one case, not a grouped property (unlike henderson_code_violations.py's
+        # per-PIN fold), so open_violations=1 per Listing; the board's own dedupe
+        # merges repeat cases at the same parcel/address the same way any other
+        # two independent sources would.
+        severe = bool(lay.ce_severe_re.search(detail or "")) if lay.ce_severe_re else True
+        raw["code_enforcement"] = {
+            "county": lay.county,
+            "open_violations": 1,
+            "total_violations": 1,
+            "prior_cases": 0,
+            "repeat_offender": False,
+            "violation_types": [detail] if detail else [],
+            "severe": severe,
+            "violations": [{
+                "violation": detail or "unknown",
+                "status": "open",
+                "date": None,
+                "case_id": parcel or situs,
+            }],
+            "has_open": True,
+            "vacancy_adjacent": severe,
+            "source": lay.slug,
+        }
+        if severe:
+            raw["distressed"] = True
+    if lay.slug == "rockhill_code_demolition":
+        # OpenCodeEnforcementCases' own Demolition sub-layer (process=
+        # "demolition_permit", not "code_enforcement" -- a city-ORDERED
+        # demolition case, not a homeowner's own voluntary teardown permit
+        # application; see Layer.process docs for why this is NOT a blanket
+        # "every demolition_permit layer" rule -- New Hanover's demolition_permits
+        # layer is a genuinely different thing, an application record, and must
+        # not be swept in here). 15 real open cases, live-verified 2026-10-02.
+        # This is Rock Hill's own equivalent of Spartanburg's condemned flag.
+        raw["condemned"] = True
     if lay.mailing_parts:
         mail_bits = [_clean(a.get(p)) for p in lay.mailing_parts]
         mailing = " ".join(b for b in mail_bits if b) or None

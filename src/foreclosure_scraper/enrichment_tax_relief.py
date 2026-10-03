@@ -18,6 +18,40 @@ county, by querying that county's parcel layer for the relief field. Reuses the
 COUNTY-layer _query + PID-variant helpers. Free, no auth. Adds raw['tax_relief']
 and a modest distress-score signal. Gate off with FORECLOSURE_TAX_RELIEF=0.
 
+2026-10-02 BREADTH FIX — a use_value_deferral hit ALSO stamps raw['rollback_exposure'].
+    `enrichment_rollback_deferral.py` (the OTHER module that models this exact
+    "rollback tax comes due on sale" liability, Buncombe + Anderson only) and the
+    county-signal coverage tracker both read `raw['rollback_exposure']`
+    specifically — not `raw['tax_relief']`. So Henderson/Gaston/Rutherford/York's
+    real, live use_value_deferral hits (confirmed live 2026-10-02: Henderson 1,598
+    parcels, Rutherford 1,917, Gaston+York as already documented above) were never
+    counted there at all, even though the distress-score signal itself
+    (`deferral_rollback`, FINANCIAL w=6) already fires correctly off raw['tax_relief'].
+    This was a raw-key naming gap, the same shape as the `lincoln_code`-vs-
+    `code_enforcement` gap found the same day — not a missing source. Fixed by also
+    writing raw['rollback_exposure'] in the same shape enrichment_rollback_deferral.py
+    uses, with NO invented tax rate (these counties' parcel layers carry a deferred
+    VALUE but no per-parcel tax-bill amount, unlike Buncombe's bills layer) —
+    `annual_deferred_tax`/`estimated_rollback` stay None with `tax_rate_source`
+    explaining why, exactly the same "report the real number, never guess a millage"
+    discipline this file already applies to Gaston's flag-only LUV_YES_NO. Only
+    fires for kind=="use_value_deferral" (never senior/disabled/homestead hits,
+    which are not a rollback liability).
+
+    Burke NC (2026-10-02 addition, live-verified: 1,560 real parcels with
+    TOTAL_DEFERRED_VALUE>0) carries the IDENTICAL schema as Henderson (same
+    LAND_USE_VALUE/USE_VALUE_DEFERRED/HISTORIC_VALUE_DEFERRED/TOTAL_DEFERRED_VALUE
+    field names — same regional CAMA vendor), so it reuses Henderson's exact
+    classify path.
+
+    Lincoln NC (2026-10-02 addition, live-verified against the COUNTY PARCEL layer,
+    a different endpoint than the dedicated lincoln_code_violations.py scraper's
+    TRACKiT code-case layer): `LANDEFERRED` is NOT a dollar amount -- sampled live
+    rows all read exactly -1, confirming it is a boolean flag encoded the old
+    FoxPro/dBase way (TRUE=-1), not a value field. Reported as a flag-only hit
+    (deferred_value=None), the same honest treatment Gaston's Y/N LUV_YES_NO
+    already gets here -- do NOT "fix" this to read LANDEFERRED as a dollar figure.
+
 MEASURED YIELD, 2026-08-06 — read this before investing more here
     Gaston and Rutherford were added on this date. The parcel joins work
     (Gaston 19/40, Rutherford 39/40 against real board rows), but over a
@@ -62,6 +96,12 @@ from .enrichment_owner_mailing import _query, _pid_variants
 
 log = structlog.get_logger()
 
+# Statutory rollback lookback in tax years, by state -- same constant
+# enrichment_rollback_deferral.py defines (NC G.S. 105-277.4(c): current year +
+# 3 preceding; SC Code 12-43-220(d)(4): 3 preceding). Duplicated rather than
+# imported to avoid a cross-module dependency for one dict literal.
+_ROLLBACK_YEARS = {"NC": 4, "SC": 3}
+
 # (state, county) -> layer config. kind: how to classify a hit.
 _RELIEF_LAYERS: dict[tuple[str, str], dict] = {
     ("NC", "Buncombe"): {
@@ -77,6 +117,41 @@ _RELIEF_LAYERS: dict[tuple[str, str], dict] = {
         "where_extra": "USE_VALUE_DEFERRED > 0",
         "fields": "PIN,PROPERTY_OWNER,TOTAL_DEFERRED_VALUE",
         "classify": "use_value_deferral",
+    },
+    # Burke NC (2026-10-02 county-breadth pass, docs: rollback_exposure investigation).
+    # IDENTICAL schema to Henderson -- same field names (LAND_USE_VALUE/
+    # USE_VALUE_DEFERRED/HISTORIC_VALUE_DEFERRED/TOTAL_DEFERRED_VALUE), same
+    # regional CAMA vendor. Live-verified 2026-10-02: 1,560 real parcels with
+    # TOTAL_DEFERRED_VALUE>0 (1,548 via USE_VALUE_DEFERRED>0 -- both numeric fields,
+    # unlike Rutherford's string-typed pair), real dollar amounts sampled
+    # (e.g. $225,888, $100,645, $18,752), reuses Henderson's exact classify path.
+    ("NC", "Burke"): {
+        "url": "https://gis.burkenc.org/arcgis/rest/services/ProdParcelViewFC/MapServer/0",
+        "pin_field": "PIN",
+        "where_extra": "USE_VALUE_DEFERRED > 0",
+        "fields": "PIN,PROPERTY_OWNER,TOTAL_DEFERRED_VALUE",
+        "classify": "use_value_deferral",
+    },
+    # Lincoln NC (2026-10-02 addition). This is the COUNTY PARCEL layer (a
+    # different endpoint than counties_nc.lincoln_code_violations.py's own
+    # TRACKiT code-case layer on the same host). LANDEFERRED is NOT a dollar
+    # amount -- live-sampled rows (PINs 2646891349, 2647803354, 2654968268, ...)
+    # all read exactly -1, the old FoxPro/dBase boolean-TRUE convention, not a
+    # value. 2,444 real parcels carry a non-zero (i.e. -1/"flagged") value,
+    # live-verified 2026-10-02. Reported flag-only, same honest treatment as
+    # Gaston's LUV_YES_NO below -- never invent a dollar figure from a flag.
+    ("NC", "Lincoln"): {
+        "url": ("https://arcgisserver.lincolncountync.gov/arcgis/rest/services/"
+                "Server_TaxParcelViewerSP/MapServer/0"),
+        "pin_field": "PIN",
+        "where_extra": "LANDEFERRED <> 0 AND LANDEFERRED IS NOT NULL",
+        "fields": "PIN,NAME1,LANDEFERRED",
+        "classify": "lincoln_use_value_flag",
+        # arcgisserver.lincolncountync.gov serves an incomplete TLS chain (same
+        # server-side misconfiguration counties_nc.lincoln_code_violations.py
+        # already works around) -- httpx's default verify=True fails with
+        # "unable to get local issuer certificate" against this exact host.
+        "insecure_tls": True,
     },
     # 1,576 parcels carry the land-use-value deferral flag, measured 2026-08-06.
     # Gaston stores it as a Y/N string rather than a deferred dollar amount, so
@@ -164,6 +239,20 @@ def _classify(cfg: dict, attrs: dict) -> Optional[dict]:
             return None
         return {"kind": "use_value_deferral", "basis": "present_use_rollback_lien",
                 "deferred_value": None}
+    if cfg["classify"] == "lincoln_use_value_flag":
+        # Lincoln's LANDEFERRED is a boolean flag (-1 = true, old FoxPro/dBase
+        # convention), NOT a dollar amount -- live-verified 2026-10-02, every
+        # sampled nonzero row read exactly -1. Report the flag, invent no number,
+        # same discipline as Gaston's LUV_YES_NO above.
+        val = attrs.get("LANDEFERRED")
+        try:
+            fv = float(val) if val not in (None, "", " ") else 0.0
+        except (TypeError, ValueError):
+            fv = 0.0
+        if fv == 0:
+            return None
+        return {"kind": "use_value_deferral", "basis": "present_use_rollback_lien",
+                "deferred_value": None}
     if cfg["classify"] == "york_sc":
         # York SC: HOMESTEAD='Y' is the SC homestead exemption (age 65+/disabled/
         # blind). LandUseDesc containing FARM is agricultural use-value assessment
@@ -194,16 +283,20 @@ async def enrich_tax_relief(listings: list[Listing], max_queries: int = 200) -> 
         return {"queried": 0, "tagged": 0}
 
     counts = {"queried": 0, "tagged": 0}
-    async with httpx.AsyncClient() as http:
+    # Lincoln's host serves an incomplete TLS chain (see _RELIEF_LAYERS note) --
+    # a SEPARATE client scoped to only that one config's queries, never a change
+    # to the shared client every other county's query runs through.
+    async with httpx.AsyncClient() as http, httpx.AsyncClient(verify=False) as http_insecure:
         for li in targets:
             county = (li.county or "").replace(" County", "").strip().title()
             cfg = _RELIEF_LAYERS[(li.state, county)]
+            use_http = http_insecure if cfg.get("insecure_tls") else http
             counts["queried"] += 1
             hit = None
             for pid in _pid_variants(li.parcel_id)[:3]:
                 safe = pid.replace("'", "''")
                 where = f"{cfg['pin_field']} LIKE '%{safe}%' AND {cfg['where_extra']}"
-                rows = await _query(http, cfg["url"], where, out_fields=cfg["fields"], count=1)
+                rows = await _query(use_http, cfg["url"], where, out_fields=cfg["fields"], count=1)
                 if rows:
                     hit = _classify(cfg, rows[0])
                     if hit:
@@ -212,6 +305,25 @@ async def enrich_tax_relief(listings: list[Listing], max_queries: int = 200) -> 
                 continue
             raw = li.raw if isinstance(li.raw, dict) else {}
             raw["tax_relief"] = {**hit, "county": county}
+            # 2026-10-02 breadth fix: also promote a rollback-liability hit into
+            # raw['rollback_exposure'], the key enrichment_rollback_deferral.py and
+            # the county-signal coverage tracker actually read -- see module
+            # docstring. Never for senior/disabled/homestead kinds (not a rollback).
+            if hit["kind"] == "use_value_deferral":
+                raw["rollback_exposure"] = {
+                    "deferred_value": hit.get("deferred_value"),
+                    "rollback_years": _ROLLBACK_YEARS.get(li.state),
+                    "annual_deferred_tax": None,
+                    "estimated_rollback": None,
+                    "estimate_is_floor": None,
+                    "tax_rate_source": "unavailable_no_bill_layer",
+                    "basis": hit["basis"],
+                    "county": county,
+                    "state": li.state,
+                    "source": f"{county} County parcel layer (tax_relief.{cfg['classify']})",
+                    "source_key": f"tax_relief_{county.lower()}",
+                    "match_method": "parcel",
+                }
             li.raw = raw
             counts["tagged"] += 1
     log.info("tax_relief.done", **counts)

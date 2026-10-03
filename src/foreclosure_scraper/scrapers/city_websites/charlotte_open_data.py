@@ -77,6 +77,15 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
+#: CaseType values that describe physical deterioration/structural distress
+#: rather than paperwork or cosmetic complaints -- live-verified 2026-10-02
+#: breakdown of the 3,139 currently-open cases: Housing 1,041, Nuisance 1,375,
+#: Zoning 639, Commercial 43, Graffiti 28, Parking 13. Same conservative split
+#: henderson_code_violations.py draws for its own county (Housing/Nuisance are
+#: the structural/dumping categories; Zoning/Parking/Graffiti/Commercial are
+#: not, by themselves, a vacancy or condemnation signal).
+_SEVERE_CASE_TYPES = {"housing", "nuisance"}
+
 SERVICE_URL = (
     "https://gis.charlottenc.gov/arcgis/rest/services/HNS/"
     "CodeEnforcementCasesAll/MapServer/0/query"
@@ -186,6 +195,59 @@ def _to_listing(attrs: dict, geometry: dict | None = None) -> Listing | None:
             except (TypeError, ValueError):
                 lat = lng = None
 
+    # 2026-10-02 breadth fix: this scraper has NEVER written raw['code_enforcement']
+    # (only its own 'charlotte_code_enforcement' detail key) since it was rewritten
+    # 2026-09-15, so none of its 3,139 real, live, currently-open cases were ever
+    # visible to distress_score.py's code_enforcement PROPERTY signal or the
+    # county-signal coverage tracker, which both read raw['code_enforcement']
+    # specifically -- the same raw-key naming gap as lincoln_code_violations.py's
+    # 'lincoln_code' and arcgis_distress_layers.py's 'arcgis_distress', found the
+    # same day. severe = Housing/Nuisance (see _SEVERE_CASE_TYPES above); a
+    # Zoning/Parking/Graffiti/Commercial-only case still ships (has_open stays
+    # True) but earns no PROPERTY credit, same conservative split Henderson's own
+    # fix draws. fof_ordered (a "Findings of Fact" demolition order -- the
+    # strongest severity signal this service carries, per the module docstring
+    # above) is ALSO Charlotte's own closest equivalent to a legal condemnation:
+    # 16 real currently-open cases, live-verified 2026-10-02 -- stamped into
+    # raw['condemned'] too, the same sub-classification Spartanburg's condemned
+    # scrapers already feed into this identical PROPERTY bucket.
+    severe = case_type.strip().lower() in _SEVERE_CASE_TYPES or bool(fof_ordered)
+    raw: dict = {
+        "charlotte_code_enforcement": {
+            "case_type": case_type,
+            "case_status": attrs.get("CaseStatus"),
+            "case_origin": attrs.get("CaseOrigin"),
+            "council_district": attrs.get("CouncilDistrict"),
+            "date_created": created.isoformat() if created else None,
+            "fof_ordered": fof_ordered,
+            "req_num_311": attrs.get("ReqNum311"),
+            "detailed_description_full": full_desc[:4000] or None,
+        },
+        "code_enforcement": {
+            "county": "Mecklenburg",
+            "city": "Charlotte",
+            "open_violations": 1,
+            "total_violations": 1,
+            "prior_cases": 0,
+            "repeat_offender": False,
+            "violation_types": [case_type],
+            "severe": severe,
+            "violations": [{
+                "violation": case_type,
+                "status": attrs.get("CaseStatus") or "unknown",
+                "date": created.date().isoformat() if created else None,
+                "case_id": str(case_num),
+            }],
+            "has_open": True,
+            "vacancy_adjacent": severe,
+            "source": "charlotte_open_data",
+        },
+    }
+    if severe:
+        raw["distressed"] = True
+    if fof_ordered:
+        raw["condemned"] = True
+
     return Listing(
         source="city_websites.charlotte_open_data",
         source_url=f"https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0/{case_num}",
@@ -205,16 +267,7 @@ def _to_listing(attrs: dict, geometry: dict | None = None) -> Listing | None:
                      + f": {desc_tail}")[:500],
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
-        raw={"charlotte_code_enforcement": {
-            "case_type": case_type,
-            "case_status": attrs.get("CaseStatus"),
-            "case_origin": attrs.get("CaseOrigin"),
-            "council_district": attrs.get("CouncilDistrict"),
-            "date_created": created.isoformat() if created else None,
-            "fof_ordered": fof_ordered,
-            "req_num_311": attrs.get("ReqNum311"),
-            "detailed_description_full": full_desc[:4000] or None,
-        }},
+        raw=raw,
     )
 
 
