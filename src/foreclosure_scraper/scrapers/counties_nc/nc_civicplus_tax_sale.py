@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import html as _html
+import io
 import re
 from datetime import datetime
 from typing import Iterable, Optional
@@ -280,8 +281,36 @@ def _parse_case_table_blocks(text: str, county: str, url: str) -> list[Listing]:
     return out
 
 
+def _pdf_to_text(content: bytes) -> str:
+    """Extract real text from a PDF response body, same `pypdf` pattern already
+    proven in the sibling nc_county_pdf_delinquent_tax.py. Returns "" (never
+    raises) on a corrupt/scanned-image-only PDF, so callers fall through to
+    the stealth-fetch retry exactly as they do for any other empty fetch."""
+    try:
+        from pypdf import PdfReader
+        return "\n".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(content)).pages)
+    except Exception as exc:
+        log.debug("nc_civicplus.pdf_extract_failed", error=str(exc)[:120])
+        return ""
+
+
 async def _fetch_text(url: str) -> str:
-    """Fetch page text via httpx."""
+    """Fetch page text via httpx.
+
+    This module's own docstring has said since it was written that it
+    "also checks those known [PDF/XLSX] URLs" -- but every PDF response was
+    being handed straight to `resp.text`, httpx's raw bytes-as-string decode
+    of binary PDF content, which is unreadable garbage no downstream regex
+    can ever match (confirmed live, 2026-10-03: Davidson County's own
+    2.8MB/35-page "Tax-Foreclosures-PDF", updated by the county 2026-09-17,
+    decoded via `.text` to a `%PDF-1.7 ... obj<</Type/Catalog...` byte dump).
+    Extracting real text via `pypdf` first -- the SAME library already used
+    for this exact purpose by nc_county_pdf_delinquent_tax.py -- let the
+    EXISTING `_parse_tax_sale_page()` tiers correctly find 21 real pending-
+    sale properties (real street addresses, parcel IDs, dollar amounts)
+    sitting behind that one PDF with no other code change: the scraper
+    could already parse this shape of data, it was just never given real
+    text to parse."""
     try:
         from ...http_client import client
         async with client(timeout=20.0) as c:
@@ -291,6 +320,8 @@ async def _fetch_text(url: str) -> str:
             })
             if resp.status_code != 200:
                 return ""
+            if resp.content[:4] == b"%PDF":
+                return _pdf_to_text(resp.content)
             return resp.text or ""
     except Exception:
         return ""

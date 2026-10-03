@@ -31,9 +31,11 @@ from __future__ import annotations
 from foreclosure_scraper.scrapers.counties_nc.nc_civicplus_tax_sale import (
     ADDR_RE,
     NcCivicplusTaxSaleScraper,
+    _fetch_text,
     _parse_case_table_blocks,
     _parse_li_blocks,
     _parse_tax_sale_page,
+    _pdf_to_text,
 )
 
 # Trimmed, field-faithful reproduction of the live Alamance County page
@@ -137,3 +139,157 @@ def test_registered():
     from foreclosure_scraper.scrapers._registry import all_scrapers
     assert "counties_nc.nc_civicplus_tax_sale" in {s.slug for s in all_scrapers()}
     assert NcCivicplusTaxSaleScraper.slug == "counties_nc.nc_civicplus_tax_sale"
+
+
+# ===========================================================================
+# PDF RESPONSES WERE BEING DECODED AS GARBAGE, NOT PARSED, 2026-10-03
+#
+# This module's own docstring has said since it was written that it "also
+# checks those known [PDF/XLSX] URLs" -- but `_fetch_text` handed every PDF
+# response straight to httpx's `.text`, a raw bytes-as-string decode of
+# binary PDF content, which can never match any of this module's own regexes
+# (they are all text-shaped: ADDR_RE, MONEY_RE, NC_CASE_RE, ...). Live-
+# confirmed on Davidson County's own 2.8MB/35-page "Tax-Foreclosures-PDF"
+# (updated by the county 2026-09-17): `.text` decoded it to a `%PDF-1.7
+# ... /Type/Catalog ...` byte dump, 0 listings found. Extracting real text
+# via `pypdf` first -- the SAME library already used for this exact purpose
+# by the sibling nc_county_pdf_delinquent_tax.py -- let the EXISTING
+# `_parse_tax_sale_page()` tiers correctly find 21 real pending-sale
+# properties (real street addresses, parcel IDs, dollar amounts) sitting
+# behind that one PDF with NO other code change: the parser could already
+# handle this shape of text, it was just never given real text to parse.
+# ===========================================================================
+
+def _make_pdf(text: str) -> bytes:
+    """Build a minimal, genuinely valid single-page PDF whose content stream
+    is exactly `text`, drawn with the one built-in Helvetica font -- so
+    `pypdf.PdfReader(...).extract_text()` recovers it character-for-character.
+    No fixture file needed; this is the same pypdf.generic machinery pypdf's
+    own PdfWriter uses internally, just assembled by hand for a test."""
+    import io
+
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=400, height=200)
+
+    escaped = text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
+    stream = DecodedStreamObject()
+    stream.set_data(f"BT /F1 12 Tf 10 100 Td ({escaped}) Tj ET".encode("latin-1"))
+    stream_ref = writer._add_object(stream)
+
+    font = DictionaryObject()
+    font[NameObject("/Type")] = NameObject("/Font")
+    font[NameObject("/Subtype")] = NameObject("/Type1")
+    font[NameObject("/BaseFont")] = NameObject("/Helvetica")
+    font_ref = writer._add_object(font)
+
+    fonts = DictionaryObject()
+    fonts[NameObject("/F1")] = font_ref
+    resources = DictionaryObject()
+    resources[NameObject("/Font")] = fonts
+
+    page[NameObject("/Resources")] = resources
+    page[NameObject("/Contents")] = stream_ref
+
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def test_pdf_to_text_extracts_real_text_not_binary_garbage():
+    pdf_bytes = _make_pdf("405 Moore Dr Tax Id 11342A0000034 Tax Value $309,150.00")
+    assert pdf_bytes[:4] == b"%PDF"
+    text = _pdf_to_text(pdf_bytes)
+    assert "405 Moore Dr" in text
+    assert "$309,150.00" in text
+    assert "11342A0000034" in text
+
+
+def test_pdf_to_text_is_silent_on_garbage_bytes():
+    """Must never raise -- a corrupt/moved/scanned-image-only PDF is reported
+    as an empty fetch, same as any other failed fetch, not a crash."""
+    assert _pdf_to_text(b"not a real pdf at all") == ""
+    assert _pdf_to_text(b"") == ""
+
+
+def test_pdf_extracted_text_flows_through_the_existing_parser():
+    """The real, measured value of the fix: once given REAL text instead of
+    binary, the free-text Pattern 2 tier this module already had finds the
+    property with no new parsing code at all -- same shape as the live
+    Davidson County PDF (address, Tax Id, dollar amount in prose, no HTML)."""
+    pdf_bytes = _make_pdf(
+        "405 Moore Dr Tax Id 1117800250006 Tax Value (2026) $309,150.00"
+    )
+    text = _pdf_to_text(pdf_bytes)
+    listings = _parse_tax_sale_page(text, "Davidson", "http://x/Tax-Foreclosures-PDF")
+    assert len(listings) == 1
+    li = listings[0]
+    assert "405 Moore Dr" in li.street_address
+    assert li.parcel_id == "1117800250006"
+    assert li.raw["nc_civicplus_tax_sale"]["current_bid"] == 309150.0
+
+
+def test_fetch_text_dispatches_pdf_responses_through_pdf_to_text(monkeypatch):
+    """Integration boundary: a 200 response whose body starts with the PDF
+    magic bytes must be routed through `_pdf_to_text`, not `resp.text`."""
+    import asyncio
+
+    pdf_bytes = _make_pdf("110 Sink Inn Rd Tax Value $36,210.00")
+
+    class _FakeResp:
+        status_code = 200
+        content = pdf_bytes
+
+        @property
+        def text(self):
+            # If this is ever read for a PDF response, the bug has regressed.
+            raise AssertionError("must not decode a PDF body via .text")
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, headers=None):
+            return _FakeResp()
+
+    monkeypatch.setattr(
+        "foreclosure_scraper.http_client.client",
+        lambda timeout=20.0: _FakeClient(),
+    )
+
+    out = asyncio.run(_fetch_text("http://example.gov/Tax-Foreclosures-PDF"))
+    assert "110 Sink Inn Rd" in out
+    assert "$36,210.00" in out
+
+
+def test_fetch_text_still_returns_plain_html_unchanged(monkeypatch):
+    """Non-PDF responses must take the old, unchanged `.text` path."""
+    import asyncio
+
+    class _FakeResp:
+        status_code = 200
+        content = b"<html>not a pdf</html>"
+        text = "<html>not a pdf</html>"
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, headers=None):
+            return _FakeResp()
+
+    monkeypatch.setattr(
+        "foreclosure_scraper.http_client.client",
+        lambda timeout=20.0: _FakeClient(),
+    )
+
+    out = asyncio.run(_fetch_text("http://example.gov/page.html"))
+    assert out == "<html>not a pdf</html>"
