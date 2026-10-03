@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Run enrichment_comps.enrich_with_comps() board-wide.
 
-Unlike doc_ocr/vision, comps' network cost is bounded by county count (18),
-not row count: it builds one sold-comp pool and one rent-comp pool per
-county seat via HomeHarvest (free, no key), then matches every listing
-against the pre-built pool in memory. Safe to run against the whole board
-in one call -- no per-listing network calls, no chunking needed.
+Unlike doc_ocr/vision, comps' network cost is bounded by DISTINCT COUNTY
+COUNT, not row count: it builds one sold-comp pool and one rent-comp pool per
+real NC/SC county actually present among the rows passed in (via HomeHarvest,
+free, no key, queried as "<County> County, <ST>" -- covers all 146 counties,
+not just the 18-county flip corridor; see enrichment_comps.enrich_with_comps's
+docstring), then matches every listing against the pre-built pool in memory.
+Board-wide that is now up to 146 pools (was 18 before 2026-10-03's fix), so a
+full run here will take noticeably longer and make more outbound calls than
+it used to -- still safe to run against the whole board in one call (no
+per-listing network calls, no chunking needed), just budget more wall-clock.
 
     python scripts/backfill_comps.py --dry-run
     python scripts/backfill_comps.py

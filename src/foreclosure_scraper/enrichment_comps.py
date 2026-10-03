@@ -26,22 +26,40 @@ from typing import Optional
 
 import structlog
 
-from .config import ALL_COUNTIES
+from .config import in_scope_distressed
 from .models import Listing, PropertyKind
+from .validation import normalize_county
 
 log = structlog.get_logger()
 
 
 # ---- Pools (sold + rent) ---------------------------------------------------
 
-def _sold_pool_for_seat(seat: str, state: str) -> list[dict]:
+def _comp_location(county: str, state: str) -> str:
+    """Location string for HomeHarvest's (Realtor.com) geo-suggest search.
+
+    '<County> County, <ST>' resolves the WHOLE county, not just its seat town
+    -- verified live 2026-10-03 against counties at every size, from Catawba
+    NC (1,858 sold/180d) and Greenville SC (5,763) down to rural Allendale SC
+    (20). It also beats a seat-town search for the ORIGINAL hardcoded
+    counties: Spartanburg SC returns 5,935 sold/180d by county vs 1,747 by
+    seat-town alone, Rutherford NC 778 vs 227 -- a county search is a strict
+    superset of a seat-town search, not a different population. This removes
+    the need for a per-county seat-town gazetteer (which doesn't exist for
+    all 146 real NC+SC counties; only the original 18-county footprint had
+    one, in config.py's `County.seat`).
+    """
+    return f"{county} County, {state}"
+
+
+def _sold_pool_for_seat(county: str, state: str) -> list[dict]:
     try:
         from homeharvest import scrape_property
     except ImportError:
         return []
     try:
         df = scrape_property(
-            location=f"{seat}, {state}",
+            location=_comp_location(county, state),
             listing_type="sold",
             past_days=180,
         )
@@ -61,18 +79,18 @@ def _sold_pool_for_seat(seat: str, state: str) -> list[dict]:
             deduped.append(r)
         return deduped
     except Exception as exc:
-        log.debug("comps.sold_pool.error", seat=seat, state=state, error=str(exc)[:100])
+        log.debug("comps.sold_pool.error", county=county, state=state, error=str(exc)[:100])
         return []
 
 
-def _rent_pool_for_seat(seat: str, state: str) -> list[dict]:
+def _rent_pool_for_seat(county: str, state: str) -> list[dict]:
     try:
         from homeharvest import scrape_property
     except ImportError:
         return []
     try:
         df = scrape_property(
-            location=f"{seat}, {state}",
+            location=_comp_location(county, state),
             listing_type="for_rent",
             past_days=90,
         )
@@ -80,7 +98,7 @@ def _rent_pool_for_seat(seat: str, state: str) -> list[dict]:
             return []
         return df.to_dict("records")
     except Exception as exc:
-        log.debug("comps.rent_pool.error", seat=seat, state=state, error=str(exc)[:100])
+        log.debug("comps.rent_pool.error", county=county, state=state, error=str(exc)[:100])
         return []
 
 
@@ -88,7 +106,7 @@ def _rent_pool_for_seat(seat: str, state: str) -> list[dict]:
 SOLD_WINDOW_MONTHS = 6.0   # the sold pool's past_days=180 == 6 months
 
 
-def _active_count_for_seat(seat: str, state: str) -> Optional[int]:
+def _active_count_for_seat(county: str, state: str) -> Optional[int]:
     """Count current for-sale listings. Returns None on FETCH FAILURE (distinct
     from a genuine 0) so a failed pull can't masquerade as a red-hot market."""
     try:
@@ -96,10 +114,10 @@ def _active_count_for_seat(seat: str, state: str) -> Optional[int]:
     except ImportError:
         return None
     try:
-        df = scrape_property(location=f"{seat}, {state}", listing_type="for_sale")
+        df = scrape_property(location=_comp_location(county, state), listing_type="for_sale")
         return 0 if df is None else int(len(df))
     except Exception as exc:
-        log.debug("comps.active_pool.error", seat=seat, state=state, error=str(exc)[:100])
+        log.debug("comps.active_pool.error", county=county, state=state, error=str(exc)[:100])
         return None
 
 
@@ -741,21 +759,44 @@ def _condition_tier(li: Listing) -> str:
 # ---- Main enrichment -------------------------------------------------------
 
 async def enrich_with_comps(listings: list[Listing]) -> None:
-    """Pull sold + rent pools per priority county-seat and attach:
+    """Pull sold + rent pools for every real NC/SC county this batch actually
+    touches, and attach:
        - 3 sold comps (kind+zip+sqft+beds+era matched)
        - 3 rent comps (kind+zip+beds+sqft matched)
        - Spec backfill (sqft, beds, baths, year)
        - Condition tier (move_in / cosmetic / major / gut)
+
+    County universe: the distinct (state, county) pairs present in `listings`,
+    validated against the full 146-county NC+SC register (`in_scope_distressed`)
+    -- NOT `config.ALL_COUNTIES`' 18-county FLIP-only corridor. That narrower
+    list is a deliberate scope for flip-specific code (law-firm footprints,
+    court scrapers, the geocode seat-centroid fallback); it undercounted here
+    by construction, since 2026-09-15's "if it's a flip, it's the 18 counties;
+    if it's a distressed lead, it's anywhere in NC/SC" direction means every
+    one of the 146 counties can carry leads that still need an ARV. A county
+    with zero listings in this batch costs nothing (no pool is fetched for
+    it), so this keeps the original design's "cost bounded by county count,
+    not row count" property -- just measured against the counties actually
+    present, not a frozen 18-county list.
     """
     if not listings:
         return
     log.info("comps.start", count=len(listings))
 
+    county_list: list[tuple[str, str]] = sorted({
+        (li.state.strip().upper(), normalize_county(li.county))
+        for li in listings
+        if li.state and li.county and in_scope_distressed(li.county, li.state)
+    })
+    if not county_list:
+        log.info("comps.no_valid_counties", count=len(listings))
+        return
+
     loop = asyncio.get_event_loop()
     with ThreadPoolExecutor(max_workers=6) as pool:
-        sold_futs = [loop.run_in_executor(pool, _sold_pool_for_seat, c.seat, c.state) for c in ALL_COUNTIES]
-        rent_futs = [loop.run_in_executor(pool, _rent_pool_for_seat, c.seat, c.state) for c in ALL_COUNTIES]
-        active_futs = [loop.run_in_executor(pool, _active_count_for_seat, c.seat, c.state) for c in ALL_COUNTIES]
+        sold_futs = [loop.run_in_executor(pool, _sold_pool_for_seat, name, state) for state, name in county_list]
+        rent_futs = [loop.run_in_executor(pool, _rent_pool_for_seat, name, state) for state, name in county_list]
+        active_futs = [loop.run_in_executor(pool, _active_count_for_seat, name, state) for state, name in county_list]
         sold_results, rent_results, active_results = await asyncio.gather(
             asyncio.gather(*sold_futs, return_exceptions=True),
             asyncio.gather(*rent_futs, return_exceptions=True),
@@ -765,14 +806,14 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
     sold_pools: dict[tuple[str, str], list[dict]] = {}
     rent_pools: dict[tuple[str, str], list[dict]] = {}
     velocity: dict[tuple[str, str], dict] = {}
-    for c, sr, rr, ar in zip(ALL_COUNTIES, sold_results, rent_results, active_results):
+    for (state, name), sr, rr, ar in zip(county_list, sold_results, rent_results, active_results):
         if isinstance(sr, list):
-            sold_pools[(c.state, c.name)] = sr
+            sold_pools[(state, name)] = sr
         if isinstance(rr, list):
-            rent_pools[(c.state, c.name)] = rr
+            rent_pools[(state, name)] = rr
         active = ar if isinstance(ar, int) else None   # None = fetch failed
         moi = _months_of_inventory(active, len(sr) if isinstance(sr, list) else 0)
-        velocity[(c.state, c.name)] = {
+        velocity[(state, name)] = {
             "moi": moi, "holding_months_est": _holding_months_from_moi(moi),
             "active": active, "sold_180d": len(sr) if isinstance(sr, list) else 0,
         }
@@ -785,8 +826,9 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
     cond_counts = {"move_in_ready": 0, "cosmetic": 0, "major": 0, "gut": 0}
 
     for li in listings:
-        sold_pool = sold_pools.get((li.state, li.county)) if (li.county and li.state) else None
-        rent_pool = rent_pools.get((li.state, li.county)) if (li.county and li.state) else None
+        pool_key = ((li.state or "").strip().upper(), normalize_county(li.county)) if (li.county and li.state) else None
+        sold_pool = sold_pools.get(pool_key) if pool_key else None
+        rent_pool = rent_pools.get(pool_key) if pool_key else None
 
         # Spec backfill from same-county sold pool
         before = (li.living_sqft, li.bedrooms, li.bathrooms)
@@ -801,7 +843,7 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
             li.raw = {}
 
         # Market velocity -> per-listing holding-period estimate (calc reads it).
-        vel = velocity.get((li.state, li.county)) if (li.county and li.state) else None
+        vel = velocity.get(pool_key) if pool_key else None
         if vel:
             li.raw["market_velocity"] = vel
         tier = _condition_tier(li)
