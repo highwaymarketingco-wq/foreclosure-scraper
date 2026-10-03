@@ -52,6 +52,49 @@ auction", "execution sale", "foreclosure sale", "notice of sale", "pending
 sale(s)") inside the same text block before treating an address/case-number
 match as a real listing, so an unrelated page with a stray address or
 docket-shaped number can no longer manufacture a fake sale.
+
+CONFIRMED-LIVE FALSE-NEGATIVE, PARTIALLY FIXED 2026-10-02 (`lt_sheriff_sale`
+zero-gap breadth audit: the board carries only 1 row board-wide for this
+listing type, and that single row is ITSELF a leftover of the 2026-10-01 bug
+above -- `street_address="311 E. Marion Street"`, no case number, no sale
+date, i.e. Cleveland's own department address fabricated before the fix
+existed, never cleaned up since no full pipeline run has completed since;
+the true current real count of sheriff_sale leads on the board is 0, not 1).
+While live-checking whether a genuinely working source was being
+mis-filtered, found one real false negative: Brunswick County NC's current
+page (brunswicksheriff.com/resources/auctions, fetched live 2026-10-02)
+carries a real posting -- "FILE# 19 CVS 004029-640 ... SHERIFF'S AUCTION
+7/17/2026 (POSTPONED TO 7/31/26)" -- with a real civil case number, but
+`_parse_brunswick` returned ZERO listings against this exact live page
+because `_SALE_CONTEXT_RE` (added the day before) required the word "sale",
+and Brunswick's own site calls its postings "Sheriff's Auctions" throughout,
+never "sheriff's sale". Added `sheriff'?s?\\s+auction` as its own
+alternative (not loosened to bare "auction", which is exactly what let the
+original false positive through) -- this widens recall for any page that
+puts the sale-context phrase and the address/case number in the SAME text
+block, which is the shape this module's own test fixtures use.
+
+NOT YET FIXED, same investigation, scoped but intentionally not attempted
+here (would touch all three parsers' shared per-element loop, a bigger and
+riskier change than this pass's mandate): Brunswick's THIS SPECIFIC live
+posting still parses to 0 listings even after the regex widening above,
+because its real markup splits the case number and the "Sheriff's Auction"
+phrase into separate sibling `<p>` tags inside the same `div.entry-content`
+(`<p>FILE# 19 CVS 004029-640</p>` ... `<p><a>SHERIFF'S AUCTION ...</a></p>`),
+and the fallback parser only ever evaluates one CSS-matched element's own
+text at a time -- it never joins sibling paragraphs into one block. Fixing
+that needs grouping consecutive sibling `<p>` text within the same parent
+before applying `_SALE_CONTEXT_RE`/address/case extraction, which changes
+the false-positive surface this module's whole fix history is about, so it
+deserves its own dedicated pass with fresh fixtures, not a rider on this one.
+
+This is a narrow fix to a narrow genuine legal category, not a bucket-
+reclassification bug: see `distress_score.py` / the per-county sheriff
+scrapers' own docstrings (Anderson, Barnwell) for why real SHERIFF_SALE
+volume is and should stay small in NC/SC -- most mortgage foreclosures here
+run through a trustee (NC) or Master-in-Equity (SC), not the literal
+Sheriff's Office -- so this fix widens recall for the genuinely-narrow
+category rather than feeding it from a different, larger bucket.
 """
 from __future__ import annotations
 
@@ -111,9 +154,28 @@ _UPSET_BID_RE = re.compile(r"upset\s+bid", re.I)
 #: Required before the free-text fallback parser will treat an address/
 #: case-number match as a real sale listing — see the module docstring's
 #: 2026-10-01 false-positive writeup for why this guard exists.
+#:
+#: 2026-10-02 FALSE-NEGATIVE FOUND LIVE (zero-gap column-breadth audit of
+#: `lt_sheriff_sale`, 1/148 counties): this guard required the literal word
+#: "sale" in the same text block, but Brunswick County NC's OWN real,
+#: currently-live page (brunswicksheriff.com/resources/auctions, confirmed
+#: live 2026-10-02) titles its postings "SHERIFF'S AUCTION", never "sheriff's
+#: sale" -- e.g. a real, current posting reading "FILE# 19 CVS 004029-640 ...
+#: SHERIFF'S AUCTION 7/17/2026 (POSTPONED TO 7/31/26)" has a real case number
+#: but was silently dropped: `_parse_brunswick` on that exact live page
+#: returns 0 listings today. `sheriff'?s?\s+auction` added below so the same
+#: department's own preferred term is recognized without loosening the guard
+#: to bare "auction" (which is what let the original false positive through).
+#: Apostrophe class covers both the plain ASCII "'" and the curly Unicode
+#: right single quote (U+2019) that selectolax's text() returns once a page's
+#: literal "&#8217;"/"&rsquo;" entity is decoded -- Brunswick's and Cleveland's
+#: real live pages both use the curly form throughout ("Sheriff’s Auctions"),
+#: so a straight-quote-only pattern silently never matches real text at all
+#: (found live 2026-10-02 fixing the sibling false-negative below).
+_APOS = "['’]?"
 _SALE_CONTEXT_RE = re.compile(
-    r"sheriff'?s?\s+sale|public\s+auction|execution\s+sale|foreclosure\s+sale|"
-    r"notice\s+of\s+sale|pending\s+sales?|civil\s+sale",
+    r"sheriff" + _APOS + r"s?\s+sale|sheriff" + _APOS + r"s?\s+auction|public\s+auction|"
+    r"execution\s+sale|foreclosure\s+sale|notice\s+of\s+sale|pending\s+sales?|civil\s+sale",
     re.I,
 )
 #: File extensions that are never worth HTML-parsing as a sub-page (a PDF
