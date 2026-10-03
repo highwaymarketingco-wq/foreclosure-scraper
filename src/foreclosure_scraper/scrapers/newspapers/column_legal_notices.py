@@ -360,6 +360,23 @@ _DOT_BOOK_PAGE = re.compile(
     r"\s*Page[:\s]*([0-9]{1,8})",
     re.I,
 )
+# EXTRACTION-COMPLETENESS AUDIT 2026-10-03: "Original Beneficiary: <Lender>" is
+# the lender/noteholder name -- the real party behind the sale, analogous to a
+# judicial-foreclosure plaintiff -- sitting labelled, clean, right in the body
+# on every Hutchens/Green-Law-style template (live-surveyed 30/44 recent NC
+# foreclosure notices across 7 footprint counties: Gaston, Buncombe, Burke,
+# Cleveland, Rutherford, Henderson, Brunswick). It was parsed nowhere. The
+# other 14/44 genuinely never name a beneficiary at all (anonymized
+# "the holder of the Note" / "the holder of the indebtedness" prose, confirmed
+# live on Buncombe's "NC R.E. Trustee" template and Burke's "Substitute
+# Trustee Services" template) -- a real template limitation, not a missed
+# regex; left as None there rather than guessed at.
+_BENEFICIARY_RE = re.compile(
+    r"Original\s+Beneficiary[:\s]*([A-Z][A-Za-z0-9 .,&'\-]{2,80}?)"
+    r"(?=\s+(?:This|The|Said|Subject|CONDITIONS|Grantors?|Dated|Description|"
+    r"Place of Sale|Date of Sale|Record Owner)\b|[.\n]|$)",
+    re.I,
+)
 
 # A residual zip we can salvage from any "..., NC 28409" tail in the body.
 _ZIP_IN_ADDR = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
@@ -608,6 +625,12 @@ def _parse_nc_foreclosure(text: str) -> dict:
     if m:
         out["dot_book"] = m.group(1).strip()
         out["dot_page"] = m.group(2).strip()
+
+    m = _BENEFICIARY_RE.search(t)
+    if m:
+        name = _clean_name(m.group(1))
+        if name:
+            out["plaintiff"] = name
 
     return out
 
@@ -1347,6 +1370,7 @@ class ColumnLegalNotices(BaseScraper):
             parcel_id=parsed.get("parcel_id"),
             owner_name=parsed.get("owner_name"),
             trustee=parsed.get("trustee"),
+            plaintiff=parsed.get("plaintiff"),
             case_number=parsed.get("case_number"),
             sale_date=parsed.get("sale_date"),
             sale_time=parsed.get("sale_time"),
