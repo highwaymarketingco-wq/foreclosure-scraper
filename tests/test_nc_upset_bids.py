@@ -76,25 +76,36 @@ def test_garbage_payloads_do_not_raise():
 
 # --- coverage accounting ----------------------------------------------------
 
-def test_feed_stats_reports_total_and_in_footprint(feed):
+def test_feed_stats_reports_total_and_in_scope(feed):
+    """2026-10-03 fix: TAX_SALE is a distressed-type lead, not a flip, so the
+    Kania feed is gated on config.in_scope_distressed (any real NC county),
+    not the narrow 18-county flip footprint. Every county in this fixture
+    (Rutherford, Burke, Cleveland, Alexander, Alleghany, Anson, Lincoln) is a
+    real NC county, so counties_in_footprint/rows_in_footprint ("footprint"
+    naming kept for diff size) now equal the totals -- nothing is dropped by
+    county anymore."""
     stats = feed_stats(feed)
     assert stats["feed_rows_total"] == len(feed)
-    # More counties in the feed than in our footprint — the point of reporting both.
-    assert stats["counties_total"] > stats["counties_in_footprint"] > 0
-    assert 0 < stats["rows_in_footprint"] < stats["feed_rows_total"]
+    assert stats["counties_total"] == stats["counties_in_footprint"] > 0
+    assert stats["rows_in_footprint"] == stats["feed_rows_total"]
     assert stats["with_current_bid"] > 0
     assert stats["with_upset_deadline"] > 0
 
 
-def test_out_of_footprint_counties_are_dropped(feed, kania_rows):
+def test_real_nc_counties_outside_the_old_footprint_are_kept(feed, kania_rows):
+    """2026-10-03 fix, same class/feed as law_firms.kania's (both read the
+    identical Kania Ninja Tables feed): Anson and Alleghany are real NC
+    counties outside the old 18-county flip footprint that the old
+    in_footprint() gate silently dropped. Live-verified against the real
+    feed (see law_firms.kania's fix) that this cost real rows across the
+    whole state, not just this fixture's two counties."""
     counties = {li.county for li in kania_rows}
+    assert "Anson" in counties
+    assert "Alleghany" in counties
+    # Still real NC counties only -- a garbage/non-NC value would still drop.
     assert counties <= {"Rutherford", "Cleveland", "Lincoln", "Polk", "Burke",
                         "Henderson", "Gaston", "Transylvania", "McDowell",
-                        "Mitchell", "Buncombe"}
-    # Cherokee NC and Madison NC ride in the feed but are not NC footprint
-    # counties (Cherokee is only in scope on the SC side).
-    assert "Alexander" not in counties
-    assert "Cherokee" not in counties
+                        "Mitchell", "Buncombe", "Anson", "Alleghany", "Alexander"}
 
 
 def test_all_rows_flag_widens_to_pre_sale_inventory(feed):

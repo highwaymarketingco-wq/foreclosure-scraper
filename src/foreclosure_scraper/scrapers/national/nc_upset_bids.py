@@ -76,9 +76,10 @@ import structlog
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...config import in_scope_distressed
 from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
-from ..law_firms._footprint import in_footprint, normalize_county
+from ..law_firms._footprint import normalize_county
 
 log = structlog.get_logger()
 
@@ -384,7 +385,12 @@ def _upset_raw(*, county: str, deadline: Optional[datetime],
 # --- source 1 parser: Kania Ninja Tables JSON ------------------------------
 
 def feed_stats(payload: list | str) -> dict:
-    """Coverage counts for the run report: total vs in-footprint vs actionable."""
+    """Coverage counts for the run report: total vs in-scope vs actionable.
+
+    "in_footprint"/"in-footprint" naming kept for diff size; since the
+    2026-10-03 fix below these counts mean "real NC county" (statewide), not
+    the 18-county flip footprint.
+    """
     rows = _decode(payload)
     now = datetime.utcnow()
     stats = {
@@ -405,7 +411,7 @@ def feed_stats(payload: list | str) -> dict:
         county = normalize_county(_strip_tags(value.get("county")))
         if county:
             counties.add(county)
-        if not (county and in_footprint(county, "NC")):
+        if not (county and in_scope_distressed(county, "NC")):
             continue
         fp_counties.add(county)
         stats["rows_in_footprint"] += 1
@@ -433,7 +439,11 @@ def _decode(payload: list | str | bytes) -> list:
 def _kania_row_to_listings(value: dict, *, slug: str, now: datetime,
                            all_rows: bool) -> list[Listing]:
     county = normalize_county(_strip_tags(value.get("county")))
-    if not county or not in_footprint(county, "NC"):
+    # TAX_SALE is a distressed-type lead, not a flip -- same 2026-10-03 SCOPE
+    # BUG fix as law_firms.kania (this scraper reads the identical Kania Ninja
+    # Tables feed): gate on in_scope_distressed (any real NC county), not the
+    # narrow 18-county flip footprint.
+    if not county or not in_scope_distressed(county, "NC"):
         return []
 
     sale_date = _date(value.get("saledatetime"))
@@ -910,9 +920,13 @@ class NCUpsetBids(BaseScraper):
             log.warning("nc_upset_bids.kania_fail", url=data_url,
                         error=str(exc)[:200])
 
-        # 2. County-published upset lists.
+        # 2. County-published upset lists. COUNTY_UPSET_PAGES itself is the
+        # real scope limit here (a new county needs its page discovered and
+        # added as a tuple) -- this check is just a sanity gate, so it uses
+        # the same statewide in_scope_distressed rule as the Kania path above
+        # rather than the narrow 18-county footprint (TAX_SALE either way).
         for county, state, url in COUNTY_UPSET_PAGES:
-            if not in_footprint(county, state):
+            if not in_scope_distressed(county, state):
                 continue
             try:
                 html = await get_text(url, timeout=45.0, impersonate=True)
