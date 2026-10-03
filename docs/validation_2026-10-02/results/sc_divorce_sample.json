@@ -1,0 +1,2218 @@
+{
+  "population_total": 5052,
+  "locally_bad_count": 177,
+  "plausible_count": 4875,
+  "sample_plausible": [
+    {
+      "owner_name": "Kristy Nicole Dunn",
+      "county": "Oconee",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026-CP-37-00695",
+      "divorce": {
+        "state": "SC",
+        "county": "Oconee",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2010DR3700751",
+            "filed_date": "2010-11-22",
+            "parties": "ADAM GARY DUNN vs. KRISTY NICOLE DUNN",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-19T22:51:38.974477+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "DUNN",
+      "_parsed_first": "KRISTY",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 961
+    },
+    {
+      "owner_name": "EDGE LISA ANN",
+      "county": "Greenville",
+      "street_address": "141 STAUNTON BRIDGE RD",
+      "source": "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels",
+      "case_number_board": "5296",
+      "divorce": {
+        "state": "SC",
+        "county": "Greenville",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2014DR2304741",
+            "filed_date": "2014-11-07",
+            "parties": "LISA ANN EDGE vs. JOE EARL EDGE",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T17:35:59.736856+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "EDGE",
+      "_parsed_first": "LISA",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 218
+    },
+    {
+      "owner_name": "SOSBEE HAROLD G SR E KILLARNEY LK",
+      "county": "Spartanburg",
+      "street_address": null,
+      "source": "counties_sc.spartanburg_delinquent_tax",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "2006DR4202648",
+            "filed_date": "2006-10-02",
+            "parties": "HAROLD BRENT SOSBEE vs. NANCY ALICE T SOSBEE",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2005DR4202921",
+            "filed_date": "2005-09-26",
+            "parties": "NANCY ALICE T SOSBEE vs. HAROLD BRENT SOSBEE",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T10:43:21.672990+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "SOSBEE",
+      "_parsed_first": "HAROLD",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 2365
+    },
+    {
+      "owner_name": "DUNCAN JOHN WESLEY SR",
+      "county": "Spartanburg",
+      "street_address": "122 LINCOLN DR",
+      "source": "counties_sc.spartanburg_delinquent_tax",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "2018DR4200153",
+            "filed_date": "2018-01-22",
+            "parties": "JOYCE ANNE ANYA vs. JOHN WESLEY DUNCAN III",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2016DR4201720",
+            "filed_date": "2016-06-03",
+            "parties": "JOHN H DUNCAN vs. GAYLE CULBERSON",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T08:02:57.659238+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "DUNCAN",
+      "_parsed_first": "JOHN",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 2111
+    },
+    {
+      "owner_name": "WEIMER MATTHEW W",
+      "county": "Pickens",
+      "street_address": "103 WESTCHESTER CT",
+      "source": "counties_sc.pickens_delinquent_parcels",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "2022DR3900771",
+            "filed_date": "2022-10-21",
+            "parties": "Matthew Weston Weimer vs. Amy Lynn Weimer",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2022DR3900091",
+            "filed_date": "2022-02-03",
+            "parties": "Matthew Weston Weimer vs. Amy Lynn Weimer",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T03:45:21.590602+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "WEIMER",
+      "_parsed_first": "MATTHEW",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 1933
+    },
+    {
+      "owner_name": "GUYTON WILBURN EUGENE",
+      "county": "Spartanburg",
+      "street_address": "590 GLENN SPRINGS RD PACOLET",
+      "source": "counties_sc.spartanburg_condemned",
+      "case_number_board": "fc-65422988",
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2017DR4200123",
+            "filed_date": "2017-01-18",
+            "parties": "JOYE L GUYTON vs. WILBURN EUGENE GUYTON",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T04:50:49.282821+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "GUYTON",
+      "_parsed_first": "WILBURN",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 1211
+    },
+    {
+      "owner_name": "Robert J Turner",
+      "county": "Pickens",
+      "street_address": "417 MEADOW RIDGE RD",
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026-CP-39-00998",
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 6,
+        "cases": [
+          {
+            "case_number": "1991DR3900589",
+            "filed_date": "1991-05-08",
+            "parties": "ANGELA F TURNER vs. ROBERT J TURNER",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "1993DR3900033",
+            "filed_date": "1993-01-11",
+            "parties": "DORIS JEANETTE TURNER vs. ROBERT EARL TURNER",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "1993DR3900024",
+            "filed_date": "1993-01-08",
+            "parties": "ROBERT E TURNER vs. JEANETTE DORIS TURNER",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2001DR3900910",
+            "filed_date": "2001-08-08",
+            "parties": "PATRICIA ANN A TURNER vs. ROBERT JAMES TURNER",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2000DR3900864",
+            "filed_date": "2000-08-08",
+            "parties": "ROBERT JAMES TURNER vs. PATRICIA ANN TURNER",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2006DR3900834",
+            "filed_date": "2006-08-17",
+            "parties": "JENNIFER LYNN TURNER vs. ROBERT FURMAN TURNER",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-20T05:45:07.999667+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "TURNER",
+      "_parsed_first": "ROBERT",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 887
+    },
+    {
+      "owner_name": "Leah Rae Gentle",
+      "county": "Anderson",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026A0410200699",
+      "divorce": {
+        "state": "SC",
+        "county": "Anderson",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2024DR0401500",
+            "filed_date": "2024-09-18",
+            "parties": "Steven Merk vs. Leah Gentle, et al.",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-19T22:18:36.638060+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "GENTLE",
+      "_parsed_first": "LEAH",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 4635
+    },
+    {
+      "owner_name": "SPEIGHT",
+      "county": "Anderson",
+      "street_address": "122 Pine Circle",
+      "source": "counties_sc.sc_flc",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Anderson",
+        "case_count": 3,
+        "cases": [
+          {
+            "case_number": "1996DR0400034",
+            "filed_date": "1996-01-10",
+            "parties": "DEBBIE M SPEIGHT vs. FRANK ALLAN SPEIGHT",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2000DR0401212",
+            "filed_date": "2000-06-08",
+            "parties": "RICKY LEWIS SPEIGHT vs. CATHERINE SPEIGHT",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2015DR0401036",
+            "filed_date": "2015-05-20",
+            "parties": "KRISTIN ROBERTS SPEIGHT vs. BRIAN DAVIS SPEIGHT",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T04:17:38.226478+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "SPEIGHT",
+      "_parsed_first": "",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 760
+    },
+    {
+      "owner_name": "LEROY JACOB",
+      "county": "Pickens",
+      "street_address": "400 TALLAHATCHIE TRL",
+      "source": "counties_sc.sc_public_notices",
+      "case_number_board": "2026-CP-39-00229",
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2026DR3900209",
+            "filed_date": "2026-03-27",
+            "parties": "Megan N. Leroy vs. Jacob Leroy",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T19:15:50.689616+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "LEROY",
+      "_parsed_first": "JACOB",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 5012
+    },
+    {
+      "owner_name": "YORK THOMAS J &",
+      "county": "Cherokee",
+      "street_address": "1059 ROBBS SCHOOL RD",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Cherokee",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "2005DR1100568",
+            "filed_date": "2005-09-08",
+            "parties": "TRACI YORK vs. THOMAS JOHN YORK",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2008DR1100749",
+            "filed_date": "2008-12-02",
+            "parties": "THOMAS J YORK vs. TRACI YORK",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-20T10:49:57.678266+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "YORK",
+      "_parsed_first": "THOMAS",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 3596
+    },
+    {
+      "owner_name": "WILLIAMS MISTY D",
+      "county": "Greenville",
+      "street_address": "431 TOLAR DR",
+      "source": "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels",
+      "case_number_board": "19532",
+      "divorce": {
+        "state": "SC",
+        "county": "Greenville",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2013DR2303241",
+            "filed_date": "2013-07-23",
+            "parties": "DONOVAN WILLIAMS vs. MISTY WILLIAMS",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T18:09:16.222215+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "WILLIAMS",
+      "_parsed_first": "MISTY",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 278
+    },
+    {
+      "owner_name": "POORE MARGARET MELETA",
+      "county": "Greenville",
+      "street_address": "402 MEADORS AVE",
+      "source": "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels",
+      "case_number_board": "14480",
+      "divorce": {
+        "state": "SC",
+        "county": "Greenville",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "1994DR2304211",
+            "filed_date": "1994-09-02",
+            "parties": "MARGARET HELEN POORE vs. MARCUS LAYTON POORE",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T17:35:59.736856+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "POORE",
+      "_parsed_first": "MARGARET",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 261
+    },
+    {
+      "owner_name": "Brandon Terrill Dodd",
+      "county": "Spartanburg",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026-CP-42-03631",
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2024DR4201604",
+            "filed_date": "2024-07-15",
+            "parties": "Latricia Denise Dodd vs. Brandon Jamaine Dodd",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-19T21:11:25.849744+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "DODD",
+      "_parsed_first": "BRANDON",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 815
+    },
+    {
+      "owner_name": "SPEARMAN, ERNEST S., JR.",
+      "county": "Pickens",
+      "street_address": "138, Richard Road, Pickens County, South Carolina, 29630, United States",
+      "source": "counties_sc.pickens_delinquent_parcels",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "1987DR3900852",
+            "filed_date": "1987-09-08",
+            "parties": "LINDA B SPEARMAN vs. ERNEST HARLEY SPEARMAN",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "1987DR3900242",
+            "filed_date": "1987-03-20",
+            "parties": "LINDA BEVAN SPEARMAN vs. ERNEST HARLEY SPEARMAN",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T03:45:21.590602+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "SPEARMAN",
+      "_parsed_first": "ERNEST",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 1894
+    },
+    {
+      "owner_name": "TERRY, WILLIAM R., TRUSTEE OF THE REVOCABLE TRUST AGREEMENT FOR WILLIAM RALPH TERRY A/K/A WILLIAM BILL TERRY",
+      "county": "Pickens",
+      "street_address": "3463 FARRS BRIDGE RD",
+      "source": "counties_sc.pickens_delinquent_parcels",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2009DR3901139",
+            "filed_date": "2009-11-03",
+            "parties": "HEATHER TERRY vs. WILLIAM TERRY",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T04:17:38.226478+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "TERRY",
+      "_parsed_first": "WILLIAM",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 2010
+    },
+    {
+      "owner_name": "CORRAL EMIDIO (JTWROS) CORRAL",
+      "county": "Greenville",
+      "street_address": "300 CRESTWOOD TER",
+      "source": "counties_sc.greenville_delinquent_tax",
+      "case_number_board": "3912",
+      "divorce": {
+        "state": "SC",
+        "county": "Greenville",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2018DR2302567",
+            "filed_date": "2018-06-15",
+            "parties": "ELENA EUGENIA CORRAL vs. EMIDIO CORRAL",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T17:35:59.736856+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "CORRAL",
+      "_parsed_first": "EMIDIO",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 4297
+    },
+    {
+      "owner_name": "MAHAFFEY CAROLINE RICHARDSON",
+      "county": "Greenville",
+      "street_address": "S MAIN ST",
+      "source": "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels",
+      "case_number_board": "11344",
+      "divorce": {
+        "state": "SC",
+        "county": "Greenville",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "2005DR2303572",
+            "filed_date": "2005-08-17",
+            "parties": "JAMES MICHAEL MAHAFFEY vs. CAROLINE RICHARDSON MAHAFFEY",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2004DR2305279",
+            "filed_date": "2004-12-14",
+            "parties": "JAMES MICHAEL MAHAFFEY vs. CAROLINE RICHARDSON MAHAFFEY",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T17:35:59.736856+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "MAHAFFEY",
+      "_parsed_first": "CAROLINE",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 232
+    },
+    {
+      "owner_name": "Thomas Paul Dow",
+      "county": "Union",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2025A4410100205",
+      "divorce": {
+        "state": "SC",
+        "county": "Union",
+        "case_count": 3,
+        "cases": [
+          {
+            "case_number": "1998DR4400222",
+            "filed_date": "1998-04-14",
+            "parties": "THOMAS PAUL DOW vs. SHARON ANN SORRELL DOW",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2022DR4400116",
+            "filed_date": "2022-06-22",
+            "parties": "Tiffany Dow vs. Thomas Paul Dow",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2015DR4400098",
+            "filed_date": "2015-03-25",
+            "parties": "BRANDI KNIGHTEN DOW vs. THOMAS DOW JR",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-20T00:31:58.753914+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "DOW",
+      "_parsed_first": "THOMAS",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 4766
+    },
+    {
+      "owner_name": "MARTIN NICHOLAS F & CAROL H",
+      "county": "Oconee",
+      "street_address": null,
+      "source": "counties_sc.oconee_flc_assignment",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Oconee",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2016DR3700798",
+            "filed_date": "2016-11-29",
+            "parties": "NICHOLAS MARTIN vs. KARA M MARTIN, et al.",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T02:41:06.771856+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "MARTIN",
+      "_parsed_first": "NICHOLAS",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 1727
+    },
+    {
+      "owner_name": "Warner Keith Gaugler",
+      "county": "Anderson",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2024A0420900093",
+      "divorce": {
+        "state": "SC",
+        "county": "Anderson",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2018DR0400901",
+            "filed_date": "2018-05-11",
+            "parties": "CYNTHIA ELIZABETH GAUGLER vs. WARNER KEITH GAUGLER",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-19T22:18:36.638060+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "GAUGLER",
+      "_parsed_first": "WARNER",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 4632
+    },
+    {
+      "owner_name": "NOLAN TERESA",
+      "county": "Cherokee",
+      "street_address": "315 WHISONANT RD",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Cherokee",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2004DR1100793",
+            "filed_date": "2004-11-22",
+            "parties": "TERESA NOLAN vs. THOMAS KIRK",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-20T10:49:57.678266+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "NOLAN",
+      "_parsed_first": "TERESA",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 3576
+    },
+    {
+      "owner_name": "BRISSEY, JUDY E.",
+      "county": "Pickens",
+      "street_address": "225 THISTLEWOOD DR",
+      "source": "counties_sc.pickens_delinquent_parcels",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "1992DR3901248",
+            "filed_date": "1992-10-28",
+            "parties": "ATHAN RAY BRISSEY vs. JUDY M BRISSEY",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T03:45:21.590602+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "BRISSEY",
+      "_parsed_first": "JUDY",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 1910
+    },
+    {
+      "owner_name": "CHAPMAN SHIRLEY ANN",
+      "county": "Oconee",
+      "street_address": "258 EASY ST",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Oconee",
+        "case_count": 4,
+        "cases": [
+          {
+            "case_number": "2018DR3700365",
+            "filed_date": "2018-06-01",
+            "parties": "AUSTIN LANE CHAPMAN vs. SHIRLEY ANN CHAPMAN",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2014DR3700621",
+            "filed_date": "2014-09-22",
+            "parties": "SHIRLEY ANN CHAPMAN, et al. vs. BABE CARLISLE CHAPMAN",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2015DR3700356",
+            "filed_date": "2015-06-15",
+            "parties": "AUSTIN LANE CHAPMAN vs. SHIRLEY MOSS CHAPMAN",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2007DR3700033",
+            "filed_date": "2007-01-19",
+            "parties": "SHIRLEY ANN CHAPMAN vs. BABE CARLISLE CHAPMAN",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T08:17:36.127451+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "CHAPMAN",
+      "_parsed_first": "SHIRLEY",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 3824
+    },
+    {
+      "owner_name": "Christopher Lynn Smith",
+      "county": "Cherokee",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026A1110200075",
+      "divorce": {
+        "state": "SC",
+        "county": "Cherokee",
+        "case_count": 4,
+        "cases": [
+          {
+            "case_number": "2007DR1100003",
+            "filed_date": "2007-01-02",
+            "parties": "CHRISTOPHER SMITH vs. MELISSA SMITH",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2021DR1100338",
+            "filed_date": "2021-07-07",
+            "parties": "Ashley Everhart vs. Christopher Smith",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2025DR1100129",
+            "filed_date": "2025-03-25",
+            "parties": "Cassie Smith vs. Christopher Smith",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2000DR1100144",
+            "filed_date": "2000-02-18",
+            "parties": "MELISSA D SMITH vs. CHRISTOPHER M SMITH",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-20T04:06:44.627472+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "SMITH",
+      "_parsed_first": "CHRISTOPHER",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 5001
+    },
+    {
+      "owner_name": "TURNER JERRY DEAN",
+      "county": "Spartanburg",
+      "street_address": "210 SUNNY ACRES RD",
+      "source": "counties_sc.spartanburg_delinquent_tax",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 3,
+        "cases": [
+          {
+            "case_number": "2002DR4201727",
+            "filed_date": "2002-05-16",
+            "parties": "MAMIE J TURNER vs. JERRY W TURNER, et al.",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2011DR4202320",
+            "filed_date": "2011-08-17",
+            "parties": "DEBRA L TURNER vs. JERRY TILLMAN TURNER",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2016DR4203235",
+            "filed_date": "2016-10-28",
+            "parties": "JERRY W TURNER vs. MAMIE RUTH TURNER",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T11:16:34.717388+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "TURNER",
+      "_parsed_first": "JERRY",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 2390
+    },
+    {
+      "owner_name": "COBB JOHN C JR",
+      "county": "Pickens",
+      "street_address": "131 BROOKWAY DR, EASLEY",
+      "source": "counties_generic.arcgis_distress.pickens_flood_damage",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2004DR3901005",
+            "filed_date": "2004-08-31",
+            "parties": "ANN STEVENSON COBB vs. JOHN ROLAND COBB JR",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T19:15:50.689616+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "COBB",
+      "_parsed_first": "JOHN",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 60
+    },
+    {
+      "owner_name": "BLACKWELL JEFFREY GLENN",
+      "county": "Spartanburg",
+      "street_address": "10 VEHORN ST INMAN",
+      "source": "counties_sc.spartanburg_condemned",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 4,
+        "cases": [
+          {
+            "case_number": "2016DR4201030",
+            "filed_date": "2016-04-08",
+            "parties": "LILLIAN R BLACKWELL vs. JEFFREY T BLACKWELL",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2005DR4202799",
+            "filed_date": "2005-09-14",
+            "parties": "JEFFREY GLENN BLACKWELL vs. PEGGY RENEE L BLACKWELL",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2005DR4202972",
+            "filed_date": "2005-09-30",
+            "parties": "JEFFREY GLENN BLACKWELL vs. CANDY BLACKWELL",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2008DR4202222",
+            "filed_date": "2008-08-08",
+            "parties": "DEBRA BLACKWELL vs. JEFFREY FATE BLACKWELL",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T06:59:05.213651+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "BLACKWELL",
+      "_parsed_first": "JEFFREY",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 1390
+    },
+    {
+      "owner_name": "BISHOP CHERRYL",
+      "county": "Cherokee",
+      "street_address": "SCRUGGS TRL",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Cherokee",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2010DR1100461",
+            "filed_date": "2010-07-20",
+            "parties": "CHERRYL LYNN BISHOP vs. EDDIE DEAN TOWERY",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-20T10:49:57.678266+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "BISHOP",
+      "_parsed_first": "CHERRYL",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 3602
+    },
+    {
+      "owner_name": "HUDSON MICHAEL STEVEN",
+      "county": "Spartanburg",
+      "street_address": "205 AMANDAJO ST",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2024DR4202338",
+            "filed_date": "2024-10-16",
+            "parties": "Michael Steven Hudson vs. Tara Danielle Hudson",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T22:00:27.376483+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "HUDSON",
+      "_parsed_first": "MICHAEL",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 2911
+    },
+    {
+      "owner_name": "TURNER COLE",
+      "county": "Spartanburg",
+      "street_address": "21 FRONT ST",
+      "source": "counties_sc.spartanburg_delinquent_tax",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 3,
+        "cases": [
+          {
+            "case_number": "2014DR4201058",
+            "filed_date": "2014-04-07",
+            "parties": "MARTHA A TURNER vs. COLE TURNER",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2010DR4202956",
+            "filed_date": "2010-10-08",
+            "parties": "MARTHA A TURNER vs. COLE TURNER",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2012DR4201848",
+            "filed_date": "2012-07-10",
+            "parties": "MARTHA A TURNER vs. COLE TURNER",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T11:16:34.717388+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "TURNER",
+      "_parsed_first": "COLE",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 2388
+    },
+    {
+      "owner_name": "DUCKWORTH ANGELA W",
+      "county": "Spartanburg",
+      "street_address": "9697 HIGHWAY 221 WOODRUFF",
+      "source": "counties_sc.spartanburg_condemned",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2009DR4200823",
+            "filed_date": "2009-03-23",
+            "parties": "ANGELA C DUCKWORTH vs. JAMES A DUCKWORTH",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T06:27:10.952734+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "DUCKWORTH",
+      "_parsed_first": "ANGELA",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 1352
+    },
+    {
+      "owner_name": "KENNEDY, BARBARA",
+      "county": "Pickens",
+      "street_address": "221 BAYWOOD DR",
+      "source": "counties_sc.pickens_delinquent_parcels",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "2021DR3900176",
+            "filed_date": "2021-03-15",
+            "parties": "Paul Ward Kennedy vs. Barbara M. Kennedy",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2020DR3900219",
+            "filed_date": "2020-03-24",
+            "parties": "PAUL WARD KENNEDY vs. BARBARA M KENNEDY",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T03:45:21.590602+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "KENNEDY",
+      "_parsed_first": "BARBARA",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 1865
+    },
+    {
+      "owner_name": "GENTRY WILLIE O &",
+      "county": "Spartanburg",
+      "street_address": "111 PYLE CT",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2007DR4200564",
+            "filed_date": "2007-03-01",
+            "parties": "ALICE R GENTRY vs. WILLIE EDWARD GENTRY",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T21:27:46.535022+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "GENTRY",
+      "_parsed_first": "WILLIE",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 2881
+    },
+    {
+      "owner_name": "Janis L Holcombe",
+      "county": "Pickens",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026-CP-39-01130",
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "1990DR3900901",
+            "filed_date": "1990-07-31",
+            "parties": "JERRY DWAINE HOLCOMBE vs. JANIS ELLEN HOLCOMBE",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "1991DR3901068",
+            "filed_date": "1991-08-19",
+            "parties": "JERRY DWAINE HOLCOMBE vs. JANIS ELLEN HOLCOMBE",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-20T05:45:07.999667+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "HOLCOMBE",
+      "_parsed_first": "JANIS",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 885
+    },
+    {
+      "owner_name": "Robert  Odom",
+      "county": "Spartanburg",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026-CP-42-03822",
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "2026DR4201889",
+            "filed_date": "2026-08-25",
+            "parties": "Corinthians Elmore Odom vs. Robert Christopher Odom",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2000DR4202666",
+            "filed_date": "2000-08-04",
+            "parties": "BRENDA GAIL ODOM vs. ROBERT T ODOM",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-19T21:46:03.057395+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "ODOM",
+      "_parsed_first": "ROBERT",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 807
+    },
+    {
+      "owner_name": "GREGORY WAYNE & GWEN",
+      "county": "Spartanburg",
+      "street_address": "1102 OLD SPARTANBURG HWY WOODRUFF",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "2009DR4203183",
+            "filed_date": "2009-11-10",
+            "parties": "MEGAN BLAIR GREGORY vs. WAYNE ELBRIDGE GREGORY",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2013DR4202188",
+            "filed_date": "2013-08-19",
+            "parties": "JEANNIE M GREGORY vs. WAYNE E GREGORY JR",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T02:21:35.641161+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "GREGORY",
+      "_parsed_first": "WAYNE",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 3240
+    },
+    {
+      "owner_name": "Michael Ray Adkins",
+      "county": "Spartanburg",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026A4210202281",
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2005DR4203294",
+            "filed_date": "2005-10-31",
+            "parties": "MICHAEL WAYNE ADKINS vs. THERESA DIANE ADKINS",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-19T21:46:03.057395+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "ADKINS",
+      "_parsed_first": "MICHAEL",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 840
+    },
+    {
+      "owner_name": "BRICE JAMES",
+      "county": "Spartanburg",
+      "street_address": "348 UNION HWY",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "1977DR4200555",
+            "filed_date": "1977-03-21",
+            "parties": "JAMES CONWAY BRICE vs. BETTY LOUISE ROBERTS",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T01:49:20.644160+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "BRICE",
+      "_parsed_first": "JAMES",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 3065
+    },
+    {
+      "owner_name": "MILLER JOSEPH SHANNON",
+      "county": "Spartanburg",
+      "street_address": "202 RHODE ISLAND CIR",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2011DR4201752",
+            "filed_date": "2011-06-22",
+            "parties": "AMY ELIZABETH MILLER vs. JOSEPH SHANNON MILLER",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T23:37:45.951886+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "MILLER",
+      "_parsed_first": "JOSEPH",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 2941
+    },
+    {
+      "owner_name": "MILLER AMY & MILLER VICTOR E",
+      "county": "Spartanburg",
+      "street_address": "186 RICE RD",
+      "source": "counties_sc.spartanburg_delinquent_tax",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 3,
+        "cases": [
+          {
+            "case_number": "2004DR4201814",
+            "filed_date": "2004-06-24",
+            "parties": "CHRISTOPHER RAY MILLER vs. AMY HICKS MILLER",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2011DR4201752",
+            "filed_date": "2011-06-22",
+            "parties": "AMY ELIZABETH MILLER vs. JOSEPH SHANNON MILLER",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2024DR4201120",
+            "filed_date": "2024-05-10",
+            "parties": "Robert Chad Miller vs. Amy Teresa Miller",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T09:38:10.640796+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "MILLER",
+      "_parsed_first": "AMY",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 2273
+    },
+    {
+      "owner_name": "MOORE GORDON",
+      "county": "Greenville",
+      "street_address": "972 GARRISON RD",
+      "source": "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels",
+      "case_number_board": "12756",
+      "divorce": {
+        "state": "SC",
+        "county": "Greenville",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2010DR2300233",
+            "filed_date": "2010-01-19",
+            "parties": "ELIZABETH M MOORE vs. GORDON TEDDY MOORE",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T17:35:59.736856+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "MOORE",
+      "_parsed_first": "GORDON",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 383
+    },
+    {
+      "owner_name": "PEREGO JANICE L",
+      "county": "Oconee",
+      "street_address": "9970 WEST",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Oconee",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2001DR3700868",
+            "filed_date": "2001-11-15",
+            "parties": "JANICE L PEREGO vs. EDRICK NORRIS PEREGO",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T08:17:36.127451+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "PEREGO",
+      "_parsed_first": "JANICE",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 3913
+    },
+    {
+      "owner_name": "John Roger Chambers",
+      "county": "Cherokee",
+      "street_address": null,
+      "source": "counties_sc.sc_probate_notices.gaffneyledger",
+      "case_number_board": "2025ES1100382",
+      "divorce": {
+        "state": "SC",
+        "county": "Cherokee",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "1996DR1100045",
+            "filed_date": "1996-01-16",
+            "parties": "VANESSA CHAMBERS vs. JOHN R CHAMBERS",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-19T21:11:25.849744+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "CHAMBERS",
+      "_parsed_first": "JOHN",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 4560
+    },
+    {
+      "owner_name": "Crystal Jean Nave",
+      "county": "Union",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026A4410200093",
+      "divorce": {
+        "state": "SC",
+        "county": "Union",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2018DR4400278",
+            "filed_date": "2018-09-07",
+            "parties": "CRYSTAL NAVE vs. MICHAEL NAVE",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-20T03:34:21.791489+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "NAVE",
+      "_parsed_first": "CRYSTAL",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 1074
+    },
+    {
+      "owner_name": "WATSON DONALD RAY",
+      "county": "Spartanburg",
+      "street_address": "840 BALL PARK RD ENOREE",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2024DR4201879",
+            "filed_date": "2024-08-16",
+            "parties": "Donald Watson vs. Ashley Lee Watson",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T02:21:35.641161+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "WATSON",
+      "_parsed_first": "DONALD",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 3228
+    },
+    {
+      "owner_name": "HARRIS, SHERRY; SAMMY HARRIS & AMANDA HARRIS",
+      "county": "Pickens",
+      "street_address": "108 LAKE CIRCLE RD",
+      "source": "counties.multi_year_delinquent_tax",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2003DR3901313",
+            "filed_date": "2003-12-04",
+            "parties": "SHERRY MELISSA HARRIS vs. RONALD BRUCE HARRIS JR",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T03:45:21.590602+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "HARRIS",
+      "_parsed_first": "SHERRY",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 692
+    },
+    {
+      "owner_name": "Steven  Johnson",
+      "county": "Cherokee",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026-CP-11-00557",
+      "divorce": {
+        "state": "SC",
+        "county": "Cherokee",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2003DR1100339",
+            "filed_date": "2003-05-16",
+            "parties": "ALICE E JOHNSON vs. STEVEN L JOHNSON",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-19T22:51:38.974477+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "JOHNSON",
+      "_parsed_first": "STEVEN",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 4691
+    },
+    {
+      "owner_name": "NEWTON RONALD WAYNE",
+      "county": "Pickens",
+      "street_address": "109 STARDUST LN",
+      "source": "counties_sc.sc_rod_acclaim",
+      "case_number_board": "202610929",
+      "divorce": {
+        "state": "SC",
+        "county": "Pickens",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2018DR3900016",
+            "filed_date": "2018-01-05",
+            "parties": "TAMMY L NEWTON vs. RONALD W NEWTON JR",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T04:50:49.282821+00:00",
+        "match": "agrees"
+      },
+      "_parsed_last": "NEWTON",
+      "_parsed_first": "RONALD",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 2515
+    },
+    {
+      "owner_name": "CHISM HENRY H",
+      "county": "Spartanburg",
+      "street_address": "188 PEARSON RD GREER",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2002DR4203400",
+            "filed_date": "2002-10-01",
+            "parties": "CAMILLA SUE CHISM vs. HENRY WAYNE CHISM",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T02:21:35.641161+00:00",
+        "match": "conflict"
+      },
+      "_parsed_last": "CHISM",
+      "_parsed_first": "HENRY",
+      "_local_name_pass": true,
+      "_only_nonparty_role": false,
+      "_idx": 3087
+    }
+  ],
+  "sample_bad": [
+    {
+      "owner_name": "W G ARTHUR INC",
+      "county": "Spartanburg",
+      "street_address": "S CHURCH ST EXT",
+      "source": "counties_generic.arcgis_distress.spartanburg_property_cleanup",
+      "case_number_board": "UST08169",
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2019DR4200962",
+            "filed_date": "2019-04-03",
+            "parties": "ELIZABETH THRESE WALKER vs. BRANDON SCOTT HAMMETT",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T16:17:20.977842+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "W",
+      "_parsed_first": "G",
+      "_local_name_pass": false,
+      "_only_nonparty_role": false,
+      "_idx": 106
+    },
+    {
+      "owner_name": "HONEST HOME SALES LLC",
+      "county": "Spartanburg",
+      "street_address": "115 GREEN ST PACOLET",
+      "source": "counties_sc.spartanburg_condemned",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 2,
+        "cases": [
+          {
+            "case_number": "2005DR4200467",
+            "filed_date": "2005-02-09",
+            "parties": "PAMELA R PATTERSON vs. JOHN C PATTERSON",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2011DR4201092",
+            "filed_date": "2011-04-19",
+            "parties": "LORI NICHOLE S PATTERSON vs. JOHN BRYSON PATTERSON JR",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T05:23:08.925446+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "HONEST",
+      "_parsed_first": "HOME",
+      "_local_name_pass": false,
+      "_only_nonparty_role": false,
+      "_idx": 1273
+    },
+    {
+      "owner_name": "GREENE AMANDA NICOLE",
+      "county": "Greenville",
+      "street_address": "707 ROCKCLIFF ST",
+      "source": "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels",
+      "case_number_board": "2044",
+      "divorce": {
+        "state": "SC",
+        "county": "Greenville",
+        "case_count": 7,
+        "cases": [
+          {
+            "case_number": "2015DR2300268",
+            "filed_date": "2015-01-23",
+            "parties": "BRONSON CLINT BROWN vs. AMANDA JOY BROWN",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2015DR2304555",
+            "filed_date": "2015-10-20",
+            "parties": "CHRISTOPHER SCOTT BROWN vs. AMANDA IRENE BROWN",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2017DR2303443",
+            "filed_date": "2017-07-31",
+            "parties": "CHRISTOPHER SCOTT BROWN vs. AMANDA IRENE BROWN",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2012DR2303786",
+            "filed_date": "2012-08-22",
+            "parties": "AMANDA IRENE BROWN vs. CHRISTOPHER SCOTT BROWN",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2024DR2303091",
+            "filed_date": "2024-08-23",
+            "parties": "Amanda M. Brown vs. Kurt E. Brown",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2025DR2304312",
+            "filed_date": "2025-11-21",
+            "parties": "Amanda E. Brown vs. Gabriel V. Brown",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2004DR2302726",
+            "filed_date": "2004-06-18",
+            "parties": "AMANDA SUE BYERS BROWN vs. JOHNNY RAY BROWN",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T17:35:59.736856+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "GREENE",
+      "_parsed_first": "AMANDA",
+      "_local_name_pass": false,
+      "_only_nonparty_role": false,
+      "_idx": 469
+    },
+    {
+      "owner_name": null,
+      "county": "Spartanburg",
+      "street_address": null,
+      "source": "counties_sc.spartan_weekly_legals",
+      "case_number_board": "2026ES4200764",
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 4,
+        "cases": [
+          {
+            "case_number": "2001DR4200905",
+            "filed_date": "2001-03-14",
+            "parties": "MICHAEL ANTHONY JONES vs. REBECCA LEE JONES",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2012DR4201466",
+            "filed_date": "2012-05-31",
+            "parties": "JOSEPH ANDREW JONES vs. REBECCA GREENE JONES",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2017DR4200583",
+            "filed_date": "2017-03-02",
+            "parties": "REBECCA ANNE JONES vs. RONALD GEORGE JONES JR",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2011DR4201904",
+            "filed_date": "2011-07-11",
+            "parties": "REBECCA GREENE JONES vs. JOSEPH ANDREW JONES",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T12:21:29.537753+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "",
+      "_parsed_first": "",
+      "_local_name_pass": false,
+      "_only_nonparty_role": false,
+      "_idx": 2581
+    },
+    {
+      "owner_name": "CROMER ERIC C",
+      "county": "Spartanburg",
+      "street_address": "112 CARROLLWOOD LN SPARTANBURG",
+      "source": "counties_sc.spartanburg_vacant",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2006DR4203196",
+            "filed_date": "2006-12-04",
+            "parties": "KIMBERLY BAIN CROMER vs. WYNDELLN MARK BY CROMER, et al.",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T00:00:55.443622+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "CROMER",
+      "_parsed_first": "ERIC",
+      "_local_name_pass": false,
+      "_only_nonparty_role": false,
+      "_idx": 1532
+    },
+    {
+      "owner_name": "Kalena Renee Jenkins",
+      "county": "Oconee",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index",
+      "case_number_board": "2026A3720400032",
+      "divorce": {
+        "state": "SC",
+        "county": "Oconee",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2015DR3700055",
+            "filed_date": "2015-01-28",
+            "parties": "KALENA RENEE LAY, et al. vs. BRADLEY LEE LAY",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-20T02:53:04.597068+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "JENKINS",
+      "_parsed_first": "KALENA",
+      "_local_name_pass": false,
+      "_only_nonparty_role": false,
+      "_idx": 4897
+    },
+    {
+      "owner_name": "JULIAN FAMILY LIVING TRUST",
+      "county": "Greenville",
+      "street_address": "HARRISON BRIDGE RD",
+      "source": "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels",
+      "case_number_board": "9648",
+      "divorce": {
+        "state": "SC",
+        "county": "Greenville",
+        "case_count": 12,
+        "cases": [
+          {
+            "case_number": "1993DR2300951",
+            "filed_date": "1993-02-24",
+            "parties": "ELAINE STACEY DUERKSEN vs. DAVID EDWARD JONES",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "1997DR2305024",
+            "filed_date": "1997-10-20",
+            "parties": "JOANN WOOTEN JONES vs. DAVID A JONES",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2013DR2300721",
+            "filed_date": "2013-02-20",
+            "parties": "YVONNE LYNETTE JONES vs. DAVID LEE JONES",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2013DR2300988",
+            "filed_date": "2013-03-06",
+            "parties": "LISETTE S JONES vs. DAVID CHADWICK JONES",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2020DR2301583",
+            "filed_date": "2020-05-11",
+            "parties": "MARITA JONES vs. DAVID JONES",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "2019DR2301079",
+            "filed_date": "2019-03-11",
+            "parties": "YVONNE L JONES vs. DAVID L JONES",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          },
+          {
+            "case_number": "1992DR2302636",
+            "filed_date": "1992-06-04",
+            "parties": "DAVID SEVERUS JONES vs. PATRICIA T JONES",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2006DR2302641",
+            "filed_date": "2006-06-13",
+            "parties": "DAVID JONES vs. SHIRLEY JONES",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2009DR2301783",
+            "filed_date": "2009-04-27",
+            "parties": "DAVID ROBERT JONES vs. BESTY RENEE JONES",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2013DR2302487",
+            "filed_date": "2013-06-06",
+            "parties": "DAVID JONES JR vs. HENRIETTA JONES",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "2024DR2304302",
+            "filed_date": "2024-12-05",
+            "parties": "David Thomas Jones vs. Mary Carolina Jones",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          },
+          {
+            "case_number": "1998DR2305770",
+            "filed_date": "1998-12-09",
+            "parties": "DAVID C JONES vs. GRACE A JONES",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T17:35:59.736856+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "JULIAN",
+      "_parsed_first": "FAMILY",
+      "_local_name_pass": false,
+      "_only_nonparty_role": false,
+      "_idx": 361
+    },
+    {
+      "owner_name": null,
+      "county": "Spartanburg",
+      "street_address": null,
+      "source": "counties_sc.sc_public_index_export",
+      "case_number_board": "2026-LP-42-00402",
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2016DR4200357",
+            "filed_date": "2016-02-09",
+            "parties": "DEBORAH NECKER THOMPSON vs. ROBERT PATRICK THOMPSON",
+            "category": "110 - Divorce",
+            "role": "Defendant"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-17T12:21:29.537753+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "",
+      "_parsed_first": "",
+      "_local_name_pass": false,
+      "_only_nonparty_role": false,
+      "_idx": 2575
+    },
+    {
+      "owner_name": "JOHNSON CAROL B",
+      "county": "Laurens",
+      "street_address": "15395 INDIAN MOUND ROAD",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Laurens",
+        "case_count": 1,
+        "cases": [
+          {
+            "case_number": "2002DR3000475",
+            "filed_date": "2002-05-24",
+            "parties": "RICHARD JOHNSON, et al. vs. ROBERT M MCCROSKEY, et al.",
+            "category": "110 - Divorce",
+            "role": "Plaintiff"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T08:17:36.127451+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "JOHNSON",
+      "_parsed_first": "CAROL",
+      "_local_name_pass": false,
+      "_only_nonparty_role": false,
+      "_idx": 4001
+    },
+    {
+      "owner_name": "TURNER MATTHEW JAMES",
+      "county": "Spartanburg",
+      "street_address": "110 MERRITT RD",
+      "source": "counties_sc.qpaybill_delinquent_roll",
+      "case_number_board": null,
+      "divorce": {
+        "state": "SC",
+        "county": "Spartanburg",
+        "case_count": 13,
+        "cases": [
+          {
+            "case_number": "2006DR4202310",
+            "filed_date": "2006-08-18",
+            "parties": "KATHY BROWN vs. EDWARD TIMOTHY BROWN",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2007DR4201048",
+            "filed_date": "2007-04-16",
+            "parties": "RANDY WILTON SNOW vs. TONYA MICHELLE SNOW",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2008DR4201487",
+            "filed_date": "2008-05-27",
+            "parties": "JENNIFER FOWLER vs. DANIEL SCOTT FOWLER",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2009DR4201817",
+            "filed_date": "2009-06-26",
+            "parties": "JENNIFER FOWLER vs. DANIEL SCOTT FOWLER",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2009DR4203312",
+            "filed_date": "2009-11-24",
+            "parties": "PHYLLIS OSBORNE HAMES vs. CLYDE ROBERT HAMES",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2010DR4200371",
+            "filed_date": "2010-02-10",
+            "parties": "CHUCK ROSS WEATHERS vs. ASHLEY BROOKE WEATHERS",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2011DR4202239",
+            "filed_date": "2011-08-11",
+            "parties": "SHERRY CHRISTINA SIMMONS vs. TIMMY GENE SIMMONS",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2015DR4203060",
+            "filed_date": "2015-10-30",
+            "parties": "MICHAEL EDDIE HOWARD vs. MARY K HOWARD",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2016DR4202226",
+            "filed_date": "2016-07-22",
+            "parties": "MIRANDA JILL TUCKER vs. CHRISTOPHER S TUCKER",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2017DR4200536",
+            "filed_date": "2017-02-28",
+            "parties": "JUDY ADELE MILLA vs. MILTON MILLA",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2018DR4200304",
+            "filed_date": "2018-02-05",
+            "parties": "JUDY ADELE MILLA vs. MILTON MILLA",
+            "category": "110 - Divorce",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2007DR4203252",
+            "filed_date": "2007-11-30",
+            "parties": "ALESIA LANCE GODFREY vs. MICHAEL SCOTT GODFREY",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Attorney"
+          },
+          {
+            "case_number": "2016DR4202644",
+            "filed_date": "2016-08-24",
+            "parties": "RAMCES ALEJO vs. TRISTA DAWN ALEJO",
+            "category": "130 - Separate Support and Maintenance",
+            "role": "Attorney"
+          }
+        ],
+        "source": "sc_fccms",
+        "fetched_at": "2026-09-18T02:21:35.641161+00:00",
+        "match": "unverified"
+      },
+      "_parsed_last": "TURNER",
+      "_parsed_first": "MATTHEW",
+      "_local_name_pass": false,
+      "_only_nonparty_role": true,
+      "_idx": 3217
+    }
+  ]
+}

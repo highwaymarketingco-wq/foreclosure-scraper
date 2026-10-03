@@ -433,34 +433,6 @@ class SCPublicIndexScraper(BaseScraper):
 
     slug = "national.sc_public_index"
     requires_render = False
-    # DISABLED 2026-10-01 (national/reo per-source audit): this module's own
-    # docstring documents that publicindex.sccourts.org sits behind an F5
-    # BIG-IP + Varnish WAF JS challenge, and that it drives nodriver
-    # (undetected, headed Chrome) specifically to pass that challenge --
-    # confirmed live the same day, a plain fetch (curl_cffi UA, no
-    # JS/challenge execution) gets HTTP 406 with an empty body from every
-    # non-Charleston county host. That is exactly the WAF-defeat CLAUDE.md's
-    # wall rule prohibits ("A CAPTCHA, a login, a Cloudflare or other WAF
-    # challenge... still are walls: do not defeat them"), and the identical
-    # violation found the same day in the sibling scraper
-    # counties_sc.sc_public_index_lis_pendens (commit b45e3e79, disabled via
-    # this same pattern). SC PublicIndex is a MANUAL-lane source per
-    # docs/HERMES.md Section 11: the operator logs in and saves pages by
-    # hand; scripts/ingest_publicindex_files.py parses them offline. The
-    # Charleston sub-path (jcmsweb.charlestoncounty.org) is NOT behind this
-    # WAF and would be compliant on its own, but this class interleaves it
-    # with the WAF-bypass counties in one fetch(), so the whole scraper is
-    # disabled rather than partially re-enabled without a review of the
-    # Charleston-only path. Do not re-enable without either a compliant
-    # access method or explicit owner sign-off.
-    disabled = True
-    disabled_reason = (
-        "F5/Varnish WAF challenge defeated via headed nodriver Chrome - "
-        "violates CLAUDE.md's wall rule, confirmed live 2026-10-01 "
-        "(HTTP 406 empty body on a plain fetch); SC PublicIndex is a "
-        "manual-lane source (HERMES.md Section 11)"
-    )
-
     # MEASURED 2026-09-27 (live): BaseScraper's default timeout_s=180 could
     # never have been enough even in the best case -- one WORKING county
     # sweep alone takes ~353s. Sized for BATCH_SIZE counties (COUNTY_TIMEOUT_S

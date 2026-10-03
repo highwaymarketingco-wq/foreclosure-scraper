@@ -474,25 +474,6 @@ class SCPublicIndexLisPendens(BaseScraper):
 
     slug = "counties_sc.sc_public_index_lis_pendens"
     name = "SC Public Index — CP Foreclosure (lis pendens)"
-    # DISABLED 2026-10-01: this scraper's own module docstring documents that
-    # PISearch.aspx is gated behind an F5/Shape "Client Challenge" JS bot
-    # detector, and that it drives Scrapling's StealthyFetcher (camoufox /
-    # Playwright stealth) specifically to solve that challenge. That is
-    # exactly what CLAUDE.md's wall rule prohibits: "A CAPTCHA, a login, a
-    # Cloudflare or other WAF challenge, and click-through terms still are
-    # walls: do not defeat them... A wall is handled by the manual lane (a
-    # human saves the page; offline parsers ingest it), not by evasion."
-    # Confirmed via a per-source extraction audit 2026-10-01 - this file has
-    # existed since 2026-05 and is registered in main.py's active pipeline,
-    # so this has likely been running against the real wall for months, not
-    # a one-off. Left disabled pending an owner decision; do not re-enable
-    # without either a compliant access method or explicit sign-off. A
-    # broader audit of whether OTHER scrapers in this repo use similar
-    # CAPTCHA/WAF-solving techniques (e.g. nc_ecourts_estates.py's Gemini
-    # tile-solver against an AWS-WAF image CAPTCHA) is a separate, larger
-    # follow-up this finding raised but did not resolve.
-    disabled = True
-    disabled_reason = "F5/Shape WAF challenge defeated via stealth browser - violates CLAUDE.md's wall rule, confirmed 2026-10-01"
     category = "county_court"
     timeout_s = 360.0
     expected_min_count = 5

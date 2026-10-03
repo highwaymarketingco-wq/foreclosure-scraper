@@ -1,6 +1,6 @@
 # SOURCE EXTRACTION AUDIT — per-source, is EVERYTHING being pulled?
 
-Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **147 scrapers**, of which **8 already wire the document harvester** (PDFs/deeds/notices) and **139 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
+Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **237 scrapers**, of which **8 already wire the document harvester** (PDFs/deeds/notices) and **229 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
 
 ## The audit protocol (do this for EVERY source in the TODO table)
 
@@ -29,10 +29,12 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.cws_marketing` | deed/notice?, img?, detail-page, links | https://www.cwsmarketing.com/real-estate/<br>https://bid\.cwsmarketing\.com/auctions/catalog/id/\d+ |
 | `national.irs_judicial_sales` | pdf?, deed/notice?, img?, detail-page, links | https://www.irsauctions.gov |
 
-## TODO — audit each for full extraction (139)
+## TODO — audit each for full extraction (229)
 
 | Slug | code hints (verify on the live page) | URLs |
 |---|---|---|
+| `city_websites.asheville_min_housing` | deed/notice?, detail-page, links | https://www.ashevillenc.gov/department/development-services/minimum-housing/ |
+| `city_websites.charlotte_open_data` | detail-page | https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0<br>https://gis.charlottenc.gov/arcgis/rest/services/HNS/ |
 | `city_websites.search` | deed/notice? | (see SOURCE_REGISTER.md) |
 | `counties.column_legal_notices` | deed/notice?, detail-page | https://us-central1-enotice-production.cloudfunctions.net/api/search/public-notices<br>https://us-central1-enotice-production.cloudfunctions.net |
 | `counties.multi_year_delinquent_tax` | deed/notice?, detail-page | https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services<br>https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services |
@@ -41,53 +43,113 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_generic.arcgis_distress_layers` | deed/notice?, detail-page | https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/<br>https://www.buncombecounty.org/governing/depts/tax/ |
 | `counties_generic.epa_frs_sites` | - | https://data.epa.gov/dmapservice/frs.frs_program_facility<br>https://www.epa.gov/frs |
 | `counties_generic.state_contamination` | deed/notice?, detail-page | https://services2.arcgis.com/kCu40SDxsCGcuUWO/arcgis/rest/services<br>https://www.deq.nc.gov/about/divisions/waste-management/underground-storage-tanks |
+| `counties_nc.albemarle_observer_tax_lists` | deed/notice? | https://albemarleobserver.news/wp-json/wp/v2/posts<br>https://albemarleobserver.news/wp-json/wp/v2/posts/<id |
 | `counties_nc.asheville_helene` | - | https://services.arcgis.com/aJ16ENn1AaqdFlqx/arcgis/rest/services/ |
 | `counties_nc.asheville_str_permits` | - | https://gis.ashevillenc.gov/server/rest/services/Permits/<br>https://gis.ashevillenc.gov/server/rest/services/Permits/HomestayPermitsView/MapServer/5 |
 | `counties_nc.buncombe_delinquent_tax` | pdf? | https://media.buncombenc.gov/common/tax/buncombe-county-tax-department-advertisement-of-tax-liens.pdf<br>https://media.buncombenc.gov/common/tax/ |
 | `counties_nc.buncombe_elderly` | - | https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query |
 | `counties_nc.buncombe_tax` | - | https://www.trumba.com/calendars/tax-foreclosures-all.json<br>https://taxforeclosures.buncombenc.gov/ |
-| `counties_nc.buncombe_tax_foreclosure` | detail-page | https://www.trumba.com/calendars/tax-foreclosures-all.ics<br>https://taxforeclosures.buncombenc.gov/ |
+| `counties_nc.buncombe_tax_foreclosure` | pdf? | https://media.buncombenc.gov/common/tax/foreclosure-listings/fcl.pdf<br>https://taxforeclosures.buncombenc.gov/ |
 | `counties_nc.cleveland_tax` | deed/notice? | https://www.clevelandcounty.com/main/departments/ |
+| `counties_nc.cleveland_tax_foreclosure` | - | https://www.clevelandcounty.com/main/departments/ |
+| `counties_nc.cumberland_tax_foreclosure` | detail-page | https://www.co.cumberland.nc.us/departments/tax/tax-administration/tax-foreclosures |
+| `counties_nc.edgecombe_tax_foreclosure` | detail-page | https://www.edgecombecountync.gov/businesses/tax_collector/tax_foreclosure_list.php |
 | `counties_nc.gaston_surplus_properties` | pdf?, detail-page, links | https://www.gastongov.com/709/Surplus-Properties<br>https://www.gastongov.com |
-| `counties_nc.henderson_code_violations` | - | https://services1.arcgis.com/ZfV5vUaX5QvLLBi9/arcgis/rest/services/<br>https://www.hendersoncountync.gov/planning/page/ |
+| `counties_nc.gaston_tax_foreclosures` | detail-page | https://www.gastongov.com/669<br>https://www.gastongov.com/671 |
+| `counties_nc.gaston_vacant` | deed/notice? | https://gis.gastoncountync.gov/publicgis/rest/services/ |
+| `counties_nc.gastonia_code_enforcement` | deed/notice? | https://devsvcs.gastonianc.gov<br>https://gis.gastoncountync.gov/publicgis/rest/services/ |
+| `counties_nc.haywood_tax_foreclosures` | pdf?, deed/notice?, img?, detail-page, links | https://www.haywoodcountync.gov/337/Tax-Foreclosures<br>https://www.haywoodcountync.gov/Bids.aspx |
+| `counties_nc.henderson_code_violations` | - | https://services1.arcgis.com/ZfV5vUaX5QvLLBi9/arcgis/rest/services/<br>https://www.hendersoncountync.gov/planning |
 | `counties_nc.henderson_foreclosure_parcels` | deed/notice? | https://www.arcgis.com<br>https://hendersoncounty.maps.arcgis.com |
 | `counties_nc.henderson_tax` | - | https://www.hendersoncountync.gov/tax/page/tax-foreclosure-sales |
-| `counties_nc.hendersonville_vacant_structures` | deed/notice?, detail-page | https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/<br>https://www.hvlnc.gov/departments/development-assistance |
+| `counties_nc.hendersonville_vacant_structures` | deed/notice?, detail-page | https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/<br>https://www.hvlnc.gov/community-development |
 | `counties_nc.lincoln_code_violations` | - | https://arcgisserver.lincolncountync.gov/arcgis/rest/services/ |
+| `counties_nc.lincoln_vacant` | - | https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query |
+| `counties_nc.mcdowell_probate` | deed/notice? | https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/ |
+| `counties_nc.mcdowell_tax_foreclosure` | detail-page | https://mcdowellnc.gov/departments/tax-collections/ |
+| `counties_nc.nc_bankruptcy_sales` | deed/notice?, detail-page, links | https://www.nceb.uscourts.gov/Public-Sales-Notice<br>https://www.ncmb.uscourts.gov/public-sales |
+| `counties_nc.nc_civicplus_tax_sale` | links | https://www.alamance-nc.com<br>https://www.alexandercountync.gov |
 | `counties_nc.nc_county_csv_delinquent_tax` | - | https://www.nhcgov.com/DocumentCenter/View/11283/Delinquent_Taxpayers_Report_CSV |
 | `counties_nc.nc_county_pdf_delinquent_tax` | pdf?, deed/notice? | https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice<br>https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf |
 | `counties_nc.nc_county_tax_foreclosure` | detail-page | https://www.gastongov.com/669/Tax-Foreclosure-Sales<br>https://www.gastongov.com/671/Previous-Tax-Foreclosure-Sales |
+| `counties_nc.nc_deq_dsca` | deed/notice? | https://www.deq.nc.gov/about/divisions/waste-management/science-data-and-reports/dsca-site-listsfacility-inventories |
 | `counties_nc.nc_ecourts_divorce` | deed/notice?, img?, detail-page | https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29<br>https://portal-nc.tylertech.cloud/Portal |
 | `counties_nc.nc_ecourts_estates` | deed/notice?, img?, detail-page | https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29<br>https://portal-nc.tylertech.cloud/Portal |
 | `counties_nc.nc_ecourts_lis_pendens` | deed/notice?, detail-page | https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/<br>https://portal-nc.tylertech.cloud/app/NCJudgmentSearchService/search |
 | `counties_nc.nc_govdeals_real_property` | deed/notice?, detail-page | https://maestro.lqdt1.com/search/list<br>https://www.transylvaniacounty.org/news |
 | `counties_nc.nc_heir_estate_parcels` | deed/notice? | (see SOURCE_REGISTER.md) |
+| `counties_nc.nc_its_public_tax` | - | https://tax.onslowcountync.gov/ITSPublicON/TaxBillSearch<br>https://www.bttaxpayerportal.com/ITSPublicGR2.0/TaxBillSearch |
 | `counties_nc.nc_ptscloud_delinquent_tax` | - | https://bcpwa.ncptscloud.com |
 | `counties_nc.nc_rod_logan` | deed/notice? | (see SOURCE_REGISTER.md) |
 | `counties_nc.nc_rod_substitute_trustee` | deed/notice? | https://buncombe-recordings.permitium.com/<br>https://www.nccourts.gov/ |
+| `counties_nc.nchfa_reo` | detail-page, links | https://www.nchfa.com/home-buyers/properties-sale |
 | `counties_nc.new_hanover_foreclosures` | deed/notice?, detail-page | https://www.nhcgov.com/345/Foreclosures |
 | `counties_nc.polk_tax` | - | https://www.polknc.gov/upcoming_auction.php |
+| `counties_nc.rutherford_foreclosure` | detail-page, links | https://www.rutherfordcountync.gov/departments/ |
 | `counties_nc.rutherford_tax` | detail-page, links | https://www.rutherfordcountync.gov/<br>https://www.rutherfordcountync.gov/departments/ |
-| `counties_nc.rutherford_wildfire_tax` | deed/notice?, detail-page | https://www.rutherfordcountync.gov/tax_search/index.php<br>https://d1ebsyxxbc7tep.cloudfront.net |
+| `counties_nc.rutherford_wildfire_tax` | detail-page | https://www.rutherfordcountync.gov/tax_search/index.php<br>https://d1ebsyxxbc7tep.cloudfront.net |
+| `counties_nc.stokes_delinquent_tax` | detail-page | https://www.co.stokes.nc.us/departments/foreclosures.php |
+| `counties_nc.swain_tax_foreclosures` | pdf?, deed/notice?, detail-page, links | https://www.swaincountync.gov/ |
+| `counties_nc.transylvania_delinquent_tax` | detail-page | https://tax.transylvaniacounty.org/TaxBillSearch<br>https://tax.transylvaniacounty.org |
+| `counties_nc.transylvania_vacant` | deed/notice? | https://gis.transylvaniacounty.org/server/rest/services/Parcels/FeatureServer/2/query |
+| `counties_nc.wake_tax_foreclosure` | deed/notice?, detail-page, links | https://www.wake.gov/departments-government/tax-administration/real-estate/foreclosures |
 | `counties_nc.wnc_rod_foreclosure_starts` | deed/notice? | (see SOURCE_REGISTER.md) |
+| `counties_nc.wnc_tax_foreclosures` | pdf?, detail-page, links | https://www.wataugacounty.org/<br>https://www.averycounty.com/ |
+| `counties_sc.abbeville_delinquent_tax` | detail-page | https://abbevillecountysc.com/delinquent-tax-collector/ |
+| `counties_sc.aiken_delinquent_tax` | detail-page, links | https://sc-aikencounty.civicplus.com/309/Tax-Foreclosures |
 | `counties_sc.anderson_master_in_equity` | pdf?, deed/notice?, links | https://www.andersoncountysc.org/departments-a-z/master-in-equity/ |
+| `counties_sc.anderson_sheriff` | detail-page | https://www.andersonsheriff.com/sheriff-sales |
+| `counties_sc.bamberg_sheriff` | detail-page | https://www.bambergcounty.sc.gov/public-safety/sheriffs-office |
+| `counties_sc.barnwell_sheriff` | detail-page | https://www.barnwellcounty.com/sheriff/sheriff-sales |
+| `counties_sc.beaufort_flc` | deed/notice?, detail-page, links | https://www.proxibid.com/Meares-Property-Advisors-Inc/ |
+| `counties_sc.berkeley_paystar_tax` | deed/notice?, detail-page | https://berkeleycountysc.paystar.io/api/search<br>https://berkeleycountysc.paystar.io |
 | `counties_sc.charleston_delinquent_tax` | pdf?, detail-page, links | https://charlestoncounty.gov/departments/delinquent-tax/<br>https://www.charlestoncounty.gov/departments/delinquent-tax/files/RP-Tax-Sale-Listing.pdf |
 | `counties_sc.charleston_mie` | pdf?, deed/notice? | https://charlestoncounty.gov/foreclosure/runninglist.html<br>https://charlestoncounty.gov/departments/master-in-equity/rosters/ |
-| `counties_sc.cherokee_delinquent_tax` | pdf?, detail-page, links | https://cherokeecountysc.gov/delinquent-tax/<br>https://cherokeecountysc.gov/delinquent-tax/tax-sale-bidders/ |
+| `counties_sc.charleston_tax_sale_xlsx` | detail-page, links | https://www.charlestoncounty.gov/departments/delinquent-tax/files/tax_sale/RP-Tax-Sale-Listing.xlsx<br>https://www.charlestoncounty.gov/departments/delinquent-tax/files/tax_sale/MH-Tax-Sale-Listing.xlsx |
+| `counties_sc.cherokee_delinquent_tax` | pdf?, deed/notice?, img?, detail-page | https://www.cherokeecountysc.gov/wp-json/wp/v2/media |
+| `counties_sc.cherokee_rod` | deed/notice? | https://www.sclandrecords.com |
+| `counties_sc.chester_delinquent_tax` | detail-page | https://www.chestercountysc.gov/treasurer/delinquent-tax-sale |
+| `counties_sc.clarendon_tax_auction` | pdf?, deed/notice?, links | https://www.clarendoncountysc.gov/ |
 | `counties_sc.colleton_tax_sale` | pdf?, detail-page, links | https://www.colletoncounty.org/delinquent-tax<br>https://www.colletoncounty.org/delinquent-tax/tax-sale |
-| `counties_sc.georgetown_civicengage` | pdf?, links | https://www.gtcountysc.gov |
-| `counties_sc.greenville_tax_distress` | deed/notice? | https://www.gcgis.org/arcgis/rest/services/GreenvilleJS/Map_Layers_JS/MapServer<br>https://www.greenvillecounty.org/appsAS400/Taxsale/ |
+| `counties_sc.darlington_delinquent_tax` | deed/notice?, detail-page | https://www.darcosc.com/government/treasurer/index.php |
+| `counties_sc.dillon_delinquent_tax` | pdf?, deed/notice?, detail-page, links | https://www.dilloncountysc.org/departments/treasurer.php<br>https://www.dilloncountysc.org/ |
+| `counties_sc.dillon_sheriff` | detail-page | https://dilloncountysc.org/services/public_safety/sheriffs_office.php |
+| `counties_sc.dorchester_billtrax_delinquent_tax` | deed/notice? | https://dorchestercountyscdelinquenttaxapi.billtrax.com<br>https://dorchestercountyscdelinquenttax.billtrax.com/ |
+| `counties_sc.edgefield_delinquent_tax` | detail-page | https://edgefieldcounty.sc.gov/treasurer/ |
+| `counties_sc.fairfield_delinquent_tax` | detail-page | https://www.fairfieldsc.com/departments/treasurer |
+| `counties_sc.florence_delinquent_tax` | pdf?, detail-page, links | https://www.florenceco.org/offices/delinquent-tax/ |
+| `counties_sc.georgetown_civicengage` | pdf?, links | https://georgetowncountysctax.com/<br>https://www.gtcountysc.gov |
+| `counties_sc.greenville_delinquent_tax` | detail-page | https://www.greenvillecounty.org/appsAS400/Taxsale/ |
+| `counties_sc.greenville_mie_adverts` | deed/notice?, detail-page | https://mie.greenvillejournal.com |
+| `counties_sc.greenville_tax_distress` | deed/notice?, detail-page | https://www.gcgis.org/arcgis3/rest/services/GreenvilleNJ/QueryLayers/MapServer<br>https://www.greenvillecounty.org/appsAS400/Taxsale/ |
+| `counties_sc.greenwood_corebtpay_delinquent_tax` | img?, detail-page | https://greenwoodco.corebtpay.com/egov/apps/payment/center.egov<br>https://greenwoodco.corebtpay.com/egov/apps/bill/pay.egov |
+| `counties_sc.greenwood_delinquent_tax` | detail-page | https://www.greenwoodcounty-sc.gov/treasurer/delinquent-tax-sale |
+| `counties_sc.horry_delinquent_xlsx` | detail-page, links | https://www.horrycountysc.gov/media/b5af14ce/delinquent-list-on-website-081926.xlsx<br>https://www.horrycountysc.gov/departments/treasurer/delinquent-tax/ |
 | `counties_sc.horry_flc` | detail-page, links | https://www.horrycountysc.gov/boards-and-commissions/<br>https://www.horrycountysc.gov/media/om1d2bwo/2025-flc-list-42126.xlsx |
+| `counties_sc.kershaw_flc` | pdf?, detail-page, links | https://www.kershaw.sc.gov/treasurer/forfeited-land-commission |
+| `counties_sc.lancaster_delinquent_tax` | pdf?, deed/notice?, detail-page, links | https://www.lancastercountysc.gov |
+| `counties_sc.laurens_delinquent_tax` | deed/notice?, img?, detail-page | https://www.laurenscountysc.gov/departments/treasurer/delinquent_taxes.php |
+| `counties_sc.lexington_flc` | detail-page, links | https://lex-co.sc.gov/treasurer/forfeited-land-commission<br>https://lex-co.sc.gov/departments/treasurer/forfeited-land-commission/ |
+| `counties_sc.marlboro_delinquent_tax` | - | https://www.marlborocounty.sc.gov/government_/meeting_publications.php |
+| `counties_sc.mccormick_flc` | pdf?, detail-page, links | https://www.mccormickcountysc.org/departments/treasurer.php |
+| `counties_sc.newberry_delinquent_tax` | detail-page | https://www.newberrycounty.gov/delinquent-tax/tax-sales |
+| `counties_sc.oconee_flc` | - | https://oconeesc.com/treasurer-home |
 | `counties_sc.oconee_flc_assignment` | - | https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/<br>https://oconeesc.com/auditor-home/forfeited-land |
 | `counties_sc.oconee_forfeited_land` | - | https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/<br>https://oconeesc.com/auditor-home/forfeited-land |
 | `counties_sc.oconee_tax_sale` | - | https://oconeesc.com/delinquent-tax/sale-list |
-| `counties_sc.pickens_delinquent_parcels` | - | https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services<br>https://www.co.pickens.sc.us/departments/delinquent_tax/index.php |
+| `counties_sc.pickens_delinquent_parcels` | deed/notice? | https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services<br>https://www.co.pickens.sc.us/departments/delinquent_tax/index.php |
 | `counties_sc.pickens_master_in_equity` | pdf?, deed/notice?, links | https://www.co.pickens.sc.us/departments/master_in_equity/sales_rosters.php<br>https://www.co.pickens.sc.us/ |
 | `counties_sc.pickens_tax_sale` | pdf?, detail-page, links | https://www.co.pickens.sc.us/departments/delinquent_tax/index.php<br>https://www.co.pickens.sc.us/ |
+| `counties_sc.qpaybill_delinquent_roll` | pdf?, deed/notice?, detail-page, links | https://dilloncountysctaxes.qpaybill.com/Taxes/<br>https://edgefieldcountysc.qpaybill.com/ |
+| `counties_sc.richland_flc` | deed/notice?, detail-page, links | https://www.richlandcountysc.gov/Property-Business/Taxes/Delinquent-Taxes/Forfeited-Land-Available<br>http://schemas.openxmlformats.org/spreadsheetml/2006/main} |
+| `counties_sc.saluda_delinquent_tax` | detail-page | https://saludacounty.sc.gov/departments/tax-collector/delinquent-tax-sale<br>https://saludacounty.sc.gov/departments/tax-collector |
+| `counties_sc.sc_catalis_delinquent_roll` | deed/notice?, detail-page | https://d1ebsyxxbc7tep.cloudfront.net/data<br>https://pickenscountysctax.us |
 | `counties_sc.sc_coastal_rosters` | deed/notice?, detail-page, links | (see SOURCE_REGISTER.md) |
 | `counties_sc.sc_county_rosters` | detail-page, links | https://publicindex.sccourts.org |
 | `counties_sc.sc_delinquent_tax_list` | pdf?, detail-page, links | https://cherokeecountysc.gov/delinquent-tax/tax-sale-bidders/ |
-| `counties_sc.sc_dew_lien_registry` | - | https://uitax.dew.sc.gov/LienRegistry/<br>https://dew.sc.gov/benefit-lien-registry |
+| `counties_sc.sc_des_brownfields` | detail-page, links | https://des.sc.gov/programs/bureau-land-waste-management/<br>https://des.sc.gov/community/environmental-sites-projects |
+| `counties_sc.sc_dew_lien_registry` | detail-page | https://uitax.dew.sc.gov/LienRegistry/<br>https://dew.sc.gov/benefit-lien-registry |
+| `counties_sc.sc_dor_delinquent_taxpayers` | detail-page | https://mydorway.dor.sc.gov/ |
 | `counties_sc.sc_flc` | pdf?, img?, detail-page, links | https://www.spartanburgcounty.gov/216/Tax-Collector<br>https://www.andersoncountysc.org/departments-a-z/treasurer/ |
 | `counties_sc.sc_probate_net` | deed/notice? | https://www.southcarolinaprobate.net/search/ |
 | `counties_sc.sc_probate_notices` | deed/notice? | (see SOURCE_REGISTER.md) |
@@ -106,7 +168,12 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_sc.spartanburg_flc` | - | https://www.spartanburgcounty.gov/DocumentCenter/View/104130 |
 | `counties_sc.spartanburg_master_in_equity` | pdf? | https://www.spartanburgcounty.gov/DocumentCenter/View/3392/Sale-Results<br>https://www.spartanburgcounty.gov/DocumentCenter/View/11824/Deficiency-Sale |
 | `counties_sc.spartanburg_vacant` | - | https://services9.arcgis.com/HoRra3ATPLGmyjn6/arcgis/rest/services/<br>https://services9.arcgis.com/HoRra3ATPLGmyjn6/ |
-| `counties_sc.terry_howe_flc` | - | https://terryhowe.com/wp-json/wp/v2/auctions |
+| `counties_sc.sumter_surplus` | detail-page | https://www.sumtercountysc.gov/online_services/property/surplus_sales.php |
+| `counties_sc.terry_howe_flc` | deed/notice? | https://terryhowe.com/wp-json/wp/v2/auctions |
+| `counties_sc.union_delinquent_tax` | detail-page | https://gearupunionsc.com/officials/treasurer/ |
+| `counties_sc.york_delinquent_tax` | pdf?, detail-page, links | https://www.yorkcountysc.gov/216/Tax-Collection |
+| `counties_sc.york_overage_claims` | pdf? | https://www.yorkcountysc.gov/DocumentCenter/View/2828/OVERAGE-CLAIM-LIST |
+| `counties_sc.zombie_properties` | deed/notice?, detail-page | (see SOURCE_REGISTER.md) |
 | `law_firms.alaw` | deed/notice?, detail-page | https://www.alaw.net/foreclosure-sales/north-carolina/<br>https://www.alaw.net/foreclosure-sales/south-carolina/ |
 | `law_firms.aldridge_pite` | deed/notice? | https://aldridgepite.com/sale-day-listings-selection/foreclosure-listings-north-carolina/<br>https://aldridgepite.com/disclaimer-north-carolina/ |
 | `law_firms.bell_carrington` | deed/notice?, detail-page | https://docs.google.com/spreadsheets/d/e/<br>https://bellcarrington.com/foreclosure-sales/ |
@@ -129,38 +196,61 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.craigslist_fsbo` | detail-page | https://sapi.craigslist.org/web/v8/postings/search/full |
 | `national.crexi_multifamily` | detail-page, links | https://www.crexi.com |
 | `national.distressed` | deed/notice?, img? | (see SOURCE_REGISTER.md) |
+| `national.epa_superfund` | detail-page | https://data.epa.gov/ef/seplan/<br>https://www.epa.gov/superfund/search-superfund-sites |
 | `national.estate_sales` | deed/notice?, detail-page, links | https://www.estatesales.net<br>https://www.estatesale.com |
 | `national.fannie_homepath` | img?, detail-page | https://homepath.fanniemae.com/cfl/property-inventory/search<br>https://homepath.fanniemae.com/ |
+| `national.fdic_failed_banks` | detail-page | https://www.fdic.gov/bank-failures/failed-bank-list |
+| `national.fema_disasters` | - | https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries |
 | `national.first_citizens_reo` | - | https://www.firstcitizens.com/real-estate |
-| `national.foreclosure_dot_com` | img?, detail-page | https://www.foreclosure.com/listings/north-carolina/<br>https://www.foreclosure.com/listings/south-carolina/ |
+| `national.foreclosure_dot_com` | img?, detail-page | https://www.foreclosure.com/listing/search<br>https://www.foreclosure.com/listings/charlotte-nc/ |
 | `national.freddie_homesteps` | detail-page, links | https://www.homesteps.com/listing/search<br>https://www.homesteps.com/ |
+| `national.govdeals` | img?, detail-page | https://maestro.lqdt1.com/search/list<br>https://www.govdeals.com/index.cfm |
 | `national.gsa_realproperty` | detail-page | https://realestatesales.gov |
+| `national.gsa_surplus` | detail-page, links | https://www.gsa.gov/real-estate/real-property-disposition/assets-identified-for-accelerated-disposition<br>https://www.gsa.gov/real-estate/real-property-disposition/ |
 | `national.hibid_real_estate` | - | https://hibid.com/graphql<br>https://hibid.com |
 | `national.homeharvest` | deed/notice?, img? | https://github.com/ZacharyHampton/HomeHarvest |
+| `national.homepath_json` | img?, detail-page | https://homepath.fanniemae.com/cfl/property-inventory/search-listings<br>https://homepath.fanniemae.com/cfl/property-inventory/search |
 | `national.hubzu` | - | https://www.hubzu.com/ |
 | `national.hud_homestore` | img?, detail-page | https://www.hudhomestore.gov/searchresult<br>https://www.hudhomestore.gov |
 | `national.hud_reac_inspection` | detail-page | https://www.hud.gov/sites/default/files/Housing/documents/MF-Inspection-Report.xls<br>https://www.hud.gov/sites/default/files/Housing/documents/ |
 | `national.hud_section8_contracts` | - | https://www.hud.gov/hud-partners/multifamily-assist-section8-database<br>https://www.hud.gov/sites/dfiles/Housing/documents/ |
+| `national.irs_treasury` | detail-page, links | https://www.irsauctions.gov/auction/items<br>https://www.irsauctions.gov |
 | `national.jail_bookings` | img?, detail-page | http://mugshots.spartanburgsheriff.org/<br>https://buncombecountyso.policetocitizen.com|23 |
 | `national.landandfarm` | img?, detail-page | (see SOURCE_REGISTER.md) |
 | `national.landsofamerica` | img?, detail-page | (see SOURCE_REGISTER.md) |
 | `national.landwatch` | img? | (see SOURCE_REGISTER.md) |
+| `national.legacy_obituaries` | detail-page, links | https://www.legacy.com |
+| `national.liensnc` | deed/notice?, detail-page, links | https://www.liensnc.com |
+| `national.loopnet` | detail-page | https://www.loopnet.com |
+| `national.nc_sos_ucc` | deed/notice? | https://www.sosnc.gov/online_services/search/by_title/_uniform_commercial_code |
 | `national.nc_upset_bids` | detail-page, links | https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/<br>https://kanialawfirm.com/wp-admin/admin-ajax.php |
+| `national.opencorporates` | - | https://api.opencorporates.com/v0.4/<br>https://api.opencorporates.com/v0.4/companies/search |
 | `national.probate_foreclosure_leads` | deed/notice? | (see SOURCE_REGISTER.md) |
 | `national.propwire` | - | (see SOURCE_REGISTER.md) |
 | `national.realtor_foreclosures` | deed/notice?, img? | (see SOURCE_REGISTER.md) |
+| `national.sc_public_index` | deed/notice?, detail-page, links | https://publicindex.sccourts.org/<county<br>https://jcmsweb.charlestoncounty.org/PublicIndex/ |
+| `national.sc_sos_entity` | detail-page, links | https://businessfilings.sc.gov/BusinessFiling/Web/Reporting/SearchByName |
+| `national.seeclickfix` | - | https://developer.seeclickfix.com/<br>https://seeclickfix.com/api/v2/issues |
 | `national.servicelink_auction` | deed/notice? | https://ui.exostechnology.com/api/listingsvc/v1/listings<br>https://www.servicelinkauction.com |
 | `national.sheriff_sales` | deed/notice?, links | https://www.brunswicksheriff.com<br>https://www.charlestoncounty.org |
-| `national.trulia` | deed/notice?, img?, links | https://www.trulia.com/foreclosures/ |
+| `national.stealth_handoff` | - | (see SOURCE_REGISTER.md) |
+| `national.tranzon` | detail-page | https://www.tranzon.com/online-real-estate-auctions.aspx |
+| `national.trulia` | deed/notice?, img?, links | https://www.trulia.com/foreclosures/<br>https://www.trulia.com/foreclosures/Charlotte,NC/ |
 | `national.usda_properties` | img?, detail-page, links | https://usdaproperties.com/property/<state<br>https://www.usdaproperties.com/property/sc/county/<county-slug |
+| `national.usmarshals_realproperty` | detail-page, links | https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property<br>https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property/ |
+| `national.va_acquired` | detail-page | https://www.va.gov/va-forms/real-property/properties/<br>https://www.benefits.va.gov/homeloans/property/property.asp |
+| `national.williams` | - | https://www.williamsauction.com |
 | `national.xome` | deed/notice?, img?, detail-page, links | https://www.xome.com/auctions/bank-owned<br>https://www.xome.com/auctions/foreclosure-homes |
 | `national.zillow_bulk` | img?, detail-page | (see SOURCE_REGISTER.md) |
 | `national.zillow_foreclosures` | deed/notice?, img?, detail-page | (see SOURCE_REGISTER.md) |
+| `newspapers.aiken_standard` | deed/notice?, detail-page | https://www.postandcourier.com/aikenstandard/classifieds/search/ |
+| `newspapers.berkeley_independent` | deed/notice?, detail-page | https://www.postandcourier.com/berkeley-independent/classifieds/community/announcements/ |
 | `newspapers.carolina_coast` | deed/notice?, detail-page | https://www.carolinacoastonline.com/classifieds/ |
 | `newspapers.coastland_times` | deed/notice?, img?, detail-page, links | https://www.thecoastlandtimes.com |
 | `newspapers.daily_courier` | deed/notice?, detail-page, links | https://www.thedigitalcourier.com/classifieds/community/announcements/legal/<br>https://www.thedigitalcourier.com |
 | `newspapers.hendersonville_lightning` | deed/notice? | https://www.hendersonvillelightning.com/legal-ads/130-foreclosures.html |
 | `newspapers.index_journal` | deed/notice?, detail-page | https://www.indexjournal.com/classifieds/community/announcements/legal/ |
+| `newspapers.journal_scene` | deed/notice?, detail-page | https://www.postandcourier.com/journal-scene/classifieds/community/announcements/ |
 | `newspapers.post_and_courier` | deed/notice?, detail-page | https://www.postandcourier.com/classifieds_new/community/announcements/ |
 | `newspapers.shelby_star` | deed/notice?, detail-page, links | https://www.shelbystar.com<br>https://www.shelbystar.com/ |
 | `newspapers.tryon_bulletin` | deed/notice?, links | https://tryondailybulletin.com<br>https://tryondailybulletin.com/ |

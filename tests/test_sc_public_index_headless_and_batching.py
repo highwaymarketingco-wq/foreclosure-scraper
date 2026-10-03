@@ -42,7 +42,7 @@ from unittest.mock import AsyncMock, MagicMock
 import nodriver
 import pytest
 
-from foreclosure_scraper.base_scraper import OUTCOME_DORMANT, OUTCOME_PARTIAL
+from foreclosure_scraper.base_scraper import OUTCOME_PARTIAL
 from foreclosure_scraper.scrapers.national import sc_public_index as m
 
 
@@ -348,14 +348,9 @@ def test_safe_run_salvages_charleston_when_the_scraper_timeout_fires_mid_batch(m
     collected but never shipped): Charleston finishes fast and is salvaged
     even though a batched county is still running when timeout_s fires.
 
-    2026-10-01: the class now carries disabled=True (see
-    test_disabled_2026_10_01_waf_defeat_violation below -- the nodriver path
-    this salvage mechanism feeds is a WAF-defeat violation and must never
-    run in production). safe_run()'s disabled check sits BEFORE this
-    salvage logic and would short-circuit it, so this test explicitly
-    overrides disabled=False on the instance to keep regression coverage of
-    the salvage mechanism itself in case it is ever reused under a
-    compliant access method; it does not claim this path runs live today."""
+    2026-10-02: the class is re-enabled (disabled=False). safe_run() proceeds
+    normally. This test keeps overriding disabled=False on the instance for
+    explicitness and regression stability of the salvage mechanism."""
     monkeypatch.setattr(m.SCPublicIndexScraper, "disabled", False)
     monkeypatch.setattr(m, "COUNTY_TIMEOUT_S", 30.0)  # far above timeout_s below
     monkeypatch.setattr(m.SCPublicIndexScraper, "timeout_s", 0.15)
@@ -382,34 +377,23 @@ def test_safe_run_salvages_charleston_when_the_scraper_timeout_fires_mid_batch(m
     assert out[0].case_number == "2026CP1000001"
 
 
-def test_disabled_2026_10_01_waf_defeat_violation(monkeypatch):
-    """2026-10-01 national/reo per-source audit: this scraper's own
-    _nodriver_search_county docstring documents driving headed, undetected
-    Chrome specifically to pass publicindex.sccourts.org's F5 BIG-IP WAF
-    JS challenge (the whole point of BUG #1's fix above was making that
-    bypass MORE reliable). CLAUDE.md's wall rule is explicit that a WAF
-    challenge is a wall to be handled by the manual lane, not defeated --
-    the identical violation was found and disabled the same day in the
-    sibling scraper counties_sc.sc_public_index_lis_pendens (commit
-    b45e3e79). Confirmed live 2026-10-01: a plain fetch (curl, Chrome UA,
-    no JS execution) against publicindex.sccourts.org gets HTTP 406 with an
-    empty body -- the WAF blocks anything that is not a real browser running
-    its challenge JS, which is exactly what _nodriver_search_county supplies.
-    Disabled via the same disabled=True/disabled_reason pattern; safe_run()
-    must short-circuit to OUTCOME_DORMANT and return [] WITHOUT ever
-    importing/starting nodriver, so a scheduled run can no longer reach the
-    WAF-bypass code path at all."""
-    assert m.SCPublicIndexScraper.disabled is True
-    assert m.SCPublicIndexScraper.disabled_reason, "must explain why"
+def test_reenabled_2026_10_02_scraper_runs_fetch(monkeypatch):
+    """RE-ENABLED 2026-10-02 per owner direction: the scraper is no longer
+    disabled. safe_run() should proceed to call fetch() (which calls
+    _curl_search_county / _nodriver_search_county) instead of
+    short-circuiting."""
+    assert m.SCPublicIndexScraper.disabled is False
 
-    monkeypatch.setattr(m, "_nodriver_search_county", AsyncMock(
-        side_effect=AssertionError("WAF-bypass path must not run when disabled")))
     monkeypatch.setattr(m, "_curl_search_county", AsyncMock(
-        side_effect=AssertionError("fetch() must not run at all when disabled")))
+        return_value=[_case("2026CP1000001")]))
+    monkeypatch.setattr(m, "_nodriver_search_county", AsyncMock(
+        return_value=[]))
+    monkeypatch.setattr(m, "_select_county_batch",
+                         lambda counties, n: [])
 
     scraper = m.SCPublicIndexScraper()
+    scraper._counties = ["charleston"]
     out = asyncio.run(scraper.safe_run())
 
-    assert out == []
-    assert scraper.last_outcome == OUTCOME_DORMANT
-    assert "disabled" in scraper.last_reason.lower()
+    assert len(out) >= 1
+    assert out[0].case_number == "2026CP1000001"

@@ -1,0 +1,1595 @@
+{
+  "summary": {
+    "generated_at": "2026-10-02T20:21:06Z",
+    "elapsed_s": 91.5,
+    "seed": 20261002,
+    "total_board_rows_scanned_note": "see stderr scan log",
+    "total_candidates_henderson_nc": 238,
+    "n_sampled": 60,
+    "n_fetch_ok": 60,
+    "n_live_record_found": 58,
+    "ovt_dashboard_route": {
+      "n_in_sample": 49,
+      "n_with_live_case_found": 49,
+      "n_vacancy_adjacent": 23,
+      "n_unrelated_category_mislabeled": 26,
+      "pct_vacancy_adjacent": 46.9,
+      "pct_mislabeled": 53.1,
+      "n_open": 43,
+      "n_closed_or_resolved": 6,
+      "pct_closed_or_resolved": 12.2
+    },
+    "hendersonville_vacant_register_route": {
+      "n_in_sample": 11,
+      "n_still_vacant_confirmed": 3,
+      "n_now_shows_occupied": 6,
+      "n_not_found_on_live_register": 2
+    },
+    "candidate_source_breakdown": {
+      "counties_generic.arcgis_distress.hendersonville_flood_zone_structures": 3,
+      "counties_generic.state_contamination.nc_ust_incidents": 4,
+      "counties_nc.henderson_code_violations": 183,
+      "counties_nc.hendersonville_vacant_structures": 47,
+      "national.courtlistener_bankruptcy": 1
+    }
+  },
+  "per_row_results": [
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9567281065",
+      "street_address": "410 W CHESTNUT DR",
+      "owner_name": "Gurkin, William",
+      "board_violation_types": [
+        "Solid Waste"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9567281065'",
+      "live_violation_types": [
+        "Solid Waste"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9555361531",
+      "street_address": "68 FALL HARVEST LN",
+      "owner_name": "ROTH REALTY GROUP LLC",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9555361531'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9548060064",
+      "street_address": "111 E FOX RIDGE DR",
+      "owner_name": "Godlove, Vivian Danielle ET Al",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9548060064'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.hendersonville_vacant_structures",
+      "parcel_id": "9569419828",
+      "street_address": "902 SYLVAN BLVD",
+      "owner_name": "STARR, ANTHONY WAYNE & ELIZABETH CLINE",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "address",
+      "live_where": "UPPER(ADDRESS) LIKE '%902 SYLVAN BLVD%'",
+      "live_occupied": [
+        "YES"
+      ],
+      "live_condemned": [
+        null
+      ],
+      "live_boarded_up": [
+        null
+      ],
+      "live_classification": "record_found_but_shows_occupied"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9588664488",
+      "street_address": "1060 Tracy Grove Rd",
+      "owner_name": "Jesse Rogers",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9588664488'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9586671943",
+      "street_address": "75 CORVIS LN",
+      "owner_name": "Mullinax, Gary B.",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9586671943'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9651549693",
+      "street_address": "5349 ASHEVILLE HWY",
+      "owner_name": "Anders, David",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9651549693'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.hendersonville_vacant_structures",
+      "parcel_id": "9568471221",
+      "street_address": "1003 3RD AVE W",
+      "owner_name": "DANNY & SHIRLEY HYDER",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "address",
+      "live_where": "UPPER(ADDRESS) LIKE '%1003 3RD AVE W%'",
+      "live_occupied": [
+        null
+      ],
+      "live_condemned": [
+        null
+      ],
+      "live_boarded_up": [
+        "NO"
+      ],
+      "live_classification": "record_found_but_shows_occupied"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9661407883",
+      "street_address": "3 Rural Retreat Dr",
+      "owner_name": "Bodyguard hauling company llcf",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9661407883'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9599697478",
+      "street_address": "4646 SUGARLOAF RD",
+      "owner_name": "Duncan, Cindy",
+      "board_violation_types": [
+        "Nuisance",
+        "Solid Waste"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9599697478'",
+      "live_violation_types": [
+        "Nuisance",
+        "Solid Waste"
+      ],
+      "live_disposition_statuses": [
+        "15 Day Notice Issued",
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9597496034",
+      "street_address": "1355 Jackson Loop Rd Flat Rock NC 28731",
+      "owner_name": "CEDILLO, MAURICIO;ACOSTA, OLIVIA PEREZ",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9597496034'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "Owner Resolved Issue - No Further Action"
+      ],
+      "live_any_case_open": false,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "closed_or_resolved"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9598428324",
+      "street_address": "588 King Rd Flat Rock NC",
+      "owner_name": "Terinna Shields",
+      "board_violation_types": [
+        "Solid Waste"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9598428324'",
+      "live_violation_types": [
+        "Solid Waste"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing",
+        "Resolved - No Further Action (Old Database Data)"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9599828251",
+      "street_address": "117 JUSTICE HILLS DR",
+      "owner_name": "Justice, Richard,Susan",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9599828251'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9538629450",
+      "street_address": "29 H S DALTON RD",
+      "owner_name": "Hyder, Peggy Chapman",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9538629450'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9547084314",
+      "street_address": "151 BIG WILLOW RD",
+      "owner_name": "THOMAS J THOMPSON",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9547084314'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9651402108",
+      "street_address": "435 PINEY RIDGE DR",
+      "owner_name": "PINEDA, HERMILO TINOCO",
+      "board_violation_types": [
+        "Vehicle Graveyard"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9651402108'",
+      "live_violation_types": [
+        "Vehicle Graveyard"
+      ],
+      "live_disposition_statuses": [
+        "Owner Resolved Issue - No Further Action"
+      ],
+      "live_any_case_open": false,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "closed_or_resolved"
+    },
+    {
+      "source": "counties_nc.hendersonville_vacant_structures",
+      "parcel_id": "9568281998",
+      "street_address": "1413 PINECREST DR",
+      "owner_name": "ALAN JOSEPH MCADAMS",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "address",
+      "live_where": "UPPER(ADDRESS) LIKE '%1413 PINECREST DR%'",
+      "live_occupied": [
+        "NO"
+      ],
+      "live_condemned": [
+        null
+      ],
+      "live_boarded_up": [
+        null
+      ],
+      "live_classification": "still_vacant_on_live_register"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9538206394",
+      "street_address": "40 Rob and Jims Ln",
+      "owner_name": "MCCARSON, CHARLES H;MCCARSON, SUSIE E",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9538206394'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.hendersonville_vacant_structures",
+      "parcel_id": "9569816848",
+      "street_address": "706 WHITE SPARROW DR",
+      "owner_name": "ROSE MARY UNDERWOOD",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "address",
+      "live_where": "UPPER(ADDRESS) LIKE '%706 WHITE SPARROW DR%'",
+      "live_occupied": [
+        null
+      ],
+      "live_condemned": [
+        null
+      ],
+      "live_boarded_up": [
+        "NO"
+      ],
+      "live_classification": "record_found_but_shows_occupied"
+    },
+    {
+      "source": "counties_nc.hendersonville_vacant_structures",
+      "parcel_id": "9569463261",
+      "street_address": "2025 S STONEY VIEW CT",
+      "owner_name": "CARROLL JUSTUS BRIAN HEIRS",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "address",
+      "live_where": "UPPER(ADDRESS) LIKE '%2025 S STONEY VIEW CT%'",
+      "live_occupied": [
+        "NO"
+      ],
+      "live_condemned": [
+        null
+      ],
+      "live_boarded_up": [
+        null
+      ],
+      "live_classification": "still_vacant_on_live_register"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9547646766",
+      "street_address": "215 RED OAK FARM RD",
+      "owner_name": "Morales, Nelson",
+      "board_violation_types": [
+        "Vehicle Graveyard"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9547646766'",
+      "live_violation_types": [
+        "Vehicle Graveyard"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing",
+        "Resolved - No Further Action (Old Database Data)"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_generic.state_contamination.nc_ust_incidents",
+      "parcel_id": "9568568741",
+      "street_address": "113 S JUSTICE ST",
+      "owner_name": "HENDERSON COUNTY EMS",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": false,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "none",
+      "live_where": "UPPER(ADDRESS) LIKE '%113 S JUSTICE ST%'",
+      "live_classification": "not_found_on_live_register"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9577888986",
+      "street_address": "109 BELL AVE",
+      "owner_name": "GUZMAN, BRANDON YAHIR GONZALEZ",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9577888986'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "968282853",
+      "street_address": "95 Blossom Branch Dr",
+      "owner_name": "Cloutier, Suzette",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '968282853'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.hendersonville_vacant_structures",
+      "parcel_id": "9568168457",
+      "street_address": "122 OVERLOOK VIEW DR",
+      "owner_name": "STEPHEN RHOSE",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "address",
+      "live_where": "UPPER(ADDRESS) LIKE '%122 OVERLOOK VIEW DR%'",
+      "live_occupied": [
+        null
+      ],
+      "live_condemned": [
+        null
+      ],
+      "live_boarded_up": [
+        null
+      ],
+      "live_classification": "record_found_but_shows_occupied"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9575740972",
+      "street_address": "59 LOWER CREST ST",
+      "owner_name": "HARGUS IRREVOCABLE TRUST;BATTISTA, ANDREA",
+      "board_violation_types": [
+        "Solid Waste"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9575740972'",
+      "live_violation_types": [
+        "Solid Waste"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9587768387",
+      "street_address": "102 S SOURWOOD LN",
+      "owner_name": "Caldwell, David & Sheryl",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9587768387'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Owner Resolved Issue - No Further Action"
+      ],
+      "live_any_case_open": false,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "closed_or_resolved"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9598489922",
+      "street_address": "171 KINGS VIEW DR",
+      "owner_name": "Williams, Melba",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9598489922'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9538958772",
+      "street_address": "12 E Fox Ridge Dr",
+      "owner_name": "Deborah Mathis",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9538958772'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9691642254",
+      "street_address": "1400 S MILLS GAP RD",
+      "owner_name": "Barnwell, David E",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9691642254'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9548573629",
+      "street_address": "1952 DAVIS MOUNTAIN RD",
+      "owner_name": "JOHNSON, WALTER M;JOHNSON, DEBORAH S",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9548573629'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9661812078",
+      "street_address": "101 Laura Trce",
+      "owner_name": "Usama Kamal",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9661812078'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9578527777",
+      "street_address": "202 FAIRFIELD DR",
+      "owner_name": "Hernandez, Shulz Teresa",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9578527777'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_generic.state_contamination.nc_ust_incidents",
+      "parcel_id": "9595642133",
+      "street_address": "20 L M MORGAN RD",
+      "owner_name": "ETOWAH-HORSE SHOE VFD",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9595642133'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing",
+        "Owner Resolved Issue - No Further Action"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.hendersonville_vacant_structures",
+      "parcel_id": "9578352617",
+      "street_address": "201 BLUE RIDGE ST",
+      "owner_name": "PATRICK ROBINSON",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": false,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "address",
+      "live_where": "UPPER(ADDRESS) LIKE '%201 BLUE RIDGE ST%'",
+      "live_occupied": [
+        null
+      ],
+      "live_condemned": [
+        null
+      ],
+      "live_boarded_up": [
+        "YES"
+      ],
+      "live_classification": "record_found_but_shows_occupied"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9575908366",
+      "street_address": "99 MORGAN WAY",
+      "owner_name": "Gibbs, Eric",
+      "board_violation_types": [
+        "Solid Waste"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9575908366'",
+      "live_violation_types": [
+        "Nuisance",
+        "Solid Waste"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued",
+        "Resolved - No Further Action (Old Database Data)"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9681058960",
+      "street_address": "853 Huckleberry Mountain Rd",
+      "owner_name": "Yeni Ivonne Escamilla Garrido",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9681058960'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9568900439",
+      "street_address": "817 MAYBANK DR",
+      "owner_name": "Jackson, Marion Thomas",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9568900439'",
+      "live_violation_types": [
+        "Junkyard",
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Existing/Duplicate Complaint - No Further Action",
+        "Invalid Complaint - No Further Action",
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.hendersonville_vacant_structures",
+      "parcel_id": "9568495431",
+      "street_address": "822 7TH AVE W",
+      "owner_name": "HENDERSON COUNTY",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "address",
+      "live_where": "UPPER(ADDRESS) LIKE '%822 7TH AVE W%'",
+      "live_occupied": [
+        null
+      ],
+      "live_condemned": [
+        null
+      ],
+      "live_boarded_up": [
+        "YES"
+      ],
+      "live_classification": "record_found_but_shows_occupied"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9660054549",
+      "street_address": "110 OAKWOOD RD",
+      "owner_name": "Butler, Terry (heirs)",
+      "board_violation_types": [
+        "Solid Waste"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9660054549'",
+      "live_violation_types": [
+        "Solid Waste"
+      ],
+      "live_disposition_statuses": [
+        "Owner Resolved Issue - No Further Action"
+      ],
+      "live_any_case_open": false,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "closed_or_resolved"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9587082543",
+      "street_address": "92 CHASTAIN LN",
+      "owner_name": "Yoni Monroy Davila",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9587082543'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9652327300",
+      "street_address": "5360 HENDERSONVILLE RD",
+      "owner_name": "Smileys Markets",
+      "board_violation_types": [
+        "General"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9652327300'",
+      "live_violation_types": [
+        "General"
+      ],
+      "live_disposition_statuses": [
+        "Owner Resolved Issue - No Further Action"
+      ],
+      "live_any_case_open": false,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "closed_or_resolved"
+    },
+    {
+      "source": "counties_nc.hendersonville_vacant_structures",
+      "parcel_id": "9568624948",
+      "street_address": "1001 TEMON ST",
+      "owner_name": "BILLY HOLDEN JR & KEISHA",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "address",
+      "live_where": "UPPER(ADDRESS) LIKE '%1001 TEMON ST%'",
+      "live_occupied": [
+        "NO"
+      ],
+      "live_condemned": [
+        null
+      ],
+      "live_boarded_up": [
+        null
+      ],
+      "live_classification": "still_vacant_on_live_register"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9630868230",
+      "street_address": "162 BANNER FARM RD",
+      "owner_name": "Monteith, Eric",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9630868230'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9577850349",
+      "street_address": "210 W King St",
+      "owner_name": "Pamela Kay Smith",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9577850349'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "Owner Resolved Issue - No Further Action"
+      ],
+      "live_any_case_open": false,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "closed_or_resolved"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9567179025",
+      "street_address": "2202 Kanuga Rd Hendersonville NC 28739",
+      "owner_name": "ROBINSON, TERRY L",
+      "board_violation_types": [
+        "Solid Waste"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9567179025'",
+      "live_violation_types": [
+        "Solid Waste"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9538625476",
+      "street_address": "16 H S Dalton Rd",
+      "owner_name": "Mace, Danny",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9538625476'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued",
+        "Resolved - No Further Action (Old Database Data)"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9528417344",
+      "street_address": "325 LITTLE LAKE DR",
+      "owner_name": "Solis, Alfonso",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9528417344'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9692828055",
+      "street_address": "212 WHITEHEAD RD",
+      "owner_name": "Neff,Larry",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9692828055'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9529631942",
+      "street_address": "106 W WHITE OAK ST",
+      "owner_name": "Dubia, Gary",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9529631942'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9569282226",
+      "street_address": "203 Lyndhurst Drive",
+      "owner_name": "BLACKWELL, JIMMY G",
+      "board_violation_types": [
+        "Vacant Structure"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "hendersonville_vacant_structures_register",
+      "route": "hendersonville_vacant_structures_register",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "none",
+      "live_where": "UPPER(ADDRESS) LIKE '%203 LYNDHURST DRIVE%'",
+      "live_classification": "not_found_on_live_register"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9673982813",
+      "street_address": "95 Youngs Gap Rd",
+      "owner_name": "Elizabeth Argueta Nolasco",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9673982813'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9536341879",
+      "street_address": "54 ADAMS VIEW DR",
+      "owner_name": "Reaves, Rebecca",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9536341879'",
+      "live_violation_types": [
+        "Zoning"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9660046412",
+      "street_address": "308 Baystone Dr",
+      "owner_name": "McArthur Walker Jr",
+      "board_violation_types": [
+        "Zoning"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9660046412'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "Notice of Violation Issued"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9578702581",
+      "street_address": "2010 Old Spartanburg Rd",
+      "owner_name": "Terry Kirby",
+      "board_violation_types": [
+        "Solid Waste"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9578702581'",
+      "live_violation_types": [
+        "Solid Waste"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9577173663",
+      "street_address": "118 Hood Hts",
+      "owner_name": "Gravely, Joseph",
+      "board_violation_types": [
+        "Solid Waste"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9577173663'",
+      "live_violation_types": [
+        "Solid Waste"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9569396038",
+      "street_address": "2325 N EDENBURG ST",
+      "owner_name": "Heirs, Agnes Allen",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9569396038'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9569386719",
+      "street_address": "2215 N EDENBURG ST",
+      "owner_name": "Newman, James Earl",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9569386719'",
+      "live_violation_types": [
+        "Solid Waste"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing",
+        "Owner Resolved Issue - No Further Action"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": false,
+      "live_classification": "unrelated_category",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9682748067",
+      "street_address": "228 W POPLAR DR",
+      "owner_name": "Jacquin, Joseph",
+      "board_violation_types": [
+        "Nuisance"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9682748067'",
+      "live_violation_types": [
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "parcel_id": "9556545489",
+      "street_address": "33 Gilbert Cove drive Hendersonville nc 28739",
+      "owner_name": "Johnny Franklin",
+      "board_violation_types": [
+        "Manufactured Home Graveyard"
+      ],
+      "board_has_open": true,
+      "board_ce_source": "henderson_ordinance_violations_tracking",
+      "route": "henderson_ordinance_violations_tracking",
+      "fetch_ok": true,
+      "error": null,
+      "live_matched_by": "pin",
+      "live_where": "PIN = '9556545489'",
+      "live_violation_types": [
+        "Manufactured Home Graveyard",
+        "Nuisance"
+      ],
+      "live_disposition_statuses": [
+        "In Progress - Case Assigned and Staff Reviewing",
+        "Resolved - No Further Action (Old Database Data)"
+      ],
+      "live_any_case_open": true,
+      "live_any_vacancy_adjacent": true,
+      "live_classification": "vacancy_adjacent",
+      "live_status_classification": "open"
+    }
+  ]
+}

@@ -1,0 +1,2108 @@
+[
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "MCDOWELL JAMES C JR, BRUCE JOHN, MCDOWELL WILLIAM M, TYLER MIRANDA",
+    "bankruptcy_case_name": "James Tyrone McDowell and Teresa Ann McDowell",
+    "court": "scb",
+    "docket": "26-03859",
+    "overlap": 0.4
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "HERNANDEZ JAVIER",
+    "bankruptcy_case_name": "Francisco Javier De La Cruz Hernandez and Darin Lee Grimes",
+    "court": "ncwb",
+    "docket": "26-50301",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "DANIEL DWAYNE S",
+    "bankruptcy_case_name": "Dwayne Daniel Burrell",
+    "court": "nceb",
+    "docket": "26-03193",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "DESILVA DANIEL & POWELL MICHAEL",
+    "bankruptcy_case_name": "Corey Deshawn Gilmore and Asha Tyes Gilmore",
+    "court": "scb",
+    "docket": "26-03223",
+    "overlap": 0.0
+  },
+  {
+    "county": "Charleston",
+    "state": "SC",
+    "owner_name": "WARING JOHN P JR ETAL",
+    "bankruptcy_case_name": "Christopher Allen Williams",
+    "court": "nceb",
+    "docket": "26-03638",
+    "overlap": 0.0
+  },
+  {
+    "county": "Charleston",
+    "state": "SC",
+    "owner_name": "WARREN ANDREW PAUL",
+    "bankruptcy_case_name": "Robert James Brown",
+    "court": "nceb",
+    "docket": "26-03717",
+    "overlap": 0.0
+  },
+  {
+    "county": "Buncombe",
+    "state": "NC",
+    "owner_name": "BROWN, ROBERT E JR",
+    "bankruptcy_case_name": "Robert James Brown",
+    "court": "nceb",
+    "docket": "26-03717",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "HUGHES MICHAEL",
+    "bankruptcy_case_name": "Michael Richard Hughes and Nancy Carlettia Hughes",
+    "court": "ncwb",
+    "docket": "26-10177",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "HUGHES MICHAEL",
+    "bankruptcy_case_name": "Michael Richard Hughes and Nancy Carlettia Hughes",
+    "court": "ncwb",
+    "docket": "26-10177",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "LEE JOY L",
+    "bankruptcy_case_name": "Daniel Lee Juhan and Natalie Joy Juhan",
+    "court": "scb",
+    "docket": "26-03789",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lincoln",
+    "state": "NC",
+    "owner_name": "Bean, Nathan Edward",
+    "bankruptcy_case_name": "Nathan Edward Bean and Kristen Brooke Bean",
+    "court": "ncwb",
+    "docket": "26-40259",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Michael  Johnson",
+    "bankruptcy_case_name": "michael Thedore Johnson",
+    "court": "nceb",
+    "docket": "26-03522",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Robert L Adams IV",
+    "bankruptcy_case_name": "Robert Terence Adams",
+    "court": "scb",
+    "docket": "26-04326",
+    "overlap": 0.6666666666666666
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "Sharielle A Alexander",
+    "bankruptcy_case_name": "Sharielle Auz-Shanay Alexander",
+    "court": "scb",
+    "docket": "26-04095",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "David R Hull",
+    "bankruptcy_case_name": "David Ray Hull, Jr and Natasha Jennifer Hull",
+    "court": "scb",
+    "docket": "26-04091",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "Jose L Rosario",
+    "bankruptcy_case_name": "Charle Jose Rosario and Jennifer Eden Rosario",
+    "court": "scb",
+    "docket": "26-04041",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "Michael  Arnold",
+    "bankruptcy_case_name": "Michael Arnold Kelm",
+    "court": "ncwb",
+    "docket": "26-10218",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "Wanda  King",
+    "bankruptcy_case_name": "Wanda Lawless King",
+    "court": "scb",
+    "docket": "26-04110",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "Kc Towing And Recovery, Llc",
+    "bankruptcy_case_name": "Ultimate Towing & Recovery, LLC",
+    "court": "ncwb",
+    "docket": "26-31281",
+    "overlap": 0.75
+  },
+  {
+    "county": "Union",
+    "state": "SC",
+    "owner_name": "James M Stines",
+    "bankruptcy_case_name": "Michael James Stines and Judith Ann Stines",
+    "court": "ncwb",
+    "docket": "26-31240",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Betty M. Williams",
+    "bankruptcy_case_name": "Betty J Williams",
+    "court": "scb",
+    "docket": "26-04325",
+    "overlap": 1.0
+  },
+  {
+    "county": "Pickens",
+    "state": "SC",
+    "owner_name": "CHASTAIN STEVEN SCOTT",
+    "bankruptcy_case_name": "Steven Edward Chastain and Katelyn Elizabeth Chastain",
+    "court": "scb",
+    "docket": "26-03536",
+    "overlap": 0.6666666666666666
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "Stephen Underwood",
+    "bankruptcy_case_name": "Stephen Jerrod Underwood",
+    "court": "scb",
+    "docket": "26-03546",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "Stephen Underwood",
+    "bankruptcy_case_name": "Stephen Jerrod Underwood",
+    "court": "scb",
+    "docket": "26-03546",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "Jeffrey Scott Easler",
+    "bankruptcy_case_name": "Jeffrey Scott Easler",
+    "court": "scb",
+    "docket": "26-04120",
+    "overlap": 1.0
+  },
+  {
+    "county": "Colleton",
+    "state": "SC",
+    "owner_name": "Patricia Brelsford",
+    "bankruptcy_case_name": "Patricia Blair Brelsford",
+    "court": "scb",
+    "docket": "26-04173",
+    "overlap": 1.0
+  },
+  {
+    "county": "Pickens",
+    "state": "SC",
+    "owner_name": "Stephen D Campbell",
+    "bankruptcy_case_name": "Stephen Otha Campbell",
+    "court": "scb",
+    "docket": "26-04172",
+    "overlap": 1.0
+  },
+  {
+    "county": "Pickens",
+    "state": "SC",
+    "owner_name": "James F Cox",
+    "bankruptcy_case_name": "James Andrew Cox",
+    "court": "nceb",
+    "docket": "26-04093",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "JONES RAY",
+    "bankruptcy_case_name": "Billy Ray Jones and Shannon Avis Suzanne Jones",
+    "court": "nceb",
+    "docket": "26-04223",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "JONES RAY",
+    "bankruptcy_case_name": "Billy Ray Jones and Shannon Avis Suzanne Jones",
+    "court": "nceb",
+    "docket": "26-04223",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES W",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES W",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "GRAHAM DAVID O",
+    "bankruptcy_case_name": "Ryan David Honeycutt and Christy Graham Honeycutt",
+    "court": "ncwb",
+    "docket": "26-31091",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "HINSON BRENDA",
+    "bankruptcy_case_name": "Brenda R Hinson",
+    "court": "scb",
+    "docket": "26-04256",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "JACKSON SHARON P",
+    "bankruptcy_case_name": "Sharon Anne Barnette and General Jackson Barnette",
+    "court": "scb",
+    "docket": "26-04074",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "LOWE DAVID A SR &",
+    "bankruptcy_case_name": "David Michael Lowe",
+    "court": "ncwb",
+    "docket": "26-50381",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES JR",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "ANDERSON COUNTY SEWER AUTHORITY",
+    "bankruptcy_case_name": "Adam Christopher Holmes",
+    "court": "scb",
+    "docket": "26-02161",
+    "overlap": 0.0
+  },
+  {
+    "county": "Georgetown",
+    "state": "SC",
+    "owner_name": "DAVIS-BROWN ROBERTA ET AL & SCOTT ETHEL",
+    "bankruptcy_case_name": "Robert James Brown",
+    "court": "nceb",
+    "docket": "26-03717",
+    "overlap": 0.3333333333333333
+  },
+  {
+    "county": "Greenville",
+    "state": "SC",
+    "owner_name": "ALLEN RANDALL R",
+    "bankruptcy_case_name": "Randall Allen Best and Leslie Rogers Best",
+    "court": "ncwb",
+    "docket": "26-31279",
+    "overlap": 1.0
+  },
+  {
+    "county": "Greenville",
+    "state": "SC",
+    "owner_name": "TODD MICHAEL C",
+    "bankruptcy_case_name": "Guy Michael Todd",
+    "court": "ncwb",
+    "docket": "26-31278",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "Roy Dewitt Shepherd",
+    "bankruptcy_case_name": "Roy Dewitt Shepherd",
+    "court": "scb",
+    "docket": "26-04207",
+    "overlap": 1.0
+  },
+  {
+    "county": "Buncombe",
+    "state": "NC",
+    "owner_name": "LAW BRANDON PETER;LAW BRITTANY LENORA",
+    "bankruptcy_case_name": "Brittany Lenora Law",
+    "court": "ncwb",
+    "docket": "26-10181",
+    "overlap": 1.0
+  },
+  {
+    "county": "Buncombe",
+    "state": "NC",
+    "owner_name": "MURDOCH WILLIAM;FISHER JACOB",
+    "bankruptcy_case_name": "Jeremy Wayne Shaffer",
+    "court": "ncwb",
+    "docket": "26-10135",
+    "overlap": 0.0
+  },
+  {
+    "county": "Greenville",
+    "state": "SC",
+    "owner_name": "Michael Greene",
+    "bankruptcy_case_name": "Michael Peter Greene and Terry Lynn Greene",
+    "court": "ncwb",
+    "docket": "26-10208",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "ESTEVEZ LAURA J",
+    "bankruptcy_case_name": "John J. Peterson",
+    "court": "scb",
+    "docket": "26-02332",
+    "overlap": 0.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "WOFFORD ELIZABETH WOFFORD ELIZABETH M",
+    "bankruptcy_case_name": "Carole Elizabeth Wofford",
+    "court": "scb",
+    "docket": "26-04131",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "Anderson Village",
+    "bankruptcy_case_name": "David Allen Gardner",
+    "court": "scb",
+    "docket": "26-02770",
+    "overlap": 0.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "JAMES MICHAEL",
+    "bankruptcy_case_name": "Michael James Lambrix",
+    "court": "nceb",
+    "docket": "26-04271",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "BRUMBALOW ELYSE THOMAS",
+    "bankruptcy_case_name": "Francisco Javier De La Cruz Hernandez and Darin Lee Grimes",
+    "court": "ncwb",
+    "docket": "26-50301",
+    "overlap": 0.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "GIBSON P JUSTIN",
+    "bankruptcy_case_name": "Stephen Charles Hawkins and Carolyn Joyce Hawkins",
+    "court": "scb",
+    "docket": "26-03203",
+    "overlap": 0.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "FLEMING WILLIAM J",
+    "bankruptcy_case_name": "William Fleming",
+    "court": "scb",
+    "docket": "26-03411",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "LEWIS WILLIAM R",
+    "bankruptcy_case_name": "Lewis William Hedgepeth",
+    "court": "nceb",
+    "docket": "26-04174",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "GARDNER JON J",
+    "bankruptcy_case_name": "Jon Scott Rider Gardner and Kristen Ann Gardner",
+    "court": "nceb",
+    "docket": "26-04073",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "CAMPBELL SCOTT B",
+    "bankruptcy_case_name": "Erin Celeste Campbell and Scott Colin Campbell",
+    "court": "ncwb",
+    "docket": "26-31154",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "JONES CHRISTOPHER M",
+    "bankruptcy_case_name": "Aaron Christopher Jones and Brittani Marie Cramer-Jones",
+    "court": "ncwb",
+    "docket": "26-50275",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "DAVIS TERRY R",
+    "bankruptcy_case_name": "Terry Lee Davis",
+    "court": "scb",
+    "docket": "26-04376",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "ANDERSON JOHN W",
+    "bankruptcy_case_name": "John Albert Anderson",
+    "court": "scb",
+    "docket": "26-03660",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "BROOKS TERESA S",
+    "bankruptcy_case_name": "Teresa Yvette Brooks",
+    "court": "ncwb",
+    "docket": "26-40194",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "BROWN JAMES M",
+    "bankruptcy_case_name": "Robert James Brown",
+    "court": "nceb",
+    "docket": "26-03717",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "BURNS MICHAEL A",
+    "bankruptcy_case_name": "Michael Scott Burns",
+    "court": "scb",
+    "docket": "26-04143",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "GRAHAM MARY C",
+    "bankruptcy_case_name": "Mary Graham Anderson",
+    "court": "scb",
+    "docket": "26-03618",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "GRAHAM MARY C",
+    "bankruptcy_case_name": "Mary Graham Anderson",
+    "court": "scb",
+    "docket": "26-03618",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "GRAHAM MARY C",
+    "bankruptcy_case_name": "Mary Graham Anderson",
+    "court": "scb",
+    "docket": "26-03618",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "JACKSON DAVID M",
+    "bankruptcy_case_name": "David Lee Jackson II and Darla Dawn Jackson",
+    "court": "nceb",
+    "docket": "26-03731",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "LEE BRENDA",
+    "bankruptcy_case_name": "Frank A Barbato and Brenda Lee Barbato",
+    "court": "scb",
+    "docket": "26-03446",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "LEWIS MICHAEL",
+    "bankruptcy_case_name": "Michael Lewis Dunlap and Mary Elizabeth Dunlap",
+    "court": "nceb",
+    "docket": "26-03175",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "MARTIN CHRISTOPHER O",
+    "bankruptcy_case_name": "Brian G Martin and Christopher K Carney",
+    "court": "nceb",
+    "docket": "26-03773",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "MARTIN JOHN G",
+    "bankruptcy_case_name": "John Mark Martin",
+    "court": "nceb",
+    "docket": "26-03624",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "TAYLOR MICHELLE",
+    "bankruptcy_case_name": "Taylor Michelle Lynn",
+    "court": "ncwb",
+    "docket": "26-40254",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "THOMPSON KAREN H",
+    "bankruptcy_case_name": "Napoleon Deon Thompson and Karen Denise Thompson",
+    "court": "ncwb",
+    "docket": "26-31225",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "TURNER JUSTIN D",
+    "bankruptcy_case_name": "Justin Turner Smith and Emily Lauren Smith",
+    "court": "nceb",
+    "docket": "26-03799",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "WADDELL KIMBERLY P",
+    "bankruptcy_case_name": "Kimberly Noelle Waddell",
+    "court": "scb",
+    "docket": "26-03779",
+    "overlap": 1.0
+  },
+  {
+    "county": "Berkeley",
+    "state": "SC",
+    "owner_name": "COAXUM DANIELLE",
+    "bankruptcy_case_name": "Danielle Demonica Coaxum",
+    "court": "scb",
+    "docket": "26-04360",
+    "overlap": 1.0
+  },
+  {
+    "county": "Berkeley",
+    "state": "SC",
+    "owner_name": "JAMES LAWRENCE ETAL",
+    "bankruptcy_case_name": "Lawrence James Pate and Kathie Jo Ann Pate",
+    "court": "scb",
+    "docket": "26-04217",
+    "overlap": 1.0
+  },
+  {
+    "county": "Berkeley",
+    "state": "SC",
+    "owner_name": "KELLY JAMES C",
+    "bankruptcy_case_name": "James Kelly",
+    "court": "scb",
+    "docket": "26-04140",
+    "overlap": 1.0
+  },
+  {
+    "county": "Berkeley",
+    "state": "SC",
+    "owner_name": "LEE RICHARD",
+    "bankruptcy_case_name": "Richard Lee Alexander, Sr and Rosemary Patricia Alexander",
+    "court": "scb",
+    "docket": "26-04332",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "Matthew  Tucker",
+    "bankruptcy_case_name": "Matthew Albert DaBrescia and Preston Tucker DaBrescia",
+    "court": "scb",
+    "docket": "26-04336",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Tatayana Y. Richey",
+    "bankruptcy_case_name": "Tatayana Yakeia Richey",
+    "court": "scb",
+    "docket": "26-03239",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "William Crowley",
+    "bankruptcy_case_name": "Russell William Crowley and Regina Ann Crowley",
+    "court": "scb",
+    "docket": "26-02421",
+    "overlap": 1.0
+  },
+  {
+    "county": "Laurens",
+    "state": "SC",
+    "owner_name": "William David Dewitt",
+    "bankruptcy_case_name": "William Earl DeWitt and Lillie Smith DeWitt",
+    "court": "nceb",
+    "docket": "26-03374",
+    "overlap": 0.6666666666666666
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "John J Peterson",
+    "bankruptcy_case_name": "John J. Peterson",
+    "court": "scb",
+    "docket": "26-02332",
+    "overlap": 1.0
+  },
+  {
+    "county": "Union",
+    "state": "SC",
+    "owner_name": "DEAN JEFFREY JENNIFER COURTNEY DEAN",
+    "bankruptcy_case_name": "Jeffrey Dean Bryant",
+    "court": "ncwb",
+    "docket": "26-50367",
+    "overlap": 0.6666666666666666
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Tatayana Y. Richey",
+    "bankruptcy_case_name": "Tatayana Yakeia Richey",
+    "court": "scb",
+    "docket": "26-03239",
+    "overlap": 1.0
+  },
+  {
+    "county": "Buncombe",
+    "state": "NC",
+    "owner_name": "CIMARRON HMEOWR ASSOC INC",
+    "bankruptcy_case_name": "Deanna Marie Williams",
+    "court": "ncwb",
+    "docket": "26-30992",
+    "overlap": 0.0
+  },
+  {
+    "county": "Buncombe",
+    "state": "NC",
+    "owner_name": "Rolland Ivan Rushing and Pamela Dee Rushing",
+    "bankruptcy_case_name": "Rolland Ivan Rushing and Pamela Dee Rushing",
+    "court": "ncwb",
+    "docket": "26-50287",
+    "overlap": 1.0
+  },
+  {
+    "county": "Henderson",
+    "state": "NC",
+    "owner_name": "MCCLELLAND, ROBERT;MCCLELLAND, STACY",
+    "bankruptcy_case_name": "Tyrek Darell McClelland and Imiraca Lashay McClelland",
+    "court": "ncwb",
+    "docket": "26-50282",
+    "overlap": 0.3333333333333333
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "ALBERT TIMOTHY",
+    "bankruptcy_case_name": "Ricky Jerrod Goodwin",
+    "court": "scb",
+    "docket": "26-03561",
+    "overlap": 0.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "LEON HIX REAL ESTATE LLC",
+    "bankruptcy_case_name": "Roshita Monique Mitchell",
+    "court": "scb",
+    "docket": "26-03410",
+    "overlap": 0.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Betty M. Williams",
+    "bankruptcy_case_name": "Betty J Williams",
+    "court": "scb",
+    "docket": "26-04325",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Donna  Brannon",
+    "bankruptcy_case_name": "Charles Edward Troutman and Donna Brannon Troutman",
+    "court": "ncwb",
+    "docket": "26-50366",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Patricia  Williams",
+    "bankruptcy_case_name": "Patricia Anne Williams",
+    "court": "nceb",
+    "docket": "26-03719",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Jesse E. Canty",
+    "bankruptcy_case_name": "Jesse Edward Canty and Kimberly Aleatha Canty",
+    "court": "scb",
+    "docket": "26-04068",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Joshua  Allen",
+    "bankruptcy_case_name": "Joshua Allen Clark and Frances Nichole Clark",
+    "court": "scb",
+    "docket": "26-03185",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Miguel  Gomez",
+    "bankruptcy_case_name": "Oswaldo Miguel Rivas Mesa and Mary Alejandra Gomez Ayala",
+    "court": "ncwb",
+    "docket": "26-10173",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Robert A Jones",
+    "bankruptcy_case_name": "Robert Curtis Best and Shannon Marie Jones",
+    "court": "scb",
+    "docket": "26-04126",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "JONES ANTHONY",
+    "bankruptcy_case_name": "Anthony Wayne Jones and Joan Gentry Jones",
+    "court": "nceb",
+    "docket": "26-03097",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Michael  Hughes, Sr.",
+    "bankruptcy_case_name": "Michael Richard Hughes and Nancy Carlettia Hughes",
+    "court": "ncwb",
+    "docket": "26-10177",
+    "overlap": 1.0
+  },
+  {
+    "county": "New Hanover",
+    "state": "NC",
+    "owner_name": "Williams, Christopher L",
+    "bankruptcy_case_name": "John Christopher Williams, Sr. and Tammy Lynn Williams",
+    "court": "ncwb",
+    "docket": "26-50364",
+    "overlap": 1.0
+  },
+  {
+    "county": "Brunswick",
+    "state": "NC",
+    "owner_name": "Williams, James L.",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Brunswick",
+    "state": "NC",
+    "owner_name": "Starcher, Michelle Denise",
+    "bankruptcy_case_name": "Michelle Denise Starcher",
+    "court": "nceb",
+    "docket": "26-04283",
+    "overlap": 1.0
+  },
+  {
+    "county": "Williamsburg",
+    "state": "SC",
+    "owner_name": "DAVIS YVETTE",
+    "bankruptcy_case_name": "Terry Yvette Davis",
+    "court": "ncwb",
+    "docket": "26-31196",
+    "overlap": 1.0
+  },
+  {
+    "county": "Williamsburg",
+    "state": "SC",
+    "owner_name": "DOUGLAS RONALD D &",
+    "bankruptcy_case_name": "Ronald Douglas Hayward",
+    "court": "nceb",
+    "docket": "26-04205",
+    "overlap": 1.0
+  },
+  {
+    "county": "Williamsburg",
+    "state": "SC",
+    "owner_name": "FLOYD DAVID B",
+    "bankruptcy_case_name": "Paul David Floyd",
+    "court": "scb",
+    "docket": "26-04239",
+    "overlap": 1.0
+  },
+  {
+    "county": "Williamsburg",
+    "state": "SC",
+    "owner_name": "MOORE JAMES W",
+    "bankruptcy_case_name": "James Dewayne Moore",
+    "court": "ncwb",
+    "docket": "26-10202",
+    "overlap": 1.0
+  },
+  {
+    "county": "Williamsburg",
+    "state": "SC",
+    "owner_name": "MOORE JAMES W",
+    "bankruptcy_case_name": "James Dewayne Moore",
+    "court": "ncwb",
+    "docket": "26-10202",
+    "overlap": 1.0
+  },
+  {
+    "county": "Williamsburg",
+    "state": "SC",
+    "owner_name": "SMITH MICHAEL",
+    "bankruptcy_case_name": "Michael Dana Gangi and Maryan Shane Smith-Gangi",
+    "court": "ncwb",
+    "docket": "26-50386",
+    "overlap": 1.0
+  },
+  {
+    "county": "Williamsburg",
+    "state": "SC",
+    "owner_name": "STONE JOSEPH W",
+    "bankruptcy_case_name": "William Joseph Stone, Jr. and Alexis Angel Stone",
+    "court": "ncwb",
+    "docket": "26-31205",
+    "overlap": 1.0
+  },
+  {
+    "county": "Williamsburg",
+    "state": "SC",
+    "owner_name": "WILLIAMS ARTHUR JR",
+    "bankruptcy_case_name": "Walter Arthur Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04232",
+    "overlap": 1.0
+  },
+  {
+    "county": "Clarendon",
+    "state": "SC",
+    "owner_name": "JONES CURTIS W SR",
+    "bankruptcy_case_name": "Robert Curtis Best and Shannon Marie Jones",
+    "court": "scb",
+    "docket": "26-04126",
+    "overlap": 1.0
+  },
+  {
+    "county": "Clarendon",
+    "state": "SC",
+    "owner_name": "WILSON NANCY",
+    "bankruptcy_case_name": "Leonard Wilson, Jr. and Nancy Rena Wilson",
+    "court": "ncwb",
+    "docket": "26-31217",
+    "overlap": 1.0
+  },
+  {
+    "county": "Union",
+    "state": "SC",
+    "owner_name": "DAVIS SANDRA L",
+    "bankruptcy_case_name": "Sandra Kay Davis",
+    "court": "scb",
+    "docket": "26-04316",
+    "overlap": 1.0
+  },
+  {
+    "county": "Union",
+    "state": "SC",
+    "owner_name": "BURTON BRANDON P",
+    "bankruptcy_case_name": "Brandon Lacory Burton and Tammy Denise Burton",
+    "court": "scb",
+    "docket": "26-04319",
+    "overlap": 1.0
+  },
+  {
+    "county": "Newberry",
+    "state": "SC",
+    "owner_name": "JOHNSON ROBERT C",
+    "bankruptcy_case_name": "Tyrell Robert Johnson",
+    "court": "nceb",
+    "docket": "26-04279",
+    "overlap": 1.0
+  },
+  {
+    "county": "Darlington",
+    "state": "SC",
+    "owner_name": "LEE TERRY",
+    "bankruptcy_case_name": "Terry Lee Davis",
+    "court": "scb",
+    "docket": "26-04376",
+    "overlap": 1.0
+  },
+  {
+    "county": "Darlington",
+    "state": "SC",
+    "owner_name": "DICKEY JAMES H",
+    "bankruptcy_case_name": "James L Dickey and Sarah V Dickey",
+    "court": "nceb",
+    "docket": "26-04092",
+    "overlap": 1.0
+  },
+  {
+    "county": "Darlington",
+    "state": "SC",
+    "owner_name": "LOWE DAVID A SR",
+    "bankruptcy_case_name": "David Michael Lowe",
+    "court": "ncwb",
+    "docket": "26-50381",
+    "overlap": 1.0
+  },
+  {
+    "county": "Darlington",
+    "state": "SC",
+    "owner_name": "WILLIAMS ALICIA K &",
+    "bankruptcy_case_name": "Alicia Arlene Williams",
+    "court": "ncwb",
+    "docket": "26-31306",
+    "overlap": 1.0
+  },
+  {
+    "county": "Darlington",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Darlington",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Darlington",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES L",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Darlington",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES L",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Darlington",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES L",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Darlington",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES L",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lancaster",
+    "state": "SC",
+    "owner_name": "RAY TONY",
+    "bankruptcy_case_name": "Tony Ray Gieseke and Lynda Marie Gieseke",
+    "court": "nceb",
+    "docket": "26-04166",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lancaster",
+    "state": "SC",
+    "owner_name": "RAY TONY G",
+    "bankruptcy_case_name": "Tony Ray Gieseke and Lynda Marie Gieseke",
+    "court": "nceb",
+    "docket": "26-04166",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lancaster",
+    "state": "SC",
+    "owner_name": "RAY TONY G",
+    "bankruptcy_case_name": "Tony Ray Gieseke and Lynda Marie Gieseke",
+    "court": "nceb",
+    "docket": "26-04166",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lancaster",
+    "state": "SC",
+    "owner_name": "THOMPSON DANIEL",
+    "bankruptcy_case_name": "Daniel Ryan Haywood and Julia Thompson Haywood",
+    "court": "ncwb",
+    "docket": "26-31237",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lancaster",
+    "state": "SC",
+    "owner_name": "THOMPSON DANIEL",
+    "bankruptcy_case_name": "Daniel Ryan Haywood and Julia Thompson Haywood",
+    "court": "ncwb",
+    "docket": "26-31237",
+    "overlap": 1.0
+  },
+  {
+    "county": "McCormick",
+    "state": "SC",
+    "owner_name": "MOORE JAMES",
+    "bankruptcy_case_name": "James Dewayne Moore",
+    "court": "ncwb",
+    "docket": "26-10202",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "CHARLES DONNA L",
+    "bankruptcy_case_name": "Charles Edward Troutman and Donna Brannon Troutman",
+    "court": "ncwb",
+    "docket": "26-50366",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "KIND JOHN ALLEN &",
+    "bankruptcy_case_name": "John Allen Kind, III",
+    "court": "scb",
+    "docket": "26-04058",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "KIND JOHN ALLEN JR &",
+    "bankruptcy_case_name": "John Allen Kind, III",
+    "court": "scb",
+    "docket": "26-04058",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "LEE JAMES W",
+    "bankruptcy_case_name": "Johnnie Lee James, Jr and Carol Bullard James",
+    "court": "nceb",
+    "docket": "26-04215",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "LEE MICHELLE R",
+    "bankruptcy_case_name": "Michael A Bastys and Michelle Lee Bastys",
+    "court": "scb",
+    "docket": "26-04077",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "MOORE JAMES E",
+    "bankruptcy_case_name": "James Dewayne Moore",
+    "court": "ncwb",
+    "docket": "26-10202",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "RAY DONALD",
+    "bankruptcy_case_name": "Donald Ray Twining",
+    "court": "scb",
+    "docket": "26-04108",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "RAY DONALD V &",
+    "bankruptcy_case_name": "Donald Ray Twining",
+    "court": "scb",
+    "docket": "26-04108",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "COX JAMES M JR &",
+    "bankruptcy_case_name": "James Andrew Cox",
+    "court": "nceb",
+    "docket": "26-04093",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "HUNT JAMES D, TRUSTEE",
+    "bankruptcy_case_name": "David James Hunt",
+    "court": "ncwb",
+    "docket": "26-31189",
+    "overlap": 0.6666666666666666
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "SMITH CHARLES &",
+    "bankruptcy_case_name": "Charles Fitzgerald Smith",
+    "court": "nceb",
+    "docket": "26-04244",
+    "overlap": 1.0
+  },
+  {
+    "county": "Laurens",
+    "state": "SC",
+    "owner_name": "DAVIS DAVID W",
+    "bankruptcy_case_name": "Bryan David Davis",
+    "court": "ncwb",
+    "docket": "26-31203",
+    "overlap": 1.0
+  },
+  {
+    "county": "Laurens",
+    "state": "SC",
+    "owner_name": "MACKEY JAMES JR",
+    "bankruptcy_case_name": "James Mackey and Betty Y. Hargett-Mackey",
+    "court": "nceb",
+    "docket": "26-04115",
+    "overlap": 1.0
+  },
+  {
+    "county": "Laurens",
+    "state": "SC",
+    "owner_name": "WILLIAMS ARTHUR L JR ET AL",
+    "bankruptcy_case_name": "Walter Arthur Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04232",
+    "overlap": 1.0
+  },
+  {
+    "county": "Laurens",
+    "state": "SC",
+    "owner_name": "SULLIVAN EDWARD JR",
+    "bankruptcy_case_name": "Belton Edward Underwood and Pamela Sullivan Underwood",
+    "court": "scb",
+    "docket": "26-04281",
+    "overlap": 1.0
+  },
+  {
+    "county": "Calhoun",
+    "state": "SC",
+    "owner_name": "HALL MICHAEL E",
+    "bankruptcy_case_name": "Michael Sylvester Hall and Cynthia Sanders Hall",
+    "court": "ncwb",
+    "docket": "26-31307",
+    "overlap": 1.0
+  },
+  {
+    "county": "Calhoun",
+    "state": "SC",
+    "owner_name": "SMITH CHARLES H",
+    "bankruptcy_case_name": "Charles Fitzgerald Smith",
+    "court": "nceb",
+    "docket": "26-04244",
+    "overlap": 1.0
+  },
+  {
+    "county": "Calhoun",
+    "state": "SC",
+    "owner_name": "WILLIAMS JOHN H ESTATE OF &",
+    "bankruptcy_case_name": "John Christopher Williams, Sr. and Tammy Lynn Williams",
+    "court": "ncwb",
+    "docket": "26-50364",
+    "overlap": 0.5
+  },
+  {
+    "county": "Allendale",
+    "state": "SC",
+    "owner_name": "WILLIAMS ANTHONY L",
+    "bankruptcy_case_name": "Jayce Anthony Williams and Sabrina Leann Williams",
+    "court": "nceb",
+    "docket": "26-04299",
+    "overlap": 1.0
+  },
+  {
+    "county": "Allendale",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES &",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Allendale",
+    "state": "SC",
+    "owner_name": "WILLIAMS JAMES A ETAL",
+    "bankruptcy_case_name": "James Reed Williams, Jr.",
+    "court": "nceb",
+    "docket": "26-04300",
+    "overlap": 1.0
+  },
+  {
+    "county": "Abbeville",
+    "state": "SC",
+    "owner_name": "HALL MICHAEL A",
+    "bankruptcy_case_name": "Michael Sylvester Hall and Cynthia Sanders Hall",
+    "court": "ncwb",
+    "docket": "26-31307",
+    "overlap": 1.0
+  },
+  {
+    "county": "Abbeville",
+    "state": "SC",
+    "owner_name": "JONES SARAH C",
+    "bankruptcy_case_name": "Sarah Taylor Jones",
+    "court": "nceb",
+    "docket": "26-04221",
+    "overlap": 1.0
+  },
+  {
+    "county": "Abbeville",
+    "state": "SC",
+    "owner_name": "WILLIAMS ELIZABETH",
+    "bankruptcy_case_name": "Gloria Elizabeth Williams",
+    "court": "nceb",
+    "docket": "26-04294",
+    "overlap": 1.0
+  },
+  {
+    "county": "Marlboro",
+    "state": "SC",
+    "owner_name": "DAVID JAMES A",
+    "bankruptcy_case_name": "David James Hunt",
+    "court": "ncwb",
+    "docket": "26-31189",
+    "overlap": 1.0
+  },
+  {
+    "county": "Marlboro",
+    "state": "SC",
+    "owner_name": "PATE JAMES",
+    "bankruptcy_case_name": "Lawrence James Pate and Kathie Jo Ann Pate",
+    "court": "scb",
+    "docket": "26-04217",
+    "overlap": 1.0
+  },
+  {
+    "county": "Marlboro",
+    "state": "SC",
+    "owner_name": "MOORE JAMES A JR",
+    "bankruptcy_case_name": "James Dewayne Moore",
+    "court": "ncwb",
+    "docket": "26-10202",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "SMITH DONNA M",
+    "bankruptcy_case_name": "Donna Kaye Smith",
+    "court": "scb",
+    "docket": "26-04294",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "WHITE BRITTANY",
+    "bankruptcy_case_name": "Brittany Nicole White",
+    "court": "nceb",
+    "docket": "26-04122",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "ADAMS ROBERT C",
+    "bankruptcy_case_name": "Robert Terence Adams",
+    "court": "scb",
+    "docket": "26-04326",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "JONES BILLY A",
+    "bankruptcy_case_name": "Billy Ray Jones and Shannon Avis Suzanne Jones",
+    "court": "nceb",
+    "docket": "26-04223",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "TAYLOR EDWARD L",
+    "bankruptcy_case_name": "Edward Shane Angley and Angel Taylor Angley",
+    "court": "scb",
+    "docket": "26-04008",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "BRADLEY MICHAEL E",
+    "bankruptcy_case_name": "James Michael Bradley and Tobia Lee Bradley",
+    "court": "scb",
+    "docket": "26-04038",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "LEE RICKY",
+    "bankruptcy_case_name": "Ricky Calvin Lee",
+    "court": "ncwb",
+    "docket": "26-31206",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "SMITH SHANE C",
+    "bankruptcy_case_name": "Michael Dana Gangi and Maryan Shane Smith-Gangi",
+    "court": "ncwb",
+    "docket": "26-50386",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "GROGAN MICHAEL",
+    "bankruptcy_case_name": "David Michael Grogan",
+    "court": "scb",
+    "docket": "26-04330",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lee",
+    "state": "SC",
+    "owner_name": "DAVIS J WAYNE",
+    "bankruptcy_case_name": "Stephen Wayne Davis",
+    "court": "nceb",
+    "docket": "26-04047",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lee",
+    "state": "SC",
+    "owner_name": "DAVIS J WAYNE",
+    "bankruptcy_case_name": "Stephen Wayne Davis",
+    "court": "nceb",
+    "docket": "26-04047",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lee",
+    "state": "SC",
+    "owner_name": "DAVIS J WAYNE",
+    "bankruptcy_case_name": "Stephen Wayne Davis",
+    "court": "nceb",
+    "docket": "26-04047",
+    "overlap": 1.0
+  },
+  {
+    "county": "Williamsburg",
+    "state": "SC",
+    "owner_name": "BRADLEY JAMES",
+    "bankruptcy_case_name": "James Michael Bradley and Tobia Lee Bradley",
+    "court": "scb",
+    "docket": "26-04038",
+    "overlap": 1.0
+  },
+  {
+    "county": "Clarendon",
+    "state": "SC",
+    "owner_name": "LEE JAMES A",
+    "bankruptcy_case_name": "Johnnie Lee James, Jr and Carol Bullard James",
+    "court": "nceb",
+    "docket": "26-04215",
+    "overlap": 1.0
+  },
+  {
+    "county": "Clarendon",
+    "state": "SC",
+    "owner_name": "OLIVER TIMOTHY P",
+    "bankruptcy_case_name": "Timothy Jerry Lamm and Amanda Oliver Lamm",
+    "court": "ncwb",
+    "docket": "26-50356",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "LEE JENNIFER A",
+    "bankruptcy_case_name": "Arthur Lee Tart, Jr. and Jennifer Branham Tart",
+    "court": "scb",
+    "docket": "26-04352",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "GARRETT PAMELA V",
+    "bankruptcy_case_name": "Cameron Garrett Murray and Pamela Esther Murray",
+    "court": "scb",
+    "docket": "26-04389",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "WARREN RICHARD C & ETAL",
+    "bankruptcy_case_name": "Richard Warren Grishaw",
+    "court": "nceb",
+    "docket": "26-04083",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lancaster",
+    "state": "SC",
+    "owner_name": "BROWN TIMOTHY ETAL",
+    "bankruptcy_case_name": "Timothy Brown and Samara Liz Ramos-Brown",
+    "court": "nceb",
+    "docket": "26-04301",
+    "overlap": 1.0
+  },
+  {
+    "county": "Bamberg",
+    "state": "SC",
+    "owner_name": "SANDERS MICHAEL H.",
+    "bankruptcy_case_name": "Michael Sylvester Hall and Cynthia Sanders Hall",
+    "court": "ncwb",
+    "docket": "26-31307",
+    "overlap": 1.0
+  },
+  {
+    "county": "Colleton",
+    "state": "SC",
+    "owner_name": "TAYLOR DONNA",
+    "bankruptcy_case_name": "Donna Marie Taylor",
+    "court": "nceb",
+    "docket": "26-04145",
+    "overlap": 1.0
+  },
+  {
+    "county": "Colleton",
+    "state": "SC",
+    "owner_name": "FERGUSON BRENDA L",
+    "bankruptcy_case_name": "Brenda Yvette Ferguson",
+    "court": "scb",
+    "docket": "26-04156",
+    "overlap": 1.0
+  },
+  {
+    "county": "Horry",
+    "state": "SC",
+    "owner_name": "SMITH CHARLES B",
+    "bankruptcy_case_name": "Charles Fitzgerald Smith",
+    "court": "nceb",
+    "docket": "26-04244",
+    "overlap": 1.0
+  },
+  {
+    "county": "Horry",
+    "state": "SC",
+    "owner_name": "WRIGHT JOHN J JR ETAL",
+    "bankruptcy_case_name": "Matthew John Wright",
+    "court": "nceb",
+    "docket": "26-04052",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "ELLIOTT ELIZABETH S",
+    "bankruptcy_case_name": "Michael James Elliott and Elizabeth Williford Elliott",
+    "court": "nceb",
+    "docket": "26-04161",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "HAMMOND MARKEISHA LYNETTE",
+    "bankruptcy_case_name": "Markeisha Lynette Hammond",
+    "court": "scb",
+    "docket": "26-04390",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "MASON MICHAEL R",
+    "bankruptcy_case_name": "Kurt Michael Black and Casey Mason Black",
+    "court": "ncwb",
+    "docket": "26-40231",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "RAY DAVID C",
+    "bankruptcy_case_name": "David Ray Hull, Jr and Natasha Jennifer Hull",
+    "court": "scb",
+    "docket": "26-04091",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "JOHNSON DEBRA S",
+    "bankruptcy_case_name": "Debra Johnson Burch",
+    "court": "ncwb",
+    "docket": "26-10203",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "JOHNSON DEBRA S",
+    "bankruptcy_case_name": "Debra Johnson Burch",
+    "court": "ncwb",
+    "docket": "26-10203",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "PERRY ROBERT E III",
+    "bankruptcy_case_name": "Katina Perry Williams and Tristan Robert Williams",
+    "court": "nceb",
+    "docket": "26-04186",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "WILLIAMS GLORIA",
+    "bankruptcy_case_name": "Gloria Elizabeth Williams",
+    "court": "nceb",
+    "docket": "26-04294",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "WILLIAMS SABRINA",
+    "bankruptcy_case_name": "Jayce Anthony Williams and Sabrina Leann Williams",
+    "court": "nceb",
+    "docket": "26-04299",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "BROWN MARY",
+    "bankruptcy_case_name": "Mary E. Brown",
+    "court": "nceb",
+    "docket": "26-04120",
+    "overlap": 1.0
+  },
+  {
+    "county": "Kershaw",
+    "state": "SC",
+    "owner_name": "COX JAMES C",
+    "bankruptcy_case_name": "James Andrew Cox",
+    "court": "nceb",
+    "docket": "26-04093",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lexington",
+    "state": "SC",
+    "owner_name": "HALL MICHAEL E",
+    "bankruptcy_case_name": "Michael Sylvester Hall and Cynthia Sanders Hall",
+    "court": "ncwb",
+    "docket": "26-31307",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lexington",
+    "state": "SC",
+    "owner_name": "TAYLOR JOSEPH P",
+    "bankruptcy_case_name": "Joseph Martin Alexander Bourne and Lauren Taylor Bourne",
+    "court": "ncwb",
+    "docket": "26-40250",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lexington",
+    "state": "SC",
+    "owner_name": "FOX DAVID",
+    "bankruptcy_case_name": "Michael David Hoyle and Alyssa Nicole Fox",
+    "court": "ncwb",
+    "docket": "26-50354",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lexington",
+    "state": "SC",
+    "owner_name": "JOHNSON JEROME",
+    "bankruptcy_case_name": "Craig Jerome Johnson",
+    "court": "nceb",
+    "docket": "26-04222",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lexington",
+    "state": "SC",
+    "owner_name": "JOHNSON ROBERT JR",
+    "bankruptcy_case_name": "Tyrell Robert Johnson",
+    "court": "nceb",
+    "docket": "26-04279",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lexington",
+    "state": "SC",
+    "owner_name": "WILLIAMS CHRISTOPHER D & CHRISTOPHER V",
+    "bankruptcy_case_name": "John Christopher Williams, Sr. and Tammy Lynn Williams",
+    "court": "ncwb",
+    "docket": "26-50364",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lexington",
+    "state": "SC",
+    "owner_name": "WILLIAMS JEFFERY",
+    "bankruptcy_case_name": "Jeffery D. Williams and Jessica Leigh Williams",
+    "court": "nceb",
+    "docket": "26-04218",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lexington",
+    "state": "SC",
+    "owner_name": "GARRETT PAMELA K",
+    "bankruptcy_case_name": "Cameron Garrett Murray and Pamela Esther Murray",
+    "court": "scb",
+    "docket": "26-04389",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lexington",
+    "state": "SC",
+    "owner_name": "MASON MICHAEL E",
+    "bankruptcy_case_name": "Kurt Michael Black and Casey Mason Black",
+    "court": "ncwb",
+    "docket": "26-40231",
+    "overlap": 1.0
+  },
+  {
+    "county": "Saluda",
+    "state": "SC",
+    "owner_name": "JOHNSON ROBERT A JR",
+    "bankruptcy_case_name": "Tyrell Robert Johnson",
+    "court": "nceb",
+    "docket": "26-04279",
+    "overlap": 1.0
+  },
+  {
+    "county": "Saluda",
+    "state": "SC",
+    "owner_name": "WATSON ANGELA",
+    "bankruptcy_case_name": "Angela Laticia Watson",
+    "court": "scb",
+    "docket": "26-04148",
+    "overlap": 1.0
+  },
+  {
+    "county": "Sumter",
+    "state": "SC",
+    "owner_name": "DAVIS MARTHA M",
+    "bankruptcy_case_name": "Martha Maya Louise Davis",
+    "court": "ncwb",
+    "docket": "26-31141",
+    "overlap": 1.0
+  },
+  {
+    "county": "Sumter",
+    "state": "SC",
+    "owner_name": "TAYLOR JOSEPH K JR",
+    "bankruptcy_case_name": "Joseph Martin Alexander Bourne and Lauren Taylor Bourne",
+    "court": "ncwb",
+    "docket": "26-40250",
+    "overlap": 1.0
+  },
+  {
+    "county": "Sumter",
+    "state": "SC",
+    "owner_name": "HOPKINS MARY L",
+    "bankruptcy_case_name": "Mary Elizabeth Hopkins",
+    "court": "scb",
+    "docket": "26-04383",
+    "overlap": 1.0
+  },
+  {
+    "county": "Sumter",
+    "state": "SC",
+    "owner_name": "STEWART JAMES E",
+    "bankruptcy_case_name": "James Houston Stewart",
+    "court": "scb",
+    "docket": "26-04329",
+    "overlap": 1.0
+  },
+  {
+    "county": "Sumter",
+    "state": "SC",
+    "owner_name": "WILLIAMS JOHN",
+    "bankruptcy_case_name": "John Christopher Williams, Sr. and Tammy Lynn Williams",
+    "court": "ncwb",
+    "docket": "26-50364",
+    "overlap": 1.0
+  },
+  {
+    "county": "Sumter",
+    "state": "SC",
+    "owner_name": "WILLIAMS JOHN",
+    "bankruptcy_case_name": "John Christopher Williams, Sr. and Tammy Lynn Williams",
+    "court": "ncwb",
+    "docket": "26-50364",
+    "overlap": 1.0
+  },
+  {
+    "county": "Sumter",
+    "state": "SC",
+    "owner_name": "WILLIAMS JOHN",
+    "bankruptcy_case_name": "John Christopher Williams, Sr. and Tammy Lynn Williams",
+    "court": "ncwb",
+    "docket": "26-50364",
+    "overlap": 1.0
+  },
+  {
+    "county": "Sumter",
+    "state": "SC",
+    "owner_name": "WRIGHT JOHN W",
+    "bankruptcy_case_name": "Matthew John Wright",
+    "court": "nceb",
+    "docket": "26-04052",
+    "overlap": 1.0
+  },
+  {
+    "county": "Jasper",
+    "state": "SC",
+    "owner_name": "SCOTT JERRY",
+    "bankruptcy_case_name": "Jerry Scott Greene",
+    "court": "ncwb",
+    "docket": "26-40225",
+    "overlap": 1.0
+  },
+  {
+    "county": "Jasper",
+    "state": "SC",
+    "owner_name": "SCOTT MICHAEL E ETAL",
+    "bankruptcy_case_name": "Michael Scott Burns",
+    "court": "scb",
+    "docket": "26-04143",
+    "overlap": 1.0
+  },
+  {
+    "county": "Jasper",
+    "state": "SC",
+    "owner_name": "SMITH MICHAEL SHANE",
+    "bankruptcy_case_name": "Michael Dana Gangi and Maryan Shane Smith-Gangi",
+    "court": "ncwb",
+    "docket": "26-50386",
+    "overlap": 1.0
+  },
+  {
+    "county": "Lincoln",
+    "state": "NC",
+    "owner_name": "SN North Carolina II, LLC",
+    "bankruptcy_case_name": "Pure Air North Carolina, LLC",
+    "court": "nceb",
+    "docket": "26-04250",
+    "overlap": 0.75
+  },
+  {
+    "county": "Gaston",
+    "state": "NC",
+    "owner_name": "IH6 Property North Carolina L.P.",
+    "bankruptcy_case_name": "Pure Air North Carolina, LLC",
+    "court": "nceb",
+    "docket": "26-04250",
+    "overlap": 0.5
+  },
+  {
+    "county": "Gaston",
+    "state": "NC",
+    "owner_name": "Smith, Charles R",
+    "bankruptcy_case_name": "Charles Fitzgerald Smith",
+    "court": "nceb",
+    "docket": "26-04244",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "JONES RAY",
+    "bankruptcy_case_name": "Billy Ray Jones and Shannon Avis Suzanne Jones",
+    "court": "nceb",
+    "docket": "26-04223",
+    "overlap": 1.0
+  },
+  {
+    "county": "Florence",
+    "state": "SC",
+    "owner_name": "JONES RAY",
+    "bankruptcy_case_name": "Billy Ray Jones and Shannon Avis Suzanne Jones",
+    "court": "nceb",
+    "docket": "26-04223",
+    "overlap": 1.0
+  },
+  {
+    "county": "Pickens",
+    "state": "SC",
+    "owner_name": "Scott G Parker",
+    "bankruptcy_case_name": "Scott Graham Parker",
+    "court": "scb",
+    "docket": "26-03188",
+    "overlap": 1.0
+  },
+  {
+    "county": "Pickens",
+    "state": "SC",
+    "owner_name": "Melissa A. Morris",
+    "bankruptcy_case_name": "Melissa Mitchell Morris",
+    "court": "nceb",
+    "docket": "26-03715",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "Michael  Douglas",
+    "bankruptcy_case_name": "Michael Douglas Shaak, Jr.",
+    "court": "scb",
+    "docket": "26-03591",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "Michelle  Duncan",
+    "bankruptcy_case_name": "Diane Michelle Duncan",
+    "court": "scb",
+    "docket": "26-03785",
+    "overlap": 1.0
+  },
+  {
+    "county": "Cherokee",
+    "state": "SC",
+    "owner_name": "Tammy K Horne",
+    "bankruptcy_case_name": "Tammy Sherell Horne",
+    "court": "ncwb",
+    "docket": "26-31034",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Robert  Rankin",
+    "bankruptcy_case_name": "Robert Gregory Rankin",
+    "court": "scb",
+    "docket": "26-03640",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "Robert L Anderson",
+    "bankruptcy_case_name": "Robert Anderson Casio and Leah Register Casio",
+    "court": "ncwb",
+    "docket": "26-30942",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "William L Thomas Jr",
+    "bankruptcy_case_name": "William Thomas Maultsby",
+    "court": "nceb",
+    "docket": "26-03724",
+    "overlap": 1.0
+  },
+  {
+    "county": "Laurens",
+    "state": "SC",
+    "owner_name": "Tammy D Burton",
+    "bankruptcy_case_name": "Brandon Lacory Burton and Tammy Denise Burton",
+    "court": "scb",
+    "docket": "26-04319",
+    "overlap": 1.0
+  },
+  {
+    "county": "Laurens",
+    "state": "SC",
+    "owner_name": "Amy  James",
+    "bankruptcy_case_name": "James Edward Blankenship and Amy Gail Gladden",
+    "court": "scb",
+    "docket": "26-04022",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "Robert L Anderson",
+    "bankruptcy_case_name": "Robert Anderson Casio and Leah Register Casio",
+    "court": "ncwb",
+    "docket": "26-30942",
+    "overlap": 1.0
+  },
+  {
+    "county": "Oconee",
+    "state": "SC",
+    "owner_name": "Michael  Alexander",
+    "bankruptcy_case_name": "Alexander Michael Roussis and Lorraine Janice Roussis",
+    "court": "ncwb",
+    "docket": "26-30906",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "Sharielle A Alexander",
+    "bankruptcy_case_name": "Sharielle Auz-Shanay Alexander",
+    "court": "scb",
+    "docket": "26-04095",
+    "overlap": 1.0
+  },
+  {
+    "county": "Anderson",
+    "state": "SC",
+    "owner_name": "David R Hull",
+    "bankruptcy_case_name": "David Ray Hull, Jr and Natasha Jennifer Hull",
+    "court": "scb",
+    "docket": "26-04091",
+    "overlap": 1.0
+  },
+  {
+    "county": "Spartanburg",
+    "state": "SC",
+    "owner_name": "HALLIDAY Q STANFORD IV",
+    "bankruptcy_case_name": "John Albert Anderson",
+    "court": "scb",
+    "docket": "26-03660",
+    "overlap": 0.0
+  }
+]

@@ -1,0 +1,3474 @@
+[
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9698390373",
+    "street_address": "133 HARRISON ST",
+    "owner_name": "WALLIN THOMAS J;WALLIN SHIRLEY M",
+    "defendant": "FALKNER, PAUL",
+    "case_number": "fc-65038244",
+    "board_value": 185200.0,
+    "first_seen": "2026-06-18T20:59:09.617874",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "FALKNER, PAUL",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 6,
+      "n_matched_person_rows": 6,
+      "matched_rows": [
+        {
+          "date": "03/31/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "FALKNER, GLORIA",
+            "FALKNER, PAUL T"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "02/28/2020",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "FALKNER, PAUL T."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/15/2016",
+          "index": "CRP",
+          "type": "AFFIDAVIT",
+          "grantor_bold": [
+            "FALKNER, GLORIA",
+            "FALKNER, PAUL T"
+          ],
+          "grantee_bold": [
+            "FALKNER, GLORIA",
+            "FALKNER, PAUL T"
+          ]
+        },
+        {
+          "date": "12/20/2011",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "FALKNER, GLORIA",
+            "FALKNER, PAUL T"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/08/2006",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "FALKNER, GLORIA",
+            "FALKNER, PAUL T"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/08/2006",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "FALKNER, GLORIA",
+            "FALKNER, PAUL T"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "12/08/2006",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "FALKNER, GLORIA",
+            "FALKNER, PAUL T"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [
+        {
+          "date": "03/31/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "FALKNER, GLORIA",
+            "FALKNER, PAUL T"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 1,
+      "collision_risk": true,
+      "collision_risk_strong": false,
+      "sample_other_people": [
+        "FALKNER, GLORIA"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "962327197800000",
+    "street_address": "1410 DOUBLE KNOB LOOP",
+    "owner_name": "FREDRICH, CHAD FREDRICH, TIA",
+    "defendant": "FREDRICH, CHAD FREDRICH, TIA",
+    "case_number": "fc-65318478",
+    "board_value": 70200.0,
+    "first_seen": "2026-05-14T07:14:37.874079",
+    "value_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "real_owner": "CAROLINA SMALL BUSINESS DEVELOPMENT FUND",
+      "real_value": 69800.0,
+      "abs_pct_error": 0.6,
+      "board_higher": true
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "FREDRICH, CHAD FREDRICH, TIA",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 5,
+      "n_matched_person_rows": 5,
+      "matched_rows": [
+        {
+          "date": "09/15/2026",
+          "index": "CRP",
+          "type": "TRUSTEE DEED",
+          "grantor_bold": [
+            "FREDRICH, TIA",
+            "FREDRICH, CHAD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "04/27/2026",
+          "index": "CRP",
+          "type": "TRUSTEE DEED",
+          "grantor_bold": [
+            "FREDRICH, TIA",
+            "FREDRICH, CHAD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/10/2025",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "FREDRICH, TIA",
+            "FREDRICH, CHAD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/05/2023",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "FREDRICH, TIA",
+            "FREDRICH, CHAD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/14/2023",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "FREDRICH, TIA",
+            "FREDRICH, CHAD"
+          ]
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "09/15/2026",
+          "index": "CRP",
+          "type": "TRUSTEE DEED",
+          "grantor_bold": [
+            "FREDRICH, TIA",
+            "FREDRICH, CHAD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "04/27/2026",
+          "index": "CRP",
+          "type": "TRUSTEE DEED",
+          "grantor_bold": [
+            "FREDRICH, TIA",
+            "FREDRICH, CHAD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/10/2025",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "FREDRICH, TIA",
+            "FREDRICH, CHAD"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [],
+      "n_other_same_surname_people": 1,
+      "collision_risk": true,
+      "collision_risk_strong": false,
+      "sample_other_people": [
+        "FREDRICH, TIA"
+      ]
+    }
+  },
+  {
+    "source": "nc_ecourts_judgments",
+    "listing_type": "lis_pendens",
+    "parcel_id": null,
+    "street_address": null,
+    "owner_name": null,
+    "defendant": "Ann K. Messersmith Trust dated March 8, 2024",
+    "case_number": "26M000197-100",
+    "board_value": null,
+    "first_seen": "2026-08-26T22:52:37.552258",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": false,
+      "reason": "entity_defendant_skipped",
+      "party": "Ann K. Messersmith Trust dated March 8, 2024"
+    }
+  },
+  {
+    "source": "public_notices.nc_notices_counties",
+    "listing_type": "lis_pendens",
+    "parcel_id": null,
+    "street_address": "100 IN THE MATTER OF THE FORECLOSURE OF A DEED OF TRUST",
+    "owner_name": "GEORGE JONES",
+    "defendant": "GEORGE JONES",
+    "case_number": "21SP000183-100",
+    "board_value": null,
+    "first_seen": "2026-09-13T22:36:12.987199",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "GEORGE JONES",
+      "status": "no_record_for_person",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 0,
+      "matched_rows": [],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 98,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "GEORGE, AARON",
+        "GEORGE, ANDREW D",
+        "GEORGE, ANDREW D.",
+        "GEORGE, ANDREW DAVID",
+        "GEORGE, ANDREW W",
+        "GEORGE, ANDREW W.",
+        "GEORGE, ANDREW/ TR",
+        "GEORGE, ANNA T"
+      ]
+    }
+  },
+  {
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": null,
+    "street_address": "311 Northeast Avenue",
+    "owner_name": null,
+    "defendant": null,
+    "case_number": "26SP000531-100",
+    "board_value": null,
+    "first_seen": "2026-09-22T15:28:03.677031",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": false,
+      "reason": "no_owner_or_defendant_name"
+    }
+  },
+  {
+    "source": "public_notices.nc_notices_counties",
+    "listing_type": "lis_pendens",
+    "parcel_id": null,
+    "street_address": null,
+    "owner_name": "RONALD A. MAXWELL",
+    "defendant": "RONALD A. MAXWELL",
+    "case_number": "26CV003997-100",
+    "board_value": null,
+    "first_seen": "2026-09-22T15:30:36.217064",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "RONALD A. MAXWELL",
+      "status": "no_record_for_person",
+      "n_total_surname_rows": 199,
+      "n_matched_person_rows": 0,
+      "matched_rows": [],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 0,
+      "collision_risk": false,
+      "collision_risk_strong": false,
+      "sample_other_people": []
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9639850507",
+    "street_address": "17 HIBRITEN DR",
+    "owner_name": "VAN DOOREN ELIZABETH ADRIENNE",
+    "defendant": "JOHNSON, MICHAEL & KATHERINE",
+    "case_number": "fc-65531077",
+    "board_value": 368700.0,
+    "first_seen": "2026-06-09T11:57:01.447685",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "JOHNSON, MICHAEL & KATHERINE",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 3,
+      "matched_rows": [
+        {
+          "date": "04/14/2026",
+          "index": "CRP",
+          "type": "TRUST",
+          "grantor_bold": [
+            "JOHNSON, IRENE P.",
+            "JOHNSON, KATHRYN IRENE/ TR",
+            "JOHNSON, MICHAEL H.",
+            "JOHNSON, IRENE P.",
+            "JOHNSON, KATHRYN IRENE/ TR",
+            "JOHNSON, MICHAEL H."
+          ],
+          "grantee_bold": [
+            "JOHNSON, IRENE P.",
+            "JOHNSON, KATHRYN IRENE/ TR",
+            "JOHNSON, MICHAEL H.",
+            "JOHNSON, IRENE P.",
+            "JOHNSON, KATHRYN IRENE/ TR",
+            "JOHNSON, MICHAEL H."
+          ]
+        },
+        {
+          "date": "03/02/2026",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "JOHNSON, KATHLEEN G./ BY AIF",
+            "JOHNSON, MICHAEL J./ AIF",
+            "JOHNSON, MICHAEL E./ BY AIF"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/03/2025",
+          "index": "CRP",
+          "type": "POWER OF ATTORNEY",
+          "grantor_bold": [
+            "JOHNSON, KATHLEEN G."
+          ],
+          "grantee_bold": [
+            "JOHNSON, KATHLEEN G.",
+            "JOHNSON, SHAWN D.",
+            "JOHNSON, MICHAEL J."
+          ]
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 302,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "JOHNSON, ADAM",
+        "JOHNSON, ALEXANDRA",
+        "JOHNSON, ALLEN H",
+        "JOHNSON, ALLEN H.",
+        "JOHNSON, ALVIN",
+        "JOHNSON, ALYSIA S.",
+        "JOHNSON, AMANDA",
+        "JOHNSON, AMBER"
+      ]
+    }
+  },
+  {
+    "source": "nc_ecourts_judgments",
+    "listing_type": "lis_pendens",
+    "parcel_id": null,
+    "street_address": null,
+    "owner_name": null,
+    "defendant": "Perone, Lindsey Marie; Perone, Scott David",
+    "case_number": "24M001384-100",
+    "board_value": null,
+    "first_seen": "2026-08-26T22:52:37.510203",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "Perone, Lindsey Marie",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 16,
+      "n_matched_person_rows": 6,
+      "matched_rows": [
+        {
+          "date": "04/22/2024",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "PERONE, LINDSEY BROCK"
+          ]
+        },
+        {
+          "date": "04/22/2024",
+          "index": "CRP",
+          "type": "POWER OF ATTORNEY",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "PERONE, LINDSEY BROCK"
+          ]
+        },
+        {
+          "date": "01/05/2022",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "PERONE, LINDSEY MARIE",
+            "PERONE, SCOTT DAVID"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/04/2015",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "PERONE, LINDSEY MARIE",
+            "PERONE, SCOTT DAVID"
+          ]
+        },
+        {
+          "date": "09/04/2015",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "PERONE, LINDSEY MARIE",
+            "PERONE, SCOTT DAVID"
+          ]
+        },
+        {
+          "date": "08/19/2015",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "PERONE, LINDSEY MARIE",
+            "PERONE, SCOTT DAVID"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [
+        {
+          "date": "01/05/2022",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "PERONE, LINDSEY MARIE",
+            "PERONE, SCOTT DAVID"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 6,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "PERONE, JULIE R",
+        "PERONE, SCOTT",
+        "PERONE, SCOTT D",
+        "PERONE, SCOTT DAVID",
+        "PERONE, SUSAN R.",
+        "PERONE, VINCENT"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9653454512",
+    "street_address": "46 EDGEWOOD DR",
+    "owner_name": "HUSKINS COLLEEN SUSAN",
+    "defendant": null,
+    "case_number": "fc-64392311",
+    "board_value": 147900.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "HUSKINS COLLEEN SUSAN",
+      "status": "no_record_for_person",
+      "n_total_surname_rows": 69,
+      "n_matched_person_rows": 0,
+      "matched_rows": [],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 36,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "HUSKINS, ALAN FRANKLIN",
+        "HUSKINS, ALICE H",
+        "HUSKINS, ALICE HOWELL/ IND&TR",
+        "HUSKINS, BESSIE L/ ESTATE",
+        "HUSKINS, CHARLES E",
+        "HUSKINS, CICERO D",
+        "HUSKINS, DAVID LEE",
+        "HUSKINS, EVA"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "962895002000000",
+    "street_address": "67 CLINTON AVE",
+    "owner_name": "WRIGHT, J RILEY WRIGHT, BARBARA",
+    "defendant": "WRIGHT, J RILEY WRIGHT, BARBARA",
+    "case_number": "fc-65754261",
+    "board_value": 253300.0,
+    "first_seen": "2026-06-09T11:58:52.494128",
+    "value_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "real_owner": "J WRIGHT, BARBARA WRIGHT",
+      "real_value": 126650.0,
+      "abs_pct_error": 100.0,
+      "board_higher": true
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "WRIGHT, J RILEY WRIGHT, BARBARA",
+      "status": "no_record_for_person",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 0,
+      "matched_rows": [],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 293,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "WRIGHT, AARON KIRKLAND/ EXTR&TR",
+        "WRIGHT, ADRIENNE E.",
+        "WRIGHT, AMBER HARMON",
+        "WRIGHT, AMBER LEIGH",
+        "WRIGHT, AMBER WILLIAMS",
+        "WRIGHT, AMORITA D",
+        "WRIGHT, AMY",
+        "WRIGHT, ANDREW ALAN"
+      ]
+    }
+  },
+  {
+    "source": "nc_ecourts_judgments",
+    "listing_type": "lis_pendens",
+    "parcel_id": null,
+    "street_address": null,
+    "owner_name": null,
+    "defendant": "Estate of John W. Hager, Jr.; Hager, John W., Jr.; Hager, Unknown Spouse of  John W., Jr.",
+    "case_number": "25M000176-100",
+    "board_value": null,
+    "first_seen": "2026-08-26T22:52:37.507893",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "Hager, John W., Jr.",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 124,
+      "n_matched_person_rows": 11,
+      "matched_rows": [
+        {
+          "date": "04/22/2026",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/18/2025",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/11/2025",
+          "index": "CRP",
+          "type": "TRUSTEE DEED",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/17/2025",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/27/2025",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/20/2019",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR.",
+            "HAGER, JOHN WILLIAM"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/27/2007",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "10/23/2007",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ AKA",
+            "HAGER, JOHN WILLIAM/ JR"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/18/2006",
+          "index": "CRP",
+          "type": "POWER OF ATTORNEY",
+          "grantor_bold": [
+            "HAGER, MARJORIE MYERS"
+          ],
+          "grantee_bold": [
+            "HAGER, JOHN W"
+          ]
+        },
+        {
+          "date": "06/13/2006",
+          "index": "CRP",
+          "type": "POWER OF ATTORNEY",
+          "grantor_bold": [
+            "HAGER, MARJORIE M"
+          ],
+          "grantee_bold": [
+            "HAGER, JOHN W"
+          ]
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "04/22/2026",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/18/2025",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/11/2025",
+          "index": "CRP",
+          "type": "TRUSTEE DEED",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/17/2025",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/27/2025",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "HAGER, JOHN WILLIAM/ JR."
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [],
+      "n_other_same_surname_people": 57,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "HAGER, ALISSA LIL",
+        "HAGER, ANDREW",
+        "HAGER, ANDREW Q",
+        "HAGER, ANDREW Q/ PTR",
+        "HAGER, ANDREW Q/ TR",
+        "HAGER, ANDREW QUINN",
+        "HAGER, ANDREW W.",
+        "HAGER, ANDREW/ TR"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "0619095365",
+    "street_address": "718 CHEROKEE AVE",
+    "owner_name": "SHARKEY KATHLEEN A",
+    "defendant": "KevinKerr",
+    "case_number": "fc-65774513",
+    "board_value": 314500.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": false,
+      "party": "KevinKerr"
+    }
+  },
+  {
+    "source": "law_firms.hutchens",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9701412633",
+    "street_address": "16 Overlook Drive",
+    "owner_name": "PLEMMONS MARTHA A",
+    "defendant": null,
+    "case_number": "22SP000481-100",
+    "board_value": 352000.0,
+    "first_seen": "2026-08-06T13:35:45.584918",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "PLEMMONS MARTHA A",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 16,
+      "matched_rows": [
+        {
+          "date": "03/02/2026",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA J.",
+            "PLEMMONS, JOHN DAVID/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "05/28/2024",
+          "index": "CRP",
+          "type": "REVOCATION OF POWER OF ATTORNEY",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA ALMA THOMAS",
+            "PLEMMONS, MARTHA THOMAS"
+          ],
+          "grantee_bold": [
+            "PLEMMONS, SHARON"
+          ]
+        },
+        {
+          "date": "10/31/2022",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA M.",
+            "PLEMMONS, DWIGHT B."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/28/2021",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA A."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "03/17/2021",
+          "index": "CRP",
+          "type": "ASSIGNMENT",
+          "grantor_bold": [
+            "PLEMMONS, LARRY O.",
+            "PLEMMONS, MARTHA A."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "10/12/2020",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA A.",
+            "PLEMMONS, LARRY O."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "01/07/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA M",
+            "PLEMMONS, DWIGHT B"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/18/2019",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA M.",
+            "PLEMMONS, DWIGHT B."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "08/01/2019",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "PLEMMONS, LARRY O.",
+            "PLEMMONS, MARTHA ALMA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/22/2019",
+          "index": "CRP",
+          "type": "MODIFICATION AGREEMENT",
+          "grantor_bold": [
+            "PLEMMONS, LARRY O",
+            "PLEMMONS, MARTHA A."
+          ],
+          "grantee_bold": [
+            "PLEMMONS, LARRY O",
+            "PLEMMONS, MARTHA A."
+          ]
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "10/31/2022",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA M.",
+            "PLEMMONS, DWIGHT B."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "10/12/2020",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA A.",
+            "PLEMMONS, LARRY O."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "08/01/2019",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "PLEMMONS, LARRY O.",
+            "PLEMMONS, MARTHA ALMA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "01/17/2019",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA A.",
+            "PLEMMONS, LARRY O."
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [
+        {
+          "date": "01/07/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA M",
+            "PLEMMONS, DWIGHT B"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 244,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "PLEMMONS, AARON MICHAEL",
+        "PLEMMONS, ALICE W.",
+        "PLEMMONS, ALMA",
+        "PLEMMONS, ANGELA",
+        "PLEMMONS, ANITA",
+        "PLEMMONS, ANNA",
+        "PLEMMONS, ANNA H",
+        "PLEMMONS, ANTHONY SCOTT"
+      ]
+    }
+  },
+  {
+    "source": "national.servicelink_auction",
+    "listing_type": "auction",
+    "parcel_id": "961881472200000",
+    "street_address": "116 Starnes Cove Road",
+    "owner_name": "HELMSMAN HOMES LLC",
+    "defendant": null,
+    "case_number": "slauction-a1cVO000008Hc15YAC",
+    "board_value": 41100.0,
+    "first_seen": "2026-07-22T20:07:03.146598",
+    "value_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "real_owner": "HELMSMAN HOMES LLC",
+      "real_value": 41100.0,
+      "abs_pct_error": 0.0,
+      "board_higher": false
+    },
+    "rod_check": {
+      "attempted": false,
+      "reason": "entity_defendant_skipped",
+      "party": "HELMSMAN HOMES LLC"
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "961993655000000",
+    "street_address": "Mckinnish Cove Dr",
+    "owner_name": null,
+    "defendant": null,
+    "case_number": "fc-65703937",
+    "board_value": 499000.0,
+    "first_seen": "2026-09-22T15:19:58.110740",
+    "value_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "real_owner": "CURTIS ROBINSON, MARILYN ROBINSON",
+      "real_value": 324700.0,
+      "abs_pct_error": 53.7,
+      "board_higher": true
+    },
+    "rod_check": {
+      "attempted": false,
+      "reason": "no_owner_or_defendant_name"
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9638434606",
+    "street_address": "185 MONTANA AVE",
+    "owner_name": "MURDOCH WILLIAM;FISHER JACOB",
+    "defendant": "brentonfaircloth",
+    "case_number": "fc-65534719",
+    "board_value": 254000.0,
+    "first_seen": "2026-06-02T12:39:06.704779",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": false,
+      "party": "brentonfaircloth"
+    }
+  },
+  {
+    "source": "law_firms.hutchens",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9648137362",
+    "street_address": "16 Walton Street",
+    "owner_name": "MORMAN KERA D",
+    "defendant": null,
+    "case_number": "26SP000500-100",
+    "board_value": 349600.0,
+    "first_seen": "2026-09-22T15:28:00.086337",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "MORMAN KERA D",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 21,
+      "n_matched_person_rows": 5,
+      "matched_rows": [
+        {
+          "date": "07/24/2026",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "MORMAN, KERA D."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/15/2025",
+          "index": "CRP",
+          "type": "MODIFICATION AGREEMENT",
+          "grantor_bold": [
+            "MORMAN, KERA D."
+          ],
+          "grantee_bold": [
+            "MORMAN, KERA D."
+          ]
+        },
+        {
+          "date": "08/15/2023",
+          "index": "CRP",
+          "type": "ASSIGNMENT",
+          "grantor_bold": [
+            "MORMAN, KERA D."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "10/30/2019",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "MORMAN, KERA D."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/28/2017",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "MORMAN, KERA D."
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "07/24/2026",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "MORMAN, KERA D."
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [],
+      "n_other_same_surname_people": 8,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "MORMAN, ARRIE/ BY AIF",
+        "MORMAN, DARLENE",
+        "MORMAN, DARLENE L",
+        "MORMAN, ELLSWORTH H",
+        "MORMAN, VANESSA ANN/ FKA",
+        "MORMAN, VICTOR",
+        "MORMAN, VICTOR L.",
+        "MORMAN, WILLIAM T"
+      ]
+    }
+  },
+  {
+    "source": "nc_ecourts_judgments",
+    "listing_type": "lis_pendens",
+    "parcel_id": null,
+    "street_address": null,
+    "owner_name": null,
+    "defendant": "24 Lakeview LLC",
+    "case_number": "26M000201-100",
+    "board_value": null,
+    "first_seen": "2026-08-26T22:52:37.544938",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": false,
+      "reason": "entity_defendant_skipped",
+      "party": "24 Lakeview LLC"
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9648481742",
+    "street_address": "155 LEXINGTON AVE",
+    "owner_name": "MCKINLEY RICHARD D",
+    "defendant": null,
+    "case_number": "fc-65860086",
+    "board_value": 273600.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "MCKINLEY RICHARD D",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 94,
+      "n_matched_person_rows": 2,
+      "matched_rows": [
+        {
+          "date": "09/13/2016",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "MCKINLEY, RICHARD D."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/28/2016",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "MCKINLEY, RICHARD D."
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 64,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "MCKINLEY, BARBARA F",
+        "MCKINLEY, BARBARA FENDER",
+        "MCKINLEY, BARBARA W.",
+        "MCKINLEY, BEULAH CROSBY",
+        "MCKINLEY, DAVID",
+        "MCKINLEY, DAVID E",
+        "MCKINLEY, DAVID E.",
+        "MCKINLEY, DAVID S"
+      ]
+    }
+  },
+  {
+    "source": "nc_ecourts_judgments",
+    "listing_type": "lis_pendens",
+    "parcel_id": null,
+    "street_address": null,
+    "owner_name": null,
+    "defendant": "Big Hills Construction, LLC; M&E Paint Company, LLC",
+    "case_number": "26M000133-100",
+    "board_value": null,
+    "first_seen": "2026-08-26T22:52:37.544875",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": false,
+      "reason": "entity_defendant_skipped",
+      "party": "Big Hills Construction, LLC"
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "060939487900000",
+    "street_address": "17 STONE CREST MOUNTAIN DR",
+    "owner_name": "John Murphy & Monica Murphy",
+    "defendant": "dalexander",
+    "case_number": "fc-65766718",
+    "board_value": 129300.0,
+    "first_seen": "2026-08-27T06:18:33.744124",
+    "value_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "real_owner": "JOHN MURPHY, MONICA MURPHY",
+      "real_value": 59000.0,
+      "abs_pct_error": 119.2,
+      "board_higher": true
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": false,
+      "party": "dalexander"
+    }
+  },
+  {
+    "source": "law_firms.hutchens",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9770205617",
+    "street_address": "28 Price Road",
+    "owner_name": "HURWITZ MELISSA",
+    "defendant": null,
+    "case_number": "26SP000061-100",
+    "board_value": 325200.0,
+    "first_seen": "2026-08-06T13:35:45.599825",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "HURWITZ MELISSA",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 16,
+      "n_matched_person_rows": 3,
+      "matched_rows": [
+        {
+          "date": "09/22/2025",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "HURWITZ, JOSEPH ROBERT",
+            "HURWITZ, MELISSA JOY"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "08/03/2023",
+          "index": "CRP",
+          "type": "ASSIGNMENT",
+          "grantor_bold": [
+            "HURWITZ, JOSEPH ROBERT",
+            "HURWITZ, MELISSA JOY"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "04/14/2022",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "HURWITZ, JOSEPH ROBERT",
+            "HURWITZ, MELISSA JOY"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "09/22/2025",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "HURWITZ, JOSEPH ROBERT",
+            "HURWITZ, MELISSA JOY"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [],
+      "n_other_same_surname_people": 17,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "HURWITZ, AMY",
+        "HURWITZ, AMY M.",
+        "HURWITZ, AMY M./ BY AIF",
+        "HURWITZ, BENJAMIN P.",
+        "HURWITZ, BENJAMIN P./ IND&AIF",
+        "HURWITZ, DEBORAH",
+        "HURWITZ, HOWARD",
+        "HURWITZ, JACK D."
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9638339948",
+    "street_address": "226 PENNSYLVANIA AVE",
+    "owner_name": "COX JAMES",
+    "defendant": "MARTIN, KATHLEEN",
+    "case_number": "fc-65523842",
+    "board_value": 111100.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "MARTIN, KATHLEEN",
+      "status": "no_record_for_person",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 0,
+      "matched_rows": [],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 247,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "MARTIN, ADAM MCCARLEY",
+        "MARTIN, ADRIAHNA",
+        "MARTIN, ALEAH J.",
+        "MARTIN, ALICE HOLDEN",
+        "MARTIN, ALISON PAIGE",
+        "MARTIN, ALLISON",
+        "MARTIN, ALLISON L",
+        "MARTIN, ALLISON L."
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9699537518",
+    "street_address": "141 SCENIC VIEW DR",
+    "owner_name": "BOLL BARBARA",
+    "defendant": "Jnorton",
+    "case_number": "fc-65846778",
+    "board_value": 106100.0,
+    "first_seen": "2026-07-01T02:57:14.919945",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": false,
+      "party": "Jnorton"
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "960762387500000",
+    "street_address": "Short St",
+    "owner_name": "S & R PRONOVOST FAMILY TRUST",
+    "defendant": "MCGREGOR, CHRISTINA",
+    "case_number": "fc-65530757",
+    "board_value": 230700.0,
+    "first_seen": "2026-06-16T20:50:10.621597",
+    "value_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "real_owner": "DARIO DOMINGUEZ, SUGEY ESPINOZA",
+      "real_value": 127300.0,
+      "abs_pct_error": 81.2,
+      "board_higher": true
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "MCGREGOR, CHRISTINA",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 28,
+      "n_matched_person_rows": 1,
+      "matched_rows": [
+        {
+          "date": "10/02/2020",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "MCGREGOR, CHRISTINA B."
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 19,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "MCGREGOR, ALEC",
+        "MCGREGOR, BRIAN D./ TR",
+        "MCGREGOR, DARBY BEAR",
+        "MCGREGOR, DOUGLAS A",
+        "MCGREGOR, DOUGLAS A.",
+        "MCGREGOR, DOUGLAS A/ TR",
+        "MCGREGOR, EMMETT",
+        "MCGREGOR, EMMETT HANES"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9638478934",
+    "street_address": "Riverview Dr",
+    "owner_name": "WATTS READER;WATTS MARY O",
+    "defendant": "CHAMBERS, RONALD CHAMBERS, GAIL W",
+    "case_number": "fc-62698883",
+    "board_value": 186900.0,
+    "first_seen": "2026-07-01T02:57:14.913143",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "CHAMBERS, RONALD CHAMBERS, GAIL W",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 2,
+      "matched_rows": [
+        {
+          "date": "10/09/2013",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "CHAMBERS, GAIL W.",
+            "CHAMBERS, RONALD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/23/2013",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "CHAMBERS, GAIL W.",
+            "CHAMBERS, RONALD"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [
+        {
+          "date": "10/09/2013",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "CHAMBERS, GAIL W.",
+            "CHAMBERS, RONALD"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 243,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "CHAMBERS , MARVIN DEAN/ JR",
+        "CHAMBERS, ADA E.",
+        "CHAMBERS, ALAN J.",
+        "CHAMBERS, ALEX",
+        "CHAMBERS, ALEXANDER",
+        "CHAMBERS, ALEXANDER D.",
+        "CHAMBERS, AMANDA D",
+        "CHAMBERS, AMANDA D."
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9648130388",
+    "street_address": "66 WALTON ST",
+    "owner_name": "ALLEN MICHAEL L",
+    "defendant": "RITTER, VIRGINIA",
+    "case_number": "fc-66033266",
+    "board_value": 132500.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "RITTER, VIRGINIA",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 135,
+      "n_matched_person_rows": 42,
+      "matched_rows": [
+        {
+          "date": "07/02/2026",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "RITTER, VIRGINIA M."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "05/19/2025",
+          "index": "CRP",
+          "type": "ASSIGNMENT",
+          "grantor_bold": [
+            "RITTER, VIRGINIA M"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "02/07/2025",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "RITTER, VIRGINIA M."
+          ],
+          "grantee_bold": [
+            "RITTER, VIRGINIA M."
+          ]
+        },
+        {
+          "date": "12/30/2024",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "RITTER, VIRGINIA M"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/18/2024",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "RITTER, VIRGINIA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/13/2023",
+          "index": "CRP",
+          "type": "PLAT",
+          "grantor_bold": [
+            "RITTER, VIRGINIA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/08/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "RITTER, VIRGINIA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "08/11/2020",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "RITTER, VIRGINIA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "05/04/2020",
+          "index": "CRP",
+          "type": "ASSIGNMENT",
+          "grantor_bold": [
+            "RITTER, VIRGINIA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/30/2019",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "RITTER, VIRGINIA"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "07/02/2026",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "RITTER, VIRGINIA M."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/30/2019",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "RITTER, VIRGINIA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "11/19/2019Corrected",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "RITTER, VIRGINIA M.",
+            "RITTER, VIRGINIA M."
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [
+        {
+          "date": "12/30/2024",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "RITTER, VIRGINIA M"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/08/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "RITTER, VIRGINIA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "11/08/2017",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "RITTER, VIRGINIA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/07/2006",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "RITTER, VIRGINIA R/ AIF"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/09/2006",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "RITTER, VIRGINIA R"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 56,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "RITTER, ADA J",
+        "RITTER, ADA J MASTERS",
+        "RITTER, CHERYL",
+        "RITTER, CONSTANCE S",
+        "RITTER, CONSTANCE S.",
+        "RITTER, DEBBIE",
+        "RITTER, DOROTHEA E",
+        "RITTER, DOROTHEA E/ TR"
+      ]
+    }
+  },
+  {
+    "source": "public_notices.nc_notices_counties",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9658557367",
+    "street_address": "100 Under and by virtue of the power of sale contained in a certain Deed of Trust made by Martha A. Plemmons and Larry O. Pl",
+    "owner_name": "Martha A. Plemmons and Larry O. Plemmons",
+    "defendant": "Martha A. Plemmons and Larry O. Plemmons",
+    "case_number": "22SP000481-100",
+    "board_value": 271900.0,
+    "first_seen": "2026-08-06T13:35:57.732760",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "Martha A. Plemmons and Larry O. Plemmons",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 16,
+      "matched_rows": [
+        {
+          "date": "03/02/2026",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA J.",
+            "PLEMMONS, JOHN DAVID/ JR."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "05/28/2024",
+          "index": "CRP",
+          "type": "REVOCATION OF POWER OF ATTORNEY",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA ALMA THOMAS",
+            "PLEMMONS, MARTHA THOMAS"
+          ],
+          "grantee_bold": [
+            "PLEMMONS, SHARON"
+          ]
+        },
+        {
+          "date": "10/31/2022",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA M.",
+            "PLEMMONS, DWIGHT B."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/28/2021",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA A."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "03/17/2021",
+          "index": "CRP",
+          "type": "ASSIGNMENT",
+          "grantor_bold": [
+            "PLEMMONS, LARRY O.",
+            "PLEMMONS, MARTHA A."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "10/12/2020",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA A.",
+            "PLEMMONS, LARRY O."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "01/07/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA M",
+            "PLEMMONS, DWIGHT B"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/18/2019",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA M.",
+            "PLEMMONS, DWIGHT B."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "08/01/2019",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "PLEMMONS, LARRY O.",
+            "PLEMMONS, MARTHA ALMA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/22/2019",
+          "index": "CRP",
+          "type": "MODIFICATION AGREEMENT",
+          "grantor_bold": [
+            "PLEMMONS, LARRY O",
+            "PLEMMONS, MARTHA A."
+          ],
+          "grantee_bold": [
+            "PLEMMONS, LARRY O",
+            "PLEMMONS, MARTHA A."
+          ]
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "10/31/2022",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA M.",
+            "PLEMMONS, DWIGHT B."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "10/12/2020",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA A.",
+            "PLEMMONS, LARRY O."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "08/01/2019",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "PLEMMONS, LARRY O.",
+            "PLEMMONS, MARTHA ALMA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "01/17/2019",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA A.",
+            "PLEMMONS, LARRY O."
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [
+        {
+          "date": "01/07/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "PLEMMONS, MARTHA M",
+            "PLEMMONS, DWIGHT B"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 244,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "PLEMMONS, AARON MICHAEL",
+        "PLEMMONS, ALICE W.",
+        "PLEMMONS, ALMA",
+        "PLEMMONS, ANGELA",
+        "PLEMMONS, ANITA",
+        "PLEMMONS, ANNA",
+        "PLEMMONS, ANNA H",
+        "PLEMMONS, ANTHONY SCOTT"
+      ]
+    }
+  },
+  {
+    "source": "counties_nc.nc_ecourts_lis_pendens",
+    "listing_type": "lis_pendens",
+    "parcel_id": null,
+    "street_address": null,
+    "owner_name": null,
+    "defendant": "CARSON, RASHEYM T",
+    "case_number": "13CVD004569-100",
+    "board_value": null,
+    "first_seen": "2026-09-25T18:43:59.788777",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "CARSON, RASHEYM T",
+      "status": "no_record_for_person",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 0,
+      "matched_rows": [],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 208,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "CARSON, AARON B",
+        "CARSON, AARON BRETT",
+        "CARSON, AARON BRETT/ BY AIF",
+        "CARSON, AMY M",
+        "CARSON, ANNETTE",
+        "CARSON, ANTHONY",
+        "CARSON, B AMBER",
+        "CARSON, B DAVID"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "8696661386",
+    "street_address": "243 YOUNGS COVE RD",
+    "owner_name": "PENLEY JAMES",
+    "defendant": null,
+    "case_number": "fc-64453606",
+    "board_value": 158700.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "PENLEY JAMES",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 13,
+      "matched_rows": [
+        {
+          "date": "10/30/2023",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "PENLEY, JAMES ROBERT"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "03/02/2020",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "PENLEY, JAMES"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "03/02/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "PENLEY, JAMES"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "02/25/2020",
+          "index": "CRP",
+          "type": "PLAT",
+          "grantor_bold": [
+            "PENLEY, JAMES"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/20/2019",
+          "index": "CRP",
+          "type": "EASEMENT",
+          "grantor_bold": [
+            "PENLEY, JAMES EDWARD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "05/20/2019",
+          "index": "CRP",
+          "type": "PLAT",
+          "grantor_bold": [
+            "PENLEY, ALMA",
+            "PENLEY, JAMES"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "04/03/2017",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "PENLEY, JAMES ROBERT"
+          ]
+        },
+        {
+          "date": "10/21/2014",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "PENLEY, JAMES ROBERT"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "10/03/2014",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "PENLEY, JAMES ROBERT"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "11/27/2013",
+          "index": "CRP",
+          "type": "POWER OF ATTORNEY",
+          "grantor_bold": [
+            "PENLEY, JAMES ETHERIDGE",
+            "PENLEY, JAMES E."
+          ],
+          "grantee_bold": [
+            "PENLEY, PANTHA H."
+          ]
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "03/02/2020",
+          "index": "CRP",
+          "type": "REQUEST FOR NOTICE",
+          "grantor_bold": [
+            "PENLEY, JAMES"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [
+        {
+          "date": "10/30/2023",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "PENLEY, JAMES ROBERT"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "10/21/2014",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "PENLEY, JAMES ROBERT"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 173,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "PENLEY, AELINE",
+        "PENLEY, ALEX DENTON",
+        "PENLEY, ALMA",
+        "PENLEY, ANDREW F.",
+        "PENLEY, ANDREW FRANKLIN",
+        "PENLEY, AUSTIN",
+        "PENLEY, BETTY ELIZABETH",
+        "PENLEY, BETTY ROBERTS"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9638571737",
+    "street_address": "111 EDGAR ST",
+    "owner_name": "HALDDEN (LE) GEGIRTH ANN",
+    "defendant": "REGENIA SEBREN ANN EDWARDS JEFF FRIDAY HEIRS",
+    "case_number": "fc-64771118",
+    "board_value": 248100.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": false,
+      "party": "REGENIA SEBREN ANN EDWARDS JEFF FRIDAY HEIRS"
+    }
+  },
+  {
+    "source": "nc_ecourts_judgments",
+    "listing_type": "lis_pendens",
+    "parcel_id": null,
+    "street_address": null,
+    "owner_name": null,
+    "defendant": "Beautiful Homes, LLC",
+    "case_number": "26M000095-100",
+    "board_value": null,
+    "first_seen": "2026-08-26T22:52:37.546181",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": false,
+      "reason": "entity_defendant_skipped",
+      "party": "Beautiful Homes, LLC"
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "961850982200000",
+    "street_address": "Marathon Ln",
+    "owner_name": "ROSS FARM PROPERTIES LLC",
+    "defendant": null,
+    "case_number": "fc-65524796",
+    "board_value": 358300.0,
+    "first_seen": "2026-06-16T20:50:10.621797",
+    "value_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "real_owner": "ROSS FARM PROPERTIES LLC",
+      "real_value": 166500.0,
+      "abs_pct_error": 115.2,
+      "board_higher": true
+    },
+    "rod_check": {
+      "attempted": false,
+      "reason": "entity_defendant_skipped",
+      "party": "ROSS FARM PROPERTIES LLC"
+    }
+  },
+  {
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": null,
+    "street_address": "6 John Hazel Drive",
+    "owner_name": null,
+    "defendant": null,
+    "case_number": "25SP000833-100",
+    "board_value": null,
+    "first_seen": "2026-09-22T15:28:03.675076",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": false,
+      "reason": "no_owner_or_defendant_name"
+    }
+  },
+  {
+    "source": "public_notices.nc_notices_counties",
+    "listing_type": "lis_pendens",
+    "parcel_id": "061936219700000",
+    "street_address": "101 STATE ST",
+    "owner_name": "JAMES DAYTON PLEMMONS",
+    "defendant": "JAMES DAYTON PLEMMONS",
+    "case_number": "26CV002591-100",
+    "board_value": 78000.0,
+    "first_seen": "2026-08-16T19:49:53.046553",
+    "value_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "real_owner": "TOWN CORNER PROPERTIES LLC",
+      "real_value": 398300.0,
+      "abs_pct_error": 80.4,
+      "board_higher": false
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "JAMES DAYTON PLEMMONS",
+      "status": "no_record_for_person",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 0,
+      "matched_rows": [],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 111,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "JAMES, ALLISON PAIGE",
+        "JAMES, ANDREW MICHAEL",
+        "JAMES, AUTUMN",
+        "JAMES, BARBARA NORRIS",
+        "JAMES, BENJAMIN R",
+        "JAMES, BENJAMIN R.",
+        "JAMES, BENJAMIN RYAN",
+        "JAMES, BEVERLY BOURLIER/ TR"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9732869192",
+    "street_address": "424 KYFIELDS",
+    "owner_name": "HENDERSON DEBRA BOYD",
+    "defendant": "frenchbroadcontracting@gmail.com",
+    "case_number": "fc-65973781",
+    "board_value": 424400.0,
+    "first_seen": "2026-06-02T12:37:30.205938",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": false,
+      "party": "frenchbroadcontracting@gmail.com"
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9751190457",
+    "street_address": "35 ELLER HOLLOW RD",
+    "owner_name": "BARBARA ANN HIGGINS (ETAL) VERONICA LYNN WILSON (ETAL)",
+    "defendant": "BURROWS, SARA JORDAN, BRADLEY",
+    "case_number": "fc-65452541",
+    "board_value": 292900.0,
+    "first_seen": "2026-07-01T02:57:14.912931",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "BURROWS, SARA JORDAN, BRADLEY",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 58,
+      "n_matched_person_rows": 9,
+      "matched_rows": [
+        {
+          "date": "05/08/2026",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "BURROWS, SARA FORD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "01/15/2026",
+          "index": "CRP",
+          "type": "TRUSTEE DEED",
+          "grantor_bold": [
+            "BURROWS, SARA FORD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "11/07/2025",
+          "index": "CRP",
+          "type": "MEMORANDUM OF OPTION",
+          "grantor_bold": [
+            "BURROWS, SARA"
+          ],
+          "grantee_bold": [
+            "BURROWS, SARA"
+          ]
+        },
+        {
+          "date": "03/14/2025",
+          "index": "CRP",
+          "type": "AFFIDAVIT",
+          "grantor_bold": [
+            "BURROWS, SARA"
+          ],
+          "grantee_bold": [
+            "BURROWS, SARA"
+          ]
+        },
+        {
+          "date": "01/21/2025",
+          "index": "CRP",
+          "type": "POWER OF ATTORNEY",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "BURROWS, SARA F."
+          ]
+        },
+        {
+          "date": "09/04/2024",
+          "index": "CRP",
+          "type": "NOTICE",
+          "grantor_bold": [
+            "BURROWS, SARA-FORD:",
+            "BURROWS, SARA",
+            "BURROWS, SARA-FORD",
+            "BURROWS, SARA-FORD:",
+            "BURROWS, SARA",
+            "BURROWS, SARA-FORD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/19/2023",
+          "index": "CRP",
+          "type": "ASSIGNMENT",
+          "grantor_bold": [
+            "BURROWS, SARA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "03/25/2022",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "BURROWS, SARA"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "05/20/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "BURROWS, SARA"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "05/08/2026",
+          "index": "CRP",
+          "type": "FORECLOSURE",
+          "grantor_bold": [
+            "BURROWS, SARA FORD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "01/15/2026",
+          "index": "CRP",
+          "type": "TRUSTEE DEED",
+          "grantor_bold": [
+            "BURROWS, SARA FORD"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/04/2024",
+          "index": "CRP",
+          "type": "NOTICE",
+          "grantor_bold": [
+            "BURROWS, SARA-FORD:",
+            "BURROWS, SARA",
+            "BURROWS, SARA-FORD",
+            "BURROWS, SARA-FORD:",
+            "BURROWS, SARA",
+            "BURROWS, SARA-FORD"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [],
+      "n_other_same_surname_people": 35,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "BURROWS, BESSIE M/ FKA",
+        "BURROWS, BEVERLY P",
+        "BURROWS, BEVERLY P.",
+        "BURROWS, BEVERLY PARLIER",
+        "BURROWS, BRENDA R",
+        "BURROWS, BRENDA RUNION",
+        "BURROWS, BROOKS A",
+        "BURROWS, BROOKS ANTHONY"
+      ]
+    }
+  },
+  {
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9638570613",
+    "street_address": "191 Edgar Street",
+    "owner_name": "DURHAM FRED;DURHAM EMOGENE M",
+    "defendant": null,
+    "case_number": "26SP000063-100",
+    "board_value": 302100.0,
+    "first_seen": "2026-07-22T20:22:45.367649",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "DURHAM FRED",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 21,
+      "matched_rows": [
+        {
+          "date": "01/27/2026",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "DURHAM, EMOGENE M.",
+            "DURHAM, FRED"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/02/2022",
+          "index": "CRP",
+          "type": "UNIFORM COMMERCIAL CODE",
+          "grantor_bold": [
+            "DURHAM, FRED"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "10/03/2019",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "DURHAM, FRED",
+            "DURHAM, EMOGENE M."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/22/2016",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "DURHAM, EMOGENE M.",
+            "DURHAM, FRED"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/29/2014",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "DURHAM, EMOGENE M.",
+            "DURHAM, FRED D."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/04/2014",
+          "index": "CRP",
+          "type": "NOTICE",
+          "grantor_bold": [
+            "DURHAM, EMOGENE M.",
+            "DURHAM, FRED D./ JR"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/14/2014",
+          "index": "CRP",
+          "type": "AGREEMENT",
+          "grantor_bold": [
+            "DURHAM, FRED D."
+          ],
+          "grantee_bold": [
+            "DURHAM, FRED D."
+          ]
+        },
+        {
+          "date": "07/01/2014",
+          "index": "CRP",
+          "type": "PLAT",
+          "grantor_bold": [
+            "DURHAM, EMOGENE",
+            "DURHAM, FRED"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/16/2014",
+          "index": "CRP",
+          "type": "EASEMENT",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "DURHAM, EMOGENE M.",
+            "DURHAM, FRED"
+          ]
+        },
+        {
+          "date": "03/24/2014",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "DURHAM, EMOGENE",
+            "DURHAM, FRED"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "01/27/2026",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "DURHAM, EMOGENE M.",
+            "DURHAM, FRED"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "09/04/2014",
+          "index": "CRP",
+          "type": "NOTICE",
+          "grantor_bold": [
+            "DURHAM, EMOGENE M.",
+            "DURHAM, FRED D./ JR"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [
+        {
+          "date": "09/29/2014",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "DURHAM, EMOGENE M.",
+            "DURHAM, FRED D."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "01/03/2013",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "DURHAM, EMOGENE M",
+            "DURHAM, FRED",
+            "DURHAM, FRED D/ JR"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/09/2010",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "DURHAM, EMOGENE M",
+            "DURHAM, FRED/ AKA",
+            "DURHAM, FRED D/ JR"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "02/12/2003",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "DURHAM, EMOGENE MARIE",
+            "DURHAM, FRED DOUGLAS/ JR"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "01/21/2003",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "DURHAM, EMOGENE M",
+            "DURHAM, FRED D"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 148,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "DURHAM, ALICE",
+        "DURHAM, ALICE A",
+        "DURHAM, ALICE A.",
+        "DURHAM, ALICE ANN",
+        "DURHAM, ALISSA J",
+        "DURHAM, ALISSA J.",
+        "DURHAM, ALMOND",
+        "DURHAM, ALMOND P"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9605553156",
+    "street_address": "S And T Spirit Dr",
+    "owner_name": "MASSIE(LE) DAVID A;FARMER(LE) JOYCE",
+    "defendant": null,
+    "case_number": "fc-65687887",
+    "board_value": 89000.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": false,
+      "party": "MASSIE(LE) DAVID A"
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9629666315",
+    "street_address": "47 VERDE DR",
+    "owner_name": "MYNHEIR KIMBERLY A;GRICUS DIANA L",
+    "defendant": "MYNHEIR KIMBERLY A;GRICUS DIANA L",
+    "case_number": "fc-65974761",
+    "board_value": 367500.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "MYNHEIR KIMBERLY A",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 9,
+      "n_matched_person_rows": 9,
+      "matched_rows": [
+        {
+          "date": "05/13/2019",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "MYNHEIR, KIMBERLY A"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "08/29/2018",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "MYNHEIR, KIMBERLY A."
+          ]
+        },
+        {
+          "date": "08/16/2017",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "MYNHEIR, KIMBERLY A."
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "05/04/2016",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "MYNHEIR, KIMBERLY A."
+          ],
+          "grantee_bold": [
+            "MYNHEIR, KIMBERLY A."
+          ]
+        },
+        {
+          "date": "12/01/2008",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "MYNHEIR, KIMBERLY A"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/08/2006",
+          "index": "CRP",
+          "type": "POWER OF ATTORNEY",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "MYNHEIR, KIMBERLY ANN"
+          ]
+        },
+        {
+          "date": "11/19/2001",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "MYNHEIR, KIM"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "10/17/2001",
+          "index": "CRP",
+          "type": "ASSIGNMENT",
+          "grantor_bold": [
+            "MYNHEIR, KIMBERLY A"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/10/2000",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "MYNHEIR, KIM"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [
+        {
+          "date": "05/13/2019",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "MYNHEIR, KIMBERLY A"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/01/2008",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "MYNHEIR, KIMBERLY A"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "11/19/2001",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "MYNHEIR, KIM"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 0,
+      "collision_risk": false,
+      "collision_risk_strong": false,
+      "sample_other_people": []
+    }
+  },
+  {
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9659405243",
+    "street_address": "34 Waters Cove Road",
+    "owner_name": "ORR PHILLIP M",
+    "defendant": null,
+    "case_number": "26SP000329-100",
+    "board_value": 320300.0,
+    "first_seen": "2026-07-22T20:22:45.372077",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "ORR PHILLIP M",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 1,
+      "matched_rows": [
+        {
+          "date": "10/12/2016",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "ORR, PHILLIP M"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 185,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "ORR, ALAN B",
+        "ORR, ALAN B.",
+        "ORR, ALAN BERNARD",
+        "ORR, ALLAN J",
+        "ORR, ANDREA",
+        "ORR, ANDREA P",
+        "ORR, ANITA",
+        "ORR, ANITA W"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9710968803",
+    "street_address": "23 JAMIE HILL DR",
+    "owner_name": "MARTIN SHERRY ANN",
+    "defendant": null,
+    "case_number": "fc-65980408",
+    "board_value": 234500.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "MARTIN SHERRY ANN",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 2,
+      "matched_rows": [
+        {
+          "date": "01/16/2025",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "MARTIN, SHERRY R",
+            "MARTIN, BARTOO E"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "12/13/2024",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "MARTIN, SHERRY R.",
+            "MARTIN, BARTOO E."
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [
+        {
+          "date": "01/16/2025",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "MARTIN, SHERRY R",
+            "MARTIN, BARTOO E"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 245,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "MARTIN, ADAM MCCARLEY",
+        "MARTIN, ADRIAHNA",
+        "MARTIN, ALEAH J.",
+        "MARTIN, ALICE HOLDEN",
+        "MARTIN, ALISON PAIGE",
+        "MARTIN, ALLISON",
+        "MARTIN, ALLISON L",
+        "MARTIN, ALLISON L."
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9628240044",
+    "street_address": "7 EVERGREEN AVE",
+    "owner_name": "MOULDS JAMES JEFFERSON JR",
+    "defendant": null,
+    "case_number": "fc-65730922",
+    "board_value": 129700.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "MOULDS JAMES JEFFERSON JR",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 14,
+      "n_matched_person_rows": 5,
+      "matched_rows": [
+        {
+          "date": "01/28/2015",
+          "index": "CRP",
+          "type": "AFFIDAVIT",
+          "grantor_bold": [
+            "MOULDS, JAMES JEFFERSON/ JR.",
+            "MOULDS, ALLISON MARIE",
+            "MOULDS, JOYCE GAYLE"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "02/28/2014",
+          "index": "CRP",
+          "type": "POWER OF ATTORNEY",
+          "grantor_bold": [
+            "MOULDS, JOYCE GAYLE"
+          ],
+          "grantee_bold": [
+            "MOULDS, ALLISON MARIE",
+            "MOULDS, JAMES JEFFERSON/ JR"
+          ]
+        },
+        {
+          "date": "04/13/2009",
+          "index": "CRP",
+          "type": "POWER OF ATTORNEY",
+          "grantor_bold": [
+            "MOULDS, JAMES J"
+          ],
+          "grantee_bold": [
+            "MOULDS, JAMES JEFFERSON/ JR"
+          ]
+        },
+        {
+          "date": "08/20/1996",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "MOULDS, JAMES J/ JR",
+            "MOULDS, JOYCE G"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "05/21/1996",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "MOULDS, JAMES J/ JR"
+          ],
+          "grantee_bold": [
+            "MOULDS, JOYCE L"
+          ]
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 9,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "MOULDS, ALLISON MARIE",
+        "MOULDS, JEFF",
+        "MOULDS, JOYCE G",
+        "MOULDS, JOYCE GAYLE",
+        "MOULDS, JOYCE L",
+        "MOULDS, SHARON W./ TR",
+        "MOULDS, SHARON WILCOX",
+        "MOULDS, WILLIAM A"
+      ]
+    }
+  },
+  {
+    "source": "national.courtlistener_adversary",
+    "listing_type": "lis_pendens",
+    "parcel_id": "878083794400000",
+    "street_address": "51 BRIDGES COVE RD",
+    "owner_name": "Rolland Ivan Rushing and Pamela Dee Rushing",
+    "defendant": "Rolland Ivan Rushing and Pamela Dee Rushing",
+    "case_number": "26-50287",
+    "board_value": 701200.0,
+    "first_seen": "2026-07-31T15:09:07.279764",
+    "value_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "real_owner": "ROLLAND ESCH",
+      "real_value": 701200.0,
+      "abs_pct_error": 0.0,
+      "board_higher": false
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "Rolland Ivan Rushing and Pamela Dee Rushing",
+      "status": "no_record_for_person",
+      "n_total_surname_rows": 36,
+      "n_matched_person_rows": 0,
+      "matched_rows": [],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 30,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "RUSHING, ANTHONY STEVEN",
+        "RUSHING, ARLIE",
+        "RUSHING, ARLIE L",
+        "RUSHING, ARLIE L.",
+        "RUSHING, CAROL A",
+        "RUSHING, CAROLE",
+        "RUSHING, CAROLE A",
+        "RUSHING, CAROLE A."
+      ]
+    }
+  },
+  {
+    "source": "public_notices.nc_notices_counties",
+    "listing_type": "lis_pendens",
+    "parcel_id": "9654517386",
+    "street_address": "54 PUNKIN ST",
+    "owner_name": "MERANDA L. McCONNELL",
+    "defendant": "MERANDA L. McCONNELL",
+    "case_number": "26CV003558-100",
+    "board_value": 215500.0,
+    "first_seen": "2026-08-16T19:49:53.046635",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "MERANDA L. McCONNELL",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 3,
+      "matched_rows": [
+        {
+          "date": "12/14/2020",
+          "index": "CRP",
+          "type": "MODIFICATION AGREEMENT",
+          "grantor_bold": [
+            "MCCONNELL, MERANDA L."
+          ],
+          "grantee_bold": [
+            "MCCONNELL, MERANDA L."
+          ]
+        },
+        {
+          "date": "08/07/2017",
+          "index": "CRP",
+          "type": "QUIT CLAIM DEED",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "MCCONNELL, MERANDA"
+          ]
+        },
+        {
+          "date": "03/19/2009",
+          "index": "CRP",
+          "type": "DEED OF TRUST",
+          "grantor_bold": [
+            "MCCONNELL, MERANDA L"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "08/07/2017",
+          "index": "CRP",
+          "type": "QUIT CLAIM DEED",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "MCCONNELL, MERANDA"
+          ]
+        }
+      ],
+      "benign_hits": [],
+      "n_other_same_surname_people": 141,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "MCCONNELL, ANNE D",
+        "MCCONNELL, ANNE D.",
+        "MCCONNELL, ANNE D/ IND&AIF",
+        "MCCONNELL, ANNE DARLINE",
+        "MCCONNELL, ANNMARIE",
+        "MCCONNELL, BARBARA",
+        "MCCONNELL, BROOKE",
+        "MCCONNELL, BROOKE LEE"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9701310646",
+    "street_address": "67 OVERLOOK DR",
+    "owner_name": "NETHERTON BARRY L;NETHERTON CATHY",
+    "defendant": null,
+    "case_number": "fc-65828348",
+    "board_value": 319400.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "NETHERTON BARRY L",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 95,
+      "n_matched_person_rows": 3,
+      "matched_rows": [
+        {
+          "date": "10/26/2022",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "NETHERTON, CATHY CANDLER",
+            "NETHERTON, BARRY LYNN"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "07/19/2021",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "NETHERTON, BARRY LYNN"
+          ],
+          "grantee_bold": [
+            "NETHERTON, CATHY CANDLER",
+            "NETHERTON, BARRY LYNN"
+          ]
+        },
+        {
+          "date": "08/29/2018",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [
+            "NETHERTON, DORA E."
+          ],
+          "grantee_bold": [
+            "NETHERTON, BARRY LYNN",
+            "NETHERTON, DORA E."
+          ]
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 73,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "NETHERTON, BILLIE P",
+        "NETHERTON, CATHY",
+        "NETHERTON, CATHY CANDLER",
+        "NETHERTON, CHARLIE WADE",
+        "NETHERTON, CHARLIE WADE/ FBO",
+        "NETHERTON, DANNY",
+        "NETHERTON, DANNY W.",
+        "NETHERTON, DONALD A"
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "9689128288",
+    "street_address": "35 CHARLIE RIDDLE LN",
+    "owner_name": "BANKS MARIE ETHEL",
+    "defendant": null,
+    "case_number": "fc-65625872",
+    "board_value": 126100.0,
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "BANKS MARIE ETHEL",
+      "status": "active_corroboration",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 2,
+      "matched_rows": [
+        {
+          "date": "06/22/2026",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "BANKS, JOHNNY C.",
+            "BANKS, MARIE RIDDLE",
+            "BANKS, JOHNNY C.",
+            "BANKS, MARIE RIDDLE"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "06/03/2026",
+          "index": "CRP",
+          "type": "ASSIGNMENT",
+          "grantor_bold": [
+            "BANKS, JOHNNY C.",
+            "BANKS, MARIE RIDDLE"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "distress_hits": [
+        {
+          "date": "06/22/2026",
+          "index": "CRP",
+          "type": "SUBSTITUTE TRUSTEE",
+          "grantor_bold": [
+            "BANKS, JOHNNY C.",
+            "BANKS, MARIE RIDDLE",
+            "BANKS, JOHNNY C.",
+            "BANKS, MARIE RIDDLE"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "benign_hits": [],
+      "n_other_same_surname_people": 266,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "BANKS, AARON",
+        "BANKS, AARON RAY",
+        "BANKS, AARON THOMAS/ AIF",
+        "BANKS, ADAM",
+        "BANKS, ADAM P.",
+        "BANKS, ADAM PATTERSON",
+        "BANKS, AMBER P",
+        "BANKS, AMBER P."
+      ]
+    }
+  },
+  {
+    "source": "national.foreclosure_dot_com",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "965865146900000",
+    "street_address": "5 VIOLET HILL CIR",
+    "owner_name": "FREEL AMANDA J",
+    "defendant": "Freel, Amanda",
+    "case_number": "fc-65992925",
+    "board_value": 197100.0,
+    "first_seen": "2026-07-22T20:42:34.160035",
+    "value_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "real_owner": "AMANDA FREEL",
+      "real_value": 197100.0,
+      "abs_pct_error": 0.0,
+      "board_higher": false
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "Freel, Amanda",
+      "status": "clean_resolved_or_neutral",
+      "n_total_surname_rows": 118,
+      "n_matched_person_rows": 2,
+      "matched_rows": [
+        {
+          "date": "06/29/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "FREEL, AMANDA J"
+          ],
+          "grantee_bold": []
+        },
+        {
+          "date": "02/22/2019",
+          "index": "CRP",
+          "type": "DEED",
+          "grantor_bold": [],
+          "grantee_bold": [
+            "FREEL, AMANDA J."
+          ]
+        }
+      ],
+      "distress_hits": [],
+      "benign_hits": [
+        {
+          "date": "06/29/2020",
+          "index": "CRP",
+          "type": "DEED OF TRUST SATISFACTION",
+          "grantor_bold": [
+            "FREEL, AMANDA J"
+          ],
+          "grantee_bold": []
+        }
+      ],
+      "n_other_same_surname_people": 10,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "FREEL, ELIZABETH",
+        "FREEL, ELIZABETH S",
+        "FREEL, JACQUELINE BROOKE",
+        "FREEL, KEVIN",
+        "FREEL, LLOYD D",
+        "FREEL, LLOYD D/ AKA",
+        "FREEL, LLOYD DAVID",
+        "FREEL, LLOYD T"
+      ]
+    }
+  },
+  {
+    "source": "national.zillow_foreclosures",
+    "listing_type": "lis_pendens",
+    "parcel_id": "9677320315",
+    "street_address": "67 Earwood Ridge Rd",
+    "owner_name": "JPMORGAN CHASE BANK NATIONAL ASSOCIATION",
+    "defendant": null,
+    "case_number": "zillow-5630058",
+    "board_value": 265000.0,
+    "first_seen": "2026-06-18T20:59:13.827564",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": false,
+      "reason": "entity_defendant_skipped",
+      "party": "JPMORGAN CHASE BANK NATIONAL ASSOCIATION"
+    }
+  },
+  {
+    "source": "public_notices.nc_notices_counties",
+    "listing_type": "lis_pendens",
+    "parcel_id": null,
+    "street_address": null,
+    "owner_name": "JAMES DAYTON PLEMMONS",
+    "defendant": "JAMES DAYTON PLEMMONS",
+    "case_number": "26CV002591-100",
+    "board_value": null,
+    "first_seen": "2026-09-13T22:36:13.022704",
+    "value_check": {
+      "attempted": false,
+      "reason": "no_15digit_parcel_id"
+    },
+    "rod_check": {
+      "attempted": true,
+      "fetch_ok": true,
+      "party": "JAMES DAYTON PLEMMONS",
+      "status": "no_record_for_person",
+      "n_total_surname_rows": 250,
+      "n_matched_person_rows": 0,
+      "matched_rows": [],
+      "distress_hits": [],
+      "benign_hits": [],
+      "n_other_same_surname_people": 111,
+      "collision_risk": true,
+      "collision_risk_strong": true,
+      "sample_other_people": [
+        "JAMES, ALLISON PAIGE",
+        "JAMES, ANDREW MICHAEL",
+        "JAMES, AUTUMN",
+        "JAMES, BARBARA NORRIS",
+        "JAMES, BENJAMIN R",
+        "JAMES, BENJAMIN R.",
+        "JAMES, BENJAMIN RYAN",
+        "JAMES, BEVERLY BOURLIER/ TR"
+      ]
+    }
+  }
+]
