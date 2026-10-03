@@ -796,6 +796,12 @@ DATELESS_OK_SOURCES = {
     # date. Without this entry _active_only() deletes every row this source
     # produces the first time it actually runs.
     "counties_nc.gastonia_code_enforcement",
+    # Asheville Accela code-enforcement cases (AccelaServicesView). Same shape as
+    # Henderson/Gastonia above: a code case has no sale date. Ships gated off by a
+    # live staleness self-check (the feed is a frozen 2016-2018 snapshot as of
+    # 2026-10-03 — see the module docstring) so it emits 0 rows today, but this
+    # entry is needed the moment it ever starts emitting again.
+    "counties_nc.asheville_code_enforcement",
     # Multi-year arrears history (Buncombe 2009-2026, Oconee DT2023-25, Pickens).
     # An arrears record is "owes for N years", which has no sale date by nature.
     "counties.multi_year_delinquent_tax",

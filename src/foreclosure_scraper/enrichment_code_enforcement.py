@@ -15,6 +15,39 @@ intact so a verified in-footprint endpoint can be slotted into
 ``CITY_ENDPOINTS`` later. With the dict empty, ``enrich_with_code_enforcement``
 is a graceful no-op.
 
+REMOVED 2026-10-03 — "Asheville" (`gis.ashevillenc.gov/.../AccelaServicesView/
+MapServer/0`), wired 2026-07-01 (commit `311ba4fc`) on the strength of an
+HTTP 200 + real addressed cases. That check never looked at the DATES. Live
+re-verification today, tasked with building a standalone scraper off this
+same endpoint, found the entire 2,738-row table is a FROZEN snapshot: every
+date field on every row (`date_opened`, `date_statused`, `date_closed`,
+`record_status_date`, `date_assigned`) maxes out at 2018-12-14, confirmed via
+direct `outStatistics` MIN/MAX queries against the live service, both overall
+and per `record_type_category` (Housing Code Referral, Damage-Incident, Junked
+Vehicles, FMO Referral, Stop Work Order, Other Referral, Short Term Rental,
+Land Use, Sign Violation — every one of them, no exceptions). Sample records
+pulled across those same categories (verbatim `description` text) are all
+dated 2016 with `record_status` already "Closed". Status values that read as
+open today (`Open` 68, `NOV Mailed` 41, `NOV Served` 50, `Citation Pending`
+32, `Unsafe Structure` 5, `Deteriorated Structure` 13, etc.) all have their
+OWN `record_status_date` frozen at the same Dec-2018 ceiling — there is no
+way to tell whether any of them are still open today; the far likelier
+explanation, consistent with `city_websites/asheville_min_housing.py`'s
+independent 2026-09-15 finding that Asheville's current minimum-housing
+process publishes no case registry at all, is that this ArcGIS view's sync
+from Accela simply stopped running after Dec 2018 and nobody pointed it at a
+successor system. This enricher was matching every CURRENT Asheville-city
+lead's address against these 8-10-year-old frozen records and granting
+`has_open: True` / `code_enforcement` PROPERTY credit whenever a stale
+"Open"/"NOV Mailed"/etc. status happened to match — a false-positive
+distress signal manufactured from dead data, the same failure shape
+`city_websites/charlotte_open_data.py`'s own docstring already names and
+rejects for a different stale Mecklenburg permits layer ("stale, not a
+current feed. Dropped rather than land dead data."). Removed rather than
+"fixed" — there is no live successor endpoint to substitute (see
+`src/foreclosure_scraper/scrapers/counties_nc/asheville_code_enforcement.py`'s
+own docstring for the full standalone-scraper investigation that found this).
+
 Free, ArcGIS REST endpoints, no auth.
 
 LIFECYCLE (audit 2026-09-21, F12). The block is written even when every violation is closed
@@ -65,7 +98,12 @@ _TTL_DAYS = 120
 #   CodeEnforcementOrderstoDemolish     17 features -- a STANDING ORDER TO DEMOLISH is
 #                                       the strongest single distress signal in this
 #                                       lane, so it is carried as its own entry
-#   Asheville AccelaServicesView     2,738 features
+#
+# Asheville AccelaServicesView (2,738 features) was here 2026-07-01 through
+# 2026-10-03 -- REMOVED, see the module docstring's 2026-10-03 note. Every row's
+# every date field is frozen at 2018-12-14; it was manufacturing false "open
+# violation" matches against today's real Asheville leads from an 8-10-year-dead
+# snapshot. Do not re-add without live-reverifying the date fields first.
 #
 # Charlotte rows carry ParcelId, which is a direct Mecklenburg parcel join key -- much
 # stronger than the 250ft lat/lng proximity test this enricher falls back on. The two
@@ -73,16 +111,6 @@ _TTL_DAYS = 120
 # a demolition order will tag twice; that is intended, and the demolish tag is the one
 # that matters.
 CITY_ENDPOINTS: dict[str, dict] = {
-    # City of Asheville self-hosted Accela services view (verified live 2026-07-01,
-    # HTTP 200, real addressed cases). record_type covers Building/Zoning/Stormwater
-    # Enforcement + STR complaints; record_status carries Open / NOV Mailed / Closed.
-    "Asheville": {
-        "url": "https://gis.ashevillenc.gov/server/rest/services/Permits/AccelaServicesView/MapServer/0",
-        "addr_fields": ("address",),
-        "violation_fields": ("record_type", "description"),
-        "status_fields": ("record_status",),
-        "date_fields": ("date_opened",),
-    },
     # City of Charlotte, Housing & Neighborhood Services. Mecklenburg is outside the
     # 18-county FORECLOSURE footprint but inside the statewide DISTRESSED scope.
     "Charlotte": {

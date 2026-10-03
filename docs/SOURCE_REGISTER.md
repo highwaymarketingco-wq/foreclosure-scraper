@@ -1,10 +1,10 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-10-01 23:57 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-10-03 20:45 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **238**
+- Scrapers in the registry: **239**
 - Producing rows on the board: **128**
-- Registered but contributing ZERO rows: **110**
+- Registered but contributing ZERO rows: **111**
 - Confirmed real and not yet built: **3**
 - Board read: `data/checkpoint/board.json.gz` (197,890 rows)
 
@@ -84,10 +84,10 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.york_overage_claims` | 107 | York SC (107) | `https://www.yorkcountysc.gov/DocumentCenter/View/2828/OVERAGE-CLAIM-LIST` |
 | `counties_nc.asheville_helene` | 102 | Buncombe NC (102) | `https://services.arcgis.com/aJ16ENn1AaqdFlqx/arcgis/rest/services/` |
 | `counties_sc.spartanburg_city_condemned` | 91 | Spartanburg SC (91) | `https://www.cityofspartanburg.org/robots.txt`<br>`https://www.cityofspartanburg.org/DocumentCenter/View/1901/`<br>`https://www.cityofspartanburg.org/` |
-| `counties_sc.sc_state_tax_lien` | 82 | Horry SC (15), Berkeley SC (9), Lexington SC (8) | `https://mydorway.dor.sc.gov/?link=delinquentind`<br>`https://dor.sc.gov/delinquent-taxpayers` |
+| `counties_sc.sc_state_tax_lien` | 82 | Horry SC (15), Berkeley SC (9), Lexington SC (8) | `https://dor.sc.gov/delinquent-taxpayers`<br>`https://mydorway.dor.sc.gov/?link=delinquentind` |
 | `law_firms.shapiro_ingle_powerbi` | 74 | Gaston NC (23), Buncombe NC (17), Cleveland NC (11) | `https://www.logs.com/nc-upcoming-sales-report.html`<br>`https://app.powerbi.com/view?r=`<br>`https://wabi-us-north-central-h-primary-api.analysis.windows.net`<br>_+2 more_ |
 | `counties_sc.sc_flc` | 73 | Anderson SC (73) | `https://www.spartanburgcounty.gov/216/Tax-Collector`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>`https://www.pickenscountysc.gov/treasurer/tax-sale`<br>_+6 more_ |
-| `counties_sc.sc_des_brownfields` | 64 | Statewide SC (64) | `https://des.sc.gov/programs/bureau-land-waste-management/`<br>`https://des.sc.gov/community/environmental-sites-projects` |
+| `counties_sc.sc_des_brownfields` | 64 | Statewide SC (64) | `https://des.sc.gov/programs/bureau-land-waste-management/`<br>`https://des.sc.gov/community/community-engagement/environmental-sites-projects` |
 | `law_firms.hutchens` | 59 | Spartanburg SC (14), Gaston NC (6), Cherokee SC (6) | `https://sales.hutchenslawfirm.com/NCfcSalesList.aspx`<br>`https://sales.hutchenslawfirm.com/SCfcSalesList.aspx` |
 | `law_firms.zacchaeus` | 59 | Guilford NC (8), Cabarrus NC (8), Robeson NC (7) | `https://www.zls-nc.com/listings`<br>`https://gis.moorecountync.gov/mooreinfo2010/` |
 | `national.auction_dot_com` | 57 | Anderson SC (7), Spartanburg SC (6), McDowell NC (2) | `https://www.auction.com/residential/nc/`<br>`https://www.auction.com/residential/sc/`<br>`https://www.auction.com/details/{slug` |
@@ -107,7 +107,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_nc.buncombe_tax` | 21 | Buncombe NC (21) | `https://www.trumba.com/calendars/tax-foreclosures-all.json`<br>`https://taxforeclosures.buncombenc.gov/` |
 | `national.nc_upset_bids` | 21 | Rutherford NC (21) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php`<br>`https://www.rutherfordcountync.gov/departments/` |
 | `national.fema_disasters` | 20 | Brunswick NC (2), Swain NC (2), Transylvania NC (2) | `https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries`<br>`https://www.fema.gov/disaster/{row.get(` |
-| `national.xome` | 18 | Anderson SC (3), Laurens SC (2), Spartanburg SC (2) | `https://www.xome.com/auctions/bank-owned`<br>`https://www.xome.com/auctions/foreclosure-homes`<br>`https://www.xome.com/auctions/foreclosuresales`<br>_+1 more_ |
+| `national.xome` | 18 | Anderson SC (3), Laurens SC (2), Spartanburg SC (2) | `https://www.xome.com/auctions`<br>`https://www.xome.com{href` |
 | `counties_nc.edgecombe_tax_foreclosure` | 17 | Edgecombe NC (17) | `https://www.edgecombecountync.gov/businesses/tax_collector/tax_foreclosure_list.php` |
 | `national.trulia` | 17 | Spartanburg SC (10) | `https://www.trulia.com/foreclosures/`<br>`https://www.trulia.com/foreclosures/Charlotte,NC/`<br>`https://www.trulia.com/foreclosures/Raleigh,NC/`<br>_+6 more_ |
 | `counties_sc.pickens_master_in_equity` | 16 | Pickens SC (16) | `https://www.co.pickens.sc.us/departments/master_in_equity/sales_rosters.php`<br>`https://www.co.pickens.sc.us/` |
@@ -135,7 +135,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.horry_flc` | 3 | Horry SC (3) | `https://www.horrycountysc.gov/boards-and-commissions/`<br>`https://www.horrycountysc.gov/media/om1d2bwo/2025-flc-list-42126.xlsx`<br>`https://www.horrycountysc.gov` |
 | `counties_sc.richland_flc` | 3 | Richland SC (3) | `https://www.richlandcountysc.gov/Property-Business/Taxes/Delinquent-Taxes/Forfeited-Land-Available`<br>`https://www.richlandcountysc.gov` |
 | `counties_sc.sc_county_rosters` | 3 | Oconee SC (2), Laurens SC (1) | `https://publicindex.sccourts.org` |
-| `national.freddie_homesteps` | 3 | - | `https://www.homesteps.com/listing/search?search=NC`<br>`https://www.homesteps.com/listing/search?search=SC`<br>`https://www.homesteps.com/`<br>_+1 more_ |
+| `national.freddie_homesteps` | 3 | - | `https://www.homesteps.com/listing/search?search=NC`<br>`https://www.homesteps.com/listing/search?search=SC`<br>`https://www.homesteps.com{src`<br>_+2 more_ |
 | `national.courtlistener_civil` | 2 | - | `https://www.courtlistener.com` |
 | `national.hibid_real_estate` | 2 | Lincoln NC (1) | `https://hibid.com/graphql```<br>`https://hibid.com/graphql`<br>`https://hibid.com`<br>_+2 more_ |
 | `national.sheriff_sales` | 2 | Cleveland NC (2) | `https://www.brunswicksheriff.com`<br>`https://www.charlestoncounty.org`<br>`https://www.sheriffclevelandcounty.com`<br>_+1 more_ |
@@ -143,7 +143,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.sc_rod_cott` | 1 | Union SC (1) | _(no literal URL in module)_ |
 | `counties_sc.spartanburg_master_in_equity` | 1 | Spartanburg SC (1) | `https://www.spartanburgcounty.gov/DocumentCenter/View/3392/Sale-Results`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11824/Deficiency-Sale` |
 | `law_firms.ingle_firm` | 1 | Gaston NC (1) | `https://www.theinglefirm.com/Sales.aspx` |
-| `national.gsa_surplus` | 1 | - | `https://www.gsa.gov/real-estate/real-property-disposition/assets-identified-for-accelerated-disposition`<br>`https://www.gsa.gov/real-estate/real-property-disposition/` |
+| `national.gsa_surplus` | 1 | - | `https://www.gsa.gov/real-estate/real-property-disposition/assets-identified-for-accelerated-disposition`<br>`https://www.gsa.gov/real-estate/real-property-disposition/`<br>`https://www.gsa.gov{photo` |
 | `newspapers.daily_courier` | 1 | Rutherford NC (1) | `https://www.thedigitalcourier.com/classifieds/community/announcements/legal/`<br>`https://www.thedigitalcourier.com` |
 | `newspapers.index_journal` | 1 | Greenwood SC (1) | `https://www.indexjournal.com/classifieds/community/announcements/legal/?f=rss` |
 
@@ -157,12 +157,13 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `city_websites.search` | `https://{domain` |
 | `counties.sitemap_walker` | `https://www.spartanburgcounty.gov`<br>`https://www.cherokeecountysc.gov`<br>_+10 more_ |
 | `counties_generic.arcgis_distress_layers` | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/`<br>`https://www.buncombecounty.org/governing/depts/tax/`<br>_+32 more_ |
-| `counties_generic.epa_frs_sites` | `https://data.epa.gov/dmapservice/frs.frs_program_facility`<br>`https://www.epa.gov/frs` |
+| `counties_generic.epa_frs_sites` | `https://data.epa.gov/dmapservice/frs.frs_program_facility`<br>`https://ofmpub.epa.gov/frs_public2/fii_query_dtl.disp_program_facility`<br>_+1 more_ |
 | `counties_generic.state_contamination` | `https://services2.arcgis.com/kCu40SDxsCGcuUWO/arcgis/rest/services`<br>`https://www.deq.nc.gov/about/divisions/waste-management/underground-storage-tanks`<br>_+2 more_ |
+| `counties_nc.asheville_code_enforcement` | `https://gis.ashevillenc.gov/server/rest/services/Permits/`<br>`https://www.ashevillenc.gov/department/development-services/` |
 | `counties_nc.brunswick_legal_notices` | `https://www.brunswickcountync.gov/912/Legal-Notices`<br>`https://www.brunswickcountync.gov`<br>_+1 more_ |
 | `counties_nc.buncombe_tax_foreclosure` | `https://media.buncombenc.gov/common/tax/foreclosure-listings/fcl.pdf`<br>`https://taxforeclosures.buncombenc.gov/` |
 | `counties_nc.cleveland_tax_foreclosure` | `https://www.clevelandcounty.com/main/departments/` |
-| `counties_nc.cumberland_tax_foreclosure` | `https://www.co.cumberland.nc.us/departments/tax/tax-administration/tax-foreclosures` |
+| `counties_nc.cumberland_tax_foreclosure` | `https://www.co.cumberland.nc.us/departments/tax-group/tax/tax-foreclosure-sales` |
 | `counties_nc.gaston_surplus_properties` | `https://www.gastongov.com/709/Surplus-Properties`<br>`https://www.gastongov.com`<br>_+1 more_ |
 | `counties_nc.gaston_tax_foreclosures` | `https://www.gastongov.com/669`<br>`https://www.gastongov.com/671` |
 | `counties_nc.gastonia_code_enforcement` | `https://devsvcs.gastonianc.gov`<br>`https://gis.gastoncountync.gov/publicgis/rest/services/` |
@@ -171,16 +172,16 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_nc.mcdowell_tax_foreclosure` | `https://mcdowellnc.gov/departments/tax-collections/` |
 | `counties_nc.nc_bankruptcy_sales` | `https://www.nceb.uscourts.gov/Public-Sales-Notice`<br>`https://www.ncmb.uscourts.gov/public-sales` |
 | `counties_nc.nc_civicplus_tax_sale` | `https://www.alamance-nc.com`<br>`https://www.alexandercountync.gov`<br>_+65 more_ |
-| `counties_nc.nc_deq_dsca` | `https://www.deq.nc.gov/about/divisions/waste-management/science-data-and-reports/dsca-site-listsfacility-inventories` |
+| `counties_nc.nc_deq_dsca` | `https://www.deq.nc.gov/about/divisions/waste-management/`<br>`https://www.deq.nc.gov` |
 | `counties_nc.nc_ecourts_estates` | `https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29`<br>`https://portal-nc.tylertech.cloud/Portal`<br>_+1 more_ |
-| `counties_nc.nc_govdeals_real_property` | `https://maestro.lqdt1.com/search/list`<br>`https://www.transylvaniacounty.org/news`<br>_+3 more_ |
+| `counties_nc.nc_govdeals_real_property` | `https://maestro.lqdt1.com/search/list`<br>`https://www.transylvaniacounty.org/news`<br>_+5 more_ |
 | `counties_nc.nc_rod_substitute_trustee` | `https://buncombe-recordings.permitium.com/```<br>`https://www.nccourts.gov/` |
 | `counties_nc.nchfa_reo` | `https://www.nchfa.com/home-buyers/properties-sale` |
 | `counties_nc.new_hanover_foreclosures` | `https://www.nhcgov.com/345/Foreclosures` |
 | `counties_nc.polk_tax` | `https://www.polknc.gov/upcoming_auction.php` |
 | `counties_nc.rutherford_foreclosure` | `https://www.rutherfordcountync.gov/departments/` |
-| `counties_nc.stokes_delinquent_tax` | `https://www.co.stokes.nc.us/departments/foreclosures.php` |
-| `counties_nc.swain_tax_foreclosures` | `https://www.swaincountync.gov/` |
+| `counties_nc.stokes_delinquent_tax` | `https://kanialawfirm.com/tax-foreclosures/`<br>`https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>_+1 more_ |
+| `counties_nc.swain_tax_foreclosures` | `https://www.swaincountync.gov/tax-office/` |
 | `counties_nc.wnc_rod_foreclosure_starts` | _(no literal URL in module)_ |
 | `counties_nc.wnc_tax_foreclosures` | `https://www.wataugacounty.org/`<br>`https://www.averycounty.com/`<br>_+3 more_ |
 | `counties_sc.abbeville_delinquent_tax` | `https://abbevillecountysc.com/delinquent-tax-collector/` |
@@ -188,9 +189,9 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.anderson_acpass_deeds` | `https://acpass.andersoncountysc.org` |
 | `counties_sc.anderson_sheriff` | `https://www.andersonsheriff.com/sheriff-sales` |
 | `counties_sc.bamberg_sheriff` | `https://www.bambergcounty.sc.gov/public-safety/sheriffs-office` |
-| `counties_sc.barnwell_sheriff` | `https://www.barnwellcounty.com/sheriff/sheriff-sales` |
+| `counties_sc.barnwell_sheriff` | `http://www.barnwellcountysheriff.com/services.html` |
 | `counties_sc.beaufort_flc` | `https://www.proxibid.com/Meares-Property-Advisors-Inc/` |
-| `counties_sc.cherokee_rod` | `https://www.sclandrecords.com` |
+| `counties_sc.cherokee_rod` | `https://www.sclandrecords.com/cherokee/`<br>`https://www.sclandrecords.com/``<br>_+3 more_ |
 | `counties_sc.chester_delinquent_tax` | `https://www.chestercountysc.gov/treasurer/delinquent-tax-sale` |
 | `counties_sc.clarendon_tax_auction` | `https://www.clarendoncountysc.gov/` |
 | `counties_sc.colleton_tax_sale` | `https://www.colletoncounty.org/delinquent-tax`<br>`https://www.colletoncounty.org/delinquent-tax/tax-sale`<br>_+1 more_ |
@@ -214,7 +215,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.pickens_tax_sale` | `https://www.co.pickens.sc.us/departments/delinquent_tax/index.php`<br>`https://www.co.pickens.sc.us/` |
 | `counties_sc.saluda_delinquent_tax` | `https://saludacounty.sc.gov/departments/tax-collector/delinquent-tax-sale`<br>`https://saludacounty.sc.gov/departments/tax-collector` |
 | `counties_sc.sc_catalis_delinquent_roll` | `https://d1ebsyxxbc7tep.cloudfront.net/data`<br>`https://pickenscountysctax.us`<br>_+4 more_ |
-| `counties_sc.sc_coastal_rosters` | _(no literal URL in module)_ |
+| `counties_sc.sc_coastal_rosters` | `https://www.horrycounty.org/parcelapp/rest/services/HorryCountyGISApp/MapServer/24/query`<br>`https://www.horrycounty.org/parcelapp/rest/services/HorryCountyGISApp/MapServer/22/query`<br>_+4 more_ |
 | `counties_sc.sc_delinquent_tax_list` | `https://cherokeecountysc.gov/delinquent-tax/tax-sale-bidders/`<br>`https://cherokeecountysc.gov/wp-content/uploads/{year` |
 | `counties_sc.sc_dor_delinquent_taxpayers` | `https://mydorway.dor.sc.gov/?link=delinquentind` |
 | `counties_sc.sc_probate_notices` | `https://{paper.host` |
@@ -227,42 +228,42 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `law_firms.finkel` | `https://www.finkellaw.com/images/Webs.pdf`<br>`https://www.finkellawcharleston.com/images/Webs.pdf` |
 | `law_firms.korn` | `https://www.kornlawfirm.com/foreclosure-sales/`<br>`https://www.kornlawfirm.com/sales/` |
 | `law_firms.mewborn_deselms` | `https://www.mewbornlaw.biz` |
-| `national.auction_bank_reo` | `https://apiweb.realtybid.com/rest/RBIAPI/`<br>`https://bid.auctionnetwork.com/Auctions`<br>_+2 more_ |
-| `national.bid4assets` | `https://www.bid4assets.com/storefront/index.cfm?searchstate=NC&searchprop=Real+Estate`<br>`https://www.bid4assets.com/storefront/index.cfm?searchstate=SC&searchprop=Real+Estate`<br>_+1 more_ |
+| `national.auction_bank_reo` | `https://apiweb.realtybid.com/rest/RBIAPI/`<br>`https://bid.auctionnetwork.com/Auctions`<br>_+4 more_ |
+| `national.bid4assets` | `https://www.bid4assets.com/v5/search`<br>`https://www.bid4assets.com/api/search/process?take=&skip=&page=&pageSize=`<br>_+3 more_ |
 | `national.crexi_multifamily` | `https://www.crexi.com` |
 | `national.cws_marketing` | `https://www.cwsmarketing.com/real-estate/`<br>`https://bid` |
 | `national.epa_superfund` | `https://data.epa.gov/ef/seplan/`<br>`https://data.epa.gov/ef/seplan/SEPLAN/ROWS/0:200/JSON?search={state`<br>_+1 more_ |
 | `national.fdic_failed_banks` | `https://www.fdic.gov/bank-failures/failed-bank-list` |
 | `national.first_citizens_reo` | `https://www.firstcitizens.com/real-estate` |
-| `national.govdeals` | `https://maestro.lqdt1.com/search/list`<br>`https://www.govdeals.com/index.cfm?fa=Main&searchText=&category=&keyword=`<br>_+4 more_ |
-| `national.gsa_realproperty` | `https://realestatesales.gov` |
-| `national.homepath_json` | `https://homepath.fanniemae.com/cfl/property-inventory/search-listings`<br>`https://homepath.fanniemae.com/cfl/property-inventory/search`<br>_+2 more_ |
+| `national.govdeals` | `https://maestro.lqdt1.com/search/list`<br>`https://www.govdeals.com/auctions/item/detail/`<br>_+3 more_ |
+| `national.gsa_realproperty` | `https://realestatesales.gov`<br>`https://```<br>_+2 more_ |
+| `national.homepath_json` | `https://homepath.fanniemae.com/cfl/property-inventory/search`<br>`https://homepath.fanniemae.com/`<br>_+1 more_ |
 | `national.irs_judicial_sales` | `https://www.irsauctions.gov` |
 | `national.irs_treasury` | `https://www.irsauctions.gov/auction/items`<br>`https://www.irsauctions.gov` |
 | `national.landsofamerica` | `https://www.land.com/{county`<br>`https://www.land.com{url` |
 | `national.legacy_obituaries` | `https://www.legacy.com` |
 | `national.liensnc` | `https://www.liensnc.com` |
-| `national.loopnet` | `https://www.loopnet.com` |
+| `national.loopnet` | `https://www.loopnet.com/`<br>`https://www.loopnet.com` |
 | `national.nc_sos_ucc` | `https://www.sosnc.gov/online_services/search/by_title/_uniform_commercial_code` |
-| `national.opencorporates` | `https://api.opencorporates.com/v0.4/`<br>`https://api.opencorporates.com/v0.4/companies/search` |
+| `national.opencorporates` | `https://api.opencorporates.com/v0.4/companies/search` |
 | `national.probate_foreclosure_leads` | _(no literal URL in module)_ |
 | `national.propwire` | _(no literal URL in module)_ |
 | `national.sc_sos_entity` | `https://businessfilings.sc.gov/BusinessFiling/Web/Reporting/SearchByName`<br>`https://businessfilings.sc.gov{href` |
 | `national.seeclickfix` | `https://developer.seeclickfix.com/`<br>`https://seeclickfix.com/api/v2/issues` |
 | `national.stealth_handoff` | _(no literal URL in module)_ |
-| `national.tranzon` | `https://www.tranzon.com/online-real-estate-auctions.aspx` |
-| `national.usmarshals_realproperty` | `https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property`<br>`https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property/`<br>_+1 more_ |
+| `national.tranzon` | `https://www.tranzon.com/online-real-estate-auctions.aspx`<br>`https://www.tranzon.com{src`<br>_+1 more_ |
+| `national.usmarshals_realproperty` | `https://reallook.com/properties?page=N`<br>`https://reallook.com/properties/{id`<br>_+2 more_ |
 | `national.va_acquired` | `https://www.va.gov/va-forms/real-property/properties/`<br>`https://www.benefits.va.gov/homeloans/property/property.asp` |
-| `national.williams` | `https://www.williamsauction.com` |
+| `national.williams` | `https://bid.auctionnetwork.com/`<br>`https://bid.auctionnetwork.com` |
 | `newspapers.carolina_coast` | `https://www.carolinacoastonline.com/classifieds/?f=rss&q=foreclosure`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=substitute+trustee`<br>_+1 more_ |
 | `newspapers.coastland_times` | `https://www.thecoastlandtimes.com` |
 | `newspapers.hendersonville_lightning` | `https://www.hendersonvillelightning.com/legal-ads/130-foreclosures.html` |
 | `newspapers.post_and_courier` | `https://www.postandcourier.com/classifieds_new/community/announcements/` |
 | `newspapers.shelby_star` | `https://www.shelbystar.com`<br>`https://www.shelbystar.com/`<br>_+4 more_ |
 | `newspapers.tryon_bulletin` | `https://tryondailybulletin.com`<br>`https://tryondailybulletin.com/?s=foreclosure+sale`<br>_+3 more_ |
-| `public_notices.publicnoticesc` | _(no literal URL in module)_ |
+| `public_notices.publicnoticesc` | `https://www.scpublicnotices.com/(S(`<br>`https://www.scpublicnotices.com/Search.aspx`<br>_+1 more_ |
 | `reo.treasury_seized` | `https://www.treasury.gov/auctions/treasury/rp/realprop.shtml` |
-| `reo.usda_rd` | `https://www.resales.usda.gov/resales/public`<br>`https://www.resales.usda.gov` |
+| `reo.usda_rd` | `https://www.resales.usda.gov/resales/public`<br>`https://www.resales.usda.gov`<br>_+1 more_ |
 
 ## 3. Not built yet
 

@@ -5,14 +5,26 @@ THE INCIDENT THIS GUARDS. A former "Charlotte" entry pointed at
 which is the City of YUCAIPA, CALIFORNIA -- out of footprint by about 2,000 miles.
 It was disabled, correctly. But the note left behind said "no in-footprint NC/SC city
 code-enforcement feed has been verified yet", and that stopped being true without anyone
-re-checking: Charlotte publishes its own on gis.charlottenc.gov, and Asheville on
-gis.ashevillenc.gov. code_vacancy was present in only 2 of 18 footprint counties on the
-live board -- the worst-covered lane in the engine -- while a working feed sat unwired.
+re-checking: Charlotte publishes its own on gis.charlottenc.gov. code_vacancy was present
+in only 2 of 18 footprint counties on the live board -- the worst-covered lane in the
+engine -- while a working feed sat unwired.
 
 So this file asserts two different things:
   * every endpoint is on a host that plausibly belongs to its own city (the Yucaipa test)
   * the config shape is complete, so a half-wired entry fails here instead of silently
     tagging nothing
+
+A SECOND INCIDENT, same family, caught 2026-10-03: "Asheville" was on a host that
+genuinely belongs to Asheville (gis.ashevillenc.gov), but the endpoint's entire 2,738-row
+table is a dead snapshot frozen at 2018-12-14 (every date field, every category --
+confirmed via live outStatistics MIN/MAX queries). The 2026-07-01 wiring only checked
+"HTTP 200 + real cases", never the dates, so it silently matched today's real leads
+against 8-10-year-old resolved-or-abandoned cases and manufactured false `has_open`
+credit. Removed (see `enrichment_code_enforcement.py`'s own docstring and
+`scrapers/counties_nc/asheville_code_enforcement.py`'s investigation notes). The Yucaipa
+test (host belongs to the right city) does not catch THIS failure shape -- a right-host,
+dead-data endpoint -- so `test_asheville_is_not_wired_back_in_without_a_live_recheck`
+below is a regression guard specifically for it.
 """
 from __future__ import annotations
 
@@ -78,9 +90,11 @@ def test_the_demolition_layer_is_kept_separate_and_carries_its_severity():
     assert sev["url"] != CITY_ENDPOINTS["Charlotte"]["url"]
 
 
-def test_asheville_was_not_disturbed():
-    """It was the only wired city and it works; this change must not have touched it."""
-    a = CITY_ENDPOINTS["Asheville"]
-    assert "ashevillenc.gov" in a["url"]
-    assert a["addr_fields"] == ("address",)
-    assert a["status_fields"] == ("record_status",)
+def test_asheville_is_not_wired_back_in_without_a_live_recheck():
+    """REMOVED 2026-10-03: the AccelaServicesView table is frozen at 2018-12-14 on
+    every date field (date_opened, date_statused, date_closed, record_status_date,
+    date_assigned), confirmed live across every record_type_category. Re-adding it
+    on the strength of a bare HTTP-200 check (how it got wired in 2026-07-01) would
+    repeat the exact mistake; whoever re-adds it must re-run the same MIN/MAX date
+    probe against the live service first."""
+    assert "Asheville" not in CITY_ENDPOINTS
