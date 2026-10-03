@@ -82,18 +82,34 @@ untouched), then every row is diffed against its own pre-run snapshot and
 landed in ONE web_artifact.patch_existing_rows() call instead of a whole-
 board write_artifact().
 
-ONE RAW-KEY DELETION HAZARD FOUND among the 8 steps (grepped all 8 modules for
-`.pop(`/`del li.raw`/`del raw[`): enrichment_bop_federal.py's
-`li.raw.pop("bop_check", None)`, which fires when a real match is later found
-for a name previously stamped a "no match" miss (raw['bop_check'] is itself a
-negative-cache stamp -- "RAW_KEEP['bop_check'] = ... answered NO-match stamp
-for enrichment_bop_federal, same shape as incarceration_check"). Verified safe
-to represent as raw['bop_check'] = None via patch_existing_rows()'s merge-only
-write (it has no delete primitive -- see its own docstring): grepped every
-reader of "bop_check" in src/+scripts/+docs/dashboard.js -- the only reader is
-enrichment_bop_federal.py's own _stamp_of(), which does
-`li.raw.get("bop_check")`, never a presence test. No other raw key is ever
-popped/deleted by any of the other 7 modules (checked each one in full).
+RAW-KEY DELETION HAZARDS (re-swept 2026-10-03 after a second one was added;
+grepped all 8 modules for `.pop(`/`del li.raw`/`del raw[`):
+  - enrichment_bop_federal.py's `li.raw.pop("bop_check", None)`, which fires
+    when a real match is later found for a name previously stamped a "no
+    match" miss (raw['bop_check'] is itself a negative-cache stamp --
+    "RAW_KEEP['bop_check'] = ... answered NO-match stamp for
+    enrichment_bop_federal, same shape as incarceration_check"). Verified safe
+    to represent as raw['bop_check'] = None via patch_existing_rows()'s
+    merge-only write (it has no delete primitive -- see its own docstring):
+    grepped every reader of "bop_check" in src/+scripts/+docs/dashboard.js --
+    the only reader is enrichment_bop_federal.py's own _stamp_of(), which does
+    `li.raw.get("bop_check")`, never a presence test.
+  - enrichment_bop_federal.py's new `_clear_stale_matches()` (2026-10-03, a
+    real live-found bug: a Buncombe row's owner changed to "COVENANT
+    PRESBYTERIAN CHURCH" but raw['bop_federal'] still named an unrelated
+    person, "CECIL BENNETT" -- the enricher's own `if ... .get("bop_federal"):
+    continue` guard never revisits a match once stamped). It pops
+    `raw['bop_federal']` AND, only when its `source` is specifically BOP_SOURCE
+    (never a NC-DAC/SC-DOC/jail-bookings match), `raw['incarceration']`, when
+    the CURRENT owner no longer supports the stored match. Verified safe to
+    represent both as `= None` the same way: every reader of either key
+    (enrichment_lead_signals.py, enrichment_jail_bookings.py,
+    scripts/build_red_flags.py, scripts/comprehensive_audit.py,
+    scripts/coverage_100_ledger.py, scripts/title_search_pipeline.py, this
+    module's own _owner_still_supports_match) reads via `.get(...)` with a
+    truthy/`or {}` check, never a bare presence test.
+  No other raw key is ever popped/deleted by any of the other 6 modules
+  (checked each one in full).
 
 LOCK HARDENING (disclosed, intentional addition, not a silent behavior
 change). The original script never called board_lock() itself -- it relied
@@ -218,10 +234,16 @@ def _snapshot(rows: list[Listing]) -> list[tuple[str | None, dict, dict | None]]
     return out
 
 
-#: enrichment_bop_federal.py's li.raw.pop("bop_check", None) is the ONE raw-key deletion among
-#: all 8 steps (grepped every module) -- see this file's own docstring, "ONE RAW-KEY DELETION
-#: HAZARD FOUND", for why representing it as raw['bop_check'] = None is verified safe.
-_RAW_DELETE_SAFE_AS_NONE = frozenset({"bop_check"})
+#: enrichment_bop_federal.py's li.raw.pop("bop_check", None) and its newer
+#: _clear_stale_matches() (pops "bop_federal" and, conditionally, "incarceration")
+#: are the only raw-key deletions among all 8 steps (grepped every module) -- see
+#: this file's own docstring, "RAW-KEY DELETION HAZARDS", for why representing
+#: each as `= None` is verified safe. A key missing from this set that a step
+#: pops would otherwise silently fail to delete here: _diff_raw() only ever
+#: writes `None` for a key removed between before/after AND listed here --
+#: patch_existing_rows() has no delete primitive, so an unlisted pop is a no-op
+#: on the actual published board even though it looks correct in memory.
+_RAW_DELETE_SAFE_AS_NONE = frozenset({"bop_check", "bop_federal", "incarceration"})
 
 
 def _diff_raw(before: dict | None, after: dict | None) -> dict:

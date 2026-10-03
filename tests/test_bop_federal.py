@@ -22,7 +22,9 @@ from foreclosure_scraper import enrichment_bop_federal as bop
 from foreclosure_scraper.enrichment_bop_federal import (
     _Lookup,
     _bop_lookup,
+    _clear_stale_matches,
     _facility_type,
+    _owner_still_supports_match,
     enrich_bop_federal,
 )
 from foreclosure_scraper.models import Listing
@@ -245,7 +247,7 @@ async def test_a_fresh_stamp_is_skipped_but_an_expired_one_is_rechecked(monkeypa
     li.raw["bop_check"] = {"checked_at": now.isoformat(), "name": "TESTCASE STALE",
                            "source": bop.BOP_SOURCE, "result": "no_match"}
     res = await enrich_bop_federal([li], recheck_days=30)
-    assert res == {"queried": 0, "matched": 0}   # fresh: not re-asked
+    assert res == {"queried": 0, "matched": 0, "stale_cleared": 0}   # fresh: not re-asked
     old = now - timedelta(days=45)
     li.raw["bop_check"]["checked_at"] = old.isoformat()
     await enrich_bop_federal([li], recheck_days=30)
@@ -280,4 +282,90 @@ async def test_out_of_footprint_state_and_entity_owner_are_skipped(monkeypatch):
                  raw={"owner_mailing": {"owner": "ACME HOLDINGS LLC"}})
     res = await enrich_bop_federal([ga, llc])
     assert srv.asked == []
-    assert res == {"queried": 0, "matched": 0}
+    assert res == {"queried": 0, "matched": 0, "stale_cleared": 0}
+
+
+# --------------------------------------------------------------------------- #
+# stale-match invalidation: a changed CURRENT owner shouldn't keep carrying   #
+# someone else's federal record forever (live-found 2026-10-03, a real       #
+# Buncombe row: owner now "COVENANT PRESBYTERIAN CHURCH", bop_federal still  #
+# said "CECIL BENNETT")                                                      #
+# --------------------------------------------------------------------------- #
+def test_owner_still_supports_match_true_when_name_unchanged():
+    li = _li(last="HUDSON", first="RUSSELL")
+    li.raw["bop_federal"] = {"matched_name": "RUSSELL HUDSON"}
+    assert _owner_still_supports_match(li) is True
+
+
+def test_owner_still_supports_match_false_when_current_owner_is_now_an_entity():
+    li = _li(last="BENNETT", first="CECIL")
+    li.raw["bop_federal"] = {"matched_name": "CECIL BENNETT"}
+    # Ownership has since changed hands to an entity -- same shape as the real
+    # Buncombe row this was found on.
+    li.raw["owner_mailing"] = {"owner": "COVENANT PRESBYTERIAN CHURCH"}
+    assert _owner_still_supports_match(li) is False
+
+
+def test_owner_still_supports_match_false_when_current_owner_is_a_different_person():
+    li = _li(last="BENNETT", first="CECIL")
+    li.raw["bop_federal"] = {"matched_name": "CECIL BENNETT"}
+    li.raw["owner_mailing"] = {"owner": "SMITH JANE"}
+    assert _owner_still_supports_match(li) is False
+
+
+def test_owner_still_supports_match_true_when_no_matched_name_to_check():
+    li = _li()
+    li.raw["bop_federal"] = {"facility_name": "Butner"}   # malformed/legacy, no matched_name
+    assert _owner_still_supports_match(li) is True
+
+
+def test_clear_stale_matches_drops_tag_and_bop_sourced_incarceration_only():
+    li = _li(last="BENNETT", first="CECIL")
+    li.raw["owner_mailing"] = {"owner": "COVENANT PRESBYTERIAN CHURCH"}
+    li.raw["bop_federal"] = {"matched_name": "CECIL BENNETT"}
+    li.raw["incarceration"] = {"source": bop.BOP_SOURCE, "state": "FEDERAL"}
+    cleared = _clear_stale_matches([li])
+    assert cleared == 1
+    assert "bop_federal" not in li.raw and "incarceration" not in li.raw
+
+
+def test_clear_stale_matches_never_touches_a_non_bop_incarceration_entry():
+    li = _li(last="BENNETT", first="CECIL")
+    li.raw["owner_mailing"] = {"owner": "COVENANT PRESBYTERIAN CHURCH"}
+    li.raw["bop_federal"] = {"matched_name": "CECIL BENNETT"}
+    li.raw["incarceration"] = {"source": "NC DAC offender search", "state": "NC"}
+    cleared = _clear_stale_matches([li])
+    assert cleared == 1
+    assert "bop_federal" not in li.raw
+    assert li.raw["incarceration"]["source"] == "NC DAC offender search"   # untouched
+
+
+@pytest.mark.asyncio
+async def test_enrich_clears_a_stale_match_and_the_row_stays_unstamped_when_owner_is_now_an_entity(monkeypatch):
+    """The exact real-world case: owner changed to an entity. _name_parts
+    rejects it outright, so the row correctly ends up with NO bop_federal at
+    all -- absent is honest, a stale wrong match is not."""
+    srv = _Server().install(monkeypatch)
+    li = _li(last="BENNETT", first="CECIL")
+    li.raw["owner_mailing"] = {"owner": "COVENANT PRESBYTERIAN CHURCH"}
+    li.raw["bop_federal"] = {"matched_name": "CECIL BENNETT"}
+    res = await enrich_bop_federal([li])
+    assert res["stale_cleared"] == 1
+    assert "bop_federal" not in li.raw
+    assert srv.asked == []              # an entity owner is still never queried
+
+
+@pytest.mark.asyncio
+async def test_enrich_clears_a_stale_match_and_requeries_the_new_person(monkeypatch):
+    """Ownership changed to a DIFFERENT real person (not an entity) -- the
+    stale tag is cleared AND the row becomes a fresh candidate in the same
+    run, so it gets re-checked against the new name rather than sitting with
+    no answer until some later run."""
+    srv = _Server(hits={("SMITH", "JANE")}).install(monkeypatch)
+    li = _li(last="BENNETT", first="CECIL")
+    li.raw["owner_mailing"] = {"owner": "SMITH JANE"}
+    li.raw["bop_federal"] = {"matched_name": "CECIL BENNETT"}
+    res = await enrich_bop_federal([li])
+    assert res["stale_cleared"] == 1
+    assert srv.asked == [("SMITH", "JANE")]
+    assert li.raw["bop_federal"]["matched_name"] == "JANE SMITH"

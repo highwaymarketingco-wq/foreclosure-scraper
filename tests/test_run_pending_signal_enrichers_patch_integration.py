@@ -65,10 +65,14 @@ def _fake_liensnc(listings):
 
 
 async def _fake_bop_federal(listings):
-    """Reproduces the real hazard: a row that was previously stamped a 'no match' miss
-    (raw['bop_check']) now gets a real match, and the miss stamp is POPPED (the one raw-key
-    deletion among all 8 steps -- enrichment_bop_federal.py's own `.pop('bop_check', None)`)."""
-    matched = 0
+    """Reproduces the real hazards: a row that was previously stamped a 'no match' miss
+    (raw['bop_check']) now gets a real match, and the miss stamp is POPPED (one of the raw-key
+    deletions among all 8 steps -- enrichment_bop_federal.py's own `.pop('bop_check', None)`).
+    Also reproduces the newer stale-match hazard (2026-10-03, _clear_stale_matches): a row whose
+    owner changed since a bop_federal match was stamped gets that match (and, when it was the
+    source, raw['incarceration']) POPPED rather than left to name someone who no longer owns
+    the parcel."""
+    matched = stale_cleared = 0
     for li in listings:
         if not isinstance(li.raw, dict):
             li.raw = {}
@@ -76,7 +80,13 @@ async def _fake_bop_federal(listings):
             li.raw["bop_federal"] = {"matched_name": "JOHN DOE", "in_custody": True}
             li.raw.pop("bop_check", None)
             matched += 1
-    return {"matched": matched, "queried": matched}
+        elif li.source == "bop_stale_target":
+            li.raw.pop("bop_federal", None)
+            inc = li.raw.get("incarceration")
+            if isinstance(inc, dict) and inc.get("source") == "BOP inmate locator":
+                li.raw.pop("incarceration", None)
+            stale_cleared += 1
+    return {"matched": matched, "queried": matched, "stale_cleared": stale_cleared}
 
 
 @pytest.fixture
@@ -162,6 +172,29 @@ def test_bop_check_deletion_lands_as_none_and_reads_as_absent(scratch_repo, monk
     assert row["raw"]["bop_check"] is None  # the only representable form of "deleted"
     # every real reader (enrichment_bop_federal._stamp_of) treats that exactly like absent:
     assert row["raw"].get("bop_check") is None
+
+
+def test_bop_stale_match_deletion_lands_as_none_for_both_keys(scratch_repo, monkeypatch):
+    """2026-10-03: _RAW_DELETE_SAFE_AS_NONE must list "bop_federal"/"incarceration" or this
+    migration's diff-based patch path silently drops the deletion (it looks correct in memory
+    but never reaches the published board) -- this is the regression that would catch it."""
+    docs = scratch_repo / "docs"
+    rows = [_row(0, source="bop_stale_target",
+                 raw={"bop_federal": {"matched_name": "CECIL BENNETT"},
+                      "incarceration": {"source": "BOP inmate locator", "state": "FEDERAL"},
+                      "owner_mailing": {"owner": "COVENANT PRESBYTERIAN CHURCH"}})]
+    _seed(docs, rows)
+    monkeypatch.setattr(sys, "argv",
+                        ["run_pending_signal_enrichers.py", "--only", "bop_federal"])
+
+    rc = P.asyncio.run(P.main())
+    assert rc == 0
+
+    board = _read_board(docs)
+    row = board[0]
+    assert row["raw"]["bop_federal"] is None
+    assert row["raw"]["incarceration"] is None
+    assert row["raw"]["owner_mailing"]["owner"] == "COVENANT PRESBYTERIAN CHURCH"  # untouched
 
 
 def test_ordinary_row_untouched_by_every_step_is_never_patched(scratch_repo, monkeypatch):

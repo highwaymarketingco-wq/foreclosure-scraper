@@ -166,6 +166,65 @@ def _stamp_miss(li: Listing, name: str, now: datetime) -> None:
                            "name": name, "source": BOP_SOURCE, "result": "no_match"}
 
 
+def _owner_still_supports_match(li: Listing) -> bool:
+    """A stale bop_federal tag is worse than no tag -- live-found 2026-10-03
+    (investigating bop_federal's 3/148-county breadth): a Buncombe parcel's
+    CURRENT owner_mailing/defendant/owner_name all read "COVENANT PRESBYTERIAN
+    CHURCH" (an entity -- _name_parts would reject it outright) yet still
+    carries raw['bop_federal']['matched_name'] == "CECIL BENNETT", a name with
+    no relation to the church at all. Root cause: the SAME "missing-only,
+    never revisited" shape owner_freshness.py (commit 7ba2de08, same day) just
+    fixed for owner_name itself, one layer downstream -- this enricher's own
+    `if (li.raw or {}).get("bop_federal"): continue` guard treats ANY existing
+    match as permanent, so a later owner-name refresh (a sale, a donation to
+    the church, a parcel_cache correction) never gets reconciled against a
+    name-keyed match stamped against whoever used to own it. Checked how
+    widespread this is: 2 of the board's 17 real matches (11.8%) currently fail
+    this check -- the church case above, plus a second Buncombe row whose
+    owner_mailing now reads "MAXWELL, RONALD" while raw['bop_federal'] still
+    names "BETTY BAKER" (released 2012) -- both the same source
+    (counties_generic.arcgis_distress.buncombe_unpaid_bills), both real
+    ownership changes since the one-time 2026-09-29 run, not a fluke.
+
+    Returns False when the CURRENT owner can no longer support the stored
+    match (now unparseable as a person, e.g. an entity/trust, or parses to a
+    different name than the one actually queried) -- the caller clears the
+    stale tag so the row becomes an ordinary candidate again instead of
+    quietly keeping someone else's federal record forever."""
+    match = li.raw.get("bop_federal") if isinstance(li.raw, dict) else None
+    if not isinstance(match, dict):
+        return True
+    queried = str(match.get("matched_name") or "").strip().upper()
+    if not queried:
+        return True                     # nothing to check against -- don't touch it
+    owner = _owner_of(li)
+    parts = _name_parts(owner) if owner else None
+    if not parts:
+        return False                    # current owner isn't even a person anymore
+    last, first = parts
+    return queried == f"{first} {last}"
+
+
+def _clear_stale_matches(listings: list[Listing]) -> int:
+    """Pre-pass: drop any bop_federal/BOP-sourced-incarceration tag the CURRENT
+    owner no longer supports (see _owner_still_supports_match), so the normal
+    candidate-selection loop below picks the row up again as if never checked.
+    Only ever removes an incarceration entry this module itself set (checked by
+    `source`) -- never touches one NC DAC/SC DOC/jail-bookings wrote."""
+    cleared = 0
+    for li in listings:
+        if li.state not in ("NC", "SC") or not isinstance(li.raw, dict):
+            continue
+        if not li.raw.get("bop_federal") or _owner_still_supports_match(li):
+            continue
+        li.raw.pop("bop_federal", None)
+        inc = li.raw.get("incarceration")
+        if isinstance(inc, dict) and inc.get("source") == BOP_SOURCE:
+            li.raw.pop("incarceration", None)
+        cleared += 1
+    return cleared
+
+
 def _select_targets(cands: list[tuple], max_queries: int) -> list[Listing]:
     """Never-checked leads first (board order), then oldest stamps. One
     national endpoint, so — unlike the per-state/county rotation in
@@ -181,11 +240,19 @@ async def enrich_bop_federal(listings: list[Listing], max_queries: Optional[int]
     max_queries    total lookups this run (env BOP_MAX_QUERIES, default 150)
     recheck_days   how long an answered miss stays fresh (env BOP_RECHECK_DAYS,
                    default 30)
+
+    Starts with a read-only-looking but mutating pre-pass (_clear_stale_matches)
+    that drops any bop_federal tag the CURRENT owner no longer supports, so a
+    sale/donation/correction since the match was stamped doesn't leave someone
+    else's federal record sitting on the lead forever -- see
+    _owner_still_supports_match for the real example that found this.
     """
     if max_queries is None:
         max_queries = int(os.environ.get("BOP_MAX_QUERIES", "150"))
     window = _recheck_days() if recheck_days is None else float(recheck_days)
     now = datetime.now(timezone.utc)
+
+    stale_cleared = _clear_stale_matches(listings)
 
     cands, fresh = [], 0
     for li in listings:
@@ -205,14 +272,14 @@ async def enrich_bop_federal(listings: list[Listing], max_queries: Optional[int]
         cands.append((li, name, checked))
     targets = _select_targets(cands, max_queries)
     if not targets:
-        log.info("bop.no_targets", skipped_fresh=fresh)
-        return {"queried": 0, "matched": 0}
+        log.info("bop.no_targets", skipped_fresh=fresh, stale_cleared=stale_cleared)
+        return {"queried": 0, "matched": 0, "stale_cleared": stale_cleared}
 
     sem = asyncio.Semaphore(int(os.environ.get("BOP_CONCURRENCY", "1")))
     delay = float(os.environ.get("BOP_DELAY", "1.0"))
     counts = {"queried": 0, "matched": 0, "stamped_miss": 0, "failed": 0,
              "skipped_fresh": fresh, "candidates": len(cands), "selected": len(targets),
-             "blocked": 0}
+             "blocked": 0, "stale_cleared": stale_cleared}
     state_box = {"tripped": False, "strikes": 0}
     max_strikes = int(os.environ.get("BOP_MAX_FAILURES", "8"))
     cache: dict[tuple, asyncio.Future] = {}
