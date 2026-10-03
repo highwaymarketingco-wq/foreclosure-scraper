@@ -13,6 +13,22 @@ Returns up to ~400 properties per request inside the bbox with:
 We query NC and SC bboxes (slightly tight to limit out-of-state spillover)
 and filter results by state. Listings include TN/VA edge cases when the
 bbox overlaps; the post-fetch state filter drops them.
+
+Fannie's own `county` field is sometimes blank (confirmed live 2026-10-03,
+national/reo per-column audit for lt_reo: 67/857 NC+SC rows, 7.8%) even
+though `city`/`zipCode`/`geoPoint` are present -- e.g. "94 Crestview
+Heights, Franklin, NC 28734" (Macon County) and "45 Sugar Cove Road,
+Weaverville, NC" (Buncombe County, one of our 18 footprint counties). REO
+is a FLIP listing type (main._FLIP_LISTING_TYPES), which gates on the
+narrow in_scope(county, state) check -- and in_scope(None, state) is
+unconditionally False -- so a blank county here silently drops a real
+in-footprint lead at the scope gate exactly the way zillow_foreclosures.py
+documented and fixed for the same reason (2026-10-01 national/reo audit).
+Fall back to the same WNC/upstate-footprint gazetteer that fix uses, then
+the full 146-county bankruptcy-caption gazetteer (Fannie's bboxes are
+genuinely statewide, not footprint-only, so the narrower gazetteer alone
+leaves most non-footprint counties unresolved), then the coastal gazetteer
+for parity with zillow_foreclosures.py's fallback chain.
 """
 from __future__ import annotations
 
@@ -26,6 +42,9 @@ from ...base_scraper import BaseScraper
 from ...county_name import canonical_county
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+from ..._bankruptcy_city_to_county import bankruptcy_county_for
+from ..._coastal_city_to_county import coastal_county_for
+from ..._upstate_city_to_county import upstate_county_for
 
 log = structlog.get_logger()
 
@@ -134,14 +153,25 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
             first_seen = datetime.fromtimestamp(listing_ms / 1000, tz=timezone.utc).replace(tzinfo=None)
         except (ValueError, OSError):
             pass
+    city = (p.get("city") or "").strip() or None
+    county = canonical_county((p.get("county") or "").replace(" COUNTY", "")) or None
+    if not county:
+        # Fannie's own county field is blank for a real chunk of rows (see module
+        # docstring) -- fall back to a city->county gazetteer the same way
+        # zillow_foreclosures.py already does for this identical bug class.
+        county = (
+            upstate_county_for(city, state)
+            or bankruptcy_county_for(city, state)
+            or coastal_county_for(city, state)
+        )
     return Listing(
         source=slug,
         source_url=f"https://homepath.fanniemae.com/property/{uuid}" if uuid else "https://homepath.fanniemae.com/",
         listing_type=ListingType.REO,
         property_kind=_PROP_KIND_MAP.get((p.get("propertyType") or "").strip(), PropertyKind.UNKNOWN),
         state=state,
-        county=canonical_county((p.get("county") or "").replace(" COUNTY", "")) or None,
-        city=(p.get("city") or "").title() or None,
+        county=county,
+        city=city.title() if city else None,
         zip_code=(p.get("zipCode") or "").strip() or None,
         street_address=addr,
         case_number=f"fannie-{uuid}" if uuid else None,
