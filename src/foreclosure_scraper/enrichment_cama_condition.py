@@ -25,13 +25,24 @@ Coverage (live-verified 2026-07-02, all open ArcGIS-REST JSON):
   * York SC      — hosted Parcels FeatureServer carries YearBuilt + FinishedSQFT
                    + HOMESTEAD (no bulk Condition/Grade in SC — see below).
 
-SC condition note: SC counties gate per-parcel CONDITION behind qPublic cards
-(per-parcel render, handled by enrichment_assessor_card's render-class path).
-No SC county in our footprint exposes a bulk ArcGIS Condition column — SCDOT's
-shared layer carries at most YearBuilt (York/Beaufort) or a numeric RESGRADE
-(Greenville). So for SC this enricher stamps YearBuilt where available and the
-Condition/Grade half of the SC ask stays on the qPublic/GATHER path. York SC is
-the SC layer live-verified here (YearBuilt fills; Condition intentionally absent).
+SC condition note: most SC counties gate per-parcel CONDITION behind qPublic
+cards (per-parcel render, handled by enrichment_assessor_card's render-class
+path) — SCDOT's shared layer carries at most YearBuilt (York/Beaufort) or a
+numeric RESGRADE (Greenville). Two SC counties ARE live bulk-ArcGIS-Condition
+exceptions, discovered after this note was first written: Spartanburg's CAMA
+layer (added to CAMA_SOURCES below 2026-08-19, ConditionFactor/CDUC/
+BuildingGrade) and, found by a 2026-10-03 reconnaissance pass, Greenwood's
+CAMA layer (Condition/ConditionText, 719 of 39,547 parcels rated "Badly Worn"/
+"Worn Out"). Greenwood is deliberately NOT added to CAMA_SOURCES below: a
+live board read that day found only 6 Greenwood SC leads on the whole board,
+none carrying a parcel_id, so a PIN-join enrichment here would match zero
+rows. It is wired instead as its own LEAD SOURCE in counties_generic/
+arcgis_distress_layers.py's greenwood_cama_condemned Layer, which emits a
+Listing per distressed parcel directly (with its own owner/situs/mailing)
+rather than waiting for an existing row to enrich. For every other SC county
+this enricher stamps YearBuilt where available and the Condition/Grade half
+of the ask stays on the qPublic/GATHER path. York SC is the plain SC layer
+live-verified here (YearBuilt fills; Condition intentionally absent).
 
 Stamps ``raw['condition_cama'] = {condition, condition_code, grade, year_built,
 source}`` and, when the appraiser condition is a distressed tier (Poor / Very

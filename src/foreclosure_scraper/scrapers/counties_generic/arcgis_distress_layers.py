@@ -130,6 +130,25 @@ class Layer(NamedTuple):
     #: not-severe split henderson_code_violations.py draws for its own county,
     #: applied here rather than claiming every open Durham case is vacancy-adjacent.
     ce_severe_re: Optional[re.Pattern] = None
+    #: Stamps raw["condemned"]=True (a bare boolean, Spartanburg's own shape --
+    #: see spartanburg_condemned.py) instead of a fabricated raw["code_enforcement"]
+    #: case record. For a layer whose rows are an APPRAISER CONDITION rating or a
+    #: CITY-ORDERED demolition case, not an actual code-enforcement complaint with a
+    #: case number/status history, inventing a `violations` list with a fake
+    #: case_id/status would misrepresent the evidence; distress_score.py's
+    #: `elif r.get("condemned")` branch already grants the identical PROPERTY
+    #: code_enforcement credit (w=14) off the bare flag, so nothing is lost.
+    #: 2026-10-02 introduced this as a hardcoded `lay.slug ==
+    #: "rockhill_code_demolition"` check (Rock Hill's demolition sub-layer, the
+    #: only layer that needed it that day); generalized to this explicit per-layer
+    #: field 2026-10-03 when greenwood_cama_condemned became the second real case
+    #: needing it -- same reasoning commit 6e00d55b used to turn Durham's one-off
+    #: severity special-case into the generic `ce_severe_re` field above. Explicit
+    #: opt-in (default False) rather than keying off `process` value, so a
+    #: differently-sourced layer that happens to share a process string (e.g. New
+    #: Hanover's demolition_permits -- a homeowner's own voluntary teardown
+    #: application, not a condemnation) is never swept in by accident.
+    condemned: bool = False
 
 
 LAYERS: tuple[Layer, ...] = (
@@ -529,6 +548,7 @@ LAYERS: tuple[Layer, ...] = (
         listing_type=ListingType.DISTRESSED,
         fields=("CaseNumber", "Type", "Status", "AddressText", "CreatedDateTime"),
         situs="AddressText", detail="Status", process="demolition_permit",
+        condemned=True,
         source_page="https://www.cityofrockhill.com/departments/neighborhood-services",
     ),
     Layer(
@@ -604,6 +624,91 @@ LAYERS: tuple[Layer, ...] = (
     #   system is on sc.accessgov.com/marlboro, a JS single-page app that's primarily a building-permit
     #   application portal; probed common REST paths (api/publicsearch, api/search,
     #   api/PublicRecords/Search, api/CodeEnforcement, etc.) -- all 404, no open query endpoint.
+    # ------------------------------------------------------------------
+    # 2026-10-03 condition-code reconnaissance (continuing the condemned/code_
+    # enforcement breadth work from 6e00d55b, which bridged 6 raw-key gaps but
+    # explicitly left "is there a Spartanburg-style CAMA condition field anywhere
+    # else" as a scoped-but-not-attempted recon task). Checked the ArcGIS field
+    # list (?f=json on the layer root -- no query needed) of every county this
+    # project already queries for owner/mailing/parcel resolution but had not yet
+    # been checked for this specific field: the 34-county `parcel_cache.PARCEL_
+    # LAYERS` registry minus the counties already checked that day (Mecklenburg,
+    # Spartanburg, Greenville, Richland, Guilford, Durham, York, Henderson, Burke,
+    # Transylvania, New Hanover), plus a few more with wired GIS access
+    # (enrichment_arcgis.NC_GIS/SC_GIS, sc_coastal_rosters) -- 22 counties total:
+    # NC Rutherford/Cleveland/Polk/Gaston/McDowell/Lincoln/Madison/Mitchell/
+    # Carteret/Onslow/Brunswick/Pender; SC Laurens/Pickens/Colleton/Beaufort/
+    # Georgetown/Charleston/Anderson/Oconee/Union/Horry, PLUS the 13 SC counties
+    # in PARCEL_LAYERS not covered above (Aiken/Barnwell/Berkeley/Calhoun/Chester/
+    # Darlington/Florence/Greenwood/Hampton/Lancaster/Lexington/Saluda/Sumter) --
+    # 35 counties checked live in total. Also confirmed, live, that the NC OneMap
+    # statewide fallback (NC1Map_Parcels, the ~90-county safety net behind every
+    # NC county with no dedicated layer) carries no condition field at all --
+    # `struct` is a bare Y/N "has a structure" flag, not a condition rating.
+    #   Two already-wired fields turned up (NOT net-new, confirmed by grep before
+    # building anything): Gaston's VacantImpro (already gaston_vacant.py's whole
+    # signal) and Lincoln's parcel-layer VACANT (already lincoln_vacant.py's whole
+    # signal) -- both vacant-LAND flags, not a condition/demolition signal anyway.
+    # Carteret's Condition/GradeAndCDU (Average/Good/Fair/Poor/Very Poor/Unsound,
+    # 854 distressed of 64,295 parcels, live-verified) looked like a fresh find
+    # but is ALREADY wired, just through a different, older module than today's
+    # condemned bridge: enrichment_cama_condition.py's CAMA_SOURCES, which already
+    # lists Carteret (and Buncombe/Onslow/York/Spartanburg/Gaston) and is the
+    # established home for "county assessor CONDITION rating" as a signal.
+    #   Every other county in the 35 came back a genuine negative: no field in
+    # its live schema resembling a condition/quality/demolition code (full field
+    # lists eyeballed for the ones with few enough columns to do so safely; see
+    # SOURCE_REGISTER.md for the slug/count this adds).
+    #   ONE real, live, net-new, previously-unwired hit: Greenwood SC. Its CAMA
+    # parcel layer (the SAME endpoint parcel_cache.PARCEL_LAYERS["Greenwood"]
+    # already queries for owner/mailing) carries Condition/ConditionText +
+    # Quality/QualityText -- an appraiser rating, not a code-case. Distinct
+    # values live-verified 2026-10-03: Excellent, Very Good/Excellent, Good/Very
+    # Good, Average/Good, Average, Badly Worn/Average, Badly Worn, Worn Out/Badly
+    # Worn, Worn Out (12,106 Good-or-better of 22,441 non-null; 17,106 null —
+    # never assessed or vacant-land cards). The two pure-distressed tiers,
+    # 'Badly Worn' (681) and 'Worn Out' (28) plus the 10 straddling both ('Worn
+    # Out/Badly Worn'), total 719 of 39,547 parcels county-wide -- live-verified
+    # by direct count query, not a sample extrapolation. The ambiguous blended
+    # label 'Badly Worn/Average' (600) is deliberately NOT included: it is a
+    # genuine middle value on this scale, not a severe one, and forcing it in
+    # would repeat the exact "field LOOKED right but was degenerate/ambiguous"
+    # mistake this recon was explicitly told to avoid. Sample real rows (not just
+    # the field name): "117 MADDOX RD" (owner LAUNCH PAD MOBILE LLC, tax value
+    # $5,000), "16 EDGEWOOD DR" (owner BUTLER E BRYAN, built 1948, tax value
+    # $17,300) -- genuine low-value, LLC- and individual-owned structures, the
+    # motivated-seller profile this engine targets, not a degenerate always-same
+    # value.
+    #   Greenwood currently carries only 6 leads on the whole board (0 with a
+    # parcel_id), so wiring this purely as a PIN-join enrichment the way Carteret
+    # is wired would enrich zero existing rows today. Wired instead as its own
+    # LEAD SOURCE here (process=`condemned`, Layer.condemned=True -> raw
+    # ["condemned"]=True, Spartanburg's own bare-boolean shape, not a fabricated
+    # code_enforcement case record -- see Layer.condemned docstring), the same
+    # architecture spartanburg_condemned.py and rockhill_code_demolition already
+    # use, so these 719 parcels become real new leads with their own owner/
+    # situs/mailing/value rather than silently waiting for a parcel_id that may
+    # never arrive. In scope per `in_scope_distressed()` ("if its a distressed
+    # property its anywhere in nc and sc," config.py/validation.py, 2026-09-15)
+    # even though Greenwood sits outside the older 18-county FLIP footprint
+    # HERMES.md/MASTER_GAPS_WALLS_AND_MANUAL_LANES.md still document as denied —
+    # that denial is scoped to FLIP-type leads only, not every distress signal.
+    Layer(
+        slug="greenwood_cama_condemned",
+        state="SC", county="Greenwood",
+        url=("https://www.greenwoodsc.gov/arcgis/rest/services/"
+             "Operational_Layers/CAMA/MapServer/9"),
+        listing_type=ListingType.DISTRESSED,
+        where="ConditionText IN ('Worn Out','Badly Worn','Worn Out/Badly Worn')",
+        fields=("PIN", "Owner", "SiteAddress", "ConditionText", "YearBuilt",
+                "TaxValue_Total", "MailAddress", "MailCityState"),
+        parcel="PIN", owner_last="Owner", situs="SiteAddress",
+        value="TaxValue_Total", detail="ConditionText",
+        mailing_parts=("MailAddress", "MailCityState"),
+        mailing_source="greenwood_cama_condemned",
+        condemned=True, process="condemned",
+        source_page="https://www.greenwoodsc.gov/departments/assessor",
+    ),
     # ------------------------------------------------------------------
 ) + tuple(
     # ---------------------------------------------------------------------
@@ -760,15 +865,16 @@ def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
         }
         if severe:
             raw["distressed"] = True
-    if lay.slug == "rockhill_code_demolition":
-        # OpenCodeEnforcementCases' own Demolition sub-layer (process=
-        # "demolition_permit", not "code_enforcement" -- a city-ORDERED
-        # demolition case, not a homeowner's own voluntary teardown permit
-        # application; see Layer.process docs for why this is NOT a blanket
-        # "every demolition_permit layer" rule -- New Hanover's demolition_permits
-        # layer is a genuinely different thing, an application record, and must
-        # not be swept in here). 15 real open cases, live-verified 2026-10-02.
-        # This is Rock Hill's own equivalent of Spartanburg's condemned flag.
+    if lay.condemned:
+        # See Layer.condemned docstring: a bare boolean, Spartanburg's own
+        # shape, for a layer whose rows are a condition rating or a city-
+        # ordered demolition case rather than an actual case-tracked
+        # code-enforcement complaint. rockhill_code_demolition (15 real open
+        # cases, live-verified 2026-10-02) and greenwood_cama_condemned (719
+        # real "Badly Worn"/"Worn Out" CAMA parcels, live-verified 2026-10-03)
+        # both opt in explicitly; New Hanover's demolition_permits layer
+        # (a homeowner's own voluntary teardown application, not a
+        # condemnation) deliberately does not.
         raw["condemned"] = True
     if lay.mailing_parts:
         mail_bits = [_clean(a.get(p)) for p in lay.mailing_parts]
