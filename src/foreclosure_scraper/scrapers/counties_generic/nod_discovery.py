@@ -37,10 +37,14 @@ ROD_TARGETS: tuple[tuple[str, str, callable], ...] = (
     ("NC", "Burke", cchs.discover_recent_nods),
     ("NC", "Lincoln", cchs.discover_recent_nods),
     ("NC", "Cleveland", cchs.discover_recent_nods),
-    # Aumentum / Manatron — Mecklenburg / Buncombe / Gaston NC
+    # Aumentum / Manatron — Mecklenburg / Buncombe NC
+    # Gaston deliberately NOT here: it was wired through this same Aumentum
+    # adapter but deeds.gastongov.com is a confirmed-dead host (live-tested
+    # 2026-10-03, see rod/aumentum.py's module docstring "GASTON REMOVED
+    # 2026-10-03" and AUMENTUM_COUNTIES) — Gaston moved its ROD to
+    # Courthouse Computer Systems on 2026-05-28 and was never re-pointed.
     ("NC", "Mecklenburg", aumentum.discover_recent_nods),
     ("NC", "Buncombe", aumentum.discover_recent_nods),
-    ("NC", "Gaston", aumentum.discover_recent_nods),
     # Cott Systems — Polk / Rutherford NC
     ("NC", "Polk", cott.discover_recent_nods),
     ("NC", "Rutherford", cott.discover_recent_nods),

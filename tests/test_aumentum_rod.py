@@ -370,3 +370,31 @@ def test_date_swept_docs_at_raw_row_cap_stops_early(monkeypatch):
 
     assert call_count["n"] == 2            # stops after the 2nd window (3, then 6 >= 5)
     assert len(out) == 5                   # sliced to the cap
+
+
+def test_gaston_not_in_aumentum_counties():
+    """Gaston removed 2026-10-03 (see module docstring "GASTON REMOVED
+    2026-10-03"): `deeds.gastongov.com` is a confirmed-dead host — live-tested
+    2026-10-03 (TCP connects, TLS handshake never completes, across 5+
+    attempts/timeout values/tools, with sibling Aumentum hosts and a
+    general-internet control all answering normally in the same session).
+    Gaston moved its ROD to Courthouse Computer Systems on 2026-05-28. This
+    pins the removal so it can't silently regress back in without a fresh
+    live re-probe."""
+    assert ("NC", "Gaston") not in aumentum.AUMENTUM_COUNTIES
+
+
+def test_gaston_calls_return_empty_without_any_network_io(monkeypatch):
+    """Every public entry point must short-circuit to [] for Gaston purely
+    from the AUMENTUM_COUNTIES membership check, before touching the
+    network — proves the fix is "stop trying" (instant, no 30s hang), not
+    just "catch the exception after waiting"."""
+    def _boom(*a, **kw):
+        raise AssertionError("must not touch the network for a county "
+                              "not in AUMENTUM_COUNTIES")
+    monkeypatch.setattr("curl_cffi.requests.AsyncSession", _boom)
+
+    assert asyncio.run(aumentum.search_by_name("NC", "Gaston", "SMITH")) == []
+    assert asyncio.run(aumentum.discover_recent_nods("NC", "Gaston")) == []
+    assert asyncio.run(aumentum.discover_recent_sold_recordings("NC", "Gaston")) == []
+    assert asyncio.run(aumentum._date_swept_docs("NC", "Gaston", 60, 100)) == []

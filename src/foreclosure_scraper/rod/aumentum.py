@@ -78,7 +78,38 @@ and short-circuits to `[]` with a log.warning instead of posting a search body
 to a login form and silently reading 0 rows back as if it were a real empty
 result. Per CLAUDE.md this is a genuine login wall: not defeated, no
 credentials held — Rutherford via this vendor is a manual-lane candidate, not
-a bypass target.
+a bypass target. RE-VERIFIED LIVE 2026-10-03 (not a transient Buncombe/Gaston-
+style redirect-loop artifact: a persistent cookie jar across the full redirect
+chain still lands on a real "Account Sign In" page with a `type="password"`
+field, while the SAME treatment on Polk still lands on the real "Guest User"
+search menu) — still genuinely walled, still correctly short-circuited.
+
+GASTON REMOVED 2026-10-03 — NOT a timeout-value bug, NOT transient, a dead
+host (this repo's docs already called it, this just finishes the fix):
+`deeds.gastongov.com` TCP-connects on :443 but never completes a TLS
+handshake and never sends a byte back, confirmed 2026-10-03 across 5+ live
+attempts (plain curl, curl -k, curl --http1.1, and this module's own
+curl_cffi impersonate="chrome" x3 trials) and every timeout value tried (20s/
+25s/30s/45s) — an indefinite hang, not a slow-but-completing response, so a
+longer timeout_s would not help. Ruled out a local/sandbox network problem:
+in the same session, google.com (0.2s), gastongov.com's own apex domain
+(1.4s), and sibling Aumentum tenants Buncombe (0.4s) and Mecklenburg (0.4s,
+403 as expected without impersonation) all answered normally. This matches
+docs/completeness_document.md and docs/completeness_deeds.md (both already
+diagnosed this exact dead-host target on 2026-08-02) and
+rod/doc_images.py's own `("NC","Gaston"): ("unreachable", ...)` entry — Gaston
+migrated its ROD off Aumentum to Courthouse Computer Systems on 2026-05-28,
+and nothing in this module was ever updated to follow. The real, live,
+working Gaston ROD is `gastonnc.courthousecomputersystems.com` (a CCHS
+DevExpress "LRSearch" MVC app — a different protocol from both this module
+and the classic-ASP `rod/cchs.py` SearchService.asp counties), already
+reused for name-indexed lien-existence lookups by
+`enrichment_gaston_rod.py`. That module only supports a per-owner-name
+search, not a date-range sweep, so it is not a drop-in replacement for this
+module's `discover_recent_nods`/`discover_recent_sold_recordings` callers —
+removing the dead mapping here (rather than silently eating a 30s timeout
+every run) is the fix in scope today; a real Gaston NOD-via-date-sweep would
+need new work against the LRSearch protocol, tracked separately.
 """
 from __future__ import annotations
 
@@ -97,7 +128,10 @@ log = structlog.get_logger()
 AUMENTUM_COUNTIES = {
     ("NC", "Mecklenburg"): "https://meckrod.manatron.com/External/LandRecords/protected/v4",
     ("NC", "Buncombe"): "https://registerofdeeds.buncombenc.gov/External/LandRecords/protected/v4",
-    ("NC", "Gaston"): "https://deeds.gastongov.com/external/LandRecords/protected/v4",
+    # Gaston deliberately NOT here — see module docstring "GASTON REMOVED
+    # 2026-10-03": deeds.gastongov.com is a confirmed-dead host (TCP connects,
+    # TLS handshake never completes), Gaston moved its ROD to Courthouse
+    # Computer Systems on 2026-05-28. Do not re-add without a live re-probe.
 }
 
 # Control prefixes for the two lazy-loaded search-tab user controls.

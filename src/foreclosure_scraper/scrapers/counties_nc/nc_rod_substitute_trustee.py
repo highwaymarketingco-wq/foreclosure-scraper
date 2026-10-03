@@ -10,7 +10,6 @@ to NOD-style document types within a date range.
 Coverage (in-scope NC counties only after the 2026-05-07 scope rollback):
 
   Aumentum:  Buncombe (registerofdeeds.buncombecounty.org)
-             Gaston   (deeds.gastongov.com)
   Cott:      Polk     (cotthosting.com/ncpolkexternal)
              Rutherford (cotthosting.com/NCRUTHERFORDEXTERNAL)
   CCHS:      Burke     (us5.courthousecomputersystems.com/burkenc)
@@ -26,11 +25,29 @@ updated after that. Re-verified live 2026-09-28 (see rod/cchs.py docstring):
 added both back rather than leaving two already-working counties silently
 uncovered.
 
+2026-10-03: removed Gaston from the Aumentum row above. It was still listed
+as `("Gaston", aumentum, "aumentum")` below, but `deeds.gastongov.com` is a
+confirmed-dead host — live-tested 2026-10-03 (TCP connects, TLS handshake
+never completes, 5+ attempts/timeout values, control hosts on the same
+network all answer normally) and already independently flagged dead in
+docs/completeness_document.md, docs/completeness_deeds.md (2026-08-02) and
+rod/doc_images.py's `("NC","Gaston"): ("unreachable", ...)` entry. Gaston
+moved its ROD to Courthouse Computer Systems on 2026-05-28 and this scraper
+was never re-pointed. The real host (`gastonnc.courthousecomputersystems.com`,
+a DevExpress "LRSearch" MVC app, NOT the classic-ASP app `rod/cchs.py`
+handles) only has a per-owner-name search built against it so far
+(`enrichment_gaston_rod.py`) — no date-range sweep exists yet to plug in
+here, so Gaston drops to NOT YET COVERED below rather than silently
+wasting a timeout every run.
+
 NOT YET COVERED (no ROD vendor mapped):
   Mitchell, McDowell, Transylvania, New Hanover, Brunswick, Onslow,
   Madison/Yancey/Haywood (these were intentionally dropped from scope per
   2026-05-07b rollback; Madison IS in CCHS_COUNTIES but stays out of SOURCES
   per that rollback — re-add if Madison comes back in scope).
+  Gaston (dead Aumentum host, see 2026-10-03 note above — a real fix needs a
+  new date-range sweep against gastonnc.courthousecomputersystems.com's
+  LRSearch app, not a re-point to an existing vendor module).
 
 Output: each RodDoc is converted into a Listing with:
   - listing_type = LIS_PENDENS (these are PRE-foreclosure leads — the
@@ -76,7 +93,7 @@ log = structlog.get_logger()
 SOURCES: list[tuple[str, object, str]] = [
     # (county_name, vendor_module, vendor_label)
     ("Buncombe", aumentum, "aumentum"),
-    ("Gaston",   aumentum, "aumentum"),
+    # Gaston removed 2026-10-03 — dead Aumentum host, see module docstring.
     ("Polk",       cott,   "cott"),
     ("Rutherford", cott,   "cott"),
     ("Burke",     cchs,    "cchs"),

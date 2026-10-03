@@ -33,7 +33,7 @@ def test_sources_cover_in_scope_nc_counties():
     """
     counties = {county for county, _, _ in SOURCES}
     assert counties == {
-        "Buncombe", "Gaston", "Polk", "Rutherford", "Burke", "Cleveland",
+        "Buncombe", "Polk", "Rutherford", "Burke", "Cleveland",
         "Lincoln", "Henderson",
     }
 
@@ -64,6 +64,24 @@ def test_cott_counties_match():
     cott_in_sources = {c for c, _, l in SOURCES if l == "cott"}
     cott_supported = {county for (state, county) in COTT_COUNTIES if state == "NC"}
     assert cott_in_sources <= cott_supported
+
+
+def test_gaston_deliberately_excluded_dead_aumentum_host():
+    """Gaston is NOT in SOURCES (2026-10-03). It used to route through the
+    Aumentum adapter, but `deeds.gastongov.com` is a confirmed-dead host
+    (live-tested 2026-10-03: TCP connects, TLS handshake never completes,
+    5+ attempts across multiple tools/timeout values, with sibling Aumentum
+    hosts and a general-internet control all answering normally in the same
+    session) — Gaston moved its ROD to Courthouse Computer Systems on
+    2026-05-28 and this scraper's SOURCES list was never re-pointed. This is
+    a regression guard, not just documentation: it fails loudly if someone
+    re-adds Gaston to SOURCES without also re-adding a live, re-verified
+    host to AUMENTUM_COUNTIES (or a new vendor module for the real CCHS
+    LRSearch host, gastonnc.courthousecomputersystems.com)."""
+    from foreclosure_scraper.rod.aumentum import AUMENTUM_COUNTIES
+    counties = {county for county, _, _ in SOURCES}
+    assert "Gaston" not in counties
+    assert ("NC", "Gaston") not in AUMENTUM_COUNTIES
 
 
 def test_cchs_counties_match():

@@ -13,7 +13,6 @@ grantee, book/page, recorded_date, and doc_type — everything we need.
 
 Counties in footprint and their ROD vendor:
   - Buncombe      — Aumentum  (registerofdeeds.buncombenc.gov)
-  - Gaston        — Aumentum  (deeds.gastongov.com)
   - Henderson     — CCHS      (us4.courthousecomputersystems.com/HendersonNCNW)
   - Cleveland     — CCHS      (us5.courthousecomputersystems.com/ClevelandNCNW)
   - Burke         — CCHS      (us5.courthousecomputersystems.com/BurkeNCNW)
@@ -24,8 +23,21 @@ Counties in footprint and their ROD vendor:
   - Transylvania  — Logan     (search.transylvaniadeeds.com)
   - Mitchell      — Logan     (search.mitchelldeeds.com)
 
-All 11 counties have FREE, no-login online ROD search (index only; document
-images may be pay-per-view but we only need index metadata).
+Gaston removed 2026-10-03: it was listed here as Aumentum (deeds.gastongov.com),
+but that host is confirmed dead (live-tested 2026-10-03 — TCP connects, TLS
+handshake never completes, across 5+ attempts/timeout values and multiple
+tools, with control hosts on the same network all answering normally).
+Gaston moved its ROD to Courthouse Computer Systems on 2026-05-28; see
+rod/aumentum.py's module docstring ("GASTON REMOVED 2026-10-03") and
+rod/doc_images.py's `("NC","Gaston"): ("unreachable", ...)` entry, both
+independently confirming the same dead host. No date-range sweep exists yet
+against the real host (gastonnc.courthousecomputersystems.com, a DevExpress
+"LRSearch" MVC app — `enrichment_gaston_rod.py` only has a per-owner-name
+search built against it), so Gaston is dropped from this scraper's footprint
+rather than silently wasting a timeout every run.
+
+All 10 remaining counties have FREE, no-login online ROD search (index only;
+document images may be pay-per-view but we only need index metadata).
 
 Extract: grantee (buyer) name, property address (from legal description),
 deed date, book/page, sale price if available. We flag cash buyers by
@@ -162,7 +174,7 @@ async def _logan_recent(state: str, county: str, days: int) -> list[RodDoc]:
 
 VENDOR_DISPATCH: tuple[tuple[str, str, callable], ...] = (
     ("Buncombe", "NC", _aumentum_recent),
-    ("Gaston", "NC", _aumentum_recent),
+    # Gaston removed 2026-10-03 — dead Aumentum host, see module docstring.
     ("Henderson", "NC", _cchs_recent),
     ("Cleveland", "NC", _cchs_recent),
     ("Burke", "NC", _cchs_recent),
@@ -402,7 +414,7 @@ def _source_url(state: str, county: str) -> str:
 # --------------------------------------------------------------------------- #
 class CashBuyerDeeds(BaseScraper):
     slug = "national.cash_buyer_deeds"
-    name = "Cash Buyer Deeds (NC ROD: 11 counties)"
+    name = "Cash Buyer Deeds (NC ROD: 10 counties)"
     category = "cash_buyer"
     expected_min_count = 0
     timeout_s = 300.0
