@@ -181,6 +181,19 @@ scoring today; the risk is a human reading raw['jail_booking_new'] directly
 off the board, or a future scorer wiring it in uncorroborated. See
 docs/HANDOFF.md / the 2026-10-02 follow-up note for the precise scope of
 correcting the rows this already wrote on the Oracle VM's uncommitted board.
+
+STALE-MATCH INVALIDATION (2026-10-03, same bug shape as owner_name/bop_federal/
+enrichment_incarceration's own state-prison lane, found during the same sweep):
+`match_rosters` and the per-name SEARCH_ROSTERS lane both skip a listing the
+moment raw['jail_booking'] is truthy, forever -- a later owner-name refresh
+(a sale, an estate closing) never gets reconciled against a name-keyed match
+stamped against whoever used to own the parcel. `_clear_stale_matches` (run
+first, every call) drops a jail_booking match the current owner no longer
+supports, and the shared raw['incarceration'] flag with it ONLY when that
+flag's own `source` is a county-jail-roster entry this module itself set --
+never an NC-DAC/SC-DOC or BOP match sharing the same key, each of which owns
+clearing its own (enrichment_incarceration.py / enrichment_bop_federal.py).
+See `_owner_still_supports_match` for the mechanism.
 """
 from __future__ import annotations
 
@@ -195,7 +208,8 @@ import structlog
 from . import jail_roster_history
 
 from .models import Listing
-from .enrichment_incarceration import _name_parts, _owner_of
+from .enrichment_incarceration import DAC_SOURCE, SCDC_SOURCE, _name_parts, _owner_of
+from .enrichment_bop_federal import BOP_SOURCE
 from .name_normalize import party_middle_verdict
 # The Citizen Connect / Tyler fetchers are shared verbatim with the standalone
 # jail-bookings scraper rather than duplicated here.
@@ -630,6 +644,58 @@ def _apply_hit(li: Listing, county: str, first: str, last: str, hit: dict) -> No
     li.raw = raw
 
 
+def _owner_still_supports_match(li: Listing) -> bool:
+    """Same staleness check as enrichment_bop_federal._owner_still_supports_match
+    and enrichment_incarceration._owner_still_supports_match (2026-10-03 sweep,
+    same bug shape), for THIS module's own raw['jail_booking'] match: a county-
+    jail hit, once stamped, was never revisited even after the owner on record
+    changed -- both `match_rosters` and the per-name SEARCH_ROSTERS lane skip a
+    listing the moment raw['jail_booking'] is truthy, forever, so a later
+    owner-name refresh (a sale, an estate closing, a parcel_cache correction)
+    never gets reconciled against a name-keyed match stamped against whoever
+    used to own the parcel.
+
+    Returns True ("leave it alone") when there is no jail_booking tag, or
+    nothing to check it against; False only when the CURRENT owner no longer
+    supports the matched_name this module stamped."""
+    match = li.raw.get("jail_booking") if isinstance(li.raw, dict) else None
+    if not isinstance(match, dict):
+        return True
+    queried = str(match.get("matched_name") or "").strip().upper()
+    if not queried:
+        return True                     # nothing to check against -- don't touch it
+    owner = _owner_of(li)
+    parts = _name_parts(owner) if owner else None
+    if not parts:
+        return False                    # current owner isn't even a person anymore
+    last, first = parts
+    return queried == f"{first} {last}"
+
+
+def _clear_stale_matches(listings: list[Listing]) -> int:
+    """Pre-pass: drop any raw['jail_booking'] match the CURRENT owner no
+    longer supports (see _owner_still_supports_match), so match_rosters / the
+    per-name search lane below pick the row up again as if never checked.
+    Also drops the shared raw['incarceration'] flag, but ONLY when its own
+    `source` is a county-jail-roster entry THIS module itself set (the
+    "{county} County jail roster" string _apply_hit writes) -- never an
+    NC-DAC/SC-DOC match (enrichment_incarceration.py) or a BOP match
+    (enrichment_bop_federal.py) sharing the same key; each of those owns
+    clearing its own."""
+    cleared = 0
+    for li in listings:
+        if li.state not in ("NC", "SC") or not isinstance(li.raw, dict):
+            continue
+        if not li.raw.get("jail_booking") or _owner_still_supports_match(li):
+            continue
+        li.raw.pop("jail_booking", None)
+        inc = li.raw.get("incarceration")
+        if isinstance(inc, dict) and inc.get("source") not in (DAC_SOURCE, SCDC_SOURCE, BOP_SOURCE):
+            li.raw.pop("incarceration", None)
+        cleared += 1
+    return cleared
+
+
 def match_rosters(listings: list[Listing], rosters: dict) -> list[Listing]:
     """Flag every listing whose owner is on its county's bulk roster.
 
@@ -773,7 +839,16 @@ async def enrich_jail_bookings(listings: list[Listing],
     dry-run report is correct), but nothing is persisted to the sidecar. The
     per-name SEARCH_ROSTERS lane never touches jail_roster_history at all, so
     it needs no dry_run handling.
+
+    Starts with a read-only-looking but mutating pre-pass (_clear_stale_matches)
+    that drops any jail_booking match the CURRENT owner no longer supports, so
+    a sale/estate-closing/parcel_cache correction since the match was stamped
+    doesn't leave someone else's county-jail record sitting on the lead
+    forever -- see _owner_still_supports_match for the real examples that
+    found this.
     """
+    stale_cleared = _clear_stale_matches(listings)
+
     bulk_covered = {(s, c) for s, c, _, _ in ROSTERS}
     search_covered = {(s, c): (v, t) for s, c, v, t in SEARCH_ROSTERS}
     covered = bulk_covered | set(search_covered)
@@ -781,10 +856,10 @@ async def enrich_jail_bookings(listings: list[Listing],
     _county = _plain_county
 
     if not any((li.state, _county(li)) in covered for li in listings):
-        log.info("jail.no_targets")
-        return {"matched": 0}
+        log.info("jail.no_targets", stale_cleared=stale_cleared)
+        return {"matched": 0, "stale_cleared": stale_cleared}
 
-    counts = {"matched": 0}
+    counts = {"matched": 0, "stale_cleared": stale_cleared}
 
     # ---- lane 1: bulk rosters (fetch each once, index by name) ----
     bulk_needed = [(s, c, v, t) for s, c, v, t in ROSTERS

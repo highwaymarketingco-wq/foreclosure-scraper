@@ -106,7 +106,22 @@ def fake_enrichers(monkeypatch):
     monkeypatch.setattr(m_notice, "enrich_notice_service_defect", _noop_sync)
 
     async def fake_jail(listings, dry_run=False):
-        return {}
+        """Reproduces enrichment_jail_bookings.py's own newer stale-match hazard
+        (2026-10-03, _clear_stale_matches): a row whose owner changed since a
+        jail_booking match was stamped gets that match (and, when it was the
+        source, the shared raw['incarceration']) POPPED rather than left to
+        name someone who no longer owns the parcel."""
+        stale_cleared = 0
+        for li in listings:
+            if li.source == "jail_stale_target":
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                li.raw.pop("jail_booking", None)
+                inc = li.raw.get("incarceration")
+                if isinstance(inc, dict) and str(inc.get("source") or "").endswith("jail roster"):
+                    li.raw.pop("incarceration", None)
+                stale_cleared += 1
+        return {"matched": 0, "stale_cleared": stale_cleared}
     monkeypatch.setattr(m_jail, "enrich_jail_bookings", fake_jail)
     monkeypatch.setattr(m_bop, "enrich_bop_federal", _fake_bop_federal)
     monkeypatch.setattr(m_land, "enrich_land_buildability", _noop_async)
@@ -195,6 +210,30 @@ def test_bop_stale_match_deletion_lands_as_none_for_both_keys(scratch_repo, monk
     assert row["raw"]["bop_federal"] is None
     assert row["raw"]["incarceration"] is None
     assert row["raw"]["owner_mailing"]["owner"] == "COVENANT PRESBYTERIAN CHURCH"  # untouched
+
+
+def test_jail_stale_match_deletion_lands_as_none_for_both_keys(scratch_repo, monkeypatch):
+    """2026-10-03: _RAW_DELETE_SAFE_AS_NONE must also list "jail_booking" (added alongside
+    "incarceration") or this migration's diff-based patch path silently drops
+    enrichment_jail_bookings.py's own stale-match deletion the same way it would have for
+    bop_federal's -- this is the regression that would catch it."""
+    docs = scratch_repo / "docs"
+    rows = [_row(0, source="jail_stale_target",
+                 raw={"jail_booking": {"matched_name": "DEANA WILSON"},
+                      "incarceration": {"source": "Gaston County jail roster", "state": "NC"},
+                      "owner_mailing": {"owner": "GASTONIA CITY OF"}})]
+    _seed(docs, rows)
+    monkeypatch.setattr(sys, "argv",
+                        ["run_pending_signal_enrichers.py", "--only", "jail_bookings"])
+
+    rc = P.asyncio.run(P.main())
+    assert rc == 0
+
+    board = _read_board(docs)
+    row = board[0]
+    assert row["raw"]["jail_booking"] is None
+    assert row["raw"]["incarceration"] is None
+    assert row["raw"]["owner_mailing"]["owner"] == "GASTONIA CITY OF"  # untouched
 
 
 def test_ordinary_row_untouched_by_every_step_is_never_patched(scratch_repo, monkeypatch):

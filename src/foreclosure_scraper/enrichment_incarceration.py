@@ -35,6 +35,21 @@ match". A host that answers 403/429 or a challenge page is left alone for the
 rest of the run. The stamp is deliberately a separate key: raw['incarceration']
 is the signal itself (distress_score weight 8) and must stay truthy only for a
 real name match.
+
+STALE-MATCH INVALIDATION (2026-10-03, same bug shape as owner_name/bop_federal/
+owner_name_signal, found during the sweep that fixed those three): a match,
+once stamped, was never revisited even after the owner on record changed —
+`if (li.raw or {}).get("incarceration"): continue` treated any existing match
+as permanent. Live-checked against the real board: 11 rows carry
+raw['incarceration'] naming someone with zero relation to the CURRENT owner,
+now a bank/city/HOA/LLC entity, plus several more where the current owner
+parses to a different real person. `_clear_stale_matches` (run first, every
+call) drops a match the current owner no longer supports so the row becomes
+an ordinary candidate again — see `_owner_still_supports_match` for the real
+examples. It only ever touches a match this module itself stamped (gated on
+`source` in (DAC_SOURCE, SCDC_SOURCE)); a BOP or county-jail-roster match
+sharing the same raw['incarceration'] key is left for enrichment_bop_federal.py
+/ enrichment_jail_bookings.py to own.
 """
 from __future__ import annotations
 
@@ -228,6 +243,61 @@ def _owner_of(li: Listing) -> Optional[str]:
     return om.get("owner") or li.defendant or None
 
 
+def _owner_still_supports_match(li: Listing) -> bool:
+    """A stale state-prison match is worse than no tag -- same "missing-only,
+    never revisited" shape commit 9e3fd2c9 fixed for enrichment_bop_federal.py
+    the same day, one lane over: this module's own
+    `if (li.raw or {}).get("incarceration"): continue` guard treats ANY
+    existing NC DAC / SC DOC match as permanent, so a later owner-name refresh
+    (a sale, an estate closing, a parcel_cache correction) never gets
+    reconciled against a name-keyed match stamped against whoever used to own
+    the parcel. Live-checked 2026-10-03 against the real board: 11 rows carry
+    raw['incarceration'] naming someone with zero relation to the CURRENT
+    owner, which is now an unrelated entity (a bank, a city, an HOA, an LLC --
+    e.g. a Henderson parcel matched "MICHAEL PEAK" but now reads
+    "FIRST CITIZENS BANK & TRUST CO"; a Gaston parcel matched "DEANA WILSON"
+    but now reads "GASTONIA CITY OF"), plus several more rows where the
+    current owner parses to a different real person entirely.
+
+    Returns True ("leave it alone") when raw['incarceration'] is absent, was
+    stamped by a DIFFERENT enricher (BOP federal or a county jail roster --
+    each owns clearing its own, see enrichment_bop_federal.py /
+    enrichment_jail_bookings.py), or still names a person the CURRENT owner
+    supports. Returns False only when THIS module's own NC DAC/SC DOC match no
+    longer matches the current owner name -- the caller clears the stale tag
+    so the row becomes an ordinary candidate again instead of quietly keeping
+    someone else's state-custody record forever."""
+    match = li.raw.get("incarceration") if isinstance(li.raw, dict) else None
+    if not isinstance(match, dict) or match.get("source") not in (DAC_SOURCE, SCDC_SOURCE):
+        return True                     # not this module's match -- don't touch it
+    queried = str(match.get("matched_name") or "").strip().upper()
+    if not queried:
+        return True                     # nothing to check against -- don't touch it
+    owner = _owner_of(li)
+    parts = _name_parts(owner) if owner else None
+    if not parts:
+        return False                    # current owner isn't even a person anymore
+    last, first = parts
+    return queried == f"{first} {last}"
+
+
+def _clear_stale_matches(listings: list[Listing]) -> int:
+    """Pre-pass: drop any NC-DAC/SC-DOC raw['incarceration'] match the CURRENT
+    owner no longer supports (see _owner_still_supports_match), so the normal
+    candidate-selection loop below picks the row up again as if never checked.
+    Only ever removes a match THIS module itself set (checked by `source`) --
+    never touches a BOP or county-jail-roster entry sharing the same key."""
+    cleared = 0
+    for li in listings:
+        if li.state not in ("NC", "SC") or not isinstance(li.raw, dict):
+            continue
+        if _owner_still_supports_match(li):
+            continue
+        li.raw.pop("incarceration", None)
+        cleared += 1
+    return cleared
+
+
 # ---- negative stamps, selection and rotation ---------------------------------
 
 def _recheck_days() -> float:
@@ -320,6 +390,13 @@ async def enrich_incarceration(listings: list[Listing], max_queries: Optional[in
                     default 50; 0 = no cap)
     recheck_days    how long an answered miss stays fresh (env INCARCERATION_RECHECK_DAYS,
                     default 30)
+
+    Starts with a read-only-looking but mutating pre-pass (_clear_stale_matches)
+    that drops any NC-DAC/SC-DOC match the CURRENT owner no longer supports, so
+    a sale/estate-closing/parcel_cache correction since the match was stamped
+    doesn't leave someone else's state-custody record sitting on the lead
+    forever -- see _owner_still_supports_match for the real example that
+    found this.
     """
     if max_queries is None:
         max_queries = int(os.environ.get("INCARCERATION_MAX_QUERIES", "150"))
@@ -327,6 +404,8 @@ async def enrich_incarceration(listings: list[Listing], max_queries: Optional[in
         per_county_cap = int(os.environ.get("INCARCERATION_PER_COUNTY_CAP", "50"))
     window = _recheck_days() if recheck_days is None else float(recheck_days)
     now = datetime.now(timezone.utc)
+
+    stale_cleared = _clear_stale_matches(listings)
 
     cands, fresh = [], 0
     for li in listings:
@@ -346,14 +425,15 @@ async def enrich_incarceration(listings: list[Listing], max_queries: Optional[in
         cands.append((li, name, checked))
     targets = _select_targets(cands, max_queries, per_county_cap, now)
     if not targets:
-        log.info("incarceration.no_targets", skipped_fresh=fresh)
-        return {"queried": 0, "matched": 0}
+        log.info("incarceration.no_targets", skipped_fresh=fresh, stale_cleared=stale_cleared)
+        return {"queried": 0, "matched": 0, "stale_cleared": stale_cleared}
 
     sem = asyncio.Semaphore(int(os.environ.get("INCARCERATION_CONCURRENCY", "1")))
     delay = float(os.environ.get("INCARCERATION_DELAY", "1.0"))
     counts = {"queried": 0, "matched": 0, "matched_nc": 0, "matched_sc": 0,
               "stamped_miss": 0, "failed": 0, "skipped_fresh": fresh,
-              "candidates": len(cands), "selected": len(targets), "blocked_hosts": 0}
+              "candidates": len(cands), "selected": len(targets), "blocked_hosts": 0,
+              "stale_cleared": stale_cleared}
     tripped: set[str] = set()      # states whose host we stopped asking this run
     strikes = {"NC": 0, "SC": 0}   # consecutive unusable answers per state
     cache: dict[tuple, asyncio.Future] = {}

@@ -131,7 +131,7 @@ async def test_second_run_moves_on_instead_of_requerying_the_same_leads(monkeypa
     assert len(srv.asked) == 1                        # only lead 5 was left
     srv.asked.clear()
     res = await enrich_incarceration(leads, max_queries=2)
-    assert srv.asked == [] and res == {"queried": 0, "matched": 0}   # all fresh
+    assert srv.asked == [] and res == {"queried": 0, "matched": 0, "stale_cleared": 0}   # all fresh
 
 
 @pytest.mark.asyncio

@@ -108,6 +108,20 @@ grepped all 8 modules for `.pop(`/`del li.raw`/`del raw[`):
     scripts/coverage_100_ledger.py, scripts/title_search_pipeline.py, this
     module's own _owner_still_supports_match) reads via `.get(...)` with a
     truthy/`or {}` check, never a bare presence test.
+  - enrichment_jail_bookings.py's new `_clear_stale_matches()` (2026-10-03,
+    same sweep, same bug shape found one lane over: `match_rosters`/the
+    per-name SEARCH_ROSTERS lane both skip a listing the moment
+    raw['jail_booking'] is truthy, forever, so a later owner-name refresh was
+    never reconciled against the stored match). It pops `raw['jail_booking']`
+    AND, only when raw['incarceration']'s `source` is a county-jail-roster
+    entry this module itself set (never DAC_SOURCE/SCDC_SOURCE/BOP_SOURCE),
+    `raw['incarceration']`, when the CURRENT owner no longer supports the
+    stored match. Verified safe to represent `raw['jail_booking']` as `= None`
+    the same way: every reader of the key (distress_score.py,
+    enrichment_lead_signals.py via `custody_ended`, jail_roster_history.py's
+    own docstring, scripts/backfill_jail_rosters.py) reads via `.get(...)`,
+    never a bare presence test; `raw['incarceration']`'s readers were already
+    swept for the bop_federal entry above.
   No other raw key is ever popped/deleted by any of the other 6 modules
   (checked each one in full).
 
@@ -234,16 +248,19 @@ def _snapshot(rows: list[Listing]) -> list[tuple[str | None, dict, dict | None]]
     return out
 
 
-#: enrichment_bop_federal.py's li.raw.pop("bop_check", None) and its newer
-#: _clear_stale_matches() (pops "bop_federal" and, conditionally, "incarceration")
-#: are the only raw-key deletions among all 8 steps (grepped every module) -- see
-#: this file's own docstring, "RAW-KEY DELETION HAZARDS", for why representing
-#: each as `= None` is verified safe. A key missing from this set that a step
-#: pops would otherwise silently fail to delete here: _diff_raw() only ever
-#: writes `None` for a key removed between before/after AND listed here --
-#: patch_existing_rows() has no delete primitive, so an unlisted pop is a no-op
-#: on the actual published board even though it looks correct in memory.
-_RAW_DELETE_SAFE_AS_NONE = frozenset({"bop_check", "bop_federal", "incarceration"})
+#: enrichment_bop_federal.py's li.raw.pop("bop_check", None) and its
+#: _clear_stale_matches() (pops "bop_federal" and, conditionally,
+#: "incarceration"), plus enrichment_jail_bookings.py's own newer
+#: _clear_stale_matches() (pops "jail_booking" and, conditionally, the same
+#: shared "incarceration") are the only raw-key deletions among all 8 steps
+#: (grepped every module) -- see this file's own docstring, "RAW-KEY DELETION
+#: HAZARDS", for why representing each as `= None` is verified safe. A key
+#: missing from this set that a step pops would otherwise silently fail to
+#: delete here: _diff_raw() only ever writes `None` for a key removed between
+#: before/after AND listed here -- patch_existing_rows() has no delete
+#: primitive, so an unlisted pop is a no-op on the actual published board even
+#: though it looks correct in memory.
+_RAW_DELETE_SAFE_AS_NONE = frozenset({"bop_check", "bop_federal", "incarceration", "jail_booking"})
 
 
 def _diff_raw(before: dict | None, after: dict | None) -> dict:
