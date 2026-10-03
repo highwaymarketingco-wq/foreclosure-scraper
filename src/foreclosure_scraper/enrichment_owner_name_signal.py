@@ -99,12 +99,25 @@ def classify(owner_name: str | None) -> dict | None:
 
 
 def enrich_owner_name_signal(listings: list[Listing]) -> dict:
-    """Stamp `raw['owner_name_signal']`. Removes nothing; the count is asserted."""
+    """Stamp `raw['owner_name_signal']` from the CURRENT owner_name every run.
+
+    Removes no LEAD; the row count is asserted. It does clear a stale FIELD:
+    if a prior run stamped this signal and the owner_name has since changed
+    (a sale, an estate closing, `owner_freshness.py`'s parcel-cache refresh)
+    so it no longer matches any token, the old stamp must not survive --
+    `fullmer_rank.py` reads `raw['owner_name_signal']['grade']` directly
+    (not a fresh `classify()` call) and would otherwise keep awarding
+    owner_name_death/fracture points for a death signal that no longer holds
+    on today's owner of record. Same "missing-only, never revalidated" bug
+    shape as the owner_name/bop_federal staleness fixes.
+    """
     before = len(listings)
-    stats = {"strong": 0, "medium": 0, "weak": 0, "institutional": 0, "tagged": 0}
+    stats = {"strong": 0, "medium": 0, "weak": 0, "institutional": 0, "tagged": 0, "stale_cleared": 0}
     for li in listings:
         sig = classify(li.owner_name)
         if sig is None:
+            if isinstance(li.raw, dict) and li.raw.pop("owner_name_signal", None) is not None:
+                stats["stale_cleared"] += 1
             continue
         if not isinstance(li.raw, dict):
             li.raw = {}
@@ -114,6 +127,6 @@ def enrich_owner_name_signal(listings: list[Listing]) -> dict:
         if sig["institutional_owner"]:
             stats["institutional"] += 1
     assert len(listings) == before, "owner_name_signal must never drop a lead"
-    if stats["tagged"]:
+    if stats["tagged"] or stats["stale_cleared"]:
         log.info("owner_name_signal.done", **stats)
     return stats

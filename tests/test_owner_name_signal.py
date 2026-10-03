@@ -120,6 +120,63 @@ def test_signal_survives_the_publish_slim():
 
 
 # ===========================================================================
+# A STALE STAMP MUST NOT SURVIVE AN OWNER-NAME CHANGE
+#
+# fullmer_rank.score() reads raw['owner_name_signal']['grade'] DIRECTLY (not a
+# fresh classify() call) to award owner_name_death/fracture points. If the
+# property sells (or an estate closes) and owner_freshness.py / a later full
+# pipeline run refreshes owner_name to a living owner, re-running this
+# enricher must erase the old stamp -- not leave "strong"/"deceased" sitting
+# behind implying a death signal that no longer holds on today's record.
+# ===========================================================================
+
+def test_enrich_clears_a_stale_stamp_when_the_name_no_longer_matches():
+    rows = _rows(["ESTATE OF JOHN SMITH"])
+    enrich_owner_name_signal(rows)
+    assert rows[0].raw["owner_name_signal"]["primary_token"] == "estate_of"
+
+    # The property sold; a refresh (owner_freshness.py, a full pipeline run)
+    # overwrote owner_name with the new, living owner -- but the stale stamp
+    # from the old name is still sitting in raw until this enricher re-runs.
+    rows[0].owner_name = "CHURCH OF JESUS CHRIST OF LDS"
+    stats = enrich_owner_name_signal(rows)
+    assert "owner_name_signal" not in rows[0].raw
+    assert stats["stale_cleared"] == 1
+    assert stats["tagged"] == 0
+
+
+def test_enrich_leaves_a_still_matching_stamp_alone():
+    """No name change, no token change -- re-running must not churn the stamp
+    or count it as cleared."""
+    rows = _rows(["HEIRS OF WILLIAM BROWN"])
+    enrich_owner_name_signal(rows)
+    stats = enrich_owner_name_signal(rows)
+    assert rows[0].raw["owner_name_signal"]["primary_token"] == "heirs"
+    assert stats["stale_cleared"] == 0
+    assert stats["tagged"] == 1
+
+
+def test_fullmer_rank_does_not_score_a_stale_owner_name_signal():
+    """The real bug this closes: fullmer_rank.py trusts the stored
+    raw['owner_name_signal'] field rather than re-deriving it, so a stale
+    'strong'/deceased stamp left over from a sold property's old owner name
+    kept awarding owner_name_death points after the sale. Simulates exactly
+    that -- a raw blob carrying the OLD signal next to a CURRENT owner_name
+    that no longer matches any token -- which only this enricher's clearing
+    behavior, run again, can fix."""
+    rows = _rows(["CHURCH OF JESUS CHRIST OF LDS"])
+    rows[0].raw = {"owner_name_signal": {"tokens": ["deceased"], "primary_token": "deceased",
+                                          "grade": "strong", "institutional_owner": False,
+                                          "source": "owner_name_token"}}
+    enrich_owner_name_signal(rows)
+    assert "owner_name_signal" not in rows[0].raw
+
+    from foreclosure_scraper.fullmer_rank import score
+    r = score(rows[0])
+    assert "owner_name_death" not in str(r)
+
+
+# ===========================================================================
 # THE ABSENTEE SIGNAL WAS BEING SCORED FROM TWO EMPTY KEYS
 #
 # fullmer_rank.score() awards 8 points for an absentee owner -- Fullmer is
