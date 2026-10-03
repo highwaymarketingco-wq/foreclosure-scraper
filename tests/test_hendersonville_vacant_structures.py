@@ -266,6 +266,38 @@ def test_delinquent_tax_note_rides_along():
     assert amt
 
 
+def test_real_delinquent_amount_bridges_into_tax_owed():
+    """2026-10-02 breadth fix: a real parsed DELINQUENT_TAX dollar figure used to
+    live ONLY under this scraper's own raw['hendersonville_delinquent_tax'] key,
+    invisible to distress_score.py's recorded_debt FINANCIAL signal (which reads
+    raw['tax_owed']['balance']) and to the coverage ledger's debt_actual check.
+    Must now also land on raw['tax_owed'] in the same {"balance", "kind",
+    "source", ...} shape every other tax scraper in this repo already writes."""
+    li = next(li for li in _run() if li.street_address == "115 RHODES ST")
+    assert li.raw["hendersonville_delinquent_tax"]["amount_owed"] == 659.41
+    assert li.raw["tax_owed"] == {
+        "balance": 659.41, "kind": "delinquent_tax",
+        "source": "hendersonville_vacant_structures_register", "years": [2022],
+    }
+    from foreclosure_scraper.distress_score import _signals_for
+    names = [n for n, _c, _w in _signals_for(li)]
+    assert "recorded_debt" in names
+
+
+def test_multi_year_note_bridges_the_max_amount():
+    li = next(li for li in _run() if li.street_address == "1605 GEORGIA AVE")
+    assert li.raw["hendersonville_delinquent_tax"]["amount_owed"] == 726.94
+    assert li.raw["tax_owed"]["balance"] == 726.94
+    assert li.raw["tax_owed"]["years"] == [2021, 2022]
+
+
+@pytest.mark.parametrize("address", ["200 EWBANK", "201 BLUE RIDGE ST", "704 E PACE ST"])
+def test_cleared_or_no_data_notes_never_bridge_into_tax_owed(address):
+    """PAID / DEMOED / NO carry no real dollar figure -- never fabricate a balance."""
+    li = next(li for li in _run() if li.street_address == address)
+    assert "tax_owed" not in li.raw
+
+
 def test_absentee_detection():
     assert mod._is_absentee({"ST": "CA", "MAIL_CITY": "GRANADA HILLS",
                              "MAILING_ADDRESS": "17508 LOS ALIMOS ST",

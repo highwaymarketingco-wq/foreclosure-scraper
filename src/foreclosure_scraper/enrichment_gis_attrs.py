@@ -360,6 +360,23 @@ EXEMPT_FIELDS = ("exempt", "exemptcd", "exempt_cd", "exemptioncode", "exemption"
                  "exemptdesc", "exempt_desc", "taxrelief", "tax_relief", "exemptstat")
 _EXEMPT_TABLE = {"ELD": "elderly_exemption", "DIS": "disabled_exemption",
                  "BLD": "blind_exemption", "VET": "disabled_veteran_exemption"}
+#: 2026-10-02 breadth fix — code -> the exact `kind` string
+#: enrichment_tax_relief.py's own senior_exemption classify path writes
+#: (`_EXEMPT_KIND = {"ELD": "elderly", "DIS": "disabled", "BLD": "blind"}`
+#: there). distress_score.py's `senior_exemption` LIFE_EVENT signal (w=8) reads
+#: raw['tax_relief']['kind'] specifically, never raw['gis_exempt'] -- so every
+#: ELD/DIS/BLD hit this GENERIC gis_attrs scan found outside
+#: enrichment_tax_relief.py's own 7-county _RELIEF_LAYERS list (Buncombe/
+#: Henderson/Gaston/Rutherford/York/Burke/Lincoln) was invisible to the score,
+#: even though raw['gis_exempt'] itself has carried the identical hard
+#: elderly/disabled/blind fact since this field was added. Live-verified
+#: 2026-10-02 against Buncombe's own live ArcGIS layer (the same one
+#: enrichment_tax_relief.py queries): 3,319 ELD / 139 DIS / 100 BLD real
+#: current parcels. VET (disabled_veteran_exemption) is deliberately NOT
+#: mapped here -- enrichment_tax_relief.py has never modeled a veteran
+#: exemption as a distress signal, so inventing one would be a new scoring
+#: decision, not a key-naming fix.
+_EXEMPT_TO_TAX_RELIEF_KIND = {"ELD": "elderly", "DIS": "disabled", "BLD": "blind"}
 
 
 def _exempt_signal(norm: dict) -> tuple[str, str] | None:
@@ -482,6 +499,19 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
         ex = _exempt_signal(norm)
         if ex:
             li.raw["gis_exempt"] = {"code": ex[0], "tag": ex[1]}
+            # 2026-10-02 breadth fix (same shape as code_enforcement/condemned/
+            # rollback_exposure the same day): also promote a real elderly/disabled/
+            # blind hit into raw['tax_relief'], the key distress_score.py's
+            # senior_exemption signal actually reads -- see
+            # _EXEMPT_TO_TAX_RELIEF_KIND above. enrichment_tax_relief.py runs LATER
+            # in main.py's pipeline and unconditionally overwrites raw['tax_relief']
+            # for its own 7 dedicated counties, so this bridge changes nothing there;
+            # it only sticks for every OTHER county this generic GIS scan reaches,
+            # where gis_exempt was previously the only record of the fact.
+            kind = _EXEMPT_TO_TAX_RELIEF_KIND.get(ex[0])
+            if kind:
+                li.raw["tax_relief"] = {"kind": kind, "basis": "elderly_disabled_exclusion",
+                                        "code": ex[0], "county": li.county}
     return flags
 
 

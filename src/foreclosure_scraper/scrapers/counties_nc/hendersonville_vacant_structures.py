@@ -303,6 +303,24 @@ def build_listing(feat: dict, now: datetime | None = None) -> Listing | None:
         raw["distressed"] = True
     if tax:
         raw["hendersonville_delinquent_tax"] = tax
+        # 2026-10-02 breadth fix (same raw-key naming gap shape as
+        # code_enforcement/condemned/rollback_exposure/sos_dissolution found
+        # the same day): a real parsed delinquent-tax dollar figure was
+        # captured here but only ever written under this scraper's own
+        # private key, never raw['tax_owed'] -- the key distress_score.py's
+        # recorded_debt FINANCIAL signal (w=12) and the coverage ledger's
+        # debt_actual check both read specifically. Live-verified 2026-10-02
+        # against this layer's own live ArcGIS service: 4 of 52 current rows
+        # carry a real DELINQUENT_TAX dollar figure (e.g. "115 RHODES ST":
+        # "2022 - DUE $659.41"). Only bridged when _tax_note() itself
+        # classified the cell `delinquent=True` (a real parsed amount, never
+        # "PAID"/"CURRENT"/"DEMOED"/no-data) -- same shape every dedicated
+        # tax scraper in this repo already writes (raw['tax_owed'] =
+        # {"balance", "kind": "delinquent_tax", "source", ...}).
+        if tax.get("delinquent") is True and tax.get("amount_owed"):
+            raw["tax_owed"] = {"balance": tax["amount_owed"], "kind": "delinquent_tax",
+                               "source": "hendersonville_vacant_structures_register",
+                               "years": tax.get("years")}
     if owner:
         raw["owner_mailing"] = {
             "street": _text(a.get("MAILING_ADDRESS")),
