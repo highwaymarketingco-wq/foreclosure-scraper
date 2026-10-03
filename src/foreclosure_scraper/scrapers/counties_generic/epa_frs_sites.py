@@ -13,13 +13,27 @@ WHY THROUGH FRS RATHER THAN THE PROGRAM ENDPOINTS
     programs keyed by pgm_sys_acrnm and answers 200, so both ACRES (brownfields)
     and SEMS (Superfund) are read through it.
 
-MEASURED IN-FOOTPRINT, not estimated
-    ACRES  1,698 statewide -> 161 in footprint
-    SEMS     795 statewide -> 110 in footprint
+MEASURED STATEWIDE (widened 2026-10-03, was MEASURED IN-FOOTPRINT)
+    Live-checked 2026-10-03: ACRES NC 1,145 rows / 75 distinct counties, SEMS
+    NC 1,333 rows / 97 counties, ACRES SC 561 rows / 43 counties, SEMS SC 770
+    rows / 47 counties. The query below (one GET per state per program)
+    already pulls every one of those rows -- FOOTPRINT used to keep only the
+    rows from the 18-county (11 NC + 7 SC) flip footprint and silently drop
+    the rest, at zero fetch-cost savings since the fetch is state-wide either
+    way. The 2026-09-15 in_scope_distressed mandate ("if its a distressed
+    property its anywhere in nc and sc") makes every one of those discarded
+    rows admissible for this generic DISTRESSED-type lead, so FOOTPRINT now
+    maps every real NC/SC county (validation.py), not just the flip
+    footprint. Same bug class 2026-10-03's comps fix closed for
+    enrichment_comps.py: an enricher/scraper scoped to the old 18-county
+    footprint that was never revisited when the lead population expanded.
 
-    Counties are filtered client-side because FRS has no county parameter, and
-    its county_name is a plain uppercase string that has to be matched against
-    the footprint rather than trusted.
+    Counties are still matched client-side (not trusted directly) because FRS
+    has no county parameter and its county_name is a plain uppercase string
+    that occasionally carries a data-entry typo (e.g. "BURTCOMBE",
+    "ALLLENDALE" -- both verified live 2026-10-03) which this dict will not
+    match; those few rows still drop, same as before, just no longer the
+    large majority of the source.
 """
 from __future__ import annotations
 
@@ -33,21 +47,17 @@ from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...layer_guard import LayerHarvest
 from ...models import Listing, ListingType, PropertyKind
+from ...validation import NC_COUNTIES as _NC_COUNTY_NAMES, SC_COUNTIES as _SC_COUNTY_NAMES
 
 log = structlog.get_logger()
 
 FRS = "https://data.epa.gov/dmapservice/frs.frs_program_facility"
 
 #: Canonical spellings, keyed by the uppercase form FRS actually returns.
+#: Every real NC/SC county (validation.py) -- see module docstring.
 FOOTPRINT = {
-    "NC": {"BUNCOMBE": "Buncombe", "HENDERSON": "Henderson",
-           "RUTHERFORD": "Rutherford", "POLK": "Polk",
-           "TRANSYLVANIA": "Transylvania", "MCDOWELL": "McDowell",
-           "CLEVELAND": "Cleveland", "GASTON": "Gaston", "LINCOLN": "Lincoln",
-           "BURKE": "Burke", "MITCHELL": "Mitchell"},
-    "SC": {"SPARTANBURG": "Spartanburg", "CHEROKEE": "Cherokee",
-           "ANDERSON": "Anderson", "PICKENS": "Pickens", "OCONEE": "Oconee",
-           "LAURENS": "Laurens", "UNION": "Union"},
+    "NC": {c.upper(): c for c in _NC_COUNTY_NAMES},
+    "SC": {c.upper(): c for c in _SC_COUNTY_NAMES},
 }
 
 #: pgm_sys_acrnm -> (human label, process tag)

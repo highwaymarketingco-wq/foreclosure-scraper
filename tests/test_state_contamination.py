@@ -4,6 +4,12 @@ A property with a confirmed petroleum release or a recorded land-use
 restriction is genuinely hard to sell. These are statewide files, which is what
 the counties publishing nothing locally need — Mitchell, Polk and McDowell all
 appear here.
+
+NC_PREFIX/NC_FULL were widened 2026-10-03 from the original 11-county flip
+footprint to all 100 real NC counties -- the WHERE clauses were filtering out
+contamination rows in the other 89 NC counties server-side even though every
+query here is a single statewide fetch either way. Same bug class as the
+2026-10-03 comps fix.
 """
 from __future__ import annotations
 
@@ -187,6 +193,21 @@ def test_dam_phone_is_captured_under_owner_mailing():
 
 def test_registries_cover_the_thin_counties():
     """The whole point of a statewide file: Mitchell, Polk and McDowell have the
-    weakest local coverage in the footprint."""
+    weakest local coverage in the old 18-county flip footprint."""
     for c in ("MITCH", "POLK", "MCDOW"):
         assert c in S.NC_PREFIX
+
+
+def test_registries_cover_all_100_nc_counties_not_just_the_old_footprint():
+    """2026-10-03 fix: these are single statewide ArcGIS queries either way,
+    so filtering down to the 11-county flip footprint was discarding real
+    rows in the other 89 NC counties for free. Mecklenburg/Wake/Durham were
+    all previously unreachable via this scraper."""
+    from foreclosure_scraper.validation import NC_COUNTIES
+    assert len(S.NC_PREFIX) == 100
+    assert len(set(S.NC_FULL) - {"TRANSYLVANIS"}) == 100
+    for c in ("Mecklenburg", "Wake", "Durham", "Robeson"):
+        assert S._county_of(c.upper()) == c
+    # no collisions: every real NC county resolves to itself, not a neighbor
+    for c in NC_COUNTIES:
+        assert S._county_of(c.upper()) == c, c

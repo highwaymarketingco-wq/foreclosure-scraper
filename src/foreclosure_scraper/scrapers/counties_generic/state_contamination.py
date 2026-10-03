@@ -11,7 +11,18 @@ WHY THIS IS A DISTRESS SIGNAL, not a directory
 WHY STATEWIDE SOURCES MATTER MOST HERE
     These files cover every county in one fetch, which is exactly what the
     counties that publish nothing locally need. Mitchell, Polk and McDowell have
-    the thinnest local coverage in the footprint and all three appear here.
+    the thinnest local coverage in the old 18-county flip footprint and all
+    three appear here.
+
+    SCOPE (fixed 2026-10-03): the WHERE clauses below used to filter server-side
+    down to that same 11-county NC footprint, even though every one of these
+    queries already pulls NC statewide in a single paginated fetch -- the
+    filter cost nothing to remove and was silently discarding real
+    contamination rows in the other 89 NC counties before they were ever
+    fetched. The 2026-09-15 in_scope_distressed mandate ("if its a distressed
+    property its anywhere in nc and sc") makes every NC county admissible for
+    this generic DISTRESSED-type lead, so NC_PREFIX/NC_FULL now cover all 100
+    real NC counties (validation.py), not just the flip footprint.
 
 THE COUNTY COLUMN IS TRUNCATED — the trap that hides 89% of the rows
     NC DEQ's UST incident file stores County truncated to FIVE characters:
@@ -43,19 +54,30 @@ from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...layer_guard import LayerHarvest
 from ...models import Listing, ListingType, PropertyKind
+from ...validation import NC_COUNTIES as _NC_COUNTY_NAMES
 
 log = structlog.get_logger()
 
 _PAGE = 1000
 
 #: Five-character prefixes, because that is how NC DEQ stores the county.
-NC_PREFIX = ("BUNCO", "HENDE", "RUTHE", "POLK", "TRANS", "MCDOW",
-             "CLEVE", "GASTO", "LINCO", "BURKE", "MITCH")
-#: Full names for layers that store the county untruncated. 'Transylvanis' is a
+#: Widened 2026-10-03 from the 18-county (11-NC) flip footprint to all 100
+#: real NC counties. These are single statewide ArcGIS FeatureServer queries
+#: either way (one POST, paginated by offset) -- the old 11-county WHERE
+#: filter was not saving any fetch cost, it was discarding real contamination
+#: rows in the other 89 NC counties server-side before they ever reached this
+#: scraper. The 2026-09-15 in_scope_distressed mandate ("if its a distressed
+#: property its anywhere in nc and sc") makes every one of those rows
+#: admissible for this generic DISTRESSED-type lead; the footprint-only
+#: filter here was simply never revisited after that mandate, the same bug
+#: class 2026-10-03's comps fix closed for enrichment_comps.py. Verified
+#: programmatically: none of the 100 real NC county names (validation.py)
+#: share the same first 5 characters once spaces are stripped, so a flat
+#: prefix map has no collision risk.
+NC_PREFIX = tuple(sorted({c.upper().replace(" ", "")[:5] for c in _NC_COUNTY_NAMES}))
+#: Full names for layers that store the county untruncated. 'TRANSYLVANIS' is a
 #: real data-entry typo in the LUR registry, not a mistake here.
-NC_FULL = ("BUNCOMBE", "HENDERSON", "RUTHERFORD", "POLK", "TRANSYLVANIA",
-           "TRANSYLVANIS", "MCDOWELL", "CLEVELAND", "GASTON", "LINCOLN",
-           "BURKE", "MITCHELL")
+NC_FULL = tuple(sorted({c.upper() for c in _NC_COUNTY_NAMES} | {"TRANSYLVANIS"}))
 
 
 def _in(col: str, vals: Iterable[str]) -> str:
@@ -101,7 +123,8 @@ class Registry(NamedTuple):
 DEQ = "https://services2.arcgis.com/kCu40SDxsCGcuUWO/arcgis/rest/services"
 
 REGISTRIES: tuple[Registry, ...] = (
-    # 4,468 in-footprint. 560 have no CloseOut date, meaning the release is
+    # 4,468 rows in the old 11-county footprint (now widened statewide,
+    # 2026-10-03). 560 have no CloseOut date, meaning the release is
     # still open and the owner is carrying an active remediation obligation.
     #
     # LatDec/LongDec/DocsLink/DateOccurred/LUR_State verified live 2026-10-01
@@ -126,7 +149,8 @@ REGISTRIES: tuple[Registry, ...] = (
         lat_field="LatDec", lon_field="LongDec",
         source_page="https://www.deq.nc.gov/about/divisions/waste-management/underground-storage-tanks",
     ),
-    # 550 in-footprint. A recorded restriction that runs with the land.
+    # 550 rows in the old 11-county footprint (now widened statewide,
+    # 2026-10-03). A recorded restriction that runs with the land.
     Registry(
         slug="nc_land_use_restrictions", state="NC",
         url=f"{DEQ}/NoticeLUR_View/FeatureServer/0/query",
@@ -138,7 +162,8 @@ REGISTRIES: tuple[Registry, ...] = (
         city="Prj_City", detail="DWM_Program",
         source_page="https://www.deq.nc.gov/about/divisions/waste-management",
     ),
-    # 2,086 statewide; filtered to the footprint below.
+    # 2,086 statewide (no longer filtered down to the old footprint below,
+    # see SCOPE note in the module docstring).
     #
     # LATITUDE/LONGITUDE/Laserfiche verified live 2026-10-01, same pattern as
     # nc_ust_incidents above: LATITUDE/LONGITUDE is the layer's own
@@ -159,7 +184,8 @@ REGISTRIES: tuple[Registry, ...] = (
         lat_field="LATITUDE", lon_field="LONGITUDE",
         source_page="https://www.deq.nc.gov/about/divisions/waste-management",
     ),
-    # 917 in-footprint. ADDR_LINE1/2 + CITY/STATE/ZIP are the DAM OWNER'S MAILING
+    # 917 rows in the old 11-county footprint (now widened statewide,
+    # 2026-10-03). ADDR_LINE1/2 + CITY/STATE/ZIP are the DAM OWNER'S MAILING
     # address, not the dam's location -- confirmed 2026-09-30: "Betty Kay Lake Dam"
     # (Transylvania County) has ADDR_LINE1/CITY = "417 Clairemont Avenue" / "Decatur, GA"
     # (the property-owners-association's mailing address) while its own LATITUDE/
@@ -209,19 +235,29 @@ def _clean(v) -> Optional[str]:
     return s
 
 
+#: raw (5-char truncated) -> canonical name, for every real NC county.
+_NC_PREFIX_MAP: dict[str, str] = {
+    c.upper().replace(" ", "")[:5]: c for c in _NC_COUNTY_NAMES
+}
+#: raw (untruncated) -> canonical name, including the LUR typo.
+_NC_FULL_MAP: dict[str, str] = {c.upper(): c for c in _NC_COUNTY_NAMES}
+_NC_FULL_MAP["TRANSYLVANIS"] = "Transylvania"
+
+
 def _county_of(raw: str) -> Optional[str]:
-    """Expand a truncated county back to its full name."""
+    """Expand a truncated (or untruncated) county back to its canonical name."""
     s = (raw or "").strip().upper()
     if not s:
         return None
     # Proper spelling matters: the scope filter and every downstream join match
     # on the county string, and "Mcdowell" from .title() does not equal
     # "McDowell". Map to the canonical form rather than title-casing.
-    for full in ("Buncombe", "Henderson", "Rutherford", "Polk", "Transylvania",
-                 "McDowell", "Cleveland", "Gaston", "Lincoln", "Burke",
-                 "Mitchell"):
-        if full.upper().startswith(s[:5]) or s.startswith(full.upper()[:5]):
-            return full
+    exact = _NC_FULL_MAP.get(s)
+    if exact:
+        return exact
+    prefix = _NC_PREFIX_MAP.get(s.replace(" ", "")[:5])
+    if prefix:
+        return prefix
     return s.title()
 
 

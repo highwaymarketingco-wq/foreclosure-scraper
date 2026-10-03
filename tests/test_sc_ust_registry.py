@@ -1,9 +1,11 @@
 """SC DES UST registry — the SC contamination spine and Union's first real source.
 
-One statewide search returns all 7 SC footprint counties. Union SC is blocked or
-empty on five of six signals in the coverage matrix; this is the first source it
-has. 39 rows name an estate as owner of record, which is a probate signal no
-probate source in the engine reaches.
+One POST per county, looped over all 46 real SC counties (widened 2026-10-03
+from the original 7-county upstate footprint -- the search form has no
+footprint restriction of its own, only this scraper's county loop did). Union
+SC is blocked or empty on five of six signals in the coverage matrix; this is
+the first source it has. 39 rows name an estate as owner of record, which is a
+probate signal no probate source in the engine reaches.
 """
 from __future__ import annotations
 
@@ -60,9 +62,21 @@ def test_a_short_row_is_dropped_not_misparsed():
     assert S._to_listing(["only", "three", "cells"], "Union") is None
 
 
-def test_all_seven_sc_footprint_counties_are_declared():
-    assert set(S.COUNTIES) == {"Spartanburg", "Anderson", "Pickens", "Laurens",
-                               "Oconee", "Cherokee", "Union"}
+def test_all_46_sc_counties_are_declared():
+    """Widened 2026-10-03 from the original 7-county upstate footprint (fixed
+    alongside the same bug class in state_contamination.py and
+    epa_frs_sites.py -- a scraper/enricher scoped to the 18-county flip
+    footprint that was never revisited after the 2026-09-15
+    in_scope_distressed mandate, "if its a distressed property its anywhere
+    in nc and sc")."""
+    from foreclosure_scraper.validation import SC_COUNTIES
+    assert set(S.COUNTIES) == set(SC_COUNTIES)
+    assert len(S.COUNTIES) == 46
+    # the original 7-county footprint must still be in there
+    assert {"Spartanburg", "Anderson", "Pickens", "Laurens",
+            "Oconee", "Cherokee", "Union"} <= set(S.COUNTIES)
+    # and real counties outside it are now included too
+    assert {"Greenville", "Charleston", "Richland", "Allendale"} <= set(S.COUNTIES)
 
 
 def test_row_maps_to_a_usable_lead():

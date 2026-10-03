@@ -5,15 +5,28 @@ WHY THIS MATTERS MORE THAN ITS SUBJECT SUGGESTS
     that runs with the land. Abandoned tanks at dead service stations and rural
     groceries are exactly the properties that sit unsold for decades.
 
-    But the real value is coverage. This is ONE statewide search that returns
-    every SC county in the footprint, including the two with almost no local
-    data at all:
+    Coverage: one POST per county (the search form takes a single county, a
+    blank value 500s -- verified live), looped over every one of SC's 46 real
+    counties, including the ones with almost no local data at all:
 
         Spartanburg 1,148 · Anderson 788 · Pickens 410 · Laurens 320
-        Oconee 315 · Cherokee 230 · Union 121          = 3,332 in-footprint
+        Oconee 315 · Cherokee 230 · Union 121          (original 7-county
+        upstate footprint; widened 2026-10-03 -- see SCOPE below)
 
     Union SC is blocked or empty on five of six signals in the coverage matrix.
     This is the first real source it has.
+
+    SCOPE (widened 2026-10-03, was 7 upstate counties): COUNTIES used to be
+    hardcoded to the original "Spartanburg/Anderson/Pickens/Laurens/Oconee/
+    Cherokee/Union" flip footprint. Live-verified 2026-10-03 that
+    apps.des.sc.gov's per-county search form has no footprint restriction of
+    its own -- Greenville returned 1,510 rows, Charleston 1,269, Richland
+    1,269, Allendale 86, all HTTP 200 -- so the restriction was only ever this
+    scraper's own county loop. The 2026-09-15 in_scope_distressed mandate
+    ("if its a distressed property its anywhere in nc and sc") makes every SC
+    county admissible for this generic DISTRESSED-type lead, so COUNTIES now
+    loops all 46 real SC counties (validation.py). Same bug class 2026-10-03's
+    comps fix closed for enrichment_comps.py.
 
 A PROBATE SIGNAL HIDING IN A TANK REGISTRY
     39 of the 3,332 name an owner of record as "ESTATE OF ..." or "... HEIRS" —
@@ -50,15 +63,16 @@ from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...layer_guard import LayerHarvest
 from ...models import Listing, ListingType, PropertyKind
+from ...validation import SC_COUNTIES as _SC_COUNTY_NAMES
 
 log = structlog.get_logger()
 
 BASE = "https://apps.des.sc.gov/USTRegistry/"
 SEARCH = BASE + "Home/searchRegistryRequest"
 
-#: The seven SC counties in the footprint.
-COUNTIES = ("Spartanburg", "Anderson", "Pickens", "Laurens", "Oconee",
-            "Cherokee", "Union")
+#: All 46 real SC counties (widened 2026-10-03 from the original 7-county
+#: upstate flip footprint -- see module docstring SCOPE note).
+COUNTIES = tuple(sorted(_SC_COUNTY_NAMES))
 
 _ROW = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S | re.I)
 _CELL = re.compile(r"<t[dh][^>]*>(.*?)</t[dh]>", re.S | re.I)
@@ -136,7 +150,7 @@ async def _one_county(c, county: str) -> list[Listing]:
 
 class SCUstRegistry(BaseScraper):
     slug = "counties_sc.sc_ust_registry"
-    name = "SC DES Underground Storage Tank registry (7 upstate counties)"
+    name = "SC DES Underground Storage Tank registry (all 46 SC counties)"
     category = "state_distress"
     expected_min_count = 0
 
