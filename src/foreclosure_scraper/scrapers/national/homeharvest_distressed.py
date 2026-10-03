@@ -14,6 +14,35 @@ These keywords are the strongest "motivated seller" signals on Realtor.com:
 
 We pull a wide for_sale net per county (no foreclosure filter) then text-match
 the description and listing fields for these markers. Free, no Apify.
+
+SCOPE BUG FOUND AND FIXED (2026-10-03), same class as enrichment_comps.py's
+c3edea94 fix and the bbb6f2f9 generic-distress widen. This scraper looped
+``config.ALL_COUNTIES`` — the 18-county (11 NC + 7 SC) FLIP footprint from a
+2026-05 scoping decision — querying each county by its SEAT TOWN. Most of
+this scraper's output is NOT a flip: only REO/trustee-sale/foreclosure
+keyword matches land on a _FLIP_LISTING_TYPES type (REO, FORECLOSURE_SALE);
+tax-sale, estate/heir/probate and the generic "as-is/motivated seller" matches
+land on TAX_SALE / LIS_PENDENS / DISTRESSED, all of which are distressed-type
+leads admissible in any real NC/SC county per config.in_scope_distressed's
+2026-09-15 mandate. Looping only the 18 footprint seats meant every one of
+those non-flip matches outside the footprint could never be found at all, no
+matter how permissive the downstream scope gate is.
+
+Live-verified 2026-10-03 against the real HomeHarvest for_sale feed, querying
+by COUNTY (not seat town) the same way the comps fix validated — counties
+WAY outside the old 18 already carry real distress-keyword matches for free:
+Catawba NC 34 matches / 1,091 for_sale, Mecklenburg NC 170 / 5,231, Richland
+SC 114 / 2,318. Fix: loop every real NC/SC county (validation.py) and query
+"<County> County, <ST>" — the format the comps fix proved resolves the whole
+county, not just its seat, and needs no per-county seat gazetteer (which only
+ever existed for the 18 footprint counties). Flip-type matches (REO,
+FORECLOSURE_SALE) outside the 18 are still correctly dropped downstream by
+main._flip_outside_footprint — this fix only stops DISCARDING the distressed-
+type matches at the source before the scope gate ever sees them.
+
+Cost note: this widens the loop from 18 to up to 146 counties (one HomeHarvest
+call each, ~1-15s depending on county size — Mecklenburg's 5,231-row pull took
+15s live). timeout_s is raised accordingly; see the class docstring.
 """
 from __future__ import annotations
 
@@ -26,8 +55,8 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...config import ALL_COUNTIES
 from ...models import Listing, ListingType, PropertyKind
+from ...validation import NC_COUNTIES as _NC_COUNTY_NAMES, SC_COUNTIES as _SC_COUNTY_NAMES
 
 log = structlog.get_logger()
 
@@ -181,7 +210,28 @@ def _to_listing(row: dict, county: str, matches: list[str]) -> Listing | None:
     )
 
 
-def _scrape_county(seat: str, state: str, county: str) -> list[Listing]:
+#: Every real NC/SC county (validation.py) -- widened 2026-10-03 from the
+#: 18-county flip footprint. See the module docstring's SCOPE BUG note.
+COUNTY_UNIVERSE: tuple[tuple[str, str], ...] = tuple(sorted(
+    {("NC", c) for c in _NC_COUNTY_NAMES} | {("SC", c) for c in _SC_COUNTY_NAMES}
+))
+
+
+def _distress_location(county: str, state: str) -> str:
+    """Location string for HomeHarvest's (Realtor.com) geo-suggest search.
+
+    "<County> County, <ST>" resolves the WHOLE county, not just its seat town
+    -- the same format enrichment_comps.py's 2026-10-03 fix verified live
+    across every county size (Catawba NC, Greenville SC, rural Allendale SC),
+    and this module's own module-docstring live-check confirms again here
+    (Catawba 34 matches/1,091 for_sale, Mecklenburg 170/5,231, Richland SC
+    114/2,318). Removes the need for a per-county seat-town gazetteer, which
+    only ever existed for the old 18-county footprint.
+    """
+    return f"{county} County, {state}"
+
+
+def _scrape_county(state: str, county: str) -> list[Listing]:
     """Sync HomeHarvest pull → distress-match. Run in thread pool."""
     try:
         from homeharvest import scrape_property
@@ -190,7 +240,7 @@ def _scrape_county(seat: str, state: str, county: str) -> list[Listing]:
     out: list[Listing] = []
     try:
         df = scrape_property(
-            location=f"{seat}, {state}",
+            location=_distress_location(county, state),
             listing_type="for_sale",
             past_days=120,
         )
@@ -215,15 +265,21 @@ class DistressedListings(BaseScraper):
     category = "national_aggregator"
     expected_min_count = 5
     requires_apify = False
-    timeout_s = 600.0
+    # Widened 2026-10-03 from 18 counties to COUNTY_UNIVERSE (up to 146) -- see
+    # module docstring. Measured live: a large urban county (Mecklenburg,
+    # 5,231 for_sale rows) took ~15s; most of the other ~128 newly-added
+    # counties are smaller/rural. Raised from 600s to budget for 8x the
+    # county count, same "noticeably longer, budget more wall-clock" note
+    # scripts/backfill_comps.py's docstring carries for its own 2026-10-03 widen.
+    timeout_s = 1200.0
 
     async def fetch(self) -> Iterable[Listing]:
         loop = asyncio.get_event_loop()
         out: list[Listing] = []
         with ThreadPoolExecutor(max_workers=4) as pool:
             futures = [
-                loop.run_in_executor(pool, _scrape_county, c.seat, c.state, c.name)
-                for c in ALL_COUNTIES
+                loop.run_in_executor(pool, _scrape_county, state, county)
+                for state, county in COUNTY_UNIVERSE
             ]
             results = await asyncio.gather(*futures, return_exceptions=True)
             for r in results:
