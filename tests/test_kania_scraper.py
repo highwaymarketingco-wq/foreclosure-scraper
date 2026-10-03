@@ -9,6 +9,15 @@ column names, the real ``<br />``-joined multi-parcel cells and the real
 "Sale date not yet set" placeholder.
 
 No live HTTP here — fetch() is two plain GETs and is smoked separately.
+
+SCOPE FIX (2026-10-03): the parse-time gate used to be the narrow 18-county
+(11 NC) flip footprint plus a coastal allowlist (`_footprint.in_footprint()`
+/`is_coastal()`), even though every row here is ListingType.TAX_SALE — a
+distressed-type lead, not a flip — which belongs on the statewide
+`config.in_scope_distressed()` gate instead (any real NC county). Live-verified
+against the real feed: 149 of 190 rows (78%, across 19 real NC counties) were
+being silently dropped. The fixture's "Mecklenburg" and "Alexander" rows are
+exactly this bug's shape — both real NC counties outside the old footprint.
 """
 from __future__ import annotations
 
@@ -41,7 +50,10 @@ def rows() -> list:
 
 @pytest.fixture(scope="module")
 def footprint(rows) -> list:
-    """Default behaviour: only the in-footprint NC counties are emitted."""
+    """Default behaviour (fixed 2026-10-03): every REAL NC county is emitted --
+    TAX_SALE is a distressed-type lead, not a flip, so config.in_scope_distressed
+    gates it rather than the narrow 18-county flip footprint. Fixture/variable
+    name kept as-is to limit diff size; it no longer means "footprint-only"."""
     return parse_rows(rows, SLUG)
 
 
@@ -138,34 +150,43 @@ def test_fixture_parses_into_listings(footprint):
 
 def test_county_comes_from_the_county_column(footprint):
     """The grid has an authoritative county column — never regex it out of
-    free text (the old parser did, and tagged the firm's own office)."""
+    free text (the old parser did, and tagged the firm's own office).
+
+    2026-10-03: the fixture's Alexander/Mecklenburg rows are real NC counties
+    outside the old 18-county flip footprint -- the exact shape of the SCOPE
+    BUG fixed in this module -- and must now be kept alongside the original
+    in-footprint four."""
     assert {li.county for li in footprint} == {
-        "Burke", "Cleveland", "Rutherford", "Lincoln"
+        "Burke", "Cleveland", "Rutherford", "Lincoln", "Alexander", "Mecklenburg"
     }
 
 
-def test_coastal_counties_pass_the_parse_time_gate(rows):
-    """Same gate the other statewide firm calendars use: footprint ∪ coastal,
-    so the engine's oceanfront lane still gets to judge New Hanover rows."""
-    from foreclosure_scraper.scrapers.law_firms._footprint import is_coastal
-
-    assert is_coastal("New Hanover", "NC")
-    assert not is_coastal("Mecklenburg", "NC")
-
-
-def test_out_of_footprint_counties_dropped_by_default(footprint):
+def test_real_nc_counties_outside_the_old_footprint_are_kept(footprint, rows):
+    """2026-10-03 fix: TAX_SALE is a distressed-type lead, not a flip, so it
+    belongs on config.in_scope_distressed() (any real NC county) rather than
+    the narrow 18-county flip footprint. Mecklenburg and Alexander are real NC
+    counties that the old footprint∪coastal gate silently dropped -- live-
+    verified against the real feed, this was 149/190 rows (78%) across 19
+    counties, not just these two fixture rows."""
     counties = {li.county for li in footprint}
-    assert "Mecklenburg" not in counties
-    assert "Alexander" not in counties
-
-
-def test_all_counties_env_emits_everything(rows, footprint, monkeypatch):
-    monkeypatch.setenv("KANIA_ALL_COUNTIES", "1")
-    out = parse_rows(rows, SLUG)
-    counties = {li.county for li in out}
     assert "Mecklenburg" in counties
     assert "Alexander" in counties
-    assert len(out) > len(footprint)
+    # Every raw row in this fixture names a real NC county -- none should be
+    # dropped as garbage/unrecognized (a row can still expand to >1 Listing,
+    # one per parcel, so this is a lower bound, not an exact row count).
+    assert len(footprint) >= len(rows)
+
+
+def test_unrecognized_county_string_still_dropped_by_default(rows, monkeypatch):
+    """in_scope_distressed() only admits REAL NC counties -- a typo or a
+    non-NC value in the county column must still drop by default, same as
+    before the widen."""
+    bogus = json.loads(json.dumps(rows[:1]))
+    bogus[0]["value"]["county"] = "Not A Real County"
+    assert parse_rows(bogus, SLUG) == []
+
+    monkeypatch.setenv("KANIA_ALL_COUNTIES", "1")
+    assert parse_rows(bogus, SLUG), "KANIA_ALL_COUNTIES=1 must still let an unrecognized county through"
 
 
 def test_multi_parcel_row_becomes_one_listing_per_parcel(footprint):

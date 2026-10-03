@@ -47,6 +47,28 @@ Notes on the data:
   * ``closedate`` is the upset-bid close date.
   * ``courtfile`` is the county court file number (e.g. 25CV003791-220).
   * There is NO owner / taxpayer name column — Kania does not publish it.
+
+SCOPE BUG FOUND AND FIXED (2026-10-03, same class as enrichment_comps.py's
+c3edea94 and state_contamination.py/sc_ust_registry.py/epa_frs_sites.py's
+bbb6f2f9): every row here is ``ListingType.TAX_SALE``, which is NOT in
+``main._FLIP_LISTING_TYPES`` — it is a distressed-type lead that belongs on
+the broad ``config.in_scope_distressed()`` gate (any real NC county, per the
+2026-09-15 owner rule: "if its a distressed property its anywhere in nc and
+sc"), the same gate ``counties_sc.terry_howe_flc`` was already fixed to use
+for its own TAX_SALE rows on 2026-09-23. This scraper instead gated on
+``_footprint.in_footprint()/is_coastal()`` — the 18-county (11 NC) FLIP
+footprint plus the coastal allowlist — even though the entire feed already
+arrives in ONE free HTTP call with no per-county cost to widen.
+
+Live-verified 2026-10-03 against the real admin-ajax endpoint: 190 rows
+across 24 distinct NC counties, of which only 41 (Burke, Rutherford,
+Cleveland, Lincoln, Polk, New Hanover) passed the old footprint∪coastal
+gate — the other 149 rows (78%), across 19 real NC counties the old gate
+had never heard of (Caldwell 21, Harnett 21, Rowan 21, Person 13, Cherokee
+12, Surry 9, Union 8, Clay 7, Davie 7, Ashe 6, Davidson 6, Catawba 5,
+Mecklenburg 5, Anson 3, Alexander 2, Alleghany 1, Montgomery 1, Stokes 1),
+were silently dropped before ``main._in_scope`` ever got a chance to judge
+them under the correct (statewide) rule.
 """
 from __future__ import annotations
 
@@ -60,9 +82,9 @@ from urllib.parse import urljoin
 from dateutil import parser as dateparser
 
 from ...base_scraper import BaseScraper
+from ...config import in_scope_distressed
 from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
-from ._footprint import in_footprint, is_coastal
 
 LISTINGS_URL = "https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/"
 
@@ -104,11 +126,13 @@ _KIND_BY_TYPE = {
     "mixed": PropertyKind.MIXED,
 }
 
-#: Set KANIA_ALL_COUNTIES=1 to emit every county Kania publishes (used for
-#: coverage audits). Default applies the same parse-time geo gate the other
-#: statewide trustee-firm calendars use (footprint ∪ coastal), so the run
-#: doesn't drag ~170 out-of-scope properties through dedupe and every
-#: enrichment just to have main._in_scope drop them at the end.
+#: Set KANIA_ALL_COUNTIES=1 to emit a row even when its county column doesn't
+#: match any real NC county (used for coverage audits of the raw feed, e.g. a
+#: typo or a non-NC county slipping in). Default (fixed 2026-10-03) already
+#: emits every REAL NC county via in_scope_distressed() below -- TAX_SALE is a
+#: distressed-type lead, not a flip, so it is admissible statewide per the
+#: 2026-09-15 owner rule. This env var no longer narrows real coverage; it only
+#: controls whether an unrecognized county string is let through unfiltered.
 _ALL_COUNTIES_ENV = "KANIA_ALL_COUNTIES"
 
 
@@ -218,9 +242,12 @@ def _row_to_listings(value: dict, slug: str) -> list[Listing]:
     county = _clean_county(value.get("county"))
     if not county:
         return []
-    if not _emit_all_counties() and not (
-        in_footprint(county, "NC") or is_coastal(county, "NC")
-    ):
+    # TAX_SALE is a distressed-type lead (not a flip), so it belongs on the
+    # statewide in_scope_distressed() gate -- any real NC county -- not the
+    # narrow 18-county flip footprint. See the module docstring's 2026-10-03
+    # SCOPE BUG note. KANIA_ALL_COUNTIES still lets an unrecognized county
+    # string (typo, non-NC value) through unfiltered for audit purposes.
+    if not _emit_all_counties() and not in_scope_distressed(county, "NC"):
         return []
 
     addresses = _split_cell(value.get("address"))
