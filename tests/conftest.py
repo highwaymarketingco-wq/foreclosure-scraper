@@ -11,6 +11,7 @@ import pytest
 
 from foreclosure_scraper import enrichment_arcgis as _arcgis
 from foreclosure_scraper import jail_roster_history as _jail_history
+from foreclosure_scraper import web_artifact as _web_artifact
 
 
 @pytest.fixture(autouse=True)
@@ -20,6 +21,36 @@ def _reset_arcgis_breaker():
     yield
     _arcgis._WALLED_HOSTS.clear()
     _arcgis._HOST_FAILS.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_board_load_stamps():
+    """web_artifact._LOAD_STAMPS is a process-wide dict keyed by the RESOLVED
+    `<docs>/listings.json` path string, remembering what load_board()/patch_existing_rows()/etc.
+    last read there so a later write_artifact() in the SAME process can detect another writer
+    having replaced the board underneath it (audit O3) -- correct for production (one process,
+    one board) but leaks between tests, because it is keyed by a path STRING, not an inode or a
+    per-test identity.
+
+    This is not a hypothetical collision (found 2026-10-03 bisecting
+    test_dedupe_key_collision_with_different_scores_is_dropped_not_misapplied, which failed only
+    in a full run, never alone): pytest's own `tmp_path` fixture truncates the test's name to 30
+    chars before appending a numbered suffix (`_pytest/tmpdir.py:_mk_tmp`), so two tests whose
+    names share the same first 30 characters --
+    test_dedupe_key_collision_with_identical_scores_is_still_applied_once and
+    test_dedupe_key_collision_with_different_scores_is_dropped_not_misapplied both truncate to
+    "test_dedupe_key_collision_with" -- request the same numbered-dir prefix. Under this repo's
+    own tmp_path_retention_count=1 / tmp_path_retention_policy="failed" (pyproject.toml, commit
+    03888576, added the same day to stop pytest's tmp_path from piling up to 57GB), a PASSING
+    test's tmp_path dir is rmtree'd immediately at teardown, which frees its numbered suffix for
+    the very next test to reuse -- so the two tests above end up with the LITERALLY IDENTICAL
+    resolved docs/listings.json path string. Without this fixture, the second test inherits the
+    first test's stale _LOAD_STAMPS entry and write_artifact() raises a false-positive
+    BoardChangedSinceLoad, even though the two tests share no fixture, no data and no explicit
+    state at all."""
+    _web_artifact._LOAD_STAMPS.clear()
+    yield
+    _web_artifact._LOAD_STAMPS.clear()
 
 
 @pytest.fixture(autouse=True)
