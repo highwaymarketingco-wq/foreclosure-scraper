@@ -76,6 +76,18 @@ Emits one Listing per PARCEL (not per bill) carrying the full history in
 ``first_year``, ``latest_year``, ``total_owed``, ``trend`` and
 ``still_accruing``.
 
+EXTRACTION-COMPLETENESS AUDIT 2026-10-03: diffed every captured layer's live
+ArcGIS schema against this file's own field allowlists (30 candidate layers
+across all 3 counties). Everything unused was either already-null on real
+rows (Buncombe ``loan_num``), redundant with a field already captured
+(Buncombe ``levy_due`` tracks ``tax_due`` 1:1 on every sampled row), or a
+geometry/editor-metadata column with no lead value. One real miss: Pickens
+``dqnt_<YYYY>`` carries ``SALEDT``/``SALEP`` -- a real recorded
+last-arms-length sale date+price (~30% of rows, live-verified; the
+county's own CAMA join). Wired into ``raw['gis']['last_sale']`` so
+``enrichment_last_sale.py`` (which already reads that exact key) surfaces
+it for free.
+
 Dateless — an arrears history has no sale date, so
 ``counties.multi_year_delinquent_tax`` must be added to
 ``main.DATELESS_OK_SOURCES`` or every row is filtered out.
@@ -235,6 +247,13 @@ _OCONEE_2015_FIELDS = _Fields(
 )
 
 # Pickens dqnt_<YYYY>: full CAMA join — owner, mailing AND situs.
+# SALEDT (epoch ms)/SALEP (dollars) are a real last-arms-length-sale date +
+# price riding along on the CAMA join -- confirmed live 2026-10-03 on
+# dqnt_2022/2023/2024 (~30% of rows populated, dates spanning 2002-2026,
+# prices $10k-$150k+). This is the same recorded-sale signal
+# enrichment_last_sale.py already assembles from gis/cama sources; wired
+# below via raw["gis"]["last_sale"] (its highest-priority input) instead of
+# a private key, so it is picked up with no enricher change needed.
 _PICKENS_FULL_FIELDS = _Fields(
     parcel=("PIN", "MAP_PARCEL", "PARCEL_NUM"),
     owner=("OWNER__NOW", "NAME1", "NAME2"),
@@ -244,7 +263,7 @@ _PICKENS_FULL_FIELDS = _Fields(
     acres=("ACRES", "CalcAcres", "CALCACRE"),
     value=("ACTUALVAL",),
     legal=("SubDivisio", "IMPVAC"),
-    extra=("ACCTNO", "STATUS"),
+    extra=("ACCTNO", "STATUS", "SALEDT", "SALEP"),
 )
 # Pickens del_2021 / delinquent_2020: parcel + situs only, no owner column.
 _PICKENS_THIN_FIELDS = _Fields(
@@ -356,6 +375,21 @@ def _zip5(val: Any) -> str | None:
         return None
     # Pickens stores 296400000 (zip + zip4 concatenated) as an int.
     return s[:5] if s[:5] != "00000" else None
+
+
+def _epoch_ms_to_iso_date(val: Any) -> str | None:
+    """Pickens SALEDT is an ArcGIS epoch-millisecond date. 0/None means no
+    sale on record -- never 1970-01-01."""
+    try:
+        ms = float(val)
+    except (TypeError, ValueError):
+        return None
+    if not ms:
+        return None
+    try:
+        return datetime.utcfromtimestamp(ms / 1000.0).date().isoformat()
+    except (ValueError, OSError, OverflowError):
+        return None
 
 
 def _norm_addr(s: str | None) -> str:
@@ -681,6 +715,10 @@ class _Obs:
     mortgage_co: str | None = None
     layer: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
+    # Pickens dqnt_* SALEDT/SALEP -- a real recorded last-arms-length sale
+    # date + price (see _PICKENS_FULL_FIELDS comment).
+    last_sale_date: str | None = None
+    last_sale_amount: float | None = None
 
 
 def row_to_obs(attrs: dict, layer: _Layer) -> tuple[str, _Obs] | None:
@@ -730,8 +768,13 @@ def row_to_obs(attrs: dict, layer: _Layer) -> tuple[str, _Obs] | None:
             if v:
                 extra[comp] = v
 
+    last_sale_date = _epoch_ms_to_iso_date(attrs.get("SALEDT")) if "SALEDT" in f.extra else None
+    last_sale_amount = _money(attrs.get("SALEP")) if "SALEP" in f.extra else None
+
     return key, _Obs(
         year=layer.year,
+        last_sale_date=last_sale_date,
+        last_sale_amount=last_sale_amount,
         amount=_first_money(attrs, f.amount),
         owner=owner,
         situs=situs,
@@ -899,6 +942,20 @@ def build_listing(state: str, county: str, parcel_key: str, obs: list[_Obs],
             "out_of_state": bool(mail_state and mail_state != state),
             "source": "county_tax_roll",
         }
+
+    # EXTRACTION-COMPLETENESS AUDIT 2026-10-03: Pickens dqnt_* carries a real
+    # recorded last-arms-length sale date+price (SALEDT/SALEP, ~30% of rows,
+    # live-verified) that was fetched nowhere. Surfaced via
+    # raw["gis"]["last_sale"] -- enrichment_last_sale.py's own highest-
+    # priority input -- rather than a private key, so the dashboard's "last
+    # sold ~<date>, ~$<amount>" fact is populated for free.
+    last_sale_date = newest("last_sale_date")
+    last_sale_amount = newest("last_sale_amount")
+    if last_sale_date and last_sale_amount:
+        raw["gis"] = {"last_sale": {
+            "date": last_sale_date, "amount": last_sale_amount,
+            "source": "pickens_tax_roll",
+        }}
 
     label = (f"{county} County {state} — delinquent {len(years)} year(s) "
              f"({years[0]}-{years[-1]})")

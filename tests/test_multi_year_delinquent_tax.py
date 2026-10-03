@@ -143,6 +143,53 @@ def test_pickens_blank_situs_placeholders_do_not_become_addresses():
     assert ob.mail_state == "FL"
 
 
+def test_pickens_saledt_salep_become_last_sale_date_and_amount():
+    """EXTRACTION-COMPLETENESS 2026-10-03: dqnt_* carries a real recorded
+    last-arms-length sale date (SALEDT, epoch ms) + price (SALEP) riding
+    along on the CAMA join -- live-verified ~30% of rows across
+    dqnt_2022/2023/2024, values real-world-plausible ($10k-$150k+, dates
+    2000-2026). Values below are a real row captured live 2026-10-03
+    (PIN 4037-00-83-2164, dqnt_2023): SALEDT=1562112000000 ->
+    2019-07-03, SALEP=10000."""
+    attrs = {
+        "PIN": "4037-00-83-2164", "OWNER__NOW": "TEST OWNER",
+        "LOCADD": "1 TEST LN", "AMOUNT_DUE": 500.0,
+        "SALEDT": 1562112000000, "SALEP": 10000,
+    }
+    key, ob = myd.row_to_obs(attrs, PICK(2023))
+    assert key == "403700832164"
+    assert ob.last_sale_date == "2019-07-03"
+    assert ob.last_sale_amount == 10000.0
+
+
+def test_saledt_zero_or_missing_is_not_treated_as_a_real_sale():
+    """0/None must never read as 1970-01-01 or a real $0 sale."""
+    assert myd._epoch_ms_to_iso_date(0) is None
+    assert myd._epoch_ms_to_iso_date(None) is None
+    attrs = {"PIN": "1", "SALEDT": 0, "SALEP": 0}
+    _, ob = myd.row_to_obs(attrs, PICK(2023))
+    assert ob.last_sale_date is None and ob.last_sale_amount is None
+
+
+def test_last_sale_surfaces_into_raw_gis_for_enrichment_last_sale():
+    """Must land in raw["gis"]["last_sale"] -- enrichment_last_sale.py's own
+    highest-priority input -- not a private key, so the dashboard's "last
+    sold" fact is populated with no enricher change needed."""
+    obs = [myd._Obs(year=2023, amount=500.0, owner="X", layer="L2023",
+                    last_sale_date="2019-07-03", last_sale_amount=10000.0),
+           myd._Obs(year=2024, amount=600.0, owner="X", layer="L2024")]
+    li = myd.build_listing("SC", "Pickens", "P1", obs, "https://x.invalid", None)
+    assert li.raw["gis"]["last_sale"] == {
+        "date": "2019-07-03", "amount": 10000.0, "source": "pickens_tax_roll",
+    }
+
+
+def test_no_last_sale_data_omits_the_gis_key_entirely():
+    obs = [_obs(2023, 500.0), _obs(2024, 600.0)]
+    li = myd.build_listing("SC", "Pickens", "P2", obs, "https://x.invalid", None)
+    assert "gis" not in li.raw
+
+
 def test_pickens_thin_layer_without_owner_still_yields_a_parcel_year():
     """del_2021 / delinquent_2020 have no owner column. They still have to
     contribute a YEAR to the history — that is the whole point."""
