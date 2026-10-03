@@ -13,6 +13,21 @@ COMPLIANCE: every number is tagged source=ncsbe_voter + needs_dnc_scrub=True and
 call-ready until scrubbed against the National DNC Registry (re-scrub >=31 days), dialed
 8am-9pm local, and screened for TCPA wireless rules. This is enrichment only; the outreach
 stack gates any dialing. Footprint county files cached under data/ncvoter/.
+
+IDENTITY FRESHNESS (added 2026-10-03): a match here is made against owner_name AT THE TIME
+THIS RUNS -- if a LATER enrichment step (e.g. owner_freshness.py's GIS refresh) changes
+owner_name afterward, nothing used to notice. Live-checked against the board: 14.5% of
+14,630 matches no longer re-derive from the SAME cached voter-file snapshot against the
+CURRENT owner_name (e.g. Buncombe parcel 9648-62-3059-C0401 still carries voter "BAKER,
+BETTY"'s phone while owner_name has moved on to "MAXWELL, RONALD"). Every match now stamps
+`matched_name` ("LAST,FIRST") and is run through enrichment_sc_phone's identity gate --
+the SAME gate enrichment_sc_voter_xref.py already uses for its own cross-state lane --
+which re-verifies both a new match and any EARLIER run's match against the CURRENT
+owner_name on every call. The phone is NEVER cleared (it may still reach that person for a
+different property; only a human or a downstream campaign decides whether that is useful) --
+a mismatch only sets `do_not_dial` + `identity_check="contradicted"`, exactly the existing
+"keep the number, gate its dialability" policy already shipped for the xref lane. See
+enrichment_sc_phone.DIRECT_SOURCES for the gate-side half of this.
 """
 from __future__ import annotations
 
@@ -176,14 +191,24 @@ def _name_candidates(owner: str):
         yield (toks[-1], toks[0])    # FIRST [MIDDLE] LAST
 
 
-def _set_phone(li, ph, match):
+def _set_phone(li, ph, match, voter_name=None):
     if not isinstance(li.raw, dict):
         li.raw = {}
-    li.raw["owner_phone"] = {
+    payload = {
         "phone": f"({ph[0:3]}) {ph[3:6]}-{ph[6:]}",
         "source": "ncsbe_voter", "line_type": "unknown",
         "needs_dnc_scrub": True, "match": match,
     }
+    if voter_name:
+        # "LAST,FIRST" of the voter this phone was matched to -- WHO it was matched
+        # against, not just that a match happened. Added 2026-10-03: without this, a
+        # later ownership change can never be told apart from a still-good match (see
+        # enrichment_sc_phone.DIRECT_SOURCES' comment for the live-confirmed example:
+        # Buncombe parcel 9648-62-3059-C0401 still carries voter BAKER,BETTY's phone
+        # under owner_name "MAXWELL, RONALD"). Consumed by
+        # enrichment_sc_phone._voter_name() to re-verify this match is still live.
+        payload["matched_name"] = voter_name
+    li.raw["owner_phone"] = payload
 
 
 def enrich_voter_phone(listings) -> dict:
@@ -193,12 +218,25 @@ def enrich_voter_phone(listings) -> dict:
     stats = {"index_size": len(_INDEX), "nc_targets": 0,
              "matched_addr": 0, "matched_namecty": 0,
              "matched_fuzzy_addr": 0, "matched_fuzzy_namecty": 0}
+    written: list = []   # matched THIS run -- needs its first identity verdict
+    earlier: list = []   # matched an EARLIER run (carries matched_name) -- re-verified every run,
+                         # same "phones already stored are re-checked on every run" policy
+                         # enrichment_sc_voter_xref.py already uses for the cross-state lane,
+                         # because owner_name can be promoted/refreshed by a LATER enrichment
+                         # step (e.g. owner_freshness.py's GIS refresh) after this one ran.
     for li in listings:
         if li.state != "NC" or not li.owner_name:
             continue
-        # Skip if already has a phone from any source
         raw = li.raw if isinstance(li.raw, dict) else {}
         if raw.get("owner_phone"):
+            # Skip if already has a phone from any source -- never clobbers an existing
+            # match. A prior run's OWN match (source ncsbe_voter + matched_name) is still
+            # eligible for a fresh identity re-check below even though no NEW match is
+            # attempted here; a legacy block with no matched_name, or any other source,
+            # is left exactly alone.
+            op = raw.get("owner_phone")
+            if isinstance(op, dict) and op.get("source") == "ncsbe_voter" and op.get("matched_name"):
+                earlier.append(li)
             continue
         stats["nc_targets"] += 1
         cands = list(_name_candidates(li.owner_name))
@@ -209,9 +247,10 @@ def enrich_voter_phone(listings) -> dict:
             for last, first in cands:
                 ph = _INDEX.get((last, first, sk[0], sk[1]))
                 if ph:
-                    _set_phone(li, ph, "name+address")
+                    _set_phone(li, ph, "name+address", voter_name=f"{last},{first}")
                     stats["matched_addr"] += 1
                     hit = True
+                    written.append(li)
                     break
         # 2) fallback: name unique within the county (catches absentee owners)
         if not hit and li.county:
@@ -219,9 +258,10 @@ def enrich_voter_phone(listings) -> dict:
             for last, first in cands:
                 ph = _NAME_COUNTY.get((cty, last, first))
                 if ph:
-                    _set_phone(li, ph, "name+county-unique")
+                    _set_phone(li, ph, "name+county-unique", voter_name=f"{last},{first}")
                     stats["matched_namecty"] += 1
                     hit = True
+                    written.append(li)
                     break
         # 3) FUZZY: Soundex(last) + canonical first name + address
         if not hit and sk:
@@ -232,9 +272,10 @@ def enrich_voter_phone(listings) -> dict:
                     continue
                 ph = _FUZZY_INDEX.get((sx, cf, sk[0], sk[1]))
                 if ph:
-                    _set_phone(li, ph, f"fuzzy:soundex+addr")
+                    _set_phone(li, ph, "fuzzy:soundex+addr", voter_name=f"{last},{first}")
                     stats["matched_fuzzy_addr"] += 1
                     hit = True
+                    written.append(li)
                     break
         # 4) FUZZY: Soundex(last) + canonical first name unique within county
         if not hit and li.county:
@@ -246,9 +287,20 @@ def enrich_voter_phone(listings) -> dict:
                     continue
                 ph = _NAME_COUNTY_FUZZY.get((cty, sx, cf))
                 if ph:
-                    _set_phone(li, ph, f"fuzzy:soundex+county-unique")
+                    _set_phone(li, ph, "fuzzy:soundex+county-unique", voter_name=f"{last},{first}")
                     stats["matched_fuzzy_namecty"] += 1
+                    written.append(li)
                     break
     stats["matched"] = (stats["matched_addr"] + stats["matched_namecty"]
                         + stats["matched_fuzzy_addr"] + stats["matched_fuzzy_namecty"])
+
+    to_gate = written + earlier
+    stats["regated"] = len(earlier)
+    if to_gate:
+        # Lazy import: enrichment_sc_phone imports _DATA/_street_key FROM this module at
+        # its own top level, so importing it back at OUR top level would be circular.
+        from .enrichment_sc_phone import flag_unverified_xref_phones
+        gate = flag_unverified_xref_phones(to_gate, apply=True)
+        for k in ("corroborated", "unverified", "contradicted", "do_not_dial"):
+            stats[k] = gate[k]
     return stats

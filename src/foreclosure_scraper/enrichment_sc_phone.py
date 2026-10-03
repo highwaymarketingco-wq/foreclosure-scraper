@@ -28,6 +28,14 @@ THE VERDICT  xref_identity_verdict(li) -> "corroborated" | "unverified" | "contr
     never share a county with a voter; "Union", "Cherokee" and "Lee" exist in both states
     and a bare county-name comparison would corroborate a stranger across the line.
 
+    Added 2026-10-03 (DIRECT_SOURCES, see its own comment): the gate also covers
+    enrichment_voter_phone.py's SAME-state match (source "ncsbe_voter") once that module
+    stamps `matched_name`. There, name-vs-owner agreement alone is CORROBORATED outright --
+    the direct match already required address or county agreement at write time, which is
+    strictly more than this gate's own address/middle-initial branches exist to approximate
+    for the cross-state guess. Only a "voter_name_not_in_owner" mismatch (owner_name moved on
+    since the match) reaches CONTRADICTED on that lane.
+
 WHAT IS NOT DIALABLE  (owner_phone_block_reason / is_owner_phone_usable)
     * do_not_dial True (set by this gate, or by anyone else),
     * an xref-sourced phone whose identity_check is not "corroborated" (fail closed: a
@@ -69,6 +77,20 @@ CONTRADICTED = "contradicted"
 
 #: Phones stamped by the NC-voter-file cross-reference. These follow the identity gate.
 XREF_SOURCES = frozenset({"ncsbe_voter_xref", "sc_voter_xref"})
+
+#: Phones stamped by enrichment_voter_phone's own SAME-STATE NC match (name + property
+#: address, or name unique within the county -- never a cross-state guess). Added 2026-10-03:
+#: live-checked against the board, 14.5% of 14,630 ncsbe_voter phones no longer re-derive from
+#: the SAME cached voter-file snapshot against the CURRENT owner_name (e.g. Buncombe parcel
+#: 9648-62-3059-C0401: owner_phone still carries voter "BAKER, BETTY"'s number while owner_name
+#: has moved on to "MAXWELL, RONALD" -- the exact "matched against an old owner_name, never
+#: revisited" shape this gate already polices for the cross-state xref lane, just unguarded here
+#: because enrich_voter_phone()'s own `if raw.get("owner_phone"): continue` treats any existing
+#: value as permanent and never stores WHICH voter it matched to begin with. Only a block that
+#: carries the new `matched_name` field (stamped going forward by enrichment_voter_phone.py)
+#: is eligible -- an already-published legacy block with no matched_name is left exactly as it
+#: was (same "code-only, takes effect next run" convention as owner_freshness.py).
+DIRECT_SOURCES = frozenset({"ncsbe_voter"})
 
 #: The people-search lane is walled (TruePeopleSearch serves a captcha, FastPeopleSearch's
 #: terms bar bots). enrichment_free_phones writes source "free_people_search".
@@ -219,7 +241,20 @@ def _county_key(s) -> str:
 
 
 def _voter_name(block: dict) -> Optional[tuple[str, str]]:
-    """(LAST, FIRST) of the voter the phone was matched to, from match 'nc_xref:LAST,FIRST'."""
+    """(LAST, FIRST) of the voter the phone was matched to.
+
+    Prefers the explicit `matched_name` field ("LAST,FIRST") that
+    enrichment_voter_phone.py stamps on its own DIRECT_SOURCES matches --
+    those never encode the matched identity in `match` (which just labels
+    the match TIER: "name+address", "fuzzy:soundex+county-unique", ...).
+    Falls back to parsing `match` as 'nc_xref:LAST,FIRST', the cross-state
+    xref lane's own original (and still unchanged) convention.
+    """
+    mn = block.get("matched_name")
+    if isinstance(mn, str) and "," in mn:
+        last, first = (p.strip().upper() for p in mn.split(",", 1))
+        if last and first:
+            return (last, first)
     m = _MATCH_RE.match(str(block.get("match") or "").strip().upper())
     return (m.group(1), m.group(2)) if m else None
 
@@ -248,11 +283,16 @@ def _middle_verdict(owner: str, rec: "VoterRec") -> str:
 
 
 def _xref_blocks(raw: dict) -> list[dict]:
-    """The phone blocks on a row that came from the NC voter cross-reference."""
+    """The phone blocks on a row this gate polices: the cross-state xref lane (always), plus
+    a DIRECT_SOURCES (same-state) match once it carries the `matched_name` provenance a
+    freshness recheck needs -- see DIRECT_SOURCES' own comment. A DIRECT_SOURCES block with no
+    matched_name (legacy, written before this gate covered that lane) is left alone."""
     out: list[dict] = []
     op = raw.get("owner_phone")
-    if isinstance(op, dict) and op.get("phone") and str(op.get("source") or "") in XREF_SOURCES:
-        out.append(op)
+    if isinstance(op, dict) and op.get("phone"):
+        src = str(op.get("source") or "")
+        if src in XREF_SOURCES or (src in DIRECT_SOURCES and op.get("matched_name")):
+            out.append(op)
     sx = raw.get("sc_voter_xref")
     if isinstance(sx, dict) and sx.get("phone"):
         out.append(sx)
@@ -303,6 +343,21 @@ def _check(li, raw: dict, block: dict, index: Optional[VoterIdentityIndex]) -> d
     tokens = _owner_tokens(owner)
     if last not in tokens or first not in tokens:
         return out(CONTRADICTED, "voter_name_not_in_owner")
+
+    if str(block.get("source") or "") in DIRECT_SOURCES:
+        # A DIRECT_SOURCES (same-state) match already required name AND
+        # (property-address or county-uniqueness) agreement AT WRITE TIME --
+        # see enrichment_voter_phone.py's 4-tier precedence. That is strictly
+        # MORE evidence than this function's own corroboration branches below
+        # exist to approximate for the cross-state xref lane (which starts
+        # from a name-only guess across a state line and has no address/
+        # county check of its own to lean on). Once the name check above still
+        # agrees with the CURRENT owner, there is nothing further to ask --
+        # falling through to those cross-state-specific branches would
+        # wrongly downgrade the ~85% of this lane that is still perfectly
+        # fine to "unverified: no_corroboration" for want of an NC mailing
+        # address or a middle-initial match neither tier ever needed.
+        return out(CORROBORATED, "direct_match_name_still_current")
 
     # corroborated: independent evidence the voter and the owner are one person
     idx = index if index is not None else default_index()

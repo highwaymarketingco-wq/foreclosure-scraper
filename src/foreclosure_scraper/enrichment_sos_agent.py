@@ -27,6 +27,24 @@ dissolution step). Network-heavy -> gated OFF by default (SOS_AGENT=1), meant
 for the scheduled land-records pass, not the weekly crawl.
 
 Free, no auth, public record, Scrapling stealth.
+
+IDENTITY FRESHNESS (added 2026-10-03, PROVENANCE ONLY, not a gate): once resolved, a lead
+is never re-checked (`if isinstance(raw.get("sos_agent"), dict): continue`) even after its
+owner_name/defendant later changes. Live-checked against the board: at least 50.6% of 344
+sos_agent rows (174) no longer read as the SAME business this profile was resolved for --
+e.g. a Buncombe parcel whose owner/defendant is now "TRIVETTE, BRUCE" (a person) still
+carries the registered agent for "Lentz Investments, LLC" (status: Dissolved); 7+ Lincoln
+County parcels whose owner/defendant is now "LINCOLN COUNTY" (reverted after a tax sale)
+still carry "BECM Properties LLC"'s agent. Unlike owner_phone (enrichment_voter_phone.py,
+same date), there is no existing "do not use this contact" precedent to extend here --
+owner_phone's gate exists because TCPA/do-not-dial is a hard compliance line for a PHONE;
+a registered-agent MAILING contact has no such line, and whether a stale one should be
+suppressed, kept with a warning, or actively re-resolved is a real outreach-policy call
+this module does not make. What IS added: `resolved_for_entity` (the entity name actually
+looked up) and `resolved_at` on every freshly-written profile, so a human or a later script
+can compare it against the lead's current owner_name/defendant and decide for themselves --
+nothing is auto-cleared or suppressed. A profile written before this fix has neither field
+and is left exactly as it was.
 """
 from __future__ import annotations
 
@@ -34,6 +52,7 @@ import asyncio
 import os
 import re
 import time
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -42,6 +61,10 @@ from .models import Listing
 from .enrichment_sos_dissolution import _is_business, _strip_business_suffix
 
 log = structlog.get_logger()
+
+
+def _today_iso() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
 
 _ENABLED = os.environ.get("SOS_AGENT") == "1"
 _MAX_CHECK = int(os.environ.get("SOS_AGENT_MAX_CHECK", "60"))
@@ -331,6 +354,21 @@ async def enrich_with_sos_agent(listings: list[Listing], max_check: int = _MAX_C
         counts["resolved"] += 1
         if prof.get("best_contact_address") or prof.get("best_contact_name"):
             counts["with_contact"] += 1
+        # Provenance only -- NOT a staleness gate (see this function's docstring and
+        # docs/HANDOFF.md 2026-10-03). `name` is the entity this profile was actually
+        # resolved FOR (_entity_of(li) at resolution time); `resolved_at` is when. Neither
+        # auto-clears or suppresses anything -- a stale registered agent may still be a
+        # real, reachable contact (e.g. the same person behind a related entity), and
+        # deciding whether to suppress/warn/keep is an outreach-policy call this module
+        # does not make. This only lets a human or a later script compare
+        # sos_agent.resolved_for_entity against the lead's CURRENT owner_name/defendant
+        # for themselves, the same live-checked gap owner_freshness.py's docstring
+        # describes for owner_name: before this, nothing recorded which entity a
+        # registered-agent lookup was even FOR, so a later ownership change (the lead's
+        # owner/defendant moving on, e.g. to a bank or a county after a tax sale) left a
+        # stranded contact with no way to tell it apart from a still-good one.
+        prof["resolved_for_entity"] = name
+        prof["resolved_at"] = _today_iso()
         for li in name_to_listings.get(name, []):
             if not isinstance(li.raw, dict):
                 li.raw = {}

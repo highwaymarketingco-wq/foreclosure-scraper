@@ -456,7 +456,7 @@ const _LEAN_RAW = {
   owner_phone: ["phone", "source", "needs_dnc_scrub", "do_not_dial", "do_not_dial_reason", "identity_check", "role"],
   free_phones: ["phone", "source", "confidence", "needs_dnc_scrub"],
   sc_voter_xref: ["phone", "source", "match_type", "needs_dnc_scrub"],
-  sos_agent: ["sosid", "best_contact_name", "best_contact_address"],
+  sos_agent: ["sosid", "best_contact_name", "best_contact_address", "resolved_for_entity"],
   rod: ["has_mortgage", "has_adverse_lien", "has_hoa_lien", "hoa_lien_count"],
   equity: "*",
   title_risk: ["surviving_senior_debt_risk"],

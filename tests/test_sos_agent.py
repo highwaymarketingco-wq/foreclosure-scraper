@@ -124,6 +124,71 @@ def test_frontier_advances_and_propagates(monkeypatch):
     assert c.raw["sos_agent"]["sosid"] == "9"
 
 
+def test_a_fresh_resolution_stamps_which_entity_and_when(monkeypatch):
+    """2026-10-03 provenance fix: resolved_for_entity/resolved_at let a human or a later
+    script compare this profile against the lead's CURRENT owner_name/defendant later --
+    see enrichment_sos_agent.py's module docstring. Neither field gates anything here."""
+    monkeypatch.setattr(sa, "_ENABLED", True)
+
+    async def fake_batch(names):
+        return {n: {"sosid": "9", "best_contact_name": "New Owner"} for n in names}
+
+    monkeypatch.setattr(sa, "_batch_lookup", fake_batch)
+    li = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
+                state="NC", county="Gaston", owner_name="BETA LLC")
+
+    asyncio.run(sa.enrich_with_sos_agent([li]))
+
+    assert li.raw["sos_agent"]["resolved_for_entity"] == "BETA LLC"
+    assert li.raw["sos_agent"]["resolved_at"] == sa._today_iso()
+
+
+def test_a_propagated_profile_keeps_its_own_resolved_for_entity(monkeypatch):
+    """B inherits A's already-stamped profile object (same entity, free, no network) --
+    the stamp still correctly names the entity the co-owned lead itself resolves to."""
+    monkeypatch.setattr(sa, "_ENABLED", True)
+
+    async def fake_batch(names):
+        return {}
+
+    monkeypatch.setattr(sa, "_batch_lookup", fake_batch)
+
+    def mk(owner, resolved=False):
+        raw = ({"sos_agent": {"sosid": "1", "best_contact_name": "Prior",
+                              "resolved_for_entity": "ACME LLC", "resolved_at": "2026-09-01"}}
+               if resolved else {})
+        return Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
+                       state="NC", county="Gaston", owner_name=owner, raw=raw)
+
+    a = mk("ACME LLC", resolved=True)
+    b = mk("ACME LLC")
+
+    asyncio.run(sa.enrich_with_sos_agent([a, b]))
+
+    assert b.raw["sos_agent"]["resolved_for_entity"] == "ACME LLC"
+    assert b.raw["sos_agent"]["resolved_at"] == "2026-09-01"   # carried forward, not re-stamped
+
+
+def test_a_profile_resolved_before_this_fix_has_neither_field(monkeypatch):
+    """Legacy data (no resolved_for_entity/resolved_at) is left exactly alone -- same
+    'code-only, no retroactive correction' convention as owner_freshness.py."""
+    monkeypatch.setattr(sa, "_ENABLED", True)
+
+    async def fake_batch(names):
+        return {}
+
+    monkeypatch.setattr(sa, "_batch_lookup", fake_batch)
+    legacy = {"sosid": "1", "best_contact_name": "Stranded Contact"}
+    li = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
+                state="NC", county="Gaston", owner_name="TRIVETTE, BRUCE",
+                raw={"sos_agent": dict(legacy)})
+
+    asyncio.run(sa.enrich_with_sos_agent([li]))
+
+    assert li.raw["sos_agent"] == legacy
+    assert "resolved_for_entity" not in li.raw["sos_agent"]
+
+
 def test_disabled_by_default(monkeypatch):
     monkeypatch.setattr(sa, "_ENABLED", False)
     li = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
