@@ -30,6 +30,18 @@ over-the-counter on a rolling basis until redeemed. We DO capture the Excel
 "DATE REDEMPTION ENDS" serial as redemption_deadline (and "LAST DAY TO BID" when
 present), but there is no sale_date to emit. Noted here per the build brief.
 
+BIDS RECEIVED / "BIDDING CLOSED" (fixed 2026-10-04): the live sheet's "BIDS
+RECEIVED" column — one of the header tokens this docstring already listed —
+was never actually read. Live-verified 2026-09-29 workbook: real rows carry a
+nonzero count (e.g. item 6639, HIGHLAND WOODS HOA INC: 1 bid received; item
+10384, MULDROW MOSES E III: 2 bids received). "LAST DAY TO BID" is also
+sometimes the literal text "BIDDING CLOSED" instead of a date serial — the
+existing `_excel_serial_to_dt` already returned None for it (not a parse
+failure), but that silently looked identical to "no deadline set yet" instead
+of "this parcel already has a pending/awarded bid". Both are now captured:
+`bids_received` (int) and `bidding_closed` (bool) in raw, plus
+`auction_status="bidding_closed"` on the Listing when the latter is true.
+
 xlsx parsing: openpyxl is NOT a project dependency. A .xlsx is a zip of XML, so
 we stream sharedStrings + the single worksheet with the stdlib
 ``xml.etree.ElementTree.iterparse`` (same approach as the HUD Section-8 scraper).
@@ -219,6 +231,8 @@ def _header_map(row: dict[int, str]) -> dict[str, int] | None:
             found["tax_owed"] = idx
         elif "minimum bid" in lab:
             found["min_bid"] = idx
+        elif "bids received" in lab:
+            found["bids_received"] = idx
         elif "last day" in lab:
             found["last_bid"] = idx
         elif "redemption" in lab:
@@ -322,7 +336,18 @@ def _parse_listings(data: bytes, slug: str, source_url: str) -> list[Listing]:
         tax_owed = _money(row.get(cols.get("tax_owed", -1)))
         min_bid = _money(row.get(cols.get("min_bid", -1)))
         redemption = _excel_serial_to_dt(row.get(cols.get("redemption", -1)))
-        last_bid = _excel_serial_to_dt(row.get(cols.get("last_bid", -1)))
+        last_bid_raw = (row.get(cols.get("last_bid", -1)) or "").strip()
+        last_bid = _excel_serial_to_dt(last_bid_raw)
+        # The cell is sometimes the literal text "BIDDING CLOSED" instead of a
+        # date serial (live-verified 2026-10-04) — _excel_serial_to_dt already
+        # returns None for it (not a parse failure), but silently losing that
+        # text throws away the one signal that this parcel ALREADY has a
+        # pending/awarded bid, not merely "no deadline set yet". Kept as its
+        # own flag rather than folded into upset_bid_deadline (which stays a
+        # real date or None, never a status string).
+        bidding_closed = bool(re.search(r"closed", last_bid_raw, re.I))
+        bids_raw = (row.get(cols.get("bids_received", -1)) or "").strip()
+        bids_received = int(bids_raw) if bids_raw.isdigit() else None
 
         kind = PropertyKind.MOBILE if is_mobile else PropertyKind.UNKNOWN
         # Mobile-home rows carry the underlying real parcel after a '/' in the
@@ -336,6 +361,10 @@ def _parse_listings(data: bytes, slug: str, source_url: str) -> list[Listing]:
         bits = [f"Horry FLC item {item}"]
         if desc:
             bits.append(desc)
+        if bidding_closed:
+            bits.append("bidding closed")
+        elif bids_received:
+            bits.append(f"{bids_received} bid{'s' if bids_received != 1 else ''} received")
         description = " — ".join(bits)[:300]
 
         out.append(Listing(
@@ -357,6 +386,10 @@ def _parse_listings(data: bytes, slug: str, source_url: str) -> list[Listing]:
             judgment_amount=tax_owed,
             redemption_deadline=redemption,
             upset_bid_deadline=last_bid,
+            # A literal "BIDDING CLOSED" cell means this parcel already has a
+            # pending/awarded bid, not an open invitation — distinct from the
+            # 'dateless OTC' default every other FLC row carries.
+            auction_status="bidding_closed" if bidding_closed else None,
             foreclosure_process="tax",
             description=description,
             first_seen=now,
@@ -369,6 +402,8 @@ def _parse_listings(data: bytes, slug: str, source_url: str) -> list[Listing]:
                 "market_improvement_value": market,
                 "tax_owed_at_sale": tax_owed,
                 "minimum_bid": min_bid,
+                "bids_received": bids_received,
+                "bidding_closed": bidding_closed,
                 "underlying_parcel": underlying_parcel,
                 "mobile_home": is_mobile,
                 "situs_raw": situs or None,
