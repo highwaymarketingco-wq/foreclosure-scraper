@@ -2350,8 +2350,21 @@ RAW_KEEP = {
     "state_contamination": "*", "stokes_delinquent_tax": "*", "sumter_surplus": "*",
     "surplus_auction": "*", "swain_tax_foreclosures": "*", "townnews_legal": "*",
     "transylvania_tax": "*", "transylvania_vacant": "*", "tranzon": "*",
+    # national.trulia added 2026-10-04 (national.* extraction-completeness
+    # audit, batch 5): is_foreclosure/is_recently_sold/beds_raw/baths_raw/
+    # floor_space_raw were all flat top-level raw keys with no RAW_KEEP
+    # entry (only trulia_id/images were) -- silently dropped at every
+    # publish since this scraper was built.
+    "trulia": "*",
     "treasury_seized": "*", "tryon_bulletin": "*", "union_delinquent_tax": "*",
     "usda_rd": "*", "usmarshals": "*", "wake_tax_foreclosure": "*",
+    # national.usda_properties added 2026-10-04 (national.* extraction-
+    # completeness audit, batch 5): usda_data_type/usda_eligible/facts were
+    # flat top-level raw keys with no RAW_KEEP entry -- silently dropped at
+    # every publish. Namespaced under this new key (also carries the new
+    # detail-page fields: lot_acres/new_construction/garage_spaces/hoa/
+    # hoa_fee/condition/listed_by/brokerage).
+    "usda_properties": "*",
     "williams": "*", "wnc_rod": "*", "wnc_tax_foreclosures": "*",
     "york_delinquent_tax": "*",
     # York's Overage Claim List (tax-sale surplus owed BACK to the former
