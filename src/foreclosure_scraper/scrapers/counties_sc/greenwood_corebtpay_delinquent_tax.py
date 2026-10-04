@@ -117,16 +117,65 @@ WHAT A RECORD CARRIES
     never trusting one without the other (mirrors Dorchester's TotalDueNow
     check).
 
-    Search results carry NO address. A second GET per unique parcel —
-    `pay.egov?view=detail;account=<latest-year's-account>;itemid=1` — returns
-    one more field, `Service Address`, a single free-text line (verified
-    live: "137 PATTERSON DR, NINETY, SIX, SC 29666" for a Ninety Six, SC
-    parcel — kept as one string rather than split into city/state/zip, since
-    the town name itself containing a comma-like artifact in the source data
-    makes any split unreliable; same "don't overparse a free-text situs"
-    posture as `dorchester_billtrax_delinquent_tax.py`). Only ONE detail
-    fetch is made per aggregated parcel (the latest year's account), not one
-    per bill-year — the service address does not change by tax year.
+    Search results carry NO address. A second GET per unique parcel resolves
+    it — but NOT the `view=detail` page this module originally used.
+
+    THE BILL PAGE CARRIES THE REAL SITUS (fixed 2026-10-04, a real
+    correctness bug, not just a missing field): `view=detail`'s one address
+    field is labeled "Service Address", and the ORIGINAL build (2026-09-30)
+    took that at face value and published it as `street_address`. Live
+    re-verification 2026-10-04 proved it is actually the OWNER'S MAILING
+    address, not the property's situs — for an owner-occupant the two
+    happen to coincide (e.g. CREASMAN JOSHUA S AS TRUST: "213 KAYAK POINT,
+    GREENWOOD, SC" both ways), but for every absentee/commercial owner they
+    diverge: MUSSMAN STEVEN PATRICK's "Service Address" was his own
+    Simpsonville, SC mailing address, while his actual Greenwood parcel sits
+    at a completely different "512 SAND SHORE DR"; WW PLASMA IV LLC's was a
+    Birmingham, AL suite. Every absentee-owner lead (precisely the
+    population this project's motivated-seller engine most wants a mailing
+    channel AND a real property address for) was carrying the WRONG address
+    as `street_address`.
+
+    The fix: fetch `pay.egov?view=bill;account=<account>;id=1;itemid=1`
+    instead (`id=1` is a fixed literal, verified live across many accounts,
+    not a per-account lookup value — no `view=detail` fetch is needed first).
+    This "View This Bill" page is a strict superset of `view=detail`: the
+    SAME owner name + mailing address (as a 3-line `<br>`-joined mail-merge
+    block), PLUS the real `LOCATION:` (situs — genuinely blank on some
+    commercial/pipeline parcels with no single address, e.g. CAROLINA GAS
+    TRANSMISSION; a blank LOCATION is kept as None, never backfilled from the
+    mailing address), PROPERTY DESCRIPTION (legal description), DISTRICT,
+    BLDGS/LOTS/ACRES, and a full valuation block (ASSESSED VALUE, TAX VALUE
+    = fair market value, the 4%-vs-6% owner-occupied/legal-residence
+    assessment-ratio split, and LESS HOMESTEAD EXEMPTION) — none of which
+    `view=detail` ever exposed. `street_address` is now the real LOCATION;
+    the mailing address moves to `raw['owner_mailing']` (the canonical key
+    `mailing_shape.mailing_of()` / `enrichment_lead_signals.py`'s absentee-
+    owner check actually read — publishing it only as `street_address`
+    made it invisible to that whole facet). Fetching the bill page also
+    REPLACES the `view=detail` fetch rather than adding to it, so this halves
+    the per-parcel request count against an already-slow, pacing-limited
+    server, not just adding fields.
+
+    A SEASONAL OBSERVATION (not a code bug, logged for the next auditor):
+    live-swept 7 different 2-letter prefixes (~22,000+ rows) on 2026-10-04
+    and found ZERO "Unpaid" rows anywhere — every current row (tax years
+    2024/2025 only; the portal appears to retain roughly a 2-year window,
+    since the 2026-09-30 build's own SMITH JAMES M multi-year 2017-2019
+    example is no longer resolvable at all, even via a direct account-number
+    search) is "Paid". Likely explanation, not confirmed with county staff:
+    SC tax sales for a given tax year's delinquent bills run Oct-Dec of the
+    FOLLOWING year, so a genuinely-still-unpaid 2025 bill is right about now
+    being pulled off the "pay your bill online" portal and handed to the
+    Treasurer's execution/tax-sale process — which would make a 0-row sweep
+    this time of year a true, temporary reflection of the source, not a
+    scraper defect. Re-checked the sibling `greenwood_delinquent_tax`'s own
+    Treasurer tax-SALE page the same day for an alternative live source: it
+    is STILL office-info-only (re-confirmed 2026-10-04), so there is
+    currently no public substitute either. The sweep/parse/filter logic
+    itself is unchanged and will correctly pick up real Unpaid rows the
+    moment the portal carries any again (confirmed by construction: the
+    Unpaid-detection test fixtures are untouched and still pass).
 
     No listing_type on this portal distinguishes real estate from business
     personal property the way Dorchester's BillNumber R-/M- prefix or
@@ -224,6 +273,42 @@ _ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.I | re.S)
 _CELL_RE = re.compile(r"<t[dh][^>]*>(.*?)</t[dh]>", re.I | re.S)
 _TAG_RE = re.compile(r"<[^>]+>")
 
+# --- the per-account "View This Bill" page (pay.egov?view=bill;...) ---------
+# See module docstring's "THE BILL PAGE CARRIES THE REAL SITUS" note: this is
+# a distinct, richer page from `view=detail` (never fetched before this
+# audit) that carries the property's actual LOCATION (situs), legal
+# description, building/lot/acreage counts and a full valuation breakdown —
+# none of which `_parse_detail` below can see. `id=1` in the URL is a fixed
+# literal (verified live across many different accounts), not a per-account
+# lookup value, so the URL is built directly from the account number alone.
+_BILL_TAXMAP_RE = re.compile(r'id="taxMapNumberContainer">\s*<div>TAX MAP NUMBER\s*([0-9]+)\s*</div>', re.I)
+_BILL_LOCATION_RE = re.compile(r"<div>LOCATION:\s*([^<]*)</div>", re.I)
+_BILL_CUSTADDR_RE = re.compile(r'class="custAddrStyle">(.*?)</div>', re.I | re.S)
+
+
+def _bill_field_re(label: str) -> re.Pattern:
+    """A `taxTableLabelIndent`/`taxTableValueIndent` label/value pair. The
+    label match is anchored right after the opening '>' so e.g. 'ASSESSED
+    VALUE' can never accidentally match inside the DIFFERENT '4% ASSESSED
+    VALUE' / '6% ASSESSED VALUE' rows (those render as one text node each,
+    so '>ASSESSED VALUE<' is not a substring of '>4% ASSESSED VALUE<')."""
+    return re.compile(
+        rf'class="taxTableLabelIndent">{re.escape(label)}</div>\s*'
+        rf'<div class="taxTableValueIndent">([^<]*)</div>', re.I)
+
+
+_BILL_DISTRICT_RE = _bill_field_re("DISTRICT")
+_BILL_PROPDESC_RE = _bill_field_re("PROPERTY DESCRIPTION")
+_BILL_BLDGS_RE = _bill_field_re("BLDGS")
+_BILL_LOTS_RE = _bill_field_re("LOTS")
+_BILL_ACRES_RE = _bill_field_re("ACRES")
+_BILL_ASSESSED_RE = _bill_field_re("ASSESSED VALUE")
+_BILL_TAXVALUE_RE = _bill_field_re("TAX VALUE")
+_BILL_PCT4_RE = _bill_field_re("4% ASSESSED VALUE")
+_BILL_PCT6_RE = _bill_field_re("6% ASSESSED VALUE")
+_BILL_HOMESTEAD_RE = re.compile(
+    r'LESS HOMESTEAD EXEMPTION</td>\s*<td class="textRight">([^<]*)</td>', re.I)
+
 
 class GreenwoodCorebtpayBlocked(RuntimeError):
     """The host answered 403/429 or otherwise refused the request — a wall,
@@ -307,6 +392,67 @@ def _parse_detail(html: str) -> dict:
     return out
 
 
+def _parse_bill(html: str) -> dict:
+    """Parse the `view=bill` per-account tax-notice page.
+
+    Returns {} if the page doesn't look like a real bill (host changed shape,
+    or the account id was rejected) — same "don't lose an otherwise-real lead
+    over a missing enrichment field" posture as `_parse_detail`.
+    """
+    if not html or "taxMapNumberContainer" not in html:
+        return {}
+    out: dict = {}
+
+    m = _BILL_TAXMAP_RE.search(html)
+    if m:
+        out["tax_map_number"] = m.group(1).strip() or None
+
+    m = _BILL_LOCATION_RE.search(html)
+    if m:
+        out["situs_address"] = _clean(m.group(1)) or None  # genuinely blank on many commercial/pipeline parcels
+
+    m = _BILL_CUSTADDR_RE.search(html)
+    if m:
+        # 3 <br>-joined lines: owner name, mailing street, mailing city/state/zip.
+        lines = [ln.strip() for ln in re.split(r"<br\s*/?>", m.group(1), flags=re.I)]
+        lines = [re.sub(r"\s+", " ", _clean(ln)) for ln in lines if _clean(ln)]
+        if len(lines) >= 2:
+            out["mailing_address"] = ", ".join(lines[1:])  # drop the name line
+
+    m = _BILL_PROPDESC_RE.search(html)
+    if m:
+        out["legal_description"] = _clean(m.group(1)) or None
+
+    m = _BILL_DISTRICT_RE.search(html)
+    if m:
+        out["district"] = _clean(m.group(1)) or None
+
+    for key, rx in (("bldgs", _BILL_BLDGS_RE), ("lots", _BILL_LOTS_RE)):
+        m = rx.search(html)
+        if m:
+            val = _clean(m.group(1))
+            try:
+                out[key] = int(val)
+            except ValueError:
+                pass
+
+    m = _BILL_ACRES_RE.search(html)
+    if m:
+        try:
+            out["acres"] = float(_clean(m.group(1)))
+        except ValueError:
+            pass
+
+    for key, rx in (("assessed_value", _BILL_ASSESSED_RE), ("tax_value", _BILL_TAXVALUE_RE),
+                    ("pct4_assessed_value", _BILL_PCT4_RE), ("pct6_assessed_value", _BILL_PCT6_RE),
+                    ("homestead_exemption", _BILL_HOMESTEAD_RE)):
+        m = rx.search(html)
+        if m:
+            out[key] = _parse_amount(_clean(m.group(1)))
+
+    return out
+
+
 def _parcel_prefix(account: str, tax_year: int) -> tuple[str, bool]:
     """Strip the trailing 2-digit tax-year suffix (`tax_year % 100`) off an
     Account Number to recover the STABLE per-parcel id — see the module
@@ -324,7 +470,18 @@ def _aggregate(rows: Iterable[dict], detail_by_account: dict[str, dict]) -> list
     """One Listing per parcel (grouped by `_parcel_prefix`), balances summed
     across bill-years still unpaid — same shape as
     dorchester_billtrax_delinquent_tax._aggregate /
-    sc_catalis_delinquent_roll.aggregate_bills."""
+    sc_catalis_delinquent_roll.aggregate_bills.
+
+    `detail_by_account` is keyed by the LATEST bill-year's account number and
+    holds whatever `_parse_bill` recovered from that account's "View This
+    Bill" page (situs, mailing, legal description, property characteristics,
+    valuation) — see module docstring's "THE BILL PAGE CARRIES THE REAL
+    SITUS" note. `street_address` is the real property LOCATION, never the
+    owner's mailing address (a correctness bug fixed 2026-10-04: the old code
+    published the detail page's "Service Address" — which is actually the
+    owner's MAILING address — as street_address, so every absentee/commercial
+    owner's lead carried a wrong, often out-of-state, "property" address).
+    """
     by_parcel: dict[str, list[dict]] = {}
     for r in rows:
         if not r["unpaid"] or not r["amount"] or r["amount"] <= 0:
@@ -339,44 +496,63 @@ def _aggregate(rows: Iterable[dict], detail_by_account: dict[str, dict]) -> list
         group = sorted(group, key=lambda g: g["tax_year"], reverse=True)
         latest = group[0]
         owner = latest["name"] or None
-        detail = detail_by_account.get(latest["account"], {})
-        address = detail.get("service_address")
+        bill = detail_by_account.get(latest["account"], {})
+        situs = bill.get("situs_address")
+        mailing = bill.get("mailing_address")
 
         years = sorted({g["tax_year"] for g in group})
         total_due = round(sum(g["amount"] for g in group), 2) or None
         bills = [{"account": g["account"], "year": g["tax_year"], "amount": g["amount"],
                   "status": g["status_text"]} for g in group]
 
-        raw = {
-            "greenwood_corebtpay_delinquent_tax": {
-                "parcel_id": parcel_id,
-                "latest_account": latest["account"],
-                "owner": owner,
-                "service_address": address,
-                "bills": bills,
-                "years": years,
-                "years_delinquent": len(years),
-                "is_two_year_plus": len(years) >= 2,
-                "total_due": total_due,
-                "year_suffix_stripped": latest["year_suffix_stripped"],
-            },
+        # BLDGS==0 on the latest bill is a real "no structure" signal (same
+        # sparse-omission convention batch 9's dillon_delinquent_tax fix
+        # established) — anything else stays UNKNOWN, since nothing on this
+        # page distinguishes single-family from commercial/mobile.
+        kind = PropertyKind.UNKNOWN
+        if bill.get("bldgs") == 0:
+            kind = PropertyKind.LAND
+
+        raw_block = {
+            "parcel_id": parcel_id,
+            "latest_account": latest["account"],
+            "owner": owner,
+            "service_address": situs,  # back-compat alias; see 'situs_address' for the honest name
+            "situs_address": situs,
+            "bills": bills,
+            "years": years,
+            "years_delinquent": len(years),
+            "is_two_year_plus": len(years) >= 2,
+            "total_due": total_due,
+            "year_suffix_stripped": latest["year_suffix_stripped"],
         }
+        if bill:
+            raw_block["bill"] = {k: v for k, v in bill.items() if k not in ("situs_address", "mailing_address")}
+        raw: dict = {"greenwood_corebtpay_delinquent_tax": raw_block}
         if total_due:
             raw["tax_owed"] = {"balance": total_due, "kind": "delinquent_tax", "source": SLUG,
                                "year": years[-1] if years else None, "basis": "own_record"}
+        if mailing:
+            # Bare-string convention (mailing_shape.mailing_dict) — same shape
+            # spartanburg_vacant/spartanburg_delinquent_tax already use.
+            raw["owner_mailing"] = mailing
 
         span = f"{years[0]}-{years[-1]}" if len(years) > 1 else (str(years[0]) if years else "")
         out.append(Listing(
             source=SLUG,
-            source_url=SITE_URL + f"?view=detail;account={latest['account']};itemid=1",
+            source_url=SITE_URL + f"?view=bill;account={latest['account']};id=1;itemid=1",
             listing_type=ListingType.TAX_LIEN,
-            property_kind=PropertyKind.UNKNOWN,
+            property_kind=kind,
             state="SC",
             county="Greenwood",
             parcel_id=parcel_id,
             defendant=owner,
             owner_name=owner,
-            street_address=address,
+            street_address=situs,
+            legal_description=bill.get("legal_description"),
+            acreage=bill.get("acres"),
+            assessed_value=bill.get("assessed_value"),
+            market_value=bill.get("tax_value"),
             description=(f"Delinquent property tax {span}"
                          f" ({len(years)} bill{'s' if len(years) != 1 else ''})"
                          + (f": ${total_due:,.2f} due" if total_due else "")),
@@ -425,6 +601,27 @@ async def _get_detail(cli: httpx.AsyncClient, account: str) -> str:
             continue
         if r.status_code in (403, 429):
             raise GreenwoodCorebtpayBlocked(f"HTTP {r.status_code} for detail {account}")
+        if r.status_code >= 500:
+            await asyncio.sleep(_BACKOFF_S)
+            continue
+        r.raise_for_status()
+        return r.text
+    return ""
+
+
+async def _get_bill(cli: httpx.AsyncClient, account: str) -> str:
+    """Fetch the `view=bill` page directly from the account number — no
+    `view=detail` fetch needed first (see module docstring; `id=1` is a
+    fixed literal, verified live across many accounts, not a lookup key)."""
+    url = SITE_URL + f"?view=bill;account={account};id=1;itemid=1"
+    for attempt in range(3):
+        try:
+            r = await cli.get(url)
+        except httpx.HTTPError:
+            await asyncio.sleep(_BACKOFF_S)
+            continue
+        if r.status_code in (403, 429):
+            raise GreenwoodCorebtpayBlocked(f"HTTP {r.status_code} for bill {account}")
         if r.status_code >= 500:
             await asyncio.sleep(_BACKOFF_S)
             continue
@@ -537,10 +734,16 @@ class GreenwoodCorebtpayDelinquentTax(BaseScraper):
                 self.last_reason = str(exc)[:200]
                 return []
 
-            # Detail (service-address) pass: one GET per unique aggregated parcel,
-            # not per bill-year (see module docstring).
+            # Bill-page pass: one GET per unique aggregated parcel (not per
+            # bill-year), fetching `view=bill` DIRECTLY off the account number
+            # — see module docstring's "THE BILL PAGE CARRIES THE REAL SITUS"
+            # note. This replaces the old `view=detail` fetch outright: the
+            # bill page is a strict superset (same owner/mailing info, PLUS
+            # the real situs, legal description, property characteristics and
+            # valuation `view=detail` never had), so there is no longer any
+            # reason to fetch `view=detail` at all.
             listings_no_addr = _aggregate(all_rows, {})
-            detail_by_account: dict[str, dict] = {}
+            bill_by_account: dict[str, dict] = {}
             accounts_needed = [
                 li.raw["greenwood_corebtpay_delinquent_tax"]["latest_account"]
                 for li in listings_no_addr
@@ -550,8 +753,8 @@ class GreenwoodCorebtpayDelinquentTax(BaseScraper):
                 if j:
                     await asyncio.sleep(_DETAIL_PACE_S)
                 try:
-                    dhtml = await _get_detail(cli, acct)
-                    detail_by_account[acct] = _parse_detail(dhtml)
+                    bhtml = await _get_bill(cli, acct)
+                    bill_by_account[acct] = _parse_bill(bhtml)
                 except GreenwoodCorebtpayBlocked as exc:
                     log.warning("greenwood_corebtpay.detail_blocked", account=acct,
                                error=str(exc))
@@ -561,7 +764,7 @@ class GreenwoodCorebtpayDelinquentTax(BaseScraper):
                     log.warning("greenwood_corebtpay.detail_error", account=acct,
                                error=str(exc)[:160])
 
-        listings = _aggregate(all_rows, detail_by_account)
+        listings = _aggregate(all_rows, bill_by_account)
         self.partial = listings
         elapsed = round(time.monotonic() - t0, 1)
         log.info("greenwood_corebtpay.done", requests=stats["requests"],

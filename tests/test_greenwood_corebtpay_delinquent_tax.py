@@ -42,6 +42,7 @@ from foreclosure_scraper.scrapers.counties_sc.greenwood_corebtpay_delinquent_tax
     _is_unpaid,
     _parcel_prefix,
     _parse_amount,
+    _parse_bill,
     _parse_detail,
     _parse_search_table,
     _sweep,
@@ -105,6 +106,60 @@ DUNLAP_DETAIL_HTML = """
     <tr><td>Status:</td><td><i class="fas fa-times"></i> Unpaid</td></tr>
     <tr><td>View This Bill:</td><td><a href="https://greenwoodco.corebtpay.com/egov/apps/bill/pay.egov?view=bill;account=688577523500025;id=1;itemid=1">View</a></td></tr>
 </table>
+"""
+
+# --- real `view=bill` page bodies (trimmed to the load-bearing markup),
+# captured live 2026-10-04 against account 684677012900025 (WW PLASMA IV LLC)
+# and 085-00-00-013.03-style RSM HOLDINGS INC account, whose own "LOCATION:"
+# is genuinely blank (a commercial parcel with no single street address) --
+# see module docstring's "THE BILL PAGE CARRIES THE REAL SITUS" note. --------
+WW_PLASMA_BILL_HTML = """
+<div id="taxMapNumberContainer">
+    <div>TAX MAP NUMBER 6846770129</div>
+    <div>LOCATION: 311 HAMPTON AV</div>
+</div>
+<div id="taxDelinquentNotice">ON APRIL 1 A $25.00 DELINQUENT COLLECTION COST WILL BE ADDED</div>
+<div id="customerContact">
+    <div class="custAddrStyle">
+        WW PLASMA IV LLC<br>
+        400 UNION HILL DR SUITE100<br>
+        BIRMINGHAM         AL 352090000
+    </div>
+</div>
+<div id="taxTableTopContainer">
+    <div><div class="taxTableLabelIndent">DISTRICT</div><div class="taxTableValueIndent">9</div></div>
+    <div><div class="taxTableLabelIndent">PROPERTY DESCRIPTION</div><div class="taxTableValueIndent">1 LT</div></div>
+    <div><div class="taxTableLabelIndent">BLDGS</div><div class="taxTableValueIndent">1</div></div>
+    <div><div class="taxTableLabelIndent">LOTS</div><div class="taxTableValueIndent">1</div></div>
+    <div><div class="taxTableLabelIndent">ACRES</div><div class="taxTableValueIndent">0.0</div></div>
+</div>
+<div id="taxTableBottomContainer">
+    <div><div class="taxTableLabelIndent">ASSESSED VALUE</div><div class="taxTableValueIndent">94190.00</div></div>
+    <div><div class="taxTableLabelIndent">TAX VALUE</div><div class="taxTableValueIndent">1569800.00</div></div>
+    <div><div class="taxTableLabelIndent">4% ASSESSED VALUE</div><div class="taxTableValueIndent">0</div></div>
+    <div><div class="taxTableLabelIndent">6% ASSESSED VALUE</div><div class="taxTableValueIndent">94188</div></div>
+</div>
+<table class="taxTableGenericContainer"><tbody class="taxTableBody">
+    <tr><td></td><td class="textRight"></td><td class="textRight"></td>
+        <td class="textLeft">LESS HOMESTEAD EXEMPTION</td><td class="textRight">0.00</td></tr>
+</tbody></table>
+"""
+
+# RSM HOLDINGS INC: same shape, but LOCATION is genuinely empty (verified
+# live) -- a commercial parcel with no single mailable street address.
+RSM_HOLDINGS_BILL_HTML = """
+<div id="taxMapNumberContainer">
+    <div>TAX MAP NUMBER 2718842000</div>
+    <div>LOCATION: </div>
+</div>
+<div id="taxDelinquentNotice">ON APRIL 1 A $25.00 DELINQUENT COLLECTION COST WILL BE ADDED TO EACH UNPAID ACCOUNT</div>
+<div id="customerContact">
+    <div class="custAddrStyle">
+        RSM HOLDINGS INC<br>
+        1310 EMERALD ROAD<br>
+        GREENWOOD         SC 296460000
+    </div>
+</div>
 """
 
 
@@ -198,11 +253,117 @@ def test_multiyear_real_delinquency_aggregates_into_one_listing():
     assert li.raw["tax_owed"]["year"] == 2019
 
 
-def test_aggregate_fills_in_address_from_detail_lookup():
+def test_aggregate_fills_in_address_from_bill_lookup():
+    """street_address comes from the bill page's real situs
+    ('situs_address'), never from the detail page's mailing-address field —
+    see test_aggregate_never_uses_mailing_as_street_address for the
+    regression this guards against."""
     rows = _parse_search_table(SEARCH_TABLE_HTML)
-    detail_map = {"67144500019": {"service_address": "123 TEST RD, GREENWOOD, SC 29646"}}
-    listings = _aggregate(rows, detail_by_account=detail_map)
+    bill_map = {"67144500019": {"situs_address": "123 TEST RD, GREENWOOD, SC 29646"}}
+    listings = _aggregate(rows, detail_by_account=bill_map)
     assert listings[0].street_address == "123 TEST RD, GREENWOOD, SC 29646"
+
+
+def test_aggregate_never_uses_mailing_as_street_address():
+    """Regression test for the 2026-10-04 fix: an absentee owner's mailing
+    address must land in raw['owner_mailing'], never in street_address."""
+    rows = _parse_search_table(SEARCH_TABLE_HTML)
+    bill_map = {
+        "67144500019": {
+            "situs_address": "512 SAND SHORE DR",
+            "mailing_address": "410 NEDDIOLO LN, SIMPSONVILLE, SC 29681",
+        }
+    }
+    listings = _aggregate(rows, detail_by_account=bill_map)
+    li = listings[0]
+    assert li.street_address == "512 SAND SHORE DR"
+    assert li.raw["owner_mailing"] == "410 NEDDIOLO LN, SIMPSONVILLE, SC 29681"
+    assert "SAND SHORE" not in (li.raw["owner_mailing"] or "")
+
+
+def test_aggregate_blank_situs_stays_none_not_backfilled_from_mailing():
+    """RSM HOLDINGS-shaped case: a genuinely blank LOCATION must not silently
+    fall back to the mailing address — that would reintroduce the exact bug
+    this fix removed, just through a different code path."""
+    rows = _parse_search_table(SEARCH_TABLE_HTML)
+    bill_map = {
+        "67144500019": {
+            "situs_address": None,
+            "mailing_address": "1310 EMERALD ROAD, GREENWOOD, SC 29646",
+        }
+    }
+    listings = _aggregate(rows, detail_by_account=bill_map)
+    assert listings[0].street_address is None
+    assert listings[0].raw["owner_mailing"] == "1310 EMERALD ROAD, GREENWOOD, SC 29646"
+
+
+def test_aggregate_wires_property_characteristics_and_valuation():
+    rows = _parse_search_table(SEARCH_TABLE_HTML)
+    bill_map = {"67144500019": _parse_bill(WW_PLASMA_BILL_HTML)}
+    listings = _aggregate(rows, detail_by_account=bill_map)
+    li = listings[0]
+    assert li.street_address == "311 HAMPTON AV"
+    assert li.legal_description == "1 LT"
+    assert li.acreage == 0.0
+    assert li.assessed_value == 94190.00
+    assert li.market_value == 1569800.00
+    assert li.raw["owner_mailing"] == "400 UNION HILL DR SUITE100, BIRMINGHAM AL 352090000"
+    bill = li.raw["greenwood_corebtpay_delinquent_tax"]["bill"]
+    assert bill["bldgs"] == 1
+    assert bill["lots"] == 1
+    assert bill["pct4_assessed_value"] == 0
+    assert bill["pct6_assessed_value"] == 94188
+    assert bill["homestead_exemption"] == 0.00
+    assert bill["tax_map_number"] == "6846770129"
+
+
+def test_aggregate_bldgs_zero_sets_land_property_kind():
+    rows = _parse_search_table(SEARCH_TABLE_HTML)
+    bill_map = {"67144500019": {"situs_address": "1 LT RD", "bldgs": 0}}
+    listings = _aggregate(rows, detail_by_account=bill_map)
+    assert listings[0].property_kind == PropertyKind.LAND
+
+
+# --- _parse_bill(): the `view=bill` per-account tax-notice page ------------
+
+def test_parse_bill_extracts_situs_legal_desc_and_valuation():
+    bill = _parse_bill(WW_PLASMA_BILL_HTML)
+    assert bill["situs_address"] == "311 HAMPTON AV"
+    assert bill["tax_map_number"] == "6846770129"
+    assert bill["legal_description"] == "1 LT"
+    assert bill["district"] == "9"
+    assert bill["bldgs"] == 1
+    assert bill["lots"] == 1
+    assert bill["acres"] == 0.0
+    assert bill["assessed_value"] == 94190.00
+    assert bill["tax_value"] == 1569800.00
+    assert bill["pct4_assessed_value"] == 0
+    assert bill["pct6_assessed_value"] == 94188
+    assert bill["homestead_exemption"] == 0.00
+    assert bill["mailing_address"] == "400 UNION HILL DR SUITE100, BIRMINGHAM AL 352090000"
+
+
+def test_parse_bill_distinguishes_assessed_value_from_the_4pct_6pct_rows():
+    """Regression test: 'ASSESSED VALUE' must never accidentally match inside
+    the DIFFERENT '4% ASSESSED VALUE' / '6% ASSESSED VALUE' rows."""
+    bill = _parse_bill(WW_PLASMA_BILL_HTML)
+    assert bill["assessed_value"] != bill["pct4_assessed_value"]
+    assert bill["assessed_value"] == 94190.00  # not 0 (the 4% row) or 94188 (the 6% row)
+
+
+def test_parse_bill_blank_location_stays_none():
+    """RSM HOLDINGS INC: a real, live case where LOCATION is genuinely empty
+    (a commercial parcel with no single situs) -- must not be dropped as a
+    parse failure, nor silently backfilled from the mailing address."""
+    bill = _parse_bill(RSM_HOLDINGS_BILL_HTML)
+    assert bill["situs_address"] is None
+    assert bill["tax_map_number"] == "2718842000"
+    assert bill["mailing_address"] == "1310 EMERALD ROAD, GREENWOOD SC 296460000"
+
+
+def test_parse_bill_returns_empty_dict_for_unrecognized_page():
+    assert _parse_bill("<html><body>not a bill</body></html>") == {}
+    assert _parse_bill("") == {}
 
 
 def test_paid_only_search_produces_no_listings():
