@@ -28,8 +28,65 @@ fresh-wins):
     sale confirmed / sale past the upset-bid window) OR after N consecutive
     misses (``FULLRUN_PERSIST_MAX_MISSES``, default = pulled-sales retention).
 
-Reuses the existing ``dedupe()`` (so fresh<->prior collapse through the full
-parcel/address/case/fuzzy/signature machinery — no double-count) and the existing
+STREAMING, not load_board() + dedupe() (2026-10-04, replacing the ORIGINAL
+implementation that called ``load_board(docs_dir)`` then ``dedupe(fresh + prior)``).
+
+THE PROBLEM THAT FORCED THIS. The original implementation paid BOARD_LOAD_MAX_
+SOURCE_MB's own worst case (load_board() materializing the WHOLE prior board as
+Listing objects) and then ran dedupe() over a DOUBLED ``fresh + prior`` combined
+list on top of that -- dedupe()'s bucket dict, zip/locale blocking indexes,
+``final`` list and union-find ``parent`` array are all sized to the COMBINED row
+count, every one a full-length structure alive simultaneously with the two
+full-length row lists (``prior``, ``combined``) that fed it. On the real board
+(2,668 MB combined source, ~221K rows) that chain's first link -- load_board() --
+now refuses outright via BoardLoadTooLarge before the run gets far enough to find
+out whether a bigger host would have survived the rest of it. See
+web_artifact.BOARD_PRIOR_MERGE_MAX_SOURCE_MB's comment for the full writeup and
+the real measured numbers this rewrite is based on.
+
+HOW THE REWRITE WORKS. The prior board is streamed via ``_iter_board_records()``
+(the same incremental-JSON, lazy-detail-merged generator append_new_rows()/
+patch_existing_rows() already use) exactly once, matched against a SMALL index
+built from ``fresh_deduped`` only (bounded by the fresh scrape's own size, NOT the
+board's) using the exact same _append_row_sigs()/_append_dict_sigs() signature
+trick append_new_rows() already uses and has its own measured ceiling for (dedupe_
+key() equality plus dedupe.py's strong same-property signatures -- see that
+function's docstring in web_artifact.py). A prior row is validated into a real
+Listing ONLY when it is either part of that small matched set (to fold onto the
+matching fresh Listing via Listing.merge()) or survives the aging check into the
+kept-prior-only set -- never for a row that gets aged out and dropped, and never
+twice for the same row. No ``combined`` list, no doubled ``prior`` list, no
+dedupe()'s full-board auxiliary structures exist at any point.
+
+DISCLOSED SCOPE-NARROWING: matching is dedupe_key()/strong-signature equality
+only -- the SAME "additive dedupe" fidelity append_new_rows() already accepts,
+not dedupe()'s pass-2 fuzzy address scoring (rapidfuzz token_set_ratio >= 92 with
+no shared key/signature). A fresh/prior pair that would only have matched via
+that fuzzy pass now surfaces as two rows this run (the fresh copy re-enriched
+from scratch, the prior copy aging down the same miss counter every other
+prior-only lead uses) instead of one carried-enrichment merge -- a quota-cost
+regression, not a data-loss or safety one, and self-healing since the unmatched
+prior copy still ages out on schedule. Prior-vs-prior matching (two already-
+published rows that are duplicates of EACH OTHER, not of anything in the fresh
+scrape) is also not attempted here: the published board is itself the output of
+a previous run's dedupe() pass, so it should already be internally deduplicated,
+and this function's own job has never been to re-discover THAT -- see
+merge_duplicate_rows() (web_artifact.py) for the dedicated, separately-measured
+tool that targets exactly that (rare, residual) case.
+
+WHAT THIS DOES NOT FIX: the return value is still a full ``list[Listing]`` of the
+merged board, because main.run() runs it through ~2,400 more lines of enrichment/
+filtering before its own write_artifact() call -- peak memory for THAT part is
+still proportional to the final kept-row count, the same way load_board()'s
+always was. This rewrite removes the EXTRA multiplicative cost stacked on top of
+that one, it does not make holding the final merged board's worth of Listing
+objects free. BOARD_PRIOR_MERGE_MAX_SOURCE_MB (web_artifact.py) is this
+function's own, separately measured ceiling for that remaining cost;
+BOARD_PRIOR_MERGE_ALLOW_LARGE=1 overrides it for one supervised run.
+
+Reuses the existing ``dedupe()``'s signature machinery (not a parallel
+reimplementation of it -- see _append_row_sigs()/_append_dict_sigs() in
+web_artifact.py, which this module imports directly) and the existing
 ``pulled_sale`` aging field — no parallel mechanism is invented.
 """
 from __future__ import annotations
@@ -42,10 +99,21 @@ from typing import Optional
 
 import structlog
 
-from .dedupe import dedupe
 from .enrichment_pulled_sales import PULLED_RETENTION_WEEKS
 from .models import Listing
-from .web_artifact import load_board
+from .web_artifact import (
+    BoardLoadDropError,
+    _append_dict_sigs,
+    _append_row_sigs,
+    _board_file_present,
+    _iter_board_records,
+    _raise_if_board_too_large_to_prior_merge,
+    load_board,  # noqa: F401 -- unused here since the 2026-10-04 streaming rewrite
+    # (this module no longer calls it), but re-exported: scripts/enrich_bankruptcy.py
+    # does `from foreclosure_scraper.board_persist import load_board` and must keep
+    # working. Removing this import silently breaks that script's import line.
+)
+from .dedupe import _house_no_of
 
 log = structlog.get_logger()
 
@@ -57,11 +125,17 @@ TERMINAL_SALE_GRACE_DAYS = int(
     os.environ.get("FULLRUN_PERSIST_TERMINAL_GRACE_DAYS", "365")
 )
 
-# Sentinels stamped onto raw so the post-dedupe pass can tell, per merged row,
-# whether a FRESH copy and/or a PRIOR copy contributed. Both are popped before
-# the rows are returned so they never reach the published artifact.
-_SEEN_FLAG = "_seen_this_run"   # set on every fresh-scrape lead
-_PRIOR_FLAG = "_from_prior_board"  # set on every prior-board lead
+# A malformed prior row this function cannot even validate into a Listing (when it
+# survives aging, or is part of a matched pair) is DROPPED, same as load_board()'s own
+# drop-rate discipline -- counted, logged, and only tolerated up to this fraction of the
+# rows actually streamed before merge_prior_board refuses outright (never silently
+# publishes a board that quietly lost more than this). Deliberately the SAME default as
+# BOARD_LOAD_MAX_DROP_RATE (0.1%): this is the identical failure mode (a row load_board()
+# itself would also have dropped), just detected at a different point in a different
+# streaming pass.
+PRIOR_MERGE_MAX_DROP_RATE = float(
+    os.environ.get("BOARD_LOAD_MAX_DROP_RATE", "0.001")
+)
 
 
 def _naive(dt: Optional[datetime]) -> Optional[datetime]:
@@ -72,6 +146,25 @@ def _naive(dt: Optional[datetime]) -> Optional[datetime]:
     if getattr(dt, "tzinfo", None) is not None:
         return dt.replace(tzinfo=None)
     return dt
+
+
+def _parse_iso_dt(v) -> Optional[datetime]:
+    """Parse an ISO-8601 datetime STRING straight off a streamed board row dict,
+    without validating the whole row into a Listing just to read one field. Mirrors
+    ``_naive()``'s tz-stripping so a dict-sourced comparison behaves identically to
+    the Listing-sourced one _is_terminal() used to do. Anything that isn't a clean
+    ISO string (None, a non-string, a value this can't parse) returns None -- same
+    "a row too malformed to key is simply unmatched" tolerance
+    _append_dict_sigs()/patch_existing_rows() already apply elsewhere in this
+    codebase, rather than raising mid-stream over one bad date field."""
+    if not isinstance(v, str) or not v:
+        return None
+    s = v[:-1] + "+00:00" if v.endswith("Z") else v
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    return _naive(dt)
 
 
 def _is_terminal(li: Listing, now: datetime) -> bool:
@@ -92,6 +185,42 @@ def _is_terminal(li: Listing, now: datetime) -> bool:
     return False
 
 
+def _is_terminal_dict(rec: dict, now: datetime) -> bool:
+    """Same check as ``_is_terminal()``, read directly off a streamed board row
+    dict -- used for the prior-only majority this function never validates into a
+    Listing unless it survives this check. Kept as a SEPARATE function (not a
+    dict-wrapping shim around _is_terminal()) because Listing.model_construct()
+    would not parse these ISO date strings into real datetimes (model_construct
+    skips validation by design), so a shim would silently compare strings to a
+    datetime and always come out False -- see _parse_iso_dt()'s docstring."""
+    raw = rec.get("raw")
+    raw = raw if isinstance(raw, dict) else {}
+    if raw.get("sold_confirmed"):
+        return True
+    if raw.get("court_sale_status") == "confirmed":
+        return True
+    dl = _parse_iso_dt(rec.get("upset_bid_deadline"))
+    if dl is not None and dl < now:
+        return True
+    sd = _parse_iso_dt(rec.get("sale_date"))
+    if sd is not None and sd < now - timedelta(days=TERMINAL_SALE_GRACE_DAYS):
+        return True
+    return False
+
+
+def _provably_different_dict(rec: dict, li: Listing) -> bool:
+    """dedupe.py's house-number guard (_provably_different_property), applied
+    between a streamed prior-row DICT and a candidate fresh Listing, without
+    constructing a Listing for the prior side just to read one field. Same
+    narrow rule: a DIFFERENT house number on BOTH sides is a different house,
+    essentially always -- see dedupe._provably_different_property's own
+    docstring for the real merge bugs this caught (parcel ids shared across two
+    different street numbers)."""
+    ha = _house_no_of(rec.get("street_address"))
+    hb = _house_no_of(li.street_address)
+    return bool(ha and hb and ha != hb)
+
+
 def merge_prior_board(
     fresh_deduped: list[Listing],
     docs_dir: Path | str | None = None,
@@ -101,9 +230,11 @@ def merge_prior_board(
     """Merge the prior published board into this run's fresh (deduped) scrape.
 
     Returns ``(merged_listings, stats)``. On an empty/missing prior board (the
-    first-ever run) the fresh set is returned unchanged. On dedupe failure, this
-    function re-raises — the caller must treat merge_prior_board as a critical
-    phase: falling back to fresh-only silently drops 72% of the board.
+    first-ever run) the fresh set is returned unchanged. Re-raises on a prior-row
+    drop rate over PRIOR_MERGE_MAX_DROP_RATE (BoardLoadDropError) or a board over
+    BOARD_PRIOR_MERGE_MAX_SOURCE_MB (BoardLoadTooLarge) -- the caller must treat
+    merge_prior_board as a critical phase either way: falling back to fresh-only
+    silently drops the vast majority of the board.
     """
     if now is None:
         now = datetime.utcnow()
@@ -113,6 +244,7 @@ def merge_prior_board(
         )
     if docs_dir is None:
         docs_dir = Path(__file__).resolve().parent.parent.parent / "docs"
+    docs = Path(docs_dir)
 
     stats: dict = {
         "fresh_count": len(fresh_deduped),
@@ -124,75 +256,87 @@ def merge_prior_board(
         "aged_out_terminal": 0,
         "aged_out_misses": 0,
         "carried_vision": 0,
+        "prior_drop_errors": 0,
     }
 
-    try:
-        prior = load_board(docs_dir)
-    except FileNotFoundError:
+    listings_path = docs / "listings.json"
+    if not _board_file_present(listings_path):
         # No published board yet (first-ever run) — nothing to persist.
-        prior = []
-    stats["prior_count"] = len(prior)
-    if not prior:
-        # First run / no board yet — nothing to persist, ship fresh as-is.
         stats["merged_count"] = len(fresh_deduped)
         stats["fresh_only"] = len(fresh_deduped)
         return list(fresh_deduped), stats
 
-    # Stamp provenance sentinels. Fresh leads get _SEEN_FLAG; prior leads get
-    # _PRIOR_FLAG. After dedupe a merged row carries whichever of the two its
-    # constituents had (deep-merged raw keeps both), which tells us matched vs
-    # fresh-only vs prior-only.
-    for li in fresh_deduped:
-        if not isinstance(li.raw, dict):
-            li.raw = {}
-        li.raw[_SEEN_FLAG] = True
-    for li in prior:
-        if not isinstance(li.raw, dict):
-            li.raw = {}
-        li.raw[_PRIOR_FLAG] = True
+    _raise_if_board_too_large_to_prior_merge(docs)
 
-    # Fresh FIRST so dedupe uses the fresh copy as the merge base: Listing.merge
-    # keeps the base's (fresh) non-null fields and only backfills from the prior
-    # copy where fresh is missing a value — fresh scrape wins, prior enrichment
-    # is carried.
-    combined = list(fresh_deduped) + list(prior)
-    try:
-        merged = dedupe(combined)
-    except Exception:
-        log.critical("board_persist.dedupe_failed", traceback=traceback.format_exc())
-        # CRITICAL: do not fall back to fresh-only. Returning 22k instead of
-        # 94k silently drops 72k records and the pipeline publishes it as the
-        # full board (exit 0). Re-raise so the caller halts.
-        raise
+    # --- SMALL index built from the fresh scrape ONLY (bounded by len(fresh_deduped),
+    # never by the board's size) -- the same signature trick append_new_rows() uses to
+    # dedupe its own small candidate set against a streamed board, reused here in the
+    # other direction (streamed prior rows checked against a small fresh index). ---
+    fresh_sig_index: dict[tuple, list[int]] = {}
+    for i, li in enumerate(fresh_deduped):
+        for sig in _append_row_sigs(li):
+            fresh_sig_index.setdefault(sig, []).append(i)
+    fresh_matched = [False] * len(fresh_deduped)
 
     kept: list[Listing] = []
-    for li in merged:
-        raw = li.raw if isinstance(li.raw, dict) else {}
-        seen = bool(raw.pop(_SEEN_FLAG, False))
-        from_prior = bool(raw.pop(_PRIOR_FLAG, False))
+    prior_total = 0
+    streamed_for_drop_rate = 0
+    drop_errors: list[str] = []
 
-        if seen:
-            # Re-scraped this run (fresh, possibly carrying prior enrichment).
-            if from_prior:
-                stats["matched"] += 1
-                if raw.get("vision"):
-                    stats["carried_vision"] += 1
-                # A reappeared lead is active again — clear any stale pulled_sale
-                # miss counter + presumed-withdrawn tag it accumulated while gone.
-                if raw.get("pulled_sale"):
-                    raw.pop("pulled_sale", None)
-                    if li.auction_status == "presumed_withdrawn":
-                        li.auction_status = None
-            else:
-                stats["fresh_only"] += 1
-            li.raw = raw
-            kept.append(li)
+    for rec in _iter_board_records(docs):
+        prior_total += 1
+        match_idx: int | None = None
+        if isinstance(rec, dict) and fresh_sig_index:
+            try:
+                rec_sigs = _append_dict_sigs(rec)
+            except Exception:  # noqa: BLE001
+                # _append_dict_sigs() builds an UNVALIDATED Listing.model_construct() of this
+                # row's identity fields -- unlike load_board()'s old path, nothing has coerced
+                # or rejected a malformed field (e.g. a non-string zip_code) before this point.
+                # A row too malformed to key is simply unmatched (the same tolerance
+                # patch_existing_rows() already applies around its own light dedupe_key() call),
+                # not a reason to crash the whole streaming pass over everything after it.
+                rec_sigs = ()
+            for sig in rec_sigs:
+                cands = fresh_sig_index.get(sig)
+                if not cands:
+                    continue
+                for i in cands:
+                    if _provably_different_dict(rec, fresh_deduped[i]):
+                        continue
+                    match_idx = i
+                    break
+                if match_idx is not None:
+                    break
+
+        if match_idx is not None:
+            streamed_for_drop_rate += 1
+            try:
+                prior_li = Listing.model_validate(rec)
+            except Exception as exc:  # noqa: BLE001 - a malformed matched row is dropped, not fatal
+                drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
+                stats["prior_drop_errors"] += 1
+                continue
+            # Fresh FIRST so Listing.merge() keeps the base's (fresh) non-null fields
+            # and only backfills from prior where fresh is missing a value — fresh
+            # scrape wins, prior enrichment is carried. Folds ALL prior rows that
+            # match this same fresh row (a dedupe_key() matching more than one
+            # existing row is rare but possible — same tolerance patch_existing_rows()
+            # applies), not just the first.
+            fresh_deduped[match_idx] = fresh_deduped[match_idx].merge(prior_li)
+            fresh_matched[match_idx] = True
             continue
 
-        # Not seen this run => prior-only (persisted but not re-scraped) => AGE.
-        if _is_terminal(li, now):
+        # Not matched => prior-only (persisted but not re-scraped this run) => AGE,
+        # entirely off the raw dict -- no Listing constructed for a row that might
+        # still get dropped by this same check.
+        if not isinstance(rec, dict):
+            continue
+        if _is_terminal_dict(rec, now):
             stats["aged_out_terminal"] += 1
             continue
+        raw = rec.get("raw")
+        raw = raw if isinstance(raw, dict) else {}
         prev_pulled = raw.get("pulled_sale") or {}
         consecutive = prev_pulled.get("consecutive_misses", 0) + 1
         if consecutive > max_misses:
@@ -204,17 +348,55 @@ def merge_prior_board(
             ),
             "consecutive_misses": consecutive,
             "presumed_withdrawn": True,
-            "last_seen_source": li.source,
-            "last_seen_sale_date": (
-                li.sale_date.isoformat() if li.sale_date else None
-            ),
+            "last_seen_source": rec.get("source"),
+            "last_seen_sale_date": rec.get("sale_date"),
         }
-        if not li.auction_status:
-            li.auction_status = "presumed_withdrawn"
-        li.raw = raw
-        kept.append(li)
+        rec["raw"] = raw
+        if not rec.get("auction_status"):
+            rec["auction_status"] = "presumed_withdrawn"
+        streamed_for_drop_rate += 1
+        try:
+            kept.append(Listing.model_validate(rec))
+        except Exception as exc:  # noqa: BLE001 - same drop tolerance as the matched branch
+            drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
+            stats["prior_drop_errors"] += 1
+            continue
         stats["prior_only_kept"] += 1
 
+    if drop_errors:
+        rate = stats["prior_drop_errors"] / streamed_for_drop_rate if streamed_for_drop_rate else 0.0
+        log.error("board_persist.prior_rows_dropped", dropped=stats["prior_drop_errors"],
+                  validated=streamed_for_drop_rate, rate=round(rate, 6), first=drop_errors[:5])
+        if rate > PRIOR_MERGE_MAX_DROP_RATE:
+            raise BoardLoadDropError(
+                f"merge_prior_board dropped {stats['prior_drop_errors']:,} of "
+                f"{streamed_for_drop_rate:,} rows it tried to validate ({rate:.3%}), over the "
+                f"{PRIOR_MERGE_MAX_DROP_RATE:.3%} limit. Publishing this merge would silently "
+                f"lose them. BOARD_LOAD_MAX_DROP_RATE raises the limit."
+            )
+
+    # Finalize pass over the (small) fresh set ONCE each, after all of a row's prior
+    # matches (if any) are folded in — mirrors the ORIGINAL implementation's
+    # post-dedupe loop, which only ever ran this logic after dedupe() had finished
+    # merging, never per-intermediate-merge.
+    for i, li in enumerate(fresh_deduped):
+        if fresh_matched[i]:
+            stats["matched"] += 1
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            if raw.get("vision"):
+                stats["carried_vision"] += 1
+            if raw.get("pulled_sale"):
+                # A reappeared lead is active again — clear any stale pulled_sale
+                # miss counter + presumed-withdrawn tag it accumulated while gone.
+                raw.pop("pulled_sale", None)
+                if li.auction_status == "presumed_withdrawn":
+                    li.auction_status = None
+            li.raw = raw
+        else:
+            stats["fresh_only"] += 1
+        kept.append(li)
+
+    stats["prior_count"] = prior_total
     stats["merged_count"] = len(kept)
     log.info("board_persist.done", **stats)
     return kept, stats

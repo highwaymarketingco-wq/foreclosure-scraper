@@ -59,6 +59,7 @@ from pathlib import Path
 import pytest
 
 from foreclosure_scraper import web_artifact as wa
+from foreclosure_scraper.board_persist import merge_prior_board as new_merge_prior_board
 from foreclosure_scraper.models import Listing, ListingType
 
 # Large enough for the fixed per-row overhead of a pydantic Listing (independent of payload
@@ -377,6 +378,164 @@ def test_patch_existing_rows_traces_meaningfully_less_memory_than_load_board_the
         f"memory than load_board()+write_artifact() ({old_mb:.0f} MB traced peak) to mutate ONE "
         f"existing row on a {size_mb:.0f} MB + {detail_mb:.0f} MB board of {N_ROWS:,} rows -- "
         f"the improvement did not show up as expected"
+    )
+
+
+MERGE_N_ROWS = 8_000
+MERGE_PAD_LEN = 150
+
+
+def _varied_lead(i: int, pad_len: int = MERGE_PAD_LEN) -> Listing:
+    """Shaped like _fat_lead() (same realistic per-row padding), but with county/zip VARIED
+    across rows instead of fixed to one ("Gaston"/no zip). dedupe()'s own pass-2 fuzzy match
+    blocks candidates by zip and by (county, state) -- see dedupe.py's own "BLOCKING
+    OPTIMIZATION" comment: 'Without this, merge_prior_board on 94K+22K hangs for hours'. A
+    fixture where EVERY row shares one (county, state) defeats that blocking entirely (the
+    whole board becomes one block) and reproduces exactly that hang at this test's scale -- this
+    is what _fat_lead()'s OTHER users in this file never hit, because none of them call dedupe()
+    at all. Varying county across 40 buckets and zip across 500 keeps each block's candidate set
+    small, the way a real board's own geographic spread does."""
+    pad = "x" * pad_len
+    return Listing(
+        source=f"src.{i % 3}", source_url=f"https://example.test/mv{i}",
+        listing_type=ListingType.FORECLOSURE_SALE, state="NC", county=f"County{i % 40}",
+        zip_code=f"{28801 + (i % 500)}", parcel_id=f"MP{i}", street_address=f"{i} Main St",
+        raw={
+            "grade": {"overall": "B", "notes": pad},
+            "calc": {"arv": 200000 + i, "rehab": 30000, "max_bid": 140000, "notes": pad},
+            "skip_trace": {"owner": f"Owner {i}", "phone": "555-0100", "notes": pad},
+            "comps": [{"addr": f"{i} Elm St", "sold_price": 190000 + i, "notes": pad}
+                      for _ in range(3)],
+        },
+    )
+
+
+@pytest.fixture(scope="module")
+def merge_board(tmp_path_factory):
+    docs = tmp_path_factory.mktemp("merge_board") / "docs"
+    wa.write_artifact([_varied_lead(i) for i in range(MERGE_N_ROWS)],
+                      {"notes": "merge_prior_board memory test fixture"}, docs_dir=docs)
+    size_mb = (docs / "listings.json").stat().st_size / (1024 * 1024)
+    detail_mb = (docs / "listings_detail.json").stat().st_size / (1024 * 1024)
+    return docs, size_mb, detail_mb
+
+
+def test_merge_prior_board_traces_meaningfully_less_memory_than_load_board_then_dedupe(
+        merge_board):
+    """board_persist.merge_prior_board() (2026-10-04 streaming rewrite): folding a fresh scrape
+    into the published board used to call load_board() (the WHOLE existing board as Listings)
+    and then run dedupe() over a DOUBLED fresh+prior combined list on top of that -- see
+    web_artifact.BOARD_PRIOR_MERGE_MAX_SOURCE_MB's comment for the real incident (the Oracle VM
+    run that could never get past this step) this rewrite fixes. Same tracemalloc method as the
+    append_new_rows()/patch_existing_rows() comparisons above; its own smaller, geographically
+    varied fixture (merge_board, not big_board) so the OLD path's real dedupe() call -- the thing
+    actually being measured here, unlike every other comparison in this file -- hits dedupe()'s
+    zip/locale blocking the way a real board does, instead of degenerating into the O(n^2) fuzzy
+    scan _varied_lead()'s own docstring describes.
+
+    fresh here is a realistic MIX, not a single row: HALF share a parcel_id with an existing
+    board row (so they actually exercise the matched/merge path, not just pass-through) and HALF
+    are brand new -- proportioned like the real pipeline's fresh scrape against a board several
+    times its size, scaled down to this fixture's MERGE_N_ROWS."""
+    docs, size_mb, detail_mb = merge_board
+
+    def _old_style_merge(fresh) -> list:
+        """A faithful reconstruction of the ORIGINAL merge_prior_board(): load the WHOLE prior
+        board as Listings, double it into a `fresh + prior` combined list, run dedupe() over
+        that combined list. Omits the aging-loop post-processing (cheap, not what this
+        comparison is measuring) -- the expensive part being compared is this load+combine+
+        dedupe chain, unchanged from what board_persist.py actually did before 2026-10-04."""
+        from foreclosure_scraper.dedupe import dedupe
+        prior = wa.load_board(docs)
+        combined = list(fresh) + list(prior)
+        return dedupe(combined)
+
+    def _fresh_batch() -> list[Listing]:
+        half = MERGE_N_ROWS // 2
+        matched = [
+            Listing(source="src.fresh", source_url=f"https://example.test/fresh{i}",
+                   listing_type=ListingType.FORECLOSURE_SALE, state="NC",
+                   county=f"County{i % 40}", zip_code=f"{28801 + (i % 500)}",
+                   parcel_id=f"MP{i}", street_address=f"{i} Main St",
+                   raw={"grade": {"overall": "A"}})
+            for i in range(0, MERGE_N_ROWS, 2)  # same parcel_id as half the board's rows
+        ]
+        new = [
+            Listing(source="src.fresh", source_url=f"https://example.test/new{i}",
+                   listing_type=ListingType.FORECLOSURE_SALE, state="NC",
+                   county=f"County{i % 40}", zip_code=f"{28801 + (i % 500)}",
+                   parcel_id=f"NEWP{i}", street_address=f"{i} New St",
+                   raw={"grade": {"overall": "A"}})
+            for i in range(len(matched))
+        ]
+        return matched + new
+
+    old_peak, old_result = _traced_peak(lambda: _old_style_merge(_fresh_batch()))
+    n_old = len(old_result)
+    del old_result
+    gc.collect()
+
+    new_peak, new_result = _traced_peak(
+        lambda: new_merge_prior_board(_fresh_batch(), docs_dir=docs)[0])
+    n_new = len(new_result)
+    del new_result
+    gc.collect()
+
+    # Both paths must land the same final count: MERGE_N_ROWS/2 matched (collapsed to one row
+    # each) + MERGE_N_ROWS/2 fresh-only new siblings + MERGE_N_ROWS/2 untouched prior-only rows.
+    expected_total = (MERGE_N_ROWS // 2) * 3
+    assert n_old == n_new == expected_total, "both paths must land the same final board"
+
+    old_mb = old_peak / (1024 * 1024)
+    new_mb = new_peak / (1024 * 1024)
+
+    # Loose threshold for the same reason as the other comparisons in this file: asserts a real,
+    # reproducible improvement without pinning an exact ratio a future unrelated change could
+    # trip. The streaming rewrite never builds a `combined` list (fresh+prior doubled) or any of
+    # dedupe()'s full-board bucket/blocking/union-find structures, so the gap here is expected to
+    # be wide; 0.85 leaves headroom without making the assertion toothless.
+    assert new_mb < old_mb * 0.85, (
+        f"merge_prior_board() ({new_mb:.0f} MB traced peak) should use meaningfully less memory "
+        f"than load_board()+dedupe(combined) ({old_mb:.0f} MB traced peak) to fold "
+        f"{MERGE_N_ROWS:,} fresh rows (half matched, half new) into a {size_mb:.0f} MB + "
+        f"{detail_mb:.0f} MB board of {MERGE_N_ROWS:,} existing rows -- the improvement did not "
+        f"show up as expected"
+    )
+
+
+def test_merge_prior_board_never_validates_terminal_rows_into_listings(big_board, tmp_path_factory,
+                                                                        monkeypatch):
+    """Structural proof, not just a memory-size inference: a prior row that is TERMINAL (dropped
+    outright via the aging check: sold_confirmed here) must never be run through
+    Listing.model_validate() at all -- the whole point of the streaming rewrite is to not pay
+    that cost for a row that never survives into the output. Forces ALL N_ROWS board rows
+    terminal (sold_confirmed=True) and fresh to a disjoint, non-matching single new lead, then
+    counts Listing.model_validate() calls: zero is required, exactly mirroring append_new_rows's/
+    patch_existing_rows's own "never validates untouched rows" tests above."""
+    docs = tmp_path_factory.mktemp("terminal_board") / "docs"
+    terminal_leads = []
+    for i in range(N_ROWS):
+        li = _fat_lead(i)
+        li.raw["sold_confirmed"] = True
+        terminal_leads.append(li)
+    wa.write_artifact(terminal_leads, {"notes": "all-terminal fixture"}, docs_dir=docs)
+
+    calls = {"n": 0}
+    orig_validate = Listing.model_validate.__func__
+
+    def counting_validate(cls, *a, **k):
+        calls["n"] += 1
+        return orig_validate(cls, *a, **k)
+
+    monkeypatch.setattr(Listing, "model_validate", classmethod(counting_validate))
+    fresh = [_new_lead()]
+    out, stats = new_merge_prior_board(fresh, docs_dir=docs)
+    assert stats["aged_out_terminal"] == N_ROWS
+    assert len(out) == 1
+    assert calls["n"] == 0, (
+        f"merge_prior_board() called Listing.model_validate() {calls['n']} times while all "
+        f"{N_ROWS:,} prior rows were terminal (dropped outright) -- a row that never survives "
+        f"into the output must never be validated into a Listing at all"
     )
 
 

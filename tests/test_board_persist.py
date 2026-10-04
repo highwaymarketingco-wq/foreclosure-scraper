@@ -12,6 +12,27 @@ published board with a fresh-only scrape:
      miss counter, and dropped when terminal or past N misses.
   5. NEW leads pass through (enriched normally downstream).
   6. DEDUP collapses fresh<->prior duplicates into one row.
+
+Plus the 2026-10-04 streaming rewrite's OWN invariants (replacing load_board() +
+dedupe() with a fresh-indexed stream of _iter_board_records() -- see
+board_persist.py's module docstring and web_artifact.BOARD_PRIOR_MERGE_MAX_SOURCE_MB's
+comment for the full writeup):
+
+  7. SIZE CEILING — merge_prior_board refuses over its own ceiling, the same
+     BOARD_PRIOR_MERGE_ALLOW_LARGE=1 / BOARD_PRIOR_MERGE_MAX_SOURCE_MB override
+     pattern every sibling streaming function in web_artifact.py already has.
+  8. HOUSE-NUMBER GUARD — a prior row sharing a signature with a fresh row but
+     carrying a provably different house number must NOT merge (dedupe()'s own
+     safety net, replicated here rather than silently fused).
+  9. NEVER VALIDATE A DROPPED ROW — a prior row that is terminal (dropped
+     outright) is never run through Listing.model_validate(), even if it would
+     fail validation — the whole point of streaming is to not pay that cost for
+     rows that never survive into the output.
+  10. BOUNDED, NON-FATAL DROP TOLERANCE — a prior row that IS kept (matched or
+      aged-and-kept) but fails Listing.model_validate() is counted and dropped,
+      not fatal, unless the rate exceeds PRIOR_MERGE_MAX_DROP_RATE, in which case
+      merge_prior_board refuses outright (BoardLoadDropError) rather than
+      silently publishing a board that quietly lost more than that.
 """
 from __future__ import annotations
 
@@ -19,6 +40,10 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
+
+from foreclosure_scraper import board_persist as bp
+from foreclosure_scraper import web_artifact as wa
 from foreclosure_scraper.board_persist import merge_prior_board
 from foreclosure_scraper.enrichment_vision import _needs_vision
 from foreclosure_scraper.models import Listing, ListingType
@@ -264,3 +289,167 @@ def test_needs_vision_gate(monkeypatch):
     # escape hatch restores re-grading of already-scored leads
     monkeypatch.setenv("VISION_REGRADE_SCORED", "1")
     assert _needs_vision(scored) is True
+
+
+# --------------------------------------------------------------------------
+# Invariant 7 — merge_prior_board's OWN size ceiling (streaming rewrite, 2026-10-04)
+# --------------------------------------------------------------------------
+
+def test_prior_merge_refuses_over_its_own_ceiling(tmp_path, monkeypatch):
+    prior = [_li(street_address="1 Oak St", zip_code="28801")]
+    _write_board(tmp_path, prior)
+    monkeypatch.setenv("BOARD_PRIOR_MERGE_MAX_SOURCE_MB", "0.0001")
+    fresh = [_li(street_address="99 New Rd", zip_code="28803")]
+    with pytest.raises(wa.BoardLoadTooLarge) as ei:
+        merge_prior_board(fresh, docs_dir=tmp_path, now=NOW)
+    assert "over the 0 MB ceiling" in str(ei.value)
+
+
+def test_prior_merge_allow_large_overrides_the_ceiling_for_one_run(tmp_path, monkeypatch):
+    prior = [_li(street_address="1 Oak St", zip_code="28801")]
+    _write_board(tmp_path, prior)
+    monkeypatch.setenv("BOARD_PRIOR_MERGE_MAX_SOURCE_MB", "0.0001")
+    monkeypatch.setenv("BOARD_PRIOR_MERGE_ALLOW_LARGE", "1")
+    fresh = [_li(street_address="99 New Rd", zip_code="28803")]
+    out, stats = merge_prior_board(fresh, docs_dir=tmp_path, now=NOW)
+    assert stats["prior_count"] == 1
+    assert "1 Oak St" in {li.street_address for li in out}
+
+
+def test_prior_merge_ceiling_is_independent_of_loads_ceiling(tmp_path, monkeypatch):
+    """BOARD_LOAD_MAX_SOURCE_MB must not gate merge_prior_board any more -- that was
+    exactly the Oracle VM crash (2026-10-04): load_board()'s own, Mac-calibrated
+    ceiling refusing a board the streaming rewrite never even asks it about."""
+    prior = [_li(street_address="1 Oak St", zip_code="28801")]
+    _write_board(tmp_path, prior)
+    monkeypatch.setenv("BOARD_LOAD_MAX_SOURCE_MB", "0.0001")
+    fresh = [_li(street_address="99 New Rd", zip_code="28803")]
+    out, stats = merge_prior_board(fresh, docs_dir=tmp_path, now=NOW)
+    assert stats["prior_count"] == 1
+
+
+# --------------------------------------------------------------------------
+# Invariant 8 — house-number guard (dedupe()'s own safety net, replicated)
+# --------------------------------------------------------------------------
+
+def test_shared_parcel_different_house_number_does_not_merge(tmp_path):
+    # Same (bad/shared) parcel id, but the street numbers provably differ --
+    # dedupe()'s house_number_guard exists exactly because a shared parcel_id
+    # across two different houses is a real, observed data bug, not a hypothetical.
+    prior = [
+        _li(street_address="306 Fountain Way", zip_code="28801",
+            parcel_id="9698372180", county="Buncombe", state="NC")
+    ]
+    _write_board(tmp_path, prior)
+    fresh = [
+        _li(street_address="346 Fountain Way", zip_code="28801",
+            parcel_id="9698372180", county="Buncombe", state="NC",
+            source="counties_nc.buncombe")
+    ]
+    out, stats = merge_prior_board(fresh, docs_dir=tmp_path, now=NOW)
+    addrs = {li.street_address for li in out}
+    # Two distinct houses stay two distinct rows -- a merge here would have
+    # silently deleted one of two real properties.
+    assert "306 Fountain Way" in addrs
+    assert "346 Fountain Way" in addrs
+    assert stats["matched"] == 0
+    assert stats["fresh_only"] == 1
+    assert stats["prior_only_kept"] == 1
+
+
+# --------------------------------------------------------------------------
+# Invariant 9 — a dropped (terminal/aged-out) prior row is NEVER validated,
+# even if it would fail validation
+# --------------------------------------------------------------------------
+
+def test_terminal_row_is_dropped_without_ever_validating_it(tmp_path):
+    docs = tmp_path
+    docs.mkdir(parents=True, exist_ok=True)
+    # Hand-written board row: sold_confirmed (terminal -> dropped outright) AND
+    # carrying an invalid listing_type that Listing.model_validate() would reject.
+    # If this function validated it before checking terminal status, it would
+    # either raise or show up in prior_drop_errors; it must do neither.
+    poison_row = {
+        "source": "x", "source_url": "https://example.com/poison",
+        "listing_type": "not_a_real_listing_type",
+        "street_address": "66 Doom St", "zip_code": "28801",
+        "raw": {"sold_confirmed": True},
+    }
+    (docs / "listings.json").write_text(json.dumps([poison_row]))
+    fresh = [_li(street_address="99 New Rd", zip_code="28803")]
+    out, stats = merge_prior_board(fresh, docs_dir=docs, now=NOW)
+    assert stats["aged_out_terminal"] == 1
+    assert stats["prior_drop_errors"] == 0
+    assert "66 Doom St" not in {li.street_address for li in out}
+
+
+# --------------------------------------------------------------------------
+# Invariant 10 — bounded, non-fatal drop tolerance for a KEPT row that fails
+# validation; fatal once the rate exceeds PRIOR_MERGE_MAX_DROP_RATE
+# --------------------------------------------------------------------------
+
+def test_one_bad_kept_row_among_many_is_dropped_not_fatal(tmp_path, monkeypatch):
+    docs = tmp_path
+    docs.mkdir(parents=True, exist_ok=True)
+    # 1 bad row in 51 streamed-for-drop-rate rows is ~2%, over the default 0.1%
+    # PRIOR_MERGE_MAX_DROP_RATE -- raise the tolerance for THIS test so it can
+    # pin the "counted, not fatal, below the limit" behavior on its own; the
+    # next test pins what happens ABOVE the limit.
+    monkeypatch.setattr(bp, "PRIOR_MERGE_MAX_DROP_RATE", 0.05)
+    good = [_li(street_address=f"{i} Good St", zip_code="28801").model_dump(mode="json")
+            for i in range(50)]
+    bad = {
+        "source": "x", "source_url": "https://example.com/bad",
+        "listing_type": "not_a_real_listing_type",
+        "street_address": "1 Bad St", "zip_code": "28899",
+        "raw": {},
+    }
+    (docs / "listings.json").write_text(json.dumps(good + [bad]))
+    fresh = [_li(street_address="99 New Rd", zip_code="28803")]
+    out, stats = merge_prior_board(fresh, docs_dir=docs, now=NOW)
+    assert stats["prior_drop_errors"] == 1
+    assert "1 Bad St" not in {li.street_address for li in out}
+    # the 50 good rows still made it through
+    assert stats["prior_only_kept"] == 50
+
+
+def test_drop_rate_over_limit_raises(tmp_path, monkeypatch):
+    docs = tmp_path
+    docs.mkdir(parents=True, exist_ok=True)
+    # PRIOR_MERGE_MAX_DROP_RATE is resolved once at module import (same reason
+    # TERMINAL_SALE_GRACE_DAYS is: see test_prior_only_terminal_sale_past_upset_
+    # window_dropped's own comment) -- monkeypatch the module ATTRIBUTE, not the
+    # env var, same pattern that test already uses.
+    monkeypatch.setattr(bp, "PRIOR_MERGE_MAX_DROP_RATE", 0.01)  # 1%
+    good = [_li(street_address=f"{i} Good St", zip_code="28801").model_dump(mode="json")
+            for i in range(5)]
+    bad_rows = [
+        {"source": "x", "source_url": f"https://example.com/bad{i}",
+         "listing_type": "not_a_real_listing_type",
+         "street_address": f"{i} Bad St", "zip_code": "28899", "raw": {}}
+        for i in range(3)
+    ]
+    (docs / "listings.json").write_text(json.dumps(good + bad_rows))
+    fresh = [_li(street_address="99 New Rd", zip_code="28803")]
+    with pytest.raises(wa.BoardLoadDropError):
+        bp.merge_prior_board(fresh, docs_dir=docs, now=NOW)
+
+
+# --------------------------------------------------------------------------
+# Scale sanity — a larger prior-only board (no fresh matches) streams through
+# correctly without needing any fresh/prior fuzzy cross product
+# --------------------------------------------------------------------------
+
+def test_many_prior_only_rows_all_survive_or_age_consistently(tmp_path):
+    prior = [_li(street_address=f"{i} Pine St", zip_code="28801") for i in range(500)]
+    _write_board(tmp_path, prior)
+    fresh = [_li(street_address="99 New Rd", zip_code="28803")]
+    out, stats = merge_prior_board(fresh, docs_dir=tmp_path, now=NOW)
+    assert stats["prior_count"] == 500
+    assert stats["prior_only_kept"] == 500
+    assert stats["matched"] == 0
+    assert stats["fresh_only"] == 1
+    assert len(out) == 501
+    for li in out:
+        if li.street_address != "99 New Rd":
+            assert (li.raw or {}).get("pulled_sale", {}).get("consecutive_misses") == 1

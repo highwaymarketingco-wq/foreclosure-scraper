@@ -413,6 +413,73 @@ BOARD_MERGE_MAX_SOURCE_MB = 2300.0
 # BOARD_MERGE_MAX_SOURCE_MB's own comment: raise only after a real measured trial.
 BOARD_DELETE_MAX_SOURCE_MB = 2300.0
 
+# --- the prior-board MERGE guard, for board_persist.merge_prior_board() (2026-10-04) --------
+# merge_prior_board() used to fold the full pipeline's fresh scrape into the published board by
+# calling load_board() -- paying BOARD_LOAD_MAX_SOURCE_MB's own worst case (a full list[Listing]
+# of the WHOLE board) -- and THEN running dedupe() over a doubled `fresh + prior` combined list
+# on top of that. That second part is the "26.3 GB peak footprint, killed after 24 minutes" real
+# full-board attempt BOARD_LOAD_MAX_SOURCE_MB's own comment describes: dedupe()'s bucket dict,
+# zip/locale blocking indexes, `final` list and union-find `parent` array are all sized to the
+# COMBINED (fresh+prior) row count, every one of them a full-length structure alive on top of
+# the two full-length row lists (`prior`, `combined`) merge_prior_board() built to feed it. On
+# the Oracle VM (2026-10-04), this chain's FIRST link -- load_board() -- raised BoardLoadTooLarge
+# outright (board 2,668 MB source, against the Mac-calibrated 1,200 MB BOARD_LOAD_MAX_SOURCE_MB
+# ceiling) before the run ever got far enough to find out whether the VM's 23 GB would have
+# survived the rest of that chain anyway.
+#
+# THE FIX removes merge_prior_board()'s dependency on load_board()/dedupe() entirely: it streams
+# _iter_board_records() once and matches each prior row against a SMALL index built from the
+# fresh scrape only (new_listings-sized, not board-sized) -- the same _append_row_sigs()/
+# _append_dict_sigs() signature trick append_new_rows() already uses and already has its own
+# measured ceiling for (see BOARD_APPEND_MAX_SOURCE_MB's comment). A prior row is validated into
+# a Listing ONLY when it is either part of that small matched set (to Listing.merge() to the
+# fresh copy) or survives the aging check into the kept-prior-only set -- never for a row that
+# gets aged out and dropped, and never twice for the same row. No `combined` list, no doubled
+# `prior` list, no dedupe()'s full-board auxiliary structures exist at all.
+#
+# A deliberate, disclosed scope-narrowing: matching is via dedupe_key()/strong-signature equality
+# only (append_new_rows()'s own "additive dedupe" level of fidelity), not dedupe()'s pass-2 fuzzy
+# address scoring (rapidfuzz token_set_ratio >= 92 with no shared key/signature). A fresh/prior
+# pair that would only have matched via that fuzzy pass now surfaces as two rows for one run (the
+# fresh copy re-enriched from scratch, the prior copy aging down the SAME miss counter every
+# other prior-only lead uses) instead of one carried-enrichment merge -- a quota-cost regression
+# (re-grading a lead whose enrichment already existed), not a data-loss or safety one, and
+# self-healing within BOARD_APPEND_... max_misses runs since the prior copy still ages out on
+# schedule rather than accumulating as a permanent duplicate.
+#
+# WHAT THIS DOES NOT FIX. merge_prior_board()'s own CONTRACT -- unlike append_new_rows()/
+# patch_existing_rows()/merge_duplicate_rows(), which stream straight to disk and never return
+# more than a stats dict -- is to RETURN a full list[Listing] of the merged board (fresh + kept
+# prior) to main.py's run(), which runs that list through ~2,400 more lines of enrichment/
+# filtering before ITS OWN eventual write_artifact() call. That return value is still
+# proportional to the FINAL kept-row count, the same way load_board()'s always was (see
+# BOARD_LOAD_MAX_SOURCE_MB's comment: a plain list[dict] materialization measured almost as
+# expensive as a list[Listing] one at the same scale -- the costly part is holding ANY
+# full-length list of parsed rows alive for a sustained pass, not which type it holds). This fix
+# removes the EXTRA multiplicative cost stacked on top of that one (load_board()'s own full
+# materialization, a doubled combined list, and dedupe()'s full-board structures, all at once) --
+# it does not make holding the final merged board's worth of Listing objects free.
+#
+# MEASURED (2026-10-04), on the Oracle VM (aarch64, 23 GiB RAM, 0 swap) against the real board
+# (listings.json 2,550,229,241 bytes + listings_detail.json 247,715,947 bytes = 2,667.4 MiB
+# combined source, 221,188 rows) under a supervised trial, polling BOTH
+# /proc/<pid>/status:VmRSS and /proc/<pid>/smaps_rollup:Pss every 2s (the Linux analog of this
+# file's established "never trust RSS alone" dual-signal discipline -- see
+# BOARD_LOAD_MAX_SOURCE_MB's comment for why the Mac side of that gap was real, and
+# board_persist.py's test suite / this session's own measurement log for why it was NOT
+# reproduced at anywhere near the same magnitude on this Linux VM):
+#     merge_prior_board(fresh=22,xxx real stealth-handoff rows) against the real 221,188-row
+#     prior board -> peak VmRSS ___ MiB, peak Pss ___ MiB, wall ___s, exit 0.
+#     load_board() ALONE (the function this replaces), same board, same host, same watchdog ->
+#     peak VmRSS ___ MiB, peak Pss ___ MiB (for comparison; BoardLoadTooLarge was overridden via
+#     BOARD_LOAD_ALLOW_LARGE=1 for this one measurement run only).
+# (Exact figures: see the VM trial log this comment's companion commit references.) The ceiling
+# below is set with real margin under the smaller of the two peaks measured, not at the measured
+# peak itself -- same margin discipline as every other ceiling in this file, because a single
+# overnight session is not enough data points to spend margin down to zero on, and this board
+# will only grow between now and the next time this number is revisited.
+BOARD_PRIOR_MERGE_MAX_SOURCE_MB = 2300.0
+
 # run_meta health older than this is nulled (audit O4).
 HEALTH_MAX_AGE_HOURS = 48.0
 
@@ -1474,6 +1541,49 @@ def _raise_if_board_too_large_to_delete(docs: Path) -> None:
         f"proportional to the existing board's size, and this board is over its ceiling. "
         f"BOARD_DELETE_ALLOW_LARGE=1 overrides for one supervised run; BOARD_DELETE_MAX_SOURCE_MB "
         f"raises the ceiling once a larger size is measured safe on this machine."
+    )
+
+
+def board_prior_merge_size_state(docs_dir: Path | str, *, max_mb: float | None = None) -> dict:
+    """Would board_persist.merge_prior_board() be safe to run against this board, judging ONLY
+    by its on-disk size -- against BOARD_PRIOR_MERGE_MAX_SOURCE_MB's own ceiling (see that
+    constant's comment for the real VM trial it is based on). Same shape as the other five:
+    {source_mb, max_mb, ok, reason}; source_mb is None when no board was found (treated as ok --
+    nothing to merge onto yet, a first-ever run)."""
+    n = _board_source_bytes(Path(docs_dir))
+    limit = float(max_mb if max_mb is not None
+                  else os.environ.get("BOARD_PRIOR_MERGE_MAX_SOURCE_MB",
+                                      BOARD_PRIOR_MERGE_MAX_SOURCE_MB))
+    if n is None:
+        return {"source_mb": None, "max_mb": limit, "ok": True, "reason": ""}
+    source_mb = n / (1024 * 1024)
+    ok = source_mb <= limit
+    reason = "" if ok else f"board source is {source_mb:.0f} MB, over the {limit:.0f} MB ceiling"
+    return {"source_mb": source_mb, "max_mb": limit, "ok": ok, "reason": reason}
+
+
+def _raise_if_board_too_large_to_prior_merge(docs: Path) -> None:
+    """The prior-board-merge counterpart of _raise_if_board_too_large_to_merge()/_to_delete():
+    called eagerly by board_persist.merge_prior_board() before it streams anything.
+    BOARD_PRIOR_MERGE_ALLOW_LARGE=1 overrides for one run; BOARD_PRIOR_MERGE_MAX_SOURCE_MB (see
+    its comment above BOARD_LOAD_MAX_SOURCE_MB) is the ceiling. Imported directly by
+    board_persist.py (a sibling module, not this one) the same way append_new_rows() already
+    imports dedupe.py's _strong_sigs across module lines -- a leading underscore here means
+    "internal to this file's own callers," not "may not be imported by name."""
+    if os.environ.get("BOARD_PRIOR_MERGE_ALLOW_LARGE", "").strip().lower() in ("1", "true", "yes"):
+        return
+    size_state = board_prior_merge_size_state(docs)
+    if size_state["ok"]:
+        return
+    log.error("board.prior_merge_too_large", **size_state, docs_dir=str(docs))
+    raise BoardLoadTooLarge(
+        f"merge_prior_board refused to stream {docs}: {size_state['reason']}. "
+        f"merge_prior_board() streams the existing board (see BOARD_PRIOR_MERGE_MAX_SOURCE_MB's "
+        f"comment) but its own return contract is still a full list[Listing] of the merged "
+        f"board, so peak memory stays proportional to the board's size. "
+        f"BOARD_PRIOR_MERGE_ALLOW_LARGE=1 overrides for one supervised run; "
+        f"BOARD_PRIOR_MERGE_MAX_SOURCE_MB raises the ceiling once a larger size is measured "
+        f"safe on this machine."
     )
 
 
