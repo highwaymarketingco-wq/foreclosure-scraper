@@ -45,12 +45,27 @@ def test_split_sale_date_plain():
     assert status == "active"
 
 
-def test_split_sale_date_cancelled_until():
+def test_split_sale_date_cancelled_until_is_a_reschedule_not_dead():
+    # "Cancelled Until <date>" means the ORIGINAL date was cancelled and the
+    # sale re-set for a real new date -- a reschedule, not a terminal
+    # cancellation (fixed 2026-10-04: this used to map to auction_status
+    # "cancelled", which models.TERMINAL_AUCTION_STATUSES + main._active_only
+    # would delete outright, discarding a still-live, often-ACTIVE sale).
     # bare mm/dd "Until" token — year anchored to the original (2026), and since
     # 07/16 > 01/05 it stays in the same year.
     orig, eff, status = split_sale_date("01/05/26 Cancelled Until 07/16")
     assert orig == datetime(2026, 1, 5)
     assert eff == datetime(2026, 7, 16)
+    assert status == "postponed"
+
+
+def test_split_sale_date_bare_cancelled_with_no_reschedule_stays_terminal():
+    # No "Until" clause -- genuinely cancelled with no new date known. This
+    # is the real terminal case; must stay "cancelled", not be swept up by
+    # the reschedule fix above.
+    orig, eff, status = split_sale_date("01/20/26 Cancelled")
+    assert orig == datetime(2026, 1, 20)
+    assert eff == datetime(2026, 1, 20)  # no Until date -> falls back to orig
     assert status == "cancelled"
 
 
@@ -185,10 +200,51 @@ def test_row_to_listing_in_scope_and_split():
     assert b.trustee == "Shapiro & Ingle, LLP"
 
     g = next(x for x in listings if x.county == "Gaston")
-    # SALE_DATE "01/05/26 Cancelled Until 07/16" -> effective 2026-07-16, cancelled.
-    assert g.auction_status == "cancelled"
+    # SALE_DATE "01/05/26 Cancelled Until 07/16" -> rescheduled to 2026-07-16,
+    # status "postponed" (not "cancelled" -- a reschedule with a real new
+    # date is still a live lead, see the 2026-10-04 fix).
+    assert g.auction_status == "postponed"
     assert g.sale_date == datetime(2026, 7, 16)
     assert g.opening_bid == 427000.0
+
+
+def test_row_to_listing_sale_results_cancelled_does_not_override_a_reschedule():
+    """The structured SALE_RESULTS column says "Cancelled" for a rescheduled
+    sale too (confirmed live: it never disagrees with the inline text, just
+    collapses the distinction) -- _row_to_listing must not blindly re-apply
+    "cancelled" on top of the inline parse's correct "postponed" verdict."""
+    rec = {
+        "OFFICE_CODE": "NC",
+        "CASE_TYPE_NAME": "Foreclosure",
+        "STATUS_NAME": "ACTIVE",
+        "SALE_RESULTS": "Cancelled",
+        "COUNTY_NAME": "Buncombe",
+        "SALE_DATE": "01/06/26 Cancelled Until 09/22",
+        "CASE_COURT_NUMB": "25SP000400-100",
+        "FULL_ADDRESS": "1 Main St, Asheville, North Carolina 28801",
+        "BID_AMNT": None,
+    }
+    li = _row_to_listing(rec, "law_firms.shapiro_ingle_powerbi")
+    assert li is not None
+    assert li.auction_status == "postponed"
+    assert li.sale_date == datetime(2026, 9, 22)
+
+
+def test_row_to_listing_bare_cancelled_sale_results_stays_cancelled():
+    rec = {
+        "OFFICE_CODE": "NC",
+        "CASE_TYPE_NAME": "Foreclosure",
+        "STATUS_NAME": "DELAYED",
+        "SALE_RESULTS": "Cancelled",
+        "COUNTY_NAME": "Buncombe",
+        "SALE_DATE": "01/20/26 Cancelled",
+        "CASE_COURT_NUMB": "25SP000401-100",
+        "FULL_ADDRESS": "2 Main St, Asheville, North Carolina 28801",
+        "BID_AMNT": None,
+    }
+    li = _row_to_listing(rec, "law_firms.shapiro_ingle_powerbi")
+    assert li is not None
+    assert li.auction_status == "cancelled"
 
 
 def test_row_to_listing_drops_out_of_scope():

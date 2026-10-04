@@ -53,13 +53,34 @@ SALE_DATE inline status
 -----------------------
 The SALE_DATE display column folds the auction status into the date string:
     "01/05/26"                    -> upcoming as-scheduled
-    "01/05/26 Cancelled Until 07/16"   -> cancelled, re-set for 07/16
+    "01/05/26 Cancelled Until 07/16"   -> re-set for 07/16 (see fix below)
     "01/06/17 Postponed Until 08/20"   -> postponed to 08/20
 We split it: the leading token is the ORIGINAL sale date; the trailing
 "<Cancelled|Postponed> Until <mm/dd>" gives auction_status + the new effective
 date (year inferred). We surface the effective (postponed-to) date as
 ``sale_date`` — matching the Ingle-HTML sibling's "prefer postponed" rule —
 and keep both in ``raw`` + ``auction_status``.
+
+FIX 2026-10-04 (extraction-completeness audit): this firm's own system
+labels a RESCHEDULED sale as SALE_RESULTS="Cancelled" / "<date> Cancelled
+Until <new date>" — "Cancelled" here means "cancelled from the original
+date", not "dead". Live-verified: 343 of 945 live rows (36%!) carry this
+exact "Cancelled Until <date>" shape, most with STATUS_NAME="ACTIVE" in
+the firm's own system (e.g. a Pender County row originally 01/06/26,
+rescheduled to 09/22, STATUS_NAME=ACTIVE). The code already computed the
+correct new ``sale_date`` for these, but then set ``auction_status =
+"cancelled"`` unconditionally whenever SALE_RESULTS said "Cancelled" —
+and "cancelled" is in ``models.TERMINAL_AUCTION_STATUSES``, so
+``main._active_only`` was deleting every one of these 343 real,
+rescheduled, often-ACTIVE sales outright, discarding over a third of this
+entire statewide feed. Only a BARE "Cancelled" with no "Until" reschedule
+date (20/945 live, genuinely dead with no new date known) is a true
+terminal cancellation now; "Cancelled Until <date>" maps to
+auction_status="postponed" instead, both in ``split_sale_date`` and in
+``_row_to_listing``'s SALE_RESULTS reconciliation (which now trusts the
+inline parse's finer Until-date distinction rather than blindly
+overwriting it — confirmed live the two signals never actually disagree
+on direction, only on this granularity).
 
 Why richer than ``law_firms.ingle_firm`` (the HTML table)
 ---------------------------------------------------------
@@ -233,14 +254,20 @@ def split_sale_date(display: str | None) -> tuple[datetime | None, datetime | No
             eff = eff.replace(year=orig.year)
             if eff < orig:
                 eff = eff.replace(year=orig.year + 1)
-        status = {
-            "cancelled": "cancelled",
-            "postponed": "postponed",
-            "continued": "postponed",
-            "rescheduled": "postponed",
-            "held": "withdrawn",
-            "on hold": "withdrawn",
-        }.get(kind, "postponed")
+        if kind == "cancelled" and eff is not None:
+            # "Cancelled Until <date>" is a RESCHEDULE, not a dead sale --
+            # the firm still has a new date on the calendar. Only a bare
+            # "Cancelled" with no reschedule date is truly terminal.
+            status = "postponed"
+        else:
+            status = {
+                "cancelled": "cancelled",
+                "postponed": "postponed",
+                "continued": "postponed",
+                "rescheduled": "postponed",
+                "held": "withdrawn",
+                "on hold": "withdrawn",
+            }.get(kind, "postponed")
         # Prefer the effective (postponed/re-set) date as the actionable sale date.
         return orig, (eff or orig), status
 
@@ -423,15 +450,25 @@ def _row_to_listing(rec: dict, slug: str) -> Listing | None:
         orig_dt = _epoch_ms_to_dt(rec.get("SALES_DATE"))
     sale_date = eff_dt or orig_dt
 
-    # Reconcile inline status with the structured SALE_RESULTS column.
+    # Reconcile inline status with the structured SALE_RESULTS column. The
+    # inline parse (split_sale_date) is trusted first: live-verified the two
+    # signals never disagree on direction, but the inline one carries the
+    # finer "was it rescheduled to a real date" distinction that the bare
+    # SALE_RESULTS column collapses into the single word "Cancelled" (see
+    # the module docstring's 2026-10-04 fix -- blindly overwriting a
+    # correctly-derived "postponed" back to "cancelled" here would delete
+    # every rescheduled sale all over again regardless of the fix above).
+    # SALE_RESULTS is only the fallback for the rare row split_sale_date
+    # could not classify at all.
     results = (rec.get("SALE_RESULTS") or "").strip().lower() or None
     status = inline_status
-    if results in ("cancelled", "canceled"):
-        status = "cancelled"
-    elif results in ("postponed", "continued"):
-        status = "postponed"
-    elif status is None:
-        status = "active"
+    if status is None:
+        if results in ("cancelled", "canceled"):
+            status = "cancelled"
+        elif results in ("postponed", "continued"):
+            status = "postponed"
+        else:
+            status = "active"
 
     process = "power_of_sale" if (rec.get("CASE_TYPE_NAME") or "").lower().startswith("foreclos") else None
 
