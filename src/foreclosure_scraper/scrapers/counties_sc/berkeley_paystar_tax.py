@@ -129,18 +129,108 @@ _PAGE_SIZE = 1000
 _DETAIL_CONCURRENCY = 10
 
 
+def _not_yet_due_rows(rows: list[dict]) -> list[dict]:
+    """Drop rows for the CURRENT tax year -- they are freshly-issued bills, not
+    delinquent accounts, even though the portal's own "Unpaid" status covers both.
+
+    GOTCHA, live-verified 2026-10-03 (same day as this fix, a season boundary that
+    had not yet been crossed when this file was first built 2026-09-14/15/23): the
+    county's 2026 annual roll loaded into paystar THIS WEEK, and an unfiltered
+    "Unpaid Real Property" search balloons from the ~3,426-3,587 genuinely
+    delinquent rows measured in September to 123,450 -- 120,359 of those are
+    TaxYear=2026 with `delinquent: false`, `invoiceIssueDate`/`invoiceDueDate`
+    both null, and an empty owner/address (confirmed on a live sample: invoice
+    2026-0045354, $1,813.29 "due", `delinquent: false`). SC real-property tax
+    bills go out in October and aren't due until the FOLLOWING January (confirmed
+    on the same live sample: `Penalty1Date: "2027-01-15"` for a 2026 bill) -- so a
+    bill for the current calendar year can never actually be delinquent yet. A
+    real 2025 (prior-year) sample fetched the same day confirms the distinguishing
+    field: `delinquent: true`, real owner/address populated (invoice 2025-0122247,
+    108 N HWY 52 LLC, $15,429.16).
+
+    This is a LIST-level, pre-detail-fetch filter (not just a post-filter in
+    _detail_to_listing) because the whole point is to avoid spending a detail GET
+    on ~120k rows that are never going to survive the delinquent-only publish
+    anyway -- at the measured ~9 req/s detail-fetch pace, 120k extra requests
+    would blow this scraper's 600s timeout by over 20x and turn every future run
+    into the exact all-zero TIMEOUT failure tests/test_berkeley_paystar_tax_timeout.py
+    already fixed once for a completely different reason (vendor latency, not a
+    filter gap). A row with a missing/non-int taxYear is kept rather than dropped
+    (conservative: "unclear" is not the same as "known not-yet-due").
+    """
+    current_year = datetime.utcnow().year
+    return [r for r in rows
+            if not (isinstance(r.get("taxYear"), int) and r["taxYear"] >= current_year)]
+
+
+async def _prior_tax_years(client: httpx.AsyncClient) -> list[str] | None:
+    """Every TaxYear facet value strictly BEFORE the current (not-yet-due) one,
+    straight from the search endpoint's own facets -- no guessing a year range.
+
+    2026-10-03 GOTCHA this exists to fix: _list_all used to page an UNFILTERED
+    "Unpaid Real Property" search (facetFilters.TaxYear=[]) and rely on
+    _not_yet_due_rows to drop the current year client-side AFTER listing. That
+    broke the moment the county's 2026 annual roll loaded this week: the vendor
+    returns results with every current-year row FIRST (live-confirmed: the
+    first 50,000 results, the existing stall-guard's whole cap, were 100%
+    taxYear=2026, zero real prior-year rows reached within that cap) -- so the
+    client-side filter correctly dropped everything it saw, but the real
+    ~3,091 delinquent rows never got paged to at all, and the scraper shipped
+    0. Querying the facets directly (one cheap pageSize=1 call) and then
+    passing an EXPLICIT facetFilters.TaxYear list of prior years straight to
+    the server-side filter sidesteps the ordering problem entirely -- live-
+    verified 2026-10-03: totalCount drops from 123,450 (unfiltered) to exactly
+    3,091 (the sum of every prior-year facet count), matching
+    _not_yet_due_rows' independent client-side math exactly.
+
+    Returns None (not []) when the facets can't be read, so callers can fall
+    back to the old unfiltered-then-client-filter path rather than silently
+    requesting zero years.
+    """
+    try:
+        r = await client.post(_SEARCH_URL, json={
+            "searchTerm": "",
+            "facetFilters": {"PaymentStatus": ["Unpaid"], "AssetType": ["Real Property"], "TaxYear": []},
+            "page": 1, "pageSize": 1,
+        })
+        r.raise_for_status()
+        data = (r.json() or {}).get("data") or {}
+        facets = data.get("facets") or []
+        tax_year_values = next(
+            (f.get("facetValues") or [] for f in facets if f.get("facetName") == "TaxYear"), [])
+        years = [v.get("propertyValue") for v in tax_year_values if v.get("propertyValue")]
+        int_years = [(y, int(y)) for y in years if str(y).isdigit()]
+        if not int_years:
+            return None
+        max_year = max(n for _, n in int_years)
+        return [y for y, n in int_years if n < max_year]
+    except Exception as exc:  # noqa: BLE001
+        log.warning("berkeley_paystar.facets_fail", error=str(exc)[:160])
+        return None
+
+
 async def _list_all(client: httpx.AsyncClient) -> list[dict]:
-    """Page the WHOLE Unpaid Real Property roll via an empty searchTerm.
+    """Page the Unpaid Real Property roll, scoped to prior (actually-due) tax
+    years whenever the facets are readable (see _prior_tax_years). Falls back to
+    an unfiltered page sweep, with the current year dropped client-side by
+    _not_yet_due_rows afterward, only if the facets call itself fails.
 
     No name enumeration -- this endpoint (unlike qpaybill and Florence's
     older paystar tenant) answers an empty search directly.
     """
+    prior_years = await _prior_tax_years(client)
+    tax_year_filter: list[str] = prior_years if prior_years is not None else []
+    log.info("berkeley_paystar.tax_year_scope",
+             mode="server_side_prior_years" if prior_years is not None else "unfiltered_fallback",
+             years=tax_year_filter or None)
+
     out: list[dict] = []
     page = 1
     while True:
         r = await client.post(_SEARCH_URL, json={
             "searchTerm": "",
-            "facetFilters": {"PaymentStatus": ["Unpaid"], "AssetType": ["Real Property"], "TaxYear": []},
+            "facetFilters": {"PaymentStatus": ["Unpaid"], "AssetType": ["Real Property"],
+                             "TaxYear": tax_year_filter},
             "page": page,
             "pageSize": _PAGE_SIZE,
         })
@@ -209,6 +299,16 @@ def _detail_to_listing(detail: dict, invoice_hash: str) -> Listing | None:
     amount_minor = detail.get("invoiceAmountMinor")
     amount = round(amount_minor / 100.0, 2) if isinstance(amount_minor, (int, float)) else _num(meta.get("TaxesDue"))
     if not amount or amount <= 0:
+        return None
+
+    # Safety net behind the list-level _not_yet_due_rows() filter in fetch(): a
+    # row whose own detail explicitly says `delinquent: false` is a freshly-issued,
+    # not-yet-due bill (see _not_yet_due_rows' docstring), never a real lead, even
+    # if it somehow reached this point (e.g. a future season where the current
+    # year's rows aren't cleanly separable by taxYear alone). Only an EXPLICIT
+    # False is excluded -- None/missing stays in, matching this file's existing
+    # "uncertain is not the same as known-clean" convention elsewhere.
+    if detail.get("delinquent") is False:
         return None
 
     situs = _full_addr(meta.get("SiteAddress"), meta.get("SiteCity"), meta.get("SiteState"), meta.get("SiteZip"))
@@ -302,6 +402,17 @@ class BerkeleyPaystarTax(BaseScraper):
             except Exception as exc:
                 log.warning("berkeley_paystar.list_fail", error=str(exc)[:160])
                 return out
+            if not rows:
+                return out
+
+            # Drop the current (not-yet-due) tax year BEFORE spending a detail GET on
+            # each row -- see _not_yet_due_rows' docstring (live-verified 2026-10-03:
+            # the just-loaded 2026 roll balloons an unfiltered "Unpaid" search from
+            # ~3,426 real delinquent rows to 123,450).
+            listed_total = len(rows)
+            rows = _not_yet_due_rows(rows)
+            log.info("berkeley_paystar.not_yet_due_filtered",
+                     listed_total=listed_total, after_filter=len(rows))
             if not rows:
                 return out
 
