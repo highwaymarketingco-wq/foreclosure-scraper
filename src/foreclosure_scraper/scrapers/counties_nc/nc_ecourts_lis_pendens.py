@@ -200,6 +200,25 @@ def _strip_court_suffix(loc: str) -> str:
     return re.sub(r"\s+(District|Superior)\s+Court\b.*$", "", loc).strip()
 
 
+def _alias_names(aliases: list[dict] | None) -> list[str]:
+    """Flatten a hit's debtorAliasNames/creditorAliasNames into plain strings.
+
+    Found 2026-10-03 (HERMES extraction-completeness audit, batch 5): already
+    present on every hit this scraper fetches but never read. Live-sampled
+    800 hits across a 90-day/100-county window: only 11 (1.4%) carry one, but
+    it's a real AKA/maiden-name fact (e.g. a divorcing spouse's own
+    searchAliasName/aliasFullName differs from her current married name on
+    the same hit) at zero marginal fetch cost -- useful for name-resolution
+    matching downstream even at this fill rate.
+    """
+    out = []
+    for a in aliases or []:
+        full = (a.get("aliasFullName") or a.get("name") or "").strip()
+        if full:
+            out.append(full)
+    return out
+
+
 def _build_search_object(
     template: dict,
     *,
@@ -315,6 +334,8 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
     creditors = hit.get("creditors") or []
     defendant = "; ".join(d.get("name", "") for d in debtors if d.get("name"))[:300] or None
     plaintiff = "; ".join(c.get("name", "") for c in creditors if c.get("name"))[:300] or None
+    defendant_aliases = _alias_names(hit.get("debtorAliasNames"))
+    plaintiff_aliases = _alias_names(hit.get("creditorAliasNames"))
 
     # Defense-in-depth safety exclusion (see _DV50B_RE docstring above): drop
     # anything DV/50B-adjacent regardless of which allowlisted cause it
@@ -428,6 +449,8 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
                 "orderedDate": od,
                 "ordered_date_iso": ordered_date.isoformat() if ordered_date else None,
                 "location": location,
+                **({"defendant_aliases": defendant_aliases} if defendant_aliases else {}),
+                **({"plaintiff_aliases": plaintiff_aliases} if plaintiff_aliases else {}),
             },
             **({"upset_bid": {
                 "in_window": True,

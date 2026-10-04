@@ -99,6 +99,29 @@ def test_upset_bid_window_listings_keep_window_data():
         )
 
 
+def test_nc_ecourts_alias_names_surfaced_when_present():
+    """2026-10-03 (HERMES extraction-completeness audit, batch 5):
+    debtorAliasNames/creditorAliasNames are already on every hit but were
+    never read. Live-sampled 11/800 (1.4%) carry one -- rare but real and
+    zero marginal cost."""
+    hit = _hit("26CV005886-100", "2026-07-16T23:00:00-05:00")
+    hit["creditorAliasNames"] = [{
+        "name": "LAWSON, CRYSTAL B", "aliasFullName": "Blanton, Crystal Jean",
+    }]
+    li = _hit_to_listing(hit, "counties_nc.nc_ecourts_lis_pendens")
+    assert li.raw["nc_ecourts"]["plaintiff_aliases"] == ["Blanton, Crystal Jean"]
+    assert "defendant_aliases" not in li.raw["nc_ecourts"]
+
+
+def test_nc_ecourts_no_alias_key_when_absent():
+    """Must not fabricate an empty list/key when the hit carries none (the
+    overwhelming majority case)."""
+    li = _hit_to_listing(_hit("26CV000001-100", "2026-07-16T23:00:00-05:00"),
+                          "counties_nc.nc_ecourts_lis_pendens")
+    assert "defendant_aliases" not in li.raw["nc_ecourts"]
+    assert "plaintiff_aliases" not in li.raw["nc_ecourts"]
+
+
 def test_nc_ecourts_in_web_artifact_keep_list():
     """raw.nc_ecourts and raw.upset_bid must be in RAW_KEEP so they
     survive the slim-on-write step. Otherwise the dashboard can't see

@@ -187,6 +187,28 @@ def test_judgment_hit_other_fam_cause_not_admitted():
     assert li is None
 
 
+def test_judgment_hit_surfaces_plaintiff_maiden_name_alias():
+    """2026-10-03 (HERMES extraction-completeness audit, batch 5): a
+    divorcing creditor-spouse's own creditorAliasNames entry (live-sampled
+    real example: maiden name "Blanton, Crystal Jean" vs married name
+    "LAWSON, CRYSTAL B") was already on every hit but never read -- rare
+    (1.4% live-sampled) but a real, zero-cost name-resolution fact and
+    especially relevant for a divorce lead specifically."""
+    scraper = div.NCECourtsDivorce()
+    li = scraper._judgment_hit_to_listing(_fam_hit(creditorAliasNames=[
+        {"name": "DOE, JANE", "aliasFullName": "Smith, Jane Marie"},
+    ]))
+    assert li.raw["nc_ecourts"]["plaintiff_aliases"] == ["Smith, Jane Marie"]
+    assert "defendant_aliases" not in li.raw["nc_ecourts"]
+
+
+def test_judgment_hit_no_alias_key_when_absent():
+    scraper = div.NCECourtsDivorce()
+    li = scraper._judgment_hit_to_listing(_fam_hit())
+    assert "defendant_aliases" not in li.raw["nc_ecourts"]
+    assert "plaintiff_aliases" not in li.raw["nc_ecourts"]
+
+
 # ---- estates: WAF solved once per run, not once per county ----------------
 
 def test_estates_waf_solve_happens_once_before_the_county_loop():

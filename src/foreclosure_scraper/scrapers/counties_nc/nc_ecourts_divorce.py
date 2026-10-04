@@ -674,6 +674,14 @@ class NCECourtsDivorce(BaseScraper):
         plaintiff = "; ".join(c.get("name", "") for c in creditors if c.get("name"))[:300] or None
         if not (defendant or plaintiff):
             return None
+        # AKA/maiden-name aliases -- already on every hit, never read (same
+        # fix as nc_ecourts_lis_pendens.py's _alias_names, 2026-10-03 HERMES
+        # audit batch 5). Rare (1.4% live-sampled) but a real, zero-cost
+        # name-resolution fact, and especially relevant HERE: a divorcing
+        # spouse's own name on a judgment can differ from her maiden name,
+        # which is what a prior deed may be titled under.
+        defendant_aliases = _lp._alias_names(hit.get("debtorAliasNames"))
+        plaintiff_aliases = _lp._alias_names(hit.get("creditorAliasNames"))
 
         od = hit.get("orderedDate")
         ordered_iso = None
@@ -706,6 +714,8 @@ class NCECourtsDivorce(BaseScraper):
                     "orderedDate": od,
                     "ordered_date_iso": ordered_iso,
                     "location": location,
+                    **({"defendant_aliases": defendant_aliases} if defendant_aliases else {}),
+                    **({"plaintiff_aliases": plaintiff_aliases} if plaintiff_aliases else {}),
                 },
                 # distress_score.score reads relationship_signal.kind == "divorce"
                 # (LIFE_EVENT, weight 15) — this is what routes the lead into scoring.
