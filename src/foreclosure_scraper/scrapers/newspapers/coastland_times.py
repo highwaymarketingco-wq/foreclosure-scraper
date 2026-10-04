@@ -34,6 +34,40 @@ Rodanthe (Dare NC), sale 2026-06-23 10:30 AM, trustee Substitute Trustee
 Services Inc., parcel 012458006 — a clean pre-auction coastal lead.
 
 Free, no login, no WAF solver, no JS for the data we read.
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, newspapers batch 1),
+all confirmed live, none previously documented:
+
+1. **A severe, 100%-dead-on-arrival scope bug, present since this scraper's
+   creation.** Every row was classified `ListingType.FORECLOSURE_SALE` (a
+   "flip" type) and hardcoded `county="Dare"`. Dare is never in the 18-county
+   WNC+Upstate-SC flip footprint, and `main._flip_outside_footprint()`
+   rejects any flip-type row outside that footprint unconditionally, before
+   any oceanfront/coastal-bypass carve-out runs. Confirmed by calling the
+   real `main._in_scope()` directly: `county="Dare", listing_type=
+   FORECLOSURE_SALE` -> `False`, every time. `main.py` already lists
+   `"newspapers.coastland_times"` in `COASTAL_COUNTY_BYPASS_SOURCES` (a
+   dedicated admission path built for exactly this source), but that
+   bypass's own `if _is_flip(li): return False` guard made the registration
+   dead code as long as this module kept emitting a flip type. Rows are now
+   classified `TAX_SALE` (county Commissioner's tax sale) or `LIS_PENDENS`
+   (private substitute-trustee power-of-sale notice) — both non-flip, both
+   confirmed live via `main._in_scope()` to reach the board (via the
+   dedicated coastal bypass for Dare, or the unrestricted NC/SC distressed
+   scope for any other county this paper names). See `_parse_detail()`.
+2. **A real county-mislabeling correctness bug.** The Coastland Times also
+   carries notices for neighboring counties — live-confirmed on a real
+   current "NOTICE OF TAX FORECLOSURE SALE" naming Tyrrell County 3 times in
+   its own body text ("District Court of Tyrrell County"... "courthouse door
+   in Tyrrell County"... "Tyrrell County Register of Deeds"), which this
+   module stamped `county="Dare"` regardless. Now resolved from the notice's
+   own text via `_resolve_notice_county()`, falling back to "Dare" (this
+   paper's home county) only when no county is named.
+3. **A real parcel-ID extraction miss.** The same live Tyrrell notice states
+   "Parcel Identification Number: C005 19 010" in plain text — `PARCEL_RE`
+   required "Parcel" to be followed directly by "Number/No/ID" (no
+   "Identification") and had no way to match a space-separated ID, so this
+   real, stated parcel number was silently dropped. Fixed (see `PARCEL_RE`).
 """
 from __future__ import annotations
 
@@ -105,9 +139,19 @@ _SUFFIX = (
 ADDR_RE = re.compile(
     rf"\b(\d{{1,6}}\s+[A-Za-z][\w .'\-]*?\s+(?:{_SUFFIX})\.?)\b", re.I
 )
-# "Dare County Parcel Number 012458006" / "Parcel Number: 012458006"
+# "Dare County Parcel Number 012458006" / "Parcel Number: 012458006" /
+# "Parcel Identification Number: C005 19 010" (tax-foreclosure notices use
+# this longer label and a SPACE-separated ID, e.g. "C005 19 010" -- found
+# live 2026-10-04 on a real current Tyrrell County notice: the old pattern
+# required "Parcel" to be followed directly by "Number/No/ID" and had no way
+# to match an ID with an internal space, so this real, plainly-stated parcel
+# number was silently dropped. Each group must contain a digit (the `(?=...)`
+# lookahead) so a following plain word like "The" (as in "...010 The
+# undersigned Commissioner...") can't be absorbed as a spurious extra group.
+_PARCEL_GROUP = r"(?=[A-Za-z0-9\-\.]*\d)[A-Za-z0-9\-\.]{1,20}"
 PARCEL_RE = re.compile(
-    r"(?:County\s+)?Parcel\s+(?:Number|No\.?|ID)?\s*[:#]?\s*([A-Z0-9][A-Z0-9\-\.]{4,20})",
+    rf"(?:County\s+)?Parcel\s+(?:Identification\s+)?(?:Number|No\.?|ID)?\s*[:#]?\s*"
+    rf"({_PARCEL_GROUP}(?:\s+{_PARCEL_GROUP}){{0,3}})",
     re.I,
 )
 # "at 10:30 AM on June 23, 2026"  -> capture time + date together.
@@ -186,6 +230,39 @@ OCLOCK_TIME_RE = re.compile(
     r"\bat\s+(\d{1,2}(?::\d{2})?)\s*o.?clock,?\s*(noon|midnight|[ap]\.?m\.?)?",
     re.I,
 )
+# FOUND 2026-10-04 (HERMES extraction-completeness audit, newspapers batch 1):
+# this module hardcoded county="Dare" on every row, but The Coastland Times
+# also carries notices for neighboring counties -- live-confirmed on a real
+# current notice ("NOTICE OF TAX FORECLOSURE SALE... District Court of
+# Tyrrell County, North Carolina... courthouse door in Tyrrell County...
+# Tyrrell County Register of Deeds") that was being mislabeled county="Dare"
+# despite the body explicitly, repeatedly naming Tyrrell. The notice always
+# states its own county plainly (a tax-foreclosure's "<County> County
+# Register of Deeds" closing line, or a trustee notice's "courthouse door in
+# <County>, <State>" clause) -- extracted here and used when present, with
+# "Dare" (this paper's home county) kept as the fallback default.
+COUNTY_NAMED_RE = re.compile(r"\b([A-Z][a-z]+)\s+County\b")
+# "NOTICE OF TAX FORECLOSURE SALE" -- a county Commissioner's ad valorem tax
+# sale, distinct from a private substitute-trustee power-of-sale notice.
+# models.ListingType.TAX_SALE already exists for exactly this and (like
+# LIS_PENDENS) is not a "flip" type -- see the listing_type comment below.
+_TAX_FORECLOSURE_RE = re.compile(r"tax\s+foreclos", re.I)
+
+
+def _resolve_notice_county(blob: str) -> str:
+    """Best-effort real county from the notice's own text; "Dare" (this
+    paper's home county) when none is named. Validated against the real NC
+    county list so a false match (e.g. a law-firm name that happens to
+    contain "<Word> County") can't silently mislabel a row."""
+    from ...validation import NC_COUNTIES
+
+    names = {c.lower(): c for c in NC_COUNTIES}
+    for m in COUNTY_NAMED_RE.finditer(blob):
+        cand = m.group(1).strip().lower()
+        hit = names.get(cand)
+        if hit:
+            return hit
+    return "Dare"
 
 
 def _clean(s: str) -> str:
@@ -379,23 +456,52 @@ def _parse_detail(html: str, url: str, slug: str) -> Listing | None:
     if contact:
         raw["notice_contact"] = contact
 
-    # SC mortgage-foreclosure summons would be lis-pendens-stage; these Dare
-    # notices are power-of-sale trustee SALES, so classify as the sale itself.
+    county = _resolve_notice_county(body)
+    is_tax = bool(_TAX_FORECLOSURE_RE.search(blob))
+    # FOUND 2026-10-04 (HERMES extraction-completeness audit, newspapers
+    # batch 1): county is NEVER Dare in the 18-county flip footprint (nor is
+    # any other NC county this paper names -- Tyrrell included), and
+    # ListingType.FORECLOSURE_SALE is a "flip" type that main.py's
+    # `_flip_outside_footprint()` rejects unconditionally outside that
+    # footprint, before any oceanfront/coastal carve-out even runs --
+    # confirmed live by calling the real `main._in_scope()`:
+    # county="Dare"/state="NC"/listing_type=FORECLOSURE_SALE -> False, every
+    # time; listing_type=LIS_PENDENS or TAX_SALE -> True (admitted via the
+    # unrestricted distressed scope `main.in_scope_distressed()`, OR -- for
+    # Dare specifically -- via `main.COASTAL_COUNTY_BYPASS_SOURCES`, which
+    # already explicitly lists "newspapers.coastland_times" today but was
+    # dead code for this source because FORECLOSURE_SALE made
+    # `main._coastal_county_source()`'s own `if _is_flip(li): return False`
+    # guard reject every row before that bypass could ever fire). So every
+    # single real row this scraper has ever produced was silently dropped at
+    # the board gate. A county tax-Commissioner's sale is classified
+    # TAX_SALE (the existing, more precise type for exactly this -- the
+    # headline/body literally says "NOTICE OF TAX FORECLOSURE SALE"); a
+    # private substitute-trustee power-of-sale notice is classified
+    # LIS_PENDENS (the same non-flip, pre-execution-sale bucket the sibling
+    # SC newspaper scrapers use for their own judicial foreclosure notices).
+    # Neither is a "flip" type, so both now actually reach the board.
+    listing_type = ListingType.TAX_SALE if is_tax else ListingType.LIS_PENDENS
+    sale_location = (
+        f"{county} County Courthouse, North Carolina"
+        if county != "Dare"
+        else "Dare County Courthouse, Manteo NC"
+    )
     return Listing(
         source=slug,
         source_url=url,
-        listing_type=ListingType.FORECLOSURE_SALE,
+        listing_type=listing_type,
         property_kind=PropertyKind.UNKNOWN,
         state="NC",
-        county="Dare",
+        county=county,
         street_address=street,
         city=city,
         zip_code=zip_code,
         parcel_id=parcel,
         sale_date=sale_date,
         sale_time=sale_time,
-        sale_location="Dare County Courthouse, Manteo NC",
-        foreclosure_process="power_of_sale",
+        sale_location=sale_location,
+        foreclosure_process="tax_foreclosure" if is_tax else "power_of_sale",
         case_number=case_number,
         owner_name=owner_name,
         defendant=defendant,

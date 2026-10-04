@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import asyncio
 
+from foreclosure_scraper import main
+from foreclosure_scraper.models import ListingType
 from foreclosure_scraper.scrapers.newspapers import coastland_times as mod
 
 # Live-captured body text (2026-10-01), reconstructed as a page the module's
@@ -151,3 +153,113 @@ def test_scraper_registered():
     from foreclosure_scraper.scrapers._registry import all_scrapers
 
     assert "newspapers.coastland_times" in {s.slug for s in all_scrapers()}
+
+
+# --- FOUND 2026-10-04 (HERMES extraction-completeness audit, newspapers ------
+# --- batch 1): scope-gate dead-on-arrival bug + county mislabel + parcel miss
+
+
+def test_dare_substitute_trustee_sale_classified_lis_pendens_and_in_scope():
+    """The dominant real shape (a scheduled substitute-trustee SALE) used to
+    ship ListingType.FORECLOSURE_SALE (a flip type). Dare is never in the
+    18-county flip footprint, so main._in_scope() silently dropped every
+    single row this scraper ever produced -- confirmed by calling the REAL
+    function, not a mock."""
+    li = mod._parse_detail(
+        _page("NOTICE OF FORECLOSURE SALE", _LABELED_TEMPLATE_BODY),
+        "https://www.thecoastlandtimes.com/public-notices/a9aad57b",
+        "newspapers.coastland_times",
+    )
+    assert li is not None
+    assert li.listing_type == ListingType.LIS_PENDENS
+    assert li.county == "Dare"
+    assert main._in_scope(li) is True
+
+
+def test_tax_foreclosure_sale_classified_tax_sale_and_in_scope():
+    li = mod._parse_detail(
+        _page("NOTICE OF TAX FORECLOSURE SALE", _ORDINAL_DATE_BODY),
+        "https://www.thecoastlandtimes.com/public-notices/e9388d56",
+        "newspapers.coastland_times",
+    )
+    assert li is not None
+    assert li.listing_type == ListingType.TAX_SALE
+    assert main._in_scope(li) is True
+
+
+def test_unfixed_foreclosure_sale_type_was_unreachable_for_dare():
+    """Documents the bug directly: the OLD hardcoded
+    listing_type=FORECLOSURE_SALE for Dare county is unreachable regardless
+    of any other field -- confirming the type remap (not county) is what
+    fixes reachability."""
+    import copy
+
+    li = mod._parse_detail(
+        _page("NOTICE OF FORECLOSURE SALE", _LABELED_TEMPLATE_BODY),
+        "https://www.thecoastlandtimes.com/public-notices/a9aad57b",
+        "newspapers.coastland_times",
+    )
+    old = copy.copy(li)
+    old.listing_type = ListingType.FORECLOSURE_SALE
+    assert main._in_scope(old) is False
+
+
+def test_real_county_named_in_body_overrides_dare_default():
+    """Regression: a real live Tyrrell County tax-foreclosure notice was
+    being stamped county="Dare" unconditionally even though its own body
+    names Tyrrell 3 times ("District Court of Tyrrell County"... "courthouse
+    door in Tyrrell County"... "Tyrrell County Register of Deeds")."""
+    li = mod._parse_detail(
+        _page("NOTICE OF TAX FORECLOSURE SALE", _ORDINAL_DATE_BODY),
+        "https://www.thecoastlandtimes.com/public-notices/e9388d56",
+        "newspapers.coastland_times",
+    )
+    assert li is not None
+    assert li.county == "Tyrrell"
+    assert li.sale_location == "Tyrrell County Courthouse, North Carolina"
+
+
+def test_dare_default_kept_when_no_county_named():
+    li = mod._parse_detail(
+        _page("NOTICE OF FORECLOSURE SALE", _LABELED_TEMPLATE_BODY),
+        "https://www.thecoastlandtimes.com/public-notices/a9aad57b",
+        "newspapers.coastland_times",
+    )
+    assert li is not None
+    assert li.county == "Dare"
+    assert li.sale_location == "Dare County Courthouse, Manteo NC"
+
+
+def test_parcel_identification_number_label_with_space_separated_id():
+    """Regression: a real live Tyrrell notice states "Parcel Identification
+    Number: C005 19 010" in plain text. The old PARCEL_RE required "Parcel"
+    to be followed directly by "Number/No/ID" (no "Identification") and had
+    no way to match a space-separated value, so this real, stated parcel
+    number was silently dropped."""
+    body = (
+        "NOTICE OF TAX FORECLOSURE SALE Parcel Identification Number: "
+        "C005 19 010 The undersigned Commissioner makes no warranties."
+    )
+    li = mod._parse_detail(
+        _page("NOTICE OF TAX FORECLOSURE SALE", body),
+        "https://www.thecoastlandtimes.com/public-notices/parcel-id",
+        "newspapers.coastland_times",
+    )
+    assert li is not None
+    assert li.parcel_id == "C005 19 010"
+
+
+def test_parcel_number_label_still_matches_single_token():
+    """No regression on the original, already-working label form."""
+    body = (
+        "NOTICE OF FORECLOSURE SALE said property being located at 22083 "
+        "Sea Gull Street, Rodanthe, North Carolina, Dare County Parcel "
+        "Number 012458006."
+    )
+    li = mod._parse_detail(
+        _page("NOTICE OF FORECLOSURE SALE", body),
+        "https://www.thecoastlandtimes.com/public-notices/parcel-orig",
+        "newspapers.coastland_times",
+    )
+    assert li is not None
+    assert li.parcel_id == "012458006"
