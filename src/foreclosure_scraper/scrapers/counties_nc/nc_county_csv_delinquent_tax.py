@@ -13,6 +13,16 @@ has one row per (parcel, bill year); we aggregate to one lead per parcel with th
 SUMMED back-tax owed across years. Amount is tax OWED -> raw['tax_owed'] (via
 enrichment_tax_owed), NOT tax_value. Gate off with FORECLOSURE_NC_CSV_TAX=0.
 When a county rotates its DocumentCenter file id, update the URL here.
+
+FIXED 2026-10-03 (extraction-completeness audit, batch 4): the CSV's own
+header is "Customer Name,Property ID,Property Location,Bill Year,Bill
+Number,Total Receivable" -- live-pulled (3,544 rows, 100% filled) and
+confirmed "Bill Number" (the county's own per-year tax-bill id, e.g.
+"16000250") was read nowhere, dropped on every row. Wired into
+raw['bill_numbers'] as a {year: bill_number} map (629 of the 1,404 parcels
+here carry 2+ billing years, so a flat list would silently lose the
+year<->bill pairing) -- a real per-bill reference id for any future county
+tax-bill lookup/payment-portal integration.
 """
 from __future__ import annotations
 
@@ -40,6 +50,7 @@ COUNTIES: dict[str, dict] = {
             "situs": "Property Location",
             "amount": "Total Receivable",
             "year": "Bill Year",
+            "bill_number": "Bill Number",
         },
     },
 }
@@ -74,11 +85,17 @@ def _parse_csv(text: str, cols: dict) -> list[dict]:
             "situs": _clean(row.get(cols.get("situs", ""))),
             "amount": 0.0,
             "years": set(),
+            "bill_numbers": {},
         })
         rec["amount"] += amt
         yr = _clean(row.get(cols.get("year", "")))
         if yr:
             rec["years"].add(yr)
+            bill_no = _clean(row.get(cols.get("bill_number", "")))
+            if bill_no:
+                # One bill number per billing year -- keyed by year, not a
+                # flat list, so a multi-year parcel never loses the pairing.
+                rec["bill_numbers"][yr] = bill_no
     return [dict(parcel=p, **v) for p, v in agg.items()]
 
 
@@ -113,6 +130,7 @@ def _to_listing(rec: dict, county: str, url: str) -> Listing:
                 "principal_tax_due": amt,   # OWED, not value
                 "bill_years": years,
                 "year_span": yr_span,
+                "bill_numbers": rec.get("bill_numbers") or None,
                 "owner": owner,
                 "situs": situs,
             }
