@@ -107,14 +107,14 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_sc.anderson_sheriff` | detail-page | https://www.andersonsheriff.com/sheriff-sales |
 | `counties_sc.bamberg_sheriff` | deed/notice?, detail-page | https://www.bambergcounty.sc.gov/public-safety/sheriffs-office |
 | `counties_sc.barnwell_sheriff` | detail-page | http://www.barnwellcountysheriff.com/services.html |
-| `counties_sc.beaufort_flc` | deed/notice?, detail-page, links | https://www.proxibid.com/Meares-Property-Advisors-Inc/ |
+| `counties_sc.beaufort_flc` | deed/notice?, detail-page, links | https://www.proxibid.com/Meares-Property-Advisors-Inc/<br>https://treasurerhelp.zendesk.com/hc/en-us/articles/ |
 | `counties_sc.berkeley_paystar_tax` | deed/notice?, detail-page | https://berkeleycountysc.paystar.io/api/search<br>https://berkeleycountysc.paystar.io |
 | `counties_sc.charleston_delinquent_tax` | pdf?, detail-page, links | https://charlestoncounty.gov/departments/delinquent-tax/<br>https://www.charlestoncounty.gov/departments/delinquent-tax/files/RP-Tax-Sale-Listing.pdf |
 | `counties_sc.charleston_mie` | pdf?, deed/notice? | https://charlestoncounty.gov/foreclosure/runninglist.html<br>https://charlestoncounty.gov/departments/master-in-equity/rosters/ |
 | `counties_sc.charleston_tax_sale_xlsx` | detail-page, links | https://www.charlestoncounty.gov/departments/delinquent-tax/files/tax_sale/RP-Tax-Sale-Listing.xlsx<br>https://www.charlestoncounty.gov/departments/delinquent-tax/files/tax_sale/MH-Tax-Sale-Listing.xlsx |
 | `counties_sc.cherokee_delinquent_tax` | pdf?, deed/notice?, img?, detail-page | https://www.cherokeecountysc.gov/wp-json/wp/v2/media |
 | `counties_sc.cherokee_rod` | deed/notice? | https://www.sclandrecords.com/cherokee/<br>https://www.sclandrecords.com/ |
-| `counties_sc.chester_delinquent_tax` | detail-page | https://www.chestercountysc.gov/treasurer/delinquent-tax-sale |
+| `counties_sc.chester_delinquent_tax` | detail-page | https://chestercountysc.gov/<br>https://www.chestercountysc.gov/treasurer/delinquent-tax-sale |
 | `counties_sc.clarendon_tax_auction` | pdf?, deed/notice?, links | https://www.clarendoncountysc.gov/ |
 | `counties_sc.colleton_tax_sale` | pdf?, detail-page, links | https://www.colletoncounty.org/delinquent-tax<br>https://www.colletoncounty.org/delinquent-tax/tax-sale |
 | `counties_sc.darlington_delinquent_tax` | deed/notice?, detail-page | https://www.darcosc.com/government/treasurer/index.php |
