@@ -24,6 +24,9 @@ from __future__ import annotations
 from foreclosure_scraper.scrapers.counties_generic.sitemap_walker import (
     ADDR_RE,
     _parse_listings,
+    _pdf_filename_date,
+    _pdf_listing,
+    _real_notice_pdfs,
 )
 
 # Trimmed, field-faithful reproduction of the live Gaston County tax
@@ -74,3 +77,76 @@ def test_addr_re_still_matches_a_real_address():
 def test_registered():
     from foreclosure_scraper.scrapers._registry import all_scrapers
     assert "counties.sitemap_walker" in {s.slug for s in all_scrapers()}
+
+
+# --------------------------------------------------------------------------
+# EXTRACTION-COMPLETENESS AUDIT 2026-10-03: PDF-anchored fallback.
+#
+# Live-confirmed _parse_listings parses to ZERO on most of the actually-
+# relevant pages across all 12 counties -- not because nothing is
+# published, but because the real sale roster is a LINKED PDF, never
+# embedded in the page's own text. Anderson County's live Master-in-Equity
+# page (andersoncountysc.org/departments-a-z/master-in-equity/) links 226
+# PDFs: a handful of real monthly sale-list/deficiency-sale documents mixed
+# into mostly site chrome (an employment application, a holiday schedule,
+# an unrelated road-sign PDF). This fixture is a trimmed, field-faithful
+# reproduction of that real href mix, captured live 2026-10-03.
+# --------------------------------------------------------------------------
+ANDERSON_MOE_HTML = """
+<html><body>
+<a href="https://www.andersoncountysc.org/wp-content/uploads/2026/09/DJ030a-Green-Pond-Landing-Scenic-Byway-Sign-002.pdf">Sign</a>
+<a href="https://www.andersoncountysc.org/wp-content/uploads/2026/07/EmploymentApplicationAndersonRev7.2026.pdf">Employment Application</a>
+<a href="https://www.andersoncountysc.org/wp-content/uploads/2025/11/2026-Holiday-Schedule.pdf">Holiday Schedule</a>
+<a href="https://www.andersoncountysc.org/wp-content/uploads/2026/10/October-6-2026-Sale-List.pdf">October 6 Sale List</a>
+<a href="https://www.andersoncountysc.org/wp-content/uploads/2026/08/September-3-2026-Deficiency-Sale.pdf">Deficiency Sale</a>
+</body></html>
+"""
+ANDERSON_MOE_URL = "https://www.andersoncountysc.org/departments-a-z/master-in-equity/"
+
+# Live-confirmed on Oconee's own delinquent-tax page: a shared sidebar
+# widget links an unrelated CROSS-DOMAIN bond-financing TEFRA notice (a
+# different agency entirely) whose filename happens to contain "Notice".
+# Must not be captured just because the page matched our keyword filter.
+OCONEE_CROSS_DOMAIN_HTML = """
+<html><body>
+<a href="https://scjeda.com/assets/uploads/2023/04/TEFRA-Notice-Prisma-Health.pdf">TEFRA Notice</a>
+</body></html>
+"""
+OCONEE_URL = "https://oconeesc.com/delinquent-tax/sale-list"
+
+
+def test_real_sale_list_pdfs_are_found_chrome_is_excluded():
+    pdfs = _real_notice_pdfs(ANDERSON_MOE_HTML, ANDERSON_MOE_URL)
+    assert any("October-6-2026-Sale-List" in p for p in pdfs)
+    assert any("September-3-2026-Deficiency-Sale" in p for p in pdfs)
+    assert not any("Sign-002" in p for p in pdfs)
+    assert not any("EmploymentApplication" in p for p in pdfs)
+    assert not any("Holiday-Schedule" in p for p in pdfs)
+
+
+def test_cross_domain_pdf_is_never_captured_even_if_keyword_matches():
+    """REGRESSION: the exact page-wide-chrome anti-pattern city_websites.
+    search was disabled for -- a page's shared sidebar can link another
+    agency's own unrelated document on a different domain entirely."""
+    pdfs = _real_notice_pdfs(OCONEE_CROSS_DOMAIN_HTML, OCONEE_URL)
+    assert pdfs == []
+
+
+def test_pdf_filename_date_parses_the_embedded_sale_date():
+    dt = _pdf_filename_date(
+        "https://www.andersoncountysc.org/wp-content/uploads/2026/10/October-6-2026-Sale-List.pdf"
+    )
+    assert dt is not None
+    assert (dt.year, dt.month, dt.day) == (2026, 10, 6)
+
+
+def test_pdf_listing_carries_the_document_and_a_real_sale_date():
+    li = _pdf_listing(
+        "https://www.andersoncountysc.org/wp-content/uploads/2026/10/October-6-2026-Sale-List.pdf",
+        ANDERSON_MOE_URL, "SC", "Anderson",
+    )
+    assert li.raw["documents"] == [
+        "https://www.andersoncountysc.org/wp-content/uploads/2026/10/October-6-2026-Sale-List.pdf"
+    ]
+    assert li.sale_date is not None and li.sale_date.month == 10
+    assert li.listing_type.value == "foreclosure_sale"

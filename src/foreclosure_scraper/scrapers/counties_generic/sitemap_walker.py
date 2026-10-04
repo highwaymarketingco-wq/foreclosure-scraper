@@ -23,11 +23,13 @@ import asyncio
 import re
 from datetime import datetime
 from typing import Iterable
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
@@ -83,6 +85,46 @@ DATE_RE = re.compile(
 BID_RE = re.compile(r"\$([\d,]+(?:\.\d{2})?)")
 # Parcel / TMS — varies by county
 PARCEL_RE = re.compile(r"(?:Parcel|TMS|PIN)[\s#:]*([\d.\-]{6,20})", re.I)
+
+# EXTRACTION-COMPLETENESS AUDIT 2026-10-03: _parse_listings only ever reads
+# the page's own TEXT. Live-verified across all 12 counties: most of the
+# "relevant" keyword-matched pages (sheriff/MOE/tax-foreclosure pages on
+# Anderson/Oconee/Henderson/Spartanburg) parse to ZERO listings not because
+# nothing is published there, but because the real sale roster is a LINKED
+# PDF, never embedded in the page text at all. Anderson County's own
+# Master-in-Equity page links 226 PDFs -- almost all site chrome (employment
+# applications, holiday schedules, an unrelated road-sign PDF) but several
+# are the real thing: "October-6-2026-Sale-List.pdf" (an upcoming sale,
+# live-confirmed), "September-3-2026-Deficiency-Sale-Results.pdf". Henderson
+# County's tax-foreclosure page links a real "notice_of_sale.pdf" the same
+# way. A blind PDF-href scan would reintroduce exactly the page-wide-chrome
+# anti-pattern city_websites.search was disabled for (see that module's
+# docstring) -- confirmed live on Oconee's own delinquent-tax page, which
+# links an unrelated bond-financing TEFRA notice on a DIFFERENT domain
+# (scjeda.com) via a shared sidebar widget. So this filter is deliberately
+# narrow: the PDF's own filename must carry a real sale-roster keyword (not
+# the page URL's broader KEYWORDS, which would let "notice"/"deed" alone
+# over-match), AND it must be same-domain as the page that linked it.
+_REAL_NOTICE_PDF_RE = re.compile(
+    r"(sale[-_]?list|sale[-_]?result|deficiency[-_]?sale|tax[-_]?foreclosure|"
+    r"notice[-_]?of[-_]?sale|foreclosure[-_]?sale|master[-_]?in[-_]?equity)",
+    re.I,
+)
+_CHROME_PDF_RE = re.compile(
+    r"(employment|application|holiday|schedule|sign-|signage|logo|\bw9\b|"
+    r"brochure|newsletter|job-posting|\brfp\b)", re.I,
+)
+_PDF_HREF_RE = re.compile(r'href="([^"]+\.pdf[^"]*)"', re.I)
+# A sale-list filename usually embeds its own date ("October-6-2026-Sale-
+# List.pdf") -- a real, free sale_date with no extra request (no PDF fetch
+# needed), and the one thing that keeps this fallback row from being
+# dateless-filtered by main._active_only() (this slug is not in
+# DATELESS_OK_SOURCES, same as the rest of this file's rows).
+_PDF_FILENAME_DATE_RE = re.compile(
+    r"(January|February|March|April|May|June|July|August|September|"
+    r"October|November|December)[-_](\d{1,2})[-_](\d{4})",
+    re.I,
+)
 
 
 def _decode_html_entities(s: str) -> str:
@@ -251,6 +293,68 @@ def _parse_listings(text: str, source_url: str, state: str, county: str) -> list
     return out
 
 
+def _pdf_filename_date(url: str) -> datetime | None:
+    m = _PDF_FILENAME_DATE_RE.search(url)
+    if not m:
+        return None
+    try:
+        from dateutil import parser as dateparser
+        return dateparser.parse(f"{m.group(1)} {m.group(2)}, {m.group(3)}", fuzzy=True)
+    except Exception:
+        return None
+
+
+def _real_notice_pdfs(html: str, page_url: str) -> list[str]:
+    """Strictly-matched real sale-roster PDFs linked from a county page --
+    same domain as the page, filename carries a real sale-list/notice
+    keyword, and not a chrome document (see the module-level comment on
+    _REAL_NOTICE_PDF_RE for the live evidence)."""
+    page_netloc = urlparse(page_url).netloc
+    seen: set[str] = set()
+    out: list[str] = []
+    for href in _PDF_HREF_RE.findall(html):
+        full = urljoin(page_url, _decode_html_entities(href))
+        if full in seen:
+            continue
+        if urlparse(full).netloc != page_netloc:
+            continue  # cross-domain link (e.g. an unrelated agency's own notice)
+        if _CHROME_PDF_RE.search(full):
+            continue
+        if not _REAL_NOTICE_PDF_RE.search(full):
+            continue
+        seen.add(full)
+        out.append(full)
+    return out
+
+
+def _pdf_listing(pdf_url: str, discovered_via: str, state: str, county: str) -> Listing:
+    """A fallback Listing anchored to a real sale-roster PDF the page text
+    scan found nothing for (case/address/parcel data lives in the PDF, not
+    the page). Carries the PDF via raw['documents'] so enrich_doc_ocr can
+    read the real content later."""
+    u = pdf_url.lower()
+    ltype = (ListingType.FORECLOSURE_SALE
+             if any(k in u for k in ("foreclos", "deficiency", "master", "sale-list", "sale_list"))
+             else (ListingType.TAX_SALE if "tax" in u else ListingType.UNKNOWN))
+    sale_date = _pdf_filename_date(pdf_url)
+    fname = pdf_url.rsplit("/", 1)[-1]
+    li = Listing(
+        source="counties.sitemap_walker",
+        source_url=pdf_url,
+        listing_type=ltype,
+        property_kind=PropertyKind.UNKNOWN,
+        state=state,
+        county=county,
+        sale_date=sale_date,
+        description=f"{county} County {state} — real sale-roster document discovered via sitemap crawl: {fname}",
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={"sitemap_walker": {"discovered_via": discovered_via}},
+    )
+    stamp_documents(li, [pdf_url])
+    return li
+
+
 async def walk_county(c: httpx.AsyncClient, state: str, county: str, base: str) -> list[Listing]:
     """Walk one county's sitemap and harvest listings."""
     urls = await _fetch_sitemap(c, base)
@@ -258,10 +362,17 @@ async def walk_county(c: httpx.AsyncClient, state: str, county: str, base: str) 
         return []
     relevant = [u for u in urls if _matches_keywords(u)][:25]  # cap per county
     out: list[Listing] = []
+    seen_pdfs: set[str] = set()
     for url in relevant:
         html = await _fetch_page(c, url)
-        if html:
-            out.extend(_parse_listings(html, url, state, county))
+        if not html:
+            continue
+        out.extend(_parse_listings(html, url, state, county))
+        for pdf in _real_notice_pdfs(html, url):
+            if pdf in seen_pdfs:
+                continue
+            seen_pdfs.add(pdf)
+            out.append(_pdf_listing(pdf, url, state, county))
     return out
 
 
