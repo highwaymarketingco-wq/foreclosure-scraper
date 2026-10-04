@@ -234,3 +234,74 @@ def test_single_row_instrument_unaffected_by_multi_row_handling():
     single = next(d for d in docs if d.instrument_no == "2026002775")
     assert single.grantor == "FEHSENFELD CAROLYN C TR"
     assert single.grantee == "ACME BANK NA"
+
+
+# --------------------------------------------------------------------------- XRef + document image
+#
+# Live-captured 2026-10-03 against search.transylvaniadeeds.com /
+# search.mcdowelldeeds.com / search.mitchelldeeds.com: every row carries two
+# MORE columns after the 6 `class="summary"` cells this parser used to stop
+# at -- "XRef" (the underlying instrument this one refers to, e.g. the Deed
+# of Trust a Notice of Sale forecloses on) and "Image?" (a free
+# view_image.php?key=<hex>&type=pdf/tif link to the actual recorded document
+# image). Neither carries a `class="summary"` attribute so the old
+# `_ROW_CELL_RE` never saw them at all.
+
+_FIXTURE_WITH_DOCS = """
+<a href="javascript: loadDetailsScreen('2026003956');" onclick="changeColor('link_2026003956');" id="link_2026003956"> 08/07/2026&nbsp; </a></td>
+<td class="summary" id="2026003956">DOC 1199  498 &nbsp; </td>
+<td class="summary" id="2026003956">S/TR&nbsp;</td>
+<td class="summary" id="2026003956">PD:APPOINTMENT OF SUBSTITUTE TRUSTEE&nbsp;</td>
+<td class="summary" id="2026003956">GRANTOR&nbsp;</td>
+<td class="summary" id="2026003956">ENGLISH EDWIN STUART JR.&nbsp;</td>
+<td class="summary" id="2026003956">PNC BANK, NATIONAL ASSOCIATION&nbsp;</td>
+<td><a href="javascript:loadDetailsScreen('2013001844');" style="color:#0033FF;">D/T
+650 325 (1)</a></td>
+<td><a id='0' onclick='linkColorChange(0)' href='view_image.php?key=b1b8057d90d945b06f28a7319d59820e&type=tif' target='_blank'>TIFF</a><br><a class='imageLinkColorChange' href='view_image.php?key=b1b8057d90d945b06f28a7319d59820e&type=pdf' target='_blank'>PDF</a>&nbsp;</td>
+"""
+
+
+def test_xref_and_image_key_are_captured():
+    docs = logan._parse_records(_FIXTURE_WITH_DOCS, "NC", "Transylvania")
+    assert len(docs) == 1
+    d = docs[0]
+    assert d.raw["logan"]["image_key"] == "b1b8057d90d945b06f28a7319d59820e"
+    assert d.raw["logan"]["xref_instrument_no"] == "2013001844"
+    assert d.raw["logan"]["xref"] == "D/T 650 325 (1)"
+
+
+def test_row_without_trailing_columns_leaves_xref_and_image_key_none():
+    """The plain single-row fixture (no XRef/Image markup) must not error and
+    must simply carry None, not crash or fabricate a value."""
+    docs = logan._parse_records(_FIXTURE, "NC", "Transylvania")
+    d = docs[0]
+    assert d.raw["logan"]["image_key"] is None
+    assert d.raw["logan"]["xref"] is None
+
+
+def test_multi_row_instrument_takes_xref_and_image_key_once_not_duplicated():
+    """A multi-row (one-party-per-row) instrument repeats the same XRef/Image
+    markup on every row; must be captured once per instrument, not per row,
+    and must not raise on the 5-cell shape."""
+    fx = _MULTI_PARTY_FIXTURE.replace(
+        "&nbsp;</td>\n",
+        "&nbsp;</td>\n<td><a href=\"javascript:loadDetailsScreen('2020000111');\">"
+        "DEED 500 100 (4)</a></td>\n<td><a href='view_image.php?key=deadbeef00"
+        "&type=pdf'>PDF</a></td>\n",
+    )
+    docs = logan._parse_records(fx, "NC", "McDowell")
+    assert len(docs) == 1
+    d = docs[0]
+    assert d.raw["logan"]["image_key"] == "deadbeef00"
+    assert d.raw["logan"]["xref_instrument_no"] == "2020000111"
+
+
+def test_to_listing_surfaces_xref_and_image_key_with_session_caveat():
+    """End-to-end: the published Listing's raw['rod'] must carry both new
+    fields, wired through nc_rod_logan.py's _to_listing."""
+    docs = logan._parse_records(_FIXTURE_WITH_DOCS, "NC", "Transylvania")
+    li = _to_listing(docs[0], "counties_nc.nc_rod_logan", "http://x")
+    assert li is not None
+    assert li.raw["rod"]["image_key"] == "b1b8057d90d945b06f28a7319d59820e"
+    assert li.raw["rod"]["xref"] == "D/T 650 325 (1)"
+    assert li.raw["rod"]["xref_instrument_no"] == "2013001844"

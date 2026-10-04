@@ -146,9 +146,29 @@ def _to_listing(doc, slug: str, source_url: str) -> Listing | None:
     lt, kind = cls
     rec = doc.recorded_date.strftime("%Y-%m-%d") if doc.recorded_date else "unknown date"
     desc = f"{doc.doc_type} recorded {rec}: {(doc.grantor or '?').strip()}"
+    logan_raw = doc.raw.get("logan", {}) if isinstance(doc.raw, dict) else {}
     raw: dict = {"rod": {"doc_type": doc.doc_type, "grantor": doc.grantor,
                          "grantee": doc.grantee, "book": doc.book, "page": doc.page,
-                         "instrument": doc.instrument_no, "recorded": rec},
+                         "instrument": doc.instrument_no, "recorded": rec,
+                         # The underlying instrument this one refers to (e.g.
+                         # the Deed of Trust a Notice of Sale forecloses on,
+                         # or the deed a judgment-debtor took title under) --
+                         # free ownership-chain context Logan's own "XRef"
+                         # column already carries; never read before.
+                         "xref": logan_raw.get("xref"),
+                         "xref_instrument_no": logan_raw.get("xref_instrument_no"),
+                         # A free view_image.php PDF/TIFF of the recorded
+                         # document exists for EVERY row (Logan's "Image?"
+                         # column) but its key is scoped to the scrape
+                         # session that rendered it -- NOT a durable URL a
+                         # later pass can fetch (live-verified: a fresh
+                         # session gets a 0-byte body for the same key). Kept
+                         # as provenance only, not stamped into the generic
+                         # raw['documents'] convention (would just waste a
+                         # guaranteed-failing fetch). A real fetch needs the
+                         # same session-aware pattern rod/doc_images.py's
+                         # LoganImageSession already uses for D/T documents.
+                         "image_key": logan_raw.get("image_key")},
                  "logan_rod": True}
     if kind == "probate":
         raw["relationship_signal"] = {"kind": "probate", "keyword": doc.doc_type,

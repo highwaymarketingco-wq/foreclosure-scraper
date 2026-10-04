@@ -69,6 +69,27 @@ _LINK_RE = re.compile(r'id="link_(\d+)"[^>]*>\s*(\d{2}/\d{2}/\d{4})')
 _CELL_RE = re.compile(r'<td class="summary" id="(\d+)">(.*?)</td>', re.S)
 _ROW_CELL_RE = re.compile(r'<td class="summary"[^>]*>(.*?)</td>', re.S)
 
+# Two more columns trail every row's `class="summary"` cells (live-verified on
+# Transylvania/McDowell/Mitchell 2026-10-03, headers "XRef" + "Image?") that
+# the old code never looked at because they aren't `class="summary"`:
+#   XRef   -- the UNDERLYING recorded instrument this one refers to (e.g. the
+#             Deed of Trust a Notice of Sale forecloses on, or the deed a
+#             judgment-debtor took title under) -- real ownership-chain
+#             context, free, already in the fetched HTML.
+#   Image? -- a free `view_image.php?key=<hex>&type=pdf` link to the actual
+#             recorded document image. The key is scoped to the PHPSESSID
+#             that rendered it (live-verified: a fresh session's client gets
+#             a 0-byte "bad download" body for the same key) so it is NOT a
+#             durable URL a later, separate OCR pass can fetch -- stamping it
+#             into the generic `raw['documents']`/_DOC_FIELDS convention
+#             would just waste a guaranteed-failing request. Kept as
+#             provenance only (same `image_key` name rod/doc_images.py's
+#             LoganImageSession already uses for the D/T-only equity sweep);
+#             a same-session fetch-and-OCR pass for non-D/T distress docs
+#             would need that session-aware machinery, not a URL string.
+_XREF_RE = re.compile(r"loadDetailsScreen\('(\d+)'\);?\"[^>]*>(.*?)</a>", re.S)
+_KEY_RE = re.compile(r"key=([0-9a-f]+)&(?:amp;)?type=pdf")
+
 
 def _clean(s: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", s or "").replace("&nbsp;", " ")).strip()
@@ -130,7 +151,8 @@ def _parse_records(html: str, state: str, county: str) -> list[RodDoc]:
         inst = m.group(1)
         date_str = m.group(2)
         end = links[i + 1].start() if i + 1 < len(links) else len(html)
-        row_cells = [_clean(c) for c in _ROW_CELL_RE.findall(html[m.end():end])]
+        window = html[m.end():end]
+        row_cells = [_clean(c) for c in _ROW_CELL_RE.findall(window)]
         if len(row_cells) >= 6:
             # Classic single-row shape: both sides of ONE transaction
             # (Searched Party / Reverse Party) in the same row.
@@ -152,9 +174,22 @@ def _parse_records(html: str, state: str, county: str) -> list[RodDoc]:
             "date": date_str, "book_info": book_info, "doc_type": doc_type,
             "legal": legal, "grantors": [], "grantees": [],
             "_seen_grantors": set(), "_seen_grantees": set(),
+            "xref": None, "xref_instrument_no": None, "image_key": None,
         })
         if inst not in order:
             order.append(inst)
+        # XRef (underlying instrument this one refers to) + the free
+        # document-image key are page chrome that repeats identically on
+        # every row of a multi-row instrument -- take the first occurrence.
+        if g["xref"] is None:
+            xm = _XREF_RE.search(window)
+            if xm:
+                g["xref_instrument_no"] = xm.group(1)
+                g["xref"] = _clean(xm.group(2)) or None
+        if g["image_key"] is None:
+            km = _KEY_RE.search(window)
+            if km:
+                g["image_key"] = km.group(1)
         for role, name in pairs:
             name = (name or "").strip()
             if not name:
@@ -181,7 +216,10 @@ def _parse_records(html: str, state: str, county: str) -> list[RodDoc]:
             grantee="; ".join(g["grantees"]) or None,
             instrument_no=inst, notes=(g["legal"] or None),
             raw={"logan": {"book_info": g["book_info"],
-                           "grantors": g["grantors"], "grantees": g["grantees"]}},
+                           "grantors": g["grantors"], "grantees": g["grantees"],
+                           "xref": g["xref"],
+                           "xref_instrument_no": g["xref_instrument_no"],
+                           "image_key": g["image_key"]}},
         ))
     return out
 
