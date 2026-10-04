@@ -27,16 +27,42 @@ redesigned since this scraper was last built:
     `timeout_s=600` full-browser multi-page-click session to a handful of
     fast plain GETs.
 
-AUDITED, NOT WIRED (scoped out, documented rather than guessed): real
-listing photos (`xomeauction.propertiescdn.com/ListingImages/...jpg`) DO
-exist on this site, but confirmed live they are NOT present inside any
-card's own HTML in the server response (0 of 96 cards on a sampled page
-had an image URL inside their own card boundary) — the card only ships an
-"animate-pulse" skeleton placeholder server-side; the real `<img src>` is
-hydrated client-side after page load from a mechanism this audit didn't
-find (no embedded `__NEXT_DATA__`/JSON state blob in the page). Wiring
-photos would mean reintroducing the stealth browser this rewrite just
-eliminated, for photos alone — flagged rather than done here.
+AUDITED, NOT WIRED on the CARD (search-results) page specifically, correctly
+documented at the time: real listing photos DO exist on this site, but are
+NOT present inside any card's own HTML on the search-results page (0 of 96
+cards on a sampled page had an image URL inside their own card boundary) --
+the card only ships an "animate-pulse" skeleton placeholder server-side.
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, national batch 5),
+confirmed live, extending the above rather than contradicting it: each
+listing's own DETAIL page (already captured as source_url, never fetched)
+DOES carry a real, server-rendered JSON state blob -- the prior audit's "no
+embedded __NEXT_DATA__/JSON state blob" finding was true of the classic
+`<script id="__NEXT_DATA__">` tag specifically, but this Next.js app-router
+site streams its data instead via `self.__next_f.push([n, "<escaped-json>"])`
+chunks, confirmed live on 2 real current detail pages (plain curl-cffi
+impersonation, no stealth browser) to carry, double-JSON-escaped but
+reliably regex-extractable: the FULL `photos` array (2 real
+xomeauction.propertiescdn.com URLs on both samples, vs. 0 on the card), a
+`documents` array (empty on both live samples but wired defensively -- a
+real field on this payload, not invented), `publicRemarks` (the actual
+property description -- "This property will be sold through the applicable
+foreclosure auction process...", vs. the card's bare transaction-type text),
+`buildingAreaTotal` (a real sqft figure, e.g. 2528 / 1524 on the 2 samples),
+`auctionStartDate` (a precise ISO datetime, e.g.
+"2026-10-05T10:00:00+00:00", vs. the card's loosely-parsed "Oct 03 - 06"
+text), `liveAuctionLocationDescription` (the full in-person courthouse
+address + alternate location), and -- the HERMES sec 9 #1 priority --
+`fclrtName`/`fclrtPhone`/`fclrtAddress`/`fclrtCity`/`fclrtState`/`fclrtZip`,
+the REAL foreclosure law firm/trustee conducting the sale with a direct
+phone number (confirmed live: "Bell Carrington Price & Gregg, LLC",
+"803-509-5078", a real NC/SC foreclosure firm this codebase's own
+`law_firms.bell_carrington` scraper already tracks independently -- this is
+free, zero-cost corroboration/contactability on every xome row). Wired as a
+best-effort per-row detail fetch, capped at `DETAIL_FETCH_CAP` total across
+the whole run (this site's real NC+SC volume across 3 categories x up to 20
+pages is far too large to detail-fetch exhaustively every run -- same
+"bounded, polite runtime" posture `PAGES_CAP` already uses).
 
 Free, no login, no CAPTCHA/WAF challenge encountered.
 """
@@ -75,6 +101,88 @@ CARDS_PER_PAGE = 96  # observed live; used only to detect the last page
 _PRICE_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
 _ADDR2_RE = re.compile(r"^(.*?),\s*([A-Z]{2})\s+(\d{5})(?:-\d{4})?\s*$")
 _ID_RE = re.compile(r"-(\d+)$")
+
+# FOUND 2026-10-04 (batch 5, see module docstring): the detail page's Next.js
+# RSC stream embeds a double-JSON-escaped state blob -- every field of
+# interest appears as the literal text `\"key\":\"value\"` (string) or
+# `\"key\":NNN` (number) inside the raw server HTML. Matched directly
+# against the raw text (no need to locate/parse the enclosing `self.
+# __next_f.push([...])` chunk) since every key name here is specific enough
+# not to collide elsewhere on the page.
+DETAIL_FETCH_CAP = 30  # total across the whole run -- same "bounded, polite
+                       # runtime" posture PAGES_CAP already uses; real NC+SC
+                       # volume across 3 categories x up to 20 pages is far
+                       # too large to detail-fetch exhaustively every run.
+_DETAIL_STR_FIELDS = (
+    "fclrtName", "fclrtPhone", "fclrtAddress", "fclrtCity", "fclrtState",
+    "fclrtZip", "liveAuctionLocationDescription", "liveAuctionStartTime",
+    "auctionStartDate", "publicRemarks", "eventName", "bidType",
+)
+_DETAIL_NUM_FIELDS = ("buildingAreaTotal",)
+
+
+def _detail_str_field(html: str, name: str) -> str | None:
+    m = re.search(r'\\"' + re.escape(name) + r'\\":\\"(.*?)\\"', html)
+    if not m:
+        return None
+    try:
+        return m.group(1).encode().decode("unicode_escape").strip() or None
+    except (UnicodeDecodeError, UnicodeError):
+        return m.group(1).strip() or None
+
+
+def _detail_num_field(html: str, name: str) -> float | None:
+    m = re.search(r'\\"' + re.escape(name) + r'\\":\s*(-?[\d.]+)', html)
+    if not m:
+        return None
+    try:
+        return float(m.group(1))
+    except ValueError:
+        return None
+
+
+def _detail_array_field(html: str, name: str) -> list[str]:
+    m = re.search(r'\\"' + re.escape(name) + r'\\":\[(.*?)\]', html)
+    if not m or not m.group(1):
+        return []
+    out = []
+    for item in re.findall(r'\\"(.*?)\\"', m.group(1)):
+        try:
+            out.append(item.encode().decode("unicode_escape"))
+        except (UnicodeDecodeError, UnicodeError):
+            out.append(item)
+    return out
+
+
+async def _fetch_detail(detail_url: str) -> dict:
+    """Best-effort enrichment from a xome.com listing's own detail page.
+    Returns {} on any failure -- callers must treat this as optional."""
+    out: dict = {}
+    try:
+        html = await get_text(detail_url, impersonate=True, timeout=20.0)
+    except Exception as exc:
+        log.warning("xome.detail_fetch_fail", url=detail_url, error=str(exc)[:160])
+        return out
+    if not html or len(html) < 5000:
+        return out
+    try:
+        for name in _DETAIL_STR_FIELDS:
+            val = _detail_str_field(html, name)
+            if val is not None:
+                out[name] = val
+        for name in _DETAIL_NUM_FIELDS:
+            val = _detail_num_field(html, name)
+            if val is not None:
+                out[name] = val
+        photos = _detail_array_field(html, "photos")
+        if photos:
+            out["photos"] = [p.split("?")[0] for p in photos]
+        documents = _detail_array_field(html, "documents")
+        if documents:
+            out["documents"] = documents
+    except Exception as exc:  # noqa: BLE001
+        log.warning("xome.detail_parse_fail", url=detail_url, error=str(exc)[:160])
+    return out
 
 
 def _ltype(text: str) -> ListingType:
@@ -269,4 +377,45 @@ class Xome(BaseScraper):
                 out.append(li)
                 kept += 1
             log.info("xome.category_done", url=category_url, found=len(rows), kept=kept)
+
+        # FOUND 2026-10-04 (batch 5, see module docstring): each row's own
+        # detail page carries a free photo gallery, a real description,
+        # precise auction timing, and the foreclosure firm's name + direct
+        # phone -- capped at DETAIL_FETCH_CAP total (not per-category) since
+        # this source's real NC+SC volume is far larger than that cap.
+        detail_fetches = 0
+        for li in out:
+            if detail_fetches >= DETAIL_FETCH_CAP:
+                break
+            detail_fetches += 1
+            try:
+                detail = await _fetch_detail(li.source_url)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("xome.detail_enrich_failed", url=li.source_url, error=str(exc)[:160])
+                continue
+            if not detail:
+                continue
+            photos = detail.get("photos")
+            if photos:
+                li.raw.setdefault("images", {})["real"] = photos
+            remarks = detail.get("publicRemarks")
+            if remarks:
+                li.description = remarks
+            area = detail.get("buildingAreaTotal")
+            if area and not li.living_sqft:
+                li.living_sqft = area
+            xome_ns = li.raw.setdefault("xome", {})
+            xome_ns["trustee_name"] = detail.get("fclrtName")
+            xome_ns["trustee_phone"] = detail.get("fclrtPhone")
+            xome_ns["trustee_address"] = ", ".join(
+                p for p in (detail.get("fclrtAddress"), detail.get("fclrtCity"),
+                            detail.get("fclrtState"), detail.get("fclrtZip")) if p
+            ) or None
+            xome_ns["live_auction_location"] = detail.get("liveAuctionLocationDescription")
+            xome_ns["live_auction_start_time"] = detail.get("liveAuctionStartTime")
+            xome_ns["auction_start_date_iso"] = detail.get("auctionStartDate")
+            xome_ns["event_name"] = detail.get("eventName")
+            if detail.get("documents"):
+                xome_ns["documents"] = detail["documents"]
+        log.info("xome.detail_enrichment_done", attempted=detail_fetches, total_rows=len(out))
         return out

@@ -99,3 +99,69 @@ def test_duplicate_flag_chips_are_deduplicated():
 def test_county_resolves_via_shared_gazetteer():
     li = _parse_card(_card(_SC_CARD), _SLUG)
     assert li.county == "Oconee"
+
+
+# --- FOUND 2026-10-04 (HERMES extraction-completeness audit, national ------
+# --- batch 5): detail-page RSC-stream enrichment (gallery/description/
+# --- precise timing/trustee contact), confirmed live on 2 real current
+# --- Xome detail pages. Fixture is a minimal fragment matching the REAL
+# --- `self.__next_f.push([n, "<escaped-json>"])` shape (double-JSON-escaped
+# --- -- literal `\"key\":\"value\"` text), not a full RSC parse.
+import asyncio
+
+from foreclosure_scraper.scrapers.national import xome as mod
+
+_DETAIL_FRAGMENT = (
+    r'<script>self.__next_f.push([1,"e9:{\"photos\":[\"https://xomeauction.propertiescdn.com/a.jpg?ts=1\",\"https://xomeauction.propertiescdn.com/b.jpg?ts=1\"],'
+    r'\"documents\":[],\"publicRemarks\":\"This property will be sold through the applicable foreclosure auction process.\",'
+    r'\"buildingAreaTotal\":2528,\"auctionStartDate\":\"2026-10-05T10:00:00+00:00\",\"liveAuctionStartTime\":\"10:00 AM\",'
+    r'\"liveAuctionLocationDescription\":\"Richland County Judicial Center, Columbia, South Carolina\",'
+    r'\"eventName\":\"October Foreclosure Sale\",\"bidType\":\"Est. Opening Bid\",'
+    r'\"fclrtName\":\"Bell Carrington Price & Gregg, LLC\",\"fclrtPhone\":\"803-509-5078\",'
+    r'\"fclrtAddress\":\"339 Heyward St, 2nd Floor\",\"fclrtCity\":\"Columbia\",\"fclrtState\":\"SC\",\"fclrtZip\":\"29201\"}"])</script>'
+) + "x" * 5000
+
+
+def test_fetch_detail_extracts_trustee_contact_and_gallery(monkeypatch):
+    async def fake_get_text(url, impersonate=True, timeout=20.0):
+        return _DETAIL_FRAGMENT
+
+    monkeypatch.setattr(mod, "get_text", fake_get_text)
+    out = asyncio.run(mod._fetch_detail("https://www.xome.com/auctions/x"))
+    assert out["fclrtName"] == "Bell Carrington Price & Gregg, LLC"
+    assert out["fclrtPhone"] == "803-509-5078"
+    assert out["auctionStartDate"] == "2026-10-05T10:00:00+00:00"
+    assert out["buildingAreaTotal"] == 2528.0
+    assert out["publicRemarks"].startswith("This property will be sold")
+    assert out["photos"] == [
+        "https://xomeauction.propertiescdn.com/a.jpg",
+        "https://xomeauction.propertiescdn.com/b.jpg",
+    ]
+    assert out.get("documents") is None or out.get("documents") == []
+
+
+def test_fetch_detail_returns_empty_dict_on_fetch_failure(monkeypatch):
+    async def failing_get_text(url, impersonate=True, timeout=20.0):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(mod, "get_text", failing_get_text)
+    out = asyncio.run(mod._fetch_detail("https://www.xome.com/auctions/x"))
+    assert out == {}
+
+
+def test_end_to_end_fetch_applies_detail_enrichment_within_cap(monkeypatch):
+    async def fake_get_text(url, impersonate=True, timeout=30.0):
+        if "auctions?" in url:
+            return f'<div class="grid">{_SC_CARD}</div>' + "x" * 5000
+        return _DETAIL_FRAGMENT
+
+    monkeypatch.setattr(mod, "get_text", fake_get_text)
+    monkeypatch.setattr(mod, "PAGES_CAP", 1)
+    monkeypatch.setattr(mod, "CARDS_PER_PAGE", 999)  # 1 card < this -> stop after page 1
+    monkeypatch.setattr(mod, "DETAIL_FETCH_CAP", 5)
+    out = asyncio.run(mod.Xome().fetch())
+    assert len(out) >= 1
+    li = out[0]
+    assert li.raw["xome"]["trustee_phone"] == "803-509-5078"
+    assert li.raw["images"]["real"][0].startswith("https://xomeauction.propertiescdn.com/")
+    assert li.description.startswith("This property will be sold")
