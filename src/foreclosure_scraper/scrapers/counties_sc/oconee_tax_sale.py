@@ -8,6 +8,23 @@ rows (no Item / Map number) — those are skipped. Real rows appear in late
 October ahead of the November sale.
 
 Columns: Item Number | Owner Name | Map Number (TMS) | Description | Total Tax Due
+
+RE-VERIFIED LIVE 2026-10-04 (extraction-completeness audit): confirmed the
+current CSV genuinely carries only announcement placeholder rows right now
+(no Item/Map number) -- "The 2026 Tax Sale is scheduled for Monday, November
+9, 2026", "The list of properties will be available online and published in
+the local newspaper starting Wednesday, October 21, 2026" -- all 5 columns
+already captured exactly as published; this IS the honest current state,
+not a parse failure, matching the module's own `expected_min_count=0`
+comment below. Also checked the landing page (oconeesc.com/delinquent-tax/
+sale-list) for any other document/PDF carrying a property list ahead of the
+Oct 21 posting date: none found. The page's nav also links a separate
+"Overage Information" page (unclaimed tax-sale-surplus funds) -- checked it
+too, since a sibling county's equivalent page turned into a real, if walled,
+lead candidate elsewhere in this project; Oconee's version is genuinely just
+a claims-PROCESS page (download/notarize/mail a form; the county notifies
+former owners directly by letter) with no list of names/amounts published
+anywhere on it, so there is nothing to harvest there, not a wall hiding data.
 """
 from __future__ import annotations
 

@@ -29,6 +29,14 @@ WHAT THIS ADDS, HONESTLY
 PRIVACY
     Owner names are held in memory only. Nothing from the sheet is written to disk.
 
+RE-VERIFIED LIVE 2026-10-04 (extraction-completeness audit): live-fetched
+the current list (081926 edition, 4,952 rows, AS OF 08/19/2026) and the
+treasurer landing page. Confirmed all 5 real columns (Item Number, PIN,
+Owner Name, New Owner Name, Description) are already captured and the
+landing page links no other .xlsx/.pdf/.csv besides this one file -- the
+"no amount, no situs" limitation stated above is still an honest description
+of the sheet, not a parsing gap.
+
 Free, no login, no CAPTCHA, ordinary GET.
 Slug: counties_sc.horry_delinquent_xlsx
 Category: county_tax
