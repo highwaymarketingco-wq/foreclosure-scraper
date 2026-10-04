@@ -9,8 +9,10 @@ from __future__ import annotations
 import asyncio
 import os
 
+import httpx
 import pytest
 
+from foreclosure_scraper.scrapers.law_firms import ingle_firm as ingle_firm_mod
 from foreclosure_scraper.scrapers.law_firms.ingle_firm import (
     IN_SCOPE,
     IngleFirm,
@@ -91,3 +93,44 @@ def test_live_returns_in_scope_nc_with_address():
         assert li.state == "NC"
         assert li.county.lower() in IN_SCOPE
         assert li.case_number  # NC SP docket number
+
+
+# --------------------------------------------------------------------------- #
+# fetch() must not swallow a real outage as a clean empty docket (2026-10-04) #
+# --------------------------------------------------------------------------- #
+# Live-verified the site's own TLS cert expired 2026-10-03 23:59:59 GMT, so
+# every real request currently raises httpx.ConnectError. The old `fetch()`
+# caught any Exception and returned [], which BaseScraper.safe_run records as
+# OUTCOME_ZERO ("ran clean but returned 0 rows") instead of OUTCOME_BLOCKED --
+# it never saw the real error. safe_run already classifies ConnectError /
+# HTTPStatusError correctly; fetch() must let them propagate, not swallow them.
+def test_connection_failure_propagates_instead_of_returning_empty(monkeypatch):
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_client(*args, **kwargs):
+        class FakeHttpClient:
+            async def get(self, *a, **kw):
+                raise httpx.ConnectError("SSL: CERTIFICATE_VERIFY_FAILED")
+        yield FakeHttpClient()
+
+    monkeypatch.setattr(ingle_firm_mod, "client", fake_client)
+    with pytest.raises(httpx.ConnectError):
+        asyncio.run(IngleFirm().fetch())
+
+
+def test_non_200_status_propagates_instead_of_returning_empty(monkeypatch):
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_client(*args, **kwargs):
+        class FakeHttpClient:
+            async def get(self, *a, **kw):
+                return httpx.Response(
+                    503, request=httpx.Request("GET", "https://www.theinglefirm.com/Sales.aspx")
+                )
+        yield FakeHttpClient()
+
+    monkeypatch.setattr(ingle_firm_mod, "client", fake_client)
+    with pytest.raises(httpx.HTTPStatusError):
+        asyncio.run(IngleFirm().fetch())

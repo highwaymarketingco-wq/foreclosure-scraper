@@ -10,6 +10,25 @@ theinglefirm.com/Sales.aspx as a clean HTML table:
 This is a high-value NC source: it carries the real Property Address AND
 the Bid Amount in one row. Statewide; we keep only our 14 in-scope NC
 counties. Plain HTTP, no bot protection.
+
+FIX 2026-10-04: `fetch()` wrapped its entire request in `except Exception:
+return []`, identical to a genuinely-empty docket. Live-verified the site's
+own TLS certificate expired 2026-10-03 23:59:59 GMT (`openssl s_client`
+against www.theinglefirm.com: `notAfter=Oct 3 23:59:59 2026 GMT`, one day
+before this audit) -- every request has been failing with
+`SSL: CERTIFICATE_VERIFY_FAILED` since. The old code swallowed that
+`httpx.ConnectError` and returned a clean `[]`, which `BaseScraper.safe_run`
+records as `OUTCOME_ZERO` ("ran clean but returned 0 rows") -- it never saw
+the real error at all. `safe_run` already has the right classification for
+this exact failure (`httpx.ConnectError` -> `OUTCOME_BLOCKED`,
+`HTTPStatusError` -> `OUTCOME_BLOCKED`/`OUTCOME_ERROR` by status code); the
+local try/except in `fetch()` was intercepting it before `safe_run` ever
+got the chance. Removed the swallow and added `raise_for_status()` so both
+a connection failure (bad cert, DNS, refused) and a bad HTTP status now
+surface as the correct outcome instead of looking identical to a week with
+no scheduled sales. This is NOT a compliance bypass: we still verify TLS
+normally (no `verify=False`); an expired cert is the SITE's own outage to
+fix, and the engine's job is to report it accurately, not hide it.
 """
 from __future__ import annotations
 
@@ -153,11 +172,12 @@ class IngleFirm(BaseScraper):
     timeout_s = 120.0
 
     async def fetch(self) -> Iterable[Listing]:
-        try:
-            async with client(timeout=40.0, follow_redirects=True) as c:
-                r = await c.get(URL, headers={"User-Agent": "Mozilla/5.0"})
-        except Exception:
-            return []
-        if r.status_code != 200:
-            return []
+        # No local try/except here on purpose: BaseScraper.safe_run already
+        # classifies a connection failure / bad HTTP status correctly
+        # (OUTCOME_BLOCKED / OUTCOME_ERROR, see the module docstring's
+        # 2026-10-04 fix). Swallowing it here made a real site-side outage
+        # look identical to a genuinely empty docket.
+        async with client(timeout=40.0, follow_redirects=True) as c:
+            r = await c.get(URL, headers={"User-Agent": "Mozilla/5.0"})
+        r.raise_for_status()
         return _parse_html(r.text, self.slug)
