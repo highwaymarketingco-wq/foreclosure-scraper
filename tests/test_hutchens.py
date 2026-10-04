@@ -84,7 +84,7 @@ def test_split_book_page_keeps_book_prefixes():
 # --------------------------------------------------------------------------- #
 def test_nc_grid_skips_header_and_pager_rows():
     scraped, _ = _grid("hutchens_nc_grid.html", NC_URL, "NC")
-    assert scraped == 6          # 6 data rows; the "Displaying page 1 of 1" row is not one
+    assert scraped == 7          # 7 data rows; the "Displaying page 1 of 1" row is not one
 
 
 def test_nc_row_uses_sp_number_as_case_number():
@@ -120,8 +120,58 @@ def test_nc_book_page_lands_in_rod_docs():
 def test_nc_footprint_gate_drops_statewide_noise():
     scraped, kept = _grid("hutchens_nc_grid.html", NC_URL, "NC")
     # Yadkin / Avery are out of footprint; Wake / Iredell are explicitly denied.
-    assert scraped == 6
-    assert sorted(r.county for r in kept) == ["Buncombe", "Buncombe"]
+    assert scraped == 7
+    assert sorted(r.county for r in kept) == ["Buncombe", "Buncombe", "Buncombe"]
+
+
+# --------------------------------------------------------------------------- #
+# upset-bid deadline promotion (NC only) — fixed 2026-10-04                    #
+# --------------------------------------------------------------------------- #
+def test_nc_upset_bid_promotes_structured_deadline():
+    """An NC row whose Bid Amount is "Bid upset <date>, increasing bid to $X"
+    must set upset_bid_deadline (filed date + 10 days, NCGS §45-21.27) and
+    raw["upset_bid"]["source"] = "published" so enrichment_upset_bid.py does
+    not derive its own (weaker, sale_date-based) deadline over it."""
+    _, kept = _grid("hutchens_nc_grid.html", NC_URL, "NC")
+    groton = [r for r in kept if r.street_address == "21 Groton Way"][0]
+    assert groton.county == "Buncombe"
+    assert groton.opening_bid == 347287.50          # the increased bid, not the filed date
+    assert groton.upset_bid_deadline is not None
+    assert groton.upset_bid_deadline.strftime("%Y-%m-%d") == "2026-10-02"  # 09/22 + 10 days
+    upset = groton.raw["upset_bid"]
+    assert upset["source"] == "published"
+    assert upset["deadline_iso"].startswith("2026-10-02")
+    assert upset["current_bid"] == 347287.50
+    assert upset["upset_filed_iso"].startswith("2026-09-22")
+    assert upset["court_file"] == "24SP000512-100"
+
+
+def test_sc_upset_bid_text_does_not_get_an_nc_deadline():
+    """SC's post-sale period is not NCGS §45-21.27's statutory 10-day window
+    (nothing in this codebase defines an SC equivalent), so an SC "Bid upset"
+    row must stay free-text only -- no fabricated upset_bid_deadline. Tested
+    directly on the row (the live Greenville example is also footprint-
+    dropped, which would make the assertion trivially true for the wrong
+    reason if checked only through the filtered `kept` list)."""
+    from selectolax.parser import HTMLParser
+
+    from foreclosure_scraper.scrapers.law_firms.hutchens import _header_indices
+
+    html = (FIX / "hutchens_sc_grid.html").read_text()
+    tree = HTMLParser(html)
+    grid = tree.css_first("table[id*='SalesListGrid']")
+    cols = _header_indices(grid)
+    row = next(
+        r for r in grid.css("tr")
+        if not r.css("th") and any("upset" in c.text(strip=True).lower() for c in r.css("td"))
+    )
+    cells = [c.text(strip=True) for c in row.css("td")]
+    li = Hutchens()._row_to_listing(cells, cols, SC_URL, "SC")
+    assert li is not None
+    assert "upset" in (li.description or "").lower()
+    assert li.opening_bid == 746000.00  # the increased bid still parses
+    assert li.upset_bid_deadline is None
+    assert "upset_bid" not in li.raw
 
 
 # --------------------------------------------------------------------------- #
@@ -174,7 +224,7 @@ def test_fetch_pulls_both_nc_and_sc_lists(monkeypatch):
     )
     rows = asyncio.run(_collect(Hutchens()))
     assert seen == [NC_URL, SC_URL]
-    assert sorted(r.county for r in rows) == ["Anderson", "Buncombe", "Buncombe"]
+    assert sorted(r.county for r in rows) == ["Anderson", "Buncombe", "Buncombe", "Buncombe"]
     assert {r.state for r in rows} == {"NC", "SC"}
 
 

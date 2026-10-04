@@ -31,6 +31,24 @@ Field notes the parser depends on:
     (85 rows), or "Bid upset 04/03/2024, increasing bid to $746,000.00" (26 rows).
     The old digit-anywhere regex read the "04" out of the upset DATE and stored a
     $4.00 opening bid on all 26 of those. Only a $-anchored amount is accepted now.
+  * FIX 2026-10-04: an upset-bid row's filed date was being captured (the
+    `_UPSET_DATE_RE` match existed already) but only ever dropped into the free-
+    text `description`, never promoted to the real `upset_bid_deadline` field or
+    `raw["upset_bid"]` -- so `enrichment_upset_bid.py`'s generic NC rule
+    (sale_date + 10 days) was computing the window off the STALE original sale
+    date instead of the real, already-reopened one. Live example caught in-
+    footprint: Buncombe NC "21 Groton Way" shows sale_date 8/18/2026 but a fresh
+    upset filed 9/22/2026 raising the bid to $347,287.50 -- the generic rule
+    would judge the window closed weeks before the real (re-opened) deadline.
+    NC rows with a parsed upset-filed date now set `upset_bid_deadline` (filed +
+    10 days per NCGS §45-21.27) and `raw["upset_bid"]` with `source: "published"`,
+    the same convention `scrapers.national.nc_upset_bids` uses, so the generic
+    enrichment skips deriving its own (weaker) date for these rows. Left as
+    free-text only for SC: Hutchens' SC grid shows the same "Bid upset" phrasing
+    on a handful of rows, but SC's post-sale period is not NCGS §45-21.27's
+    statutory 10-day upset window (that enrichment is itself NC-gated), and
+    nothing in this codebase defines the SC equivalent -- asserting a 10-day
+    deadline there would be a guess, not a verified fact.
   * "Deed of Trust Book/Page" is present on 374 of 376 rows and may carry a book
     prefix ("R 8776 / 2360", "MO 5421 / 1478", "Volume 125 / 2213"). Recorded into
     raw["rod_docs"] so the ROD / payoff lookups can use it.
@@ -38,7 +56,7 @@ Field notes the parser depends on:
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Iterable
 
 import structlog
@@ -302,4 +320,34 @@ class Hutchens(BaseScraper):
                 "state": state,
                 "source": self.slug,
             }]
+
+        # NC only -- NCGS §45-21.27's statutory 10-day upset-bid window.
+        # enrichment_upset_bid.py skips its own sale_date+10 derivation for
+        # any row whose raw["upset_bid"]["source"] is already "published",
+        # same convention scrapers.national.nc_upset_bids uses.
+        if state == "NC" and upset_date:
+            upset_dt = None
+            try:
+                upset_dt = dateparser.parse(upset_date)
+            except (ValueError, TypeError, OverflowError):
+                upset_dt = None
+            if upset_dt is not None:
+                deadline = upset_dt + timedelta(days=10)
+                now = datetime.utcnow()
+                days_left = (deadline.date() - now.date()).days
+                listing.upset_bid_deadline = deadline
+                listing.raw["upset_bid"] = {
+                    "source": "published",
+                    "in_window": days_left >= 0,
+                    "deadline_iso": deadline.isoformat(),
+                    "days_remaining": max(0, days_left),
+                    "current_bid": bid,
+                    "sale_datetime_iso": sale_date.isoformat() if sale_date else None,
+                    "upset_filed_iso": upset_dt.isoformat(),
+                    "court_file": court_case,
+                    "county": county,
+                    "statute": "NCGS §45-21.27",
+                    "feed": "hutchens",
+                    "page_url": url,
+                }
         return listing
