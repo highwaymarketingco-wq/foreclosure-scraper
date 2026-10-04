@@ -108,3 +108,21 @@ def test_missing_registry_id_falls_back_to_generic_url():
     li = E._to_listing(_row(registry_id=None), "NC", "ACRES")
     assert li.raw["epa_frs"]["registry_id"] is None
     assert li.source_url == "https://www.epa.gov/frs"
+
+
+def test_supplemental_location_is_captured_when_present():
+    """EXTRACTION-COMPLETENESS 2026-10-03: live field-population survey of
+    all 3,809 current NC+SC ACRES/SEMS rows found supplemental_location
+    populated on 14 (0.4%) carrying real content no other field has --
+    live example: 'PIN 4599156896' (a literal parcel id) alongside
+    location_address 'WEDDINGTON ROAD'. Already fetched in the same
+    response; must be kept, not dropped on the floor."""
+    row = _row()
+    row["supplemental_location"] = "PIN 4599156896"
+    li = E._to_listing(row, "NC", "ACRES")
+    assert li.raw["epa_frs"]["supplemental_location"] == "PIN 4599156896"
+
+
+def test_missing_supplemental_location_is_none_not_a_crash():
+    li = E._to_listing(_row(), "NC", "ACRES")
+    assert li.raw["epa_frs"]["supplemental_location"] is None

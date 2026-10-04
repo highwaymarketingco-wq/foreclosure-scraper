@@ -122,6 +122,15 @@ def _to_listing(row: dict, state: str, program: str) -> Optional[Listing]:
             "county_name": _clean(row.get("county_name")),
             "location_description": _clean(row.get("location_description")),
             "last_reported_date": _clean(row.get("last_reported_date")),
+            # EXTRACTION-COMPLETENESS AUDIT 2026-10-03: live field-population
+            # survey across all 3,809 current NC+SC ACRES/SEMS rows found
+            # every other unused FRS column null on 100% of rows except this
+            # one (0.4%, 14 rows) -- and where it IS populated it carries
+            # real content this list endpoint has no other field for: an
+            # alternate/former street address, additional parcel numbers the
+            # same site covers, or a literal PIN ("PIN 4599156896"). Already
+            # fetched in the same response; costs nothing to keep.
+            "supplemental_location": _clean(row.get("supplemental_location")),
         }},
     )
 
