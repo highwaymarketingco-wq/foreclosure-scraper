@@ -112,6 +112,44 @@ WHAT A RECORD CARRIES
     AccountNumber -- aggregated here into one Listing per parcel (sc_catalis_
     delinquent_roll.aggregate_bills's exact pattern), balances summed, years listed.
 
+PER-BILL NOTICE PDF (AUDITED 2026-10-03)
+    Every bill also carries `PdfName` + `ContainerName` -- not previously captured
+    anywhere, despite most real (non-placeholder) ones pointing at a genuine, per-bill
+    delinquent-tax NOTICE PDF (live sample of 57 current nonzero-balance real-estate
+    bills: 35 (61%) had a real filename like "dc_R-2025-10078864_delq.pdf" or
+    "mobile_R-2024-10076383-00.pdf"; the rest were the generic placeholder
+    "empty-bill.pdf"/"ICVehicleEmpty.pdf" the app falls back to for a too-new bill
+    with no notice generated yet).
+
+    Reverse-engineered the actual document retrieval live with a real browser
+    (static JS-bundle analysis alone was not enough -- the backend call that mints
+    the signed URL is buried in a lazy-loaded Angular chunk this session never
+    isolated): the app's "View Bill" action calls
+    `window.open("/view/bill/pdfbill?" + base64(f"pdfName={PdfName}&container={ContainerName}"))`
+    (URL-encoded). That route is NOT a server redirect -- a plain `httpx`/`fetch`
+    GET to it just returns the Angular shell (200 text/html) -- it only resolves once
+    a REAL browser navigates to it, Angular bootstraps, and the route's own component
+    calls a (still-unidentified) backend endpoint that mints a short-lived (~20 min)
+    Azure Blob SAS URL and does `location.href = <that URL>`. CONFIRMED working live
+    2026-10-03 (both the placeholder "empty-bill.pdf"/container "billtrax" and a real
+    "dc_R-2025-10078864_delq.pdf"/container "dorchester-proptax-2025" -- the FIRST
+    attempt at the real one silently hung because the container name is PER-BILL, not
+    always "billtrax"; using the bill's own ContainerName fixed it) -- the browser
+    tab's title and origin changed to the target PDF / `billtraxblob.blob.core.windows.net`
+    in both cases.
+
+    Because that redirect is JS-driven (not a plain HTTP 302), this scraper's plain
+    httpx stack CANNOT resolve it to PDF bytes server-side -- there is no browser
+    runtime in the scrape loop, and running one per-bill at 22k+ rows is not this
+    codebase's architecture (see "no browser tool available" elsewhere in this file).
+    So the DETERMINISTIC view-URL (same base64 scheme, built from fields already on
+    every bill) is captured into raw as `notice_pdf_view_url` -- a real, always-correct
+    link a human (or a future browser-based enrichment pass) can open directly -- but
+    is deliberately kept OUT of enrichment_doc_ocr.py's `_DOC_FIELDS` scan (that
+    enricher fetches with plain httpx too, so it would just download the Angular
+    shell, not the PDF -- harmless, but useless, so there is no point feeding it in).
+    Only built when PdfName is a real, non-placeholder filename.
+
 Free, public, no login, no CAPTCHA.
 Slug: counties_sc.dorchester_billtrax_delinquent_tax
 Category: county_tax
@@ -120,12 +158,14 @@ ListingType: TAX_LIEN (standing roll -- no scheduled sale/redemption date on thi
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import re
 import time
 from datetime import datetime
 from typing import Iterable
+from urllib.parse import quote as _urlquote
 
 import httpx
 import structlog
@@ -261,6 +301,25 @@ def _is_real_estate(account_number: str | None) -> bool:
     return bool(account_number and _TMS_RE.match(account_number))
 
 
+#: The app falls back to one of these generic templates when a bill is too new to
+#: have a real per-bill notice PDF generated yet (live-confirmed on current-page
+#: bills) -- a view-URL built from one of these would only show boilerplate.
+_PLACEHOLDER_PDF_NAMES = {"empty-bill.pdf", "icvehicleempty.pdf", ""}
+
+
+def _notice_pdf_view_url(pdf_name: str | None, container_name: str | None) -> str | None:
+    """The deterministic Angular route that -- ONLY in a real browser, see module
+    docstring's "PER-BILL NOTICE PDF" section -- redirects to this bill's actual
+    notice PDF. None for a blank/placeholder PdfName."""
+    pdf_name = (pdf_name or "").strip()
+    container_name = (container_name or "").strip()
+    if not pdf_name or not container_name or pdf_name.lower() in _PLACEHOLDER_PDF_NAMES:
+        return None
+    payload = f"pdfName={pdf_name}&container={container_name}"
+    b64 = base64.b64encode(payload.encode()).decode()
+    return f"{SITE_URL.rstrip('/')}/view/bill/pdfbill?{_urlquote(b64)}"
+
+
 async def _fetch_page(client: httpx.AsyncClient, template: dict, page: int,
                        page_size: int = PAGE_SIZE) -> tuple[list[dict], int]:
     """One search window: records [page*page_size, (page+1)*page_size). Returns
@@ -380,6 +439,8 @@ def _aggregate(bills: Iterable[dict]) -> list[Listing]:
 
         per_bill = []
         for b in group:
+            pdf_name = b.get("PdfName")
+            container_name = b.get("ContainerName")
             per_bill.append({
                 "bill_number": b.get("BillNumber"),
                 "year": _bill_year(b.get("BillNumber")),
@@ -389,9 +450,18 @@ def _aggregate(bills: Iterable[dict]) -> list[Listing]:
                 "reason_to_block_payment": b.get("ReasonToBlockPayment") or None,
                 "bill_id": b.get("_BillId"),
                 "property_id": b.get("_PropertyId"),
+                "sticker_no": (b.get("StickerNo") or "").strip() or None,
+                "pdf_name": pdf_name or None,
+                "container_name": container_name or None,
+                "notice_pdf_view_url": _notice_pdf_view_url(pdf_name, container_name),
             })
         years = sorted({p["year"] for p in per_bill if p["year"]})
         total_due = round(sum(p["total_due_now"] or 0 for p in per_bill), 2) or None
+        # Surface the most relevant (current-year, or else newest) real notice link
+        # at the parcel level too, so it's reachable without scanning every bill.
+        notice_url = next(
+            (p["notice_pdf_view_url"] for p in per_bill if p["notice_pdf_view_url"]),
+            None)
 
         raw = {
             "billtrax_dorchester_delinquent_tax": {
@@ -404,6 +474,11 @@ def _aggregate(bills: Iterable[dict]) -> list[Listing]:
                 "is_two_year_plus": len(years) >= 2,
                 "total_due": total_due,
                 "property_id": latest.get("_PropertyId"),
+                # Deliberately NOT a top-level raw["document_url"]/etc key --
+                # enrichment_doc_ocr.py's _DOC_FIELDS scan fetches with plain
+                # httpx, which cannot resolve this JS-driven redirect (see
+                # module docstring's "PER-BILL NOTICE PDF" section).
+                "notice_pdf_view_url": notice_url,
             },
         }
         if total_due:

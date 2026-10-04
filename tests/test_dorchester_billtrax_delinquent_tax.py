@@ -34,11 +34,13 @@ from __future__ import annotations
 
 from foreclosure_scraper.models import ListingType, PropertyKind
 from foreclosure_scraper.scrapers.counties_sc.dorchester_billtrax_delinquent_tax import (
+    SITE_URL,
     UTILITY_ID,
     _aggregate,
     _bill_year,
     _field_map,
     _is_real_estate,
+    _notice_pdf_view_url,
 )
 
 # --- verbatim Bill[] field lists, as the API returns them under
@@ -77,6 +79,28 @@ LONG_2025_BILL = [
     {"FieldName": "BillDate", "FieldValue": "2025-12-08T05:00:00Z"},
     {"FieldName": "BlockPayment", "FieldValue": "false"},
     {"FieldName": "ReasonToBlockPayment", "FieldValue": ""},
+    {"FieldName": "StickerNo", "FieldValue": ""},
+    {"FieldName": "ContainerName", "FieldValue": "billtrax"},
+    {"FieldName": "PdfName", "FieldValue": "empty-bill.pdf"},
+]
+# A real, non-placeholder notice PDF -- verified live 2026-10-03 with a real
+# browser: the app's "/view/bill/pdfbill?<base64 of pdfName+container>" route
+# redirects (JS-driven, not a server 302) to this exact file on
+# billtraxblob.blob.core.windows.net/dorchester-proptax-2025/, confirmed by the
+# browser tab's title/origin changing to the target PDF.
+CREEL_REAL_NOTICE_BILL = [
+    {"FieldName": "AccountNumber", "FieldValue": "118-00-00-147-001"},
+    {"FieldName": "StickerNo", "FieldValue": "27404"},
+    {"FieldName": "BillNumber", "FieldValue": "R-2024-10076383"},
+    {"FieldName": "PropertyOwner", "FieldValue": "CREEL DONNA &SPENCER MUCKELVANEY"},
+    {"FieldName": "PropertyLocation", "FieldValue": "RIDGE RD 1137"},
+    {"FieldName": "TotalDueNow", "FieldValue": "312.42000000000002"},
+    {"FieldName": "BillDate", "FieldValue": "2025-04-11T04:00:00Z"},
+    {"FieldName": "BlockPayment", "FieldValue": "true"},
+    {"FieldName": "ReasonToBlockPayment",
+     "FieldValue": "Unavailable for online payment, please contact Delinquent Tax Office ."},
+    {"FieldName": "ContainerName", "FieldValue": "dorchester-proptax-2025"},
+    {"FieldName": "PdfName", "FieldValue": "mobile_R-2024-10076383-00.pdf"},
 ]
 # A real "M-" (vehicle/manufactured-home/personal-property) bill on the same roll --
 # AccountNumber is a plain digit account id, not a TMS.
@@ -223,3 +247,71 @@ def test_mixed_batch_keeps_only_real_nonzero_real_estate():
     listings = _aggregate(bills)
     parcels = {li.parcel_id for li in listings}
     assert parcels == {"161-00-00-097-000", "135-00-00-118-777"}
+
+
+# ---------------------------------------------------------------------------
+# AUDITED 2026-10-03: PdfName/ContainerName/StickerNo were already present on
+# every Bill[] field list the API returns but were never read -- most real,
+# currently-owed bills point at a genuine per-bill delinquent-tax notice PDF
+# (live sample: 35/57 = 61%), previously invisible to this scraper entirely.
+# ---------------------------------------------------------------------------
+
+def test_notice_pdf_view_url_matches_the_live_verified_scheme():
+    """Exact base64 payload confirmed live 2026-10-03 with a real browser: the
+    app's own window.open() call for this bill used this identical string."""
+    url = _notice_pdf_view_url("dc_R-2025-10078864_delq.pdf", "dorchester-proptax-2025")
+    assert url == (
+        f"{SITE_URL.rstrip('/')}/view/bill/pdfbill?"
+        "cGRmTmFtZT1kY19SLTIwMjUtMTAwNzg4NjRfZGVscS5wZGYmY29udGFpbmVyPWRvcmNoZXN0ZXItcHJvcHRheC0yMDI1"
+    )
+
+
+def test_notice_pdf_view_url_none_for_placeholder_or_blank():
+    """empty-bill.pdf / ICVehicleEmpty.pdf are the app's own generic fallback for
+    a too-new bill with no real notice generated yet -- a view-URL built from
+    one of these would only ever show boilerplate, not a real per-bill notice."""
+    assert _notice_pdf_view_url("empty-bill.pdf", "billtrax") is None
+    assert _notice_pdf_view_url("ICVehicleEmpty.pdf", "ironcounty-propertytax-2022") is None
+    assert _notice_pdf_view_url("", "billtrax") is None
+    assert _notice_pdf_view_url(None, None) is None
+    assert _notice_pdf_view_url("real.pdf", "") is None  # no container -> can't build a path
+
+
+def test_real_notice_pdf_surfaced_on_listing_and_per_bill():
+    bills = _bills_from(_bp(CREEL_REAL_NOTICE_BILL))
+    listings = _aggregate(bills)
+    assert len(listings) == 1
+    detail = listings[0].raw["billtrax_dorchester_delinquent_tax"]
+    expected_url = _notice_pdf_view_url("mobile_R-2024-10076383-00.pdf",
+                                         "dorchester-proptax-2025")
+    assert detail["notice_pdf_view_url"] == expected_url
+    assert detail["bills"][0]["notice_pdf_view_url"] == expected_url
+    assert detail["bills"][0]["pdf_name"] == "mobile_R-2024-10076383-00.pdf"
+    assert detail["bills"][0]["container_name"] == "dorchester-proptax-2025"
+    assert detail["bills"][0]["sticker_no"] == "27404"
+    # Deliberately not promoted to a top-level _DOC_FIELDS key -- see module
+    # docstring: plain httpx can't resolve the JS-driven redirect.
+    assert "document_url" not in listings[0].raw
+    assert "pdf_url" not in listings[0].raw
+
+
+def test_placeholder_pdf_bill_carries_no_notice_url():
+    bills = _bills_from(_bp(LONG_2025_BILL))
+    listings = _aggregate(bills)
+    detail = listings[0].raw["billtrax_dorchester_delinquent_tax"]
+    assert detail["notice_pdf_view_url"] is None
+    assert detail["bills"][0]["pdf_name"] == "empty-bill.pdf"
+    assert detail["bills"][0]["notice_pdf_view_url"] is None
+
+
+def test_parcel_level_notice_url_picks_first_real_one_across_years():
+    """A multi-year parcel where only the OLDER bill has a real notice PDF (the
+    newer one still shows the generic placeholder) must still surface the real
+    link at the parcel level, not silently prefer the (placeholder) latest bill."""
+    bills = _bills_from(_bp(CREEL_REAL_NOTICE_BILL), _bp(LONG_2025_BILL))
+    listings = _aggregate(bills)
+    parcels = {li.parcel_id: li for li in listings}
+    assert parcels["118-00-00-147-001"].raw["billtrax_dorchester_delinquent_tax"][
+        "notice_pdf_view_url"] is not None
+    assert parcels["135-00-00-118-777"].raw["billtrax_dorchester_delinquent_tax"][
+        "notice_pdf_view_url"] is None
