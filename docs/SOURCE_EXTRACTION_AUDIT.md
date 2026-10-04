@@ -163,7 +163,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_sc.sc_public_index_lis_pendens` | deed/notice?, detail-page | https://publicindex.sccourts.org/<County |
 | `counties_sc.sc_public_notices` | deed/notice?, detail-page | https://www.scpublicnotices.com/Search.aspx |
 | `counties_sc.sc_rod_acclaim` | deed/notice? | (see SOURCE_REGISTER.md) |
-| `counties_sc.sc_rod_cott` | deed/notice? | (see SOURCE_REGISTER.md) |
+| `counties_sc.sc_rod_cott` | deed/notice?, detail-page | (see SOURCE_REGISTER.md) |
 | `counties_sc.sc_state_tax_lien` | - | https://dor.sc.gov/delinquent-taxpayers<br>https://mydorway.dor.sc.gov/ |
 | `counties_sc.sc_tax_delinquent` | pdf?, deed/notice?, img?, detail-page, links | https://1543.newstogo.us/editionviewer/default.aspx<br>https://www.andersoncountysc.org/departments-a-z/treasurer/ |
 | `counties_sc.sc_ust_registry` | detail-page | https://apps.des.sc.gov/USTRegistry/ |
