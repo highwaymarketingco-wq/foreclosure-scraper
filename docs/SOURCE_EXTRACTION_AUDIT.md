@@ -227,7 +227,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.landwatch` | img?, detail-page | (see SOURCE_REGISTER.md) |
 | `national.legacy_obituaries` | detail-page, links | https://www.legacy.com |
 | `national.liensnc` | deed/notice?, detail-page, links | https://www.liensnc.com |
-| `national.loopnet` | detail-page, links | https://www.loopnet.com/<br>https://www.loopnet.com |
+| `national.loopnet` | img?, detail-page, links | https://www.loopnet.com |
 | `national.nc_sos_ucc` | deed/notice?, detail-page | https://www.sosnc.gov/online_services/search/by_title/_uniform_commercial_code |
 | `national.nc_upset_bids` | detail-page, links | https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/<br>https://kanialawfirm.com/wp-admin/admin-ajax.php |
 | `national.opencorporates` | - | https://api.opencorporates.com/v0.4/companies/search |
