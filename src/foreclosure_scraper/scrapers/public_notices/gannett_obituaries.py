@@ -34,6 +34,28 @@ list-only Listing (name + slug) this scraper always produced is still emitted.
 
 Free, public, plain-HTTP. Gate off with FORECLOSURE_OBITUARIES=0, or the detail
 fetch alone with FORECLOSURE_OBIT_DETAIL=0 (keeps the name-only list behavior).
+
+EXTRACTION-COMPLETENESS AUDIT FINDING (2026-10-04, final batch): despite its
+own docstring above claiming all 8 papers are "Gannett... the Tukios
+platform," ``thedigitalcourier.com`` is NOT -- it is a TownNews/BLOX (TNCMS)
+site, confirmed live by its real URL shapes (``/archives/<slug>/
+article_<uuid>.html``, not Tukios' ``/obituaries/<slug>``) and its RSS
+search endpoint. The static ``/obituaries/`` list page this scraper fetches
+for every host renders only the SINGLE most-recent obituary server-side for
+this one host (TownNews lazy-loads the rest client-side); the other 7 real
+Tukios hosts correctly render ~20 each. Live-confirmed 2026-10-04: this
+host's own TownNews RSS feed (``/search/?f=rss&t=article&c=obituaries&
+l=50``) carries 50 real current obituaries -- a 98% miss (1 of 50) on every
+run since this scraper existed, on a REAL 18-county-footprint source
+(Rutherford NC). The RSS item is also strictly richer than the Tukios path
+for this host: the full obituary lede + age/city is already in the feed's
+own ``<description>`` (no extra per-decedent GET needed, unlike the Tukios
+``_fetch_detail`` path) and each item carries a real `<enclosure>` photo URL
+TownNews serves directly. Routed this one host through its RSS feed instead
+of the Tukios HTML-list path; ``_AGE_FROM_DESC_RE`` extended (one optional
+"age " token) to also match TownNews' "Name, age 89, of City..." phrasing
+alongside the existing Tukios "Name, 80, of City..." shape -- both now share
+``_parse_detail_description()`` unchanged otherwise.
 """
 from __future__ import annotations
 
@@ -43,10 +65,11 @@ import re
 from datetime import datetime
 from typing import Iterable
 
+import feedparser
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...http_client import client
+from ...http_client import client, get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -63,6 +86,15 @@ PAPERS = {
     "independentmail.com": ("Anderson", "SC"),
 }
 
+# Hosts in PAPERS that are actually TownNews (NOT Tukios) -- see the module
+# docstring's 2026-10-04 finding. Routed through _fetch_townnews_rss()
+# instead of the Tukios /obituaries/ list-page path.
+_TOWNNEWS_RSS_HOSTS = {"thedigitalcourier.com"}
+
+
+def _townnews_rss_url(host: str) -> str:
+    return f"https://www.{host}/search/?f=rss&t=article&c=obituaries&l=50&s=start_time&sd=desc"
+
 _SLUG_RE = re.compile(r'/obituaries/([a-z][a-z0-9]+-[a-z0-9-]{2,40})(?=["/?])')
 _NOISE = ("daily-digest", "privacy", "terms", "how-to", "self-service", "faq",
           "place-an", "frequently", "submit")
@@ -75,10 +107,13 @@ _DETAIL_MAX = int(os.environ.get("FORECLOSURE_OBIT_DETAIL_MAX", "40"))
 _META_DESC_RE = re.compile(
     r'<meta\s+name="description"\s+content="([^"]*)"', re.I
 )
-# "Darlene Rice Honeycutt, 80, of Asheville, ..." / "Jerry Deal, 92, of 11 Elk
-# Mountain Road, ..." -- the decedent's own name repeats the slug-derived name,
-# age is the first bare integer after the first comma.
-_AGE_FROM_DESC_RE = re.compile(r"^[^,]+,\s*(\d{1,3}),")
+# "Darlene Rice Honeycutt, 80, of Asheville, ..." (Tukios) / "Jerry Deal, 92,
+# of 11 Elk Mountain Road, ..." (Tukios) / "Charles E. Smith, age 89, of
+# Ellenboro, ..." (TownNews, live-confirmed 2026-10-04 on thedigitalcourier.com's
+# own RSS <description> -- same shape, one extra "age " token) -- the
+# decedent's own name repeats the slug-derived name, age is the first bare
+# integer after the first comma, optionally preceded by the literal word "age".
+_AGE_FROM_DESC_RE = re.compile(r"^[^,]+,\s*(?:age\s+)?(\d{1,3}),", re.I)
 # "passed away on September 26, 2026" / "died on Wednesday, September 30, 2026"
 _DEATH_DATE_RE = re.compile(
     r"(?:passed away|died)(?:\s+on)?\s+(?:[A-Z][a-z]+,\s+)?"
@@ -149,6 +184,110 @@ async def _fetch_detail(c, url: str) -> dict:
         return {}
 
 
+_TOWNNEWS_ARTICLE_ID_RE = re.compile(r"article_([0-9a-f-]+)\.html", re.I)
+
+
+def _build_obit_listing(
+    source_slug: str,
+    slug_or_id: str,
+    name: str,
+    detail_url: str,
+    host: str,
+    county: str,
+    state: str,
+    detail: dict,
+    now: datetime,
+) -> Listing:
+    """Shared Listing-builder for both the Tukios (/obituaries/<slug> + a
+    per-decedent detail GET) and TownNews (RSS item, detail already in hand)
+    paths -- same raw shape either way."""
+    obituary = {"decedent": name, "slug": slug_or_id,
+                "paper": host, "county": county, "state": state}
+    obituary.update(detail)
+
+    desc_bits = [f"Obituary (death) — {name}"]
+    if detail.get("age"):
+        desc_bits.append(f"age {detail['age']}")
+    desc_bits.append(f"{county} County {state} — pre-probate heir/estate signal")
+
+    li = Listing(
+        source=source_slug,
+        source_url=detail_url,
+        listing_type=ListingType.PROBATE_NOTICE,
+        property_kind=PropertyKind.UNKNOWN,
+        state=state, county=county,
+        defendant=name,  # decedent -> resolver pins parcel by owner-name
+        description=", ".join(desc_bits)[:300],
+        first_seen=now, last_seen=now,
+        raw={
+            "obituary": obituary,
+            "life_event": "death",
+            "relationship_signal": {"kind": "probate",
+                                    "keyword": "obituary"},
+        },
+    )
+    # A literal home address found in the obituary text IS the decedent's own
+    # situs — skip the name->parcel resolver entirely and anchor the lead
+    # directly, same value a resolved parcel gives, for free.
+    home_addr = detail.get("home_address")
+    if home_addr:
+        li.street_address = home_addr
+        obituary["home_address_used_as_situs"] = True
+    return li
+
+
+async def _fetch_townnews_host(
+    host: str, county: str, state: str, now: datetime, source_slug: str,
+) -> list[Listing]:
+    """TownNews path (currently just thedigitalcourier.com -- see module
+    docstring's 2026-10-04 finding). The RSS item already carries the full
+    lede (age/city/death-date in <description>) and a real photo
+    (<enclosure>), so unlike the Tukios path this needs NO extra per-decedent
+    GET -- strictly cheaper AND far more complete (50 real rows vs. the 1 the
+    static /obituaries/ list page server-renders for this host).
+
+    Fetched independently of the Tukios loop's shared plain-httpx client via
+    ``get_text(..., impersonate=True)``: live-confirmed 2026-10-04 this
+    host's TownNews search endpoint 429s plain httpx fairly readily (shared
+    with the newspapers.* TownNews sources' own documented rate-limiting)
+    but a real Chrome TLS fingerprint gets a clean 200 reliably."""
+    out: list[Listing] = []
+    url = _townnews_rss_url(host)
+    try:
+        text = await get_text(url, timeout=20.0, impersonate=True)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("obituaries.townnews_fetch_failed", host=host, error=str(exc)[:140])
+        return out
+
+    parsed = feedparser.parse(text)
+    for e in parsed.entries:
+        name = (getattr(e, "title", "") or "").strip()
+        if len(name) < 5 or name.replace(" ", "").isdigit() or " " not in name:
+            continue
+        link = (getattr(e, "link", "") or "").strip()
+        if not link:
+            continue
+        summary = getattr(e, "summary", "") or ""
+        detail = _parse_detail_description(summary)
+
+        idm = _TOWNNEWS_ARTICLE_ID_RE.search(link)
+        slug_or_id = idm.group(1) if idm else name
+
+        li = _build_obit_listing(
+            source_slug, slug_or_id, name, link, host, county, state, detail, now,
+        )
+        # The RSS <enclosure> is a real, directly-fetchable photo URL --
+        # confirmed live (bloximages.newyork1.vip.townnews.com, image/jpeg).
+        encs = getattr(e, "enclosures", None) or []
+        if encs:
+            href = (encs[0].get("href") or "").strip()
+            if href.startswith("http"):
+                li.raw["images"] = {"real": [href]}
+        out.append(li)
+    log.info("obituaries.townnews_county", host=host, county=county, kept=len(out))
+    return out
+
+
 def _name_from_slug(slug: str) -> str:
     parts = slug.split("-")
     # drop trailing numeric disambiguators the platform appends: sara-moore-2026-1
@@ -184,6 +323,12 @@ class GannettObituaries(BaseScraper):
         detail_fetched = detail_hits = 0
         async with client(timeout=30.0) as c:
             for host, (county, state) in PAPERS.items():
+                if host in _TOWNNEWS_RSS_HOSTS:
+                    out.extend(await _fetch_townnews_host(
+                        host, county, state, now, self.slug
+                    ))
+                    continue
+
                 try:
                     r = await c.get(f"https://www.{host}/obituaries/")
                     if r.status_code != 200:
@@ -215,39 +360,10 @@ class GannettObituaries(BaseScraper):
                         if detail:
                             detail_hits += 1
 
-                    obituary = {"decedent": name, "slug": slug,
-                                "paper": host, "county": county, "state": state}
-                    obituary.update(detail)
-
-                    desc_bits = [f"Obituary (death) — {name}"]
-                    if detail.get("age"):
-                        desc_bits.append(f"age {detail['age']}")
-                    desc_bits.append(f"{county} County {state} — pre-probate heir/estate signal")
-
-                    li = Listing(
-                        source=self.slug,
-                        source_url=detail_url,
-                        listing_type=ListingType.PROBATE_NOTICE,
-                        property_kind=PropertyKind.UNKNOWN,
-                        state=state, county=county,
-                        defendant=name,  # decedent -> resolver pins parcel by owner-name
-                        description=", ".join(desc_bits)[:300],
-                        first_seen=now, last_seen=now,
-                        raw={
-                            "obituary": obituary,
-                            "life_event": "death",
-                            "relationship_signal": {"kind": "probate",
-                                                    "keyword": "obituary"},
-                        },
+                    li = _build_obit_listing(
+                        self.slug, slug, name, detail_url, host, county, state,
+                        detail, now,
                     )
-                    # A literal home address found in the obituary text IS the
-                    # decedent's own situs — skip the name->parcel resolver
-                    # entirely and anchor the lead directly, same value a
-                    # resolved parcel gives, for free.
-                    home_addr = detail.get("home_address")
-                    if home_addr:
-                        li.street_address = home_addr
-                        obituary["home_address_used_as_situs"] = True
                     out.append(li)
                     kept += 1
                 log.info("obituaries.county", host=host, county=county, kept=kept)
