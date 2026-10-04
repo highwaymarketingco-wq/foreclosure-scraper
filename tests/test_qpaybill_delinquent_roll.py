@@ -451,3 +451,112 @@ def test_detail_page_property_address_never_overrides_a_real_grid_situs():
     r["detail"] = {"property_address": "128 PHOENIX LN"}
     li = _to_listings("Barnwell", [r])[0]
     assert li.street_address == "999 REAL GRID ADDR"
+
+
+# ---------------------------------------------------------------------------
+# County-timeout salvage (2026-10-03 Darlington finding)
+#
+# A scoped Darlington-ONLY run (full budget/concurrency to itself, no other
+# county competing) hit COUNTY_TIMEOUT_S with parcels=0 after 2,264 real,
+# non-erroring requests -- the exact shape this module already names for
+# Williamsburg's GenericErrorPage hang. Live-verified this is NOT that: a
+# direct search against darlingtontreasurer.qpaybill.com for prefix "A" alone
+# returns 25 real, parseable rows, and sweep_county() called without the
+# wait_for wrapper finished in 525.9s with 0 errors and 14,308 real rows.
+# Darlington is simply a county with more owner-name volume than
+# COUNTY_TIMEOUT_S budgets for -- the real bug was that `sweep_county()`'s
+# sink (mutated incrementally as prefixes are absorbed, same mechanism
+# `_walk_prefix` already relies on for its own retries) was being thrown away
+# whenever `asyncio.wait_for` cancelled the sweep, substituting a hardcoded
+# empty result. These tests pin the fix: a caller-owned sink/stats survives
+# cancellation.
+# ---------------------------------------------------------------------------
+
+import asyncio
+
+import foreclosure_scraper.scrapers.counties_sc.qpaybill_delinquent_roll as qpr
+
+
+@pytest.mark.asyncio
+async def test_rows_absorbed_before_a_wall_clock_cutoff_survive_cancellation(monkeypatch):
+    """Simulates a county where most prefixes answer instantly but one is still
+    in flight when the wall clock runs out -- exactly what a large county's
+    depth>=2 fan-out looks like live. The caller's sink/stats must come back
+    populated with everything absorbed before the cutoff, not emptied by the
+    cancellation of the one prefix still running.
+    """
+    async def fake_walk_prefix(client, sub, prefix, budget, sink, stats):
+        if prefix == "A":
+            await asyncio.sleep(10)  # still "in flight" when wait_for times out
+            return False, set()
+        stats["queries"] += 1
+        sink[(prefix, "2025", f"N-{prefix}")] = {
+            "ident": prefix, "year": "2025", "notice_no": f"N-{prefix}",
+            "owner": f"{prefix} OWNER", "amount": 100.0, "status": "Unpaid",
+        }
+        return False, set()
+
+    monkeypatch.setattr(qpr, "_walk_prefix", fake_walk_prefix)
+
+    sink: dict = {}
+    stats = {"queries": 0, "errors": 0, "page_capped_prefixes": 0,
+             "pager_stalled": 0, "drifted": 0, "deepened": 0,
+             "truncated_prefixes": 0, "lost_prefixes": []}
+    budget = qpr._Budget(2500)
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(
+            qpr.sweep_county(object(), "TestCounty", "testsub", budget,
+                             sink=sink, stats=stats),
+            timeout=0.3,
+        )
+
+    # 35 of 36 prefixes ("A" is the one still sleeping) absorbed a real row
+    # before the cutoff. The old code discarded `sink` on this exact
+    # cancellation path; the fix is that the CALLER's own dict still has them.
+    assert len(sink) >= 30, (
+        "rows absorbed before the cutoff must survive the sweep's cancellation"
+    )
+    assert stats["queries"] >= 30
+
+
+@pytest.mark.asyncio
+async def test_fetch_reports_salvaged_rows_not_zero_when_a_county_times_out(monkeypatch):
+    """End-to-end: QPayBillDelinquentRoll.fetch()'s own per-county timeout
+    handling must return the rows sweep_county() had already absorbed, not the
+    old hardcoded empty result, when the ONLY reason the county didn't finish
+    is wall-clock time -- not a dead portal.
+    """
+    async def fake_sweep_county(client, county, sub, budget, sink=None, stats=None):
+        if sink is None:
+            sink = {}
+        if stats is None:
+            stats = {"queries": 0, "errors": 0, "page_capped_prefixes": 0,
+                     "pager_stalled": 0, "drifted": 0, "deepened": 0,
+                     "truncated_prefixes": 0, "lost_prefixes": []}
+        # Absorb one real row, same as a live prefix would via `_absorb()`,
+        # THEN hang -- modeling a county still mid-sweep when the wall clock
+        # (COUNTY_TIMEOUT_S, patched below to 0.3s) runs out.
+        sink[("067-07-03-066", "2025", "N1")] = {
+            "ident": "067-07-03-066", "year": "2025", "notice_no": "N1",
+            "owner": "A 1 TRANSMISSION INC", "address": None,
+            "description": None, "amount": 180.58, "status": "Unpaid",
+        }
+        stats["queries"] += 1
+        await asyncio.sleep(10)
+        return list(sink.values()), stats
+
+    monkeypatch.setattr(qpr, "sweep_county", fake_sweep_county)
+    monkeypatch.setattr(qpr, "COUNTY_TIMEOUT_S", 0.3)
+    monkeypatch.setattr(qpr, "QPAYBILL_SUBS", {"TestCounty": "testsub"})
+    monkeypatch.delenv("QPAYBILL_ROLL_COUNTIES", raising=False)
+
+    scraper = qpr.QPayBillDelinquentRoll()
+    listings = await scraper.fetch()
+
+    assert len(listings) == 1, (
+        "a county that times out on wall clock alone, after real rows were "
+        "already absorbed, must report those rows -- not parcels=0"
+    )
+    assert listings[0].owner_name == "A 1 TRANSMISSION INC"
+    assert listings[0].raw["qpaybill_roll"]["county"] == "TestCounty"

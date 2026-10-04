@@ -698,7 +698,8 @@ def _next_chars(rows: list[dict], prefix: str) -> tuple[set, str | None]:
 
 
 async def sweep_county(client: httpx.AsyncClient, county: str, sub: str,
-                       budget: "_Budget") -> tuple[list[dict], dict]:
+                       budget: "_Budget", sink: dict | None = None,
+                       stats: dict | None = None) -> tuple[list[dict], dict]:
     """Union sweep of one county: page every prefix, deepen the capped ones.
 
     `client` is accepted for call-site symmetry but intentionally unused. Every
@@ -709,11 +710,35 @@ async def sweep_county(client: httpx.AsyncClient, county: str, sub: str,
     answered with letter M's rows. The _all_match guard caught the crossover, so the
     loss surfaced as retries rather than as wrong data, but the rows behind the
     rejected pages were never read.
+
+    `sink`/`stats` may be supplied by the CALLER rather than allocated here. This
+    exists for exactly one reason: QPayBillDelinquentRoll.fetch() wraps this whole
+    call in ``asyncio.wait_for(..., timeout=COUNTY_TIMEOUT_S)``, and a county that
+    is genuinely large (Darlington, found live 2026-10-03: a scoped Darlington-ONLY
+    run -- full budget and concurrency to itself, no competing county -- still hit
+    COUNTY_TIMEOUT_S with 0 parcels after 2,264 real, non-erroring requests) can be
+    cancelled mid-sweep. asyncio.wait_for's cancellation discards this coroutine's
+    RETURN VALUE, but `sink` and `stats` are mutated INCREMENTALLY as each prefix's
+    rows are absorbed (see `_absorb()` inside `_walk_prefix`) -- the same thing that
+    already lets a single prefix's own retries survive a partial failure. If the
+    caller passes in containers it still holds a reference to, whatever this sweep
+    had already found before being cancelled is NOT lost with the coroutine; the
+    caller reads it back from the very dict it handed in. Live-verified this is a
+    real distinction and not a cosmetic one: prefix "A" alone, searched directly
+    against darlingtontreasurer.qpaybill.com, returns 25 real Unpaid RealEstate
+    rows (owners, TMS idents, real dollar amounts, e.g. a $25,448.19 2026 balance)
+    -- this tenant is not a Williamsburg-style GenericErrorPage/never-satisfies-
+    _all_match dead end, it simply has more total owner-name volume to walk at
+    depth<=4 than COUNTY_TIMEOUT_S budgets for, and losing everything already read
+    to a wall-clock cutoff was pure waste. Callers that don't care (tests, ad-hoc
+    scripts) get fresh containers as before.
     """
-    sink: dict[tuple[str, str, str], dict] = {}
-    stats: dict = {"queries": 0, "errors": 0, "page_capped_prefixes": 0,
-                   "pager_stalled": 0, "drifted": 0, "deepened": 0,
-                   "truncated_prefixes": 0, "lost_prefixes": []}
+    if sink is None:
+        sink = {}
+    if stats is None:
+        stats = {"queries": 0, "errors": 0, "page_capped_prefixes": 0,
+                 "pager_stalled": 0, "drifted": 0, "deepened": 0,
+                 "truncated_prefixes": 0, "lost_prefixes": []}
     sem = asyncio.Semaphore(_PER_HOST_CONCURRENCY)
 
     async def guarded(prefix: str) -> tuple[str, bool, set]:
@@ -1104,16 +1129,17 @@ class QPayBillDelinquentRoll(BaseScraper):
         detail_rows: dict[str, list[dict]] = {}
         kept_idents: dict[str, set] = {}
 
-        _EMPTY_STATS = {"queries": 0, "errors": 1, "page_capped_prefixes": 0,
-                        "pager_stalled": 0, "drifted": 0, "deepened": 0,
-                        "truncated_prefixes": 0, "lost_prefixes": []}
+        def _fresh_stats() -> dict:
+            return {"queries": 0, "errors": 0, "page_capped_prefixes": 0,
+                    "pager_stalled": 0, "drifted": 0, "deepened": 0,
+                    "truncated_prefixes": 0, "lost_prefixes": []}
 
         async def run_county(client: httpx.AsyncClient, county: str, sub: str
                              ) -> tuple[str, list[dict], dict]:
             """One county's sweep, gated by MAX_CONCURRENT_COUNTIES and individually
             bounded to COUNTY_TIMEOUT_S once it actually starts.
 
-            This is now TWO fixes stacked, for two different failures:
+            This is now THREE fixes stacked, for three different failures:
 
               2026-09-23 (all-19-counties-return-zero): REQUEST_BUDGET_PER_COUNTY
               bounds how many requests a county can spend, not how long it can take
@@ -1134,25 +1160,62 @@ class QPayBillDelinquentRoll(BaseScraper):
               sweep_county() together; it is acquired BEFORE the wait_for below starts
               its clock, so a county queued behind others is not charged timeout budget
               for time spent waiting its turn -- only its own active sweep counts.
+
+              2026-10-03 (Darlington-alone-times-out-at-zero): a SCOPED, Darlington-
+              ONLY run (QPAYBILL_ROLL_COUNTIES=Darlington, full budget/concurrency to
+              itself, no other county competing) still hit COUNTY_TIMEOUT_S with
+              parcels=0 after 2,264 real requests and 0 real HTTP errors. This LOOKED
+              exactly like the Williamsburg GenericErrorPage hang this module already
+              names, but live-verified it is NOT: a direct, unmocked search against
+              darlingtontreasurer.qpaybill.com for prefix "A" alone returns 25 real,
+              parseable Unpaid RealEstate rows (real owners, TMS idents, dollar
+              amounts -- one a $25,448.19 2026 balance), and calling sweep_county()
+              directly with NO wait_for wrapper (1200s safety bound instead) finished
+              in 525.9s having spent its full 2,500-request budget, 0 errors, 14,308
+              real raw rows. Darlington is not dead like Williamsburg; it simply has
+              more owner-name volume than COUNTY_TIMEOUT_S=480s budgets for, which this
+              module's own depth-4 deepening (see MAX_PREFIX_DEPTH's docstring) turns
+              into a large request count even for a single county alone.
+              THE REAL BUG was here, not in the portal: `sink`/`stats` inside
+              sweep_county() are mutated INCREMENTALLY as each prefix absorbs its rows
+              (same mechanism _walk_prefix already relies on for its own retries), but
+              the old code let `asyncio.wait_for` cancel the whole coroutine and threw
+              that partial `sink` away, substituting a hardcoded empty `_EMPTY_STATS`
+              -- so a timeout on a LARGE-BUT-HEALTHY county reported the exact same
+              `parcels=0` a truly-dead county would. `sink`/`stats` are now allocated
+              HERE, passed into sweep_county() by reference, and read back from the
+              SAME objects in the except branches below, so whatever had already been
+              absorbed before the cutoff is salvaged exactly like Williamsburg-style
+              rows never would have been (there, sink stays empty regardless, so this
+              fix is a no-op for a genuinely dead tenant and a real recovery for a
+              merely slow one).
             """
+            sink: dict = {}
+            stats: dict = _fresh_stats()
             async with _county_sem():
                 try:
                     rows, stats = await asyncio.wait_for(
-                        sweep_county(client, county, sub, budgets[county]),
+                        sweep_county(client, county, sub, budgets[county],
+                                     sink=sink, stats=stats),
                         timeout=COUNTY_TIMEOUT_S)
                     return county, rows, stats
                 except asyncio.TimeoutError:
                     log.warning("qpaybill_roll.county_timeout", county=county,
                                 timeout_s=COUNTY_TIMEOUT_S,
+                                salvaged_rows=len(sink),
                                 note="this county alone exceeded its bounded per-county "
-                                     "timeout and was skipped for this run; it must never "
-                                     "be allowed to hold every OTHER county's already-"
-                                     "collected rows hostage to the scraper's soft timeout")
-                    return county, [], dict(_EMPTY_STATS, county_timed_out=True)
+                                     "timeout and was skipped for FURTHER work this run; "
+                                     "it must never be allowed to hold every OTHER "
+                                     "county's already-collected rows hostage to the "
+                                     "scraper's soft timeout. Rows already absorbed into "
+                                     "sink before the cutoff are salvaged below, NOT "
+                                     "discarded -- see sweep_county()'s sink/stats "
+                                     "docstring for why that is safe to do.")
+                    return county, list(sink.values()), {**stats, "county_timed_out": True}
                 except Exception as exc:  # noqa: BLE001
                     log.warning("qpaybill_roll.county_failed", county=county,
-                                error=str(exc)[:140])
-                    return county, [], dict(_EMPTY_STATS)
+                                error=str(exc)[:140], salvaged_rows=len(sink))
+                    return county, list(sink.values()), stats
 
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                      headers={"User-Agent": _UA}) as client:

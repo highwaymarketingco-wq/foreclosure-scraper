@@ -135,12 +135,29 @@ def _make_fake_sweep_county(*, delays: dict, rows_by_county: dict):
     """Stands in for the real sweep_county(): no HTTP, just a controllable delay
     per county plus a fixed row set, so these tests exercise fetch()'s own
     orchestration logic rather than the portal's HTML parsing (already covered by
-    tests/test_qpaybill_delinquent_roll.py)."""
-    async def fake(client, county, sub, budget):
+    tests/test_qpaybill_delinquent_roll.py).
+
+    Accepts (and mirrors into) `sink`/`stats` keywords, added 2026-10-03 so
+    run_county() can read back whatever a cancelled sweep had already collected
+    (see test_qpaybill_delinquent_roll.py's county-timeout-salvage tests) instead
+    of discarding it. A county that sleeps past its own cancellation NEVER reaches
+    the line below, so a delayed/stuck county here still correctly contributes
+    nothing -- consistent with those rows being written only once "found", not
+    before the delay the test is simulating.
+    """
+    async def fake(client, county, sub, budget, sink=None, stats=None):
         delay = delays.get(county, 0.0)
         if delay:
             await asyncio.sleep(delay)
-        return list(rows_by_county.get(county, [])), _empty_stats()
+        rows = list(rows_by_county.get(county, []))
+        result_stats = _empty_stats()
+        if sink is not None:
+            for r in rows:
+                sink[(r["ident"], r.get("year") or "", r.get("notice_no") or "")] = r
+        if stats is not None:
+            stats.update(result_stats)
+            result_stats = stats
+        return rows, result_stats
     return fake
 
 
@@ -309,7 +326,7 @@ def _make_tracking_fake_sweep_county(*, work_s: float, peak: dict, rows_by_count
     active = 0
     lock = asyncio.Lock()
 
-    async def fake(client, county, sub, budget):
+    async def fake(client, county, sub, budget, sink=None, stats=None):
         nonlocal active
         async with lock:
             active += 1
@@ -317,7 +334,15 @@ def _make_tracking_fake_sweep_county(*, work_s: float, peak: dict, rows_by_count
         try:
             if work_s:
                 await asyncio.sleep(work_s)
-            return list(rows_by_county.get(county, [_row(f"{county}1", county)])), _empty_stats()
+            rows = list(rows_by_county.get(county, [_row(f"{county}1", county)]))
+            result_stats = _empty_stats()
+            if sink is not None:
+                for r in rows:
+                    sink[(r["ident"], r.get("year") or "", r.get("notice_no") or "")] = r
+            if stats is not None:
+                stats.update(result_stats)
+                result_stats = stats
+            return rows, result_stats
         finally:
             async with lock:
                 active -= 1
