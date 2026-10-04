@@ -120,14 +120,14 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_sc.darlington_delinquent_tax` | deed/notice?, detail-page | https://www.darcosc.com/government/treasurer/index.php |
 | `counties_sc.dillon_delinquent_tax` | pdf?, deed/notice?, detail-page, links | https://www.dilloncountysc.org/departments/treasurer.php<br>https://www.dilloncountysc.org/ |
 | `counties_sc.dillon_sheriff` | detail-page | https://dilloncountysc.org/services/public_safety/sheriffs_office.php |
-| `counties_sc.dorchester_billtrax_delinquent_tax` | deed/notice? | https://dorchestercountyscdelinquenttaxapi.billtrax.com<br>https://dorchestercountyscdelinquenttax.billtrax.com/ |
+| `counties_sc.dorchester_billtrax_delinquent_tax` | pdf?, deed/notice?, links | https://dorchestercountyscdelinquenttaxapi.billtrax.com<br>https://dorchestercountyscdelinquenttax.billtrax.com/ |
 | `counties_sc.edgefield_delinquent_tax` | detail-page | https://edgefieldcounty.sc.gov/treasurer/ |
 | `counties_sc.fairfield_delinquent_tax` | detail-page | https://www.fairfieldsc.com/departments/treasurer |
 | `counties_sc.florence_delinquent_tax` | pdf?, detail-page, links | https://www.florenceco.org/offices/delinquent-tax/ |
 | `counties_sc.georgetown_civicengage` | pdf?, links | https://georgetowncountysctax.com/<br>https://www.gtcountysc.gov |
-| `counties_sc.greenville_delinquent_tax` | detail-page | https://www.greenvillecounty.org/appsAS400/Taxsale/ |
+| `counties_sc.greenville_delinquent_tax` | detail-page, links | https://www.greenvillecounty.org/appsAS400/Taxsale/ |
 | `counties_sc.greenville_mie_adverts` | deed/notice?, detail-page | https://mie.greenvillejournal.com |
-| `counties_sc.greenville_tax_distress` | deed/notice?, detail-page | https://www.gcgis.org/arcgis3/rest/services/GreenvilleNJ/QueryLayers/MapServer<br>https://www.greenvillecounty.org/appsAS400/Taxsale/ |
+| `counties_sc.greenville_tax_distress` | deed/notice?, img?, detail-page | https://www.gcgis.org/arcgis3/rest/services/GreenvilleNJ/QueryLayers/MapServer<br>https://www.greenvillecounty.org/appsAS400/Taxsale/ |
 | `counties_sc.greenwood_corebtpay_delinquent_tax` | img?, detail-page | https://greenwoodco.corebtpay.com/egov/apps/payment/center.egov<br>https://greenwoodco.corebtpay.com/egov/apps/bill/pay.egov |
 | `counties_sc.greenwood_delinquent_tax` | detail-page | https://www.greenwoodcounty-sc.gov/treasurer/delinquent-tax-sale |
 | `counties_sc.horry_delinquent_xlsx` | detail-page, links | https://www.horrycountysc.gov/media/b5af14ce/delinquent-list-on-website-081926.xlsx<br>https://www.horrycountysc.gov/departments/treasurer/delinquent-tax/ |
