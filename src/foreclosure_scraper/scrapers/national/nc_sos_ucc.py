@@ -36,6 +36,25 @@ Free, no auth, public record, Scrapling stealth — the approach itself
 (running Cloudflare's own JS challenge via a real headless browser) is
 compliant and still proven elsewhere (enrichment_sos_dissolution.py,
 enrichment_sos_agent.py); it is this page's actual content that is dead.
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 17), same
+bug class as the 2026-10-01 law_firms.korn fix: `fetch()` below was a
+hardcoded `return []` with NO `disabled = True` set on the class. `disabled`
+defaults to False (base_scraper.py), so every run executed the normal
+`safe_run()` path, got an empty list back, and recorded `OUTCOME_ZERO`
+("ran clean but returned 0 rows") -- indistinguishable from a genuinely
+quiet day on a source whose data is real but sparse. The module's OWN
+docstring above already proves this source is permanently, confirmedly
+dead (wrong content at the URL, broken search-form premise), not
+intermittently empty. Set `disabled = True` with the reason already
+documented above, so `safe_run()` now reports the accurate
+`OUTCOME_DORMANT` instead.
+
+Also re-verified live 2026-10-04: the target URL is now gated behind an
+ADDITIONAL, active Cloudflare JS "Just a moment..." challenge that did not
+let even a genuine (non-headless) browser through after ~18s of waiting --
+strictly worse than the 2026-10-01 finding (a redirect to unrelated
+content), not better. The disable conclusion is reconfirmed, not weakened.
 """
 from __future__ import annotations
 
@@ -277,12 +296,28 @@ class NcSosUccScraper(BaseScraper):
     expected_min_count = 0
     optional = True
     timeout_s = 300.0
+    # FIXED 2026-10-04 (HERMES extraction-completeness audit, batch 17):
+    # see module docstring's FOUND note -- fetch() used to hardcode
+    # `return []` with no `disabled` flag, so safe_run() recorded the
+    # ambiguous OUTCOME_ZERO every run instead of the accurate
+    # OUTCOME_DORMANT this confirmed-permanently-dead source deserves.
+    disabled = True
+    disabled_reason = (
+        "sosnc.gov's UCC search URL 307-redirects to an unrelated generic "
+        "Business Registration search widget with zero UCC content "
+        "(confirmed live 2026-10-01), and the scraper's own broad "
+        "date-range-discovery premise never matched how that site's real "
+        "name-only search works even before that; re-verified live "
+        "2026-10-04 the URL is now ALSO gated behind an active Cloudflare "
+        "challenge a genuine browser didn't clear in ~18s -- strictly "
+        "worse, not better. See module docstring for full detail."
+    )
 
     async def fetch(self) -> Iterable[Listing]:
-        # Disabled — see module docstring. Confirmed dead (the URL redirects
-        # to an unrelated generic business-search page with zero UCC
-        # content) and confirmed the broad date-range discovery this
-        # scraper was designed around never existed on this site.
+        # Confirmed permanently dead -- see module docstring. `disabled =
+        # True` above means safe_run never even calls this, but fetch()
+        # stays a safe no-op for any direct caller (tests, __main__
+        # probes, etc.)
         return []
 
     async def _disabled_fetch(self) -> Iterable[Listing]:
