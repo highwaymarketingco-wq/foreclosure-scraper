@@ -178,6 +178,14 @@ _SALE_RE = re.compile(
     r"notice of sale|will sell|offer(?:ed)? for sale|public auction|"
     r"highest bidder|by virtue of a decree", re.I)
 
+# The case caption's own venue declaration, e.g. "STATE OF SOUTH CAROLINA
+# COUNTY OF FAIRFIELD IN THE COURT OF COMMON PLEAS" -- see _to_listing's
+# county-selection comment for why this is preferred over county_meta when
+# both are available. Restricted to the caption zone (first 300 chars of the
+# preview) so a stray "county of" phrase deep in the body (unseen here since
+# the preview truncates early, but defensive) can't be mistaken for the venue.
+_CASE_COUNTY_RE = re.compile(r"\bCOUNTY\s+OF\s+([A-Z][A-Za-z]+)\b", re.I)
+
 _PLAINTIFF_RE = re.compile(
     r"\b([A-Z][A-Za-z0-9&.,'/\- ]{2,90}?),?\s+Plaintiffs?\b", re.I)
 _DEFENDANT_RE = re.compile(
@@ -303,7 +311,33 @@ def _to_listing(notice: dict, slug: str) -> Listing | None:
         return None
 
     county_meta = (notice.get("county_meta") or "").strip()
-    county = _FOOTPRINT_LOWER.get(county_meta.lower())
+    # ``county_meta`` is the grid's "County:" field -- live-verified
+    # 2026-10-04 (150-row statewide sample across the real "Foreclosures"
+    # preset) this is NOT reliably the CASE's own county: it reads back the
+    # PUBLICATION's county on real rows whose own caption names a different
+    # one (confirmed 3 of 55 checked rows, e.g. notice 649899: county_meta
+    # "Richland" but the case's own text reads "STATE OF SOUTH CAROLINA
+    # COUNTY OF FAIRFIELD IN THE COURT OF COMMON PLEAS" -- the shared
+    # _press_assoc.py parse_grid() docstring already carried this exact
+    # caveat generically; this is the live confirmation it holds for this
+    # site too, not just the NC sibling). The case caption's own "COUNTY OF
+    # X" is the court VENUE, which for a SC judicial foreclosure (this
+    # module's foreclosure_process) is the authoritative subject county, so
+    # prefer it whenever it names a real footprint county; county_meta is
+    # the fallback for the (common) case where the preview truncates before
+    # reaching a caption, or the caption uses other phrasing.
+    case_county_m = _CASE_COUNTY_RE.search(text[:300])
+    if case_county_m:
+        # The caption names a real venue -- it governs outright, in or out
+        # of footprint. Falling back to county_meta here (instead of
+        # rejecting on a non-footprint caption county) would reopen the
+        # exact mislabel risk this fix closes: a footprint-publication case
+        # whose own caption names a DIFFERENT, non-footprint county.
+        county = _FOOTPRINT_LOWER.get(case_county_m.group(1).lower())
+        county_source = "caption"
+    else:
+        county = _FOOTPRINT_LOWER.get(county_meta.lower())
+        county_source = "publication_meta"
     if not county:
         # Out of the 7-county footprint. The server-side county checkbox
         # filter does not reliably restrict keyword-search results (see
@@ -336,6 +370,10 @@ def _to_listing(notice: dict, slug: str) -> Listing | None:
             "notice_id": notice_id,
             "publication": notice.get("publication") or None,
             "publication_county": county_meta or None,
+            # "caption" when the case's own "COUNTY OF X" venue text drove
+            # the county (preferred -- see _to_listing), "publication_meta"
+            # when it fell back to the grid's County: field.
+            "county_source": county_source,
             "publication_city": notice.get("city_meta") or None,
             "publication_date": notice.get("date_text") or None,
             "published_at": published.isoformat() if published else None,
