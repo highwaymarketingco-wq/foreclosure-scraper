@@ -27,6 +27,26 @@ Listing field) was never populated at all. ``node["name"]`` carries the
 correct full line instead (``"<street> <City>, <ST> <ZIP>, <County>
 County"``); see ``_parse_name_city_county``.
 
+FIX 2026-10-04 (extraction-completeness audit, continued): the slug-fallback
+path used for rows with NO JSON-LD node (only ~50 of ~510 statewide rows get
+one, per the 2026-06-24 capture-model note above -- the fallback is the
+MAJORITY case) took only the LAST hyphen token as the city, silently
+truncating every multi-word city to its last word: live-verified real
+in-footprint examples in the current NC render --
+``165-fernwood-dr-forest-city`` (Forest City, Rutherford County) would have
+produced city="City"; ``212-burton-farm-rd-browns-summit`` -> "Summit";
+``152-scotland-ridge-dr-winston-salem`` -> "Salem". This run those three
+happened to also have a JSON-LD node and so didn't hit the bug in practice,
+but the fallback path itself was still broken for the next run where they
+(or Lake Lure / Black Mountain / Old Fort / Mount Holly -- all real
+in-footprint multi-word NC places) don't. Fixed using the SAME proven
+longest-match-first city gazetteer `scrapers.national.crexi_multifamily`
+already uses for its own slug-city extraction (``_upstate_city_to_county.
+KNOWN_CITIES``) instead of a blind last-token split, and used the now-
+accurate city to also backfill ``county`` via ``upstate_county_for`` for
+fallback rows (previously always None -- only JSON-LD-enriched rows ever
+got a county at all).
+
 AUDITED, NOT FIXED (scoped out, documented rather than silently skipped):
   * ``opening_bid`` is null on every current row. This is NOT a parsing bug
     -- live-checked the raw JSON-LD on both state pages (100 rows) and
@@ -56,6 +76,7 @@ from typing import Iterable
 
 import structlog
 
+from ..._upstate_city_to_county import KNOWN_CITIES, upstate_county_for
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
 
@@ -112,16 +133,34 @@ def _ltype_from_status(s: str) -> ListingType:
 
 def _split_slug_address(slug: str) -> tuple[str | None, str | None]:
     """Recover (street, city) from a detail slug like
-    ``1402-tom-pepper-rd-creswell``. The trailing token is the city; the
-    rest is the street. Best-effort and defensive — returns (None, None) if
-    it can't make sense of the slug."""
+    ``1402-tom-pepper-rd-creswell``. The city is always the trailing
+    token(s); the rest is the street. Best-effort and defensive — returns
+    (None, None) if it can't make sense of the slug.
+
+    Checks KNOWN_CITIES (the same longest-match-first NC/SC gazetteer
+    scrapers.national.crexi_multifamily already uses for this exact
+    problem) FIRST, so a real multi-word city name (e.g. "Forest City",
+    "Winston Salem", "Browns Summit") is recognized whole instead of
+    silently truncated to its last word -- a bare last-token split would
+    turn "forest-city" into just "City". Falls back to the last-token
+    heuristic only when no known city matches the slug's tail.
+    """
     if not slug:
         return None, None
     words = [w for w in slug.split("-") if w]
     if len(words) < 2:
         return None, None
-    # City is the trailing 1-2 tokens; we keep it simple (last token) and
-    # title-case. Street is everything before it.
+    padded = f" {' '.join(words)} "
+    for cand in KNOWN_CITIES:
+        if padded.endswith(f" {cand} "):
+            n = len(cand.split())
+            if n < len(words):  # leave at least one street token
+                city = cand.title()
+                street = " ".join(words[:-n]).title()
+                if len(street) >= 2:
+                    return street, city
+            break  # longest match found but unusable; don't fall through to a shorter false match
+    # No known multi-word city matched — fall back to the last-token split.
     city = words[-1].title()
     street = " ".join(words[:-1]).title()
     if len(street) < 2:
@@ -264,6 +303,14 @@ def _node_listing(detail_id: str, slug: str, state: str,
     if not street:
         return None
 
+    # Fallback rows never got a county at all before (only the JSON-LD path
+    # sets one, via _parse_name_city_county). Now that the slug-derived city
+    # is accurate (see _split_slug_address's 2026-10-04 fix), backfill county
+    # from the same gazetteer scrapers.national.crexi_multifamily uses — a
+    # cheap, free win for every in-footprint fallback row.
+    if not county and city:
+        county = upstate_county_for(city, state)
+
     def _flt(v):
         try:
             return float(v) if v not in (None, "") else None
@@ -391,6 +438,19 @@ class AuctionDotCom(BaseScraper):
     category = "national_auction"
     expected_min_count = 0
     requires_apify = False
+    # FIX 2026-10-04: this scraper uses Scrapling StealthyFetcher (see
+    # _render() above) like its law_firms.{korn,zacchaeus,
+    # mcmichael_taylor_gray} siblings, all of which declare this -- it was
+    # just never set here. main.py reads it in two places that both matter:
+    # (1) carryover.carryover_for_zeroed_sources skips replaying stale data
+    # for render-required sources (their own docstring: "zero is
+    # acknowledged (paywall/apify/render-blocked)"), and (2) the run-report
+    # buckets a render-required source's bad run as an ACKNOWLEDGED failure
+    # mode rather than a REGRESSED alert. Without this, a flaky stealth-
+    # browser run against auction.com's anti-bot defenses (expected for this
+    # class of source) would have fired a false REGRESSED alarm instead of
+    # being silently acknowledged like its siblings.
+    requires_render = True
     timeout_s = 360.0
 
     async def fetch(self) -> Iterable[Listing]:
