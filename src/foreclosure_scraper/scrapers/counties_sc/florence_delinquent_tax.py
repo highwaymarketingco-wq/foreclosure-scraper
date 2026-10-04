@@ -29,6 +29,32 @@ Free, public, no login, no CAPTCHA.
 Slug: counties_sc.florence_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
+
+AUDITED 2026-10-03: the PDF's own trailing LOTS/ACRES/BLDGS/DISTRICT columns
+(visible in the header dump above) were being stripped off `rest` by
+`_TAIL_NUMS_RE` and thrown away -- never written to any field. These are
+NOT reliably separable by counting whitespace-delimited numbers from the
+right: a 2-number tail is "LOTS DISTRICT" on one row (e.g. "1  10") and
+"ACRES DISTRICT" on another (e.g. "9  20") with no text difference between
+the two shapes -- only each number's X position on the page (preserved by
+pypdf's text flow as inconsistent run-to-run character offsets, confirmed
+live NOT usable for fixed-width slicing) tells them apart. Fixed via a
+SEPARATE pdfplumber word-coordinate pass (`_extract_tail_columns`): read the
+header's own LOTS/ACRES/BLDGS/DISTRICT word x0/x1 once per PDF to get each
+column's x-range, then for every other page word that's purely numeric,
+bucket it by which column's x-range its x0 falls in, keyed by the TMS token
+on the same visual line (words grouped by rounded `top`). Live-verified
+2026-10-03 against the real 2026 files: 714/715 "Real" rows and 263/263
+"Mobile Homes" rows recovered their tail columns (spot-checked 5 rows
+against a manual read of the PDF text/word dump -- exact match, e.g. TMS
+395-02-003 -> acres=9, district=20, no lots/bldgs, matching "ANDREWS GAIL
+KATHY ... OFF HWY 57     9     20" on the live page). `BLDGS` is NEVER
+written as a literal "0" in this export (confirmed: value set is only
+{None, "1".."8"}) -- blank means no building, the same sparse-omission
+convention Dillon's PAPER.xlsx uses for its own Buildings column. On the
+"Real" list only (not "Mobile Homes", which is already force-tagged
+MOBILE), a missing `bldgs` now sets `property_kind=LAND` -- live: 357/715
+Real rows (50.0%) carry no BLDGS value.
 """
 from __future__ import annotations
 
@@ -129,6 +155,56 @@ def _extract_pdf_text(pdf_bytes: bytes) -> str:
     return "\n".join((p.extract_text() or "") for p in reader.pages)
 
 
+_COL_NUM_RE = re.compile(r"^[\d.,]+$")
+
+
+def _extract_tail_columns(pdf_bytes: bytes) -> dict[str, dict[str, str]]:
+    """Map each row's TMS -> its {lots, acres, bldgs, district} values, read
+    by each number's X position against the header's own column bins (see
+    the module docstring's "AUDITED 2026-10-03" note for why position, not
+    whitespace-run counting, is the only reliable way to tell these columns
+    apart). Works for both the "Real" (LOTS/ACRES/BLDGS/DISTRICT) and
+    "Mobile Homes" (BLDGS/DISTRICT only) PDFs -- whichever header words are
+    actually present set the bins."""
+    import pdfplumber
+
+    out: dict[str, dict[str, str]] = {}
+    bins: dict[str, tuple[float, float]] = {}
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        for page in pdf.pages:
+            try:
+                words = page.extract_words()
+            except Exception:
+                continue
+            for w in words:
+                name = w["text"].rstrip(":").upper()
+                if name in ("LOTS", "ACRES", "BLDGS", "DISTRICT"):
+                    bins[name.lower()] = (w["x0"] - 3, w["x1"] + 3)
+            if not bins:
+                continue  # header not seen yet on any page -- nothing to bin against
+
+            lines: dict[int, list[dict]] = {}
+            for w in words:
+                lines.setdefault(round(w["top"]), []).append(w)
+            for ws in lines.values():
+                ws.sort(key=lambda w: w["x0"])
+                tms = None
+                nums: dict[str, str] = {}
+                for w in ws:
+                    t = w["text"]
+                    if tms is None and re.fullmatch(_TMS, t):
+                        tms = t
+                        continue
+                    if _COL_NUM_RE.match(t):
+                        for col, (lo, hi) in bins.items():
+                            if lo <= w["x0"] <= hi:
+                                nums[col] = t
+                                break
+                if tms and nums:
+                    out[tms] = nums
+    return out
+
+
 def _parse_pdf_text(text: str) -> list[dict]:
     """Parse a Florence tax-sale PDF into {taxpayer, tms, location, current_owner}."""
     rows: list[dict] = []
@@ -214,7 +290,13 @@ class FlorenceDelinquentTax(BaseScraper):
             except Exception as exc:
                 log.warning("florence_tax.pdf_error", url=label[:60], error=str(exc)[:140])
                 continue
-            log.info("florence_tax.pdf_parsed", url=label[:60], rows=len(rows))
+            try:
+                tail_cols = _extract_tail_columns(data)
+            except Exception as exc:
+                log.warning("florence_tax.tail_cols_error", url=label[:60], error=str(exc)[:140])
+                tail_cols = {}
+            log.info("florence_tax.pdf_parsed", url=label[:60], rows=len(rows),
+                      tail_cols=len(tail_cols))
 
             for r in rows[:5000]:
                 loc = r.get("location")
@@ -222,11 +304,31 @@ class FlorenceDelinquentTax(BaseScraper):
                 if loc and _HOUSE_NUM_RE.match(loc) and not _YEAR_PREFIX_RE.match(loc):
                     addr = loc
                 now = datetime.utcnow()
+                tail = tail_cols.get(r["tms"], {})
+
+                def _num(key: str) -> float | None:
+                    v = tail.get(key)
+                    if not v:
+                        return None
+                    try:
+                        return float(v.replace(",", ""))
+                    except ValueError:
+                        return None
+
+                # AUDITED 2026-10-03: BLDGS is never written as a literal "0"
+                # in this export (blank = no building, same sparse-omission
+                # convention as Dillon's own Buildings column) -- a missing
+                # bldgs on the REAL list (not the already-MOBILE-tagged list)
+                # means vacant land.
+                kind = PropertyKind.MOBILE if is_mobile else (
+                    PropertyKind.LAND if "bldgs" not in tail else PropertyKind.UNKNOWN
+                )
+
                 out.append(Listing(
                     source="counties_sc.florence_delinquent_tax",
                     source_url=pdf_url,
                     listing_type=ListingType.TAX_SALE,
-                    property_kind=PropertyKind.MOBILE if is_mobile else PropertyKind.UNKNOWN,
+                    property_kind=kind,
                     state="SC",
                     county="Florence",
                     parcel_id=r["tms"],
@@ -247,6 +349,10 @@ class FlorenceDelinquentTax(BaseScraper):
                         "pdf_url": pdf_url,
                         "sale_date_text": sale_date_text,
                         "is_mobile_home": is_mobile,
+                        "lots": _num("lots"),
+                        "acres": _num("acres"),
+                        "buildings": _num("bldgs"),
+                        "tax_district": tail.get("district"),
                     }},
                 ))
 
