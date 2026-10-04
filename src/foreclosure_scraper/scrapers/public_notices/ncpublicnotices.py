@@ -19,6 +19,28 @@ the deceased's name + county only). The address-required filter is
 relaxed for those categories — county + named-defendant is enough to
 emit a useful lead. Address can be backfilled later via owner-name
 cross-reference against tax records.
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, public_notices
+batch): COUNTY_RE below still carries Mecklenburg/Madison/Yancey -- stale
+leftovers from BEFORE the 2026-05-07 footprint narrowing (config.py's own
+comments date that pruning; those 3 names are not in config.NC_COUNTIES and
+Mecklenburg/Madison/Yancey are all explicitly in config.SCOPE_DENY_COUNTIES
+today). ListingType.FORECLOSURE_SALE/SHERIFF_SALE (the two flip types
+_classify() can produce for the "foreclosure" category) are gated to the
+narrow 18-county footprint by main._flip_outside_footprint(), checked
+before every other admission path -- confirmed directly: a synthetic
+"NORTH CAROLINA MECKLENBURG COUNTY NOTICE OF FORECLOSURE SALE" row (the
+exact caption shape this module's own keyword queries target) classifies
+FORECLOSURE_SALE and main._in_scope() returns False. Mecklenburg (NC's
+largest county) almost certainly publishes real foreclosure notices on this
+statewide aggregator regularly, so this is not a theoretical gap. Fixed in
+_parse_results_html() by remapping FORECLOSURE_SALE/SHERIFF_SALE ->
+LIS_PENDENS whenever the resolved county is outside the true 18-county
+flip footprint (reuses nc_notices_counties.py's _FLIP_FOOTPRINT_NAMES); the
+11 true footprint counties keep their flip classification unchanged.
+TAX_SALE (the 3rd type _classify() can emit) was never affected -- it is
+not a flip type (main._FLIP_LISTING_TYPES), so it already reaches the
+board via the unrestricted distressed scope regardless of county.
 """
 from __future__ import annotations
 
@@ -37,6 +59,7 @@ from ..newspapers.column_legal_notices import _notice_email
 from .nc_notices_counties import (
     _CASE_RE as _NCC_CASE_RE,
     _CASE_SPACED_RE as _NCC_CASE_SPACED_RE,
+    _FLIP_FOOTPRINT_NAMES as _NCC_FLIP_FOOTPRINT_NAMES,
     _PLAINTIFF_RE as _NCC_PLAINTIFF_RE,
     _sale_date as _ncc_sale_date,
     _tidy_name as _ncc_tidy_name,
@@ -737,11 +760,23 @@ def _parse_results_html(html: str, query: str, category: str) -> list[Listing]:
             street_address = None
             defendant = named_party
 
+        listing_type = _classify(text, category)
+        # FOUND 2026-10-04: see module docstring -- Mecklenburg/Madison/
+        # Yancey (stale pre-footprint-narrowing entries in COUNTY_RE) are
+        # outside the true 18-county flip footprint, so a flip-type
+        # classification for one of them is unconditionally dropped at the
+        # board gate. Remap to the non-flip equivalent so the row still
+        # reaches the board via the unrestricted distressed scope; the 11
+        # true footprint counties are unaffected.
+        if (listing_type in (ListingType.FORECLOSURE_SALE, ListingType.SHERIFF_SALE)
+                and county not in _NCC_FLIP_FOOTPRINT_NAMES):
+            listing_type = ListingType.LIS_PENDENS
+
         out.append(
             Listing(
                 source="public_notices.ncnotices",
                 source_url=href,
-                listing_type=_classify(text, category),
+                listing_type=listing_type,
                 property_kind=PropertyKind.UNKNOWN,
                 street_address=street_address,
                 state="NC",
