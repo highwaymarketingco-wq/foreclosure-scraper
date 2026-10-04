@@ -13,6 +13,14 @@ We hit:
 For each search result page we follow the dated article URL
 (/YYYY/MM/DD/<slug>/), pull the H1 + article body, and extract case#, address,
 sale date with the same regexes used for Hendersonville Lightning.
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, newspapers batch 2):
+real NC substitute-trustee notices state the foreclosed Deed of Trust's
+recording reference in prose (live-confirmed on the sibling
+hendersonville_lightning.py page, same publisher-agnostic NC legal-notice
+boilerplate this Polk County paper's articles also carry) -- never captured
+here. Wired as `deed_book`/`deed_page` under the existing per-row raw key
+(see `DEED_BOOK_PAGE_RE`).
 """
 from __future__ import annotations
 
@@ -69,6 +77,16 @@ PLAINTIFF_RE = re.compile(
 )
 DEFENDANT_RE = re.compile(
     r"Present\s+Owner\(?s?\)?:\s*([^.\n]+?)(?:\.|The\s+sale)",
+    re.I,
+)
+# Deed of Trust recording reference, stated in prose (not a labelled field) --
+# e.g. "...recorded June 30, 2008 in Deed of Trust Book 2088, at Page 656..."
+# FOUND 2026-10-04 (HERMES extraction-completeness audit, newspapers batch 2):
+# live-confirmed on real NC substitute-trustee notices (same shape as the
+# sibling hendersonville_lightning.py finding); never captured here.
+DEED_BOOK_PAGE_RE = re.compile(
+    r"recorded\s+(?:on\s+)?[^.]{0,40}?\bin\s+(?:Deed\s+of\s+Trust\s+)?Book\s*:?\s*(\d+)"
+    r"\s*,?\s*(?:at\s+)?Page\s*:?\s*(\d+)",
     re.I,
 )
 
@@ -203,6 +221,13 @@ class TryonBulletinForeclosures(BaseScraper):
                 contact = _notice_email(body)
                 if contact:
                     raw["notice_contact"] = contact
+
+                # FOUND 2026-10-04: the foreclosed Deed of Trust's recording
+                # reference (book/page) -- see DEED_BOOK_PAGE_RE above.
+                dp_m = DEED_BOOK_PAGE_RE.search(body)
+                if dp_m:
+                    raw["tryon_bulletin"]["deed_book"] = dp_m.group(1)
+                    raw["tryon_bulletin"]["deed_page"] = dp_m.group(2)
 
                 out.append(
                     Listing(

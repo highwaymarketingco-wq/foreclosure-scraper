@@ -14,6 +14,15 @@ Each notice is an <h3 class="title"> followed by <p> blocks. Body contains:
   - Plaintiff (HOA / lender / county)
   - Defendant (current owner)
   - Trustee (substitute trustee firm)
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, newspapers batch 2): real notices
+also state the foreclosed Deed of Trust's recording reference in prose -- live-confirmed on
+2 real current notices: "...recorded June 30, 2008 in Deed of Trust Book 2088, at Page 656
+of the Henderson County Registry..." and "...recorded on January 5, 2001 in Book 935 at
+Page 148, Henderson County Registry..." -- a precise, authoritative Register-of-Deeds
+reference to the exact instrument (more precise than the street address for matching
+against ROD records), never captured. Wired as `deed_book`/`deed_page` under the existing
+per-row raw key (see `DEED_BOOK_PAGE_RE`).
 """
 from __future__ import annotations
 
@@ -68,6 +77,17 @@ PLAINTIFF_RE = re.compile(
 )
 DEFENDANT_RE = re.compile(
     r"Present\s+Owner\(?s?\)?:\s*([^.\n]+?)(?:\.|The\s+sale)",
+    re.I,
+)
+# Deed of Trust recording reference, stated in prose (not a labelled field) --
+# e.g. "...recorded June 30, 2008 in Deed of Trust Book 2088, at Page 656..."
+# or "...recorded on January 5, 2001 in Book 935 at Page 148...". The optional
+# "Deed of Trust " prefix on Book covers the first shape without requiring it,
+# so the second (plain "...in Book NNN at Page NNN", "Deed of Trust" named
+# earlier in the same sentence) still matches.
+DEED_BOOK_PAGE_RE = re.compile(
+    r"recorded\s+(?:on\s+)?[^.]{0,40}?\bin\s+(?:Deed\s+of\s+Trust\s+)?Book\s*:?\s*(\d+)"
+    r"\s*,?\s*(?:at\s+)?Page\s*:?\s*(\d+)",
     re.I,
 )
 
@@ -162,6 +182,14 @@ class HendersonvilleLightningForeclosures(BaseScraper):
             contact = _notice_email(body)
             if contact:
                 raw["notice_contact"] = contact
+
+            # FOUND 2026-10-04: the foreclosed Deed of Trust's recording
+            # reference (book/page), stated in prose on real notices -- see
+            # module docstring + DEED_BOOK_PAGE_RE.
+            dp_m = DEED_BOOK_PAGE_RE.search(body)
+            if dp_m:
+                raw["hendersonville_lightning"]["deed_book"] = dp_m.group(1)
+                raw["hendersonville_lightning"]["deed_page"] = dp_m.group(2)
 
             out.append(
                 Listing(
