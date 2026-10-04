@@ -39,6 +39,31 @@ Free, public, no login, no CAPTCHA.
 Slug: counties_sc.greenville_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
+
+AUDITED 2026-10-03 -- Map# detail link investigated, CONFIRMED BROKEN on the
+county's own site (not a scraper gap). Each real-estate row's Map# cell is
+an `<a href="...RealProperty/Details.aspx?TaxYear=2025&MapNumber=...">` --
+a per-parcel detail page that would carry far more than this table's 4
+columns (owner mailing address, situs, building characteristics, etc., same
+shape as the assessor "Details" pages other SC counties here already mine).
+Tried three independent ways to fetch it, all hung or failed the SAME way:
+(1) a direct `get_text()` to the exact live href: curl-level TIMEOUT, 0
+bytes received after 40s: "Failed to perform, curl: (28) Operation timed
+out ... with 0 bytes received"; (2) clicking the real link in a live
+browser from the real Tax Sale listing page: eventually loaded (after a
+long hang) an in-site ERROR page, "Tax Year or Map Number cannot be
+blank!", despite both query params being present and correct in the URL;
+(3) using the site's OWN "Search Real Property by Map No." form (not a
+deep link -- selected Tax Year 2025, typed the exact Map# into the site's
+own search box, clicked the site's own Search button, which does an
+ASP.NET `__doPostBack`): same long hang, SAME "Tax Year or Map Number
+cannot be blank!" error. Three different access paths (cold HTTP, deep
+link in a real browser, the site's own in-app search) converged on the
+same failure -- this legacy AS/400-backed ASP.NET WebForms lookup is
+broken/effectively non-responsive on Greenville County's own live site
+right now, not a request-shape or session problem on our end. Not
+implemented; do not force a fetch here (would hang every run) -- re-verify
+live before revisiting, the county may fix its own site.
 """
 from __future__ import annotations
 
