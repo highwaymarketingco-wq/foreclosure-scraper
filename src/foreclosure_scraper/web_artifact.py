@@ -1931,6 +1931,8 @@ RAW_KEEP = {
     "foreclosure_sold_comps": "*",    # Per-listing like-for-like recently-sold foreclosure comps
     "foreclosure_sold_comp_summary": "*",  # County-level sold-comp rollup
     "actual_sold_price": "*",         # Real hammer price (Pickens MIE results PDFs etc.)
+    "sold_to": "*",                   # Who won a results PDF's sale: {type: plaintiff|third_party|unknown, name}
+                                       # (law_firms.finkel, added 2026-10-04)
     "pickens_mie": "*",               # Pickens MIE results PDF parse provenance
     "anderson_mie_results": "*",      # Anderson MIE Sale-Results parse provenance
     "anderson_mie": "*",              # Anderson MIE Sale-List (upcoming) parse provenance: legal_description, sale_notes
