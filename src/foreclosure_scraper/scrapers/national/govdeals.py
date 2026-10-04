@@ -108,6 +108,7 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
@@ -117,7 +118,20 @@ log = structlog.get_logger()
 API = "https://maestro.lqdt1.com/search/list"
 API_KEY = "af93060f-337e-428c-87b8-c74b5837d6cd"
 SUB_KEY = "cf620d1d8f904b5797507dc5fd1fdb80"
-ASSET_URL = "https://www.govdeals.com/auctions/item/detail/"
+# Real per-asset detail URL (confirmed live 2026-10-04 -- see _auction_url()
+# docstring; the old `/auctions/item/detail/{assetId}` path 404s).
+ASSET_URL = "https://www.govdeals.com/en/asset/"
+# The real per-asset detail JSON endpoint (reverse-engineered 2026-10-04 from
+# the live Angular bundle's `AssetService.GetAsset()` call, same technique
+# the 2026-10-01 search-API fix used). Free, no auth/session required.
+# POST {ASSET_DETAIL_API}/{assetId}/{accountId}/false  body {businessId, siteId}
+# Carries the FULL photo gallery (assetPhotos -- the search API's "photo"
+# field is only the first of these), any linked document attachments
+# (assetAttachments), and a seller-contact block (sellerContactName/Email/
+# Phone) -- all silently unavailable from the search-list API this scraper
+# otherwise relies on.
+ASSET_DETAIL_API = "https://maestro.lqdt1.com/assets"
+PHOTO_CDN_BASE = "https://webassets.lqdt1.com/assets"
 
 HEADERS = {
     "x-api-key": API_KEY,
@@ -235,11 +249,26 @@ def _safe_float(v):
 
 
 def _auction_url(row: dict) -> str:
-    """Build a human-reachable detail URL for a GovDeals auction."""
+    """Build a human-reachable detail URL for a GovDeals auction.
+
+    FIXED 2026-10-04 (HERMES extraction-completeness audit, batch 17):
+    the old fallback built `{ASSET_URL}{assetId}` ==
+    "https://www.govdeals.com/auctions/item/detail/{assetId}" -- live-
+    verified this 404s ("Page Not Found") on the live site for every row,
+    confirmed on real current NC+SC assets (id 6, id 4). `clickUrl` is also
+    null on every live row sampled (search-API quirk, not scoped to NC/SC),
+    so this fallback was the ACTUAL url shipped on every row, every time --
+    a dead link on 100% of listings. The real route, confirmed live by
+    searching the site's own UI and landing on a working page, is
+    `/en/asset/{assetId}/{accountId}` (both ids are already on every row).
+    """
     direct = row.get("clickUrl")
     if isinstance(direct, str) and direct.startswith("http"):
         return direct
     aid = row.get("assetId") or row.get("inventoryId")
+    acc = row.get("accountId")
+    if aid and acc:
+        return f"{ASSET_URL}{aid}/{acc}"
     if aid:
         return f"{ASSET_URL}{aid}"
     return "https://www.govdeals.com/"
@@ -294,6 +323,17 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
     if aid:
         case_no = f"govdeals-{aid}" + (f"-{lot}" if lot else "")
 
+    # isReserveNotMet -- found 2026-10-04 (HERMES extraction-completeness
+    # audit, batch 17), confirming the gap batch 5 flagged on the sibling
+    # counties_nc.nc_govdeals_real_property.py when it fixed the identical
+    # field there. Live-verified on this scraper's own current NC/SC rows:
+    # hasReservePrice=True on both sampled lots, with isReserveNotMet=False
+    # on one (reserve met) and True on the other (reserve NOT yet met) --
+    # a real, zero-cost signal that currentBid is not yet a price the
+    # seller has committed to accept. Mirrors the sibling's exact logic.
+    has_reserve = row.get("hasReservePrice")
+    reserve_met = (not row.get("isReserveNotMet")) if has_reserve else None
+
     title = (row.get("assetShortDescription") or "").strip()
     description = (row.get("assetLongDescription") or "").strip()
     desc_bits = ["GovDeals surplus auction"]
@@ -346,7 +386,8 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
                 "start_date": start_date.isoformat() if start_date else None,
                 "end_date": end_date.isoformat() if end_date else None,
                 "is_sold": row.get("isSoldAuction"),
-                "has_reserve": row.get("hasReservePrice"),
+                "has_reserve": has_reserve,
+                "reserve_met": reserve_met,
             },
             "images": {"real": photos} if photos else {},
         },
@@ -399,6 +440,87 @@ def _build_payload(category_id: str, state_full: str, page: int) -> dict:
     }
 
 
+async def _fetch_asset_detail(c, asset_id, account_id) -> dict | None:
+    """Best-effort fetch of the real per-asset detail JSON (see
+    ASSET_DETAIL_API docstring above). Returns None on any failure --
+    callers must treat this as pure enrichment, never load-bearing for
+    whether a row ships."""
+    if not asset_id or not account_id:
+        return None
+    url = f"{ASSET_DETAIL_API}/{asset_id}/{account_id}/false"
+    headers = {
+        "x-api-key": API_KEY,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "x-user-id": "-1",
+        "x-api-correlation-id": str(uuid.uuid4()),
+    }
+    try:
+        r = await c.post(url, json={"businessId": "GD", "siteId": 1}, headers=headers,
+                          follow_redirects=True)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        return data if isinstance(data, dict) else None
+    except Exception as exc:
+        log.debug("govdeals.detail_fetch_failed", asset_id=asset_id,
+                   account_id=account_id, error=str(exc)[:200])
+        return None
+
+
+def _apply_detail(li: Listing, detail: dict) -> None:
+    """Fold the per-asset detail JSON's extra fields onto an already-built
+    Listing: the full photo gallery (search API only carries the first
+    photo), any linked document attachments, and seller-contact info when
+    the seller has chosen to display it (rare, but free when present --
+    same opportunistic-capture pattern as hud_homestore/freddie_homesteps,
+    HERMES sec 9's #1 priority)."""
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+
+    photos = detail.get("assetPhotos")
+    if isinstance(photos, list) and photos:
+        full_urls = [
+            f"{PHOTO_CDN_BASE}{p}" if isinstance(p, str) and p.startswith("/") else p
+            for p in photos if isinstance(p, str) and p
+        ]
+        if full_urls:
+            # REPLACE (not merge) the single search-API photo: live-verified
+            # assetPhotos[0] is always the SAME underlying image as the
+            # search row's "photo" field, just reachable via a different CDN
+            # path prefix (ecomm/ vs assets/photos/{accountId}/) -- merging
+            # would keep two URLs pointing at one real photo.
+            li.raw.setdefault("images", {})["real"] = full_urls
+
+    attachments = detail.get("assetAttachments")
+    if isinstance(attachments, list) and attachments:
+        doc_urls = []
+        for a in attachments:
+            u = a.get("url") or a.get("attachmentUrl") or a.get("path") if isinstance(a, dict) else (
+                a if isinstance(a, str) else None)
+            if isinstance(u, str) and u:
+                doc_urls.append(u if u.startswith("http") else f"https://www.govdeals.com{u}")
+        if doc_urls:
+            stamp_documents(li, doc_urls)
+
+    contact_name = (detail.get("sellerContactName") or "").strip()
+    contact_email = (detail.get("sellerContactEmail") or "").strip()
+    contact_phone = (detail.get("sellerContactPhone") or "").strip()
+    if contact_name or contact_email or contact_phone:
+        li.raw["govdeals"]["seller_contact"] = {
+            "name": contact_name or None,
+            "email": contact_email or None,
+            "phone": contact_phone or None,
+        }
+
+    # Correct per-asset detail URL -- always reachable (unlike clickUrl,
+    # which is null on every live row sampled), so prefer it outright.
+    acc = detail.get("accountId")
+    aid = detail.get("assetId")
+    if acc and aid:
+        li.source_url = f"{ASSET_URL}{aid}/{acc}"
+
+
 async def _fetch_category_state(c, category_id: str, state: str, slug: str) -> list[Listing]:
     state_full = _STATE_FULL[state]
     out: list[Listing] = []
@@ -444,6 +566,9 @@ async def _fetch_category_state(c, category_id: str, state: str, slug: str) -> l
             if key in seen:
                 continue
             seen.add(key)
+            detail = await _fetch_asset_detail(c, row.get("assetId"), row.get("accountId"))
+            if detail:
+                _apply_detail(li, detail)
             out.append(li)
             new_this_page += 1
 

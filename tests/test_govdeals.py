@@ -24,6 +24,8 @@ make it SINGLE_FAMILY)."""
 from foreclosure_scraper.models import PropertyKind
 from foreclosure_scraper.scrapers.national.govdeals import (
     REAL_ESTATE_CATEGORY_IDS,
+    _apply_detail,
+    _auction_url,
     _build_payload,
     _kind,
     _to_listing,
@@ -143,3 +145,117 @@ def test_out_of_footprint_state_is_dropped():
     row = dict(_NC_LAND_ROW)
     row["locationState"] = "GA"
     assert _to_listing(row, "national.govdeals") is None
+
+
+# ---------------------------------------------------------------------------
+# Batch 17 (2026-10-04): isReserveNotMet, the broken detail-URL fallback, and
+# the new per-asset detail-JSON enrichment (photos/documents/seller contact).
+# ---------------------------------------------------------------------------
+
+
+def test_reserve_met_computed_from_is_reserve_not_met():
+    """Confirms the sibling gap batch 5 flagged on
+    counties_nc.nc_govdeals_real_property.py (isReserveNotMet captured
+    there but not here) -- live-verified 2026-10-04 this scraper's own
+    current rows carry the same field with both polarities."""
+    row_met = dict(_NC_LAND_ROW, isReserveNotMet=False)
+    li = _to_listing(row_met, "national.govdeals")
+    assert li.raw["govdeals"]["has_reserve"] is True
+    assert li.raw["govdeals"]["reserve_met"] is True
+
+    row_not_met = dict(_SC_HOME_ROW, isReserveNotMet=True)
+    li2 = _to_listing(row_not_met, "national.govdeals")
+    assert li2.raw["govdeals"]["has_reserve"] is True
+    assert li2.raw["govdeals"]["reserve_met"] is False
+
+
+def test_reserve_met_is_none_when_no_reserve_at_all():
+    row = dict(_NC_LAND_ROW, hasReservePrice=False, isReserveNotMet=None)
+    li = _to_listing(row, "national.govdeals")
+    assert li.raw["govdeals"]["has_reserve"] is False
+    assert li.raw["govdeals"]["reserve_met"] is None
+
+
+def test_auction_url_uses_real_asset_route_not_dead_fallback():
+    """FIXED 2026-10-04: the old `{ASSET_URL}{assetId}` ==
+    "https://www.govdeals.com/auctions/item/detail/{id}" 404s on the live
+    site for every row (clickUrl is also null on every live row sampled).
+    The real, confirmed-live route is `/en/asset/{assetId}/{accountId}`."""
+    row = {"assetId": 6, "accountId": 30033, "clickUrl": None}
+    assert _auction_url(row) == "https://www.govdeals.com/en/asset/6/30033"
+
+
+def test_auction_url_falls_back_to_asset_id_only_without_account_id():
+    row = {"assetId": 6, "accountId": None, "clickUrl": None}
+    assert _auction_url(row) == "https://www.govdeals.com/en/asset/6"
+
+
+def test_auction_url_prefers_real_click_url_when_present():
+    row = {"assetId": 6, "accountId": 30033, "clickUrl": "https://www.govdeals.com/some/real/path"}
+    assert _auction_url(row) == "https://www.govdeals.com/some/real/path"
+
+
+def test_to_listing_uses_fixed_detail_url():
+    row = dict(_SC_HOME_ROW, accountId=30033, assetId=6)
+    li = _to_listing(row, "national.govdeals")
+    assert li.source_url == "https://www.govdeals.com/en/asset/6/30033"
+
+
+# A real per-asset detail JSON shape (trimmed to the fields _apply_detail
+# reads), live-captured 2026-10-04 from POST
+# maestro.lqdt1.com/assets/6/30033/false -- the SC home row has a 25-photo
+# gallery where the search API's "photo" field only ever carries the first.
+_DETAIL_WITH_GALLERY = {
+    "accountId": 30033, "assetId": 6,
+    "assetPhotos": [
+        "/photos/30033/30033_6_a1da8fd2-3692-4168-89a2-ca40769e07e4.jpg?cb=260212042404",
+        "/photos/30033/30033_6_3e51a602-aa72-4d7a-bc20-6884280b34cb.jpeg?cb=260217092156",
+    ],
+    "assetAttachments": [],
+    "sellerContactName": "", "sellerContactEmail": "", "sellerContactPhone": "",
+}
+
+_DETAIL_WITH_ATTACHMENTS_AND_CONTACT = {
+    "accountId": 12345, "assetId": 77,
+    "assetPhotos": ["/photos/12345/12345_77_abc.jpg"],
+    "assetAttachments": [{"url": "/attachments/notice.pdf"}, "https://example.com/deed.pdf"],
+    "sellerContactName": "Jane Seller", "sellerContactEmail": "jane@example.gov",
+    "sellerContactPhone": "555-123-4567",
+}
+
+
+def test_apply_detail_replaces_single_photo_with_full_gallery():
+    li = _to_listing(dict(_SC_HOME_ROW, accountId=30033, assetId=6), "national.govdeals")
+    before = li.raw.get("images", {}).get("real", [])
+    assert len(before) <= 1
+    _apply_detail(li, _DETAIL_WITH_GALLERY)
+    photos = li.raw["images"]["real"]
+    assert len(photos) == 2
+    assert all(p.startswith("https://webassets.lqdt1.com/assets/photos/") for p in photos)
+
+
+def test_apply_detail_stamps_attachments_as_documents():
+    li = _to_listing(dict(_SC_HOME_ROW, accountId=30033, assetId=6), "national.govdeals")
+    _apply_detail(li, _DETAIL_WITH_ATTACHMENTS_AND_CONTACT)
+    docs = li.raw.get("documents", [])
+    assert "https://www.govdeals.com/attachments/notice.pdf" in docs
+    assert "https://example.com/deed.pdf" in docs
+
+
+def test_apply_detail_captures_seller_contact_when_present():
+    li = _to_listing(dict(_SC_HOME_ROW, accountId=30033, assetId=6), "national.govdeals")
+    _apply_detail(li, _DETAIL_WITH_ATTACHMENTS_AND_CONTACT)
+    contact = li.raw["govdeals"]["seller_contact"]
+    assert contact == {"name": "Jane Seller", "email": "jane@example.gov", "phone": "555-123-4567"}
+
+
+def test_apply_detail_skips_seller_contact_when_all_blank():
+    li = _to_listing(dict(_SC_HOME_ROW, accountId=30033, assetId=6), "national.govdeals")
+    _apply_detail(li, _DETAIL_WITH_GALLERY)
+    assert "seller_contact" not in li.raw["govdeals"]
+
+
+def test_apply_detail_corrects_source_url():
+    li = _to_listing(dict(_SC_HOME_ROW, accountId=30033, assetId=6, clickUrl=None), "national.govdeals")
+    _apply_detail(li, _DETAIL_WITH_GALLERY)
+    assert li.source_url == "https://www.govdeals.com/en/asset/6/30033"
