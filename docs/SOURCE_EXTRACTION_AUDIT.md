@@ -1,6 +1,6 @@
 # SOURCE EXTRACTION AUDIT — per-source, is EVERYTHING being pulled?
 
-Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **19 already wire the document harvester** (PDFs/deeds/notices) and **220 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
+Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **22 already wire the document harvester** (PDFs/deeds/notices) and **217 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
 
 ## The audit protocol (do this for EVERY source in the TODO table)
 
@@ -16,7 +16,7 @@ Then VERIFY the change three ways: it compiles, `discover()` still lists the slu
 
 The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) as a starting clue for where to look. It is a hint from static text, NOT proof the source has or lacks these — your eyes on the live page are the authority.
 
-## DONE — already harvest documents (19)
+## DONE — already harvest documents (22)
 
 | Slug | already captures | URLs |
 |---|---|---|
@@ -33,6 +33,9 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_sc.terry_howe_auctions` | pdf?, deed/notice?, img?, detail-page | https://terryhowe.com/wp-json/wp/v2/auctions |
 | `law_firms.mewborn_deselms` | pdf?, deed/notice?, detail-page, links | https://www.mewbornlaw.biz |
 | `law_firms.rogers_townsend` | pdf?, deed/notice? | https://rogerstownsend.com/reports/NC_Listings.pdf<br>https://rogerstownsend.com/reports/ |
+| `national.courtlistener_adversary` | deed/notice?, links | https://www.courtlistener.com |
+| `national.courtlistener_bankruptcy` | deed/notice?, links | https://www.courtlistener.com/sign-up/<br>https://www.courtlistener.com/profile/api/ |
+| `national.courtlistener_civil` | deed/notice?, links | https://www.courtlistener.com |
 | `national.cws_marketing` | deed/notice?, img?, detail-page, links | https://www.cwsmarketing.com/real-estate/<br>https://bid\.cwsmarketing\.com/auctions/catalog/id/\d+ |
 | `national.gsa_realproperty` | deed/notice?, img?, detail-page | https://realestatesales.gov<br>https://...jpg |
 | `national.irs_judicial_sales` | pdf?, deed/notice?, img?, detail-page, links | https://www.irsauctions.gov |
@@ -40,7 +43,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.usmarshals_realproperty` | pdf?, deed/notice?, img?, detail-page, links | https://reallook.com/properties<br>https://reallook.com |
 | `national.williams` | deed/notice?, img?, detail-page, links | https://bid.auctionnetwork.com/<br>https://bid.auctionnetwork.com |
 
-## TODO — audit each for full extraction (220)
+## TODO — audit each for full extraction (217)
 
 | Slug | code hints (verify on the live page) | URLs |
 |---|---|---|
@@ -194,18 +197,15 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `law_firms.zacchaeus` | deed/notice?, detail-page, links | https://www.zls-nc.com/listings<br>https://gis.moorecountync.gov/mooreinfo2010/ |
 | `national.auction_bank_reo` | img?, detail-page, links | https://apiweb.realtybid.com/rest/RBIAPI/<br>https://bid.auctionnetwork.com/Auctions |
 | `national.auction_dot_com` | img?, detail-page, links | https://www.auction.com/residential/nc/<br>https://www.auction.com/residential/sc/ |
-| `national.bid4assets` | deed/notice?, detail-page | https://www.bid4assets.com/v5/search<br>https://www.bid4assets.com/api/search/process |
+| `national.bid4assets` | deed/notice?, img?, detail-page | https://www.bid4assets.com/v5/search<br>https://www.bid4assets.com/api/search/process |
 | `national.cash_buyer_deeds` | deed/notice?, img? | (see SOURCE_REGISTER.md) |
-| `national.courtlistener_adversary` | deed/notice?, links | https://www.courtlistener.com |
-| `national.courtlistener_bankruptcy` | deed/notice?, links | https://www.courtlistener.com/sign-up/<br>https://www.courtlistener.com/profile/api/ |
-| `national.courtlistener_civil` | deed/notice?, links | https://www.courtlistener.com |
-| `national.craigslist_fsbo` | detail-page | https://sapi.craigslist.org/web/v8/postings/search/full |
+| `national.craigslist_fsbo` | img?, detail-page | https://sapi.craigslist.org/web/v8/postings/search/full<br>https://images.craigslist.org/<rest |
 | `national.crexi_multifamily` | detail-page, links | https://www.crexi.com |
 | `national.distressed` | deed/notice?, img? | (see SOURCE_REGISTER.md) |
 | `national.epa_superfund` | detail-page | https://data.epa.gov/ef/seplan/<br>https://www.epa.gov/superfund/search-superfund-sites |
 | `national.estate_sales` | deed/notice?, detail-page, links | https://www.estatesales.net<br>https://www.estatesale.com |
 | `national.fannie_homepath` | img?, detail-page | https://homepath.fanniemae.com/cfl/property-inventory/search<br>https://homepath.fanniemae.com/ |
-| `national.fdic_failed_banks` | detail-page, links | https://www.fdic.gov/bank-failures/failed-bank-list |
+| `national.fdic_failed_banks` | detail-page, links | https://www.fdic.gov/bank-failures/failed-bank-list<br>https://www.fdic.gov/bank-failures/download-data.csv |
 | `national.fema_disasters` | - | https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries |
 | `national.first_citizens_reo` | links | https://www.firstcitizens.com/real-estate |
 | `national.foreclosure_dot_com` | img?, detail-page | https://www.foreclosure.com/listing/search<br>https://www.foreclosure.com/listings/charlotte-nc/ |
