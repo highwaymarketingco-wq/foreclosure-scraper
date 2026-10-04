@@ -71,6 +71,19 @@ if [[ -n "${GOOGLE_MAPS_API_KEY:-}" ]]; then
   export STREETVIEW_MAX="${STREETVIEW_MAX:-300}"
 fi
 
+# merge_prior_board() streams the published board rather than fully materializing
+# it (2026-10-04 fix for the BoardLoadTooLarge crash that blocked every VM run
+# from ever reaching write_artifact -- see board_persist.py's module docstring
+# and web_artifact.BOARD_PRIOR_MERGE_MAX_SOURCE_MB's comment), but its ceiling is
+# still calibrated to the 8 GB Mac (same board, same pipeline, same function) --
+# a real, supervised, dual-signal (VmRSS + smaps_rollup Pss) trial on THIS VM
+# against the real board (223,832 rows, 2,667 MiB combined source) measured a
+# clean 11.84 GiB peak and exit 0, comfortably inside this VM's 23 GiB with no
+# swap -- the same "24 GB VM has no OOM ceiling" reasoning ASSESSOR_CARD_ON above
+# already overrides for. Override per-host here, not by raising the shared
+# default and risking the Mac.
+export BOARD_PRIOR_MERGE_ALLOW_LARGE="${BOARD_PRIOR_MERGE_ALLOW_LARGE:-1}"
+
 echo "==> VM run $STAMP  role=vm  vision=$VISION_PROVIDER  log=$LOG" | tee -a "$LOG"
 uv sync --frozen >>"$LOG" 2>&1 || uv sync >>"$LOG" 2>&1
 

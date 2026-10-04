@@ -460,25 +460,51 @@ BOARD_DELETE_MAX_SOURCE_MB = 2300.0
 # materialization, a doubled combined list, and dedupe()'s full-board structures, all at once) --
 # it does not make holding the final merged board's worth of Listing objects free.
 #
-# MEASURED (2026-10-04), on the Oracle VM (aarch64, 23 GiB RAM, 0 swap) against the real board
+# MEASURED (2026-10-04), on the Oracle VM (aarch64, 23 GiB RAM, 0 swap) against the REAL board
 # (listings.json 2,550,229,241 bytes + listings_detail.json 247,715,947 bytes = 2,667.4 MiB
-# combined source, 221,188 rows) under a supervised trial, polling BOTH
-# /proc/<pid>/status:VmRSS and /proc/<pid>/smaps_rollup:Pss every 2s (the Linux analog of this
-# file's established "never trust RSS alone" dual-signal discipline -- see
-# BOARD_LOAD_MAX_SOURCE_MB's comment for why the Mac side of that gap was real, and
-# board_persist.py's test suite / this session's own measurement log for why it was NOT
-# reproduced at anywhere near the same magnitude on this Linux VM):
-#     merge_prior_board(fresh=22,xxx real stealth-handoff rows) against the real 221,188-row
-#     prior board -> peak VmRSS ___ MiB, peak Pss ___ MiB, wall ___s, exit 0.
-#     load_board() ALONE (the function this replaces), same board, same host, same watchdog ->
-#     peak VmRSS ___ MiB, peak Pss ___ MiB (for comparison; BoardLoadTooLarge was overridden via
-#     BOARD_LOAD_ALLOW_LARGE=1 for this one measurement run only).
-# (Exact figures: see the VM trial log this comment's companion commit references.) The ceiling
-# below is set with real margin under the smaller of the two peaks measured, not at the measured
-# peak itself -- same margin discipline as every other ceiling in this file, because a single
-# overnight session is not enough data points to spend margin down to zero on, and this board
-# will only grow between now and the next time this number is revisited.
-BOARD_PRIOR_MERGE_MAX_SOURCE_MB = 2300.0
+# combined source, 223,832 rows) under a supervised trial, polling BOTH /proc/<pid>/status:VmRSS
+# and /proc/<pid>/smaps_rollup:Pss every ~1-2s (the Linux analog of this file's established
+# "never trust RSS alone" dual-signal discipline -- see BOARD_LOAD_MAX_SOURCE_MB's comment for
+# why the Mac side of that gap was real):
+#     merge_prior_board(fresh=28,989 real stealth-handoff rows) against the real 223,832-row
+#     prior board -> peak VmRSS 11,842.4 MiB, peak Pss 11,836.8 MiB, wall 125.1s, exit 0.
+#     matched=16,723 fresh_only=12,266 prior_only_kept=205,808 aged_out=1,294 merged_count=234,797.
+#     load_board() ALONE (the function this replaces), same board, same host, same watchdog,
+#     BOARD_LOAD_ALLOW_LARGE=1 overridden for this one measurement run only -> peak VmRSS
+#     11,739.4 MiB, peak Pss 11,734.2 MiB, wall 95.4s, exit 0, 223,832 rows.
+#
+# TWO REAL FINDINGS, not assumptions. First: unlike the Mac (BOARD_LOAD_MAX_SOURCE_MB's own
+# 5.7x RSS/footprint gap from macOS's memory compressor), VmRSS and Pss track within 0.05% of
+# each other on this Linux VM at this scale -- the compressed/swapped-pages blind spot that made
+# RSS alone look safe on the Mac while the real footprint hit 11.1 GB does not reproduce here,
+# at least not at this magnitude; RSS is a trustworthy proxy for the real cost on THIS host,
+# though the dual-signal watchdog stays required (a single trial is not proof it never diverges).
+# Second, and more important for what this ceiling should actually BE: merge_prior_board()'s
+# measured peak (11,842 MiB, ratio ~4.44x the 2,667 MiB source) is essentially IDENTICAL to
+# load_board()'s own (11,739 MiB, ~4.40x) -- not the half-or-less ratio append_new_rows()/
+# patch_existing_rows()/merge_duplicate_rows() each earned their own more generous ceilings with.
+# That is NOT this fix failing; it is this fix's own docstring's "WHAT THIS DOES NOT FIX" section
+# confirmed empirically: merge_prior_board()'s OWN output is unavoidably a full list[Listing]
+# proportional to the final row count, the same shape load_board()'s always was, so of course its
+# per-source-MB cost lands in the same class. The real, measured win here is everything this
+# number is NOT paying for anymore -- the doubled `fresh + prior` combined list and dedupe()'s
+# full-board bucket/blocking/union-find structures BOARD_LOAD_MAX_SOURCE_MB's own "26.3 GB,
+# killed" precedent describes for that chain -- which was never safe to re-measure at real-board
+# scale on this run (it would risk exceeding this VM's own 23 GiB), so this ceiling is set the
+# same way BOARD_LOAD_MAX_SOURCE_MB's was: a direct ratio match, not a discount.
+#
+# WHAT THE CEILING IS SET TO. Because this function's real measured cost class matches
+# load_board()'s, not its cheaper streaming siblings', it gets load_board()'s OWN number, for the
+# same reason BOARD_LOAD_MAX_SOURCE_MB itself was never raised after being measured safe-ish on
+# this one VM trial: this ceiling has to stay safe on the SAME 8 GB Mac load_board() protects
+# (merge_prior_board() runs there too, same board, same pipeline), and an 11+ GiB operation does
+# not fit there regardless of what this one VM run showed. BOARD_PRIOR_MERGE_ALLOW_LARGE=1 is the
+# deliberate, per-host override -- set in deploy/oracle/vm_run.sh (see its own comment) on the
+# strength of today's real, supervised, successful trial on THIS host, exactly the way
+# ASSESSOR_CARD_ON/ASSESSOR_CARD_MAX are already overridden there for the same "23 GiB VM, not an
+# 8 GB Mac" reason. Left UNSET (refusing) everywhere else, including the Mac, until a Mac-scale
+# trial says otherwise.
+BOARD_PRIOR_MERGE_MAX_SOURCE_MB = 1200.0
 
 # run_meta health older than this is nulled (audit O4).
 HEALTH_MAX_AGE_HOURS = 48.0
