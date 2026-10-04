@@ -129,6 +129,53 @@ def test_gaston_multi_heir_row_gets_a_real_list_not_just_the_joined_string(canne
     assert names[0]["raw"] == "HARDIN CLARENCE HEIRS"
 
 
+# --------------------------------------------------------------------------- 2026-10-04
+# Regression pin for task_heir_names_coverage_gap: confirmed LIVE that 0 of 1,039
+# estate_lead rows on the published board carry heir_names (board predates this
+# field's 2026-10-02 commit). Before trusting that "it'll reach the board on the
+# next run" claim, PROVE the publish pipeline really does preserve the nested
+# {raw,name,role} list end-to-end -- scraper emits heir_names -> simulate the
+# publish step (web_artifact._to_dict / _slim_raw, the SAME function every real
+# write_artifact()/append_new_rows()/patch_existing_rows() call uses) -> assert it
+# survives byte-for-byte. RAW_KEEP["heir_estate"] = "*" is a wildcard (keeps the
+# WHOLE sub-dict, not a per-subkey allowlist), so this also pins that a future
+# narrowing of that entry to an explicit tuple of subkeys (the shape "gis"/
+# "zillow" use) would break this test rather than silently dropping heir_names
+# again with no error, the way the original 2026-09-10 RAW_KEEP audit found
+# heir_estate itself being dropped entirely.
+def test_gaston_multi_heir_heir_names_survives_the_publish_slim(canned):
+    from foreclosure_scraper.web_artifact import RAW_KEEP, _to_dict
+
+    assert RAW_KEEP.get("heir_estate") == "*", (
+        "heir_estate's RAW_KEEP entry changed from a wildcard -- the rest of "
+        "this test's reasoning (whole sub-dict survives, no per-subkey "
+        "registration needed) no longer applies; re-verify before editing this "
+        "pin"
+    )
+
+    table, _ = canned
+    table[_url("NC:Gaston")] = [GASTON_MULTI_HEIR]
+    out = asyncio.run(m.NCHeirEstateParcels().fetch())
+    rows = [li for li in out if li.county == "Gaston"]
+    assert len(rows) == 1
+    li = rows[0]
+
+    before = li.raw["heir_estate"]["heir_names"]
+    assert before, "fixture regressed -- nothing to prove survives"
+
+    published = _to_dict(li)
+    after = published["raw"]["heir_estate"]["heir_names"]
+
+    assert after == before
+    assert [h["name"] for h in after] == ["HARDIN CLARENCE", "HARDIN OMA"]
+    assert all(h["role"] == "heir" for h in after)
+    # Every OTHER heir_estate sibling key must also still be there -- a
+    # wildcard keep is "the whole dict survives", not "heir_names in
+    # particular happens to survive while something else is sub-projected".
+    for sibling in ("owner_of_record", "mailing", "care_of", "match"):
+        assert sibling in published["raw"]["heir_estate"]
+
+
 # --------------------------------------------------------------------------- live-shaped fixtures
 
 # gis.gastoncountync.gov .../Parcels/FeatureServer/11 — CURR_NAME1/CURR_NAME2.
