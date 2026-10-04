@@ -245,6 +245,21 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
     interest = _money(row.get("InterestAmount"))
     penalty = _money(row.get("PenaltyAmount"))
     cost_fees = _money(row.get("Cost_FeesAmount"))
+    # 2026-10-04 extraction-completeness audit: the NAME-SEARCH fallback path
+    # (used whenever the bulk Export_All_Ind pull times out -- a documented,
+    # real occurrence, not a hypothetical) returns a materially richer row
+    # than the bulk export. Live-verified on a capped SMITH name-search pull,
+    # 220 rows that actually survive _is_active(): LienLastUpdated is
+    # populated on 220/220 and is NOT a duplicate of LienDateFiled (0/220
+    # equal -- it is a genuinely distinct "last touched" date) and
+    # LiendPeriods (the API's own misspelling, kept verbatim as the dict key)
+    # is real free text on 159/220 ("Q3-2009, Q4-2009, Q1-2010, ...", the
+    # actual tax quarters the lien covers) on 159/220 -- both silently
+    # dropped before this fix. "Payoff" was checked too and is NOT data: it
+    # is a static UI button label ("PayOff" literal, 220/220) that the SPA
+    # renders as a link, not a per-row fact -- correctly left uncaptured.
+    last_updated = _parse_date(row.get("LienLastUpdated"))
+    periods = (row.get("LiendPeriods") or "").strip() or None
 
     street, city, addr_state, zipc, county = _split_address(row.get("EmployerAddress"))
     state = (addr_state or "SC").upper()
@@ -331,6 +346,8 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
                 "employer_fein": row.get("EmployerFEIN") or None,
                 "raw_address": row.get("EmployerAddress") or None,
                 "date_filed": filed.isoformat() if filed else None,
+                "date_last_updated": last_updated.isoformat() if last_updated else None,
+                "lien_periods": periods,
                 "in_footprint": in_footprint,
             },
         },

@@ -142,3 +142,40 @@ def test_debt_breakdown_fields_are_captured():
     assert d["interest"] == 150.0
     assert d["penalty"] == 50.0
     assert d["cost_fees"] is None  # 0.00 -> falsy, _money() returns None by design
+
+
+def test_last_updated_and_lien_periods_are_captured():
+    # 2026-10-04 extraction-completeness audit: the NAME-SEARCH fallback path
+    # (fired whenever the bulk Export_All_Ind pull times out) returns a richer
+    # row than the bulk export. Live-verified on 220 real ACTIVE rows from a
+    # capped SMITH name search: LienLastUpdated populated 220/220 and never
+    # equal to LienDateFiled (a genuinely distinct date), LiendPeriods real
+    # free text on 159/220 (e.g. "Q3-2009, Q4-2009, Q1-2010, Q2-2010, ...").
+    row = _row("Chester")
+    row["LienLastUpdated"] = "8/7/2020 12:00:00 AM"
+    row["LiendPeriods"] = " Q3-2009, Q4-2009, Q1-2010"
+    li = _to_listing(row, _SLUG)
+    assert li is not None
+    d = li.raw["sc_dew_lien_registry"]
+    assert d["date_last_updated"] == "2020-08-07T00:00:00"
+    assert d["lien_periods"] == "Q3-2009, Q4-2009, Q1-2010"
+
+
+def test_payoff_button_label_is_not_mistaken_for_data():
+    """'Payoff' is a static UI link label the SPA always sends as the literal
+    string 'PayOff' (220/220 live) -- never a per-row fact. No field reads it;
+    this just pins that nothing in _to_listing's raw dict is sourced from it."""
+    row = _row("Chester")
+    row["Payoff"] = "PayOff"
+    li = _to_listing(row, _SLUG)
+    assert li is not None
+    assert "PayOff" not in str(li.raw["sc_dew_lien_registry"])
+
+
+def test_no_last_updated_leaves_the_field_absent():
+    row = _row("Chester")
+    li = _to_listing(row, _SLUG)
+    assert li is not None
+    d = li.raw["sc_dew_lien_registry"]
+    assert d["date_last_updated"] is None
+    assert d["lien_periods"] is None
