@@ -94,6 +94,32 @@ def _discover_list_pdf(html: str) -> list[str]:
     return [u for u, s in sorted(best.items(), key=lambda x: -x[1]) if s > 0]
 
 
+#: Filename-embedded-date patterns seen on Colleton's own tax-sale page, newest
+#: pattern first. Both groups are (month, day[, 2-digit year]).
+_FNAME_DATE_RES = (
+    re.compile(r"(\d{1,2})-(\d{1,2})-(\d{2})\.pdf", re.I),  # taxsale-1-30-26.pdf
+    re.compile(r"(\d{1,2})-(\d{1,2})\.pdf", re.I),           # taxsalelist-01-29.pdf (no year)
+)
+
+
+def _filename_date(url: str) -> datetime | None:
+    """Best-effort date parsed from a PDF's own filename, for comparing two
+    same-shaped candidate PDFs (see fetch()'s 2026-10-03 fix below). Returns
+    None when the filename carries no recognizable date -- callers must treat
+    that as "can't compare", not "oldest"."""
+    for rx in _FNAME_DATE_RES:
+        m = rx.search(url)
+        if not m:
+            continue
+        try:
+            mo, day = int(m.group(1)), int(m.group(2))
+            yr = 2000 + int(m.group(3)) if len(m.groups()) >= 3 else datetime.utcnow().year
+            return datetime(yr, mo, day)
+        except (ValueError, IndexError):
+            continue
+    return None
+
+
 def _find_sale_date(html: str) -> datetime | None:
     """Pull the sale date (e.g. 'February 20, 2026') from the tax-sale page."""
     text = HTMLParser(html).text(separator=" ") if html else ""
@@ -212,8 +238,30 @@ class ColletonTaxSale(BaseScraper):
         sale_date = _find_sale_date(page_html)
         candidates = _discover_list_pdf(page_html) if page_html else []
 
-        # 2) Fetch ranked candidates; first PDF that parses to >=1 parcel wins.
-        out: list[Listing] = []
+        # 2) Fetch every ranked candidate that parses to >=1 parcel (not just the
+        # first), then pick the single most CURRENT revision among them.
+        #
+        # GOTCHA, live-verified 2026-10-03: the tax-sale page currently publishes
+        # TWO real listing PDFs at once -- a dated "taxsale-1-30-26.pdf" with real
+        # visible "here" anchor text (the link a human actually clicks: `<a
+        # href=".../taxsale-1-30-26.pdf"><strong>here</strong></a>`), and an
+        # orphaned "taxsalelist-01-29.pdf" left over from an earlier CMS edit
+        # with an EMPTY anchor (`<a href="...taxsalelist-01-29.pdf"> </a>`,
+        # single space, invisible on the page). _discover_list_pdf's scoring
+        # (keyed on the filename containing "taxsalelist"/"/del_tax/") ranks the
+        # stale, invisible link ABOVE the real current one, and the old
+        # first-match-wins loop below picked it -- live-confirmed those two PDFs
+        # differ by exactly 2 rows ("A H CONCRETE LLC", 2 parcels present in the
+        # 01-29 file, absent from the 01-30 file one day later -- almost
+        # certainly paid/redeemed in between). Comparing by the date EMBEDDED IN
+        # EACH FILENAME (_filename_date) and preferring the latest one fixes this
+        # without hardcoding either filename; when neither candidate's filename
+        # carries a parseable date, this degrades to the previous first-match
+        # behavior (score order), so a future season with only one undated PDF
+        # is unaffected.
+        best_url: str | None = None
+        best_rows: list[Listing] = []
+        best_date: datetime | None = None
         seen_url: set[str] = set()
         for url in candidates:
             if url in seen_url:
@@ -226,11 +274,24 @@ class ColletonTaxSale(BaseScraper):
             if not (data and data[:4] == b"%PDF"):
                 continue
             rows = parse_list(_pdf_text(data), url, sale_date)
-            if rows:  # the actual parcel list (not an info/bidder sheet)
-                out.extend(rows)
-                log.info("colleton_tax_sale.list_ok", url=url,
-                         count=len(rows), sale_date=str(sale_date))
-                break
+            if not rows:  # not the actual parcel list (e.g. an info/bidder sheet)
+                continue
+            fdate = _filename_date(url)
+            log.info("colleton_tax_sale.candidate_ok", url=url, count=len(rows),
+                     filename_date=str(fdate))
+            if best_url is None:
+                best_url, best_rows, best_date = url, rows, fdate
+                continue
+            # Only override the first (highest-ranked) hit with a LATER one when
+            # both sides have a parseable date -- an unparseable date on either
+            # side means "can't tell", so the original rank order stands.
+            if fdate is not None and best_date is not None and fdate > best_date:
+                best_url, best_rows, best_date = url, rows, fdate
+
+        out: list[Listing] = list(best_rows)
+        if best_url:
+            log.info("colleton_tax_sale.list_ok", url=best_url,
+                     count=len(out), sale_date=str(sale_date))
 
         log.info("colleton_tax_sale.done", count=len(out))
         return out
