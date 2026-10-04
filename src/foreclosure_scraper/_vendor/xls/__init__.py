@@ -184,6 +184,42 @@ _REC_LABELSST = 0x00FD
 _REC_NUMBER = 0x0203
 _REC_RK = 0x027E
 _REC_MULRK = 0x00BD
+# Classic LABEL (direct string, no shared-string-table indirection). Added
+# 2026-10-03 for Georgetown County SC's monthly MIE foreclosure-sale .xls
+# rosters, which use this record for EVERY cell (header AND data) instead of
+# SST+LABELSST -- confirmed live, zero LABELSST/NUMBER/RK/MULRK records
+# anywhere in that file. This specific export omits the trailing grbit
+# (Unicode-flag) byte the BIFF8 spec normally has after `cch` -- confirmed
+# live by exact length arithmetic (payload length == 6 + 2 + cch for every
+# record sampled, with no 7th header byte) -- so this reader assumes
+# compressed (non-Unicode) ASCII content with no flag byte, which is what
+# this exporter actually writes. A real BIFF8 LABEL record WITH the grbit
+# byte would have cch 1 byte "too long" for its payload and is read as
+# ASCII (ignoring any flag) rather than raise -- any garbled high-byte
+# content from mis-reading one is a display-only cosmetic risk, not a
+# crash, since callers merge this into tolerant text fields.
+_REC_LABEL = 0x0204
+
+
+def _parse_label(p: bytes) -> tuple[int, int, str] | None:
+    """Decode a classic LABEL record: r(u16) c(u16) xf(u16) cch(u16) then
+    either `cch` raw bytes (this specific exporter's own convention,
+    confirmed live -- no Unicode/grbit flag byte) or, for a spec-conforming
+    BIFF8 writer, a 1-byte grbit then `cch` bytes. Length arithmetic alone
+    tells the two apart (there's no other signal), so try the no-flag
+    reading first and fall back to the with-flag reading only if that is
+    the one that actually accounts for every byte in the payload. Returns
+    None if neither accounts for the payload length (refuses to guess)."""
+    if len(p) < 8:
+        return None
+    r, c, _xf, cch = struct.unpack_from("<HHHH", p, 0)
+    if len(p) == 8 + cch:
+        text = p[8:8 + cch].decode("latin-1", errors="replace")
+        return r, c, text
+    if len(p) == 9 + cch:
+        text = p[9:9 + cch].decode("latin-1", errors="replace")
+        return r, c, text
+    return None
 
 
 def _rk_to_number(rk: int) -> float:
@@ -375,6 +411,12 @@ def read_first_sheet(data: bytes) -> list[dict[str, Any]]:
                 o += 6
                 c += 1
             continue
+        elif rt == _REC_LABEL:
+            parsed = _parse_label(p)
+            if parsed is None:
+                continue
+            r, c, text = parsed
+            grid[(r, c)] = text
         else:
             continue
         if r > max_row:
