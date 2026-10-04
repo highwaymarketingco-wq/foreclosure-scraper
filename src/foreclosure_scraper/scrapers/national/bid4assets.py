@@ -62,6 +62,7 @@ Free, no login, no CAPTCHA.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime
 from typing import Iterable
@@ -146,12 +147,22 @@ def _to_listing(row: dict, state: str, slug: str) -> Listing | None:
     elif not link:
         link = f"https://www.bid4assets.com/auction/{aid}"
 
+    # The search API's own `locatedCity`/`locatedState` fields are SWAPPED on
+    # every live row (confirmed 2026-10-04 across all 24 current NC+SC rows,
+    # no exceptions): `locatedCity` holds the 2-letter STATE code ("NC"/"SC")
+    # and `locatedState` holds the real county-seat/located CITY ("Shelby",
+    # "Edenton", "Anderson", ...). Previously unused entirely (city was never
+    # captured); read from the field that actually carries it rather than the
+    # one named for it.
+    city = (row.get("locatedState") or "").strip() or None
+
     return Listing(
         source=slug,
         source_url=link,
         listing_type=ListingType.TAX_SALE,
         property_kind=PropertyKind.UNKNOWN,
         state=state,
+        city=city,
         county=county,
         sale_date=sale_date,
         case_number=f"bid4assets-{aid}",
@@ -164,8 +175,51 @@ def _to_listing(row: dict, state: str, slug: str) -> Listing | None:
             "num_deeds": num_deeds,
             "bid_close_time": row.get("bidCloseTime"),
             "actual_close_time": row.get("actualCloseTime"),
+            # County-level stock image (not a per-parcel photo -- these are
+            # batch notices with no per-parcel data at all, see module
+            # docstring) but it's real, free, and on the page -- captured
+            # per HERMES sec 8 item 3.
+            "image_url": row.get("mainImageUrl") or row.get("thumbnailImageUrl"),
         }},
     )
+
+
+# "Deed or Lien: Deed Sale Type: Live/In Person Number of Deeds: 6" -- the
+# per-auction /auction/description/{id} page's free-text notice, live-
+# verified 2026-10-04 across 10 current NC auctions (100% "Deed"/"Live/In
+# Person" today, but the fields are real distinctions Bid4Assets itself
+# draws elsewhere and not guaranteed constant -- a Lien-type sale or an
+# Online sale type would matter a lot to a bidder and this source has no
+# other way to tell them apart). Not present anywhere in the search API's
+# JSON rows -- only on this per-auction detail page.
+_DEED_OR_LIEN_RE = re.compile(r"Deed or Lien:\s*(\S+)", re.I)
+_SALE_TYPE_RE = re.compile(r"Sale Type:\s*(.+?)\s*Number of Deeds", re.I)
+_TAG_RE = re.compile(r"<script.*?</script>|<style.*?</style>", re.I | re.S)
+_ANY_TAG_RE = re.compile(r"<[^>]+>")
+
+
+async def _fetch_description_fields(s, aid: int) -> dict:
+    """Best-effort fetch of one auction's /auction/description/{id} page for
+    the Deed-or-Lien / Sale-Type fields the search API never returns. Never
+    raises -- a failure here must never drop or block the listing itself."""
+    try:
+        r = await s.get(f"https://www.bid4assets.com/auction/description/{aid}", timeout=20)
+        if r.status_code != 200 or not r.text:
+            return {}
+        text = _TAG_RE.sub("", r.text)
+        text = _ANY_TAG_RE.sub(" ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        out: dict = {}
+        dm = _DEED_OR_LIEN_RE.search(text)
+        if dm:
+            out["deed_or_lien"] = dm.group(1).strip()
+        sm = _SALE_TYPE_RE.search(text)
+        if sm:
+            out["sale_type"] = sm.group(1).strip()
+        return out
+    except Exception as exc:
+        log.info("bid4assets.description_fetch_skip", auction_id=aid, error=str(exc)[:160])
+        return {}
 
 
 async def _get_session_and_token():
@@ -212,12 +266,29 @@ async def _fetch_state(s, token: str, state: str, slug: str) -> list[Listing]:
             break
 
         rows = data.get("data") or []
+        page_listings: list[Listing] = []
         for row in rows:
             if not isinstance(row, dict):
                 continue
             li = _to_listing(row, state, slug)
             if li is not None:
-                out.append(li)
+                page_listings.append(li)
+        out.extend(page_listings)
+
+        # Best-effort: pull the Deed-or-Lien / Sale-Type fields off each
+        # auction's own description page (see _fetch_description_fields).
+        # Low volume (current NC+SC total is ~24 notices), so fetched
+        # concurrently per page rather than deferred; any individual
+        # failure just leaves those two raw fields unset on that row.
+        if page_listings:
+            extras = await asyncio.gather(
+                *(_fetch_description_fields(s, li.raw["bid4assets"]["auction_id"])
+                  for li in page_listings),
+                return_exceptions=True,
+            )
+            for li, extra in zip(page_listings, extras):
+                if isinstance(extra, dict) and extra:
+                    li.raw["bid4assets"].update(extra)
 
         total = data.get("total") or 0
         log.info("bid4assets.page_done", state=state, page=page,
