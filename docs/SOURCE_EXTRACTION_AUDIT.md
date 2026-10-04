@@ -99,13 +99,13 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_nc.transylvania_vacant` | deed/notice? | https://gis.transylvaniacounty.org/server/rest/services/Parcels/FeatureServer/2/query |
 | `counties_nc.wake_tax_foreclosure` | deed/notice?, img?, detail-page, links | https://www.wake.gov/departments-government/tax-administration/real-estate/foreclosures<br>https://services.wake.gov/realestate/ |
 | `counties_nc.wnc_rod_foreclosure_starts` | deed/notice?, img? | (see SOURCE_REGISTER.md) |
-| `counties_nc.wnc_tax_foreclosures` | pdf?, detail-page, links | https://www.wataugacounty.org/<br>https://www.averycounty.com/ |
+| `counties_nc.wnc_tax_foreclosures` | pdf?, detail-page, links | https://www.wataugacounty.org/<br>https://www.averycountync.gov/ |
 | `counties_sc.abbeville_delinquent_tax` | detail-page | https://abbevillecountysc.com/delinquent-tax-collector/ |
 | `counties_sc.aiken_delinquent_tax` | detail-page, links | https://sc-aikencounty.civicplus.com/309/Tax-Foreclosures |
 | `counties_sc.anderson_acpass_deeds` | deed/notice?, img?, detail-page, links | https://acpass.andersoncountysc.org |
 | `counties_sc.anderson_master_in_equity` | pdf?, deed/notice?, links | https://www.andersoncountysc.org/departments-a-z/master-in-equity/ |
 | `counties_sc.anderson_sheriff` | detail-page | https://www.andersonsheriff.com/sheriff-sales |
-| `counties_sc.bamberg_sheriff` | detail-page | https://www.bambergcounty.sc.gov/public-safety/sheriffs-office |
+| `counties_sc.bamberg_sheriff` | deed/notice?, detail-page | https://www.bambergcounty.sc.gov/public-safety/sheriffs-office |
 | `counties_sc.barnwell_sheriff` | detail-page | http://www.barnwellcountysheriff.com/services.html |
 | `counties_sc.beaufort_flc` | deed/notice?, detail-page, links | https://www.proxibid.com/Meares-Property-Advisors-Inc/ |
 | `counties_sc.berkeley_paystar_tax` | deed/notice?, detail-page | https://berkeleycountysc.paystar.io/api/search<br>https://berkeleycountysc.paystar.io |
