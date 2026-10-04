@@ -35,6 +35,16 @@ bypass it and hit the JSON endpoint directly. Free, pure HTTP, no Apify needed.
 
 Also added: the "PIN lookup" custom field carries the Buncombe GIS PIN, which is
 the parcel key the address/GIS backfill needs — it is now parsed into parcel_id.
+
+EXTRACTION-COMPLETENESS AUDIT 2026-10-03: `location`'s own <a> link is a Google
+Maps query URL that embeds the EXACT inspection lat/lng the county itself
+geocoded the parcel to (e.g. ``maps.google.com/?q=35.785141,-82.432815(LARRY+A+
+WOOTEN)``) -- live-confirmed on 43 of 66 current events. The code already
+strips that link down to its anchor TEXT to regex out a street address, but
+threw the href (and the precise point inside it) away entirely; latitude/
+longitude were never set on this scraper's Listings at all. Now parsed into
+li.latitude/li.longitude, a free, already-fetched, county-verified point --
+no geocoding API call needed.
 """
 from __future__ import annotations
 
@@ -60,14 +70,25 @@ LOOKBACK_DAYS = 2000
 LOOKAHEAD_DAYS = 400
 
 _TAG_RE = re.compile(r"<[^>]+>")
+# EXTRACTION-COMPLETENESS AUDIT 2026-10-03: found while verifying the GEO_RE fix
+# below against real events -- the street-suffix alternation had no word
+# boundaries, so it matched a suffix abbreviation EMBEDDED inside a longer word
+# with no preceding boundary needed. Live-confirmed real damage: "368 N FORK RD
+# BARNARDSVILLE" truncated to "...RD BARNARD" (the "RD" inside "BARNARDsville"
+# matched instead of the real one); "539 Deaverview" mangled to "539 Deave" (the
+# "AVE" inside "DeAVErview" matched). \b on both sides of the suffix group fixes
+# both: a suffix can only match as a genuine separate token.
 ADDR_RE = re.compile(
-    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
-    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    r"(\d+\s+[A-Z][\w .'\-]+\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
+    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\b\.?)",
     re.I,
 )
 # Buncombe GIS PIN, e.g. .../buncomap/Default.aspx?PINN=966738953300000
 PIN_RE = re.compile(r"PINN=([0-9]{8,20})", re.I)
 MONEY_RE = re.compile(r"\$?\s*([\d,]+(?:\.\d{2})?)")
+# The county's own Google Maps pin for this parcel, e.g.
+#   <a href="http://maps.google.com/?q=35.785141,-82.432815(LARRY+A+WOOTEN)">
+GEO_RE = re.compile(r"maps\.google\.com/\?q=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)", re.I)
 
 
 def _strip(value: str | None) -> str:
@@ -163,6 +184,10 @@ class BuncombeTax(BaseScraper):
             # location often contains an HTML <a> with the address; strip tags
             addr_m = ADDR_RE.search(_TAG_RE.sub(" ", location))
             address = addr_m.group(1) if addr_m else None
+            # The SAME <a>'s href carries the county's own precise geocode for
+            # this parcel (FIXED 2026-10-03) -- a free, already-fetched point.
+            geo_m = GEO_RE.search(location)
+            lat, lng = (float(geo_m.group(1)), float(geo_m.group(2))) if geo_m else (None, None)
 
             case_num = _strip(fields.get("case number")) or None
             bid = None
@@ -182,6 +207,8 @@ class BuncombeTax(BaseScraper):
                     street_address=address,
                     state="NC",
                     county="Buncombe",
+                    latitude=lat,
+                    longitude=lng,
                     parcel_id=parcel,
                     sale_date=sale_date,
                     case_number=case_num,
