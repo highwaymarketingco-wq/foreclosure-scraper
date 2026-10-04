@@ -13,6 +13,36 @@ correct; this scraper's slug is just the transport.
 Datacenter-safe (reads a local file, no browser) so it runs on the VM and is
 skipped on the Mac (FORECLOSURE_ROLE=mac). Missing/absent/stale file = leads or
 zero, never a hard error.
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 18), the
+exact "silently reporting for N+ weeks" class the audit protocol calls out
+by name. The repo's own `docs/handoff/stealth_leads.json` is dated
+`generated_at: 2026-09-01T23:20:57Z` -- 32+ DAYS stale as of today, 10x
+past this module's own 72h "stale but still ingest" advisory threshold.
+Root cause is NOT in this file: `deploy/mac/install_stealth_schedule.sh`
+describes a daily 06:00 launchd job that is supposed to run
+`scripts/run_stealth_sources.py` on this Mac and push the hand-off, but
+`launchctl list | grep stealth` returns NOTHING and
+`~/Library/LaunchAgents/com.highway.foreclosure.stealth-handoff.plist`
+does not exist on this machine -- the schedule was never (re-)installed,
+or was removed, and `logs/mac-stealth.log`'s last line is also dated
+Sep 1, confirming the writer side simply has not run since. This lines up
+with this project's own tracked `project_oracle_vm_revival` status (the
+Oracle VM side of this exact cloud split has been idle since 9/3 and was
+"built but never turned on") -- so this is a known, already-tracked
+infrastructure gap, not a new hidden one, and NOT something this batch
+re-enables unilaterally: flipping the Mac-side scheduler back on is an
+operational change with real side effects (unattended scraper runs +
+automatic git pushes) that overlaps with that already-in-progress revival
+effort, not a scraper code fix. Flagged in this session's memory update
+instead. What IS fixed here, safely and with zero operational side
+effects: `fetch()` used to log this exact situation at the same
+`log.warning` level as an ordinary few-hours-stale file, indistinguishable
+in run output from a routine, healthy staleness blip -- a severely stale
+(7+ days) file now also sets `self.last_outcome = OUTCOME_PARTIAL` with an
+explicit reason, so a run-outcome scan (the same kind of scan that caught
+this) surfaces it immediately instead of requiring someone to open the
+JSON file and read `generated_at` by hand.
 """
 from __future__ import annotations
 
@@ -24,7 +54,7 @@ from typing import Iterable
 
 import structlog
 
-from ...base_scraper import BaseScraper
+from ...base_scraper import BaseScraper, OUTCOME_PARTIAL
 from ...models import Listing
 
 log = structlog.get_logger()
@@ -41,6 +71,14 @@ log = structlog.get_logger()
 _HANDOFF = Path(__file__).resolve().parents[4] / "docs" / "handoff" / "stealth_leads.json"
 # Past this age we still ingest (stale stealth leads beat none) but warn loudly.
 _STALE_HOURS = float(os.environ.get("HANDOFF_STALE_HOURS", "72"))
+# FOUND 2026-10-04 (batch 18, see module docstring): a plain log.warning at
+# the SAME level whether the file is 4 hours or 4 weeks past _STALE_HOURS
+# makes a severe, ongoing outage (the real Sep 1 -> Oct 4 case) blend into
+# routine staleness noise. Past THIS age (7 days, chosen as clearly "the
+# pipeline feeding this is broken" rather than "a bit late"), also flip
+# self.last_outcome so a run-outcome scan surfaces it without anyone having
+# to open the JSON and read generated_at by hand.
+_SEVERE_STALE_HOURS = float(os.environ.get("HANDOFF_SEVERE_STALE_HOURS", str(24 * 7)))
 
 
 class StealthHandoffScraper(BaseScraper):
@@ -75,6 +113,18 @@ class StealthHandoffScraper(BaseScraper):
                          - datetime.fromisoformat(gen)).total_seconds() / 3600
                 (log.warning if age_h > _STALE_HOURS else log.info)(
                     "stealth_handoff.age", hours=round(age_h, 1), stale_after=_STALE_HOURS)
+                if age_h > _SEVERE_STALE_HOURS:
+                    # FOUND 2026-10-04 (batch 18): surface this distinctly
+                    # from routine staleness -- see module docstring.
+                    self.last_outcome = OUTCOME_PARTIAL
+                    self.last_reason = (
+                        f"hand-off file is severely stale ({age_h / 24:.1f} days old, "
+                        f"generated_at={gen}) -- the Mac-side scheduled job "
+                        f"(scripts/run_stealth_sources.py) does not appear to be "
+                        f"running; ingesting the stale data anyway"
+                    )
+                    log.warning("stealth_handoff.severely_stale", days=round(age_h / 24, 1),
+                                generated_at=gen)
             except Exception:  # noqa: BLE001
                 pass
 
