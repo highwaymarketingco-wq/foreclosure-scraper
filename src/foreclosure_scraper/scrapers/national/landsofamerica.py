@@ -318,6 +318,14 @@ class LandsOfAmerica(BaseScraper):
     # interactive bot-sensor challenge is a wall per CLAUDE.md, not a
     # fingerprint gate to clear harder. Disabled rather than left to spend
     # ~90s x up to MAX_PAGES x 26 counties failing the same way every run.
+    #
+    # RE-VERIFIED 2026-10-04 (HERMES extraction-completeness audit, batch
+    # 17): land.com loads fine in a genuine, non-headless browser (743 real
+    # Buncombe County results rendered, no challenge page) -- confirming
+    # the site itself isn't dead, only automated/headless access is walled.
+    # That's consistent with an Akamai Sensor challenge (designed
+    # specifically to detect headless/automation signatures) and with this
+    # being a genuine compliance wall, not a stale finding -- no change.
     disabled = True
     disabled_reason = (
         "land.com serves a real Akamai Sensor interactive challenge "

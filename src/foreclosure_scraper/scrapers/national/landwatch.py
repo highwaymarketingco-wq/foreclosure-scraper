@@ -24,11 +24,25 @@ import structlog
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...http_client import get_text_impersonate
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
 MAX_PAGES = 10  # safety cap; most counties have 2-5 pages
+# FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 17): the
+# 2026-10-01 note below ("offeredBy never carries a telephone field at all
+# anymore") only checked the SEARCH-RESULTS page's JSON-LD. Each listing's
+# own DETAIL page (same Land.com-network markup as the sibling
+# national.landandfarm, confirmed live on landwatch.com too) carries a
+# SEPARATE, richer JSON-LD block with a REAL seller.telephone, the full
+# untruncated description, a real datePosted, and a structured
+# additionalProperty list. Also confirmed live: unlike the search-results
+# page (Akamai-gated, needs StealthyFetcher), the DETAIL page is reachable
+# via plain curl_cffi impersonation -- no expensive headless render needed
+# for this enrichment. Bounded per county to keep one run's extra request
+# count and wall-clock reasonable.
+DETAIL_FETCH_CAP_PER_COUNTY = 10
 
 # Core counties — NC (16) + SC (10)
 NC_COUNTIES = [
@@ -218,6 +232,95 @@ def _extract_county(url: str, name: str) -> str | None:
     return None
 
 
+def _extract_json_objects(html: str, marker: str) -> list[dict]:
+    """Return every top-level JSON object embedded in a <script> tag whose
+    raw text contains `marker`, using brace-depth matching (same technique
+    `_extract_listings` already uses for the search page's CollectionPage
+    block) -- a detail page embeds SEVERAL separate JSON-LD <script> tags,
+    so this returns all matches rather than stopping at the first."""
+    out: list[dict] = []
+    tree = HTMLParser(html)
+    for script_node in tree.css("script"):
+        text = script_node.text()
+        if not text or marker not in text:
+            continue
+        start = text.find("{")
+        if start < 0:
+            continue
+        depth = 0
+        end = start
+        for i in range(start, len(text)):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+        try:
+            out.append(json.loads(text[start:end]))
+        except (json.JSONDecodeError, ValueError):
+            continue
+    return out
+
+
+def _parse_detail_extras(html: str) -> dict:
+    """Pull the richer fields off a listing's own detail page: a real agent
+    phone (seller.telephone -- the search page never carries this, see
+    DETAIL_FETCH_CAP_PER_COUNTY's module-level comment), the full
+    untruncated description, datePosted, and the structured
+    additionalProperty list."""
+    extras: dict = {}
+    for obj in _extract_json_objects(html, "#listingdetailpage"):
+        if "RealEstateListing" not in str(obj.get("@type", "")):
+            continue
+        desc = (obj.get("description") or "").strip()
+        if desc:
+            extras["full_description"] = desc
+        if obj.get("datePosted"):
+            extras["date_posted"] = obj["datePosted"]
+        seller = ((obj.get("offers") or {}).get("seller")) or {}
+        phone = (seller.get("telephone") or "").strip()
+        if phone:
+            extras["agent_phone"] = phone
+        main_entity = obj.get("mainEntity") or {}
+        props = main_entity.get("additionalProperty") or []
+        if isinstance(props, list) and props:
+            parsed = {}
+            for p in props:
+                if isinstance(p, dict) and p.get("name"):
+                    parsed[p["name"]] = p.get("value")
+            if parsed:
+                extras["additional_properties"] = parsed
+        break
+    return extras
+
+
+async def _fetch_detail_extras(url: str) -> dict:
+    """Best-effort fetch of one listing's detail page. Never raises --
+    callers must treat this as pure enrichment, not load-bearing."""
+    try:
+        html = await get_text_impersonate(url, timeout=25.0)
+        return _parse_detail_extras(html) if html else {}
+    except Exception as exc:
+        log.debug("landwatch.detail_fetch_failed", url=url, error=str(exc)[:160])
+        return {}
+
+
+def _apply_detail_extras(li: Listing, extras: dict) -> None:
+    if not extras:
+        return
+    ns = li.raw.setdefault("landwatch", {})
+    if not ns.get("agent_phone") and extras.get("agent_phone"):
+        ns["agent_phone"] = extras["agent_phone"]
+    if extras.get("date_posted"):
+        ns["date_posted"] = extras["date_posted"]
+    if extras.get("additional_properties"):
+        ns["additional_properties"] = extras["additional_properties"]
+    if extras.get("full_description") and len(extras["full_description"]) > len(li.description or ""):
+        li.description = extras["full_description"][:2000]
+
+
 async def _fetch_county(
     county: str, state: str, base_url: str, slug: str
 ) -> list[Listing]:
@@ -229,6 +332,7 @@ async def _fetch_county(
 
     out: list[Listing] = []
     seen: set[str] = set()
+    detail_fetches_done = 0
     for page in range(1, MAX_PAGES + 1):
         url = base_url if page == 1 else f"{base_url}?page={page}"
         try:
@@ -264,6 +368,10 @@ async def _fetch_county(
                 seen.add(li.source_url)
                 out.append(li)
                 new += 1
+                if detail_fetches_done < DETAIL_FETCH_CAP_PER_COUNTY:
+                    extras = await _fetch_detail_extras(li.source_url)
+                    _apply_detail_extras(li, extras)
+                    detail_fetches_done += 1
         if new == 0:
             break
         log.info(
