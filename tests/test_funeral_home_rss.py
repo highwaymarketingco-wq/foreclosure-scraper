@@ -72,7 +72,7 @@ DYCHES = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 def _names(xml, kind):
-    return [(n, l, p) for n, l, p, _summary, _td in _iter_entries(xml, kind)]
+    return [(n, l, p) for n, l, p, _summary, _td, _extra in _iter_entries(xml, kind)]
 
 
 def test_lambfh_cabarrus_nc():
@@ -132,12 +132,13 @@ def test_dyches_barnwell_sc_wordpress_obituaries_category():
     # to split on), which is exactly why this off-label host still parses
     # correctly under the existing "frazer" kind.
     entries = list(_iter_entries(DYCHES, "frazer"))
-    name, link, pub, summary, title_date = entries[0]
+    name, link, pub, summary, title_date, extra = entries[0]
     assert name == "Sean Arlen Clancy"
     assert link == "https://dychesfuneralhome.com/sean-arlen-clancy/"
     assert "2026" in pub
     assert title_date is None  # no pipe-delimited date suffix on this CMS
     assert "Aiken" in summary
+    assert extra == {}  # plain WordPress has no obits: namespace at all
     assert HOMES["dychesfuneralhome.com"] == ("Barnwell", "SC", "frazer")
 
 

@@ -129,6 +129,39 @@ owner_name first, then defendant) and ``raw.dateless=True`` marks the row as int
 dateless.
 
 Free, public, plain-HTTP. Gate off with FORECLOSURE_FUNERAL_RSS=0.
+
+EXTRACTION-COMPLETENESS AUDIT (2026-10-04, final batch). Two confirmed live
+findings, both fixed here:
+
+1. **2 of the 11 real hosts were silently returning nothing.** This module
+   fetched with the bare ``client()`` (plain httpx only -- the shared
+   ``http_client.client()``'s ``impersonate_browser`` kwarg is accepted but
+   never actually used by that function, confirmed by reading it; it never
+   escalates). Live-confirmed 2026-10-04: ``sullivanking.com`` and
+   ``dial-murrayfuneralhome.com`` both now sit behind a Cloudflare
+   "Just a moment..." JS challenge that plain httpx 403s on every request,
+   while ``get_text_impersonate()`` (a real Chrome TLS/JA3 fingerprint, no
+   CAPTCHA solving, no login -- the same compliant bypass class this
+   codebase already uses elsewhere) sails through with a clean 200 and the
+   real feed. Both hosts were silently producing zero rows, every run, with
+   nothing distinguishing it from "no new obituaries this week." Switched to
+   ``get_text(..., impersonate=True)`` per host.
+2. **Every Frazer-kind feed (9 of 11 hosts) carries a rich ``obits:``
+   RSS-namespace extension that was never read at all.** Live-confirmed
+   across all 9: ``obits:birthDate``/``obits:deathDate`` (exact MM/DD/YYYY,
+   feedparser exposes them as ``entry.obits_birthdate``/``obits_deathdate``),
+   ``obits:deceased_city``/``obits:deceased_state`` (the DECEDENT's own city,
+   independently useful -- confirmed it sometimes differs from the funeral
+   home's own ``obits:fh_city``, e.g. a real Edgecombe Co. item: fh_city
+   Tarboro, deceased_city Rocky Mount), and ``obits:fh_name``. The existing
+   ``_summary_fields()`` (age/survivors from the RSS ``<description>``) is a
+   complete no-op on every Frazer feed -- confirmed live: Frazer's
+   ``<description>`` is pure boilerplate ("View The Obituary For X. Please
+   join us...") with zero age/survivor signal, so this was the ONLY age
+   source available for 9 of 11 hosts and it was silently empty on all of
+   them. Now parsed into a precise ``age`` (computed from birth+death date,
+   more reliable than any regex) plus ``birth_date``/``death_date``/
+   ``deceased_city``/``deceased_state``/``fh_name`` in ``raw['obituary']``.
 """
 from __future__ import annotations
 
@@ -140,7 +173,7 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...http_client import client
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 try:  # feedparser handles entity decoding + malformed feeds; stdlib fallback below
@@ -262,10 +295,62 @@ def _summary_fields(summary_html: str) -> dict:
     return out
 
 
+def _age_from_dates(birth: str | None, death: str | None) -> int | None:
+    """Precise age in completed years from MM/DD/YYYY birth + death dates.
+
+    More reliable than any regex over free text -- this is exact arithmetic
+    on the Frazer feed's own structured dates, not an inference."""
+    if not birth or not death:
+        return None
+    try:
+        b = datetime.strptime(birth.strip(), "%m/%d/%Y")
+        d = datetime.strptime(death.strip(), "%m/%d/%Y")
+    except ValueError:
+        return None
+    age = d.year - b.year - ((d.month, d.day) < (b.month, b.day))
+    return age if 0 <= age <= 120 else None
+
+
+def _obits_namespace_fields(entry) -> dict:
+    """Pull the Frazer ``obits:`` RSS-namespace extension fields feedparser
+    exposes as ``obits_birthdate``/``obits_deathdate``/etc. -- present on
+    every Frazer-kind feed (live-confirmed 2026-10-04 across 9 of this
+    module's 11 hosts) but never read before this fix. {} when the entry
+    carries none (the ltobits / plain-WordPress hosts have no such
+    namespace -- ``_summary_fields()``'s free-text regex is still their only
+    source, unchanged)."""
+    out: dict = {}
+    bd = (getattr(entry, "obits_birthdate", "") or "").strip()
+    dd = (getattr(entry, "obits_deathdate", "") or "").strip()
+    if bd:
+        out["birth_date"] = bd
+    if dd:
+        out["death_date"] = dd
+    age = _age_from_dates(bd, dd)
+    if age is not None:
+        out["age"] = age
+    # The DECEDENT's own city/state -- distinct from the funeral home's city
+    # (obits:fh_city), confirmed live to sometimes differ (e.g. a real
+    # Edgecombe Co. item: fh_city Tarboro, deceased_city Rocky Mount).
+    dc = (getattr(entry, "obits_deceased_city", "") or "").strip()
+    ds = (getattr(entry, "obits_deceased_state", "") or "").strip()
+    if dc:
+        out["deceased_city"] = dc
+    if ds:
+        out["deceased_state"] = ds
+    fh_name = (getattr(entry, "obits_fh_name", "") or "").strip()
+    if fh_name:
+        out["fh_name"] = fh_name
+    return out
+
+
 def _iter_entries(text: str, kind: str):
-    """Yield (name, link, pubdate_raw, summary_html, title_date) per feed
-    <item>. feedparser first, stdlib regex fallback so a missing dep never
-    silences the source."""
+    """Yield (name, link, pubdate_raw, summary_html, title_date, extra) per
+    feed <item>. feedparser first, stdlib regex fallback so a missing dep
+    never silences the source. ``extra`` carries the Frazer ``obits:``
+    namespace fields (see ``_obits_namespace_fields``) when present, else
+    {} (the stdlib fallback path also yields {} -- it has no namespace
+    handling, a defensive-only code path for a missing feedparser dep)."""
     if feedparser is not None:
         parsed = feedparser.parse(text)
         for e in parsed.entries:
@@ -280,7 +365,7 @@ def _iter_entries(text: str, kind: str):
                     summary = content[0].get("value") or summary
                 except (AttributeError, IndexError, KeyError, TypeError):
                     pass
-            yield name, link, pub, summary, _date_from_title(raw_title)
+            yield name, link, pub, summary, _date_from_title(raw_title), _obits_namespace_fields(e)
         return
     for block in _ITEM_RE.findall(text):
         tm = _TAG_RE["title"].search(block)
@@ -292,7 +377,7 @@ def _iter_entries(text: str, kind: str):
         link = _unescape(lm.group(1)) if lm else ""
         pub = _unescape(pm.group(1)) if pm else ""
         summary = dm.group(1) if dm else ""
-        yield name, link, pub, summary, _date_from_title(raw_title)
+        yield name, link, pub, summary, _date_from_title(raw_title), {}
 
 
 class FuneralHomeRss(BaseScraper):
@@ -313,63 +398,67 @@ class FuneralHomeRss(BaseScraper):
         out: list[Listing] = []
         seen: set[tuple[str, str]] = set()  # dedupe by (name, url)
         now = datetime.utcnow()
-        async with client(timeout=15.0) as c:
-            for host, (county, state, kind) in HOMES.items():
-                url = self._feed_url(host, kind)
-                try:
-                    r = await c.get(url)
-                    if r.status_code != 200:
-                        log.warning("funeral_rss.bad_status", host=host,
-                                    status=r.status_code)
-                        continue
-                except Exception as exc:  # noqa: BLE001
-                    log.warning("funeral_rss.fetch_failed", host=host,
-                                error=str(exc)[:140])
-                    continue
+        for host, (county, state, kind) in HOMES.items():
+            url = self._feed_url(host, kind)
+            try:
+                # impersonate=True: plain httpx first, escalating to a real
+                # Chrome TLS fingerprint only on a 403/406 block (see module
+                # docstring finding #1 -- 2 of 11 real hosts need this today).
+                text = await get_text(url, timeout=15.0, impersonate=True)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("funeral_rss.fetch_failed", host=host,
+                            error=str(exc)[:140])
+                continue
 
-                kept = 0
-                for name, link, pub, summary_html, title_date in _iter_entries(
-                    r.text, kind
-                ):
-                    if len(name) < 5 or name.replace(" ", "").isdigit():
-                        continue
-                    if " " not in name:  # need at least first + last
-                        continue
-                    link = link or url
-                    key = (name.lower(), link)
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    obituary = {"decedent": name, "home": host,
-                                "county": county, "state": state,
-                                "cms": kind, "pub_date": pub or None}
-                    # Keep the Frazer title date instead of discarding it.
-                    if title_date:
-                        obituary["title_date"] = title_date
-                    # Age / survivors / summary from the RSS body.
-                    obituary.update(_summary_fields(summary_html))
-                    out.append(Listing(
-                        source=self.slug,
-                        source_url=link,
-                        listing_type=ListingType.PROBATE_NOTICE,
-                        property_kind=PropertyKind.UNKNOWN,
-                        state=state, county=county,
-                        defendant=name,  # decedent -> resolver pins parcel by owner-name
-                        owner_name=name,  # the resolver reads owner_name first, then defendant
-                        description=f"Obituary (death) — {name}, {county} County {state} "
-                                    f"— pre-probate heir/estate signal (funeral-home feed)",
-                        first_seen=now, last_seen=now,
-                        raw={
-                            "obituary": obituary,
-                            "life_event": "death",
-                            "dateless": True,   # a death has no sale date; needs DATELESS_OK_SOURCES
-                            "relationship_signal": {"kind": "probate",
-                                                    "keyword": "obituary"},
-                        },
-                    ))
-                    kept += 1
-                log.info("funeral_rss.home", host=host, county=county,
-                         cms=kind, kept=kept)
+            kept = 0
+            for name, link, pub, summary_html, title_date, extra in _iter_entries(
+                text, kind
+            ):
+                if len(name) < 5 or name.replace(" ", "").isdigit():
+                    continue
+                if " " not in name:  # need at least first + last
+                    continue
+                link = link or url
+                key = (name.lower(), link)
+                if key in seen:
+                    continue
+                seen.add(key)
+                obituary = {"decedent": name, "home": host,
+                            "county": county, "state": state,
+                            "cms": kind, "pub_date": pub or None}
+                # Keep the Frazer title date instead of discarding it.
+                if title_date:
+                    obituary["title_date"] = title_date
+                # Age / survivors / summary from the RSS body (ltobits /
+                # plain-WordPress hosts' only source of either).
+                obituary.update(_summary_fields(summary_html))
+                # Frazer's own obits: namespace (birth/death dates, precise
+                # age, decedent's own city/state) -- applied LAST so its
+                # exact age wins over the free-text regex guess above on any
+                # host that happens to carry both.
+                obituary.update(extra)
+                out.append(Listing(
+                    source=self.slug,
+                    source_url=link,
+                    listing_type=ListingType.PROBATE_NOTICE,
+                    property_kind=PropertyKind.UNKNOWN,
+                    state=state, county=county,
+                    defendant=name,  # decedent -> resolver pins parcel by owner-name
+                    owner_name=name,  # the resolver reads owner_name first, then defendant
+                    description=f"Obituary (death) — {name}, {county} County {state} "
+                                f"— pre-probate heir/estate signal (funeral-home feed)",
+                    first_seen=now, last_seen=now,
+                    raw={
+                        "obituary": obituary,
+                        "life_event": "death",
+                        "dateless": True,   # a death has no sale date; needs DATELESS_OK_SOURCES
+                        "relationship_signal": {"kind": "probate",
+                                                "keyword": "obituary"},
+                    },
+                ))
+                kept += 1
+            log.info("funeral_rss.home", host=host, county=county,
+                     cms=kind, kept=kept)
         log.info("funeral_rss.done", leads=len(out))
         return out
 
