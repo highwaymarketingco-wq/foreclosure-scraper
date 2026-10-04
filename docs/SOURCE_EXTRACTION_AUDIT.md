@@ -1,6 +1,6 @@
 # SOURCE EXTRACTION AUDIT — per-source, is EVERYTHING being pulled?
 
-Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **16 already wire the document harvester** (PDFs/deeds/notices) and **223 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
+Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **18 already wire the document harvester** (PDFs/deeds/notices) and **221 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
 
 ## The audit protocol (do this for EVERY source in the TODO table)
 
@@ -16,13 +16,15 @@ Then VERIFY the change three ways: it compiles, `discover()` still lists the slu
 
 The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) as a starting clue for where to look. It is a hint from static text, NOT proof the source has or lacks these — your eyes on the live page are the authority.
 
-## DONE — already harvest documents (16)
+## DONE — already harvest documents (18)
 
 | Slug | already captures | URLs |
 |---|---|---|
 | `counties.sitemap_walker` | pdf?, deed/notice?, links | https://www.spartanburgcounty.gov<br>https://www.cherokeecountysc.gov |
 | `counties_nc.brunswick_legal_notices` | pdf?, deed/notice?, img?, detail-page, links | https://www.brunswickcountync.gov/912/Legal-Notices<br>https://www.brunswickcountync.gov |
+| `counties_nc.edgecombe_tax_foreclosure` | pdf?, deed/notice?, detail-page, links | https://www.edgecombe<br>https://www.edgecombecountync.gov/businesses/tax_collector/tax_foreclosure_list.php |
 | `counties_nc.haywood_tax_foreclosures` | pdf?, deed/notice?, img?, detail-page, links | https://www.haywoodcountync.gov/337/Tax-Foreclosures<br>https://www.haywoodcountync.gov/Bids.aspx |
+| `counties_nc.henderson_foreclosure_parcels` | deed/notice?, img? | https://www.arcgis.com<br>https://hendersoncounty.maps.arcgis.com |
 | `counties_nc.nc_bankruptcy_sales` | pdf?, deed/notice?, detail-page, links | https://www.nceb.uscourts.gov/Public-Sales-Notice<br>https://www.ncmb.uscourts.gov/public-sales |
 | `counties_nc.nc_coastal_tax_foreclosure` | deed/notice?, img?, detail-page, links | https://www.brunswickcountync.gov/912/Legal-Notices<br>https://www.brunswickcountync.gov |
 | `counties_nc.swain_tax_foreclosures` | pdf?, deed/notice?, img?, detail-page, links | https://www.swaincountync.gov/tax-office/ |
@@ -37,7 +39,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.usmarshals_realproperty` | pdf?, deed/notice?, img?, detail-page, links | https://reallook.com/properties<br>https://reallook.com |
 | `national.williams` | deed/notice?, img?, detail-page, links | https://bid.auctionnetwork.com/<br>https://bid.auctionnetwork.com |
 
-## TODO — audit each for full extraction (223)
+## TODO — audit each for full extraction (221)
 
 | Slug | code hints (verify on the live page) | URLs |
 |---|---|---|
@@ -61,14 +63,12 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_nc.cleveland_tax` | deed/notice?, detail-page | https://www.clevelandcounty.com/main/departments/ |
 | `counties_nc.cleveland_tax_foreclosure` | - | https://www.clevelandcounty.com/main/departments/ |
 | `counties_nc.cumberland_tax_foreclosure` | detail-page | https://www.co.cumberland.nc.us/departments/tax-group/tax/tax-foreclosure-sales |
-| `counties_nc.edgecombe_tax_foreclosure` | detail-page | https://www.edgecombecountync.gov/businesses/tax_collector/tax_foreclosure_list.php |
 | `counties_nc.gaston_surplus_properties` | pdf?, detail-page, links | https://www.gastongov.com/709/Surplus-Properties<br>https://www.gastongov.com |
 | `counties_nc.gaston_tax_foreclosures` | detail-page | https://www.gastongov.com/669<br>https://www.gastongov.com/671 |
-| `counties_nc.gaston_vacant` | deed/notice? | https://gis.gastoncountync.gov/publicgis/rest/services/ |
+| `counties_nc.gaston_vacant` | deed/notice?, img? | https://gastonnc.devnetwedge.com/PropertyImages/<br>https://gis.gastoncountync.gov/publicgis/rest/services/ |
 | `counties_nc.gastonia_code_enforcement` | deed/notice?, detail-page | https://devsvcs.gastonianc.gov<br>https://gis.gastoncountync.gov/publicgis/rest/services/ |
 | `counties_nc.henderson_code_violations` | - | https://services1.arcgis.com/ZfV5vUaX5QvLLBi9/arcgis/rest/services/<br>https://www.hendersoncountync.gov/planning |
-| `counties_nc.henderson_foreclosure_parcels` | deed/notice? | https://www.arcgis.com<br>https://hendersoncounty.maps.arcgis.com |
-| `counties_nc.henderson_tax` | - | https://www.hendersoncountync.gov/tax/page/tax-foreclosure-sales |
+| `counties_nc.henderson_tax` | detail-page, links | https://www.hendersoncountync.gov/tax/page/tax-foreclosure-sales |
 | `counties_nc.hendersonville_vacant_structures` | deed/notice?, detail-page | https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/<br>https://www.hvlnc.gov/community-development |
 | `counties_nc.lincoln_code_violations` | - | https://arcgisserver.lincolncountync.gov/arcgis/rest/services/ |
 | `counties_nc.lincoln_vacant` | - | https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query |
