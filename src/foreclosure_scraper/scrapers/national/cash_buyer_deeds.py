@@ -94,11 +94,48 @@ async def _cott_recent(state: str, county: str, days: int) -> list[RodDoc]:
     window (the grid shows everything; doc-type filtering is post-parse).
     We call discover_recent_nods which internally filters, but also
     discover_recent_sold_recordings for deeds. To get ALL recent docs we
-    need to hit the date-range form directly."""
-    # Cott's discover_recent_nods filters to NOD types only. For cash-buyer
-    # detection we need warranty deeds + deeds of trust. Use search_by_name
-    # is name-required. Instead, use the internal grid parser by fetching
-    # the SrchDocType form with a wide date range and no type filter.
+    need to hit the date-range form directly.
+
+    2026-10-04 (national.* extraction-completeness audit, batch 15):
+    LIVE-VERIFIED this has NEVER actually returned data for either of its
+    two counties (Polk, Rutherford) -- the posted field names
+    ("ctl00$cphMain$txtFromDate" etc.) don't exist anywhere on either
+    county's real SrchName.aspx page, so the POST silently lands back on
+    the same page with no search ever run and `_parse_grid` correctly
+    finds no grid -- a silent, indistinguishable-from-a-quiet-month zero.
+    Root cause differs by county, confirmed live:
+
+      * Rutherford -- SrchName.aspx is a login/guest-registration gate
+        (`ctl00$cphMain$blkLogin$...`), and clicking "Sign in as a Guest"
+        does NOT grant anonymous access here (unlike the newer Cott
+        RecordRoom product rod/cott_recordroom.py already uses for SC
+        Union) -- it returns "Application Received and Pending Review...
+        FURTHER ACTION REQUIRED... We require a form to be completed,
+        signed and submitted..." A genuine registration-approval wall:
+        no credentials to defeat, but real identity/paperwork is required
+        before any search exists, which this engine cannot complete on
+        its own (HERMES rule 3: no logins the robot holds).
+
+      * Polk -- NO login gate at all (served as "Guest User" immediately).
+        The real date-range search lives behind a separate "Date" nav
+        button (`ctl00$NavMenuIdxRec$btnNav_IdxRec_Date_NEW`) that swaps
+        in a DIFFERENT form
+        (`ctl00$cphMain$tcMain$tpNewSearch$ucSrchDates$txtFiledFrom` /
+        `txtFiledThru` / `btnSearch`) inside an ASP.NET AJAX UpdatePanel.
+        This is a genuine CODE BUG, not a wall -- confirmed reachable
+        (clicking the Date nav correctly returns "eSearch | Date Range
+        Search" with those real field names) -- but the final async
+        postback to btnSearch did not complete end-to-end in this
+        session's investigation (the TabContainer's ActiveTab client
+        state needs more work; see scratchpad probes from this session).
+        NOT fixed this batch rather than ship an unverified guess; left
+        as a confirmed, scoped gap for a follow-up session instead of a
+        mysterious silent zero.
+
+    The behavior below is UNCHANGED (still a safe no-op), with logging
+    added so this reports as a diagnosed, explained zero instead of an
+    indistinguishable "ran clean, found nothing this month."
+    """
     if (state, county) not in cott.COTT_COUNTIES:
         return []
     base = cott.COTT_COUNTIES[(state, county)]
@@ -112,10 +149,30 @@ async def _cott_recent(state: str, county: str, days: int) -> list[RodDoc]:
             if r.status_code != 200:
                 return []
             html = r.text
+            if "blkLogin$btnGuestLogin" in html or "blkLogin$txtUsername" in html:
+                # See docstring: this county's Cott deployment is a real
+                # registration/login gate (NOT the anonymous-guest Cott
+                # RecordRoom product). Confirmed for Rutherford; checked
+                # live here in case a future county onboarded via the same
+                # pattern, rather than hardcoding the county name.
+                log.warning("cash_buyer_deeds.cott_registration_wall",
+                            county=county, state=state,
+                            reason="login/guest-registration gate, no anonymous access")
+                return []
             viewstate = _extract_hidden(html, "__VIEWSTATE")
             generator = _extract_hidden(html, "__VIEWSTATEGENERATOR")
             event_val = _extract_hidden(html, "__EVENTVALIDATION")
-            if not viewstate:
+            # `_extract_hidden` returns "" both when the field is genuinely
+            # absent (real fetch failure) AND when it's present with a
+            # legitimately empty value -- live-verified 2026-10-04: Polk's
+            # real page ships `name="__VIEWSTATE" ... value=""` (empty by
+            # design, not missing). The old `if not viewstate: return []`
+            # treated Polk's normal page shape as a fetch failure and bailed
+            # out BEFORE ever attempting the search POST, which is why the
+            # field-mismatch diagnostic below could never fire for it.
+            # Distinguish "field missing" from "field empty" by checking the
+            # raw HTML for the field name itself.
+            if not viewstate and "__VIEWSTATE" not in html:
                 return []
             # Post a date-range search with no name and no type filter
             data = {
@@ -132,7 +189,16 @@ async def _cott_recent(state: str, county: str, days: int) -> list[RodDoc]:
                               headers={"Referer": f"{base}/SrchName.aspx"})
             if r2.status_code != 200:
                 return []
-            return _parse_grid(r2.text, county, state)
+            docs = _parse_grid(r2.text, county, state)
+            if not docs:
+                # Known-confirmed for Polk (see docstring): this form shape
+                # needs the "Date" nav + ucSrchDates fields instead of the
+                # ones posted above, which don't exist on the real page.
+                log.warning("cash_buyer_deeds.cott_field_mismatch",
+                            county=county, state=state,
+                            reason="posted search fields not found on live form; "
+                                   "see module docstring, needs Date-nav flow")
+            return docs
     except Exception:
         return []
 
