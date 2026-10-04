@@ -1,6 +1,6 @@
 # SOURCE EXTRACTION AUDIT — per-source, is EVERYTHING being pulled?
 
-Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **24 already wire the document harvester** (PDFs/deeds/notices) and **215 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
+Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **25 already wire the document harvester** (PDFs/deeds/notices) and **214 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
 
 ## The audit protocol (do this for EVERY source in the TODO table)
 
@@ -16,7 +16,7 @@ Then VERIFY the change three ways: it compiles, `discover()` still lists the slu
 
 The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) as a starting clue for where to look. It is a hint from static text, NOT proof the source has or lacks these — your eyes on the live page are the authority.
 
-## DONE — already harvest documents (24)
+## DONE — already harvest documents (25)
 
 | Slug | already captures | URLs |
 |---|---|---|
@@ -44,8 +44,9 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.servicelink_auction` | deed/notice?, img? | https://ui.exostechnology.com/api/listingsvc/v1/listings<br>https://www.servicelinkauction.com |
 | `national.usmarshals_realproperty` | pdf?, deed/notice?, img?, detail-page, links | https://reallook.com/properties<br>https://reallook.com |
 | `national.williams` | deed/notice?, img?, detail-page, links | https://bid.auctionnetwork.com/<br>https://bid.auctionnetwork.com |
+| `reo.treasury_seized` | img?, detail-page, links | https://www.treasury.gov/auctions/treasury/rp/realprop.shtml |
 
-## TODO — audit each for full extraction (215)
+## TODO — audit each for full extraction (214)
 
 | Slug | code hints (verify on the live page) | URLs |
 |---|---|---|
@@ -256,11 +257,10 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `newspapers.post_and_courier` | deed/notice?, detail-page | https://www.postandcourier.com/classifieds_new/community/announcements/ |
 | `newspapers.shelby_star` | deed/notice?, detail-page, links | https://www.shelbystar.com<br>https://www.shelbystar.com/ |
 | `newspapers.tryon_bulletin` | deed/notice?, links | https://tryondailybulletin.com<br>https://tryondailybulletin.com/ |
-| `public_notices.funeral_home_rss` | deed/notice? | (see SOURCE_REGISTER.md) |
-| `public_notices.gannett_obituaries` | deed/notice?, detail-page | (see SOURCE_REGISTER.md) |
+| `public_notices.funeral_home_rss` | deed/notice?, detail-page | (see SOURCE_REGISTER.md) |
+| `public_notices.gannett_obituaries` | deed/notice?, img?, detail-page, links | (see SOURCE_REGISTER.md) |
 | `public_notices.nc_notices_counties` | deed/notice?, detail-page | https://www.ncnotices.com/Search.aspx |
 | `public_notices.ncnotices` | deed/notice?, img?, detail-page, links | https://www.ncnotices.com/ |
 | `public_notices.publicnoticesc` | deed/notice?, img?, detail-page | https://www.scpublicnotices.com/(S(<br>https://www.scpublicnotices.com/Search.aspx |
-| `reo.treasury_seized` | - | https://www.treasury.gov/auctions/treasury/rp/realprop.shtml |
 | `reo.usda_rd` | img?, detail-page, links | https://www.resales.usda.gov/resales/public<br>https://www.resales.usda.gov |
 | `reo.vrm_va_reo` | img?, detail-page, links | https://vrmproperties.com/<br>https://vrmproperties.com |
