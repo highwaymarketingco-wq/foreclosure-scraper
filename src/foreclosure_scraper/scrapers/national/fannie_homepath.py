@@ -135,6 +135,14 @@ _PROP_KIND_MAP = {
 }
 
 
+def _safe_float(v):
+    try:
+        f = float(v)
+        return f if f > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _to_listing(p: dict, slug: str) -> Listing | None:
     state = (p.get("state") or "").strip().upper()
     if state not in ("NC", "SC"):
@@ -153,6 +161,11 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
             first_seen = datetime.fromtimestamp(listing_ms / 1000, tz=timezone.utc).replace(tzinfo=None)
         except (ValueError, OSError):
             pass
+    year_built_raw = p.get("yearBuilt")
+    try:
+        year_built = int(year_built_raw) if year_built_raw else None
+    except (TypeError, ValueError):
+        year_built = None
     city = (p.get("city") or "").strip() or None
     county = canonical_county((p.get("county") or "").replace(" COUNTY", "")) or None
     if not county:
@@ -178,6 +191,22 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
         latitude=geo.get("latitude") if isinstance(geo.get("latitude"), (int, float)) else None,
         longitude=geo.get("longitude") if isinstance(geo.get("longitude"), (int, float)) else None,
         opening_bid=p.get("price") if isinstance(p.get("price"), (int, float)) else None,
+        # FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 18):
+        # identical bug to the sibling national.homepath_json (fixed batch
+        # 17, commit c81124b6) -- this module's raw dict is line-for-line the
+        # same shape, and NONE of bedrooms/bathrooms/sqft/year_built/mls_id/
+        # retail_status/online_offer_only/first_look were ever registered in
+        # web_artifact.RAW_KEEP, so every one of them was silently dropped at
+        # publish on every row this scraper has ever produced (live-verified
+        # 2026-10-04: a real current Waynesville, NC / Haywood County row
+        # carries bedrooms=3.0, bathrooms=5.0, sqft=3531, yearBuilt=2005, all
+        # genuinely populated on the live API). Same fix pattern: promote the
+        # property-characteristic fields to first-class Listing kwargs
+        # (always serialized, sidesteps RAW_KEEP entirely).
+        bedrooms=_safe_float(p.get("bedrooms")),
+        bathrooms=_safe_float(p.get("bathrooms")),
+        living_sqft=_safe_float(p.get("sqft")),
+        year_built=year_built,
         description=(
             f"Fannie Mae HomePath REO "
             f"{p.get('propertyType') or ''} "
@@ -189,15 +218,14 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
         last_seen=datetime.utcnow(),
         raw={
             "reo_id": p.get("reoId"),
-            "mls_id": p.get("mlsId"),
-            "year_built": p.get("yearBuilt"),
-            "bedrooms": p.get("bedrooms"),
-            "bathrooms": p.get("bathrooms"),
-            "sqft": p.get("sqft"),
-            "retail_status": p.get("retailStatus"),
-            "online_offer_only": p.get("onlineOfferOnly"),
-            "first_look": bool(p.get("firstLookProgramIndicator")),
             "images": {"real": photos} if photos else {},
+            "fannie_homepath": {
+                "mls_id": p.get("mlsId"),
+                "property_uuid": p.get("propertyUuid"),
+                "retail_status": p.get("retailStatus"),
+                "online_offer_only": p.get("onlineOfferOnly"),
+                "first_look": bool(p.get("firstLookProgramIndicator")),
+            },
         },
     )
 

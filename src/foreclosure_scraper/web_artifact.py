@@ -2266,6 +2266,16 @@ RAW_KEEP = {
     "helene": "*", "henderson_tax": "*", "hendersonville_delinquent_tax": "*",
     "hendersonville_lightning": "*", "hibid": "*", "homeharvest": "*",
     "horry_flc": "*", "hubzu": "*",
+    # national.fannie_homepath added 2026-10-04 (HERMES extraction-
+    # completeness audit, batch 18): the exact same bug as the sibling
+    # national.homepath_json (fixed batch 17, commit c81124b6) -- this
+    # scraper's raw dict was line-for-line identical in shape, and none of
+    # mls_id/property_uuid/retail_status/online_offer_only/first_look were
+    # ever registered here, so they were silently dropped at every publish
+    # since this scraper was built. bedrooms/bathrooms/sqft/year_built
+    # promoted to first-class Listing fields instead (sidesteps RAW_KEEP),
+    # same pattern.
+    "fannie_homepath": "*",
     # national.homepath_json added 2026-10-04 (HERMES extraction-completeness
     # audit, batch 17): mls_id/property_uuid/retail_status/online_offer_only/
     # first_look were all flat top-level raw keys, none registered -- a
