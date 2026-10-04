@@ -71,13 +71,13 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_nc.henderson_tax` | detail-page, links | https://www.hendersoncountync.gov/tax/page/tax-foreclosure-sales |
 | `counties_nc.hendersonville_vacant_structures` | deed/notice?, detail-page | https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/<br>https://www.hvlnc.gov/community-development |
 | `counties_nc.lincoln_code_violations` | - | https://arcgisserver.lincolncountync.gov/arcgis/rest/services/ |
-| `counties_nc.lincoln_vacant` | - | https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query |
+| `counties_nc.lincoln_vacant` | deed/notice? | https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query |
 | `counties_nc.mcdowell_probate` | deed/notice? | https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/ |
 | `counties_nc.mcdowell_tax_foreclosure` | detail-page | https://mcdowellnc.gov/departments/tax-collections/ |
 | `counties_nc.nc_civicplus_tax_sale` | pdf?, img?, links | https://www.alamance-nc.com<br>https://www.alexandercountync.gov |
 | `counties_nc.nc_county_csv_delinquent_tax` | - | https://www.nhcgov.com/DocumentCenter/View/11283/Delinquent_Taxpayers_Report_CSV |
 | `counties_nc.nc_county_pdf_delinquent_tax` | pdf?, deed/notice? | https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice<br>https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf |
-| `counties_nc.nc_county_tax_foreclosure` | detail-page | https://www.gastongov.com/669/Tax-Foreclosure-Sales<br>https://www.gastongov.com/671/Previous-Tax-Foreclosure-Sales |
+| `counties_nc.nc_county_tax_foreclosure` | deed/notice?, detail-page | https://www.gastongov.com/669/Tax-Foreclosure-Sales<br>https://www.gastongov.com/671/Previous-Tax-Foreclosure-Sales |
 | `counties_nc.nc_deq_dsca` | deed/notice?, detail-page, links | https://www.deq.nc.gov/about/divisions/waste-management/<br>https://www.deq.nc.gov |
 | `counties_nc.nc_ecourts_divorce` | deed/notice?, img?, detail-page | https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29<br>https://portal-nc.tylertech.cloud/Portal |
 | `counties_nc.nc_ecourts_estates` | deed/notice?, img?, detail-page | https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29<br>https://portal-nc.tylertech.cloud/Portal |
