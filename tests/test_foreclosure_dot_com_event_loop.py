@@ -1,58 +1,49 @@
-"""national.foreclosure_dot_com.fetch() must not block the asyncio event loop.
+"""national.foreclosure_dot_com -- event loop + block-signal regression (batch 16).
 
-CONFIRMED LIVE 2026-10-01 (per-source audit, Pattern-B sweep): fetch() looped over
-SEARCH_URLS and CITY_URLS calling the fully synchronous `_fetch_search`/`_fetch_city`
-helpers -- which call `curl_cffi.requests.get()` (a blocking, requests-style call, not
-an async session) and sleep between pages with `time.sleep()`, not `asyncio.sleep()` --
-with ZERO `await` points anywhere in the coroutine. A coroutine with no await points
-cannot be preempted by `asyncio.wait_for` (Task cancellation only takes effect at an
-await), so the whole event loop froze for this scraper's entire run: with up to 2
-search URLs and 35 city URLs each potentially paginating, a slow/throttled host could
-have frozen every sibling scraper in a real `run_local.sh` run for minutes, the same
-mechanism `docs/full_run_execution_audit_2026-09-23.md` independently observed around
-this scraper's run window (`national.fannie_homepath` timing out nearby) without the
-root cause having been found at the time, and the same bug class already fixed in
-`zombie_properties.py` and `wnc_rod_foreclosure_starts.py`.
+Two bugs, same scraper, found together 2026-10-04 (national.* extraction-
+completeness audit) while re-verifying the 2026-10-01 event-loop fix:
 
-Fix: the synchronous body now runs via `asyncio.to_thread`, so the event loop stays
-free for sibling scrapers while this one is busy. This test proves the loop is
-genuinely free during fetch() by racing a concurrent asyncio.sleep()-based heartbeat
-against it -- on the old (blocking) code the heartbeat would never increment until
-fetch() returned; on the fix it increments throughout, mirroring
-tests/test_zombie_properties_event_loop.py's pattern for the identical bug class.
+1. The event-loop fix itself (asyncio.to_thread around a fully-synchronous
+   curl_cffi body) was a correct FIX but not the simplest one available.
+   Rewriting `_fetch_search`/`_fetch_city` as native coroutines that
+   `await get_text_impersonate(...)` at every page fetch keeps the event
+   loop free by construction (no thread hop needed) -- these tests confirm
+   that still holds.
+2. THE SEVERE ONE: live-reproduced a hard 403 ("VPN or proxy") from
+   foreclosure.com on every search/city URL as of 2026-10-04, and the run
+   logs show this has been the case since ~2026-08-29 (5,483 real rows on
+   2026-08-27, then 0 on every run through 2026-09-25). The OLD code's raw
+   `curl_cffi.requests.get()` + `r.status_code != 200: return out` check
+   swallowed that block completely -- `safe_run()` saw a clean empty
+   result with nothing to promote, so every run logged OUTCOME_ZERO
+   ("ran clean but returned 0 rows") instead of OUTCOME_BLOCKED for over a
+   month. `get_text_impersonate()` records a block signal
+   (`http_client._block_holder`) BEFORE raising, which `safe_run()` reads
+   via `take_block_signal()` to correctly reclassify a swallowed-exception
+   zero-result run as BLOCKED -- the raw curl_cffi call bypassed that
+   mechanism entirely.
 """
 from __future__ import annotations
 
 import asyncio
-import time
 from unittest.mock import patch
 
 import pytest
 
+from foreclosure_scraper.base_scraper import OUTCOME_BLOCKED
 from foreclosure_scraper.scrapers.national.foreclosure_dot_com import ForeclosureDotCom
 
-
-class _FakeResponse:
-    def __init__(self, text: str, status_code: int = 200):
-        self.text = text
-        self.status_code = status_code
-
-
-# No "<N> Foreclosure Listings" title and no JSON-LD -> _get_total returns 0 (single
-# page) and no listings parse -- the content of the response does not matter for this
-# test, only that each "network" call and each inter-page sleep takes real wall-clock
-# time, so a still-blocked event loop would visibly starve the heartbeat below.
+# No "<N> Foreclosure Listings" title and no JSON-LD -> _get_total returns 0
+# (single page) and no listings parse -- the content does not matter here,
+# only that each "network" call takes real wall-clock time so a still-
+# blocked event loop would visibly starve the heartbeat below.
 _PAGE = "<html><body>" + ("x" * 6000) + "</body></html>"
 _CALL_DELAY_S = 0.01
-#: `time.sleep` itself gets patched below (the module-under-test's `time` is the same
-#: singleton module object this test file imports) -- capture the REAL function first
-#: so the fakes below can still sleep for real without recursing into the mock.
-_real_sleep = time.sleep
 
 
-def _fake_get(url, *args, **kwargs):
-    _real_sleep(_CALL_DELAY_S)  # simulates real (blocking) network latency
-    return _FakeResponse(_PAGE)
+async def _fake_get_text_impersonate(url, **kwargs):
+    await asyncio.sleep(_CALL_DELAY_S)  # simulates real network latency
+    return _PAGE
 
 
 @pytest.mark.asyncio
@@ -65,11 +56,8 @@ async def test_fetch_does_not_block_the_event_loop():
             heartbeats["n"] += 1
 
     with patch(
-        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.cf.get",
-        side_effect=_fake_get,
-    ), patch(
-        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.time.sleep",
-        side_effect=lambda _s: _real_sleep(_CALL_DELAY_S),
+        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.get_text_impersonate",
+        side_effect=_fake_get_text_impersonate,
     ):
         hb_task = asyncio.create_task(_heartbeat())
         scraper = ForeclosureDotCom()
@@ -80,11 +68,6 @@ async def test_fetch_does_not_block_the_event_loop():
         except asyncio.CancelledError:
             pass
 
-    # On the old (blocking) code, fetch() never yields, so the heartbeat task --
-    # scheduled on the SAME event loop -- gets zero chances to run until fetch() has
-    # already returned. asyncio.to_thread keeps the loop free the whole time fetch()
-    # is doing real (synchronous) work in a worker thread, so the heartbeat should
-    # have ticked many times over the ~37-call run.
     assert heartbeats["n"] > 3, (
         f"only {heartbeats['n']} heartbeats ticked while fetch() ran -- "
         "the event loop was blocked, the fix regressed"
@@ -92,19 +75,89 @@ async def test_fetch_does_not_block_the_event_loop():
 
 
 @pytest.mark.asyncio
-async def test_fetch_still_returns_normally_after_the_threading_change():
-    """Functional-equivalence guard: moving the body into a worker thread via
-    asyncio.to_thread must not change behavior, only scheduling."""
+async def test_fetch_still_returns_normally():
+    """Functional-equivalence guard: must cleanly return an empty list
+    (no JSON-LD/table in the fake page) rather than raise or hang."""
     with patch(
-        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.cf.get",
-        side_effect=_fake_get,
-    ), patch(
-        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.time.sleep",
-        return_value=None,
+        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.get_text_impersonate",
+        side_effect=_fake_get_text_impersonate,
     ):
         scraper = ForeclosureDotCom()
         out = await scraper.fetch()
 
-    # No JSON-LD/table in the fake page, so this must cleanly return an empty list
-    # rather than raise or hang.
     assert out == []
+
+
+@pytest.mark.asyncio
+async def test_a_block_on_every_url_degrades_gracefully_without_raising():
+    """THE core bug this batch fixed: a block/403 on every URL (the live,
+    current, real state of this host -- reproduced live 2026-10-04) must
+    not crash fetch() -- it should swallow the exception per-URL (as
+    before) and return an empty list, so `safe_run()`'s own
+    take_block_signal() check (exercised by get_text_impersonate recording
+    the block before raising, not tested here directly) is what promotes
+    this to BLOCKED rather than a silent, indistinguishable ZERO_RESULT."""
+    async def _always_blocked(url, **kwargs):
+        raise RuntimeError("impersonate got 403 for " + url)
+
+    with patch(
+        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.get_text_impersonate",
+        side_effect=_always_blocked,
+    ):
+        scraper = ForeclosureDotCom()
+        out = await scraper.fetch()
+
+    assert out == []
+
+
+@pytest.mark.asyncio
+async def test_a_real_403_is_classified_blocked_not_zero_via_safe_run(monkeypatch):
+    """The actual severe bug, end to end through safe_run() (not just
+    fetch() in isolation): a 403 from the real curl-cffi transport layer
+    must make safe_run() report OUTCOME_BLOCKED, not OUTCOME_ZERO. This
+    mocks at the `curl_cffi.requests.AsyncSession` level (the lowest layer
+    get_text_impersonate actually calls) so the REAL block-recording code
+    in http_client._impersonate_fetch runs for real, instead of mocking
+    get_text_impersonate itself and bypassing that mechanism entirely --
+    which is exactly how the old raw-curl_cffi code silently defeated it.
+
+    Trimmed to a single SEARCH_URLS/CITY_URLS entry each: get_text_
+    impersonate retries a blocked call 3x with REAL exponential-jitter
+    backoff (not mocked here, since the backoff itself is part of the
+    real transport this test deliberately exercises), and the full
+    SEARCH_URLS + CITY_URLS lists (~32 URLs) would make this test take
+    several real minutes if every one were retried 3x.
+    """
+    import foreclosure_scraper.scrapers.national.foreclosure_dot_com as mod
+
+    monkeypatch.setattr(mod, "SEARCH_URLS", (("NC", "https://www.foreclosure.com/listing/search?q=NC"),))
+    monkeypatch.setattr(mod, "CITY_URLS", (("NC", "https://www.foreclosure.com/listings/charlotte-nc/"),))
+
+    class _FakeResp:
+        def __init__(self):
+            self.status_code = 403
+            self.text = (
+                "Sorry, access to this resource is restricted... "
+                "VPN or proxy"
+            )
+
+    class _FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            return _FakeResp()
+
+    with patch("curl_cffi.requests.AsyncSession", lambda **kw: _FakeSession()):
+        scraper = ForeclosureDotCom()
+        out = await scraper.safe_run()
+
+    assert out == []
+    assert scraper.last_outcome == OUTCOME_BLOCKED, (
+        f"expected OUTCOME_BLOCKED, got {scraper.last_outcome!r} "
+        f"({scraper.last_reason!r}) -- a real 403 is being silently "
+        "reported as a clean zero-result run again"
+    )

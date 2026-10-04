@@ -74,30 +74,24 @@ def _make_jsonld_page() -> str:
     return f"<html><head>{script}</head><body>{padding}</body></html>"
 
 
-class _FakeResponse:
-    def __init__(self, text: str, status_code: int = 200):
-        self.text = text
-        self.status_code = status_code
-
-
 def test_public_fetch_parses_listings():
     """fetch() does a public HTTP fetch (no credentials) and parses Listings.
 
-    The http/curl_cffi layer is mocked so the test is deterministic and
-    exercises the parse path rather than the live site.
+    The shared get_text_impersonate() transport is mocked so the test is
+    deterministic and exercises the parse path rather than the live site
+    (2026-10-04: migrated off raw curl_cffi.requests.get() onto the shared
+    transport so a real block gets correctly classified -- see
+    test_foreclosure_dot_com_event_loop.py).
     """
     page = _make_jsonld_page()
 
-    def fake_get(url, *args, **kwargs):
-        return _FakeResponse(page)
+    async def fake_get_text_impersonate(url, *args, **kwargs):
+        return page
 
     scraper = ForeclosureDotCom()
     with patch(
-        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.cf.get",
-        side_effect=fake_get,
-    ), patch(
-        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.time.sleep",
-        return_value=None,
+        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.get_text_impersonate",
+        side_effect=fake_get_text_impersonate,
     ):
         result = list(asyncio.run(scraper.fetch()))
 
@@ -120,18 +114,15 @@ def test_credentials_not_required():
     """
     page = _make_jsonld_page()
 
-    def fake_get(url, *args, **kwargs):
-        return _FakeResponse(page)
+    async def fake_get_text_impersonate(url, *args, **kwargs):
+        return page
 
     scraper = ForeclosureDotCom()
     with patch.dict(
         "os.environ", {"FORECLOSURE_DOT_COM_USER": "x@example.com"}, clear=False
     ), patch(
-        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.cf.get",
-        side_effect=fake_get,
-    ), patch(
-        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.time.sleep",
-        return_value=None,
+        "foreclosure_scraper.scrapers.national.foreclosure_dot_com.get_text_impersonate",
+        side_effect=fake_get_text_impersonate,
     ):
         result = list(asyncio.run(scraper.fetch()))
 

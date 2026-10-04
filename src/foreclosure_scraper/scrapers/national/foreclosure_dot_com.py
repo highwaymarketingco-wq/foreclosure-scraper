@@ -22,25 +22,20 @@ by listing ID. When a listing appears in both, the city-page data wins.
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import re
-import time
 from datetime import datetime
 from typing import Iterable
 
 import structlog
-from curl_cffi import requests as cf
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...http_client import get_text_impersonate
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
-
-# Sleep between requests to avoid rate-limiting (foreclosure.com returns 429)
-REQUEST_DELAY = 0.5  # seconds between page fetches
 
 # Search-view URLs (broadest coverage)
 SEARCH_URLS = (
@@ -288,22 +283,49 @@ def _get_total(html: str) -> int:
     return 0
 
 
-def _fetch_search(state: str, url: str, slug_name: str, pages_cap: int = 100) -> list[Listing]:
-    """Fetch all listings from a search-view URL."""
+async def _fetch_search(state: str, url: str, slug_name: str, pages_cap: int = 100) -> list[Listing]:
+    """Fetch all listings from a search-view URL.
+
+    REWRITTEN 2026-10-04 (national.* extraction-completeness audit, batch
+    16) to go through the shared `http_client.get_text_impersonate()`
+    instead of calling `curl_cffi.requests.get()` (a bare sync client)
+    directly. This is not a style change -- it fixes a real, severe,
+    long-silent bug: this host has been returning a hard 403 ("Sorry,
+    access to this resource is restricted... VPN or proxy") to EVERY
+    search/city URL since ~2026-08-29 (live-reproduced 2026-10-04 across
+    multiple impersonation profiles), yet the raw `cf.get()` call's
+    `r.status_code != 200` check just silently `return`ed an empty list on
+    every page -- `safe_run()` then saw a clean empty result with no
+    exception and no recorded block, so every run since has logged
+    `OUTCOME_ZERO` ("ran clean but returned 0 rows") instead of
+    `OUTCOME_BLOCKED`, identical in shape to the already-fixed
+    `law_firms.ingle_firm` TLS-swallow bug. Confirmed via the run logs:
+    5,483 real rows on 2026-08-27, then 0 on EVERY run from 2026-08-29
+    through 2026-09-25 (the most recent before this audit) with nobody
+    the wiser. `get_text_impersonate()` is the one fetch path in this
+    codebase that both honors the per-host politeness throttle AND records
+    a block signal `base_scraper.safe_run()` reads to correctly promote a
+    swallowed-exception zero-result run to BLOCKED (see http_client.py's
+    module docstring + `_block_holder`) -- raw `curl_cffi.requests` bypasses
+    that entirely. Also drops the manual `time.sleep(REQUEST_DELAY)`
+    pacing between pages: the shared transport already paces same-host
+    requests (`_throttle()`), so a second, redundant sleep on top of it
+    only slowed real runs down for no benefit.
+    """
     out: list[Listing] = []
     seen_ids: set[str] = set()
 
     try:
-        r = cf.get(url, impersonate="chrome", timeout=15)
+        html = await get_text_impersonate(url, timeout=15.0)
     except Exception as exc:
         log.warning("foreclosure_dot_com.search_failed", url=url, error=str(exc)[:200])
         return out
 
-    if r.status_code != 200 or len(r.text) < 5000:
+    if len(html) < 5000:
         return out
 
-    total = _get_total(r.text)
-    listings = _extract_search_listings(r.text, state, slug_name)
+    total = _get_total(html)
+    listings = _extract_search_listings(html, state, slug_name)
     for li in listings:
         key = li.case_number or li.source_url
         if key not in seen_ids:
@@ -312,14 +334,15 @@ def _fetch_search(state: str, url: str, slug_name: str, pages_cap: int = 100) ->
 
     total_pages = min(pages_cap, (total + 9) // 10) if total > 0 else 1
     for page in range(2, total_pages + 1):
-        time.sleep(REQUEST_DELAY)
         try:
-            r = cf.get(f"{url}&pg={page}", impersonate="chrome", timeout=15)
-        except Exception:
+            html = await get_text_impersonate(f"{url}&pg={page}", timeout=15.0)
+        except Exception as exc:
+            log.warning("foreclosure_dot_com.search_page_failed", url=url, page=page,
+                        error=str(exc)[:200])
             break
-        if r.status_code != 200 or len(r.text) < 5000 or "Too Many Requests" in r.text:
+        if len(html) < 5000 or "Too Many Requests" in html:
             break
-        listings = _extract_search_listings(r.text, state, slug_name)
+        listings = _extract_search_listings(html, state, slug_name)
         new_count = 0
         for li in listings:
             key = li.case_number or li.source_url
@@ -334,22 +357,24 @@ def _fetch_search(state: str, url: str, slug_name: str, pages_cap: int = 100) ->
     return out
 
 
-def _fetch_city(state: str, url: str, slug_name: str, pages_cap: int = 50) -> list[Listing]:
-    """Fetch all listings from a city/zip URL (JSON-LD path)."""
+async def _fetch_city(state: str, url: str, slug_name: str, pages_cap: int = 50) -> list[Listing]:
+    """Fetch all listings from a city/zip URL (JSON-LD path). See
+    `_fetch_search`'s docstring for why this goes through
+    `get_text_impersonate()` rather than raw `curl_cffi.requests`."""
     out: list[Listing] = []
     seen_ids: set[str] = set()
 
     try:
-        r = cf.get(url, impersonate="chrome", timeout=15)
+        html = await get_text_impersonate(url, timeout=15.0)
     except Exception as exc:
         log.warning("foreclosure_dot_com.city_failed", url=url, error=str(exc)[:200])
         return out
 
-    if r.status_code != 200 or len(r.text) < 5000:
+    if len(html) < 5000:
         return out
 
-    total = _get_total(r.text)
-    listings = _extract_jsonld_listings(r.text, state, slug_name)
+    total = _get_total(html)
+    listings = _extract_jsonld_listings(html, state, slug_name)
     for li in listings:
         key = li.case_number or li.source_url
         if key not in seen_ids:
@@ -358,14 +383,15 @@ def _fetch_city(state: str, url: str, slug_name: str, pages_cap: int = 50) -> li
 
     total_pages = min(pages_cap, (total + 9) // 10) if total > 0 else 1
     for page in range(2, total_pages + 1):
-        time.sleep(REQUEST_DELAY)
         try:
-            r = cf.get(f"{url}?pg={page}", impersonate="chrome", timeout=15)
-        except Exception:
+            html = await get_text_impersonate(f"{url}?pg={page}", timeout=15.0)
+        except Exception as exc:
+            log.warning("foreclosure_dot_com.city_page_failed", url=url, page=page,
+                        error=str(exc)[:200])
             break
-        if r.status_code != 200 or len(r.text) < 5000 or "Too Many Requests" in r.text:
+        if len(html) < 5000 or "Too Many Requests" in html:
             break
-        listings = _extract_jsonld_listings(r.text, state, slug_name)
+        listings = _extract_jsonld_listings(html, state, slug_name)
         new_count = 0
         for li in listings:
             key = li.case_number or li.source_url
@@ -390,32 +416,20 @@ class ForeclosureDotCom(BaseScraper):
     timeout_s = 900.0  # 15 min for full search + city pagination
 
     async def fetch(self) -> Iterable[Listing]:
-        # The whole body below is synchronous: _fetch_search/_fetch_city call
-        # curl_cffi's `cf.get()` (a blocking requests-style call, not an async
-        # session) and sleep between pages with `time.sleep()`, not
-        # `asyncio.sleep()`. With up to 2 search URLs and ~20 city URLs each
-        # paginating up to 50-100 pages at REQUEST_DELAY=0.5s apart, this
-        # coroutine previously had ZERO `await` points for its whole run --
-        # the identical bug class fixed in zombie_properties.py and
-        # wnc_rod_foreclosure_starts.py (asyncio.wait_for cannot interrupt a
-        # coroutine that never yields, so this scraper's own timeout_s=900
-        # would not just apply to itself: it would freeze the event loop for
-        # EVERY sibling scraper in the same run for up to 15 minutes). This
-        # is the exact starvation mechanism docs/full_run_execution_audit_
-        # 2026-09-23.md independently observed around this scraper's run
-        # window on 2026-09-22/23 (national.fannie_homepath timing out
-        # nearby) without the root cause having been fixed at the time.
-        # Running the synchronous body in a worker thread via
-        # asyncio.to_thread lets safe_run's own asyncio.wait_for(...,
-        # timeout=self.timeout_s) actually apply.
-        return await asyncio.to_thread(self._fetch_sync)
-
-    def _fetch_sync(self) -> list[Listing]:
-        # Step 1: Search view (broadest coverage)
+        # REWRITTEN 2026-10-04 (see _fetch_search's docstring for the full
+        # rationale): this used to run a fully-synchronous body
+        # (`_fetch_sync`) on a worker thread via `asyncio.to_thread` because
+        # `curl_cffi.requests.get()` blocks and the old pagination loop used
+        # `time.sleep()`. Now that `_fetch_search`/`_fetch_city` are native
+        # coroutines awaiting `get_text_impersonate()` at every page fetch,
+        # the event loop stays free on its own -- no thread hop needed, AND
+        # (the actually severe part) a block/403 is now correctly recorded
+        # for `safe_run()`'s ZERO->BLOCKED promotion instead of silently
+        # swallowed by a bare `status_code != 200` check.
         by_id: dict[str, Listing] = {}
         for state, url in SEARCH_URLS:
             try:
-                listings = _fetch_search(state, url, self.slug)
+                listings = await _fetch_search(state, url, self.slug)
                 for li in listings:
                     key = li.case_number or li.source_url
                     if key not in by_id:
@@ -423,19 +437,15 @@ class ForeclosureDotCom(BaseScraper):
             except Exception as exc:
                 log.warning("foreclosure_dot_com.search_error", state=state, error=str(exc)[:200])
 
-        # Step 2: City pages (richer detail — beds/baths/sqft/lat/lon)
-        # Merge by ID: city data overrides search data
+        # City pages (richer detail — beds/baths/sqft/lat/lon). Merge by ID:
+        # city data overrides search data. No manual inter-URL sleep here —
+        # get_text_impersonate() already paces same-host requests.
         for state, url in CITY_URLS:
-            time.sleep(REQUEST_DELAY)
             try:
-                listings = _fetch_city(state, url, self.slug)
+                listings = await _fetch_city(state, url, self.slug)
                 for li in listings:
                     key = li.case_number or li.source_url
-                    if key in by_id:
-                        # Merge: city data has richer detail, keep it
-                        by_id[key] = li
-                    else:
-                        by_id[key] = li
+                    by_id[key] = li
             except Exception as exc:
                 log.warning("foreclosure_dot_com.city_error", url=url, error=str(exc)[:200])
 
