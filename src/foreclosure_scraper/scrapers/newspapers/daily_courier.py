@@ -36,6 +36,24 @@ REVIVAL 2026-09-21 -- WHAT BROKE AND WHAT CHANGED
   (project memory: the Rutherford upset-bid gap). NOTICE TO CREDITORS estate notices are
   deliberately NOT emitted: they are dateless and this slug is not in
   ``main.DATELESS_OK_SOURCES``. Adding them is one line there plus a PROBATE_NOTICE branch.
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, newspapers batch 2): this module
+reads the same full per-notice body text (up to 6 KB, ``itemprop="description"``) that its
+3 sibling newspaper scrapers (hendersonville_lightning.py / shelby_star.py /
+tryon_bulletin.py) already pass through the shared ``column_legal_notices._notice_email()``
+helper to capture the trustee/attorney's published phone + email -- a real, reachable case
+contact, HERMES sec 9's #1 contactability priority -- but this module never called it, an
+inconsistency with no apparent reason (not a wall; the same body text is already in hand).
+Live-confirmed 2026-10-04 the helper DOES extract real contact info from this exact site's
+real notice bodies: 2 of 2 live-fetched current cards produced a hit (a Rutherford County
+notice: phone ``(828) 286-8222``, name ``"Alayna P. English Law Office"``; a DEQ consent-order
+notice: phone ``(919) 707-3613`` + email ``kate.shadwell@deq.nc.gov``) -- confirming the
+extraction mechanism works on this CMS/body shape, even though the host's aggressive 429
+rate-limiting (confirmed live: a 6 s-paced fetch of a 3rd card still got rate-limited) meant
+a foreclosure-specifically-titled card wasn't captured with a contact hit this batch. NC
+substitute-trustee notices (this scraper's actual target type) routinely carry the same
+closing trustee/attorney contact block as the samples above. Wired identically to the 3
+sibling scrapers.
 """
 from __future__ import annotations
 
@@ -55,6 +73,7 @@ from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 from ..counties_nc.rutherford_tax import _split_situs
+from .column_legal_notices import _notice_email
 
 log = structlog.get_logger()
 
@@ -308,6 +327,21 @@ def parse_notice(html: str, ad_url: str, now: datetime | None = None) -> Listing
     if dd:
         deed = {"book": dd.group(1), "page": dd.group(2), "dated": dd.group(3)}
 
+    # FOUND 2026-10-04: the trustee/attorney's published phone + email from
+    # the full notice body -- a real reachable case contact. Same helper +
+    # pattern the 3 sibling newspaper scrapers already use (see module
+    # docstring); this module reads the same full body text but never
+    # called it until now.
+    raw = {"daily_courier": {
+        "title": title,
+        "case_number_full": case_full,
+        "deed_of_trust": deed,
+        "body_preview": body[:1500],
+    }}
+    contact = _notice_email(body)
+    if contact:
+        raw["notice_contact"] = contact
+
     when = now or datetime.utcnow()
     return Listing(
         source="newspapers.daily_courier",
@@ -331,12 +365,7 @@ def parse_notice(html: str, ad_url: str, now: datetime | None = None) -> Listing
         description=title[:_TITLE_MAX] or None,
         first_seen=when,
         last_seen=when,
-        raw={"daily_courier": {
-            "title": title,
-            "case_number_full": case_full,
-            "deed_of_trust": deed,
-            "body_preview": body[:1500],
-        }},
+        raw=raw,
     )
 
 
