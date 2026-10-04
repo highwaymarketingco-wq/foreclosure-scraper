@@ -28,6 +28,28 @@ path free-text-scans flattened body text for an address-shaped string within
 same "keyword matching catches boilerplate" pattern this audit found and
 fixed elsewhere, and would need hardening before re-enabling even once a
 live URL exists again.
+
+RE-VERIFIED 2026-10-04 (HERMES extraction-completeness audit, batch 17):
+still disabled, but with two new findings for whoever revisits this.
+(1) The real, CURRENT url pattern (found live via the site's own location
+search in a real browser, screenshot + window.location.href) is
+`/search/commercial-real-estate/<city>-<state>/for-sale/` (and
+`/for-lease/`), not the old `/<city>-<state>/commercial-real-estate/` this
+module's dead `_CITIES` loop still builds -- confirmed the old pattern is
+STILL 404 and the new pattern loads real content in a genuine browser.
+(2) Even against that CORRECT current URL, curl_cffi Chrome impersonation
+still gets a hard 403 (re-tested live) -- the WAF block is real and URL-
+pattern-independent, not a stale-pattern artifact. BUT a genuine headless
+browser render (tested live via a real browser pane, not curl_cffi) loads
+the search-results page fine, no block -- the same shape of problem this
+codebase has already solved elsewhere (national.auction_dot_com,
+law_firms.korn/zacchaeus/mcmichael_taylor_gray) by switching from
+impersonation to a real render (`requires_render = True` +
+StealthyFetcher). A render-based rewrite is plausible but out of scope for
+this pass (this machine's RAM headroom didn't support testing a local
+StealthyFetcher render this session, and the fallback free-text-scan noted
+above would need the same hardening either way) -- flagged as a follow-up,
+not attempted blind.
 """
 from __future__ import annotations
 
@@ -97,7 +119,13 @@ class LoopNetScraper(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         for slug, city, state in _CITIES:
-            url = f"{_BASE}/{slug}/commercial-real-estate/"
+            # Real current pattern confirmed live 2026-10-04 (see module
+            # docstring's RE-VERIFIED note) -- the old
+            # f"{_BASE}/{slug}/commercial-real-estate/" 404s. Kept current
+            # even though this path is unreachable while disabled=True, so
+            # whoever re-enables this (e.g. after a render-based rewrite)
+            # isn't starting from a URL already known to be dead.
+            url = f"{_BASE}/search/commercial-real-estate/{slug}/for-sale/"
             try:
                 html = await get_text_impersonate(url, timeout=45.0)
             except Exception as exc:
