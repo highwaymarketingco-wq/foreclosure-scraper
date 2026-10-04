@@ -189,7 +189,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `law_firms.ingle_firm` | deed/notice? | https://www.theinglefirm.com/Sales.aspx |
 | `law_firms.kania` | detail-page, links | https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/<br>https://kanialawfirm.com/wp-admin/admin-ajax.php |
 | `law_firms.korn` | deed/notice? | https://www.kornlawfirm.com/foreclosure-sales/<br>https://www.kornlawfirm.com/sales/ |
-| `law_firms.mcmichael_taylor_gray` | deed/notice? | https://app.powerbi.com/view |
+| `law_firms.mcmichael_taylor_gray` | deed/notice?, detail-page | https://app.powerbi.com/view |
 | `law_firms.shapiro_ingle_powerbi` | deed/notice? | https://www.logs.com/nc-upcoming-sales-report.html<br>https://app.powerbi.com/view |
 | `law_firms.zacchaeus` | deed/notice?, detail-page, links | https://www.zls-nc.com/listings<br>https://gis.moorecountync.gov/mooreinfo2010/ |
 | `national.auction_bank_reo` | img?, detail-page, links | https://apiweb.realtybid.com/rest/RBIAPI/<br>https://bid.auctionnetwork.com/Auctions |
