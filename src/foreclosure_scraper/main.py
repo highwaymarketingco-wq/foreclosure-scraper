@@ -550,6 +550,13 @@ DATELESS_OK_SOURCES = {
     # scraper's own comment): it would otherwise be the PAST parcel auction
     # date and _active_only would drop every row as a stale upcoming sale.
     "counties_sc.york_overage_claims",
+    # Same reasoning as York's overage list, directly above: Orangeburg's
+    # yearly overage rosters carry no per-row sale_date (the claim sits open
+    # until someone files, not a scheduled event).
+    "counties_sc.orangeburg_overage_claims",
+    # Laurens's scanned overage list, same reasoning again: a standing
+    # unclaimed-funds condition, not a scheduled event.
+    "counties_sc.laurens_overage_claims",
     # Greenville's AS/400 tax-sale roster carries no per-row sale_date either
     # (a standing "who currently owes" list, not a scheduled event) -- same
     # reasoning as every other county delinquent-tax source in this list.

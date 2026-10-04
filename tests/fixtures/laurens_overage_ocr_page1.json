@@ -1,0 +1,10 @@
+{
+  "tax_sale_date": "DECEMBER 8, 2021",
+  "rows": [
+    {"item": "5", "map_number": "906-10-02-022", "owner_name": "ABERCROMBIE LAURA", "amount": "5.57"},
+    {"item": "170", "map_number": "906-13-13-021", "owner_name": "BAILEY RUTH M", "amount": "48,537.27"},
+    {"item": "806", "map_number": "309-01-07-006", "owner_name": "DUDLEY DERRIAL P; DUDLEY ELAINE G", "amount": "3,251.93"},
+    {"item": "1412", "map_number": "906-16-04-022", "owner_name": "JONES, ANNIE; MOBLEY VALERIE; MOBLEY ERIC L; SIMPSON ERNEST", "amount": "1,443.19"},
+    {"item": "", "map_number": "", "owner_name": "", "amount": ""}
+  ]
+}

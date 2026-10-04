@@ -539,3 +539,48 @@ The following hosts burn significant run time and are documented here so the cos
 - `counties_sc.charleston_tax_sale_xlsx`: `https://www.charlestoncounty.gov/departments/delinquent-tax/files/tax_sale/RP-Tax-Sale-Listing.xlsx` and `MH-Tax-Sale-Listing.xlsx`.
 - `counties_sc.horry_delinquent_xlsx`: link discovered on `https://www.horrycountysc.gov/departments/treasurer/delinquent-tax/` (dated `delinquent-list-on-website-MMDDYY.xlsx`).
 - `counties_nc.albemarle_observer_tax_lists`: `https://albemarleobserver.news/wp-json/wp/v2/posts` (WordPress REST, delinquent-tax list posts for Tyrrell, Washington, Plymouth, Gates, Bertie).
+
+### Tax-sale overage claim rosters, 2026-10-04 (Aiken investigation + sweep)
+
+Triggered by a check of Aiken County SC's "Tax Collector Overage Claims" page
+(`https://sc-aikencounty.civicplus.com/308/Tax-Collector-Overage-Claims`).
+Live-verified the disclaimer click-through gates only a blank claim FORM +
+instructions PDF (`/DocumentCenter/View/242` and `/243`) -- Aiken publishes
+NO roster of names/parcels/amounts, just "how to file if you already know
+you're owed something." Confirmed with a real disclaimer-checkbox browser
+render, not just curl. Genuine wall, nothing to build. Same shape (form-only,
+no roster) independently confirmed live for Oconee, Spartanburg, Anderson,
+Cherokee, Bamberg. NC counties confirmed structurally different: NCGS
+§105-374 routes tax-foreclosure surplus through a per-case Clerk of Superior
+Court motion, not a published county roster, for every NC county checked.
+
+Two SC counties DO publish a real roster and got built:
+- `counties_sc.orangeburg_overage_claims`: `https://www.orangeburgcounty.org/371/Overage-Claim-Procedures`
+  links 3 per-year documents (`/DocumentCenter/View/2405` 2021,
+  `/DocumentCenter/View/3074` 2022, `/DocumentCenter/View/3534` 2023 --
+  despite the URL/page both calling it a PDF, the real bytes are an .xlsx
+  workbook). Text-layer, no OCR. Live-verified fetch: **446 usable rows**
+  (2021: 208, 2022: 110, 2023: 128; the remainder of each year's rows are
+  already-zeroed $0.00 claims, correctly dropped).
+- `counties_sc.laurens_overage_claims`: `https://www.laurenscountysc.gov/departments/treasurer/forms_and_documents.php`
+  -> "2021-2024 Overage List" (real file currently at
+  `/Images/Documents/Departments/Treasurer/2021_2024%20Overage%20Lists.pdf`,
+  resolved against the site ROOT via a `<base>` tag, not the treasurer
+  sub-path -- a naive `urljoin` against the page URL 404s). **Corrects** the
+  section 1.18 note above ("Tax Sale Overage / FLC links all resolve to
+  `.../error.html` -> HTTP 404") -- that was true when written but the
+  county has since relinked the document; verified live 2026-10-04. Unlike
+  Orangeburg this is a SCANNED 4-page image PDF (one page per tax-sale year,
+  2021-2024), read through the same free Gemini OCR pool as
+  `counties_sc.sc_flc`. Live OCR pass: **142 usable rows** across all 4
+  years, including correctly joining multi-owner/heir claims (e.g. item 1412
+  has 4 names) into one semicolon-joined `owner_name` per claim.
+
+Both emit `ListingType.TAX_SALE_OVERAGE`, which bypasses the narrow
+18-county flip footprint (only `_FLIP_LISTING_TYPES` is footprint-gated --
+see `main.py`) and is admitted statewide via `config.in_scope_distressed()`
+for any non-denied SC county, same as the pre-existing
+`counties_sc.york_overage_claims`. Neither Orangeburg nor Laurens is in the
+18-county list, but neither is denied either. A follow-up sweep of the
+remaining ~35 SC counties for the same roster-vs-form-only pattern is
+flagged as separate work (not yet done).
