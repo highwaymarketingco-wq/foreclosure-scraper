@@ -21,6 +21,37 @@ Row layout (verified 2026-05-14):
 
 If the iframe layout changes (new column order, slicer aria-labels), the
 NC click or row-cell index will silently miss — return 0 and log a warning.
+
+Live-reverified 2026-10-04 (extraction-completeness audit): column order,
+count (8 cells inc. "Select Row"), and labels (State/County/SALE DATE/MTG
+Case Number/Court Case Number/Property Address/Opening Bid Amount) are
+UNCHANGED. Confirmed via the report's own DOM there is no second page, no
+drill-through detail panel behind "Select Row", and no hidden column --
+this is a genuinely flat 8-column table with nothing else on it to harvest.
+Court Case Number is real and populated for SC rows too (e.g.
+"2025-CP-04-01726"), not NC-only as the row-layout comment above might
+suggest; `_parse_row` already reads it state-agnostically, so this was a
+stale comment, not a functional gap. The 4/85 rows with no sale_date
+(MTG file numbers shaped "NC2019-00180"/"SC2023-00031", several years old,
+and -- unlike every dated row -- with no Court Case Number at all) are
+genuinely stale archival entries the dashboard never purges, not a live
+scheduled sale with a missing date; main._active_only correctly drops them
+since this slug is not (and should not be) in DATELESS_OK_SOURCES.
+
+FIX 2026-10-04: county normalization used a naive `.title()`, which the
+sibling law_firms/_footprint.py module's own docstring explicitly warns
+against ("'mcdowell'.title() -> 'Mcdowell', not 'McDowell', and a dozen
+enrichments key on the exact string"). This is not hypothetical: the live
+source itself emits the county cell as literally "Mcdowell" for a real,
+currently active, in-footprint NC row (195 Old River Road, Marion --
+$49,472.39 opening bid, real court case 25 SP 000063-580) -- `.title()`
+does nothing to fix that spelling, so this row's county landed on the
+board as "Mcdowell" and would have silently missed every enrichment keyed
+on the exact string "McDowell" (ArcGIS parcel layer, FHFA value, geocode
+centroid, Helene damage, etc.). Switched to `_footprint.normalize_county`,
+the same canonicalization helper brock_scott.py / hutchens.py already use,
+which maps any casing back to the one true "McDowell" via its precomputed
+lowercase->canonical lookup.
 """
 from __future__ import annotations
 
@@ -32,6 +63,7 @@ from dateutil import parser as dateparser
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
+from ._footprint import normalize_county
 
 POWERBI_URL = (
     "https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1Ii"
@@ -52,10 +84,14 @@ def _parse_row(cells: list[str], slug: str) -> Listing | None:
     state = (cells[1] or "").strip().upper()
     if state not in ("NC", "SC"):
         return None
-    county = (cells[2] or "").strip().replace(" County", "") or None
-    if county:
-        # PowerBI emits "Guilford-Forsyth" composites — split, keep the first
-        county = county.split("-")[0].strip().title()
+    county_raw = (cells[2] or "").strip().replace(" County", "") or None
+    county = None
+    if county_raw:
+        # PowerBI emits "Guilford-Forsyth" composites — split, keep the
+        # first. normalize_county (not a bare .title()) fixes real source-
+        # side casing issues like the live "Mcdowell" cell back to the
+        # canonical "McDowell" every downstream enrichment keys on.
+        county = normalize_county(county_raw.split("-")[0].strip())
     raw_date = (cells[3] or "").strip()
     file_no = (cells[4] or "").strip() or None
     sp_no = (cells[5] or "").strip() or None

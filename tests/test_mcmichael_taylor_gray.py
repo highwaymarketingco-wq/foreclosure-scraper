@@ -61,6 +61,28 @@ def test_composite_county_split_on_hyphen():
     assert li.county == "Guilford"
 
 
+def test_mcdowell_source_casing_normalized_to_canonical_spelling():
+    """Live-verified 2026-10-04: the real PowerBI data itself emits this
+    county cell as "Mcdowell" (source-side typo, not introduced by our
+    code). A bare .title() does nothing to fix that spelling (it's already
+    title-case), so the row would silently miss every enrichment keyed on
+    the exact string "McDowell" (config.NC_COUNTIES' own canonical
+    spelling). normalize_county must recover it regardless of source
+    casing."""
+    cells = [
+        "Select Row", "NC", "Mcdowell", "8/27/2026", "25-000931-01",
+        "25 SP 000063-580", "195 Old River Road, Marion, NC, 28752", "$49,472.39",
+    ]
+    li = _parse_row(cells, "law_firms.mcmichael_taylor_gray")
+    assert li.county == "McDowell"  # not "Mcdowell"
+
+    # Also holds for an all-caps or fully-lowercased source variant.
+    for variant in ("MCDOWELL", "mcdowell", "McDOWELL"):
+        cells[2] = variant
+        li2 = _parse_row(cells, "law_firms.mcmichael_taylor_gray")
+        assert li2.county == "McDowell", variant
+
+
 def test_non_nc_sc_state_rejected():
     cells = ["Select Row", "GA", "Fulton", "10/15/2026", "F1", "", "1 Main St, Atlanta, GA, 30301", ""]
     assert _parse_row(cells, "law_firms.mcmichael_taylor_gray") is None
