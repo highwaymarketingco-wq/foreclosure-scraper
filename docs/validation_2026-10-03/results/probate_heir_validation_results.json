@@ -1,0 +1,3159 @@
+{
+  "summary": {
+    "pool_stats": {
+      "total_buncombe_positive": 254,
+      "by_listing_type": {
+        "estate_lead": 52,
+        "probate_notice": 202
+      },
+      "checkable_decedent_name": 187,
+      "n_personal_representative": 4,
+      "n_care_of": 20
+    },
+    "n_checkable_decedent_name": 187,
+    "pct_pool_with_checkable_decedent_name": 73.6,
+    "n_sampled": 55,
+    "check1_death_record": {
+      "n_checked": 55,
+      "n_not_checkable_no_name": 0,
+      "n_confirmed_real_death_record": 45,
+      "pct_confirmed_real_death_record": 81.8,
+      "n_no_record_found": 9,
+      "pct_no_record_found": 16.4,
+      "n_ambiguous_insufficient_name_data": 1,
+      "pct_ambiguous_insufficient_name_data": 1.8
+    },
+    "check2_transfer_pattern": {
+      "n_checked": 28,
+      "n_not_checkable_no_parcel_or_fetch_error": 27,
+      "n_consistent_with_heir_estate": 25,
+      "pct_consistent_with_heir_estate": 89.3,
+      "n_inconsistent_already_sold_arms_length": 3,
+      "pct_inconsistent_already_sold_arms_length": 10.7
+    },
+    "check3_named_heir_voter_liveness": {
+      "n_pool_rows_with_any_named_individual": 24,
+      "pct_of_total_pool_with_any_named_individual": 9.4,
+      "n_checked": 24,
+      "n_confirmed_active_locatable": 16,
+      "pct_confirmed_active_locatable": 66.7
+    }
+  },
+  "sample_results": [
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Deborah White",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Deborah White",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 4,
+        "n_candidate_matches": 2,
+        "matched_grantor": "WHITE, DEBORAH DRAPER, DEBORAH",
+        "matched_grantee": "DRAPER, JAMES KENNETH EVERHART, NADINE RUTH",
+        "matched_book": "113",
+        "matched_page": "1782"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Brian Lee Carlson",
+      "street_address": "604 TOMAHAWK AVE",
+      "parcel_id": "0619081430",
+      "parcel_id_usable": "0619081430",
+      "decedent_name": "Brian Lee Carlson",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "CARLSON, BRIAN LEE",
+        "matched_grantee": "CARLSON, JOSEPH VALENTINE, KATHRYN",
+        "matched_book": "113",
+        "matched_page": "1496"
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 257800.0,
+        "n_sales_on_record": 4,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2009-10-16",
+            "price": 226000.0,
+            "book": "4731",
+            "page": "1591",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2006-07-17",
+            "price": 260000.0,
+            "book": "4254",
+            "page": "668",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2004-03-08",
+            "price": 182500.0,
+            "book": "3569",
+            "page": "338",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "1996-10-31",
+            "price": 95000.0,
+            "book": "1932",
+            "page": "676",
+            "reason": "Qualified Sale"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Landon G. Lewis",
+      "street_address": "100 Having qualified as Executor of the Est",
+      "parcel_id": "9628862283",
+      "parcel_id_usable": "9628862283",
+      "decedent_name": "Herman W. Lance",
+      "decedent_source": "probate.decedent",
+      "es_case_number": "26E001013-100",
+      "nc_estate_file_no": "25E001625-100",
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "LANCE, HERMAN WILLIAM",
+        "matched_grantee": "LANCE, WILLIAM STANLEY CREASMAN, EDNA HARRIETT",
+        "matched_book": "113",
+        "matched_page": "1385"
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 1472300.0,
+        "n_sales_on_record": 2,
+        "case_year_proxy": 2026,
+        "sales": [
+          {
+            "sale_date": "2020-04-17",
+            "price": 5000.0,
+            "book": "5886",
+            "page": "638",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "2008-12-16",
+            "book": "4631",
+            "page": "536",
+            "reason": "Not Qualified"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "COLLIER MARGARET SMITH",
+      "street_address": null,
+      "parcel_id": "9775726561",
+      "parcel_id_usable": "9775726561",
+      "decedent_name": "J G HUNTSINGER",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "WILLIAM G HUNTSINGER",
+      "heir_estate_mailing": "6 N SIDE DR BARNARDSVILLE NC 28709",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "ambiguous_insufficient_name_data",
+        "match_quality": "surname_only",
+        "n_raw_rows": 130,
+        "n_candidate_matches": 72,
+        "matched_grantor": "HUNTSINGER, JUDY MARIE HARRIS, JUDY MARIE",
+        "matched_grantee": "HARRIS, HARLEY RAY BOOKER, VERA",
+        "matched_book": "113",
+        "matched_page": "539"
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 24400.0,
+        "n_sales_on_record": 1,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2000-07-11",
+            "book": "2306",
+            "page": "19",
+            "reason": "Not Qualified"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Marjorie C. Clay",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Marjorie C. Clay",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 3,
+        "n_candidate_matches": 1,
+        "matched_grantor": "CLAY, MARJORIE CRAWFORD, MARJORIE",
+        "matched_grantee": "CRAWFORD, WILLIAM EDMONDS, NELL",
+        "matched_book": "113",
+        "matched_page": "1622"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "REDMON HAROLD G;REDMON JOHNNIE L",
+      "street_address": "22 PENNY LN",
+      "parcel_id": "9733932289",
+      "parcel_id_usable": "9733932289",
+      "decedent_name": "REDMON HAROLD G",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 2,
+        "n_candidate_matches": 1,
+        "matched_grantor": "REDMON, HAROLD GRANT",
+        "matched_grantee": "REDMON, HERMAN LAUGHTER, ROBENA",
+        "matched_book": "113",
+        "matched_page": "2018"
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 215700.0,
+        "n_sales_on_record": 1,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2012-09-21",
+            "price": 200000.0,
+            "book": "5021",
+            "page": "808",
+            "reason": "Qualified Sale"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "STEPHEN CHRISTOPHER VOUSDEN",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "STEPHEN CHRISTOPHER VOUSDEN",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "VOUSDEN, STEPHEN CHRISTOPHER",
+        "matched_grantee": "VOUSDEN, JOHN ANTHONY MOTT, RITA GENEVIEVE",
+        "matched_book": "113",
+        "matched_page": "1324"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "CLARK EVERETTE W JR;CLARK JULIA F",
+      "street_address": "79 LAKE DR",
+      "parcel_id": "9616393669",
+      "parcel_id_usable": "9616393669",
+      "decedent_name": "CLARK EVERETTE W JR",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 3,
+        "n_candidate_matches": 3,
+        "matched_grantor": "CLARK, EVERETTE WILLIAM JR",
+        "matched_grantee": "CLARK, EVERETTE WILLIAM SR. TOW, JUANITA",
+        "matched_book": "113",
+        "matched_page": "1796"
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 442900.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Timothy Gerow Arem",
+      "street_address": "001050100 Having qualified as Executor of the Est",
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Timothy Gerow Arem",
+      "decedent_source": "probate.decedent",
+      "es_case_number": "24E001050100",
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "AREM, TIMOTHY GEROW",
+        "matched_grantee": "AREM, IRVING LAFFERTY, JANE",
+        "matched_book": "111",
+        "matched_page": "1576"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Marjorie Jean Hettrick",
+      "street_address": "259 BULL CREEK RD",
+      "parcel_id": "9760796055",
+      "parcel_id_usable": "9760796055",
+      "decedent_name": "Marjorie Jean Hettrick",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "HETTRICK, MARJORIE JEAN HALER, MARJORIE JEAN",
+        "matched_grantee": "HALER, HAROLD WILLIAM DEISS, CLARA LOUISE",
+        "matched_book": "113",
+        "matched_page": "1744"
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 281700.0,
+        "n_sales_on_record": 4,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2022-10-17",
+            "book": "6267",
+            "page": "1529",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "2017-11-08",
+            "price": 179000.0,
+            "book": "5609",
+            "page": "159",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "2002-02-28",
+            "price": 110000.0,
+            "book": "2729",
+            "page": "434",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "1999-12-21",
+            "price": 95000.0,
+            "book": "2212",
+            "page": "208",
+            "reason": "Qualified Sale"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "LIMEBERRY DANNY R;LIMEBERRY SUZANNE G",
+      "street_address": "18 ROCKY LN",
+      "parcel_id": "9774139884",
+      "parcel_id_usable": "9774139884",
+      "decedent_name": "CARL HARWOOD",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "DARLINE HARWOOD",
+      "heir_estate_mailing": "PO BOX 368 BARNARDSVILLE NC 28709",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 5,
+        "n_candidate_matches": 1,
+        "matched_grantor": "HARWOOD, CARL",
+        "matched_grantee": "HARWOOD, RANS HARWOOD, MARY",
+        "matched_book": "77",
+        "matched_page": "1764"
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 145400.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "MILLER CHARLES M;LOVOY JOY R",
+      "street_address": "12 DUNWOOD RD",
+      "parcel_id": "9750067277",
+      "parcel_id_usable": "9750067277",
+      "decedent_name": "MILLER CHARLES M",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 68,
+        "n_candidate_matches": 35,
+        "matched_grantor": "MILLER, CHARLES MICHAEL",
+        "matched_grantee": "MILLER, JACK FRANKLIN SCHELL, JOAN ELIZABELL",
+        "matched_book": "113",
+        "matched_page": "1617"
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 405800.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Earl Francis Wiggins",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Earl Francis Wiggins",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 2,
+        "n_candidate_matches": 2,
+        "matched_grantor": "WIGGINS, EARL FRANCIS",
+        "matched_grantee": "WIGGINS, WILLIAM LUTHER DOWNS, ROSA MAE",
+        "matched_book": "113",
+        "matched_page": "2004"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "CATHA PARKER",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "CATHA PARKER",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "PARKER, CATHA OWEN, CATHA",
+        "matched_grantee": "OWEN, EDWARD UNKNOWN, NELLIE V.",
+        "matched_book": "113",
+        "matched_page": "1641"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "SUE REID BUCKNER",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "SUE REID BUCKNER",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 9,
+        "n_candidate_matches": 2,
+        "matched_grantor": "BUCKNER, SUE REID BLAIR, SUE REID",
+        "matched_grantee": "BLAIR, LUCIUS HELDERMAN, RUBY ANGELINE",
+        "matched_book": "113",
+        "matched_page": "1315"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "EARL JAMES ARRINGTON",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "EARL JAMES ARRINGTON",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 13,
+        "n_candidate_matches": 1,
+        "matched_grantor": "ARRINGTON, EARL JAMES",
+        "matched_grantee": "ARRINGTON, CLEOPHAS WILLIS, DALLIE",
+        "matched_book": "113",
+        "matched_page": "1253"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Stephen Douglas Gray",
+      "street_address": "10068 CHELMSFORD TER",
+      "parcel_id": "9720111803",
+      "parcel_id_usable": "9720111803",
+      "decedent_name": "Stephen Douglas Gray",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "GRAY, STEPHEN DOUGLAS",
+        "matched_grantee": "GRAY, DOUGLAS WHEELER, ELLEN A.",
+        "matched_book": "107",
+        "matched_page": "2427"
+      },
+      "transfer_check": {
+        "category": "inconsistent_arms_length_sale",
+        "market_value": 376600.0,
+        "n_sales_on_record": 7,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2024-03-27",
+            "price": 513500.0,
+            "book": "6395",
+            "page": "744",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2023-02-23",
+            "book": "6298",
+            "page": "341",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "2022-05-16",
+            "price": 410000.0,
+            "book": "6219",
+            "page": "1210",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2019-02-25",
+            "price": 285000.0,
+            "book": "5746",
+            "page": "1290",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2003-06-27",
+            "price": 160000.0,
+            "book": "3272",
+            "page": "263",
+            "reason": "Qualified Sale"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "PAYNE, WILLIAM VERNON",
+      "street_address": "77 BUFFALO ST",
+      "parcel_id": "9638476772",
+      "parcel_id_usable": "9638476772",
+      "decedent_name": "HENRY LIGON",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": "PO BOX 1272 ASHEVILLE NC 28802",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 4,
+        "n_candidate_matches": 2,
+        "matched_grantor": "LIGON, HENRY JR.",
+        "matched_grantee": "LIGON, HENRY SR. JONES, CAROL",
+        "matched_book": "108",
+        "matched_page": "3586"
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 324500.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Charles \u201cCharlie\u201d Van Sickle",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Charles \u201cCharlie\u201d Van Sickle",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "no_record",
+        "n_raw_rows": 0
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "James Anthony Smith",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "James Anthony Smith",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 229,
+        "n_candidate_matches": 101,
+        "matched_grantor": "SMITH, JAMES ANTHONY",
+        "matched_grantee": "SMITH, RALPH YERKES, CATHERINE",
+        "matched_book": "113",
+        "matched_page": "877"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Robert Eugene Smith",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Robert Eugene Smith",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 151,
+        "n_candidate_matches": 63,
+        "matched_grantor": "SMITH, ROBERT EUGENE",
+        "matched_grantee": "SMITH, JAMES RAYMOND SANDIS, ROSEMARY ELISE",
+        "matched_book": "113",
+        "matched_page": "2649"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Bernice Irene Clark",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Bernice Irene Clark",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 3,
+        "n_candidate_matches": 1,
+        "matched_grantor": "CLARK, BERNICE IRENE BLANTON, BERNICE IRENE",
+        "matched_grantee": "BLANTON, WILLIAM SHULER, SADIE",
+        "matched_book": "113",
+        "matched_page": "2699"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "TOUCHSTONE JAMES A",
+      "street_address": "9, LaGrange Drive, Asheville, Buncombe County, North Carolina, 28803, United States",
+      "parcel_id": "9648769287",
+      "parcel_id_usable": "9648769287",
+      "decedent_name": "TOUCHSTONE JAMES A",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "no_record",
+        "n_raw_rows": 0
+      },
+      "transfer_check": {
+        "category": "inconsistent_arms_length_sale",
+        "market_value": 660000.0,
+        "n_sales_on_record": 3,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2025-05-30",
+            "price": 1210000.0,
+            "book": "6496",
+            "page": "1052",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2017-11-16",
+            "price": 132500.0,
+            "book": "5611",
+            "page": "777",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2013-12-17",
+            "price": 93000.0,
+            "book": "5172",
+            "page": "227",
+            "reason": "Qualified Sale"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "FRANCES WILKIE WHITTED",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "FRANCES WILKIE WHITTED",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "no_record",
+        "n_raw_rows": 0
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Marion Yvonne Brown",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Marion Yvonne Brown",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 7,
+        "n_candidate_matches": 4,
+        "matched_grantor": "BROWN, MARION YVONNE MOEBIUS, MARION YVONNE",
+        "matched_grantee": "UNOBTAINABLE MOEBIUS, LISELOTTIE PAULA",
+        "matched_book": "113",
+        "matched_page": "1994"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Barbara Anne Hayes",
+      "street_address": "1070 TUNNEL RD",
+      "parcel_id": "9667803626",
+      "parcel_id_usable": "9667803626",
+      "decedent_name": "Barbara Anne Hayes",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "HAYES, BARBARA ANNE",
+        "matched_grantee": "HAYES, CARTHEY MALACHI HENDERSON, NONA BEVIE",
+        "matched_book": "112",
+        "matched_page": "3801"
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 604000.0,
+        "n_sales_on_record": 1,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2007-02-22",
+            "price": 165000.0,
+            "book": "4364",
+            "page": "177",
+            "reason": "Qualified Sale"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "ROGERS TERRY DEWAYNE;ROGERS SHARI J",
+      "street_address": "6 SPRING MEADOWS RD",
+      "parcel_id": "9743538722",
+      "parcel_id_usable": "9743538722",
+      "decedent_name": "ROGERS TERRY DEWAYNE",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "no_record",
+        "n_raw_rows": 0
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 405700.0,
+        "n_sales_on_record": 2,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2017-08-16",
+            "book": "5581",
+            "page": "263",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "1999-04-14",
+            "price": 17500.0,
+            "book": "2086",
+            "page": "749",
+            "reason": "Qualified Sale"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Margareta Koch",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Margareta Koch",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "KOCH, MARGARETA WILLIAMS JOHANSSON, MARGARETA WILLIAMS",
+        "matched_grantee": "JOHANSSON, GUNNAR HERBERT PERSSON, MARGARETA ARVIDA",
+        "matched_book": "113",
+        "matched_page": "2665"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Tammy Yvette Robinson",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Tammy Yvette Robinson",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 2,
+        "n_candidate_matches": 2,
+        "matched_grantor": "ROBINSON, TAMMY YVETTE",
+        "matched_grantee": "ROBINSON, JAMES DONALD ARROWOOD, SHIRLEY",
+        "matched_book": "113",
+        "matched_page": "2258"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Raymond Harold Bullman",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Raymond Harold Bullman",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 2,
+        "n_candidate_matches": 2,
+        "matched_grantor": "BULLMAN, RAYMOND HAROLD",
+        "matched_grantee": "BULLMAN, RAYMOND THOMAS, GEORGIA",
+        "matched_book": "113",
+        "matched_page": "392"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "GRAHAM (HEIRS) LULA M",
+      "street_address": "10 SWINDALE ST",
+      "parcel_id": "9648261493",
+      "parcel_id_usable": "9648261493",
+      "decedent_name": "GRAHAM LULA M",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "ROSELYN H BATES",
+      "heir_estate_mailing": "10 SWINDALE ST ASHEVILLE NC 28801",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 3,
+        "n_candidate_matches": 3,
+        "matched_grantor": "GRAHAM, LULA MAE WILLIAMS, LULA MAE",
+        "matched_grantee": "WILLIAMS, JOHN HENRY SR. MONTGOMERY, ESTELLE",
+        "matched_book": "111",
+        "matched_page": "2416"
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 230000.0,
+        "n_sales_on_record": 1,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "1964-11-19",
+            "book": "912",
+            "page": "308",
+            "reason": "Not Qualified"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "DONNIE LEE BENSON SR (HEIRS)",
+      "street_address": "516 DEAVERVIEW RD",
+      "parcel_id": "9628063694",
+      "parcel_id_usable": "9628063694",
+      "decedent_name": "DONNIE LEE BENSON SR",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": "516 DEAVERVIEW RD ASHEVILLE NC 28806",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "BENSON, DONNIE LEE",
+        "matched_grantee": "BENSON, HORACE LEDFORD, THELMA",
+        "matched_book": "90",
+        "matched_page": "1717"
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 115100.0,
+        "n_sales_on_record": 1,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2003-07-01",
+            "book": "3277",
+            "page": "411",
+            "reason": "Not Qualified"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Frances Alexander Ducker",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Frances Alexander Ducker",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "DUCKER, FRANCES ALEXANDER, FRANCES",
+        "matched_grantee": "ALEXANDER, PAUL J. SNELSON, LILLIE MAE",
+        "matched_book": "113",
+        "matched_page": "1257"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "BRANDON HOLCOMBE",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "BRANDON HOLCOMBE",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "HOLCOMBE, BRANDON SCOTT",
+        "matched_grantee": "HOLCOMBE, BRUCE W. EDMONDS, JEAN",
+        "matched_book": "113",
+        "matched_page": "1547"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "LEWIS KENT BRIGGS",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "LEWIS KENT BRIGGS",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "no_matching_record",
+        "n_raw_rows": 1
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "OLIVER EAGEN BURNS",
+      "street_address": "111 PINE RIDGE DR",
+      "parcel_id": "969646520100000",
+      "parcel_id_usable": "969646520100000",
+      "decedent_name": "OLIVER EAGEN BURNS",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "first_last",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "BURNS, OLIVER EAGAN",
+        "matched_grantee": "BURNS, JOHN OLIVER LACEY, ALLISON EDMONDS",
+        "matched_book": "113",
+        "matched_page": "16"
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 190100.0,
+        "n_sales_on_record": 6,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2021-02-26",
+            "price": 231000.0,
+            "book": "6026",
+            "page": "1001",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2018-09-24",
+            "price": 170000.0,
+            "book": "5704",
+            "page": "1780",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "2011-08-02",
+            "price": 115000.0,
+            "book": "4904",
+            "page": "670",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2010-07-02",
+            "price": 70000.0,
+            "book": "4797",
+            "page": "453",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "2010-04-13",
+            "price": 104000.0,
+            "book": "4775",
+            "page": "372",
+            "reason": "Not Qualified"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "ANNETTE C MAYFIELD",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "ANNETTE C MAYFIELD",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "MAYFIELD, ANNETTE CECILE CAGLE, ANNETTE CECILE",
+        "matched_grantee": "CAGLE, CLIFFORD D. BUMGARNER, IDA MAE",
+        "matched_book": "113",
+        "matched_page": "1306"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "FRANK FLETCHER HEIRS",
+      "street_address": "6 COPNEY LN",
+      "parcel_id": "9644937186",
+      "parcel_id_usable": "9644937186",
+      "decedent_name": "FRANK FLETCHER",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": "3 COPNEY LN ARDEN NC 28704",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 14,
+        "n_candidate_matches": 4,
+        "matched_grantor": "FLETCHER, FRANK ROBERT",
+        "matched_grantee": "UNOBTAINABLE UNOBTAINABLE",
+        "matched_book": "61",
+        "matched_page": "451"
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 99100.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "CHEHAYEB ZOHEIR S;CHEHAYEB DONNA M",
+      "street_address": "70 CHIMNEY CREST DR",
+      "parcel_id": "9629575926",
+      "parcel_id_usable": "9629575926",
+      "decedent_name": "CHEHAYEB ZOHEIR S",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": "4 CHIMNEY CREST DR APT K ASHEVILLE NC 28806",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "no_record",
+        "n_raw_rows": 0
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 85000.0,
+        "n_sales_on_record": 2,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2020-12-29",
+            "price": 79000.0,
+            "book": "5999",
+            "page": "493",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2005-08-19",
+            "price": 180000.0,
+            "book": "4093",
+            "page": "341",
+            "reason": "Not Qualified"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "JAMES B METCALF (HEIRS)",
+      "street_address": "40 TOY DR",
+      "parcel_id": "9634918859",
+      "parcel_id_usable": "9634918859",
+      "decedent_name": "JAMES B METCALF",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": "40 TOY DR ARDEN NC 28704",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 32,
+        "n_candidate_matches": 13,
+        "matched_grantor": "METCALF, JAMES ROBERT",
+        "matched_grantee": "METCALF, BART HENSLEY, FRANCES",
+        "matched_book": "112",
+        "matched_page": "446"
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 122700.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "CARROL DAVID MUNDY",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "CARROL DAVID MUNDY",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 4,
+        "n_candidate_matches": 1,
+        "matched_grantor": "MUNDY, CARROL DAVID",
+        "matched_grantee": "MUNDY, MORRIS MCKINLEY BURRELL, ANNIE ATLAS",
+        "matched_book": "111",
+        "matched_page": "1911"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Max H Penley",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Max H Penley",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 3,
+        "n_candidate_matches": 1,
+        "matched_grantor": "PENLEY, MAX HILLIARD",
+        "matched_grantee": "PENLEY, ROSCOE ROGERS, STELLA",
+        "matched_book": "109",
+        "matched_page": "4126"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Crayton W Bedford",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Crayton W Bedford",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "BEDFORD, CRAYTON WARD",
+        "matched_grantee": "BEDFORD, HENRY WARD BATES, MARY LOUISE",
+        "matched_book": "113",
+        "matched_page": "1818"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "JONES SUSAN E",
+      "street_address": "505 NEW HAW CREEK RD",
+      "parcel_id": "9658783699",
+      "parcel_id_usable": "9658783699",
+      "decedent_name": "PEARL R HUGHEY",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "PEGGY MURPHY",
+      "heir_estate_mailing": "493 NEW HAW CREEK RD ASHEVILLE NC 28805",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "HUGHEY, PEARL ROSIE",
+        "matched_grantee": "ROBINSON, SAMUEL WILSON, LAURA",
+        "matched_book": "67",
+        "matched_page": "1748"
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 16500.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "LIBBY K KELLY",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "LIBBY K KELLY",
+      "decedent_source": "probate.decedent",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "KELLY, LIBBY KAY KOONTS, LIBBY KAY",
+        "matched_grantee": "KOONTS, LONNIE WEAVER, IVA",
+        "matched_book": "113",
+        "matched_page": "1699"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "HEINTZ GEORGEANNA",
+      "street_address": "1400 WAVERLY RD UNIT V56",
+      "parcel_id": "9744565607",
+      "parcel_id_usable": "9744565607",
+      "decedent_name": "HEINTZ GEORGEANNA",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "HEINTZ, GEORGEANNA",
+        "matched_grantee": "HEINTZ, LEO HAROLD CAPRON, AGNES ALLYN",
+        "matched_book": "113",
+        "matched_page": "927"
+      },
+      "transfer_check": {
+        "category": "inconsistent_arms_length_sale",
+        "market_value": 249600.0,
+        "n_sales_on_record": 2,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2024-03-20",
+            "price": 97000.0,
+            "book": "6393",
+            "page": "913",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "2002-12-17",
+            "book": "3029",
+            "page": "339",
+            "reason": "Not Qualified"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "WHITTED (HEIRS) FRANCES W",
+      "street_address": "159 LOWER EDGEWOOD RD",
+      "parcel_id": "9617351909",
+      "parcel_id_usable": "9617351909",
+      "decedent_name": "WHITTED FRANCES W",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "CINDY BROOKS",
+      "heir_estate_mailing": "141 MIMOSA LN SYLVA NC 28779",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "no_record",
+        "n_raw_rows": 0
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 37900.0,
+        "n_sales_on_record": 1,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "1979-10-12",
+            "book": "1228",
+            "page": "432",
+            "reason": "Not Qualified"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Stuart Bragg Harmon",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Stuart Bragg Harmon",
+      "decedent_source": "probate.decedent",
+      "es_case_number": "26E001356-100",
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 1,
+        "n_candidate_matches": 1,
+        "matched_grantor": "HARMON, STUART BRAGG",
+        "matched_grantee": "HARMON, MAX BERRY BRAGG, CAROLINE LEE",
+        "matched_book": "113",
+        "matched_page": "2107"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "BETTY LORRAINE LOWRY",
+      "street_address": "61 NIGHTHAWK KNL",
+      "parcel_id": "968598049700000",
+      "parcel_id_usable": "968598049700000",
+      "decedent_name": "BETTY LORRAINE LOWRY",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 2,
+        "n_candidate_matches": 1,
+        "matched_grantor": "LOWRY, BETTY LORRAINE",
+        "matched_grantee": "LOWRY, JOHN THOMAS KLEIN, LORRAINE RUTH",
+        "matched_book": "108",
+        "matched_page": "3170"
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 293100.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "LUNSFORD ALLEN LEE",
+      "street_address": "62 CHICKWOOD TRL",
+      "parcel_id": "9744128112",
+      "parcel_id_usable": "9744128112",
+      "decedent_name": "LUNSFORD ALLEN LEE",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "no_record",
+        "n_raw_rows": 0
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 429100.0,
+        "n_sales_on_record": 5,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2012-06-05",
+            "book": "4988",
+            "page": "520",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "2007-01-04",
+            "price": 305000.0,
+            "book": "4342",
+            "page": "681",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2006-05-05",
+            "price": 43500.0,
+            "book": "4218",
+            "page": "1529",
+            "reason": "Qualified Sale"
+          },
+          {
+            "sale_date": "2005-06-23",
+            "book": "4058",
+            "page": "695",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "2005-06-23",
+            "price": 221000.0,
+            "book": "4058",
+            "page": "698",
+            "reason": "Not Qualified"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "GLADYS E WHITAKER HEIRS WHITAKER CEMETERY",
+      "street_address": null,
+      "parcel_id": "9775352351",
+      "parcel_id_usable": "9775352351",
+      "decedent_name": "GLADYS E WHITAKER WHITAKER CEMETERY",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": "70 CONESTEE ST ASHEVILLE NC 28801",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "no_record",
+        "n_raw_rows": 0
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 14100.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "MONROE C LONG HEIRS",
+      "street_address": "186 FAYETTEVILLE ST",
+      "parcel_id": "9638477045",
+      "parcel_id_usable": "9638477045",
+      "decedent_name": "MONROE C LONG",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": "312 TODDINGTON CT FRANKLIN TN 37067",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 5,
+        "n_candidate_matches": 2,
+        "matched_grantor": "LONG III, MONROE CHARLES",
+        "matched_grantee": "LONG, MONROE C JR HAWKINS, PERLINA",
+        "matched_book": "83",
+        "matched_page": "504"
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 211300.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "William \u201cBill\u201d Eugene Moore",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "William \u201cBill\u201d Eugene Moore",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "first_last",
+        "n_raw_rows": 145,
+        "n_candidate_matches": 35,
+        "matched_grantor": "MOORE, WILLIAM OLIVER",
+        "matched_grantee": "MOORE, JAMES O MILLER, MILDRED",
+        "matched_book": "110",
+        "matched_page": "1441"
+      },
+      "transfer_check": {
+        "category": "not_checkable",
+        "reason": "no_usable_parcel_id"
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "SULLIVAN LEIGH ANNE",
+      "street_address": "30 IVEY BAPTIST RD",
+      "parcel_id": "9755791213",
+      "parcel_id_usable": "9755791213",
+      "decedent_name": "ALICE METCALF",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "JOHN METCALF",
+      "heir_estate_mailing": "66 VERNON RDG WEAVERVILLE NC 28787",
+      "heir_estate_match": "heirs",
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "full",
+        "n_raw_rows": 5,
+        "n_candidate_matches": 1,
+        "matched_grantor": "METCALF, ALICE",
+        "matched_grantee": "ANDERS, LEVI HAYNES, MANERVIA",
+        "matched_book": "94",
+        "matched_page": "1304"
+      },
+      "transfer_check": {
+        "category": "no_recent_transfer",
+        "market_value": 208600.0,
+        "n_sales_on_record": 2,
+        "case_year_proxy": null,
+        "sales": [
+          {
+            "sale_date": "2010-09-29",
+            "price": 17000.0,
+            "book": "4820",
+            "page": "1634",
+            "reason": "Not Qualified"
+          },
+          {
+            "sale_date": "1948-11-06",
+            "book": "667",
+            "page": "505",
+            "reason": "Not Qualified"
+          }
+        ]
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Bobby Dean Brigman",
+      "street_address": "2599 BRADDY RD",
+      "parcel_id": "9796009369",
+      "parcel_id_usable": "9796009369",
+      "decedent_name": "Bobby Dean Brigman",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "death_check": {
+        "category": "death_confirmed",
+        "match_quality": "first_last",
+        "n_raw_rows": 2,
+        "n_candidate_matches": 1,
+        "matched_grantor": "BRIGMAN, BOBBY JOE",
+        "matched_grantee": "BRIGMAN, ARY MOSS, LILLY",
+        "matched_book": "110",
+        "matched_page": "717"
+      },
+      "transfer_check": {
+        "category": "no_sales_on_record",
+        "market_value": 130000.0,
+        "n_sales_on_record": 0,
+        "case_year_proxy": null,
+        "sales": []
+      }
+    }
+  ],
+  "named_individual_census_results": [
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Eddie Deweese",
+      "street_address": "100 Having qualified as Administrator of the Est",
+      "parcel_id": "0629585399",
+      "parcel_id_usable": "0629585399",
+      "decedent_name": "Douglas Dale Tesner",
+      "decedent_source": "probate.decedent",
+      "es_case_number": "26E001037-100",
+      "nc_estate_file_no": null,
+      "personal_representative": "Tyler Tesner",
+      "pr_role": "Administrator",
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "voter_check": {
+        "role": "personal_representative",
+        "name": "Tyler Tesner",
+        "category": "not_found",
+        "match_city_hint": null,
+        "voter_result": {
+          "first_name": "Tyler",
+          "last_name": "Tesner",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 0,
+          "status": "not_found",
+          "match": null,
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": null
+        }
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Stephen Douglas Gray",
+      "street_address": "698 Leisure Lane",
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Stephen Douglas Gray",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": "Craigan Gray",
+      "pr_role": "Administrator",
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "voter_check": {
+        "role": "personal_representative",
+        "name": "Craigan Gray",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": null,
+        "voter_result": {
+          "first_name": "Craigan",
+          "last_name": "Gray",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 1,
+          "status": "active",
+          "match": {
+            "full_name": "GRAY, CRAIGAN",
+            "status_desc": "ACTIVE",
+            "county_name": "MADISON",
+            "voter_reg_num": "000030023526",
+            "ncid": "AL11154",
+            "res_address_csz": "MARSHALL, NC 28753"
+          },
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "03/03/2026 PRIMARY",
+            "voted_county": "MADISON",
+            "voted_method": "EARLY VOTING IN-PERSON",
+            "voted_party": "DEMOCRATIC"
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "SULLIVAN LEIGH ANNE",
+      "street_address": "30 IVEY BAPTIST RD",
+      "parcel_id": "9755791213",
+      "parcel_id_usable": "9755791213",
+      "decedent_name": "ALICE METCALF",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "JOHN METCALF",
+      "heir_estate_mailing": "66 VERNON RDG WEAVERVILLE NC 28787",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "JOHN METCALF",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "WEAVERVILLE",
+        "voter_result": {
+          "first_name": "JOHN",
+          "last_name": "METCALF",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 12,
+          "status": "active",
+          "match": {
+            "full_name": "METCALF, JOHN W",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000559372",
+            "ncid": "AL240726",
+            "res_address_csz": "WEAVERVILLE, NC 28787"
+          },
+          "disambiguated_by_city": true,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "IN-PERSON ELECTION DAY",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "DAS ENTERPRISES LLC",
+      "street_address": "460 MONTFORD AVE",
+      "parcel_id": "9639856328",
+      "parcel_id_usable": "9639856328",
+      "decedent_name": "JEAN CHEEKS JETER",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "ILKA BOWDITCH MCDOWELL",
+      "heir_estate_mailing": "63 WESTOVER DR ASHEVILLE NC 28801",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "ILKA BOWDITCH MCDOWELL",
+        "category": "not_found",
+        "match_city_hint": "ASHEVILLE",
+        "voter_result": {
+          "first_name": "ILKA",
+          "last_name": "MCDOWELL",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 0,
+          "status": "not_found",
+          "match": null,
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": null
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "JONES SUSAN E",
+      "street_address": "505 NEW HAW CREEK RD",
+      "parcel_id": "9658783699",
+      "parcel_id_usable": "9658783699",
+      "decedent_name": "PEARL R HUGHEY",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "PEGGY MURPHY",
+      "heir_estate_mailing": "493 NEW HAW CREEK RD ASHEVILLE NC 28805",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "PEGGY MURPHY",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "ASHEVILLE",
+        "voter_result": {
+          "first_name": "PEGGY",
+          "last_name": "MURPHY",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 11,
+          "status": "active",
+          "match": {
+            "full_name": "MURPHY, PEGGY LEE",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000038066",
+            "ncid": "AL17024",
+            "res_address_csz": "ASHEVILLE, NC 28805"
+          },
+          "disambiguated_by_city": true,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "IN-PERSON ELECTION DAY",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "HARPER (HEIRS) ELMORE",
+      "street_address": null,
+      "parcel_id": "9648901600",
+      "parcel_id_usable": "9648901600",
+      "decedent_name": "ARTHUR D LITTLE SR",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "MARILYN LITTLE",
+      "heir_estate_mailing": "73 MCCLAIN ST ASHEVILLE NC 28803",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "MARILYN LITTLE",
+        "category": "ambiguous_common_name",
+        "match_city_hint": "ASHEVILLE",
+        "voter_result": {
+          "first_name": "MARILYN",
+          "last_name": "LITTLE",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 6,
+          "status": "ambiguous",
+          "match": null,
+          "disambiguated_by_city": false,
+          "candidates": [
+            {
+              "VoterRegNum": "000000040780",
+              "CountyId": 4,
+              "CountyName": "ANSON",
+              "FullName": "LITTLE, MARILYN",
+              "NCID": "AD35288",
+              "ResAddressCSZ": "WADESBORO, NC 28170",
+              "StatusDesc": "INACTIVE",
+              "StatusLbl": "I"
+            },
+            {
+              "VoterRegNum": "000000023338",
+              "CountyId": 84,
+              "CountyName": "STANLY",
+              "FullName": "LITTLE, MARILYN COLETTE",
+              "NCID": "DZ25372",
+              "ResAddressCSZ": "LOCUST, NC 28097",
+              "StatusDesc": "ACTIVE",
+              "StatusLbl": "A"
+            },
+            {
+              "VoterRegNum": "000030148839",
+              "CountyId": 34,
+              "CountyName": "FORSYTH",
+              "FullName": "LITTLE, MARILYN E",
+              "NCID": "BN403761",
+              "ResAddressCSZ": "WINSTON SALEM, NC 27106",
+              "StatusDesc": "ACTIVE",
+              "StatusLbl": "A"
+            },
+            {
+              "VoterRegNum": "000100428890",
+              "CountyId": 92,
+              "CountyName": "WAKE",
+              "FullName": "LITTLE, MARILYN JEAN",
+              "NCID": "EH1054302",
+              "ResAddressCSZ": "FUQUAY VARINA, NC 27526",
+              "StatusDesc": "ACTIVE",
+              "StatusLbl": "A"
+            },
+            {
+              "VoterRegNum": "000010175986",
+              "CountyId": 34,
+              "CountyName": "FORSYTH",
+              "FullName": "LITTLE, MARILYN MANDLER",
+              "NCID": "BN235155",
+              "ResAddressCSZ": "WINSTON SALEM, NC 27101",
+              "StatusDesc": "ACTIVE",
+              "StatusLbl": "A"
+            },
+            {
+              "VoterRegNum": "000000009149",
+              "CountyId": 62,
+              "CountyName": "MONTGOMERY",
+              "FullName": "LITTLE, MARILYN MARIE",
+              "NCID": "CY10835",
+              "ResAddressCSZ": "CANDOR, NC 27229",
+              "StatusDesc": "INACTIVE",
+              "StatusLbl": "I"
+            }
+          ],
+          "most_recent_vote": null
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "COLLEEN GUZMAN GREGORY (HEIRS)",
+      "street_address": "50 BOONE ST",
+      "parcel_id": "9639623518",
+      "parcel_id_usable": "9639623518",
+      "decedent_name": "COLLEEN GUZMAN GREGORY",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "WILLIAM GUZMAN",
+      "heir_estate_mailing": "50 BOONE ST ASHEVILLE NC 28806",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "WILLIAM GUZMAN",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "ASHEVILLE",
+        "voter_result": {
+          "first_name": "WILLIAM",
+          "last_name": "GUZMAN",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 2,
+          "status": "active",
+          "match": {
+            "full_name": "GUZMAN, WILLIAM GAYLING",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000241515",
+            "ncid": "AL151418",
+            "res_address_csz": "ASHEVILLE, NC 28806"
+          },
+          "disambiguated_by_city": true,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "EARLY VOTING IN-PERSON",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "COLLIER MARGARET SMITH",
+      "street_address": null,
+      "parcel_id": "9775726561",
+      "parcel_id_usable": "9775726561",
+      "decedent_name": "J G HUNTSINGER",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "WILLIAM G HUNTSINGER",
+      "heir_estate_mailing": "6 N SIDE DR BARNARDSVILLE NC 28709",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "WILLIAM G HUNTSINGER",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "BARNARDSVILLE",
+        "voter_result": {
+          "first_name": "WILLIAM",
+          "last_name": "HUNTSINGER",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 4,
+          "status": "active",
+          "match": {
+            "full_name": "HUNTSINGER, WILLIAM GRADY",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000029916",
+            "ncid": "AL13790",
+            "res_address_csz": "BARNARDSVILLE, NC 28709"
+          },
+          "disambiguated_by_city": true,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "IN-PERSON ELECTION DAY",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "GRAHAM (HEIRS) LULA M",
+      "street_address": "10 SWINDALE ST",
+      "parcel_id": "9648261493",
+      "parcel_id_usable": "9648261493",
+      "decedent_name": "GRAHAM LULA M",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "ROSELYN H BATES",
+      "heir_estate_mailing": "10 SWINDALE ST ASHEVILLE NC 28801",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "ROSELYN H BATES",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "ASHEVILLE",
+        "voter_result": {
+          "first_name": "ROSELYN",
+          "last_name": "BATES",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 1,
+          "status": "active",
+          "match": {
+            "full_name": "BATES, ROSELYN HOPE",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000088414",
+            "ncid": "AL37426",
+            "res_address_csz": "ASHEVILLE, NC 28801"
+          },
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "03/03/2026 PRIMARY",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "EARLY VOTING IN-PERSON",
+            "voted_party": "DEMOCRATIC"
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "ROBERT S GRIFFIN LIVING TRUST KENNETH R CLEMMER LIVING TRUST",
+      "street_address": null,
+      "parcel_id": "9751433155",
+      "parcel_id_usable": "9751433155",
+      "decedent_name": "HARVEY E SYKES SR",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "DOUGLAS M SKYES",
+      "heir_estate_mailing": "1763 C RD LOXAHATCHEE FL 33470",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "DOUGLAS M SKYES",
+        "category": "not_found",
+        "match_city_hint": "LOXAHATCHEE",
+        "voter_result": {
+          "first_name": "DOUGLAS",
+          "last_name": "SKYES",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 0,
+          "status": "not_found",
+          "match": null,
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": null
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "ROBERT C BURRIS HEIRS",
+      "street_address": null,
+      "parcel_id": "9648009831",
+      "parcel_id_usable": "9648009831",
+      "decedent_name": "ROBERT C BURRIS",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "MICHAEL RAUCHWARG",
+      "heir_estate_mailing": "500 RIDGEFIELD CT ASHEVILLE NC 28806",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "MICHAEL RAUCHWARG",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "ASHEVILLE",
+        "voter_result": {
+          "first_name": "MICHAEL",
+          "last_name": "RAUCHWARG",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 1,
+          "status": "active",
+          "match": {
+            "full_name": "RAUCHWARG, MICHAEL PAUL",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000166953",
+            "ncid": "AL84262",
+            "res_address_csz": "ASHEVILLE, NC 28803"
+          },
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "EARLY VOTING CURBSIDE",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "HEIRS OF GLENDA J SLAUGHTER",
+      "street_address": "6 PIERSON CREEK RD",
+      "parcel_id": "9795100665",
+      "parcel_id_usable": "9795100665",
+      "decedent_name": "GLENDA J SLAUGHTER",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "ROBIN HENSLEY",
+      "heir_estate_mailing": "21 PIERSON CREEK DR BARNARDSVILLE NC 28709",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "ROBIN HENSLEY",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "BARNARDSVILLE",
+        "voter_result": {
+          "first_name": "ROBIN",
+          "last_name": "HENSLEY",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 9,
+          "status": "active",
+          "match": {
+            "full_name": "HENSLEY, ROBIN DOROTHY",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000201744",
+            "ncid": "AL113401",
+            "res_address_csz": "BARNARDSVILLE, NC 28709"
+          },
+          "disambiguated_by_city": true,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "03/03/2026 PRIMARY",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "IN-PERSON ELECTION DAY",
+            "voted_party": "REPUBLICAN"
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "SHELBURNE WOODS DEVELOPMENT LLC",
+      "street_address": "273 BEAR WALLOW TRL",
+      "parcel_id": "8678793986",
+      "parcel_id_usable": "8678793986",
+      "decedent_name": "WILLIAM F KEHRES ELIZABETH KEHRES",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "GRANT W KEHRES",
+      "heir_estate_mailing": "2000 GLADES RD STE 302 BOCA RATON FL 33431",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "GRANT W KEHRES",
+        "category": "not_found",
+        "match_city_hint": "RATON",
+        "voter_result": {
+          "first_name": "GRANT",
+          "last_name": "KEHRES",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 0,
+          "status": "not_found",
+          "match": null,
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": null
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "LIMEBERRY DANNY R;LIMEBERRY SUZANNE G",
+      "street_address": "18 ROCKY LN",
+      "parcel_id": "9774139884",
+      "parcel_id_usable": "9774139884",
+      "decedent_name": "CARL HARWOOD",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "DARLINE HARWOOD",
+      "heir_estate_mailing": "PO BOX 368 BARNARDSVILLE NC 28709",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "DARLINE HARWOOD",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "BARNARDSVILLE",
+        "voter_result": {
+          "first_name": "DARLINE",
+          "last_name": "HARWOOD",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 1,
+          "status": "active",
+          "match": {
+            "full_name": "HARWOOD, DARLINE H",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000026128",
+            "ncid": "AL12238",
+            "res_address_csz": "BARNARDSVILLE, NC 28709"
+          },
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "CURBSIDE ELECTION DAY",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "ALICE METCALF HEIRS",
+      "street_address": null,
+      "parcel_id": "9755694658",
+      "parcel_id_usable": "9755694658",
+      "decedent_name": "ALICE METCALF",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "JOHN METCALF",
+      "heir_estate_mailing": "66 VERNON RDG WEAVERVILLE NC 28787",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "JOHN METCALF",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "WEAVERVILLE",
+        "voter_result": {
+          "first_name": "JOHN",
+          "last_name": "METCALF",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 12,
+          "status": "active",
+          "match": {
+            "full_name": "METCALF, JOHN W",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000559372",
+            "ncid": "AL240726",
+            "res_address_csz": "WEAVERVILLE, NC 28787"
+          },
+          "disambiguated_by_city": true,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "IN-PERSON ELECTION DAY",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "WILLSON HEIRS NELLE B",
+      "street_address": "77 MONTICELLO RD",
+      "parcel_id": "9743030292",
+      "parcel_id_usable": "9743030292",
+      "decedent_name": "WILLSON NELLE B",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "ERIC WILLSON",
+      "heir_estate_mailing": "800 REEMS CREEK RD WEAVERVILLE NC 28787",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "ERIC WILLSON",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "WEAVERVILLE",
+        "voter_result": {
+          "first_name": "ERIC",
+          "last_name": "WILLSON",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 1,
+          "status": "active",
+          "match": {
+            "full_name": "WILLSON, ERIC PAUL",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000133393",
+            "ncid": "AL59565",
+            "res_address_csz": "WEAVERVILLE, NC 28787"
+          },
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "EARLY VOTING IN-PERSON",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "DENNIS A HALL (HEIRS)",
+      "street_address": null,
+      "parcel_id": "9689604942",
+      "parcel_id_usable": "9689604942",
+      "decedent_name": "DENNIS A HALL",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "ANNETTE H PERKINS",
+      "heir_estate_mailing": "18 WHITE PINE CIR FLETCHER NC 28732",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "ANNETTE H PERKINS",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "FLETCHER",
+        "voter_result": {
+          "first_name": "ANNETTE",
+          "last_name": "PERKINS",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 1,
+          "status": "active",
+          "match": {
+            "full_name": "PERKINS, ANNETTE H",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000171740",
+            "ncid": "AL88105",
+            "res_address_csz": "FLETCHER, NC 28732"
+          },
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "IN-PERSON ELECTION DAY",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "JAMES FALCONER HEIRS",
+      "street_address": null,
+      "parcel_id": "9649544610",
+      "parcel_id_usable": "9649544610",
+      "decedent_name": "JAMES FALCONER",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "MILDRED DAVIS BOOKER",
+      "heir_estate_mailing": "24 STENGEL AVE NEWARK NJ 07112",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "MILDRED DAVIS BOOKER",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "NEWARK",
+        "voter_result": {
+          "first_name": "MILDRED",
+          "last_name": "BOOKER",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 1,
+          "status": "active",
+          "match": {
+            "full_name": "BOOKER, MILDRED C",
+            "status_desc": "ACTIVE",
+            "county_name": "IREDELL",
+            "voter_reg_num": "000000735100",
+            "ncid": "CG7608",
+            "res_address_csz": "STATESVILLE, NC 28677"
+          },
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "03/03/2026 PRIMARY",
+            "voted_county": "IREDELL",
+            "voted_method": "IN-PERSON ELECTION DAY",
+            "voted_party": "DEMOCRATIC"
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "LANCE HAROLD L",
+      "street_address": "33 WESLEY DR",
+      "parcel_id": "8792793598",
+      "parcel_id_usable": "8792793598",
+      "decedent_name": "DOT A FREEMAN",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "MARIE CANDLER",
+      "heir_estate_mailing": "926 NEW LEICESTER HWY ASHEVILLE NC 28806",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "MARIE CANDLER",
+        "category": "not_found",
+        "match_city_hint": "ASHEVILLE",
+        "voter_result": {
+          "first_name": "MARIE",
+          "last_name": "CANDLER",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 0,
+          "status": "not_found",
+          "match": null,
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": null
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "BETTY MOORE PENLAND (HEIRS)",
+      "street_address": null,
+      "parcel_id": "9742916139",
+      "parcel_id_usable": "9742916139",
+      "decedent_name": "BETTY MOORE PENLAND",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "JOAN ROGER REEDER",
+      "heir_estate_mailing": "263 LONGS CHAPEL RD WEAVERVILLE NC 28787",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "JOAN ROGER REEDER",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "WEAVERVILLE",
+        "voter_result": {
+          "first_name": "JOAN",
+          "last_name": "REEDER",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 1,
+          "status": "active",
+          "match": {
+            "full_name": "REEDER, JOAN ROGERS",
+            "status_desc": "ACTIVE",
+            "county_name": "BUNCOMBE",
+            "voter_reg_num": "000000358294",
+            "ncid": "AL22858",
+            "res_address_csz": "WEAVERVILLE, NC 28787"
+          },
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "BUNCOMBE",
+            "voted_method": "EARLY VOTING IN-PERSON",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "FRANK LYTLE HEIRS",
+      "street_address": null,
+      "parcel_id": "9689219127",
+      "parcel_id_usable": "9689219127",
+      "decedent_name": "FRANK LYTLE",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "TERRI CLARK",
+      "heir_estate_mailing": "122 WINTERFIELD DR RAEFORD NC 28376",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "TERRI CLARK",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": "RAEFORD",
+        "voter_result": {
+          "first_name": "TERRI",
+          "last_name": "CLARK",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 19,
+          "status": "active",
+          "match": {
+            "full_name": "CLARK, TERRI LUCILLE",
+            "status_desc": "ACTIVE",
+            "county_name": "HOKE",
+            "voter_reg_num": "000000055290",
+            "ncid": "BE189965",
+            "res_address_csz": "RAEFORD, NC 28376"
+          },
+          "disambiguated_by_city": true,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "11/05/2024 GENERAL",
+            "voted_county": "HOKE",
+            "voted_method": "EARLY VOTING IN-PERSON",
+            "voted_party": null
+          }
+        }
+      }
+    },
+    {
+      "listing_type": "estate_lead",
+      "owner_name": "WHITTED (HEIRS) FRANCES W",
+      "street_address": "159 LOWER EDGEWOOD RD",
+      "parcel_id": "9617351909",
+      "parcel_id_usable": "9617351909",
+      "decedent_name": "WHITTED FRANCES W",
+      "decedent_source": "heir_estate.owner_of_record",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": null,
+      "pr_role": null,
+      "heir_estate_care_of": "CINDY BROOKS",
+      "heir_estate_mailing": "141 MIMOSA LN SYLVA NC 28779",
+      "heir_estate_match": "heirs",
+      "voter_check": {
+        "role": "care_of",
+        "name": "CINDY BROOKS",
+        "category": "ambiguous_common_name",
+        "match_city_hint": "SYLVA",
+        "voter_result": {
+          "first_name": "CINDY",
+          "last_name": "BROOKS",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 4,
+          "status": "ambiguous",
+          "match": null,
+          "disambiguated_by_city": false,
+          "candidates": [
+            {
+              "VoterRegNum": "000000027619",
+              "CountyId": 39,
+              "CountyName": "GRANVILLE",
+              "FullName": "BROOKS, CINDY LEIGH",
+              "NCID": "BW24424",
+              "ResAddressCSZ": "OXFORD, NC 27565",
+              "StatusDesc": "ACTIVE",
+              "StatusLbl": "A"
+            },
+            {
+              "VoterRegNum": "000199426614",
+              "CountyId": 62,
+              "CountyName": "MONTGOMERY",
+              "FullName": "BROOKS, CINDY MURCHISON",
+              "NCID": "CW86876",
+              "ResAddressCSZ": "MT GILEAD, NC 27306",
+              "StatusDesc": "ACTIVE",
+              "StatusLbl": "A"
+            },
+            {
+              "VoterRegNum": "000010442032",
+              "CountyId": 41,
+              "CountyName": "GUILFORD",
+              "FullName": "BROOKS, CINDY RENEE",
+              "NCID": "AA154070",
+              "ResAddressCSZ": "MCLEANSVILLE, NC 27301",
+              "StatusDesc": "ACTIVE",
+              "StatusLbl": "A"
+            },
+            {
+              "VoterRegNum": "000000274787",
+              "CountyId": 65,
+              "CountyName": "NEW HANOVER",
+              "FullName": "BROOKS, CINDY TEACHEY",
+              "NCID": "EH254674",
+              "ResAddressCSZ": "WILMINGTON, NC 28412",
+              "StatusDesc": "ACTIVE",
+              "StatusLbl": "A"
+            }
+          ],
+          "most_recent_vote": null
+        }
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Douglas Dale Tesner",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Douglas Dale Tesner",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": "Tyler Tesner",
+      "pr_role": "Administrator",
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "voter_check": {
+        "role": "personal_representative",
+        "name": "Tyler Tesner",
+        "category": "not_found",
+        "match_city_hint": null,
+        "voter_result": {
+          "first_name": "Tyler",
+          "last_name": "Tesner",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 0,
+          "status": "not_found",
+          "match": null,
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": null
+        }
+      }
+    },
+    {
+      "listing_type": "probate_notice",
+      "owner_name": "Stephen Douglas Gray",
+      "street_address": null,
+      "parcel_id": null,
+      "parcel_id_usable": null,
+      "decedent_name": "Stephen Douglas Gray",
+      "decedent_source": "owner_name_fallback",
+      "es_case_number": null,
+      "nc_estate_file_no": null,
+      "personal_representative": "Craigan Gray",
+      "pr_role": "Administrator",
+      "heir_estate_care_of": null,
+      "heir_estate_mailing": null,
+      "heir_estate_match": null,
+      "voter_check": {
+        "role": "personal_representative",
+        "name": "Craigan Gray",
+        "category": "confirmed_active_locatable",
+        "match_city_hint": null,
+        "voter_result": {
+          "first_name": "Craigan",
+          "last_name": "Gray",
+          "county": "ALL",
+          "ok": true,
+          "error": null,
+          "total_matches": 1,
+          "status": "active",
+          "match": {
+            "full_name": "GRAY, CRAIGAN",
+            "status_desc": "ACTIVE",
+            "county_name": "MADISON",
+            "voter_reg_num": "000030023526",
+            "ncid": "AL11154",
+            "res_address_csz": "MARSHALL, NC 28753"
+          },
+          "disambiguated_by_city": false,
+          "candidates": [],
+          "most_recent_vote": {
+            "election": "03/03/2026 PRIMARY",
+            "voted_county": "MADISON",
+            "voted_method": "EARLY VOTING IN-PERSON",
+            "voted_party": "DEMOCRATIC"
+          }
+        }
+      }
+    }
+  ]
+}
