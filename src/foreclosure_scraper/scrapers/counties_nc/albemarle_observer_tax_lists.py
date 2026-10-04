@@ -166,12 +166,131 @@ def parse_bertie(content: str) -> list[dict]:
     return out
 
 
+# EXTRACTION-COMPLETENESS AUDIT 2026-10-03: the INDEX_URL query (search=delinquent)
+# was already returning Chowan/Hyde/Perquimans-Hertford-Winfall posts alongside the
+# 5 targets above -- they just had no Target entry, so pick_post() never selected
+# them and the fetched index data for 3 more counties/towns was silently dropped.
+# Live-verified volumes: Chowan 887 parcel rows, Hyde 1,026 owner/property rows
+# ($649,638.05 total), Perquimans/Hertford/Winfall 1,724 parcel rows -- all on
+# posts the scraper's own index call already returns every run.
+def _table_rows(content: str, required_labels: tuple[str, str]) -> Iterable[tuple[dict[str, int], list[str]]]:
+    """Yield (column-index-map, cell-text-list) for each data row of the first
+    <table> whose header carries BOTH `required_labels` (lowercased). Locating
+    the header by its own labels (not column position) means a layout shuffle
+    doesn't silently misalign fields -- same convention as nc_coastal_tax_
+    foreclosure.parse_carteret."""
+    for tbl in re.findall(r"<table[^>]*>(.*?)</table>", content, flags=re.S):
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", tbl, flags=re.S)
+        if not rows:
+            continue
+        col: dict[str, int] = {}
+        header_idx = -1
+        for ri, row in enumerate(rows):
+            cells = [_text(c) for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, flags=re.S)]
+            labels = [c.strip().lower() for c in cells]
+            if all(lab in labels for lab in required_labels):
+                for ci, lab in enumerate(labels):
+                    col[lab] = ci
+                header_idx = ri
+                break
+        if header_idx < 0:
+            continue
+        for row in rows[header_idx + 1:]:
+            cells = [_text(c) for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, flags=re.S)]
+            if cells and any(c.strip() for c in cells):
+                yield col, cells
+
+
+def _cell(col: dict[str, int], cells: list[str], label: str) -> str:
+    i = col.get(label)
+    return cells[i].strip() if i is not None and i < len(cells) else ""
+
+
+# Chowan's own "Total Due" cells are NOT reliably 2-decimal ("2142", "360.3",
+# "1702.6" all live-observed alongside normal "86.79" cells) -- a strict
+# \.\d{2} requirement (the module-level _AMT used by Tyrrell/Washington/Gates,
+# whose sources ARE always 2-decimal) silently dropped 85 of 887 real Chowan
+# rows. This accepts 0, 1 or 2 decimal digits. NOTE: the digit run is
+# deliberately NOT capped at 3-before-a-comma the way _AMT above is -- an
+# alternation like \d{1,3}(?:,\d{3})* partial-matches just the first 3 digits
+# of a comma-less 4+-digit integer ("2142" -> "214"), because regex
+# alternation stops at the first branch that matches at all, not the longest
+# one; [\d,]+ always consumes the whole digit run instead.
+_AMT_RE = re.compile(r"([\d,]+(?:\.\d{1,2})?)")
+
+
+def parse_chowan(content: str) -> list[dict]:
+    """Chowan's republished roll: Parcel Number | Property Address | Name1 |
+    Name 2 | City | State | Total Due. Live-confirmed 2026-10-03: 887 rows, a
+    real parcel AND situs address AND a mailing City/State per row (several
+    out-of-state -- e.g. a Kittredge, CO owner) that the scraper had never
+    even tried to read (no Target matched this post's title at all)."""
+    out = []
+    for col, cells in _table_rows(content, ("parcel number", "total due")):
+        parcel = _cell(col, cells, "parcel number")
+        amt = _AMT_RE.search(_cell(col, cells, "total due"))
+        name1 = _cell(col, cells, "name1") or _cell(col, cells, "name 1")
+        if not (parcel and amt and name1):
+            continue
+        name2 = _cell(col, cells, "name 2") or _cell(col, cells, "name2")
+        owner = name1 + (f" & {name2}" if name2 else "")
+        out.append({
+            "owner": owner, "parcel": parcel, "amount": _money(amt.group(1)),
+            "situs": _cell(col, cells, "property address") or None,
+            "mail_city": _cell(col, cells, "city") or None,
+            "mail_state": _cell(col, cells, "state") or None,
+        })
+    return out
+
+
+def parse_hyde(content: str) -> list[dict]:
+    """Hyde's republished roll: Name | Property | Amount Owed. NO parcel id --
+    'Property' is a free-text legal/chattel description ('LOT & HOUSE', '2.50
+    AC. CLAYTON', 'DOUBLE WIDE', 'WATERCRAFT'), not a street address, so rows
+    group on (owner, property text) rather than a parcel: live-confirmed 112
+    owners carry 2+ DISTINCT properties (e.g. two different tracts), and
+    grouping by owner alone would silently merge them into one lead. 1,026
+    rows live, $649,638.05 total principal."""
+    out = []
+    for col, cells in _table_rows(content, ("name", "amount owed")):
+        owner = _cell(col, cells, "name")
+        amt = _AMT_RE.search(_cell(col, cells, "amount owed"))
+        if not (owner and amt):
+            continue
+        prop = _cell(col, cells, "property") or None
+        out.append({"owner": owner, "property": prop, "amount": _money(amt.group(1))})
+    return out
+
+
+# Perquimans/Hertford/Winfall: one <li> per record, no header/table at all --
+# "NAME ... AMOUNT PARCEL" run together with &nbsp;-padding (decoded by _text()
+# before matching). Parcel ids are hyphenated and may lead with a letter
+# (live-confirmed "P-D082-Y018-AP"), so the id group accepts a leading digit OR
+# letter. Live-confirmed 2026-10-03: 1,724/1,724 <li> rows match.
+_PHW_ROW = re.compile(
+    r"^(?P<owner>.+?)\s+\$?(?P<amt>\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2})\s+"
+    r"(?P<pid>[0-9A-Za-z][0-9A-Za-z\-]{4,})\$?$"
+)
+
+
+def parse_perquimans(content: str) -> list[dict]:
+    """Perquimans County/Hertford/Winfall joint notice (one list, like
+    Washington's joint county/town heading -- not split per sub-jurisdiction)."""
+    out = []
+    for li in re.findall(r"<li[^>]*>(.*?)</li>", content, flags=re.S):
+        m = _PHW_ROW.match(_text(li))
+        if m:
+            out.append({"owner": m["owner"].strip(" ,"), "parcel": m["pid"],
+                        "amount": _money(m["amt"])})
+    return out
+
+
 @dataclass(frozen=True)
 class Target:
     county: str
     title_re: re.Pattern
     parser: Callable[[str], list[dict]]
-    key: str                       # how bills group into one lead: parcel | account | owner | owner_situs
+    key: str                       # how bills group into one lead: parcel | account | owner | owner_situs | owner_property
     title_not: re.Pattern | None = None
 
 
@@ -183,6 +302,9 @@ TARGETS: tuple[Target, ...] = (
            parse_plymouth, "owner"),
     Target("Gates", re.compile(r"^Gates County Delinquent", re.I), parse_gates, "owner_situs"),
     Target("Bertie", re.compile(r"^Bertie County .*delinquent", re.I), parse_bertie, "parcel"),
+    Target("Chowan", re.compile(r"^Chowan County Delinquent", re.I), parse_chowan, "parcel"),
+    Target("Hyde", re.compile(r"^Hyde County Delinquent", re.I), parse_hyde, "owner_property"),
+    Target("Perquimans", re.compile(r"^Perquimans Co.*Taxes", re.I), parse_perquimans, "parcel"),
 )
 
 
@@ -229,6 +351,11 @@ def to_listings(target: Target, bills: list[dict], *, post: dict, content: str) 
             k = (b["jurisdiction"], b["account"])
         elif target.key == "owner":
             k = (b.get("jurisdiction"), b["owner"].upper())
+        elif target.key == "owner_property":
+            # Hyde: no parcel id, and the same owner can carry 2+ DISTINCT
+            # properties (live-confirmed 112 owners) -- group on the property
+            # text too, or two different tracts would silently merge into one.
+            k = (b["owner"].upper(), (b.get("property") or "").upper())
         else:
             k = (b["owner"].upper(), (b["situs"] or "").upper())
         groups.setdefault(k, []).append(b)
@@ -245,14 +372,21 @@ def to_listings(target: Target, bills: list[dict], *, post: dict, content: str) 
         years = sorted({b["year"] for b in group if b.get("year")}) or [year]
         situs = head.get("situs")
         street = situs if (situs and _HOUSE.match(situs)) else None
+        # Hyde's "property" is a free-text legal/chattel description (never a
+        # street), so it is the legal_description directly, not gated behind
+        # the _HOUSE street-shape check the situs-bearing targets use.
+        legal = head.get("property") if target.key == "owner_property" else (None if street else situs)
+        mail_city, mail_state = head.get("mail_city"), head.get("mail_state")
         block = {
             "county": target.county, "post_url": post.get("link"), "post_date": post_date.date().isoformat(),
             "list_year": year, "owner": head["owner"], "parcel": head.get("parcel"),
             "account": head.get("account"), "situs_text": situs,
+            "property_text": head.get("property"),
             "jurisdiction": head.get("jurisdiction"), "years": years,
             "years_delinquent": len(years), "is_two_year_plus": len(years) >= 2,
             "total_due": total, "bills": [{"year": b.get("year"), "amount": b["amount"]} for b in group],
             "principal_only": True,
+            "mail_city": mail_city, "mail_state": mail_state,
         }
         raw = {"albemarle_observer_tax_list": block,
                "tax_owed": {"balance": total, "kind": "delinquent_tax", "source": SLUG,
@@ -262,6 +396,17 @@ def to_listings(target: Target, bills: list[dict], *, post: dict, content: str) 
             # Tyrrell, Bertie and Washington lists are a single tax year and say nothing about age.
             raw["two_year_delinquent"] = {"is_two_year_plus": len(years) >= 2, "years": len(years),
                                           "oldest_year": years[0], "source": SLUG}
+        if mail_state:
+            # Chowan carries the owner's MAILING city/state alongside the situs
+            # (e.g. a Kittredge, CO owner of a Chowan NC parcel) -- a real,
+            # already-fetched absentee/out-of-state signal, never surfaced
+            # before (same convention as counties_generic.multi_year_
+            # delinquent_tax's own absentee/out_of_state block).
+            raw["absentee_owner"] = {
+                "mail_city": mail_city, "mail_state": mail_state,
+                "out_of_state": mail_state.strip().upper() != "NC",
+                "source": SLUG,
+            }
         out.append(Listing(
             source=SLUG,
             source_url=f"{post.get('link') or BASE}#{frag}",
@@ -271,7 +416,7 @@ def to_listings(target: Target, bills: list[dict], *, post: dict, content: str) 
             parcel_id=head.get("parcel"),
             owner_name=head["owner"], defendant=head["owner"],
             street_address=street,
-            legal_description=None if street else situs,
+            legal_description=legal,
             foreclosure_process="tax",
             description=(f"{target.county} County {year} delinquent property tax list (NCGS 105-369): "
                          f"${total:,.2f} principal advertised"

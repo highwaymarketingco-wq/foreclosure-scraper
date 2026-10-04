@@ -3,6 +3,14 @@
 Each county's list is laid out differently. The post bodies below are hand-built from the
 shapes read live (Tyrrell <li>, Washington <li> with an account number, Gates <p> rows with a
 year and a situs, Bertie <table>); every name, parcel, account and amount is invented.
+
+Chowan/Hyde/Perquimans-Hertford-Winfall (added 2026-10-03, extraction-completeness audit):
+the scraper's own INDEX_URL query was already returning these 3 posts every run, but no
+Target matched their titles, so the data was fetched and thrown away. Chowan <table> (parcel +
+situs + 2 owner-name columns + mailing city/state), Hyde <table> (name + free-text property
+description, no parcel), Perquimans/Hertford/Winfall <li> (one joint notice, name+amount+parcel
+run together). Shapes below are hand-built from the real live layout; names/parcels/amounts
+invented.
 """
 from __future__ import annotations
 
@@ -38,6 +46,35 @@ BERTIE = """<table><thead><tr><th>Current Owner</th><th>PIN</th><th>Amount</th><
 <tr><td>ALSTON ANNETTE &amp; JORDAN BRYON M</td><td>25A5869412801</td><td>$66.87</td></tr>
 <tr><td>A AND E HOMES INC</td><td>25A690026869002</td><td>101.65</td></tr>
 <tr><td>NOT A PIN</td><td>hello</td><td>$1.00</td></tr></tbody></table>"""
+
+CHOWAN = """<p>Published below is the delinquent property tax list for Chowan County.</p>
+<table><tbody>
+<tr><td>Parcel Number</td><td>Property Address</td><td>Name1</td><td>Name 2</td><td>City</td><td>State</td><td>Total Due</td></tr>
+<tr><td>697007792923</td><td>100 CHEYENNE TRL</td><td>3B DEVELOPMENT INC</td><td></td><td>WASHINGTON</td><td>NC</td><td>86.79</td></tr>
+<tr><td>780520706376</td><td>124 E CARTERET ST</td><td>AHMAD, JALEES</td><td>AHMAD, MARIAM</td><td>DURHAM</td><td>NC</td><td>2746.86</td></tr>
+<tr><td>699200136763</td><td>108 RYLAND RD</td><td>AINSLEY, BONNIE</td><td></td><td>KITTREDGE</td><td>CO</td><td>241.21</td></tr>
+<tr><td>689412877469</td><td></td><td>ADAMS, RAYMOND, III</td><td></td><td>EDENTON</td><td>NC</td><td>543.38</td></tr>
+<tr><td>780518306324</td><td>101 CHOWAN CT</td><td>BELFIELD, CARROLL L</td><td>BELFIELD, JOLYQUIN A</td><td>EDENTON</td><td>NC</td><td>2142</td></tr>
+<tr><td></td><td>NO PARCEL ROW</td><td>NOBODY</td><td></td><td>EDENTON</td><td>NC</td><td>9.99</td></tr>
+</tbody></table>"""
+
+HYDE = """<p>Published below is the delinquent property tax list for Hyde County for 2025.</p>
+<table><tbody>
+<tr><td>Name</td><td>Property</td><td>Amount Owed</td></tr>
+<tr><td>ABRAMS, SHELIA MCCULLOUGH</td><td>LOT &amp; HOUSE</td><td>$1,001.93</td></tr>
+<tr><td>ADAMS, MONNIE</td><td>2.50 AC. CLAYTON</td><td>$57.07</td></tr>
+<tr><td>ADAMS, MONNIE</td><td>1/2 INT.IN 48 AC.</td><td>$103.04</td></tr>
+<tr><td>NO NAME HERE</td><td></td><td></td></tr>
+</tbody></table>"""
+
+PERQUIMANS_HERTFORD_WINFALL = (
+    "<p>NOTICE OF ADVERTISEMENT OF TAX LIENS ON REAL PROPERTY PERQUIMANS COUNTY, HERTFORD AND WINFALL</p>"
+    "<ul>"
+    "<li>ABREGO, ARELY &amp; HUSBAND, &nbsp; &nbsp; 399.50 2-D070-0022-BF&nbsp;</li>"
+    "<li>ALBEMARLE PRESERVE, LLC, &nbsp; &nbsp; 417.45 P-D082-Y018-AP</li>"
+    "<li>Note: this line has no amount or parcel</li>"
+    "</ul>"
+)
 
 
 def _post(title, date="2026-05-26T09:00:00"):
@@ -89,6 +126,48 @@ def test_bertie_pins_drop_the_25a_prefix_and_keep_longer_parcel_numbers():
         ("5869412801", "25A5869412801", 66.87), ("690026869002", "25A690026869002", 101.65)]
 
 
+def test_chowan_rows_carry_parcel_situs_and_mailing_city_state():
+    b = m.parse_chowan(CHOWAN)
+    # The row with no parcel number is dropped; the row with no situs keeps parsing
+    # (parcel-keyed, not situs-keyed) with situs=None rather than an empty string.
+    assert len(b) == 5
+    first = next(x for x in b if x["parcel"] == "697007792923")
+    assert first == {"owner": "3B DEVELOPMENT INC", "parcel": "697007792923", "amount": 86.79,
+                      "situs": "100 CHEYENNE TRL", "mail_city": "WASHINGTON", "mail_state": "NC"}
+    co_owned = next(x for x in b if x["parcel"] == "780520706376")
+    assert co_owned["owner"] == "AHMAD, JALEES & AHMAD, MARIAM"
+    no_situs = next(x for x in b if x["parcel"] == "689412877469")
+    assert no_situs["situs"] is None
+    out_of_state = next(x for x in b if x["parcel"] == "699200136763")
+    assert out_of_state["mail_city"] == "KITTREDGE" and out_of_state["mail_state"] == "CO"
+
+
+def test_chowan_amount_is_not_truncated_when_it_has_no_decimal_or_comma():
+    """2142 (no decimal, no comma) must parse whole -- a \\d{1,3}(?:,\\d{3})* style
+    alternation would partial-match just '214' and silently drop the trailing digit."""
+    b = m.parse_chowan(CHOWAN)
+    whole = next(x for x in b if x["parcel"] == "780518306324")
+    assert whole["amount"] == 2142.0
+
+
+def test_hyde_rows_have_no_parcel_and_keep_distinct_properties_per_owner():
+    b = m.parse_hyde(HYDE)
+    assert len(b) == 3  # the blank name/amount row is dropped
+    assert all(x.get("parcel") is None for x in b) and all("parcel" not in x for x in b)
+    monnie = [x for x in b if x["owner"] == "ADAMS, MONNIE"]
+    assert len(monnie) == 2
+    assert {x["property"] for x in monnie} == {"2.50 AC. CLAYTON", "1/2 INT.IN 48 AC."}
+    assert {x["amount"] for x in monnie} == {57.07, 103.04}
+
+
+def test_perquimans_rows_accept_a_letter_leading_parcel_id():
+    b = m.parse_perquimans(PERQUIMANS_HERTFORD_WINFALL)
+    assert [(x["owner"], x["parcel"], x["amount"]) for x in b] == [
+        ("ABREGO, ARELY & HUSBAND", "2-D070-0022-BF", 399.50),
+        ("ALBEMARLE PRESERVE, LLC", "P-D082-Y018-AP", 417.45),
+    ]
+
+
 # --------------------------------------------------------------------------- selection
 
 INDEX = [
@@ -99,12 +178,16 @@ INDEX = [
     {"id": 5, "date": "2026-05-26T10:00:00", "link": "u5", "title": {"rendered": "Gates County Delinquent Property Tax List — Have you paid your taxes?"}},
     {"id": 6, "date": "2026-06-05T10:00:00", "link": "u6", "title": {"rendered": "Bertie County 2025 delinquent personal property tax list"}},
     {"id": 7, "date": "2026-04-27T10:00:00", "link": "u7", "title": {"rendered": "Public Record: Tyrrell County 2025 Unpaid Taxes List"}},
+    {"id": 8, "date": "2026-04-16T10:00:00", "link": "u8", "title": {"rendered": "Chowan County Delinquent Property Tax List — Have you paid your taxes?"}},
+    {"id": 9, "date": "2026-09-10T10:00:00", "link": "u9", "title": {"rendered": "Chowan County commissioners weigh pros and cons of data centers"}},
+    {"id": 10, "date": "2026-07-14T10:00:00", "link": "u10", "title": {"rendered": "Hyde County Delinquent Property Tax List — Have you paid your taxes?"}},
+    {"id": 11, "date": "2026-06-11T10:00:00", "link": "u11", "title": {"rendered": "Perquimans Co, Hertford and Winfall — Have You Paid Your Taxes?"}},
 ]
 TODAY = datetime(2026, 9, 21)
 
 
 def test_the_right_post_is_picked_per_target():
-    want = {"Tyrrell": 7, "Gates": 5, "Bertie": 6}
+    want = {"Tyrrell": 7, "Gates": 5, "Bertie": 6, "Chowan": 8, "Hyde": 10, "Perquimans": 11}
     for t in m.TARGETS:
         p = m.pick_post(INDEX, t, today=TODAY)
         if t.county in want:
@@ -161,6 +244,38 @@ def test_tyrrell_and_bertie_leads_carry_a_parcel_and_the_principal_only_flag():
     assert a.source_url.startswith("https://albemarleobserver.news/x/#")
 
 
+def test_chowan_leads_carry_street_address_and_absentee_owner_signal():
+    t = next(t for t in m.TARGETS if t.county == "Chowan")
+    leads = m.to_listings(t, m.parse_chowan(CHOWAN), post=_post("Chowan County Delinquent Property Tax List"),
+                          content="")
+    local = next(l for l in leads if l.parcel_id == "697007792923")
+    assert local.street_address == "100 CHEYENNE TRL" and "absentee_owner" in local.raw
+    assert local.raw["absentee_owner"]["out_of_state"] is False
+    oos = next(l for l in leads if l.parcel_id == "699200136763")
+    assert oos.raw["absentee_owner"] == {"mail_city": "KITTREDGE", "mail_state": "CO",
+                                         "out_of_state": True, "source": m.SLUG}
+    no_situs = next(l for l in leads if l.parcel_id == "689412877469")
+    assert no_situs.street_address is None and no_situs.legal_description is None
+
+
+def test_hyde_leads_have_no_street_but_carry_the_property_text_as_legal_description():
+    t = next(t for t in m.TARGETS if t.county == "Hyde")
+    leads = m.to_listings(t, m.parse_hyde(HYDE), post=_post("Hyde County Delinquent Property Tax List"),
+                          content="")
+    assert len(leads) == 3  # Monnie's two distinct tracts are NOT merged
+    assert all(l.street_address is None and l.parcel_id is None for l in leads)
+    assert {l.legal_description for l in leads} == {"LOT & HOUSE", "2.50 AC. CLAYTON", "1/2 INT.IN 48 AC."}
+    assert len({l.dedupe_key() for l in leads}) == 3  # distinct dedupe keys despite no parcel
+
+
+def test_perquimans_leads_carry_a_parcel_and_county_label():
+    t = next(t for t in m.TARGETS if t.county == "Perquimans")
+    leads = m.to_listings(t, m.parse_perquimans(PERQUIMANS_HERTFORD_WINFALL),
+                          post=_post("Perquimans Co, Hertford and Winfall — Have You Paid Your Taxes?"), content="")
+    assert len(leads) == 2 and all(l.county == "Perquimans" and l.state == "NC" for l in leads)
+    assert {l.parcel_id for l in leads} == {"2-D070-0022-BF", "P-D082-Y018-AP"}
+
+
 def test_washington_leads_group_by_account_and_plymouth_by_owner():
     tw = next(t for t in m.TARGETS if t.parser is m.parse_washington)
     leads = m.to_listings(tw, m.parse_washington(WASHINGTON), post=_post("Washington County Delinquent Property Tax List"), content="")
@@ -198,22 +313,29 @@ def _patch(monkeypatch, transport):
     monkeypatch.setattr(m, "datetime", type("D", (datetime,), {"utcnow": staticmethod(lambda: TODAY)}))
 
 
+_ALL_POSTS = {7: TYRRELL, 2: WASHINGTON, 1: PLYMOUTH, 5: GATES, 6: BERTIE,
+              8: CHOWAN, 10: HYDE, 11: PERQUIMANS_HERTFORD_WINFALL}
+
+
 def test_the_scraper_reads_the_index_then_only_the_current_posts(monkeypatch):
     seen: list = []
-    _patch(monkeypatch, _transport({7: TYRRELL, 2: WASHINGTON, 1: PLYMOUTH, 5: GATES, 6: BERTIE}, seen))
+    _patch(monkeypatch, _transport(_ALL_POSTS, seen))
     out = asyncio.run(m.AlbemarleObserverTaxLists().fetch())
     counties = sorted({l.county for l in out})
-    assert counties == ["Bertie", "Gates", "Tyrrell", "Washington"]
-    # One index request plus five posts; the stale Gates post (id 4) and the commissioners
-    # story (id 3) are never fetched.
-    assert len(seen) == 6
+    assert counties == ["Bertie", "Chowan", "Gates", "Hyde", "Perquimans", "Tyrrell", "Washington"]
+    # One index request plus eight posts (one per Target); the stale Gates post (id 4), the
+    # Washington commissioners story (id 3) and the Chowan commissioners story (id 9) are
+    # never fetched even though the index returns them too.
+    assert len(seen) == 9
     assert not any(u.endswith("/4?_fields=id,date,link,title,content") for u in seen)
+    assert not any(u.endswith("/9?_fields=id,date,link,title,content") for u in seen)
 
 
 def test_a_post_whose_layout_changed_is_named_not_silently_empty(monkeypatch):
     seen: list = []
-    _patch(monkeypatch, _transport({7: "<p>We redesigned the page, no list here</p>", 2: WASHINGTON,
-                                    1: PLYMOUTH, 5: GATES, 6: BERTIE}, seen))
+    posts = dict(_ALL_POSTS)
+    posts[7] = "<p>We redesigned the page, no list here</p>"
+    _patch(monkeypatch, _transport(posts, seen))
     out = asyncio.run(m.AlbemarleObserverTaxLists().fetch())
     assert "Tyrrell" not in {l.county for l in out} and "Gates" in {l.county for l in out}
 
@@ -227,11 +349,11 @@ def test_a_dead_index_is_an_empty_run_not_a_crash(monkeypatch):
 
 def test_a_sample_limit_caps_each_list(monkeypatch):
     seen: list = []
-    _patch(monkeypatch, _transport({7: TYRRELL, 2: WASHINGTON, 1: PLYMOUTH, 5: GATES, 6: BERTIE}, seen))
+    _patch(monkeypatch, _transport(_ALL_POSTS, seen))
     s = m.AlbemarleObserverTaxLists()
     s.limit = 1
     out = asyncio.run(s.fetch())
-    assert len(out) == 5                      # one lead from each of the five lists
+    assert len(out) == 8                      # one lead from each of the eight lists
 
 
 def test_rows_with_no_parcel_and_no_address_keep_distinct_dedupe_keys():
