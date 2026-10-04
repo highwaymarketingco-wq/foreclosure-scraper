@@ -175,6 +175,23 @@ PRIVACY: fields are enumerated explicitly — never ``outFields=*``. Everything
 taken from the GIS is a property/assessment record field (owner of record, owner
 mailing address, situs, value, tax owed). No phone, email, SSN, DL or DOB is
 requested or stored anywhere in this module.
+
+AUDITED 2026-10-04: the live layer carries 89 fields total; PARCEL_FIELDS asked
+for 26. Live-queried a 20-row sample of currently-delinquent parcels against
+every other field to check for real, silently-dropped value (never outFields=*
+-- each candidate was checked individually): HMSTCD/ZONECD/CLASS1 were blank on
+every sampled row (not populated on this layer, nothing to capture); DEEDTE is
+a YYYYMMDD-encoded duplicate of the already-captured DEEDDATE (confirmed by
+converting both on the same rows -- same date, different encoding); PDDATE was
+0 on every row (unclear meaning, no evidence of real content). Three fields
+WERE real and 100% filled on the sample and are now captured: CUBOOK/CUPAGE
+(the recorded deed's book/page -- the same chain-of-title reference this
+codebase's NC ROD modules already key off, letting a human or
+enrich_doc_images pull the actual deed) and LANDVAL/BLDGVAL (the land-vs-
+building split behind the already-captured FAIRMKTVAL/TAXMKTVAL totals --
+e.g. BLDGVAL=0 on an "IMPROVED" parcel is a real signal, a structure with no
+recorded value). ACCTNO (the county's own tax-billing account number,
+distinct from PIN) also added as a cross-reference key.
 """
 from __future__ import annotations
 
@@ -229,7 +246,8 @@ PAGE_URL = "https://www.greenvillecounty.org/RealPropertyServices/"
 PARCEL_FIELDS = (
     "OBJECTID,PIN,OWNAM1,OWNAM2,STREET,CITY,STATE,ZIP5,STRNUM,STRPRE,LOCATE,STRTYP,STRSUF,DESCR,"
     "SUBDIV,LANDUSE,PROPTYPE,IMPROVED,TOTTAX,PAIDDATE,SLPRICE,DEEDDATE,"
-    "FAIRMKTVAL,TAXMKTVAL,TACRES,SQFEET,BEDROOMS,BATHRMS,HALFBATH"
+    "FAIRMKTVAL,TAXMKTVAL,TACRES,SQFEET,BEDROOMS,BATHRMS,HALFBATH,"
+    "CUBOOK,CUPAGE,LANDVAL,BLDGVAL,ACCTNO"
 )
 SALES_FIELDS = (
     "OBJECTID,PIN,STREET,STRPRE,STRTYP,STRSUF,SALETYPE,TRUESALE,SALEDATE,"
@@ -298,6 +316,25 @@ def _money(v: Any) -> float | None:
     except ValueError:
         return None
     return f if f > 0 else None
+
+
+def _num_or_zero(v: Any) -> float | None:
+    """Like _money(), but keeps a real 0 instead of collapsing it to None --
+    _money()'s >0 filter is right for 'how much is billed/owed' (0 means
+    nothing there) but wrong for LANDVAL/BLDGVAL, where 0 is itself a real
+    signal (e.g. BLDGVAL=0 on an "IMPROVED" parcel -- a structure with no
+    recorded value). Only a genuinely missing value becomes None."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = re.sub(r"[^\d.]", "", str(v))
+    if not s or s == ".":
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
 
 
 def _zip5(v: Any) -> str | None:
@@ -554,6 +591,11 @@ def build_listing(pin: str, attrs: dict, geom: dict | None,
         "bathrooms": attrs.get("BATHRMS") or None,
         "subdivision": _clean(attrs.get("SUBDIV")),
         "legal_note": _clean(attrs.get("DESCR")),
+        "deed_book": _clean(attrs.get("CUBOOK")),
+        "deed_page": _clean(attrs.get("CUPAGE")),
+        "land_value": _num_or_zero(attrs.get("LANDVAL")),
+        "building_value": _num_or_zero(attrs.get("BLDGVAL")),
+        "tax_account_number": _clean(attrs.get("ACCTNO")),
         "source": "greenville_county_gis_and_tax_apps",
     }
     if tax_sale:

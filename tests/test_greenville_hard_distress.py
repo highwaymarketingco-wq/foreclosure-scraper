@@ -237,6 +237,50 @@ def test_the_unpaid_balance_never_lands_in_a_value_field():
     assert li.tax_value != 5567.69 and li.market_value != 5567.69
 
 
+def test_deed_book_page_and_value_breakdown_captured():
+    """AUDITED 2026-10-04: CUBOOK/CUPAGE/LANDVAL/BLDGVAL/ACCTNO are real,
+    100%-filled fields on the live layer (verified against a 20-row live
+    sample of currently-delinquent parcels) that were never requested.
+    Values here mirror a real live row (PIN 0012000101200, 2026-10-04)."""
+    f = _by_pin()[PIN_BOTH]
+    attrs = dict(f["attributes"], CUBOOK="2516", CUPAGE=5913,
+                 LANDVAL=2760, BLDGVAL=0, ACCTNO="202500002758577001")
+    li = build_listing(_normalize_parcel(PIN_BOTH), attrs, f["geometry"])
+    d = li.raw["greenville_distress"]
+    assert d["deed_book"] == "2516"
+    assert d["deed_page"] == "5913"
+    assert d["land_value"] == 2760.0
+    assert d["tax_account_number"] == "202500002758577001"
+
+
+def test_zero_building_value_is_kept_not_collapsed_to_none():
+    """The core correctness property: BLDGVAL=0 is a real signal (a
+    structure with no recorded value, live on 1,280/2,306 = 55.5% of a real
+    2026-10-04 run) -- the generic _money() helper would silently turn that
+    0 into None (it treats 0 as "nothing billed", right for TOTTAX, wrong
+    here), so a dedicated _num_or_zero() is used instead."""
+    f = _by_pin()[PIN_BOTH]
+    attrs = dict(f["attributes"], LANDVAL=2760, BLDGVAL=0)
+    li = build_listing(_normalize_parcel(PIN_BOTH), attrs, f["geometry"])
+    d = li.raw["greenville_distress"]
+    assert d["building_value"] == 0.0
+    assert d["building_value"] is not None
+
+
+def test_missing_deed_or_value_fields_are_none_not_crashes():
+    f = _by_pin()[PIN_BOTH]
+    attrs = dict(f["attributes"])
+    for k in ("CUBOOK", "CUPAGE", "LANDVAL", "BLDGVAL", "ACCTNO"):
+        attrs.pop(k, None)
+    li = build_listing(_normalize_parcel(PIN_BOTH), attrs, f["geometry"])
+    d = li.raw["greenville_distress"]
+    assert d["deed_book"] is None
+    assert d["deed_page"] is None
+    assert d["land_value"] is None
+    assert d["building_value"] is None
+    assert d["tax_account_number"] is None
+
+
 def test_government_owners_are_never_leads():
     f = _by_pin()[PIN_GOV]
     assert build_listing(_normalize_parcel(PIN_GOV), f["attributes"], None) is None
