@@ -48,6 +48,86 @@ def test_money():
     assert m._money("") is None
 
 
+# --------------------------------------------------------------------------- FLAGS audit (2026-10-03)
+#
+# FLAGS is a free-text, comma-joined column every row already carries that
+# nothing ever read. Live-verified across 7 tenants: FORECLOSURE (Guilford
+# 924/3,547 parcels, 26%; Beaufort; Orange), BANKRUPTCY (Hyde), ADVERTISED,
+# OWNERSHIP TRANSFER, Judgement Filed, FINAL NOTICE, HARDSHIP PAY PLAN,
+# REJECTED FORECLOSURE (must not count as foreclosure=True), and several USPS
+# return-mail codes (RM-NOT DELIVERABLE, RM-VACANT PROPERTY, MAIL RETURNED).
+
+def test_flags_summary_plain_delinquent_only():
+    f = m._flags_summary("DLQ")
+    assert f["in_foreclosure"] is False
+    assert f["tokens"] == ["DLQ"]
+
+
+def test_flags_summary_detects_foreclosure():
+    f = m._flags_summary("DLQ, FORECLOSURE, OWNERSHIP TRANSFER")
+    assert f["in_foreclosure"] is True
+    assert f["ownership_transfer"] is True
+    assert f["foreclosure_rejected"] is False
+
+
+def test_flags_summary_rejected_foreclosure_is_not_in_foreclosure():
+    f = m._flags_summary("ADVERTISED, DLQ, REJECTED FORECLOSURE")
+    assert f["in_foreclosure"] is False
+    assert f["foreclosure_rejected"] is True
+    assert f["advertised"] is True
+
+
+def test_flags_summary_bankruptcy_and_mail_undeliverable():
+    f = m._flags_summary("BANKRUPTCY, DLQ")
+    assert f["bankruptcy_mentioned"] is True
+    f2 = m._flags_summary("DLQ, RM-NOT DELIVERABLE")
+    assert f2["mail_undeliverable"] is True
+    f3 = m._flags_summary("ADVERTISED, DLQ, FINAL NOTICE, MAIL RETURNED")
+    assert f3["mail_undeliverable"] is True
+    assert f3["final_notice"] is True
+
+
+def test_flags_summary_vacant_property_and_judgment():
+    f = m._flags_summary("DLQ, RM-VACANT PROPERTY")
+    assert f["vacant_property_flag"] is True
+    f2 = m._flags_summary("DLQ, Judgement Filed")
+    assert f2["judgment_filed"] is True
+
+
+def test_flags_summary_blank_is_all_false():
+    f = m._flags_summary("")
+    assert not any(v for k, v in f.items() if k not in ("raw", "tokens"))
+    assert f["tokens"] is None
+
+
+_FLAGS_CSV = (
+    "BILL_TYPE,PARCEL_NUM,TAX_YEAR,OWNER_NAME,MAIL_ADDR1,MAIL_CITY,MAIL_STATE,MAIL_ZIP,"
+    "ABSTRACT_ASSESS_VALUE,ABSTRACT_TAXABLE_VALUE,TOTAL_DUE_AMOUNT,BILL_AMOUNT,INTEREST_DUE,"
+    "BILL_DUE_DATE,FLAGS,BILL_NUMBER\n"
+    # older year: plain DLQ. newest year: FORECLOSURE -- union must catch it.
+    "REI,7777,2023,\"HILL, SAM\",10 Pine St,Asheville,NC,28801,100000,100000,400.00,350.00,50.00,"
+    "09/01/2023 00:00:00,DLQ,B20\n"
+    "REI,7777,2024,\"HILL, SAM\",10 Pine St,Asheville,NC,28801,100000,100000,250.00,220.00,30.00,"
+    "09/01/2024 00:00:00,\"DLQ, FORECLOSURE\",B21\n"
+)
+
+
+def test_flags_union_across_aggregated_years_catches_later_foreclosure_flag():
+    leads = m._parse_csv(_FLAGS_CSV, "Guilford", "NC", "Guilford")
+    assert len(leads) == 1
+    li = leads[0]
+    assert li.raw["tax_sale_status"] == "in_foreclosure"
+    assert li.description.startswith("ACTIVE TAX FORECLOSURE — ")
+    tv = li.raw["nc_ptscloud_delinquent_tax"]
+    assert tv["flags"]["in_foreclosure"] is True
+    # interest + original bill amount summed across both years, same as principal
+    assert tv["interest_due"] == 80.0
+    assert tv["original_bill_amount"] == 570.0
+    assert tv["taxable_value"] == 100000.0
+    # bill_due_date is the representative (latest-year) row's own date
+    assert tv["bill_due_date"] == "09/01/2024 00:00:00"
+
+
 _PLACEHOLDER_CSV = (
     "BILL_TYPE,PARCEL_NUM,TAX_YEAR,OWNER_NAME,MAIL_ADDR1,MAIL_CITY,MAIL_STATE,MAIL_ZIP,"
     "ABSTRACT_ASSESS_VALUE,TOTAL_DUE_AMOUNT,BILL_NUMBER,DESCRIPTION\n"

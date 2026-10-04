@@ -162,6 +162,47 @@ def _acres(v) -> float | None:
     return f if f > 0 else None
 
 
+# FLAGS is a free-text, comma-joined column every row already carries but
+# nothing ever read -- live-verified 2026-10-03 across 7 tenants (Henderson,
+# Guilford, Forsyth, Orange, Pitt, Hyde, Madison, Beaufort), each with its own
+# vocabulary beyond plain "DLQ": FORECLOSURE (Guilford 6,907+, Beaufort
+# 4,300+ rows -- the county's own in-foreclosure flag, same concept
+# nc_its_public_tax.py already surfaces as raw['tax_sale_status']=
+# "in_foreclosure"), BANKRUPTCY (Hyde), ADVERTISED (the NCGS 105-369
+# tax-lien advertisement, matching rutherford_wildfire_tax's own flag),
+# OWNERSHIP TRANSFER, judgement/Judgement Filed, FINAL NOTICE, HARDSHIP PAY
+# PLAN, REJECTED FORECLOSURE (must NOT count as foreclosure=True), and
+# several USPS return-mail reason codes (RM-NOT DELIVERABLE, RM-VACANT
+# PROPERTY, RM-ATTMPTD NOT KNOWN, RM-FWD. TIME EXPIRED / "MAIL RETURNED") --
+# a direct, structured "this owner's mail is bouncing" signal, worth far
+# more than the free-text noise-stripping _OWNER_NOISE_RE already does.
+# Henderson alone: 142/2,120 REI rows ownership-transferred, 37 undeliverable
+# mail, 34 with a judgment filed, 8 flagged vacant by the postal system.
+def _flags_summary(flags_raw: str) -> dict:
+    tokens = [t.strip() for t in (flags_raw or "").split(",") if t.strip()]
+    joined = " | ".join(t.upper() for t in tokens)
+    def has(sub: str) -> bool:
+        return sub in joined
+    rejected_fcl = has("REJECTED") and has("FORECLOSURE")
+    return {
+        "raw": flags_raw or None,
+        "tokens": tokens or None,
+        "in_foreclosure": has("FORECLOSURE") and not rejected_fcl,
+        "foreclosure_rejected": rejected_fcl,
+        "bankruptcy_mentioned": has("BANKRUPTCY"),
+        "advertised": has("ADVERTISED"),
+        "final_notice": has("FINAL NOTICE"),
+        "ownership_transfer": has("OWNERSHIP TRANSFER"),
+        "judgment_filed": has("JUDGEMENT FILED") or has("JUDGMENT FILED"),
+        "mail_undeliverable": (has("NOT DELIVERABLE") or has("MAIL RETURNED")
+                               or has("ATTMPTD NOT KNOWN") or has("TIME EXPIRED")
+                               or has("RM-")),
+        "vacant_property_flag": has("VACANT PROPERTY"),
+        "hardship_plan": has("HARDSHIP"),
+        "retired_parcel": has("RETIRED PARCEL"),
+    }
+
+
 class TenantExportBroken(RuntimeError):
     """The tenant's export pipeline failed. Distinct from 'published nothing'."""
 
@@ -248,8 +289,15 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
         if not identity_key:
             continue
         a = agg.setdefault(identity_key, {"owed": 0.0, "year": "", "row": r,
-                                           "parcel_id": parcel_id, "parcel_raw": parcel})
+                                           "parcel_id": parcel_id, "parcel_raw": parcel,
+                                           "interest_due": 0.0, "bill_amount": 0.0,
+                                           "flags_seen": []})
         a["owed"] += owed
+        a["interest_due"] += _money(r.get("INTEREST_DUE")) or 0.0
+        a["bill_amount"] += _money(r.get("BILL_AMOUNT")) or 0.0
+        flags_this_row = (r.get("FLAGS") or "").strip()
+        if flags_this_row and flags_this_row not in a["flags_seen"]:
+            a["flags_seen"].append(flags_this_row)
         yr = (r.get("TAX_YEAR") or "").strip()
         if yr >= a["year"]:
             a["year"], a["row"], a["parcel_id"], a["parcel_raw"] = yr, r, parcel_id, parcel
@@ -281,6 +329,19 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
             "zip": (r.get("MAIL_ZIP") or "").strip() or None,
             "in_care_of": in_care_of,
         }
+        # FLAGS across every aggregated year/bill for this parcel, unioned
+        # (a parcel can pick up FORECLOSURE on a later year's bill even if an
+        # earlier year's row -- the one `a["row"]` keeps as representative --
+        # only said plain "DLQ"). See _flags_summary's docstring.
+        flags = _flags_summary(" | ".join(a["flags_seen"]))
+        taxable_value = _money(r.get("ABSTRACT_TAXABLE_VALUE"))
+        due_date = (r.get("BILL_DUE_DATE") or "").strip() or None
+        bits = [owner or "", f"{county} NC delinquent tax ${a['owed']:,.0f} owed (parcel {parcel})"]
+        description = " — ".join(b for b in bits if b)
+        if flags["in_foreclosure"]:
+            description = "ACTIVE TAX FORECLOSURE — " + description
+        elif flags["bankruptcy_mentioned"]:
+            description = "BANKRUPTCY FLAG — " + description
         out.append(Listing(
             source="counties_nc.nc_ptscloud_delinquent_tax",
             source_url=f"{BASE}/",
@@ -298,8 +359,7 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
             # confidence + data_quality flags it as assessed-basis.
             market_value=assessed if (assessed and 1000 <= assessed <= 20_000_000) else None,
             foreclosure_process="tax",
-            description=(f"{owner or ''} — {county} NC delinquent tax "
-                         f"${a['owed']:,.0f} owed (parcel {parcel})")[:300],
+            description=description[:300],
             first_seen=now,
             last_seen=now,
             raw={
@@ -311,7 +371,14 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
                     "parcel_raw": a.get("parcel_raw"),
                     # back-tax OWED (summed across years) -> tax_owed, NOT value
                     "principal_tax_due": round(a["owed"], 2),
+                    # interest accrued + original tax, summed across the same
+                    # aggregated years as principal_tax_due -- TOTAL_DUE_AMOUNT
+                    # was always principal+interest conflated into one number.
+                    "interest_due": round(a["interest_due"], 2) if a["interest_due"] else None,
+                    "original_bill_amount": round(a["bill_amount"], 2) if a["bill_amount"] else None,
                     "assessed_value": assessed,
+                    "taxable_value": taxable_value,
+                    "bill_due_date": due_date,
                     "tax_year": a["year"] or None,
                     "owner": owner,
                     "in_care_of": in_care_of,
@@ -319,7 +386,13 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
                     "prop_size": (r.get("PROP_SIZE") or "").strip() or None,
                     "mailing": mail,
                     "bill_number": (r.get("BILL_NUMBER") or "").strip() or None,
-                }
+                    "flags": flags,
+                },
+                # Same key + value nc_its_public_tax.py already publishes for
+                # the identical concept (the county's own in-rem foreclosure
+                # flag) -- one canonical name across sources, see
+                # _flags_summary's docstring.
+                **({"tax_sale_status": "in_foreclosure"} if flags["in_foreclosure"] else {}),
             },
         ))
     return out
