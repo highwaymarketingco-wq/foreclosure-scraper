@@ -45,6 +45,18 @@ by best-effort fetching each Account.asp page and promoting these fields
 so a listing this scraper already resolved is correctly skipped by that
 enricher's has_mailing() gate instead of being re-resolved over GIS).
 
+FIXED 2026-10-03 (extraction-completeness audit, batch 6): Account.asp links
+a sibling Photo.asp tab (same tax_id, no other params needed) carrying real
+assessor-card JPEGs -- live-verified 4/4 of the current live properties have
+one (up to 3 photos each, by photography date), confirmed a real 200
+image/jpeg up to ~94 KB. Never followed before despite sitting one hop away
+on a page this scraper already fetches. Wired into the canonical
+raw['images']['real'] key. Also surfaced two more already-visible
+Account.asp fields in different markup shapes _account_field's cell-pair
+regex can't reach: PIN # (a county parcel identifier distinct from the Real
+Estate ID this scraper already uses as parcel_id) and Property Description
+(the legal description, inline value on the row below its own label row).
+
 Free, public, no login.
 Slug: counties_nc.wake_tax_foreclosure
 Category: county_tax
@@ -135,6 +147,62 @@ def _account_money(html: str, label: str) -> float | None:
         return None
 
 
+#: Two more fields live on Account.asp that _account_field's cell-pair shape
+#: can't reach: "PIN #" puts its value INLINE in the same <td> as the label
+#: (no separate value cell), and "Property Description" (the legal
+#: description) is a ROW-pair -- the label sits in one <tr>'s SECOND <td>
+#: (paired with "Location Address" in the first), and the value is the
+#: SECOND <td> of the very next <tr>. Both live-verified 2026-10-03.
+_PIN_RE = re.compile(r"PIN #</font><b><font[^>]*>\s*(?:&nbsp;)*\s*(\d+)\s*</font></b>", re.I)
+_LEGAL_DESC_RE = re.compile(
+    r"Property Description</font></font></td>\s*</tr>\s*<tr[^>]*>"
+    r".*?<td[^>]*>.*?</td>\s*<td[^>]*><b><font[^>]*>(.*?)</font></b></td>",
+    re.I | re.S,
+)
+
+
+def _account_pin(html: str) -> str | None:
+    m = _PIN_RE.search(html)
+    return (m.group(1).strip() or None) if m else None
+
+
+def _account_legal_description(html: str) -> str | None:
+    m = _LEGAL_DESC_RE.search(html)
+    if not m:
+        return None
+    val = re.sub(r"&nbsp;", " ", m.group(1))
+    val = re.sub(r"\s+", " ", val).strip()
+    return val or None
+
+
+#: Account.asp links a sibling Photo.asp page carrying real assessor-card
+#: JPEGs (one per past photography date, newest first) -- live-verified
+#: 2026-10-03: 4/4 of the current live tax-foreclosure properties have one,
+#: `Photo.asp?id=<tax_id>` alone (no other query params) is enough, and the
+#: image itself is a real 200 image/jpeg (confirmed up to ~94 KB). This tab
+#: was linked right next to Account.asp (which this scraper already fetches)
+#: but never followed. "images/Logo.gif" is site chrome, not a property photo.
+_PHOTO_IMG_RE = re.compile(r"IMG SRC=([^\s>]+)", re.I)
+_PHOTO_BASE = "https://services.wake.gov/realestate/"
+
+
+async def _fetch_photos(tax_id: str) -> list[str]:
+    try:
+        html = await get_text(f"{_PHOTO_BASE}Photo.asp?id={tax_id}", impersonate=True, timeout=30.0)
+    except Exception as exc:  # noqa: BLE001 — best-effort
+        log.info("wake_tax.photo_fetch_failed", tax_id=tax_id, error=str(exc)[:160])
+        return []
+    if not html:
+        return []
+    out: list[str] = []
+    for raw_src in _PHOTO_IMG_RE.findall(html):
+        src = raw_src.strip().strip('"').strip("'")
+        if not src or "photos/" not in src.lower():
+            continue  # skip site chrome (images/Logo.gif)
+        out.append(_PHOTO_BASE + src)
+    return out
+
+
 def _account_block_lines(html: str, start_label: str, end_label: str) -> list[str]:
     """Owner / mailing-address / property-location-address are each a run of
     sibling `<TR>` rows (one name or address line per row) between two known
@@ -193,11 +261,15 @@ async def _enrich_from_account_page(li: Listing) -> None:
     land_value = _account_money(html, "Land Value Assessed")
     bldg_value = _account_money(html, "Bldg. Value Assessed")
     total_value = _account_money(html, "Total Value Assessed*") or _account_money(html, "Total Value Assessed")
+    pin = _account_pin(html)
+    legal_desc = _account_legal_description(html)
 
     if owner and not li.owner_name:
         li.owner_name = owner
     if zoning and not li.zoning:
         li.zoning = zoning
+    if legal_desc and not li.legal_description:
+        li.legal_description = legal_desc
     if acreage_s:
         try:
             if not li.acreage:
@@ -253,7 +325,20 @@ async def _enrich_from_account_page(li: Listing) -> None:
         "land_value_assessed": land_value,
         "bldg_value_assessed": bldg_value,
         "total_value_assessed": total_value,
+        "pin": pin,
+        "legal_description": legal_desc,
     })
+
+    # Account.asp links a sibling Photo.asp tab (same tax_id) carrying real
+    # assessor-card JPEGs -- never followed before. Live-verified 2026-10-03:
+    # 4/4 of the current live properties have one. Canonical raw['images']
+    # ['real'] key (same convention gaston_vacant.py / asheville_helene.py
+    # already use), newest photo first as the vendor page orders them.
+    tax_id = (li.raw.get("wake_tax_foreclosure") or {}).get("tax_id")
+    if tax_id:
+        photos = await _fetch_photos(tax_id)
+        if photos:
+            li.raw["images"] = {"real": photos}
 
 
 class WakeTaxForeclosure(BaseScraper):

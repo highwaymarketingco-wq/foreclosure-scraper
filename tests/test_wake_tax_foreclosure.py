@@ -142,3 +142,136 @@ def test_enrich_from_account_page_tolerates_fetch_failure(monkeypatch):
     asyncio.run(wake._enrich_from_account_page(li))  # must not raise
     assert li.owner_name is None
     assert "owner_mailing" not in li.raw
+
+
+# --------------------------------------------------------------------------- PIN# / Property Description / Photos (2026-10-03)
+#
+# PIN # puts its value INLINE in the same <td> as the label (no separate
+# value cell, unlike every other _account_field this scraper already reads).
+# Property Description (legal description) is a ROW-pair: the label sits in
+# one <tr>'s second <td> (paired with "Location Address" in the first), and
+# the value is the second <td> of the very next <tr>. Both trimmed, faithful
+# copies of the real live Account.asp markup (id 0047895, 2026-10-03).
+
+_PIN_AND_DESC_HTML = """
+<tr VALIGN="top">
+<td WIDTH="31%"><font SIZE="2" FACE="Arial">Real Estate ID </font><b><font SIZE="2" FACE="Arial">
+0047895
+</font></b></td>
+<td WIDTH="39%"><font SIZE="2" FACE="Arial"> </font><font SIZE="2" FACE="Arial">PIN #</font><b><font SIZE="2" FACE="Arial">&nbsp;&nbsp;1713252770</font></b></td>
+</tr>
+<tr VALIGN="top">
+<td WIDTH="31%"><font face="Arial"><font size="2">Location Address</font></font></td>
+<td WIDTH="69%"><font face="Arial"><font size="2">Property Description</font></font></td>
+</tr>
+<tr VALIGN="top">
+<td WIDTH="31%"><b><font SIZE="2" FACE="Arial">610  CUMBERLAND ST</font></b></td>
+<td WIDTH="69%"><b><font SIZE="2" FACE="Arial">LO19 & PT LT 20 QUARRY HLS BM1915-00097</font></b></td>
+</tr>
+"""
+
+
+def test_account_pin_reads_inline_value():
+    assert wake._account_pin(_PIN_AND_DESC_HTML) == "1713252770"
+
+
+def test_account_pin_absent_returns_none():
+    assert wake._account_pin("<td>no pin here</td>") is None
+
+
+def test_account_legal_description_reads_row_pair_value():
+    assert wake._account_legal_description(_PIN_AND_DESC_HTML) == \
+        "LO19 & PT LT 20 QUARRY HLS BM1915-00097"
+
+
+def test_enrich_from_account_page_wires_pin_and_legal_description(monkeypatch):
+    li = _bare_listing("https://services.wake.gov/realestate/Account.asp?id=0047895")
+    li.raw["wake_tax_foreclosure"]["tax_id"] = "0047895"
+    combined_html = _OWNER_OCCUPIED_ACCOUNT_HTML + _PIN_AND_DESC_HTML
+
+    async def fake_get_text(url, impersonate=True, timeout=30.0):
+        if "Photo.asp" in url:
+            return "<html>no photos</html>"
+        return combined_html
+
+    monkeypatch.setattr(wake, "get_text", fake_get_text)
+    asyncio.run(wake._enrich_from_account_page(li))
+
+    assert li.legal_description == "LO19 & PT LT 20 QUARRY HLS BM1915-00097"
+    assert li.raw["wake_tax_foreclosure"]["pin"] == "1713252770"
+    assert li.raw["wake_tax_foreclosure"]["legal_description"] == \
+        "LO19 & PT LT 20 QUARRY HLS BM1915-00097"
+
+
+# A trimmed, faithful copy of the real live Photo.asp markup (id 0047895,
+# 2026-10-03): three dated photos plus the unrelated site-chrome logo image,
+# which must be excluded.
+_PHOTO_PAGE_HTML = """
+<IMG SRC="images/Logo.gif">
+<DIV ALIGN=center><B><FONT SIZE=2>Photograph Date:  3/21/2022</FONT></B></DIV>
+<DIV ALIGN=center><IMG SRC=photos/mvideo/20220321/ILA0047895.jpg WIDTH=512 HEIGHT=384></DIV>
+<DIV ALIGN=center><B><FONT SIZE=2>Photograph Date:  12/5/2011</FONT></B></DIV>
+<DIV ALIGN=center><IMG SRC=photos/mvideo/151205111403/E151205111403001345050.jpg WIDTH=512 HEIGHT=384></DIV>
+"""
+
+
+def test_fetch_photos_extracts_real_image_urls_not_site_chrome(monkeypatch):
+    async def fake_get_text(url, impersonate=True, timeout=30.0):
+        assert url == "https://services.wake.gov/realestate/Photo.asp?id=0047895"
+        return _PHOTO_PAGE_HTML
+
+    monkeypatch.setattr(wake, "get_text", fake_get_text)
+    photos = asyncio.run(wake._fetch_photos("0047895"))
+    assert photos == [
+        "https://services.wake.gov/realestate/photos/mvideo/20220321/ILA0047895.jpg",
+        "https://services.wake.gov/realestate/photos/mvideo/151205111403/E151205111403001345050.jpg",
+    ]
+    assert not any("Logo.gif" in p for p in photos)
+
+
+def test_fetch_photos_empty_page_returns_empty_list(monkeypatch):
+    async def fake_get_text(url, impersonate=True, timeout=30.0):
+        return "<html>no photographs on file</html>"
+
+    monkeypatch.setattr(wake, "get_text", fake_get_text)
+    assert asyncio.run(wake._fetch_photos("9999999")) == []
+
+
+def test_fetch_photos_tolerates_fetch_failure(monkeypatch):
+    async def failing_get_text(*a, **kw):
+        raise TimeoutError("boom")
+
+    monkeypatch.setattr(wake, "get_text", failing_get_text)
+    assert asyncio.run(wake._fetch_photos("0047895")) == []  # must not raise
+
+
+def test_enrich_from_account_page_wires_real_images(monkeypatch):
+    li = _bare_listing("https://services.wake.gov/realestate/Account.asp?id=0047895")
+    li.raw["wake_tax_foreclosure"]["tax_id"] = "0047895"
+
+    async def fake_get_text(url, impersonate=True, timeout=30.0):
+        if "Photo.asp" in url:
+            return _PHOTO_PAGE_HTML
+        return _OWNER_OCCUPIED_ACCOUNT_HTML
+
+    monkeypatch.setattr(wake, "get_text", fake_get_text)
+    asyncio.run(wake._enrich_from_account_page(li))
+
+    assert li.raw["images"]["real"] == [
+        "https://services.wake.gov/realestate/photos/mvideo/20220321/ILA0047895.jpg",
+        "https://services.wake.gov/realestate/photos/mvideo/151205111403/E151205111403001345050.jpg",
+    ]
+
+
+def test_enrich_from_account_page_no_tax_id_skips_photo_fetch(monkeypatch):
+    """No raw['wake_tax_foreclosure']['tax_id'] set (e.g. a future caller
+    that forgets to stamp it) must not crash and must not set raw['images']."""
+    li = _bare_listing("https://services.wake.gov/realestate/Account.asp?id=0047895")
+
+    async def fake_get_text(url, impersonate=True, timeout=30.0):
+        assert "Photo.asp" not in url, "must not fetch photos without a tax_id"
+        return _OWNER_OCCUPIED_ACCOUNT_HTML
+
+    monkeypatch.setattr(wake, "get_text", fake_get_text)
+    asyncio.run(wake._enrich_from_account_page(li))
+    assert "images" not in li.raw
