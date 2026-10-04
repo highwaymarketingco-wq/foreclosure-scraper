@@ -2184,6 +2184,21 @@ RAW_KEEP = {
     # cross-cutting distress signals
     "absentee_owner": "*", "bank_name": "*", "case": "*",
     "cash_buyer_deeds": "*", "court": "*", "document_url": "*",
+    # document_links.stamp_documents() -- the shared harvester HERMES sec 5
+    # calls out as THE way to wire PDFs/notices into the board (used by the
+    # "8 already-harvesting scrapers" that section calls worked examples) --
+    # fills BOTH raw['documents'] (the full capped list) and raw['document_url']
+    # (the primary scalar, already registered just above). Found 2026-10-04
+    # (national.* extraction-completeness audit, batch 15) while wiring fresh
+    # CourtListener RECAP PDF URLs through this exact helper: document_url
+    # alone was registered, so every call site's SECOND-and-later harvested
+    # document (deed + notice on the same row, multiple RECAP filings, etc.)
+    # has been silently stripped at publish since stamp_documents() was
+    # written -- live-confirmed via _slim_raw() directly (documents=[...]
+    # goes in, comes back out missing; document_url alone survives). Same
+    # bug class as every other entry in this file's history, just upstream
+    # of any one scraper rather than caused by one.
+    "documents": "*",
     "epa_id": "*", "filing_number": "*", "flc": "*",
     "geo_missing": "*", "geo_source": "*", "heir_estate": "*",
     "irs": "*", "irs_treasury": "*", "legacy": "*",
