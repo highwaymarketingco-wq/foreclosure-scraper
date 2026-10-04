@@ -42,13 +42,12 @@ currently-active, in-footprint lot: 340 Cedar Grove Dr, Henderson, NC 27537
 real gallery (`field--name-field-asset-photos`) that this scraper never had
 an image path for at all; now wired into raw["images"]["real"] following
 the national.servicelink_auction / counties_sc.terry_howe_auctions
-convention. NOTE (out of this audit's scope, flagged separately): the
-resolved county for this lead, "Henderson", is WRONG -- the shared
-`_upstate_city_to_county.py` gazetteer collides the city of Henderson, NC
-(seat of Vance County, outside the 18-county footprint) with Henderson
-COUNTY, NC (the western mountain county, in-footprint) because it lists
-the county's own name as one of its city aliases. That is a shared-module
-geocoding bug, not an extraction-completeness bug in this file.
+convention. This lot's county was briefly resolving WRONG, to Henderson
+COUNTY (in-footprint) instead of Vance County (real seat of Henderson, NC):
+a shared `_upstate_city_to_county.py` gazetteer bug, fixed 2026-10-04 by
+removing the colliding bare "Henderson" city alias from Henderson County
+and mapping it to its real county (Vance) instead. This lead now resolves
+to Vance County and is correctly denied as out-of-footprint.
 """
 from __future__ import annotations
 

@@ -58,15 +58,34 @@ _add("NC", "Rutherford", "Rutherfordton", "Forest City", "Spindale",
      "Ruth", "Caroleen", "Henrietta", "Cliffside", "Union Mills")
 _add("NC", "Cleveland", "Shelby", "Kings Mountain", "Boiling Springs",
      "Lawndale", "Fallston", "Casar", "Belwood", "Polkville", "Grover",
-     "Earl", "Mooresboro", "Lattimore", "Waco", "Cleveland")
+     "Earl", "Mooresboro", "Lattimore", "Waco")
+# NOTE: deliberately NOT adding bare "Cleveland" here -- there is a real,
+# distinct Cleveland, NC (Rowan County, zip 27013, pop ~846) outside this
+# footprint. Both are NC, so the state check in upstate_county_for cannot
+# tell them apart; the collision is resolved below by mapping bare
+# "Cleveland" to its real county (Rowan) in the out-of-footprint section.
 _add("NC", "Henderson", "Hendersonville", "Flat Rock", "Fletcher",
      "Laurel Park", "Mills River", "Etowah", "Edneyville", "Dana", "Zirconia",
-     "Bat Cave", "Gerton", "Horse Shoe", "East Flat Rock", "Henderson")
+     "Bat Cave", "Gerton", "Horse Shoe", "East Flat Rock")
+# NOTE: deliberately NOT adding bare "Henderson" here -- there is a real,
+# distinct Henderson, NC (seat of Vance County, zips 27536/27537, pop ~25k)
+# outside this footprint. CONFIRMED LIVE 2026-10-03/04: national.irs_judicial_
+# sales surfaced an active federal auction lot at 340 Cedar Grove Dr,
+# Henderson, NC 27537, which this bare alias used to miscategorize as
+# Henderson COUNTY (in-footprint) instead of Vance County (out-of-footprint).
+# Fixed by mapping bare "Henderson" to its real county (Vance) below.
 _add("NC", "Polk", "Columbus", "Tryon", "Saluda", "Mill Spring", "Polk",
      "Lynn", "Green Creek")
+# "Polk" bare alias checked and kept: there is no other real, distinct NC
+# place simply named "Polk" (Polkton is Anson County, Polkville is Cleveland
+# County -- different names, not actual collisions with bare "Polk").
 _add("NC", "Gaston", "Gastonia", "Belmont", "Mount Holly", "Bessemer City",
      "Cherryville", "Dallas", "Stanley", "Lowell", "Ranlo", "McAdenville",
-     "Cramerton", "Mount Holly", "High Shoals", "Spencer Mountain", "Gaston")
+     "Cramerton", "High Shoals", "Spencer Mountain")
+# NOTE: deliberately NOT adding bare "Gaston" here -- there is a real,
+# distinct Gaston, NC (Northampton County, zip 27832, pop ~1,008, near Lake
+# Gaston) outside this footprint. Fixed by mapping bare "Gaston" to its real
+# county (Northampton) below.
 _add("NC", "Buncombe", "Asheville", "Black Mountain", "Weaverville",
      "Montreat", "Woodfin", "Biltmore Forest", "Swannanoa", "Fairview",
      "Candler", "Arden", "Leicester", "Barnardsville", "Enka", "Buncombe")
@@ -104,6 +123,14 @@ _add("NC", "Iredell", "Statesville", "Mooresville", "Iredell", "Troutman")
 _add("NC", "Cabarrus", "Concord", "Kannapolis", "Cabarrus", "Harrisburg")
 _add("NC", "New Hanover", "Wilmington")
 _add("NC", "Pitt", "Greenville")    # NB: NC Greenville is Pitt; SC Greenville added below
+# Bare county-name-as-city collisions (see NOTEs in the in-footprint section
+# above): these real, distinct, out-of-footprint NC cities share their exact
+# name with an in-footprint county, so they are mapped to their REAL county
+# here (same "resolve to the real county so in_scope denies deterministically"
+# pattern as the rest of this section) instead of being dropped to None.
+_add("NC", "Vance", "Henderson")        # Henderson city != Henderson County
+_add("NC", "Northampton", "Gaston")     # Gaston town != Gaston County
+_add("NC", "Rowan", "Cleveland")        # Cleveland town != Cleveland County
 
 # SC metros / common cities outside the upstate footprint
 _add("SC", "Greenville", "Greenville", "Greer", "Mauldin", "Simpsonville",
