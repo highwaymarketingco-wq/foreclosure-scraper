@@ -2294,6 +2294,20 @@ RAW_KEEP = {
     # isZillowOwned/daysOnZillow/rentZestimate, all free, all previously
     # unread on the same already-fetched item.
     "zillow_foreclosures": "*",
+    # national.zillow_bulk added 2026-10-04 (national.* extraction-
+    # completeness audit, batch 5): same bug, same sibling file
+    # (zillow_bulk.py is a near-line-for-line copy of zillow_foreclosures.py
+    # for the sold-comp feed) -- marketing_status/status_text/home_type/
+    # beds/baths/area/sold_comp were all flat top-level raw keys, none
+    # registered here (only zpid/images were), silently dropped at every
+    # publish since this scraper was built. "sold_comp" is a third,
+    # separate flat key the same scraper writes on every row (distinct from
+    # the unrelated enrichment_foreclosure_sold_comps.py "foreclosure_sold_
+    # comps"/"foreclosure_sold_comp_summary" keys, already registered below)
+    # -- caught by this fix's own new test (test_zillow_bulk_extraction_
+    # gaps.py's _slim_raw round-trip test), registered for the same reason.
+    "zillow_bulk": "*",
+    "sold_comp": "*",
     # national.hud_homestore added 2026-10-04 (national.* extraction-
     # completeness audit, batch 16): 9 of this scraper's 11 raw keys
     # (fha_financing/listing_period/property_status/bid_open_date/
