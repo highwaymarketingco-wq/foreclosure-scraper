@@ -20,9 +20,20 @@ ONSLOW = m.PORTALS["Onslow"]
 GRAHAM = m.PORTALS["Graham"]
 
 
-def _row(year, bill, owner, desc, orig, bal, acct="496055000"):
+def _row(year, bill, owner, desc, orig, bal, acct="496055000", action="<button>+</button>"):
     return {"id": f"{year}/{bill}",
-            "cell": [str(year), str(bill), acct, owner, desc, orig, bal, "<button>+</button>"]}
+            "cell": [str(year), str(bill), acct, owner, desc, orig, bal, action]}
+
+
+_FORECLOSURE_CELL = (
+    "<div style='white-space: normal; display: inline-block; overflow: auto; "
+    "word-wrap: break-word'>This property is currently in Tax Foreclosure. "
+    "Contact the tax office for further information</div>"
+)
+_RETURNED_ITEM_CELL = (
+    "<div style='white-space: normal'>There is a returned item on this account.  "
+    "Contact the tax office for further information</div>"
+)
 
 
 ON_ROW = _row(2025, 72, "ROE JANE &amp; JOHN",
@@ -114,6 +125,50 @@ def test_one_lead_per_parcel_with_the_years_summed():
     assert li.raw["two_year_delinquent"]["is_two_year_plus"] is True and li.raw["two_year_delinquent"]["years"] == 3
     assert "2023-2025 (3 bills)" in li.description and "$500.75" in li.description
     assert li.foreclosure_process == "tax"
+
+
+def test_bill_status_cell_parsed_for_foreclosure_and_returned_item():
+    """2026-10-03 (HERMES extraction-completeness audit, batch 5): cell[7]
+    is the UI's own 'Add to Cart' button on a normal bill, but a status
+    MESSAGE instead on some bills -- live-sampled 155/500 (31%) of current
+    Onslow bills carry the foreclosure message, and parse_row never looked
+    at this cell at all (only required len(cell) >= 7)."""
+    fc = m.parse_row(_row(2025, 72, "ROE JANE",
+                          "000072<br/>801-154<br />1008 1ST ST SURF CITY NC 28445<br />0.150 AC",
+                          "2,205.73", "2,404.06", action=_FORECLOSURE_CELL), ONSLOW.cities)
+    assert fc["status"] == "in_tax_foreclosure"
+
+    ri = m.parse_row(_row(2025, 167, "HUMPHREY J R",
+                          "000167<br/>350-194<br />REGALWOOD DR JACKSONVILLE NC 28546<br />8.000 AC",
+                          "5.24", "5.70", action=_RETURNED_ITEM_CELL), ONSLOW.cities)
+    assert ri["status"] == "returned_payment"
+
+    normal = m.parse_row(ON_ROW, ONSLOW.cities)
+    assert normal["status"] is None
+
+
+def test_aggregate_surfaces_worst_bill_status_as_tax_sale_status():
+    """A parcel whose NEWEST bill is plain but an OLDER bill already shows
+    the foreclosure message must still surface as in_foreclosure -- the
+    worst status across all bills, not just the head (newest) one."""
+    newest = m.parse_row(_row(2025, 801, "ROE JANE",
+                              "000801<br/>801-154<br />1008 1ST ST SURF CITY NC 28445<br />0.150 AC",
+                              "100.00", "120.50"), ONSLOW.cities)
+    oldest = m.parse_row(_row(2023, 802, "ROE JANE",
+                              "000802<br/>801-154<br />1008 1ST ST SURF CITY NC 28445<br />0.150 AC",
+                              "100.00", "80.00", action=_FORECLOSURE_CELL), ONSLOW.cities)
+    li = m.aggregate("Onslow", ONSLOW, [newest, oldest])[0]
+    assert li.raw["nc_its_public_tax"]["status"] == "in_tax_foreclosure"
+    assert li.raw["tax_sale_status"] == "in_foreclosure"
+    assert "ACTIVE TAX FORECLOSURE" in li.description
+
+
+def test_aggregate_no_status_key_when_all_bills_clean():
+    b = m.parse_row(ON_ROW, ONSLOW.cities)
+    li = m.aggregate("Onslow", ONSLOW, [b])[0]
+    assert li.raw["nc_its_public_tax"]["status"] is None
+    assert "tax_sale_status" not in li.raw
+    assert "ACTIVE TAX FORECLOSURE" not in li.description
 
 
 def test_a_bill_with_no_balance_has_no_tax_owed():

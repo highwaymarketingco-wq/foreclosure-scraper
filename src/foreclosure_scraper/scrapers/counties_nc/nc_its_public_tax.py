@@ -190,6 +190,30 @@ def _split_situs(situs: str | None, cities: tuple[str, ...]) -> dict:
     return out
 
 
+_SEVERITY = {"in_tax_foreclosure": 2, "returned_payment": 1}
+
+
+def _bill_status(action_cell: str | None) -> str | None:
+    """Cell[7] -- the UI's own 'Add to Cart' button on a normal bill, but on
+    some bills a status message INSTEAD of the button. Found 2026-10-03
+    (HERMES extraction-completeness audit, batch 5): `parse_row` required
+    >=7 cells and never looked at cell[7] at all, even though it's the SAME
+    row the code already has in hand. Live-sampled 500 current Onslow bills:
+    155/500 (31%) carry "This property is currently in Tax Foreclosure.
+    Contact the tax office for further information" -- a materially
+    stronger, further-along signal than plain delinquency, sitting
+    uncaptured on nearly a third of this county's rows. A second, rarer
+    message ("There is a returned item on this account...") flags a
+    bounced payment -- also real but less severe."""
+    text = _text(action_cell or "")
+    low = text.lower()
+    if "foreclosure" in low:
+        return "in_tax_foreclosure"
+    if "returned item" in low:
+        return "returned_payment"
+    return None
+
+
 def parse_row(row: dict, cities: tuple[str, ...] = ()) -> dict | None:
     """One jqGrid row -> a bill dict, or None for personal property / junk."""
     cell = row.get("cell") or []
@@ -199,9 +223,11 @@ def parse_row(row: dict, cities: tuple[str, ...] = ()) -> dict | None:
     desc = parse_description(str(cell[4]), bill, cities)
     if desc is None:
         return None
+    status = _bill_status(cell[7]) if len(cell) > 7 else None
     return {"year": int(year) if year.isdigit() else None, "bill": bill,
             "account": _text(cell[2]), "owner": _text(cell[3]) or None,
-            "original_levy": _money(cell[5]), "balance": _money(cell[6]), **desc}
+            "original_levy": _money(cell[5]), "balance": _money(cell[6]),
+            "status": status, **desc}
 
 
 def aggregate(county: str, portal: ITSPortal, bills: list[dict]) -> list[Listing]:
@@ -217,6 +243,11 @@ def aggregate(county: str, portal: ITSPortal, bills: list[dict]) -> list[Listing
         years = sorted({b["year"] for b in group if b["year"]})
         total = round(sum(b["balance"] or 0 for b in group), 2) or None
         owner = head["owner"]
+        # Worst status across this parcel's bills (a multi-year-delinquent
+        # parcel can carry a foreclosure flag on one bill and a plain one on
+        # another -- take the most severe, not just the newest).
+        statuses = [b.get("status") for b in group if b.get("status")]
+        worst_status = max(statuses, key=lambda s: _SEVERITY.get(s, 0), default=None)
         block = {
             "county": county, "portal": portal.base, "parcel": parcel,
             "alternate_id": head.get("alt"), "account": head["account"], "owner": owner,
@@ -225,8 +256,10 @@ def aggregate(county: str, portal: ITSPortal, bills: list[dict]) -> list[Listing
             "is_two_year_plus": len(years) >= 2, "total_due": total,
             "original_levy": round(sum(b["original_levy"] or 0 for b in group), 2) or None,
             "bills": [{"year": b["year"], "bill": b["bill"], "balance": b["balance"],
-                       "original_levy": b["original_levy"]} for b in group],
+                       "original_levy": b["original_levy"], "status": b.get("status")}
+                      for b in group],
             "acres": head.get("acres"), "unit": head.get("unit"),
+            "status": worst_status,
         }
         raw: dict = {"nc_its_public_tax": block,
                      # The shared, published key fullmer_rank reads for delinquency ripeness.
@@ -236,6 +269,12 @@ def aggregate(county: str, portal: ITSPortal, bills: list[dict]) -> list[Listing
         if total:
             raw["tax_owed"] = {"balance": total, "kind": "delinquent_tax", "source": SLUG,
                                "year": head["year"], "basis": "own_record"}
+        # Same top-level key counties_nc.nc_county_tax_foreclosure already
+        # publishes (sold/redeemed/surplus/upset_bid there) -- "in_foreclosure"
+        # here means the COUNTY'S OWN system already flags this specific
+        # parcel as past plain delinquency, into active in-rem proceedings.
+        if worst_status == "in_tax_foreclosure":
+            raw["tax_sale_status"] = "in_foreclosure"
         span = f"{years[0]}-{years[-1]}" if len(years) > 1 else (str(years[0]) if years else "")
         out.append(Listing(
             source=SLUG,
@@ -249,7 +288,9 @@ def aggregate(county: str, portal: ITSPortal, bills: list[dict]) -> list[Listing
             city=head.get("city"), zip_code=head.get("zip"),
             legal_description=None if head.get("street") else head.get("situs_text"),
             acreage=head.get("acres"),
-            description=(f"Delinquent NC property tax {span} ({len(group)} bill"
+            description=(
+                         ("ACTIVE TAX FORECLOSURE — " if worst_status == "in_tax_foreclosure" else "")
+                         + f"Delinquent NC property tax {span} ({len(group)} bill"
                          f"{'s' if len(group) != 1 else ''})"
                          + (f": ${total:,.2f} due" if total else "")
                          + f" (parcel {parcel})"),
