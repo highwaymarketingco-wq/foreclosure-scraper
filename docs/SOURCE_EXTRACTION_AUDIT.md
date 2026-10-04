@@ -85,8 +85,8 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_nc.nc_govdeals_real_property` | deed/notice?, img?, detail-page | https://maestro.lqdt1.com/search/list<br>https://www.transylvaniacounty.org/news |
 | `counties_nc.nc_heir_estate_parcels` | deed/notice? | (see SOURCE_REGISTER.md) |
 | `counties_nc.nc_its_public_tax` | - | https://tax.onslowcountync.gov/ITSPublicON/TaxBillSearch<br>https://www.bttaxpayerportal.com/ITSPublicGR2.0/TaxBillSearch |
-| `counties_nc.nc_ptscloud_delinquent_tax` | - | https://bcpwa.ncptscloud.com |
-| `counties_nc.nc_rod_logan` | deed/notice? | (see SOURCE_REGISTER.md) |
+| `counties_nc.nc_ptscloud_delinquent_tax` | deed/notice? | https://bcpwa.ncptscloud.com |
+| `counties_nc.nc_rod_logan` | deed/notice?, img? | (see SOURCE_REGISTER.md) |
 | `counties_nc.nc_rod_substitute_trustee` | deed/notice?, img? | https://buncombe-recordings.permitium.com/<br>https://www.nccourts.gov/ |
 | `counties_nc.nchfa_reo` | detail-page, links | https://www.nchfa.com/home-buyers/properties-sale |
 | `counties_nc.new_hanover_foreclosures` | deed/notice?, detail-page, links | https://www.nhcgov.com/345/Foreclosures |
@@ -97,7 +97,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_nc.stokes_delinquent_tax` | deed/notice?, detail-page | https://kanialawfirm.com/tax-foreclosures/<br>https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/ |
 | `counties_nc.transylvania_delinquent_tax` | detail-page | https://tax.transylvaniacounty.org/TaxBillSearch<br>https://tax.transylvaniacounty.org |
 | `counties_nc.transylvania_vacant` | deed/notice? | https://gis.transylvaniacounty.org/server/rest/services/Parcels/FeatureServer/2/query |
-| `counties_nc.wake_tax_foreclosure` | deed/notice?, detail-page, links | https://www.wake.gov/departments-government/tax-administration/real-estate/foreclosures |
+| `counties_nc.wake_tax_foreclosure` | deed/notice?, img?, detail-page, links | https://www.wake.gov/departments-government/tax-administration/real-estate/foreclosures<br>https://services.wake.gov/realestate/ |
 | `counties_nc.wnc_rod_foreclosure_starts` | deed/notice?, img? | (see SOURCE_REGISTER.md) |
 | `counties_nc.wnc_tax_foreclosures` | pdf?, detail-page, links | https://www.wataugacounty.org/<br>https://www.averycounty.com/ |
 | `counties_sc.abbeville_delinquent_tax` | detail-page | https://abbevillecountysc.com/delinquent-tax-collector/ |
