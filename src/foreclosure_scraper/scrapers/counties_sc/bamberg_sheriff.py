@@ -3,6 +3,27 @@
 Bamberg County Sheriff's Office posts real estate auction listings
 for properties being sold via court-ordered sheriff sales.
 
+AUDITED 2026-10-03 (HERMES sec 8 per-source audit, batch 7): live-fetched
+the current page -- it is the county's bare department-info page (staff
+directory: "Candace Wroten, Administrative Assistant"; "Katelyn Kinard,
+Civil Division"; a complaint/commendation form; a FOIA-request blurb). Zero
+`<tr>` on the whole page, zero mention of "sale" anywhere in the body text,
+and the only linked PDFs are a hazard-mitigation plan and the complaint
+form -- no sheriff-sale property roster exists online for this county at
+all, not a parsing failure against real content. Same pattern independently
+re-confirmed the same day on the sibling `anderson_sheriff` (old .com domain
+dead; the real current .org replacement site has no sales page in its own
+sitemap either) and `barnwell_sheriff` (its live page is a civil-process FEE
+schedule, no property listings) -- small SC counties appear not to publish a
+structured online sheriff-sale list at all. Bamberg's real foreclosure-sale
+NOTICES (the SC-law-required newspaper advertisement) are already swept
+statewide by `newspapers.column_legal_notices`, which explicitly covers the
+"Orangeburg, Bamberg and Calhoun" legal-notice region -- so nothing is lost
+by this page itself carrying nothing. Left un-disabled (same as
+`anderson_sheriff`/`barnwell_sheriff`): the page could legitimately start
+publishing a table in the future, and `expected_min_count=0` already makes
+a quiet run a non-failure.
+
 Free, public, no login.
 Slug: counties_sc.bamberg_sheriff
 Category: sheriff_sale

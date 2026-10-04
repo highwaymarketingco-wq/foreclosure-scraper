@@ -5,13 +5,44 @@ tax sale information on their county websites but don't warrant individual
 scraper modules due to low volume.  This scraper covers them all:
 
 - Watauga County (wataugacounty.org)
-- Avery County (averycounty.com)
+- Avery County (averycountync.gov)
 - Yancey County (yanceycountync.gov)
 - Cherokee NC County (cherokeecounty-nc.gov)
 - Madison County (madisoncountync.gov)
 
 Each county page is checked for property listings, PDF links to tax sale
 lists, and delinquent tax information.
+
+FIXED 2026-10-03 (HERMES sec 8 per-source audit, batch 7). ``COUNTIES["Avery"]``
+pointed at ``averycounty.com`` -- live-fetched and confirmed that domain is the
+AVERY COUNTY CHAMBER OF COMMERCE (title: "Avery County Chamber of Commerce --
+Home of the Annual Woolly Worm Festival...", 6 unrelated "tax" hits all from a
+WordPress Directorist plugin's internal field names, zero county-government
+content). This guaranteed 0 real rows for Avery FOREVER, for the wrong reason
+(wrong site entirely, not "no data published"). The real county government
+site is ``averycountync.gov`` (confirmed via its own title "Welcome to Avery
+County"); its Tax Assessor's page (`/departments/tax_assessors_office.php`)
+links a real "Property For Sale" page (sealed-bid sale of county-held parcels,
+authorized by the Board of Commissioners) -- live-verified real content
+("Currently there are no properties for sale" today, a genuine 0, not a
+parse failure).
+
+ALSO VERIFIED LIVE (no fix needed, two other counties' real foreclosure path
+runs through sources this project already built elsewhere, same-day):
+Watauga's own Tax Collections page states real-property tax foreclosure "is
+handled by a Law firm located in Boone, NC" with NO firm name and NO link
+anywhere on the page or site -- a genuine wall (nothing to follow, not a code
+gap). Yancey's own "2025 TAX FORECLOSURE PROCESS" PDF names its foreclosure
+attorney as kanialawfirm.com -- the SAME statewide Kania Ninja-Tables feed
+``law_firms.kania`` already reads and (as of today's separate scope-bug fix)
+now emits EVERY real NC county the feed carries, Yancey included when the
+feed has a Yancey row (0 right now, matching the PDF's "sales do not occur on
+a regular schedule"). Cherokee's tax-sale table is likewise already read by
+the dedicated ``nc_civicplus_tax_sale`` module. Nothing for THIS generic
+multi-county module to add for either -- it cannot see Kania's JSON-via-
+WordPress-nonce feed or civicplus's own parser through a generic
+`<table>`-on-the-county's-own-site heuristic, and it does not need to: the
+real data already lands on the board via those dedicated sources.
 
 FOUND 2026-09-15 (background triage agent, this codebase's zero-row-
 scraper audit; confirmed by hand): Madison County's own homepage links
@@ -66,7 +97,10 @@ async def _bounded_text(url: str, **kwargs) -> str | None:
 
 COUNTIES: dict[str, str] = {
     "Watauga": "https://www.wataugacounty.org/",
-    "Avery": "https://www.averycounty.com/",
+    # NOT averycounty.com -- that domain is the Avery County CHAMBER OF
+    # COMMERCE (Woolly Worm Festival site), not the county government.
+    # Live-confirmed 2026-10-03; see module docstring.
+    "Avery": "https://www.averycountync.gov/",
     "Yancey": "https://www.yanceycountync.gov/",
     "Cherokee": "https://www.cherokeecounty-nc.gov/",
     "Madison": "https://www.madisoncountync.gov/",

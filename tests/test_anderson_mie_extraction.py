@@ -26,7 +26,9 @@ from foreclosure_scraper.scrapers.counties_sc.anderson_master_in_equity import (
     _legal_description,
     _parse_pdf,
     _parse_results_pdf,
+    _parse_deficiency_upcoming_pdf,
     ADDR_RE,
+    DEFICIENCY_UPCOMING_HREF_RE,
 )
 from foreclosure_scraper.models import PropertyKind
 from datetime import datetime
@@ -163,6 +165,122 @@ def test_addr_re_does_not_match_inside_a_surname():
     bare substrings -- the old ADDR_RE (no \\b around the suffix) matched
     both as if they were street-suffix tokens."""
     assert ADDR_RE.search("1257 Cox Edward A. Steele v. Amanda") is None
+
+
+# A real excerpt of the September 3, 2026 UPCOMING Deficiency Sale PDF
+# (NOT "-Results") -- the third PDF family found+fixed 2026-10-03. Note the
+# reopen date in the body (September 3, 2026) vs. a second real fixture
+# below whose body date deliberately drifts from its own filename.
+DEFICIENCY_UPCOMING_TEXT = """
+DEFICIENCY SALE
+(Updated September 2, 2026)
+DEFICIENCY - BIDDING WILL REMAIN OPEN FOR 30 DAYS. THE BIDDING WILL
+REOPEN ON THURSDAY, SEPTEMBER 3, 2026 @ 11:00 AM.
+
+CASE NO. ATTY. CAPTION DESCRIPTION NOTES
+1. 26-690 CVK NewRez, LLC v. Patrick M.
+Lahmann
+Lot 58
+PB80@169
+101 Clarendon Drive, Anderson
+DEFICIENCY
+Plaintiff bid
+$301,500.00
+2. 26-610 T. Shook Loan Funder, LLC v.
+Platinum Home Builders, et
+al.
+Lot 36
+PB27@284
+121 Brookmeade Dr., Unit A & B
+Anderson
+DEFICIENCY
+Plaintiff bid
+$349,000.00
+"""
+
+# A real excerpt confirming the filename/body DATE DRIFT this module's
+# docstring calls out: this fixture's own text is from the file published
+# as "May-7-2026-Deficiency-Sale-1.pdf" but its body names the reopen date
+# as April 2, 2026 -- a full month earlier than the filename implies.
+DEFICIENCY_UPCOMING_DATE_DRIFT_TEXT = """
+DEFICIENCY - BIDDING WILL REMAIN OPEN FOR 30 DAYS. THE BIDDING WILL
+REOPEN ON THURSDAY, APRIL 2, 2026 @ 11:00 AM
+
+CASE NO. ATTY. CAPTION DESCRIPTION NOTES
+1. 25-2484 B&S The Bank of New York
+Mellon v. Tamara
+Ballard Hayes, et al.
+Lot E-7
+PB102@862
+1108 Green Willow Trail, Anderson
+DEFICIENCY
+Plaintiff bid
+$129,713.77
+"""
+
+# A real excerpt where the ONLY row is withdrawn/bankruptcy -- the live
+# October 1, 2026 edition's actual (empty-of-real-leads) content.
+DEFICIENCY_UPCOMING_ALL_WITHDRAWN_TEXT = """
+DEFICIENCY - BIDDING WILL REMAIN OPEN FOR 30 DAYS. THE BIDDING WILL
+REOPEN ON THURSDAY, OCTOBER 1, 2026 @ 11:00 AM
+
+CASE NO. ATTY. CAPTION DESCRIPTION NOTES
+1. 25-1208 B&S US Bank v. Debra
+McAlister, et al.
+Lot 10
+PB1038@1&2
+118 Quartermein Ct., Piedmont
+DEFICIENCY
+Plaintiff bid
+$261,183.24
+WD/BR
+"""
+
+
+def test_deficiency_href_matches_upcoming_not_results():
+    """The real failure mode this fix closes: a plain '-Deficiency-Sale.pdf'
+    (upcoming reopen) was invisible to both pre-existing regexes. The new
+    one must match it but still correctly exclude the '-Results' sibling."""
+    assert DEFICIENCY_UPCOMING_HREF_RE.search(
+        "/wp-content/uploads/2026/08/September-3-2026-Deficiency-Sale.pdf")
+    assert DEFICIENCY_UPCOMING_HREF_RE.search(
+        "/wp-content/uploads/2026/09/October-1-2026-Deficiency-Sale-1.pdf")
+    assert not DEFICIENCY_UPCOMING_HREF_RE.search(
+        "/wp-content/uploads/2026/09/September-3-2026-Deficiency-Sale-Results.pdf")
+    assert not DEFICIENCY_UPCOMING_HREF_RE.search(
+        "/wp-content/uploads/2026/06/June-4-2026-Deficiency-Sale-Results-1.pdf")
+
+
+def test_deficiency_upcoming_captures_real_pending_leads():
+    out = _parse_deficiency_upcoming_pdf(
+        DEFICIENCY_UPCOMING_TEXT, "https://x/deficiency.pdf", "test.slug")
+    by_case = {li.case_number: li for li in out}
+    assert {"26-690", "26-610"} == set(by_case)
+    row = by_case["26-690"]
+    assert row.street_address == "101 Clarendon Drive"
+    assert row.opening_bid == 301500.0
+    assert row.auction_status == "deficiency_reopening"
+    assert row.sale_date == datetime(2026, 9, 3)
+    assert row.legal_description and "Lot 58" in row.legal_description
+    assert row.raw["anderson_mie_deficiency"]["source_pdf"] == "https://x/deficiency.pdf"
+
+
+def test_deficiency_upcoming_sale_date_comes_from_body_not_filename():
+    """GOTCHA this test pins: the filename says May-7-2026 but the PDF's own
+    body says the reopen date is April 2, 2026 -- sale_date must reflect
+    the body, proving the filename is never trusted for this PDF family."""
+    out = _parse_deficiency_upcoming_pdf(
+        DEFICIENCY_UPCOMING_DATE_DRIFT_TEXT, "https://x/deficiency-drift.pdf", "test.slug")
+    assert len(out) == 1
+    assert out[0].sale_date == datetime(2026, 4, 2)
+
+
+def test_deficiency_upcoming_drops_withdrawn_rows():
+    """The live October 1, 2026 edition's only row is WD/BR -- correctly 0
+    real leads, not a parse failure."""
+    out = _parse_deficiency_upcoming_pdf(
+        DEFICIENCY_UPCOMING_ALL_WITHDRAWN_TEXT, "https://x/deficiency-wd.pdf", "test.slug")
+    assert out == []
 
 
 def test_legal_description_handles_multiline_defendant_wrap():

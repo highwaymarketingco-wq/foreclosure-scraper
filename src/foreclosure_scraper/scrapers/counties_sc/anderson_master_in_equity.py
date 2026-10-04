@@ -1,4 +1,28 @@
-"""Anderson County SC Master in Equity — corrected URL + WordPress uploads PDF discovery."""
+"""Anderson County SC Master in Equity — corrected URL + WordPress uploads PDF discovery.
+
+FIXED 2026-10-03 (HERMES sec 8 per-source audit, batch 7). The live page
+publishes a THIRD PDF family this module never fetched at all: a plain
+"<Month>-<Day>-<Year>-Deficiency-Sale.pdf" / "...-Deficiency-Sale-1.pdf" link
+(no "-List" and no "-Results" in the filename). It is neither of the two
+types already handled -- `PDF_HREF_RE` requires "-Sale-List" and
+`RESULTS_HREF_RE` requires the "-Results" suffix -- so this family was
+silently invisible to both. Live-verified 2026-10-03: when a Master-in-Equity
+sale's winning bid was the PLAINTIFF's own (no third party outbid them), SC
+law reopens bidding for 30 more days, and Anderson publishes that reopened
+roster here with the SAME columns as a Sale-List (case#/attorney/caption/
+legal-desc/address) plus a "Plaintiff bid $X" floor the next bidder must
+beat. The September 3, 2026 edition alone carries 4 real, un-withdrawn rows
+(e.g. case 26-690, NewRez LLC v. Patrick Lahmann, 101 Clarendon Drive
+Anderson, floor $301,500) -- real pending auctions with a real address,
+never captured. GOTCHA caught live: the reopen date/time is printed in the
+PDF's own BODY text ("...BIDDING WILL REOPEN ON THURSDAY, OCTOBER 1, 2026 @
+11:00 AM") and does NOT always match the filename's nominal date -- the
+May-7-2026-Deficiency-Sale-1.pdf's own body names its reopen date as APRIL
+2, 2026, a full month off the filename. Sale-List safely trusts its filename
+date because that convention was never seen to drift; this one does drift,
+so `sale_date` here is parsed from the body's "REOPEN ON ... @ ..." line,
+never assumed from the filename.
+"""
 from __future__ import annotations
 
 import io
@@ -37,6 +61,22 @@ ANDERSON_SOLD_RE = re.compile(
     re.I,
 )
 ANDERSON_NON_SALE_RE = re.compile(r"\b(WD|WD/BR|BR\b|withdrawn)", re.I)
+
+# Upcoming Deficiency Sale (reopened bidding) -- distinct from both
+# "-Sale-List" (first sale) and "-Deficiency-Sale-Results" (completed).
+# The trailing "$" anchors against the "-Results" variant, which never
+# matches here since "Results" sits between "Deficiency-Sale" and ".pdf".
+DEFICIENCY_UPCOMING_HREF_RE = re.compile(
+    r"/wp-content/uploads/(\d{4})/(\d{2})/([A-Za-z]+)-(\d+)-(\d{4})-Deficiency-Sale(?:-\d+)?\.pdf$",
+    re.I,
+)
+# "...BIDDING WILL REOPEN ON THURSDAY, OCTOBER 1, 2026 @ 11:00 AM" -- the
+# authoritative sale date for this PDF family; see module docstring for why
+# the filename's own date cannot be trusted here the way Sale-List's can.
+_REOPEN_DATE_RE = re.compile(
+    r"REOPEN\s+ON\s+\w+,?\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})\s*@\s*(\d{1,2}):(\d{2})\s*([AP]M)",
+    re.I,
+)
 CASE_RE = re.compile(r"\b\d{2,4}-\d{3,5}\b")
 ADDR_RE = re.compile(
     r"(\d+\s+[A-Z][\w .'\-]+?\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
@@ -170,6 +210,87 @@ def _parse_results_pdf(text: str, source_url: str, slug: str,
                 "anderson_mie_results": {
                     "source_pdf": source_url,
                     "raw_chunk_excerpt": chunk[:400],
+                },
+            },
+        ))
+    return out
+
+
+def _parse_deficiency_upcoming_pdf(text: str, source_url: str, slug: str) -> list[Listing]:
+    """Anderson's upcoming "Deficiency Sale" PDFs (never "-Results") reopen
+    bidding for 30 days on a prior Master-in-Equity sale the PLAINTIFF's own
+    bid won outright (no third party outbid them). Each row names that
+    floor bid ("Plaintiff bid $X") the next bidder must beat -- a real
+    pending auction with a real address, not a completed comp, so it is
+    kept separate from `_parse_results_pdf`'s `actual_sold_price` convention."""
+    out: list[Listing] = []
+    sale_date = None
+    m = _REOPEN_DATE_RE.search(text)
+    if m:
+        month_num = MONTHS.get(m.group(1).lower())
+        if month_num:
+            try:
+                sale_date = datetime(int(m.group(3)), month_num, int(m.group(2)))
+            except ValueError:
+                sale_date = None
+
+    chunks = re.split(r"(?=\b\d+\.\s+\d{2}-\d{3,5}\b)", text)
+    for chunk in chunks:
+        chunk = chunk.strip()
+        if len(chunk) < 30:
+            continue
+        case_m = CASE_RE.search(chunk)
+        if not case_m:
+            continue
+        if ANDERSON_NON_SALE_RE.search(chunk):
+            continue  # withdrawn / bankruptcy -- no longer up for bid
+
+        bid_m = ANDERSON_SOLD_RE.search(chunk)
+        floor_bid = None
+        if bid_m:
+            try:
+                floor_bid = float(bid_m.group(1).replace(",", ""))
+            except ValueError:
+                floor_bid = None
+
+        addr_m = ADDR_RE.search(chunk)
+        atty = None
+        for code, full in ATTORNEY_LEGEND.items():
+            if re.search(rf"\b{re.escape(code)}\b", chunk):
+                atty = full
+                break
+        plaintiff = defendant = None
+        pm = re.search(r"([A-Z][\w &.,'-]{3,80}?)\s+v\.\s+([A-Z][\w &.,'-]{3,80})", chunk)
+        if pm:
+            plaintiff, defendant = pm.group(1).strip(), pm.group(2).strip().split("\n")[0]
+        legal_desc, mh_kind = _legal_description(chunk, addr_m)
+
+        out.append(Listing(
+            source=slug,
+            source_url=source_url,
+            listing_type=ListingType.FORECLOSURE_SALE,
+            property_kind=mh_kind,
+            street_address=addr_m.group(1) if addr_m else None,
+            state="SC",
+            county="Anderson",
+            case_number=case_m.group(0),
+            plaintiff=plaintiff,
+            defendant=defendant,
+            trustee=atty,
+            sale_date=sale_date,
+            opening_bid=floor_bid,
+            auction_status="deficiency_reopening",
+            legal_description=legal_desc,
+            description=chunk[:500],
+            first_seen=datetime.utcnow(),
+            last_seen=datetime.utcnow(),
+            raw={
+                "anderson_mie_deficiency": {
+                    "source_pdf": source_url,
+                    "raw_chunk_excerpt": chunk[:400],
+                    "note": "floor_bid is the PLAINTIFF's own bid (the floor "
+                            "a new bidder must beat), not a completed sale "
+                            "price -- do not feed to foreclosure_sold_comps.",
                 },
             },
         ))
@@ -353,6 +474,46 @@ class AndersonMasterInEquity(BaseScraper):
                     if not text:
                         continue
                     out.extend(_parse_results_pdf(text, url, self.slug, sale_date))
+                except Exception:
+                    continue
+
+            # ---- Deficiency Sale PDFs (UPCOMING reopened bidding -- the
+            # third PDF family, see module docstring) ----
+            deficiency_pdfs: list[tuple[str, tuple[int, int]]] = []
+            for a in tree.css("a[href*='Deficiency-Sale']"):
+                href = a.attributes.get("href", "")
+                m = DEFICIENCY_UPCOMING_HREF_RE.search(href)
+                if not m:
+                    continue  # the "-Results" variant never matches (see regex comment)
+                full_url = (
+                    href if href.startswith("http")
+                    else f"https://www.andersoncountysc.org{href}"
+                )
+                deficiency_pdfs.append((full_url, (int(m.group(1)), int(m.group(2)))))
+
+            # Sort by the upload path's own (year, month) -- a cheap proxy for
+            # recency ahead of fetching (the real reopen date only comes from
+            # the PDF body; see module docstring on the filename/body drift).
+            deficiency_pdfs.sort(key=lambda x: x[1], reverse=True)
+            cutoff = today - timedelta(days=45)
+            for url, _ym in deficiency_pdfs[:4]:
+                try:
+                    r4 = await c.get(url)
+                    if r4.status_code != 200:
+                        continue
+                    text = _extract_pdf_text(r4.content)
+                    if not text:
+                        continue
+                    listings = _parse_deficiency_upcoming_pdf(text, url, self.slug)
+                    # Drop editions whose OWN body resolves to a stale date --
+                    # a resolved date is trustworthy evidence of staleness;
+                    # an unresolved one (parse miss) is kept rather than
+                    # silently dropped.
+                    listings = [
+                        li for li in listings
+                        if li.sale_date is None or li.sale_date >= cutoff
+                    ]
+                    out.extend(listings)
                 except Exception:
                     continue
 
