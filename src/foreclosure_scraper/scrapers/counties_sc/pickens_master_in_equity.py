@@ -93,6 +93,30 @@ SOLD_PRICE_PATTERNS = [
     re.compile(r"sale\s+price\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
     # "$45,000 SOLD" — money-amount immediately followed by SOLD keyword
     re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)\s+SOLD\b", re.I),
+    # 2026-10-04 extraction-completeness fix: NONE of the patterns above ever
+    # matched Pickens' OWN live results-PDF phrasing. Live-verified against
+    # every current RESULTS/ROSTER PDF in the scraper's actual 365-day fetch
+    # window (Dec 2025 - Sep 2026, 8 PDFs): every single completed-sale row
+    # used one of these phrasings in the NOTES column, and every one of them
+    # came back price=None ("no_match") before this fix -- a 0/many hit rate
+    # on real sold prices, not an edge case. pypdf's column-to-text flattening
+    # also splits "SOLD TO THIRD" and "PARTY BIDDER" across a line break, so
+    # the gap between words must tolerate a newline (plain \s* already does).
+    #
+    # "SOLD TO THIRD PARTY BIDDER $236,000.00" / "SOLD TO PLAINTIFF $100,000.00"
+    re.compile(r"sold\s+to\s+(?:third\s*[\s-]?\s*party\s*bidder|plaintiff)"
+               r"\s*[-:]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "3rd Party Bid - $205,000.00" / "To Plaintiff - $200,000.00" (the
+    # 2023-era phrasing, no leading "SOLD")
+    re.compile(r"(?:3rd\s*party\s*bid|third[\s-]party\s*bid|to\s+plaintiff)"
+               r"\s*[-:]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "PLAINTIFF BID $95,000.00" — a deficiency-demanded row still reports a
+    # real plaintiff bid amount
+    re.compile(r"plaintiff\s+bid\s*[-:]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "$31,024.46 PLAINTIFF BID" — amount BEFORE the label (both orders occur
+    # across different monthly PDFs; same "amount-then-keyword" shape as the
+    # "$45,000 SOLD" pattern above)
+    re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)\s+PLAINTIFF\s+BID\b", re.I),
 ]
 
 # Phrases indicating an upset bid was filed (Pickens results sometimes

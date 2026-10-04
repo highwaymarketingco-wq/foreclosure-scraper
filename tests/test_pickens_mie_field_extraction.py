@@ -22,6 +22,7 @@ from foreclosure_scraper.scrapers.counties_sc.pickens_master_in_equity import (
     PARTIES_RE,
     TMS_RE,
     _LEADING_ATTY_RE,
+    _extract_sold_price,
 )
 
 # Real roster-PDF chunk: case# -> plaintiff "V" defendant (no period) -> ET AL
@@ -98,3 +99,63 @@ def test_address_bridges_a_pdf_line_wrap():
     assert m is not None
     addr = re.sub(r"\s+", " ", m.group(1)).strip()
     assert addr == "333 SLAB BRIDGE RD."
+
+
+# --------------------------------------------------------------------------- #
+# sold-price extraction, fixed 2026-10-04
+# --------------------------------------------------------------------------- #
+#
+# Live-verified against every current RESULTS/ROSTER PDF in the scraper's
+# actual 365-day fetch window (Dec 2025 - Sep 2026, 8 PDFs) BEFORE this fix:
+# 0 of 21 real completed sales matched ANY SOLD_PRICE_PATTERN -- every row
+# came back price=None ("no_match"). Pickens' own NOTES-column phrasing
+# ("SOLD TO THIRD PARTY BIDDER $X", "SOLD TO PLAINTIFF $X", the 2023-era
+# "To Plaintiff - $X" / "3rd Party Bid - $X", and "PLAINTIFF BID $X" in
+# either amount-then-label or label-then-amount order) was never in
+# SOLD_PRICE_PATTERNS at all. These chunks are real text pulled live that
+# day (pypdf splits "THIRD" / "PARTY BIDDER" across a line break).
+
+def test_sold_to_third_party_bidder_is_captured():
+    chunk = ("EASLEY, SC 29642  5028-15-64-2308 SOLD TO THIRD  PARTY BIDDER  "
+             "$236,000.00  4.")
+    price, _src = _extract_sold_price(chunk)
+    assert price == 236000.0
+
+
+def test_sold_to_plaintiff_is_captured():
+    chunk = ("LIBERTY, SC 29657  5006-01-39-1946 SOLD TO  PLAINTIFF  "
+             "$100,000.00  3.")
+    price, _src = _extract_sold_price(chunk)
+    assert price == 100000.0
+
+
+def test_legacy_dash_separated_phrasing_is_captured():
+    """The 2023-era phrasing ("To Plaintiff - $X" / "3rd Party Bid - $X", no
+    leading "SOLD") -- still reachable if an older PDF is ever re-parsed."""
+    assert _extract_sold_price(
+        "104 C Pinnacle Ln Easley SC 29642 5038-14-44-1372 To Plaintiff - $200,000.00"
+    )[0] == 200000.0
+    assert _extract_sold_price(
+        "401 Norris Hwy Central SC 29630 N/A 3rd Party Bid - $205,000.00"
+    )[0] == 205000.0
+
+
+def test_plaintiff_bid_both_orders_are_captured():
+    """Live PDFs use BOTH "label then amount" and "amount then label" for a
+    deficiency-demanded row's plaintiff bid, in different monthly PDFs."""
+    label_then_amount = (
+        "4074-00-65-3867 DEFICIENCY  DEMANDED  PLAINTIFF BID  $95,000.00  4."
+    )
+    amount_then_label = (
+        "4191-10-25-8593 DEFICIENCY  DEMANDED  $31,024.46  PLAINTIFF BID  2."
+    )
+    assert _extract_sold_price(label_then_amount)[0] == 95000.0
+    assert _extract_sold_price(amount_then_label)[0] == 31024.46
+
+
+def test_cancelled_rows_still_return_none_not_a_stray_dollar_amount():
+    """The new patterns must not override the existing NON_SALE_STATUS_RE
+    short-circuit -- a CANCELLED row has no real sold price even if some
+    unrelated dollar figure appears nearby in the same chunk."""
+    chunk = "4151-00-89-3897 CANCELLED    2022 MOBILE HOME  2."
+    assert _extract_sold_price(chunk) == (None, "non_sale_status")
