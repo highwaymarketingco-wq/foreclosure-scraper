@@ -1,14 +1,36 @@
 """Sumter County SC — Surplus Property Sales.
 
-Sumter County posts surplus property sales at
-sumtercountysc.gov/online_services/property/surplus_sales.php.
-These are county-owned properties being sold, including tax-delinquent
-foreclosed properties that didn't sell at the annual tax sale.
+DISABLED 2026-10-04 (extraction-completeness audit, batch 13). Live-fetched
+the current page: it no longer carries ANY inline listing table. Every one of
+its 5 "Our Current Auctions" nav rows is now a bare link out to
+GovDeals.com's legacy `index.cfm?fa=Main.AdvSearchResults&myseller=<id>` path
+-- Sumter County Surplus Property (seller 348), Surplus Vehicles/Heavy
+Equipment (seller 400), Forfeited Land Commission Real Property (seller
+3939), Sheriff's Office Seized/Unclaimed Property (seller 400), and the
+Detention Center's volunteer-made items (seller 3361). The page's own HTML
+has NO parcel/owner/address/amount anywhere -- the 2026-09-15 digit-presence
+guard already correctly filters this nav text out (confirmed live today it
+still returns 0, not a false positive), but there is no amount of re-parsing
+that page that can ever recover real data, because none is left on it.
 
-Free, public, no login.
-Slug: counties_sc.sumter_surplus
-Category: county_tax
-ListingType: TAX_SALE
+The real data (when any exists) now lives entirely on GovDeals, which
+`scrapers/national/govdeals.py` (national.govdeals) ALREADY sweeps
+state-wide for SC, server-side scoped to the real-estate taxonomy branches
+(categoryIds 84 + 95A), with NO seller restriction -- confirmed live
+2026-10-04 that an unrestricted SC sweep across both categories returns a
+real (if currently sparse, 1 unrelated listing) result set, so whenever
+Sumter's FLC/surplus real property IS posted to GovDeals in those
+categories, national.govdeals already picks it up with no Sumter-specific
+code needed. Right now Sumter has nothing posted in either category
+(a genuine current-inventory zero, not a code gap). Disabling this module
+rather than leaving it as permanent dead weight (a network request every run
+that can structurally never yield a row again).
+
+Pre-migration docstring, for history: Sumter County used to post surplus
+property sales directly at
+sumtercountysc.gov/online_services/property/surplus_sales.php as an inline
+HTML table. Free, public, no login. Slug: counties_sc.sumter_surplus.
+Category: county_tax. ListingType: TAX_SALE.
 """
 from __future__ import annotations
 
@@ -34,6 +56,11 @@ class SumterSurplusSales(BaseScraper):
     timeout_s = 120.0
     expected_min_count = 0
     optional = True
+    disabled = True
+    disabled_reason = ("page migrated to pure GovDeals link-outs (sellers 348/400/3939/3361), "
+                       "no inline listing data left to parse; national.govdeals already "
+                       "sweeps SC real-estate categories 84/95A state-wide with no seller "
+                       "restriction, confirmed live 2026-10-04")
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
