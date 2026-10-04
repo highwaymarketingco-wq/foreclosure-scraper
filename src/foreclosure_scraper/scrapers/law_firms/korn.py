@@ -7,6 +7,24 @@ yfdabv11.com on 2026-05-14). The scraper is intentionally retained as a
 stub so the slug stays known but skipped; fetch() returns [] without
 doing network work.
 
+RE-VERIFIED LIVE 2026-10-04 (extraction-completeness audit): still dead,
+now even more plainly so -- /foreclosure-sales/ serves a plain "domain may
+be for sale" parking page (abovedomains.com, title literally
+"kornlawfirm.com", no redirect at all anymore) and /sales/ fails to load
+outright. A web search found no successor site: the firm's name only turns
+up in historical court filings (an August 2026 Charleston Master-in-Equity
+appeal document still lists "Korn Law Firm, PO Box 11264, Columbia, SC" as
+counsel of record on an existing case, and a 2021 SC Supreme Court matter
+involving the firm's principal) -- evidence the firm/attorney may still
+exist in some capacity, but nothing suggesting it maintains a public sale
+calendar anywhere. Set `disabled = True` this session (previously the
+dead-skip was only a hardcoded `return []` inside fetch(), which
+BaseScraper.safe_run records as OUTCOME_ZERO -- "ran clean but returned 0
+rows" -- indistinguishable from a real source having a quiet week; the
+`disabled` flag is what this codebase already uses for a confirmed,
+permanent dead-end, e.g. counties_sc.sumter_surplus, and reports the
+accurate OUTCOME_DORMANT instead).
+
 If the firm ever republishes (new domain or restored site), revert this
 commit to get the working stealth/parser logic back.
 """
@@ -182,7 +200,13 @@ class Korn(BaseScraper):
     requires_render = True
     expected_min_count = 0
     timeout_s = 240.0
+    disabled = True
+    disabled_reason = ("kornlawfirm.com domain parked (dead since 2026-05-13, "
+                        "re-verified live 2026-10-04: plain 'domain for sale' page, "
+                        "no successor site found)")
 
     async def fetch(self) -> Iterable[Listing]:
-        # Domain dead since 2026-05-13 — skip network entirely.
+        # Domain dead since 2026-05-13 — skip network entirely. `disabled =
+        # True` above means safe_run never even calls this, but fetch() stays
+        # a safe no-op for any direct caller (tests, __main__ probes, etc.)
         return []
