@@ -434,6 +434,20 @@ SCOPE_BYPASS_SOURCES = {
     # handles this, so this bypass entry isn't fighting the date-window
     # check the way an unmodified value would).
     "courtlistener.recap",
+    # national.fdic_failed_banks added 2026-10-04 (national.* extraction-
+    # completeness audit, batch 15): the FDIC source table has no county
+    # column, only City. The scraper now derives county from city via the
+    # 146-county NC+SC gazetteer (_bankruptcy_city_to_county), but that
+    # gazetteer is not exhaustive (confirmed gaps: Pawleys Island, Myrtle
+    # Beach, Fairfax SC all appear in the real historical NC/SC rows and
+    # don't resolve) -- same "state reliable, county may not resolve" shape
+    # as craigslist_fsbo/sc_public_index above. Also fixed same day:
+    # listing_type REO -> DISTRESSED (a bank failure is a leading indicator,
+    # not a specific flip-able property), which took this source OUT of the
+    # narrow 18-county footprint gate it had always silently zeroed under
+    # before this bypass could even matter -- see fdic_failed_banks.py's
+    # module docstring for the full before/after.
+    "national.fdic_failed_banks",
 }
 
 #: Coastal foreclosure sources whose COUNTY is the whole point of the lead. They

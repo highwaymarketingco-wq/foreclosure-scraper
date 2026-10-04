@@ -383,6 +383,14 @@ _CONTEXT_ONLY_DISTRESSED_SOURCES = frozenset({
     "nc_land_use_restrictions",
     # federal contract and listing records with no condition evidence
     "hud_section8_contracts", "crexi_multifamily",
+    # 2026-10-04 (national.* extraction-completeness audit, batch 15):
+    # fdic_failed_banks retyped reo -> distressed the same day (a bank
+    # failure is a leading indicator for REO inventory 6-12 months out, not
+    # evidence about this specific structure's condition today -- see that
+    # scraper's module docstring). Same reasoning as hud_section8_contracts/
+    # crexi_multifamily just above: a federal regulatory record with zero
+    # condition evidence for the property itself.
+    "fdic_failed_banks",
     # hazard-zone and program context
     "fema_disasters", "hendersonville_flood_zone_structures", "buncombe_hmgp_buyout",
     # 2026-10-01 per-source audit (zombie_properties.py): a "zombie property" is a
