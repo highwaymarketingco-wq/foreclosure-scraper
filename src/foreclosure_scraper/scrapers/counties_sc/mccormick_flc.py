@@ -4,6 +4,24 @@ McCormick County's FLC page lists available forfeited land commission
 properties - properties the county acquired through tax delinquency
 proceedings. These are county-owned properties available for purchase.
 
+RE-VERIFIED LIVE 2026-10-04 (extraction-completeness audit): PAGE_URL today
+is STILL exactly the Treasurer office-contact table `_county_own_addresses`
+already guards against (Dept Head / Location / Office Hours / Phone / Fax,
+133 South Mine Street) - zero "forfeited"/"FLC" mentions, zero PDF links,
+matching the 2026-09-10 finding this module's own `_county_own_addresses`
+docstring already documents. The page's own text confirms WHY: "The County
+Tax Sale is held on the first Monday in October... properties going to the
+sale are advertised in The McCormick Messenger" - print-only, no online FLC
+roster. A web search the same day turned up no alternative McCormick FLC
+listing anywhere online either. counties_sc.qpaybill_delinquent_roll
+("mccormicktreasurer" tenant, confirmed live the same day) covers McCormick's
+STANDING delinquent-tax roll, but that is a materially earlier stage than
+FLC (county-owned, already-forfeited inventory) - it does not supersede this
+module's actual purpose. Genuine current wall, not a code bug: left
+un-disabled (matching the `bamberg_sheriff`/`anderson_sheriff` precedent)
+since `expected_min_count=0` already makes a quiet 0-row run a non-failure
+and the county could start publishing a real list at this same URL.
+
 Free, public, no login.
 Slug: counties_sc.mccormick_flc
 Category: county_tax

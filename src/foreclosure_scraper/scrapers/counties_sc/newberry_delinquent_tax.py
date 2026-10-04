@@ -15,6 +15,12 @@ counties_sc per-source extraction audit. parse_rows()'s shared junk-row gate
 scraper is disabled. Do not re-enable without a different, real per-parcel
 source at this URL.
 
+RE-VERIFIED LIVE 2026-10-04: PAGE_URL still has 0 `<table>` tags; the only
+"Delinquent Tax" text on the page is the department's own nav-menu link
+label, not a list. qpaybill's Newberry tenant ("newberrytreasurer") is still
+delivering real current rows (live-swept prefix "A": 27 rows, e.g. ABNEY
+ROBERT &, UPPER LN, $564.24 unpaid 2025).
+
 Slug: counties_sc.newberry_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE

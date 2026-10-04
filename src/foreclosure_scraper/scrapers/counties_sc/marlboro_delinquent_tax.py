@@ -19,6 +19,13 @@ gate happens to currently exclude September -- neither is a real
 protection, and "fix" attempts that just widen the gate or add the
 whitelist entry would ship this garbage straight onto the board.
 
+RE-VERIFIED LIVE 2026-10-04: PAGE_URL is still the meetings/publications
+page (4 `<table>` tags, 0 "delinquent" mentions anywhere) -- same budget/
+agenda content, not a tax-sale list. qpaybill's Marlboro tenant
+("marlborocountytax") is still delivering real current rows (live-swept
+prefix "A": 24 rows, e.g. ABRAHAM SHANAKA, 13 MUNNERLYN STREET, $545.18
+unpaid 2025).
+
 `fetch()` was disabled (returned []) pending a real, dedicated tax-sale
 page/document. AUDITED 2026-10-01: that real source turned out to already
 exist elsewhere in this codebase rather than on Marlboro's own site --

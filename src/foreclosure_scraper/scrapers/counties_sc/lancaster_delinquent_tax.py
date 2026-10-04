@@ -33,6 +33,20 @@ is not worth the cycle. Found via the 2026-10-01 counties_sc per-source
 extraction audit. Its shared junk-row gate (is_usable_row, see
 test_sc_tax_table_guards.py) is left in place -- only the scraper is disabled.
 
+RE-VERIFIED LIVE 2026-10-04: the "superseded by qpaybill" conclusion still
+holds (live-swept qPayBill's Lancaster tenant, prefix "A": 49 real current
+unpaid rows, e.g. "A & C PROPERTIES OF THE CAROLI", TMS 0042 -00-059.01,
+$65.78 due). NEW finding while re-checking: PAGE_URLS[0]
+(/194/Delinquent-Tax-Collection) now returns a genuine HTTP 404 (confirmed
+via plain curl and this module's own impersonating client) even though the
+county's own sitemap.xml still lists it. Harmless here -- `fetch()`'s
+per-page try/except already treats a failed GET as "no content from this
+page" and falls through to PAGE_URLS[1] (/198/Tax-Sale-Procedures), which is
+still live and still carries exactly the same text-only notice (sale
+"Monday, November 9, 2026", list posts after the Nov 6 deadline), 0 tables,
+0 DocumentCenter links. Not worth fixing the dead URL given the module is
+disabled and the real roll lives on qpaybill regardless.
+
 Slug: counties_sc.lancaster_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE

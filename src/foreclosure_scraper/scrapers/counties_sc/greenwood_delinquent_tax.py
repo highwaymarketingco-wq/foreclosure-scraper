@@ -16,6 +16,14 @@ live the same day: that scraper is actively sweeping real unpaid parcels.
 Found via the 2026-10-01 counties_sc per-source extraction audit. Do not
 re-enable without a different, real per-parcel source at this URL.
 
+RE-VERIFIED LIVE 2026-10-04: still holds. The county's site has since moved
+to a Wix Studio build (the page now renders ~835KB with heavy embedded JSON
+app config), but the actual content is unchanged - 0 `<table>` tags, and the
+only "delinquent" mention anywhere on the page is inside that JSON config's
+own echoed requestUrl, not real page content. counties_sc.
+greenwood_corebtpay_delinquent_tax (the real per-parcel source) is still the
+live tenant for Greenwood.
+
 Slug: counties_sc.greenwood_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE

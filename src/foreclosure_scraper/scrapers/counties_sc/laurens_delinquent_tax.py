@@ -29,6 +29,18 @@ amount owed, tax year -- is already live elsewhere: this same page's
 rows with dollar amounts (e.g. SAAYU INVESTMENT LLC, 906-16-01-070,
 $1,719.49 unpaid). Do not duplicate that sweep here -- this module is kept
 only in case the county ever republishes a table on this page.
+
+RE-VERIFIED LIVE 2026-10-04 (extraction-completeness audit): still holds,
+unchanged. The page still has 0 `<table>` tags; its only two document-ish
+links are "Delinquent Tax Sale Registration Packet" and "Delinquent Tax Sale
+Bidder Registration Form" (procedure paperwork, not a property list) plus
+the same newstogo.us scanned-newspaper page-flip viewer link noted below --
+no new PDF, no "Current FLC List"/"Tax Sale Overage List" link exists on
+this page at all (those were a DIFFERENT county's dead links, not Laurens').
+qpaybill's Laurens tenant is still delivering: live-swept prefix "S" again
+today, 72 real current rows including the SAME SAAYU INVESTMENT LLC parcel
+(906-16-01-070, now $1,719.49 for tax year 2025 specifically -- i.e. still
+unpaid, not a one-off).
 """
 from __future__ import annotations
 
