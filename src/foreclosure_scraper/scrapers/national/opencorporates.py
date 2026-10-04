@@ -24,6 +24,25 @@ token set -> request goes out unauthenticated -> 401 -> returns None,
 never raises, never fabricates a result) rather than being "fixed" into
 something that would require paying for API access this engine is not
 allowed to buy.
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 17), same bug
+class as the 2026-10-01 law_firms.korn fix and this same batch's
+national.nc_sos_ucc fix: this class never set `disabled = True`, and
+`scrapers/_registry.py`'s `discover()` auto-registers EVERY BaseScraper
+subclass in the national package with no category filter -- confirmed by
+reading it, "enrichment" is not special-cased anywhere. That means
+`OpenCorporatesScraper` has been running through the normal safe_run() path
+on every orchestration cycle since this source was documented as
+confirmed-dead on 2026-10-01, and `fetch()`'s hardcoded `return []`
+recorded OUTCOME_ZERO every single time -- indistinguishable from a real
+source having a quiet week, on a source that is actually a permanent,
+by-design dead-end. Also found: `search_entity()`'s own docstring claims
+it is "called by the SOS enrichment pipeline" -- a repo-wide grep (src/,
+tests/, scripts/) found ZERO callers of `OpenCorporatesScraper` or
+`search_entity` anywhere outside this file and its own test file. That
+integration claim is stale; nothing in this codebase currently calls it.
+Re-verified live 2026-10-04: still a hard 401 "Invalid Api Token" on the
+real endpoint, unchanged.
 """
 from __future__ import annotations
 
@@ -48,8 +67,9 @@ _JURISDICTIONS = ("us_nc", "us_sc")
 class OpenCorporatesScraper(BaseScraper):
     """OpenCorporates free API entity search.
 
-    Enrichment-only: called by the SOS enrichment pipeline. Standalone fetch
-    returns [].
+    Enrichment-only: NOT currently called by anything in this codebase
+    (see module docstring's 2026-10-04 FOUND note -- the "called by the SOS
+    enrichment pipeline" claim below is stale). Standalone fetch returns [].
     """
     slug = "national.opencorporates"
     name = "OpenCorporates API (free entity enrichment)"
@@ -57,8 +77,27 @@ class OpenCorporatesScraper(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 60.0
+    # FIXED 2026-10-04 (HERMES extraction-completeness audit, batch 17):
+    # see module docstring's FOUND note -- this auto-registers into the
+    # normal scrape loop (scrapers/_registry.py discover() has no category
+    # filter) and fetch()'s hardcoded `return []` was recording the
+    # ambiguous OUTCOME_ZERO every run instead of the accurate
+    # OUTCOME_DORMANT this confirmed-permanent, by-design (paid-API,
+    # out-of-scope) dead-end deserves.
+    disabled = True
+    disabled_reason = (
+        "OpenCorporates requires a paid API token for every request now "
+        "(confirmed live: unauthenticated requests get HTTP 401 'Invalid "
+        "Api Token'), and is explicitly named as an out-of-scope paid "
+        "broker service by this project's own rules (CLAUDE.md / "
+        "HERMES.md section 2 rule 1) -- not a gap to fill, by design."
+    )
 
     async def fetch(self) -> Iterable[Listing]:
+        # Confirmed permanently out of scope -- see module docstring.
+        # `disabled = True` above means safe_run never even calls this, but
+        # fetch() stays a safe no-op for any direct caller (tests,
+        # __main__ probes, etc.)
         return []
 
     @staticmethod
