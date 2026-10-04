@@ -138,7 +138,87 @@ SCRAPER_KEYS_INTENTIONALLY_INTERNAL = {
     "source_url": "duplicates the Listing.source_url column; a raw copy shadowing a "
                   "real field invites the two disagreeing",
     "documents": "generic bag already carried by the document_links / doc_ocr keys",
+    # 2026-10-04: surfaced by extending the scraper scan to walk raw={...} dict-literal
+    # ASTs directly (see _scraper_raw_dict_literal_keys) instead of a regex that could
+    # only ever see a literal's first key. Each of these, verified against its own
+    # scraper source, assigns the exact same variable to both raw[...] and an
+    # already-published top-level Listing field -- a real duplicate, not a dropped
+    # signal, so it belongs here rather than in RAW_KEEP.
+    "city": "national.fdic_failed_banks writes the same `city` variable into both "
+            "raw['city'] and the top-level Listing.city field",
+    "state": "national.fdic_failed_banks writes the same `state` variable into both "
+             "raw['state'] and the top-level Listing.state field",
+    "description": "counties_sc.cherokee_delinquent_tax writes the same `desc` variable "
+                    "into both raw['description'] and street_address (the parsed legal "
+                    "description IS the situs text for this source)",
+    "parcel": "counties_sc.abbeville_delinquent_tax writes the same `parcel` variable "
+              "into both raw['parcel'] and the top-level Listing.parcel_id field",
+    "price": "national.va_acquired writes the same `price` variable into both "
+             "raw['price'] and the top-level Listing.opening_bid field",
+    "source": "national.nc_sos_ucc hardcodes raw['source']='nc_sos_ucc', identical to "
+              "the top-level Listing.source field (self.slug) on every row it emits",
 }
+
+
+def _scraper_raw_dict_literal_keys(path: _Path) -> set[str]:
+    """Every literal string key of a `raw={...}` dict, found by walking the real
+    AST dict node rather than regexing around it.
+
+    This exists because of a confirmed gap in the regex scan just below: its
+    dict-literal pattern is anchored on `raw\\s*=\\s*\\{\\s*["\\']...` and can
+    only ever capture the ONE key immediately following the opening brace --
+    a plain regex has no notion of matching braces, so it cannot tell where
+    that dict ends, let alone walk its other comma-separated siblings. Every
+    key after the first in a multi-key literal is therefore invisible to it,
+    silently, which is exactly the shape of the bug this whole test file
+    exists to catch.
+
+    Live-confirmed 2026-10-04 against reo/vrm_va_reo.py's pre-fix literal --
+    `raw={"vrm_id": ..., "beds": ..., "baths": ..., "sqft": ..., "list_price":
+    ..., "images": ...}` -- where the regex scan below finds only `vrm_id`;
+    `beds`/`baths`/`sqft`/`list_price`/`images` (items 2-6) do not appear in
+    its output at all, so registering or un-registering them in RAW_KEEP had
+    zero effect on `test_every_scraper_raw_key_survives_publish`'s result.
+    This AST pass walks the dict node directly, so every key is seen
+    regardless of its position in the literal.
+
+    Covers both shapes the codebase uses:
+      - `Listing(..., raw={"a": ..., "b": ...})`  -- a dict literal passed as
+        a keyword argument to any call (not just `Listing` by name, since
+        scrapers alias/wrap the constructor in a few places).
+      - `raw = {"a": ..., "b": ...}` / `li.raw = {...}` -- a plain assignment
+        of a dict literal to a `raw`-named target.
+    Only the dict's own top-level keys are collected -- a nested dict VALUE
+    (e.g. `"images": {"real": photos}`) is left alone, since `RAW_KEEP`
+    entries are namespaces ("*") covering their whole subtree, not individual
+    subkeys.
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (SyntaxError, UnicodeDecodeError):
+        return set()
+
+    found: set[str] = set()
+
+    def _collect(dict_node: ast.Dict) -> None:
+        for k in dict_node.keys:
+            if isinstance(k, ast.Constant) and isinstance(k.value, str):
+                found.add(k.value)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            for kw in node.keywords:
+                if kw.arg == "raw" and isinstance(kw.value, ast.Dict):
+                    _collect(kw.value)
+        elif isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
+            for tgt in node.targets:
+                is_raw = (
+                    (isinstance(tgt, ast.Attribute) and tgt.attr == "raw")
+                    or (isinstance(tgt, ast.Name) and tgt.id in ("raw", "_raw"))
+                )
+                if is_raw:
+                    _collect(node.value)
+    return found
 
 
 def _scraper_raw_keys() -> dict[str, set[str]]:
@@ -149,6 +229,7 @@ def _scraper_raw_keys() -> dict[str, set[str]]:
         keys = set(_re.findall(r'raw\s*=\s*\{\s*["\']([A-Za-z0-9_]+)["\']', t))
         keys |= set(_re.findall(r'\braw\[\s*["\']([A-Za-z0-9_]+)["\']\s*\]\s*=', t))
         keys |= set(_re.findall(r'\braw\.setdefault\(\s*["\']([A-Za-z0-9_]+)["\']', t))
+        keys |= _scraper_raw_dict_literal_keys(f)
         for k in keys:
             out.setdefault(k, set()).add(f.stem)
     return out
@@ -160,6 +241,49 @@ def test_the_audit_actually_finds_scraper_keys():
     keys = _scraper_raw_keys()
     assert len(keys) > 150, f"only found {len(keys)} scraper raw keys; the scan broke"
     assert "liensnc" in keys
+
+
+def test_dict_literal_scan_catches_every_sibling_key(tmp_path):
+    """Regression pin for the gap this audit found in `reo/vrm_va_reo.py`
+    (2026-10-04, commit f7c57c0d): the regex dict-literal pattern only ever
+    captures the FIRST key of a `raw={...}` literal. Reproduces that file's
+    exact pre-fix shape -- a `Listing(..., raw={...})` call with SIX keys --
+    and asserts both halves of the regression:
+      1. the plain regex alone (what shipped before this fix) really does
+         miss every key but the first, proving the gap was real and not
+         hypothetical;
+      2. `_scraper_raw_dict_literal_keys()` (the new AST pass) finds all six,
+         so the combined `_scraper_raw_keys()` scan no longer has this
+         blind spot.
+    """
+    synthetic = tmp_path / "synthetic_vrm_shape.py"
+    synthetic.write_text(
+        "def _parse_card(card):\n"
+        "    return Listing(\n"
+        "        source_url=url,\n"
+        "        raw={\n"
+        "            \"vrm_id\": listing_id,\n"
+        "            \"beds\": beds,\n"
+        "            \"baths\": baths,\n"
+        "            \"sqft\": sqft,\n"
+        "            \"list_price\": price,\n"
+        "            \"images\": {\"real\": photos} if photos else {},\n"
+        "        },\n"
+        "    )\n"
+    )
+    text = synthetic.read_text()
+    regex_only = set(re.findall(r'raw\s*=\s*\{\s*["\']([A-Za-z0-9_]+)["\']', text))
+    assert regex_only == {"vrm_id"}, (
+        f"expected the bare regex to see only the first key (the historical bug), "
+        f"got {sorted(regex_only)} -- if this changed, the rest of this pin may be stale"
+    )
+
+    ast_keys = _scraper_raw_dict_literal_keys(synthetic)
+    expected = {"vrm_id", "beds", "baths", "sqft", "list_price", "images"}
+    assert ast_keys == expected, (
+        f"AST dict-literal scan should see every sibling key, got {sorted(ast_keys)}, "
+        f"expected {sorted(expected)}"
+    )
 
 
 def test_every_scraper_raw_key_survives_publish():

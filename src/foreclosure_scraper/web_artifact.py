@@ -2420,6 +2420,47 @@ RAW_KEEP = {
     # enrichment_entity_type.py instead of recomputed independently by ~10 call sites.
     "entity_type": "*",
 
+    # 2026-10-04: found by extending tests/test_raw_keep_covers_enrichers.py's scraper
+    # scan to walk the actual AST of `raw={...}` dict literals instead of a regex that
+    # could only ever see the FIRST key of such a literal (the exact blind spot that let
+    # reo/vrm_va_reo's beds/baths/sqft/list_price ship silently-dropped for this whole
+    # extraction-completeness audit -- see _scraper_raw_dict_literal_keys() docstring).
+    # Every key below is a real, previously-unregistered, previously-silently-dropped
+    # scraper raw key the new scan surfaced; duplicates of an already-published
+    # top-level Listing field went to SCRAPER_KEYS_INTENTIONALLY_INTERNAL in that test
+    # file instead (same precedent as this dict's own "source_url" exclusion there).
+    "absentee": "*",              # counties_sc.spartanburg_vacant: mails from outside SPT/SC or a PO box
+    "anonymized_address": "*", "fc_city_page": "*", "fc_price_emv": "*", "fc_search_view": "*",
+    "beds": "*", "baths": "*", "sqft": "*",
+    # ^ national.foreclosure_dot_com: street NUMBER is masked on this source (hence
+    # anonymized_address), but city/state/zip/beds/baths/sqft and which internal code
+    # path (search-view vs. city-page JSON-LD) produced the row are all real and were
+    # all silently dropped.
+    "collateral": "*", "debtor": "*", "filing_date": "*", "secured_party": "*",
+    # ^ national.nc_sos_ucc: the UCC-1 filing itself -- who filed against whom, when,
+    # and over what collateral. nc_sos_ucc's own raw["source"]="nc_sos_ucc" duplicated
+    # the top-level Listing.source field and went to SCRAPER_KEYS_INTENTIONALLY_INTERNAL
+    # instead of here.
+    "contamination_type": "*", "npl_status": "*", "site_name": "*",
+    # ^ national.epa_superfund: National Priorities List status + contamination type
+    # for the site named in site_name.
+    "dateless": "*",              # public_notices.funeral_home_rss: True marks a row AS
+                                   # intentionally missing a sale_date (a death has none);
+                                   # operator context, same precedent as link_may_be_stale
+    "item_number": "*",           # counties_sc.cherokee_delinquent_tax: the county's own
+                                   # tax-sale item #, distinct from parcel_id/TMS
+    "property_name": "*", "units": "*", "owner_contact": "*", "section8": "*",
+    "oceanfront_candidate": "*",
+    # ^ national.hud_section8_contracts: owner_contact is organization/phone/email on
+    # the property's HUD contract -- direct contactability (HERMES sec 9 priority #1) --
+    # and section8 is the contract_expiration/expiring_soon motivated-seller signal.
+    # Both were being computed and then thrown away at every publish.
+    "str_permit_lapsed": "*",
+    # ^ counties_nc.asheville_str_permits: status/business_name/license_number/reason
+    # behind a lapsed short-term-rental permit. Already scored (distress_score.py FINANCIAL,
+    # weight 12) before this fix, so the number on the board was right but the evidence
+    # an operator would open the row to check was not there to back it up.
+
 }
 
 
