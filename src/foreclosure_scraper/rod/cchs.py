@@ -152,13 +152,37 @@ def search_url(state: str, county: str) -> str | None:
 
 
 def _parse_rows(xml: str, state: str, county: str, *, sold: bool) -> list[RodDoc]:
+    """Parse a getall reply into one RodDoc per document.
+
+    2026-10-03: every `<r>` also carries `orc`/`eec` (the vendor's OWN "I"
+    individual vs "F" firm/entity classification for the grantor/grantee
+    party) and `ors`/`ees` (a role suffix like "TR" trustee, "AIF"
+    attorney-in-fact) -- live-verified on Burke, never read here even though
+    `deed_index.py`'s `Party(name, kind, suffix)` + `_is_person()` /
+    `derive_loss()` are BUILT to consume exactly this (and `_party()` below
+    already reads it for the separate deed-index sweep). Without it, every
+    caller of `discover_recent_nods`/`discover_recent_sold_recordings`
+    (nc_rod_substitute_trustee.py) only had a bare name string and had to
+    guess person-vs-firm from name text alone -- confirmed live on Burke
+    instrument 2026005171: a real owner (JACKSON CLYDE EUGENE JR., orc="I")
+    shares the grantor side with CAPE FEAR TRUSTEE SERVICES, LLC and BELL
+    CARRINGTON PRICE & GREGG, PLLC (both orc="F", the foreclosing trustee and
+    its law firm), and the pre-sale path's `_all_grantor_names()` had no
+    institutional filter at all -- all three would be joined into one
+    `defendant` string. Now carried in `raw['grantor_parties']`/
+    `raw['grantee_parties']` as the same `[kind, suffix]` pairing
+    `deed_index.py.upsert()` already serializes, alongside the existing flat
+    `raw['grantors']`/`raw['grantees']` name lists (unchanged, so any
+    existing reader of the plain-string convention keeps working).
+    """
     docs: dict[tuple, RodDoc] = {}
     for rec in re.findall(r"<r>(.*?)</r>", xml or "", re.S):
         ki = _field(rec, "ki")
         bk, pg, dn = _field(rec, "bk"), _field(rec, "pg"), _field(rec, "dn")
         key = (bk, pg, dn)
-        grantor = f"{_field(rec, 'or')} {_field(rec, 'or1')}".strip() or None
-        grantee = f"{_field(rec, 'ee')} {_field(rec, 'ee1')}".strip() or None
+        gp, ep = _party(rec, "or"), _party(rec, "ee")
+        grantor = gp.name if gp else None
+        grantee = ep.name if ep else None
         seen = docs.get(key)
         if seen is not None:
             # A later party row of a document already read. doc.grantor stays the
@@ -167,6 +191,9 @@ def _parse_rows(xml: str, state: str, county: str, *, sold: bool) -> list[RodDoc
             for names, name in ((seen.raw["grantors"], grantor), (seen.raw["grantees"], grantee)):
                 if name and name not in names:
                     names.append(name)
+            for parties, p in ((seen.raw["grantor_parties"], gp), (seen.raw["grantee_parties"], ep)):
+                if p and p.name not in {q["name"] for q in parties}:
+                    parties.append({"name": p.name, "kind": p.kind, "suffix": p.suffix})
             continue
         try:
             recorded = dateparser.parse(_field(rec, "da")) if _field(rec, "da") else None
@@ -179,7 +206,11 @@ def _parse_rows(xml: str, state: str, county: str, *, sold: bool) -> list[RodDoc
             parcel_id=_field(rec, "pk") or None, notes=_field(rec, "de") or ki or None,
             raw={"ki": ki, "cchs": True,
                  "grantors": [grantor] if grantor else [],
-                 "grantees": [grantee] if grantee else []},
+                 "grantees": [grantee] if grantee else [],
+                 "grantor_parties": ([{"name": gp.name, "kind": gp.kind, "suffix": gp.suffix}]
+                                      if gp else []),
+                 "grantee_parties": ([{"name": ep.name, "kind": ep.kind, "suffix": ep.suffix}]
+                                      if ep else [])},
         )
         if sold:
             # NC excise stamp = $1 per $500 of consideration; <mo> carries the stamp.

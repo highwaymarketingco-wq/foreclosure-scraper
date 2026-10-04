@@ -135,35 +135,75 @@ def _case_id_from_doc(doc: RodDoc) -> str | None:
     return None
 
 
+# CCHS tags every grantor/grantee party "I" (individual) or "F" (firm/
+# entity) -- the vendor's own `orc`/`eec` columns, live-verified on Burke
+# 2026-10-03, now carried in `raw['grantor_parties']`/`raw['grantee_parties']`
+# by rod/cchs.py's `_parse_rows` (see its docstring). A suffix of TR/TRUSTEE/
+# SUB TR/COMM/COMMISSIONER/ATTY/AIF (the vendor's `ors`/`ees` role column)
+# marks a party acting in a PROFESSIONAL capacity even when kind=="I" -- a
+# live-named human substitute trustee is still not the homeowner. Confirmed
+# live on Burke instrument 2026005171: grantor side carries the real owner
+# (JACKSON CLYDE EUGENE JR., kind "I") alongside CAPE FEAR TRUSTEE SERVICES,
+# LLC and BELL CARRINGTON PRICE & GREGG, PLLC (both kind "F") -- the OLD
+# `_all_grantor_names` had no institutional filter at all, so all three
+# would have landed in `defendant` together. Aumentum/Cott docs never
+# populate `grantor_parties`/`grantee_parties` (those vendors don't carry
+# kind/suffix columns), so this only ever activates for CCHS.
+_OFFICER_SUFFIXES = {"TR", "TRUSTEE", "SUB TR", "COMM", "COMMISSIONER", "ATTY", "AIF"}
+
+
+def _is_real_owner_party(p: dict) -> bool:
+    if (p.get("kind") or "").strip().upper() == "F":
+        return False
+    if (p.get("suffix") or "").strip().upper() in _OFFICER_SUFFIXES:
+        return False
+    return bool((p.get("name") or "").strip())
+
+
+def _dedupe_names(names: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for n in names:
+        n = (n or "").strip()
+        if not n:
+            continue
+        key = n.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(n)
+    return out
+
+
 def _all_grantor_names(doc: RodDoc) -> str | None:
-    """Every grantor-side party name on this recording, joined and deduped.
+    """Every REAL-OWNER grantor-side party name on this recording, joined and
+    deduped.
 
     CCHS-sourced docs (Burke/Cleveland/Lincoln/Henderson) serve ONE ROW PER
     PARTY (see this module's `_former_owner` docstring, `deed_index.py`'s
     module docstring -- "Burke 2025: 166 party rows for 55 documents" -- and
     `rod/cchs.py`'s own sweep docstring) and the vendor adapter already
-    collapses them into `raw['grantors']`. `_former_owner` (below) reads that
-    full list for the POST-sale path, but this PRE-sale path used to read
-    only the single `doc.grantor` -- the FIRST party's name -- which silently
-    dropped every co-owner on a multi-grantor Notice of Sale / Lis Pendens
-    (a husband-and-wife or multi-heir filing). Aumentum/Cott docs don't
-    populate `raw['grantors']`, so this falls back to plain `doc.grantor`
-    for those exactly as before -- no behavior change there.
+    collapses them into `raw['grantors']` / `raw['grantor_parties']`.
+    `_former_owner` (below) reads the full list for the POST-sale path, but
+    this PRE-sale path used to read only the single `doc.grantor` -- the
+    FIRST party's name -- which silently dropped every co-owner on a
+    multi-grantor Notice of Sale / Lis Pendens (a husband-and-wife or
+    multi-heir filing). Now prefers `grantor_parties` (carries the vendor's
+    own individual/firm classification, see `_is_real_owner_party`) and
+    falls back to the plain name list, then to `doc.grantor`, for vendors
+    that don't carry it -- no behavior change for Aumentum/Cott.
     """
     raw = doc.raw if isinstance(doc.raw, dict) else {}
+    parties = raw.get("grantor_parties")
+    if parties:
+        owners = _dedupe_names([p["name"] for p in parties if _is_real_owner_party(p)])
+        if owners:
+            return "; ".join(owners)
+        # every grantor-side party reads as a firm/officer -- fall through
+        # rather than publish nothing, in case the vendor flag mis-tagged.
     names = raw.get("grantors")
     if names:
-        seen: set[str] = set()
-        out: list[str] = []
-        for n in names:
-            n = (n or "").strip()
-            if not n:
-                continue
-            key = n.upper()
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append(n)
+        out = _dedupe_names(names)
         if out:
             return "; ".join(out)
     return doc.grantor
@@ -196,6 +236,7 @@ def _doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
                 "instrument_no": doc.instrument_no,
                 "grantor": doc.grantor,
                 "grantors": (doc.raw or {}).get("grantors") if isinstance(doc.raw, dict) else None,
+                "grantor_parties": (doc.raw or {}).get("grantor_parties") if isinstance(doc.raw, dict) else None,
                 "grantee": doc.grantee,
                 "kind": "pre_sale",
             },
@@ -207,11 +248,26 @@ def _former_owner(doc: RodDoc) -> str | None:
     """The borrower or taxpayer named on a post-sale deed. CCHS serves one row per
     party and doc.grantor is the FIRST row's, which on a trustee's deed is often
     the foreclosing law firm (the sweep now requests TR/D, so this is common).
-    Falls back to doc.grantor when the parties cannot be read as a loss."""
+    Falls back to doc.grantor when the parties cannot be read as a loss.
+
+    Prefers `raw['grantor_parties']` (name + the vendor's own kind/suffix,
+    see `_all_grantor_names` above) so `derive_loss`'s internal `_is_person`
+    check gets the REAL individual/firm flag instead of a blank default --
+    `Party(n)` with no kind/suffix was the only thing ever built here before,
+    so a firm whose name carries none of `_FIRM_RE`'s keywords (no LLC/TRUST/
+    BANK/etc token) could previously slip through as a "loser". Falls back
+    to plain names for Aumentum/Cott, which never populate grantor_parties.
+    """
     raw = doc.raw if isinstance(doc.raw, dict) else {}
-    names = raw.get("grantors") or ([doc.grantor] if doc.grantor else [])
+    parties_raw = raw.get("grantor_parties")
+    if parties_raw:
+        parties = [Party(p["name"], kind=p.get("kind") or "", suffix=p.get("suffix") or "")
+                   for p in parties_raw if (p.get("name") or "").strip()]
+    else:
+        names = raw.get("grantors") or ([doc.grantor] if doc.grantor else [])
+        parties = [Party(n) for n in names]
     cls = classify_instrument(raw.get("ki"), doc.doc_type)
-    _kind, losers = derive_loss(cls, [Party(n) for n in names], doc.notes or "")
+    _kind, losers = derive_loss(cls, parties, doc.notes or "")
     return losers[0] if losers else doc.grantor
 
 

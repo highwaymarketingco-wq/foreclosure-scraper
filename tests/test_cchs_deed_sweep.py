@@ -200,10 +200,21 @@ def test_parse_rows_keeps_every_party_of_a_document_in_raw():
     tr = docs["2025000101"]
     assert tr.doc_type == "TR/D"                                # vendor code, unchanged
     assert tr.grantor == "PLACEHOLDER TRUSTEE SERVICES PLLC"   # first row, as before
-    assert tr.raw["grantors"] == ["PLACEHOLDER TRUSTEE SERVICES PLLC", "DOE JOHN", "DOE JANE"]
+    # 2026-10-03: _parse_rows now reuses the same _party() helper
+    # collapse_documents() already used, so the <or2>/<ee2> middle-name
+    # column (live-verified on Burke, previously only read by the deed-index
+    # sweep) is no longer silently dropped here either -- "DOE JOHN Q" /
+    # "DOE JANE R", not the truncated "DOE JOHN" / "DOE JANE".
+    assert tr.raw["grantors"] == ["PLACEHOLDER TRUSTEE SERVICES PLLC", "DOE JOHN Q", "DOE JANE R"]
     assert tr.raw["grantees"] == ["EXAMPLE MORTGAGE HOLDINGS LLC"]
     assert tr.raw["ki"] == "TR/D"
     assert tr.excise_tax_stamp == 135.0 and tr.consideration_amount == 67500.0
+    # the vendor's own individual/firm classification + role suffix (orc/eec,
+    # ors/ees) now rides along too, keyed by name.
+    gp = {p["name"]: p for p in tr.raw["grantor_parties"]}
+    assert gp["PLACEHOLDER TRUSTEE SERVICES PLLC"]["kind"] == "F"
+    assert gp["DOE JOHN Q"]["kind"] == "I"
+    assert gp["DOE JANE R"]["kind"] == "I"
 
 
 # --- collapsing party rows into documents ---------------------------------------------------
@@ -544,7 +555,11 @@ def test_sold_listing_names_the_borrower_not_the_foreclosing_law_firm():
     tr = docs["2025000101"]
     assert tr.grantor == "PLACEHOLDER TRUSTEE SERVICES PLLC"
     li = _sold_doc_to_listing(tr, "cchs")
-    assert li.defendant == "DOE JOHN" and li.plaintiff == "EXAMPLE MORTGAGE HOLDINGS LLC"
+    # 2026-10-03: _former_owner now builds real Party(name, kind, suffix) from
+    # raw['grantor_parties'] instead of Party(name) with blank kind/suffix, so
+    # derive_loss's own _is_person check sees the <or2> middle initial too —
+    # "DOE JOHN Q", not the truncated "DOE JOHN".
+    assert li.defendant == "DOE JOHN Q" and li.plaintiff == "EXAMPLE MORTGAGE HOLDINGS LLC"
     assert li.opening_bid == 67500.0 and li.raw["actual_sold_price"] == 67500.0
     # a trust as the only grantor names nobody: the grantor as served is kept
     trust = docs["2025000512"]

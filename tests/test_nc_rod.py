@@ -207,6 +207,90 @@ def test_all_grantor_names_handles_no_raw_dict_at_all():
     assert _all_grantor_names(doc) == "Brown Jane"
 
 
+# ---- CCHS orc/eec individual-vs-firm classification (live-verified on Burke 2026-10-03) ----
+
+def test_pre_sale_defendant_filters_out_firm_parties_via_vendor_kind_flag():
+    """Live-confirmed on Burke instrument 2026005171: the real owner shares
+    the grantor side with the foreclosing trustee company and its law firm.
+    raw['grantor_parties'] (orc="I"/"F") must drop both firms and keep only
+    the real owner, even though all three would pass a plain name-text scan
+    (neither firm name trips an obvious institutional keyword list)."""
+    doc = RodDoc(
+        county="Burke", state="NC", doc_type="FCL",
+        grantor="JACKSON CLYDE EUGENE JR.",
+        raw={
+            "grantors": ["JACKSON CLYDE EUGENE JR.", "CAPE FEAR TRUSTEE SERVICES, LLC",
+                         "BELL CARRINGTON PRICE & GREGG, PLLC"],
+            "grantor_parties": [
+                {"name": "JACKSON CLYDE EUGENE JR.", "kind": "I", "suffix": ""},
+                {"name": "CAPE FEAR TRUSTEE SERVICES, LLC", "kind": "F", "suffix": ""},
+                {"name": "BELL CARRINGTON PRICE & GREGG, PLLC", "kind": "F", "suffix": "AGENT"},
+            ],
+        },
+    )
+    assert _all_grantor_names(doc) == "JACKSON CLYDE EUGENE JR."
+
+
+def test_pre_sale_defendant_filters_out_individual_acting_as_trustee():
+    """A named human substitute trustee (kind 'I', suffix 'TR') is still not
+    the homeowner -- the role suffix must exclude them even though the
+    vendor's own kind flag alone would have kept them."""
+    doc = RodDoc(
+        county="Henderson", state="NC", doc_type="S/TR",
+        grantor="SMITH MAURICE R.",
+        raw={
+            "grantors": ["CIVIC FEDERAL CREDIT UNION", "SMITH MAURICE R."],
+            "grantor_parties": [
+                {"name": "CIVIC FEDERAL CREDIT UNION", "kind": "F", "suffix": ""},
+                {"name": "SMITH MAURICE R.", "kind": "I", "suffix": "TR"},
+                {"name": "HOMEOWNER REAL PERSON", "kind": "I", "suffix": ""},
+            ],
+        },
+    )
+    assert _all_grantor_names(doc) == "HOMEOWNER REAL PERSON"
+
+
+def test_pre_sale_defendant_falls_through_when_every_party_is_a_firm():
+    """No real person on the grantor side per the vendor's own flag -- falls
+    back to the plain name list rather than publishing nothing, in case the
+    flag mis-tagged a genuine owner."""
+    doc = RodDoc(
+        county="Burke", state="NC", doc_type="LIEN",
+        grantor="ACME BANK NA",
+        raw={
+            "grantors": ["ACME BANK NA", "OTHER BANK NA"],
+            "grantor_parties": [
+                {"name": "ACME BANK NA", "kind": "F", "suffix": ""},
+                {"name": "OTHER BANK NA", "kind": "F", "suffix": ""},
+            ],
+        },
+    )
+    assert _all_grantor_names(doc) == "ACME BANK NA; OTHER BANK NA"
+
+
+def test_former_owner_uses_vendor_kind_flag_not_just_name_text():
+    """_former_owner (post-sale) must also prefer grantor_parties so
+    derive_loss's _is_person check gets the real kind flag -- a firm whose
+    name alone wouldn't trip the FIRM_RE keyword list (no LLC/TRUST/BANK
+    token) must still be excluded via orc='F'."""
+    from foreclosure_scraper.scrapers.counties_nc.nc_rod_substitute_trustee import _former_owner
+
+    doc = RodDoc(
+        county="Burke", state="NC", doc_type="TR/D",
+        grantor="QUIET TITLE SERVICES",  # no obvious institutional keyword
+        notes="8123/456",  # deed-of-trust book/page xref -> officer_seen gate
+        raw={
+            "ki": "TR/D",
+            "grantors": ["QUIET TITLE SERVICES", "HOMEOWNER REAL PERSON"],
+            "grantor_parties": [
+                {"name": "QUIET TITLE SERVICES", "kind": "F", "suffix": ""},
+                {"name": "HOMEOWNER REAL PERSON", "kind": "I", "suffix": ""},
+            ],
+        },
+    )
+    assert _former_owner(doc) == "HOMEOWNER REAL PERSON"
+
+
 # ---- scraper class metadata ----
 
 def test_scraper_class_metadata():
