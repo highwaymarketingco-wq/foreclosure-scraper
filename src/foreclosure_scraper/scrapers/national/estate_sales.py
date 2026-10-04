@@ -225,7 +225,23 @@ def _saleevent_to_listing(node: dict, source_url: str, city: str, state: str,
     # the event's own county from its actual city; only fall back to the
     # search county when the event has no place (VirtualLocation) or its
     # city isn't in the gazetteer.
-    event_county = upstate_county_for(ev_city, ev_state) or county
+    #
+    # 2026-10-04 (national.* extraction-completeness audit, batch 15): that
+    # fallback was unconditional, which let it ALSO fire across STATE lines
+    # -- live-verified: a Buncombe-zip (28801 Asheville) search page's own
+    # JSON-LD returns real sales in Knoxville, TN and Bristol, TN (both well
+    # outside the gazetteer, same radius-search behavior as the in-state
+    # Hickory/Gastonia case above), and the unconditional `or county` stamped
+    # "Buncombe" (a North Carolina county) onto a Tennessee street address.
+    # These particular rows still get rejected downstream by
+    # main._in_scope()'s state check (TN is simply never NC/SC), but the
+    # raw data itself was wrong regardless, and the same unconditional
+    # fallback would silently mislabel a genuine same-STATE gazetteer gap's
+    # county too. Only fall back to the search county when the event is
+    # actually in the SAME state the search was run in.
+    event_county = upstate_county_for(ev_city, ev_state)
+    if event_county is None and (ev_state or "").strip().upper() == (state or "").strip().upper():
+        event_county = county
 
     return Listing(
         source="national.estate_sales",
@@ -447,7 +463,12 @@ def _estatesales_net_json_to_listing(
     if not address and not title:
         return None
 
-    event_county = upstate_county_for(ev_city, ev_state) or county
+    # Same cross-state fix as _saleevent_to_listing (2026-10-04, see that
+    # function's docstring comment) -- never stamp the search's own county
+    # onto an event confirmed to be in a DIFFERENT state.
+    event_county = upstate_county_for(ev_city, ev_state)
+    if event_county is None and (ev_state or "").strip().upper() == (state or "").strip().upper():
+        event_county = county
 
     return Listing(
         source="national.estate_sales",

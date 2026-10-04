@@ -32,12 +32,27 @@ upstate_county_for() (falling back to the search county only when the
 event has no place info), and only run the HTML card fallback when the
 JSON-LD parser truly found nothing, matching the existing text-block
 fallback's own "if not out" pattern.
+
+2026-10-04 (national.* extraction-completeness audit, batch 15): that
+"fall back to the search county" rule was itself still unconditional, and
+crossed STATE lines too -- live-verified: a real Buncombe-zip (28801
+Asheville) search page's own JSON-LD returns genuine sales in Knoxville, TN
+and Bristol, TN (same wide-radius behavior as the in-state Hickory/Gastonia
+case above), and the event's county was being stamped "Buncombe" -- a North
+Carolina county -- onto a Tennessee street address, because
+`upstate_county_for("Knoxville", "TN")` correctly returns None (not in the
+gazetteer) and the old code fell back to the search county regardless of
+state. Fixed: the search-county fallback now only applies when the event
+actually shares the search's OWN state.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-from foreclosure_scraper.scrapers.national.estate_sales import _parse_estatesales_net
+from foreclosure_scraper.scrapers.national.estate_sales import (
+    _parse_estatesales_net,
+    _parse_jsonld_sale_events,
+)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "estatesales_net_shelby_28150.html"
 
@@ -90,3 +105,60 @@ def test_events_with_no_place_data_keep_the_search_county_as_best_guess():
     assert len(shelby_rows) >= 10
     assert all(li.county == "Cleveland" for li in shelby_rows)
     assert all(li.street_address is None for li in shelby_rows)
+
+
+# --- 2026-10-04 fix: cross-state fallback contamination --------------------
+
+def _jsonld_html(city: str, region: str, street: str) -> str:
+    return f"""
+    <html><body>
+    <script type="application/ld+json">
+    {{
+      "@type": "SaleEvent",
+      "name": "Estate Sale",
+      "url": "https://www.estatesales.net/x/1",
+      "startDate": "2026-10-04T12:00:00.000Z",
+      "location": {{
+        "@type": "Place",
+        "address": {{
+          "streetAddress": "{street}",
+          "addressLocality": "{city}",
+          "addressRegion": "{region}",
+          "postalCode": "00000"
+        }}
+      }}
+    }}
+    </script>
+    </body></html>
+    """
+
+
+def test_out_of_state_event_gets_no_county_not_the_search_countys():
+    """Live-reproduced 2026-10-04: a Buncombe-zip (28801 Asheville, NC)
+    search returning a real Knoxville, TN sale must not inherit "Buncombe"
+    -- Knoxville isn't in the NC/SC gazetteer AND isn't even in the
+    search's own state, so it must resolve to no county at all."""
+    html = _jsonld_html("Knoxville", "TN", "5626 Holston Hills Rd")
+    out = _parse_jsonld_sale_events(
+        html, "https://www.estatesales.net/NC/Asheville/28801",
+        "Asheville", "NC", "Buncombe", "estatesales.net",
+    )
+    assert len(out) == 1
+    li = out[0]
+    assert li.state == "TN"
+    assert li.city == "Knoxville"
+    assert li.county is None  # NOT "Buncombe"
+
+
+def test_same_state_gazetteer_gap_still_falls_back_to_search_county():
+    """The fix must not break the ORIGINAL, intentional fallback: a city in
+    the SAME state that simply isn't in the gazetteer still reasonably
+    defaults to the search county (this is the pre-existing, correct
+    behavior for e.g. a VirtualLocation event, pinned above)."""
+    html = _jsonld_html("Not A Real NC Town", "NC", "1 Nowhere Ln")
+    out = _parse_jsonld_sale_events(
+        html, "https://www.estatesales.net/NC/Asheville/28801",
+        "Asheville", "NC", "Buncombe", "estatesales.net",
+    )
+    assert len(out) == 1
+    assert out[0].county == "Buncombe"
