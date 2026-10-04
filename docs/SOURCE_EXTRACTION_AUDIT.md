@@ -1,6 +1,6 @@
 # SOURCE EXTRACTION AUDIT — per-source, is EVERYTHING being pulled?
 
-Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **15 already wire the document harvester** (PDFs/deeds/notices) and **224 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
+Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **16 already wire the document harvester** (PDFs/deeds/notices) and **223 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
 
 ## The audit protocol (do this for EVERY source in the TODO table)
 
@@ -16,10 +16,11 @@ Then VERIFY the change three ways: it compiles, `discover()` still lists the slu
 
 The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) as a starting clue for where to look. It is a hint from static text, NOT proof the source has or lacks these — your eyes on the live page are the authority.
 
-## DONE — already harvest documents (15)
+## DONE — already harvest documents (16)
 
 | Slug | already captures | URLs |
 |---|---|---|
+| `counties.sitemap_walker` | pdf?, deed/notice?, links | https://www.spartanburgcounty.gov<br>https://www.cherokeecountysc.gov |
 | `counties_nc.brunswick_legal_notices` | pdf?, deed/notice?, img?, detail-page, links | https://www.brunswickcountync.gov/912/Legal-Notices<br>https://www.brunswickcountync.gov |
 | `counties_nc.haywood_tax_foreclosures` | pdf?, deed/notice?, img?, detail-page, links | https://www.haywoodcountync.gov/337/Tax-Foreclosures<br>https://www.haywoodcountync.gov/Bids.aspx |
 | `counties_nc.nc_bankruptcy_sales` | pdf?, deed/notice?, detail-page, links | https://www.nceb.uscourts.gov/Public-Sales-Notice<br>https://www.ncmb.uscourts.gov/public-sales |
@@ -36,7 +37,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.usmarshals_realproperty` | pdf?, deed/notice?, img?, detail-page, links | https://reallook.com/properties<br>https://reallook.com |
 | `national.williams` | deed/notice?, img?, detail-page, links | https://bid.auctionnetwork.com/<br>https://bid.auctionnetwork.com |
 
-## TODO — audit each for full extraction (224)
+## TODO — audit each for full extraction (223)
 
 | Slug | code hints (verify on the live page) | URLs |
 |---|---|---|
@@ -46,7 +47,6 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties.column_legal_notices` | deed/notice?, detail-page | https://us-central1-enotice-production.cloudfunctions.net/api/search/public-notices<br>https://us-central1-enotice-production.cloudfunctions.net |
 | `counties.multi_year_delinquent_tax` | deed/notice?, detail-page | https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services<br>https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services |
 | `counties.nod_discovery` | deed/notice? | (see SOURCE_REGISTER.md) |
-| `counties.sitemap_walker` | deed/notice? | https://www.spartanburgcounty.gov<br>https://www.cherokeecountysc.gov |
 | `counties_generic.arcgis_distress_layers` | deed/notice?, detail-page | https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/<br>https://www.buncombecounty.org/governing/depts/tax/ |
 | `counties_generic.epa_frs_sites` | detail-page | https://data.epa.gov/dmapservice/frs.frs_program_facility<br>https://ofmpub.epa.gov/frs_public2/fii_query_dtl.disp_program_facility |
 | `counties_generic.state_contamination` | deed/notice?, detail-page | https://services2.arcgis.com/kCu40SDxsCGcuUWO/arcgis/rest/services<br>https://www.deq.nc.gov/about/divisions/waste-management/underground-storage-tanks |
