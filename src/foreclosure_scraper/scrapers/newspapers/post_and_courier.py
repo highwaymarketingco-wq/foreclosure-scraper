@@ -29,27 +29,59 @@ default_county="Charleston" only when no known SC/NC county name is found in
 the text at all).
 
 Free, no login, no WAF, no JS for the data we read (RSS is static XML).
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, newspapers batch 2),
+both confirmed live, neither previously documented (batch 1 fixed the same
+bug class on 4 sibling newspaper sources but explicitly left `_townnews.py`'s
+shared `_classify()` untouched and did not re-verify the 3 remaining
+TownNews-based papers — this is that re-verification):
+
+1. **The identical severe, 100%-dead-on-arrival scope bug as batch 1, this
+   time traced to the SHARED `_townnews._classify()` this module calls
+   (not a per-scraper bug)**. Every "NOTICE OF SALE" / Master-in-Equity row
+   is classified `ListingType.FORECLOSURE_SALE` (a "flip" type), and
+   Charleston County has never been in the 18-county WNC+Upstate-SC flip
+   footprint (it is explicitly in `config.SCOPE_DENY_COUNTIES`, and
+   `main._flip_outside_footprint()` rejects it unconditionally, before any
+   oceanfront/downtown-Charleston carve-out even runs). Confirmed live
+   2026-10-04: all 9 real current rows sampled across the `master+in+equity`
+   and `trustee` feeds (the `foreclosure` feed itself 429'd this run) were
+   `FORECLOSURE_SALE` and all 9 came back `main._in_scope() -> False`. One of
+   those 9 resolved to county="Dorchester" via `_resolve_county()` -- still
+   dropped, same reason. Remapped after `parse_rss_items()` returns, scoped
+   to this file only, the exact pattern batch 1 used for aiken_standard.py/
+   berkeley_independent.py/carolina_coast.py -- `_townnews._classify()`
+   itself is still left untouched (journal_scene.py/index_journal.py share
+   it and are fixed identically alongside this file in the same batch).
+2. **The same `l=50` volume cap batch 1 found and fixed on the 3 sibling
+   TownNews papers, not yet backported here.** Confirmed live 2026-10-04 this
+   feed is the same TownNews platform and also honors `l=100`. Bumped.
 """
 from __future__ import annotations
 
 from typing import Iterable
 
+import structlog
+
 from ...base_scraper import BaseScraper
 from ...http_client import get_text
-from ...models import Listing
+from ...models import Listing, ListingType
 from ._townnews import parse_rss_items
 
+log = structlog.get_logger()
+
 # TownNews legal-classifieds category RSS, foreclosure-filtered.
-# `l=50` raises the item cap; `s=start_time&sd=desc` = newest first.
+# `l=100` is the real server cap (confirmed live 2026-10-04 -- see docstring
+# point 2); `s=start_time&sd=desc` = newest first.
 FEED_URLS = (
     "https://www.postandcourier.com/classifieds_new/community/announcements/"
-    "legal/?f=rss&q=foreclosure&l=50&s=start_time&sd=desc",
+    "legal/?f=rss&q=foreclosure&l=100&s=start_time&sd=desc",
     # Broader fallback term — catches trustee/MIE notices not literally tagged
     # "foreclosure" in the headline.
     "https://www.postandcourier.com/classifieds_new/community/announcements/"
-    "legal/?f=rss&q=master+in+equity&l=50&s=start_time&sd=desc",
+    "legal/?f=rss&q=master+in+equity&l=100&s=start_time&sd=desc",
     "https://www.postandcourier.com/classifieds_new/community/announcements/"
-    "legal/?f=rss&q=trustee&l=50&s=start_time&sd=desc",
+    "legal/?f=rss&q=trustee&l=100&s=start_time&sd=desc",
 )
 
 
@@ -86,5 +118,13 @@ class PostAndCourierForeclosures(BaseScraper):
                 if li.source_url in seen_urls:
                     continue
                 seen_urls.add(li.source_url)
+                # FOUND 2026-10-04: see module docstring -- Charleston County
+                # is never in the 18-county flip footprint (explicitly
+                # deny-listed), so FORECLOSURE_SALE (flip) is remapped to
+                # LIS_PENDENS (non-flip, reaches the board via the
+                # unrestricted distressed scope instead).
+                if li.listing_type == ListingType.FORECLOSURE_SALE:
+                    li.listing_type = ListingType.LIS_PENDENS
                 out.append(li)
+        log.info("post_and_courier.fetch_done", count=len(out))
         return out

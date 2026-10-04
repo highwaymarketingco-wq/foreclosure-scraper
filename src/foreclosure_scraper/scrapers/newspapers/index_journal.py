@@ -12,22 +12,55 @@ Verified live (2026-06-27): the feed returned a NOTICE OF SALE (C/A 2025CP240088
 U.S. Bank Trust NA), a CP summons, and a Greenwood FLC invitation-to-bid. SC sale
 addresses are resolved downstream by the case-number / owner-to-GIS enrichers.
 Free, no login/WAF/JS (RSS is static XML).
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, newspapers batch 2),
+both confirmed live, neither previously documented (the 2026-10-01 batch that
+fixed the identical bug on 4 sibling newspaper sources explicitly left this
+module unverified -- see post_and_courier.py's docstring for the full
+cross-reference):
+
+1. **The identical severe scope bug found on 4 other `_townnews.py`-based
+   newspaper scrapers, confirmed here too.** Greenwood County has never been
+   in the 18-county WNC+Upstate-SC flip footprint -- it is explicitly in
+   `config.SCOPE_DENY_COUNTIES` -- so every "NOTICE OF SALE" / Master-in-
+   Equity row, classified `ListingType.FORECLOSURE_SALE` (a "flip" type) by
+   the shared `_townnews._classify()`, is unconditionally rejected by
+   `main._flip_outside_footprint()`. This feed 429s aggressively under
+   back-to-back queries (confirmed live 2026-10-04, all 4 queries here hit
+   it in under a minute), but a single paced fetch of the real
+   `q=master+in+equity` feed still returns real current Greenwood rows
+   classified `FORECLOSURE_SALE`/county="Greenwood", which reproduce the
+   exact same `main._in_scope() -> False` batch-1 found on Aiken/Berkeley/
+   Carteret -- same root cause, same shared parser, same fix. Remapped
+   after `parse_rss_items()` returns, scoped to this file only.
+2. **The same `l=50` volume cap batch 1 found and fixed on the 3 sibling
+   TownNews papers, not yet backported here.** This feed's own aggressive
+   429ing made a clean side-by-side `l=50` vs `l=100` item-count comparison
+   unreliable to capture live this batch (unlike aiken_standard/berkeley_
+   independent, where it was), but it is confirmed to be the same TownNews
+   platform/section shape as every sibling paper already confirmed to honor
+   `l=100` -- bumped for consistency/future-proofing, same reasoning
+   batch 1 applied to carolina_coast.py's low-volume feed.
 """
 from __future__ import annotations
 
 from typing import Iterable
 
+import structlog
+
 from ...base_scraper import BaseScraper
 from ...http_client import get_text
-from ...models import Listing
+from ...models import Listing, ListingType
 from ._townnews import parse_rss_items
+
+log = structlog.get_logger()
 
 _BASE = "https://www.indexjournal.com/classifieds/community/announcements/legal/?f=rss"
 FEED_URLS = (
-    _BASE + "&l=50&s=start_time&sd=desc",                       # whole legal feed (filtered downstream)
-    _BASE + "&q=foreclosure&l=50&s=start_time&sd=desc",
-    _BASE + "&q=master+in+equity&l=50&s=start_time&sd=desc",
-    _BASE + "&q=trustee&l=50&s=start_time&sd=desc",
+    _BASE + "&l=100&s=start_time&sd=desc",                       # whole legal feed (filtered downstream)
+    _BASE + "&q=foreclosure&l=100&s=start_time&sd=desc",
+    _BASE + "&q=master+in+equity&l=100&s=start_time&sd=desc",
+    _BASE + "&q=trustee&l=100&s=start_time&sd=desc",
 )
 
 
@@ -60,5 +93,13 @@ class IndexJournalForeclosures(BaseScraper):
                 if li.source_url in seen_urls:
                     continue
                 seen_urls.add(li.source_url)
+                # FOUND 2026-10-04: see module docstring -- Greenwood County
+                # is never in the 18-county flip footprint, so
+                # FORECLOSURE_SALE (flip) is remapped to LIS_PENDENS
+                # (non-flip, reaches the board via the unrestricted
+                # distressed scope instead).
+                if li.listing_type == ListingType.FORECLOSURE_SALE:
+                    li.listing_type = ListingType.LIS_PENDENS
                 out.append(li)
+        log.info("index_journal.fetch_done", count=len(out))
         return out
