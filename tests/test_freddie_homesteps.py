@@ -24,7 +24,12 @@ from __future__ import annotations
 from selectolax.parser import HTMLParser
 
 from foreclosure_scraper.models import PropertyKind
-from foreclosure_scraper.scrapers.national.freddie_homesteps import _parse_row
+from foreclosure_scraper.scrapers.national.freddie_homesteps import (
+    _decode_cfemail,
+    _parse_detail_page,
+    _parse_row,
+)
+from foreclosure_scraper.web_artifact import _slim_raw
 
 # A trimmed but real card, captured live 2026-10-01 against
 # https://www.homesteps.com/listing/search?search=NC
@@ -98,3 +103,117 @@ def test_no_photos_svg_placeholder_is_not_a_real_image():
     assert li.bedrooms == 3
     assert li.bathrooms == 1
     assert li.living_sqft == 1100
+
+
+# ---------------------------------------------------------------------------
+# Per-listing detail page (2026-10-04, batch 16): the card never carries a
+# county at all -- a national/REO row with no county gets dropped outright
+# by main._countyless_national(), so this is a real board-reach bug, not
+# cosmetic. The detail page also has 4 more photos, precise lat/lng, and a
+# real listing-agent name/phone/email (Cloudflare-obfuscated in the raw
+# HTML but a plain single-byte-XOR decode, the same one the page's own JS
+# runs client-side -- no login/bypass involved).
+# ---------------------------------------------------------------------------
+
+# A trimmed but real detail page, captured live 2026-10-04 against
+# https://www.homesteps.com/listingdetails/2005-ada-williams-ln-lenoir-nc-28645
+_REAL_DETAIL_HTML = """
+<html><body>
+<script>
+const propertyData = {
+  propertyLatLng: {
+    lat: 35.937209,
+    lng: -81.613939
+  }
+};
+</script>
+<img src="https://rbimages.blob.core.windows.net/rb-images/US/real-estate/mls-homes/single-family-property/for-sale/NC/Lenoir/28645/1774-CAR4425402-20260916-2005-Ada-Williams-Lane-1.jpg">
+<img src="https://rbimages.blob.core.windows.net/rb-images/US/real-estate/mls-homes/single-family-property/for-sale/NC/Lenoir/28645/1774-CAR4425402-20260916-2005-Ada-Williams-Lane-2.jpg">
+<img src="https://rbimages.blob.core.windows.net/rb-images/US/real-estate/mls-homes/single-family-property/for-sale/NC/Lenoir/28645/1774-CAR4425402-20260916-2005-Ada-Williams-Lane-3.jpg">
+<ul class="detail-list two-col">
+  <li><span>Price:</span><strong>$189,900</strong></li>
+  <li><span>Bedrooms:</span><strong>2</strong></li>
+  <li><span>Year Built:</span><strong>1988</strong></li>
+  <li><span>Lot Size:</span><strong>1.1 acres</strong></li>
+  <li><span>Subdivision:</span><strong>None</strong></li>
+</ul>
+<ul class="detail-list">
+  <li><span>County:</span><strong>CALDWELL</strong></li>
+  <li><span>Property Type:</span><strong>Single-Family</strong></li>
+</ul>
+<div class="cell large-4">
+  <div class="callout background-navy">
+    <h2>Agent Information</h2>
+    <p>Damion  Patton <br>
+      Damion Patton <br>
+      Phone:
+      (828) 403-1756
+    </p>
+    <a class="button mailto-agent" href="/cdn-cgi/l/email-protection#593d383430363729382d2d36372b3c38353c2a2d382d3c193e34383035773a3634">Email Agent</a>
+  </div>
+</div>
+</body></html>
+"""
+
+
+def test_decode_cfemail_matches_the_real_page_js():
+    """Verified live against the actual decoded value homesteps.com's own
+    client-side JS renders for this exact obfuscated string."""
+    hexstr = "593d383430363729382d2d36372b3c38353c2a2d382d3c193e34383035773a3634"
+    assert _decode_cfemail(hexstr) == "damionpattonrealestate@gmail.com"
+
+
+def test_decode_cfemail_garbage_input_returns_none():
+    assert _decode_cfemail("") is None
+    assert _decode_cfemail("not-hex-at-all") is None
+
+
+def test_parse_detail_page_extracts_county_specs_latlng_and_agent():
+    detail = _parse_detail_page(_REAL_DETAIL_HTML)
+    assert detail["county"] == "Caldwell"
+    assert detail["year_built"] == 1988
+    assert detail["acreage"] == 1.1
+    assert detail["latitude"] == 35.937209
+    assert detail["longitude"] == -81.613939
+    assert detail["agent"]["name"] == "Damion  Patton"
+    assert detail["agent"]["phone"] == "(828) 403-1756"
+    assert detail["agent"]["email"] == "damionpattonrealestate@gmail.com"
+    assert detail["specs"]["county"] == "CALDWELL"  # raw, pre-.title() value kept too
+
+
+def test_parse_detail_page_captures_the_full_gallery_not_just_the_teaser_photo():
+    """The card/JSON-LD teaser only ever surfaces the FIRST image -- this
+    page has 3 (the real one has 5); all must be captured, not just one."""
+    detail = _parse_detail_page(_REAL_DETAIL_HTML)
+    assert len(detail["photos"]) == 3
+    assert detail["photos"][0].endswith("Lane-1.jpg")
+    assert detail["photos"][2].endswith("Lane-3.jpg")
+
+
+def test_parse_detail_page_missing_sections_degrade_gracefully():
+    detail = _parse_detail_page("<html><body><p>nothing here</p></body></html>")
+    assert detail["county"] is None
+    assert detail["photos"] == []
+    assert detail["agent"] == {}
+
+
+class TestRawKeepRegression:
+    """A SECOND instance of the exact bug this project's extraction-gaps
+    audit keeps finding, in the SAME scraper: homesteps_details and
+    homesteps_img_kind_slug (added 2026-10-01, alongside homesteps_kind)
+    were never registered in RAW_KEEP either -- only homesteps_kind was.
+    Confirmed via a direct _slim_raw() round-trip."""
+
+    def test_all_four_homesteps_flat_keys_now_survive_slim_raw(self):
+        raw = {
+            "homesteps_kind": "Single-Family",
+            "homesteps_details": "2 beds, 2 baths, 1,296 sq. ft.",
+            "homesteps_img_kind_slug": "single-family-property",
+            "homesteps_agent": {"name": "Damion Patton", "phone": "(828) 403-1756"},
+            "homesteps_specs": {"year built": "1988"},
+            "images": {"real": ["https://rbimages.blob.core.windows.net/x.jpg"]},
+        }
+        sliced = _slim_raw(raw)
+        assert sliced == raw, (
+            f"RAW_KEEP dropped: {sorted(set(raw) - set(sliced))}"
+        )

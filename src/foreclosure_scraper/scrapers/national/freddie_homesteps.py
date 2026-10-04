@@ -7,6 +7,32 @@ query `?search=NC` and `?search=SC`. Each result is a `div.property-teaser`
 card wrapped in an `a[href^="/listingdetails/"]` anchor, with address,
 price and beds/baths/sqft in `.property-address`, `.property-price` and
 `.property-details`.
+
+ADDED 2026-10-04 (national.* extraction-completeness audit, batch 16):
+every listing's own `/listingdetails/<slug>` page (already captured as
+`source_url`, but never fetched) carries real data the search-result card
+never does — live-confirmed against a current NC listing (small volume:
+13 NC + 14 SC today, so one extra request per listing is cheap):
+  * **County** — the card has NO county at all today; the detail page's
+    "Property Tax Roll Information" block states it plainly (e.g.
+    "CALDWELL"). National/REO rows with no county get dropped outright by
+    `main._countyless_national()`, so this isn't cosmetic — it is the
+    difference between the row surviving to the board or not.
+  * **4 more real photos** — the card/JSON-LD teaser only ever surfaces
+    the FIRST image; the detail page's gallery has up to 5 (confirmed
+    live: `...-1.jpg` through `...-5.jpg`), 80% of which were never seen.
+  * **Precise lat/lng** (a `propertyLatLng` JS object on the page) and
+    **listing-agent name + phone + email** — a real, free, direct contact
+    channel (HERMES sec 9's #1 ceiling), confirmed live
+    ("Damion Patton", "(828) 403-1756",
+    "damionpattonrealestate@gmail.com"). The email is Cloudflare-
+    obfuscated in the raw HTML (`/cdn-cgi/l/email-protection#<hex>`) but
+    decodes with the standard single-byte XOR cipher — no login, no
+    bypass, just reading what the page already sends every visitor's
+    browser (the browser's own JS does the identical decode to render it).
+  * Also captured: year built, lot size (acres), full baths, basement,
+    exterior, heating/AC, parking — real structured specs that only ever
+    reached the card as unstructured free text (or not at all).
 """
 from __future__ import annotations
 
@@ -198,6 +224,110 @@ def _parse_row(row, state: str) -> Listing | None:
     return li
 
 
+_LATLNG_RE = re.compile(r"propertyLatLng:\s*\{\s*lat:\s*([\-\d.]+)\s*,\s*lng:\s*([\-\d.]+)")
+_PHONE_RE = re.compile(r"Phone:\s*([\(\)\d\-\s]{7,20})")
+_ACRES_RE = re.compile(r"([\d.]+)\s*acres?", re.I)
+_GALLERY_IMG_RE = re.compile(r"rbimages\.blob\.core\.windows\.net")
+
+
+def _decode_cfemail(hex_str: str) -> str | None:
+    """Cloudflare's "email protection" obfuscation is a single-byte XOR
+    cipher (the first hex byte is the key) -- the same decode the page's
+    own JS runs client-side to render the address for a human visitor.
+    Not a login/CAPTCHA bypass: this is the plain content the site already
+    sends to every browser."""
+    try:
+        raw = bytes.fromhex(hex_str.strip())
+        if not raw:
+            return None
+        key = raw[0]
+        decoded = bytes(b ^ key for b in raw[1:])
+        text = decoded.decode("utf-8", errors="strict")
+        return text if "@" in text else None
+    except (ValueError, UnicodeDecodeError):
+        return None
+
+
+def _parse_detail_page(html: str) -> dict:
+    """Everything the card/JSON-LD teaser never carries: county, the full
+    photo gallery, precise lat/lng, listing-agent contact, and the
+    structured specs (year built, lot acres, full baths, etc.) that only
+    ever reach the card as unstructured free text."""
+    out: dict = {}
+    tree = HTMLParser(html)
+
+    specs: dict[str, str] = {}
+    for li in tree.css("ul.detail-list li"):
+        label_el = li.css_first("span")
+        value_el = li.css_first("strong")
+        if label_el is None or value_el is None:
+            continue
+        label = label_el.text(strip=True).rstrip(":").strip().lower()
+        value = value_el.text(strip=True)
+        if label and value and value.lower() != "none":
+            specs[label] = value
+    out["specs"] = specs
+
+    county = specs.get("county")
+    out["county"] = county.title() if county else None
+    yb = specs.get("year built")
+    if yb and yb.isdigit():
+        out["year_built"] = int(yb)
+    lot = specs.get("lot size") or ""
+    am = _ACRES_RE.search(lot)
+    if am:
+        try:
+            out["acreage"] = float(am.group(1))
+        except ValueError:
+            pass
+
+    m = _LATLNG_RE.search(html)
+    if m:
+        try:
+            out["latitude"] = float(m.group(1))
+            out["longitude"] = float(m.group(2))
+        except ValueError:
+            pass
+
+    # Full photo gallery -- the card/JSON-LD teaser only ever surfaces the
+    # first image under this same CDN path.
+    photos: list[str] = []
+    for img in tree.css("img"):
+        src = (img.attributes.get("src") or "").strip()
+        if src and _GALLERY_IMG_RE.search(src) and src not in photos:
+            photos.append(src)
+    out["photos"] = photos[:8]
+
+    # Listing-agent contact -- the one real, free, direct contactability
+    # channel on this page (HERMES sec 9's #1 ceiling).
+    agent: dict = {}
+    for h2 in tree.css("h2"):
+        if h2.text(strip=True) != "Agent Information":
+            continue
+        card = h2.parent
+        if card is None:
+            break
+        p_el = card.css_first("p")
+        if p_el is not None:
+            text = p_el.text(separator="\n")
+            first_line = next((l.strip() for l in text.split("\n") if l.strip()), None)
+            if first_line:
+                agent["name"] = first_line
+            pm = _PHONE_RE.search(text)
+            if pm:
+                agent["phone"] = pm.group(1).strip()
+        mail_a = card.css_first('a[href*="email-protection#"]')
+        if mail_a is not None:
+            href = mail_a.attributes.get("href") or ""
+            frag = href.split("#", 1)[-1]
+            email = _decode_cfemail(frag)
+            if email:
+                agent["email"] = email
+        break
+    out["agent"] = agent
+    return out
+
+
 async def _fetch_state(state: str, url: str) -> list[Listing]:
     async with client(timeout=30.0) as c:
         try:
@@ -205,24 +335,67 @@ async def _fetch_state(state: str, url: str) -> list[Listing]:
         except Exception as exc:
             log.warning("freddie.fetch_failed", state=state, error=str(exc)[:200])
             return []
-    if r.status_code != 200 or len(r.text) < 5000:
-        return []
-    tree = HTMLParser(r.text)
-    out: list[Listing] = []
-    cards = tree.css("div.property-teaser") or tree.css(
-        ".views-row, [class*='property-listing'] article, [class*='listing-tile']"
-    )
-    # Only honor a "no results" short-circuit when there are genuinely no cards
-    # — the phrase can appear in inert page chrome even when results exist.
-    if not cards and ("No results found" in r.text or "no-results" in r.text):
-        return []
-    for row in cards:
-        try:
-            li = _parse_row(row, state)
-        except Exception:
-            continue
-        if li is not None:
-            out.append(li)
+        if r.status_code != 200 or len(r.text) < 5000:
+            return []
+        tree = HTMLParser(r.text)
+        out: list[Listing] = []
+        cards = tree.css("div.property-teaser") or tree.css(
+            ".views-row, [class*='property-listing'] article, [class*='listing-tile']"
+        )
+        # Only honor a "no results" short-circuit when there are genuinely no cards
+        # — the phrase can appear in inert page chrome even when results exist.
+        if not cards and ("No results found" in r.text or "no-results" in r.text):
+            return []
+        for row in cards:
+            try:
+                li = _parse_row(row, state)
+            except Exception:
+                continue
+            if li is not None:
+                out.append(li)
+
+        # Per-listing detail-page enrichment (county / full gallery /
+        # lat-lng / agent contact — see module docstring). Small volume
+        # (13 NC + 14 SC live 2026-10-04), one extra request each, same
+        # client/connection reused.
+        for li in out:
+            if not li.source_url or not li.source_url.startswith(
+                "https://www.homesteps.com/listingdetails/"
+            ):
+                continue
+            try:
+                dr = await c.get(li.source_url, headers=HEADERS, follow_redirects=True)
+            except Exception as exc:
+                log.warning("freddie.detail_fetch_failed", url=li.source_url,
+                            error=str(exc)[:160])
+                continue
+            if dr.status_code != 200 or len(dr.text) < 1000:
+                continue
+            try:
+                detail = _parse_detail_page(dr.text)
+            except Exception as exc:
+                log.warning("freddie.detail_parse_failed", url=li.source_url,
+                            error=str(exc)[:160])
+                continue
+            if detail.get("county") and not li.county:
+                li.county = detail["county"]
+            if detail.get("year_built") and not li.year_built:
+                li.year_built = detail["year_built"]
+            if detail.get("acreage") and not li.acreage:
+                li.acreage = detail["acreage"]
+            if detail.get("latitude") and detail.get("longitude") and not li.latitude:
+                li.latitude = detail["latitude"]
+                li.longitude = detail["longitude"]
+            photos = detail.get("photos") or []
+            if photos:
+                have = li.raw.setdefault("images", {}).setdefault("real", [])
+                for p in photos:
+                    if p not in have:
+                        have.append(p)
+            if detail.get("agent"):
+                li.raw["homesteps_agent"] = detail["agent"]
+            if detail.get("specs"):
+                li.raw["homesteps_specs"] = detail["specs"]
     return out
 
 
