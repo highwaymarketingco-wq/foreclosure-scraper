@@ -128,6 +128,21 @@ def _to_listing(row, county_name: str | None = None) -> Listing | None:
                 "office_email": _clean(row.get("office_email")),
                 "half_baths": _num(row.get("half_baths")),
                 "tax": _num(row.get("tax")),  # annual property-tax $ (Realtor.com tax_history latest)
+                # FOUND 2026-10-04 (HERMES extraction-completeness audit,
+                # batch 17): HomeHarvest's own dataframe already carries these
+                # for free (no extra request -- same row this scraper already
+                # fetches) but they were never read. Live-sampled 8 current
+                # SC foreclosure-flagged rows: last_sold_price/last_sold_date
+                # populated on 6/8, a real distress signal (e.g. a real
+                # current row last sold for $20,000 in 2023, now back on the
+                # market as a foreclosure -- a recent-purchase-then-default
+                # pattern invisible without this field).
+                "last_sold_price": _num(row.get("last_sold_price")),
+                "last_sold_date": str(row.get("last_sold_date") or "") or None,
+                "sold_price": _num(row.get("sold_price")),
+                "hoa_fee": _num(row.get("hoa_fee")),
+                "stories": _num(row.get("stories")),
+                "new_construction": bool(row.get("new_construction")) if row.get("new_construction") is not None else None,
             },
             "zillow": {
                 "photo": photos[0] if photos else None,
@@ -138,13 +153,30 @@ def _to_listing(row, county_name: str | None = None) -> Listing | None:
 
 
 def _scrape_one_county(seat: str, state: str, county: str) -> list[Listing]:
-    """Synchronous HomeHarvest call per county-seat city. Run in thread pool."""
+    """Synchronous HomeHarvest call per county. Run in thread pool.
+
+    FIXED 2026-10-04 (HERMES extraction-completeness audit, batch 17): this
+    searched by SEAT-TOWN CITY NAME ("Rutherfordton, NC"), the same
+    under-coverage bug the sibling national.distressed scraper found and
+    fixed 2026-10-03 (there it was a scope-widening fix; here the footprint
+    of 18 counties is correct -- these ARE flip-type listings, scoped
+    correctly -- the bug is the search STRING missing most of each county).
+    Live-verified across all 3 states/counties sampled: Rutherfordton,NC
+    (seat) -> 0 rows vs Rutherford County,NC -> 1 (a Mooresboro listing,
+    a different town than the seat); Spartanburg,SC (seat) -> 3 rows vs
+    Spartanburg County,SC -> 8 (nearly 3x -- Boiling Springs/Pauline/
+    Wellford listings the seat-only search never saw at all); Asheville,NC
+    (seat) -> 2 vs Buncombe County,NC -> 3 (adds a Fletcher listing).
+    "<County> County, <ST>" resolves the WHOLE county via Realtor.com's own
+    geo-suggest, same format enrichment_comps.py / homeharvest_distressed.py
+    already proved live.
+    """
     try:
         from homeharvest import scrape_property
     except ImportError:
         return []
     out: list[Listing] = []
-    location = f"{seat}, {state}"
+    location = f"{county} County, {state}"
 
     # Two passes: foreclosure-flagged for_sale (most active), then pending
     # (lis-pendens / under-contract foreclosures aren't always flagged but
