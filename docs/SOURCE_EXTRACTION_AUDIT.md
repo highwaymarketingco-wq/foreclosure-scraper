@@ -52,11 +52,11 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_generic.state_contamination` | deed/notice?, detail-page | https://services2.arcgis.com/kCu40SDxsCGcuUWO/arcgis/rest/services<br>https://www.deq.nc.gov/about/divisions/waste-management/underground-storage-tanks |
 | `counties_nc.albemarle_observer_tax_lists` | deed/notice? | https://albemarleobserver.news/wp-json/wp/v2/posts<br>https://albemarleobserver.news/wp-json/wp/v2/posts/<id |
 | `counties_nc.asheville_code_enforcement` | - | https://gis.ashevillenc.gov/server/rest/services/Permits/<br>https://www.ashevillenc.gov/department/development-services/ |
-| `counties_nc.asheville_helene` | - | https://services.arcgis.com/aJ16ENn1AaqdFlqx/arcgis/rest/services/ |
+| `counties_nc.asheville_helene` | img? | https://services.arcgis.com/aJ16ENn1AaqdFlqx/arcgis/rest/services/ |
 | `counties_nc.asheville_str_permits` | - | https://gis.ashevillenc.gov/server/rest/services/Permits/<br>https://gis.ashevillenc.gov/server/rest/services/Permits/HomestayPermitsView/MapServer/5 |
 | `counties_nc.buncombe_delinquent_tax` | pdf? | https://media.buncombenc.gov/common/tax/buncombe-county-tax-department-advertisement-of-tax-liens.pdf<br>https://media.buncombenc.gov/common/tax/ |
-| `counties_nc.buncombe_elderly` | - | https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query |
-| `counties_nc.buncombe_tax` | - | https://www.trumba.com/calendars/tax-foreclosures-all.json<br>https://taxforeclosures.buncombenc.gov/ |
+| `counties_nc.buncombe_elderly` | deed/notice? | https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query |
+| `counties_nc.buncombe_tax` | links | https://www.trumba.com/calendars/tax-foreclosures-all.json<br>http://maps.google.com/ |
 | `counties_nc.buncombe_tax_foreclosure` | pdf? | https://media.buncombenc.gov/common/tax/foreclosure-listings/fcl.pdf<br>https://taxforeclosures.buncombenc.gov/ |
 | `counties_nc.cleveland_tax` | deed/notice?, detail-page | https://www.clevelandcounty.com/main/departments/ |
 | `counties_nc.cleveland_tax_foreclosure` | - | https://www.clevelandcounty.com/main/departments/ |
