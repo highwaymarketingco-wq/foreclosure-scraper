@@ -48,13 +48,64 @@ def _parse_coord(v):
         return None, None
 
 
+def _image_urls(item) -> list[str]:
+    """Real photo URLs off the SAPI item's own `[4, "3:<tok>", ...]` subarray.
+
+    Found 2026-10-04 (national.* extraction-completeness audit, batch 15):
+    every listing with photos carries this subarray already, with 1-12
+    image tokens observed live -- completely unused before this fix. Each
+    token is `"<flag>:<rest>"`; dropping the flag prefix and appending a
+    standard CL thumbnail-size suffix gives a real, free, directly-fetchable
+    JPEG at `https://images.craigslist.org/<rest>_600x450.jpg` (confirmed
+    live 2026-10-04: 200, image/jpeg, real bytes). No images subarray at all
+    (code 5 bare `0` in that position) means a real no-photo posting, not a
+    miss -- the search API carries no OTHER image reference to fall back to.
+    """
+    out: list[str] = []
+    for sub in item:
+        if isinstance(sub, list) and len(sub) >= 2 and sub[0] == 4:
+            for tok in sub[1:]:
+                if isinstance(tok, str) and ":" in tok:
+                    rest = tok.split(":", 1)[1]
+                    out.append(f"https://images.craigslist.org/{rest}_600x450.jpg")
+    return out
+
+
+def _bedrooms_sqft(item) -> tuple[float | None, float | None]:
+    """(bedrooms, sqft) off the SAPI item's `[5, beds, sqft]` subarray.
+
+    Found 2026-10-04: cross-checked against each listing's own title text
+    ("3 bedroom 2 bath singlewide" -> [5, 3, 0]; "Tiny Home... " -> [5, 1,
+    600]; a log cabin -> [5, 3, 1400]) -- beds matches the title every time.
+    But the sqft figure is NOT always living area: a vacant-lot listing
+    ("Vacant building lot -- 1.12 Acres") carries `[5, 0, 48787]` -- 48,787
+    sqft is exactly 1.12 acres, i.e. LOT size, not a structure's living
+    area. The caller only promotes this to Listing.living_sqft when
+    bedrooms > 0 (a real structure); bedrooms==0 most plausibly means land,
+    so the raw pair is still captured for provenance but not mislabeled as
+    living square footage. Previously unused entirely either way.
+    """
+    for sub in item:
+        if isinstance(sub, list) and len(sub) >= 3 and sub[0] == 5:
+            beds = sub[1] if isinstance(sub[1], (int, float)) else None
+            sqft = sub[2] if isinstance(sub[2], (int, float)) and sub[2] else None
+            return beds, sqft
+    return None, None
+
+
 def _listing_from_item(item, host: str, min_posting_id: int) -> Listing | None:
     # SAPI item = [deltaId, _, catId, price, "1:N~lat~lng", code, ...tagged subarrays..., title, ...]
     # The real posting id is delta-encoded: minPostingId + item[0]. The URL slug is the
     # [6, "<slug>"] subarray; the bare string after the subarrays is the title.
     if not isinstance(item, list) or len(item) < 6 or not isinstance(item[0], int):
         return None
-    price = item[3] if isinstance(item[3], (int, float)) and item[3] else None
+    # -1 is CL's own "no price listed / contact seller" sentinel (confirmed
+    # live 2026-10-04: a -1 row never carries the formatted `[10, "$..."]`
+    # subarray that every priced row has) -- same shape as this project's
+    # other confirmed bid/price sentinels (bid4assets currentBid:0/
+    # bidCount:-1). Must never surface as a real negative listing price.
+    raw_price = item[3]
+    price = (raw_price if isinstance(raw_price, (int, float)) and raw_price > 0 else None)
     lat, lng = _parse_coord(item[4])
     if lat is None or not (_LAT_MIN <= lat <= _LAT_MAX and _LNG_MIN <= lng <= _LNG_MAX):
         return None
@@ -62,6 +113,12 @@ def _listing_from_item(item, host: str, min_posting_id: int) -> Listing | None:
     slug = next((s[1] for s in item if isinstance(s, list) and len(s) >= 2 and s[0] == 6
                  and isinstance(s[1], str)), "x")
     title = next((x for x in item[6:] if isinstance(x, str)), "")
+    images = _image_urls(item)
+    bedrooms, raw_sqft = _bedrooms_sqft(item)
+    # Only promote to Listing.living_sqft when a real structure is implied
+    # (bedrooms > 0) -- see _bedrooms_sqft's docstring for the vacant-lot
+    # counter-example where this figure is LOT size, not living area.
+    living_sqft = raw_sqft if bedrooms else None
     # NC/SC border runs ~lat 35.0 in the west; good-enough first cut, downstream county GIS corrects it.
     state = "SC" if lat < 35.0 else "NC"
     url = f"https://{host}/reo/d/{slug}/{pid}.html"
@@ -74,12 +131,22 @@ def _listing_from_item(item, host: str, min_posting_id: int) -> Listing | None:
         state=state,
         latitude=lat,
         longitude=lng,
+        bedrooms=bedrooms,
+        living_sqft=living_sqft,
         description=(f"Craigslist FSBO ({host.split('.')[0]}): {title[:120]}"
                      + (f" — asking ${price:,.0f}" if price else "")),
         first_seen=now,
         last_seen=now,
         raw={"craigslist": {"posting_id": pid, "list_price": price, "region": host,
-                            "title": title[:200]}},
+                            "title": title[:200],
+                            # Real photo URLs (see _image_urls) -- previously
+                            # unused despite being in every fetched response.
+                            "images": images, "image_url": images[0] if images else None,
+                            "raw_price_sentinel": raw_price if price is None and raw_price else None,
+                            # bedrooms/raw_sqft kept here even when not
+                            # promoted to living_sqft (see _bedrooms_sqft) so
+                            # the lot-size figure isn't lost on vacant land.
+                            "bedrooms": bedrooms, "sqft": raw_sqft}},
     )
 
 
