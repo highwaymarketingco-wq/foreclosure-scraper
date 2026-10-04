@@ -1,6 +1,6 @@
 # SOURCE EXTRACTION AUDIT — per-source, is EVERYTHING being pulled?
 
-Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **23 already wire the document harvester** (PDFs/deeds/notices) and **216 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
+Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **24 already wire the document harvester** (PDFs/deeds/notices) and **215 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
 
 ## The audit protocol (do this for EVERY source in the TODO table)
 
@@ -16,7 +16,7 @@ Then VERIFY the change three ways: it compiles, `discover()` still lists the slu
 
 The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) as a starting clue for where to look. It is a hint from static text, NOT proof the source has or lacks these — your eyes on the live page are the authority.
 
-## DONE — already harvest documents (23)
+## DONE — already harvest documents (24)
 
 | Slug | already captures | URLs |
 |---|---|---|
@@ -37,6 +37,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.courtlistener_bankruptcy` | deed/notice?, links | https://www.courtlistener.com/sign-up/<br>https://www.courtlistener.com/profile/api/ |
 | `national.courtlistener_civil` | deed/notice?, links | https://www.courtlistener.com |
 | `national.cws_marketing` | deed/notice?, img?, detail-page, links | https://www.cwsmarketing.com/real-estate/<br>https://bid\.cwsmarketing\.com/auctions/catalog/id/\d+ |
+| `national.govdeals` | deed/notice?, img?, detail-page | https://maestro.lqdt1.com/search/list<br>https://www.govdeals.com/en/asset/ |
 | `national.gsa_realproperty` | deed/notice?, img?, detail-page | https://realestatesales.gov<br>https://...jpg |
 | `national.irs_judicial_sales` | pdf?, deed/notice?, img?, detail-page, links | https://www.irsauctions.gov |
 | `national.irs_treasury` | pdf?, deed/notice?, detail-page, links | https://www.irsauctions.gov/auction/items<br>https://www.irsauctions.gov |
@@ -44,7 +45,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.usmarshals_realproperty` | pdf?, deed/notice?, img?, detail-page, links | https://reallook.com/properties<br>https://reallook.com |
 | `national.williams` | deed/notice?, img?, detail-page, links | https://bid.auctionnetwork.com/<br>https://bid.auctionnetwork.com |
 
-## TODO — audit each for full extraction (216)
+## TODO — audit each for full extraction (215)
 
 | Slug | code hints (verify on the live page) | URLs |
 |---|---|---|
@@ -211,7 +212,6 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.first_citizens_reo` | links | https://www.firstcitizens.com/real-estate<br>https://www.firstcitizens.com/real-estate/_jcr_content/root/ |
 | `national.foreclosure_dot_com` | img?, detail-page | https://www.foreclosure.com/listing/search<br>https://www.foreclosure.com/listings/charlotte-nc/ |
 | `national.freddie_homesteps` | img?, detail-page, links | https://www.homesteps.com/listing/search<br>https://www.homesteps.com/ |
-| `national.govdeals` | deed/notice?, img?, detail-page | https://maestro.lqdt1.com/search/list<br>https://www.govdeals.com/auctions/item/detail/ |
 | `national.gsa_surplus` | img?, detail-page, links | https://www.gsa.gov/real-estate/real-property-disposition/assets-identified-for-accelerated-disposition<br>https://www.gsa.gov/real-estate/real-property-disposition/ |
 | `national.hibid_real_estate` | - | https://hibid.com/graphql<br>https://hibid.com |
 | `national.homeharvest` | deed/notice?, img? | https://github.com/ZacharyHampton/HomeHarvest |
@@ -223,11 +223,11 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.jail_bookings` | img?, detail-page | http://mugshots.spartanburgsheriff.org/<br>https://buncombecountyso.policetocitizen.com|23 |
 | `national.landandfarm` | img?, detail-page | (see SOURCE_REGISTER.md) |
 | `national.landsofamerica` | img?, detail-page | (see SOURCE_REGISTER.md) |
-| `national.landwatch` | img? | (see SOURCE_REGISTER.md) |
+| `national.landwatch` | img?, detail-page | (see SOURCE_REGISTER.md) |
 | `national.legacy_obituaries` | detail-page, links | https://www.legacy.com |
 | `national.liensnc` | deed/notice?, detail-page, links | https://www.liensnc.com |
-| `national.loopnet` | detail-page | https://www.loopnet.com/<br>https://www.loopnet.com |
-| `national.nc_sos_ucc` | deed/notice? | https://www.sosnc.gov/online_services/search/by_title/_uniform_commercial_code |
+| `national.loopnet` | detail-page, links | https://www.loopnet.com/<br>https://www.loopnet.com |
+| `national.nc_sos_ucc` | deed/notice?, detail-page | https://www.sosnc.gov/online_services/search/by_title/_uniform_commercial_code |
 | `national.nc_upset_bids` | detail-page, links | https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/<br>https://kanialawfirm.com/wp-admin/admin-ajax.php |
 | `national.opencorporates` | - | https://api.opencorporates.com/v0.4/companies/search |
 | `national.probate_foreclosure_leads` | deed/notice? | (see SOURCE_REGISTER.md) |
