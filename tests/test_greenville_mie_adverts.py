@@ -185,3 +185,86 @@ def test_no_sale_date_defaults_to_foreclosure_sale_not_distressed():
     assert li is not None
     assert li.sale_date is None
     assert li.listing_type == ListingType.FORECLOSURE_SALE
+
+
+# ---------------------------------------------------------------------------
+# AUDITED 2026-10-03: Additional Defendants / senior-encumbrance / interim-
+# interest-rate were plainly printed on every live advert sampled (15/15)
+# but never read. Fixture shape (paragraph layout, blank-line gap after a
+# genuinely-empty "Additional Defendants:") copied from the real
+# 2026-CP-23-00913 / 2025-CP-23-00924 adverts quoted in the module docstring.
+# ---------------------------------------------------------------------------
+
+REAL_WITH_EXTRAS = """
+<html><body>
+<p>STATE OF SOUTH CAROLINA COUNTY OF GREENVILLE</p>
+<p>Case No. 2026-CP-23-00913</p>
+<p>Freedom Mortgage Corporation,<br/>Plaintiff,<br/>vs.<br/>
+Codi C. Hindman,<br/>Defendant.</p>
+<p>Additional Defendants: James Brett Hindman Superior Pool Products LLC</p>
+<p>BY VIRTUE of a decree heretofore granted, I will sell on 10/05/2099 at public auction.</p>
+<p>TMS map: 0532000101200</p>
+<p>THE STREET ADDRESS IS:<br/>303 Wood Dr Greer, SC 29651</p>
+<p>the total judgment debt set forth in the Order is $171,673.15.</p>
+<p>This property will be sold subject to the following mortgage(s)/ senior encumbrances: None</p>
+<p>The successful bidder must pay interim interest from the date of the Sale through date of compliance at the rate of 2.75%.</p>
+</body></html>
+"""
+
+REAL_BLANK_EXTRAS = """
+<html><body>
+<p>STATE OF SOUTH CAROLINA COUNTY OF GREENVILLE</p>
+<p>Case No. 2025-CP-23-00924</p>
+<p>Some Bank,<br/>Plaintiff,<br/>vs.<br/>
+John Q Homeowner, Jr.,<br/>Defendant.</p>
+<p>Additional Defendants: </p>
+<p>BY VIRTUE of a decree heretofore granted, I will sell on 10/05/2099 at public auction.</p>
+<p>TMS map: 0577040104000</p>
+<p>THE STREET ADDRESS IS:<br/>1 Any St Greenville, SC 29601</p>
+<p>the total judgment debt set forth in the Order is $50,000.00.</p>
+</body></html>
+"""
+
+
+def test_additional_defendants_captured_when_present():
+    li = parse_advert(URL, REAL_WITH_EXTRAS)
+    assert li is not None
+    assert (li.raw["greenville_mie"]["additional_defendants"]
+            == "James Brett Hindman Superior Pool Products LLC")
+
+
+def test_senior_encumbrances_and_interest_rate_captured():
+    li = parse_advert(URL, REAL_WITH_EXTRAS)
+    assert li.raw["greenville_mie"]["senior_encumbrances"] == "None"
+    assert li.raw["greenville_mie"]["interim_interest_rate"] == "2.75%"
+
+
+def test_blank_additional_defendants_is_none_not_a_false_match():
+    """The core correctness property: a genuinely-empty 'Additional
+    Defendants: ' line (immediately followed by the next paragraph) must
+    resolve to None, not fall through and capture the auction's own
+    opening sentence -- which is exactly what a \\s*-based (newline-
+    crossing) regex did before this fix."""
+    li = parse_advert(URL, REAL_BLANK_EXTRAS)
+    assert li is not None
+    assert li.raw["greenville_mie"]["additional_defendants"] is None
+    assert "I will sell" not in (li.raw["greenville_mie"]["additional_defendants"] or "")
+
+
+def test_missing_senior_encumbrance_and_rate_sections_are_none():
+    li = parse_advert(URL, REAL_BLANK_EXTRAS)
+    assert li.raw["greenville_mie"]["senior_encumbrances"] is None
+    assert li.raw["greenville_mie"]["interim_interest_rate"] is None
+
+
+def test_real_senior_mortgage_captured_verbatim():
+    """A genuinely attached senior mortgage (not just 'None') -- a real
+    valuation input, not boilerplate -- must survive intact."""
+    html = REAL_WITH_EXTRAS.replace(
+        "sold subject to the following mortgage(s)/ senior encumbrances: None",
+        "sold subject to the following mortgage(s)/ senior encumbrances: "
+        "SUBJECT TO A SENIOR MORTGAGE HELD BY MERS FOR NVR MORTGAGE FINANCE, "
+        "INC. RECORDED IN BOOK 5679 AT PAGE 1191.",
+    )
+    li = parse_advert(URL, html)
+    assert "NVR MORTGAGE FINANCE" in li.raw["greenville_mie"]["senior_encumbrances"]

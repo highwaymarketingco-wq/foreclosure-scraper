@@ -21,6 +21,35 @@ WHAT THIS UNLOCKS
     against the property, not an estimate. `calc.est_gross_margin` was populated on 1,297
     of 94,384 board rows -- 1.4% -- and this source carries it per case.
 
+AUDITED 2026-10-03 -- every advert's full body ALSO carries three fields the
+original parser never read, despite being plainly printed on every page sampled
+(15/15 live):
+  "Additional Defendants: <names>" -- co-defendants beyond the one primary
+      plaintiff/defendant line already captured (HOAs, co-owners, judgment
+      co-debtors, e.g. "James Brett Hindman Superior Pool Products LLC" on
+      2026-CP-23-00913). Live: 10/15 adverts carry a real value here (6/15
+      real names/entities, 4/15 the literal placeholder "et al." -- kept
+      verbatim rather than filtered, since even an unnamed "et al." still
+      tells a human reader more defendants exist), the rest genuinely blank
+      ("Additional Defendants: " followed immediately by the next
+      paragraph -- correctly None, not the auction-prose false match an
+      earlier whitespace-greedy regex produced by crossing the blank-line
+      gap -- see the inline comment above _ADDL_DEFENDANTS_RE).
+  "sold subject to the following mortgage(s)/ senior encumbrances: <text>"
+      -- whether the buyer inherits a SENIOR lien on top of the auction
+      price, a real valuation input (`calc.est_gross_margin`'s margin
+      shrinks if there is one). Live: mostly "None"/"N/A"/"NONE", but at
+      least one real case (2025-CP-23-04026-2): "SUBJECT TO ASSESSMENTS...
+      SPECIFICALLY, THIS SALE IS SUBJECT TO A SENIOR MORTGAGE HELD BY MERS
+      FOR NVR MORTGAGE FINANCE, INC. RECORDED IN BOOK 5679 AT PAGE 1191" --
+      a real, named, still-attached mortgage.
+  "interim interest ... at the rate of <N%>" -- the post-sale compliance
+      interest rate (13/15 live). Lower-value than the two above but free
+      and consistently present, so captured alongside them.
+  All three captured into raw only (not promoted to typed Listing fields --
+  `defendant`/`judgment_amount` already carry the one load-bearing name/
+  amount this source's own scope decision below keys off of).
+
 THE SITEMAP RETURNS HTTP 404 AND 96KB OF VALID XML
     wp-sitemap-posts-advert-1.xml answers 404 while serving 772 <loc> entries. A probe
     that checks the status and stops sees nothing. This is the same shape as the qPayBill
@@ -84,6 +113,17 @@ _ADDR_RE = re.compile(r"STREET ADDRESS IS:?\s*\n?\s*([^\n]{5,90})", re.I)
 _SALE_RE = re.compile(r"\bon\s+(\d{2}/\d{2}/\d{4})", re.I)
 _PLAINTIFF_RE = re.compile(r"\n([A-Z][A-Za-z .,&'\-]{4,60}?)\s*,?\s*\n?\s*Plaintiff", re.I)
 _DEFENDANT_RE = re.compile(r"\n([A-Z][A-Za-z .,&'\-]{4,60}?)\s*,?\s*\n?\s*Defendant", re.I)
+# [ \t]* (not \s*) right after the colon so the match can't cross the blank-
+# line gap to the NEXT paragraph when the field is genuinely empty -- an
+# earlier \s*-based version of this regex did exactly that and silently
+# captured the auction's own opening sentence as a fake "additional
+# defendant" on every advert that had none (see module docstring's
+# "AUDITED 2026-10-03" note).
+_ADDL_DEFENDANTS_RE = re.compile(r"Additional Defendants?:[ \t]*([^\n]*)\n", re.I)
+_SENIOR_ENCUMBRANCE_RE = re.compile(
+    r"mortgage\(s\)/?\s*senior encumbrances?:[ \t]*([^\n]+)", re.I)
+_INTEREST_RATE_RE = re.compile(
+    r"interim interest.{0,120}?rate of\s*\n?\s*([\d.]+\s*%)", re.I | re.S)
 
 
 def _text(raw: str) -> str:
@@ -141,6 +181,12 @@ def parse_advert(url: str, raw: str) -> Listing | None:
         return None
     pl = _PLAINTIFF_RE.search(t)
     df = _DEFENDANT_RE.search(t)
+    addl_m = _ADDL_DEFENDANTS_RE.search(t)
+    additional_defendants = (addl_m.group(1).strip() if addl_m else None) or None
+    senior_m = _SENIOR_ENCUMBRANCE_RE.search(t)
+    senior_encumbrances = (senior_m.group(1).strip() if senior_m else None) or None
+    rate_m = _INTEREST_RATE_RE.search(t)
+    interim_interest_rate = rate_m.group(1).replace(" ", "") if rate_m else None
     now = datetime.utcnow()
     # User-confirmed policy (2026-09-15): "if they are actual foreclosures
     # going to sale, do not grab them [for Greenville]. if they are real
@@ -190,6 +236,9 @@ def parse_advert(url: str, raw: str) -> Listing | None:
             "total_judgment_debt": judgment,
             "sale_date": sm.group(1) if sm else None,
             "advert_url": url,
+            "additional_defendants": additional_defendants,
+            "senior_encumbrances": senior_encumbrances,
+            "interim_interest_rate": interim_interest_rate,
         }},
     )
 
