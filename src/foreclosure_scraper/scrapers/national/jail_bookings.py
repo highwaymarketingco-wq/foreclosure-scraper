@@ -223,6 +223,15 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
         charges = rec.get("hold_reasons") or rec.get("charges") or ""
         if isinstance(charges, list):
             charges = "; ".join(str(x) for x in charges)[:_CHARGE_CAP]
+        else:
+            # FOUND 2026-10-04 (HERMES extraction-completeness audit, batch
+            # 17): hold_reasons is a vendor-formatted HTML string with
+            # embedded `<br />` tags between multiple charges (live-sampled
+            # 4 counties: 200/291 Cherokee, 361/538 Anderson, 113/193
+            # Laurens, 161/203 Oconee rows carry literal "<br" in the raw
+            # string) -- was never stripped, so most charge descriptions
+            # shipped with literal HTML markup instead of a clean separator.
+            charges = _strip_tags(str(charges))
         # Extra Zuercher fields (live-verified present): race/sex/cell_block,
         # a release date, and a mugshot ref. Carry them through for skip-trace.
         cell_block = rec.get("cell_block")
@@ -236,6 +245,24 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
             release_status = f"in_custody cell_block={cell_block}"
         else:
             release_status = "in_custody"
+        # FOUND 2026-10-04: `mugshot` (and its `image`/`photo` aliases) is
+        # raw base64 JPEG bytes embedded directly in the JSON response (the
+        # `/9j/...` prefix is the base64 encoding of a JPEG's SOI marker,
+        # confirmed live across all 4 Zuercher counties) -- NOT a URL, and
+        # nothing downstream decodes or renders it (grepped the whole repo:
+        # no other reference to "mugshot" exists). Storing the bare base64
+        # string made it unusable to any consumer expecting an <img src=...>
+        # value; wrapping it as a proper data: URI makes it actually
+        # renderable without changing where it's stored (still namespaced
+        # under raw.jail_booking, not raw.images, since this is a photo of
+        # a PERSON, not the property, and the dashboard's images.real
+        # channel is documented as the property-photo channel).
+        mugshot_b64 = rec.get("mugshot") or rec.get("image") or rec.get("photo")
+        mugshot_uri = (
+            f"data:image/jpeg;base64,{mugshot_b64}"
+            if isinstance(mugshot_b64, str) and mugshot_b64
+            else None
+        )
         out.append({
             "last": last, "first": first,
             "dob": rec.get("dob"),
@@ -245,8 +272,13 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
             "sex": rec.get("sex"),
             "cell_block": cell_block,
             "release_date": release_date,
-            "mugshot": rec.get("mugshot") or rec.get("image") or rec.get("photo"),
+            "mugshot": mugshot_uri,
             "release_status": release_status,
+            # Rarely true (3/291 live on Cherokee, 0 elsewhere) but a real,
+            # free field -- flagged rather than silently dropped so a
+            # downstream owner-cross-reference pass can choose to exclude
+            # minors rather than never knowing the flag existed.
+            "is_juvenile": bool(rec.get("is_juvenile")),
         })
     log.info("jail_scraper.zuercher_ok", subdomain=subdomain, count=len(out))
     return out
@@ -289,6 +321,18 @@ async def _fetch_p2c_jqgrid(base: str) -> list[dict]:
             "dob": rw.get("dob"),
             "arrest_date": rw.get("disp_arrest_date"),
             "charge": (rw.get("chrgdesc") or rw.get("disp_charge") or "")[:_CHARGE_CAP],
+            # FOUND 2026-10-04 (HERMES extraction-completeness audit, batch
+            # 17): live-verified every one of these is already on the same
+            # jqGrid row this code already fetches, never read before.
+            # book_id is a stable per-booking vendor id (better dedupe key
+            # than name+county); middlename/age/race/sex are real skip-trace
+            # identity signals.
+            "middle": (rw.get("middlename") or "").strip().upper() or None,
+            "age": rw.get("age"),
+            "race": rw.get("race"),
+            "sex": rw.get("sex"),
+            "book_id": rw.get("book_id"),
+            "agency": rw.get("disp_agency") or rw.get("agency"),
         })
     log.info("jail_scraper.p2c_jqgrid_ok", base=base, count=len(out))
     return out
@@ -351,12 +395,59 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
                     first = (rec.get("FirstName") or "").strip().upper()
                     if not last or not first:
                         continue
+                    # FOUND 2026-10-04 (HERMES extraction-completeness audit,
+                    # batch 17): live-verified this record already carries
+                    # all of the below (same /api/Inmates/<listId> response
+                    # this code already parses), none previously read.
+                    # ScarsMarksTattoos populated on 174/200 (87%) of a live
+                    # sample -- a strong identity-confirmation signal for
+                    # skip-trace. Charges (the full list) carries a SECOND+
+                    # charge on 158/200 (79%) of bookings -- the old code
+                    # kept only PrimaryChargeDescription. ImageId maps to a
+                    # real, directly fetchable mugshot at
+                    # /api/Inmates/Image/<listId>/<ImageId> (confirmed live,
+                    # 200 OK, real JPEG bytes) -- a photo source this vendor
+                    # has never had wired at all. HomeAddress exists in the
+                    # schema but was 0/200 populated live (this agency
+                    # evidently redacts it, same policy as DateOfBirth) --
+                    # captured anyway in case that policy ever changes, at
+                    # zero marginal cost.
+                    charges_list = rec.get("Charges") or []
+                    extra_charges = [
+                        c.get("Description") for c in charges_list
+                        if isinstance(c, dict) and c.get("Description")
+                        and c.get("Description") != rec.get("PrimaryChargeDescription")
+                    ]
+                    tattoos = rec.get("ScarsMarksTattoos") or []
+                    tattoo_desc = "; ".join(
+                        f"{t.get('Type', '')} {t.get('Location', '')} "
+                        f"{t.get('BodyPart', '')}: {t.get('Description', '')}".strip()
+                        for t in tattoos if isinstance(t, dict)
+                    ) or None
+                    image_id = rec.get("ImageId")
                     out.append({
                         "last": last, "first": first,
+                        "middle": (rec.get("MiddleName") or "").strip().upper() or None,
                         "dob": rec.get("DateOfBirth"),
                         "age": rec.get("Age"),
                         "arrest_date": rec.get("ArrestDate"),
                         "charge": (rec.get("PrimaryChargeDescription") or "")[:_CHARGE_CAP],
+                        "other_charges": "; ".join(extra_charges)[:_CHARGE_CAP] or None,
+                        "race": rec.get("Race"),
+                        "sex": rec.get("Sex"),
+                        "height": rec.get("Height"),
+                        "weight": rec.get("Weight"),
+                        "scars_marks_tattoos": tattoo_desc,
+                        "holding_facility": rec.get("HoldingFacility"),
+                        "booking_agency": rec.get("BookingAgency"),
+                        "court_date": rec.get("CourtDate") or None,
+                        "release_date_raw": rec.get("ReleaseDate") or None,
+                        "total_bond_amount": rec.get("TotalBondAmount"),
+                        "home_address": rec.get("HomeAddress") or None,
+                        "mugshot_url": (
+                            f"{host}/api/Inmates/Image/{list_id}/{image_id}"
+                            if image_id else None
+                        ),
                     })
                 if len(recs) < page_size:
                     break
@@ -645,7 +736,14 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
 
     # Build a source URL — link to the county's public search page
     if state == "NC" and county == "Buncombe":
-        source_url = "https://buncombecountyso.policetocitizen.com/en/Inmates"
+        # FIXED 2026-10-04 (HERMES extraction-completeness audit, batch 17):
+        # /en/Inmates returns HTTP 200 (so the scraper's own XSRF-token
+        # handshake still works) but the Angular SPA's client-side router
+        # has no route for that locale-prefixed path and renders its own
+        # "404 - Not Found" page to a human visitor (confirmed live via
+        # browser render). The real, working nav target (confirmed live by
+        # clicking the site's own "Inmates" menu link) is /Inmates/Catalog.
+        source_url = "https://buncombecountyso.policetocitizen.com/Inmates/Catalog"
     elif state == "NC" and county == "Cleveland":
         source_url = "http://74.218.167.200/p2c/jailinmates.aspx"
     elif state == "SC" and county == "Cherokee":
@@ -698,11 +796,30 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
                 "sex": rec.get("sex"),
                 "cell_block": rec.get("cell_block"),
                 "release_date": rec.get("release_date"),
-                "mugshot": rec.get("mugshot"),
+                "mugshot": rec.get("mugshot") or rec.get("mugshot_url"),
+                "is_juvenile": rec.get("is_juvenile"),
                 # Full vendor field/cell dicts (Citizen-Connect / Tyler).
                 "fields": rec.get("fields"),
                 "cells": rec.get("cells"),
                 "vendor": "jail_bookings_scraper",
+                # FOUND 2026-10-04 (HERMES extraction-completeness audit,
+                # batch 17): the below were all already on the vendor row
+                # this scraper already fetches (p2c_jqgrid Cleveland /
+                # p2c_centralsquare Buncombe) but never read or carried
+                # through to the Listing. See the two vendor fetchers'
+                # inline comments for live-sample evidence.
+                "middle_name": rec.get("middle"),
+                "book_id": rec.get("book_id"),
+                "agency": rec.get("agency"),
+                "other_charges": rec.get("other_charges"),
+                "height": rec.get("height"),
+                "weight": rec.get("weight"),
+                "scars_marks_tattoos": rec.get("scars_marks_tattoos"),
+                "holding_facility": rec.get("holding_facility"),
+                "booking_agency": rec.get("booking_agency"),
+                "court_date": rec.get("court_date"),
+                "total_bond_amount": rec.get("total_bond_amount"),
+                "home_address": rec.get("home_address"),
             },
         },
     )
