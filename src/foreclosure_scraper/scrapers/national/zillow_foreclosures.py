@@ -9,13 +9,64 @@ listings are embedded in the page's `__NEXT_DATA__` script tag:
 Each entry contains:
   zpid, addressStreet, addressCity, addressState, addressZipcode,
   unformattedPrice, beds, baths, area, latLong, statusType, statusText,
-  marketingStatusSimplifiedCd ("Pre-Foreclosure", "Foreclosure", "Auction",
-  "Bank Owned (REO)"), detailUrl, hdpData.homeInfo.{...}
+  marketingStatusSimplifiedCd, detailUrl, brokerName,
+  carouselPhotosComposable.{baseUrl, photoData[].photoKey}, zestimate,
+  hdpData.homeInfo.{homeType, listing_sub_type, isNonOwnerOccupied,
+  isZillowOwned, daysOnZillow, lotAreaValue, lotAreaUnit, rentZestimate,
+  ...}
 
 We paginate until totalPages is reached (typically ~6 per state). On a
 residential IP Scrapling generally succeeds; on a datacenter IP it gets
 captcha'd and yields []. The expected_min_count is 0 to avoid REGRESSED
 noise on captcha runs.
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 18), live-
+investigated via a real browser session (not this machine's local
+Scrapling/StealthyFetcher, which needs a headless Chromium render --
+skipped per this machine's RAM constraint; www.zillow.com/nc/foreclosures/
+loaded cleanly with no captcha via the session's own cloud-hosted browser,
+SC got captcha-blocked that same check, matching this module's own
+documented residential-vs-datacenter-IP note):
+
+1. **A severe, live-reproduced classification bug**, not previously
+   documented: this module's own docstring assumed
+   marketingStatusSimplifiedCd carries one of "Pre-Foreclosure"/
+   "Foreclosure"/"Auction"/"Bank Owned (REO)". On the real current page (41
+   live NC rows), the ACTUAL values are "RecentChange" (23/41, 56%),
+   "Pre-Foreclosure - RecentChange" (17/41), and "Non Owner Occupied"
+   (1/41) -- UI/marketing badges, not stable foreclosure-stage categories.
+   "RecentChange" and "Non Owner Occupied" match NONE of `_ltype()`'s old
+   keyword checks, so the MAJORITY of real current listings (24/41, 59%)
+   were silently classified `ListingType.UNKNOWN`. The real, reliable
+   signal was sitting one level down, unused: every one of the same 41
+   rows' `hdpData.homeInfo.listing_sub_type` carries exactly one of
+   `is_bankOwned`/`is_foreclosure`/`is_forAuction` (never more than one,
+   confirmed by cross-tabulating all 41 rows) -- a clean, structured, same-
+   cost classifier. `_ltype()` now checks `listing_sub_type` FIRST, falling
+   back to the old marketingStatusSimplifiedCd text match only when
+   `listing_sub_type` is absent (defense in depth, not a regression if
+   Zillow's schema drifts again).
+2. **A 7th instance this session of the RAW_KEEP silent-drop pattern**:
+   `marketing_status`/`status_text`/`home_type`/`beds`/`baths`/`area` were
+   ALL flat top-level `raw` keys with no RAW_KEEP entry (only `zpid` and
+   `images` were ever registered) -- a direct `_slim_raw()` round-trip
+   confirmed 6 of 8 raw keys were silently dropped at every publish since
+   this scraper was built. Fixed by namespacing them under a new
+   registered `"zillow_foreclosures"` key.
+3. **Several richly-detailed, zero-marginal-cost fields found unused on
+   the same already-fetched item**: `zestimate` (a real market-value
+   estimate, present on 15/41 live rows) -> promoted to `market_value`.
+   `hdpData.homeInfo.lotAreaValue`/`lotAreaUnit` (e.g. "0.3533 acres") ->
+   promoted to `lot_size_sqft` (acres converted to sqft via the same `*
+   43560` convention `servicelink_auction.py` already uses). `brokerName`
+   (37/41 live rows, e.g. "NorthGroup Real Estate LLC") -- a real,
+   HERMES-sec-9 contactability signal, never captured. `carouselPhoto
+   Composable` (`baseUrl` template + `photoData[].photoKey` list) -- the
+   FULL photo gallery (one live row carried 23 photos; confirmed live the
+   constructed URL `baseUrl.replace("{photoKey}", photoKey)` is a real,
+   directly-fetchable JPEG, no auth) vs. the single `imgSrc` previously
+   kept. `hdpData.homeInfo.isNonOwnerOccupied`/`isZillowOwned`/
+   `daysOnZillow`/`rentZestimate` -- all free, all on the row, never read.
 """
 from __future__ import annotations
 
@@ -56,7 +107,20 @@ def _kind(label: str | None) -> PropertyKind:
     return PropertyKind.UNKNOWN
 
 
-def _ltype(marketing_status: str | None) -> ListingType:
+def _ltype(marketing_status: str | None, listing_sub_type: dict | None = None) -> ListingType:
+    # FOUND 2026-10-04 (batch 18, see module docstring): listing_sub_type is
+    # the real, reliable, structured classifier -- marketingStatusSimplifiedCd
+    # carries UI/marketing badges on the real current page ("RecentChange",
+    # "Non Owner Occupied"), not the stable foreclosure-stage categories this
+    # function used to assume. Checked FIRST; every live-sampled row carried
+    # exactly one of these three flags, never more than one.
+    if isinstance(listing_sub_type, dict):
+        if listing_sub_type.get("is_forAuction"):
+            return ListingType.AUCTION
+        if listing_sub_type.get("is_bankOwned"):
+            return ListingType.REO
+        if listing_sub_type.get("is_foreclosure"):
+            return ListingType.FORECLOSURE_SALE
     if not marketing_status:
         return ListingType.UNKNOWN
     s = marketing_status.lower()
@@ -71,6 +135,37 @@ def _ltype(marketing_status: str | None) -> ListingType:
     return ListingType.UNKNOWN
 
 
+def _acres_to_sqft(value, unit: str | None) -> float | None:
+    if not isinstance(value, (int, float)) or value <= 0:
+        return None
+    u = (unit or "").strip().lower()
+    if u.startswith("acre"):
+        return float(value) * 43560.0
+    if u.startswith("sqft") or u.startswith("sq ft") or u == "":
+        return float(value)
+    return None
+
+
+def _photo_gallery(item: dict) -> list[str]:
+    """FOUND 2026-10-04 (batch 18): carouselPhotosComposable carries the
+    FULL photo gallery (a baseUrl template + a list of photoKeys) -- one
+    live-sampled row carried 23 photos vs. the single imgSrc previously
+    kept. Confirmed live the constructed URL is a real, directly-
+    fetchable JPEG with no auth needed."""
+    cp = item.get("carouselPhotosComposable")
+    if not isinstance(cp, dict):
+        return []
+    base = cp.get("baseUrl")
+    photo_data = cp.get("photoData")
+    if not isinstance(base, str) or "{photoKey}" not in base or not isinstance(photo_data, list):
+        return []
+    out = []
+    for p in photo_data:
+        if isinstance(p, dict) and isinstance(p.get("photoKey"), str) and p["photoKey"]:
+            out.append(base.replace("{photoKey}", p["photoKey"]))
+    return out
+
+
 def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
     addr_street = (item.get("addressStreet") or "").strip()
     if not addr_street:
@@ -82,8 +177,15 @@ def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
     lat_lng = item.get("latLong") or {}
     price = item.get("unformattedPrice")
     home_info = (item.get("hdpData") or {}).get("homeInfo") or {}
-    img = item.get("imgSrc") or ""
-    photos = [img] if isinstance(img, str) and img.startswith("http") else []
+    # FOUND 2026-10-04 (batch 18): carouselPhotosComposable carries the FULL
+    # gallery (up to dozens of photos); fall back to the single imgSrc only
+    # when the gallery is absent/empty.
+    photos = _photo_gallery(item)
+    if not photos:
+        img = item.get("imgSrc") or ""
+        photos = [img] if isinstance(img, str) and img.startswith("http") else []
+    zestimate = item.get("zestimate")
+    lot_sqft = _acres_to_sqft(home_info.get("lotAreaValue"), home_info.get("lotAreaUnit"))
     # Zillow's hdpData.homeInfo doesn't carry county for most listings --
     # confirmed live 2026-10-01 (national/reo per-source audit): 282/310 NC
     # rows (91%) had no county at all. FORECLOSURE_SALE/AUCTION/REO are all
@@ -117,7 +219,7 @@ def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
     return Listing(
         source=slug,
         source_url=item.get("detailUrl") or f"https://www.zillow.com/{state.lower()}/foreclosures/",
-        listing_type=_ltype(item.get("marketingStatusSimplifiedCd")),
+        listing_type=_ltype(item.get("marketingStatusSimplifiedCd"), home_info.get("listing_sub_type")),
         property_kind=_kind(home_info.get("homeType")),
         state=region,
         county=county,
@@ -132,6 +234,10 @@ def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
         bedrooms=item.get("beds") if isinstance(item.get("beds"), (int, float)) else None,
         bathrooms=item.get("baths") if isinstance(item.get("baths"), (int, float)) else None,
         living_sqft=item.get("area") if isinstance(item.get("area"), (int, float)) else None,
+        # FOUND 2026-10-04 (batch 18): zestimate/lot size were on the same
+        # already-fetched item, never read. See module docstring.
+        market_value=float(zestimate) if isinstance(zestimate, (int, float)) and zestimate > 0 else None,
+        lot_size_sqft=lot_sqft,
         description=(
             f"Zillow foreclosure ({item.get('statusText') or 'For Sale'}) — "
             f"{item.get('beds') or ''}bd/{item.get('baths') or ''}ba "
@@ -141,13 +247,32 @@ def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
         last_seen=datetime.utcnow(),
         raw={
             "zpid": zpid,
-            "marketing_status": item.get("marketingStatusSimplifiedCd"),
-            "status_text": item.get("statusText"),
-            "home_type": home_info.get("homeType"),
-            "beds": item.get("beds"),
-            "baths": item.get("baths"),
-            "area": item.get("area"),
             "images": {"real": photos} if photos else {},
+            # FOUND 2026-10-04 (batch 18): marketing_status/status_text/
+            # home_type/beds/baths/area were all flat top-level raw keys --
+            # a direct _slim_raw() round-trip confirmed only zpid/images
+            # survived publish (neither was in RAW_KEEP), so the rest were
+            # silently dropped on every row since this scraper was built.
+            # Namespaced under a new registered "zillow_foreclosures" key;
+            # also adds brokerName/listing_sub_type/isNonOwnerOccupied/
+            # isZillowOwned/daysOnZillow/rentZestimate, all free, all
+            # previously unread on the same item.
+            "zillow_foreclosures": {
+                "marketing_status": item.get("marketingStatusSimplifiedCd"),
+                "status_text": item.get("statusText"),
+                "status_type": item.get("statusType"),
+                "raw_home_status_cd": item.get("rawHomeStatusCd"),
+                "home_type": home_info.get("homeType"),
+                "listing_sub_type": home_info.get("listing_sub_type"),
+                "beds": item.get("beds"),
+                "baths": item.get("baths"),
+                "area": item.get("area"),
+                "broker_name": item.get("brokerName"),
+                "is_non_owner_occupied": home_info.get("isNonOwnerOccupied"),
+                "is_zillow_owned": home_info.get("isZillowOwned"),
+                "days_on_zillow": home_info.get("daysOnZillow"),
+                "rent_zestimate": home_info.get("rentZestimate"),
+            },
         },
     )
 

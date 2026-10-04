@@ -2285,6 +2285,15 @@ RAW_KEEP = {
     # first-class Listing fields instead (sidesteps RAW_KEEP), same pattern
     # batch 16 used for hud_homestore.
     "homepath_json": "*",
+    # national.zillow_foreclosures added 2026-10-04 (HERMES extraction-
+    # completeness audit, batch 18): marketing_status/status_text/home_type/
+    # beds/baths/area were all flat top-level raw keys, none registered here
+    # (only zpid/images were) -- a direct _slim_raw() round-trip confirmed
+    # the rest were silently dropped at every publish since this scraper
+    # was built. Also adds brokerName/listing_sub_type/isNonOwnerOccupied/
+    # isZillowOwned/daysOnZillow/rentZestimate, all free, all previously
+    # unread on the same already-fetched item.
+    "zillow_foreclosures": "*",
     # national.hud_homestore added 2026-10-04 (national.* extraction-
     # completeness audit, batch 16): 9 of this scraper's 11 raw keys
     # (fha_financing/listing_period/property_status/bid_open_date/
