@@ -150,6 +150,108 @@ def _extract_from_text(
     return out
 
 
+def _wide_row_to_listing(row: list, source_url: str, is_results: bool,
+                         doc_sale_date, seen: set[str]) -> Listing | None:
+    """One >=7-col pdfplumber table row -> a Listing, or None (header/dup/
+    no case#). Pulled out of `_parse_pdf_tables`'s loop 2026-10-04 so the
+    cancelled-row fix (batch 13) is unit-testable without a real PDF."""
+    joined = " ".join(c or "" for c in row).lower()
+    if "case #" in joined or "attorney" in joined and "plaintiff" in joined:
+        return None
+    # Detect cancelled marker in any cell. Live-verified 2026-10-04
+    # (extraction-completeness audit, batch 13): the current Sale-Results.pdf
+    # carries 16 of 47 wide rows (34%) with a "√" in the Cancelled column,
+    # every one of them with a real case#/attorney/plaintiff/defendant/address
+    # already parsed on the SAME row (only the Bid/BidBy cells are the blank
+    # "____"/"_____" placeholder the sale never reached) -- these were
+    # silently dropped WHOLESALE instead of kept as the real "this
+    # foreclosure was pulled from the auction this cycle" signal they are (a
+    # bankruptcy stay, reinstatement, or loan workout -- the defendant is
+    # still a live distress lead, just not sold). Same "tag the status,
+    # don't drop the row" fix as georgetown_civicengage's Included-with-Sale
+    # CANCELLED mapping (batch 9) and horry_flc's bidding_closed bool
+    # (batch 10). Status column is a blank placeholder ("_____") on these
+    # rows, not a value worth keeping, so the marker overrides it.
+    cancelled = any("√" in (c or "") or "✓" in (c or "") for c in row)
+
+    # Status, Case#, Attorney, Plaintiff, Defendant+Addr, Bid, BidBy
+    status = (row[1] or "").strip()
+    case = (row[2] or "").strip()
+    attorney = (row[3] or "").strip()
+    plaintiff = (row[4] or "").strip()
+    def_addr = (row[5] or "").strip()
+    bid_str = (row[6] or "").strip() if len(row) > 6 else ""
+
+    if not case or not CASE_RE.search(case):
+        return None
+    case_clean = CASE_RE.search(case).group(0)
+    if case_clean in seen:
+        return None
+    seen.add(case_clean)
+
+    # Defendant column = "Last, First\n<address>"
+    defendant = None
+    address = None
+    if def_addr:
+        lines = def_addr.split("\n")
+        defendant = lines[0].strip() if lines else None
+        if len(lines) > 1:
+            address = lines[1].strip()
+            # Address may include city: "144 Southland Ave., Boiling Springs"
+            # Keep full string; downstream GIS enrichment handles the city.
+
+    bid = None
+    bm = BID_RE.search(bid_str)
+    if bm:
+        try:
+            bid = float(bm.group(1).replace(",", ""))
+        except ValueError:
+            pass
+
+    # Build raw payload — when this is a RESULTS PDF
+    # AND we captured a bid, surface as actual_sold_price
+    # at top level so enrichment_foreclosure_sold_comps
+    # treats it as confirmed hammer price (not just an
+    # opening-bid floor).
+    raw_payload = {"spartanburg_pdf": {
+        "status": status,
+        "attorney": attorney,
+        "bid_by": (row[7] or "").strip() if len(row) > 7 else None,
+        "doc_sale_date": doc_sale_date.isoformat() if doc_sale_date else None,
+        "is_results_pdf": is_results,
+        "cancelled": cancelled,
+    }}
+    # A cancelled row's Bid cell is normally the blank placeholder, so `bid`
+    # is already None here (BID_RE needs a $) in every live case seen -- but
+    # `not cancelled` is an explicit belt-and-suspenders guard too, so a sale
+    # that never happened can never report a hammer price even if some future
+    # PDF edition leaves a stale/incorrect $ figure in a cancelled row's Bid
+    # cell.
+    if is_results and bid is not None and not cancelled:
+        raw_payload["actual_sold_price"] = bid
+
+    return Listing(
+        source="counties_sc.spartanburg_master_in_equity",
+        source_url=source_url,
+        listing_type=ListingType.FORECLOSURE_SALE,
+        property_kind=PropertyKind.UNKNOWN,
+        street_address=address,
+        state="SC",
+        county="Spartanburg",
+        case_number=case_clean,
+        plaintiff=plaintiff or None,
+        defendant=defendant,
+        sale_date=doc_sale_date,
+        opening_bid=bid,
+        description=def_addr[:500],
+        auction_status=("cancelled" if cancelled
+                        else (status.lower() if status else "active")),
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw=raw_payload,
+    )
+
+
 def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
     """Use pdfplumber.extract_tables() — preserves the 9-column row structure:
        [#, Status, Case#, Attorney, Plaintiff, Defendant+Address, Bid, BidBy, Cancelled]
@@ -206,84 +308,10 @@ def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
                         if not row or len(row) < 7:
                             continue
                         saw_wide_row = True
-                        # Skip header row
-                        joined = " ".join(c or "" for c in row).lower()
-                        if "case #" in joined or "attorney" in joined and "plaintiff" in joined:
-                            continue
-                        # Detect cancelled marker in any cell
-                        if any("√" in (c or "") or "✓" in (c or "") for c in row):
-                            continue
-
-                        # Status, Case#, Attorney, Plaintiff, Defendant+Addr, Bid, BidBy
-                        status = (row[1] or "").strip()
-                        case = (row[2] or "").strip()
-                        attorney = (row[3] or "").strip()
-                        plaintiff = (row[4] or "").strip()
-                        def_addr = (row[5] or "").strip()
-                        bid_str = (row[6] or "").strip() if len(row) > 6 else ""
-
-                        if not case or not CASE_RE.search(case):
-                            continue
-                        case_clean = CASE_RE.search(case).group(0)
-                        if case_clean in seen:
-                            continue
-                        seen.add(case_clean)
-
-                        # Defendant column = "Last, First\n<address>"
-                        defendant = None
-                        address = None
-                        if def_addr:
-                            lines = def_addr.split("\n")
-                            defendant = lines[0].strip() if lines else None
-                            if len(lines) > 1:
-                                address = lines[1].strip()
-                                # Address may include city: "144 Southland Ave., Boiling Springs"
-                                # Keep full string; downstream GIS enrichment handles the city.
-
-                        bid = None
-                        bm = BID_RE.search(bid_str)
-                        if bm:
-                            try:
-                                bid = float(bm.group(1).replace(",", ""))
-                            except ValueError:
-                                pass
-
-                        # Build raw payload — when this is a RESULTS PDF
-                        # AND we captured a bid, surface as actual_sold_price
-                        # at top level so enrichment_foreclosure_sold_comps
-                        # treats it as confirmed hammer price (not just an
-                        # opening-bid floor).
-                        raw_payload = {"spartanburg_pdf": {
-                            "status": status,
-                            "attorney": attorney,
-                            "bid_by": (row[7] or "").strip() if len(row) > 7 else None,
-                            "doc_sale_date": doc_sale_date.isoformat() if doc_sale_date else None,
-                            "is_results_pdf": is_results,
-                        }}
-                        if is_results and bid is not None:
-                            raw_payload["actual_sold_price"] = bid
-
-                        out.append(
-                            Listing(
-                                source="counties_sc.spartanburg_master_in_equity",
-                                source_url=source_url,
-                                listing_type=ListingType.FORECLOSURE_SALE,
-                                property_kind=PropertyKind.UNKNOWN,
-                                street_address=address,
-                                state="SC",
-                                county="Spartanburg",
-                                case_number=case_clean,
-                                plaintiff=plaintiff or None,
-                                defendant=defendant,
-                                sale_date=doc_sale_date,
-                                opening_bid=bid,
-                                description=def_addr[:500],
-                                auction_status=status.lower() if status else "active",
-                                first_seen=datetime.utcnow(),
-                                last_seen=datetime.utcnow(),
-                                raw=raw_payload,
-                            )
-                        )
+                        li = _wide_row_to_listing(row, source_url, is_results,
+                                                  doc_sale_date, seen)
+                        if li is not None:
+                            out.append(li)
 
             # TEXT fallback: the Deficiency-Sale roster yields single-cell
             # rows, so extract_tables() never produces a >=7-col row and we
