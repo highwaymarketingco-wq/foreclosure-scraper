@@ -54,6 +54,7 @@ import structlog
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...document_links import harvest_document_links, stamp_documents
 from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 from ...validation import SC_COUNTIES
@@ -109,14 +110,34 @@ def _extract_site_links(html: str, base_url: str) -> list[tuple[str, str]]:
     return out
 
 
-def _parse_detail_page(html: str) -> tuple[Optional[str], Optional[str]]:
-    """Return (county, description_snippet) from a site's own detail page.
+def _parse_detail_page(html: str, base_url: str = "") -> tuple[Optional[str], Optional[str], list[str]]:
+    """Return (county, description_snippet, document_urls) from a site's own detail page.
 
     county is set ONLY when the page's structured "Tags" field contains
     exactly one value matching a real SC county name — see the module
     docstring for why prose-based inference is deliberately avoided.
     description_snippet is the page's own first substantial paragraph of
     real body text (never fabricated/guessed).
+
+    document_urls (2026-10-04 extraction-completeness audit): these DHEC site
+    pages link real case documents — Emergency Orders, Corrective Action
+    Plans, quarterly monitoring/progress reports, site maps, public notices —
+    that were fetched (the page is already in hand for the description above)
+    and then thrown away. Live-verified on 3 real sites: able-contracting-fire
+    (4 docs incl. its Emergency Order), circle-k-stores-inc-petroleum-leak-
+    ravenel (16 docs), csxt-bramlett-road-site (~100 docs spanning a decade of
+    remediation reports).
+
+    harvest_document_links() is run ONLY over body_el's own HTML, never the
+    full page. Every DES site page shares the same ~9 global-nav boilerplate
+    PDF links (generic "guidance-documents"/"public-notice-requirements"
+    pages that appear on literally every page on des.sc.gov) that live
+    OUTSIDE the article body and would otherwise win stamp_documents()'s
+    8-link cap on every single one of the ~96 sites before a single real
+    per-site document got a slot — confirmed live: scoping to the full page
+    returned the same ~9 boilerplate links first on both a 4-document site
+    and a 100-document site. Scoping to body_el alone reproduces exactly the
+    real per-site documents with zero boilerplate.
     """
     tree = HTMLParser(html)
     county = None
@@ -130,6 +151,7 @@ def _parse_detail_page(html: str) -> tuple[Optional[str], Optional[str]]:
     body_el = (tree.css_first(".node__content") or tree.css_first("article")
                or tree.css_first("main"))
     desc = None
+    doc_urls: list[str] = []
     if body_el:
         text = body_el.text(separator="\n")
         for para in text.split("\n"):
@@ -137,7 +159,8 @@ def _parse_detail_page(html: str) -> tuple[Optional[str], Optional[str]]:
             if len(para) > 40:
                 desc = para
                 break
-    return county, desc
+        doc_urls = harvest_document_links(body_el.html or "", base_url=base_url)
+    return county, desc, doc_urls
 
 
 class SCDESBrownfields(BaseScraper):
@@ -170,7 +193,7 @@ class SCDESBrownfields(BaseScraper):
         now = datetime.utcnow()
 
         async def _one(full_url: str, site_name: str) -> Optional[Listing]:
-            county, desc = None, None
+            county, desc, doc_urls = None, None, []
             async with sem:
                 try:
                     detail_html = await get_text(full_url, impersonate=True, timeout=30.0)
@@ -178,10 +201,10 @@ class SCDESBrownfields(BaseScraper):
                     log.warning("sc_des_brownfields.detail_fail", url=full_url, error=str(exc)[:160])
                     detail_html = None
             if detail_html:
-                county, desc = _parse_detail_page(detail_html)
+                county, desc, doc_urls = _parse_detail_page(detail_html, base_url=full_url)
 
             description = f"{site_name}: {desc}"[:400] if desc else site_name
-            return Listing(
+            li = Listing(
                 source="counties_sc.sc_des_brownfields",
                 source_url=full_url,
                 listing_type=ListingType.DISTRESSED,
@@ -198,6 +221,8 @@ class SCDESBrownfields(BaseScraper):
                     "description_full": desc,
                 }},
             )
+            stamp_documents(li, doc_urls)
+            return li
 
         results = await asyncio.gather(*(_one(u, n) for u, n in sites.items()))
         out = [li for li in results if li is not None]
