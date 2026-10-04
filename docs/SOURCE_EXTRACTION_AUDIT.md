@@ -128,9 +128,9 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_sc.greenville_delinquent_tax` | detail-page, links | https://www.greenvillecounty.org/appsAS400/Taxsale/ |
 | `counties_sc.greenville_mie_adverts` | deed/notice?, detail-page | https://mie.greenvillejournal.com |
 | `counties_sc.greenville_tax_distress` | deed/notice?, img?, detail-page | https://www.gcgis.org/arcgis3/rest/services/GreenvilleNJ/QueryLayers/MapServer<br>https://www.greenvillecounty.org/appsAS400/Taxsale/ |
-| `counties_sc.greenwood_corebtpay_delinquent_tax` | img?, detail-page | https://greenwoodco.corebtpay.com/egov/apps/payment/center.egov<br>https://greenwoodco.corebtpay.com/egov/apps/bill/pay.egov |
+| `counties_sc.greenwood_corebtpay_delinquent_tax` | deed/notice?, img?, detail-page | https://greenwoodco.corebtpay.com/egov/apps/payment/center.egov<br>https://greenwoodco.corebtpay.com/egov/apps/bill/pay.egov |
 | `counties_sc.greenwood_delinquent_tax` | detail-page | https://www.greenwoodcounty-sc.gov/treasurer/delinquent-tax-sale |
-| `counties_sc.horry_delinquent_xlsx` | detail-page, links | https://www.horrycountysc.gov/media/b5af14ce/delinquent-list-on-website-081926.xlsx<br>https://www.horrycountysc.gov/departments/treasurer/delinquent-tax/ |
+| `counties_sc.horry_delinquent_xlsx` | pdf?, detail-page, links | https://www.horrycountysc.gov/media/b5af14ce/delinquent-list-on-website-081926.xlsx<br>https://www.horrycountysc.gov/departments/treasurer/delinquent-tax/ |
 | `counties_sc.horry_flc` | detail-page, links | https://www.horrycountysc.gov/boards-and-commissions/<br>https://www.horrycountysc.gov/media/om1d2bwo/2025-flc-list-42126.xlsx |
 | `counties_sc.kershaw_flc` | - | https://www.kershaw.sc.gov/treasurer/forfeited-land-commission |
 | `counties_sc.lancaster_delinquent_tax` | pdf?, deed/notice?, detail-page, links | https://www.lancastercountysc.gov |
