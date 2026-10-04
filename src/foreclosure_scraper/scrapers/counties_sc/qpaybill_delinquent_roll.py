@@ -847,16 +847,32 @@ def parse_detail(text: str) -> dict:
         except ValueError:
             return None
 
-    # "Assessment Ratio:" sits above a 3-value row: ratio | land appraisal | building appraisal.
-    ratio = None
-    rm = re.search(r"\n\s*(\d{1,2})%\s*\n", flat)
+    # "Assessment Ratio:" sits above a 3-value row: ratio | land appraisal | building
+    # appraisal. 2026-10-04: this used to read ONLY the ratio and throw the other two
+    # numbers away, even though the docstring above already documented them as part of
+    # "WHAT THE DETAIL PAGE CARRIES". Live-verified on Barnwell notice 000213255: the
+    # row is literally "4% / 0 / 2,400" (land appraisal 0, building appraisal 2,400 --
+    # a mobile-home-on-rented-land parcel, so 0 land value is real, not a parse miss).
+    ratio = land_appraisal = building_appraisal = None
+    rm = re.search(r"\n\s*(\d{1,2})%\s*\n\s*([\d,]+(?:\.\d+)?)\s*\n\s*([\d,]+(?:\.\d+)?)\s*\n", flat)
     if rm:
         ratio = int(rm.group(1))
+        try:
+            land_appraisal = float(rm.group(2).replace(",", ""))
+            building_appraisal = float(rm.group(3).replace(",", ""))
+        except ValueError:
+            land_appraisal = building_appraisal = None
+    else:
+        rm2 = re.search(r"\n\s*(\d{1,2})%\s*\n", flat)
+        if rm2:
+            ratio = int(rm2.group(1))
 
     out = {
         "appraised_value": money("Total Appraisal:"),
         "assessed_value": money("Total Assessed:"),
         "assessment_ratio_pct": ratio,
+        "land_appraisal": land_appraisal,
+        "building_appraisal": building_appraisal,
         # SC: 4% is the owner-occupied legal-residence ratio, 6% is everything else. So a 6%
         # parcel is NOT the owner's residence -- a free, authoritative absentee signal.
         "owner_occupied": (ratio == 4) if ratio in (4, 6) else None,
@@ -865,11 +881,25 @@ def parse_detail(text: str) -> dict:
         "record_type": after("Record Type:"),
         "map_number": after("Map Number:"),
         "legal_description": after("Description:"),
+        # "Property Address" has no label colon on this page; the un-truncated address
+        # the detail page carries (the grid's own situs column is only ~57% filled).
+        "property_address": after("Property Address"),
+        "balance_due": money("Balance Due:"),
         "residential_exemption": money("Residential Exemption:"),
         "homestead_exemption": money("Homestead Exemption:"),
+        # 2026-10-04: County Tax was already read; City Tax / Fees / Other Exemptions /
+        # Local Option Credit / Total Taxes sit in the SAME tax-breakdown block (this
+        # module's own docstring already promised all of these under "the tax
+        # breakdown") but were never parsed. Live-verified real and nonzero on
+        # Barnwell: City Tax $7.50, Local Option Credit $8.57.
+        "city_tax": money("City Tax:"),
+        "fees": money("Fees:"),
+        "other_exemptions": money("Other Exemptions:"),
+        "local_option_credit": money("Local Option Credit:"),
         "county_tax": money("County Tax:"),
         "penalty": money("Penalty:"),
         "cost": money("Cost:"),
+        "total_taxes": money("Total Taxes:"),
         "issue_date": after("Issue Date:"),
     }
     return {k: v for k, v in out.items() if v not in (None, "")}
@@ -980,6 +1010,24 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
             if isinstance(g.get("detail"), dict) and g["detail"]:
                 det = g["detail"]
                 break
+        # 2026-10-04: the grid's own situs column is only ~57% filled (module
+        # docstring), but the detail page's "Property Address" is the SAME field
+        # un-truncated -- a real backfill when the detail pass reached this parcel
+        # and the grid row had nothing.
+        if not address and det.get("property_address"):
+            address = _clean_situs(det["property_address"])
+        raw_owner_mailing = None
+        if det.get("owner_occupied") is not None:
+            # SC's own statutory 4%-legal-residence vs 6%-everything-else ratio is an
+            # AUTHORITATIVE absentee signal (module docstring, "WHAT THE DETAIL PAGE
+            # CARRIES") that was computed in parse_detail() and then never written
+            # anywhere a consumer reads -- enrichment_lead_signals.py's absentee_owner
+            # signal reads raw['owner_mailing']['absentee'], not a bare raw key, and
+            # this source has no owner_mailing block of its own to clobber (the
+            # module docstring's own "STILL NOT THERE" note: this source never learns
+            # the owner's actual mailing address).
+            raw_owner_mailing = {"absentee": not det["owner_occupied"],
+                                 "source": "qpaybill_assessment_ratio"}
         out.append(Listing(
             source="counties_sc.qpaybill_delinquent_roll",
             source_url=_url(QPAYBILL_SUBS[county]),
@@ -1016,8 +1064,14 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
                 # the county's own 100%-basis number; owner_occupied comes from SC's statutory
                 # 4%-legal-residence vs 6%-everything-else assessment ratio.
                 **({"detail": det} if det else {}),
-            }},
+            },
+            # Top-level raw key, NOT nested under qpaybill_roll -- this is exactly
+            # the shape enrichment_lead_signals.py's absentee_owner check reads
+            # (raw['owner_mailing']['absentee']), via mailing_shape.mailing_of().
+            **({"owner_mailing": raw_owner_mailing} if raw_owner_mailing else {}),
+            },
             tax_value=det.get("appraised_value"),
+            assessed_value=det.get("assessed_value"),
             acreage=_acres(det.get("acres")),
             legal_description=det.get("legal_description"),
         ))

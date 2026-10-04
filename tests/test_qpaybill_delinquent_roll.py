@@ -354,3 +354,100 @@ def test_no_detail_leaves_the_listing_clean():
     li = _to_listings("Barnwell", [_row("045-00-00-021.03", "2025", 130.55)])[0]
     assert li.tax_value is None and li.acreage is None
     assert "detail" not in li.raw["qpaybill_roll"]
+    assert "owner_mailing" not in li.raw
+
+
+# --------------------------------------------------------------------------- #
+# 2026-10-04 extraction-completeness fix: land/building appraisal, the tax-
+# breakdown columns, and the absentee signal the docstring already promised
+# but parse_detail()/_to_listings() silently dropped.
+# --------------------------------------------------------------------------- #
+
+def test_land_and_building_appraisal_are_parsed():
+    """The 3-value row after 'Assessment Ratio:' is ratio | land | building --
+    this used to read only the ratio and throw the other two numbers away even
+    though they are real (Barnwell notice 000207255: land 0, building 690 --
+    mobile-home-on-rented-land, so 0 land is a real value, not a miss)."""
+    d = parse_detail(REAL_DETAIL)
+    assert d["land_appraisal"] == 0.0
+    assert d["building_appraisal"] == 690.0
+
+
+def test_tax_breakdown_columns_are_parsed():
+    """County Tax was already read; the sibling City Tax / Fees / Other
+    Exemptions / Local Option Credit / Total Taxes columns in the same block
+    were not, even though the module's own docstring already promised them
+    under 'the tax breakdown'."""
+    detail_with_more = REAL_DETAIL + (
+        "<div>City Tax:</div><div>$3.50</div>"
+        "<div>Fees:</div><div>$0.00</div>"
+        "<div>Other Exemptions:</div><div>$0.00</div>"
+        "<div>Local Option Credit:</div><div>$1.20</div>"
+        "<div>Total Taxes:</div><div>$130.55</div>"
+    )
+    d = parse_detail(detail_with_more)
+    assert d["city_tax"] == 3.50
+    assert d["fees"] == 0.0
+    assert d["other_exemptions"] == 0.0
+    assert d["local_option_credit"] == 1.20
+    assert d["total_taxes"] == 130.55
+    assert d["county_tax"] == 19.12  # already worked -- not a regression
+
+
+def test_property_address_and_balance_due_are_parsed():
+    detail_with_addr = REAL_DETAIL + (
+        "<div>Property Address</div><div>128 PHOENIX LN</div>"
+    )
+    d = parse_detail(detail_with_addr)
+    assert d["property_address"] == "128 PHOENIX LN"
+    assert d["balance_due"] == 130.55
+
+
+def test_owner_occupied_reaches_the_listing_as_an_absentee_signal():
+    """THE headline value of the whole detail pass, per the module's own
+    docstring ('a free absentee-owner signal on every parcel'), was computed
+    in parse_detail() and then never written anywhere enrichment_lead_signals.
+    py's absentee_owner check actually reads (raw['owner_mailing']['absentee'],
+    not a bare raw key) -- so it reached the board as nothing at all."""
+    r = _row("045-00-00-021.03", "2025", 130.55)
+    r["detail"] = {"owner_occupied": False, "assessment_ratio_pct": 6}
+    li = _to_listings("Barnwell", [r])[0]
+    assert li.raw["owner_mailing"]["absentee"] is True
+
+    r2 = _row("045-00-00-021.04", "2025", 100.0)
+    r2["detail"] = {"owner_occupied": True, "assessment_ratio_pct": 4}
+    li2 = _to_listings("Barnwell", [r2])[0]
+    assert li2.raw["owner_mailing"]["absentee"] is False
+
+
+def test_unknown_owner_occupied_sets_no_mailing_block():
+    """A None ratio must not fabricate an owner_mailing/absentee claim either
+    way (see test_an_unknown_ratio_is_not_guessed_as_absentee)."""
+    r = _row("045-00-00-021.03", "2025", 130.55)
+    r["detail"] = {"appraised_value": 690.0}  # no owner_occupied key at all
+    li = _to_listings("Barnwell", [r])[0]
+    assert "owner_mailing" not in li.raw
+
+
+def test_assessed_value_reaches_the_listing():
+    r = _row("045-00-00-021.03", "2025", 130.55)
+    r["detail"] = {"assessed_value": 40.0}
+    li = _to_listings("Barnwell", [r])[0]
+    assert li.assessed_value == 40.0
+
+
+def test_detail_page_property_address_backfills_a_blank_grid_situs():
+    """The grid's own situs column is only ~57% filled (module docstring); the
+    detail page's un-truncated Property Address is the same field and should
+    backfill a row the grid left blank."""
+    r = _row("045-00-00-021.03", "2025", 130.55, addr=None)
+    r["detail"] = {"property_address": "128 PHOENIX LN"}
+    li = _to_listings("Barnwell", [r])[0]
+    assert li.street_address == "128 PHOENIX LN"
+
+
+def test_detail_page_property_address_never_overrides_a_real_grid_situs():
+    r = _row("045-00-00-021.03", "2025", 130.55, addr="999 REAL GRID ADDR")
+    r["detail"] = {"property_address": "128 PHOENIX LN"}
+    li = _to_listings("Barnwell", [r])[0]
+    assert li.street_address == "999 REAL GRID ADDR"
