@@ -1,6 +1,6 @@
 # SOURCE EXTRACTION AUDIT — per-source, is EVERYTHING being pulled?
 
-Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **18 already wire the document harvester** (PDFs/deeds/notices) and **221 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
+Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **19 already wire the document harvester** (PDFs/deeds/notices) and **220 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
 
 ## The audit protocol (do this for EVERY source in the TODO table)
 
@@ -16,7 +16,7 @@ Then VERIFY the change three ways: it compiles, `discover()` still lists the slu
 
 The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) as a starting clue for where to look. It is a hint from static text, NOT proof the source has or lacks these — your eyes on the live page are the authority.
 
-## DONE — already harvest documents (18)
+## DONE — already harvest documents (19)
 
 | Slug | already captures | URLs |
 |---|---|---|
@@ -29,6 +29,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_nc.nc_coastal_tax_foreclosure` | deed/notice?, img?, detail-page, links | https://www.brunswickcountync.gov/912/Legal-Notices<br>https://www.brunswickcountync.gov |
 | `counties_nc.swain_tax_foreclosures` | pdf?, deed/notice?, img?, detail-page, links | https://www.swaincountync.gov/tax-office/ |
 | `counties_sc.meares_auctions` | deed/notice?, img?, detail-page, links | https://www.mpa-sc.com/<br>https://maps.google.com/ |
+| `counties_sc.sc_des_brownfields` | deed/notice?, detail-page, links | https://des.sc.gov/programs/bureau-land-waste-management/<br>https://des.sc.gov/community/community-engagement/environmental-sites-projects |
 | `counties_sc.terry_howe_auctions` | pdf?, deed/notice?, img?, detail-page | https://terryhowe.com/wp-json/wp/v2/auctions |
 | `law_firms.mewborn_deselms` | pdf?, deed/notice?, detail-page, links | https://www.mewbornlaw.biz |
 | `law_firms.rogers_townsend` | pdf?, deed/notice? | https://rogerstownsend.com/reports/NC_Listings.pdf<br>https://rogerstownsend.com/reports/ |
@@ -39,7 +40,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.usmarshals_realproperty` | pdf?, deed/notice?, img?, detail-page, links | https://reallook.com/properties<br>https://reallook.com |
 | `national.williams` | deed/notice?, img?, detail-page, links | https://bid.auctionnetwork.com/<br>https://bid.auctionnetwork.com |
 
-## TODO — audit each for full extraction (221)
+## TODO — audit each for full extraction (220)
 
 | Slug | code hints (verify on the live page) | URLs |
 |---|---|---|
@@ -153,7 +154,6 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `counties_sc.sc_coastal_rosters` | deed/notice?, detail-page, links | https://www.horrycounty.org/parcelapp/rest/services/HorryCountyGISApp/MapServer/24/query<br>https://www.horrycounty.org/parcelapp/rest/services/HorryCountyGISApp/MapServer/22/query |
 | `counties_sc.sc_county_rosters` | deed/notice?, detail-page, links | https://publicindex.sccourts.org |
 | `counties_sc.sc_delinquent_tax_list` | pdf?, detail-page, links | https://cherokeecountysc.gov/delinquent-tax/tax-sale-bidders/ |
-| `counties_sc.sc_des_brownfields` | deed/notice?, detail-page, links | https://des.sc.gov/programs/bureau-land-waste-management/<br>https://des.sc.gov/community/community-engagement/environmental-sites-projects |
 | `counties_sc.sc_dew_lien_registry` | detail-page | https://uitax.dew.sc.gov/LienRegistry/<br>https://dew.sc.gov/benefit-lien-registry |
 | `counties_sc.sc_dor_delinquent_taxpayers` | detail-page | https://mydorway.dor.sc.gov/ |
 | `counties_sc.sc_flc` | pdf?, img?, detail-page, links | https://www.spartanburgcounty.gov/216/Tax-Collector<br>https://www.andersoncountysc.org/departments-a-z/treasurer/ |
