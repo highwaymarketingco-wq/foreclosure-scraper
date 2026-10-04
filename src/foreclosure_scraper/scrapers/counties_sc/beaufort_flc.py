@@ -43,6 +43,55 @@ bids), not a scheduled event, so this scraper never sets sale_date — it must s
 main.DATELESS_OK_SOURCES or _active_only() silently deletes every row.
 
 Free, public HTTP. No login, no paywall, no CAPTCHA, no WAF bypass.
+
+DISABLED 2026-10-03 (extraction-completeness re-audit, batch 8): CATALOG_URL
+is a DEAD, CLOSED auction, not a live feed, and the scraper had no way to
+tell the difference. Live-verified three independent ways:
+
+  1. The catalog page ITSELF says so: fetching event-catalog/131010 live
+     today renders "Auction closed." at the top, and every one of its 73
+     lots is labelled either "PASSED / This lot was not sold" or
+     "Sold for: USD <amount> to <masked bidder>" — e.g. lot #1 (37459633,
+     Stuart Point Road, Seabrook) shows "Sold for: USD 2,050.00 to s****s".
+     Opening a single lot's own detail page (lot #2, 37459634, "SOUTH
+     CAROLINA REALTY (FLC) - Adams Way") in a real browser shows
+     "AUGUST 10, 2017 / Lot Closed" — this catalog is a NINE-YEAR-OLD
+     frozen snapshot, not current inventory. `_parse_lots` never read the
+     PASSED/Sold status at all, so the old code was publishing 2017
+     already-resolved lots (including ones already SOLD to a real bidder
+     nine years ago) as if they were live, biddable TAX_SALE listings
+     today, with the 2017 sale price mislabeled as a current `opening_bid`.
+  2. No newer Beaufort FLC Proxibid catalog exists to repoint to: a
+     Proxibid site search and a general web search for "Beaufort County
+     Forfeited Land Commission" (site:proxibid.com) turn up only this 2017
+     catalog (131010) and a 2016 one (111679, "...-2016/event-catalog/
+     111679") — nothing current. Meares' own site (mpa-sc.com) has since
+     moved its active sales to its own bid.mpa-sc.com platform, and its
+     live Real Estate Auctions page (fetched 2026-10-03) lists no Beaufort
+     listing at all.
+  3. Beaufort County's OWN current, authoritative page confirms zero FLC
+     inventory right now: treasurerhelp.zendesk.com's "List of Forfeited
+     Land Commission Properties" article (part of the same Zendesk help
+     center the module docstring above already cites, last updated ~6
+     months ago, i.e. maintained) states plainly: "There are currently no
+     properties available for bidding at this time." This is the real,
+     current, free source of truth for this source's own stated purpose —
+     not a scrape target today (support-article prose, not a table, and
+     correctly reports 0), but the place a future session should check
+     first before trusting any Proxibid catalog ID again, and the place to
+     build a real scraper against once/if the county starts posting live
+     FLC inventory there (URL below).
+
+No fix was possible that keeps this scraper useful: filtering out "Sold
+for" rows would still leave "PASSED" rows from a 9-year-old auction with no
+evidence they reflect Beaufort's FLC holdings today, and the county's own
+page says the true current count is zero. Disabled rather than patched —
+matches this same session's treatment of chester_delinquent_tax.py /
+clarendon_tax_auction.py / darlington_delinquent_tax.py (superseded /
+dead sources, documented not forced).  Do not re-enable without either a
+genuinely current Proxibid catalog id, or a real scraper against
+AUTHORITATIVE_SOURCE_URL below once it carries real rows.
+
 Slug: counties_sc.beaufort_flc
 Category: county_tax
 ListingType: TAX_SALE
@@ -64,9 +113,20 @@ log = structlog.get_logger()
 
 #: Curated, live-verified direct catalog URL (see module docstring for why this can't
 #: be discovered fresh each run). Update the event-catalog id when this 404s.
+#: CONFIRMED CLOSED/STALE 2026-10-03 -- this is a 2017 auction, not live inventory.
+#: See the module docstring's 2026-10-03 note before reusing this URL.
 CATALOG_URL = (
     "https://www.proxibid.com/Meares-Property-Advisors-Inc/"
     "Beaufort-County-Forfeited-Land-Commission/event-catalog/131010"
+)
+
+#: Beaufort County's own current/authoritative FLC inventory page (part of its
+#: treasurer help center). Live 2026-10-03: "There are currently no properties
+#: available for bidding at this time." Check here, not Proxibid, before any
+#: future rebuild of this source.
+AUTHORITATIVE_SOURCE_URL = (
+    "https://treasurerhelp.zendesk.com/hc/en-us/articles/"
+    "4409066520973-List-of-Forfeited-Land-Commission-Properties"
 )
 
 _LOT_TITLE_RE = re.compile(
@@ -120,6 +180,16 @@ def _parse_lots(page_html: str) -> list[dict]:
 class BeaufortFLC(BaseScraper):
     slug = "counties_sc.beaufort_flc"
     name = "Beaufort County SC Forfeited Land Commission (via Meares/Proxibid)"
+    disabled = True
+    disabled_reason = (
+        "CATALOG_URL is a closed 2017 Proxibid auction (page itself says "
+        "'Auction closed.'; sampled lots show 'PASSED'/'Sold for: USD ...' "
+        "9-year-old outcomes, not live inventory); no newer Beaufort FLC "
+        "Proxibid catalog found (Proxibid + web search); county's own "
+        "current page (AUTHORITATIVE_SOURCE_URL) states 'There are "
+        "currently no properties available for bidding at this time' - "
+        "confirmed 2026-10-03"
+    )
     category = "county_tax"
     timeout_s = 60.0
     expected_min_count = 0
