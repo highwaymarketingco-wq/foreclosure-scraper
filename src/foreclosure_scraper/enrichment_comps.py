@@ -26,7 +26,9 @@ from typing import Optional
 
 import structlog
 
+from . import enrichment_gis_sale_crosscheck as gis_crosscheck
 from .config import in_scope_distressed
+from .http_client import client
 from .models import Listing, PropertyKind
 from .validation import normalize_county
 
@@ -349,6 +351,60 @@ def _haversine_miles(lat1, lon1, lat2, lon2) -> float | None:
     return 3958.8 * 2 * asin(min(1.0, sqrt(a)))
 
 
+# ---- Multi-dwelling "investment property" exclusion -----------------------
+# A parcel styled/zoned single-family that actually carries TWO OR MORE
+# separate structures (a site-built house plus a second mobile home, a
+# detached guest house, an in-law suite/ADU) reports AGGREGATE beds/baths/
+# sqft across every structure combined -- not either individual dwelling's
+# own specs. Confirmed live example (2026-10-04): 140 Old Leicester Rd,
+# Asheville NC -- HomeHarvest's `style` field says SINGLE_FAMILY and combined
+# sqft=1529, but the listing `text` says "two separate dwellings: a 1940s
+# bungalow and a single-wide mobile home" -- neither dwelling alone is
+# anywhere near 1529 sqft. Using this as a same-kind SFR comp compares the
+# subject's ONE house against the combined footprint/bed count of TWO
+# dwellings, which is not like-for-like no matter how well sqft/beds/zip/era
+# happen to land in-band.
+#
+# No STRUCTURED HomeHarvest/Realtor.com field exposes this: `style` stays
+# SINGLE_FAMILY (the parcel isn't platted/zoned as a duplex) and the
+# flattened sold-pool row carries no "structure_count"/"units" column
+# (verified against homeharvest's own `ordered_properties` DataFrame schema,
+# `.venv/lib/python3.12/site-packages/homeharvest/utils.py`, and the live
+# 140 Old Leicester Rd row itself -- `style` was SINGLE_FAMILY). The ONLY
+# available signal is the free-text `text` field, and only when the listing
+# happens to mention it, so recall here is necessarily partial -- a multi-
+# structure parcel whose listing text is silent on it is invisible to this
+# check. That makes this a PRECISION-first filter: match only unambiguous
+# multi-dwelling phrasing (never a loose single word like "guest" or
+# "cottage" alone) to keep false positives near zero, and when the match
+# would leave fewer than 3 comps, keep the pool as-is rather than starve it
+# on an unconfirmed guess -- the same discipline the condition-tier filter
+# just below already uses.
+_MULTI_DWELLING_RE = re.compile(
+    r"\b("
+    r"two\s+separate\s+(?:dwellings|homes|houses|residences)|"
+    r"(?:a\s+)?second\s+(?:dwelling|home|house|residence)\s+on\s+"
+    r"(?:the\s+|this\s+)?(?:property|lot|parcel|land)|"
+    r"(?:detached\s+)?(?:guest\s+house|in-?law\s+suite|accessory\s+dwelling\s+unit|\bADU\b)|"
+    r"(?:main\s+(?:house|dwelling)|primary\s+(?:dwelling|residence))\s+"
+    r"(?:plus|and|\+)\s+(?:a\s+)?(?:second|additional)?\s*"
+    r"(?:mobile\s+home|cottage|cabin|bungalow)|"
+    r"(?:house|home|bungalow|cottage)\s+and\s+(?:a\s+)?"
+    r"(?:single|double)[\s\-]?wide\s+mobile\s+home|"
+    r"multiple\s+(?:dwellings|structures|residences|homes)\s+on\s+"
+    r"(?:the\s+|this\s+)?(?:property|lot|parcel|site)"
+    r")\b", re.I,
+)
+
+
+def _is_multi_dwelling_listing(row: dict) -> bool:
+    """True when a HomeHarvest pool row's own listing text unambiguously
+    describes 2+ separate dwellings on one parcel. See the module note above
+    `_MULTI_DWELLING_RE` for why this is text-only and precision-first."""
+    text = str(row.get("text") or "")
+    return bool(text) and bool(_MULTI_DWELLING_RE.search(text))
+
+
 def _filter_by_kind(pool: list[dict], target_kind: str) -> list[dict]:
     """Keep only same-kind properties from the pool."""
     if target_kind == "unknown":
@@ -513,6 +569,17 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
             pool = retail
             match_quality += "+cond"
 
+    # Multi-dwelling exclusion: an aggregate-spec investment-property comp
+    # (two+ structures on one parcel) is not like-for-like even when its
+    # combined sqft/beds happen to land in-band — see `_is_multi_dwelling_
+    # listing` above. Drop when 3+ single-dwelling comps remain; never drop
+    # below 3 on a text guess alone, same discipline as condition parity.
+    if target_kind != "land":
+        single_dwelling = [s for s in pool if not _is_multi_dwelling_listing(s)]
+        if len(single_dwelling) >= 3:
+            pool = single_dwelling
+            match_quality += "+single_dwelling"
+
     # Sort: closest-first when we have distances, else most-recent-first.
     try:
         if has_geo and any(s.get("_distance_mi") is not None for s in pool):
@@ -549,6 +616,7 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
             "price_per_sqft": round(sold_price / sqft, 2) if sold_price and sqft else None,
             "url": s.get("property_url"),
             "match_quality": match_quality,
+            "multi_dwelling_suspected": _is_multi_dwelling_listing(s),
         })
 
     # Line-item adjustment grid (improved property only): adjust each comp toward
@@ -602,6 +670,13 @@ def _pick_3_rent_comps(target: Listing, rent_pool: list[dict]) -> list[dict]:
         if len(sqft_filt) >= 3:
             pool = sqft_filt
 
+    # Multi-dwelling exclusion (see `_is_multi_dwelling_listing` above): an
+    # aggregate rent across two+ structures on one parcel isn't the rent for
+    # either dwelling alone. Same "never drop below 3" discipline.
+    single_dwelling = [s for s in pool if not _is_multi_dwelling_listing(s)]
+    if len(single_dwelling) >= 3:
+        pool = single_dwelling
+
     out: list[dict] = []
     for s in pool[:3]:
         rent = _num(s.get("list_price"))
@@ -616,6 +691,7 @@ def _pick_3_rent_comps(target: Listing, rent_pool: list[dict]) -> list[dict]:
             "baths": _num(s.get("full_baths")),
             "rent_per_sqft": round(rent / sqft, 2) if rent and sqft else None,
             "url": s.get("property_url"),
+            "multi_dwelling_suspected": _is_multi_dwelling_listing(s),
         })
     return out
 
@@ -756,6 +832,55 @@ def _condition_tier(li: Listing) -> str:
     return "cosmetic"  # safe middle
 
 
+# ---- County-recorded sale-price cross-check --------------------------------
+
+async def _apply_gis_crosscheck(http, comps: list[dict], pool_key: tuple[str, str],
+                                 cache: dict[tuple[str, str], dict | None]) -> None:
+    """For each sold comp in a `gis_crosscheck.SUPPORTED` county, look up the
+    county's own recorded SalePrice/DeedDate for that address and, when they
+    disagree with HomeHarvest's claimed sold_price by more than
+    `gis_crosscheck.PRICE_DISAGREEMENT_TOLERANCE`, prefer the county's number
+    (see enrichment_gis_sale_crosscheck.py for the confirmed bug this closes).
+    Mutates each comp dict in place. `cache` is keyed by (address, city) so
+    the same comp address reused across many listings in this run's batch
+    costs one live query, not one per listing."""
+    state, county = pool_key
+    for c in comps:
+        addr = c.get("address")
+        if not addr:
+            continue
+        key = (str(addr).strip().lower(), str(c.get("city") or "").strip().lower())
+        if key not in cache:
+            try:
+                cache[key] = await gis_crosscheck.crosscheck_sold_price(
+                    http, state=state, county=county, address=addr, city=c.get("city"),
+                    claimed_sold_price=c.get("sold_price"), claimed_sold_date=c.get("sold_date"),
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.debug("comps.gis_crosscheck.error", error=str(exc)[:120])
+                cache[key] = None
+        result = cache[key]
+        if not result:
+            continue
+        c["gis_crosscheck"] = result
+        if not result["preferred"]:
+            continue
+        old_price = c.get("sold_price")
+        new_price = result["county_sale_price"]
+        c["sold_price_homeharvest"] = old_price
+        c["sold_price"] = new_price
+        if c.get("sqft"):
+            c["price_per_sqft"] = round(new_price / c["sqft"], 2)
+        # The appraisal-style adjustment grid (_adjust_comp) baked the OLD
+        # price into `adjusted_ppsf`; re-express it on the corrected price by
+        # the same ratio rather than re-running the whole grid -- cheap and
+        # directionally correct, not a full re-derivation.
+        if c.get("adjusted_ppsf") and old_price:
+            c["adjusted_ppsf"] = round(c["adjusted_ppsf"] * (new_price / old_price), 2)
+            if isinstance(c.get("adjustments"), dict):
+                c["adjustments"]["gis_price_corrected"] = True
+
+
 # ---- Main enrichment -------------------------------------------------------
 
 async def enrich_with_comps(listings: list[Listing]) -> None:
@@ -825,6 +950,16 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
     matched_sold = matched_rent = backfilled = 0
     cond_counts = {"move_in_ready": 0, "cosmetic": 0, "major": 0, "gut": 0}
 
+    # County-recorded sale-price cross-check (see enrichment_gis_sale_
+    # crosscheck.py): only open the extra httpx client when this batch
+    # actually touches a county that module covers, and cache by comp
+    # address so the same handful of addresses -- reused as comps across
+    # many nearby listings -- cost one live query each, not one per listing.
+    gis_needed = any(k in gis_crosscheck.SUPPORTED for k in county_list)
+    gis_cache: dict[tuple[str, str], dict | None] = {}
+    gis_ctx = client(timeout=20.0) if gis_needed else None
+    gis_http = await gis_ctx.__aenter__() if gis_ctx is not None else None
+
     for li in listings:
         pool_key = ((li.state or "").strip().upper(), normalize_county(li.county)) if (li.county and li.state) else None
         sold_pool = sold_pools.get(pool_key) if pool_key else None
@@ -853,6 +988,8 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
         # Sold comps (strict like-for-like; may return fewer than 3 or zero)
         if sold_pool:
             comps = _pick_3_comps(li, sold_pool)
+            if comps and gis_http is not None and pool_key in gis_crosscheck.SUPPORTED:
+                await _apply_gis_crosscheck(gis_http, comps, pool_key, gis_cache)
             if comps:
                 li.raw["comps"] = comps
                 # Honesty gate: only derive ARV $/sqft from comps that are
@@ -906,6 +1043,9 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
                         # Estimate rent from per-sqft (more reliable than absolute median)
                         li.raw["estimated_monthly_rent"] = round(median_rpsf * li.living_sqft, -1)
                 matched_rent += 1
+
+    if gis_ctx is not None:
+        await gis_ctx.__aexit__(None, None, None)
 
     log.info("comps.done", listings=len(listings),
              sold_matched=matched_sold, rent_matched=matched_rent,
