@@ -59,6 +59,7 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
+from ...config import NC_COUNTIES as _FLIP_FOOTPRINT_NC
 from ...models import Listing, ListingType, PropertyKind
 from . import _press_assoc as pa
 
@@ -109,6 +110,12 @@ FOOTPRINT: tuple[str, ...] = (
     "New Hanover", "Brunswick",
 )
 _FOOTPRINT_LOWER = {c.lower(): c for c in FOOTPRINT}
+#: The subset of FOOTPRINT that is ALSO in the 18-county WNC+Upstate-SC flip
+#: footprint (config.NC_COUNTIES) -- 11 of the 20 FOOTPRINT entries. The other
+#: 9 (Haywood + the 8 coastal counties) were deliberately added for real,
+#: confirmed coverage (see the module docstring and FOOTPRINT's own comments)
+#: but are NOT flip-scoped; see _to_listing()'s FORECLOSURE_SALE remap below.
+_FLIP_FOOTPRINT_NAMES = frozenset(c.name for c in _FLIP_FOOTPRINT_NC)
 
 # Publication window and per-query page cap. The platform's "current search"
 # index only reaches back 12 months; older notices need its Archive Search.
@@ -334,6 +341,29 @@ def _to_listing(notice: dict, slug: str) -> Listing | None:
     county = _subject_county(text, notice.get("county_meta", ""))
     if not county:
         return None
+
+    # FOUND 2026-10-04 (HERMES extraction-completeness audit, public_notices
+    # batch): FOOTPRINT deliberately spans the 11 real 18-county-footprint NC
+    # counties PLUS 9 counties added for distress-signal coverage only
+    # (Haywood + the 8 coastal counties -- see FOOTPRINT's own comments).
+    # ListingType.FORECLOSURE_SALE is a "flip" type (main._FLIP_LISTING_TYPES)
+    # gated to the narrow 18-county footprint by main._flip_outside_footprint()
+    # -- checked before every other admission path, with no exception, and
+    # this source is not in main.COASTAL_COUNTY_BYPASS_SOURCES (which excludes
+    # flip-type rows from its bypass regardless). Confirmed directly via
+    # main._in_scope(): a real-shaped Brunswick County substitute-trustee
+    # "will offer for sale ... at public auction" notice -- exactly the
+    # caption shape this scraper's own _SALE_RE/_FORECLOSURE_RE match --
+    # classifies FORECLOSURE_SALE and comes back False, meaning every
+    # genuinely-scheduled sale notice for one of these 9 counties has been
+    # silently dropped at the board gate since each was added to FOOTPRINT
+    # (Haywood 2026-09-30, coastal 2026-08-12). The 11 true footprint
+    # counties are unaffected (confirmed they ARE in config.NC_COUNTIES) and
+    # deliberately keep the flip classification. Only the 9 non-flip-scoped
+    # counties are remapped, so FORECLOSURE_SALE's narrower flip semantics
+    # are preserved everywhere they still apply.
+    if listing_type == ListingType.FORECLOSURE_SALE and county not in _FLIP_FOOTPRINT_NAMES:
+        listing_type = ListingType.LIS_PENDENS
 
     owner = _party(text, kind)
     case_m = _CASE_RE.search(text) or _CASE_SPACED_RE.search(text)

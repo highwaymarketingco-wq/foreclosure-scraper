@@ -118,6 +118,18 @@ def test_haywood_is_in_footprint_and_classifies_real_rows():
     notices found" marker, not a parsing miss) -- so this addition closes real
     coverage for FORECLOSURE_SALE/PROBATE_NOTICE, not the tax_delinquent gap
     itself, which stays open per the gap ledger.
+
+    UPDATE 2026-10-04 (HERMES extraction-completeness audit, public_notices
+    batch): the "real coverage" claim above was only half true. This test
+    never checked main._in_scope() -- and Haywood is explicitly deny-listed
+    (config.SCOPE_DENY_COUNTIES) AND not in the 18-county flip footprint, so
+    the FORECLOSURE_SALE row below was being silently dropped at the board
+    gate on every real run since 2026-09-30, the exact same bug class the
+    newspapers.* batch found the same day. Fixed in nc_notices_counties.py by
+    remapping FORECLOSURE_SALE -> LIS_PENDENS for any county outside the true
+    18-county footprint (Haywood + the 8 coastal FOOTPRINT entries); the 11
+    real footprint counties are unaffected. This test now asserts the
+    corrected type AND that it actually reaches the board.
     """
     assert "Haywood" in M.FOOTPRINT
 
@@ -138,10 +150,17 @@ def test_haywood_is_in_footprint_and_classifies_real_rows():
     assert li is not None
     assert li.county == "Haywood"
     assert li.state == "NC"
-    assert li.listing_type is ListingType.FORECLOSURE_SALE
+    # Haywood is deny-listed and outside the 18-county flip footprint, so the
+    # raw FORECLOSURE_SALE classification is remapped to LIS_PENDENS -- see
+    # the UPDATE note above. This is what actually reaches the board; a bare
+    # FORECLOSURE_SALE here would be silently dropped by main._in_scope().
+    assert li.listing_type is ListingType.LIS_PENDENS
     assert li.foreclosure_process == "power_of_sale"
     assert li.case_number == "26SP000070-430"
     assert li.defendant == "William O'Brien and Betty Sue McCoy O'Brien"
+
+    from foreclosure_scraper import main as _main
+    assert _main._in_scope(li) is True
 
     creditors_row = {
         "notice_id": "982818",
