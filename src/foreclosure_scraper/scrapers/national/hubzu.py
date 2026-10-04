@@ -89,11 +89,27 @@ def _parse_item(item: dict, state: str) -> Listing | None:
         latitude=item.get("lat") or None,
         longitude=item.get("lng") or None,
         sale_date=_date(item.get("listingEndDate")),
+        # listingPrice is the site's own marketed/list price -- a distinct
+        # valuation signal from startingBid (the auction opening bid), NOT
+        # a duplicate. Found 2026-10-04 (national.* extraction-completeness
+        # audit, batch 16): live-sampled 132 current NC+SC rows, 42 (32%)
+        # carry a non-empty listingPrice, and it differs from startingBid
+        # on 41 of those 42 -- real data, never captured before. Mapped to
+        # market_value (the convention this project's county-assessor
+        # scrapers already use for a vendor-stated valuation, distinct
+        # from the bid itself).
+        market_value=_money(item.get("listingPrice")),
         raw={"hubzu": {"category": cat, "subtype": item.get("propertySubType"),
                        "listing_id": item.get("listingId"), "current_bid": item.get("currentBid"),
                        "status": item.get("listingStatus"),
                        "broker": (item.get("agentCompanyName") or "").strip() or None,
-                       "photo_count": item.get("photoCount")}},
+                       "photo_count": item.get("photoCount"),
+                       "listing_price": _money(item.get("listingPrice")),
+                       # Real Y/N signal on whether the property is
+                       # currently occupied -- found in the same audit,
+                       # never captured before (useful REO context: an
+                       # occupied former-owner property vs. a vacant one).
+                       "occupancy_status": (item.get("occupancyStatus") or "").strip() or None}},
     )
     if photo:
         li.raw["images"] = {"real": [photo]}

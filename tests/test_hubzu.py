@@ -72,3 +72,43 @@ def test_parse_item_no_photo_omits_images_key():
     li = _parse_item(item, "NC")
     assert li is not None
     assert "images" not in li.raw
+
+
+# ---------------------------------------------------------------------------
+# listingPrice / occupancyStatus (2026-10-04, batch 16): live-sampled 132
+# current NC+SC rows -- listingPrice present on 42 (32%), differing from
+# startingBid on 41 of those 42 (a real, distinct valuation signal, not a
+# duplicate); occupancyStatus carries real "Y"/"N" values. Neither was
+# captured before this fix.
+# ---------------------------------------------------------------------------
+
+def test_listing_price_maps_to_market_value_and_is_kept_in_raw():
+    item = dict(_REAL_ITEM)
+    item["listingPrice"] = "229,900"  # distinct from startingBid=315,400
+    li = _parse_item(item, "NC")
+    assert li is not None
+    assert li.market_value == 229900.0
+    assert li.raw["hubzu"]["listing_price"] == 229900.0
+    # startingBid must still drive opening_bid, unaffected by this fix.
+    assert li.opening_bid == 315400.0
+
+
+def test_no_listing_price_leaves_market_value_none():
+    li = _parse_item(_REAL_ITEM, "NC")  # no listingPrice key at all
+    assert li is not None
+    assert li.market_value is None
+    assert li.raw["hubzu"]["listing_price"] is None
+
+
+def test_occupancy_status_captured():
+    item = dict(_REAL_ITEM)
+    item["occupancyStatus"] = "Y"
+    li = _parse_item(item, "NC")
+    assert li is not None
+    assert li.raw["hubzu"]["occupancy_status"] == "Y"
+
+
+def test_no_occupancy_status_is_none_not_empty_string():
+    li = _parse_item(_REAL_ITEM, "NC")
+    assert li is not None
+    assert li.raw["hubzu"]["occupancy_status"] is None
