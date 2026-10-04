@@ -407,6 +407,22 @@ def to_listings(target: Target, bills: list[dict], *, post: dict, content: str) 
                 "out_of_state": mail_state.strip().upper() != "NC",
                 "source": SLUG,
             }
+            # 2026-10-04 extraction-completeness audit (batch 11), same raw-key-
+            # naming-gap shape as dd19fa6a/6e00d55b: enrichment_lead_signals.py's
+            # absentee_owner facet and distress_score.py's own +8 absentee bonus
+            # both read raw['owner_mailing']['absentee'] (mailing_shape.mailing_of),
+            # never this bare raw['absentee_owner'] key -- and unlike the other
+            # 5 writers of this same bug, this scraper never builds an
+            # raw['owner_mailing'] block at all (there is no mailing STREET here,
+            # only the taxpayer's mailing city/state), so the real absentee fact
+            # was invisible outright. Same shape as counties_generic.
+            # multi_year_delinquent_tax.py's own owner_mailing block.
+            raw["owner_mailing"] = {
+                "city": mail_city, "state": mail_state, "mail_state": mail_state,
+                "absentee": True,
+                "out_of_state": mail_state.strip().upper() != "NC",
+                "source": SLUG,
+            }
         out.append(Listing(
             source=SLUG,
             source_url=f"{post.get('link') or BASE}#{frag}",

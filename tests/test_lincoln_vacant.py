@@ -99,6 +99,10 @@ def test_out_of_state_mailing_surfaces_owner_mailing_and_absentee_flag():
         "street": "2646 GOLDENROD LN", "street2": "UNIT 4",
         "city": "GLENVIEW", "state": "IL", "zip": "60026",
         "source": "lincoln_county_gis",
+        # 2026-10-04 audit: enrichment_lead_signals.py / distress_score.py read
+        # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
+        # bare raw['absentee_owner'] key below -- both must agree.
+        "absentee": True,
     }
     assert li.raw["absentee_owner"] is True
     assert li.raw["lincoln_vacant"]["co_owner"] == "LUTZ THOMAS L"
@@ -129,6 +133,7 @@ def test_po_box_mailing_is_absentee_even_in_state():
     out = _run_fetch([{"attributes": ROW_INSTATE_NO_HOUSENUM}])
     li = out[0]
     assert li.raw["absentee_owner"] is True  # PO Box tell, not the street-token tell
+    assert li.raw["owner_mailing"]["absentee"] is True
 
 
 def test_street_token_mismatch_only_checked_when_situs_has_a_house_number():

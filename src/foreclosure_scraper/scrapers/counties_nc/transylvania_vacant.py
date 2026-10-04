@@ -113,6 +113,16 @@ def _build_raw(a: dict, situs: str | None, mailing: dict, mail_street: str | Non
         raw["owner_mailing"] = mailing
         if _is_absentee(mail_state, mail_street, situs):
             raw["absentee_owner"] = True
+            # 2026-10-04 extraction-completeness audit (batch 11), same raw-key-
+            # naming-gap shape as dd19fa6a/6e00d55b: enrichment_lead_signals.py's
+            # absentee_owner facet and distress_score.py's own +8 absentee bonus
+            # both read raw['owner_mailing']['absentee'] (mailing_shape.mailing_of),
+            # never this bare raw['absentee_owner'] key -- the top-level
+            # raw['owner_mailing'] wire-up above (2026-10-03) fixed visibility of
+            # the mailing BLOCK itself but the absentee verdict computed right
+            # here still only landed in the key nothing reads. Add it to the same
+            # dict (mailing is raw['owner_mailing'] by reference).
+            raw["owner_mailing"]["absentee"] = True
     # SALE_PRICE + SALE_DATE already fetched but never paired into the
     # canonical raw['gis']['last_sale'] key enrichment_last_sale.py reads
     # (same convention as lincoln_vacant.py's own 2026-10-03 fix).

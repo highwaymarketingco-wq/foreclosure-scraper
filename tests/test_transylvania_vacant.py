@@ -83,8 +83,12 @@ def test_owner_mailing_is_wired_to_top_level_key():
                "city": "Atlanta", "state": "GA", "zip": "30306"}
     raw = _build_raw(_attrs(), "CASHIERS RD", mailing, "840 Springdale Rd NE",
                      "Atlanta", "GA", 62500.0, "199606")
-    assert raw["owner_mailing"] == mailing
+    assert raw["owner_mailing"] is mailing
     assert raw["absentee_owner"] is True  # GA != NC
+    # 2026-10-04 audit: enrichment_lead_signals.py / distress_score.py read
+    # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
+    # bare raw['absentee_owner'] key above -- both must agree.
+    assert raw["owner_mailing"]["absentee"] is True
 
 
 def test_no_mailing_street_or_city_does_not_set_owner_mailing():

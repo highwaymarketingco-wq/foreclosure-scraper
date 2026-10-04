@@ -515,6 +515,14 @@ def build_listing(pin: str, rows: list[Row], now: datetime | None = None) -> Lis
         }
         if _is_absentee(mail_city, mail_state, mail_addr, situs):
             raw["absentee_owner"] = True
+            # 2026-10-04 extraction-completeness audit (batch 11), same raw-key-
+            # naming-gap shape as dd19fa6a/6e00d55b: enrichment_lead_signals.py's
+            # absentee_owner facet and distress_score.py's own +8 absentee bonus
+            # both read raw['owner_mailing']['absentee'] (mailing_shape.mailing_of),
+            # never this bare raw['absentee_owner'] key -- so a real absentee hit
+            # computed right here was invisible to both. owner_mailing already
+            # exists in this branch; just add the key the consumer actually reads.
+            raw["owner_mailing"]["absentee"] = True
     if sale_price and sale_date_dt:
         # Written where enrichment_last_sale.py / enrichment_gis_attrs.py's
         # existing consumers already look (raw['gis']['last_sale']), not a

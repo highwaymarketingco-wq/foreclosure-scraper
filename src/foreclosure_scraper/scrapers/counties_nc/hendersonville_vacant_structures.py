@@ -331,6 +331,14 @@ def build_listing(feat: dict, now: datetime | None = None) -> Listing | None:
         }
         if _is_absentee(a):
             raw["absentee_owner"] = True
+            # 2026-10-04 extraction-completeness audit (batch 11), same raw-key-
+            # naming-gap shape as dd19fa6a/6e00d55b: enrichment_lead_signals.py's
+            # absentee_owner facet and distress_score.py's own +8 absentee bonus
+            # both read raw['owner_mailing']['absentee'] (mailing_shape.mailing_of),
+            # never this bare raw['absentee_owner'] key -- so a real absentee hit
+            # computed right here was invisible to both. owner_mailing already
+            # exists in this branch; just add the key the consumer actually reads.
+            raw["owner_mailing"]["absentee"] = True
     if demolished:
         # The structure is gone; the LOT and its absentee owner remain a lead.
         raw["code_enforcement"]["has_open"] = False

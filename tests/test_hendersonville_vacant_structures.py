@@ -222,6 +222,10 @@ def test_listing_shape():
     assert 35.0 < li.latitude < 35.6 and -82.7 < li.longitude < -82.2
     assert li.raw["vacancy"]["vacant"] is True
     assert li.raw["absentee_owner"] is True
+    # 2026-10-04 audit: enrichment_lead_signals.py / distress_score.py read
+    # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
+    # bare raw['absentee_owner'] key above -- both must agree.
+    assert li.raw["owner_mailing"]["absentee"] is True
     assert li.raw["code_enforcement"]["source"] == \
         "hendersonville_vacant_structures_register"
 

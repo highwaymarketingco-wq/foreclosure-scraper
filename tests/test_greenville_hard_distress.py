@@ -400,6 +400,10 @@ def test_absentee_is_an_attribute_and_never_a_lane():
     f = _by_pin()[PIN_ABSENTEE]
     li = build_listing(_normalize_parcel(PIN_ABSENTEE), f["attributes"], None)
     assert li.raw["absentee_owner"] is True
+    # 2026-10-04 audit: enrichment_lead_signals.py / distress_score.py read
+    # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
+    # bare raw['absentee_owner'] key above -- both must agree.
+    assert li.raw["owner_mailing"]["absentee"] is True
     assert "absentee" not in " ".join(li.raw["greenville_distress"]["lanes"])
     assert li.raw["greenville_distress"]["lanes"] == ["delinquent_tax"]
 

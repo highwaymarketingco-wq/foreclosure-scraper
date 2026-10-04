@@ -631,6 +631,14 @@ def build_listing(pin: str, attrs: dict, geom: dict | None,
         # Attribute, not a lane. Never counted in the hard-distress total.
         if _is_absentee(mail_street, mail_state, situs):
             raw["absentee_owner"] = True
+            # 2026-10-04 extraction-completeness audit (batch 11), same raw-key-
+            # naming-gap shape as dd19fa6a/6e00d55b: enrichment_lead_signals.py's
+            # absentee_owner facet and distress_score.py's own +8 absentee bonus
+            # both read raw['owner_mailing']['absentee'] (mailing_shape.mailing_of),
+            # never this bare raw['absentee_owner'] key -- so a real absentee hit
+            # computed right here was invisible to both. owner_mailing already
+            # exists in this branch; just add the key the consumer actually reads.
+            raw["owner_mailing"]["absentee"] = True
     # 2026-09-30 audit (same false-positive class already fixed for
     # pickens_delinquent_parcels.py's chronic-delinquency flag, F5 2026-09-21): this used
     # to set raw['distressed'] = True off a probate match OR a tax-sale-with-balance fact.

@@ -361,6 +361,10 @@ def test_absentee_owner_flagged_from_the_mailing_address():
     li = _run(_only(payload))[0]
     assert li.raw["absentee_owner"] is True
     assert li.raw["owner_mailing"]["state"] == "FL"
+    # 2026-10-04 audit: enrichment_lead_signals.py / distress_score.py read
+    # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
+    # bare raw['absentee_owner'] key above -- both must agree.
+    assert li.raw["owner_mailing"]["absentee"] is True
 
 
 def test_owner_occupied_parcel_is_not_flagged_absentee():

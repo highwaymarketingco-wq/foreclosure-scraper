@@ -251,9 +251,17 @@ def test_chowan_leads_carry_street_address_and_absentee_owner_signal():
     local = next(l for l in leads if l.parcel_id == "697007792923")
     assert local.street_address == "100 CHEYENNE TRL" and "absentee_owner" in local.raw
     assert local.raw["absentee_owner"]["out_of_state"] is False
+    # 2026-10-04 audit: enrichment_lead_signals.py / distress_score.py read
+    # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
+    # bare raw['absentee_owner'] key above -- this writer has no owner_mailing
+    # block at all otherwise, so without the bridge the signal is invisible
+    # outright, in- or out-of-state alike.
+    assert local.raw["owner_mailing"]["absentee"] is True
     oos = next(l for l in leads if l.parcel_id == "699200136763")
     assert oos.raw["absentee_owner"] == {"mail_city": "KITTREDGE", "mail_state": "CO",
                                          "out_of_state": True, "source": m.SLUG}
+    assert oos.raw["owner_mailing"]["absentee"] is True
+    assert oos.raw["owner_mailing"]["out_of_state"] is True
     no_situs = next(l for l in leads if l.parcel_id == "689412877469")
     assert no_situs.street_address is None and no_situs.legal_description is None
 
