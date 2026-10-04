@@ -156,6 +156,23 @@ class Layer(NamedTuple):
     impvac: str | None = None
     acct: str | None = None
     pin_ext: str | None = None
+    #: County-assessed value (ACTUALVAL). Only on dqnt_2022/2023 -- the county
+    #: dropped the column for 2024. Live-verified real (nonzero) on 246/834
+    #: (2022) and 123/362 (2023) rows; it is 0 on the rest, which _money()
+    #: already treats as "no value" rather than a true $0 assessment.
+    assessed_val: str | None = None
+    #: Last recorded arm's-length sale amount (SALEP) / date (SALEDT) -- a pair,
+    #: never read independently (same rule as lat/lng: a price from one cycle
+    #: must not pair with a date from another). Live-verified real on
+    #: 260/834 (2022), 107/362 (2023), 313/954 (2024) rows, e.g. PIN
+    #: 4054-15-53-7539 sold for $6,262,000 on 2006-06-07 per dqnt_2023.
+    sale_price: str | None = None
+    sale_date_col: str | None = None
+    #: ZONINGDESC (human-readable; dqnt_2023 only). Real text on 86/362 rows,
+    #: e.g. "Cp 2 Community Bus Dist" / "R 20 Single Fam Res Dist" -- usable to
+    #: tell commercial/multi-family apart from the impvac flag's improved/
+    #: vacant-only signal.
+    zoning_desc: str | None = None
 
     @property
     def url(self) -> str:
@@ -187,17 +204,24 @@ LAYERS: tuple[Layer, ...] = (
           mail_addr="ADD1", mail_city="CITY", mail_state="STATE", mail_zip="ZIP",
           situs="LOCADD", situs_city="LOCCITY", situs_zip="LOCZIP",
           amount="AMOUNT_DUE", tax_year="TAXYEAR", acres="ACRES",
-          bldgs="BLDGS", impvac="IMPVAC", acct="ACCTNO", pin_ext="PINEXT"),
+          bldgs="BLDGS", impvac="IMPVAC", acct="ACCTNO", pin_ext="PINEXT",
+          assessed_val="ACTUALVAL", sale_price="SALEP", sale_date_col="SALEDT"),
     Layer("dqnt_2023", 2023, False, pin="PIN", owner="NAME1", owner_alt="OWNER__NOW",
           mail_addr="ADD1", mail_city="CITY", mail_state="STATE", mail_zip="ZIP",
           situs="LOCADD", situs_city="LOCCITY", situs_zip="LOCZIP",
           amount="AMOUNT_DUE", tax_year="TAXYEAR", acres="ACRES",
-          bldgs="BLDGS", impvac="IMPVAC", acct="ACCTNO"),
+          bldgs="BLDGS", impvac="IMPVAC", acct="ACCTNO",
+          assessed_val="ACTUALVAL", sale_price="SALEP", sale_date_col="SALEDT",
+          zoning_desc="ZONINGDESC"),
     Layer("dqnt_2024", 2024, False, pin="PIN", owner="NAME1",
           mail_addr="ADD1", mail_city="CITY", mail_state="STATE", mail_zip="ZIP",
           situs="LOCADD", situs_city="LOCCITY", situs_zip="LOCZIP",
           amount="Max_AMT_DU", tax_year="TAXYEAR", acres="ACRES",
-          bldgs="BLDGS", impvac="IMPVAC", acct="ACCTNO", pin_ext="PINEXT"),
+          bldgs="BLDGS", impvac="IMPVAC", acct="ACCTNO", pin_ext="PINEXT",
+          # 2024 roll dropped ACTUALVAL entirely (confirmed live: field absent
+          # from the service's own schema, not just blank) -- SALEP/SALEDT
+          # still present and real (313/954 rows).
+          sale_price="SALEP", sale_date_col="SALEDT"),
     # --- current cycle: published-but-unsold ---------------------------------
     Layer("DelParces_October2025NewsAd", 2025, True, pin="PIN",
           owner="OWNER__NOW", amount="AMOUNT_DUE", acres="CALCACRE"),
@@ -262,6 +286,23 @@ def _zip5(v: Any) -> str | None:
     return None
 
 
+def _epoch_ms_to_dt(v: Any) -> datetime | None:
+    """SALEDT arrives as epoch milliseconds UTC, same as every other ArcGIS
+    date field on this org's services. Naive UTC to match the rest of the
+    codebase (datetime.utcnow())."""
+    try:
+        ms = int(v)
+    except (TypeError, ValueError):
+        return None
+    if ms <= 0:
+        return None
+    try:
+        from datetime import timezone
+        return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).replace(tzinfo=None)
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
 def _centroid(geom: dict[str, Any] | None) -> tuple[float, float] | None:
     """Mean of a polygon's ring vertices -> (lat, lng). Geometry is WGS84."""
     rings = (geom or {}).get("rings") or []
@@ -321,6 +362,10 @@ class Row(NamedTuple):
     pin_ext: str | None
     lat: float | None
     lng: float | None
+    assessed_val: float | None
+    sale_price: float | None
+    sale_date: datetime | None
+    zoning_desc: str | None
 
 
 def parse_feature(feat: dict, layer: Layer) -> tuple[str, Row] | None:
@@ -372,6 +417,10 @@ def parse_feature(feat: dict, layer: Layer) -> tuple[str, Row] | None:
         bldgs=bldgs, impvac=_clean(g("impvac")), acct=_clean(g("acct")),
         pin_ext=_clean(g("pin_ext")),
         lat=lat, lng=lng,
+        assessed_val=_money(g("assessed_val")),
+        sale_price=_money(g("sale_price")),
+        sale_date=_epoch_ms_to_dt(g("sale_date_col")),
+        zoning_desc=_clean(g("zoning_desc")),
     )
 
 
@@ -416,6 +465,19 @@ def build_listing(pin: str, rows: list[Row], now: datetime | None = None) -> Lis
     lat, lng = next(((r.lat, r.lng) for r in rows if r.lat is not None), (None, None))
     impvac = newest("impvac")
 
+    # 2026-10-04 extraction-completeness fix: ACTUALVAL (assessed value, real
+    # on dqnt_2022/2023 only -- 2024 dropped the column) and SALEP/SALEDT
+    # (last recorded sale, real on all three dqnt_* rolls) were fetched into
+    # Row by parse_feature but never read here, so they were silently dropped
+    # on every parcel. Live-verified real: PIN 4054-15-53-7539 (dqnt_2023)
+    # sold for $6,262,000 on 2006-06-07; ~30% of rows on each roll carry a
+    # genuine nonzero sale price. Price+date taken as a PAIR from the SAME
+    # row, same rule as lat/lng above.
+    assessed_val = next((r.assessed_val for r in rows if r.assessed_val), None)
+    sale_price, sale_date_dt = next(
+        ((r.sale_price, r.sale_date) for r in rows if r.sale_price), (None, None))
+    zoning_desc = newest("zoning_desc")
+
     raw: dict[str, Any] = {
         "pickens_delinquent": {
             "county": "Pickens",
@@ -453,6 +515,16 @@ def build_listing(pin: str, rows: list[Row], now: datetime | None = None) -> Lis
         }
         if _is_absentee(mail_city, mail_state, mail_addr, situs):
             raw["absentee_owner"] = True
+    if sale_price and sale_date_dt:
+        # Written where enrichment_last_sale.py / enrichment_gis_attrs.py's
+        # existing consumers already look (raw['gis']['last_sale']), not a
+        # new key -- real comps/equity data this delinquent roll carries that
+        # nothing in the engine previously read.
+        raw["gis"] = {"last_sale": {
+            "amount": sale_price,
+            "date": sale_date_dt.date().isoformat(),
+            "source": "pickens_delinquent_roll",
+        }}
     # Three or more separate delinquency publications is not an oversight, and that is already
     # recorded as raw['pickens_delinquent']['chronic']. It used to ALSO set raw['distressed'] =
     # True, which the scorer read as PROPERTY (physical) distress, so one delinquency record made
@@ -488,6 +560,13 @@ def build_listing(pin: str, rows: list[Row], now: datetime | None = None) -> Lis
         # raw['pickens_delinquent']['amount_owed'] (normalized to raw['tax_owed']
         # by enrichment_tax_owed). Putting it in tax_value/assessed_value would
         # make calc.py price a house off a $300 tax bill.
+        #
+        # assessed_value below is a DIFFERENT field (ACTUALVAL, the county's own
+        # assessed value, dqnt_2022/2023 only — real and nonzero on ~30% of
+        # rows, live-verified 2026-10-04) and belongs here; it was fetched and
+        # then silently dropped before this fix.
+        assessed_value=assessed_val,
+        zoning=zoning_desc,
         foreclosure_process="tax",
         description=desc,
         first_seen=now,

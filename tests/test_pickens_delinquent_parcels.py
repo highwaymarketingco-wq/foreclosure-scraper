@@ -242,6 +242,62 @@ def test_listing_shape():
     assert len(d["publications"]) >= d["cycle_count"]
 
 
+def test_assessed_value_sale_price_and_zoning_are_captured():
+    """2026-10-04 extraction-completeness fix.
+
+    Live schema/data check found ACTUALVAL (assessed value, real on 246/834
+    dqnt_2022 rows and 123/362 dqnt_2023 rows; 2024 dropped the column
+    entirely), SALEP/SALEDT (last recorded sale amount/date, real on all
+    three dqnt_* rolls, e.g. PIN 4054-15-53-7539 sold $6,262,000 on
+    2006-06-07 per dqnt_2023), and ZONINGDESC (dqnt_2023 only, e.g. "Cp 2
+    Community Bus Dist") were all fetched by ``out_fields`` once wired into
+    the per-layer column map but never read in ``build_listing`` before this
+    fix — this is the dedicated test for that wiring.
+    """
+    layer = mod.LAYERS[3]  # dqnt_2023
+    assert layer.service == "dqnt_2023"
+    feat = {
+        "attributes": {
+            "PIN": "4054-15-53-7539",
+            "NAME1": "SOME OWNER",
+            "ACTUALVAL": 5376700,
+            "SALEP": 6262000,
+            "SALEDT": 1149638400000,  # 2006-06-07
+            "ZONINGDESC": "Cp 2 Community Bus Dist",
+            "LOCADD": "123 MAIN ST",
+        },
+        "geometry": None,
+    }
+    pin, row = mod.parse_feature(feat, layer)
+    assert pin == "4054-15-53-7539"
+    assert row.assessed_val == 5376700
+    assert row.sale_price == 6262000
+    assert row.sale_date is not None and row.sale_date.date().isoformat() == "2006-06-07"
+    assert row.zoning_desc == "Cp 2 Community Bus Dist"
+
+    li = mod.build_listing(pin, [row])
+    assert li is not None
+    assert li.assessed_value == 5376700
+    assert li.zoning == "Cp 2 Community Bus Dist"
+    assert li.raw["gis"]["last_sale"] == {
+        "amount": 6262000, "date": "2006-06-07", "source": "pickens_delinquent_roll",
+    }
+    # the delinquent-balance field stays completely separate (see
+    # test_delinquent_balance_never_lands_in_a_property_value_field).
+    assert li.tax_value is None
+    assert li.market_value is None
+
+
+def test_dqnt_2024_has_no_actualval_column():
+    """The county dropped ACTUALVAL for the 2024 roll (field absent from the
+    service's own live schema, not just blank) — assert the layer map does not
+    request a column that 400s the query."""
+    layer = next(L for L in mod.LAYERS if L.service == "dqnt_2024")
+    assert layer.assessed_val is None
+    assert "ACTUALVAL" not in layer.out_fields
+    assert "SALEP" in layer.out_fields and "SALEDT" in layer.out_fields
+
+
 def test_parcel_is_the_join_key_onto_the_rest_of_the_board():
     for li in _run():
         assert li.dedupe_key() == f"parcel:SC:pickens:{li.parcel_id.replace('-', '').lower()}"
