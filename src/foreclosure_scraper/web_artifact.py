@@ -2246,6 +2246,13 @@ RAW_KEEP = {
     "hud_property_id": "*", "reo_id": "*", "trulia_id": "*",
     "usda_property_id": "*", "vrm_id": "*", "xome_listing_id": "*",
     "zpid": "*",
+    # reo.vrm_va_reo: beds/baths/sqft/list_price were flat, unregistered
+    # RAW_KEEP keys (only vrm_id/images above survived) -- found 2026-10-04,
+    # final extraction-completeness batch, a 9th+ instance of this exact
+    # bug class this session. Namespaced here along with the per-row
+    # detail-page fields (mls_id/status/stories/hoa/property_type/agent_*)
+    # this same batch added.
+    "vrm_va_reo": "*",
 
     # per-source provenance: the parsed cells, case numbers and notice URLs behind
     # each lead, which is what an operator opens a row to check
