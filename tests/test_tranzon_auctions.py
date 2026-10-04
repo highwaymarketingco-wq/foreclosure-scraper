@@ -111,3 +111,96 @@ def test_end_to_end_fetch_wires_source_url_and_photo(monkeypatch):
     assert li.county == "Rutherford"
     assert li.source_url == "https://www.tranzon.com/rutherford26"
     assert li.raw["images"]["real"] == ["https://www.tranzon.com/propertyimagesmedium/999_111.jpg"]
+
+
+# --- FOUND 2026-10-04 (HERMES extraction-completeness audit, national ------
+# --- batch 5): detail-page gallery + agent contact + narrative description
+
+# Fragment matching the REAL detail-page shape confirmed live on /dg26040 --
+# full photo gallery under /propertyimages/ (distinct from the search page's
+# /propertyimagesmedium/ thumbnail), agent name/phone/email, and a narrative
+# description block distinguishable from the title/agent-card wrapper and
+# the Terms & Conditions boilerplate (both also ".edescription").
+_DETAIL_HTML = """
+<html><body>
+<section class="edescription edescription-column">
+  <h2>Contact Agent</h2>
+  <p id="ContentPlaceHolder1_cname">Anna Spencer, AARE<br/>Tranzon Driggers</p>
+  <span class="edescription_tel">352-400-3233</span>
+  <a href="mailto:aspencer@tranzon.com" id="ContentPlaceHolder1_cemail" class="edescription_email">aspencer@tranzon.com</a>
+</section>
+<section class="edescription">
+  2BR/2BA Block Home on 0.29± Acres, Beverly Hills, FL. This 2-bedroom,
+  2-bathroom home sits on a corner lot with an attached 2-car garage.
+</section>
+<section class="edescription">
+  The following summary of Terms & Conditions of Auction Sale is only
+  intended to provide a brief outline. Contact Agent for details.
+</section>
+<img src="https://www.tranzon.com/propertyimages/182693_18245.jpg">
+<img src="https://www.tranzon.com/propertyimages/182694_18245.jpg">
+<img src="https://www.tranzon.com/propertyimagesmedium/182693_18245.jpg">
+</body></html>
+""" + "x" * 2000
+
+
+def test_fetch_detail_extracts_full_gallery_and_agent_contact(monkeypatch):
+    async def fake_get_text(url, headers=None, timeout=20.0, impersonate=True):
+        return _DETAIL_HTML
+
+    monkeypatch.setattr(mod, "get_text", fake_get_text)
+    out = asyncio.run(mod._fetch_detail("https://www.tranzon.com/dg26040"))
+    # The full /propertyimages/ gallery, NOT the /propertyimagesmedium/
+    # thumbnail (a different path on the same page).
+    assert out["photos"] == [
+        "https://www.tranzon.com/propertyimages/182693_18245.jpg",
+        "https://www.tranzon.com/propertyimages/182694_18245.jpg",
+    ]
+    assert out["agent_name"] == "Anna Spencer, AARE Tranzon Driggers"
+    assert out["agent_phone"] == "352-400-3233"
+    assert out["agent_email"] == "aspencer@tranzon.com"
+
+
+def test_fetch_detail_narrative_description_excludes_boilerplate(monkeypatch):
+    async def fake_get_text(url, headers=None, timeout=20.0, impersonate=True):
+        return _DETAIL_HTML
+
+    monkeypatch.setattr(mod, "get_text", fake_get_text)
+    out = asyncio.run(mod._fetch_detail("https://www.tranzon.com/dg26040"))
+    desc = out.get("description_full", "")
+    assert "2-car garage" in desc
+    assert "Terms & Conditions" not in desc
+    assert "Contact Agent" not in desc
+
+
+def test_detail_fetch_failure_is_swallowed_not_raised(monkeypatch):
+    """Best-effort enrichment: a detail-page fetch error must not crash the
+    whole run -- callers get {} and keep the base row."""
+    async def failing_get_text(url, headers=None, timeout=20.0, impersonate=True):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(mod, "get_text", failing_get_text)
+    out = asyncio.run(mod._fetch_detail("https://www.tranzon.com/dg26040"))
+    assert out == {}
+
+
+def test_end_to_end_fetch_wires_detail_enrichment(monkeypatch):
+    """Full fetch() path: the search page AND the per-row detail page are
+    both fetched; the detail page's richer gallery/description win over the
+    search page's single thumbnail/title-only description."""
+    async def fake_get_text(url, headers=None, timeout=30.0, impersonate=True):
+        if url == "https://www.tranzon.com/rutherford26":
+            return _DETAIL_HTML
+        return _FULL_PAGE_HTML
+
+    monkeypatch.setattr(mod, "get_text", fake_get_text)
+    out = asyncio.run(mod._fetch_tranzon())
+
+    assert len(out) == 1
+    li = out[0]
+    assert li.raw["images"]["real"] == [
+        "https://www.tranzon.com/propertyimages/182693_18245.jpg",
+        "https://www.tranzon.com/propertyimages/182694_18245.jpg",
+    ]
+    assert li.raw["tranzon"]["agent_phone"] == "352-400-3233"
+    assert "2-car garage" in li.description

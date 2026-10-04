@@ -10,6 +10,20 @@ in span elements using the pattern:
 We parse page 1 (which shows all current auctions — typically 10-15)
 and filter for NC + SC properties. Tranzon has a small inventory but
 high-value auction leads (sheriff sales, estate sales, bank-owned).
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, national batch 5):
+each property's OWN detail page (e.g. /dg26040, already captured as
+source_url since the 2026-10-01 fix but never fetched) carries, all free
+via plain curl-cffi impersonation, no login: the FULL photo gallery at
+/propertyimages/{id}_{set}.jpg (confirmed live: 25 real photos on a sampled
+listing vs. the single /propertyimagesmedium/ thumbnail the search page's
+own row carries), the listing agent's real name/phone/email (a HERMES sec 9
+contactability signal), and a full narrative property description
+(beds/baths/sqft/garage/lot — the search page carries only a bare address +
+auction date). A "Property Information Package" download exists but is
+gated behind a JS-bound control with no plain href in the server HTML — a
+real wall, not fetched. Wired as a best-effort per-row detail fetch; see
+`_fetch_detail()`.
 """
 from __future__ import annotations
 
@@ -102,6 +116,72 @@ def _county_for(city: str | None, state: str) -> str | None:
         return upstate_county_for(city, state)
     except Exception:  # noqa: BLE001
         return None
+
+
+# FOUND 2026-10-04 (HERMES extraction-completeness audit, national batch 5):
+# live-fetched a real detail page (/dg26040) and confirmed it carries, all
+# free, no login, no JS required (plain curl-cffi impersonation, same as the
+# search page): the FULL photo gallery at /propertyimages/{id}_{set}.jpg (25
+# real photos on the sampled listing vs. the single /propertyimagesmedium/
+# thumbnail the search page's own row captures), the listing agent's real
+# name/phone/email (a HERMES sec 9 contactability signal -- "Anna Spencer,
+# AARE", "352-400-3233", "aspencer@tranzon.com"), and a full narrative
+# property description (beds/baths/sqft/garage/lot, truncated to a bare
+# title on the search page). A "Property Information Package" download is
+# gated behind a JS-bound "#spvault" control with no plain href in the
+# server HTML -- a real wall, not fetched. Wired as a best-effort per-row
+# fetch; this site's entire live inventory is ~12 properties site-wide
+# (0-few ever match NC/SC), so no cap is needed.
+async def _fetch_detail(detail_url: str) -> dict:
+    """Best-effort enrichment from a tranzon.com property detail page.
+    Returns {} on any failure -- callers must treat this as optional."""
+    out: dict = {}
+    try:
+        html = await get_text(detail_url, headers=HEADERS, timeout=20.0, impersonate=True)
+    except Exception as exc:
+        log.warning("tranzon.detail_fetch_fail", url=detail_url, error=str(exc)[:160])
+        return out
+    if not html or len(html) < 2000:
+        return out
+    try:
+        tree = HTMLParser(html)
+        photos = []
+        for img in tree.css('img[src*="/propertyimages/"]'):
+            src = (img.attributes.get("src") or "").strip()
+            if src and src not in photos:
+                photos.append(src if src.startswith("http") else f"https://www.tranzon.com{src}")
+        if photos:
+            out["photos"] = photos
+        name_el = tree.css_first("#ContentPlaceHolder1_cname")
+        if name_el is not None:
+            name = re.sub(r"\s+", " ", name_el.text(separator=" ", strip=True)).strip()
+            if name:
+                out["agent_name"] = name
+        tel_el = tree.css_first(".edescription_tel")
+        if tel_el is not None:
+            tel = re.sub(r"\s+", " ", tel_el.text(strip=True)).strip()
+            if tel:
+                out["agent_phone"] = tel
+        email_el = tree.css_first("#ContentPlaceHolder1_cemail")
+        if email_el is not None:
+            email = email_el.text(strip=True)
+            if email and "@" in email:
+                out["agent_email"] = email
+        # The narrative description is a THIRD ".edescription" block (the
+        # first is the title/location/agent-card wrapper, the last is the
+        # Terms & Conditions boilerplate) -- picked by excluding those two
+        # known shapes rather than by a fragile fixed index.
+        for el in tree.css(".edescription"):
+            txt = el.text(separator=" ", strip=True)
+            if "Terms & Conditions" in txt or "Contact Agent" in txt:
+                continue
+            txt = re.sub(r"\s+", " ", txt).strip()
+            if len(txt) > 40:
+                out["description_full"] = txt[:2000]
+                break
+    except Exception as exc:  # noqa: BLE001
+        log.warning("tranzon.detail_parse_fail", url=detail_url, error=str(exc)[:160])
+    return out
 
 
 async def _fetch_tranzon() -> list[Listing]:
@@ -206,6 +286,16 @@ async def _fetch_tranzon() -> list[Listing]:
         photo = img_map.get(idx)
         detail_url = detail_map.get(idx) or AUCTION_URL
 
+        # FOUND 2026-10-04 (batch 5, see module docstring): the detail page
+        # carries a full photo gallery + agent contact + a real narrative
+        # description, all free -- best-effort fetch (this site's entire
+        # live inventory is tiny, so no per-run cap is needed).
+        detail: dict = {}
+        if detail_url != AUCTION_URL:
+            detail = await _fetch_detail(detail_url)
+        photos = detail.get("photos") or ([photo] if photo else [])
+        description = detail.get("description_full") or " — ".join(desc_parts)
+
         out.append(
             Listing(
                 source="national.tranzon",
@@ -217,7 +307,7 @@ async def _fetch_tranzon() -> list[Listing]:
                 street_address=street,
                 city=city,
                 zip_code=zip_code,
-                description=" — ".join(desc_parts),
+                description=description,
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),
                 raw={
@@ -225,8 +315,11 @@ async def _fetch_tranzon() -> list[Listing]:
                         "auction_date": auction_dt.isoformat() if auction_dt else None,
                         "raw_address": raw_addr,
                         "raw_date": raw_date,
+                        "agent_name": detail.get("agent_name"),
+                        "agent_phone": detail.get("agent_phone"),
+                        "agent_email": detail.get("agent_email"),
                     },
-                    "images": {"real": [photo]} if photo else {},
+                    "images": {"real": photos} if photos else {},
                 },
             )
         )
