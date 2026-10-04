@@ -197,6 +197,20 @@ def parse_wac_cells(wac_html: str, source_url: str = WP_PAGE_URL) -> list[Listin
                 except ValueError:
                     bid = None
 
+        # 2026-10-04 (extraction-completeness audit, batch 13): "Case Status"
+        # is a real column -- mapped into colmap via _COL_ALIASES since
+        # 2026-08 -- but its VALUE was never read anywhere; every row's
+        # status was parsed then thrown away. Live-rendered both the NC and
+        # SC sheets today: every current row on both reads "FORECLOSURE" (no
+        # observed diversity), which reads as a CASE-TYPE label, not a sale
+        # outcome ("postponed"/"cancelled"/"sold") -- so it is captured here
+        # as provenance in raw, not mapped onto auction_status (that field's
+        # existing semantics on this model are sale-outcome, and "foreclosure"
+        # would be a misleading value there). If the firm's sheet ever starts
+        # using this column to flag a cancelled/postponed sale, the value is
+        # now visible without another code change.
+        case_status = _f(cell(r, "case_status"))
+
         out.append(
             Listing(
                 source="law_firms.alaw",
@@ -216,6 +230,7 @@ def parse_wac_cells(wac_html: str, source_url: str = WP_PAGE_URL) -> list[Listin
                 description=f"ALAW trustee sale — file {file_no or '?'}",
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),
+                raw={"alaw": {"file_number": file_no, "case_status": case_status}},
             )
         )
     return out

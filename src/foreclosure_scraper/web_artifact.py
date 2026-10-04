@@ -2222,7 +2222,7 @@ RAW_KEEP = {
 
     # per-source provenance: the parsed cells, case numbers and notice URLs behind
     # each lead, which is what an operator opens a row to check
-    "aiken_delinquent_tax": "*", "aldridge_pite": "*", "anderson_sheriff": "*", "arcgis_distress": "*",
+    "aiken_delinquent_tax": "*", "alaw": "*", "aldridge_pite": "*", "anderson_sheriff": "*", "arcgis_distress": "*",
     "asheville_min_housing": "*", "auction_bank_reo": "*", "auction_dot_com": "*",
     "bamberg_sheriff": "*", "barnwell_sheriff": "*", "brunswick_legal_notices": "*",
     "buncombe_tax": "*", "buncombe_tax_fcl": "*", "charleston_delinquent_tax": "*", "charleston_mie": "*",

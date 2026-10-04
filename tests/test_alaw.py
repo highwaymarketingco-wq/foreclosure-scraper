@@ -75,6 +75,20 @@ def test_sale_date_and_bid_parsed():
     assert next(r for r in rows if r.county == "Cleveland").opening_bid is None
 
 
+def test_case_status_column_is_captured_in_raw():
+    """2026-10-04 (extraction-completeness audit, batch 13): "Case Status"
+    was already mapped into colmap via _COL_ALIASES but its value was never
+    read anywhere -- confirmed live on both the NC and SC sheets the column
+    is real and currently reads "FORECLOSURE" on every row. Captured into
+    raw['alaw']['case_status'] (registered in web_artifact.RAW_KEEP) rather
+    than onto auction_status, since this model's auction_status semantics
+    are sale-OUTCOME (active/postponed/cancelled), not case-type."""
+    rows = _rows()
+    cat = next(r for r in rows if r.county == "Catawba")
+    assert cat.raw["alaw"]["case_status"] == "FORECLOSURE"
+    assert cat.raw["alaw"]["file_number"] == "25-000950"
+
+
 def test_empty_or_garbage_capture_returns_empty():
     assert parse_wac_cells("", "u") == []
     assert parse_wac_cells("no cell objects here at all", "u") == []
