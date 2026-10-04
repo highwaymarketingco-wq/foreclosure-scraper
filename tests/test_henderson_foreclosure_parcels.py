@@ -126,6 +126,76 @@ def test_raw_records_the_filter_provenance():
 
 
 # --------------------------------------------------------------------------- #
+# extraction-completeness audit 2026-10-03: legal desc / deed+plat ref / sale
+# --------------------------------------------------------------------------- #
+
+_LAYER = agw.MapLayer(title="Foreclosure Parcels Henderson County NC",
+                      url="https://gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0")
+
+# Shape mirrors a real live row (captured 2026-10-03, PIN/owner unchanged from
+# the public roster at the time): a real deed reference + a priced land sale +
+# a CCHS viewer link on both DEED_URL and PLAT_URL.
+_ATTRS_FULL = {
+    "PIN": "0601970510", "REID": "9970187", "PROPERTY_OWNER": "JONES, PATRICIA A. TRUSTEE",
+    "LOCATION_ADDR": "US64 ON", "PHYADDR_CITY": "HENDERSONVILLE", "PHYADDR_ZIP": "28792",
+    "TOTAL_PROP_VALUE": 12000.0, "ACREAGE": 0.5, "HEATED_AREA": 0, "LAND_CLASS": "VACANT",
+    "Centroid_Latitude": 35.3, "Centroid_Longitude": -82.5,
+    "OWNER_MAIL_1": "123 MAIN ST", "OWNER_MAIL_CITY": "HENDERSONVILLE", "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28792",
+    "PROPERTY_DESCR": "US64 ON",
+    "DEED_BOOK": "001541", "DEED_PAGE": "00445", "DEED_DATE": 1374638460000,
+    "PLAT_BOOK": None, "PLAT_PAGE": None,
+    "DEED_URL": ("https://us4.courthousecomputersystems.com/hendersonncnw/application.asp"
+                 "?cmd=image_link&image_link_book=1541&image_link_page=445"),
+    "PLAT_URL": "https://www.hendersoncountync.gov/rd/page/deed-or-plat-not-available",
+    "LAND_SALE_DATE": 1374639060000, "LAND_SALE_PRICE": 185000.0,
+    "PKG_SALE_DATE": None, "PKG_SALE_PRICE": None,
+}
+
+# A $0 LAND_SALE_PRICE means no arms-length sale (inheritance / correction
+# deed) -- must not be surfaced as a priced sale.
+_ATTRS_ZERO_SALE = {**_ATTRS_FULL, "PIN": "0601975215",
+                    "LAND_SALE_DATE": 1374639060000, "LAND_SALE_PRICE": 0.0}
+
+
+def test_legal_description_is_wired():
+    li = mod.build_listing(SRC, _LAYER, _ATTRS_FULL)
+    assert li.legal_description == "US64 ON"
+
+
+def test_deed_and_plat_reference_captured_as_metadata():
+    tf = mod.build_listing(SRC, _LAYER, _ATTRS_FULL).raw["tax_foreclosure"]
+    assert tf["deed_book"] == "001541" and tf["deed_page"] == "00445"
+    assert tf["deed_date"] == "2013-07-24T04:01:00"
+
+
+def test_deed_url_kept_as_reference_only_not_in_documents():
+    """Must NOT go through stamp_documents()/OCR -- it's a Cloudflare-fronted,
+    robots-disallowed CCHS viewer shell, not a direct document byte stream."""
+    li = mod.build_listing(SRC, _LAYER, _ATTRS_FULL)
+    assert li.raw["tax_foreclosure"]["deed_url"].startswith(
+        "https://us4.courthousecomputersystems.com/")
+    assert "documents" not in li.raw
+    assert "document_url" not in li.raw
+
+
+def test_plat_url_not_available_placeholder_is_dropped():
+    assert mod.build_listing(SRC, _LAYER, _ATTRS_FULL).raw["tax_foreclosure"]["plat_url"] is None
+
+
+def test_priced_land_sale_surfaces_into_raw_gis_last_sale():
+    li = mod.build_listing(SRC, _LAYER, _ATTRS_FULL)
+    assert li.raw["gis"]["last_sale"] == {
+        "date": "2013-07-24T04:11:00", "amount": 185000.0, "source": "henderson_county_gis",
+    }
+
+
+def test_zero_price_sale_is_not_surfaced_as_a_free_property():
+    li = mod.build_listing(SRC, _LAYER, _ATTRS_ZERO_SALE)
+    assert "gis" not in li.raw
+
+
+# --------------------------------------------------------------------------- #
 # estate / heir signal
 # --------------------------------------------------------------------------- #
 
