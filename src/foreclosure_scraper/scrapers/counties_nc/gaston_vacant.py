@@ -10,6 +10,34 @@ name-resolution needed.
 
 Free, anonymous, compliant (public ArcGIS MapServer, no auth/captcha). ~21,288 vacant parcels
 of ~117k total, paginated. Gate with FORECLOSURE_GASTON_VACANT=0 to skip.
+
+FIXED 2026-10-03 (extraction-completeness audit, batch 4): the layer's own field list
+(``MapServer/11?f=json``) carries six more real, high-value fields this scraper's ``_OUT``
+never requested, so they were dropped for free -- no extra request, they ride along in the
+SAME bulk query:
+  - ``ImagePath`` -- populated on 58.6% of a live 2,000-row sample (NOT a public URL -- it's
+    an internal UNC share path, "\\\\GCSQL-DVNT25\\DEVNET\\Images\\ASRIMG\\2019\\984056.JPG").
+    Live-confirmed the county's own DevNet Wedge parcel page
+    (gastonnc.devnetwedge.com/parcel/view/{PID}/{year}) renders that SAME file from a public
+    HTTP path, "/PropertyImages/ASRIMG/2019/984056.JPG" -- i.e. everything in the UNC path
+    from "Images\\" onward, backslashes flipped to slashes, served off
+    https://gastonnc.devnetwedge.com/PropertyImages/. Verified live on 4 independent samples
+    (all 200 image/jpeg, up to 2.1MB) -- real assessor-card property photos, not placeholders.
+    Wired into ``raw["images"]["real"]`` (asheville_helene.py's own convention) with zero
+    extra requests.
+  - ``LEGDESC_1`` -- 100% filled in the same sample, a real legal description (e.g. "WELDON
+    HEIGHTS BLK C L 19..."); wired to ``Listing.legal_description`` (was blank on every row).
+  - ``DEED_BOOK``/``DEED_PAGE`` -- 100% filled; a real recorded-deed reference. Combined with
+    the SALEDATE/SALESAMT this module ALREADY fetches (but only stashed under the private
+    ``raw.gaston_gis`` key nothing downstream reads), now also wired into the canonical
+    ``raw["gis"]["last_sale"]`` shape (same convention as batch 2's Pickens fix and batch 3's
+    Buncombe-elderly fix) so ``enrichment_last_sale.py`` actually surfaces it.
+  - ``DEEDTYPE`` -- 98.9% filled (QCD/NWD/etc code); a quitclaim/non-warranty deed is itself a
+    distress signal (heir transfer, foreclosure-adjacent conveyance), kept alongside the deed
+    reference.
+  - ``CURR_NAME2``/``CURR_ADDR2`` -- co-owner name (21.1% filled) and mailing-address line 2
+    (15.8% filled); only NAME1/ADDR1 were captured, dropping the second owner on joint-owned
+    parcels -- a contactability miss (HERMES Section 9's #1 ceiling).
 """
 from __future__ import annotations
 
@@ -28,11 +56,31 @@ QUERY_URL = (
 _WHERE = "VacantImpro='Vacant'"
 _OUT = (
     "PIN,PID,WHOLE_ADDRESS,PHYSSTRADD,POSTAL,STATE,ZIP,"
-    "JAN1_NAME1,JAN1_NAME2,CURR_NAME1,CURR_ADDR1,CURR_CITY,CURR_STATE,CURR_ZIPCODE,"
+    "JAN1_NAME1,JAN1_NAME2,CURR_NAME1,CURR_NAME2,CURR_ADDR1,CURR_ADDR2,CURR_CITY,"
+    "CURR_STATE,CURR_ZIPCODE,"
     "Latitude,Longitude,FMV_TOTAL,FMV_LAND,FMV_IMPRV,TOTVAL,"
-    "SALEDATE,SALESAMT,SQFT,YEARBLT,property_use,DESC1_DESC,VacantImpro,CALCAC,DEEDAC"
+    "SALEDATE,SALESAMT,SQFT,YEARBLT,property_use,DESC1_DESC,VacantImpro,CALCAC,DEEDAC,"
+    "ImagePath,LEGDESC_1,DEED_BOOK,DEED_PAGE,DEEDTYPE"
 )
 _PAGE = 2000
+# The county's GIS ImagePath is an internal UNC share path
+# ("\\GCSQL-DVNT25\DEVNET\Images\ASRIMG\2019\984056.JPG"); the live DevNet Wedge parcel
+# page serves the SAME file publicly at this base + everything after "Images\" (slashes
+# flipped). Verified live 2026-10-03 on 4 independent samples.
+_DEVNET_IMAGE_BASE = "https://gastonnc.devnetwedge.com/PropertyImages/"
+
+
+def _image_url(image_path: str | None) -> str | None:
+    """Convert a Gaston GIS UNC ImagePath to its public DevNet Wedge photo URL."""
+    if not image_path:
+        return None
+    p = image_path.strip().replace("\\", "/")
+    marker = "Images/"
+    idx = p.rfind(marker)
+    if idx == -1:
+        return None
+    rel = p[idx + len(marker):].strip("/")
+    return f"{_DEVNET_IMAGE_BASE}{rel}" if rel else None
 
 
 def _f(v) -> float | None:
@@ -124,6 +172,56 @@ class GastonVacant(BaseScraper):
                     if owner and owner2:
                         owner = f"{owner} & {owner2}"
                     last_sale_dt = _epoch_ms_to_dt(a.get("SALEDATE"))
+                    last_sale_amt = _f(a.get("SALESAMT"))
+                    legal_desc = _s(a.get("LEGDESC_1"))
+                    photo_url = _image_url(_s(a.get("ImagePath")))
+                    raw_payload: dict = {"gaston_gis": {
+                        "signal": "vacant_parcel",
+                        "life_event": "vacant_land",
+                        "VacantImpro": _s(a.get("VacantImpro")),
+                        "DESC1_DESC": _s(a.get("DESC1_DESC")),
+                        "property_use": _s(a.get("property_use")),
+                        "PIN": pin,
+                        "PID": pid,
+                        "FMV_TOTAL": _f(a.get("FMV_TOTAL")),
+                        "FMV_LAND": _f(a.get("FMV_LAND")),
+                        "FMV_IMPRV": _f(a.get("FMV_IMPRV")),
+                        "SALESAMT": last_sale_amt,
+                        # NOT the Listing's own sale_date: SALEDATE is the county's last
+                        # recorded TRANSACTION date (when the current owner acquired the
+                        # parcel), not a scheduled foreclosure auction. This source is a
+                        # STANDING vacant-land distress signal with no scheduled event (it's
+                        # in main.py's DATELESS_OK_SOURCES for exactly that reason) -- setting
+                        # it as Listing.sale_date made _active_only() drop every row as a
+                        # "sale more than 14 days in the past" even though the whitelist entry
+                        # existed, since that check only applies when sale_date is None.
+                        # Found 2026-09-15: this bug was why 21,299 real, live rows never
+                        # reached the board despite the scraper working correctly.
+                        "last_sale_date": last_sale_dt.isoformat() if last_sale_dt else None,
+                        "deed_book": _s(a.get("DEED_BOOK")),
+                        "deed_page": _s(a.get("DEED_PAGE")),
+                        "deed_type": _s(a.get("DEEDTYPE")),
+                        "legal_description": legal_desc,
+                        "owner_mailing": {
+                            "name": _s(a.get("CURR_NAME1")),
+                            "name2": _s(a.get("CURR_NAME2")),
+                            "addr": _s(a.get("CURR_ADDR1")),
+                            "addr2": _s(a.get("CURR_ADDR2")),
+                            "city": _s(a.get("CURR_CITY")),
+                            "state": _s(a.get("CURR_STATE")),
+                            "zip": _s(a.get("CURR_ZIPCODE")),
+                        },
+                    }}
+                    # Canonical shape enrichment_last_sale.py actually reads -- the SAME
+                    # SALEDATE/SALESAMT above, just also surfaced where the enricher looks.
+                    if last_sale_dt and last_sale_amt:
+                        raw_payload["gis"] = {"last_sale": {
+                            "date": last_sale_dt.isoformat(),
+                            "amount": last_sale_amt,
+                            "source": "gaston_gis",
+                        }}
+                    if photo_url:
+                        raw_payload["images"] = {"real": [photo_url]}
                     out.append(Listing(
                         source=self.slug,
                         source_url=(
@@ -148,6 +246,7 @@ class GastonVacant(BaseScraper):
                         year_built=_i(a.get("YEARBLT")),
                         acreage=_f(a.get("CALCAC")) or _f(a.get("DEEDAC")),
                         land_use=_s(a.get("property_use")),
+                        legal_description=legal_desc,
                         description=(
                             "Vacant parcel (no improvements on record) per county GIS "
                             "VacantImpro flag — absentee / holding-cost distress signal; "
@@ -155,37 +254,7 @@ class GastonVacant(BaseScraper):
                         ),
                         first_seen=now,
                         last_seen=now,
-                        raw={"gaston_gis": {
-                            "signal": "vacant_parcel",
-                            "life_event": "vacant_land",
-                            "VacantImpro": _s(a.get("VacantImpro")),
-                            "DESC1_DESC": _s(a.get("DESC1_DESC")),
-                            "property_use": _s(a.get("property_use")),
-                            "PIN": pin,
-                            "PID": pid,
-                            "FMV_TOTAL": _f(a.get("FMV_TOTAL")),
-                            "FMV_LAND": _f(a.get("FMV_LAND")),
-                            "FMV_IMPRV": _f(a.get("FMV_IMPRV")),
-                            "SALESAMT": _f(a.get("SALESAMT")),
-                            # NOT the Listing's own sale_date: SALEDATE is the county's last
-                            # recorded TRANSACTION date (when the current owner acquired the
-                            # parcel), not a scheduled foreclosure auction. This source is a
-                            # STANDING vacant-land distress signal with no scheduled event (it's
-                            # in main.py's DATELESS_OK_SOURCES for exactly that reason) -- setting
-                            # it as Listing.sale_date made _active_only() drop every row as a
-                            # "sale more than 14 days in the past" even though the whitelist entry
-                            # existed, since that check only applies when sale_date is None.
-                            # Found 2026-09-15: this bug was why 21,299 real, live rows never
-                            # reached the board despite the scraper working correctly.
-                            "last_sale_date": last_sale_dt.isoformat() if last_sale_dt else None,
-                            "owner_mailing": {
-                                "name": _s(a.get("CURR_NAME1")),
-                                "addr": _s(a.get("CURR_ADDR1")),
-                                "city": _s(a.get("CURR_CITY")),
-                                "state": _s(a.get("CURR_STATE")),
-                                "zip": _s(a.get("CURR_ZIPCODE")),
-                            },
-                        }},
+                        raw=raw_payload,
                     ))
                 offset += len(feats)
                 if len(feats) < _PAGE:
