@@ -24,6 +24,15 @@ from ...models import Listing, ListingType, PropertyKind
 # description, same as every other law_firms.* scraper.
 CASE_NO_RE = re.compile(r"^\d{2}SP\d{5,7}-\d{2,4}$")
 
+# When "Bid" is a status word instead of a dollar amount, the sale was not
+# held as originally scheduled. Live-verified 2026-10-04: a "Postponed" row
+# carries its NEW sale date/time in Notes (e.g. "11/12/2026 at 11:30 AM")
+# instead of a case number or free text -- the original Sale Date column
+# still shows the OLD, superseded date. Without this, a postponed sale ships
+# with a stale sale_date and no indication the listed date already passed.
+_STATUS_RE = re.compile(r"postpon|cancel|withdraw", re.I)
+_STATUS_MAP = {"postpon": "postponed", "cancel": "cancelled", "withdraw": "withdrawn"}
+
 CSV_URL = (
     "https://docs.google.com/spreadsheets/d/e/"
     "2PACX-1vSIUFqSQg76o_XFa1uQePxCuubohTs9JG4ptdzpR7dqTZj1JwkjracxTF9IPqqPExAADyxzuWS8teaD"
@@ -76,14 +85,30 @@ class BellCarrington(BaseScraper):
                 continue  # require valid date
 
             bid = None
+            auction_status = None
             bm = re.search(r"\$?\s*([\d,]+(?:\.\d{2})?)", bid_raw)
             if bm:
                 try:
                     bid = float(bm.group(1).replace(",", ""))
                 except ValueError:
                     pass
+            else:
+                sm = _STATUS_RE.search(bid_raw)
+                if sm:
+                    auction_status = _STATUS_MAP[sm.group(0).lower()]
 
             case_number = notes if (notes and CASE_NO_RE.match(notes)) else None
+
+            # A postponed sale's Notes column is the new sale date/time, not
+            # a case number or free text -- prefer it as the effective
+            # sale_date over the now-superseded original Sale Date value.
+            if auction_status == "postponed" and notes and not case_number:
+                try:
+                    new_date = dateparser.parse(notes, fuzzy=True)
+                except (ValueError, TypeError):
+                    new_date = None
+                if new_date:
+                    sale_date = new_date
 
             out.append(
                 Listing(
@@ -98,6 +123,7 @@ class BellCarrington(BaseScraper):
                     county=county or None,
                     sale_date=sale_date,
                     opening_bid=bid,
+                    auction_status=auction_status,
                     case_number=case_number,
                     trustee="Bell Carrington Price & Gregg",
                     description=None if case_number else (notes[:300] or None),
