@@ -24,6 +24,11 @@ class RodDoc:
     instrument_no: str | None = None
     parcel_id: str | None = None
     notes: str | None = None
+    # Property's own situs street address, when the vendor's index exposes one
+    # directly (Cott RecordRoom's "Property" block does, keyed off the same
+    # data-propertyid div as parcel_id -- see rod/cott_recordroom.py). Distinct
+    # from grantor/grantee NAME addresses (mailing), which stay in raw.
+    property_address: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:

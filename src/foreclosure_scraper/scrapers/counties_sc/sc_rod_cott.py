@@ -20,7 +20,12 @@ def _classify(doc_type: str) -> tuple[ListingType, str] | None:
     s = (doc_type or "").upper()
     if any(k in s for k in ("SAT", "REL", "TERM", "CANCEL")):
         return None
-    if any(k in s for k in ("DOD", "DIST", "DIS STMT", "DEATH", "DECEAS", "ESTATE")):
+    # "DIS STMT" removed 2026-10-04 (extraction-completeness audit, batch 13) --
+    # see the matching, more detailed comment in rod/cott_recordroom.py._DISTRESS.
+    # Live-verified: every "DIS STMT" row Union actually records is a
+    # "HOMEOWNERS DISCLOSURE STATEMENT" (a building-safety filing), never an
+    # estate distribution statement; this token was a 100% false-positive match.
+    if any(k in s for k in ("DOD", "DIST", "DEATH", "DECEAS", "ESTATE")):
         return ListingType.PROBATE_NOTICE, "probate"
     if any(k in s for k in ("LIEN", "MECH", "JUDG", "EXECUTION")):
         return ListingType.TAX_LIEN, "lien"
@@ -33,10 +38,21 @@ def _to_listing(doc, slug: str, source_url: str) -> Listing | None:
         return None
     lt, kind = cls
     rec = doc.recorded_date.strftime("%Y-%m-%d") if doc.recorded_date else "unknown date"
-    raw: dict = {"rod": {"doc_type": doc.doc_type, "grantor": doc.grantor,
-                         "grantee": doc.grantee, "book": doc.book, "page": doc.page,
-                         "instrument": doc.instrument_no, "recorded": rec},
-                 "cott_rod": True}
+    rod_block: dict = {"doc_type": doc.doc_type, "grantor": doc.grantor,
+                       "grantee": doc.grantee, "book": doc.book, "page": doc.page,
+                       "instrument": doc.instrument_no, "recorded": rec}
+    # 2026-10-04 (batch 13): doc.raw['cott_recordroom'] now carries the grantee's
+    # own mailing address + a $ consideration when the vendor's Property/PartyTwo
+    # cells parsed one (rod/cott_recordroom.py) -- surfaced into raw['rod'] for
+    # provenance. See that module's own comment for why grantee_address is not
+    # bridged into raw['owner_mailing'] here.
+    extra = doc.raw.get("cott_recordroom") if isinstance(doc.raw, dict) else None
+    if isinstance(extra, dict):
+        if extra.get("grantee_address"):
+            rod_block["grantee_address"] = extra["grantee_address"]
+        if extra.get("consideration_amount") is not None:
+            rod_block["consideration_amount"] = extra["consideration_amount"]
+    raw: dict = {"rod": rod_block, "cott_rod": True}
     if kind == "probate":
         raw["relationship_signal"] = {"kind": "probate", "keyword": doc.doc_type,
                                       "tagged_at": datetime.utcnow().isoformat() + "Z"}
@@ -44,6 +60,13 @@ def _to_listing(doc, slug: str, source_url: str) -> Listing | None:
         source=slug, source_url=source_url,
         listing_type=lt, property_kind=PropertyKind.UNKNOWN,
         state=doc.state, county=doc.county,
+        # 2026-10-04 (batch 13): parcel_id + street_address recovered from the
+        # Cott RecordRoom "Property" cell's own structured Parcel #/Address --
+        # previously thrown away into one flattened notes soup (see
+        # rod/cott_recordroom.py). Matches the sibling sc_rod_acclaim.py, which
+        # already wires parcel_id the same way.
+        parcel_id=(doc.parcel_id or "").strip() or None,
+        street_address=(getattr(doc, "property_address", None) or "").strip() or None,
         defendant=(doc.grantor or "").strip() or None,
         case_number=(doc.instrument_no or "").strip() or None,
         legal_description=(doc.notes or "").strip() or None,
