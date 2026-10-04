@@ -2233,6 +2233,16 @@ RAW_KEEP = {
 
     # third-party listing / property identifiers, needed to re-find a lead upstream
     "fc_listing_id": "*", "govdeals_asset_id": "*", "homesteps_kind": "*",
+    # national.freddie_homesteps added homesteps_details/homesteps_img_kind_slug
+    # on 2026-10-01 (national/reo per-source audit) alongside homesteps_kind
+    # above, but only homesteps_kind was ever registered here -- confirmed via a
+    # direct _slim_raw() round-trip, both have been silently dropped at every
+    # publish since 2026-10-01. Found 2026-10-04 (national.* extraction-
+    # completeness audit, batch 16) while adding this SAME scraper's new
+    # homesteps_agent/homesteps_specs keys (the per-listing detail-page
+    # enrichment -- county/full photo gallery/lat-lng/listing-agent contact).
+    "homesteps_details": "*", "homesteps_img_kind_slug": "*",
+    "homesteps_agent": "*", "homesteps_specs": "*",
     "hud_property_id": "*", "reo_id": "*", "trulia_id": "*",
     "usda_property_id": "*", "vrm_id": "*", "xome_listing_id": "*",
     "zpid": "*",
@@ -2255,7 +2265,19 @@ RAW_KEEP = {
     "greenwood_delinquent_tax": "*", "gsa": "*", "gsa_surplus": "*", "haywood_tax_foreclosures": "*",
     "helene": "*", "henderson_tax": "*", "hendersonville_delinquent_tax": "*",
     "hendersonville_lightning": "*", "hibid": "*", "homeharvest": "*",
-    "horry_flc": "*", "hubzu": "*", "ingle_firm": "*",
+    "horry_flc": "*", "hubzu": "*",
+    # national.hud_homestore added 2026-10-04 (national.* extraction-
+    # completeness audit, batch 16): 9 of this scraper's 11 raw keys
+    # (fha_financing/listing_period/property_status/bid_open_date/
+    # period_deadline_date/bedrooms/bathrooms/sqft/year_built) were flat
+    # top-level keys never registered here at all -- confirmed via a direct
+    # _slim_raw() round-trip -- so they were silently dropped at every
+    # publish since this scraper was built. bedrooms/bathrooms/sqft/
+    # year_built are now promoted to first-class Listing fields (no
+    # registration needed); the rest moved under this new nested key,
+    # which also now carries the per-case Listing Broker contact
+    # (name/phone/email) fetched from each case's own /propertydetails page.
+    "hud_homestore": "*", "ingle_firm": "*",
     # 2026-10-02 Kania-statewide follow-up audit: law_firms.kania (built 2026-07-31,
     # still live and correct today -- 190 rows across 24 counties) stamps
     # raw={"kania": {our_file, court_file, property_type, current_bid, sale_status,

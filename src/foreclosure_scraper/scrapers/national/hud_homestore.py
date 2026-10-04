@@ -17,12 +17,40 @@ Response: JSON
                        fhaFinancing, propertyStatus, listDate, ... } ],
    "MapModel": {"ListingsPins": "<json with all property pins>", ...}}
 
-The searchresult JSON shows the first ~9 listings; MapModel.ListingsPins
-contains the full pinned set (id, x, y, name) for the state. We pull
-both and join on propertyCaseNumber so we get all listings even though
-the "current page" only renders the first 9.
+The searchresult JSON used to show only the first ~9 listings per the
+original 2026-06 build notes; live-reverified 2026-10-04 (national.*
+extraction-completeness audit, batch 16) and the handler now returns the
+FULL state result set directly in `searchresult` (17 NC / 10 SC today,
+cross-checked 1:1 against MapModel.ListingsPins' case-number set, which
+carries no case this one doesn't already have) -- no pagination or
+pins-join is actually needed any more.
 
 Free, no Apify dependency, no headless browser required.
+
+FIXED 2026-10-04 (same audit): confirmed via a direct `_slim_raw()`
+round-trip that 9 of this scraper's 11 raw keys (`fha_financing`,
+`listing_period`, `property_status`, `bid_open_date`,
+`period_deadline_date`, `bedrooms`, `bathrooms`, `sqft`, `year_built`) were
+never registered in `web_artifact.RAW_KEEP` as flat top-level keys and have
+been silently dropped at every publish since this scraper was built --
+exactly the failure mode this project's extraction-gaps audit keeps
+finding (see batch 7's `anderson_mie_deficiency` / batch 15's `documents`).
+Fixed two ways: (1) `bedrooms`/`bathrooms`/`sqft`->`living_sqft`/
+`year_built` are promoted to the Listing's own first-class fields (which
+always serialize, no RAW_KEEP entry needed at all -- the more correct fix,
+matching how sibling REO scrapers freddie_homesteps/hubzu already do it);
+(2) the remaining HUD-specific metadata moves into a nested
+`raw["hud_homestore"]` dict, registered `"hud_homestore": "*"` in
+RAW_KEEP. Also added: each listing's own `/propertydetails?caseNumber=`
+page (confirmed live, NO auth/token needed, unlike the search handler)
+carries a "Listing Broker" contact block with a real name + direct phone +
+email (live example: "COREY ADAMSKI", "(828) 231-4430",
+"COREYADAMSKI@GMAIL.COM") -- genuine free contactability HERMES sec 9
+calls the #1 ceiling, previously never fetched at all. Also captured from
+that same searchresult row (also previously dropped): `inAmenities`/
+`outAmenities`/`parkingType`/`numberOfStories` and `bidderTypes`/
+`eligibleBidders` (who may currently bid -- e.g. "Owner Occupant" vs
+"All Bidders" periods).
 """
 from __future__ import annotations
 
@@ -32,6 +60,7 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -87,6 +116,52 @@ def _safe_float(v):
         return None
 
 
+def _extract_broker(html: str) -> dict:
+    """The per-case `/propertydetails` page's "Listing Broker" card: a real
+    name, direct phone (plain `tel:` href, not obfuscated), and email (the
+    Cloudflare-obfuscated `__cf_email__` span's PLAIN-TEXT value is already
+    sitting in the same `<a>`'s `title` attribute -- no hex decode needed).
+    Scoped to the "Listing Broker" h2's own card so it can't pick up the
+    page's separate "Asset Manager" or "Field Service Manager" contacts,
+    which use the identical markup shape."""
+    if not html:
+        return {}
+    tree = HTMLParser(html)
+    for h2 in tree.css("h2"):
+        if h2.text(strip=True) != "Listing Broker":
+            continue
+        container = h2.parent
+        depth = 0
+        while container is not None and depth < 6:
+            cls = container.attributes.get("class") or ""
+            if "row" in cls.split():
+                break
+            container = container.parent
+            depth += 1
+        if container is None:
+            break
+        out: dict = {}
+        name_el = container.css_first("div.font-weight-bold")
+        if name_el is not None:
+            out["name"] = name_el.text(strip=True) or None
+        tel = container.css_first('a[href^="tel:"]')
+        if tel is not None:
+            # Read the href, not the link text: the <a> wraps BOTH a
+            # visually-hidden "Listing Broker's Phone number" <span
+            # class=sr-only> AND the visible number in a sibling <span> --
+            # .text() concatenates both ("Listing Broker's Phone
+            # number(828) 231-4430", confirmed live) with no separator.
+            href = (tel.attributes.get("href") or "")
+            out["phone"] = href[4:].strip() or None if href.startswith("tel:") else None
+        for a in container.css("a[title]"):
+            title = (a.attributes.get("title") or "").strip()
+            if "@" in title:
+                out["email"] = title
+                break
+        return {k: v for k, v in out.items() if v}
+    return {}
+
+
 def _to_listing(p: dict, state: str) -> Listing | None:
     addr = (p.get("propertyAddress") or "").strip()
     if not addr:
@@ -124,10 +199,14 @@ def _to_listing(p: dict, state: str) -> Listing | None:
 
     return Listing(
         source="national.hud_homestore",
-        # 2026-06-19: /Listing/PropertyDetails 404s (HUD has no stable public
-        # deep-link). Point at the working state search page so the link always
-        # resolves; the case number is carried in raw for lookup.
-        source_url=f"{BASE}/searchresult?stateCode={state}",
+        # 2026-10-04: /propertydetails?caseNumber=<case> is a REAL, stable,
+        # auth-free per-property deep link (live-confirmed across multiple
+        # cases) -- the 2026-06-19 note that HUD has no stable public
+        # detail link was about a DIFFERENT, wrong path
+        # (/Listing/PropertyDetails, capital-L, which does 404). Falls back
+        # to the state search page only if a row somehow has no case number.
+        source_url=(f"{BASE}/propertydetails?caseNumber={case}" if case
+                    else f"{BASE}/searchresult?stateCode={state}"),
         listing_type=ListingType.REO,
         property_kind=_kind(p.get("propertyType")),
         state=(p.get("propertyState") or state).strip().upper(),
@@ -139,6 +218,16 @@ def _to_listing(p: dict, state: str) -> Listing | None:
         latitude=lat,
         longitude=lng,
         opening_bid=price,
+        # Promoted to first-class fields 2026-10-04 (were raw-only flat
+        # scalar keys -- "bedrooms"/"bathrooms"/"sqft"/"year_built" --
+        # never registered in web_artifact.RAW_KEEP, so silently dropped at
+        # every publish; a first-class Listing field always serializes and
+        # sidesteps that allowlist entirely, same pattern freddie_homesteps/
+        # hubzu already use).
+        bedrooms=_safe_int(p.get("bedrooms")),
+        bathrooms=_safe_float(p.get("bathrooms")),
+        living_sqft=_safe_float(p.get("squareFootage")),
+        year_built=_safe_int(p.get("yearBuilt")),
         description=(
             f"HUD HomeStore REO {p.get('propertyType') or ''} "
             f"{p.get('bedrooms') or ''}bd/{p.get('bathrooms') or ''}ba "
@@ -149,16 +238,25 @@ def _to_listing(p: dict, state: str) -> Listing | None:
         last_seen=datetime.utcnow(),
         raw={
             "case": case,
-            "fha_financing": p.get("fhaFinancing"),
-            "listing_period": p.get("listingPeriod"),
-            "property_status": p.get("propertyStatus"),
-            "bid_open_date": p.get("bidOpenDate"),
-            "period_deadline_date": p.get("periodDeadlineDate"),
-            "bedrooms": _safe_int(p.get("bedrooms")),
-            "bathrooms": _safe_float(p.get("bathrooms")),
-            "sqft": _safe_int(p.get("squareFootage")),
-            "year_built": _safe_int(p.get("yearBuilt")),
             "images": {"real": photos} if photos else {},
+            # Nested 2026-10-04 under a RAW_KEEP-registered ("*") key --
+            # these used to be flat top-level scalars with no registration
+            # at all (see module docstring).
+            "hud_homestore": {
+                "fha_financing": p.get("fhaFinancing"),
+                "listing_period": p.get("listingPeriod"),
+                "property_status": p.get("propertyStatus"),
+                "bid_open_date": p.get("bidOpenDate"),
+                "period_deadline_date": p.get("periodDeadlineDate"),
+                # Real structured features stated on the card but never
+                # captured at all before this audit.
+                "in_amenities": (p.get("inAmenities") or "").strip() or None,
+                "out_amenities": (p.get("outAmenities") or "").strip() or None,
+                "parking_type": (p.get("parkingType") or "").strip() or None,
+                "number_of_stories": _safe_float(p.get("numberOfStories")),
+                "bidder_types": (p.get("bidderTypes") or "").strip() or None,
+                "eligible_bidders": (p.get("eligibleBidders") or "").strip() or None,
+            },
         },
     )
 
@@ -196,21 +294,45 @@ async def _fetch_state(state: str) -> list[Listing]:
         except Exception as exc:
             log.warning("hud.search_fail", state=state, error=str(exc)[:200])
             return []
-    if r.status_code != 200:
-        return []
-    try:
-        data = r.json()
-    except Exception:
-        return []
-    out: list[Listing] = []
-    seen: set[str] = set()
-    for p in data.get("searchresult") or []:
-        li = _to_listing(p, state)
-        if li is None or (li.case_number in seen):
-            continue
-        if li.case_number:
-            seen.add(li.case_number)
-        out.append(li)
+        if r.status_code != 200:
+            return []
+        try:
+            data = r.json()
+        except Exception:
+            return []
+        out: list[Listing] = []
+        seen: set[str] = set()
+        for p in data.get("searchresult") or []:
+            li = _to_listing(p, state)
+            if li is None or (li.case_number in seen):
+                continue
+            if li.case_number:
+                seen.add(li.case_number)
+            out.append(li)
+
+        # Step 3: per-listing Listing Broker contact (name/phone/email) --
+        # a real, auth-free per-case detail page (see module docstring),
+        # fetched on the SAME client so the connection is reused. One extra
+        # request per listing; the state's whole result set is small
+        # (17 NC / 10 SC live 2026-10-04), so this stays cheap.
+        for li in out:
+            if not li.case_number:
+                continue
+            try:
+                dr = await c.get(
+                    f"{BASE}/propertydetails?caseNumber={li.case_number}",
+                    headers=HEADERS, follow_redirects=True,
+                )
+            except Exception as exc:
+                log.warning("hud.broker_fetch_failed", case=li.case_number,
+                            error=str(exc)[:160])
+                continue
+            if dr.status_code != 200:
+                continue
+            broker = _extract_broker(dr.text)
+            if broker:
+                li.raw.setdefault("hud_homestore", {})["listing_broker"] = broker
+
     return out
 
 
