@@ -50,6 +50,26 @@ shows it is paid off (Redeemed) or already sold (Sale Confirmed / Deed
 Recorded) is not a lead and is dropped. Everything else — upset bidding,
 courthouse sale, pending confirmation, scheduled/upcoming — is emitted.
 The raw status is always stashed in raw["zls"]["status"].
+
+FIX 2026-10-04 (extraction-completeness audit): the grid's own "Upset
+Bidding Deadline" column (col 4) is a REAL, site-published deadline --
+not derived, the actual date -- and was already being parsed and set as
+``upset_bid_deadline``. But enrichment_upset_bid.py's generic NC rule
+(sale_date + 10 days, NCGS §45-21.27) will OVERWRITE that real value
+with its own weaker guess once ``li.sale_date`` falls into the generic
+0-10-day post-sale window, unless the row's raw["upset_bid"] already
+carries ``source: "published"`` (the convention scrapers.national.
+nc_upset_bids / law_firms.hutchens use) -- this scraper never set that
+key at all (its own raw dict lives under raw["zls"], a different name),
+so the real published deadline was silently vulnerable to being clobbered
+by the generic estimate on every run. Worse for this source specifically:
+when an upset deadline is later than the courthouse-sale date, the code
+above already promotes it to ``sale_date`` itself (the "actionable-date
+keying" comment below), so the generic rule would then derive yet
+another +10-day guess FROM the real deadline date rather than from a
+true sale date at all. Now sets raw["upset_bid"] with source="published"
+whenever a real upset_dt is parsed, so the generic enrichment skips this
+row and the real, site-published deadline survives untouched.
 """
 from __future__ import annotations
 
@@ -233,7 +253,7 @@ def _row_to_listing(row: dict, slug: str) -> Listing | None:
         "maps_url": (row.get("maps_url") or "").strip() or None,
     }
 
-    return Listing(
+    listing = Listing(
         source=slug,
         source_url=LISTINGS_URL,
         listing_type=ListingType.TAX_SALE,
@@ -259,6 +279,26 @@ def _row_to_listing(row: dict, slug: str) -> Listing | None:
         last_seen=datetime.utcnow(),
         raw={"zls": zls_raw},
     )
+
+    # Real, site-published deadline -- mark it so enrichment_upset_bid.py's
+    # generic sale_date+10-day rule does not overwrite it (see module
+    # docstring's 2026-10-04 fix).
+    if upset_dt is not None:
+        now = datetime.utcnow()
+        days_left = (upset_dt.date() - now.date()).days
+        listing.raw["upset_bid"] = {
+            "source": "published",
+            "in_window": days_left >= 0,
+            "deadline_iso": upset_dt.isoformat(),
+            "days_remaining": max(0, days_left),
+            "current_bid": listing.raw["zls"].get("current_bid"),
+            "sale_datetime_iso": sale_dt.isoformat() if sale_dt else None,
+            "county": county,
+            "statute": "NCGS §45-21.27",
+            "feed": "zacchaeus",
+            "page_url": LISTINGS_URL,
+        }
+    return listing
 
 
 # JS run inside the rendered page: read every data row of the current grid

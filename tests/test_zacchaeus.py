@@ -159,6 +159,44 @@ def test_upset_row_carries_deadline_and_status(listings):
     assert li.raw["zls"]["current_bid"] == "$32,029.51"
 
 
+def test_upset_row_marks_deadline_as_published_so_generic_enrichment_skips_it():
+    """Fixed 2026-10-04: the grid's "Upset Bidding Deadline" column is a
+    real, site-published date, but without raw["upset_bid"]["source"] =
+    "published", enrichment_upset_bid.py's generic NC sale_date+10-day rule
+    would silently overwrite it with a weaker derived guess."""
+    row = {
+        "office": "Guilford County Tax Office",
+        "parcel": "0021388",
+        "status": "Upset Bidding in Progress",
+        "sale": "6/1/2026",
+        "upset": "6/15/2026 5:00 PM",
+        "current_bid": "$32,029.51",
+        "addr": "⚠️ 100 Main St, Greensboro, NC 27401",
+    }
+    li = _row_to_listing(row, SLUG)
+    assert li is not None
+    upset = li.raw.get("upset_bid")
+    assert upset is not None
+    assert upset["source"] == "published"
+    assert upset["deadline_iso"].startswith("2026-06-15")
+    assert li.upset_bid_deadline.strftime("%Y-%m-%d") == "2026-06-15"
+
+
+def test_row_without_upset_date_has_no_upset_bid_raw_key():
+    row = {
+        "office": "Jones County Tax Office",
+        "parcel": "4478-83-5588-00",
+        "status": "Courthouse Sale",
+        "sale": "7/1/2026",
+        "opening_bid": "$4,957.42",
+        "addr": "⚠️ 1 Main St, Trenton, NC 28585",
+    }
+    li = _row_to_listing(row, SLUG)
+    assert li is not None
+    assert "upset_bid" not in li.raw
+    assert li.upset_bid_deadline is None
+
+
 def test_courthouse_sale_row_carries_opening_bid(listings):
     li = next(x for x in listings if x.parcel_id == "4478-83-5588-00")
     assert li.county == "Jones"
