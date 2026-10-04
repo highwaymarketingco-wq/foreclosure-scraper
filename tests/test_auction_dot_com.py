@@ -6,10 +6,17 @@ City, NC property). `city` was silently wrong on every enriched row, and
 `county` (a real Listing field) was never populated at all. The node's
 `name` field carries the correct full line instead:
 "<street> <City>, <ST> <ZIP>, <County> County"."""
+from foreclosure_scraper.models import ListingType
 from foreclosure_scraper.scrapers.national.auction_dot_com import (
+    REO_URL_SUFFIX,
+    REO_URLS,
+    URLS,
+    _extract_page,
+    _ltype_from_status,
     _node_listing,
     _parse_name_city_county,
     _split_slug_address,
+    _status_index,
 )
 
 # Live-captured JSON-LD node (2026-10-01).
@@ -135,3 +142,116 @@ def test_node_listing_backfills_county_from_known_city_in_fallback_path():
     assert li is not None
     assert li.city == "Forest City"
     assert li.county == "Rutherford"
+
+
+# ---------------------------------------------------------------------------
+# FIX 2026-10-04 (REO-liveness audit): every row was hardcoded
+# ListingType.AUCTION -- `_ltype_from_status` existed but was never called.
+# Live-verified (real browser render against auction.com, 2026-10-04) that
+# each rendered card carries its own status in a
+# `data-elm-id="asset-info-asset_<id>"` block whose child `<img alt="...">`
+# reads "Bank Owned" or "Foreclosure Sale" verbatim. The HTML fragments below
+# are real captured markup from https://www.auction.com/residential/nc/
+# (ids 2185639 "Bank Owned" / 2139335 "Foreclosure Sale") -- the `<img>`'s
+# `src` data-URI (a multi-KB base64 SVG in the live page) is elided since
+# it's irrelevant to the parsing logic; everything else, including tag
+# order and attribute names, is the real captured shape.
+# ---------------------------------------------------------------------------
+
+_CARD_HTML_BANK_OWNED = (
+    '<div data-elm-id="asset_2185639_root" data-position="0" class="q__asset-root--VmozO">'
+    '<div class="styles__root--k0hIz">'
+    '<a href="/details/181-booth-ln-richlands-nc-2185639" class="styles__card-link--pHDnC" '
+    'target="_blank" rel="noopener noreferrer">'
+    '<div class="styles__base-card--aZR7x" data-elm-id="property_card_asset_2185639">'
+    '<h3 data-elm-id="address_line_asset_2185639" '
+    'class="styles__text--YqNdS cardPartsStyles__property-address-line--SHW3X">'
+    '181 Booth Lane, Richlands, NC 28574</h3>'
+    '<div class="cardPartsStyles__listing-indicator-row--vyfs8">'
+    '<div data-elm-id="asset-info-asset_2185639" '
+    'class="styles__asset-info--AQgpK cardPartsStyles__asset-info--i04ie listing-card-asset-info">'
+    '<img src="data:image/svg+xml;base64,ELIDED" class="styles__info-dot--qtzr4" alt="Bank Owned">'
+    '<div>Bank Owned</div></div></div></div></a></div></div>'
+)
+
+_CARD_HTML_FORECLOSURE_SALE = (
+    '<div data-elm-id="asset_2139335_root" data-position="3" class="q__asset-root--VmozO">'
+    '<div class="styles__root--k0hIz">'
+    '<a href="/details/1442-carnsmore-dr-fayetteville-nc-2139335" class="styles__card-link--pHDnC" '
+    'target="_blank" rel="noopener noreferrer">'
+    '<div class="styles__base-card--aZR7x" data-elm-id="property_card_asset_2139335">'
+    '<h3 data-elm-id="address_line_asset_2139335" '
+    'class="styles__text--YqNdS cardPartsStyles__property-address-line--SHW3X">'
+    '1442 Carnsmore Drive, Fayetteville, NC 28304</h3>'
+    '<div class="cardPartsStyles__listing-indicator-row--vyfs8">'
+    '<div data-elm-id="asset-info-asset_2139335" '
+    'class="styles__asset-info--AQgpK cardPartsStyles__asset-info--i04ie listing-card-asset-info">'
+    '<img src="data:image/svg+xml;base64,ELIDED" class="styles__info-dot--qtzr4" alt="Foreclosure Sale">'
+    '<div>Foreclosure Sale</div></div></div></div></a></div></div>'
+)
+
+# A plain detail-link with NO asset-info badge block at all -- the realistic
+# "off-screen, not yet hydrated" case (auction.com virtualizes the card
+# list; see module docstring). _status_index must simply omit it rather
+# than mis-tagging it, and _extract_page must default it to AUCTION.
+_SLUG_ONLY_HTML = '<a href="/details/1402-tom-pepper-rd-creswell-nc-2045737">1402 Tom Pepper Rd</a>'
+
+
+def test_status_index_recovers_real_badge_text_by_id():
+    html = _CARD_HTML_BANK_OWNED + _CARD_HTML_FORECLOSURE_SALE + _SLUG_ONLY_HTML
+    idx = _status_index(html)
+    assert idx == {"2185639": "Bank Owned", "2139335": "Foreclosure Sale"}
+    assert "2045737" not in idx  # no badge block -> not in the index at all
+
+
+def test_ltype_from_status_classifies_real_badge_text():
+    assert _ltype_from_status("Bank Owned") == ListingType.REO
+    assert _ltype_from_status("Foreclosure Sale") == ListingType.FORECLOSURE_SALE
+    assert _ltype_from_status("") == ListingType.AUCTION
+    assert _ltype_from_status(None) == ListingType.AUCTION
+
+
+def test_extract_page_tags_reo_and_foreclosure_sale_from_real_badges():
+    """End-to-end: _extract_page must pick up _status_index's classification
+    for cards that carry the badge, and fall back to the old AUCTION default
+    for the slug-only card that doesn't (partial/best-effort, matching the
+    JSON-LD index's existing "enrich where available" shape)."""
+    html = _CARD_HTML_BANK_OWNED + _CARD_HTML_FORECLOSURE_SALE + _SLUG_ONLY_HTML
+    rows = _extract_page(html, "NC")
+    assert rows["2185639"].listing_type == ListingType.REO
+    assert rows["2139335"].listing_type == ListingType.FORECLOSURE_SALE
+    assert rows["2045737"].listing_type == ListingType.AUCTION
+
+
+def test_node_listing_default_listing_type_is_still_auction():
+    """Backward-compat: callers (and the dedicated REO-crossref path in
+    fetch(), which only forces REO on an id match) that don't pass
+    listing_type explicitly must keep getting the old hardcoded AUCTION."""
+    li = _node_listing("2045737", "1402-tom-pepper-rd-creswell", "NC", None)
+    assert li is not None
+    assert li.listing_type == ListingType.AUCTION
+
+
+# ---------------------------------------------------------------------------
+# REO_URLS: live-verified 2026-10-04 by selecting auction.com's own
+# "Listing Type" -> "REO Bank Owned" filter checkbox through the UI (NOT
+# guessed) and reading the resulting URL. See module docstring for the full
+# verification detail (result counts + sampled-card badge confirmation on
+# both NC and SC).
+# ---------------------------------------------------------------------------
+
+def test_reo_urls_match_the_live_verified_pattern():
+    assert REO_URL_SUFFIX == (
+        "active_lt/resi_sort_v2_st/y_nbs/bank-owned,newly-foreclosed_at"
+    )
+    reo = dict(REO_URLS)
+    assert reo["NC"] == (
+        "https://www.auction.com/residential/nc/"
+        "active_lt/resi_sort_v2_st/y_nbs/bank-owned,newly-foreclosed_at"
+    )
+    assert reo["SC"] == (
+        "https://www.auction.com/residential/sc/"
+        "active_lt/resi_sort_v2_st/y_nbs/bank-owned,newly-foreclosed_at"
+    )
+    # Every state in the regular URLS list must have a matching REO URL.
+    assert set(dict(REO_URLS)) == {state for state, _ in URLS}
