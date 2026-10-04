@@ -557,6 +557,12 @@ DATELESS_OK_SOURCES = {
     # Laurens's scanned overage list, same reasoning again: a standing
     # unclaimed-funds condition, not a scheduled event.
     "counties_sc.laurens_overage_claims",
+    # Fairfield's overage list, same reasoning again: a standing
+    # unclaimed-funds condition, not a scheduled event.
+    "counties_sc.fairfield_overage_claims",
+    # Calhoun's yearly overage lists, same reasoning again: a standing
+    # unclaimed-funds condition, not a scheduled event.
+    "counties_sc.calhoun_overage_claims",
     # Greenville's AS/400 tax-sale roster carries no per-row sale_date either
     # (a standing "who currently owes" list, not a scheduled event) -- same
     # reasoning as every other county delinquent-tax source in this list.
