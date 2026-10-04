@@ -69,6 +69,7 @@ AUDITED 2026-10-01 -- THE SITE CAME BACK, REDESIGNED, AND BROKE TWO THINGS.
 from __future__ import annotations
 
 import asyncio
+import html as _html
 import re
 import time
 from datetime import datetime
@@ -82,17 +83,21 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-# NOTE: www.spartanweeklyonline.com is DEAD as of 2026-08-24 — domain returns
-# 404 for all pages, no replacement found. The scraper will fail gracefully
-# (get_text returns empty / raises) and produce 0 listings until a new host
-# is identified.  Do NOT remove the module — the parsing logic is sound and
-# will work again once a replacement publisher is found.
-_HOST = "https://www.spartanweeklyonline.com"  # DEAD — kept for reference
+# AUDITED 2026-10-01: the site came back from its 2026-08-24 DEAD state (see
+# that audit's note in the module docstring above). This host is live.
+_HOST = "https://www.spartanweeklyonline.com"
 _LIST = _HOST + "/legal-notices/?page={page}"
 _MAX_PAGES = 40          # safety cap; loop also stops when a page adds nothing new
 _ENRICH_DETAILS = True   # follow each notice to its detail page for the body text
 _MAX_DETAIL_FETCH = 250  # bound detail fetches so a big run never blows timeout_s
 _DETAIL_BUDGET_S = 150   # hard wall-clock cap on the (throttled) detail-enrich pass
+
+# Sentinel `_row_to_listing(enrich=True)` returns to mean "the body CONFIRMS
+# this notice is junk, drop it" -- distinct from returning None, which means
+# "enrichment failed/hasn't run; keep whatever the no-network base pass
+# already shipped". Collapsing both into None would un-drop a confirmed-junk
+# row the moment its pre-enrichment stub had already been banked.
+_JUNK = object()
 
 _ARTICLE_RE = re.compile(
     r'<div class="article[^"]*">\s*'
@@ -158,11 +163,72 @@ _PROBATE_PR = re.compile(
     r"((?:P\.?\s*O\.?\s*Box|Post\s+Office\s+Box|\d{1,6})"
     r"[A-Za-z0-9 .,'#\-]*?,?\s*[A-Z]{2}\.?\s*\d{5})", re.I)
 _ES_CASE_RE = re.compile(r"\b(20\d{2}ES\d{6,9})\b")
+# SC's "deposit of will" probate filing ("The Will of <NAME>, Deceased, was
+# delivered to me and filed <DATE>. No proceedings for the probate of said
+# Will have begun.") carries no "Estate:"/"ESTATE OF:" label at all -- the
+# standard _ESTATE_RE/_PROBATE_ESTATE patterns never match it. AUDITED
+# 2026-10-04: this is NOT a rare variant -- live, it was 12 of 72 probate
+# notices in one run (the single most common PROBATE_NOTICE sub-type after
+# the standard Notice-to-Creditors format), every one of which shipped with
+# defendant=None before this fix.
+_WILL_DEPOSIT_RE = re.compile(
+    r"\bWill\s+of\s+([A-Z][A-Za-z .,'\-]{3,70}?),?\s+Deceased\b", re.I)
+# "IN THE MATTER OF: <NAME> (Decedent)" -- the caption SC Probate Court uses
+# on a Notice of Hearing (e.g. an "Application for Successor Personal
+# Representative"). AUDITED 2026-10-04: live-confirmed this body carries a
+# real decedent name, case number, and a petitioner's own name/address/
+# phone/email -- the OLD code filed this under _classify()'s generic "other"
+# fallback (h6 label "All Other Notices") and shipped it as a bare
+# ListingType.UNKNOWN row with every field None, discarding all of that.
+_MATTER_OF_RE = re.compile(
+    r"\bIN\s+THE\s+MATTER\s+OF:?\s*([A-Z][A-Za-z .,'\-]{3,70}?)\s*\(Decedent\)", re.I)
+_PROBATE_HEARING_TOPIC_RE = re.compile(
+    r"\(Decedent\)|Relationship\s+to\s+Decedent/Estate|Successor\s+Personal\s+Representative",
+    re.I)
+# Petitioner contact on a Notice of Hearing: best-effort, anchored on the
+# Phone:/Email: labels the court form always prints (confirmed live on a real
+# "Application for Successor Personal Representative" notice).
+_PETITIONER_SIGNATURE_RE = re.compile(
+    r"\bs/\s*([A-Z][a-z]+(?:[-'][A-Z]?[a-z]+)*(?:\s+[A-Z][a-z]+(?:[-'][A-Z]?[a-z]+)*){0,3})")
+_PETITIONER_ADDR_RE = re.compile(
+    r"(\d{1,6}\s+[A-Za-z0-9 .,'\-]+?,?\s*[A-Z]{2}\.?\s*\d{5})\s+Phone:", re.I)
+_PETITIONER_PHONE_RE = re.compile(r"\bPhone:?\s*([\d().\-\s]{7,20}?)(?=\s+Email:|\s+Relationship|$)", re.I)
+_PETITIONER_EMAIL_RE = re.compile(r"\bEmail:?\s*([\w.+\-]+@[\w.\-]+\.\w+)", re.I)
+# Confirmed junk, live 2026-10-04: a city "Abandoned vehicle" impound notice
+# (make/model/VIN/towing cost, no property, no party). The site's taxonomy
+# collapse (see module docstring) files these under the same "All Other
+# Notices" h6 as every other non-probate notice, so a bare label check can't
+# tell them from a real foreclosure summons -- the body always can.
+_VEHICLE_JUNK_RE = re.compile(r"\bVin:\s*[A-Z0-9]{8,}|\bAbandoned\s+vehicle\b", re.I)
+# A quiet-title/heir-action caption has NO "will sell"/"et al"/"I, the
+# undersigned" closing marker _VS_RE requires (those are foreclosure-sale-
+# specific) -- live-confirmed on 2 real captions, _VS_RE matches neither.
+# Anchor on the SAME heirs-of-Defendant phrase _QUIET_TITLE_TOPIC_RE already
+# uses to classify the notice ("all"/"any" both occur on real notices).
+_QUIET_TITLE_DEFENDANT_RE = re.compile(
+    r"\bvs?\.?\s+(.+?)\s*,?\s*and\s+(?:all|any)\s+known\s+and\s+unknown\s+heirs", re.I)
 
 
 def _clean(s: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", s or "")
-                  .replace("&nbsp;", " ").replace("&amp;", "&").replace("&#39;", "'")).strip()
+    # AUDITED 2026-10-04: this used to hand-roll three entity replacements
+    # (&nbsp;/&amp;/&#39;) and leave every OTHER named entity -- notably the
+    # CMS's own typographic &rsquo; for an apostrophe in a name -- as the
+    # LITERAL 7-character string "&rsquo;" in the cleaned text. That breaks
+    # every [A-Za-z .,'\-]-shaped name/address regex in this module outright
+    # (not just drops the apostrophe): confirmed live on THREE real
+    # Notice-to-Creditors decedents in one run -- "Ahsad U&rsquo;Real Logan",
+    # "La&rsquo;Shauna Davette Long", "Marquise Asant&rsquo;e Browning" --
+    # _PROBATE_ESTATE/_ESTATE_RE matched NONE of them; every one shipped with
+    # defendant=None despite the real name sitting in the fetched body.
+    # html.unescape() decodes every named/numeric entity (not just three),
+    # and the curly-quote/dash normalization below maps the result back to
+    # the plain ASCII forms this module's regexes already expect.
+    t = re.sub(r"<[^>]+>", " ", s or "")
+    t = _html.unescape(t)
+    t = (t.replace("’", "'").replace("‘", "'")
+         .replace("“", '"').replace("”", '"')
+         .replace("–", "-").replace("—", "-"))
+    return re.sub(r"\s+", " ", t).strip()
 
 
 def _classify(notice_type: str) -> tuple[ListingType, str]:
@@ -186,6 +252,18 @@ _FORECLOSURE_TOPIC_RE = re.compile(
     r"\bforeclosur\w+|deed\s+of\s+trust|master[\s-]in[\s-]equity|master'?s\s+sale|"
     r"special\s+referee|order\s+of\s+reference\b", re.I)
 
+# AUDITED 2026-10-04: a second real sub-type the same collapsed "All Other
+# Notices" bucket hides -- a QUIET TITLE / partition-style civil action
+# against "all known and unknown heirs" of prior owners. Live-confirmed on 3
+# real Spartanburg notices (one explicitly labeled "(Quiet Title)", all 3
+# sharing the same boilerplate caption below) -- these are real-property
+# actions naming heir-defendants, exactly the tangled-title / heir-property
+# shape this project's motivated-seller engine already targets elsewhere.
+# The OLD code shipped them as ListingType.UNKNOWN with every field None.
+_QUIET_TITLE_TOPIC_RE = re.compile(
+    r"\bquiet\s+title\b|"
+    r"\bknown\s+and\s+unknown\s+heirs\s+of\s+any\s+named\s+or\s+unnamed\s+Defendant", re.I)
+
 
 def _reclassify_from_body(lt: ListingType, kind: str, body: str) -> tuple[ListingType, str]:
     """Upgrade (lt, kind) using the notice's own body text, independent of
@@ -193,8 +271,15 @@ def _reclassify_from_body(lt: ListingType, kind: str, body: str) -> tuple[Listin
     tax, which the label already identifies reliably."""
     if kind in ("probate", "tax"):
         return lt, kind
+    # Checked before the foreclosure topic: a Notice of Hearing names a
+    # "(Decedent)" and never mentions foreclosure language, so there is no
+    # real ordering conflict, but probate is the more specific/useful type.
+    if _PROBATE_HEARING_TOPIC_RE.search(body or ""):
+        return ListingType.PROBATE_NOTICE, "probate"
     if _FORECLOSURE_TOPIC_RE.search(body or ""):
         return ListingType.LIS_PENDENS, "foreclosure"
+    if _QUIET_TITLE_TOPIC_RE.search(body or ""):
+        return ListingType.LIS_PENDENS, "quiet_title"
     return lt, kind
 
 
@@ -209,8 +294,23 @@ def _looks_like_address(text: str | None) -> bool:
 
 
 def _defendant(body: str, kind: str) -> str | None:
-    m = _ESTATE_RE.search(body) if kind == "probate" else _VS_RE.search(body)
-    return _clean(m.group(1)) if m else None
+    if kind == "probate":
+        # AUDITED 2026-10-04: _ESTATE_RE alone missed 2 of the site's own
+        # probate sub-formats -- the "Will of X, Deceased" deposit-of-will
+        # filing (no "Estate:"/"estate of" label at all) and a Notice of
+        # Hearing's "IN THE MATTER OF: X (Decedent)" caption. Both tried as
+        # fallbacks, in the order a human would recognize them.
+        m = _ESTATE_RE.search(body) or _WILL_DEPOSIT_RE.search(body) or _MATTER_OF_RE.search(body)
+    elif kind == "quiet_title":
+        # AUDITED 2026-10-04: _VS_RE requires a foreclosure-sale-specific
+        # closing marker ("will sell" / "et al" / "I, the undersigned") that
+        # a quiet-title/heir-action caption never prints -- confirmed live,
+        # it matches neither of 2 real captions. _QUIET_TITLE_DEFENDANT_RE
+        # anchors on the heirs-of-Defendant phrase instead.
+        m = _QUIET_TITLE_DEFENDANT_RE.search(body)
+    else:
+        m = _VS_RE.search(body)
+    return _clean(m.group(1)).strip(" ,;") if m else None
 
 
 def _plaintiff(body: str) -> str | None:
@@ -298,7 +398,13 @@ class SpartanWeeklyLegals(BaseScraper):
                         full = await self._row_to_listing(rows[j], c, enrich=True)
                     except Exception:
                         full = None
-                    if full:
+                    if full is _JUNK:
+                        # Confirmed junk by the body text itself -- explicitly
+                        # drop, overwriting the base pass's stub. A plain
+                        # `None` here would mean "enrichment didn't run",
+                        # which must NOT un-drop a row already banked.
+                        listings[j] = None
+                    elif full:
                         listings[j] = full
                         enriched_n += 1
                 log.info("spartan_weekly.enriched", enriched=enriched_n, of=len(rows))
@@ -306,7 +412,10 @@ class SpartanWeeklyLegals(BaseScraper):
         log.info("spartan_weekly.done", notices=len(rows), leads=len(listings))
         return listings
 
-    async def _row_to_listing(self, row: dict, c, enrich: bool) -> Listing | None:
+    async def _row_to_listing(self, row: dict, c, enrich: bool):
+        # Returns a Listing, None (no news yet / fetch failed, caller keeps
+        # whatever it already has), or the module-level `_JUNK` sentinel
+        # (enrich=True only: the body CONFIRMS this notice should be dropped).
         lt, kind = _classify(row["type"])
         meta = _clean(row["meta"])
         case_m = _CASE_RE.search(meta)
@@ -370,9 +479,44 @@ class SpartanWeeklyLegals(BaseScraper):
                             "pr_address": (_clean(prm.group(2)) if prm else None),
                             "es_case_number": es_case,
                         }
+                        # A Notice of Hearing (e.g. an "Application for Successor
+                        # Personal Representative") carries a PETITIONER's own
+                        # name/address/phone/email instead of a standard PR block
+                        # -- capture it too when present. Live-confirmed real:
+                        # name, mailing address, phone AND email all on one
+                        # notice, which _PROBATE_PR (built for the plain
+                        # Notice-to-Creditors shape) never looks for. Stored
+                        # separately from `raw['owner_phone']` on purpose: that
+                        # key is a contract several enrichers (enrichment_dnc,
+                        # enrichment_line_type) read as already DNC-gate-shaped
+                        # (needs_dnc_scrub/do_not_dial flags); a court filing's
+                        # self-disclosed number is real data worth keeping, but
+                        # wiring it into that gated contract is a separate
+                        # enrichment decision this single-source audit should
+                        # not make unilaterally.
+                        if _PROBATE_HEARING_TOPIC_RE.search(body):
+                            pm = _PETITIONER_SIGNATURE_RE.search(body)
+                            pam = _PETITIONER_ADDR_RE.search(body)
+                            phm = _PETITIONER_PHONE_RE.search(body)
+                            ehm = _PETITIONER_EMAIL_RE.search(body)
+                            mm = _MATTER_OF_RE.search(body)
+                            if pm or pam or phm or ehm:
+                                probate["petitioner"] = {
+                                    "name": _clean(pm.group(1)) if pm else None,
+                                    "address": _clean(pam.group(1)) if pam else None,
+                                    "phone": _clean(phm.group(1)) if phm else None,
+                                    "email": (ehm.group(1).strip() if ehm else None),
+                                }
+                            if mm and not decedent:
+                                probate["decedent"] = _clean(mm.group(1))
                         # No property address in a probate notice — clear the notice
                         # title so the owner-name backfill fires on the decedent.
                         address = None
+                    if kind == "other" and _VEHICLE_JUNK_RE.search(body):
+                        # Confirmed junk (see module docstring): a city vehicle-
+                        # impound notice carries no property and no party --
+                        # drop it rather than ship an all-None UNKNOWN row.
+                        return _JUNK
             except Exception:
                 log.debug("spartan_weekly.detail_failed", url=source_url[:120])
 

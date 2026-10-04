@@ -72,6 +72,28 @@ REVIVAL 2026-09-21 -- WHY 1,334 ROWS NEVER REACHED THE BOARD
   (Spartanburg, Anderson, Cherokee, Oconee, Union, Laurens: all 0 on 2026-09-21, lists
   appear Oct to Nov): the ~42 Pickens rows, duplicates of ``pickens_tax_sale`` by parcel.
 
+DISABLED 2026-10-04 (extraction-completeness audit) -- the 2026-09-21 revival's own
+prediction came true and settled the question. Live run today: still exactly 42 Pickens
+rows, 0 for every other of the 7 target counties. Diffed those 42 parcel_ids against a
+live ``pickens_tax_sale.fetch()`` run the same minute: ALL 42 are a strict subset of its
+160 parcels (``parcels1.issubset(parcels2) == True``, zero parcels unique to this
+module) -- and every one of the 42 carries here is `owner=None, street_address=None`
+(this module's table-header heuristic never recognizes Pickens' actual "BIDDER# ITEM#
+MAP/PARCEL# OWNER $SALE $TAX $TAX" layout, so it falls through to the bare-TMS text
+regex), while ``pickens_tax_sale`` parses the SAME PDF into owner name + sale/bid price +
+both years' tax amounts for 140 of its 160. Zero unique parcels, strictly worse fields on
+every one it does emit -- this module adds nothing Pickens-side.
+The other 6 counties are not just "currently 0", they are superseded: Spartanburg/
+Oconee/Laurens/Union/Cherokee all have live ``qpaybill_delinquent_roll`` tenants, and
+Cherokee/Laurens/Spartanburg/Union additionally have their own dedicated
+``*_delinquent_tax.py`` / ``oconee_tax_sale.py`` modules. Anderson has no dedicated
+coverage anywhere in the codebase and none here either (confirmed live 2026-10-04: the
+treasurer page still carries no delinquent-tax table) -- disabling loses no live
+Anderson rows, since this module was not delivering any. Re-enable only if a genuinely
+NEW county with a real parseable table/PDF is added, or if this module's table-header
+detection is fixed to actually beat pickens_tax_sale.py on Pickens (it currently does
+not, and has not for every live check since 2026-09-21).
+
 Free, pure HTTP (no Apify, no spend).
 """
 from __future__ import annotations
@@ -535,6 +557,12 @@ async def _scrape_html(c, url: str, county: str) -> list[Listing]:
 class SCTaxDelinquent(BaseScraper):
     slug = "counties_sc.sc_tax_delinquent"
     name = "SC County Delinquent Tax / Pre-Sale (7 counties)"
+    disabled = True
+    disabled_reason = ("confirmed-worse duplicate of pickens_tax_sale (its only live county: "
+                       "42 rows, all a strict subset of pickens_tax_sale's 160 richer rows, "
+                       "owner/address always None here); the other 6 counties are superseded "
+                       "by qpaybill_delinquent_roll tenants + dedicated *_delinquent_tax.py "
+                       "modules, or (Anderson) still return 0 here too - confirmed 2026-10-04")
     category = "county_tax"
     expected_min_count = 0
     requires_apify = False
