@@ -84,3 +84,52 @@ def test_populated_outbuilding_value_and_both_dates_are_captured():
     assert det["outbuilding_value"] == 2760.0
     assert det["last_transaction_date"] == "08/28/2026"
     assert det["last_payment_date"] == "08/28/2026"
+
+
+# --------------------------------------------------------------------------- 2026-10-03 follow-up audit
+#
+# Live-sampled 30 current unpaid bills (2026-10-03): Net Taxable Valuation is
+# populated on every one (30/30), Personal Value on 12/30 (often a mobile home
+# riding on an otherwise-real-estate account), and Exemption on 1/30 -- a real
+# $116,285 homestead/elderly exemption on account 70527110. A probed companion
+# "TaxDistrictsData" per-bill tax/fee breakdown table turned out to be dead on
+# the vendor's own site (its own AJAX call 404s: "the controller ... was not
+# found"), so that one was investigated and correctly NOT pursued.
+
+_DETAIL_HTML_WITH_EXEMPTION = """
+<div>Account Info</div>
+<div>Account Number :</div><div>70527110</div>
+<div>Baker Michael D &amp; Baker Elizabeth D</div>
+<div>44 Blantyre Church Rd</div>
+<div>Brevard, NC 28712</div>
+<div>Bill Info</div>
+<div>Parcel Number :</div><div>9518755741000</div>
+<div>Legal Description :</div><div>LOT 9</div>
+<div>Taxable Values</div>
+<div>Building Value :</div><div>120,000</div>
+<div>Land Value :</div><div>30,000</div>
+<div>Parcel Value Total :</div><div>150,000</div>
+<div>Deferred Value :</div><div>5,000</div>
+<div>Taxable Value :</div><div>145,000</div>
+<div>Balance Info</div>
+<div>Current Balance :</div><div>14.09</div>
+<div>Personal Value :</div><div>875</div>
+<div>Total Valuation :</div><div>145,875</div>
+<div>Exemption :</div><div>116,285</div>
+<div>Net Taxable Valuation :</div><div>29,590</div>
+"""
+
+
+def test_exemption_deferred_and_personal_value_are_captured():
+    det = _parse_detail(_DETAIL_HTML_WITH_EXEMPTION)
+    assert det["exemption"] == 116285.0
+    assert det["deferred_value"] == 5000.0
+    assert det["personal_value"] == 875.0
+    assert det["net_taxable_valuation"] == 29590.0
+
+
+def test_zero_exemption_is_none_like_other_money_fields():
+    det = _parse_detail(_DETAIL_HTML_PAID_WITH_OUTBUILDING)
+    assert det["exemption"] is None
+    assert det["deferred_value"] is None
+    assert det["personal_value"] is None

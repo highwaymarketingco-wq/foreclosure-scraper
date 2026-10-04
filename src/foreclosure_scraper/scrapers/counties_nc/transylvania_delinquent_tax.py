@@ -23,6 +23,14 @@ the legal description and the taxable value live only on the per-bill detail
 direct httpx.AsyncClient — the shared rate-limited client() would serialize ~450 calls to a
 single host into many minutes.
 
+The grid also mixes in PERSONAL PROPERTY bills (vehicles/boats/business
+personal property) with no source-type column -- the only tell is the
+description cell literally reading "Personal Property" instead of a
+parcel/map/acreage block. Live-verified 2026-10-03: 188 of 429 current
+unpaid bills (44%) are Personal Property; these are filtered out (see
+``_is_personal_property``) before enrichment and emission, since they are
+not real property.
+
 Free, anonymous, compliant (public tax portal, no auth / captcha / token forgery).
 Gate off with FORECLOSURE_TRANSYLVANIA_TAX=0.
 Tunables: FORECLOSURE_TRANSYLVANIA_TAX_YEAR (default 2025),
@@ -55,6 +63,24 @@ _HEADERS = {
 
 # City, ST 12345  (optionally -6789)
 _CSZ_RE = re.compile(r"^(.*),\s*([A-Za-z]{2})\.?\s+(\d{5})(?:-\d{4})?$")
+
+#: The "UnpaidBillsOnly" grid mixes REAL ESTATE and PERSONAL PROPERTY (vehicle/
+#: boat/business-personal-property) bills with no source-type flag to tell them
+#: apart by column -- unlike the sibling Rutherford scrapers' explicit
+#: BILL_TYPE=="REI" filter, this grid's only tell is the description cell
+#: (cell[4]) literally reading "Personal Property" instead of a parcel/map/
+#: acreage block. Live-verified 2026-10-03: 188 of 429 current unpaid bills
+#: (44%) are Personal Property -- previously emitted anyway, with cell[4]'s
+#: literal text "Personal Property" published as parcel_id (there is no real
+#: parcel, so ViewTaxBill's "Parcel Number :" line is also absent and the grid
+#: fallback took over), i.e. nearly half of this source's leads were fake
+#: "properties" that are actually a delinquent vehicle/boat tax bill.
+_PERSONAL_PROPERTY_RE = re.compile(r"^\s*Personal\s+Property\b", re.I)
+
+
+def _is_personal_property(cell4) -> bool:
+    plain = html.unescape(re.sub(r"<[^>]+>", " ", str(cell4 or ""))).strip()
+    return bool(_PERSONAL_PROPERTY_RE.match(plain))
 
 
 def _f(v) -> float | None:
@@ -162,6 +188,24 @@ def _parse_detail(page_html: str) -> dict:
     out["last_transaction_date"] = last_txn if last_txn and _date_shape.match(last_txn) else None
     last_pmt = _label_value(lines, "Last Payment Date :")
     out["last_payment_date"] = last_pmt if last_pmt and _date_shape.match(last_pmt) else None
+    # 2026-10-03: three more "Taxable Values" lines on the same already-fetched
+    # detail page, live-verified against a 30-bill sample. "Exemption :" (1/30
+    # live, $116,285 on account 70527110) is the dollar amount knocked off the
+    # taxable value by a homestead/elderly/veteran/disability exemption -- a
+    # direct "elderly" lead-source signal (HERMES sec 1 lists elderly as one of
+    # the named distress types), not just a value adjustment. "Deferred Value :"
+    # (present-use-value deferral, e.g. agricultural land) and "Personal Value :"
+    # (12/30 live -- often a mobile home value riding on an otherwise-real-estate
+    # account, distinct from a standalone personal-property BILL) were also
+    # dropped. A probed companion "TaxDistrictsData" AJAX table (tax/fee line
+    # items by district) turned out to be dead on the vendor's OWN site --
+    # POST /TaxDistrictsData/GetSearchTableData 404s ("controller ... was not
+    # found"), confirmed from the vendor's own PageTable.js routing logic -- so
+    # NOT pursued further, not a gap on our side.
+    out["exemption"] = _f(_label_value(lines, "Exemption :"))
+    out["deferred_value"] = _f(_label_value(lines, "Deferred Value :"))
+    out["personal_value"] = _f(_label_value(lines, "Personal Value :"))
+    out["net_taxable_valuation"] = _f(_label_value(lines, "Net Taxable Valuation :"))
     return out
 
 
@@ -218,9 +262,18 @@ class TransylvaniaDelinquentTax(BaseScraper):
                 if not rows:
                     return []
 
+                # Drop Personal Property bills (vehicles/boats/business personal
+                # property) before enrichment too -- no point spending a
+                # ViewTaxBill request on a bill that will be discarded below.
+                def _row_desc(r: dict) -> str:
+                    c = r.get("cell") or []
+                    return c[4] if len(c) > 4 else ""
+
+                real_estate_rows = [r for r in rows if not _is_personal_property(_row_desc(r))]
+
                 # Detail enrichment (owner mailing address / parcel / value) — parallel,
                 # bounded. ViewTaxBill needs only the seed cookie, so it is safe to fan out.
-                to_enrich = rows if max_detail <= 0 else rows[:max_detail]
+                to_enrich = real_estate_rows if max_detail <= 0 else real_estate_rows[:max_detail]
                 sem = asyncio.Semaphore(concurrency)
                 details: dict[str, dict] = {}
 
@@ -243,7 +296,7 @@ class TransylvaniaDelinquentTax(BaseScraper):
                 except Exception:  # noqa: BLE001
                     pass
 
-                for row in rows:
+                for row in real_estate_rows:
                     try:
                         rid = row.get("id") or ""
                         cell = row.get("cell") or []
@@ -333,6 +386,16 @@ class TransylvaniaDelinquentTax(BaseScraper):
                                 "last_payment_date": det.get("last_payment_date"),
                                 "owner_mailing_full": det.get("mailing_full"),
                                 "mailing_state": mail_state,
+                                # 2026-10-03: exemption is a direct "elderly" lead
+                                # signal (homestead/elderly/veteran/disability
+                                # exclusion), deferred_value a present-use (ag/
+                                # forestry) deferral, personal_value a mobile home
+                                # or similar riding on this real-estate account --
+                                # see _parse_detail's docstring note.
+                                "exemption": det.get("exemption"),
+                                "deferred_value": det.get("deferred_value"),
+                                "personal_value_on_account": det.get("personal_value"),
+                                "net_taxable_valuation": det.get("net_taxable_valuation"),
                                 "signal": "delinquent_property_tax",
                             }},
                         ))
