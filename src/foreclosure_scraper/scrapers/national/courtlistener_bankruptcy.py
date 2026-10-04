@@ -69,6 +69,7 @@ import structlog
 
 from ..._bankruptcy_city_to_county import KNOWN_CITIES, bankruptcy_county_for
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 from ...signal_freshness import bankruptcy_case_age
@@ -260,6 +261,37 @@ def _auth_headers(token: str | None) -> dict:
     return h
 
 
+def _recap_pdf_urls(hit: dict) -> list[str]:
+    """Free, already-archived PDF URLs off a /search/?type=r hit's nested
+    `recap_documents[]`.
+
+    Found 2026-10-04 (national.* extraction-completeness audit, batch 15):
+    every recap_documents[] entry carries `is_available` + `filepath_local`,
+    but neither was ever read -- this scraper (and its civil/adversary
+    siblings) kept only text metadata (short_description etc.), discarding
+    the one field that says whether a REAL document exists. Live-verified:
+    `is_available=True` + a `filepath_local` means CourtListener already
+    holds that PACER document for free in the public RECAP archive (someone
+    else already paid PACER and donated it) at
+    `https://storage.courtlistener.com/<filepath_local>` -- confirmed live
+    2026-10-04 with a direct fetch (200, `application/pdf`, real PDF bytes).
+    Sampled across all 4 courts x the adversary scraper's 3 phrases: 42 of
+    199 recap_documents (21%) qualify -- lift-stay motions, orders, §363
+    sale motions, the exact documents HERMES sec 8 calls "THE most common
+    miss." The remaining 79% have `is_available=False` (CourtListener does
+    NOT have a free copy) -- deliberately NOT fetched, since getting one
+    would mean buying it from PACER (out of scope, HERMES rule 1 FREE-only).
+    """
+    urls: list[str] = []
+    for rd in hit.get("recap_documents") or []:
+        if not isinstance(rd, dict):
+            continue
+        fp = rd.get("filepath_local")
+        if rd.get("is_available") and fp:
+            urls.append(f"https://storage.courtlistener.com/{fp}")
+    return urls
+
+
 def _normalize_search_hit(hit: dict, court: str) -> dict:
     """Map a /search/?type=r result onto the docket shape the rest of this
     module (and its tests) already speak, carrying `chapter` through inline."""
@@ -280,6 +312,9 @@ def _normalize_search_hit(hit: dict, court: str) -> dict:
         "firm": hit.get("firm") or hit.get("firm_str") or "",
         "date_terminated": hit.get("dateTerminated"),
         "pacer_case_id": hit.get("pacer_case_id"),
+        # 2026-10-04 fix (see _recap_pdf_urls docstring): free RECAP PDF
+        # URLs for this docket's documents, if any are already archived.
+        "recap_pdfs": _recap_pdf_urls(hit),
     }
 
 
@@ -428,44 +463,46 @@ class CourtListenerBankruptcy(BaseScraper):
                     # government party never lands in a name-resolution field.
                     cap_plaintiff, cap_defendant = _split_caption(case_name)
 
-                    out.append(
-                        Listing(
-                            source=self.slug,
-                            source_url=("https://www.courtlistener.com" + d["absolute_url"]) if d.get("absolute_url") else "",
-                            listing_type=ListingType.BANKRUPTCY,  # 2026-06-19: was mislabeled LIS_PENDENS
-                            property_kind=PropertyKind.UNKNOWN,
-                            state=state,
-                            county=county,
-                            case_number=docket_no,
-                            plaintiff=cap_plaintiff[:200] if cap_plaintiff else None,
-                            defendant=cap_defendant[:200] if cap_defendant else None,
-                            trustee=d.get("trustee") or None,  # §363 seller / disposition trustee
-                            description=desc,
-                            first_seen=datetime.utcnow(),
-                            last_seen=datetime.utcnow(),
-                            raw={
-                                "courtlistener": {
-                                    "court": court,
-                                    "docket_number": docket_no,
-                                    "chapter": chapter,
-                                    "case_name": case_name,
-                                    "date_filed": date_filed,
-                                    "nature_of_suit": d.get("nature_of_suit"),
-                                    "cause": d.get("cause"),
-                                    "absolute_url": d.get("absolute_url"),
-                                    "bankruptcy_information": d.get("bankruptcy_information"),
-                                    "docket_id": d.get("docket_id"),
-                                    "trustee": d.get("trustee") or None,
-                                    "party": d.get("party") or None,  # joint filers = co-owners
-                                    "attorney": d.get("attorney") or None,
-                                    "firm": d.get("firm") or None,
-                                    "date_terminated": d.get("date_terminated"),
-                                    "pacer_case_id": d.get("pacer_case_id"),
-                                    **age_flags,
-                                },
+                    li = Listing(
+                        source=self.slug,
+                        source_url=("https://www.courtlistener.com" + d["absolute_url"]) if d.get("absolute_url") else "",
+                        listing_type=ListingType.BANKRUPTCY,  # 2026-06-19: was mislabeled LIS_PENDENS
+                        property_kind=PropertyKind.UNKNOWN,
+                        state=state,
+                        county=county,
+                        case_number=docket_no,
+                        plaintiff=cap_plaintiff[:200] if cap_plaintiff else None,
+                        defendant=cap_defendant[:200] if cap_defendant else None,
+                        trustee=d.get("trustee") or None,  # §363 seller / disposition trustee
+                        description=desc,
+                        first_seen=datetime.utcnow(),
+                        last_seen=datetime.utcnow(),
+                        raw={
+                            "courtlistener": {
+                                "court": court,
+                                "docket_number": docket_no,
+                                "chapter": chapter,
+                                "case_name": case_name,
+                                "date_filed": date_filed,
+                                "nature_of_suit": d.get("nature_of_suit"),
+                                "cause": d.get("cause"),
+                                "absolute_url": d.get("absolute_url"),
+                                "bankruptcy_information": d.get("bankruptcy_information"),
+                                "docket_id": d.get("docket_id"),
+                                "trustee": d.get("trustee") or None,
+                                "party": d.get("party") or None,  # joint filers = co-owners
+                                "attorney": d.get("attorney") or None,
+                                "firm": d.get("firm") or None,
+                                "date_terminated": d.get("date_terminated"),
+                                "pacer_case_id": d.get("pacer_case_id"),
+                                **age_flags,
                             },
-                        )
+                        },
                     )
+                    # 2026-10-04 fix: wire any free RECAP PDFs already
+                    # archived for this docket (see _recap_pdf_urls).
+                    stamp_documents(li, d.get("recap_pdfs") or [])
+                    out.append(li)
 
         log.info(
             "courtlistener.done",

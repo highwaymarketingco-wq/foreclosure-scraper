@@ -49,6 +49,7 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 from .courtlistener_bankruptcy import (
@@ -57,6 +58,7 @@ from .courtlistener_bankruptcy import (
     COURT_STATE,
     _county_from_text,
     _load_token,
+    _recap_pdf_urls,
     _split_caption,
 )
 
@@ -369,7 +371,7 @@ class CourtListenerAdversary(BaseScraper):
                         or res.get("firm") or res.get("firm_str")
                     )
 
-                    out.append(Listing(
+                    li = Listing(
                         source=self.slug,
                         source_url=source_url,
                         listing_type=ListingType.LIS_PENDENS,
@@ -401,7 +403,14 @@ class CourtListenerAdversary(BaseScraper):
                             "docket_absolute_url": abs_url,
                             "recap_documents": rd_refs,
                         }},
-                    ))
+                    )
+                    # 2026-10-04 fix (national.* extraction-completeness
+                    # audit, batch 15): this is exactly the lift-stay/§363
+                    # motion PDF HERMES sec 8 calls "THE most common miss" --
+                    # wire any copy CourtListener already has for free. See
+                    # courtlistener_bankruptcy._recap_pdf_urls's docstring.
+                    stamp_documents(li, _recap_pdf_urls(res))
+                    out.append(li)
 
         log.info("courtlistener_adv.done",
                  listings=len(out),

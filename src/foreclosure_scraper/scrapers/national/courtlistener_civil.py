@@ -46,6 +46,7 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
@@ -239,7 +240,7 @@ class CourtListenerCivil(BaseScraper):
                     # owner_name ... SERVICEMAC/FNMA/case-caption"). Split it.
                     cap_plaintiff, cap_defendant = _split_caption(case_name)
 
-                    out.append(Listing(
+                    li = Listing(
                         source=self.slug,
                         source_url=("https://www.courtlistener.com" + d["absolute_url"]) if d.get("absolute_url") else "",
                         listing_type=ListingType.LIS_PENDENS,
@@ -272,7 +273,13 @@ class CourtListenerCivil(BaseScraper):
                             "firm": d.get("firm") or None,
                             "date_terminated": d.get("date_terminated"),
                         }},
-                    ))
+                    )
+                    # 2026-10-04 fix (national.* extraction-completeness
+                    # audit, batch 15): wire any free RECAP PDFs already
+                    # archived for this docket -- see
+                    # courtlistener_bankruptcy._recap_pdf_urls's docstring.
+                    stamp_documents(li, d.get("recap_pdfs") or [])
+                    out.append(li)
 
         log.info("courtlistener_civil.done",
                  listings=len(out), courts=len(CIVIL_COURTS),
