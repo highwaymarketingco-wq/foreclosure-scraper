@@ -1,6 +1,6 @@
 # SOURCE EXTRACTION AUDIT — per-source, is EVERYTHING being pulled?
 
-Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **22 already wire the document harvester** (PDFs/deeds/notices) and **217 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
+Auto-generated from the live registry by `scripts/gen_extraction_audit.py`. **239 scrapers**, of which **23 already wire the document harvester** (PDFs/deeds/notices) and **216 do not yet**. Re-run the script any time; it reads `discover()`, so it can never miss a source.
 
 ## The audit protocol (do this for EVERY source in the TODO table)
 
@@ -16,7 +16,7 @@ Then VERIFY the change three ways: it compiles, `discover()` still lists the slu
 
 The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) as a starting clue for where to look. It is a hint from static text, NOT proof the source has or lacks these — your eyes on the live page are the authority.
 
-## DONE — already harvest documents (22)
+## DONE — already harvest documents (23)
 
 | Slug | already captures | URLs |
 |---|---|---|
@@ -39,11 +39,12 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.cws_marketing` | deed/notice?, img?, detail-page, links | https://www.cwsmarketing.com/real-estate/<br>https://bid\.cwsmarketing\.com/auctions/catalog/id/\d+ |
 | `national.gsa_realproperty` | deed/notice?, img?, detail-page | https://realestatesales.gov<br>https://...jpg |
 | `national.irs_judicial_sales` | pdf?, deed/notice?, img?, detail-page, links | https://www.irsauctions.gov |
+| `national.irs_treasury` | pdf?, deed/notice?, detail-page, links | https://www.irsauctions.gov/auction/items<br>https://www.irsauctions.gov |
 | `national.servicelink_auction` | deed/notice?, img? | https://ui.exostechnology.com/api/listingsvc/v1/listings<br>https://www.servicelinkauction.com |
 | `national.usmarshals_realproperty` | pdf?, deed/notice?, img?, detail-page, links | https://reallook.com/properties<br>https://reallook.com |
 | `national.williams` | deed/notice?, img?, detail-page, links | https://bid.auctionnetwork.com/<br>https://bid.auctionnetwork.com |
 
-## TODO — audit each for full extraction (217)
+## TODO — audit each for full extraction (216)
 
 | Slug | code hints (verify on the live page) | URLs |
 |---|---|---|
@@ -207,7 +208,7 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.fannie_homepath` | img?, detail-page | https://homepath.fanniemae.com/cfl/property-inventory/search<br>https://homepath.fanniemae.com/ |
 | `national.fdic_failed_banks` | detail-page, links | https://www.fdic.gov/bank-failures/failed-bank-list<br>https://www.fdic.gov/bank-failures/download-data.csv |
 | `national.fema_disasters` | - | https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries |
-| `national.first_citizens_reo` | links | https://www.firstcitizens.com/real-estate |
+| `national.first_citizens_reo` | links | https://www.firstcitizens.com/real-estate<br>https://www.firstcitizens.com/real-estate/_jcr_content/root/ |
 | `national.foreclosure_dot_com` | img?, detail-page | https://www.foreclosure.com/listing/search<br>https://www.foreclosure.com/listings/charlotte-nc/ |
 | `national.freddie_homesteps` | img?, detail-page, links | https://www.homesteps.com/listing/search<br>https://www.homesteps.com/ |
 | `national.govdeals` | deed/notice?, img?, detail-page | https://maestro.lqdt1.com/search/list<br>https://www.govdeals.com/auctions/item/detail/ |
@@ -216,10 +217,9 @@ The `hint` column flags what the CODE mentions (pdf?, img?, detail-page, links) 
 | `national.homeharvest` | deed/notice?, img? | https://github.com/ZacharyHampton/HomeHarvest |
 | `national.homepath_json` | img?, detail-page | https://homepath.fanniemae.com/cfl/property-inventory/search<br>https://homepath.fanniemae.com/ |
 | `national.hubzu` | img? | https://www.hubzu.com/ |
-| `national.hud_homestore` | img?, detail-page | https://www.hudhomestore.gov/searchresult<br>https://www.hudhomestore.gov |
+| `national.hud_homestore` | img?, detail-page, links | https://www.hudhomestore.gov/searchresult<br>https://www.hudhomestore.gov |
 | `national.hud_reac_inspection` | detail-page | https://www.hud.gov/sites/default/files/Housing/documents/MF-Inspection-Report.xls<br>https://www.hud.gov/sites/default/files/Housing/documents/ |
 | `national.hud_section8_contracts` | - | https://www.hud.gov/hud-partners/multifamily-assist-section8-database<br>https://www.hud.gov/sites/dfiles/Housing/documents/ |
-| `national.irs_treasury` | detail-page, links | https://www.irsauctions.gov/auction/items<br>https://www.irsauctions.gov |
 | `national.jail_bookings` | img?, detail-page | http://mugshots.spartanburgsheriff.org/<br>https://buncombecountyso.policetocitizen.com|23 |
 | `national.landandfarm` | img?, detail-page | (see SOURCE_REGISTER.md) |
 | `national.landsofamerica` | img?, detail-page | (see SOURCE_REGISTER.md) |
