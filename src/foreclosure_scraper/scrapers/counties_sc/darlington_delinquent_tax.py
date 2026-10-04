@@ -17,6 +17,27 @@ extraction audit. parse_rows() and its guards are left in place (correct,
 tested code) -- only the scraper is disabled. Do not re-enable without a
 different, real per-parcel source at this URL.
 
+RE-VERIFIED 2026-10-03 (extraction-completeness re-audit, batch 8): live
+re-fetched PAGE_URL (same impersonate=True path this scraper uses) -- still
+exactly 1 <table> on the page (the office-hours widget, 8 rows: Days/Hours
++ Sunday..Saturday), parse_rows() against the live HTML still correctly
+returns 0. Re-enabling THIS module would still not help.
+
+Checked, for honesty, whether the superseding source is actually delivering
+today (not just "covered in code") -- it is NOT, right now: a scoped,
+Darlington-ONLY qpaybill_delinquent_roll.py run (no other county competing
+for its concurrency gates) still hit that module's own documented
+COUNTY_TIMEOUT_S=480s county-level guard with 0 parcels after 2,264
+requests and 1 error -- the exact "answers every request but never
+satisfies _all_match" hang shape that module's own docstring already
+describes and names for a DIFFERENT county (Williamsburg), now observed
+live on Darlington too. This is a real, currently-live gap in
+qpaybill_delinquent_roll.py's Darlington tenant specifically, not in this
+file -- out of scope here (qpaybill_delinquent_roll.py was not one of this
+session's 10 audited sources), flagged separately rather than guessed at or
+silently left uncorrected after an earlier, less careful same-day check of
+this file wrongly logged it as delivering.
+
 Slug: counties_sc.darlington_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE

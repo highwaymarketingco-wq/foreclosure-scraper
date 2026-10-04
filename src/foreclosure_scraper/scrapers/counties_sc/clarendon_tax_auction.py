@@ -31,6 +31,21 @@ less reliably. Converted to the standard disabled=True/disabled_reason so
 this reads correctly in run reports (DORMANT, not an ambiguous silent zero)
 instead of the ad hoc `return []` the 2026-09-15 fix used.
 
+RE-VERIFIED 2026-10-03 (extraction-completeness re-audit, batch 8):
+re-fetched PAGE_URL live. The homepage now links a NEW post (posted Oct 1,
+2026, 2 days before this re-check) that the keyword-follower would have
+matched: "2026 TAX SALE REGISTRATION" -> a 7-page PDF
+(2026-tax-sale-registration.pdf). Checked it is NOT a parcel list before
+concluding there is nothing new to capture: pypdf/pdfplumber both extract 0
+chars and 0 form fields (it's scanned), so it was OCR'd (this repo's own
+Gemini-vision path, same one enrichment_doc_ocr.py uses) -- the model
+confirms it is "a registration packet and instruction form," matching the
+same blank-form pattern already correctly excluded on
+charleston_delinquent_tax.py's FLC-Sealed-Bid-Form.pdf. Live-confirmed the
+superseding source is actually delivering today: a scoped
+qpaybill_delinquent_roll.py run against Clarendon alone returned 1,217 real
+parcels (owner/parcel/situs populated) within its normal budget.
+
 Free, public, no login.
 Slug: counties_sc.clarendon_tax_auction
 Category: county_tax

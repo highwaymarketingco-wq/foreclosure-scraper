@@ -14,6 +14,23 @@ covered by counties_sc.sc_catalis_delinquent_roll.py (CATALIS_COUNTIES
 address). Found via the 2026-10-01 counties_sc per-source extraction audit.
 Do not re-enable without a correct live URL.
 
+RE-VERIFIED 2026-10-03 (extraction-completeness re-audit, batch 8): the
+redirect-to-homepage finding above still holds (live-fetched with the same
+curl_cffi impersonate=True this scraper itself used; canonical link on the
+response is still plain "https://chestercountysc.gov/", a generic homepage,
+no tax-sale content anywhere in the body text). Also checked, for honesty,
+whether the superseding source is actually delivering today: a live scoped
+run of sc_catalis_delinquent_roll.py against Chester hit that host's own
+documented 403-is-a-stop guard immediately (Chester is right after Pickens
+in CATALIS_COUNTIES.SWEEP_ORDER, and that module's own code already treats
+a 403 from this Avenu/Catalis host as a declined request, never to be
+retried or bypassed -- see that module's docstring, dated 2026-09-11). So
+right now, NEITHER this module's own dead URL NOR the superseding source is
+actually yielding Chester delinquent-tax rows -- but re-enabling THIS file
+would not fix that (its own URL is still dead), and the sc_catalis 403 is
+an existing, correctly-handled compliance wall on a DIFFERENT module, not a
+bug in this one. Left disabled.
+
 Slug: counties_sc.chester_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
