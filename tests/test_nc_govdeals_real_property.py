@@ -122,6 +122,35 @@ def test_parse_asset_no_photo_field_omits_images_key():
     assert "images" not in li.raw
 
 
+def test_parse_asset_surfaces_reserve_price_fields():
+    """2026-10-03 (HERMES extraction-completeness audit, batch 5):
+    hasReservePrice/isReserveNotMet were already on every asset this
+    scraper fetches but never read. Live-sampled all 15 current NC+SC
+    real-estate lots: 6/15 carry a reserve, 4 of those not yet met -- a
+    real signal that the displayed currentBid is NOT a price the seller
+    has committed to accept."""
+    row = dict(_YADKIN_COMMERCIAL)
+    row["hasReservePrice"] = True
+    row["isReserveNotMet"] = True
+    li = parse_asset(row)
+    assert li.raw["nc_govdeals_real_property"]["has_reserve"] is True
+    assert li.raw["nc_govdeals_real_property"]["reserve_met"] is False
+
+    row2 = dict(_YADKIN_COMMERCIAL)
+    row2["hasReservePrice"] = True
+    row2["isReserveNotMet"] = False
+    li2 = parse_asset(row2)
+    assert li2.raw["nc_govdeals_real_property"]["reserve_met"] is True
+
+
+def test_parse_asset_no_reserve_price_gives_none_not_false():
+    """No reserve at all must read as unknown (None), not fabricate a
+    reserve_met=True that implies a reserve existed and was cleared."""
+    li = parse_asset(_YADKIN_COMMERCIAL)  # no hasReservePrice key at all
+    assert li.raw["nc_govdeals_real_property"]["has_reserve"] is None
+    assert li.raw["nc_govdeals_real_property"]["reserve_met"] is None
+
+
 def test_parse_asset_land_parcel_street_and_pin_from_description():
     li = parse_asset(_MOUNTAIRY_LAND)
     assert li is not None

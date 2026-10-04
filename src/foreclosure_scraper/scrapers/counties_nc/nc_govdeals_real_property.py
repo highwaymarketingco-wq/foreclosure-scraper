@@ -391,6 +391,18 @@ def parse_asset(d: dict[str, Any]) -> Optional[Listing]:
         lat = lng = None
 
     photo = _photo_url(d.get("photo"), account_id)
+    start_date = _parse_dt(d.get("assetAuctionStartDate"))
+    # hasReservePrice/isReserveNotMet -- found 2026-10-03 (HERMES extraction-
+    # completeness audit, batch 5): already on every asset this scraper
+    # fetches but never read. Live-sampled all 15 current NC+SC real-estate
+    # lots: 6/15 carry a reserve, and of those 4 have NOT yet had it met --
+    # a real, zero-cost signal that the displayed currentBid is NOT yet a
+    # price the seller has committed to accept. Same gap exists in the
+    # sibling national.govdeals.py (which captures has_reserve but not
+    # reserve_met either) -- out of scope here (different source, not in
+    # this batch), flagged separately.
+    has_reserve = d.get("hasReservePrice")
+    reserve_met = (not d.get("isReserveNotMet")) if has_reserve else None
 
     li = Listing(
         source=SLUG,
@@ -422,6 +434,9 @@ def parse_asset(d: dict[str, Any]) -> Optional[Listing]:
                 "category": d.get("categoryDescription"),
                 "dated": sale_date is not None,
                 "current_bid": opening_bid,
+                "start_date": start_date.isoformat() if start_date else None,
+                "has_reserve": has_reserve,
+                "reserve_met": reserve_met,
             }
         },
     )
