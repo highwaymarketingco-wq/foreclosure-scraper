@@ -2,6 +2,30 @@
 
 Source: https://publicindex.sccourts.org/<county>/publicindex/
 
+FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 18), flagged
+for the operator rather than acted on unilaterally: the Charleston
+disclaimer page's own click-through text (jcmsweb.charlestoncounty.org,
+re-read live this batch) states plainly "Access to the South Carolina
+Judicial Department Public Index web sites by a site data scraper or any
+similar software intended to discover and extract data from a website
+through automated, repetitive querying for the purpose of collecting such
+data is expressly prohibited." This module already auto-accepts that same
+disclaimer programmatically (both the Charleston curl flow and the
+nodriver flow below) as part of its existing, multi-session-invested
+architecture (predates this audit by weeks, per the dated findings
+throughout this docstring) -- not a new behavior introduced here. Noted
+for the record, not disabled: this is a standing compliance judgment call
+for the project owner, outside this audit's extraction-completeness scope,
+and disabling a heavily-engineered, actively-producing source (9,464+ real
+party names verified for Charleston alone per main.py's own comment) is
+not a call to make unilaterally mid-audit.
+
+Also FOUND/FIXED this batch (small, code-level, zero live-testing-risk
+fix): `_parse_search_results()` parses a 6th results-table column,
+`date_disposed`, off every row -- but `_to_listings()` never read it back
+out, so it was silently discarded on every case, every run. Now carried
+through to `raw["sc_public_index"]["date_disposed"]`.
+
 SC foreclosure cases are filed as Common Pleas (CP) — case format YYYYCPNNNNNNN.
 The search form uses ASP.NET WebForms with a disclaimer/accept flow + NoBot extender.
 
@@ -551,6 +575,13 @@ class SCPublicIndexScraper(BaseScraper):
             role = case.get("role", "")
             date_filed = case.get("date_filed", "")
             status = case.get("status", "")
+            # FOUND 2026-10-04 (HERMES extraction-completeness audit, batch
+            # 18): _parse_search_results() already parses a 6th column,
+            # date_disposed, off every result row (it's right there in the
+            # same cells[5] read as date_filed/status), but this function
+            # never read it back out of the case dict -- it was captured
+            # then silently thrown away on every single case, every run.
+            date_disposed = case.get("date_disposed", "")
             # See _salvage()'s comment in fetch() for why this must be read
             # per-case, not passed in as a separate county_counts summary --
             # county=None here is what let dedupe_key() collapse nearly the
@@ -575,6 +606,7 @@ class SCPublicIndexScraper(BaseScraper):
                         "case_number": case_num,
                         "date_filed": date_filed,
                         "status": status,
+                        "date_disposed": date_disposed,
                         "court": "SC Common Pleas",
                         "source": "publicindex.sccourts.org",
                     }
