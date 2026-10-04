@@ -47,6 +47,36 @@ FORMAT
 Map Number is the same dashed-TMS format every other SC county source in
 this codebase already uses (e.g. "104-16-12-018").
 
+AUDITED 2026-10-03: the parser decoded all 16 columns into `records` but only
+promoted 7 of them to the `Listing`/raw -- `Acres`, `Buildings`, `Lots`,
+`New Owner Name`, and `New Owner Name 2` were parsed into `rec` and then
+silently dropped on the floor every single fetch. Live-verified against the
+current 343-row PAPER.xlsx (2026-09-22 export): `Acres`, `Buildings`, and
+`Lots` are 100% filled on every row (not a sparse field), and the `Real / MH
+(R,M)` column already captured in raw was never used to set `property_kind`
+either, despite being a clean R/M split (245 real-property / 98 mobile-home).
+Crossed with `Buildings`: every row where `Buildings == "0"` is `Real/MH ==
+"R"` (150 rows, vacant land -- no structure), every `M` row has a nonzero
+`Buildings` count (98 rows, mobile home on the parcel) -- a clean, lossless
+3-way split now wired to `property_kind` (LAND / MOBILE / left UNKNOWN for
+improved "R" rows, since an improved real-property row alone doesn't say
+single-family vs commercial and this module has no field that does).
+`New Owner Name`(+`2`) is sparse (18/343 = 5.2%) but real: the county is
+saying the parcel ALREADY changed hands since the delinquent-tax roll was
+built (e.g. item 00541 "DAVIS WILLIE LEE ETALS" owed the tax, but
+`New Owner Name` = "PAGE MARY KATE & TYRONE DAVIS") -- the defendant on this
+row may no longer be the right person to contact. Surfaced as
+`raw["ownership_transferred"]` + the new-owner name(s), not used to drop the
+row (the debt and parcel are still real; only the right contact changed).
+`Comment` (100% filled, format "<district-digit> $<number>", e.g.
+"3  $17482") was investigated and deliberately NOT promoted: its leading
+digit matches `District` on 343/343 rows (confirmed redundant with the
+column already captured), but the trailing dollar figure has NO stable
+relationship to `Total Tax Due` tested against SC's 4%/6% assessment ratios
+(tax/value ratio ranged 0.008x to 119x across the live file, not a usable
+valuation signal) -- captured verbatim as `raw["comment_raw"]` for
+provenance only, never parsed into a typed amount.
+
 DATELESS: a delinquent-tax balance is a standing condition, not a scheduled
 event -- same reasoning as every other SC delinquent-tax source here. In
 main.py's DATELESS_OK_SOURCES.
@@ -224,11 +254,43 @@ class DillonDelinquentTax(BaseScraper):
                 except ValueError:
                     amt = None
 
+            real_mh = (rec.get("Real / MH (R,M)") or "").strip().upper()
+            buildings_raw = (rec.get("Buildings") or "").strip()
+            lots_raw = (rec.get("Lots") or "").strip()
+            acres_raw = (rec.get("Acres") or "").strip()
+            try:
+                buildings = int(float(buildings_raw)) if buildings_raw else None
+            except ValueError:
+                buildings = None
+            try:
+                lots = int(float(lots_raw)) if lots_raw else None
+            except ValueError:
+                lots = None
+            try:
+                acres = float(acres_raw) if acres_raw else None
+            except ValueError:
+                acres = None
+
+            # Clean, lossless 3-way split live-verified 2026-10-03 (see module
+            # docstring): M => mobile home; R with 0 buildings => vacant land;
+            # R with >=1 building => stays UNKNOWN (no field here says single-
+            # family vs commercial).
+            if real_mh == "M":
+                kind = PropertyKind.MOBILE
+            elif real_mh == "R" and buildings == 0:
+                kind = PropertyKind.LAND
+            else:
+                kind = PropertyKind.UNKNOWN
+
+            new_owner = (rec.get("New Owner Name") or "").strip()
+            new_owner2 = (rec.get("New Owner Name 2") or "").strip()
+            full_new_owner = f"{new_owner} {new_owner2}".strip() if new_owner2 else new_owner
+
             out.append(Listing(
                 source=self.slug,
                 source_url=doc_url,
                 listing_type=ListingType.TAX_SALE,
-                property_kind=PropertyKind.UNKNOWN,
+                property_kind=kind,
                 state="SC",
                 county="Dillon",
                 parcel_id=parcel,
@@ -247,6 +309,12 @@ class DillonDelinquentTax(BaseScraper):
                     "real_or_mh": rec.get("Real / MH (R,M)"),
                     "notice_01_number": rec.get("Notice 01 Number"),
                     "notice_02_number": rec.get("Notice 02 Number"),
+                    "acres": acres,
+                    "buildings": buildings,
+                    "lots": lots,
+                    "ownership_transferred": bool(full_new_owner),
+                    "new_owner_name": full_new_owner or None,
+                    "comment_raw": (rec.get("Comment") or "").strip() or None,
                 }},
             ))
 

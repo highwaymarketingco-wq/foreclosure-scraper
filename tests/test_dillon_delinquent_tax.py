@@ -10,6 +10,7 @@ import struct
 import zipfile
 from xml.sax.saxutils import escape
 
+from foreclosure_scraper.models import PropertyKind
 from foreclosure_scraper.scrapers.counties_sc.dillon_delinquent_tax import (
     _HEADERS, parse_paper_xls, parse_xlsx_rows,
 )
@@ -244,3 +245,102 @@ def test_end_to_end_listing_shape():
     r2 = next(r for r in rows if r.parcel_id == "069-03-12-039")
     assert r2.owner_name == "ADAMS EARLINE BETHEA ETAL % EARLINE ADAMS"
     assert r2.sale_date is None
+
+
+# AUDITED 2026-10-03: Acres/Buildings/Lots/New Owner Name(+2) were parsed
+# off the live file into `rec` and then silently dropped before reaching the
+# Listing/raw. These fixtures mirror real live rows (see batch-10 memory
+# entry): a vacant-land row (Buildings="0"), a mobile-home row (Real/MH="M"),
+# and a row where the parcel already changed hands (New Owner Name filled).
+ROW_VACANT_LAND = {
+    "Item Number": "01270", "Owner Name": "MCCLURE KIMBERLY", "District": "3",
+    "Map Number": "076-00-00-229", "Description": "FRONTING 114 FT ON THE SW SIDE",
+    "Acres": "1.00", "Buildings": "0", "Lots": "0", "Real / MH (R,M)": "R",
+    "Notice 01 Number": "003398253", "Comment": "3 $3949",
+    "Notice 02 Number": "014428243", "Total Tax Due": "528.93",
+}
+ROW_MOBILE_HOME = {
+    "Item Number": "00006", "Owner Name": "ABUDAYYA AMJAD RABAH", "District": "2",
+    "Map Number": "032-00-00-028", "Description": "S SIDE SC 9",
+    "Acres": ".50", "Buildings": "1", "Lots": "1", "Real / MH (R,M)": "M",
+    "Notice 01 Number": "000053253", "Comment": "2 $3096",
+    "Notice 02 Number": "000048243", "Total Tax Due": "234.04",
+}
+ROW_OWNERSHIP_TRANSFERRED = {
+    "Item Number": "00541", "Owner Name": "DAVIS WILLIE LEE ETALS", "District": "1",
+    "Map Number": "111-06-00-077", "Description": "900 SHADY CIRCLE",
+    "Acres": ".00", "Buildings": "1", "Lots": "1",
+    "New Owner Name": "PAGE MARY KATE & TYRONE DAVIS",
+    "Real / MH (R,M)": "R", "Notice 01 Number": "006015253",
+    "Comment": "1 $81088", "Notice 02 Number": "005942243",
+    "Total Tax Due": "3,067.34",
+}
+
+
+def _fetch_rows(rows: list[dict[str, str]]):
+    import asyncio
+    from unittest.mock import patch
+
+    from foreclosure_scraper.scrapers.counties_sc.dillon_delinquent_tax import DillonDelinquentTax
+
+    html = '<a href="Documents/Departments/Treasurer/PAPER.XLS?t=1">Delinquent Tax Sale List</a>'
+    data = _build_file(rows)
+
+    async def fake_get_text(*a, **k):
+        return html
+
+    async def fake_get_bytes(*a, **k):
+        return data
+
+    with patch("foreclosure_scraper.scrapers.counties_sc.dillon_delinquent_tax.get_text", fake_get_text), \
+         patch("foreclosure_scraper.scrapers.counties_sc.dillon_delinquent_tax.get_bytes", fake_get_bytes):
+        return list(asyncio.run(DillonDelinquentTax().fetch()))
+
+
+def test_acres_buildings_lots_captured_in_raw():
+    rows = _fetch_rows([ROW1])
+    r = rows[0]
+    raw = r.raw["dillon_delinquent_tax"]
+    assert raw["acres"] == 0.0
+    assert raw["buildings"] == 1
+    assert raw["lots"] == 1
+    assert raw["comment_raw"] == "3  $17482"
+
+
+def test_zero_buildings_real_property_maps_to_land():
+    rows = _fetch_rows([ROW_VACANT_LAND])
+    r = rows[0]
+    assert r.property_kind == PropertyKind.LAND
+    assert r.raw["dillon_delinquent_tax"]["buildings"] == 0
+    assert r.raw["dillon_delinquent_tax"]["acres"] == 1.0
+
+
+def test_mobile_home_flag_maps_to_mobile_property_kind():
+    rows = _fetch_rows([ROW_MOBILE_HOME])
+    r = rows[0]
+    assert r.property_kind == PropertyKind.MOBILE
+
+
+def test_improved_real_property_stays_unknown_kind():
+    """A real-property row WITH a building isn't necessarily single-family
+    (could be commercial) -- stays UNKNOWN rather than guessing."""
+    rows = _fetch_rows([ROW_OWNERSHIP_TRANSFERRED])
+    r = rows[0]
+    assert r.property_kind == PropertyKind.UNKNOWN
+
+
+def test_new_owner_name_surfaced_without_dropping_the_row():
+    rows = _fetch_rows([ROW_OWNERSHIP_TRANSFERRED])
+    r = rows[0]
+    raw = r.raw["dillon_delinquent_tax"]
+    assert raw["ownership_transferred"] is True
+    assert raw["new_owner_name"] == "PAGE MARY KATE & TYRONE DAVIS"
+    # Still a real lead -- not filtered out despite the ownership change.
+    assert r.defendant == "DAVIS WILLIE LEE ETALS"
+
+
+def test_no_new_owner_flag_false_when_blank():
+    rows = _fetch_rows([ROW1])
+    raw = rows[0].raw["dillon_delinquent_tax"]
+    assert raw["ownership_transferred"] is False
+    assert raw["new_owner_name"] is None
