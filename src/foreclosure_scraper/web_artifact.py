@@ -2266,6 +2266,15 @@ RAW_KEEP = {
     "helene": "*", "henderson_tax": "*", "hendersonville_delinquent_tax": "*",
     "hendersonville_lightning": "*", "hibid": "*", "homeharvest": "*",
     "horry_flc": "*", "hubzu": "*",
+    # national.homepath_json added 2026-10-04 (HERMES extraction-completeness
+    # audit, batch 17): mls_id/property_uuid/retail_status/online_offer_only/
+    # first_look were all flat top-level raw keys, none registered -- a
+    # direct _slim_raw() round-trip confirmed only reo_id/images survived
+    # publish on every one of this scraper's ~4,605 live rows since its
+    # 2026-10-01 rewrite. bedrooms/bathrooms/sqft/year_built promoted to
+    # first-class Listing fields instead (sidesteps RAW_KEEP), same pattern
+    # batch 16 used for hud_homestore.
+    "homepath_json": "*",
     # national.hud_homestore added 2026-10-04 (national.* extraction-
     # completeness audit, batch 16): 9 of this scraper's 11 raw keys
     # (fha_financing/listing_period/property_status/bid_open_date/

@@ -45,6 +45,70 @@ def _prop(uuid: str, state: str = "NC", street: str = "1 Test St") -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Batch 17 (2026-10-04): bedrooms/bathrooms/sqft/year_built/mls_id/
+# property_uuid/retail_status/online_offer_only/first_look were all dropped
+# silently at publish -- a direct _slim_raw() round-trip confirmed only
+# `reo_id` and `images` survived (none of the rest were in RAW_KEEP, and
+# bedrooms/bathrooms/sqft/year_built were never set as first-class Listing
+# fields at all, despite the Listing model having real fields for them).
+# ---------------------------------------------------------------------------
+
+
+def _rich_prop(uuid: str = "rich-1") -> dict:
+    p = _prop(uuid)
+    p.update({
+        "reoId": "R999", "mlsId": "M888",
+        "bedrooms": 3, "bathrooms": 2, "sqft": 1800, "yearBuilt": 2001,
+        "retailStatus": "Price Reduced", "onlineOfferOnly": True,
+        "firstLookProgramIndicator": True,
+        "primHiResImageUrl": "https://homepath.fanniemae.com/images/x.jpg",
+    })
+    return p
+
+
+def test_bedrooms_bathrooms_sqft_year_built_are_first_class_listing_fields():
+    """These are real Listing-model fields (see web_artifact._SLIM_TOP) and
+    must be set directly, not buried in `raw` where they'd need a RAW_KEEP
+    entry that never existed."""
+    li = m._to_listing(_rich_prop(), m.HomePathJSON.slug)
+    assert li.bedrooms == 3.0
+    assert li.bathrooms == 2.0
+    assert li.living_sqft == 1800.0
+    assert li.year_built == 2001
+
+
+def test_remaining_fields_namespaced_under_registered_homepath_json_key():
+    li = m._to_listing(_rich_prop(), m.HomePathJSON.slug)
+    hp = li.raw["homepath_json"]
+    assert hp["mls_id"] == "M888"
+    assert hp["property_uuid"] == "rich-1"
+    assert hp["retail_status"] == "Price Reduced"
+    assert hp["online_offer_only"] is True
+    assert hp["first_look"] is True
+    # reo_id/images stay flat (pre-existing, already-registered convention).
+    assert li.raw["reo_id"] == "R999"
+
+
+def test_raw_fields_survive_slim_raw_round_trip():
+    """Direct regression pin for the silent-drop bug this batch found --
+    every field _to_listing stuffs into raw must still be present after
+    web_artifact._slim_raw() (the real publish-time filter)."""
+    from foreclosure_scraper.web_artifact import _slim_raw
+
+    li = m._to_listing(_rich_prop(), m.HomePathJSON.slug)
+    slim = _slim_raw(li.raw)
+    assert slim.get("homepath_json") == li.raw["homepath_json"]
+    assert slim.get("reo_id") == "R999"
+
+
+def test_missing_year_built_does_not_crash():
+    p = _rich_prop()
+    p["yearBuilt"] = None
+    li = m._to_listing(p, m.HomePathJSON.slug)
+    assert li.year_built is None
+
+
 def test_case_number_uses_the_fannie_prefix_matching_the_sibling_scraper():
     li = m._to_listing(_prop("abc-123"), m.HomePathJSON.slug)
     assert li is not None

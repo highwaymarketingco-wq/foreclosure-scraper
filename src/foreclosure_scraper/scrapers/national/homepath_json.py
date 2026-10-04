@@ -149,6 +149,12 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
         else None
     )
 
+    year_built_raw = p.get("yearBuilt")
+    try:
+        year_built = int(year_built_raw) if year_built_raw else None
+    except (TypeError, ValueError):
+        year_built = None
+
     return Listing(
         source=slug,
         source_url=(
@@ -169,6 +175,23 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
         latitude=lat,
         longitude=lng,
         opening_bid=price,
+        # FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 17):
+        # bedrooms/bathrooms/sqft/year_built are real first-class fields on
+        # the Listing model (confirmed via web_artifact._SLIM_TOP) but this
+        # scraper only ever stuffed them into the flat `raw` dict below,
+        # where NONE of them (nor mls_id/property_uuid/retail_status/
+        # online_offer_only/first_look) were ever in web_artifact.RAW_KEEP --
+        # a direct _slim_raw() round-trip confirmed only `reo_id` and
+        # `images` survived publish; every other field silently dropped on
+        # every one of this scraper's ~4,605 live rows since its 2026-10-01
+        # rewrite. Same fix pattern as batch 16's hud_homestore finding:
+        # promote the property-characteristic fields to first-class Listing
+        # kwargs (always serialized, sidesteps RAW_KEEP entirely) and
+        # namespace the rest under a new registered "homepath_json" key.
+        bedrooms=_safe_float(p.get("bedrooms")),
+        bathrooms=_safe_float(p.get("bathrooms")),
+        living_sqft=_safe_float(p.get("sqft")),
+        year_built=year_built,
         description=(
             f"HomePath REO {p.get('propertyType') or ''} "
             f"{int(p['bedrooms']) if p.get('bedrooms') else ''}bd/"
@@ -179,16 +202,14 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
         last_seen=datetime.utcnow(),
         raw={
             "reo_id": p.get("reoId"),
-            "mls_id": p.get("mlsId"),
-            "property_uuid": p.get("propertyUuid"),
-            "year_built": p.get("yearBuilt"),
-            "bedrooms": p.get("bedrooms"),
-            "bathrooms": p.get("bathrooms"),
-            "sqft": p.get("sqft"),
-            "retail_status": p.get("retailStatus"),
-            "online_offer_only": p.get("onlineOfferOnly"),
-            "first_look": bool(p.get("firstLookProgramIndicator")),
             "images": {"real": photos} if photos else {},
+            "homepath_json": {
+                "mls_id": p.get("mlsId"),
+                "property_uuid": p.get("propertyUuid"),
+                "retail_status": p.get("retailStatus"),
+                "online_offer_only": p.get("onlineOfferOnly"),
+                "first_look": bool(p.get("firstLookProgramIndicator")),
+            },
         },
     )
 
