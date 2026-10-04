@@ -35,6 +35,28 @@ module ``oconee_flc_assignment`` (a different FeatureServer, ``Assignment_FLC``,
 publishing the full cost buildup for the same program) already filters these
 out; reusing its exact departed-status set here for consistency.
 
+2026-10-04 extraction-completeness audit: live schema check (``?f=json`` on
+both layers) found real, populated columns this module asked outFields for
+but never requested, independent of the sibling ``oconee_flc_assignment`` /
+``Assignment_FLC`` service (a DIFFERENT FeatureServer with its own,
+non-identical TMS universe -- 76/948 features here vs 468/189 there -- so
+this is not redundant with that module's money trail). Live-verified counts
+on layer 1 ("FLC", 76 rows): ``DT_Cost``/``Abated_Tax``/``Proc_Fee`` populated
+on 10 rows (the breakdown behind the already-captured ``FLC_Price``/``Bid``
+totals) and ``Comment`` populated on 23 rows with real operator notes, e.g.
+TMS 520-37-01-137 = "not for sale at this time- nv", TMS 316-06-01-070 =
+"HOLD FOR FOXWOOD HILLS POA" -- a HOLD-status parcel (NOT in ``_DEPARTED``,
+so still emitted as a live lead) with no context explaining it is actually
+reserved/unavailable despite appearing "available". ``Total_Tax`` was checked
+too and is genuinely 0/76 populated on this service (unlike the sibling's
+``Assignment_FLC``, which carries it on every row) -- correctly left
+uncaptured, not a miss. On layer 0 ("Assignment", 948 rows): ``Comment`` is
+0/948 non-blank (every "non-null" value is literal whitespace) so NOT worth
+adding there; ``Date`` is populated on 42/948 but the TMS-bearing subset with
+a real parcel id is a handful -- added anyway since it is free and the two
+real-TMS examples found (316-01-01-001, 316-07-01-010) carry both a usable
+Date and a nonzero FLC_Bid.
+
 Dateless: this is a standing inventory, not a seasonal sale list, so there is
 no active_months window — the layers carry parcels year-round.
 
@@ -75,10 +97,10 @@ PAGE_URL = "https://oconeesc.com/auditor-home/forfeited-land"
 _LAYERS: tuple[tuple[int, str, str], ...] = (
     (1, "FLC",
      "OBJECTID,TMS,TMS_NUMBER,Owner,Description,SUBDIVSION,GIS_ACRES,TMS_ACRES,"
-     "FLC_Price,Bid,Sale_Date,Status,Year"),
+     "FLC_Price,Bid,DT_Cost,Abated_Tax,Proc_Fee,Comment,Sale_Date,Status,Year"),
     (0, "Assignment",
      "OBJECTID,TMS,TMS_NUMBER,Owner,Description,SUBDIVSION,GIS_ACRES,TMS_ACRES,"
-     "Acres,FLC_Bid,Redeem_Assign"),
+     "Acres,FLC_Bid,Redeem_Assign,Date"),
 )
 
 _PAGE_SIZE = 1000  # ArcGIS hard cap per request; we page with resultOffset.
@@ -152,7 +174,19 @@ def _feature_to_listing(attrs: dict[str, Any], geom: dict[str, Any], label: str)
     opening_bid = (_money(attrs.get("FLC_Price")) or _money(attrs.get("Bid"))
                    or _money(attrs.get("FLC_Bid")))
 
-    sale_date = _epoch_ms_to_dt(attrs.get("Sale_Date"))
+    # Breakdown behind FLC_Price/Bid, FLC layer only (Assignment layer has no
+    # equivalent columns). DT_Cost is the delinquent-tax cost component; this
+    # service's own Total_Tax is genuinely always blank (checked live), unlike
+    # the sibling oconee_flc_assignment's Assignment_FLC service, which carries
+    # it on every row -- not a parsing miss, just absent here.
+    dt_cost = _money(attrs.get("DT_Cost"))
+    abated_tax = _money(attrs.get("Abated_Tax"))
+    proc_fee = _money(attrs.get("Proc_Fee"))
+    comment = _clean(attrs.get("Comment"))
+
+    # Layer 0's "Date" has no FLC-layer equivalent requested (Sale_Date is
+    # layer-1-only); either way it is the acquisition/assignment date.
+    sale_date = _epoch_ms_to_dt(attrs.get("Sale_Date")) or _epoch_ms_to_dt(attrs.get("Date"))
     status = _clean(attrs.get("Status")) or _clean(attrs.get("Redeem_Assign"))
 
     lat = lng = None
@@ -167,6 +201,12 @@ def _feature_to_listing(attrs: dict[str, Any], geom: dict[str, Any], label: str)
         desc_bits.append(subdiv)
     if status:
         desc_bits.append(f"status={status}")
+    if comment:
+        # Real operator notes caught live explaining a HOLD that isn't in
+        # _DEPARTED (so the parcel still ships as a lead), e.g. "not for sale
+        # at this time- nv" / "HOLD FOR FOXWOOD HILLS POA" -- surface it so a
+        # human sees the caveat the status code alone doesn't convey.
+        desc_bits.append(f"note: {comment}")
     description = " — ".join(desc_bits)
 
     return Listing(
@@ -196,6 +236,10 @@ def _feature_to_listing(attrs: dict[str, Any], geom: dict[str, Any], label: str)
             "owner": owner,
             "status": status,
             "fll_bid": opening_bid,
+            "dt_cost": dt_cost,
+            "abated_tax": abated_tax,
+            "processing_fee": proc_fee,
+            "comment": comment,
             "year": attrs.get("Year"),
             "objectid": attrs.get("OBJECTID"),
         }},

@@ -92,6 +92,51 @@ def test_departed_parcels_are_filtered_out():
     assert tms_out == {"BBB", "FFF"}
 
 
+def test_money_breakdown_and_comment_are_captured_on_flc_layer():
+    """2026-10-04 extraction-completeness fix.
+
+    Live schema/data check found DT_Cost/Abated_Tax/Proc_Fee (the breakdown
+    behind the already-captured FLC_Price/Bid totals, populated on 10/76 live
+    rows) and Comment (real operator notes on 23/76 live rows, e.g. a HOLD
+    parcel's "not for sale at this time- nv" -- HOLD is not in _DEPARTED, so
+    it still ships as a lead with no caveat before this fix) were requested
+    from neither layer's outFields. Total_Tax was checked too and is
+    genuinely 0/76 populated on this service, so it is correctly left out.
+    """
+    from foreclosure_scraper.scrapers.counties_sc import oconee_forfeited_land as mod
+
+    fields = dict((label, f) for _id, label, f in mod._LAYERS)
+    assert "DT_Cost" in fields["FLC"]
+    assert "Abated_Tax" in fields["FLC"]
+    assert "Proc_Fee" in fields["FLC"]
+    assert "Comment" in fields["FLC"]
+    assert "Total_Tax" not in fields["FLC"]  # verified live: always null here
+
+    attrs = {
+        "OBJECTID": 99,
+        "TMS": "316-06-01-070",
+        "Owner": "SOME OWNER",
+        "Status": "HOLD",
+        "FLC_Price": 500.0,
+        "Bid": 450.0,
+        "DT_Cost": 300.0,
+        "Abated_Tax": 15.0,
+        "Proc_Fee": 20.0,
+        "Comment": "HOLD FOR FOXWOOD HILLS POA",
+    }
+    li = mod._feature_to_listing(attrs, {}, "FLC")
+    assert li is not None
+    assert li.raw["oconee_forfeited_land"]["dt_cost"] == 300.0
+    assert li.raw["oconee_forfeited_land"]["abated_tax"] == 15.0
+    assert li.raw["oconee_forfeited_land"]["processing_fee"] == 20.0
+    assert li.raw["oconee_forfeited_land"]["comment"] == "HOLD FOR FOXWOOD HILLS POA"
+    assert "HOLD FOR FOXWOOD HILLS POA" in li.description
+    # HOLD is not in _DEPARTED -- this parcel still ships, which is exactly
+    # why the comment context matters.
+    from foreclosure_scraper.scrapers.counties_sc.oconee_flc_assignment import is_departed
+    assert not is_departed(li.auction_status)
+
+
 def test_a_dead_layer_fails_the_run_instead_of_halving_the_inventory():
     """Half the FLC roll is a believable number, so it must not be shippable.
 
