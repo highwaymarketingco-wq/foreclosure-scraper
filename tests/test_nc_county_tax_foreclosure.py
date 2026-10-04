@@ -13,6 +13,7 @@ import pytest
 from foreclosure_scraper.scrapers.counties_nc.nc_county_tax_foreclosure import (
     COUNTY_PAGES,
     NCCountyTaxForeclosure,
+    parse_kania_text,
     parse_text,
 )
 
@@ -102,6 +103,73 @@ def test_parse_dedupes_repeat_file_numbers():
 
 def test_parse_empty_when_no_file_numbers():
     assert parse_text("No active tax foreclosure sales at this time.", "Polk", "http://x") == []
+
+
+def test_parse_kania_text_extracts_owner_pin_addr_case_bid_and_deadline():
+    """2026-10-03 (HERMES extraction-completeness audit, batch 5): Rutherford's
+    nav menu links a SEPARATE "Outside Law (Kania Law Firm)" page this scraper
+    never fetched at all. Its case-number format ("26CVD000526-800") doesn't
+    match the module's own _FILE_RE, so a naive wire-up would have scanned the
+    page and returned zero rows. Text below is a cleaned excerpt of the real
+    live page (html.unescape already applied upstream -- see the separate
+    &ndash;-entity regression test)."""
+    text = (
+        "Current Foreclosures Pictures below may not be the most recent "
+        "PK Ventures I Limited Partnership – (908440) – 0 Harris Henrietta Rd "
+        "– File #24743, 9.26 acres 26CVD000526-800 Current Bid: $22,100.00, "
+        "amount needed to upset the bid $23,205.00, Last day for upset bid: "
+        "10/12/2026 "
+        "Brooks, Rosalie M., et al. - 912224 - 5970 US 221A Hwy – File #24565, "
+        "House with 1.50 acres 26CV000506-800 Current Bid: $18,354.15, "
+        "Amount needed to upset the bid: $19,271.86 Last day for upset bid: "
+        "10/9/2026 "
+        "Upcoming Kania Law Firm foreclosures"
+    )
+    out = parse_kania_text(text)
+    assert len(out) == 2
+    by_case = {li.case_number: li for li in out}
+
+    r1 = by_case["26CVD000526-800"]
+    assert r1.owner_name == "PK Ventures I Limited Partnership"
+    assert r1.parcel_id == "908440"
+    assert r1.street_address == "0 Harris Henrietta Rd"
+    assert r1.opening_bid == 22100.0
+    assert r1.upset_bid_deadline.strftime("%m/%d/%Y") == "10/12/2026"
+    assert r1.county == "Rutherford"
+    assert r1.state == "NC"
+    assert r1.trustee == "Kania Law Firm, P.A."
+    assert r1.raw["nc_county_tax_foreclosure"]["upset_bid_amount"] == 23205.0
+    assert r1.raw["nc_county_tax_foreclosure"]["file_number"] == "24743"
+
+    r2 = by_case["26CV000506-800"]
+    assert r2.owner_name == "Brooks, Rosalie M., et al"
+    assert r2.parcel_id == "912224"
+    assert r2.street_address == "5970 US 221A Hwy"
+    assert r2.opening_bid == 18354.15
+
+
+def test_parse_kania_text_unescapes_literal_ndash_html_entity():
+    """Live-confirmed 2026-10-03: the real page's separator is the literal
+    text "&ndash;" (an un-decoded HTML entity), not a real en-dash character
+    -- _fetch_page's own tag-stripping only decodes &nbsp;, so every owner/
+    pin/addr match silently failed before parse_kania_text started decoding
+    entities itself."""
+    text = (
+        "Current Foreclosures "
+        "Cedar Creek Mountain, LLC &ndash; 1641050 &ndash; 186 Mountaintop Pkwy "
+        "&ndash; File #23106, 1.11 Acres 24CVD001334-800 Current Bid: $4,501.00, "
+        "Amount needed to upset the bid: $5,251.00 Last day for upset bid: "
+        "10/2/2026"
+    )
+    out = parse_kania_text(text)
+    assert len(out) == 1
+    assert out[0].owner_name == "Cedar Creek Mountain, LLC"
+    assert out[0].parcel_id == "1641050"
+    assert out[0].street_address == "186 Mountaintop Pkwy"
+
+
+def test_parse_kania_text_empty_when_no_records():
+    assert parse_kania_text("Upcoming Kania Law Firm foreclosures on ------ below.") == []
 
 
 def test_in_scope_counties_only():

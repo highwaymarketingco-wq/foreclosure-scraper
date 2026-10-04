@@ -10,6 +10,21 @@ inventory that does NOT surface in the eCourts mortgage pipeline.
 Pages are JS-rendered, so we drive them with the free stealth browser and
 extract via text regex (low per-county volume makes text extraction robust
 across the varied county CMS layouts). In-scope counties only.
+
+2026-10-03 (HERMES extraction-completeness audit, batch 5): Rutherford's own
+"foreclosure_sale_dates.php" page (above) is just the IN-OFFICE track; its own
+nav menu links a SEPARATE "Outside Law (Kania Law Firm)" page this scraper
+never fetched at all -- live-confirmed a second, fully distinct roster of 5
+current Kania-administered Rutherford tax foreclosures (owner, PIN, address,
+file #, acreage/description, case #, current bid, upset-bid amount, upset-bid
+deadline) that this scraper silently never saw. Its case-number format
+("26CVD000526-800") doesn't match ``_FILE_RE`` at all (that pattern caps at 5
+digits before the suffix; these carry 6 then a dash-suffixed docket group), so
+simply adding the URL to ``COUNTY_PAGES`` would have scanned it and returned
+zero rows -- a second silent-zero on top of the missing fetch. Parsed with a
+dedicated ``parse_kania_text`` (own case/file/bid regex set) rather than
+forcing it through the two-sided ``parse_text`` block logic built for the
+other two layouts.
 """
 from __future__ import annotations
 
@@ -35,6 +50,14 @@ COUNTY_PAGES: dict[str, list[str]] = {
     "McDowell": ["https://mcdowellnc.gov/departments/tax-collections/tax-foreclosures/upcoming-tax-foreclosure-sales"],
     "Rutherford": ["https://www.rutherfordcountync.gov/departments/revenue_department_tax_administrator/foreclosure_sale_dates.php"],
 }
+
+# Rutherford's SEPARATE Kania-administered track (see module docstring). Kept
+# out of COUNTY_PAGES (and its own distinct parser, below) since its layout
+# and case-number format don't fit parse_text's two generic shapes.
+RUTHERFORD_KANIA_URL = (
+    "https://www.rutherfordcountync.gov/departments/revenue_department_tax_administrator/"
+    "foreclosure_information/outside_law_(kania_law_firm)_current_and_upcoming_foreclosure_sale_dates.php"
+)
 
 # Sale-status phrases (priority order). "sold"/"redeemed" = the sale is over →
 # not an active opportunity (flag sold_confirmed so the dashboard hides it);
@@ -216,6 +239,117 @@ def parse_text(text: str, county: str, url: str) -> list[Listing]:
     return out
 
 
+# --- Rutherford / Kania Law Firm track (separate layout + case-number format,
+# see module docstring) ------------------------------------------------------
+_KANIA_FILE_RE = re.compile(r"File\s*#\s*(\d+)", re.I)
+# "26CVD000526-800" / "26CV000506-800" -- 2-digit year, CV or CVD, a 4-7 digit
+# docket number, then a dash-suffixed 2-4 digit group. Deliberately separate
+# from the module-level _FILE_RE (which caps at 5 digits with no dash suffix
+# and would silently 0-match every row on this page -- see docstring).
+_KANIA_CASE_RE = re.compile(r"\b(\d{2}\s?[- ]?CV[D]?\s?[- ]?\d{4,7}[- ]?\d{2,4})\b", re.I)
+_KANIA_OWNER_PIN_ADDR_RE = re.compile(
+    r"(?P<owner>[A-Za-z][A-Za-z.,'\- ]{2,70}?)\s*[–-]\s*\(?(?P<pin>\d{4,8})\)?\s*[–-]\s*"
+    r"(?P<addr>\d[^–\n]{2,70}?)\s*[–-]\s*$", re.I,
+)
+_KANIA_BID_RE = re.compile(r"Current Bid:\s*\$([\d,]+\.\d{2})", re.I)
+_KANIA_UPSET_RE = re.compile(r"[Aa]mount needed to upset the bid:?\s*\$([\d,]+\.\d{2})", re.I)
+_KANIA_DEADLINE_RE = re.compile(r"Last day for upset bid:\s*(\d{1,2}/\d{1,2}/\d{2,4})", re.I)
+_KANIA_DESC_RE = re.compile(
+    r",\s*([^\n]{0,60}?)\s*\d{2}\s?[- ]?CV[D]?\s?[- ]?\d{4,7}[- ]?\d{2,4}", re.I)
+# Fixed site boilerplate that otherwise glues onto the FIRST record's owner
+# name (no clean sentence break in the source HTML before it).
+_KANIA_BOILERPLATE_RE = re.compile(
+    r"Current Foreclosures\s*|Pictures below may not be the most recent\s*", re.I)
+
+
+def parse_kania_text(text: str, url: str = RUTHERFORD_KANIA_URL) -> list[Listing]:
+    """Parse Rutherford's separate Kania-administered tax-foreclosure roster.
+
+    One record per "...File #<n>, <desc> <case#> Current Bid: $X, amount
+    needed to upset the bid $Y, Last day for upset bid: <date>" block. Owner/
+    PIN/address sit BEFORE the "File #" anchor; case/bid/upset/deadline sit
+    AFTER it and before the NEXT record's "File #" -- split both ways per
+    anchor (same two-sided-block technique as ``parse_text`` above, applied
+    to this page's own distinct layout).
+    """
+    import html as _html
+    out: list[Listing] = []
+    # The live page's separators are the literal HTML entity "&ndash;" (NOT a
+    # real en-dash character), still unescaped at this point since the
+    # caller only strips &nbsp; -- live-confirmed 2026-10-03, every owner/
+    # pin/addr match silently failed on this before unescaping.
+    clean = _html.unescape(text)
+    clean = _KANIA_BOILERPLATE_RE.sub(" ", clean)
+    file_matches = list(_KANIA_FILE_RE.finditer(clean))
+    seen: set[str] = set()
+    for i, fm in enumerate(file_matches):
+        back_start = file_matches[i - 1].end() if i > 0 else max(0, fm.start() - 200)
+        fwd_end = file_matches[i + 1].start() if i + 1 < len(file_matches) else len(clean)
+        back = clean[back_start:fm.start()]
+        fwd = clean[fm.end():fwd_end]
+
+        owner_m = _KANIA_OWNER_PIN_ADDR_RE.search(back)
+        case_m = _KANIA_CASE_RE.search(fwd)
+        bid_m = _KANIA_BID_RE.search(fwd)
+        upset_m = _KANIA_UPSET_RE.search(fwd)
+        deadline_m = _KANIA_DEADLINE_RE.search(fwd)
+        desc_m = _KANIA_DESC_RE.search(", " + fwd)
+
+        file_no = fm.group(1).strip()
+        case_no = re.sub(r"\s+", "", case_m.group(1)).upper() if case_m else None
+        key = case_no or file_no
+        if key in seen:
+            continue
+        seen.add(key)
+
+        bid = float(bid_m.group(1).replace(",", "")) if bid_m else None
+        upset_amt = float(upset_m.group(1).replace(",", "")) if upset_m else None
+        deadline_dt = None
+        if deadline_m:
+            try:
+                from dateutil import parser as dp
+                deadline_dt = dp.parse(deadline_m.group(1))
+            except (ValueError, TypeError, OverflowError):
+                deadline_dt = None
+
+        owner = owner_m.group("owner").strip(" ,.-") if owner_m else None
+        pin = owner_m.group("pin").strip() if owner_m else None
+        addr = owner_m.group("addr").strip() if owner_m else None
+        desc = desc_m.group(1).strip(" ,") if desc_m else None
+
+        out.append(Listing(
+            source="counties_nc.nc_county_tax_foreclosure",
+            source_url=url,
+            listing_type=ListingType.TAX_SALE,
+            property_kind=PropertyKind.UNKNOWN,
+            state="NC",
+            county="Rutherford",
+            owner_name=owner,
+            defendant=owner,
+            street_address=addr,
+            parcel_id=pin,
+            case_number=case_no,
+            opening_bid=bid,
+            upset_bid_deadline=deadline_dt,
+            foreclosure_process="tax",
+            auction_status="active",
+            trustee="Kania Law Firm, P.A.",
+            description=(
+                f"Rutherford County NC tax foreclosure (Kania Law Firm) — "
+                f"{addr or owner or ('file ' + file_no)}"
+                + (f"; {desc}" if desc else "")
+            )[:400],
+            first_seen=datetime.utcnow(),
+            last_seen=datetime.utcnow(),
+            raw={"nc_county_tax_foreclosure": {
+                "county": "Rutherford", "track": "kania", "file_number": file_no,
+                "description": desc, "upset_bid_amount": upset_amt,
+                "administrator": "Kania Law Firm, P.A.",
+            }},
+        ))
+    return out
+
+
 async def _render(url: str) -> str:
     from ...render import fetch_rendered
     try:
@@ -263,4 +397,27 @@ class NCCountyTaxForeclosure(BaseScraper):
                         continue
                     seen.add(key)
                     out.append(li)
+
+        # Rutherford's separate Kania track (own layout + case-number format;
+        # see module docstring). A plain static GET -- confirmed live this is
+        # ordinary server-rendered HTML, not JS -- so this bypasses
+        # _fetch_page's _FILE_RE-based render-fallback gate (which would
+        # never match this page's case format and waste a browser render on
+        # every run for nothing).
+        try:
+            from ...http_client import get_text
+            html = await get_text(RUTHERFORD_KANIA_URL, headers={"User-Agent": "Mozilla/5.0"})
+            text = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html)
+            text = re.sub(r"(?s)<[^>]+>", " ", text)
+            text = re.sub(r"&nbsp;", " ", text)
+            text = re.sub(r"\s+", " ", text)
+            for li in parse_kania_text(text):
+                key = (li.county, li.case_number)
+                if li.case_number and key in seen:
+                    continue
+                seen.add(key)
+                out.append(li)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("nc_county_tax_foreclosure.kania_fetch_failed", error=str(exc)[:160])
+
         return out
