@@ -6,16 +6,30 @@ docket across two sibling ``.php`` pages under
 ``/departments/revenue_department_tax_administrator/foreclosure_information/``:
 
 1. ``in_office_current_and_upcoming_foreclosure_sale_dates.php`` — the parcels
-   the county prosecutes IN-HOUSE, as a clean server-rendered HTML ``<table>``:
-   Address | Parcel | File # | Tax Value | Sale Date | Opening Bid |
-   Property Record Card | Additional Info. Live-verified 2026-08-30: 16 rows,
-   each with a street address, one-or-two parcel ids, an ``M``-docket file
-   number ("24M251"), a tax value, and a Property-Info link into
-   ``lrcpwa.ncptscloud.com``. Sale dates on this page are mostly soft
-   ("Summer 2026", "Fall 2026", "tbd") — a real calendar quarter, not yet a
-   calendar day — so ``sale_date`` is only set when an actual M/D/Y (or a
-   spelled-out month-day-year) is published; the soft text is preserved in
-   ``raw``.
+   the county prosecutes IN-HOUSE, as TWO sibling server-rendered HTML
+   ``<table>`` elements (2026-10-03: a prior version of this scraper read
+   only the first one with ``css_first("table")``, silently discarding
+   whichever table that wasn't):
+     a. A "CURRENT" / upset-bid-period table: Address | Parcel | File # |
+        Tax Value | Current Bid | Last day to bid | Minimum bid amount |
+        Property Record Card — the SAME upset-bid structure the Kania track
+        (below) gets, run in-house. Emitted with ``auction_status=
+        "upset_period"`` and ``raw["rutherford_foreclosure"]["docket"] ==
+        "in_office_upset"``.
+     b. An "UPCOMING PROPERTIES FOR SALE" table: Address | Parcel | File # |
+        Tax Value | Sale Date and Time | Opening Bid | Property Record Card |
+        Additional Info. Live-verified 2026-10-03: 20 rows, each with a
+        street address, parcel id, tax value, and a Property-Info link into
+        ``lrcpwa.ncptscloud.com``. Sale dates on this page are mostly soft
+        ("Summer 2026", "Fall 2026", "tbd") — a real calendar quarter, not
+        yet a calendar day — so ``sale_date`` is only set when an actual
+        M/D/Y (or a spelled-out month-day-year) is published; the soft text
+        is preserved in ``raw``. Emitted with ``auction_status="upcoming"``
+        and ``docket == "in_office"``.
+   A literal "tbd" cell value (common on both tables before a stage is
+   scheduled) is treated as blank everywhere, not just by the money/date
+   parsers — a row whose address AND parcel are both "tbd" placeholders is
+   skipped rather than published as a junk lead.
 
 2. ``outside_law_(kania_law_firm)_current_and_upcoming_foreclosure_sale_dates.php``
    — the parcels the county farms out to The Kania Law Firm. NOT a table:
@@ -201,6 +215,18 @@ def _first_parcel(raw: Optional[str]) -> tuple[Optional[str], list[str]]:
     return (parts[0] if parts else None), parts
 
 
+#: A cell value that is literally this placeholder text carries no real
+#: information (live-verified on the in-office page: "tbd" appears in
+#: Address/File/Sale-Date/Bid columns alike before a stage is scheduled) --
+#: treat it as blank everywhere, not just in the money/date parsers that
+#: already tolerate it.
+def _clean_tbd(val: Optional[str]) -> Optional[str]:
+    if not val:
+        return None
+    s = val.strip()
+    return None if s.lower() in ("tbd", "n/a", "pending", "") else s
+
+
 def _header_map(table) -> dict[str, int]:
     head = table.css_first("tr")
     out: dict[str, int] = {}
@@ -220,80 +246,156 @@ def _col(cells: list, hmap: dict[str, int], *names: str) -> Optional[str]:
 
 
 def _parse_in_office(html: str, now: datetime.datetime) -> list[Listing]:
+    """The in-office page publishes TWO separate tables, not one:
+
+    1. A "CURRENT" / upset-bid-period table (headers: Current Bid, Last day
+       to bid, Minimum bid amount) -- the SAME two-stage upset-bid structure
+       the Kania track already gets, just run in-house.
+    2. An "UPCOMING PROPERTIES FOR SALE" table (headers: Sale Date and Time,
+       Opening Bid) -- a property scheduled but not yet sold.
+
+    The old code called `tree.css_first("table")`, which only ever reads the
+    FIRST table on the page. Live-verified 2026-10-03: that first table is
+    the upset-bid one, and on the day checked it held a single empty
+    placeholder row ("tbd" in every cell) -- so the scraper published ONE
+    junk listing with street_address="tbd" while silently discarding the
+    SECOND table entirely, which carried 20 real scheduled properties
+    (address, parcel, tax value, a lrcpwa.ncptscloud.com Property Record
+    Card link) -- e.g. "262 Canine Dr, Bostic" / parcel 1647549 / tax value
+    $16,400. Now reads every table on the page and classifies each by its
+    own headers rather than assuming a fixed schema or a fixed count.
+    """
     tree = HTMLParser(html)
-    table = tree.css_first("table")
-    if not table:
-        return []
-    hmap = _header_map(table)
-    rows = table.css("tr")
+    tables = tree.css("table")
     out: list[Listing] = []
-    for tr in rows[1:]:  # skip header
-        cells = tr.css("td")
-        if not cells or len(cells) < 2:
+    for table in tables:
+        hmap = _header_map(table)
+        if not hmap:
             continue
-        addr_raw = _col(cells, hmap, "address")
-        parcel_raw = _col(cells, hmap, "parcel")
-        parcel, all_parcels = _first_parcel(parcel_raw)
-        if not (addr_raw or parcel):
-            continue
-        file_no = _col(cells, hmap, "file")
-        tax_val = _money(_col(cells, hmap, "tax value", "value"))
-        sale_raw = _col(cells, hmap, "sale date", "sale")
-        bid_raw = _col(cells, hmap, "opening bid", "bid")
-        info = _col(cells, hmap, "additional")
-        street, city = _split_addr(addr_raw)
-        # Property-record-card link(s), if any.
-        card_links: list[str] = []
-        for c in cells:
-            for a in c.css("a[href]"):
-                href = (a.attributes.get("href") or "").strip()
-                if href.startswith("http"):
-                    card_links.append(href)
-        sale_dt = _parse_date(sale_raw)
-        no_situs_number = bool(street and street.lstrip().startswith("0 "))
+        is_upset = any(
+            ("last day to bid" in k) or ("minimum bid" in k) or ("current bid" in k)
+            for k in hmap
+        )
+        rows = table.css("tr")
+        for tr in rows[1:]:  # skip header
+            cells = tr.css("td")
+            if not cells or len(cells) < 2:
+                continue
+            addr_raw = _clean_tbd(_col(cells, hmap, "address"))
+            parcel_raw = _clean_tbd(_col(cells, hmap, "parcel"))
+            parcel, all_parcels = _first_parcel(parcel_raw)
+            if not (addr_raw or parcel):
+                continue  # a fully-blank/placeholder row (e.g. the lone "tbd" row)
+            file_no = _clean_tbd(_col(cells, hmap, "file"))
+            tax_val = _money(_col(cells, hmap, "tax value", "value"))
+            info = _col(cells, hmap, "additional")
+            street, city = _split_addr(addr_raw)
+            # Property-record-card link(s), if any.
+            card_links: list[str] = []
+            for c in cells:
+                for a in c.css("a[href]"):
+                    href = (a.attributes.get("href") or "").strip()
+                    if href.startswith("http"):
+                        card_links.append(href)
+            no_situs_number = bool(street and street.lstrip().startswith("0 "))
 
-        bits = [
-            "Rutherford NC tax foreclosure (in-office)",
-            street or addr_raw or "unknown address",
-        ]
-        if file_no and file_no.lower() != "tbd":
-            bits.append(f"File {file_no}")
-        if sale_raw and not sale_dt:
-            bits.append(f"sale: {sale_raw}")
+            if is_upset:
+                current_bid_raw = _clean_tbd(_col(cells, hmap, "current bid"))
+                last_day_raw = _clean_tbd(_col(cells, hmap, "last day to bid"))
+                min_bid_raw = _clean_tbd(_col(cells, hmap, "minimum bid amount"))
+                opening = _money(current_bid_raw)
+                upset_deadline = _parse_date(last_day_raw)
 
-        out.append(Listing(
-            source=SLUG,
-            source_url=IN_OFFICE_URL,
-            listing_type=ListingType.TAX_SALE,
-            property_kind=PropertyKind.UNKNOWN,
-            state="NC",
-            county="Rutherford",
-            parcel_id=parcel,
-            street_address=street,
-            city=city,
-            sale_date=sale_dt,
-            opening_bid=_money(bid_raw),
-            tax_value=tax_val,
-            case_number=(file_no if file_no and file_no.lower() != "tbd" else None),
-            foreclosure_process="tax",
-            auction_status="upcoming",
-            description=" — ".join(b for b in bits if b)[:300],
-            first_seen=now,
-            last_seen=now,
-            raw={"rutherford_foreclosure": {
-                "docket": "in_office",
-                "address_raw": addr_raw,
-                "parcels": all_parcels,
-                "file_number": file_no,
-                "tax_value": tax_val,
-                "sale_date_raw": sale_raw,
-                "opening_bid_raw": bid_raw,
-                "additional_info": info,
-                "property_record_cards": card_links or None,
-                "no_situs_number": no_situs_number,
-                "dateless": sale_dt is None,
-            }},
-        ))
+                bits = [
+                    "Rutherford NC tax foreclosure (in-office, upset bid)",
+                    street or addr_raw or "unknown address",
+                ]
+                if file_no:
+                    bits.append(f"File {file_no}")
+                if last_day_raw:
+                    bits.append(f"upset by {last_day_raw}")
+
+                out.append(Listing(
+                    source=SLUG,
+                    source_url=IN_OFFICE_URL,
+                    listing_type=ListingType.TAX_SALE,
+                    property_kind=PropertyKind.UNKNOWN,
+                    state="NC",
+                    county="Rutherford",
+                    parcel_id=parcel,
+                    street_address=street,
+                    city=city,
+                    opening_bid=opening,
+                    upset_bid_deadline=upset_deadline,
+                    tax_value=tax_val,
+                    case_number=file_no,
+                    foreclosure_process="tax",
+                    auction_status="upset_period",
+                    description=" — ".join(b for b in bits if b)[:300],
+                    first_seen=now,
+                    last_seen=now,
+                    raw={"rutherford_foreclosure": {
+                        "docket": "in_office_upset",
+                        "address_raw": addr_raw,
+                        "parcels": all_parcels,
+                        "file_number": file_no,
+                        "tax_value": tax_val,
+                        "current_bid": opening,
+                        "upset_amount_needed": _money(min_bid_raw),
+                        "last_day_for_upset_bid": last_day_raw,
+                        "property_record_cards": card_links or None,
+                        "no_situs_number": no_situs_number,
+                        "dateless": True,  # carried by upset deadline, not a sale date
+                    }},
+                ))
+                continue
+
+            sale_raw = _col(cells, hmap, "sale date", "sale")
+            bid_raw = _col(cells, hmap, "opening bid", "bid")
+            sale_dt = _parse_date(sale_raw)
+
+            bits = [
+                "Rutherford NC tax foreclosure (in-office)",
+                street or addr_raw or "unknown address",
+            ]
+            if file_no:
+                bits.append(f"File {file_no}")
+            if sale_raw and not sale_dt:
+                bits.append(f"sale: {sale_raw}")
+
+            out.append(Listing(
+                source=SLUG,
+                source_url=IN_OFFICE_URL,
+                listing_type=ListingType.TAX_SALE,
+                property_kind=PropertyKind.UNKNOWN,
+                state="NC",
+                county="Rutherford",
+                parcel_id=parcel,
+                street_address=street,
+                city=city,
+                sale_date=sale_dt,
+                opening_bid=_money(bid_raw),
+                tax_value=tax_val,
+                case_number=file_no,
+                foreclosure_process="tax",
+                auction_status="upcoming",
+                description=" — ".join(b for b in bits if b)[:300],
+                first_seen=now,
+                last_seen=now,
+                raw={"rutherford_foreclosure": {
+                    "docket": "in_office",
+                    "address_raw": addr_raw,
+                    "parcels": all_parcels,
+                    "file_number": file_no,
+                    "tax_value": tax_val,
+                    "sale_date_raw": sale_raw,
+                    "opening_bid_raw": bid_raw,
+                    "additional_info": info,
+                    "property_record_cards": card_links or None,
+                    "no_situs_number": no_situs_number,
+                    "dateless": sale_dt is None,
+                }},
+            ))
     return out
 
 
