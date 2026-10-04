@@ -9,13 +9,14 @@ Brunswick County NC's real, currently-live page titles its postings
 auction" — the exact two phrasings `_SALE_CONTEXT_RE` recognized before this
 fix — so a real posting with a real case number was silently dropped.
 
-This file also pins the known REMAINING gap: Brunswick's real page splits
-the case number and the "Sheriff's Auction" phrase across separate sibling
-`<p>` tags, and the fallback parser evaluates one element at a time, so this
-specific live posting still does not parse even after the regex fix. That
-needs a separate, deliberately NOT-attempted-here change (joining sibling
-paragraph text before matching). The test below documents that limitation
-explicitly so it isn't mistaken for "fully fixed" by a future reader.
+FIXED 2026-10-04 (HERMES extraction-completeness audit, batch 18): this
+file used to pin the known REMAINING gap (Brunswick's real page splits the
+case number and the "Sheriff's Auction" phrase across separate sibling
+`<p>` tags, and the fallback parser evaluated one element at a time, so
+this specific live posting did not parse even after the regex fix above).
+That gap is now fixed via `_join_single_posting_container` (see module
+docstring's 2026-10-04 FIXED note) -- the test below now pins the FIXED
+behavior instead of the gap.
 """
 from __future__ import annotations
 
@@ -37,15 +38,19 @@ _REAL_AUCTION_WORDING_HTML = """
 </body></html>
 """
 
-# Real-shaped reproduction of Brunswick's actual live markup (fetched
-# 2026-10-02): case number and the auction phrase are in separate sibling
-# <p> tags under the same entry-content div, with blank spacer <p>s between.
+# Real-shaped reproduction of Brunswick's actual live markup (re-fetched
+# live 2026-10-04, unchanged since 2026-10-02): case number and the auction
+# phrase are in separate sibling <p> tags under the same entry-content div,
+# with blank spacer <p>s between. Includes the real sergeant's contact
+# phone run together with no separator ("Powell, 9108804903Civil Division"),
+# exactly as the live page renders it.
 _REAL_BRUNSWICK_SPLIT_PARAGRAPHS_HTML = """
 <html><body>
 <div class="entry-content">
 <p>FILE# 19 CVS 004029-640</p>
 <p>&nbsp;</p>
 <p>Brian M. Chism, Sheriff of Brunswick County,<br>
+Sergeant. Christopher Powell, 9108804903<br>
 Civil Division<br>
 Brunswick County Sheriffs&#8217; Office</p>
 <p>&nbsp;</p>
@@ -80,18 +85,24 @@ def test_brunswick_parses_a_real_single_block_auction_notice():
     assert out[0].street_address == "123 Main St"
 
 
-def test_brunswicks_actual_live_markup_still_does_not_parse_known_gap():
-    """KNOWN, DOCUMENTED, NOT-YET-FIXED gap (see module docstring): when the
-    real site splits the case number and the sale-context phrase into
-    separate sibling <p> tags (Brunswick's actual live markup, fetched
-    2026-10-02), the regex fix alone is not enough — each element is
-    evaluated independently and neither one alone has both an address/case
-    number AND the sale-context phrase. This intentionally still returns
-    zero; it is not a passing-but-wrong test, it is a regression guard so a
-    future "fix" doesn't get silently un-fixed, and a signpost for the next
-    real task (join sibling paragraph text before matching)."""
+def test_brunswicks_actual_live_markup_now_parses_fixed_2026_10_04():
+    """FIXED 2026-10-04 (batch 18): the real site splits the case number
+    and the sale-context phrase into separate sibling <p> tags under one
+    div.entry-content -- _join_single_posting_container now joins that
+    container's text (since it holds exactly one case-number signal and
+    one sale-context signal, nothing else to confuse the join with) before
+    extraction, so this now parses to the real single posting instead of
+    zero."""
     out = _parse_brunswick(
         _REAL_BRUNSWICK_SPLIT_PARAGRAPHS_HTML,
         "https://www.brunswicksheriff.com/resources/auctions",
     )
-    assert out == []
+    assert len(out) == 1
+    li = out[0]
+    assert li.case_number is not None and "19" in li.case_number
+    assert li.county == "Brunswick"
+    assert li.state == "NC"
+    # The POSTPONED-TO date must win over the superseded original 7/17 date.
+    assert li.sale_date is not None
+    assert (li.sale_date.month, li.sale_date.day) == (7, 31)
+    assert li.raw["sheriff_sale"]["contact_phone"] == "9108804903"

@@ -24,33 +24,45 @@ log = structlog.get_logger()
 # Top metros INSIDE our footprint (matched against SCOPE_DENY_COUNTIES
 # downstream — out-of-scope cities like Charlotte/Raleigh/Greenville-SC
 # would just get filtered, so don't bother scraping them at all).
+#
+# FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 18): this
+# tuple used to query by CITY/SEAT name ("Asheville, NC") rather than the
+# whole county — the exact under-coverage bug class batch 17 found and
+# fixed on the sibling national.homeharvest ("searched by SEAT-TOWN CITY
+# NAME instead of the whole county"), just not yet backported here. Live-
+# verified the same lift on THIS scraper's own query shape (foreclosure=
+# True, past_days=180): "Asheville, NC" -> 2 rows vs "Buncombe County, NC"
+# -> 3 rows (adds a real Fletcher, NC row the city-only query missed);
+# "Myrtle Beach, SC" (10) + "North Myrtle Beach, SC" (0) vs "Horry County,
+# SC" (13) -- the county-wide query is a strict superset, not just a
+# dedup of the two city queries. Replaced every city anchor with its real
+# county (resolved via the same upstate/coastal/bankruptcy gazetteers
+# fannie_homepath.py / estate_sales.py / crexi_multifamily.py already use
+# for this identical city->county problem, confirmed live 2026-10-04) and
+# deduped the coastal cities that share a county (e.g. Wilmington +
+# Wrightsville Beach + Carolina Beach are all New Hanover County) down to
+# 13 unique counties from the original 18 city entries -- fewer fetches,
+# strictly more coverage.
 SEARCH_LOCATIONS = (
-    # In-scope WNC + upstate-SC anchors
-    "Asheville, NC",
-    "Hickory, NC",
-    "Spartanburg, SC",
-    # Coastal cities — only oceanfront-passing listings will survive
+    # In-scope WNC + upstate-SC anchors — county-wide, not seat-city-only
+    "Buncombe County, NC",      # was "Asheville, NC"
+    "Catawba County, NC",       # was "Hickory, NC"
+    "Spartanburg County, SC",   # was "Spartanburg, SC" (already county-seat-named)
+    # Coastal counties — only oceanfront-passing listings will survive
     # _in_scope (OCEANFRONT_COASTAL_COUNTIES override). HomeHarvest's
     # MLS descriptions usually contain "oceanfront" / "beachfront" terms
     # when the property qualifies, giving the keyword signal the second
     # hit it needs alongside geofence.
-    "Wilmington, NC",
-    "Wrightsville Beach, NC",
-    "Carolina Beach, NC",
-    "Oak Island, NC",
-    "Holden Beach, NC",
-    "Topsail Beach, NC",
-    "Atlantic Beach, NC",
-    "Emerald Isle, NC",
-    "Nags Head, NC",
-    "Myrtle Beach, SC",
-    "North Myrtle Beach, SC",
-    "Pawleys Island, SC",
-    "Folly Beach, SC",
-    "Isle of Palms, SC",
-    "Charleston, SC",
-    "Edisto Beach, SC",
-    "Hilton Head Island, SC",
+    "New Hanover County, NC",   # was Wilmington, Wrightsville Beach, Carolina Beach
+    "Brunswick County, NC",     # was Oak Island, Holden Beach
+    "Pender County, NC",        # was Topsail Beach
+    "Carteret County, NC",      # was Atlantic Beach, Emerald Isle
+    "Dare County, NC",          # was Nags Head
+    "Horry County, SC",         # was Myrtle Beach, North Myrtle Beach
+    "Georgetown County, SC",    # was Pawleys Island
+    "Charleston County, SC",    # was Folly Beach, Isle of Palms, Charleston
+    "Colleton County, SC",      # was Edisto Beach
+    "Beaufort County, SC",      # was Hilton Head Island
 )
 
 
@@ -161,6 +173,21 @@ def _to_listing(row, slug: str) -> Listing | None:
                 "broker_name": _clean(row.get("broker_name")),
                 "mls_id": _clean(row.get("mls_id")),
                 "half_baths": _f(row.get("half_baths")),
+                # FOUND 2026-10-04 (HERMES extraction-completeness audit,
+                # batch 18): already on this scraper's own HomeHarvest row,
+                # zero extra requests, never read -- same gap batch 17 fixed
+                # on the sibling national.homeharvest. Live-verified 2026-
+                # 10-04 against the real current Horry County, SC query:
+                # 9/13 rows carry a real last_sold_price/last_sold_date/
+                # sold_price, 12/13 a real hoa_fee, 11/13 stories, 13/13
+                # new_construction -- a real recent-sale/new-build signal on
+                # a property now listed as a foreclosure.
+                "last_sold_price": _f(row.get("last_sold_price")),
+                "last_sold_date": str(row.get("last_sold_date") or "") or None,
+                "sold_price": _f(row.get("sold_price")),
+                "hoa_fee": _f(row.get("hoa_fee")),
+                "stories": _f(row.get("stories")),
+                "new_construction": bool(row.get("new_construction")) if row.get("new_construction") is not None else None,
             },
             "zillow": {
                 "photo": photos[0] if photos else None,

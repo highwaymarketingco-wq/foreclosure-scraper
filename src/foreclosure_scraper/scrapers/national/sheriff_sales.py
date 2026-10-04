@@ -74,19 +74,38 @@ original false positive through) -- this widens recall for any page that
 puts the sale-context phrase and the address/case number in the SAME text
 block, which is the shape this module's own test fixtures use.
 
-NOT YET FIXED, same investigation, scoped but intentionally not attempted
-here (would touch all three parsers' shared per-element loop, a bigger and
-riskier change than this pass's mandate): Brunswick's THIS SPECIFIC live
-posting still parses to 0 listings even after the regex widening above,
-because its real markup splits the case number and the "Sheriff's Auction"
-phrase into separate sibling `<p>` tags inside the same `div.entry-content`
-(`<p>FILE# 19 CVS 004029-640</p>` ... `<p><a>SHERIFF'S AUCTION ...</a></p>`),
-and the fallback parser only ever evaluates one CSS-matched element's own
-text at a time -- it never joins sibling paragraphs into one block. Fixing
-that needs grouping consecutive sibling `<p>` text within the same parent
-before applying `_SALE_CONTEXT_RE`/address/case extraction, which changes
-the false-positive surface this module's whole fix history is about, so it
-deserves its own dedicated pass with fresh fixtures, not a rider on this one.
+FIXED 2026-10-04 (HERMES extraction-completeness audit, batch 18), the item
+the 2026-10-02 note above left deliberately deferred. Re-verified live: the
+real current Brunswick page STILL has the exact same 3-sibling-`<p>` shape
+under `div.entry-content` (`<p>FILE# 19 CVS 004029-640</p>`, a blank
+spacer, `<p>Brian M. Chism, Sheriff... Sergeant. Christopher Powell,
+9108804903...</p>`, a blank spacer, `<p><a>SHERIFF'S AUCTION 7/17/2026
+(POSTPONED TO 7/31/26)</a></p>`), and still parses to 0 listings without
+this fix. Implemented the narrow, bounded join the deferred note called
+for, via `_join_single_posting_container()`: when a known content
+container (`div.entry-content`, `article`, `div.content`) holds EXACTLY
+ONE case-number-shaped paragraph and EXACTLY ONE sale-context-phrase
+paragraph among its direct children, it is safe to join that container's
+whole text into one block before extraction -- there is nothing else under
+it to confuse the join with. If a container ever holds MULTIPLE case-number
+or sale-context signals (i.e. genuinely multiple distinct postings sharing
+one parent), the join is skipped outright and control falls through to the
+existing, already-correct per-element loop -- so this does not touch or
+loosen the false-positive surface the 2026-10-01 fix was about. Live-
+verified end to end: Brunswick now parses the real live page to 1 listing
+(case `19 CVS 004029-640`, sale_date 2026-07-31 via the POSTPONED-TO date,
+not the superseded 7/17 date). Also captured the sergeant's real direct
+phone (9108804903) from that same paragraph -- previously thrown away
+entirely -- into `raw["sheriff_sale"]["contact_phone"]`.
+
+Also fixed in `_fetch_county`: the cross-page dedup keyed SOLELY on
+`source_url`, which is the same value for every listing parsed off one
+page -- so a page with 2+ genuinely distinct postings would have silently
+kept only the FIRST and dropped the rest as "duplicates" (confirmed by
+reading the loop, not live-observed, since Brunswick's page currently
+carries only the one posting -- but the bug is unconditional and would
+hit the next real second posting on any of these 3 pages). Re-keyed on
+`(source_url, case_number, street_address)` instead.
 
 This is a narrow fix to a narrow genuine legal category, not a bucket-
 reclassification bug: see `distress_score.py` / the per-county sheriff
@@ -151,6 +170,43 @@ _ADDR_RE = re.compile(
     re.I,
 )
 _UPSET_BID_RE = re.compile(r"upset\s+bid", re.I)
+#: FOUND 2026-10-04 (batch 18): Brunswick's real live posting reads
+#: "SHERIFF'S AUCTION 7/17/2026 (POSTPONED TO 7/31/26)" -- the ORIGINAL
+#: sale date appears first in the text and would win a plain first-match
+#: `_DATE_RE` search, but the date that actually matters is the new one
+#: after "POSTPONED TO". Checked first in `_effective_sale_date` below.
+_POSTPONED_TO_RE = re.compile(r"postponed\s+to\s*:?\s*([^)\n;]+)", re.I)
+
+
+def _effective_sale_date(text: str | None) -> datetime | None:
+    """Prefer an explicit "postponed to <date>" date over the first date
+    found in the text (which is usually the superseded original date)."""
+    if not text:
+        return None
+    pm = _POSTPONED_TO_RE.search(text)
+    if pm:
+        d = _parse_date(pm.group(1))
+        if d is not None:
+            return d
+    return _parse_date(text)
+#: FOUND 2026-10-04 (batch 18): Brunswick's real live contact paragraph
+#: ("Sergeant. Christopher Powell, 9108804903Civil Division...") runs the
+#: phone digits straight into the next WORD with no separator at all (not
+#: even a space) -- `selectolax`'s default `.text()` inserts nothing at
+#: `<br>` boundaries. The standard `\d{3}[-.\s]\d{3}[-.\s]\d{4}\b` pattern
+#: used elsewhere in this codebase (enrichment_free_phones.py etc.) requires
+#: a separator AND a trailing `\b`, and `\b` does not fire between a digit
+#: and an immediately-following letter (both are \w) -- confirmed live this
+#: pattern alone does NOT match "9108804903Civil". Uses `(?!\d)`/`(?<!\d)`
+#: instead of `\b` so a run of exactly 10 digits still matches even when a
+#: letter follows with zero separator, while still refusing to match inside
+#: a LONGER run of digits (e.g. a 12-digit case/parcel number).
+_PHONE_RE = re.compile(r"(?<!\d)\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)")
+
+
+def _extract_phone(text: str) -> str | None:
+    m = _PHONE_RE.search(text or "")
+    return m.group().strip() if m else None
 #: Required before the free-text fallback parser will treat an address/
 #: case-number match as a real sale listing — see the module docstring's
 #: 2026-10-01 false-positive writeup for why this guard exists.
@@ -181,6 +237,48 @@ _SALE_CONTEXT_RE = re.compile(
 #: File extensions that are never worth HTML-parsing as a sub-page (a PDF
 #: fed through HTMLParser produces no real rows, just wasted fetches).
 _NON_HTML_EXT = (".pdf", ".jpg", ".jpeg", ".png", ".gif", ".doc", ".docx", ".xls", ".xlsx")
+
+#: Content-container selectors to try for `_join_single_posting_container`,
+#: in priority order. `div.entry-content` is Brunswick's real live wrapper
+#: (WordPress default theme); `article`/`div.content` are kept as
+#: lower-priority fallbacks for the sibling county sites, untested against
+#: a live multi-paragraph posting but following the same WordPress/CMS
+#: convention.
+_POSTING_CONTAINER_SELECTORS = ("div.entry-content", "article", "div.content")
+
+
+def _join_single_posting_container(tree: HTMLParser) -> str | None:
+    """FOUND/FIXED 2026-10-04 (HERMES extraction-completeness audit, batch
+    18) -- see module docstring's FIXED note. Brunswick's real live page
+    splits one single posting's case number, contact block, and sale-
+    context phrase across separate sibling `<p>` tags under the same
+    `div.entry-content`, so the per-element fallback loop below never sees
+    all three in the same text block.
+
+    This looks for a content container whose direct children collectively
+    hold EXACTLY ONE case-number-shaped paragraph and EXACTLY ONE sale-
+    context-phrase paragraph (`_SALE_CONTEXT_RE`). When that holds, there
+    is nothing else under the container to confuse a join with, so it is
+    safe to join ALL of its non-blank child text into one block. If a
+    container holds zero, or MORE THAN ONE, of either signal -- which would
+    mean either no real posting, or multiple distinct postings sharing one
+    parent -- this returns None and the caller must fall through to the
+    existing per-element loop instead, so genuinely separate postings are
+    never merged into one composite (fabricated) listing.
+    """
+    for sel in _POSTING_CONTAINER_SELECTORS:
+        container = tree.css_first(sel)
+        if container is None:
+            continue
+        texts = [child.text(strip=True) for child in container.iter()]
+        texts = [t for t in texts if t]
+        if not texts:
+            continue
+        case_hits = sum(1 for t in texts if _CASE_RE.search(t))
+        sale_hits = sum(1 for t in texts if _SALE_CONTEXT_RE.search(t))
+        if case_hits == 1 and sale_hits == 1:
+            return " ".join(texts)
+    return None
 
 
 def _parse_money(text: str | None) -> float | None:
@@ -445,6 +543,51 @@ def _parse_brunswick(html: str, source_url: str) -> list[Listing]:
         if li:
             out.append(li)
 
+    # FIXED 2026-10-04 (batch 18, see module docstring's FIXED note): try
+    # joining a single-posting container BEFORE the per-element loop below.
+    # Brunswick's real live page splits one posting's case number, contact
+    # block, and sale-context phrase across separate sibling <p> tags, so
+    # the per-element loop (which only ever sees one tag's own text) finds
+    # none of them. `_join_single_posting_container` only returns a block
+    # when it is safe to (exactly one case-number signal + one sale-context
+    # signal under the container), so this cannot merge multiple distinct
+    # postings into one fabricated listing.
+    if not out:
+        joined = _join_single_posting_container(tree)
+        if joined and _SALE_CONTEXT_RE.search(joined):
+            addr = _extract_address(joined)
+            case = _extract_case_number(joined)
+            if addr or case:
+                sale_date = _effective_sale_date(joined)
+                bid = _parse_money(joined)
+                phone = _extract_phone(joined)
+                defendant = None
+                dm = re.search(r"(?:defendant|debtor|owner)\s*:?\s*(.+?)(?:\n|;|\||$)",
+                               joined, re.I)
+                if dm:
+                    defendant = dm.group(1).strip()
+                out.append(Listing(
+                    source="national.sheriff_sales",
+                    source_url=source_url,
+                    listing_type=ListingType.SHERIFF_SALE,
+                    property_kind=PropertyKind.UNKNOWN,
+                    street_address=addr,
+                    county="Brunswick",
+                    state="NC",
+                    case_number=case,
+                    defendant=defendant,
+                    sale_date=sale_date,
+                    opening_bid=bid,
+                    sale_location="Brunswick County Sheriff's Office",
+                    description=joined[:500] if joined else None,
+                    first_seen=datetime.utcnow(),
+                    last_seen=datetime.utcnow(),
+                    raw={"sheriff_sale": {"county": "Brunswick", "state": "NC",
+                                          "text_block": joined[:500],
+                                          "contact_phone": phone,
+                                          "joined_container": True}},
+                ))
+
     # Also check for list-based layouts (<li> or <div> with auction text)
     if not out:
         for el in tree.css("li, div.entry, div.auction, div.content p"):
@@ -459,8 +602,9 @@ def _parse_brunswick(html: str, source_url: str) -> list[Listing]:
             case = _extract_case_number(text)
             if not addr and not case:
                 continue
-            sale_date = _parse_date(text)
+            sale_date = _effective_sale_date(text)
             bid = _parse_money(text)
+            phone = _extract_phone(text)
             # Try to extract defendant from common label patterns
             defendant = None
             dm = re.search(r"(?:defendant|debtor|owner)\s*:?\s*(.+?)(?:\n|;|\||$)",
@@ -485,7 +629,8 @@ def _parse_brunswick(html: str, source_url: str) -> list[Listing]:
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),
                 raw={"sheriff_sale": {"county": "Brunswick", "state": "NC",
-                                      "text_block": text[:500]}},
+                                      "text_block": text[:500],
+                                      "contact_phone": phone}},
             )
             out.append(li)
 
@@ -522,7 +667,7 @@ def _parse_charleston(html: str, source_url: str) -> list[Listing]:
             case = _extract_case_number(text)
             if not addr and not case:
                 continue
-            sale_date = _parse_date(text)
+            sale_date = _effective_sale_date(text)
             bid = _parse_money(text)
             defendant = None
             dm = re.search(
@@ -586,7 +731,7 @@ def _parse_cleveland(html: str, source_url: str) -> list[Listing]:
             case = _extract_case_number(text)
             if not addr and not case:
                 continue
-            sale_date = _parse_date(text)
+            sale_date = _effective_sale_date(text)
             bid = _parse_money(text)
             defendant = None
             dm = re.search(
@@ -679,7 +824,16 @@ async def _fetch_county(
         return []
 
     out: list[Listing] = []
-    seen_urls: set[str] = set()
+    # FOUND/FIXED 2026-10-04 (batch 18): this used to dedupe on bare
+    # `li.source_url` alone -- every listing parsed off the SAME page
+    # shares the same source_url (the page URL itself), so a page with 2+
+    # genuinely distinct postings would have silently kept only the FIRST
+    # one and dropped the rest as "duplicates". The whole point of this set
+    # is to avoid re-adding the SAME posting when it appears on both the
+    # main listing page and a linked sub-page, which (source_url, case_number,
+    # street_address) still catches -- it just no longer also collapses
+    # multiple real postings on one page into one.
+    seen: set[tuple[str, str | None, str | None]] = set()
     for page_url in sub_urls[:6]:  # cap at 6 pages to stay polite
         if page_url != url:
             try:
@@ -692,8 +846,9 @@ async def _fetch_county(
                 continue
         listings = parser(html, page_url)
         for li in listings:
-            if li.source_url not in seen_urls:
-                seen_urls.add(li.source_url)
+            key = (li.source_url, li.case_number, li.street_address)
+            if key not in seen:
+                seen.add(key)
                 out.append(li)
         if listings:
             log.info("sheriff_sales.page_done", county=county,

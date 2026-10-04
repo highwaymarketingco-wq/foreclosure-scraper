@@ -3,9 +3,14 @@
 Looks up LLC/Corp entities by name for the enrichment pipeline. Used to detect
 dissolved/admin/revoked entities (distress signal for LLC-owned properties).
 
-This is an ENRICHMENT scraper, not a lead source. It is called by the
-enrichment_sos_sc module when a listing has an LLC/Inc defendant or owner.
-The scraper does a name search and returns entity status.
+This is an ENRICHMENT scraper, not a lead source. The scraper does a name
+search and returns entity status. CORRECTED 2026-10-04 (batch 18): this
+docstring used to claim it is "called by the enrichment_sos_sc module" --
+no such module exists anywhere in this codebase (only
+enrichment_sos_agent.py and enrichment_sos_dissolution.py do, and neither
+calls this), and a repo-wide grep for search_entity() finds zero callers
+outside this file's own test. Stale claim, same pattern batch 17 found on
+opencorporates.py's identical docstring claim.
 
 WALLED-CONFIRMED-DEAD (2026-10-01 per-source audit), matches the operator's
 own prior note ("SC SoS captcha-walled"):
@@ -34,6 +39,31 @@ remains the free path for entity/agent lookups; this one does not have one.
 
 Free, public, no login required for the search ITSELF -- but gated by a
 CAPTCHA. Server-rendered HTML with a form POST.
+
+FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 18), same bug
+class as the 2026-10-01 law_firms.korn fix and the 2026-10-04 (batch 17)
+national.nc_sos_ucc / national.opencorporates fixes: this class never set
+`disabled = True`, and `scrapers/_registry.py`'s `discover()` auto-registers
+every BaseScraper subclass in the national package with no category filter
+(confirmed by reading it -- "enrichment" is not special-cased anywhere).
+That means `SCSOSBusinessSearch` has been running through the normal
+safe_run() path on every orchestration cycle since the CAPTCHA wall was
+documented 2026-10-01, and `fetch()`'s hardcoded `return []` recorded
+OUTCOME_ZERO every single time -- indistinguishable from a real source
+having a quiet week, on a helper that is actually a permanent dead-end for
+its one real function. Also found: this docstring's own claim that
+search_entity() "is called by the enrichment_sos_sc module" is stale/false
+-- no `enrichment_sos_sc` module exists anywhere in this codebase (only
+`enrichment_sos_agent.py` and `enrichment_sos_dissolution.py` do, and
+neither calls this), and a repo-wide grep for `search_entity` found ZERO
+callers outside this file and its own test file -- the exact same
+stale-docstring pattern batch 17 found on opencorporates.py. Re-verified
+live 2026-10-04 via a real browser session (not just curl): the real
+current `/BusinessFiling/Entity/Search` page carries the SAME reCAPTCHA
+sitekey (`6Leb4xEUAAAAABb-cJNQHgSXe100c1ch58rsqKJh`) the 2026-10-01 note
+found, hidden on load but confirmed to render VISIBLY after submitting a
+real search (`document.getElementById('SearchTextBox').value='Smith'` +
+clicking `EntitySearchButton`) -- genuine, unchanged wall.
 """
 from __future__ import annotations
 
@@ -70,9 +100,11 @@ def _normalize_entity_name(name: str) -> str:
 class SCSOSBusinessSearch(BaseScraper):
     """Search SC SOS for business entity status by name.
 
-    This scraper is designed to be called directly by the enrichment pipeline
-    (enrichment_sos_sc) rather than producing standalone leads. When called
-    as a standalone scraper, it does nothing (returns []).
+    Enrichment-only: NOT currently called by anything in this codebase (see
+    module docstring's 2026-10-04 FOUND note -- the "called by
+    enrichment_sos_sc" claim was stale). Standalone fetch returns [].
+    search_entity()'s one real function is reCAPTCHA-walled (re-verified
+    live 2026-10-04).
     """
     slug = "national.sc_sos_entity"
     name = "SC Secretary of State Business Entity Search"
@@ -80,9 +112,29 @@ class SCSOSBusinessSearch(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 60.0
+    # FIXED 2026-10-04 (HERMES extraction-completeness audit, batch 18):
+    # see module docstring's FOUND note -- this auto-registers into the
+    # normal scrape loop (scrapers/_registry.py discover() has no category
+    # filter) and fetch()'s hardcoded `return []` was recording the
+    # ambiguous OUTCOME_ZERO every run instead of the accurate
+    # OUTCOME_DORMANT this confirmed-permanent CAPTCHA wall (re-verified
+    # live 2026-10-04) and currently-uncalled helper deserves.
+    disabled = True
+    disabled_reason = (
+        "search_entity()'s one real function is reCAPTCHA-gated (confirmed "
+        "live 2026-10-04: a real Google reCAPTCHA renders on the results "
+        "page after any search submission, same sitekey the 2026-10-01 "
+        "audit found) -- a compliance wall this codebase does not solve or "
+        "route around. Also uncalled: no enrichment_sos_sc module exists in "
+        "this codebase and a repo-wide grep finds zero callers of "
+        "search_entity() outside this file's own test."
+    )
 
     async def fetch(self) -> Iterable[Listing]:
-        # Standalone: no-op. This module is called by enrichment_sos_sc.
+        # Confirmed permanently CAPTCHA-walled -- see module docstring.
+        # `disabled = True` above means safe_run never even calls this, but
+        # fetch() stays a safe no-op for any direct caller (tests,
+        # __main__ probes, etc.)
         return []
 
     @staticmethod

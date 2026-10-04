@@ -1,28 +1,36 @@
 """SeeClickFix municipal issue API v2 — free, keyless bulk data.
 
-DISABLED 2026-09-15 (national.* zero-row audit) — confirmed garbage
-emitter. SeeClickFix's v2 API silently ignores the `lat`/`lng`/`radius`
-geo-filter params today (a query for Asheville NC returns issues from
-Tacoma WA, Detroit MI, Salem MA, etc — live-verified), and `_fetch_city`
-below then HARDCODES `city=c["city"], state=c["state"]` from the query
-dict rather than the real returned address, so a Salem MA "Illegal
-Dumping" report gets mislabeled `city="Asheville", state="NC"`. Produced
-1,239 rows of fabricated-geography municipal complaints in one live run.
-Currently harmless only because every row also lacks a real
-county/zip_code and gets dropped by the scope gate — this was disabled
-outright rather than left dormant so a future scope-gate fix (e.g. a
-generic county-arrives-late bypass, the same class of fix craigslist_fsbo
-got this same audit) doesn't start landing these on the board.
+FIXED 2026-10-04 (HERMES extraction-completeness audit, batch 18) -- was
+DISABLED 2026-09-15 (national.* zero-row audit) as a confirmed garbage
+emitter: SeeClickFix's v2 API silently ignores the `lat`/`lng`/`radius`
+geo-filter params (re-confirmed STILL true live 2026-10-04: a query for
+Asheville NC's coordinates still returns issues from Mesquite TX, Cape
+Winelands ZAF, Toledo OH, Oakland CA, Fort Lauderdale FL, Albuquerque NM,
+Rock Island IL), and the old `_fetch_city` then HARDCODED
+`city=c["city"], state=c["state"]` from the query dict rather than the
+real returned address, fabricating geography on every row.
 
-A real fix needs the API's actual per-issue lat/lng + address (SeeClickFix
-does return these; they were just never asserted onto city/state) and a
-distance check against the queried point before keeping a row — not a
-loose keyword match.
+The real, free fix: SCF has a SEPARATE, genuinely-working `place_url`
+scoping param (undocumented in the module's old note) -- confirmed live
+2026-10-04 that `/api/v2/issues?place_url=<slug>` returns correctly
+geo-scoped results, e.g. `place_url=spartanburg` -> 415 entries, all real
+Spartanburg SC addresses. The slug is NOT always just the lowercased city
+name though -- SCF's own `/api/v2/places?lat=&lng=` lookup (which DOES
+state-disambiguate) caught a real collision: `place_url=hendersonville`
+resolves to Hendersonville, TENNESSEE (wrong state entirely), while the
+correct NC slug is `hendersonville_nc`. Every one of this module's 20
+footprint cities was re-resolved this way (places-lookup first, verified
+state match; a couple of slugs like `greer`/`union_3`/`anderson_3` needed
+cross-checking directly against `/issues?place_url=` since the places
+lookup's own nearest-point search didn't always surface the right City
+object) and spot-checked against real live addresses before being hard-
+coded below. A handful (Brevard/Rutherfordton/Marion/Sylva/Burnsville/
+Union/Pickens/Walhalla) resolve to a real, state-verified SCF place that
+currently has ZERO total issues ever reported -- plausible for small rural
+towns, not a mapping error (the place_url itself is state-confirmed).
 
-Original design intent, for a future real rebuild: SeeClickFix is a
-citizen-reporting platform used by 100s of US municipalities. Issues
-tagged "code violation"/"abandoned property"/"blight"/"vacant"/"graffiti"
-are real motivated-seller distress signals. API docs:
+Issues tagged "code violation"/"abandoned property"/"blight"/"vacant"/
+"graffiti" are real motivated-seller distress signals. API docs:
 https://developer.seeclickfix.com/ — free, no key needed for basic
 queries (rate-limited ~100 req/min).
 """
@@ -42,33 +50,59 @@ log = structlog.get_logger()
 
 _API = "https://seeclickfix.com/api/v2/issues"
 
-# Footprint city -> {lat, lng, radius} for the API search. SeeClickFix
-# uses lat/lng + radius (meters) bounding. We cover the core 18-county
-# metro areas. 5000m radius covers most city cores.
+# Footprint city -> real, state-verified SCF `place_url` slug (see module
+# docstring's 2026-10-04 FOUND note for how each was resolved/verified).
+# `county` is hardcoded from this project's own gazetteers
+# (_upstate_city_to_county.upstate_county_for), not derived from the API,
+# since these are the anchor cities WE chose, not something SCF returns.
 _CITIES = [
     # NC
-    {"city": "Asheville", "state": "NC", "lat": 35.5951, "lng": -82.5515, "radius": 8000},
-    {"city": "Hendersonville", "state": "NC", "lat": 35.3185, "lng": -82.4600, "radius": 5000},
-    {"city": "Brevard", "state": "NC", "lat": 35.2335, "lng": -82.7340, "radius": 5000},
-    {"city": "Rutherfordton", "state": "NC", "lat": 35.3668, "lng": -81.9570, "radius": 5000},
-    {"city": "Marion", "state": "NC", "lat": 35.6840, "lng": -82.0119, "radius": 5000},
-    {"city": "Shelby", "state": "NC", "lat": 35.2923, "lng": -81.5346, "radius": 5000},
-    {"city": "Gastonia", "state": "NC", "lat": 35.2621, "lng": -81.1873, "radius": 8000},
-    {"city": "Lincolnton", "state": "NC", "lat": 35.4740, "lng": -81.2523, "radius": 5000},
-    {"city": "Morganton", "state": "NC", "lat": 35.7454, "lng": -81.6848, "radius": 5000},
-    {"city": "Sylva", "state": "NC", "lat": 35.3738, "lng": -83.2182, "radius": 5000},
-    {"city": "Burnsville", "state": "NC", "lat": 35.9171, "lng": -82.2990, "radius": 5000},
-    {"city": "Forest City", "state": "NC", "lat": 35.3343, "lng": -81.8637, "radius": 5000},
+    {"city": "Asheville", "state": "NC", "county": "Buncombe", "place_url": "asheville"},
+    {"city": "Hendersonville", "state": "NC", "county": "Henderson", "place_url": "hendersonville_nc"},
+    {"city": "Brevard", "state": "NC", "county": "Transylvania", "place_url": "brevard"},
+    {"city": "Rutherfordton", "state": "NC", "county": "Rutherford", "place_url": "rutherfordton"},
+    {"city": "Marion", "state": "NC", "county": "McDowell", "place_url": "marion_10"},
+    {"city": "Shelby", "state": "NC", "county": "Cleveland", "place_url": "shelby-nc"},
+    {"city": "Gastonia", "state": "NC", "county": "Gaston", "place_url": "gastonia"},
+    {"city": "Lincolnton", "state": "NC", "county": "Lincoln", "place_url": "lincolnton"},
+    {"city": "Morganton", "state": "NC", "county": "Burke", "place_url": "morganton"},
+    {"city": "Sylva", "state": "NC", "county": "Jackson", "place_url": "sylva"},
+    {"city": "Burnsville", "state": "NC", "county": "Yancey", "place_url": "burnsville_3"},
+    {"city": "Forest City", "state": "NC", "county": "Rutherford", "place_url": "forest-city"},
     # SC
-    {"city": "Spartanburg", "state": "SC", "lat": 34.9496, "lng": -81.9320, "radius": 8000},
-    {"city": "Greer", "state": "SC", "lat": 34.6157, "lng": -82.2271, "radius": 5000},
-    {"city": "Gaffney", "state": "SC", "lat": 35.0718, "lng": -81.6498, "radius": 5000},
-    {"city": "Union", "state": "SC", "lat": 34.6249, "lng": -81.6251, "radius": 5000},
-    {"city": "Laurens", "state": "SC", "lat": 34.4990, "lng": -82.0184, "radius": 5000},
-    {"city": "Pickens", "state": "SC", "lat": 34.8812, "lng": -82.7068, "radius": 5000},
-    {"city": "Anderson", "state": "SC", "lat": 34.5034, "lng": -82.6501, "radius": 8000},
-    {"city": "Walhalla", "state": "SC", "lat": 34.7632, "lng": -83.0646, "radius": 5000},
+    {"city": "Spartanburg", "state": "SC", "county": "Spartanburg", "place_url": "spartanburg"},
+    {"city": "Greer", "state": "SC", "county": "Spartanburg", "place_url": "greer"},
+    {"city": "Gaffney", "state": "SC", "county": "Cherokee", "place_url": "gaffney"},
+    {"city": "Union", "state": "SC", "county": "Union", "place_url": "union_3"},
+    {"city": "Laurens", "state": "SC", "county": "Laurens", "place_url": "laurens"},
+    {"city": "Pickens", "state": "SC", "county": "Pickens", "place_url": "pickens"},
+    {"city": "Anderson", "state": "SC", "county": "Anderson", "place_url": "anderson_3"},
+    {"city": "Walhalla", "state": "SC", "county": "Oconee", "place_url": "walhalla"},
 ]
+
+# Defense-in-depth sanity check: if an issue's own free-text address names a
+# DIFFERENT, unexpected state outright, drop it rather than trust the
+# place_url tag blindly -- live-verified 2026-10-04 that `place_url=shelby-nc`
+# returned one row address-texted "Brownsville, TX" mixed into 20 otherwise-
+# correct Shelby, NC rows (SCF's own place-tagging has occasional noise).
+# A short allowlist of state tokens that must NOT appear (home state is
+# deliberately not required to appear, since many real addresses are
+# terse -- "281 Wells Drforest City NC 28043" -- and a strict require-state
+# check would reject genuinely-good rows).
+_OTHER_STATE_TOKENS = (
+    "TX", "TN", "GA", "VA", "FL", "CA", "OH", "NM", "IL", "WA", "MI", "MA",
+)
+
+
+def _address_names_wrong_state(addr: str, expected_state: str) -> bool:
+    if not addr:
+        return False
+    for tok in _OTHER_STATE_TOKENS:
+        if tok == expected_state:
+            continue
+        if f", {tok}" in addr or f" {tok}," in addr or addr.strip().endswith(f" {tok}"):
+            return True
+    return False
 
 # Issue categories / keywords that signal property distress.
 _DISTRESS_KEYWORDS = (
@@ -88,29 +122,17 @@ class SeeClickFixScraper(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 240.0
-    # DISABLED 2026-09-15 (see module docstring: confirmed garbage emitter,
-    # geo-filter silently ignored + city/state hardcoded from the query).
-    # fetch() already hardcoded `return []` but never set disabled=True, so
-    # every run reported OUTCOME_ZERO instead of OUTCOME_DORMANT -- an
-    # ambiguous zero. Found via the 2026-10-01 national/reo per-source
-    # audit, same pattern as national.liensnc / national.epa_superfund /
-    # national.legacy_obituaries. No behavior change.
-    disabled = True
-    disabled_reason = (
-        "confirmed garbage emitter 2026-09-15: the v2 API's lat/lng/radius "
-        "geo-filter is silently ignored and city/state get hardcoded from "
-        "the query dict rather than the real result (produced 1,239 "
-        "fabricated-geography rows in one live run)"
-    )
+    # RE-ENABLED 2026-10-04 (HERMES extraction-completeness audit, batch 18)
+    # -- see module docstring's FOUND note. Was DISABLED 2026-09-15 for the
+    # lat/lng/radius bug; that bug is fixed (place_url scoping replaces it
+    # entirely), so this is a real source again, not a dormant one.
 
     async def _fetch_city(self, c: dict) -> list[Listing]:
         out: list[Listing] = []
         async with client(timeout=30.0) as c_http:
             for page in range(1, _MAX_PAGES + 1):
                 params = {
-                    "lat": str(c["lat"]),
-                    "lng": str(c["lng"]),
-                    "radius": str(c["radius"]),
+                    "place_url": c["place_url"],
                     "page": str(page),
                     "per_page": str(_PER_PAGE),
                     "sort": "updated_at",
@@ -140,6 +162,14 @@ class SeeClickFixScraper(BaseScraper):
                         continue
                     # Extract address if present.
                     addr = iss.get("address") or ""
+                    # Defense-in-depth (see module docstring): SCF's own
+                    # place-tagging occasionally mislabels a row from a
+                    # different state (live-verified on shelby-nc). Drop it
+                    # rather than silently fabricate geography again.
+                    if _address_names_wrong_state(addr, c["state"]):
+                        log.warning("seeclickfix.wrong_state_dropped", city=c["city"],
+                                    expected_state=c["state"], address=addr[:120])
+                        continue
                     lat = iss.get("lat")
                     lng = iss.get("lng")
                     issue_url = iss.get("html_url") or iss.get("url") or ""
@@ -151,7 +181,12 @@ class SeeClickFixScraper(BaseScraper):
                         street_address=addr or None,
                         city=c["city"],
                         state=c["state"],
-                        county=None,
+                        # FOUND 2026-10-04 (batch 18): county is now a
+                        # curated, gazetteer-verified value (see _CITIES),
+                        # not the hardcoded None the disabled version
+                        # shipped -- real rows can now actually clear the
+                        # scope gate instead of being dropped unconditionally.
+                        county=c["county"],
                         description=f"SeeClickFix: {iss.get('summary', '')[:200]}",
                         first_seen=datetime.utcnow(),
                         last_seen=datetime.utcnow(),
@@ -168,6 +203,7 @@ class SeeClickFixScraper(BaseScraper):
                                 "updated_at": iss.get("updated_at"),
                                 "reporter": iss.get("reporter"),
                                 "url": issue_url,
+                                "place_url": c["place_url"],
                             },
                         },
                     ))
@@ -178,12 +214,6 @@ class SeeClickFixScraper(BaseScraper):
         return out
 
     async def fetch(self) -> Iterable[Listing]:
-        # Disabled — see module docstring. Confirmed garbage emitter (the
-        # API's geo-filter is silently ignored and city/state get
-        # hardcoded from the query, not the real result).
-        return []
-
-    async def _disabled_fetch(self) -> Iterable[Listing]:
         tasks = [self._fetch_city(c) for c in _CITIES]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         out: list[Listing] = []
