@@ -102,8 +102,17 @@ def test_parse_workbook_filters_to_footprint_and_captures_fields():
     assert hg.city == "Asheville"
     assert hg.zip_code == "28805"
     assert hg.raw["nc_deq_dsca"]["status"] == "active"
+    # 2026-10-03 (HERMES extraction-completeness audit, batch 5): live-sampled
+    # 26/26 footprint active_inactive rows carry a machine-type count that
+    # was never read. # Hal (halogenated/PERC solvent) is a materially worse
+    # contamination signal than # Petro, so it must survive as its own field.
+    assert hg.raw["nc_deq_dsca"]["machines"] == 1
+    assert hg.raw["nc_deq_dsca"]["machines_hal"] == 1
+    assert hg.raw["nc_deq_dsca"]["machines_petro"] is None
     suds = by_name["Suds Laundromat"]
     assert suds.raw["nc_deq_dsca"]["status"] == "inactive"
+    assert suds.raw["nc_deq_dsca"]["machines"] == 1
+    assert suds.raw["nc_deq_dsca"]["machines_hal"] is None
 
 
 def test_parse_workbook_closed_list_status_and_zip_plus4_stripped():
@@ -114,6 +123,8 @@ def test_parse_workbook_closed_list_status_and_zip_plus4_stripped():
     assert li.raw["nc_deq_dsca"]["list_kind"] == "closed"
     assert li.zip_code == "28803"  # +4 suffix stripped
     assert li.raw["nc_deq_dsca"]["status_date"] == "2016-01-06"
+    # Closed workbook has no machine-count columns at all -- must not fabricate.
+    assert li.raw["nc_deq_dsca"]["machines"] is None
 
 
 def test_parse_workbook_empty_on_bad_header():

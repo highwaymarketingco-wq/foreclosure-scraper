@@ -141,6 +141,16 @@ def parse_workbook(data: bytes, list_kind: str, page_url: str) -> list[Listing]:
         col("inspected") if col("inspected") is not None else col("closed"),
         col("generator status"),
     )
+    # Machine-type counts -- only on the active_inactive workbook (closed drops
+    # them, per the module docstring). Found 2026-10-03 (HERMES extraction-
+    # completeness audit, batch 5): live-sampled 26/26 footprint active_
+    # inactive rows carry at least one of these, and nothing read them.
+    # # Hal (halogenated solvent -- perchloroethylene) is a materially worse
+    # contamination signal than # Petro (petroleum solvent); collapsing them
+    # into one "has machines" boolean would throw that distinction away, so
+    # all three + # Other are kept as separate counts.
+    c_mach, c_hal, c_petro, c_other = (
+        col("machines"), col("hal"), col("petro"), col("other"))
 
     out: list[Listing] = []
     now = datetime.utcnow()
@@ -171,6 +181,16 @@ def parse_workbook(data: bytes, list_kind: str, page_url: str) -> list[Listing]:
         description = f"{county} County NC — " + " — ".join(desc_bits) if desc_bits else \
             f"{county} County NC dry-cleaner facility"
 
+        def _count(c: Optional[int]) -> Optional[int]:
+            v = get(c)
+            try:
+                return int(float(v)) if v else None
+            except (TypeError, ValueError):
+                return None
+
+        machines, machines_hal, machines_petro, machines_other = (
+            _count(c_mach), _count(c_hal), _count(c_petro), _count(c_other))
+
         out.append(Listing(
             source=SLUG,
             source_url=page_url,
@@ -194,6 +214,15 @@ def parse_workbook(data: bytes, list_kind: str, page_url: str) -> list[Listing]:
                     "status": status,
                     "list_kind": list_kind,
                     "status_date": date_val.date().isoformat() if date_val else None,
+                    # Machine-type counts (active_inactive workbook only --
+                    # closed drops these columns entirely). # Hal (halogenated
+                    # / PERC solvent) is a materially worse groundwater-
+                    # contamination signal than # Petro; kept separate rather
+                    # than collapsed into one boolean.
+                    "machines": machines,
+                    "machines_hal": machines_hal,
+                    "machines_petro": machines_petro,
+                    "machines_other": machines_other,
                 }
             },
         ))
