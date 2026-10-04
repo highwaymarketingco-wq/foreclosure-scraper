@@ -20,6 +20,27 @@ upset figure, promoted to ``opening_bid`` and floated (``$1,613.43*`` -> 1613.43
 Tax-foreclosure calendars are seasonal: when the county has no sale scheduled the
 table can be empty or absent. An empty parse is a correct zero, not a failure.
 
+FIXED 2026-10-03 (extraction-completeness audit, batch 4): the "Clerk of Court
+File #" cell wraps its text in a real `<a href>` to the case's NC eCourts
+"Register of Actions" portal page (``portal-nc.tylertech.cloud/app/
+RegisterOfActions/#/<hash>/anon/portalembed``, 100% of live rows) -- the old
+parser read only the cell's visible text (the case number) and discarded the
+href entirely. Captured into ``raw['henderson_tax']['case_detail_url']`` as a
+reference link.
+
+NOT further parsed: the page is an anonymous Angular SPA shell (plain httpx
+gets a WAF 403; the shared `get_text(impersonate=True)` curl-cffi tier clears
+it to a real 200, but the page is client-side-rendered -- the actual case
+data loads via a JS API call keyed off the opaque hash, not from the HTML
+returned). Probed 4 plausible REST paths under the same app
+(/api/Cases/{hash}, /api/CaseSummaries/{hash}, /RegisterOfActionsService/
+Case/{hash}, /api/RegisterOfActions/{hash}); all either 404 or return the
+same generic error shell -- not a quick regex target. This is a DIFFERENT
+Tyler app from the Portal/Smart-Search dashboard
+(`enrichment_nc_case_status_tyler.py` already fights that one's full
+WAF+login flow) -- full parsing here would need its own from-scratch
+API/JS investigation, tracked as a follow-up rather than guessed at.
+
 Gate with FORECLOSURE_HENDERSON_FCL=0 to skip.
 """
 from __future__ import annotations
@@ -133,6 +154,13 @@ class HendersonTaxForeclosure(BaseScraper):
             description = " ".join((cells[2].text() or "").split())
             file_no = " ".join((cells[3].text() or "").split())
             bid_str = " ".join((cells[4].text() or "").split())
+            # The File # cell wraps its text in <a href> to the NC eCourts
+            # Register-of-Actions portal page for this case (see module
+            # docstring) -- captured as a reference URL, not further parsed.
+            case_link_a = cells[3].css_first("a")
+            case_detail_url = None
+            if case_link_a is not None:
+                case_detail_url = (case_link_a.attributes.get("href") or "").strip() or None
 
             # Drop the header row and anything without a real numeric parcel.
             if not parcel or not re.match(r"\d{4,}", parcel):
@@ -179,6 +207,7 @@ class HendersonTaxForeclosure(BaseScraper):
                             "description": description,
                             "clerk_file": file_no,
                             "opening_bid": bid_str,
+                            "case_detail_url": case_detail_url,
                         }
                     },
                 )
