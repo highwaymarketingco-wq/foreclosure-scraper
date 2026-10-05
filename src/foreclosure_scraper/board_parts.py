@@ -494,6 +494,13 @@ def atomic_write_bytes(path, data: bytes) -> None:
         raise
 
 
+def commit_staged_part(staged, final) -> None:
+    """Move a part that was written under a temp name into place (atomic within docs/).
+    web_artifact.write_artifact stages every part first and commits them only once every row
+    has converted; this is the one rename per part (and the seam tests interrupt)."""
+    os.replace(str(staged), str(final))
+
+
 def gzip_array(blobs: Sequence[bytes], sep: bytes = b", ", level: int = 9) -> bytes:
     """gzip of `[blob0, blob1, ...]`, deterministic (mtime 0) and without ever holding the
     joined document: rows go into the compressor one at a time."""
@@ -551,9 +558,24 @@ def _sample_groups(blobs: Sequence[bytes]) -> List[Sequence[bytes]]:
     return [blobs[k * span:k * span + SAMPLE_CHUNK_ROWS] for k in range(SAMPLE_CHUNKS)]
 
 
+def sample_index_groups(n: int) -> List[range]:
+    """The row indices _sample_groups reads from an n-row board, as ranges (same rule)."""
+    if n <= SAMPLE_CHUNKS * SAMPLE_CHUNK_ROWS:
+        return [range(0, n)]
+    span = (n - SAMPLE_CHUNK_ROWS) // (SAMPLE_CHUNKS - 1)
+    return [range(k * span, k * span + SAMPLE_CHUNK_ROWS) for k in range(SAMPLE_CHUNKS)]
+
+
+def sample_groups_for(n: int, row_at) -> List[List[bytes]]:
+    """_sample_groups(full_list) for an n-row board whose row i's bytes are row_at(i), built
+    WITHOUT the full list: only the (at most SAMPLE_CHUNKS * SAMPLE_CHUNK_ROWS) sampled rows."""
+    return [[row_at(i) for i in r] for r in sample_index_groups(n)]
+
+
 def write_parts(docs, blobs: Iterable[bytes], *, cap: Optional[int] = None,
                 hint_rows: Optional[int] = None, level: int = 9,
-                write=None, remove_stale: bool = True) -> dict:
+                write=None, remove_stale: bool = True,
+                sample_groups: Optional[Sequence[Sequence[bytes]]] = None) -> dict:
     """Cut `blobs` (one bytes object per row, in board order) into gzipped JSON-array parts of
     at most `cap` bytes each (default PART_MAX_BYTES) and write them to docs/.
 
@@ -567,6 +589,12 @@ def write_parts(docs, blobs: Iterable[bytes], *, cap: Optional[int] = None,
     the rows that fit (at least one row) and the rest moves to the next part, so the cap is
     never exceeded. A single row that alone exceeds the cap raises PartTooLargeError.
 
+    `sample_groups` lets a STREAMING caller get exactly the cut a list would get: pass
+    sample_groups_for(n, row_at) (the same contiguous samples _sample_groups would take from the
+    full list) with `blobs` as an iterator, and the parts are byte-identical to passing the whole
+    list -- without the caller ever holding every row's bytes at once (web_artifact.write_artifact,
+    2026-10-05). Without it, an iterator is sampled from its first STREAM_SAMPLE_ROWS rows only.
+
     Stale higher-numbered parts (from a longer previous board) are removed AFTER every new part
     is on disk. Parts are written atomically one by one; the manifest that seals the set is the
     caller's job, and until it is written the on-disk set disagrees with the old manifest, which
@@ -576,7 +604,11 @@ def write_parts(docs, blobs: Iterable[bytes], *, cap: Optional[int] = None,
     cap = int(cap if cap is not None else max_bytes())
     writer = write or atomic_write_bytes
 
-    if isinstance(blobs, (list, tuple)):
+    if sample_groups is not None:
+        total_known = None
+        groups = list(sample_groups)
+        source = iter(blobs)
+    elif isinstance(blobs, (list, tuple)):
         total_known = len(blobs)
         groups = _sample_groups(blobs)
         source = iter(blobs)

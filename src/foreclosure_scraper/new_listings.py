@@ -21,14 +21,16 @@ from datetime import datetime
 
 import structlog
 
-from .carryover import load_prior_listings
+from . import carryover
+from .board_parts import iter_plain_rows
 from .models import Listing, ListingType
 
 log = structlog.get_logger()
 
 
-def _prior_keys(prior: list[dict]) -> set[str]:
-    """Reconstruct prior listings just enough to compute their dedupe_key."""
+def _prior_keys(prior) -> set[str]:
+    """Reconstruct prior listings just enough to compute their dedupe_key.
+    `prior` may be any iterable of row dicts; it is consumed once."""
     keys: set[str] = set()
     for d in prior:
         try:
@@ -39,13 +41,41 @@ def _prior_keys(prior: list[dict]) -> set[str]:
     return keys
 
 
+def _prior_keys_streamed(docs_dir=None) -> tuple[set[str], int]:
+    """(dedupe keys, row count) of the prior docs/listings.json, streamed one row at a time.
+
+    Same source and same keys as the old `_prior_keys(load_prior_listings()[0])`, without ever
+    holding the board: that call did json.loads(path.read_text()) of the full plain file (2.5 GB
+    on 2026-10-05) -- its text and every parsed row alive together -- on top of ~270K live
+    Listings, and the VM run that day was OOM-killed about a minute after the step before this
+    one. A missing or unreadable file is "no prior", exactly as before (load_prior_listings
+    returned [] for both)."""
+    path = (docs_dir or carryover._docs_dir()) / "listings.json"
+    if not path.exists():
+        return set(), 0
+    count = 0
+
+    def _rows():
+        nonlocal count
+        for d in iter_plain_rows(path):
+            count += 1
+            yield d
+
+    try:
+        keys = _prior_keys(_rows())
+    except Exception as exc:  # noqa: BLE001 - same contract as load_prior_listings
+        log.warning("carryover.prior_listings_read_failed", error=str(exc))
+        return set(), 0
+    return keys, count
+
+
 def mark_new_listings(listings: list[Listing]) -> dict:
     """Tag listings new vs the prior run. Mutates raw.is_new in place.
     Returns stats for the run summary + email."""
-    prior, _ = load_prior_listings()
+    prior_keys, prior_total = _prior_keys_streamed()
     stamp = datetime.utcnow().isoformat() + "Z"
 
-    if not prior:
+    if not prior_total:
         # First-ever run (no prior file): everything is "new", but don't
         # spam — mark them new=False so the first email isn't 100% alerts.
         for li in listings:
@@ -54,7 +84,6 @@ def mark_new_listings(listings: list[Listing]) -> dict:
         log.info("new_listings.no_prior", count=len(listings))
         return {"new": 0, "prior_total": 0, "is_first_run": True}
 
-    prior_keys = _prior_keys(prior)
     new_count = 0
     new_lp = 0
     for li in listings:
@@ -69,11 +98,11 @@ def mark_new_listings(listings: list[Listing]) -> dict:
                 new_lp += 1
 
     log.info("new_listings.done", new=new_count, new_lis_pendens=new_lp,
-             prior_total=len(prior))
+             prior_total=prior_total)
     return {
         "new": new_count,
         "new_lis_pendens": new_lp,   # earliest-signal early-access leads
-        "prior_total": len(prior),
+        "prior_total": prior_total,
         "is_first_run": False,
     }
 

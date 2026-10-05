@@ -1131,6 +1131,32 @@ def _file_matches_manifest(path: Path, entry: dict) -> tuple[bool, str]:
     return True, ""
 
 
+def plain_board_row_count(path: Path | str) -> int | None:
+    """Number of rows in a plain JSON-array board file (docs/listings.json), WITHOUT holding it.
+
+    The sealed manifest's record count is used when the manifest's sha256 for this exact file
+    matches (hashing is cached per process by _file_matches_manifest, and write_artifact re-reads
+    the same file anyway); otherwise the rows are streamed and counted one at a time. Returns
+    None when the file is absent. Raises on a malformed file, like the json.loads it replaces.
+
+    Why: main.py's count-drop guard used json.loads(path.read_text()) only to take len() of the
+    result -- the full 2.5 GB text plus every parsed row, on top of ~270K live Listings, a minute
+    before write_artifact (the 2026-10-05 VM OOM, see write_artifact's MEMORY note)."""
+    path = Path(path)
+    if not path.is_file():
+        return None
+    man = load_manifest(path.parent)
+    ent = (man or {}).get("files", {}).get(path.name) if man else None
+    if isinstance(ent, dict) and isinstance(ent.get("records"), int):
+        ok, _why = _file_matches_manifest(path, ent)
+        if ok:
+            return ent["records"]
+    n = 0
+    for _row in _bp.iter_plain_rows(path):
+        n += 1
+    return n
+
+
 def _choose_listings_source(p: Path):
     """Source selection for docs/listings.json specifically, now that the published board is
     a set of PARTS (audit O1). Returns (path, role, resolution) or None to fall through to the
@@ -4149,6 +4175,112 @@ def _apply_health_freshness(meta: dict, prior_meta: dict, summary: dict, now_iso
         meta["source_last_success"] = dict(sorted(_ls.items()))
 
 
+class _ArrayFileWriter:
+    """Stream `[row0<sep>row1<sep>...]` into a PID-named temp file next to `path`, hashing as it
+    goes; nothing at `path` changes until commit(). Same bytes as joining the rows in memory
+    (and, with sep b", ", as json.dumps of the list: what _write_plain_array/json.dumps wrote)."""
+
+    def __init__(self, path: Path, sep: bytes = b", "):
+        self.path = path
+        self.tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        self.sep = sep
+        self._fh = open(self.tmp, "wb")
+        self._h = hashlib.sha256()
+        self.nbytes = 0
+        self.rows = 0
+        self._put(b"[")
+
+    def _put(self, b: bytes) -> None:
+        self._fh.write(b)
+        self._h.update(b)
+        self.nbytes += len(b)
+
+    def add(self, blob: bytes) -> None:
+        if self.rows:
+            self._put(self.sep)
+        self._put(blob)
+        self.rows += 1
+
+    def finish(self) -> dict:
+        """Close the array; returns {"bytes", "sha256"} of the finished file."""
+        self._put(b"]")
+        self._fh.close()
+        return {"bytes": self.nbytes, "sha256": self._h.hexdigest()}
+
+    def commit(self) -> None:
+        os.replace(self.tmp, self.path)
+
+    def abort(self) -> None:
+        try:
+            self._fh.close()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            self.tmp.unlink()
+        except OSError:
+            pass
+
+
+def _open_board_source_texts(p: Path) -> Iterator[str]:
+    """Each row of a board JSON file as its exact source TEXT, with the same source selection
+    as read_board_json (manifest-verified plain/gz; listings.json may be parts)."""
+    used, role, res = _choose_board_source(p)
+    if role == "parts":
+        return (b.decode("utf-8") for part in res.paths for b in _bp.iter_row_texts(part))
+    if role == "gz":
+        return _bp.iter_gz_rows(used, want_text=True)
+    return _bp.iter_plain_rows(used, want_text=True)
+
+
+def _nonempty_dict_text(t: str) -> bool:
+    """True when `t` is the JSON text of a dict with at least one key, without parsing it."""
+    s = t.strip()
+    return s.startswith("{") and bool(s[1:-1].strip())
+
+
+def _prior_detail_index(docs: Path, wanted: dict) -> dict:
+    """identity key -> prior sidecar detail (as its JSON TEXT), streamed.
+
+    The same join as _load_prior_details_by_key -- a key qualifies only when exactly one prior
+    row claims it (counted over every prior row, like _unique_key_map) and that row's sidecar
+    entry is a non-empty dict -- restricted to the keys write_artifact can actually look up
+    (`wanted`: the keys unique on the NEW board), and holding each detail as compact text rather
+    than parsed objects. _load_prior_details_by_key read the whole prior board AND sidecar with
+    read_board_json (2.5 GB of parsed rows on the 2026-10-05 VM board) to build that map; here
+    one prior row and its sidecar entry are alive at a time. Same failure contract: a torn set
+    raises BoardIntegrityError; anything else unreadable returns {} (fresh publish)."""
+    lp = docs / "listings.json"
+    dp = docs / "listings_detail.json"
+    if not wanted or not _board_file_present(lp) or not _board_file_present(dp):
+        return {}
+    try:
+        _used, rows = _open_board_source_rows(lp)
+        dets = _open_board_source_texts(dp)
+        freq: dict = {}
+        held: list = []
+        for rec in rows:
+            d_text = next(dets, None)        # index-aligned, exactly like dets[i]
+            if not isinstance(rec, dict):
+                continue
+            keys = _identity_keys(rec)
+            for k in keys:
+                freq[k] = freq.get(k, 0) + 1
+            if d_text is not None and _nonempty_dict_text(d_text):
+                ks = [k for k in keys if wanted.get(k)]
+                if ks:
+                    held.append((ks, d_text))
+    except BoardIntegrityError:
+        raise
+    except Exception:  # noqa: BLE001
+        return {}
+    out: dict = {}
+    for ks, t in held:
+        for k in ks:
+            if freq.get(k) == 1:
+                out[k] = t
+    return out
+
+
 def write_artifact(
     listings: list[Listing],
     summary: dict,
@@ -4159,7 +4291,36 @@ def write_artifact(
     Refuses (BoardLockNotHeld) unless the caller holds the board lock, and
     (BoardChangedSinceLoad) if listings.json is not the file this process loaded
     — see require_board_lock / _check_not_changed_since_load and audit O3.
+
+    MEMORY (rewritten 2026-10-05). The VM's 18h full run (270,232 rows) was OOM-killed one
+    step short of this call: on top of the ~270K live Listings the publish tail held, in
+    sequence, a full parsed copy of the prior board (mark_new_listings, the count-drop guard,
+    and _load_prior_details_by_key here), then `payload` (a dict copy of every row), the
+    serialized bytes of every row (`listing_blobs`, ~3 GB), the sidecar dicts and bytes, and
+    the slim payload joined in memory twice. Now nothing proportional to the board is held
+    beyond the Listings themselves:
+      pass 1  one _to_dict per row, keeping only its identity keys (for the cross-run sidecar
+              join, which must know which keys are unique on the NEW board before it can match);
+      prior   _prior_detail_index streams the prior board + sidecar, keeping only the matching
+              sidecar entries, as text;
+      pass 2  one _to_dict per row again; the row is encoded ONCE and the bytes go straight to
+              listings.json's temp file and to the parts writer (which cuts parts exactly where a
+              full list would, from the same samples: board_parts.sample_groups_for), its
+              sidecar entry to listings_detail.json's temp file, its slim projection to the slim
+              temp file and its shard entry into the current 1,000-row shard (gzipped as each
+              fills). Then the row is dropped.
+    Every file is still written to a temp name and only renamed into place after every row has
+    converted, so a failure mid-pass leaves the published set exactly as it was (as before,
+    when nothing was written until `payload` was complete). The bytes are the same as the
+    single-list version produced for the same input (tests/test_write_artifact_streaming.py
+    holds that version verbatim and compares every output file).
+
+    Why two _to_dict passes and not one: _to_dict -> annotate_stale_links setdefault()s keys
+    into raw['fallback_links'] BY REFERENCE, so it can mutate an object a later row shares;
+    the list version encoded only after every row had been converted, so pass 1 does all the
+    conversions first and pass 2 encodes, giving the same bytes even then.
     """
+    import gzip
     docs = Path(docs_dir)
     docs.mkdir(parents=True, exist_ok=True)
 
@@ -4170,89 +4331,190 @@ def write_artifact(
     require_board_lock(docs)
     _check_not_changed_since_load(listings_path)
 
-    payload = [_to_dict(li) for li in listings]
+    n = len(listings)
 
-    # Split the heavy, detail-panel-only raw keys (comps/vision arrays — the
-    # most deeply nested payload) into an index-aligned sidecar the dashboard
-    # fetches lazily on the first card open. Index alignment (not a per-lead id)
-    # is the join: both files are built from `payload` in the same order, so
-    # detail[i] belongs to listing[i]. Popping happens LAST (after _to_dict /
-    # _slim_raw / annotate_stale_links) so nothing re-adds these keys. Additive:
-    # if listings_detail.json is missing/mismatched, those panels render empty.
-    # Prior sidecar, keyed by identity — lets a full re-scrape (which only
-    # re-visions a capped subset) KEEP vision/comps/cama for the leads it
-    # didn't touch this run, instead of overwriting details[i] with {}.
-    # Fresh detail from THIS run always wins; prior only backfills missing keys.
-    prior = _load_prior_details_by_key(docs)
-    # Guard BOTH sides: a key can be unique in the prior board yet ambiguous in
-    # what we are about to write (e.g. a re-scrape that pulled 3,293 leads from
-    # one ArcGIS URL). Carrying detail across it would fan one report out to all
-    # of them, so only keys unique on BOTH sides are allowed to match.
-    payload_unique = _unique_key_map(payload) if prior else {}
-    details = []
-    for rec in payload:
+    def _row(li: Listing) -> tuple[dict, dict]:
+        """(published record, its sidecar entry): _to_dict, then the heavy detail-panel-only
+        raw keys (comps/vision/cama...) popped into the index-aligned sidecar the dashboard
+        fetches lazily (detail[i] belongs to listing[i]). Popping happens LAST (after _to_dict /
+        _slim_raw / annotate_stale_links) so nothing re-adds these keys."""
+        rec = _to_dict(li)
         raw = rec.get("raw")
-        d = {}
+        d: dict = {}
         if isinstance(raw, dict):
             for k in LAZY_DETAIL_KEYS:
                 if k in raw:
                     d[k] = raw.pop(k)
-        if prior:
-            pri = None
-            for key in _identity_keys(rec):
-                if payload_unique.get(key) and key in prior:
-                    pri = prior[key]
-                    break
-            if pri:
-                for k in LAZY_DETAIL_KEYS:
-                    if k not in d and k in pri:
-                        d[k] = pri[k]
-        details.append(d)
-    import gzip
-    # One bytes object per row, in board order. json.dumps over the whole list is exactly
-    # "[" + ", ".join(rows) + "]" (same encoder, same default separators), so the plain
-    # listings.json below is byte-identical to what the single dumps used to produce, but the
-    # 1.1 GB document is never one string and never held twice (audit O1: the parts cut the
-    # same rows, and need per-row bytes to land on a row boundary).
+        return rec, d
+
+    # One encoder for every board row: json.dumps over the whole list is exactly
+    # "[" + ", ".join(rows) + "]" with this same encoder, so listings.json is byte-identical to
+    # the single dumps it once was (audit O1: the parts cut the same rows, and need per-row
+    # bytes to land on a row boundary).
     _row_enc = json.JSONEncoder(ensure_ascii=False, default=str)
-    listing_blobs = [_row_enc.encode(rec).encode("utf-8") for rec in payload]
-    detail_path = docs / "listings_detail.json"
-    detail_bytes = json.dumps(details, ensure_ascii=False, default=str).encode("utf-8")
-    # Atomic writes (temp + os.replace) so a kill mid-write can never leave a
-    # truncated 100MB+ file — the prior good file survives. git history is the
-    # rollback backup for a completed-but-bad write (the count-drop guard flags
-    # those before publish).
+
+    def _blob(rec: dict) -> bytes:
+        return _row_enc.encode(rec).encode("utf-8")
+
+    # PASS 1: identity keys of the board being written. A key can be unique in the prior board
+    # yet ambiguous in what we are about to write (e.g. a re-scrape that pulled 3,293 leads
+    # from one ArcGIS URL); carrying detail across it would fan one report out to all of them,
+    # so only keys unique on BOTH sides are allowed to match.
+    _key_freq: dict = {}
+    for li in listings:
+        for key in _identity_keys(_to_dict(li)):
+            _key_freq[key] = _key_freq.get(key, 0) + 1
+    payload_unique = {k: (c == 1) for k, c in _key_freq.items()}
+    del _key_freq
+
+    # Prior sidecar, keyed by identity — lets a full re-scrape (which only re-visions a capped
+    # subset) KEEP vision/comps/cama for the leads it didn't touch this run, instead of
+    # overwriting details[i] with {}. Fresh detail from THIS run always wins; prior only
+    # backfills missing keys.
+    prior = _prior_detail_index(docs, payload_unique)
+    if not prior:
+        payload_unique = {}
+
     # BACKUP-BEFORE-OVERWRITE + COUNT GUARD (extracted to _count_guard_and_backup, shared with
     # append_new_rows -- see that function's docstring for the two real incidents it guards
-    # against).
-    _accepted_intentional = _count_guard_and_backup(docs, listings_path, len(payload), summary)
-    # The manifest (written LAST) needs each big file's size and sha256. Take them
-    # from the bytes already in memory rather than re-reading 1.1 GB from disk.
-    _manifest_pre: dict = {
-        "listings.json": {**_write_plain_array(listings_path, listing_blobs), "records": len(payload)},
-        "listings_detail.json": {"bytes": len(detail_bytes),
-                                 "sha256": hashlib.sha256(detail_bytes).hexdigest(),
-                                 "records": len(details)},
-    }
-    _atomic_write_bytes(detail_path, detail_bytes)
+    # against). Still before a single published byte changes: everything below writes temp
+    # files until the commit step.
+    _accepted_intentional = _count_guard_and_backup(docs, listings_path, n, summary)
+
     # The PUBLISHED form of the board: contiguous, independently gzipped parts, each under
     # board_parts.PART_MAX_BYTES (audit O1). The single docs/listings.json.gz is no longer
     # written: it was 84 MiB against GitHub's 100 MiB limit. A stale copy left by an older
     # version is not touched here and is ignored by every reader once the manifest lists parts.
     # mtime=0 keeps the gzip deterministic so identical rows produce identical bytes (no git
     # churn), and the row-per-part count is kept from write to write so a change confined to
-    # some rows rewrites only the parts that hold them.
+    # some rows rewrites only the parts that hold them. Rows per part come from the same
+    # contiguous samples a full list would give (only those <= 2,400 rows are encoded early).
     _prior_parts = _bp.manifest_parts_block(_bp.read_manifest(docs)) or {}
-    _parts = _bp.write_parts(docs, listing_blobs, hint_rows=_prior_parts.get("rows_per_part"))
+    _samples = _bp.sample_groups_for(n, lambda i: _blob(_row(listings[i])[0]))
+    _sample_lookup = {i: b for r, g in zip(_bp.sample_index_groups(n), _samples) for i, b in zip(r, g)}
+
+    _slim_on = os.getenv("FORECLOSURE_SLIM") != "0"      # emergency stop, see _emit_slim
+    _shards_on = os.getenv("FORECLOSURE_DETAIL_SHARDS") != "0"
+    slim_path = docs / "listings_slim.json"
+    slim_gz_path = docs / "listings_slim.json.gz"
+    detail_path = docs / "listings_detail.json"
+    shard_dir = docs / DETAIL_SHARD_DIR
+
+    plain_w: _ArrayFileWriter | None = None
+    detail_w: _ArrayFileWriter | None = None
+    slim_w: _ArrayFileWriter | None = None
+    slim_err: Exception | None = None
+    shard_gz: dict = {}          # name -> gzipped shard bytes, written after the board
+    shard_err: Exception | None = None
+    staged: list = []            # (final part path, staged temp path)
+    sample_mismatch = 0
+
+    def _stage_part(path: Path, data: bytes) -> None:
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.staged.tmp")
+        staged.append((path, tmp))
+        _bp.atomic_write_bytes(tmp, data)
+
+    def _rows_for_parts():
+        """Pass 2. Yields each row's bytes, in board order, to write_parts; writes everything
+        else derived from the row as a side effect, then drops the row."""
+        nonlocal slim_w, slim_err, shard_err, sample_mismatch
+        shard_buf: list = []
+        for i, li in enumerate(listings):
+            rec, d = _row(li)
+            if prior:
+                pri_text = None
+                for key in _identity_keys(rec):
+                    if payload_unique.get(key) and key in prior:
+                        pri_text = prior[key]
+                        break
+                if pri_text:
+                    pri = json.loads(pri_text)
+                    for k in LAZY_DETAIL_KEYS:
+                        if k not in d and k in pri:
+                            d[k] = pri[k]
+            blob = _blob(rec)
+            if i in _sample_lookup and blob != _sample_lookup[i]:
+                sample_mismatch += 1
+            plain_w.add(blob)
+            detail_w.add(_row_enc.encode(d).encode("utf-8"))
+            # Derivatives (SLIM-V1 + DETAIL SHARDS, see their blocks above): a failure here
+            # costs the derivative, never the board. Projections are pure (never mutate rec).
+            if _slim_on and slim_err is None:
+                try:
+                    if slim_w is None:
+                        slim_w = _ArrayFileWriter(slim_path, sep=b",")
+                    slim_w.add(json.dumps(_project_slim_record(rec), ensure_ascii=False, default=str,
+                                          separators=(",", ":")).encode("utf-8"))
+                except Exception as exc:  # noqa: BLE001
+                    slim_err = exc
+            if _slim_on and _shards_on and slim_err is None and shard_err is None:
+                try:
+                    shard_buf.append(json.dumps(_shard_record(rec, d), ensure_ascii=False,
+                                                default=str, separators=(",", ":")).encode("utf-8"))
+                    if len(shard_buf) == DETAIL_SHARD_SIZE or i == n - 1:
+                        name = f"{(i // DETAIL_SHARD_SIZE):05d}.json.gz"
+                        shard_gz[name] = gzip.compress(b"[" + b",".join(shard_buf) + b"]",
+                                                       compresslevel=9, mtime=0)
+                        shard_buf = []
+                except Exception as exc:  # noqa: BLE001
+                    shard_err = exc
+                    shard_gz.clear()
+            del rec, d
+            yield blob
+
+    try:
+        plain_w = _ArrayFileWriter(listings_path)
+        detail_w = _ArrayFileWriter(detail_path)
+        _parts = _bp.write_parts(docs, _rows_for_parts(), hint_rows=_prior_parts.get("rows_per_part"),
+                                 write=_stage_part, remove_stale=False, sample_groups=_samples)
+        if plain_w.rows != n:
+            raise RuntimeError(f"write_artifact: streamed {plain_w.rows} rows, expected {n}")
+        _plain_ent = plain_w.finish()
+        _detail_ent = detail_w.finish()
+        if slim_w is not None and slim_err is None:
+            slim_w.finish()
+        elif _slim_on and slim_err is None and n == 0:
+            slim_w = _ArrayFileWriter(slim_path, sep=b",")
+            slim_w.finish()
+    except BaseException:
+        for w in (plain_w, detail_w, slim_w):
+            if w is not None:
+                w.abort()
+        for _final, tmp in staged:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        raise
+    if sample_mismatch:
+        # Cannot happen unless a row's conversion is not repeatable; the parts are still a
+        # correct cut of the rows, only possibly a different one than a full list would give.
+        log.warning("web_artifact.part_sample_drift", rows=sample_mismatch)
+
+    # ---- COMMIT: every row converted; now replace the published files, in the old order.
+    # Atomic renames (temp + os.replace) so a kill mid-write can never leave a truncated file —
+    # the prior good file survives. git history is the rollback backup for a completed-but-bad
+    # write (the count-drop guard flags those before publish).
+    plain_w.commit()
+    detail_w.commit()
+    for final, tmp in staged:
+        _bp.commit_staged_part(tmp, final)
+    _bp.remove_stale_parts(docs, len(_parts["entries"]))
     _parts_block = _bp.make_block(_parts["entries"], rows_per_part=_parts["rows_per_part"],
                                   cap=_parts["cap"])
-    del listing_blobs
+    # The manifest (written LAST) needs each big file's size and sha256: taken as the bytes
+    # streamed out, never by re-reading 1.1 GB from disk.
+    _manifest_pre: dict = {
+        "listings.json": {**_plain_ent, "records": n},
+        "listings_detail.json": {**_detail_ent, "records": n},
+    }
     # Also emit a gzipped copy of the sidecar the dashboard fetches (16x smaller). The .json
-    # files remain the local source-of-truth + a fallback. mtime=0 as above.
-    detail_gz = gzip.compress(detail_bytes, compresslevel=9, mtime=0)
+    # files remain the local source-of-truth + a fallback. mtime=0 as above. (~250 MB read
+    # back here, once, when nothing board-sized is held any more.)
+    detail_gz = gzip.compress(detail_path.read_bytes(), compresslevel=9, mtime=0)
     _manifest_pre["listings_detail.json.gz"] = {"bytes": len(detail_gz),
                                                 "sha256": hashlib.sha256(detail_gz).hexdigest(),
-                                                "records": len(details)}
+                                                "records": n}
     _atomic_write_bytes(docs / "listings_detail.json.gz", detail_gz)
     # Identity of the sidecar THIS call wrote — see the detail_count/
     # detail_digest note where run_meta is assembled. Deterministic (sha256 of
@@ -4260,22 +4522,65 @@ def write_artifact(
     detail_digest = hashlib.sha256(detail_gz).hexdigest()[:16]
     del detail_gz
 
-    # SLIM-V1, the mobile payload. Derived from the SAME `payload` list, and
-    # deliberately emitted only after the two authoritative files are already on
-    # disk: nothing below this line can change listings.json's bytes, and a bug
-    # in the derivative cannot cost a run its board. See the SLIM-V1 block above.
-    del detail_bytes    # free the sidecar bytes before projecting (8 GB box)
+    # SLIM-V1, the mobile payload. Emitted only after the authoritative files are on disk:
+    # nothing below this line can change listings.json's bytes, and a bug in the derivative
+    # cannot cost a run its board. Same outcomes as _emit_slim: FORECLOSURE_SLIM=0 or a
+    # projection failure DELETES the slim files (a stale slim file beside a fresh board is a
+    # silently mis-joined board on a phone), otherwise both are replaced.
     _report_slim_drops(listings)   # loud about what slim leaves behind — see the docstring
-    slim_count = _emit_slim(docs, payload)
+    slim_count: int | None = None
+    if _slim_on and slim_err is None and slim_w is not None:
+        try:
+            slim_w.commit()
+            _atomic_write_bytes(slim_gz_path, gzip.compress(slim_path.read_bytes(),
+                                                            compresslevel=9, mtime=0))
+            slim_count = n
+        except Exception as exc:  # noqa: BLE001
+            slim_err = exc
+    if slim_count is None:
+        if slim_w is not None:
+            slim_w.abort()
+        for p in (slim_path, slim_gz_path):
+            try:
+                p.unlink(missing_ok=True)
+            except OSError:
+                pass
+        if slim_err is not None:
+            log.warning("web_artifact.slim_failed", error=str(slim_err))
 
-    # DETAIL SHARDS, the mobile detail payload. Same contract as the slim file
-    # and deliberately last: every authoritative byte is already on disk, this
-    # reads `payload` and `details` without mutating either, and a failure here
-    # costs a derivative, never a board. Gated on the slim emit having succeeded
-    # — the two are one mobile payload, advertised in one metadata block. See
-    # the DETAIL SHARDS block above.
-    shard_meta = _emit_detail_shards(docs, payload, details,
-                                     slim_ok=slim_count is not None)
+    # DETAIL SHARDS, the mobile detail payload. Same outcomes as _emit_detail_shards: gated on
+    # the slim emit having succeeded (the two are one mobile payload, advertised in one
+    # metadata block); FORECLOSURE_DETAIL_SHARDS=0, an empty board or any failure REMOVES the
+    # directory (index i is the join; shards from another write are mis-joined data).
+    shard_meta: dict | None = None
+    if slim_count is None or not _shards_on or n == 0 or shard_err is not None:
+        _rm_detail_shards(shard_dir)
+        if shard_err is not None and slim_count is not None:
+            log.warning("web_artifact.detail_shards_failed", error=str(shard_err))
+    else:
+        try:
+            shard_dir.mkdir(parents=True, exist_ok=True)
+            for name in sorted(shard_gz):
+                _atomic_write_bytes(shard_dir / name, shard_gz[name])
+            # Purge shards from a LARGER previous board plus any orphaned .tmp.
+            for stale in shard_dir.iterdir():
+                if stale.name not in shard_gz:
+                    try:
+                        stale.unlink()
+                    except OSError:
+                        pass
+            shard_meta = {
+                "schema": DETAIL_SHARD_SCHEMA,
+                "dir": DETAIL_SHARD_DIR,
+                "size": DETAIL_SHARD_SIZE,   # records per shard: index i -> i // size
+                "count": len(shard_gz),      # number of shard files
+                "records": n,                # indices covered: must equal board.count
+            }
+        except Exception as exc:  # noqa: BLE001
+            _rm_detail_shards(shard_dir)
+            log.warning("web_artifact.detail_shards_failed", error=str(exc))
+            shard_meta = None
+    shard_gz.clear()
 
     _now = datetime.utcnow()
     _now_iso = _now.isoformat() + "Z"
@@ -4324,7 +4629,7 @@ def write_artifact(
         # board block's key set to {schema, count, detail_shards}, and the block
         # is deliberately absent whenever the slim payload was not written, while
         # the desktop sidecar is written unconditionally.
-        "detail_count": len(details),
+        "detail_count": n,
         "detail_digest": detail_digest,
         # THE BOARD, AS PARTS (audit O1). The dashboard reads this list (same ?t=<run_time>
         # cache key as every payload file), fetches the parts in parallel and concatenates them

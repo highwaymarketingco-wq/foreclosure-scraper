@@ -77,8 +77,16 @@ def test_cli_takes_the_board_lock_for_the_whole_run(monkeypatch):
     assert seen["max_runtime"] >= 24 * 3600, "a 15 to 57 hour run needs a max runtime that long"
 
 
+def _run_src() -> str:
+    """run() plus the tail it hands off to (run_enrich_tail -> publish_tail, shared with the
+    checkpoint resume since 2026-10-05), in execution order."""
+    run_src = inspect.getsource(m.run)
+    assert run_src.index("await run_enrich_tail(_tail)") < run_src.index("return publish_tail(_tail, summary)")
+    return run_src + inspect.getsource(m.run_enrich_tail) + inspect.getsource(m.publish_tail)
+
+
 def test_a_failed_board_write_skips_every_downstream_export():
-    src = inspect.getsource(m.run)
+    src = _run_src()
     abort = src.index("orchestrator.aborted_board_not_written")
     assert "return EXIT_WRITE_FAILED" in src[abort: abort + 400]
     for later in ("foreclosure_sold_pool.json", "write_health_artifact(", "write_listings(", "send_digest("):
@@ -91,7 +99,7 @@ def test_a_failed_board_write_skips_every_downstream_export():
 
 
 def test_a_scoring_failure_refuses_the_write_and_lands_in_the_health_alarms():
-    src = inspect.getsource(m.run)
+    src = _run_src()
     assert "except ScoreBoardError as exc:" in src
     assert "raise ScoreBoardFailed(" in src
     assert "SCORE_BOARD_FAIL_SOFT" in src

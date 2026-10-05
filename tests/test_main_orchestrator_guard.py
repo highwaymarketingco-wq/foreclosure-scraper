@@ -23,7 +23,8 @@ def test_path_is_module_level():
 def test_run_has_no_function_local_pathlib_import():
     """A function-local `from pathlib import Path` re-shadows the module-level one
     and reintroduces the UnboundLocalError. Forbid it in run()."""
-    tree = ast.parse(inspect.getsource(m.run))
+    # run() hands its tail to run_enrich_tail/publish_tail (2026-10-05): same rule there.
+    tree = ast.parse("\n".join(inspect.getsource(f) for f in (m.run, m.run_enrich_tail, m.publish_tail)))
     offenders = [
         n for n in ast.walk(tree)
         if isinstance(n, ast.ImportFrom) and n.module == "pathlib"

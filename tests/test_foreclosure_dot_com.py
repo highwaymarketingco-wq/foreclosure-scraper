@@ -141,6 +141,6 @@ def test_main_surfaces_paywall_blocked_status():
     classification for the paywalled sources that do declare it."""
     import inspect
     from foreclosure_scraper import main as orchestrator
-    src = inspect.getsource(orchestrator.run)
+    src = (inspect.getsource(orchestrator.run) + inspect.getsource(orchestrator.run_enrich_tail) + inspect.getsource(orchestrator.publish_tail))
     assert "requires_paywall" in src
     assert "PAYWALL-BLOCKED" in src

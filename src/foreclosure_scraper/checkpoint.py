@@ -73,16 +73,33 @@ def save(listings: list[Listing], phase: str, *, extra: Optional[dict] = None) -
     t0 = time.monotonic()
     try:
         d = _dir()
-        payload = [li.model_dump(mode="json") for li in listings]
 
         # Temp file in the SAME directory so os.replace is atomic (a rename
         # across filesystems is not). A crash mid-write leaves the previous
         # checkpoint intact.
+        #
+        # One row at a time (2026-10-05): this used to build the full
+        # [model_dump(...) for li in listings] list first -- a second full-fidelity
+        # copy of the whole board (~270K rows on the VM) alive next to the Listings,
+        # at every checkpoint. The bytes are the same json.dump(payload) produced
+        # ("[" + ", ".join(rows) + "]", default separators, ensure_ascii).
         fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
         os.close(fd)
-        with gzip.open(tmp, "wt", encoding="utf-8") as fh:
-            json.dump(payload, fh)
-        os.replace(tmp, d / BOARD_FILE)
+        try:
+            with gzip.open(tmp, "wt", encoding="utf-8") as fh:
+                fh.write("[")
+                for i, li in enumerate(listings):
+                    if i:
+                        fh.write(", ")
+                    fh.write(json.dumps(li.model_dump(mode="json")))
+                fh.write("]")
+            os.replace(tmp, d / BOARD_FILE)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
         manifest = {
             "phase": phase,
@@ -139,23 +156,33 @@ def load(max_age_h: Optional[float] = None) -> Optional[list[Listing]]:
     if age is not None and age > limit:
         log.warning("checkpoint.too_old", age_h=round(age, 1), limit_h=limit)
         return None
+    # Streamed (2026-10-05): json.load of the whole file kept every parsed row dict
+    # alive until the last Listing was built -- the decoded board and the validated
+    # board at the same time. Now each row is validated and its dict dropped.
+    from .board_parts import iter_gz_rows
+    out: list[Listing] = []
+    seen = 0
     try:
-        with gzip.open(p, "rt", encoding="utf-8") as fh:
-            records = json.load(fh)
+        for rec in iter_gz_rows(p):
+            seen += 1
+            try:
+                out.append(Listing.model_validate(rec))
+            except Exception:  # noqa: BLE001 - one bad row must not void the resume
+                continue
     except Exception as exc:  # noqa: BLE001
         log.warning("checkpoint.load_failed",
                     error=f"{type(exc).__name__}: {str(exc)[:120]}")
         return None
-    out: list[Listing] = []
-    for rec in records:
-        try:
-            out.append(Listing.model_validate(rec))
-        except Exception:  # noqa: BLE001 - one bad row must not void the resume
-            continue
     m = manifest() or {}
+    # A streamed decoder stops quietly at a truncated tail where json.load raised, so
+    # check the row count the save recorded instead of trusting end-of-stream.
+    if isinstance(m.get("count"), int) and seen < m["count"]:
+        log.warning("checkpoint.load_failed",
+                    error=f"row count {seen} < manifest count {m['count']}")
+        return None
     log.info("checkpoint.loaded", leads=len(out), phase=m.get("phase"),
              age_h=round(age, 1) if age is not None else None,
-             dropped=len(records) - len(out))
+             dropped=seen - len(out))
     return out or None
 
 

@@ -47,6 +47,6 @@ def test_aldridge_now_plain_fetch():
 def test_main_surfaces_render_required_status():
     import inspect
     from foreclosure_scraper import main as orchestrator
-    src = inspect.getsource(orchestrator.run)
+    src = (inspect.getsource(orchestrator.run) + inspect.getsource(orchestrator.run_enrich_tail) + inspect.getsource(orchestrator.publish_tail))
     assert "RENDER-REQUIRED" in src
     assert "requires_render" in src

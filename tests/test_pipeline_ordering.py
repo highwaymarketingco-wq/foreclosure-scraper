@@ -48,7 +48,7 @@ def test_main_orchestrator_runs_property_kind_before_valuation():
     """Static guarantee: read main.run's source and verify the property_kind
     enrichment line precedes the valuation_calc line. If a refactor moves
     valuation up, this catches it."""
-    src = inspect.getsource(orchestrator.run)
+    src = (inspect.getsource(orchestrator.run) + inspect.getsource(orchestrator.run_enrich_tail) + inspect.getsource(orchestrator.publish_tail))
     pk_idx = src.find("enrich_property_kind")
     calc_idx = src.find("valuation_calc.compute")
     assert pk_idx > 0, "enrich_property_kind no longer called in orchestrator"
@@ -64,7 +64,7 @@ def test_no_enrichment_runs_after_valuation_that_changes_property_kind():
     """Static guarantee: between the valuation_calc line and the end of
     main.run, no other enrichment may change property_kind. We approximate
     this by checking no `enrich_*property_kind*` call appears after calc."""
-    src = inspect.getsource(orchestrator.run)
+    src = (inspect.getsource(orchestrator.run) + inspect.getsource(orchestrator.run_enrich_tail) + inspect.getsource(orchestrator.publish_tail))
     calc_idx = src.find("valuation_calc.compute")
     after = src[calc_idx:]
     assert "property_kind" not in after.replace("li.property_kind", "").replace(

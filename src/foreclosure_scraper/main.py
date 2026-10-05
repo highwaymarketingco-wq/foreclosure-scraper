@@ -8,8 +8,10 @@ import re
 import sys
 import traceback
 from collections import Counter
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, Optional
 
 import structlog
 
@@ -1175,9 +1177,6 @@ async def run() -> int:
     # hit UnboundLocalError (which the surrounding try/except silently swallowed,
     # losing those stats + logging a false "failed"). One dict for the whole run.
     enrichment_stats: dict[str, dict] = {}
-    # Set when score_board raised (F17). Declared here for the same reason as the dict above.
-    _scoring_failed: str | None = None
-
     scrapers = all_scrapers()
     # FORECLOSURE_ONLY_SOURCES=substr,substr — restrict to matching slugs (for a scoped
     # timing/subset run). Unset = all sources (normal full run).
@@ -2853,6 +2852,79 @@ async def run() -> int:
     except Exception:
         log.error("dot_ocr.failed", traceback=traceback.format_exc())
 
+    # The tail from here to the end of the run is shared with the checkpoint resume
+    # (scripts/resume_from_checkpoint.py) so both run the same steps in the same order.
+    _tail = TailState(
+        enriched=enriched, enrichment_stats=enrichment_stats, errors=errors, cfg=cfg,
+        scrapers=scrapers, by_source=by_source, expected=expected,
+        source_outcomes=source_outcomes, carry_stats=carry_stats, regressions=regressions,
+        grandfather=_grandfather, off_footprint_removed=_off_footprint_removed,
+        sold_pool=sold_pool,
+    )
+    summary = await run_enrich_tail(_tail)
+    return publish_tail(_tail, summary)
+
+
+@dataclass
+class TailState:
+    """What the post-``dot_ocr``-checkpoint tail of :func:`run` reads from the scrape/merge half.
+
+    The tail (every step from the divorce group through the board write, the run_health file,
+    the Sheet export and the digest email) lives in :func:`run_enrich_tail` +
+    :func:`publish_tail` so that :func:`run` and ``scripts/resume_from_checkpoint.py`` run the
+    SAME code in the SAME order. Before 2026-10-05 the only way to finish a run that died after
+    the checkpoint was ``recover_from_checkpoint.py``, which published the checkpoint as-is,
+    unscored -- so a resume had to either re-list the tail by hand (and rot) or skip it.
+
+    ``run()`` fills every field from its own locals; the resume path has no scrape, so it passes
+    empty scrape-time state and turns off the four side effects that would otherwise write a
+    misleading file (``update_source_health`` already ran for the failed run with the real
+    per-source counts; ``write_sold_pool`` would write ``[]``; ``write_run_health`` would report
+    no sources; ``export_and_email`` would mail a digest with no source status in it).
+    """
+    enriched: list
+    enrichment_stats: dict
+    errors: list
+    cfg: Any
+    scrapers: list = field(default_factory=list)
+    by_source: Any = field(default_factory=Counter)
+    expected: dict = field(default_factory=dict)
+    source_outcomes: dict = field(default_factory=dict)
+    carry_stats: Optional[dict] = None
+    regressions: list = field(default_factory=list)
+    grandfather: list = field(default_factory=list)
+    off_footprint_removed: int = 0
+    sold_pool: list = field(default_factory=list)
+    update_source_health: bool = True
+    write_sold_pool: bool = True
+    write_run_health: bool = True
+    export_and_email: bool = True
+    scoring_failed: Optional[str] = None
+
+
+async def run_enrich_tail(st: TailState) -> dict:
+    """Everything :func:`run` does after the ``dot_ocr`` checkpoint and before the board write:
+    the network enrichers that follow it (divorce, name resolver, ACPASS, resolved-lead
+    catch-up incl. vision, tax_relief, rollback, court_bid, fhfa_value, dew_liens,
+    assessor_card, burke history, lrcpwa photos, homepath uuids, ...), valuation, scoring, every
+    post-score derived signal, the board-quality passes and the run summary. Returns the summary
+    :func:`publish_tail` writes. ``st.enriched`` is updated in place (prune_stale_reo rebinds it,
+    the grandfather restore extends it) and ``st.scoring_failed`` is set when scoring ran
+    fail-soft. Raises ScoreBoardFailed exactly as the inline code did."""
+    enriched = st.enriched
+    enrichment_stats = st.enrichment_stats
+    errors = st.errors
+    cfg = st.cfg
+    scrapers = st.scrapers
+    by_source = st.by_source
+    expected = st.expected
+    source_outcomes = st.source_outcomes
+    carry_stats = st.carry_stats
+    regressions = st.regressions
+    _grandfather = st.grandfather
+    _off_footprint_removed = st.off_footprint_removed
+    _scoring_failed: str | None = None
+
     # ---- Divorce enrichment group (concurrent) ----
     # NC and SC divorce enrichers hit different court portals and write the
     # same raw['divorce'] key, but for DISJOINT sets of leads (NC owners vs
@@ -3659,7 +3731,8 @@ async def run() -> int:
     source_alarms: dict = {}
     try:
         from .source_health_tracker import update_source_health
-        source_alarms = update_source_health(by_source, expected, docs_dir)
+        if st.update_source_health:
+            source_alarms = update_source_health(by_source, expected, docs_dir)
     except Exception:
         log.error("source_health.call_failed", traceback=traceback.format_exc())
 
@@ -3859,11 +3932,14 @@ async def run() -> int:
     # it can never pass unnoticed again. We do NOT abort — a genuinely quiet
     # week should still publish — but the drop is made impossible to miss.
     try:
-        import json as _json
         prev_path = Path(__file__).resolve().parent.parent.parent / "docs" / "listings.json"
         if prev_path.exists():
-            prev = _json.loads(prev_path.read_text())
-            prev_total = len(prev) if isinstance(prev, list) else 0
+            # Counted, never materialized: json.loads of the 2.5 GB plain board here held its
+            # text AND its parsed rows on top of the ~270K live Listings, inside the same minute
+            # as mark_new_listings' and write_artifact's own prior-board reads (the 2026-10-05
+            # VM OOM). See web_artifact.plain_board_row_count.
+            from .web_artifact import plain_board_row_count
+            prev_total = plain_board_row_count(prev_path) or 0
             curr_total = len(enriched)
             if prev_total >= 100 and curr_total < prev_total * 0.75:
                 pct = round(100 * (1 - curr_total / prev_total))
@@ -3878,6 +3954,20 @@ async def run() -> int:
     except Exception:
         log.error("count_drop_guard.failed", traceback=traceback.format_exc())
 
+
+    st.enriched = enriched
+    st.scoring_failed = _scoring_failed
+    return summary
+
+
+def publish_tail(st: TailState, summary: dict) -> int:
+    """The board write and what follows it (sold pool, run_health, Sheet export, digest
+    email), shared by :func:`run` and the checkpoint resume. Returns the process exit code."""
+    enriched = st.enriched
+    enrichment_stats = st.enrichment_stats
+    cfg = st.cfg
+    sold_pool = st.sold_pool
+    _scoring_failed = st.scoring_failed
     # Web artifact — always write, even when Sheets/Email secrets are missing.
     # GitHub Actions then commits docs/ back to the repo, GitHub Pages serves it.
     _write_ok = False
@@ -3901,77 +3991,80 @@ async def run() -> int:
                   note="skipping sold pool, run_health, Sheet export and digest email; exit 3")
         return EXIT_WRITE_FAILED
 
-    # Sold-comp pool — separate file so the dashboard's main grid never
-    # shows past-sale "listings". The card popout still reads
-    # raw.foreclosure_sold_comps which travels with the active listing.
-    # This separate file is for power-users / future analytics.
-    try:
-        import json as _json
-        from .web_artifact import _to_dict as _slim
-        sold_path = Path(__file__).resolve().parent.parent.parent / \
-            "docs" / "foreclosure_sold_pool.json"
-        sold_payload = [_slim(li) for li in sold_pool]
-        sold_path.write_text(
-            _json.dumps(sold_payload, ensure_ascii=False, default=str),
-            encoding="utf-8",
-        )
-        log.info("orchestrator.sold_pool_written",
-                 path=str(sold_path), count=len(sold_payload))
-    except Exception:
-        log.error("sold_pool_write.failed",
-                  traceback=traceback.format_exc())
-
-    # Per-source health JSON — committed alongside listings.json each run
-    # so an investor (or alerting hook) can see at a glance which sources
-    # are OK, which are blocked, and which actually regressed.
-    try:
-        from .run_health import write_health_artifact
-        health_path = Path(__file__).resolve().parent.parent.parent / "docs" / "run_health.json"
-        write_health_artifact(
-            out_path=health_path,
-            summary=summary,
-            enrichment_stats=enrichment_stats,
-        )
-        log.info("orchestrator.health_artifact", path=str(health_path))
-    except Exception:
-        log.error("run_health.failed", traceback=traceback.format_exc())
-
-    # Sheets + Email — guarded so a missing secret doesn't kill the rest of the run
-    sheet_url = ""
-    if cfg.sheet_id and cfg.google_service_account_json:
+    if st.write_sold_pool:  # a resume has no sold pool; writing [] would wipe the file
+        # Sold-comp pool — separate file so the dashboard's main grid never
+        # shows past-sale "listings". The card popout still reads
+        # raw.foreclosure_sold_comps which travels with the active listing.
+        # This separate file is for power-users / future analytics.
         try:
-            sheet_url = write_listings(
-                sheet_id=cfg.sheet_id,
-                service_account_json=cfg.google_service_account_json,
-                listings=enriched,
-                run_summary=summary,
+            import json as _json
+            from .web_artifact import _to_dict as _slim
+            sold_path = Path(__file__).resolve().parent.parent.parent / \
+                "docs" / "foreclosure_sold_pool.json"
+            sold_payload = [_slim(li) for li in sold_pool]
+            sold_path.write_text(
+                _json.dumps(sold_payload, ensure_ascii=False, default=str),
+                encoding="utf-8",
             )
+            log.info("orchestrator.sold_pool_written",
+                     path=str(sold_path), count=len(sold_payload))
         except Exception:
-            log.error("sheets.failed", traceback=traceback.format_exc())
-    else:
-        log.warning("sheets.skipped_no_secret")
+            log.error("sold_pool_write.failed",
+                      traceback=traceback.format_exc())
 
-    # Send the digest whenever Gmail creds exist — do NOT gate on sheet_url.
-    # Gating on the sheet meant a missing/failed Sheets export silently
-    # suppressed the ENTIRE email, including the source-alarm/failure banner the
-    # owner relies on to learn a source broke. The template already guards the
-    # sheet link with `if sheet_url`, so an empty sheet_url is fine.
-    if cfg.gmail_app_password and cfg.gmail_sender:
+    if st.write_run_health:  # a resume has no per-source scrape status to report
+        # Per-source health JSON — committed alongside listings.json each run
+        # so an investor (or alerting hook) can see at a glance which sources
+        # are OK, which are blocked, and which actually regressed.
         try:
-            send_digest(
-                sender=cfg.gmail_sender,
-                app_password=cfg.gmail_app_password,
-                recipients=cfg.email_recipients,
-                sheet_url=sheet_url,
-                run_summary=summary,
+            from .run_health import write_health_artifact
+            health_path = Path(__file__).resolve().parent.parent.parent / "docs" / "run_health.json"
+            write_health_artifact(
+                out_path=health_path,
+                summary=summary,
+                enrichment_stats=enrichment_stats,
             )
+            log.info("orchestrator.health_artifact", path=str(health_path))
         except Exception:
-            log.error("email.failed", traceback=traceback.format_exc())
-    elif summary.get("source_alarms"):
-        # No Gmail creds but sources failed — make sure it can't pass silently.
-        log.error("email.skipped_but_alarms_present", alarms=list(summary["source_alarms"]))
-    else:
-        log.warning("email.skipped_no_secret")
+            log.error("run_health.failed", traceback=traceback.format_exc())
+
+    if st.export_and_email:  # a resume does not re-export the Sheet or re-send the digest
+        # Sheets + Email — guarded so a missing secret doesn't kill the rest of the run
+        sheet_url = ""
+        if cfg.sheet_id and cfg.google_service_account_json:
+            try:
+                sheet_url = write_listings(
+                    sheet_id=cfg.sheet_id,
+                    service_account_json=cfg.google_service_account_json,
+                    listings=enriched,
+                    run_summary=summary,
+                )
+            except Exception:
+                log.error("sheets.failed", traceback=traceback.format_exc())
+        else:
+            log.warning("sheets.skipped_no_secret")
+
+        # Send the digest whenever Gmail creds exist — do NOT gate on sheet_url.
+        # Gating on the sheet meant a missing/failed Sheets export silently
+        # suppressed the ENTIRE email, including the source-alarm/failure banner the
+        # owner relies on to learn a source broke. The template already guards the
+        # sheet link with `if sheet_url`, so an empty sheet_url is fine.
+        if cfg.gmail_app_password and cfg.gmail_sender:
+            try:
+                send_digest(
+                    sender=cfg.gmail_sender,
+                    app_password=cfg.gmail_app_password,
+                    recipients=cfg.email_recipients,
+                    sheet_url=sheet_url,
+                    run_summary=summary,
+                )
+            except Exception:
+                log.error("email.failed", traceback=traceback.format_exc())
+        elif summary.get("source_alarms"):
+            # No Gmail creds but sources failed — make sure it can't pass silently.
+            log.error("email.skipped_but_alarms_present", alarms=list(summary["source_alarms"]))
+        else:
+            log.warning("email.skipped_no_secret")
 
     if _scoring_failed:
         log.error("orchestrator.done_with_stale_tiers", scoring_failed=_scoring_failed)

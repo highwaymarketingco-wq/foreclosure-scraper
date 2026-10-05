@@ -26,7 +26,7 @@ from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 # ---- Fix A: photos+images BEFORE vision ----
 
 def test_photos_runs_before_vision():
-    src = inspect.getsource(orchestrator.run)
+    src = (inspect.getsource(orchestrator.run) + inspect.getsource(orchestrator.run_enrich_tail) + inspect.getsource(orchestrator.publish_tail))
     photos_idx = src.find("enrich_with_address_photos(enriched)")
     vision_idx = src.find("enrich_with_vision(enriched")
     assert photos_idx > 0, "enrich_with_address_photos no longer called"
@@ -39,7 +39,7 @@ def test_photos_runs_before_vision():
 
 
 def test_images_runs_before_vision():
-    src = inspect.getsource(orchestrator.run)
+    src = (inspect.getsource(orchestrator.run) + inspect.getsource(orchestrator.run_enrich_tail) + inspect.getsource(orchestrator.publish_tail))
     images_idx = src.find("enrich_with_images(enriched")
     vision_idx = src.find("enrich_with_vision(enriched")
     assert images_idx > 0

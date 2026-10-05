@@ -50,13 +50,19 @@ def test_a_crash_during_a_checkpoint_cannot_corrupt_the_previous_one(monkeypatch
     """The whole point of the atomic write. If the process dies mid-save, the
     last good checkpoint must still load."""
     C.save(_leads(2), "good")
-    real = C.json.dump
+    real = C.json.dumps
+    calls = {"n": 0}
 
     def boom(*a, **kw):
-        raise OSError("simulated crash mid-write")
-    monkeypatch.setattr(C.json, "dump", boom)
+        # save() streams one row at a time: die after some rows are already in the temp file
+        calls["n"] += 1
+        if calls["n"] > 3:
+            raise OSError("simulated crash mid-write")
+        return real(*a, **kw)
+    monkeypatch.setattr(C.json, "dumps", boom)
     assert C.save(_leads(9), "doomed") is False      # must not raise
-    monkeypatch.setattr(C.json, "dump", real)
+    monkeypatch.setattr(C.json, "dumps", real)
+    assert not list(C.CHECKPOINT_DIR.glob("*.tmp")), "the half-written temp file was left behind"
 
     back = C.load()
     assert back is not None and len(back) == 2, "previous checkpoint was destroyed"

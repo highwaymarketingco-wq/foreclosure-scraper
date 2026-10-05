@@ -413,10 +413,39 @@ def _interrupt_after(monkeypatch, n_parts_written: int):
     monkeypatch.setattr(bp, "atomic_write_bytes", flaky)
 
 
+def _interrupt_commit_after(monkeypatch, n_parts_committed: int):
+    """write_artifact stages every part under a temp name and renames them into place only after
+    every row converted (2026-10-05); a kill can still land BETWEEN those renames."""
+    real = bp.commit_staged_part
+    n = {"i": 0}
+
+    def flaky(staged, final):
+        if n["i"] == n_parts_committed:
+            raise KeyboardInterrupt("killed mid-commit")
+        n["i"] += 1
+        real(staged, final)
+    monkeypatch.setattr(bp, "commit_staged_part", flaky)
+
+
+def test_a_kill_while_parts_are_still_being_written_leaves_the_board_untouched(two_boards, monkeypatch):
+    """Before 2026-10-05 listings.json was replaced first and the parts written one by one into
+    place, so a kill here tore the set. Parts are now staged under temp names until every row has
+    converted: the published set is still board A, intact, and nothing is left behind."""
+    docs = two_boards
+    before = {p.name: p.read_bytes() for p in docs.iterdir() if p.is_file()}
+    _interrupt_after(monkeypatch, 1)
+    with pytest.raises(KeyboardInterrupt):
+        wa.write_artifact([_lead(i + 5000) for i in range(600)], {"notes": "B"}, docs_dir=docs)
+    monkeypatch.undo()
+    after = {p.name: p.read_bytes() for p in docs.iterdir() if p.is_file()}
+    assert after == before
+    assert wa.verify_manifest(docs)["ok"] and len(wa.load_board(docs)) == 600
+
+
 def test_part_i_written_manifest_not_updated_is_a_BoardIntegrityError_everywhere(two_boards, monkeypatch):
     docs = two_boards
     board_a = [_lead(i) for i in range(600)]
-    _interrupt_after(monkeypatch, 1)                                   # part 000 lands, part 001 does not
+    _interrupt_commit_after(monkeypatch, 1)                            # part 000 lands, part 001 does not
     changed = [_lead(i) if i % 2 else _lead(i + 1000) for i in range(600)]      # every part's bytes change
     with pytest.raises(KeyboardInterrupt):
         wa.write_artifact(changed, {"notes": "B"}, docs_dir=docs)
@@ -445,7 +474,7 @@ def test_part_i_written_manifest_not_updated_is_a_BoardIntegrityError_everywhere
 
 def test_the_next_write_refuses_to_publish_on_top_of_a_torn_part_set(two_boards, monkeypatch):
     docs = two_boards
-    _interrupt_after(monkeypatch, 1)
+    _interrupt_commit_after(monkeypatch, 1)
     with pytest.raises(KeyboardInterrupt):
         wa.write_artifact([_lead(i + 5000) for i in range(600)], {"notes": "B"}, docs_dir=docs)
     monkeypatch.undo()
