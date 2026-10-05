@@ -30,6 +30,14 @@ two stealth browsers on an 8 GB Mac -- from overlapping.
 
 ADAPTIVE CAP: see sos_agent_handoff.py (choose_cap/next_cap). State: data/sos_agent_backoff.json.
 
+RESULT SELECTION (2026-10-05): _batch_lookup() now opens only the search result that IS the
+entity (enrichment_sos_agent.select_result()); a search with candidates but no confident match
+comes back under outcome["ambiguous"] and is recorded as status "ambiguous" (never applied).
+Every run first re-checks the ledger's resolved entries against the same rule
+(sos_agent_handoff.recheck_resolved()): a failing one becomes "mismatch", is not applied by the
+VM, and is re-queried here ahead of every other target. Rows that still carry a rejected
+profile count as lookup candidates (the VM clears the profile from them on its next run).
+
 Usage:
   uv run python scripts/sos_agent_refresh.py             # what the scheduled job runs
   uv run python scripts/sos_agent_refresh.py --dry-run   # scan + targets only: no lookups, no writes
@@ -79,9 +87,12 @@ def scan_board(docs: Path, entities: dict, today: str) -> dict:
     """One streaming pass: seed the ledger from profiles already on the board and collect
     lookup candidates. Mirrors enrich_with_sos_agent()'s selection: NC rows with an entity
     name and no sos_agent dict; one candidate per entity_key under its first-seen spelling,
-    ranked by the first-seen row's _prio()."""
-    total = with_sos = seeded = unseedable = 0
+    ranked by the first-seen row's _prio(). A row whose profile the ledger REJECTED for its
+    entity (sos_agent_handoff.row_profile_rejected(), the VM's own clear rule) is a candidate
+    too: the VM takes that profile off it on its next run."""
+    total = with_sos = seeded = unseedable = carrying_rejected = 0
     cand: dict[str, dict] = {}
+    rejected = ho.rejected_sosids_by_key({"entities": entities})
     for rec in iter_board_rows(docs / "listings.json.gz"):
         total += 1
         raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
@@ -94,7 +105,9 @@ def scan_board(docs: Path, entities: dict, today: str) -> dict:
                 seeded += n
                 if not ho.seed_names_for_board_profile(sa, _entity_of(li)):
                     unseedable += 1
-            continue
+            if not ho.row_profile_rejected(sa, _entity_of(li), rejected):
+                continue
+            carrying_rejected += 1
         if rec.get("state") != "NC":
             continue
         name = _entity_of(li)
@@ -107,12 +120,15 @@ def scan_board(docs: Path, entities: dict, today: str) -> dict:
         else:
             c["rows"] += 1
     return {"total": total, "with_sos": with_sos, "seeded": seeded,
-            "unseedable": unseedable, "candidates": cand}
+            "unseedable": unseedable, "carrying_rejected": carrying_rejected,
+            "candidates": cand}
 
 
 def pick_targets(cand: dict, entities: dict, cap: int, today: str) -> dict:
-    """Split candidates by what the ledger knows; rank the due ones and cap them. Never-checked
-    names go before due rechecks at the same priority, so each run advances the frontier."""
+    """Split candidates by what the ledger knows; rank the due ones and cap them. A mismatch
+    (a profile the ledger rejected under the 2026-10-05 matching rule) goes first of all, so
+    the next run re-queries it; then by priority, never-checked names before due rechecks at
+    the same priority, so each run advances the frontier."""
     pending_rows = pending_entities = not_due = 0
     due: list[tuple[int, int, int, str, str]] = []
     for k, c in cand.items():
@@ -124,10 +140,12 @@ def pick_targets(cand: dict, entities: dict, cap: int, today: str) -> dict:
         if not ho.is_due(e, today):
             not_due += 1
             continue
-        due.append((c["prio"], 0 if e is None else 1, c["order"], c["name"], k))
+        first = 0 if (e or {}).get("status") == "mismatch" else 1
+        due.append((first, c["prio"], 0 if e is None else 1, c["order"], c["name"], k))
     due.sort()
-    return {"names": [t[3] for t in due[:max(0, cap)]], "due": len(due),
-            "rechecks": sum(1 for t in due if t[1]), "not_due": not_due,
+    return {"names": [t[4] for t in due[:max(0, cap)]], "due": len(due),
+            "rechecks": sum(1 for t in due if t[2]), "not_due": not_due,
+            "requeries": sum(1 for t in due if t[0] == 0),
             "pending_entities": pending_entities, "pending_rows": pending_rows}
 
 
@@ -225,6 +243,13 @@ def run(args) -> int:
         return 1
     entities = ledger.setdefault("entities", {})
     before = ho.ledger_counts(entities)
+    # re-check every resolved entry against the current matching rule (idempotent)
+    rc = ho.recheck_resolved(entities, today=today)
+    if rc["mismatch"] or rc["contacts_cleaned"]:
+        print(f"ledger re-check: {len(rc['mismatch'])} resolved -> mismatch {rc['by_reason']} "
+              f"({', '.join(entities[k].get('entity') or k for k in rc['mismatch'][:8])}"
+              f"{', ...' if len(rc['mismatch']) > 8 else ''}); contacts cleaned on "
+              f"{len(rc['contacts_cleaned'])}", flush=True)
 
     t0 = time.monotonic()
     scan = scan_board(DOCS, entities, today)
@@ -246,8 +271,9 @@ def run(args) -> int:
           f"{before['error']} no-answer | seeded from board: +{scan['seeded']} "
           f"({scan['unseedable']} board profiles not fileable) | candidate entities="
           f"{len(scan['candidates'])} | awaiting VM apply: {tg['pending_entities']} entities / "
-          f"{tg['pending_rows']} rows | not due={tg['not_due']} | due={tg['due']} "
-          f"({tg['rechecks']} rechecks)", flush=True)
+          f"{tg['pending_rows']} rows | rows carrying a rejected profile="
+          f"{scan['carrying_rejected']} | not due={tg['not_due']} | due={tg['due']} "
+          f"({tg['rechecks']} rechecks, {tg['requeries']} mismatch re-queries)", flush=True)
     print(f"cap={cap} ({why}) | targets this run={len(names)}", flush=True)
 
     if args.dry_run:
@@ -264,8 +290,9 @@ def run(args) -> int:
         results = asyncio.run(_batch_lookup(names, outcome=outcome))
         outcome["seconds"] = round(time.monotonic() - t1)
     else:
-        outcome = {"attempted": 0, "resolved": [], "misses": [], "errors": [],
-                   "breaker_tripped": False, "deadline_hit": False, "session_failed": False}
+        outcome = {"attempted": 0, "resolved": [], "misses": [], "errors": [], "ambiguous": [],
+                   "ambiguous_detail": {}, "breaker_tripped": False, "deadline_hit": False,
+                   "session_failed": False}
 
     with_contact = new_rows = 0
     for name in outcome.get("resolved", []):
@@ -275,15 +302,24 @@ def run(args) -> int:
             with_contact += 1
         c = scan["candidates"].get(entity_key(name))
         new_rows += c["rows"] if c else 0
+    for name in outcome.get("ambiguous", []):
+        ho.record_result(entities, name, "ambiguous", today=today,
+                         detail=(outcome.get("ambiguous_detail") or {}).get(name))
     for name in outcome.get("misses", []):
         ho.record_result(entities, name, "miss", today=today)
     for name in outcome.get("errors", []):
         ho.record_result(entities, name, "error", today=today)
 
-    n_res, n_miss, n_err = (len(outcome.get(k, [])) for k in ("resolved", "misses", "errors"))
+    n_res, n_miss, n_err, n_amb = (len(outcome.get(k, []))
+                                   for k in ("resolved", "misses", "errors", "ambiguous"))
+    for name in outcome.get("ambiguous", []):
+        d = (outcome.get("ambiguous_detail") or {}).get(name) or {}
+        print(f"  ambiguous: {name}: {d.get('reason')} ({d.get('exact', 0)} same-name of "
+              f"{d.get('candidates', 0)} candidates)", flush=True)
     print(f"sos_agent: targets={len(names)} attempted={outcome.get('attempted', 0)} "
           f"resolved={n_res} (with contact {with_contact}, {new_rows} board rows for the VM) "
-          f"misses={n_miss} no-answer={n_err} breaker={outcome.get('breaker_tripped')} "
+          f"ambiguous={n_amb} misses={n_miss} no-answer={n_err} "
+          f"breaker={outcome.get('breaker_tripped')} "
           f"deadline={outcome.get('deadline_hit')} session_failed={outcome.get('session_failed')} "
           f"in {outcome.get('seconds', 0)}s"
           + (f" error={outcome.get('error')}" if outcome.get("error") else ""), flush=True)
@@ -295,7 +331,7 @@ def run(args) -> int:
     run_rec = {"at": datetime.now(timezone.utc).isoformat(), "cap_used": cap,
                "manual": args.cap is not None, "targets": len(names),
                "attempted": outcome.get("attempted", 0), "resolved": n_res, "misses": n_miss,
-               "no_answer": n_err, "breaker_tripped": bool(outcome.get("breaker_tripped")),
+               "ambiguous": n_amb, "no_answer": n_err, "breaker_tripped": bool(outcome.get("breaker_tripped")),
                "deadline_hit": bool(outcome.get("deadline_hit")),
                "session_failed": bool(outcome.get("session_failed")),
                "seconds": outcome.get("seconds", 0), "verdict": verdict, "next_cap": nxt}
@@ -309,11 +345,14 @@ def run(args) -> int:
         ho.merge_ledgers(ledger, ho.load_ledger(HANDOFF))
     except ho.LedgerUnreadable:
         pass
+    ho.recheck_resolved(entities, today=today)     # whatever the merge brought back
     ledger["last_run"] = {k: v for k, v in run_rec.items() if k != "manual"} | {
-        "seeded_from_board": scan["seeded"], "awaiting_vm_rows": tg["pending_rows"] + new_rows}
+        "seeded_from_board": scan["seeded"], "awaiting_vm_rows": tg["pending_rows"] + new_rows,
+        "rechecked_to_mismatch": len(rc["mismatch"]), "mismatch_requeries": tg["requeries"]}
     ho.save_ledger(ledger, HANDOFF, host=socket.gethostname())
     after = ledger["counts"]
-    print(f"ledger: {after['entities']} entities ({after['resolved']} resolved, {after['miss']} "
+    print(f"ledger: {after['entities']} entities ({after['resolved']} resolved, "
+          f"{after['ambiguous']} ambiguous, {after['mismatch']} mismatch, {after['miss']} "
           f"miss, {after['error']} no-answer) -> {HANDOFF.relative_to(REPO)}", flush=True)
 
     if not PUSH:
@@ -321,11 +360,12 @@ def run(args) -> int:
         _write_outcome("ok" if n_res else "no_change", n_res, f"{n_res} resolved; HANDOFF_PUSH=0")
         return 0
 
-    msg = (f"sos_agent hand-off: +{n_res} resolved, {n_miss} miss, {n_err} no-answer "
-           f"({after['resolved']} resolved total, {today})")
+    msg = (f"sos_agent hand-off: +{n_res} resolved, {n_amb} ambiguous, {n_miss} miss, "
+           f"{n_err} no-answer ({after['resolved']} resolved total, {today})")
     result, detail = publish(msg)
     print(f"git: {result} {detail}", flush=True)
-    note = (f"targets={len(names)} resolved={n_res} misses={n_miss} no_answer={n_err} "
+    note = (f"targets={len(names)} resolved={n_res} ambiguous={n_amb} misses={n_miss} "
+            f"no_answer={n_err} "
             f"cap={cap} next={nxt} ({verdict}); git {result} {detail[:120]}")
     if result in ("push_failed", "commit_failed"):
         _write_outcome("push_failed", n_res, note)

@@ -117,7 +117,8 @@ def test_save_and_load_round_trip_one_entity_per_line(tmp_path):
     text = p.read_text()
     back = ho.load_ledger(p)
     assert back["entities"] == led["entities"]
-    assert back["counts"] == {"entities": 6, "resolved": 1, "miss": 5, "error": 0}
+    assert back["counts"] == {"entities": 6, "resolved": 1, "miss": 5, "error": 0,
+                              "ambiguous": 0, "mismatch": 0}
     assert back["host"] == "test-host" and back["schema"] == 1 and back["generated_at"]
     # one entity per line, so a day's commit is a few changed lines
     assert sum(1 for line in text.splitlines() if line.startswith('"entity ')) == 5
@@ -382,6 +383,18 @@ class _FakePage:
         kind = self.script.get(self.core)
         self._title = "Just a moment..." if kind == "block" else "Business Registration Results"
         return ["/online_services/search/Business_Registration_Profile?Id=1"] if kind == "hit" else []
+
+    async def content(self):
+        # the result list _one() reads to choose the hit (real structure: one accordion per
+        # entity, tests/fixtures/sosnc_search_*.html); only a "hit" gets this far
+        return ('<div class="usa-accordion__heading"><button aria-controls="a1">'
+                '<div class="searchHeader">Hit LLC <span> • 77</span></div>'
+                '<div class="searchSubHeader">Current - Active • Limited Liability Company</div>'
+                '</button></div><div id="a1" class="usa-accordion__content" hidden="">'
+                '<div class="para-small"><span class="boldSpan">Legal name:</span> Hit LLC</div>'
+                '<div class="para-small"><span class="boldSpan">Status:</span> Current - Active</div>'
+                '<div class="para-small"><a href="/online_services/search/'
+                'Business_Registration_Profile?Id=1">More information</a></div></div>')
 
     async def inner_text(self, sel):
         return "Legal name: Hit LLC\nSecretary of State Identification Number (SOSID): 77\n"
