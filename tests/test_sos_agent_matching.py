@@ -549,8 +549,47 @@ def test_mac_scan_counts_rows_carrying_a_rejected_profile_as_candidates(tmp_path
     recs = [{"state": "NC", "owner_name": "COVENANT PRESBYTERIAN CHURCH", "defendant": None,
              "raw": {"sos_agent": copy.deepcopy(JACKSONVILLE)}},
             {"state": "NC", "owner_name": "GOOD HOLDINGS LLC", "defendant": None,
-             "raw": {"sos_agent": _p("Good Holdings, LLC", "5")}}]
+             "raw": {"sos_agent": _p("Good Holdings, LLC", "5")}},
+            {"state": "NC", "owner_name": "J AND M FAMILY HOMES LLC", "defendant": None,
+             "raw": {"sos_agent": _p("J & M Family Homes, Inc.", "0151520", status="Multiple",
+                                     match_count=2)}}]
     monkeypatch.setattr(sar, "iter_board_rows", lambda path: iter(recs))
     scan = sar.scan_board(tmp_path, ents, "2026-10-05")
-    assert scan["carrying_rejected"] == 1
-    assert set(scan["candidates"]) == {"covenant presbyterian church"}
+    assert scan["carrying_rejected"] == 2 and scan["board_mismatch"] == ["j and m family homes llc"]
+    assert set(scan["candidates"]) == {"covenant presbyterian church", "j and m family homes llc"}
+    tg = sar.pick_targets(scan["candidates"], ents, cap=5, today="2026-10-05")
+    assert set(tg["names"]) == {"COVENANT PRESBYTERIAN CHURCH", "J AND M FAMILY HOMES LLC"}
+
+
+def test_board_rows_with_a_same_name_unconfirmed_profile_are_registered_and_cleared(tmp_path):
+    """Live 2026-10-05: four 'J AND M FAMILY HOMES LLC' rows carry 'J & M Family Homes, Inc.'
+    (a legacy profile, seeded only under the registry's own spelling, so the ledger's
+    rejection never reached those rows). Same core name -> it was looked up for this entity
+    -> rejected for it. A row whose owner is now someone else is left alone (item 57)."""
+    jm = _p("J & M Family Homes, Inc.", "0151520", status="Multiple", match_count=2)
+    ents: dict = {}
+    k = ho.register_board_profile_mismatch(ents, jm, "J AND M FAMILY HOMES LLC", today="2026-10-05")
+    assert k == "j and m family homes llc"
+    e = ents[k]
+    assert e["status"] == "mismatch" and e["source"] == "board_check"
+    assert e["rejected_sosids"] == ["0151520"] and e["mismatch"]["reason"] == "legal_name_differs"
+    assert ho.is_due(e, "2026-10-05")
+    # idempotent; a different owner is not this check's business; a confirmed one is fine
+    assert ho.register_board_profile_mismatch(ents, jm, "J AND M FAMILY HOMES LLC") is None
+    assert ho.register_board_profile_mismatch(ents, jm, "TRIVETTE, BRUCE") is None
+    assert ho.register_board_profile_mismatch(ents, _p("Good Holdings, LLC", "5"),
+                                              "GOOD HOLDINGS LLC") is None
+    # an entity the ledger already re-confirmed under the rule is not re-rejected
+    wnc = _p("WNC Building, LLC", "1933160", status="Admin. Dissolved", match_count=4)
+    ho.record_result(ents, "WNC BUILDING, LLC", "resolved",
+                     dict(wnc, match_rule=sa.MATCH_RULE), today="2026-10-05")
+    assert ho.register_board_profile_mismatch(ents, wnc, "WNC BUILDING, LLC") is None
+
+    p = _save(tmp_path, ents)
+    rows = [_li("J AND M FAMILY HOMES LLC", raw={"sos_agent": copy.deepcopy(jm)}, i=0),
+            _li("TRIVETTE, BRUCE", raw={"sos_agent": copy.deepcopy(jm)}, i=1),
+            _li("WNC BUILDING, LLC", raw={"sos_agent": copy.deepcopy(wnc)}, i=2)]
+    out = ho.apply_sos_agent_handoff(rows, path=p)
+    assert out["cleared"] == 1 and "sos_agent" not in rows[0].raw
+    assert rows[1].raw["sos_agent"]["sosid"] == "0151520"
+    assert rows[2].raw["sos_agent"]["sosid"] == "1933160"

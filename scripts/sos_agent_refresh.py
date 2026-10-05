@@ -91,6 +91,7 @@ def scan_board(docs: Path, entities: dict, today: str) -> dict:
     entity (sos_agent_handoff.row_profile_rejected(), the VM's own clear rule) is a candidate
     too: the VM takes that profile off it on its next run."""
     total = with_sos = seeded = unseedable = carrying_rejected = 0
+    board_mismatch: set[str] = set()
     cand: dict[str, dict] = {}
     rejected = ho.rejected_sosids_by_key({"entities": entities})
     for rec in iter_board_rows(docs / "listings.json.gz"):
@@ -105,6 +106,10 @@ def scan_board(docs: Path, entities: dict, today: str) -> dict:
                 seeded += n
                 if not ho.seed_names_for_board_profile(sa, _entity_of(li)):
                     unseedable += 1
+                k = ho.register_board_profile_mismatch(entities, sa, _entity_of(li), today=today)
+                if k:
+                    board_mismatch.add(k)
+                    rejected.setdefault(str(sa["sosid"]), set()).add(k)
             if not ho.row_profile_rejected(sa, _entity_of(li), rejected):
                 continue
             carrying_rejected += 1
@@ -121,7 +126,7 @@ def scan_board(docs: Path, entities: dict, today: str) -> dict:
             c["rows"] += 1
     return {"total": total, "with_sos": with_sos, "seeded": seeded,
             "unseedable": unseedable, "carrying_rejected": carrying_rejected,
-            "candidates": cand}
+            "board_mismatch": sorted(board_mismatch), "candidates": cand}
 
 
 def pick_targets(cand: dict, entities: dict, cap: int, today: str) -> dict:
@@ -272,7 +277,9 @@ def run(args) -> int:
           f"({scan['unseedable']} board profiles not fileable) | candidate entities="
           f"{len(scan['candidates'])} | awaiting VM apply: {tg['pending_entities']} entities / "
           f"{tg['pending_rows']} rows | rows carrying a rejected profile="
-          f"{scan['carrying_rejected']} | not due={tg['not_due']} | due={tg['due']} "
+          f"{scan['carrying_rejected']} (new board mismatches: {len(scan['board_mismatch'])}"
+          f"{': ' + ', '.join(entities[k].get('entity') or k for k in scan['board_mismatch'][:6]) if scan['board_mismatch'] else ''}"
+          f") | not due={tg['not_due']} | due={tg['due']} "
           f"({tg['rechecks']} rechecks, {tg['requeries']} mismatch re-queries)", flush=True)
     print(f"cap={cap} ({why}) | targets this run={len(names)}", flush=True)
 
@@ -348,7 +355,8 @@ def run(args) -> int:
     ho.recheck_resolved(entities, today=today)     # whatever the merge brought back
     ledger["last_run"] = {k: v for k, v in run_rec.items() if k != "manual"} | {
         "seeded_from_board": scan["seeded"], "awaiting_vm_rows": tg["pending_rows"] + new_rows,
-        "rechecked_to_mismatch": len(rc["mismatch"]), "mismatch_requeries": tg["requeries"]}
+        "rechecked_to_mismatch": len(rc["mismatch"]), "board_mismatch": len(scan["board_mismatch"]),
+        "mismatch_requeries": tg["requeries"]}
     ho.save_ledger(ledger, HANDOFF, host=socket.gethostname())
     after = ledger["counts"]
     print(f"ledger: {after['entities']} entities ({after['resolved']} resolved, "

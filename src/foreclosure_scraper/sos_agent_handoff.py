@@ -86,6 +86,7 @@ import structlog
 
 from .enrichment_sos_agent import (
     _entity_of, clean_contact, entity_key, is_active_status, names_match, propagate_profiles,
+    sos_core_key,
 )
 
 log = structlog.get_logger()
@@ -374,6 +375,51 @@ def recheck_resolved(entities: dict, today: Optional[str] = None) -> dict:
         elif clean_contact(prof):
             out["contacts_cleaned"].append(k)
     return out
+
+
+def register_board_profile_mismatch(entities: dict, profile: Any, current_entity: Optional[str],
+                                    today: Optional[str] = None) -> Optional[str]:
+    """The board-row side of recheck_resolved(). A profile on a board row was looked up for
+    its resolved_for_entity, or (an older profile with no stamp) evidently for the row's own
+    entity when that has the same core name as the profile's Legal name ("J AND M FAMILY HOMES
+    LLC" carrying "J & M Family Homes, Inc."). When profile_confirmed() rejects it for that
+    entity, the SOSID is recorded as rejected under that entity's key (a new "mismatch" entry,
+    source "board_check", when the ledger has none), so the VM clears it from those rows and
+    the Mac re-queries the entity. A row whose owner is now a different entity is not
+    touched (docs/HANDOFF.md item 57). Returns the entity key it registered, else None;
+    idempotent."""
+    if not isinstance(profile, dict) or not profile.get("sosid"):
+        return None
+    legal = profile.get("legal_name")
+    searched = profile.get("resolved_for_entity")
+    if not searched and current_entity and legal \
+            and sos_core_key(current_entity) == sos_core_key(legal):
+        searched = current_entity
+    if not searched:
+        return None
+    ok, why = profile_confirmed(searched, profile)
+    k = entity_key(searched)
+    if ok or not k:
+        return None
+    sid = str(profile["sosid"])
+    e = entities.get(k)
+    if e is not None:
+        if e.get("status") == "resolved" and str((e.get("profile") or {}).get("sosid")) == sid:
+            return None       # the ledger re-confirmed this very entity under the rule
+        if sid in set(e.get("rejected_sosids") or []):
+            return None
+    day = today or _today()
+    if e is None:
+        e = {"entity": searched, "status": "mismatch", "source": "board_check", "checks": 0,
+             "first_checked_at": day}
+        entities[k] = e
+    e["rejected_sosids"] = sorted(set(e.get("rejected_sosids") or []) | {sid})
+    if e.get("status") not in ("resolved", "ambiguous", "miss"):
+        e["status"] = "mismatch"
+        e["mismatch"] = {"reason": why, "at": day, "legal_name": legal, "sosid": sid,
+                         "match_count": profile.get("match_count"), "found_on": "board_row"}
+        e.setdefault("rejected_profile", copy.deepcopy(profile))
+    return k
 
 
 def rejected_sosids_by_key(ledger: dict) -> dict[str, set[str]]:
