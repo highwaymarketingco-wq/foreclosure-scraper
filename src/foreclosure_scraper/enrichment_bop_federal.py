@@ -56,6 +56,7 @@ import structlog
 
 from .enrichment_incarceration import _name_parts, _owner_of
 from .models import Listing
+from .signal_freshness import is_prison_sourced
 
 log = structlog.get_logger()
 
@@ -320,12 +321,14 @@ async def enrich_bop_federal(listings: list[Listing], max_queries: Optional[int]
                     li.raw = {}
                 li.raw["bop_federal"] = res.match
                 li.raw.pop("bop_check", None)
-                if res.match.get("in_custody"):
-                    li.raw.setdefault("incarceration", {
+                # Replaces a county-jail flag (a federal custody match outranks it and must not be
+                # dropped when the jail stay ends); never replaces a state-prison match.
+                if res.match.get("in_custody") and not is_prison_sourced(li.raw.get("incarceration")):
+                    li.raw["incarceration"] = {
                         "state": "FEDERAL", "source": BOP_SOURCE,
                         "matched_name": res.match["matched_name"],
                         "facility_type": res.match["facility_type"],
-                        "confidence": "name_only_low"})
+                        "confidence": "name_only_low"}
                 counts["matched"] += 1
             elif res.answered:
                 _stamp_miss(li, f"{first} {last}", now)

@@ -187,6 +187,28 @@ def custody_ended(jail_booking: Any, today: Optional[date] = None) -> bool:
     return sr is not None and sr < (today or date.today())
 
 
+# The `source` values the state/federal prison lanes stamp on raw['incarceration']
+# (enrichment_incarceration DAC_SOURCE/SCDC_SOURCE, enrichment_bop_federal BOP_SOURCE). Literals
+# because this module imports nothing from the engine; tests/test_incarceration_active.py pins them.
+PRISON_SOURCES = ("NC DAC offender search", "SC DOC inmate search", "BOP inmate locator")
+
+
+def is_prison_sourced(incarceration: Any) -> bool:
+    return isinstance(incarceration, dict) and incarceration.get("source") in PRISON_SOURCES
+
+
+def incarceration_active(incarceration: Any, jail_booking: Any,
+                         today: Optional[date] = None) -> bool:
+    """Whether raw['incarceration'] still counts. A state/federal prison match stands on its own;
+    only a county-jail (or legacy source-less) flag is tied to the jail booking's custody, so a
+    person moved from county jail to prison is not dropped when the jail stay ends."""
+    if not incarceration:
+        return False
+    if is_prison_sourced(incarceration):
+        return True
+    return not custody_ended(jail_booking, today)
+
+
 # HEIRS / ESTATE OF / EST OF in an owner name says a death. `TRUST` (a living trust is ordinary
 # estate planning) and a bare `ESTATE` ("ACME REAL ESTATE HOLDINGS LLC") do not (audit F13).
 _DEATH_NAME_RE = re.compile(r"\bHEIRS?\b|\bEST(?:ATE)?\s+OF\b", re.I)

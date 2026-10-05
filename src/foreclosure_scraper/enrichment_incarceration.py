@@ -66,6 +66,7 @@ import structlog
 from .config import in_scope
 from .models import Listing
 from .mailing_shape import mailing_dict
+from .signal_freshness import incarceration_active
 
 log = structlog.get_logger()
 
@@ -411,7 +412,10 @@ async def enrich_incarceration(listings: list[Listing], max_queries: Optional[in
     for li in listings:
         if li.state not in ("NC", "SC"):
             continue
-        if (li.raw or {}).get("incarceration"):
+        raw = li.raw or {}
+        # An ended county-jail flag no longer blocks the lookup: that is exactly the person
+        # who may have moved on to state prison.
+        if incarceration_active(raw.get("incarceration"), raw.get("jail_booking")):
             continue
         owner = _owner_of(li)
         parts = _name_parts(owner) if owner else None

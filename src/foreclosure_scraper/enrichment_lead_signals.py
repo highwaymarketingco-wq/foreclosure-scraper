@@ -53,7 +53,7 @@ from .distress_score import (
 )
 from .enrichment_equity import is_countable_debt
 from .signal_freshness import (
-    bankruptcy_lapsed, code_enforcement_open, custody_ended, has_real_probate,
+    bankruptcy_lapsed, code_enforcement_open, has_real_probate, incarceration_active,
     owner_names_a_death,
 )
 
@@ -122,7 +122,8 @@ def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
     st = raw.get("bankruptcy_stay")
     if isinstance(st, dict) and st.get("status") == "stayed":
         out.add("bankruptcy_stay")   # foreclosure paused by an automatic stay; will likely resume
-    if _truthy(raw.get("incarceration")) and not custody_ended(raw.get("jail_booking"), today):
+    if _truthy(raw.get("incarceration")) and incarceration_active(
+            raw.get("incarceration"), raw.get("jail_booking"), today):
         out.add("incarceration")
 
     # --- LIFE_EVENT ---

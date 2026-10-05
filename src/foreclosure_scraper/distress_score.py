@@ -62,7 +62,7 @@ from .enrichment_equity import (
     equity_is_evidenced, is_countable_debt, valuation_ran_without_arv,
 )
 from .signal_freshness import (
-    bankruptcy_lapsed, code_enforcement_open, custody_ended, has_real_probate, to_date,
+    bankruptcy_lapsed, code_enforcement_open, has_real_probate, incarceration_active, to_date,
 )
 from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 
@@ -768,7 +768,7 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     c.stay = stay
     if bk and not bankruptcy_lapsed(bk, today):
         sig.append(("bankruptcy", "LEGAL", 18, NO))
-    if r.get("incarceration") and not custody_ended(r.get("jail_booking"), today):
+    if incarceration_active(r.get("incarceration"), r.get("jail_booking"), today):
         sig.append(("incarceration", "LEGAL", 8, NO))  # low-conf name-only signal
 
     # ---- life events -----------------------------------------------------------------
