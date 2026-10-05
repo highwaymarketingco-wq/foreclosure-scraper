@@ -9,7 +9,8 @@ pipeline run does):
   * a first-time same-county match carries facility_type="jail",
     is_new_booking=True and a first_detected_at timestamp
   * a SECOND run of the identical roster leaves an already-matched listing
-    untouched (match_rosters' existing skip-once-matched rule — unchanged)
+    unchanged (since 2026-10-05 match_rosters re-evaluates the stamp instead
+    of skipping it, and a same-day re-confirmation rewrites identical values)
   * a listing whose OWN property county has NO roster coverage still gets
     flagged when its owner's name is new to a DIFFERENT covered county's
     roster this run — raw['jail_booking_new'], not raw['jail_booking'] or
@@ -85,7 +86,7 @@ async def test_rerunning_the_same_roster_does_not_touch_an_already_matched_listi
     li = _li("SC", "Cherokee", "ADAMS BRUCE")
     await enrich_jail_bookings([li])
     first_pass = dict(li.raw["jail_booking"])
-    await enrich_jail_bookings([li])          # match_rosters' own skip-once-set rule
+    await enrich_jail_bookings([li])          # re-evaluated, not re-stamped
     assert li.raw["jail_booking"] == first_pass
 
 

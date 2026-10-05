@@ -9,8 +9,9 @@ a motivated seller the state rosters miss entirely.
 We fetch each county's CURRENT in-custody roster once per run (free public
 "jail viewer" APIs), index it by (last, first), and match resolved owner names.
 Several rosters expose full DOB, which we keep for future disambiguation (we
-still match name-only today since we have no owner DOB — so this stays a
-LOW-confidence STACK signal, meaningful only combined with other distress).
+have no owner DOB, so the match is exact first+last plus a middle-name gate --
+see "SAME-COUNTY MIDDLE-NAME GATE" below -- and stays a LOW-confidence STACK
+signal, meaningful only combined with other distress).
 
 Two access shapes:
 
@@ -165,11 +166,9 @@ same fail-closed default `name_normalize`'s own module docstring states as
 this codebase's policy ("errs toward committing nothing"). The confidence tag
 changes from "name_only_low_cross_county" to "middle_corroborated_cross_county"
 so it reads as what it now is, and so no downstream code can confuse it with
-the old, uncorroborated tier. `match_rosters`' same-county tier (confidence
-"name_only_low") is deliberately left as-is: it is the tier the module's own
-earlier docstring already discloses and accepts as a bounded, low-confidence
-STACK signal (weight 8 in distress_score.py); it was not the source of this
-incident and this fix does not change its behavior.
+the old, uncorroborated tier. `match_rosters`' same-county tier was left as-is
+by this fix; it got its own middle-name gate on 2026-10-05 (see "SAME-COUNTY
+MIDDLE-NAME GATE" below).
 
 Checked whether any scorer compounds this: as of this fix, raw['jail_booking_new']
 is read by nothing outside this module, its own tests, and
@@ -194,13 +193,50 @@ flag's own `source` is a county-jail-roster entry this module itself set --
 never an NC-DAC/SC-DOC or BOP match sharing the same key, each of which owns
 clearing its own (enrichment_incarceration.py / enrichment_bop_federal.py).
 See `_owner_still_supports_match` for the mechanism.
+
+SAME-COUNTY MIDDLE-NAME GATE + RE-EVALUATION (2026-10-05). A full-population
+live check of all 322 board rows carrying raw['jail_booking']
+(docs/validation_2026-10-02/FINDINGS.md section 5) found (a) 19 of the 147
+current matches that had a middle name on both sides were a CONFIRMED
+different person (owner "DAWKINS CHRISTOPHER A" vs inmate "Christopher Keith
+Dawkins"), and (b) 47 rows still said in_custody for someone no longer on the
+roster, one for ~2 years. Both came from `match_rosters` matching exact
+last+first with no middle check and then skipping a stamped listing forever.
+Now:
+  * every new same-county match runs `party_middle_verdict` against the
+    roster record's middle name (`_hit_middle_verdict` / `_pick_hit`, which
+    also picks the best of several same-name records): 'conflict' is never
+    stamped; 'agrees' stamps confidence "middle_corroborated"; 'unverified'
+    (no middle on one side) stamps "name_only_low" as before -- the county
+    match itself is the second corroborating channel the cross-county tier
+    lacks (see _cross_county_corroborated), and FINDINGS.md section 5 asks for
+    feeds without a middle to stay unverifiable, not dropped;
+  * every existing stamp of THIS module (`_is_own_same_county_stamp` --
+    never the national.jail_bookings scraper's inmate-as-lead rows) is
+    re-evaluated against each run's roster (`_reevaluate_stamp`): a conflict
+    clears it (+ its own incarceration flag under _clear_stale_matches' source
+    rule), presence refreshes release_status / last_confirmed_on_roster /
+    middle_verdict, and absence marks release_status "released_or_transferred"
+    + left_roster_detected_at, which custody_ended() recognises, so the scorer
+    drops it while the record stays for history;
+  * absence counts ONLY on a roster `jail_roster_history.assess_roster_health`
+    calls healthy (non-empty, >= HEALTH_MIN_ROSTER names, and >=
+    HEALTH_MIN_RATIO of that county's recent median size; no history = not
+    healthy). A failed, empty or truncated fetch never marks anyone released,
+    and the per-name SEARCH lane (LANSA page-1 only) never applies absence;
+  * every vendor that prints a middle name now hands it through: Zuercher and
+    LANSA did already; P2C jqGrid (live 2026-10-05: Cleveland 311/311, Lincoln
+    157/157), P2C CentralSquare (Burke 178/182), Citizen Connect and Tyler now
+    do too. The validation's "P2C publishes no middle" was its own fetcher not
+    reading the field. Side effect, intended: the cross-county tier's strict
+    'agrees' requirement can now be met for those vendors as well.
 """
 from __future__ import annotations
 
 import asyncio
 import re
 import traceback
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import structlog
@@ -340,7 +376,12 @@ async def _fetch_p2c_jqgrid(base: str) -> list[dict]:
         first = (rw.get("firstname") or "").strip().upper()
         if not last or not first:
             continue
-        out.append({"last": last, "first": first, "dob": rw.get("dob"),
+        out.append({"last": last, "first": first,
+                    # Live 2026-10-05: Cleveland 311/311 and Lincoln 157/157 rows
+                    # carry middlename (the 2026-10-02 validation assumed P2C had
+                    # none because its fetcher never read the field).
+                    "middle": (rw.get("middlename") or "").strip().upper(),
+                    "dob": rw.get("dob"),
                     "arrest_date": rw.get("disp_arrest_date"),
                     "charge": (rw.get("chrgdesc") or rw.get("disp_charge") or "")[:300]})
     return out
@@ -400,6 +441,8 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
                         continue
                     out.append({
                         "last": last, "first": first,
+                        # Live 2026-10-05: Burke carried MiddleName on 178/182.
+                        "middle": (rec.get("MiddleName") or "").strip().upper(),
                         "dob": rec.get("DateOfBirth"),  # redacted on this feed
                         "age": rec.get("Age"),
                         "arrest_date": rec.get("ArrestDate"),
@@ -529,6 +572,35 @@ async def _search_vendor(vendor: str, target: str, last: str, first: str) -> lis
     return []
 
 
+class RosterIndex(dict):
+    """(last, first) -> the FIRST roster record with that name: exactly the
+    plain dict `_load_roster` always returned, so match_cross_county and every
+    caller that iterates or .get()s it is unchanged. Adds:
+
+      same_name  (last, first) -> EVERY record with that name, roster order.
+                 Two people can share an exact first+last on one roster (seen
+                 live 2026-10-02: two Buncombe MICHAEL DAVIS bookings), and the
+                 middle-name gate must be able to pick the one whose middle
+                 agrees, not whichever the vendor listed first.
+      healthy    True only when this fetch passed jail_roster_history's size
+                 check -- the ONLY condition under which a name missing from
+                 the roster may be read as "left custody". A plain dict (older
+                 callers, tests) has no such attribute and counts as unhealthy.
+      health     jail_roster_history.assess_roster_health()'s verdict dict.
+    """
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.same_name: dict[tuple, list[dict]] = {}
+        self.healthy: bool = False
+        self.health: dict = {}
+
+    def add(self, rec: dict) -> None:
+        key = _norm_key(rec["last"], rec["first"])
+        self.setdefault(key, rec)
+        self.same_name.setdefault(key, []).append(rec)
+
+
 async def _load_roster(state: str, county: str, vendor: str, target: str,
                        dry_run: bool = False):
     if vendor == "zuercher":
@@ -541,9 +613,15 @@ async def _load_roster(state: str, county: str, vendor: str, target: str,
         recs = await _fetch_tyler_inmate_inquiry(target)
     else:
         recs = await _fetch_p2c_jqgrid(target)
-    index: dict[tuple, dict] = {}
+    index = RosterIndex()
     for rec in recs:
-        index.setdefault(_norm_key(rec["last"], rec["first"]), rec)
+        # One normalised middle for every consumer: a placeholder ("NMN") or a
+        # suffix in the middle slot becomes "", so neither the same-county gate
+        # nor match_cross_county's strict 'agrees' can read it as an initial.
+        if "middle" in rec:
+            rec["middle"] = _clean_middle(rec.get("middle"))
+        index.add(rec)
+    health: dict = {"healthy": False, "reason": "empty_fetch", "size": 0, "baseline": None}
     if recs:
         # Diff against the sidecar so every record carries whether THIS is the
         # first time we have ever seen this name on this county's roster, plus
@@ -559,22 +637,38 @@ async def _load_roster(state: str, county: str, vendor: str, target: str,
         # diffed-and-recorded as "seen" for real, so a genuine real run
         # shortly after found 0 new matches for names its dry run had already
         # consumed -- 590 real jail_booking_new detections lost in one run.
+        #
+        # Roster health (2026-10-05): judged against the county's own history
+        # BEFORE this fetch is recorded, so it is never compared with itself.
+        # match_rosters only applies its "left the roster -> custody ended"
+        # rule when this says healthy; any sidecar failure fails closed.
         try:
             con = jail_roster_history.connect()
             try:
+                health = jail_roster_history.assess_roster_health(
+                    con, state, county, len(index))
                 meta = jail_roster_history.diff_and_record(
                     con, state, county, vendor, recs, commit=not dry_run)
+                jail_roster_history.record_fetch(
+                    con, state, county, vendor, len(index), commit=not dry_run)
             finally:
                 con.close()
-            for key, rec in index.items():
+            for key, same in index.same_name.items():
                 m = meta.get(key)
                 if m:
-                    rec["is_new_booking"] = m["is_new"]
-                    rec["first_detected_at"] = m["first_seen_at"]
+                    for rec in same:
+                        rec["is_new_booking"] = m["is_new"]
+                        rec["first_detected_at"] = m["first_seen_at"]
         except Exception:  # noqa: BLE001
+            health = {"healthy": False, "reason": "history_unavailable",
+                      "size": len(index), "baseline": None}
             log.warning("jail_history.persist_failed", county=county, vendor=vendor,
                        traceback=traceback.format_exc())
-    log.info("jail.roster", county=county, vendor=vendor, inmates=len(recs))
+    index.health = health
+    index.healthy = bool(health.get("healthy"))
+    log.info("jail.roster", county=county, vendor=vendor, inmates=len(recs),
+             roster_healthy=index.healthy, health_reason=health.get("reason"),
+             baseline=health.get("baseline"))
     return (state, county), index
 
 
@@ -613,8 +707,77 @@ async def _hydrate_tyler_hits(listings: list[Listing],
     return done
 
 
-def _apply_hit(li: Listing, county: str, first: str, last: str, hit: dict) -> None:
-    """Attach the jail_booking detail + reuse the LEGAL incarceration signal."""
+def _today_iso(today: Optional[date] = None) -> str:
+    return (today or datetime.now(timezone.utc).date()).isoformat()
+
+
+# Middle-name values that mean "no middle name", not an initial to compare.
+# Cleveland's live P2C roster carried 2 such placeholders out of 311 (2026-10-05);
+# a generational suffix in the middle slot ("SMITH, JOHN JR") is not a middle either.
+_MIDDLE_PLACEHOLDERS = frozenset({"NMN", "NMI", "NONE", "NA", "UNK", "UNKNOWN", "X", "XX",
+                                  "JR", "SR", "II", "III", "IV", "V"})
+# County GIS tacks co-owner / role words onto the owner string. In the ALL-CAPS
+# "LAST FIRST MIDDLE" convention `owner_last_first_middle` reads the third token
+# as the middle initial, so "SMITH JOHN ETAL" would carry a bogus middle "E".
+_OWNER_NOISE_RE = re.compile(r"\b(?:ET\s*AL|ET\s*UX|ET\s*VIR|TRUSTEE|TTEE)\b\.?", re.I)
+
+
+def _clean_middle(middle) -> str:
+    m = re.sub(r"[^A-Z]", "", str(middle or "").upper())
+    return "" if m in _MIDDLE_PLACEHOLDERS else m
+
+
+def _hit_middle_verdict(owner: Optional[str], hit: dict) -> str:
+    """'agrees' | 'conflict' | 'unverified' for one roster record vs the owner,
+    via name_normalize.party_middle_verdict (the SC-divorce / voter-phone /
+    cross-county convention). The party string is built from the roster's
+    NORMALIZED last/first -- the same _norm_key the name match itself used --
+    so a hyphen or apostrophe in a surname cannot break the positional check."""
+    middle = _clean_middle(hit.get("middle"))
+    if not middle:
+        return "unverified"
+    last, first = _norm_key(hit.get("last") or "", hit.get("first") or "")
+    owner_clean = _OWNER_NOISE_RE.sub(" ", str(owner or ""))
+    return party_middle_verdict(owner_clean, [f"{first} {middle} {last}"])
+
+
+def _pick_hit(owner: Optional[str], candidates: list[dict]) -> tuple[Optional[dict], str]:
+    """Best-supported roster record among same-name candidates: the first whose
+    middle AGREES, else the first that cannot be checked ('unverified'), else
+    the first record with verdict 'conflict' (every candidate is a proven
+    different person)."""
+    if not candidates:
+        return None, "unverified"
+    verdicts = [(c, _hit_middle_verdict(owner, c)) for c in candidates]
+    for want in ("agrees", "unverified"):
+        for c, v in verdicts:
+            if v == want:
+                return c, v
+    return candidates[0], "conflict"
+
+
+def _roster_candidates(idx: dict, key: tuple) -> list[dict]:
+    same = getattr(idx, "same_name", None)
+    if same and same.get(key):
+        return list(same[key])
+    hit = idx.get(key)
+    return [hit] if hit else []
+
+
+def _confidence_for(verdict: str) -> str:
+    return "middle_corroborated" if verdict == "agrees" else "name_only_low"
+
+
+def _apply_hit(li: Listing, county: str, first: str, last: str, hit: dict,
+               middle_verdict: str = "unverified",
+               today: Optional[date] = None) -> None:
+    """Attach the jail_booking detail + reuse the LEGAL incarceration signal.
+
+    Never called on a 'conflict' verdict (a proven different person) -- see
+    match_rosters. 'agrees' stamps confidence "middle_corroborated";
+    'unverified' (no middle on one side, so nothing proves it right OR wrong)
+    keeps the historical "name_only_low", same as before this gate existed."""
+    confidence = _confidence_for(middle_verdict)
     raw = li.raw if isinstance(li.raw, dict) else {}
     raw["jail_booking"] = {
         "county": county, "state": li.state,
@@ -627,7 +790,9 @@ def _apply_hit(li: Listing, county: str, first: str, last: str, hit: dict) -> No
         # Vendor row id, kept only so _hydrate_tyler_hits can pull the booking
         # date + charges for this one person.
         "detail_id": hit.get("detail_id"),
-        "confidence": "name_only_low",
+        "confidence": confidence,
+        "middle_verdict": middle_verdict,
+        "last_confirmed_on_roster": _today_iso(today),
         # Every ROSTERS/SEARCH_ROSTERS vendor is a county sheriff jail system —
         # see module docstring "FACILITY TYPE".
         "facility_type": "jail",
@@ -640,7 +805,7 @@ def _apply_hit(li: Listing, county: str, first: str, last: str, hit: dict) -> No
     }
     raw.setdefault("incarceration", {
         "state": li.state, "source": f"{county} County jail roster",
-        "matched_name": f"{first} {last}", "confidence": "name_only_low"})
+        "matched_name": f"{first} {last}", "confidence": confidence})
     li.raw = raw
 
 
@@ -688,34 +853,157 @@ def _clear_stale_matches(listings: list[Listing]) -> int:
             continue
         if not li.raw.get("jail_booking") or _owner_still_supports_match(li):
             continue
-        li.raw.pop("jail_booking", None)
-        inc = li.raw.get("incarceration")
-        if isinstance(inc, dict) and inc.get("source") not in (DAC_SOURCE, SCDC_SOURCE, BOP_SOURCE):
-            li.raw.pop("incarceration", None)
+        _drop_jail_match(li)
         cleared += 1
     return cleared
 
 
-def match_rosters(listings: list[Listing], rosters: dict) -> list[Listing]:
-    """Flag every listing whose owner is on its county's bulk roster.
+def _drop_jail_match(li: Listing) -> None:
+    """Remove this module's raw['jail_booking'] and, under the one source rule
+    shared with _clear_stale_matches, the raw['incarceration'] flag it set --
+    never an NC-DAC / SC-DOC / BOP entry, each of which owns clearing its own."""
+    li.raw.pop("jail_booking", None)
+    inc = li.raw.get("incarceration")
+    if isinstance(inc, dict) and inc.get("source") not in (DAC_SOURCE, SCDC_SOURCE, BOP_SOURCE):
+        li.raw.pop("incarceration", None)
 
-    rosters maps (state, county) -> {(last, first): record}, as _load_roster
-    builds it. Returns the listings it flagged. Shared by enrich_jail_bookings and
-    scripts/backfill_jail_rosters.py so the standalone run cannot drift from the
-    pipeline's match rule (name-only, exact last+first, person-owned, one booking
-    per lead)."""
+
+_OWN_CONFIDENCES = ("name_only_low", "middle_corroborated")
+
+
+def _is_own_same_county_stamp(li, jbk) -> bool:
+    """True only for a raw['jail_booking'] that _apply_hit wrote for THIS
+    listing's own county. The national.jail_bookings scraper's inmate-as-lead
+    rows also carry raw['jail_booking'] (no matched_name, no confidence, vendor
+    "jail_bookings_scraper"); those, and any malformed/legacy dict, are never
+    re-evaluated here."""
+    return (isinstance(jbk, dict)
+            and jbk.get("confidence") in _OWN_CONFIDENCES
+            and bool(jbk.get("matched_name"))
+            and jbk.get("vendor") != "jail_bookings_scraper"
+            and jbk.get("county") == _plain_county(li)
+            and (jbk.get("state") or li.state) == li.state)
+
+
+# What custody_ended() (signal_freshness.py) recognises: any release_status that
+# starts with "released". "released_or_transferred" is the honest reading of a
+# name gone from a county roster -- it may be a release, a bond-out or a move to
+# state prison (which enrichment_incarceration's NC DAC / SC DOC lane covers).
+LEFT_ROSTER_STATUS = "released_or_transferred"
+
+
+def _reevaluate_stamp(li: Listing, idx: dict, parts: tuple[str, str],
+                      roster_complete: bool, today: Optional[date] = None) -> str:
+    """Re-check an existing same-county stamp against today's roster.
+
+    Returns one of:
+      'conflict_cleared'  the name is on today's roster but every same-name
+                          record's middle name contradicts the owner's -- a
+                          proven different person; stamp dropped (+ its own
+                          incarceration flag under _drop_jail_match's rule).
+      'confirmed'         on today's roster; release_status/dates refreshed,
+                          middle_verdict + confidence re-stamped, and any
+                          earlier "left roster" marking undone (re-booked, or
+                          an earlier run's partial fetch -- this self-heals).
+      'left_roster'       absent from a roster `roster_complete` vouches for;
+                          marked ended so custody_ended() is True. The record
+                          stays for history.
+      'already_ended'     absent again; already marked on an earlier run.
+      'absent_unchecked'  absent, but the roster is not known to be complete
+                          (failed / implausibly small / per-name search) --
+                          left exactly as it was.
+    """
+    jbk = li.raw["jail_booking"]
+    hit, verdict = _pick_hit(_owner_of(li), _roster_candidates(idx, _norm_key(*parts)))
+    if hit is not None:
+        if verdict == "conflict":
+            _drop_jail_match(li)
+            return "conflict_cleared"
+        jbk["release_status"] = hit.get("release_status") or "in_custody"
+        jbk["scheduled_release"] = hit.get("scheduled_release")
+        for board_key, hit_key in (("arrest_date", "arrest_date"), ("charge", "charge"),
+                                   ("roster_dob", "dob"), ("roster_age", "age"),
+                                   ("detail_id", "detail_id")):
+            if hit.get(hit_key):
+                jbk[board_key] = hit[hit_key]
+        jbk["middle_verdict"] = verdict
+        jbk["confidence"] = _confidence_for(verdict)
+        jbk["last_confirmed_on_roster"] = _today_iso(today)
+        jbk.pop("left_roster_detected_at", None)
+        inc = li.raw.get("incarceration")
+        if isinstance(inc, dict) and inc.get("source") == f"{jbk.get('county')} County jail roster":
+            inc["confidence"] = jbk["confidence"]
+        return "confirmed"
+    if not roster_complete:
+        return "absent_unchecked"
+    if jbk.get("left_roster_detected_at"):
+        jbk["release_status"] = LEFT_ROSTER_STATUS
+        return "already_ended"
+    jbk["release_status"] = LEFT_ROSTER_STATUS
+    jbk["left_roster_detected_at"] = _today_iso(today)
+    return "left_roster"
+
+
+_REEVAL_STAT = {"conflict_cleared": "reeval_conflict_cleared",
+                "confirmed": "reeval_confirmed",
+                "left_roster": "reeval_left_roster",
+                "already_ended": "reeval_already_ended",
+                "absent_unchecked": "reeval_absent_roster_unhealthy"}
+
+
+def match_rosters(listings: list[Listing], rosters: dict,
+                  today: Optional[date] = None,
+                  stats: Optional[dict] = None) -> list[Listing]:
+    """Match every listing in a loaded county against that county's bulk roster.
+
+    rosters maps (state, county) -> {(last, first): record} (a RosterIndex, as
+    _load_roster builds it; a plain dict still works and counts as an
+    UNHEALTHY roster). Returns the listings NEWLY flagged this call. Shared by
+    enrich_jail_bookings and scripts/backfill_jail_rosters.py so the standalone
+    run cannot drift from the pipeline's rule:
+
+      * exact last+first, person-owned, one booking per lead -- as before;
+      * MIDDLE-NAME GATE (2026-10-05): a same-name record whose middle name
+        contradicts the owner's middle initial is a proven different person
+        and is never stamped ('agrees' -> confidence "middle_corroborated",
+        'unverified' -> "name_only_low", as before);
+      * RE-EVALUATION: a listing already carrying this module's own same-county
+        stamp is re-checked against today's roster instead of being skipped
+        forever (see _reevaluate_stamp). "Left the roster" is applied ONLY
+        when the roster is non-empty and `healthy` per jail_roster_history.
+
+    `stats` (optional) is incremented in place: middle_conflict_rejected,
+    middle_corroborated and the reeval_* outcome counters."""
+    stats = stats if stats is not None else {}
     matched: list[Listing] = []
     for li in listings:
-        idx = rosters.get((li.state, _plain_county(li)))
-        if not idx or (li.raw or {}).get("jail_booking"):
-            continue
+        county = _plain_county(li)
+        idx = rosters.get((li.state, county))
+        if not idx:
+            continue                         # no roster, or a failed/empty fetch
+        jbk = (li.raw or {}).get("jail_booking")
         parts = _name_parts(_owner_of(li) or "")
+        if jbk:
+            # Only our own stamp, and only while the current owner still is the
+            # person it names (_clear_stale_matches owns the owner-changed case).
+            if parts and _is_own_same_county_stamp(li, jbk) and _owner_still_supports_match(li):
+                outcome = _reevaluate_stamp(li, idx, parts,
+                                            roster_complete=bool(getattr(idx, "healthy", False)),
+                                            today=today)
+                key = _REEVAL_STAT[outcome]
+                stats[key] = stats.get(key, 0) + 1
+            continue
         if not parts:
             continue
-        hit = idx.get(_norm_key(*parts))
-        if not hit:
+        hit, verdict = _pick_hit(_owner_of(li), _roster_candidates(idx, _norm_key(*parts)))
+        if hit is None:
             continue
-        _apply_hit(li, _plain_county(li), parts[1], parts[0], hit)
+        if verdict == "conflict":
+            stats["middle_conflict_rejected"] = stats.get("middle_conflict_rejected", 0) + 1
+            continue
+        if verdict == "agrees":
+            stats["middle_corroborated"] = stats.get("middle_corroborated", 0) + 1
+        _apply_hit(li, county, parts[1], parts[0], hit, middle_verdict=verdict, today=today)
         matched.append(li)
     return matched
 
@@ -749,9 +1037,8 @@ def _cross_county_corroborated(owner: Optional[str], hit: dict) -> bool:
     "CROSS-COUNTY NAME-ONLY FANOUT" — and unlike the divorce/voter-phone
     gates, it has no second corroborating channel (no county match possible
     by construction) if middle name fails, so "unverified" (no middle on one
-    side — including every roster vendor that does not carry one, e.g.
-    p2c_jqgrid/p2c_centralsquare/citizen_connect/tyler today) is REJECTED
-    here, not passed through the way those other gates allow.
+    side, e.g. a roster row printed without one) is REJECTED here, not passed
+    through the way those other gates allow.
     """
     middle = (hit.get("middle") or "").strip()
     if not middle:
@@ -825,7 +1112,8 @@ def match_cross_county(listings: list[Listing], rosters: dict) -> list[Listing]:
 
 async def enrich_jail_bookings(listings: list[Listing],
                                max_searches_per_county: int = 200,
-                               dry_run: bool = False) -> dict:
+                               dry_run: bool = False,
+                               today: Optional[date] = None) -> dict:
     """Match resolved owner names against covered county jail rosters.
 
     Two lanes: BULK rosters (fetched once/run + indexed) and PER-NAME SEARCH
@@ -846,6 +1134,15 @@ async def enrich_jail_bookings(listings: list[Listing],
     doesn't leave someone else's county-jail record sitting on the lead
     forever -- see _owner_still_supports_match for the real examples that
     found this.
+
+    Both lanes apply the same-county middle-name gate and re-evaluate this
+    module's existing stamps (see match_rosters). The per-name SEARCH lane
+    re-checks already-stamped owners inside the same per-county search cap
+    (stamped names are searched first): presence re-runs the middle-name
+    verdict (a conflict clears the stamp) and refreshes the record, but
+    ABSENCE from a search result is never read as "left custody" -- LANSA
+    returns only page 1 for a surname, a failed search returns [], and
+    neither can be told apart from a release.
     """
     stale_cleared = _clear_stale_matches(listings)
 
@@ -867,7 +1164,10 @@ async def enrich_jail_bookings(listings: list[Listing],
     rosters = dict(await asyncio.gather(
         *[_load_roster(s, c, v, t, dry_run=dry_run)
           for s, c, v, t in bulk_needed])) if bulk_needed else {}
-    counts["matched"] += len(match_rosters(listings, rosters))
+    gate_stats: dict = {}
+    counts["matched"] += len(match_rosters(listings, rosters, today=today, stats=gate_stats))
+    counts["rosters_unhealthy"] = sorted(
+        c for (_s, c), idx in rosters.items() if not getattr(idx, "healthy", False))
 
     # Tyler grids omit booking date + charges; pull them for matched rows only.
     counts["hydrated"] = await _hydrate_tyler_hits(listings)
@@ -878,20 +1178,29 @@ async def enrich_jail_bookings(listings: list[Listing],
 
     # ---- lane 2: per-name search rosters (one lookup per in-scope owner) ----
     for (state, county), (vendor, target) in search_covered.items():
-        # De-dupe owner names so we hit the vendor once per distinct surname pair.
+        # De-dupe owner names so we hit the vendor once per distinct surname
+        # pair. Owners already carrying this module's own stamp are re-checked
+        # (searched first, so the cap can never starve them); any other
+        # existing jail_booking is left alone, as before.
         by_name: dict[tuple, list[Listing]] = {}
+        restamp_keys: set[tuple] = set()
         for li in listings:
             if (li.state, _county(li)) != (state, county):
                 continue
-            if (li.raw or {}).get("jail_booking"):
-                continue
             parts = _name_parts(_owner_of(li) or "")
-            if parts:
-                by_name.setdefault(_norm_key(*parts), []).append(li)
+            if not parts:
+                continue
+            jbk = (li.raw or {}).get("jail_booking")
+            if jbk:
+                if not (_is_own_same_county_stamp(li, jbk) and _owner_still_supports_match(li)):
+                    continue
+                restamp_keys.add(_norm_key(*parts))
+            by_name.setdefault(_norm_key(*parts), []).append(li)
         if not by_name:
             continue
+        ordered = sorted(by_name.items(), key=lambda kv: kv[0] not in restamp_keys)
         searched = 0
-        for _key, lis in by_name.items():
+        for _key, lis in ordered:
             if searched >= max_searches_per_county:
                 break
             parts = _name_parts(_owner_of(lis[0]) or "")
@@ -900,16 +1209,36 @@ async def enrich_jail_bookings(listings: list[Listing],
             last, first = parts
             recs = await _search_vendor(vendor, target, last, first)
             searched += 1
-            index: dict[tuple, dict] = {}
+            index = RosterIndex()          # healthy stays False: see docstring
             for rec in recs:
-                index.setdefault(_norm_key(rec["last"], rec["first"]), rec)
-            hit = index.get(_norm_key(last, first))
-            if hit:
-                for li in lis:
-                    _apply_hit(li, county, first, last, hit)
-                    counts["matched"] += 1
+                index.add(rec)
+            candidates = _roster_candidates(index, _norm_key(last, first))
+            for li in lis:
+                if (li.raw or {}).get("jail_booking"):
+                    outcome = _reevaluate_stamp(li, index, parts, roster_complete=False,
+                                                today=today)
+                    k = _REEVAL_STAT[outcome]
+                    gate_stats[k] = gate_stats.get(k, 0) + 1
+                    continue
+                hit, verdict = _pick_hit(_owner_of(li), candidates)
+                if hit is None:
+                    continue
+                if verdict == "conflict":
+                    gate_stats["middle_conflict_rejected"] = (
+                        gate_stats.get("middle_conflict_rejected", 0) + 1)
+                    continue
+                if verdict == "agrees":
+                    gate_stats["middle_corroborated"] = gate_stats.get("middle_corroborated", 0) + 1
+                _apply_hit(li, county, first, last, hit, middle_verdict=verdict, today=today)
+                counts["matched"] += 1
             await asyncio.sleep(0.4)  # polite pacing
         log.info("jail.search_roster", county=county, vendor=vendor, searched=searched)
 
-    log.info("jail.done", matched=counts["matched"])
+    counts.update(gate_stats)
+    if gate_stats.get("middle_conflict_rejected") or gate_stats.get("reeval_conflict_cleared"):
+        # Counts only: roster names never go to the log (see backfill script's privacy note).
+        log.info("jail.middle_conflict",
+                 rejected_new=gate_stats.get("middle_conflict_rejected", 0),
+                 cleared_existing=gate_stats.get("reeval_conflict_cleared", 0))
+    log.info("jail.done", matched=counts["matched"], **{k: v for k, v in gate_stats.items()})
     return counts

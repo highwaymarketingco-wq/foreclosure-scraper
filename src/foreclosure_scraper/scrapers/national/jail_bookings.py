@@ -16,8 +16,17 @@ Supported systems (all free, public, no auth):
   - Tyler New World InmateInquiry — Gaston NC (plain GET form + HTML grid;
     publishes FULL DOB on every record)
 
+NOT AN OWNER MATCH (checked 2026-10-05). Unlike enrichment_jail_bookings, this
+scraper never compares an inmate to a property owner: each Listing IS the
+inmate (defendant = the roster name, no address), and its raw['jail_booking']
+describes that person's own booking. It sets no raw['incarceration'], so
+distress_score's incarceration signal never fires off these rows, and it
+carries no matched_name/confidence, so the enricher's same-county middle-name
+gate and re-evaluation (which only touch the enricher's own stamps) leave these
+rows alone by design.
+
 Each system returns current in-custody inmates. We extract:
-  - Inmate name (last, first)
+  - Inmate name (last, first, and the middle name where the vendor prints one)
   - DOB (if exposed — Buncombe redacts; Cleveland/Cherokee/Henderson/Gaston
     publish it in full, which is the point: DOB is the single biggest lift to
     downstream skip-trace match rates)
@@ -136,6 +145,30 @@ def _split_comma_name(name: str) -> tuple[str, str] | None:
     if not toks or not last.strip():
         return None
     return last.strip().upper(), toks[0].strip().upper()
+
+
+def _comma_middle(name: str) -> str:
+    """'Smith, John Michael' -> 'MICHAEL'; '' when only one given name.
+
+    Kept separate from `_split_comma_name` so that function's 2-tuple contract
+    is unchanged. The middle is what enrichment_jail_bookings' same-county
+    middle-name gate (2026-10-05) compares against the owner's middle initial;
+    the 2026-10-02 live validation found 12.9% of same-county matches that had
+    a middle on both sides were a different person.
+    """
+    if not name or "," not in name:
+        return ""
+    toks = name.partition(",")[2].strip().split()
+    return toks[1].strip().upper() if len(toks) > 1 else ""
+
+
+def _space_middle(name: str) -> str:
+    """'MICHAEL LEE ABSHER' -> 'LEE' (the token after the given name, once
+    trailing suffixes are dropped the same way `_split_space_name` does)."""
+    toks = [t for t in re.split(r"\s+", (name or "").strip().upper()) if t]
+    while len(toks) > 2 and _norm_alpha(toks[-1]) in _NAME_SUFFIXES:
+        toks.pop()
+    return toks[1] if len(toks) > 2 else ""
 
 
 def _split_space_name(name: str) -> tuple[str, str] | None:
@@ -265,6 +298,7 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
         )
         out.append({
             "last": last, "first": first,
+            "middle": _comma_middle(rec.get("name") or "") or None,
             "dob": rec.get("dob"),
             "arrest_date": rec.get("arrest_date"),
             "charge": str(charges)[:_CHARGE_CAP],
@@ -486,7 +520,8 @@ def _parse_citizen_connect_cards(html_text: str) -> list[dict]:
         nm = _CC_NAME_RE.search(card)
         if not nm:
             continue
-        parts = _split_space_name(html.unescape(nm.group(1)))
+        flat_name = html.unescape(nm.group(1))
+        parts = _split_space_name(flat_name)
         if not parts:
             continue
         last, first = parts
@@ -499,6 +534,7 @@ def _parse_citizen_connect_cards(html_text: str) -> list[dict]:
                or None)
         out.append({
             "last": last, "first": first,
+            "middle": _space_middle(flat_name) or None,
             "dob": fields.get("Date of Birth") or None,
             "age": age,
             "arrest_date": (fields.get("Booked")
@@ -601,6 +637,7 @@ def _parse_tyler_rows(html_text: str) -> list[dict]:
         sched = cells.get("ScheduledReleaseDate") or None
         out.append({
             "last": last, "first": first,
+            "middle": _comma_middle(html.unescape(cells["Name"])) or None,
             "dob": cells.get("DateOfBirth") or None,
             "arrest_date": None,   # booking date lives on the detail page
             "charge": "",          # charges live on the detail page

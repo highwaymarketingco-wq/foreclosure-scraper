@@ -222,7 +222,7 @@ def test_roster_host_matches_the_host_the_adapter_calls():
 async def test_fetch_rosters_skips_a_host_that_already_pushed_back(monkeypatch):
     asked = []
 
-    async def fake_load(state, county, vendor, target):
+    async def fake_load(state, county, vendor, target, dry_run=False):
         asked.append(county)
         g.blocked["cc.southernsoftware.com"] = "HTTP 403"     # first CC roster gets 403
         return (state, county), {}
@@ -442,3 +442,55 @@ def test_apply_a_second_time_flags_nothing_new(monkeypatch, board):
     bjr.main(["--counties", "Laurens", "--interval", "0", "--board", str(board), "--apply"])
     assert [dict(li.raw.get("jail_booking") or {}) for li in lis] == snapshot
     assert [e[0] for e in w2.events] == ["lock", "load", "unlock"]
+
+
+# --------------------------------------------------------------------------- #
+# 2026-10-05: middle-name gate + re-evaluation flow through the shared rule    #
+# --------------------------------------------------------------------------- #
+def test_would_match_and_match_rosters_both_refuse_a_middle_name_conflict():
+    rows = [_row("Laurens County", "TESTCASE ALPHA B"),      # middle B vs roster CARL
+            _row("Laurens County", "PLACEHOLDER GAMMA D")]   # roster has no middle
+    index = {_norm_key("TESTCASE", "ALPHA"): {"last": "TESTCASE", "first": "ALPHA", "middle": "CARL"},
+             _norm_key("PLACEHOLDER", "GAMMA"): {"last": "PLACEHOLDER", "first": "GAMMA"}}
+    scan = bjr.scan_board(rows, {("SC", "Laurens")})
+    predicted = bjr.would_match(scan[("SC", "Laurens")], index)
+    listings = [Listing(source="t", source_url="http://x", state=r["state"], county=r["county"],
+                        raw=dict(r["raw"]), defendant=r["defendant"]) for r in rows]
+    flagged = match_rosters(listings, {("SC", "Laurens"): index})
+    assert predicted == len(flagged) == 1
+    assert "jail_booking" not in listings[0].raw
+
+
+def test_dry_run_does_not_commit_the_roster_sidecar(monkeypatch, board, no_board_writes, capsys):
+    from foreclosure_scraper import jail_roster_history as jrh
+    _fake_zuercher(monkeypatch, {"laurens-911-sc.zuercherportal.com": (200, LAURENS_ROSTER)})
+    bjr.main(["--counties", "Laurens", "--interval", "0", "--board", str(board)])
+    out = capsys.readouterr().out
+    assert "already-flagged leads re-checked: 0" in out
+    con = jrh.connect()
+    try:
+        assert jrh.recent_roster_sizes(con, "SC", "Laurens") == []
+        assert con.execute("SELECT COUNT(*) FROM bookings").fetchone()[0] == 0
+    finally:
+        con.close()
+
+
+def test_apply_writes_when_only_an_existing_conflict_was_cleared(monkeypatch, tmp_path, capsys):
+    stamp = {"county": "Laurens", "state": "SC", "matched_name": "ALPHA TESTCASE",
+             "confidence": "name_only_low", "release_status": "in_custody"}
+    rows = [_row("Laurens County", "TESTCASE ALPHA Q",
+                 raw_extra={"jail_booking": stamp,
+                            "incarceration": {"source": "Laurens County jail roster"}})]
+    b = _write_board(tmp_path / "b.json.gz", rows)
+    _fake_zuercher(monkeypatch, {"laurens-911-sc.zuercherportal.com":
+                                 (200, [_rec("Testcase, Alpha Beta")])})
+    lis = [Listing(source="t", source_url="http://x", state=r["state"], county=r["county"],
+                   raw=json.loads(json.dumps(r["raw"])), defendant=r["defendant"]) for r in rows]
+    w = _Writer(lis).install(monkeypatch)
+    rc = bjr.main(["--counties", "Laurens", "--interval", "0", "--board", str(b), "--apply"])
+    assert rc == 0
+    assert [e[0] for e in w.events] == ["lock", "load", "write", "unlock"]
+    assert "1 middle-name conflicts cleared" in w.events[2][2]["notes"]
+    assert "jail_booking" not in lis[0].raw and "incarceration" not in lis[0].raw
+    out = capsys.readouterr().out
+    assert "TESTCASE" not in out.upper() and "ALPHA" not in out.upper()

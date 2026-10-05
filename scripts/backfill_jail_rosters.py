@@ -9,11 +9,20 @@ CentralSquare P2C jqGrid, Transylvania Southern Software Citizen Connect).
 
 This fetches each roster ONCE, indexes it by (last, first) and flags board leads
 whose person-owner name matches exactly, through the SAME match rule the
-pipeline uses (enrichment_jail_bookings.match_rosters). The signal is name-only
-and low confidence, exactly as before: raw['jail_booking'] plus
-raw['incarceration'] (distress_score weight 8), meaningful only stacked with
-other distress. Scores are not recomputed here; run scripts/patch_distress_score.py
-afterwards (or wait for the next scoring pass) so the new signal reaches the tiers.
+pipeline uses (enrichment_jail_bookings.match_rosters). The signal is low
+confidence: raw['jail_booking'] plus raw['incarceration'] (distress_score weight
+8), meaningful only stacked with other distress. Scores are not recomputed here;
+run scripts/patch_distress_score.py afterwards (or wait for the next scoring
+pass) so the new signal reaches the tiers.
+
+Since 2026-10-05 that shared rule also (a) refuses a match whose roster middle
+name contradicts the owner's middle initial and (b) re-evaluates leads already
+carrying the enricher's own stamp: a middle-name conflict clears it, presence
+refreshes it, and absence from a roster the sidecar judges healthy marks the
+booking released_or_transferred (custody_ended). The dry run reports those
+counts too. The roster fetch honours the dry run: the sidecar diff and the
+roster-size log are only committed with --apply (same fix as the pipeline's
+2026-09-29 DRY-RUN SIDECAR BUG).
 
 Politeness (owner decision): one request at a time, at least --interval seconds
 apart (default 1.0), a normal client, free public pages only. A host that answers
@@ -51,11 +60,15 @@ from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.enrichment_jail_bookings import (  # noqa: E402
     ROSTERS,
     _hydrate_tyler_hits,
+    _is_own_same_county_stamp,
     _load_roster,
     _name_parts,
     _norm_key,
     _owner_of,
+    _owner_still_supports_match,
+    _pick_hit,
     _plain_county,
+    _roster_candidates,
     match_rosters,
 )
 from foreclosure_scraper.scrapers.national.jail_bookings import CITIZEN_CONNECT_BASE  # noqa: E402
@@ -171,10 +184,13 @@ def roster_host(vendor: str, target: str) -> str:
 # ---- board scan (read-only, constant memory) ---------------------------------
 
 def scan_board(rows, wanted: set) -> dict:
-    """Per roster county: leads, person-owned leads not yet flagged, and a Counter
-    of their normalised (last, first) keys. Uses the pipeline's own owner / county /
-    name helpers on a light stand-in, so the counts follow the real match rule."""
-    out = {k: {"leads": 0, "eligible": 0, "keys": Counter()} for k in wanted}
+    """Per roster county: leads, person-owned leads not yet flagged, a Counter of
+    their normalised (last, first) keys, the owner strings behind each key (for
+    the middle-name gate), and the leads already carrying the enricher's own
+    stamp (for the re-evaluation preview). Uses the pipeline's own owner / county
+    / name helpers on a light stand-in, so the counts follow the real match rule."""
+    out = {k: {"leads": 0, "eligible": 0, "keys": Counter(), "owners": {},
+               "stamped": []} for k in wanted}
     for r in rows:
         v = SimpleNamespace(state=r.get("state"), county=r.get("county"),
                             raw=r.get("raw"), defendant=r.get("defendant"))
@@ -182,17 +198,47 @@ def scan_board(rows, wanted: set) -> dict:
         if s is None:
             continue
         s["leads"] += 1
-        if isinstance(v.raw, dict) and v.raw.get("jail_booking"):
-            continue
         parts = _name_parts(_owner_of(v) or "")
+        jbk = v.raw.get("jail_booking") if isinstance(v.raw, dict) else None
+        if jbk:
+            if parts and _is_own_same_county_stamp(v, jbk) and _owner_still_supports_match(v):
+                s["stamped"].append((_norm_key(*parts), _owner_of(v), bool(jbk.get("left_roster_detected_at"))))
+            continue
         if parts:
+            key = _norm_key(*parts)
             s["eligible"] += 1
-            s["keys"][_norm_key(*parts)] += 1
+            s["keys"][key] += 1
+            s["owners"].setdefault(key, Counter())[_owner_of(v)] += 1
     return out
 
 
 def would_match(scan_entry: dict, index: dict) -> int:
-    return sum(n for k, n in scan_entry["keys"].items() if k in index)
+    """Leads the shared rule would flag: on the roster AND not a middle-name conflict."""
+    owners = scan_entry.get("owners") or {}
+    total = 0
+    for k, n in scan_entry["keys"].items():
+        if k not in index:
+            continue
+        if k not in owners:                          # older scan shape: no gate info
+            total += n
+            continue
+        cands = _roster_candidates(index, k)
+        total += sum(c for owner, c in owners[k].items() if _pick_hit(owner, cands)[1] != "conflict")
+    return total
+
+
+def reeval_preview(scan_entry: dict, index: dict) -> dict:
+    """What re-evaluating already-flagged leads would do (counts only)."""
+    out = {"rechecked": 0, "conflict_cleared": 0, "left_roster": 0}
+    healthy = bool(getattr(index, "healthy", False))
+    for key, owner, already_ended in scan_entry.get("stamped") or ():
+        out["rechecked"] += 1
+        cands = _roster_candidates(index, key)
+        if cands:
+            out["conflict_cleared"] += _pick_hit(owner, cands)[1] == "conflict"
+        elif healthy and not already_ended:
+            out["left_roster"] += 1
+    return out
 
 
 # ---- rosters -----------------------------------------------------------------
@@ -209,9 +255,10 @@ def select_rosters(names: str | None) -> list[tuple]:
     return picked
 
 
-async def fetch_rosters(entries: list[tuple], gate: Gate) -> dict:
+async def fetch_rosters(entries: list[tuple], gate: Gate, dry_run: bool = False) -> dict:
     """Fetch each roster once, sequentially. -> {(state, county): {index, blocked}}.
-    A roster whose host already pushed back is not asked again."""
+    A roster whose host already pushed back is not asked again. `dry_run` keeps
+    the jail_roster_history sidecar uncommitted (see _load_roster)."""
     out: dict = {}
     for state, county, vendor, target in entries:
         host = roster_host(vendor, target)
@@ -219,7 +266,7 @@ async def fetch_rosters(entries: list[tuple], gate: Gate) -> dict:
         if host in gate.blocked:
             out[key] = {"index": {}, "blocked": gate.blocked[host]}
             continue
-        _k, index = await _load_roster(state, county, vendor, target)
+        _k, index = await _load_roster(state, county, vendor, target, dry_run=dry_run)
         out[key] = {"index": index, "blocked": gate.blocked.get(host)}
     return out
 
@@ -238,16 +285,29 @@ def report(entries, scan, rosters) -> list[str]:
     head = f"{'county':<16}{'vendor':<22}{'leads':>8}{'person':>9}{'roster':>8}{'would match':>13}"
     lines = [head, "-" * len(head)]
     total = 0
+    rejected = 0
+    pre = {"rechecked": 0, "conflict_cleared": 0, "left_roster": 0}
+    unhealthy = 0
     for state, county, vendor, _t in entries:
         s = scan[(state, county)]
         r = rosters.get((state, county))
         size = len(r["index"]) if r else 0
         wm = would_match(s, r["index"]) if r else 0
         total += wm
+        if r and r["index"]:
+            rejected += sum(n for k, n in s["keys"].items() if k in r["index"]) - wm
+            for k, v in reeval_preview(s, r["index"]).items():
+                pre[k] += v
+            unhealthy += not getattr(r["index"], "healthy", False)
         lines.append(f"{state + ' ' + county:<16}{vendor:<22}{s['leads']:>8,}{s['eligible']:>9,}"
                      f"{(f'{size:,}' if r else '-'):>8}{wm:>13,}  "
-                     f"{_note(size, r['blocked'] if r else None, s['eligible'])}".rstrip())
+                     f"{_note(size, r['blocked'] if r else None, s['eligible'] or len(s['stamped']))}".rstrip())
     lines.append(f"\nleads that would be flagged: {total:,}   (roster = distinct names in custody)")
+    lines.append(f"name matches refused (middle-name conflict): {rejected:,}")
+    lines.append(f"already-flagged leads re-checked: {pre['rechecked']:,}; would clear "
+                 f"{pre['conflict_cleared']:,} (middle-name conflict), would mark "
+                 f"{pre['left_roster']:,} left the roster; fetched rosters not trusted for "
+                 f"'left the roster' (empty/small/no history): {unhealthy:,}")
     return lines
 
 
@@ -261,10 +321,12 @@ async def _amain(args) -> int:
     except FileNotFoundError:
         print(f"board file not found: {args.board}", file=sys.stderr)
         return 2
-    need = [e for e in entries if scan[(e[0], e[1])]["eligible"] > 0]
+    # A county is fetched for new matches OR to re-check leads already flagged.
+    need = [e for e in entries
+            if scan[(e[0], e[1])]["eligible"] > 0 or scan[(e[0], e[1])]["stamped"]]
     gate = Gate(args.interval)
     with polite_curl_cffi(gate):
-        rosters = await fetch_rosters(need, gate)
+        rosters = await fetch_rosters(need, gate, dry_run=not args.apply)
     print("\n".join(report(entries, scan, rosters)))
     print(f"requests sent: {gate.requests}   hosts that pushed back: {len(gate.blocked)}")
 
@@ -280,17 +342,25 @@ async def _amain(args) -> int:
     with board_lock(REPO, owner="backfill_jail_rosters"):
         rows = load_board(REPO / "docs")
         n = len(rows)
-        matched = match_rosters(rows, usable)
+        gate_stats: dict = {}
+        matched = match_rosters(rows, usable, stats=gate_stats)
         # Gaston's grid has no booking date or charges; pull them for matched rows only.
         with polite_curl_cffi(gate):
             hydrated = await _hydrate_tyler_hits(matched)
         assert len(rows) == n
-        print(f"\nboard rows: {n:,}; flagged {len(matched):,} leads; hydrated {hydrated}")
-        if not matched:
-            print("nothing matched; board not rewritten.")
+        cleared = gate_stats.get("reeval_conflict_cleared", 0)
+        ended = gate_stats.get("reeval_left_roster", 0)
+        print(f"\nboard rows: {n:,}; flagged {len(matched):,} leads; hydrated {hydrated}; "
+              f"refused {gate_stats.get('middle_conflict_rejected', 0):,} (middle-name conflict); "
+              f"re-checked {sum(v for k, v in gate_stats.items() if k.startswith('reeval_')):,}: "
+              f"cleared {cleared:,}, marked left the roster {ended:,}")
+        # A refreshed last_confirmed_on_roster date alone is not worth a whole-board write.
+        if not (matched or cleared or ended):
+            print("nothing matched or changed; board not rewritten.")
             return 0
-        write_artifact(rows, {"notes": f"backfill_jail_rosters: {len(matched)} leads flagged "
-                                       f"from {len(usable)} county rosters"},
+        write_artifact(rows, {"notes": f"backfill_jail_rosters: {len(matched)} leads flagged, "
+                                       f"{cleared} middle-name conflicts cleared, {ended} marked "
+                                       f"left the roster, from {len(usable)} county rosters"},
                        docs_dir=REPO / "docs")
         print(f"wrote board: {n:,} rows")
     return 0

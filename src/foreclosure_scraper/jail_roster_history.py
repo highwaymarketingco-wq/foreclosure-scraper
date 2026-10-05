@@ -73,7 +73,37 @@ CREATE TABLE IF NOT EXISTS bookings (
 );
 CREATE INDEX IF NOT EXISTS idx_bookings_name ON bookings (state, last_name, first_name);
 CREATE INDEX IF NOT EXISTS idx_bookings_county ON bookings (state, county);
+CREATE TABLE IF NOT EXISTS roster_fetches (
+    state        TEXT NOT NULL,
+    county       TEXT NOT NULL,
+    vendor       TEXT NOT NULL,
+    fetched_at   TEXT NOT NULL,
+    roster_size  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fetches_county ON roster_fetches (state, county, fetched_at);
 """
+
+# ROSTER HEALTH (2026-10-05). enrichment_jail_bookings now re-evaluates every
+# existing same-county match each run and marks a person whose name is gone
+# from today's roster as no longer in custody. That rule is only safe when
+# today's fetch is the WHOLE roster: a timed-out page, a vendor hiccup or a
+# half-paged result must never read as "everyone missing was released". The
+# fetchers cannot tell a partial result from a complete one (Citizen Connect
+# and Tyler even return what they had so far when a later page throws), so the
+# judge is size against this county's own recent history:
+#   * empty                         -> unhealthy (failed and empty look alike)
+#   * fewer than HEALTH_MIN_ROSTER  -> unhealthy (smallest real roster: Polk ~44)
+#   * no history to compare against -> unhealthy (fail closed; the fetch is
+#                                      still recorded, so the NEXT run can judge)
+#   * under HEALTH_MIN_RATIO x the median of the last HEALTH_LOOKBACK recorded
+#     sizes                         -> unhealthy (implausibly small)
+# A plausible-looking partial fetch can still slip through; the enricher's
+# re-evaluation self-heals that case on the next run (anyone back on a roster is
+# restored to in-custody), so the worst outcome is a one-run under-count, never
+# a permanent false "released".
+HEALTH_MIN_ROSTER = 20
+HEALTH_MIN_RATIO = 0.7
+HEALTH_LOOKBACK = 5
 
 
 def _norm(s: str) -> str:
@@ -174,6 +204,77 @@ def diff_and_record(con: sqlite3.Connection, state: str, county: str, vendor: st
     log.info("jail_history.diff", state=state, county=county, vendor=vendor,
              fetched=len(seen_keys), new=sum(1 for m in meta.values() if m["is_new"]))
     return meta
+
+
+def listed_count(con: sqlite3.Connection, state: str, county: str) -> int:
+    """Names currently_listed for (state, county) -- the size of the last REAL
+    fetch diff_and_record saw. Read it BEFORE recording a new fetch."""
+    row = con.execute(
+        "SELECT COUNT(*) AS n FROM bookings WHERE state=? AND county=? AND currently_listed=1",
+        (state, county)).fetchone()
+    return int(row["n"] or 0)
+
+
+def recent_roster_sizes(con: sqlite3.Connection, state: str, county: str,
+                        limit: int = HEALTH_LOOKBACK) -> list[int]:
+    """The last `limit` non-empty roster sizes recorded for (state, county), newest first."""
+    rows = con.execute(
+        "SELECT roster_size FROM roster_fetches WHERE state=? AND county=? AND roster_size>0"
+        " ORDER BY fetched_at DESC, rowid DESC LIMIT ?", (state, county, limit)).fetchall()
+    return [int(r["roster_size"]) for r in rows]
+
+
+def record_fetch(con: sqlite3.Connection, state: str, county: str, vendor: str,
+                 size: int, now: Optional[datetime] = None, commit: bool = True) -> None:
+    """Log one fetch's roster size (distinct names). An empty fetch is never
+    logged: it is indistinguishable from a failure and must not drag the
+    baseline down. `commit` has the same dry-run meaning as diff_and_record's."""
+    if size <= 0:
+        return
+    now = now or datetime.now(timezone.utc)
+    con.execute(
+        "INSERT INTO roster_fetches (state, county, vendor, fetched_at, roster_size)"
+        " VALUES (?,?,?,?,?)",
+        (state, county, vendor, now.replace(microsecond=0).isoformat(), int(size)))
+    if commit:
+        con.commit()
+
+
+def judge_roster_size(size: int, baseline: Optional[float]) -> tuple[bool, str]:
+    """(healthy, reason) for a fetch of `size` names against `baseline`. Pure;
+    see the ROSTER HEALTH note above for the policy."""
+    if size <= 0:
+        return False, "empty_fetch"
+    if size < HEALTH_MIN_ROSTER:
+        return False, "below_floor"
+    if not baseline:
+        return False, "no_history"
+    if size < HEALTH_MIN_RATIO * baseline:
+        return False, "implausibly_small"
+    return True, "ok"
+
+
+def assess_roster_health(con: sqlite3.Connection, state: str, county: str,
+                         size: int) -> dict:
+    """Judge this fetch against the county's own history. Call BEFORE
+    diff_and_record/record_fetch for the same fetch, or the fetch is compared
+    against itself. Baseline = median of the recent logged sizes; on a sidecar
+    that predates the roster_fetches table it falls back to the names still
+    currently_listed from the last real fetch."""
+    sizes = recent_roster_sizes(con, state, county)
+    if sizes:
+        ordered = sorted(sizes)
+        mid = len(ordered) // 2
+        baseline: Optional[float] = (float(ordered[mid]) if len(ordered) % 2
+                                     else (ordered[mid - 1] + ordered[mid]) / 2.0)
+        basis = "recent_fetches"
+    else:
+        listed = listed_count(con, state, county)
+        baseline = float(listed) if listed else None
+        basis = "currently_listed" if listed else "none"
+    healthy, reason = judge_roster_size(size, baseline)
+    return {"healthy": healthy, "reason": reason, "size": size,
+            "baseline": baseline, "basis": basis}
 
 
 def stats(con: sqlite3.Connection) -> list[dict]:
