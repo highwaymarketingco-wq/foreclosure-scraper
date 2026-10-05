@@ -368,17 +368,38 @@ def test_lrcpwa_rebases_onto_a_moved_origin_before_pushing(tmp_path):
     assert _run(["git", "rev-parse", "HEAD"], cwd=root).stdout == _run(["git", "rev-parse", "origin/main"], cwd=root).stdout
 
 
-def test_sos_only_commits_when_a_payload_file_other_than_run_meta_changed(tmp_path):
+def test_sos_wrapper_no_longer_holds_the_board_or_commits_it(tmp_path):
+    """2026-10-05: the SOS pass hands its results to the VM (docs/handoff/sos_agent_results.json,
+    committed by scripts/sos_agent_refresh.py itself) and never writes the board, so the wrapper
+    takes no board lock and never commits a board change, even when docs/ changed under it."""
     root = make_repo(tmp_path)
-    out = wrapper(root, "sos_agent_refresh.sh", make_env(root, {"STUB_UV_MODE": "meta"}))
-    assert out.returncode == 0
-    assert job_events(root, "sosagent")[-1]["outcome"] == "no_change"
-    assert git_log(root, 1) == ["base"], "a run whose only effect is run_meta.json must not commit"
-    staged = _run(["git", "diff", "--cached", "--name-only"], cwd=root).stdout
-    assert staged == "", "the payload-mode gate must reset what it staged"
-    out = wrapper(root, "sos_agent_refresh.sh", make_env(root, {"STUB_UV_MODE": "change"}))
-    assert job_events(root, "sosagent")[-1]["outcome"] == "ok"
-    assert git_log(root, 1)[0].startswith("Scheduled SOS pass")
+    out = wrapper(root, "sos_agent_refresh.sh", make_env(root, {
+        "STUB_UV_MODE": "lockcheck", "STUB_UV_OUTCOME": "ok\\n3\\ntargets=10 resolved=3"}))
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert (root / "logs" / "stub_phases.txt").read_text().startswith("LOCK_FREE_DURING_")
+    assert git_log(root, 1) == ["base"], "the wrapper must not commit the board"
+    ev = job_events(root, "sosagent")[-1]
+    assert ev["outcome"] == "ok" and ev["rows_changed"] == 3 and "resolved=3" in ev["note"]
+    calls = (root / "logs" / "stub_uv_calls.txt").read_text()
+    assert "scripts/sos_agent_refresh.py" in calls
+
+
+def test_sos_wrapper_reports_the_pass_outcome_or_fails_loudly(tmp_path):
+    root = make_repo(tmp_path)
+    wrapper(root, "sos_agent_refresh.sh", make_env(root, {
+        "STUB_UV_MODE": "nochange", "STUB_UV_OUTCOME": "push_failed\\n2\\ngit push_failed"}))
+    assert job_events(root, "sosagent")[-1]["outcome"] == "push_failed"
+    wrapper(root, "sos_agent_refresh.sh", make_env(root, {"STUB_UV_MODE": "nochange"}))
+    ev = job_events(root, "sosagent")[-1]
+    assert ev["outcome"] == "failed" and "without reporting an outcome" in ev["note"]
+    out = wrapper(root, "sos_agent_refresh.sh", make_env(root, {"STUB_UV_MODE": "fail"}))
+    assert out.returncode == 1 and job_events(root, "sosagent")[-1]["outcome"] == "failed"
+    calls = (root / "logs" / "stub_uv_calls.txt").read_text().splitlines()
+    assert calls[-1].endswith("scripts/sos_agent_refresh.py"), "no --cap unless asked"
+    wrapper(root, "sos_agent_refresh.sh", make_env(root, {
+        "STUB_UV_MODE": "nochange", "SOS_AGENT_CAP": "10", "STUB_UV_OUTCOME": "ok\\n1\\nx"}))
+    calls = (root / "logs" / "stub_uv_calls.txt").read_text().splitlines()
+    assert calls[-1].endswith("scripts/sos_agent_refresh.py --cap 10")
 
 
 def test_parcel_cache_wrapper_propagates_failure_and_logs_to_logs(tmp_path):

@@ -45,15 +45,30 @@ looked up) and `resolved_at` on every freshly-written profile, so a human or a l
 can compare it against the lead's current owner_name/defendant and decide for themselves --
 nothing is auto-cleared or suppressed. A profile written before this fix has neither field
 and is left exactly as it was.
+
+MAC LOOKS UP, VM APPLIES (2026-10-05). The daily lookup runs on the Mac (residential IP,
+scripts/sos_agent_refresh.py) and no longer writes the board: results go to the cumulative
+hand-off file docs/handoff/sos_agent_results.json (sos_agent_handoff.py owns its format), and
+the VM's pipeline attaches them with apply_sos_agent_handoff(), which calls THIS module's
+propagate_profiles() -- the same matching (_entity_of + entity_key) and the same "one entity's
+profile goes to every row it owns" propagation enrich_with_sos_agent() uses, not a copy of it.
+What changed here for that: entity_key() (one normalized key for both sides), _prio() and
+stamp_profile() lifted to module level so the Mac script imports them instead of duplicating
+them, a polite randomized pause between lookups, a larger wall-clock budget, and
+_batch_lookup(outcome=...) bookkeeping that tells an ANSWERED "no match" (a real miss) apart
+from a lookup that never got an answer (timeout, exception, Cloudflare block page). The fetch
+itself (_one: the stealth session, the form, the selectors) is unchanged.
 """
 from __future__ import annotations
 
 import asyncio
+import copy
 import os
+import random
 import re
 import time
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Iterator, Optional
 
 import structlog
 
@@ -69,8 +84,21 @@ def _today_iso() -> str:
 _ENABLED = os.environ.get("SOS_AGENT") == "1"
 _MAX_CHECK = int(os.environ.get("SOS_AGENT_MAX_CHECK", "60"))
 _CALL_TIMEOUT_S = float(os.environ.get("SOS_AGENT_CALL_TIMEOUT_S", "45"))
-_MAX_SECONDS = float(os.environ.get("SOS_AGENT_MAX_SECONDS", "900"))
+# Wall-clock budget for one batch. Was 900 s, sized for 40 names with no pause. The daily
+# cap is now up to 150 names with a 4-6 s polite pause between them (~9-10 s a name, about
+# 25 minutes), so 45 minutes leaves real margin; scripts/sos_agent_refresh.sh's SOS_TIMEOUT
+# (4200 s) sits above this plus the board scan and the git push.
+_MAX_SECONDS = float(os.environ.get("SOS_AGENT_MAX_SECONDS", "2700"))
 _BREAKER_FAILS = int(os.environ.get("SOS_AGENT_BREAKER_FAILS", "6"))
+# Polite randomized pause between two lookups in the same session (not before the first).
+_PAUSE_MIN_S = float(os.environ.get("SOS_AGENT_PAUSE_MIN_S", "4"))
+_PAUSE_MAX_S = float(os.environ.get("SOS_AGENT_PAUSE_MAX_S", "6"))
+
+# Page titles of a block/challenge interstitial instead of a real sosnc.gov page. A lookup
+# that lands on one got NO answer (counts toward the breaker and is retried), which is
+# different from an answered search with no matching entity (a real miss).
+_BLOCK_TITLES = ("just a moment", "attention required", "access denied",
+                 "too many requests", "verify you are human", "checking your browser")
 
 _SEARCH_URL = "https://www.sosnc.gov/online_services/search/by_title/_Business_Registration"
 _BASE = "https://www.sosnc.gov"
@@ -124,6 +152,68 @@ def _entity_of(li: Listing) -> Optional[str]:
         if c:
             return c
     return None
+
+
+def entity_key(name: str) -> str:
+    """The one normalized key an entity is matched on, on the Mac (hand-off ledger) and the
+    VM (apply) alike: case, punctuation and spacing do not matter ("ACME HOLDINGS, LLC" and
+    "Acme Holdings LLC" are the same key; they send sosnc.gov the same search)."""
+    return " ".join(re.sub(r"[^0-9a-z]+", " ", (name or "").lower()).split())
+
+
+def _prio(li: Listing) -> int:
+    """HOT/WARM first, so a capped run spends its lookups on the best leads."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    tier = ((raw.get("distress_stack") or {}).get("tier")
+            or (raw.get("grade") or {}).get("tier") or "")
+    return {"HOT": 0, "WARM": 1}.get(str(tier).upper(), 2)
+
+
+def stamp_profile(prof: dict, name: str) -> dict:
+    """Provenance stamp on a freshly resolved profile (2026-10-03, see the module
+    docstring): which entity it was resolved FOR, and when. Gates nothing."""
+    prof["resolved_for_entity"] = name
+    prof["resolved_at"] = _today_iso()
+    return prof
+
+
+def _unresolved_entity_rows(listings) -> Iterator[tuple[Listing, str]]:
+    """(listing, entity name) for every NC entity-owned row that has no sos_agent yet. A row
+    that already carries one is never touched (it is not re-checked or overwritten)."""
+    for li in listings:
+        if li.state != "NC":
+            continue
+        name = _entity_of(li)
+        if not name:
+            continue
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        if isinstance(raw.get("sos_agent"), dict):
+            continue
+        yield li, name
+
+
+def _attach(li: Listing, prof: dict) -> None:
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    li.raw = raw
+    li.raw["sos_agent"] = copy.deepcopy(prof)
+
+
+def propagate_profiles(listings, profiles_by_key: dict[str, dict]) -> int:
+    """Attach a resolved profile to EVERY unresolved NC row whose entity matches it (same
+    entity -> same registered agent; free, no network). `profiles_by_key` is keyed by
+    entity_key(). Used by enrich_with_sos_agent() for profiles already on the board and by
+    sos_agent_handoff.apply_sos_agent_handoff() for the Mac's hand-off file. Returns the
+    number of rows that received a profile."""
+    if not profiles_by_key:
+        return 0
+    n = 0
+    for li, name in _unresolved_entity_rows(listings):
+        prof = profiles_by_key.get(entity_key(name))
+        if prof is None:
+            continue
+        _attach(li, prof)
+        n += 1
+    return n
 
 
 _ADDR_HEADERS = {
@@ -229,30 +319,87 @@ def _parse_profile(text: str) -> dict:
     return out
 
 
-async def _batch_lookup(names: list[str]) -> dict:
-    """One stealth session: clear Cloudflare once, then look up each name."""
+async def _looks_blocked(page) -> bool:
+    """True when the page is a challenge/block interstitial, not a sosnc.gov page."""
+    try:
+        title = (await page.title() or "").lower()
+    except Exception:  # noqa: BLE001 - an unreadable title is not evidence of a block
+        return False
+    return any(t in title for t in _BLOCK_TITLES)
+
+
+async def _pause() -> None:
+    lo, hi = sorted((max(0.0, _PAUSE_MIN_S), max(0.0, _PAUSE_MAX_S)))
+    if hi > 0:
+        await asyncio.sleep(random.uniform(lo, hi))
+
+
+async def _batch_lookup(names: list[str], outcome: Optional[dict] = None) -> dict:
+    """One stealth session: clear Cloudflare once, then look up each name.
+
+    Returns {name: profile-or-None} for every name ATTEMPTED (a name the deadline or the
+    breaker stopped before is absent). When `outcome` is passed it is filled with how the
+    batch went, for the caller's ledger and back-off:
+      attempted       names actually looked up
+      resolved/misses/errors   lists of names. A MISS is an answered search with no
+                      matching entity; an ERROR got no answer (timeout, exception, a
+                      Cloudflare block page, a profile page with no SOSID on it).
+      breaker_tripped _BREAKER_FAILS errors in a row stopped the batch
+      deadline_hit    the _MAX_SECONDS budget stopped the batch
+      session_failed  the stealth session itself failed (nothing could be looked up)
+      error           text of that session failure, if any
+
+    THE BREAKER counts consecutive lookups that got no answer. It used to count an answered
+    "no match" as a failure too, so six real misses in a row (normal: ~55% of names are not
+    in the NC registry) stopped the batch. That is what happened on 2026-10-01 and 10-02:
+    the same 7 names, the same 1 hit + 6 misses, both runs over in under a minute. A miss is
+    the site answering, so it now resets the streak instead.
+    """
+    out = outcome if outcome is not None else {}
+    out.update({"attempted": 0, "resolved": [], "misses": [], "errors": [],
+                "breaker_tripped": False, "deadline_hit": False,
+                "session_failed": False, "error": None})
     try:
         from scrapling.fetchers import StealthyFetcher
     except ImportError:
+        out["session_failed"] = True
+        out["error"] = "scrapling not installed"
         return {}
 
     results: dict = {}
     state = {"consec_fail": 0, "deadline": time.monotonic() + _MAX_SECONDS}
 
     async def page_action(page):
-        for name in names:
-            if time.monotonic() > state["deadline"] or state["consec_fail"] >= _BREAKER_FAILS:
+        for i, name in enumerate(names):
+            if state["consec_fail"] >= _BREAKER_FAILS:
+                out["breaker_tripped"] = True
                 break
+            if time.monotonic() > state["deadline"]:
+                out["deadline_hit"] = True
+                break
+            if i:
+                await _pause()
             core = _strip_business_suffix(name) or name
+            out["attempted"] += 1
             try:
                 await asyncio.wait_for(_one(page, name, core, results), timeout=_CALL_TIMEOUT_S)
-                if name in results and results[name]:
+                prof = results.get(name)
+                if prof and prof.get("sosid"):
+                    out["resolved"].append(name)
+                    state["consec_fail"] = 0
+                elif prof is None and not await _looks_blocked(page):
+                    out["misses"].append(name)     # answered: no such NC entity
                     state["consec_fail"] = 0
                 else:
+                    out["errors"].append(name)     # block page, or a profile with no SOSID
                     state["consec_fail"] += 1
             except (Exception, asyncio.TimeoutError):
                 state["consec_fail"] += 1
                 results.setdefault(name, None)
+                out["errors"].append(name)
+        # six no-answers in a row is the rate-limit signal even when they were the last six
+        if state["consec_fail"] >= _BREAKER_FAILS:
+            out["breaker_tripped"] = True
 
     async def _one(page, name, core, results):
         await page.goto(_SEARCH_URL)
@@ -283,8 +430,12 @@ async def _batch_lookup(names: list[str]) -> dict:
             page_action=page_action,
         )
         await asyncio.wait_for(coro, timeout=_MAX_SECONDS + _CALL_TIMEOUT_S)
-    except (Exception, asyncio.TimeoutError):
-        pass
+    except asyncio.TimeoutError:
+        out["deadline_hit"] = True
+    except Exception as exc:  # noqa: BLE001 - partial results below are still returned
+        out["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+    if not out["attempted"] and names:
+        out["session_failed"] = True
     return results
 
 
@@ -298,12 +449,6 @@ async def enrich_with_sos_agent(listings: list[Listing], max_check: int = _MAX_C
     name_to_listings: dict[str, list[Listing]] = {}
     ranked: list[tuple[int, str]] = []
 
-    def _prio(li: Listing) -> int:
-        raw = li.raw if isinstance(li.raw, dict) else {}
-        tier = ((raw.get("distress_stack") or {}).get("tier")
-                or (raw.get("grade") or {}).get("tier") or "")
-        return {"HOT": 0, "WARM": 1}.get(str(tier).upper(), 2)
-
     # Names already resolved on a prior pass — skip them so each run advances
     # the frontier to NEW entities instead of re-hitting the same top-priority
     # names, and propagate a resolved profile to any co-owned lead that lacks
@@ -314,27 +459,20 @@ async def enrich_with_sos_agent(listings: list[Listing], max_check: int = _MAX_C
         sa = raw.get("sos_agent")
         if isinstance(sa, dict) and sa.get("sosid"):
             nm = _entity_of(li)
-            if nm and nm not in resolved_profiles:
-                resolved_profiles[nm] = sa
+            if nm:
+                resolved_profiles.setdefault(entity_key(nm), sa)
 
-    propagated = 0
-    for li in listings:
-        if li.state != "NC":
-            continue
-        name = _entity_of(li)
-        if not name:
-            continue
-        raw = li.raw if isinstance(li.raw, dict) else {}
-        if isinstance(raw.get("sos_agent"), dict):
-            continue  # already resolved on this lead
-        if name in resolved_profiles:
-            li.raw = raw
-            li.raw["sos_agent"] = resolved_profiles[name]
-            propagated += 1
-            continue
-        if name not in name_to_listings:
+    propagated = propagate_profiles(listings, resolved_profiles)
+
+    # whatever is still unresolved after propagation is a lookup candidate; one lookup per
+    # entity_key, under the first spelling seen
+    key_to_name: dict[str, str] = {}
+    for li, name in _unresolved_entity_rows(listings):
+        k = entity_key(name)
+        if k not in key_to_name:
+            key_to_name[k] = name
             ranked.append((_prio(li), name))
-        name_to_listings.setdefault(name, []).append(li)
+        name_to_listings.setdefault(key_to_name[k], []).append(li)
 
     ranked.sort(key=lambda t: t[0])
     names = [n for _, n in ranked][:max_check]
@@ -367,12 +505,9 @@ async def enrich_with_sos_agent(listings: list[Listing], max_check: int = _MAX_C
         # registered-agent lookup was even FOR, so a later ownership change (the lead's
         # owner/defendant moving on, e.g. to a bank or a county after a tax sale) left a
         # stranded contact with no way to tell it apart from a still-good one.
-        prof["resolved_for_entity"] = name
-        prof["resolved_at"] = _today_iso()
+        stamp_profile(prof, name)
         for li in name_to_listings.get(name, []):
-            if not isinstance(li.raw, dict):
-                li.raw = {}
-            li.raw["sos_agent"] = prof
+            _attach(li, prof)
 
     log.info("sos_agent.done", **counts)
     return counts

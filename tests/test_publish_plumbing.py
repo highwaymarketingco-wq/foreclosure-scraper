@@ -511,8 +511,9 @@ def test_pages_check_is_wired_into_the_publish_paths():
     # and the local wrappers must reach board_payload_check, directly or through
     # publish_commit (scripts/publish_helper.sh runs it before every commit)
     assert "board_payload_check" in (REPO / "scripts/publish_helper.sh").read_text()
-    for rel in ("scripts/run_local.sh", "scripts/lrcpwa_refresh.sh",
-                "scripts/sos_agent_refresh.sh"):
+    # (scripts/sos_agent_refresh.sh left this list 2026-10-05: it no longer publishes the
+    # board, only its hand-off file -- see tests/test_sos_agent_handoff.py)
+    for rel in ("scripts/run_local.sh", "scripts/lrcpwa_refresh.sh"):
         text = (REPO / rel).read_text()
         assert "board_payload_check" in text or "publish_commit" in text, rel
 
@@ -699,9 +700,10 @@ def test_board_writers_do_not_read_past_the_sidecar():
 
 def test_the_scheduled_board_writers_all_take_the_lock():
     """Every entry point that can hold a board while another job wants it."""
+    # sos_agent_refresh.sh/.py are not board writers since 2026-10-05 (Mac -> VM hand-off);
+    # the .py still takes the lock, briefly, around its git commit + rebase.
     for rel in ("scripts/run_local.sh", "scripts/run_daily_vision.sh",
-                "scripts/lrcpwa_refresh.sh", "scripts/sos_agent_refresh.sh",
-                "scripts/ingest_saved.sh"):
+                "scripts/lrcpwa_refresh.sh", "scripts/ingest_saved.sh"):
         src = (REPO / rel).read_text()
         assert "board_lock_acquire" in src, f"{rel} does not take the board lock"
         assert "board_lock_release" in src, f"{rel} never releases the board lock"

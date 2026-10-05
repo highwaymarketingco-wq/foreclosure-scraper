@@ -1,10 +1,18 @@
 #!/bin/zsh
-# Daily NC SOS registered-agent pass: advance the entity-contact frontier by ~40 new
-# NC LLC leads/day (gentle on sosnc.gov — the enricher skips already-resolved names
-# and back-off is enforced by a fast circuit breaker). Scheduled at 08:30 by
-# deploy/mac/com.highway.foreclosure.sosagent.plist, right after lrcpwa. Commits ONLY
-# when new contacts actually landed (a Cloudflare-walled run bails fast with 0 changes
-# and must not create an empty commit).
+# Daily NC SOS registered-agent lookups: the MAC side of the Mac -> VM hand-off (2026-10-05).
+# Runs at 14:00 ET from the INSTALLED ~/Library/LaunchAgents/com.highway.foreclosure.sosagent.plist
+# (the not-installed template deploy/mac/com.highway.foreclosure.sosagent.plist proposes 08:30).
+#
+# This job NO LONGER WRITES THE BOARD. It looks up up to SOS_AGENT_MAX_CHECK (150) new NC
+# entities a day (adaptive: half the cap after a breaker trip or a mostly-failed run, floor 40;
+# +25 back toward the max after each clean run), merges every answer into the cumulative
+# hand-off file docs/handoff/sos_agent_results.json, and commits + pushes ONLY that file. The
+# Oracle VM's nightly run attaches the profiles to the board (sos_agent_handoff.py).
+#
+# So there is no board lock around the run any more (it took the whole board for 40 minutes
+# to write nothing). scripts/sos_agent_refresh.py takes the board lock itself, briefly, only
+# around the git commit and the rebase, and holds its own run lock
+# (logs/.sos_agent_refresh.lock) so two SOS runs -- two stealth browsers -- never overlap.
 set -uo pipefail
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
 ROOT="${FORECLOSURE_ROOT:-$HOME/foreclosure-scraper}"; cd "$ROOT" || exit 1
@@ -14,64 +22,40 @@ exec >> "$LOG" 2>&1
 echo "=== sos_agent_refresh $(date) ==="
 
 . "$ROOT/scripts/job_event.sh"
-. "$ROOT/scripts/board_lock.sh"
-. "$ROOT/scripts/board_payload.sh"
-. "$ROOT/scripts/publish_helper.sh"
 JOB_EVENT_ROOT="$ROOT"
 job_event_begin sosagent
-trap 'job_event_finalize; board_lock_release' EXIT INT TERM
+trap 'job_event_finalize' EXIT INT TERM
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "!! uv not found on PATH ($PATH)"; job_event_end failed "" "uv_not_found"; exit 127
 fi
 
-# ONE BOARD WRITER AT A TIME — a real lock held across the whole
-# load_board -> mutate -> write_artifact -> commit span, replacing the
-# hand-maintained pgrep list that used to be here. See lrcpwa_refresh.sh and
-# scripts/board_lock.sh.
-if ! board_lock_acquire "$ROOT" "sos_agent_refresh.sh" 0 "${SOS_MAX_RUNTIME:-3600}"; then
-  echo "$(board_lock_refusal_message 'this run')"
-  if [ "$BOARD_LOCK_REFUSAL" = "memory" ]; then
-    job_event_end skipped_memory "" "$BOARD_MEM_REASON"
-  else
-    job_event_end skipped_lock "" "$(board_lock_holder)"
-  fi
-  exit 0
-fi
-
 export SOS_AGENT=1
-export SOS_AGENT_MAX_CHECK="${SOS_AGENT_MAX_CHECK:-40}"
+export SOS_AGENT_MAX_CHECK="${SOS_AGENT_MAX_CHECK:-150}"       # adaptive cap ceiling
+export SOS_AGENT_MIN_CHECK="${SOS_AGENT_MIN_CHECK:-40}"        # back-off floor
+export SOS_AGENT_CAP_STEP="${SOS_AGENT_CAP_STEP:-25}"          # step up after a clean run
 export SOS_AGENT_BREAKER_FAILS="${SOS_AGENT_BREAKER_FAILS:-6}"
-job_run "${SOS_TIMEOUT:-2400}" uv run python scripts/sos_agent_refresh.py
+export SOS_AGENT_MAX_SECONDS="${SOS_AGENT_MAX_SECONDS:-2700}"  # lookup budget: 150 x ~10 s fits
+export SOS_AGENT_OUTCOME_FILE="$ROOT/logs/.sos_agent_outcome"
+rm -f "$SOS_AGENT_OUTCOME_FILE"
+# SOS_AGENT_CAP=N: a one-off small run by hand (passes --cap N; never raises the adaptive cap).
+SOS_ARGS=()
+[ -n "${SOS_AGENT_CAP:-}" ] && SOS_ARGS=(--cap "$SOS_AGENT_CAP")
+
+# Hard kill for the whole pass: the 45-min lookup budget + the board scan + the git push.
+# SOS_MAX_RUNTIME is the old name (it was the board lock's max runtime) and still works.
+job_run "${SOS_TIMEOUT:-${SOS_MAX_RUNTIME:-4200}}" uv run python scripts/sos_agent_refresh.py "${SOS_ARGS[@]}"
 RC=$JOB_RUN_RC
 if [ "$RC" -ne 0 ]; then
   echo "pass failed rc=$RC"; job_event_end failed "" "rc=$RC"; exit 1
 fi
 
-# commit ONLY if the board data changed (not run_meta's timestamp) — a walled run
-# rewrites listings.json byte-identically and must not commit. THE CHANGE GATE
-# COVERS EVERYTHING THE `git reset -q` CAN THROW AWAY (publish_commit's "payload"
-# mode): it used to watch board/detail/shards only, so a run whose only effect was
-# on docs/listings_slim.json.gz (the payload phones fetch) was told "no change",
-# reset it, and never published it.
-publish_commit "$ROOT" "Scheduled SOS pass: +NC entity registered-agent contacts
-
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>" payload
-PC=$?
-board_lock_release      # the lock protects the write and the commit, not the network
-
-case $PC in
-  0)
-    if publish_push "$ROOT"; then
-      echo "committed + pushed"; job_event_end ok
-    else
-      echo "!! commit made locally but PUSH FAILED — the next publisher's push will carry it"
-      printf '%s\n' "$PUBLISH_PUSH_OUT"
-      job_event_end push_failed "" "$PUBLISH_PUSH_OUT"
-    fi ;;
-  1) echo "no new contacts (sosnc.gov may be rate-limited) — no commit"
-     job_event_end no_change ;;
-  *) echo "!! commit refused (size gate or hook) — see logs/publish_blocked.log"
-     job_event_end failed "" "commit_failed"; exit 1 ;;
-esac
+OUTCOME="failed"; ROWS=""; NOTE="the pass exited 0 without reporting an outcome"
+if [ -f "$SOS_AGENT_OUTCOME_FILE" ]; then
+  OUTCOME="$(sed -n 1p "$SOS_AGENT_OUTCOME_FILE")"
+  ROWS="$(sed -n 2p "$SOS_AGENT_OUTCOME_FILE")"
+  NOTE="$(sed -n 3p "$SOS_AGENT_OUTCOME_FILE")"
+fi
+echo "outcome: $OUTCOME ${ROWS:+($ROWS resolved)} $NOTE"
+job_event_end "$OUTCOME" "$ROWS" "$NOTE"
 echo "=== done $(date) ==="

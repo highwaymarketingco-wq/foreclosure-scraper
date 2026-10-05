@@ -2529,10 +2529,27 @@ async def run() -> int:
         except Exception:
             log.error("sos_dissolution.failed", traceback=traceback.format_exc())
 
+    # NC SOS registered-agent HAND-OFF (2026-10-05): the Mac's daily lookup job
+    # (scripts/sos_agent_refresh.sh) can no longer write the board, so it pushes its
+    # answers to docs/handoff/sos_agent_results.json and THIS step attaches them:
+    # no network, every NC row owned by a resolved entity that has no raw['sos_agent']
+    # yet gets the profile, through enrichment_sos_agent.propagate_profiles() (the
+    # module's own matching/propagation). Runs for every FORECLOSURE_ROLE (vm, all);
+    # a missing/stale/unreadable file is logged and skipped inside, never fatal.
+    # SOS_AGENT_HANDOFF_APPLY=0 turns it off. See src/foreclosure_scraper/sos_agent_handoff.py.
+    try:
+        from .sos_agent_handoff import apply_sos_agent_handoff
+        s = apply_sos_agent_handoff(enriched)
+        if s:
+            enrichment_stats["sos_agent_handoff"] = s
+    except Exception:
+        log.error("sos_agent_handoff.failed", traceback=traceback.format_exc())
+
     # NC SOS registered-agent + officer enrichment — for entity-owned NC leads,
     # pull the free public registered agent / officers so a contact-less LLC lead
     # gets a real mailable contact without a paid skip-trace. Stealth + slow, so
-    # gated OFF by default (SOS_AGENT=1); runs in the scheduled land-records pass.
+    # gated OFF by default (SOS_AGENT=1) and kept OFF on the VM: the live lookups
+    # run on the Mac and arrive through the hand-off step above.
     try:
         from .enrichment_sos_agent import enrich_with_sos_agent
         s = await _await_capped(enrich_with_sos_agent(enriched), "with_sos_agent")

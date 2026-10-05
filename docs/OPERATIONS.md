@@ -30,7 +30,7 @@ The board on 2026-09-21: **170,066 leads** (NC 93,030, SC 77,036) from **156 sou
 | --- | --- | --- | --- |
 | Daily 09:30 (not Tue/Fri until the patch is applied) | `com.highway.foreclosure.dailyvision` | `scripts/run_daily_vision.sh` | API refresh of 14 sources, then vision. Logs `logs/dailyvision.{out,err}.log`, `logs/daily-vision-*.log` |
 | Daily 12:00 | `com.highway.foreclosure.lrcpwa` | `scripts/lrcpwa_refresh.sh` | NC land-records addresses, values, photos |
-| Daily 14:00 | `com.highway.foreclosure.sosagent` | `scripts/sos_agent_refresh.sh` | NC SOS registered-agent contacts, about 40 a day |
+| Daily 14:00 | `com.highway.foreclosure.sosagent` | `scripts/sos_agent_refresh.sh` | NC SOS registered-agent lookups, up to 150 a day (adaptive back-off, floor 40). Since 2026-10-05 it does not write the board: it pushes `docs/handoff/sos_agent_results.json` and the VM's run applies it (`docs/HANDOFF.md` item 62) |
 | Sunday 04:00 | `com.highway.foreclosure.parcelcache` | `scripts/parcel_cache_refresh.sh` | Rebuilds 26 county parcel caches in `data/parcel_cache`; does not touch the board |
 | Tue and Fri 09:30 | `com.highway.foreclosure.weekly` | `scripts/prompt_run.sh` | A two-step popup: ingest saved court pages, then offer the full run. Does nothing unless a human answers |
 

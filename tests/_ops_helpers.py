@@ -39,6 +39,8 @@ case "$mode" in
   lockcheck) [ -d "$FORECLOSURE_ROOT/logs/.board.lock" ] && echo "LOCK_HELD_DURING_$phase" >> "$FORECLOSURE_ROOT/logs/stub_phases.txt" || echo "LOCK_FREE_DURING_$phase" >> "$FORECLOSURE_ROOT/logs/stub_phases.txt"; touch_board ;;
 esac
 [ -n "$FAMILY_ROWS_FILE" ] && [ "$phase" = "scrape" ] && printf '42' > "$FAMILY_ROWS_FILE"
+# the SOS pass reports its outcome through a file (scripts/sos_agent_refresh.sh reads it)
+[ -n "${STUB_UV_OUTCOME:-}" ] && [ -n "${SOS_AGENT_OUTCOME_FILE:-}" ] && printf '%b' "$STUB_UV_OUTCOME" > "$SOS_AGENT_OUTCOME_FILE"
 exit 0
 '''
 
