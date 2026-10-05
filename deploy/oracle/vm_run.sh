@@ -69,6 +69,9 @@ export FORECLOSURE_ASSESSOR_PHOTO="${FORECLOSURE_ASSESSOR_PHOTO:-1}"
 if [[ -n "${GOOGLE_MAPS_API_KEY:-}" ]]; then
   export FORECLOSURE_STREETVIEW="${FORECLOSURE_STREETVIEW:-1}"
   export STREETVIEW_MAX="${STREETVIEW_MAX:-300}"
+  # Owner-approved 2026-10-05: use Google's free 10,000/month. enrichment_streetview's
+  # FREE_TIER_GUARD still clamps this to 9,000 unless STREETVIEW_ALLOW_PAID=1, so it stays free.
+  export STREETVIEW_MONTHLY_MAX="${STREETVIEW_MONTHLY_MAX:-9000}"
 fi
 
 # merge_prior_board() streams the published board rather than fully materializing
