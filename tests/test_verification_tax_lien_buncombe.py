@@ -57,6 +57,9 @@ def test_applies_to_flagged_buncombe_nc_rows_only():
     ("9686540826", "968654082600000"),
     ("9686540826000", "968654082600000"),
     ("96865408261234", None),
+    ("9648623059c0401", "9648623059C0401"),          # condo unit, live-resolved 2026-10-06
+    ("9648-62-3059-C0401", "9648623059C0401"),
+    ("9648623059X", None),
     ("12345", None),
     (None, None),
 ])
@@ -187,3 +190,16 @@ def test_owner_match():
     assert t.owner_match("SMITH JOHN", "JOHN SMITH, MARY JONES") in ("same", "partial")
     assert t.owner_match("SMITH JOHN", "ACME HOLDINGS LLC") == "different"
     assert t.owner_match(None, "X") is None
+
+
+def test_a_parcel_record_that_ends_early_is_unconfirmed_not_stale():
+    """249 Main Ave S (PIN 965808521500000): billing stops at the 2024 levy (paid late, with
+    interest), but the row claims 2026. The PIN no longer carries the property's bills, so
+    the verdict is unconfirmed and no bill page is fetched (v2; v1 called this stale)."""
+    f = ReplayFetcher(served("Parcel/Details/965808521500000"))
+    r = run(_row(parcel_id="9658-08-5215-00000", raw={"tax_owed": {"balance": 10.0, "year": 2026}}), f)
+    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "parcel_record_ended"
+    assert r.evidence["latest_levy_year"] == 2024
+    assert r.evidence["latest_delinquent_eligible_levy"] == 2025
+    assert len(f.asked) == 1
+    assert t.VERSION == "v2"

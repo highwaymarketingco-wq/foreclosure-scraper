@@ -123,3 +123,15 @@ def test_the_sweep_holds_no_board_write_path():
     src = (REPO / "scripts" / "verification_sweep.py").read_text()
     for banned in ("patch_existing_rows(", "write_artifact(", "load_board(", "append_new_rows("):
         assert banned not in src
+
+
+def test_recheck_only_takes_just_rows_already_in_the_ledger(board):
+    sw = _load_script()
+    v = _fake_verifier([])
+    led = L.Ledger("tax_lien")
+    led.record(ROWS[0], core.result("tax_lien", "confirmed", {}, version="v0", verifier="fake_tax",
+                                    now=NOW - timedelta(days=1)), ttl_days=30, now=NOW)
+    plan, why = sw.select(board / "listings.json.gz", [v], {"tax_lien": led}, county=None,
+                          cap=10, now=NOW, recheck_only=True)
+    assert [r["parcel_id"] for _p, _k, r, _v in plan["tax_lien"]] == ["1000000001"]
+    assert why["tax_lien"]["due_version"] == 1

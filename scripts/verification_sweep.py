@@ -28,6 +28,7 @@ lane, verification_human_lane.py) never fetches and answers "wall".
 Usage:
   uv run python scripts/verification_sweep.py --signal tax_lien --county Buncombe --max-rows 50
   uv run python scripts/verification_sweep.py --dry-run          # candidates only, no fetch
+  uv run python scripts/verification_sweep.py --recheck-only     # after a VERSION bump
   HANDOFF_PUSH=0 uv run python scripts/verification_sweep.py ...  # write the ledger, skip git
 """
 from __future__ import annotations
@@ -59,9 +60,10 @@ RUN_LOCK = REPO / "logs" / ".verification_sweep.lock"
 
 
 def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, cap: int,
-           now: datetime) -> tuple[dict, dict]:
+           now: datetime, recheck_only: bool = False) -> tuple[dict, dict]:
     """One streaming pass. Returns ({signal: [(prio, key, row, verifier)] best first},
-    {signal: Counter of why rows were or were not due})."""
+    {signal: Counter of why rows were or were not due}). recheck_only: only rows that already
+    have a ledger entry (TTL / VERSION re-checks), e.g. right after a VERSION bump."""
     heaps: dict[str, list] = {v.signal: [] for v in verifiers}
     inheap: dict[str, dict] = {v.signal: {} for v in verifiers}   # key -> item, per signal
     why: dict[str, Counter] = {v.signal: Counter() for v in verifiers}
@@ -79,6 +81,9 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
             _, entry = ledgers[v.signal].find(keys)
             due, reason = L.is_due(entry, v, now)
             why[v.signal]["applies"] += 1
+            if recheck_only and entry is None:
+                why[v.signal]["skipped_new_recheck_only"] += 1
+                continue
             why[v.signal][("due_" if due else "not_due_") + reason] += 1
             if not due:
                 continue
@@ -190,6 +195,8 @@ def main(argv=None) -> int:
                     help="save every fetched response body here (fixtures, audits)")
     ap.add_argument("--ledger-dir", default=None, help="default docs/handoff/verification")
     ap.add_argument("--docs", default=str(REPO / "docs"), help="board directory (read-only)")
+    ap.add_argument("--recheck-only", action="store_true",
+                    help="only rows already in the ledger (TTL/VERSION re-checks), no new rows")
     ap.add_argument("--dry-run", action="store_true", help="select candidates only")
     args = ap.parse_args(argv)
 
@@ -236,7 +243,8 @@ def run(args) -> int:
 
     t0 = time.monotonic()
     plan, why = select(Path(args.docs) / "listings.json.gz", verifiers, ledgers,
-                       county=args.county, cap=max(0, args.max_rows), now=now)
+                       county=args.county, cap=max(0, args.max_rows), now=now,
+                       recheck_only=args.recheck_only)
     scan_s = time.monotonic() - t0
     for sig in plan:
         tiers = Counter(("HOT", "WARM", "COLD", "-")[int(p[0][0])] for p in plan[sig])
@@ -260,6 +268,7 @@ def run(args) -> int:
     for sig, led in ledgers.items():
         led.last_run = {"at": iso_z(datetime.now(timezone.utc)), "host": host,
                         "county": args.county, "max_rows": args.max_rows, "seconds": secs,
+                        "recheck_only": bool(args.recheck_only),
                         "selection": dict(why.get(sig) or {}), "result": tallies.get(sig, {}),
                         "requests": fetcher.stats()}
         _save(led, host)

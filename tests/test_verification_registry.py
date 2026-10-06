@@ -93,3 +93,20 @@ def test_the_real_package_holds_the_reference_verifier():
     v = names["tax_lien_buncombe"]
     assert v.signal == "tax_lien" and v.ttl_days == 30
     assert "tax_lien" in v.governs and "recorded_debt:tax" in v.governs
+
+
+def test_the_sc_divorce_verifier_is_a_wall_that_never_fetches():
+    import asyncio
+    from foreclosure_scraper.verification.fetch import ReplayFetcher
+    from foreclosure_scraper.verification.verifiers import divorce_sc_wall as w
+    v = {x.name: x for x in registry.discover()}["divorce_sc_wall"]
+    assert v.wall and v.signal == "divorce" and v.governs == ()
+    row = {"state": "SC", "county": "Greenville",
+           "raw": {"divorce": {"case_count": 2, "cases": [{"case_number": "2024DR2300123"}]}}}
+    assert w.applies(row)
+    assert not w.applies(dict(row, state="NC"))
+    assert not w.applies({"state": "SC", "raw": {"divorce": {"case_count": 0, "cases": []}}})
+    f = ReplayFetcher({})
+    r = asyncio.run(w.verify(row, f))
+    assert r.verdict == "wall" and f.asked == []
+    assert r.evidence["case_numbers"] == ["2024DR2300123"] and "terms" in r.evidence["reason"]

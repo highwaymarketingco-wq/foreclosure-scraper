@@ -21,7 +21,10 @@ the 2025 one is. Verdicts:
                delinquency was real and has been paid since. One or two Bill/Details fetches.
   refuted      nothing delinquent today and the bill(s) checked were paid on time (or the only
                unpaid bill is the current, not-yet-delinquent levy).
-  unconfirmed  no usable PIN on the row, the page could not be fetched, or no bills parsed.
+  unconfirmed  no usable PIN on the row, the page could not be fetched, no bills parsed, or
+               the parcel's billing ends before the latest delinquent-eligible levy (a PIN
+               retired by a split/recombination: this record no longer answers for the
+               property).
 
 Evidence also carries the two FINDINGS.md side checks: the county's current owner against the
 board's owner_name (Finding C) and the county's assessed value against the board's value with
@@ -42,7 +45,8 @@ from typing import Any, Optional
 from ..core import VerificationResult, digits, result
 
 SIGNAL = "tax_lien"
-VERSION = "v1"
+VERSION = "v2"         # v2 (2026-10-06): a parcel record that ends before the latest
+                       # delinquent-eligible levy is unconfirmed, not refuted/stale
 TTL_DAYS = 30          # a balance changes when paid; re-check monthly
 RETRY_DAYS = 7         # an unreadable page is retried after a week
 SOURCE = "tax.buncombenc.gov"
@@ -84,11 +88,17 @@ def applies(row: dict) -> bool:
 
 
 def pin_of(row: dict) -> Optional[str]:
-    """The 15-digit Buncombe PIN the tax site takes. A 10-digit board PIN is the base PIN
+    """The 15-character Buncombe PIN the tax site takes. A 10-digit board PIN is the base PIN
     (county GIS exports pad it with zeros, models._normalize_parcel strips them), so it gets
     its 00000 suffix back; 11-14 digits are accepted only when everything past the 10th digit
-    is a zero pad. Anything else is not resolvable here."""
-    d = digits(row.get("parcel_id"))
+    is a zero pad. A condominium unit keeps its letter suffix ("9648-62-3059-C0401" ->
+    9648623059C0401, resolved live 2026-10-06). Anything else is not resolvable here."""
+    an = re.sub(r"[^0-9A-Za-z]", "", str(row.get("parcel_id") or "")).upper()
+    if re.fullmatch(r"\d{10}[A-Z]\d{4}", an):
+        return an
+    d = digits(an)
+    if d != an:
+        return None
     if len(d) == 15:
         return d
     if len(d) == 10:
@@ -314,7 +324,18 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         ev["under_500"] = ev["total_delinquent"] < 500
         return _res("confirmed", ev)
 
-    # nothing delinquent today: was it ever (paid late since) or not (paid on time)?
+    # nothing delinquent today. If the parcel's billing stops before the latest levy that
+    # could be delinquent (a PIN retired by a split or recombination: the 2026-10-06 sweep
+    # met records ending 2022 and 2024 under rows claiming 2025/2026), the property is billed
+    # elsewhere now and this record cannot answer for it.
+    latest_eligible = max(y for y in range(today.year - 2, today.year + 1)
+                          if is_delinquent_year(y, today))
+    if ev["latest_levy_year"] < latest_eligible:
+        ev["reason"] = "parcel_record_ended"
+        ev["latest_delinquent_eligible_levy"] = latest_eligible
+        return _res("unconfirmed", ev)
+
+    # was it ever delinquent (paid late since) or not (paid on time)?
     eligible = [b for b in page["bills"] if is_delinquent_year(b["year"], today)]
     by_year = {b["year"]: b for b in eligible}
     order = [y for y in claimed if y in by_year]
