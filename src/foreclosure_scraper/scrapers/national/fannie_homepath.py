@@ -255,7 +255,14 @@ async def _fetch_bbox(state: str, sw_lat: float, sw_lng: float, ne_lat: float, n
     nationwide_total = None
     async with client(timeout=30.0) as c:
         for page in range(1, MAX_PAGES_PER_CELL + 1):
-            params = {"bounds": bounds, "page": str(page)}
+            # listingTypes=5 is Fannie Mae's own REO inventory. Without it the endpoint also returns
+            # ListHub MLS retail listings from other sellers (listingType LISTHUB), which are not
+            # bank-owned and were being published as REO flips. Measured live 2026-10-06 on one
+            # Upstate SC cell: 400 results, 392 LISTHUB and 8 REO; with the filter exactly those 8
+            # (totalProperties 8). docs/source_reverification_2026-09-10.md D39 documented this on
+            # 9/10: 71 true REO rows replacing 494 mislabeled ones. With the filter a cell is far
+            # below the 400-row page cap, so the paging below ends at page 1.
+            params = {"bounds": bounds, "page": str(page), "listingTypes": "5"}
             try:
                 r = await c.get(API, params=params, headers=HEADERS, follow_redirects=True)
             except Exception as exc:
