@@ -776,7 +776,9 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
 
     # ---- legal: name-only matches (F6) and the bankruptcy stay (F3) ---------------------
     bk = r.get("bankruptcy")
-    stay = _stay_block(r, today)
+    # a refuted/stale bankruptcy_stay verification (not this owner's case, or the case is over)
+    # also lifts the F3 stay cap, which is not a signal the drop at the end of _collect reaches
+    stay = None if "bankruptcy_stay" in drop else _stay_block(r, today)
     c.stay = stay
     if bk and not bankruptcy_lapsed(bk, today):
         sig.append(("bankruptcy", "LEGAL", 18, NO))
