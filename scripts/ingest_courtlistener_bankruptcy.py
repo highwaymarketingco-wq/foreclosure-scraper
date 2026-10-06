@@ -20,6 +20,7 @@ DOCS = REPO / "docs"
 TOKEN_FILE = REPO / ".secrets" / "courtlistener_token.txt"
 
 sys.path.insert(0, str(REPO / "src"))
+from foreclosure_scraper.http_client import CURL_ARGV, curl_config
 from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 from foreclosure_scraper.web_artifact import load_board, write_artifact
 
@@ -36,12 +37,11 @@ SEARCH_BASE = "https://www.courtlistener.com/api/rest/v4/search/"
 
 
 def _curl_json(url: str, headers: dict, timeout: int = 45) -> dict | None:
-    """Use curl to fetch JSON from CourtListener API."""
-    hdr_args = []
-    for k, v in headers.items():
-        hdr_args += ["-H", f"{k}: {v}"]
-    cmd = ["curl", "-s", "-m", str(timeout)] + hdr_args + [url]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 10)
+    """Use curl to fetch JSON from CourtListener API. The token header goes through curl's
+    stdin config (http_client.curl_config), never argv, where `ps` would show it."""
+    cfg = curl_config(url, timeout=timeout, headers=headers, follow=False, compressed=False)
+    result = subprocess.run(list(CURL_ARGV), input=cfg, capture_output=True, text=True,
+                            timeout=timeout + 10)
     if not result.stdout.strip():
         return None
     try:

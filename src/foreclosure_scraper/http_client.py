@@ -23,6 +23,7 @@ no login, no token forgery. Hosts that still block (e.g. portal-nc.tylertech,
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import random
 import signal
@@ -347,6 +348,44 @@ async def get_text_impersonate(
     raise RuntimeError("unreachable")
 
 
+#: The whole argv of every curl subprocess: the options travel in a config read from stdin.
+CURL_ARGV = ("curl", "--config", "-")
+
+
+def _curl_quote(value: object) -> str:
+    """A curl config-file string: double-quoted, backslash and quote escaped, and no CR/LF (a
+    header value must never smuggle a second line into the config)."""
+    v = str(value).replace("\r", " ").replace("\n", " ")
+    return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def curl_config(url: str, *, timeout: float, headers: dict | None = None,
+                referer: str | None = None, user_agent: str | None = None,
+                proxy: str | None = None, follow: bool = True,
+                compressed: bool = True) -> str:
+    """The `curl --config -` text for one GET.
+
+    Request headers (an API token: CourtListener's `Authorization: Token ...`), the proxy URL
+    (which can carry credentials) and the URL itself (some carry a key in the query string) go
+    in here, written to curl's stdin, never in argv: argv is readable by every local user
+    through `ps` and lands in process accounting. Nothing touches the disk either."""
+    lines = ["silent", f"max-time = {int(timeout)}"]
+    if follow:
+        lines.append("location")
+    if compressed:
+        lines.append("compressed")
+    if user_agent:
+        lines.append(f"user-agent = {_curl_quote(user_agent)}")
+    for k, v in (headers or {}).items():
+        lines.append(f"header = {_curl_quote(f'{k}: {v}')}")
+    if referer:
+        lines.append(f"referer = {_curl_quote(referer)}")
+    if proxy:
+        lines.append(f"proxy = {_curl_quote(proxy)}")
+    lines.append(f"url = {_curl_quote(url)}")
+    return "\n".join(lines) + "\n"
+
+
 async def _curl_fallback_text(
     url: str,
     *,
@@ -359,30 +398,32 @@ async def _curl_fallback_text(
     On some networks (e.g. macOS with IPv6 issues), httpx times out while
     the system curl binary works fine. This is a last-resort tier BEFORE
     impersonation, used when httpx raises TransportError/TimeoutException.
+
+    Every option (headers, user agent, referer, proxy, the URL) is passed as a config on
+    stdin (curl_config), so the argv `ps` shows is exactly CURL_ARGV: until 2026-10-06 the
+    headers were `-H` arguments and a CourtListener token was visible on the command line
+    whenever httpx timed out.
     """
-    import shlex
-    cmd = ["curl", "-s", "-m", str(int(timeout)), "-L", "--compressed"]
-    cmd += ["-A", _SESSION_UA]
-    if headers:
-        for k, v in headers.items():
-            cmd += ["-H", f"{k}: {v}"]
-    if referer:
-        cmd += ["-e", referer]
-    proxy = os.environ.get("PROXY_URL")
-    if proxy:
-        cmd += ["--proxy", proxy]
-    cmd.append(url)
+    cfg = curl_config(url, timeout=timeout, headers=headers, referer=referer,
+                      user_agent=_SESSION_UA, proxy=os.environ.get("PROXY_URL") or None)
     try:
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
+            *CURL_ARGV,
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout + 10)
+        try:
+            stdout, _ = await asyncio.wait_for(proc.communicate(cfg.encode("utf-8")),
+                                               timeout=timeout + 10)
+        except asyncio.TimeoutError:
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+            raise
         if proc.returncode == 0 and stdout:
             return stdout.decode("utf-8", errors="replace")
     except (asyncio.TimeoutError, OSError) as e:
-        log.warning("curl_fallback.failed", url=url[:100], error=str(e))
+        log.warning("curl_fallback.failed", url=url[:100], error=f"{type(e).__name__}: {e}")
     return ""
 
 
