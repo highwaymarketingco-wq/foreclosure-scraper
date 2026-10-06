@@ -479,3 +479,174 @@ def test_apply_then_score_end_to_end(tmp_path):
     assert "incarceration" not in _scored(jail_row)
     assert "incarceration" in _scored(prison_row)
     assert "verification" not in control.raw and "incarceration" in _scored(control)
+
+
+# --------------------------------------------------------------------------- #
+# REAL responses: the 2026-10-06 live sweep's own roster bodies                #
+# --------------------------------------------------------------------------- #
+# tests/fixtures/verification/jail_roster_<county>.json.gz: every request the real vendor
+# fetchers made for that county during the sweep (Buncombe = P2C CentralSquare: the XSRF app
+# GET + three 200-row pages; Cherokee = Zuercher; Lincoln = P2C jqGrid), as served, with every
+# person-name token pseudonymized consistently (first letter kept, so each middle-name
+# agree/conflict is what it was live; suffixes, placeholders and entity words untouched) and
+# DOB / mugshots / image ids / warrant and docket numbers / marks / addresses removed.
+# jail_booking_cases.json: the 34 sweep rows of those counties (owner and matched names through
+# the same pseudonym map) with the verdict the live sweep gave each.
+
+import gzip  # noqa: E402
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+FIX = Path(__file__).parent / "fixtures" / "verification"
+CASES = json.loads((FIX / "jail_booking_cases.json").read_text())
+# the warm-up fetch sizes recorded in the verifier's history 6 minutes before the sweep
+# (Cherokee's warm-up timed out, so the sweep judged it with no history, as here)
+WARMUP = {("NC", "Buncombe"): 509, ("NC", "Lincoln"): 154}
+
+
+def _recorded(county):
+    return json.loads(gzip.decompress((FIX / f"jail_roster_{county.lower()}.json.gz").read_bytes()))
+
+
+class _RecordedResp:
+    def __init__(self, rec):
+        self.status_code = rec["status"]
+        self.text = rec["text"]
+
+    def json(self):
+        return json.loads(self.text)
+
+
+class _Recorded:
+    """curl_cffi.AsyncSession stand-in that replays the captured requests per host, in order,
+    and fails loudly on any request the real fetcher did not make live."""
+
+    def __init__(self, counties, *, truncate_after=None):
+        self.queues: dict[str, list] = {}
+        for co in counties:
+            recs = _recorded(co)
+            if truncate_after is not None and co in truncate_after:
+                n = truncate_after[co]
+                empty = dict(recs[n], text=json.dumps({"Inmates": [], "Total": 0}))
+                recs = recs[:n] + [empty]
+            for rec in recs:
+                self.queues.setdefault(rec["url"].split("/")[2], []).append(rec)
+        self.served: Counter = Counter()
+
+    def factory(self, *a, **k):
+        outer = self
+
+        class _S:
+            def __init__(self):
+                self.cookies: dict = {}
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            def _next(self, method, url):
+                host = url.split("/")[2]
+                rec = outer.queues[host].pop(0)
+                assert (rec["method"], rec["url"]) == (method, url)
+                self.cookies.update(rec["cookies"])
+                outer.served[host] += 1
+                return _RecordedResp(rec)
+
+            async def get(self, url, **_):
+                return self._next("GET", url)
+
+            async def post(self, url, **_):
+                return self._next("POST", url)
+
+        return _S()
+
+
+def _install_recorded(monkeypatch, counties, **kw):
+    import curl_cffi.requests as ccr
+    rec = _Recorded(counties, **kw)
+    monkeypatch.setattr(ccr, "AsyncSession", rec.factory)
+    return rec
+
+
+def _seed_warmup():
+    con = jrh.connect(v.history_db())
+    try:
+        for (st, co), n in WARMUP.items():
+            jrh.record_fetch(con, st, co, "warmup", n,
+                             now=datetime(2026, 10, 6, 4, 43, tzinfo=timezone.utc))
+    finally:
+        con.close()
+
+
+def test_the_real_cases_cover_every_verdict():
+    assert Counter(c["expect"]["verdict"] for c in CASES) == Counter(
+        {"confirmed": 18, "refuted": 7, "unconfirmed": 7, "stale": 2})
+    for c in CASES:
+        assert v.applies(c["row"]), c["name"]
+
+
+@pytest.mark.parametrize("case", CASES, ids=[c["name"] for c in CASES])
+def test_real_roster_reproduces_the_live_verdict(monkeypatch, case):
+    _seed_warmup()
+    _install_recorded(monkeypatch, [case["row"]["county"]])
+    res = run(case["row"], _Client())
+    exp = case["expect"]
+    assert (res.verdict, res.evidence.get("reason"), res.evidence.get("middle_verdict"),
+            res.evidence.get("on_roster")) == (exp["verdict"], exp["reason"],
+                                               exp["middle_verdict"], exp["on_roster"])
+    if exp["verdict"] in ("confirmed", "refuted"):
+        assert res.evidence["inmate"]["last"] and res.evidence["inmate"]["first"]
+        assert "dob" not in res.evidence["inmate"]
+
+
+def test_real_rosters_one_load_per_county_for_every_case(monkeypatch):
+    _seed_warmup()
+    rec = _install_recorded(monkeypatch, ["Buncombe", "Cherokee", "Lincoln"])
+    client = _Client()
+
+    async def sweep():
+        return [await v.verify(c["row"], client) for c in CASES]
+
+    got = [r.verdict for r in asyncio.run(sweep())]
+    assert got == [c["expect"]["verdict"] for c in CASES]
+    # exactly the live sweep's requests: P2C's app GET + 3 pages, one Zuercher POST,
+    # jqGrid's session GET + one POST; nothing per row
+    assert rec.served == Counter({"buncombecountyso.policetocitizen.com": 4,
+                                  "cherokee-so-sc.zuercherportal.com": 1,
+                                  "p2c.lincolnsheriff.org": 2})
+    assert all(not q for q in rec.queues.values())
+    sizes = {k[1]: r.size for k, r in v._RUNS[client].items()}
+    assert sizes == {"Buncombe": 509, "Cherokee": 288, "Lincoln": 154}
+
+
+def test_real_buncombe_roster_cut_after_one_page_is_never_stale(monkeypatch):
+    """The same live roster, cut to its first 200-row page (a vendor hiccup mid-paging): 199
+    names against a 509 history is implausibly small, so the two people the full roster shows
+    gone come out unconfirmed, never stale; presence still decides the others."""
+    _seed_warmup()
+    _install_recorded(monkeypatch, ["Buncombe"], truncate_after={"Buncombe": 2})
+    client = _Client()
+    bun = [c for c in CASES if c["row"]["county"] == "Buncombe"]
+
+    async def sweep():
+        return [await v.verify(c["row"], client) for c in bun]
+
+    res = asyncio.run(sweep())
+    roster = v._RUNS[client][("NC", "Buncombe")]
+    # 199: the page holds 200 records, one without a name (the full roster: Total 510, 509 named)
+    assert roster.size == 199 and roster.health["reason"] == "implausibly_small"
+    assert "stale" not in {r.verdict for r in res}
+    for c, r in zip(bun, res):
+        if c["expect"]["verdict"] == "stale":
+            assert (r.verdict, r.evidence["reason"]) == ("unconfirmed", "roster_unhealthy")
+
+
+def test_real_roster_with_no_history_is_never_stale(monkeypatch):
+    """The machine's first sweep: the same full Buncombe roster, no recorded history."""
+    _install_recorded(monkeypatch, ["Buncombe"])
+    stale = [c for c in CASES if c["expect"]["verdict"] == "stale"]
+    res = run(stale[0]["row"], _Client())
+    assert (res.verdict, res.evidence["reason"], res.evidence["roster_health_reason"]) == (
+        "unconfirmed", "roster_unhealthy", "no_history")

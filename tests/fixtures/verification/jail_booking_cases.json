@@ -1,0 +1,1167 @@
+[
+ {
+  "name": "buncombe_confirmed_1",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "NC",
+   "county": "Buncombe",
+   "parcel_id": "FIXTURE0001",
+   "street_address": "101 FIXTURE RD",
+   "source": "counties_nc.nc_ecourts_lis_pendens",
+   "defendant": "Ritete, Aefefituk Bojeno",
+   "raw": {
+    "jail_booking": {
+     "county": "Buncombe",
+     "state": "NC",
+     "matched_name": "AEFEFITUK RITETE",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "7/30/2026 12:00:00 AM",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Buncombe County jail roster",
+     "matched_name": "AEFEFITUK RITETE",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_2",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0002",
+   "street_address": "102 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Midehap Refase Cinih",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "MIDEHAP CINIH",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-08-18",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "MIDEHAP CINIH",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_3",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0003",
+   "street_address": "103 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Jepefojac Ladew Fohebik",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "JEPEFOJAC FOHEBIK",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-05-21",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "JEPEFOJAC FOHEBIK",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_4",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0004",
+   "street_address": "104 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Laral Einipo Hodaj",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "LARAL HODAJ",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-07-20",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "LARAL HODAJ",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_5",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0005",
+   "street_address": "105 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Jisuj Kekakac Huvajof",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "JISUJ HUVAJOF",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-07-21",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "JISUJ HUVAJOF",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_6",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0006",
+   "street_address": "106 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Midehap Kejif Aubas",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "MIDEHAP AUBAS",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-07-22",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "MIDEHAP AUBAS",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_7",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0007",
+   "street_address": "107 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Iumema Qupo'Yin Cuzodudi",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "IUMEMA CUZODUDI",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-08-08",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "IUMEMA CUZODUDI",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_8",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0008",
+   "street_address": "108 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Caroj Mozerus Hakobozuv",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "CAROJ HAKOBOZUV",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-08-13",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "CAROJ HAKOBOZUV",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_9",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0009",
+   "street_address": "109 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Hekeju Metad Calofo",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "HEKEJU CALOFO",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-08-25",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "HEKEJU CALOFO",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_10",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0010",
+   "street_address": "110 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Jodawo Rogulad Jesehotuc",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "JODAWO JESEHOTUC",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-07-30",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "JODAWO JESEHOTUC",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_11",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0011",
+   "street_address": "111 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Riwohiz Lat Badotoset",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "RIWOHIZ BADOTOSET",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-08-01",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "RIWOHIZ BADOTOSET",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_12",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0012",
+   "street_address": "112 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Tilovi Ladew Hona",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "TILOVI HONA",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-08-05",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "TILOVI HONA",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_13",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0013",
+   "street_address": "113 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Zopu Earudu Bilu",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "ZOPU BILU",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-08-06",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "ZOPU BILU",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_14",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0014",
+   "street_address": "114 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Kakobu Kog'Dap Cifesirac",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "KAKOBU CIFESIRAC",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-08-13",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "KAKOBU CIFESIRAC",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_15",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0015",
+   "street_address": "115 FIXTURE RD",
+   "source": "counties_sc.sc_public_index",
+   "defendant": "Aelev Juhofizo Jesehotuc",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "AELEV JESEHOTUC",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-08-19",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "AELEV JESEHOTUC",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "buncombe_unconfirmed_16",
+  "expect": {
+   "verdict": "unconfirmed",
+   "reason": "middle_unverifiable",
+   "middle_verdict": "unverified",
+   "on_roster": true
+  },
+  "row": {
+   "state": "NC",
+   "county": "Buncombe",
+   "parcel_id": "FIXTURE0016",
+   "street_address": "116 FIXTURE RD",
+   "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+   "defendant": "MAWECE, WATOGUB",
+   "raw": {
+    "jail_booking": {
+     "county": "Buncombe",
+     "state": "NC",
+     "matched_name": "WATOGUB MAWECE",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "8/24/2026 12:00:00 AM",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Buncombe County jail roster",
+     "matched_name": "WATOGUB MAWECE",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "buncombe_refuted_17",
+  "expect": {
+   "verdict": "refuted",
+   "reason": null,
+   "middle_verdict": "conflict",
+   "on_roster": true
+  },
+  "row": {
+   "state": "NC",
+   "county": "Buncombe",
+   "parcel_id": "FIXTURE0017",
+   "street_address": "117 FIXTURE RD",
+   "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+   "defendant": "JAMUMIB, JULOME",
+   "raw": {
+    "owner_mailing": {
+     "owner": "JAMUMIB JULOME G;JAMUMIB RUSEDI"
+    },
+    "jail_booking": {
+     "county": "Buncombe",
+     "state": "NC",
+     "matched_name": "JULOME JAMUMIB",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "9/19/2026 12:00:00 AM",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Buncombe County jail roster",
+     "matched_name": "JULOME JAMUMIB",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "buncombe_unconfirmed_18",
+  "expect": {
+   "verdict": "unconfirmed",
+   "reason": "middle_unverifiable",
+   "middle_verdict": "unverified",
+   "on_roster": true
+  },
+  "row": {
+   "state": "NC",
+   "county": "Buncombe",
+   "parcel_id": "FIXTURE0018",
+   "street_address": "118 FIXTURE RD",
+   "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+   "defendant": "WILOMI, TENAMI",
+   "raw": {
+    "jail_booking": {
+     "county": "Buncombe",
+     "state": "NC",
+     "matched_name": "TENAMI WILOMI",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "1/27/2026 12:00:00 AM",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Buncombe County jail roster",
+     "matched_name": "TENAMI WILOMI",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "buncombe_stale_19",
+  "expect": {
+   "verdict": "stale",
+   "reason": null,
+   "middle_verdict": null,
+   "on_roster": false
+  },
+  "row": {
+   "state": "NC",
+   "county": "Buncombe",
+   "parcel_id": "FIXTURE0019",
+   "street_address": "119 FIXTURE RD",
+   "source": "counties_nc.buncombe_delinquent_tax",
+   "defendant": "WUWO, HEKUL CIPOPUFI",
+   "raw": {
+    "owner_mailing": {
+     "owner": "WUWO HEKUL CIPOPUFI"
+    },
+    "jail_booking": {
+     "county": "Buncombe",
+     "state": "NC",
+     "matched_name": "HEKUL WUWO",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "9/21/2026 12:00:00 AM",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Buncombe County jail roster",
+     "matched_name": "HEKUL WUWO",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "buncombe_stale_20",
+  "expect": {
+   "verdict": "stale",
+   "reason": null,
+   "middle_verdict": null,
+   "on_roster": false
+  },
+  "row": {
+   "state": "NC",
+   "county": "Buncombe",
+   "parcel_id": "FIXTURE0020",
+   "street_address": "120 FIXTURE RD",
+   "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+   "defendant": "PELIRO, JAKODA",
+   "raw": {
+    "jail_booking": {
+     "county": "Buncombe",
+     "state": "NC",
+     "matched_name": "JAKODA PELIRO",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "12/13/2024 12:00:00 AM",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Buncombe County jail roster",
+     "matched_name": "JAKODA PELIRO",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "buncombe_unconfirmed_21",
+  "expect": {
+   "verdict": "unconfirmed",
+   "reason": "owner_no_longer_matches",
+   "middle_verdict": null,
+   "on_roster": false
+  },
+  "row": {
+   "state": "NC",
+   "county": "Buncombe",
+   "parcel_id": "FIXTURE0021",
+   "street_address": "121 FIXTURE RD",
+   "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills_2024",
+   "defendant": "LADE LENUHEPA (ETAL)",
+   "raw": {
+    "owner_mailing": {
+     "owner": "LADE LENUHEPA (ETAL)"
+    },
+    "jail_booking": {
+     "county": "Buncombe",
+     "state": "NC",
+     "matched_name": "JAKODA PELIRO",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "12/13/2024 12:00:00 AM",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Buncombe County jail roster",
+     "matched_name": "JAKODA PELIRO",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "buncombe_confirmed_22",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "NC",
+   "county": "Buncombe",
+   "parcel_id": "FIXTURE0022",
+   "street_address": "122 FIXTURE RD",
+   "source": "counties_nc.buncombe_delinquent_tax",
+   "defendant": "DIFIH, MIDEHAP AOHUFOK CUHA DIFIH, MAKOZ AOD",
+   "raw": {
+    "jail_booking": {
+     "county": "Buncombe",
+     "state": "NC",
+     "matched_name": "MIDEHAP DIFIH",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "9/10/2026 12:00:00 AM",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Buncombe County jail roster",
+     "matched_name": "MIDEHAP DIFIH",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "buncombe_unconfirmed_23",
+  "expect": {
+   "verdict": "unconfirmed",
+   "reason": "middle_unverifiable",
+   "middle_verdict": "unverified",
+   "on_roster": true
+  },
+  "row": {
+   "state": "NC",
+   "county": "Buncombe",
+   "parcel_id": "FIXTURE0023",
+   "street_address": "123 FIXTURE RD",
+   "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+   "defendant": "WESIDUL, JULOME",
+   "raw": {
+    "jail_booking": {
+     "county": "Buncombe",
+     "state": "NC",
+     "matched_name": "JULOME WESIDUL",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "9/5/2026 12:00:00 AM",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Buncombe County jail roster",
+     "matched_name": "JULOME WESIDUL",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "buncombe_refuted_24",
+  "expect": {
+   "verdict": "refuted",
+   "reason": null,
+   "middle_verdict": "conflict",
+   "on_roster": true
+  },
+  "row": {
+   "state": "NC",
+   "county": "Buncombe",
+   "parcel_id": "FIXTURE0024",
+   "street_address": "124 FIXTURE RD",
+   "source": "counties_generic.state_contamination.nc_dam_safety",
+   "defendant": "Tunekaf C Pucilunur",
+   "raw": {
+    "jail_booking": {
+     "county": "Buncombe",
+     "state": "NC",
+     "matched_name": "TUNEKAF PUCILUNUR",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "8/13/2026 12:00:00 AM",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Buncombe County jail roster",
+     "matched_name": "TUNEKAF PUCILUNUR",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "lincoln_refuted_32",
+  "expect": {
+   "verdict": "refuted",
+   "reason": null,
+   "middle_verdict": "conflict",
+   "on_roster": true
+  },
+  "row": {
+   "state": "NC",
+   "county": "Lincoln",
+   "parcel_id": "FIXTURE0032",
+   "street_address": "132 FIXTURE RD",
+   "source": "counties_nc.nc_county_pdf_delinquent_tax",
+   "defendant": "TUVAJEF COHAJONAT MIDEHAP",
+   "raw": {
+    "jail_booking": {
+     "county": "Lincoln",
+     "state": "NC",
+     "matched_name": "COHAJONAT TUVAJEF",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "05/14/2026",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "NC",
+     "source": "Lincoln County jail roster",
+     "matched_name": "COHAJONAT TUVAJEF",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_37",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0037",
+   "street_address": "137 FIXTURE RD",
+   "source": "counties_sc.cherokee_delinquent_tax",
+   "defendant": "GALUDUMI SISEL M",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "SISEL GALUDUMI",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-07-06",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "SISEL GALUDUMI",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_unconfirmed_38",
+  "expect": {
+   "verdict": "unconfirmed",
+   "reason": "middle_unverifiable",
+   "middle_verdict": "unverified",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0038",
+   "street_address": "138 FIXTURE RD",
+   "source": "counties_sc.cherokee_delinquent_tax",
+   "defendant": "DUKEJAM COHAJONAT",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-09-19",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_refuted_39",
+  "expect": {
+   "verdict": "refuted",
+   "reason": null,
+   "middle_verdict": "conflict",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0039",
+   "street_address": "139 FIXTURE RD",
+   "source": "counties_sc.cherokee_delinquent_tax",
+   "defendant": "DUKEJAM COHAJONAT A",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-09-19",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_refuted_40",
+  "expect": {
+   "verdict": "refuted",
+   "reason": null,
+   "middle_verdict": "conflict",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0040",
+   "street_address": "140 FIXTURE RD",
+   "source": "counties_sc.cherokee_delinquent_tax",
+   "defendant": "DUKEJAM COHAJONAT A",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-09-19",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_refuted_41",
+  "expect": {
+   "verdict": "refuted",
+   "reason": null,
+   "middle_verdict": "conflict",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0041",
+   "street_address": "141 FIXTURE RD",
+   "source": "counties_sc.cherokee_delinquent_tax",
+   "defendant": "DUKEJAM COHAJONAT RASOFUFO",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-09-19",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_unconfirmed_42",
+  "expect": {
+   "verdict": "unconfirmed",
+   "reason": "middle_unverifiable",
+   "middle_verdict": "unverified",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0042",
+   "street_address": "142 FIXTURE RD",
+   "source": "counties_sc.cherokee_delinquent_tax",
+   "defendant": "DUKEJAM COHAJONAT",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-09-19",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_refuted_43",
+  "expect": {
+   "verdict": "refuted",
+   "reason": null,
+   "middle_verdict": "conflict",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0043",
+   "street_address": "143 FIXTURE RD",
+   "source": "counties_sc.cherokee_delinquent_tax",
+   "defendant": "DUKEJAM COHAJONAT AUBAS",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-09-19",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "COHAJONAT DUKEJAM",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_unconfirmed_44",
+  "expect": {
+   "verdict": "unconfirmed",
+   "reason": "middle_unverifiable",
+   "middle_verdict": "unverified",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0044",
+   "street_address": "144 FIXTURE RD",
+   "source": "counties_sc.cherokee_delinquent_tax",
+   "defendant": "MUFOTERU TEVIP & NECEW",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "TEVIP MUFOTERU",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": "2026-08-17",
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "TEVIP MUFOTERU",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ },
+ {
+  "name": "cherokee_confirmed_45",
+  "expect": {
+   "verdict": "confirmed",
+   "reason": null,
+   "middle_verdict": "agrees",
+   "on_roster": true
+  },
+  "row": {
+   "state": "SC",
+   "county": "Cherokee",
+   "parcel_id": "FIXTURE0045",
+   "street_address": "145 FIXTURE RD",
+   "source": "counties_sc.cherokee_delinquent_tax",
+   "defendant": "GOZOVUN TEVIP SOFAKEG",
+   "raw": {
+    "jail_booking": {
+     "county": "Cherokee",
+     "state": "SC",
+     "matched_name": "TEVIP GOZOVUN",
+     "confidence": "name_only_low",
+     "release_status": "in_custody",
+     "arrest_date": null,
+     "facility_type": null
+    },
+    "incarceration": {
+     "state": "SC",
+     "source": "Cherokee County jail roster",
+     "matched_name": "TEVIP GOZOVUN",
+     "confidence": "name_only_low"
+    }
+   }
+  }
+ }
+]
