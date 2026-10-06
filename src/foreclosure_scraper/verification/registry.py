@@ -52,6 +52,13 @@ Optional:
                                optional, only for ledger.migrate_to_case_scope(): the case a
                                stored ledger record's evidence names (e.g. bankruptcy
                                confirmed/stale publish court + docket number).
+    DETAIL_KEYS: tuple         lazy-detail raw keys the verifier reads (e.g. ("comps",)). The
+                               published board keeps comps/vision/cama/rent_comps/
+                               foreclosure_sold_comps in the index-aligned sidecar
+                               (docs/listings_detail.json.gz), not in the rows board_stream
+                               yields; when a selected verifier names any, the sweep streams
+                               the sidecar alongside (board_stream.iter_board_rows_with_detail)
+                               and merges just those keys into each row's raw before applies().
 """
 from __future__ import annotations
 
@@ -86,6 +93,7 @@ class Verifier:
     module: Any = None
     identity: str = "property"     # or "case" (see IDENTITY in the module docstring)
     case_identity: Optional[Callable[[Any], Optional[str]]] = None
+    detail_keys: tuple[str, ...] = ()   # lazy-detail raw keys it reads (DETAIL_KEYS)
 
     def case_of(self, row: Any) -> Optional[str]:
         """The row's case id (case-scoped verifiers), None for a property-scoped one or when
@@ -149,13 +157,16 @@ def from_module(mod: Any, name: Optional[str] = None) -> Verifier:
         problems.append('IDENTITY must be "property" or "case"')
     elif ident == "case" and not callable(cid):
         problems.append('IDENTITY = "case" needs case_identity(row)')
+    dk = getattr(mod, "DETAIL_KEYS", ())
+    if not isinstance(dk, (tuple, list)) or not all(isinstance(k, str) and k for k in dk):
+        problems.append("DETAIL_KEYS must be a tuple of raw key names")
     if problems:
         raise ContractError(f"{name}: " + "; ".join(problems))
     return Verifier(name=name, signal=sig, version=ver, ttl_days=float(ttl), applies=ap,
                     verify=vf, governs=tuple(gov), source=str(getattr(mod, "SOURCE", "") or ""),
                     retry_days=float(getattr(mod, "RETRY_DAYS", DEFAULT_RETRY_DAYS)),
                     wall=bool(getattr(mod, "WALL", False)), module=mod, identity=ident,
-                    case_identity=cid if ident == "case" else None)
+                    case_identity=cid if ident == "case" else None, detail_keys=tuple(dk))
 
 
 def discover(package: str = PACKAGE) -> list[Verifier]:

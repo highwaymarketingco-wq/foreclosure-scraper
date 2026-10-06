@@ -49,7 +49,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
-from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
+from foreclosure_scraper.board_parts import BoardIntegrityError  # noqa: E402
+from foreclosure_scraper.board_stream import (  # noqa: E402
+    detail_source, iter_board_rows, iter_board_rows_with_detail,
+)
 from foreclosure_scraper.verification import ledger as L  # noqa: E402
 from foreclosure_scraper.verification.core import (  # noqa: E402
     iso_z, parse_ts, result, tier_of, tier_rank, utc_now,
@@ -74,7 +77,19 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
     why: dict[str, Counter] = {v.signal: Counter() for v in verifiers}
     want_county = county.strip().lower() if county else None
     order = 0
-    for rec in iter_board_rows(board_path):
+    # a verifier that reads lazy-detail keys (DETAIL_KEYS, e.g. comps) gets them merged in from
+    # the index-aligned sidecar; otherwise the slim stream, as before. A missing or mismatched
+    # sidecar costs only those verifiers their rows, never the others' sweep.
+    detail_keys = sorted({k for v in verifiers for k in (getattr(v, "detail_keys", ()) or ())})
+    rows = iter_board_rows(board_path)
+    if detail_keys:
+        try:
+            detail_source(Path(board_path).parent)
+            rows = iter_board_rows_with_detail(board_path, detail_keys)
+        except (FileNotFoundError, BoardIntegrityError) as exc:
+            print(f"!! lazy-detail sidecar unavailable ({exc}); rows carry no {detail_keys}",
+                  flush=True)
+    for rec in rows:
         if want_county and str(rec.get("county") or "").strip().lower() != want_county:
             continue
         if tiers and (tier_of(rec) or "-") not in tiers:
@@ -172,7 +187,8 @@ async def run_checks(plan: dict, ledgers: dict, fetcher, *, budget_s: float, sav
 def _brief(ev: dict) -> str:
     bits = []
     for k in ("total_delinquent", "years_delinquent", "reason", "owner_match",
-              "value_ratio_board_to_county"):
+              "value_ratio_board_to_county", "comps_matched", "comps_mismatched",
+              "comps_not_found"):
         if ev.get(k) not in (None, "", 0, {}):
             bits.append(f"{k}={ev[k]}")
     for c in ev.get("bills_checked") or []:
