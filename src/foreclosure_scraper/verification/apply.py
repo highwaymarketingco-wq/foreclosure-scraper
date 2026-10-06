@@ -11,7 +11,16 @@ VERIFICATION_PIPELINE_SPEC.md section 1), each the ledger entry's `latest` plus:
                  current value when that module still exists, else the TTL the entry stored)
     governs      the scorer signal names a refuted/stale verdict removes (same precedence)
 Records for signals no ledger covers are left as they are. A row is matched to a ledger entry
-on any of its row_keys() that exactly one entry claims (ledger.Ledger.find).
+on any of its row_keys() that exactly one entry claims (ledger.Ledger.find), never to an entry
+holding a different parcel.
+
+CASE-SCOPED SIGNALS (a verifier with IDENTITY = "case": bankruptcy_stay, jail_booking). The row
+is looked up by its case id + property keys first (core.scoped_keys, the case id from the
+module's case_identity(), computed here on the Listing), so a verdict about one case is never
+attached to another case's row on the same parcel. Then by its plain property keys, which can
+only find a property-keyed entry (e.g. one the human lane wrote to a shared ledger); a
+property-keyed entry whose verdict came from the case-scoped verifier itself (written before
+case scoping) names no case and is never attached.
 """
 from __future__ import annotations
 
@@ -22,7 +31,8 @@ from typing import Any, Iterable, Optional
 
 import structlog
 
-from .core import SUPPRESSING, expires_at, is_expired, records_of, row_keys, utc_now
+from .core import (SUPPRESSING, expires_at, is_expired, records_of, row_keys, scoped_keys,
+                   split_key, utc_now)
 from .ledger import ledger_dir, load_all
 
 log = structlog.get_logger()
@@ -34,6 +44,29 @@ def _verifier_meta() -> dict[str, Any]:
         return {v.name: v for v in discover()}
     except Exception:  # noqa: BLE001 - the stored values are the fallback
         return {}
+
+
+def _case_scoped(meta: dict) -> dict[str, list]:
+    """{signal: [case-scoped Verifier, ...] by module name}."""
+    out: dict[str, list] = {}
+    for name in sorted(meta):
+        v = meta[name]
+        if getattr(v, "identity", "property") == "case":
+            out.setdefault(v.signal, []).append(v)
+    return out
+
+
+def find_entry(led, li: Any, base: list[str], case_verifiers: Optional[list] = None
+               ) -> tuple[Optional[str], Optional[dict]]:
+    """The ledger entry for this row (see CASE-SCOPED SIGNALS in the module docstring)."""
+    if not case_verifiers:
+        return led.find(base)
+    cid = next((c for c in (v.case_of(li) for v in case_verifiers) if c), None)
+    ek, entry = led.find(scoped_keys(base, cid) + base if cid else base)
+    if entry is not None and split_key(ek)[0] is None and \
+            (entry.get("latest") or {}).get("verifier") in {v.name for v in case_verifiers}:
+        return None, None
+    return ek, entry
 
 
 def attachable(entry: dict, meta: Optional[dict] = None) -> Optional[dict]:
@@ -69,6 +102,7 @@ def apply_verification(listings: Iterable, directory: Optional[Path] = None,
             log.info("verification_apply.nothing", dir=str(d), status=counts["status"])
             return counts
         meta = _verifier_meta()
+        case_scoped = _case_scoped(meta)
         now = now or utc_now()
         active = [(sig, led) for sig, led in sorted(ledgers.items()) if led.rows]
         for sig, led in active:
@@ -81,7 +115,7 @@ def apply_verification(listings: Iterable, directory: Optional[Path] = None,
                 for sig, led in active:
                     if keys is None:
                         keys = row_keys(li)
-                    _, entry = led.find(keys)
+                    _, entry = find_entry(led, li, keys, case_scoped.get(sig))
                     if entry is None:
                         continue
                     rec = attachable(entry, meta)

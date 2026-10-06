@@ -620,8 +620,9 @@ def test_apply_then_score_end_to_end(tmp_path):
     stale = core.result("jail_booking", "stale", {"on_roster": False}, source="x",
                         version="v1", verifier="jail_booking",
                         now=datetime(2026, 10, 6, 3, tzinfo=timezone.utc))
-    for li in (jail_row, prison_row):
-        led.record(li, stale, ttl_days=v.TTL_DAYS, governs=v.GOVERNS)
+    for li in (jail_row, prison_row):          # keyed as the sweep keys a case-scoped verifier
+        led.record(li, stale, ttl_days=v.TTL_DAYS, governs=v.GOVERNS,
+                   keys=core.scoped_keys(core.row_keys(li), v.case_identity(li)))
     led.save()
     counts = apply_verification([jail_row, prison_row, control], directory=tmp_path,
                                 now=datetime(2026, 10, 6, 12, tzinfo=timezone.utc))

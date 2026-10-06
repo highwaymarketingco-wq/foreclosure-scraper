@@ -209,7 +209,10 @@ async def test_a_hit_sets_the_signal_and_drops_any_old_stamp(monkeypatch):
 async def test_already_flagged_leads_are_not_queried(monkeypatch):
     srv = _Server().install(monkeypatch)
     li = _lead(1)
+    # the jail lane's flag comes with its booking (a flag with none is an orphan and no longer
+    # counts as active since 2026-10-06: tests/test_incarceration_active.py)
     li.raw["incarceration"] = {"state": "SC", "source": "Oconee County jail roster"}
+    li.raw["jail_booking"] = {"release_status": "in_custody"}
     res = await enrich_incarceration([li])
     assert srv.asked == [] and res["queried"] == 0
 

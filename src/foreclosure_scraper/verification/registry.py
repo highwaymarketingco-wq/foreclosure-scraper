@@ -31,6 +31,27 @@ Optional:
     ROW_SUMMARY_EXCLUDE: tuple core.row_summary() fields the sweep leaves out of this signal's
                                ledger entries (the ledger is pushed to a PUBLIC repo; e.g.
                                jail_booking drops owner_name)
+    IDENTITY: str              "property" (default) or "case". Property: the ledger is keyed by
+                               the row's property (core.row_keys), and every row of a parcel
+                               shares one verdict: right for a fact about the property (a tax
+                               bill, a code case, an exemption). Case: the claim is about a
+                               CASE the row ties to a property (a bankruptcy filing, a jail
+                               booking, a lis pendens), so the ledger is keyed by case id +
+                               property (core.scoped_keys): two cases on one parcel get two
+                               verdicts, the same case on two rows of one property shares one,
+                               and a case on two parcels is two entries. Requires:
+    case_identity(row) -> str | None
+                               pure, no I/O: the row's case id, built with core.case_id(kind,
+                               *parts) (e.g. case_id("bk", court, docket_number)). It must
+                               accept a board dict AND a models.Listing (the VM's apply step
+                               calls it on Listings; read fields with getattr when the row is
+                               not a dict). None when the row names no case: the sweep then
+                               keys that row by its own fingerprint (never shared), the apply
+                               step attaches nothing of this verifier to it.
+    case_identity_of_record(record) -> str | None
+                               optional, only for ledger.migrate_to_case_scope(): the case a
+                               stored ledger record's evidence names (e.g. bankruptcy
+                               confirmed/stale publish court + docket number).
 """
 from __future__ import annotations
 
@@ -41,6 +62,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 import structlog
+
+from .core import row_fingerprint_case, row_keys, scoped_keys
 
 log = structlog.get_logger()
 
@@ -61,6 +84,29 @@ class Verifier:
     retry_days: float = DEFAULT_RETRY_DAYS
     wall: bool = False
     module: Any = None
+    identity: str = "property"     # or "case" (see IDENTITY in the module docstring)
+    case_identity: Optional[Callable[[Any], Optional[str]]] = None
+
+    def case_of(self, row: Any) -> Optional[str]:
+        """The row's case id (case-scoped verifiers), None for a property-scoped one or when
+        the row names no case. Never raises."""
+        if self.identity != "case" or self.case_identity is None:
+            return None
+        try:
+            return self.case_identity(row) or None
+        except Exception as exc:  # noqa: BLE001 - an odd row names no case
+            log.warning("verification.case_identity_failed", verifier=self.name,
+                        error=f"{type(exc).__name__}: {str(exc)[:160]}")
+            return None
+
+    def ledger_keys(self, row: Any) -> list[str]:
+        """The keys this verifier's ledger knows the row by: core.row_keys() for a
+        property-scoped verifier; for a case-scoped one the same keys scoped by the row's case
+        id, or by the row's own fingerprint when it names no case (never shared)."""
+        keys = row_keys(row)
+        if self.identity != "case":
+            return keys
+        return scoped_keys(keys, self.case_of(row) or row_fingerprint_case(row))
 
     def safe_applies(self, row: dict) -> bool:
         try:
@@ -97,12 +143,19 @@ def from_module(mod: Any, name: Optional[str] = None) -> Verifier:
     gov = getattr(mod, "GOVERNS", ())
     if not isinstance(gov, (tuple, list)) or not all(isinstance(g, str) for g in gov):
         problems.append("GOVERNS must be a tuple of scorer signal names")
+    ident = getattr(mod, "IDENTITY", "property")
+    cid = getattr(mod, "case_identity", None)
+    if ident not in ("property", "case"):
+        problems.append('IDENTITY must be "property" or "case"')
+    elif ident == "case" and not callable(cid):
+        problems.append('IDENTITY = "case" needs case_identity(row)')
     if problems:
         raise ContractError(f"{name}: " + "; ".join(problems))
     return Verifier(name=name, signal=sig, version=ver, ttl_days=float(ttl), applies=ap,
                     verify=vf, governs=tuple(gov), source=str(getattr(mod, "SOURCE", "") or ""),
                     retry_days=float(getattr(mod, "RETRY_DAYS", DEFAULT_RETRY_DAYS)),
-                    wall=bool(getattr(mod, "WALL", False)), module=mod)
+                    wall=bool(getattr(mod, "WALL", False)), module=mod, identity=ident,
+                    case_identity=cid if ident == "case" else None)
 
 
 def discover(package: str = PACKAGE) -> list[Verifier]:

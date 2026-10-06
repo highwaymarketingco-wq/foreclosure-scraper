@@ -26,6 +26,12 @@ RULES.
   * Keyed by verification.core.row_key(); `keys` holds every row_keys() value, and a row is
     found by ANY of them (find()), so a re-check of a row whose parcel was backfilled lands on
     its existing entry, which is re-keyed under the new primary key (never duplicated).
+  * A case-scoped verifier (IDENTITY = "case", registry.py) keys its entries "<case id>@<key>"
+    for each property key (core.scoped_keys) and stamps `case`: one entry per case and
+    property. find() compares parcels on the property part, so a case is never matched to a row
+    of a different parcel. migrate_to_case_scope() re-keys entries written before that; an
+    entry it cannot give to one case keeps its verdict in `superseded` (no `latest`) with a
+    `recheck` reason.
   * Entries are never dropped. Writes are atomic (temp file + rename).
   * A decisive answer (confirmed/refuted/stale) always becomes `latest`. A non-decisive one
     (unconfirmed/wall) becomes `latest` only when there is no decisive latest that is still
@@ -48,7 +54,7 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from .core import (DECISIVE, VERDICTS, VerificationResult, compact, iso_z, parse_ts,
-                   row_keys, row_summary, utc_now)
+                   property_part, row_keys, row_summary, scoped_keys, split_key, utc_now)
 
 SCHEMA = 1
 KIND = "verification_ledger"
@@ -158,18 +164,19 @@ class Ledger:
         return self._index
 
     def find(self, keys: Iterable[str]) -> tuple[Optional[str], Optional[dict]]:
-        """The entry for a row with these row_keys(): the first key exactly one entry claims,
-        unless that entry holds a DIFFERENT parcel than the row (two parcels are two
-        properties, whatever address or case they share)."""
+        """The entry for a row with these keys (row_keys(), or a case-scoped verifier's
+        scoped_keys()): the first key exactly one entry claims, unless that entry holds a
+        DIFFERENT parcel than the row (two parcels are two properties, whatever address or case
+        they share). The parcel comparison reads the property part of a case-scoped key."""
         keys = list(keys)
-        mine = {k for k in keys if k.startswith("parcel:")}
+        mine = _parcels(keys)
         idx = self.index()
         for k in keys:
             ek = idx.get(k)
             if ek is None:
                 continue
             e = self.rows[ek]
-            theirs = {x for x in (ek, *(e.get("keys") or [])) if x.startswith("parcel:")}
+            theirs = _parcels((ek, *(e.get("keys") or [])))
             if mine and theirs and not (mine & theirs):
                 continue
             return ek, e
@@ -197,6 +204,10 @@ class Ledger:
         self._index = None
         entry["keys"] = sorted(set(entry.get("keys") or []) | set(keys),
                                key=lambda k: (keys.index(k) if k in keys else 99, k))
+        case = split_key(keys[0])[0]
+        if case:
+            entry["case"] = case
+        entry.pop("recheck", None)
         entry["row"] = row_summary(row)
         if ttl_days is not None:
             entry["ttl_days"] = float(ttl_days)
@@ -262,6 +273,109 @@ class Ledger:
         la, lo = b.get("last_attempt") or {}, o.get("last_attempt") or {}
         if str(lo.get("checked_at") or "") > str(la.get("checked_at") or ""):
             b["last_attempt"] = copy.deepcopy(lo)
+
+
+def migrate_to_case_scope(led: "Ledger", verifier: Any, rows: Iterable[Any], *,
+                          now: Optional[datetime] = None) -> dict:
+    """Re-key, offline, the property-keyed entries a case-scoped verifier (IDENTITY = "case")
+    wrote before case scoping existed. Nothing is fetched; no entry is dropped.
+
+    `rows` are the board rows (board_stream). Each row the verifier can name a case for
+    (case_identity) is matched to an entry exactly as the apply step matched it (find() on its
+    plain row_keys()): those are the rows that entry's verdict was attached to. Per entry:
+      scoped                one case among its rows: the entry is that case's (same verdict,
+                            stamps, history), re-keyed "<case>@<key>" with its rows' keys;
+      attributed            several cases, and the stored evidence names the one the verdict
+                            was about (the module's optional case_identity_of_record(), e.g.
+                            bankruptcy confirmed/stale publish court + docket): that case keeps
+                            it; the other cases have no entry and are due as new;
+      scoped_from_evidence  no board row names a case, the evidence does;
+      recheck               several cases and the evidence names none of them
+                            (case_collision), the evidence names another case than the only
+                            one on the board (evidence_names_another_case), or neither the board
+                            nor the evidence names one (no_case_on_board): the verdict cannot be
+                            given to any one case, so it is moved to `superseded` (no `latest`:
+                            the apply step attaches nothing, ledger counts skip it) and
+                            `recheck` says why; every case on that property is checked as new.
+    Returns a report: counts per outcome and one line per entry ({key, outcome, reason, cases,
+    rows, verdict})."""
+    now = now or utc_now()
+    from_record = getattr(getattr(verifier, "module", None), "case_identity_of_record", None)
+    plain = {ek for ek, e in led.rows.items()
+             if split_key(ek)[0] is None and isinstance(e.get("latest"), dict)}
+    groups: dict[str, dict[str, list[list[str]]]] = {}
+    for row in rows:
+        cid = verifier.case_of(row)
+        if not cid:
+            continue
+        base = row_keys(row)
+        ek, _ = led.find(base)
+        if ek in plain:
+            groups.setdefault(ek, {}).setdefault(cid, []).append(scoped_keys(base, cid))
+    report: dict[str, Any] = {"entries": len(plain), "scoped": 0, "attributed": 0,
+                              "scoped_from_evidence": 0, "recheck": 0, "lines": []}
+    out = {ek: e for ek, e in led.rows.items() if ek not in plain}
+    stamp = iso_z(now)
+    for ek in sorted(plain):
+        e = copy.deepcopy(led.rows[ek])
+        cases = groups.get(ek, {})
+        ev_cid = None
+        if callable(from_record):
+            try:
+                ev_cid = from_record(e["latest"])
+            except Exception:  # noqa: BLE001
+                ev_cid = None
+        decided, outcome, reason = None, "recheck", None
+        if len(cases) == 1:
+            only = next(iter(cases))
+            if ev_cid and ev_cid != only:
+                reason = "evidence_names_another_case"
+            else:
+                decided, outcome = only, "scoped"
+        elif len(cases) > 1:
+            if ev_cid in cases:
+                decided, outcome = ev_cid, "attributed"
+            else:
+                reason = "case_collision"
+        elif ev_cid:
+            decided, outcome = ev_cid, "scoped_from_evidence"
+        else:
+            reason = "no_case_on_board"
+        n_rows = sum(len(v) for v in cases.values())
+        report[outcome] += 1
+        report["lines"].append({"key": ek, "outcome": outcome, "reason": reason,
+                                "cases": len(cases), "rows": n_rows,
+                                "verdict": e["latest"].get("verdict")})
+        if decided:
+            keys = scoped_keys([ek, *(e.get("keys") or [])], decided)
+            for ks in cases.get(decided, []):
+                keys.extend(ks)
+            e["keys"] = list(dict.fromkeys(keys))
+            e["case"] = decided
+            e["migrated"] = {"from": "property_key", "how": outcome, "at": stamp,
+                             "rows": len(cases.get(decided, []))}
+            nk = e["keys"][0]
+            if nk in out:
+                Ledger._merge_entry(out[nk], e)
+            else:
+                out[nk] = e
+        else:
+            e["superseded"] = e.pop("latest")
+            e["recheck"] = {"reason": reason, "cases_on_board": len(cases), "rows": n_rows,
+                            "marked_at": stamp}
+            out[ek] = e
+    led.rows = out
+    led._index = None
+    return report
+
+
+def _parcels(keys: Iterable[str]) -> set[str]:
+    out = set()
+    for k in keys:
+        p = property_part(k)
+        if p.startswith("parcel:"):
+            out.add(p)
+    return out
 
 
 def _expired(rec: dict, ttl_days: Optional[float], now: datetime) -> bool:

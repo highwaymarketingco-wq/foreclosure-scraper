@@ -84,12 +84,18 @@ prison-sourced (whether this verdict can touch the score at all), and `reason` w
 ROW_SUMMARY_EXCLUDE drops owner_name from the ledger's row summary (scripts/verification_sweep.py
 honours it): an owner-changed entry would otherwise name a matched person next to a property
 that is not theirs, and the board carries the names anyway.
+
+CASE IDENTITY (IDENTITY = "case", 2026-10-06). The ledger is keyed by the booking (case_identity:
+state + county + booking id, or matched name + arrest date, hashed) and the property, not by the
+property alone: 91 Anderson court-case rows sit on one city-owned parcel on the 2026-10-05
+board, and a property key gave all of them one verdict.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import os
+import re
 import weakref
 from collections import Counter
 from dataclasses import dataclass, field
@@ -108,6 +114,7 @@ RETRY_DAYS = 1         # a roster that failed or had no history is retried the n
 SOURCE = "county jail rosters"
 GOVERNS = ("incarceration:jail",)
 ROW_SUMMARY_EXCLUDE = ("owner_name",)     # see EVIDENCE in the docstring
+IDENTITY = "case"      # one verdict per booking and property (case_identity), not per property
 
 _NAME = __name__.rsplit(".", 1)[-1]
 _REPO = Path(__file__).resolve().parents[4]
@@ -151,6 +158,27 @@ def applies(row: dict) -> bool:
         return False
     from ...signal_freshness import custody_ended
     return not custody_ended(jbk)
+
+
+def case_identity(row: Any) -> Optional[str]:
+    """The booking the row's stamp claims, as a hashed core.case_id ("jail:<16 hex>"): state +
+    county + the vendor's booking id (`detail_id`, Tyler) when the stamp has one, else state +
+    county + the matched name + the arrest date (307 of the 322 stamps on the 2026-10-05 board
+    carry no booking id). Hashed: the ledger is public and a refuted verdict is about someone
+    else. A re-booking (a new id or arrest date) is a new case. Works on a board dict and on a
+    Listing."""
+    from ..core import case_id
+    raw = row.get("raw") if isinstance(row, dict) else getattr(row, "raw", None)
+    jbk = raw.get("jail_booking") if isinstance(raw, dict) else None
+    if not isinstance(jbk, dict) or not jbk.get("matched_name"):
+        return None                     # not a matched stamp (e.g. the jail scraper's own rows)
+    get = row.get if isinstance(row, dict) else (lambda k: getattr(row, k, None))
+    state = str(jbk.get("state") or get("state") or "").strip().upper()
+    county = str(jbk.get("county") or "").strip() or \
+        re.sub(r"\s+county$", "", str(get("county") or "").strip(), flags=re.I)
+    if jbk.get("detail_id"):
+        return case_id("jail", state, county, "id", jbk["detail_id"])
+    return case_id("jail", state, county, "name", jbk["matched_name"], jbk.get("arrest_date"))
 
 
 def roster_spec(state: str, county: str) -> Optional[tuple[str, str]]:
@@ -388,11 +416,10 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         # The board's owner is no longer the matched person (a sale, a resolver correction;
         # on the 2026-10-06 board, 91 Anderson court-case rows whose address resolved to one
         # city-owned parcel). The roster can say whether the matched PERSON is in custody,
-        # not whether this property's owner is, and the ledger is keyed by property: a
-        # verdict about one of those people would be attached to every row of the parcel.
-        # So never decisive, and the roster answer is NOT published (it would be about
-        # someone other than this property's owner). The run's _clear_stale_matches drops
-        # such a stamp on its next pass.
+        # not whether this property's owner is. So never decisive, and the roster answer is
+        # NOT published (it would be about someone other than this property's owner). The
+        # run's _clear_stale_matches drops such a stamp on its next pass. (Since the ledger
+        # became case-scoped, IDENTITY, those 91 rows are 91 entries, not one.)
         ev["on_roster"] = bool(candidates)
         ev["reason"] = "owner_no_longer_matches"
         return _res("unconfirmed", ev)

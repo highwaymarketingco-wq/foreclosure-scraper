@@ -5,7 +5,8 @@ src/foreclosure_scraper/verification/verifiers/ (auto-discovered), WITHOUT writi
 
   1. ONE read-only stream of the board (board_stream.iter_board_rows(), ~300 MB peak). For
      each row and each verifier whose applies(row) is true, the row is a candidate when its
-     ledger entry is missing, past the verifier's TTL_DAYS (RETRY_DAYS for an unconfirmed
+     ledger entry (found by the verifier's ledger_keys(): the property, or case id + property
+     for a case-scoped verifier) is missing, past the verifier's TTL_DAYS (RETRY_DAYS for an unconfirmed
      answer), or was checked by another verifier VERSION. Candidates are ranked HOT -> WARM ->
      COLD, then never-checked first, then oldest check, and only the top --max-rows per
      signal are kept (a bounded heap: memory does not grow with the backlog).
@@ -51,7 +52,7 @@ sys.path.insert(0, str(REPO / "src"))
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.verification import ledger as L  # noqa: E402
 from foreclosure_scraper.verification.core import (  # noqa: E402
-    iso_z, parse_ts, result, row_keys, tier_of, tier_rank, utc_now,
+    iso_z, parse_ts, result, tier_of, tier_rank, utc_now,
 )
 from foreclosure_scraper.verification.fetch import Fetcher  # noqa: E402
 from foreclosure_scraper.verification.registry import discover  # noqa: E402
@@ -85,7 +86,7 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
             if v.signal in done or not v.safe_applies(rec):
                 continue
             done.add(v.signal)             # first applicable verifier of a signal owns the row
-            keys = row_keys(rec)
+            keys = v.ledger_keys(rec)      # property keys, or case id + property (IDENTITY)
             _, entry = ledgers[v.signal].find(keys)
             due, reason = L.is_due(entry, v, now)
             why[v.signal]["applies"] += 1
@@ -104,8 +105,9 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
             h, seen = heaps[v.signal], inheap[v.signal]
             prev = seen.get(keys[0])
             if prev is not None:
-                # another board row of the same property is already queued: one check covers
-                # both (they share the ledger entry); keep the better-ranked row
+                # another board row of the same property (of the same case, for a case-scoped
+                # verifier) is already queued: one check covers both (they share the ledger
+                # entry); keep the better-ranked row
                 why[v.signal]["same_property_queued"] += 1
                 if item[0] > prev[0]:
                     h[h.index(prev)] = item
@@ -150,7 +152,8 @@ async def run_checks(plan: dict, ledgers: dict, fetcher, *, budget_s: float, sav
                 res.verifier = v.name
             if not res.verifier_version:
                 res.verifier_version = v.version
-            entry = led.record(row, res, ttl_days=v.ttl_days, governs=v.governs)
+            entry = led.record(row, res, ttl_days=v.ttl_days, governs=v.governs,
+                               keys=v.ledger_keys(row))
             for f in getattr(v.module, "ROW_SUMMARY_EXCLUDE", ()) or ():
                 (entry.get("row") or {}).pop(f, None)     # e.g. jail_booking: no owner_name
             tally[res.verdict] += 1

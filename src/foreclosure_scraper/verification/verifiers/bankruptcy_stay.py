@@ -70,6 +70,12 @@ docket number and id, chapter, filing date, the terminal event's kind and date, 
 and the dates of relief-from-stay entries. unconfirmed adds its reason and the status fields.
 ROW_SUMMARY_EXCLUDE keeps owner_name out of the ledger's row summary; migrate_ledger() rewrites
 a stored ledger to this shape offline.
+
+CASE IDENTITY (IDENTITY = "case", 2026-10-06). The ledger is keyed by the claimed case (court +
+docket number, hashed: case_identity) and the property, not by the property alone: a
+geo-snapped placeholder parcel holds many unrelated filings (about 37 on one Anderson SC parcel,
+3 on one Lincoln parcel on the 2026-10-05 board), and a property key gave all of them one
+verdict. The same case on two rows of one property still shares one.
 """
 from __future__ import annotations
 
@@ -92,6 +98,7 @@ RETRY_DAYS = 7
 SOURCE = "courtlistener.com"
 GOVERNS = ("bankruptcy", "bankruptcy_stay")
 ROW_SUMMARY_EXCLUDE = ("owner_name",)   # the ledger is public; see WHAT IS PUBLISHED
+IDENTITY = "case"      # one verdict per case and property (case_identity), not per property
 
 SITE = "https://www.courtlistener.com"
 API = SITE + "/api/rest/v4"
@@ -158,6 +165,49 @@ def claim_of(row: dict) -> Optional[dict]:
 
 def applies(row: dict) -> bool:
     return claim_of(row) is not None
+
+
+_CLAIM_FIELDS = ("raw", "listing_type", "parcel_id", "street_address", "source_url",
+                 "case_number", "defendant")
+
+
+def _as_dict(row: Any) -> dict:
+    """A board dict as is; a models.Listing (the VM's apply step) as the dict claim_of reads."""
+    if isinstance(row, dict):
+        return row
+    out = {k: getattr(row, k, None) for k in _CLAIM_FIELDS}
+    lt = out.get("listing_type")
+    out["listing_type"] = getattr(lt, "value", lt)
+    return out
+
+
+def _case_id(court: Any, docket_number: Any, docket_id: Any) -> Optional[str]:
+    from ..core import case_id
+    court = str(court or "").strip().lower()
+    dn = str(docket_number or "").strip()
+    if court and dn:
+        return case_id("bk", court, dn)
+    return case_id("bk", "courtlistener", docket_id) if docket_id else None
+
+
+def case_identity(row: Any) -> Optional[str]:
+    """The case the row claims (claim_of): court + docket number, else CourtListener's docket
+    id, as a hashed core.case_id ("bk:<16 hex>"; the ledger publishes no docket identifiers on
+    a refuted record, so neither may its keys). Every claim on the 2026-10-05 board has court +
+    docket number but one (a docket id only). Works on a board dict and on a Listing."""
+    claim = claim_of(_as_dict(row))
+    if claim is None:
+        return None
+    return _case_id(claim.get("court"), claim.get("docket_number"), claim.get("docket_id"))
+
+
+def case_identity_of_record(record: dict) -> Optional[str]:
+    """The case a stored record's evidence names: confirmed and stale publish court + docket
+    number (public_evidence); refuted and unconfirmed do not. For the case-scope migration."""
+    ev = (record or {}).get("evidence") or {}
+    if (record or {}).get("verdict") not in ("confirmed", "stale"):
+        return None
+    return _case_id(ev.get("court"), ev.get("docket_number"), ev.get("docket_id"))
 
 
 # ---------------------------------------------------------------------------

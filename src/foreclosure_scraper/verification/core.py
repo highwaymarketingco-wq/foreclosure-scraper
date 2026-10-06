@@ -33,7 +33,9 @@ the scorer signals its record governs. `confirmed` changes no weight; it is ther
 dashboard badge (verdict_badges()). `unconfirmed` and `wall` change nothing.
 
 ROW IDENTITY (row_key): Listing.dedupe_key()'s property identity, parcel first -- see
-row_key()'s docstring for the measurement on real boards that chose it.
+row_key()'s docstring for the measurement on real boards that chose it. A verifier whose claim
+is about a CASE on the property (IDENTITY = "case": bankruptcy, jail) keys its ledger by case id
++ property instead (case_id(), scoped_keys(); see "case-scoped identity" below).
 """
 from __future__ import annotations
 
@@ -239,6 +241,71 @@ def _fingerprint(row: Any) -> str:
     blob = json.dumps(vals, sort_keys=True, separators=(",", ":"),
                       default=lambda o: o.isoformat() if hasattr(o, "isoformat") else str(o))
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]
+
+
+# ---------------------------------------------------------------------------
+# case-scoped identity (a verifier with IDENTITY = "case")
+# ---------------------------------------------------------------------------
+#
+# WHY. row_key() is the PROPERTY, right for a fact about the property (a tax bill, a code case,
+# an exemption). Some claims are about a CASE that a row ties to a property: a bankruptcy
+# filing, a jail booking. Keyed by property, every filing on one parcel shared one verdict, and
+# placeholder parcels hold many unrelated ones (2026-10-06 board: about 37 unrelated
+# bankruptcy filings on one geo-snapped Anderson SC parcel, 3 on one Lincoln parcel; 91
+# Anderson court-case jail rows on one city-owned parcel), so one filing's verdict was attached
+# to, and scored on, all of them.
+#
+# HOW. A case-scoped key is "<case id>@<property key>", for every property key of the row: two
+# cases on one parcel are two entries; the same case on two rows of one property is one entry
+# (found by any shared property key, as before); the same case on two different parcels is two
+# entries (Ledger.find never matches an entry holding a different parcel).
+#
+# The case id is "<kind>:<hash>", the first 16 hex of a sha256 over the kind and the
+# normalized parts (court + docket number; state + county + booking id). Hashed because the
+# ledger is pushed to a PUBLIC repo and a refuted verdict means the case belongs to someone
+# else: the bankruptcy verifier publishes no docket identifiers on a refuted record, so the key
+# must not either. The hash is a pseudonym, not a secret (docket numbers are enumerable).
+
+CASE_SEP = "@"
+#: the property-key prefixes row_keys() emits; a case kind can never be one of them
+PROPERTY_PREFIXES = ("parcel", "addr", "case", "row")
+_KIND = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def case_id(kind: str, *parts: Any) -> Optional[str]:
+    """A case identity: f"{kind}:{sha256(kind|parts)[:16]}" over the parts lowercased and cut to
+    [a-z0-9] ("3:26-bk-10161" and "326BK10161" are the same part). None when no part has any
+    content. `kind` is a short [a-z0-9_] word that is not a property-key prefix."""
+    if not _KIND.match(str(kind or "")) or kind in PROPERTY_PREFIXES:
+        raise ValueError(f"case kind must be [a-z][a-z0-9_]* and not one of {PROPERTY_PREFIXES}")
+    norm = [re.sub(r"[^a-z0-9]", "", str(p if p is not None else "").lower()) for p in parts]
+    if not any(norm):
+        return None
+    return f"{kind}:" + hashlib.sha256("|".join([kind, *norm]).encode("utf-8")).hexdigest()[:16]
+
+
+def scoped_keys(keys: list[str], case: Optional[str]) -> list[str]:
+    """The keys of a row for a case-scoped ledger: "<case>@<key>" for each property key."""
+    return [f"{case}{CASE_SEP}{k}" for k in keys] if case else list(keys)
+
+
+def split_key(key: Any) -> tuple[Optional[str], str]:
+    """(case id or None, property key) of a ledger key."""
+    k = str(key)
+    if k.split(":", 1)[0] in PROPERTY_PREFIXES:
+        return None, k
+    head, sep, tail = k.partition(CASE_SEP)
+    return (head, tail) if sep else (None, k)
+
+
+def property_part(key: Any) -> str:
+    return split_key(key)[1]
+
+
+def row_fingerprint_case(row: Any) -> str:
+    """The case id of last resort for a row a case-scoped verifier applies to but cannot name
+    a case for: unique to the row, so it never shares a verdict with another row."""
+    return case_id("rowfp", _fingerprint(row)) or "rowfp:none"
 
 
 def row_summary(row: Any) -> dict:
