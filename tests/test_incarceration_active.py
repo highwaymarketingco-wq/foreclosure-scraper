@@ -20,6 +20,7 @@ from foreclosure_scraper.models import Listing
 from foreclosure_scraper.signal_freshness import (
     PRISON_SOURCES,
     incarceration_active,
+    is_jail_sourced,
     is_prison_sourced,
 )
 
@@ -49,10 +50,43 @@ def test_prison_sources_match_the_enrichers_constants():
     (DAC_INC, None, True),
     (JAIL_INC, ENDED, False),          # jail flag ends with the jail stay
     (JAIL_INC, IN_CUSTODY, True),
+    (JAIL_INC, None, False),           # orphan: a jail flag with no booking record behind it
+    (JAIL_INC, {}, False),
+    (JAIL_INC, "in_custody", False),   # not a booking record either
+    (dict(JAIL_INC, source="Anderson County jail roster"), None, False),
     ({"matched_name": "X"}, None, True),   # legacy source-less flag: unchanged behaviour
 ])
 def test_incarceration_active(incarceration, jail, expected):
     assert incarceration_active(incarceration, jail, TODAY) is expected
+
+
+def test_is_jail_sourced():
+    assert is_jail_sourced(JAIL_INC)
+    assert is_jail_sourced({"source": "Polk County jail roster"})
+    assert not is_jail_sourced(DAC_INC) and not is_jail_sourced({"source": bop.BOP_SOURCE})
+    assert not is_jail_sourced({"matched_name": "X"}) and not is_jail_sourced(None)
+
+
+def test_orphan_jail_flag_scores_nowhere_and_prison_flags_without_a_booking_still_do():
+    orphan = _li({"incarceration": dict(JAIL_INC)})
+    assert not _scored(orphan)
+    assert "incarceration" not in _facet_signals(orphan, TODAY)
+    for src in PRISON_SOURCES:
+        li = _li({"incarceration": dict(DAC_INC, source=src)})
+        assert _scored(li) and "incarceration" in _facet_signals(li, TODAY)
+
+
+@pytest.mark.parametrize("raw_extra", [
+    {"incarceration": dict(JAIL_INC)},
+    {"incarceration": dict(JAIL_INC), "jail_booking": dict(IN_CUSTODY)},
+    {"incarceration": dict(JAIL_INC), "jail_booking": dict(ENDED)},
+    {"incarceration": dict(DAC_INC)},
+    {"incarceration": dict(DAC_INC), "jail_booking": dict(ENDED)},
+    {"incarceration": {"matched_name": "X"}},
+])
+def test_scorer_and_lead_signals_agree_on_every_flag_shape(raw_extra):
+    li = _li(raw_extra)
+    assert _scored(li) == ("incarceration" in _facet_signals(li, TODAY))
 
 
 def test_is_prison_sourced():
@@ -110,6 +144,16 @@ def _fast(monkeypatch):
 async def test_state_lane_checks_someone_whose_jail_stay_ended_and_records_the_prison_match(monkeypatch):
     srv = _StateServer(hits={("HUDSON", "RUSSELL")}).install(monkeypatch)
     li = _li({"incarceration": dict(JAIL_INC), "jail_booking": dict(ENDED)})
+    await inc.enrich_incarceration([li])
+    assert srv.asked == [("HUDSON", "RUSSELL")]
+    assert li.raw["incarceration"]["source"] == inc.DAC_SOURCE
+    assert _scored(li)
+
+
+@pytest.mark.asyncio
+async def test_state_lane_checks_the_owner_behind_an_orphan_jail_flag(monkeypatch):
+    srv = _StateServer(hits={("HUDSON", "RUSSELL")}).install(monkeypatch)
+    li = _li({"incarceration": dict(JAIL_INC)})
     await inc.enrich_incarceration([li])
     assert srv.asked == [("HUDSON", "RUSSELL")]
     assert li.raw["incarceration"]["source"] == inc.DAC_SOURCE

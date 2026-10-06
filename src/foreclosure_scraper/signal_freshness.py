@@ -197,12 +197,31 @@ def is_prison_sourced(incarceration: Any) -> bool:
     return isinstance(incarceration, dict) and incarceration.get("source") in PRISON_SOURCES
 
 
+# The source enrichment_jail_bookings._apply_hit stamps on the flag it sets:
+# f"{county} County jail roster" ("Buncombe County jail roster").
+_JAIL_SOURCE_RE = re.compile(r"\bcounty jail roster\s*$", re.I)
+
+
+def is_jail_sourced(incarceration: Any) -> bool:
+    """A raw['incarceration'] flag the county-jail lane set (its `source` is "<county> County jail
+    roster"). Not a legacy source-less flag, not a prison flag."""
+    return (isinstance(incarceration, dict)
+            and bool(_JAIL_SOURCE_RE.search(str(incarceration.get("source") or ""))))
+
+
 def incarceration_active(incarceration: Any, jail_booking: Any,
                          today: Optional[date] = None, *,
                          jail_verdict_suppresses: bool = False) -> bool:
     """Whether raw['incarceration'] still counts. A state/federal prison match stands on its own;
     only a county-jail (or legacy source-less) flag is tied to the jail booking's custody, so a
     person moved from county jail to prison is not dropped when the jail stay ends.
+
+    A jail-sourced flag needs its booking: with no raw['jail_booking'] record behind it there is
+    no custody to be in, and nothing the jail lane's re-evaluation or the jail_booking verifier
+    would ever re-check, so it would score forever (custody_ended(None) is False). Measured on
+    the 2026-10-05 board: 44 rows (Anderson 20, Cherokee 12, Buncombe 9, Henderson 2, Polk 1)
+    carried a "<county> County jail roster" flag with no jail_booking. Such a flag does not
+    count. A legacy source-less flag keeps its old behaviour (none on that board).
 
     `jail_verdict_suppresses`: the row carries a non-expired refuted/stale jail_booking
     verification (GOVERNS "incarceration:jail", verification/verifiers/jail_booking.py; the
@@ -215,6 +234,8 @@ def incarceration_active(incarceration: Any, jail_booking: Any,
         return True
     if jail_verdict_suppresses:
         return False
+    if is_jail_sourced(incarceration) and not (isinstance(jail_booking, dict) and jail_booking):
+        return False                    # an orphan jail flag: no booking, no custody
     return not custody_ended(jail_booking, today)
 
 
