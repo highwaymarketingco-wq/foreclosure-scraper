@@ -15,7 +15,9 @@ LISTINGS instead of fully-hydrated ones.
 
 WHY THIS IS SAFE, NOT A REIMPLEMENTATION. Both functions were read in full (not assumed) to
 confirm exactly which fields they touch:
-  * `dedupe()` (src/foreclosure_scraper/dedupe.py) never reads `Listing.raw` AT ALL. Its three
+  * `dedupe()` (src/foreclosure_scraper/dedupe.py) reads `Listing.raw` for ONE matching fact
+    (2026-10-06): whether the parcel was attached by a resolver (raw['parcel_from_geo'] /
+    raw['parcel_from_address']), which the light Listing carries. Its three
     passes (bucket by `dedupe_key()`, cross-bucket fuzzy match with zip/locale BLOCKING -- already
     sub-quadratic, not naive O(n^2) -- and signature union-find via `_strong_sigs()`) read only
     eight scalar fields: source, source_url, listing_type, street_address, city, state, zip_code,
@@ -113,6 +115,7 @@ from .board_stream import iter_board_rows
 from .dedupe import dedupe
 from .distress_score import score_board
 from .models import Listing, ListingType, PropertyKind
+from .placeholder_twins import RESOLVER_PARCEL_KEYS
 from .web_artifact import row_identity_hash
 
 #: The 8 scalar identity fields dedupe()'s bucket/fuzzy/signature passes read (dedupe_key(),
@@ -179,6 +182,14 @@ def _light_listing_for_dedupe(rec: dict, prov_hash: str) -> Optional[Listing]:
     fields = {k: rec[k] for k in _DEDUPE_SCALAR_FIELDS if k in rec}
     _coerce_enums(fields)
     fields["raw"] = {"_prov": {prov_hash: True}}
+    # dedupe()'s identity rule (dedupe.identity_conflict, 2026-10-06) reads ONE raw fact: whether
+    # the parcel was attached by a resolver (placeholder_twins.RESOLVER_PARCEL_KEYS), which makes
+    # it no evidence either way. Carried so the streamed finder matches exactly what dedupe() does.
+    raw = rec.get("raw")
+    if isinstance(raw, dict):
+        for k in RESOLVER_PARCEL_KEYS:
+            if raw.get(k):
+                fields["raw"][k] = raw[k]
     try:
         return Listing.model_validate(fields)
     except Exception:  # noqa: BLE001 - a row too malformed to key is simply skipped

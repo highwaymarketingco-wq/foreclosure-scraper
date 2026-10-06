@@ -81,7 +81,9 @@ def test_the_same_house_number_on_different_streets_is_not_forced_together():
     ("100 Main St", "100 Main St", True),
     ("100 Main St", "200 Main St", False),
     ("100 Main St", "1000 Main St", False),   # not a prefix match
-    ("7 Elm", "07 Elm", False),               # '7' != '07' -- conservative, splits rather than fuses
+    # 2026-10-06: house numbers are compared as placeholder_twins.real_house_no() reads them
+    # (leading zeros dropped, '000141 LEVI DR' is 141), so with one valid parcel these are one house
+    ("7 Elm", "07 Elm", True),
 ])
 def test_house_number_comparison_is_exact(a, b, same):
     out = dedupe([L(a, "5555555555"), L(b, "5555555555")])

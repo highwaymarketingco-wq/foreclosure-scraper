@@ -86,6 +86,12 @@ parcel key, and the fresh row plus all its twins agree on one real house number 
 before). The fold is Listing.merge() fresh-first, keeping the prior's numbered situs over the
 sentinel. FULLRUN_PERSIST_PLACEHOLDER_TWINS=0 turns it off.
 
+DIFFERENT VALID PARCELS (2026-10-06). A strict match is also refused when the prior row and the
+fresh candidate carry two different VALID parcels (_different_valid_parcels(); dedupe()'s own
+identity rule), so a shared address signature can no longer fold one parcel's prior row into
+another parcel's fresh row. stats['refused_different_parcel'] counts prior rows that were left
+unmatched only by this rule.
+
 WHAT THIS DOES NOT FIX: the return value is still a full ``list[Listing]`` of the
 merged board, because main.run() runs it through ~2,400 more lines of enrichment/
 filtering before its own write_artifact() call -- peak memory for THAT part is
@@ -125,7 +131,8 @@ from .web_artifact import (
     # does `from foreclosure_scraper.board_persist import load_board` and must keep
     # working. Removing this import silently breaks that script's import line.
 )
-from .dedupe import _house_no_of
+from .dedupe import _house_no_of, different_valid_parcels as _different_valid_parcels_id
+from .dedupe import identity as _identity
 from .placeholder_twins import MAX_GROUP_ROWS, fold, real_house_no, twin_pair_ok
 
 log = structlog.get_logger()
@@ -234,6 +241,22 @@ def _provably_different_dict(rec: dict, li: Listing) -> bool:
     return bool(ha and hb and ha != hb)
 
 
+def _different_valid_parcels(rec: dict, li: Listing) -> bool:
+    """dedupe()'s parcel rule (dedupe.identity_conflict, 2026-10-06) between a streamed prior row
+    and a fresh candidate: two different VALID parcels (placeholder_twins.parcel_key, not attached
+    by a resolver) are two properties, whatever address signature they share. Without it a prior
+    row could fold into a DIFFERENT parcel's fresh row through an address signature ('115 SOUTHPORT
+    RD' is two parcels, so is '0 SOUTHPORT RD' on a board that kept the sentinel), carrying its
+    enrichment onto the wrong lead, and, when its own parcel was not re-scraped, vanishing instead
+    of aging. Only this rule is applied here: the house-number guard above stays as it was (the
+    placeholder-twin fallback below depends on it), and an unnumbered prior row may still match
+    its own re-scraped record."""
+    a = _identity(rec)
+    if not a.pk:
+        return False
+    return _different_valid_parcels_id(a, _identity(li))
+
+
 def _placeholder_twin_index(rec: dict, rec_sigs, fresh_sig_index: dict,
                             fresh_deduped: list[Listing]) -> int | None:
     """The fresh row a prior row is a placeholder twin of (placeholder_twins.py), or None.
@@ -290,6 +313,7 @@ def merge_prior_board(
         "prior_drop_errors": 0,
         "matched_placeholder_twin": 0,
         "placeholder_twin_ambiguous": 0,
+        "refused_different_parcel": 0,
     }
     # Placeholder twins (placeholder_twins.py): on by default; FULLRUN_PERSIST_PLACEHOLDER_TWINS=0
     # restores the strict-only matching of the 2026-10-04 rewrite.
@@ -362,6 +386,7 @@ def merge_prior_board(
         prior_total += 1
         match_idx: int | None = None
         rec_sigs = ()
+        refused_parcel = False
         if isinstance(rec, dict) and fresh_sig_index:
             try:
                 rec_sigs = _append_dict_sigs(rec)
@@ -380,11 +405,16 @@ def merge_prior_board(
                 for i in cands:
                     if _provably_different_dict(rec, fresh_deduped[i]):
                         continue
+                    if _different_valid_parcels(rec, fresh_deduped[i]):
+                        refused_parcel = True
+                        continue
                     match_idx = i
                     break
                 if match_idx is not None:
                     break
 
+        if refused_parcel and match_idx is None:
+            stats["refused_different_parcel"] += 1
         if match_idx is not None:
             streamed_for_drop_rate += 1
             try:

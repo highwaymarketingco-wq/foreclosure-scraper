@@ -98,12 +98,32 @@ def _clean_env(monkeypatch):
         monkeypatch.delenv(k, raising=False)
 
 
+@contextlib.contextmanager
+def _old_matching():
+    """dedupe()'s matching before the 2026-10-06 identity rule (test_dedupe_identity_evidence.py):
+    the house-number guard alone (_house_no_of on both rows; a sentinel '0' is a number, a parcel
+    is no evidence), and a merged row keeps its base row's own address. Emulated by swapping the
+    identity hooks, which is exact for the two- and three-row fixtures here."""
+    saved = (D.identity, D.identity_conflict, D._union, D._merge)
+    D.identity = lambda li: D.Identity(D._house_no_of(li.street_address), None)
+    D.identity_conflict = lambda x, y, evidence=None: (
+        "house_number" if x.hn and y.hn and x.hn != y.hn else None)
+    D._union = lambda x, y: x
+    D._merge = lambda a, b: D.merge_rows(a, b)
+    try:
+        yield
+    finally:
+        D.identity, D.identity_conflict, D._union, D._merge = saved
+
+
 def _shipped_dedupe(rows):
-    """dedupe() exactly as it ran on 10/5: every merge is plain Listing.merge(), earlier row first."""
+    """dedupe() exactly as it ran on 10/5: the old matching, and every merge plain
+    Listing.merge(), earlier row first."""
     real = D.merge_rows
     D.merge_rows = lambda a, b: a.merge(b)
     try:
-        return D.dedupe(rows)
+        with _old_matching():
+            return D.dedupe(rows)
     finally:
         D.merge_rows = real
 
@@ -132,10 +152,31 @@ def test_as_shipped_the_tag_survives_even_live_first(src, aged, live):
 # ---------------------------------------------------------------------------------- the fix
 @pytest.mark.parametrize("aged_first", [True, False], ids=["aged_first", "live_first"])
 @pytest.mark.parametrize("src,aged,live", REAL_FUSIONS, ids=IDS)
-def test_dedupe_keeps_the_live_row_and_drops_the_tag(src, aged, live, aged_first):
+def test_dedupe_no_longer_matches_these_pairs(src, aged, live, aged_first):
+    """2026-10-06: every one of these pairs is two DIFFERENT valid parcels (and one side has no
+    real house number), so dedupe()'s identity rule keeps them apart: the live row is untouched
+    and untagged, and the aged neighbour stays its own (aged) row."""
     rows = [_aged(src, aged), _live(src, live)]
     out = D.dedupe(rows if aged_first else rows[::-1])
-    assert len(out) == 1                                     # which rows match is unchanged
+    assert len(out) == 2
+    by_parcel = {li.parcel_id: li for li in out}
+    li = by_parcel[live[0]]
+    assert (li.parcel_id, li.street_address, li.owner_name) == live
+    assert "pulled_sale" not in li.raw and "stale_case" not in li.raw and li.auction_status is None
+    assert li.last_seen == FRESH_T and li.first_seen == FRESH_T
+    old = by_parcel[aged[0]]
+    assert (old.street_address, old.owner_name) == aged[1:] and old.raw["pulled_sale"]
+
+
+@pytest.mark.parametrize("aged_first", [True, False], ids=["aged_first", "live_first"])
+@pytest.mark.parametrize("src,aged,live", REAL_FUSIONS, ids=IDS)
+def test_merge_rows_keeps_the_live_row_and_drops_the_tag(src, aged, live, aged_first):
+    """Item 64's merge_rows() fix on its own: had the old matching joined these rows, the live row
+    is the base and the result is not presumed withdrawn."""
+    rows = [_aged(src, aged), _live(src, live)]
+    with _old_matching():
+        out = D.dedupe(rows if aged_first else rows[::-1])
+    assert len(out) == 1                                     # the old matching joins them
     li = out[0]
     assert (li.parcel_id, li.street_address, li.owner_name) == live
     assert li.source_url == src[1]
