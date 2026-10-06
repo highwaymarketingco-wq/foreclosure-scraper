@@ -143,3 +143,13 @@ def test_tier_filter(board):
                         county=None, cap=10, now=NOW, tiers={"COLD"})
     # the two COLD rows (1000000003's second row is COLD; its HOT twin is filtered out)
     assert sorted(r["parcel_id"] for _p, _k, r, _v in plan["tax_lien"]) == ["1000000001", "1000000003"]
+
+
+def test_source_filter(board):
+    sw = _load_script()
+    plan, _ = sw.select(board / "listings.json.gz", [_fake_verifier([])], {"tax_lien": L.Ledger("tax_lien")},
+                        county=None, cap=10, now=NOW, sources={"nope"})
+    assert plan["tax_lien"] == []
+    plan, _ = sw.select(board / "listings.json.gz", [_fake_verifier([])], {"tax_lien": L.Ledger("tax_lien")},
+                        county=None, cap=10, now=NOW, sources={"s"})
+    assert len(plan["tax_lien"]) == 6

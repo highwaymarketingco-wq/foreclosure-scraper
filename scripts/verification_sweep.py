@@ -61,11 +61,13 @@ RUN_LOCK = REPO / "logs" / ".verification_sweep.lock"
 
 def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, cap: int,
            now: datetime, recheck_only: bool = False,
-           tiers: set[str] | None = None) -> tuple[dict, dict]:
+           tiers: set[str] | None = None,
+           sources: set[str] | None = None) -> tuple[dict, dict]:
     """One streaming pass. Returns ({signal: [(prio, key, row, verifier)] best first},
     {signal: Counter of why rows were or were not due}). recheck_only: only rows that already
     have a ledger entry (TTL / VERSION re-checks), e.g. right after a VERSION bump. tiers:
-    only rows of these tiers (HOT/WARM/COLD; "-" for untiered), e.g. to sample the COLD tail."""
+    only rows of these tiers (HOT/WARM/COLD; "-" for untiered), e.g. to sample the COLD tail.
+    sources: only rows whose `source` equals one of these (e.g. re-verify one scraper)."""
     heaps: dict[str, list] = {v.signal: [] for v in verifiers}
     inheap: dict[str, dict] = {v.signal: {} for v in verifiers}   # key -> item, per signal
     why: dict[str, Counter] = {v.signal: Counter() for v in verifiers}
@@ -75,6 +77,8 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
         if want_county and str(rec.get("county") or "").strip().lower() != want_county:
             continue
         if tiers and (tier_of(rec) or "-") not in tiers:
+            continue
+        if sources and str(rec.get("source") or "") not in sources:
             continue
         done: set[str] = set()
         for v in verifiers:
@@ -199,6 +203,8 @@ def main(argv=None) -> int:
                     help="save every fetched response body here (fixtures, audits)")
     ap.add_argument("--ledger-dir", default=None, help="default docs/handoff/verification")
     ap.add_argument("--docs", default=str(REPO / "docs"), help="board directory (read-only)")
+    ap.add_argument("--source", action="append", default=None,
+                    help="only rows of this board source slug (repeatable or comma-separated)")
     ap.add_argument("--tier", action="append", default=None,
                     help="only rows of this tier (HOT/WARM/COLD, repeatable or comma-separated)")
     ap.add_argument("--recheck-only", action="store_true",
@@ -251,7 +257,8 @@ def run(args) -> int:
     plan, why = select(Path(args.docs) / "listings.json.gz", verifiers, ledgers,
                        county=args.county, cap=max(0, args.max_rows), now=now,
                        recheck_only=args.recheck_only,
-                       tiers={t.strip().upper() for a in (args.tier or []) for t in a.split(",") if t.strip()} or None)
+                       tiers={t.strip().upper() for a in (args.tier or []) for t in a.split(",") if t.strip()} or None,
+                       sources={t.strip() for a in (args.source or []) for t in a.split(",") if t.strip()} or None)
     scan_s = time.monotonic() - t0
     for sig in plan:
         tiers = Counter(("HOT", "WARM", "COLD", "-")[int(p[0][0])] for p in plan[sig])
@@ -276,6 +283,7 @@ def run(args) -> int:
         led.last_run = {"at": iso_z(datetime.now(timezone.utc)), "host": host,
                         "county": args.county, "max_rows": args.max_rows, "seconds": secs,
                         "recheck_only": bool(args.recheck_only), "tier": args.tier,
+                        "source": args.source,
                         "selection": dict(why.get(sig) or {}), "result": tallies.get(sig, {}),
                         "requests": fetcher.stats()}
         _save(led, host)
