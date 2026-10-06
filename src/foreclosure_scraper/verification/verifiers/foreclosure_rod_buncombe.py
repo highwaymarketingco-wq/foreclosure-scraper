@@ -138,7 +138,9 @@ from urllib.parse import urlencode
 from ..core import VerificationResult, result
 
 SIGNAL = "foreclosure_rod"
-VERSION = "v1"
+VERSION = "v2"         # v2 (2026-10-06, before any v1 verdict was used): a trustee deed is
+                       # judged against its own borrower's acquisition (not the later buyer's),
+                       # a description naming another lot never ties, no-chain reason split out
 TTL_DAYS = 14          # a sale, a trustee deed or a payoff can land within weeks
 RETRY_DAYS = 7
 SOURCE = "registerofdeeds.buncombenc.gov"
@@ -639,9 +641,12 @@ def desc_tie(desc: str, a: dict) -> Optional[str]:
     if not desc:
         return None
     D = " ".join(_words(desc))
-    lot = str(a.get("SubLot") or "").strip().upper().lstrip("0")
+    mine = {t.strip().lstrip("0") for t in re.split(r"\s*(?:&|,|AND)\s*", str(a.get("SubLot") or "").upper())
+            if t.strip().lstrip("0")}
     lots = _lots(desc)
-    lot_ok = bool(lot) and lot in lots
+    if mine and lots and not (mine & lots):
+        return None              # another lot (an investor's lot 15 on the same street is not lots 1 & 2)
+    lot_ok = bool(mine & lots)
     sub = " ".join(w for w in _words(a.get("SubName")) if w not in ("SUBDIVISION", "SUB"))
     if lot_ok and sub and f" {sub} " in f" {D} ":
         return "subdivision_lot"
@@ -899,8 +904,15 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
     tdeeds = [d for d in tied if d["type"] in CONCLUSION_TYPES and d.get("refs")
               and ((ident(d) and "grantor" in (d.get("matched_side") or "")) or d.get("bp") == vest)]
     fcls = [d for d in tied if d["type"] == FORECLOSURE_TYPE]
-    acquired = max((d["date"] for d in tied if d["type"] in CONVEYANCE_TYPES and ident(d)
-                    and "grantee" in (d.get("matched_side") or "") and d.get("date")), default=None)
+    def acquired_before(t: dict) -> Optional[str]:
+        """When the trustee deed's grantor (a searched person) last took title to the parcel: a
+        tied conveyance in that person's own results with them on the grantee side. A later
+        buyer's acquisition (the sale that followed the foreclosure) is not theirs."""
+        roles = [r for r, keys in by_role.items() if _key(t) in keys]
+        dates = [d["date"] for d in tied for r in roles
+                 if _key(d) in by_role[r] and d["type"] in CONVEYANCE_TYPES and d is not t
+                 and "grantee" in (d.get("matched_side") or "") and d.get("date")]
+        return max(dates, default=None)
     ev["chain"] = {"tied_instruments": len(tied), "deeds_of_trust": len(dots),
                    "initiations": len(inits), "trustee_deeds": len(tdeeds),
                    "foreclosure_records": len(fcls)}
@@ -911,6 +923,7 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
         td = _dd(t.get("date"))
         if td is None or td < recent_from:
             continue
+        acquired = acquired_before(t)
         if (acquired and t["date"] < acquired) or (latest_init and t["date"] < (latest_init.get("date") or "")):
             continue
         strong = (ties.get(t["bp"]) or {}).get("strength") == "strong"
@@ -1006,7 +1019,9 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
             ev["claim_person_deeds_of_trust"] = len(cp_dots)
             return "refuted", ev
 
-    if fcls and not tdeeds:
+    if not tied:
+        ev["reason"] = "parcel_chain_not_found_at_rod"
+    elif fcls and not tdeeds:
         ev["reason"] = "foreclosure_record_without_trustee_deed"
     elif no_fc:
         ev["reason"] = "no_foreclosure_instrument_at_rod"
