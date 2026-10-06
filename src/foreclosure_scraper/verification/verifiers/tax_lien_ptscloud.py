@@ -270,7 +270,7 @@ async def _get_json(client: Any, url: str, tenant: str) -> Any:
 # verify
 # ---------------------------------------------------------------------------
 
-_KEYS = ("reason", "url", "page_url", "tenant", "tax_parcel", "tax_parcel_from", "board_parcel",
+_KEYS = ("reason", "url", "page_url", "tenant", "claim_county_differs", "tax_parcel", "tax_parcel_from", "board_parcel",
          "searched", "results_total", "latest_levy_year", "latest_delinquent_eligible_levy",
          "delinquent_by_year", "total_delinquent", "years_delinquent", "under_500", "de_minimis",
          "not_yet_delinquent_due", "deferred_by_year", "flags", "claimed_years", "claimed_bill",
@@ -302,6 +302,8 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         return _res("unconfirmed", dict(ev, reason="no_bill_tenant"))
     slug = tenant.lower()
     ev["page_url"] = PAGE_URL.format(slug=slug)
+    if slug != str(row.get("county") or "").strip().lower():
+        ev["claim_county_differs"] = True      # the roll's row, geocoded into another county
     cands = parcel_candidates(row, tenant, blk)
     if not cands:
         return _res("unconfirmed", dict(ev, reason="parcel_unresolvable"))
