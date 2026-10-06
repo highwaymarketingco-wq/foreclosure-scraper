@@ -51,7 +51,7 @@ sys.path.insert(0, str(REPO / "src"))
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.verification import ledger as L  # noqa: E402
 from foreclosure_scraper.verification.core import (  # noqa: E402
-    iso_z, parse_ts, result, row_keys, tier_rank, utc_now,
+    iso_z, parse_ts, result, row_keys, tier_of, tier_rank, utc_now,
 )
 from foreclosure_scraper.verification.fetch import Fetcher  # noqa: E402
 from foreclosure_scraper.verification.registry import discover  # noqa: E402
@@ -60,10 +60,12 @@ RUN_LOCK = REPO / "logs" / ".verification_sweep.lock"
 
 
 def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, cap: int,
-           now: datetime, recheck_only: bool = False) -> tuple[dict, dict]:
+           now: datetime, recheck_only: bool = False,
+           tiers: set[str] | None = None) -> tuple[dict, dict]:
     """One streaming pass. Returns ({signal: [(prio, key, row, verifier)] best first},
     {signal: Counter of why rows were or were not due}). recheck_only: only rows that already
-    have a ledger entry (TTL / VERSION re-checks), e.g. right after a VERSION bump."""
+    have a ledger entry (TTL / VERSION re-checks), e.g. right after a VERSION bump. tiers:
+    only rows of these tiers (HOT/WARM/COLD; "-" for untiered), e.g. to sample the COLD tail."""
     heaps: dict[str, list] = {v.signal: [] for v in verifiers}
     inheap: dict[str, dict] = {v.signal: {} for v in verifiers}   # key -> item, per signal
     why: dict[str, Counter] = {v.signal: Counter() for v in verifiers}
@@ -71,6 +73,8 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
     order = 0
     for rec in iter_board_rows(board_path):
         if want_county and str(rec.get("county") or "").strip().lower() != want_county:
+            continue
+        if tiers and (tier_of(rec) or "-") not in tiers:
             continue
         done: set[str] = set()
         for v in verifiers:
@@ -195,6 +199,8 @@ def main(argv=None) -> int:
                     help="save every fetched response body here (fixtures, audits)")
     ap.add_argument("--ledger-dir", default=None, help="default docs/handoff/verification")
     ap.add_argument("--docs", default=str(REPO / "docs"), help="board directory (read-only)")
+    ap.add_argument("--tier", action="append", default=None,
+                    help="only rows of this tier (HOT/WARM/COLD, repeatable or comma-separated)")
     ap.add_argument("--recheck-only", action="store_true",
                     help="only rows already in the ledger (TTL/VERSION re-checks), no new rows")
     ap.add_argument("--dry-run", action="store_true", help="select candidates only")
@@ -244,7 +250,8 @@ def run(args) -> int:
     t0 = time.monotonic()
     plan, why = select(Path(args.docs) / "listings.json.gz", verifiers, ledgers,
                        county=args.county, cap=max(0, args.max_rows), now=now,
-                       recheck_only=args.recheck_only)
+                       recheck_only=args.recheck_only,
+                       tiers={t.strip().upper() for a in (args.tier or []) for t in a.split(",") if t.strip()} or None)
     scan_s = time.monotonic() - t0
     for sig in plan:
         tiers = Counter(("HOT", "WARM", "COLD", "-")[int(p[0][0])] for p in plan[sig])
@@ -268,7 +275,7 @@ def run(args) -> int:
     for sig, led in ledgers.items():
         led.last_run = {"at": iso_z(datetime.now(timezone.utc)), "host": host,
                         "county": args.county, "max_rows": args.max_rows, "seconds": secs,
-                        "recheck_only": bool(args.recheck_only),
+                        "recheck_only": bool(args.recheck_only), "tier": args.tier,
                         "selection": dict(why.get(sig) or {}), "result": tallies.get(sig, {}),
                         "requests": fetcher.stats()}
         _save(led, host)
