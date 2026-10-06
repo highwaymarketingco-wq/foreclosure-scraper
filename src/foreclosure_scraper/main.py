@@ -3367,6 +3367,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("vacant_landuse.failed", traceback=traceback.format_exc())
 
+    # Per-listing verification verdicts (docs/HANDOFF.md item 66). The Mac's
+    # scripts/verification_sweep.py checks claims live and pushes the per-signal ledgers
+    # docs/handoff/verification/<signal>.json; this attaches raw['verification'] from them, no
+    # network, BEFORE score_board so a refuted/stale verdict drops the signal it governs on
+    # this same run (nightly and the enrich-only resume both pass through here). Never fails
+    # the run; VERIFICATION_APPLY=0 turns it off.
+    try:
+        from .verification.apply import apply_verification
+        s = apply_verification(enriched)
+        if s:
+            enrichment_stats["verification"] = s
+    except Exception:
+        log.error("verification_apply.failed", traceback=traceback.format_exc())
+
     # Stacked-distress score (HOT/WARM/COLD operator board) — runs last so it
     # can stack every signal + equity + contactability gathered above.
     def _score_failed(kind: str, detail: str, hist: dict | None = None,

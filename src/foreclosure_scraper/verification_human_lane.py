@@ -76,18 +76,17 @@ any row whose ``state`` is not ``"NC"`` -- NC eCourts and NC SOS cannot answer
 anything about an SC case -- and for any ``listing_type`` outside the
 probate/heir_estate/lis_pendens/divorce families this pass is scoped to.
 
-NOT WIRED TO THE BOARD
-------------------------
-This module never writes a ``raw.verification`` record back onto the published
-board. ``build_patch_preview`` shows what a follow-up write step WOULD apply
-through ``web_artifact.patch_existing_rows()`` (the safe, small-patch primitive
-this codebase already uses for exactly this "touch a known few rows" shape),
-but does not call it. Left out of THIS pass deliberately: this machine is an
-8 GB Air already pinned against ``BOARD_LOAD_MAX_SOURCE_MB``/
-``BOARD_PATCH_MAX_SOURCE_MB`` by other work, and wiring a real write path
-deserves its own review (dedupe_key() collision risk, merge-vs-replace
-semantics on an existing ``raw.verification`` list) rather than riding in on a
-first pass that was asked to stay conservative. See ``docs/HANDOFF.md``.
+REACHES THE BOARD THROUGH THE VERIFICATION LEDGER (2026-10-05, docs/HANDOFF.md item 66)
+--------------------------------------------------------------------------------------
+``record_to_ledger(row, record)`` merges each record this lane produces (the ``wall``
+placeholder at step 1, the real verdict at step 2) into the same per-signal ledger the
+automated verifiers use, ``docs/handoff/verification/<signal>.json``
+(``verification/ledger.py``), keyed by ``verification.core.row_key(row)``. The CLI writes it
+and pushes only those files (``ledger.publish_ledgers``; ``HANDOFF_PUSH=0`` or ``--no-push``
+skips git); the VM's next run attaches it as ``raw['verification']`` before scoring
+(``verification/apply.py``). Nothing here writes the board itself. The ledger's merge rule
+keeps a placeholder ``wall`` from ever displacing a real verdict on the same row.
+``build_patch_preview`` is kept for inspection only.
 """
 from __future__ import annotations
 
@@ -121,6 +120,21 @@ VERIFIER_VERSION = "v1"
 #: freshness-pass concern (same shape as signal_freshness.is_stale()), not
 #: something this point-in-time human check computes itself.
 VALID_VERDICTS = ("confirmed", "refuted", "stale", "unconfirmed", "wall")
+
+#: How long a human-cleared verdict stays good in the verification ledger (no verifier module
+#: exists for these signals, so the ledger entry carries its own TTL). A court case or an
+#: entity's status changes slowly; a lis pendens moves fastest.
+LEDGER_TTL_DAYS = {"probate": 365, "heir_estate": 365, "divorce": 180, "lis_pendens": 90,
+                   "sos_entity": 180}
+#: Scorer signal names a refuted/stale verdict of each signal would remove. This lane never
+#: emits refuted/stale for an eCourts check today (see verify_ecourts_from_saved_page), and
+#: an SOS entity's status governs no scorer signal, so these only take effect if that changes.
+LEDGER_GOVERNS = {"probate": ("probate", "probate_notice", "estate_lead"),
+                  "heir_estate": ("probate", "probate_notice", "estate_lead"),
+                  "divorce": ("divorce", "divorce_notice"),
+                  "lis_pendens": ("lis_pendens",),
+                  "sos_entity": ()}
+LEDGER_VERIFIER = "human_lane"
 
 #: listing_type -> which of the two scoped signal families it belongs to.
 _PROBATE_LISTING_TYPES = {"probate_notice", "estate_lead"}
@@ -641,7 +655,26 @@ async def verify_ecourts_from_saved_page(html: str, spec: ECourtsCheckSpec, row:
 
 
 # --------------------------------------------------------------------------- #
-# What a follow-up write step WOULD apply -- NOT applied here.
+# Write-back: the per-signal verification ledger the VM applies
+# --------------------------------------------------------------------------- #
+def record_to_ledger(row: dict, record: dict, *, directory: Optional[Path] = None,
+                     now: Optional[datetime] = None) -> Path:
+    """Merge one record from this lane into ``docs/handoff/verification/<signal>.json`` under
+    ``verification.core.row_key(row)``; returns the ledger path. Raises
+    ``verification.ledger.LedgerUnreadable`` rather than overwrite a broken ledger."""
+    from .verification.core import VerificationResult
+    from .verification.ledger import Ledger
+
+    res = VerificationResult.from_dict(record)
+    res.verifier = res.verifier or LEDGER_VERIFIER
+    led = Ledger.load(res.signal, directory)
+    led.record(row, res, ttl_days=LEDGER_TTL_DAYS.get(res.signal, 180),
+               governs=LEDGER_GOVERNS.get(res.signal, ()), now=now)
+    return led.save()
+
+
+# --------------------------------------------------------------------------- #
+# What a direct board patch WOULD apply (inspection only; the ledger is the write path).
 # --------------------------------------------------------------------------- #
 def build_patch_preview(row: dict, record: dict) -> dict:
     """The shape a follow-up board-write script would need to call
@@ -650,8 +683,9 @@ def build_patch_preview(row: dict, record: dict) -> dict:
     fields, not trusted pre-computed here -- `patch_existing_rows()`'s own
     contract) plus the `raw.verification` LIST to merge in (that function
     merges `raw` updates rather than overwriting them). This module never
-    calls `patch_existing_rows()` itself -- see this module's docstring,
-    "NOT WIRED TO THE BOARD"."""
+    calls `patch_existing_rows()` itself: records reach the board through
+    `record_to_ledger()` and the VM's verification apply (module docstring,
+    "REACHES THE BOARD THROUGH THE VERIFICATION LEDGER")."""
     identity = {
         k: row.get(k)
         for k in ("source_url", "parcel_id", "street_address", "zip_code",

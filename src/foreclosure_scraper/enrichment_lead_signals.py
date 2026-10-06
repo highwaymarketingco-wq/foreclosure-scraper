@@ -56,6 +56,7 @@ from .signal_freshness import (
     bankruptcy_lapsed, code_enforcement_open, has_real_probate, incarceration_active,
     owner_names_a_death,
 )
+from .verification.core import suppressed_scorer_signals
 
 log = structlog.get_logger()
 
@@ -97,9 +98,15 @@ def _dollar(v) -> bool:
 def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
     raw = li.raw if isinstance(li.raw, dict) else {}
     out: set[str] = set()
+    # Per-listing verification (docs/HANDOFF.md item 66), the same rule as
+    # distress_score._collect: a non-expired refuted/stale verdict removes the facet names its
+    # record governs (returned set minus `drop`), and "recorded_debt:tax" drops the
+    # recorded_debt credit only where that debt is the tax balance.
+    drop = suppressed_scorer_signals(raw, today)
+    tax_gone = "recorded_debt:tax" in drop
 
     # --- FINANCIAL ---
-    if _dollar((raw.get("tax_owed") or {}).get("balance")):
+    if not tax_gone and _dollar((raw.get("tax_owed") or {}).get("balance")):
         out.add("recorded_debt")
     if _truthy(raw.get("sc_tax_delinquent")):
         out.add("tax_lien")
@@ -111,7 +118,10 @@ def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
         out.add("lien")
     # the same predicate the scorer and the equity engine use: an assessed-value placeholder in
     # amount_owed is not a debt
-    if is_countable_debt(raw.get("amount_owed")):
+    ao = raw.get("amount_owed")
+    if tax_gone and isinstance(ao, dict) and ao.get("source") == "tax_owed":
+        ao = None
+    if is_countable_debt(ao):
         out.add("recorded_debt")
     if _upset_open(raw.get("upset_bid"), today or date.today()):
         out.add("upset_bid")
@@ -194,7 +204,7 @@ def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
     if _truthy(om.get("out_of_state")):
         out.add("out_of_state_owner")
 
-    return out
+    return out - drop
 
 
 def _category_of(name: str) -> Optional[str]:

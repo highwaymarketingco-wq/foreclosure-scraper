@@ -14,10 +14,12 @@ is about to act on. It is explicitly not a bulk/background sweep (the spec
 this implements, docs/validation_2026-10-02/VERIFICATION_PIPELINE_SPEC.md
 section 4, is explicit that a CAPTCHA step must never be bulk/background).
 
-NOT WIRED TO THE BOARD: this script prints/saves the resulting
-`raw.verification` record and a preview of the patch a follow-up write step
-would apply -- it never calls `web_artifact.patch_existing_rows()` itself.
-See verification_human_lane.py's "NOT WIRED TO THE BOARD" docstring section.
+WRITES THE VERIFICATION LEDGER (2026-10-05, docs/HANDOFF.md item 66): every record
+(the step-1 "wall" placeholder and the step-2 verdict) is merged into
+docs/handoff/verification/<signal>.json and only those files are committed and pushed;
+the VM's next run attaches them to the row as raw['verification'] before scoring. This
+script never writes the board. --no-ledger skips the ledger; --no-push (or HANDOFF_PUSH=0)
+writes it without git.
 
 Usage
 -----
@@ -79,6 +81,11 @@ def main() -> int:
     ap.add_argument("--no-open", action="store_true",
                      help="don't open a browser (print the URL instead) -- e.g. on a headless box")
     ap.add_argument("--out", default=None, help="write JSON result here (default: stdout)")
+    ap.add_argument("--no-ledger", action="store_true",
+                     help="do not write docs/handoff/verification/<signal>.json")
+    ap.add_argument("--no-push", action="store_true",
+                     help="write the ledger but do not commit/push it")
+    ap.add_argument("--ledger-dir", default=None, help="default docs/handoff/verification")
     args = ap.parse_args()
 
     try:
@@ -132,6 +139,25 @@ def main() -> int:
 
     patch_previews = [lane.build_patch_preview(row, r) for r in records]
 
+    ledger_paths: list[str] = []
+    if not args.no_ledger:
+        from foreclosure_scraper.verification.ledger import LedgerUnreadable, publish_ledgers
+        try:
+            for r in records:
+                p = lane.record_to_ledger(row, r, directory=Path(args.ledger_dir) if args.ledger_dir else None)
+                if str(p) not in ledger_paths:
+                    ledger_paths.append(str(p))
+        except LedgerUnreadable as exc:
+            print(f"ERROR: verification ledger unreadable, not overwritten: {exc}", file=sys.stderr)
+            return 1
+        print(f"ledger: {', '.join(ledger_paths)}", file=sys.stderr)
+        if not args.no_push:
+            verdicts = ", ".join(f"{r['signal']} {r['verdict']}" for r in records)
+            res, detail = publish_ledgers([Path(p) for p in ledger_paths],
+                                          f"verification hand-off (human lane): {verdicts} "
+                                          f"[{row.get('county')} {row.get('parcel_id') or row.get('case_number') or ''}]")
+            print(f"git: {res} {detail}", file=sys.stderr)
+
     any_pending = any(r["verdict"] == "wall" for r in records)
     if any_pending:
         print(
@@ -142,14 +168,13 @@ def main() -> int:
         )
     else:
         print(
-            "\nDone. These records are NOT applied to the board -- "
-            "patch_existing_rows() is not called by this tool. See the "
-            "'raw_patch' preview below for what a follow-up write step "
-            "would apply.",
+            "\nDone. The records are in the verification ledger above; the VM's next run "
+            "attaches them to this row (raw['verification']). This tool never writes the board.",
             file=sys.stderr,
         )
 
-    _emit({"verification_records": records, "patch_previews": patch_previews}, args.out)
+    _emit({"verification_records": records, "ledger_files": ledger_paths,
+           "patch_previews": patch_previews}, args.out)
     return 0
 
 

@@ -65,6 +65,7 @@ from .signal_freshness import (
     bankruptcy_lapsed, code_enforcement_open, has_real_probate, incarceration_active, to_date,
 )
 from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
+from .verification.core import suppressed_scorer_signals
 
 log = structlog.get_logger()
 
@@ -663,6 +664,10 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     lt = _ltype(li)
     slugs = _slugs(li)
     by_name = _resolved_by_name(r)
+    # Per-listing verification (verification/, docs/HANDOFF.md item 66): a non-expired refuted
+    # or stale verdict removes the scorer signals its record governs, at the end of this
+    # function. "recorded_debt:tax" is the partial rule read in the debt block below.
+    drop = suppressed_scorer_signals(r, today)
 
     # ---- the listing-type signal ---------------------------------------------------
     override = None
@@ -735,7 +740,14 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     # ---- debt ------------------------------------------------------------------------
     _to = r.get("tax_owed")
     _real_tax = isinstance(_to, dict) and isinstance(_to.get("balance"), (int, float)) and _to["balance"] > 0
-    if is_countable_debt(r.get("amount_owed")) or _real_tax:
+    _ao = r.get("amount_owed")
+    if "recorded_debt:tax" in drop:
+        # the county says the tax balance behind this debt is not owed (refuted) or was paid
+        # since (stale): a judgment or an opening bid still counts, the tax balance does not
+        _real_tax = False
+        if isinstance(_ao, dict) and _ao.get("source") == "tax_owed":
+            _ao = None
+    if is_countable_debt(_ao) or _real_tax:
         # A REAL debt only: an actual judgment / opening bid, or a real delinquent-tax balance
         # (raw['tax_owed']). An estimate (assessed value, an assumed two years of tax) is a
         # magnitude hint the amount_owed module itself labels "not debt". The waterfall can
@@ -860,6 +872,9 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
         # stacks normally with absentee/tax signals (the LAND_WHOLESALE lane this enricher
         # feeds), the same as every other PROPERTY signal here.
         sig.append(("vacant_lot", "PROPERTY", 10, REC))
+    if drop:
+        c.signals = [x for x in c.signals if x[0] not in drop]
+        c.events = [e for e in c.events if e[0] not in drop]
     return c
 
 

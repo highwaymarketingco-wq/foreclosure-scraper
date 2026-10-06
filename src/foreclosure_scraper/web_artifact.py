@@ -1994,6 +1994,10 @@ RAW_KEEP = {
     "bid4assets": "*",                # auction-site raw payload
     "sos_status": "*",                # NC SOS LLC dissolution status (when defendant is LLC)
     "sos_agent": "*",                 # NC SOS registered agent + officers = free entity-owner contact
+    # Per-listing verification verdicts, one record per signal ({signal, verdict, evidence,
+    # source, checked_at, verifier_version, verifier, expires_at, governs}), attached by
+    # verification.apply from docs/handoff/verification/<signal>.json (HANDOFF item 66).
+    "verification": "*",
     "rent_comps_extra": "*",          # broader rent comp pool when strict was empty
     "rent_median_ppsf_extra": "*",
     "estimated_monthly_rent_extra": "*",
