@@ -2056,6 +2056,7 @@ RAW_KEEP = {
     "divorce": "*",                   # SC Family-Court divorce / marital-dissolution match on owner party-name (FCCMS)
     "geo_imprecise": "*",             # out_of_bbox (geo nulled) | centroid_snap/county_centroid/county_centroid_no_addr (no real address, shared fallback point) | census_geocode (REAL resolved address, not a shared point — valuation/calc.py treats it as full precision, see its geo_imprecise_comps comment)
     "stale_case": "*",                # presumed_withdrawn lis-pendens — likely resolved, down-ranked from HOT
+    "parcel_id_nulled": "*",          # {value, reason}: the source's id validation nulled (too short / bad pattern); merge_prior_board re-keys the published row with it
     "staleness": "*",                 # staleness_sweep verdict {state: upset_closed|sale_passed|gone_quiet, ...} for dashboard filtering
     "life_events": "*",               # elderly/probate signals: life_estate | estate_probate | multiple_heirs | trust
     "probate": "*",                   # probate court case search result: case_number, filing_date, court, decedent, status

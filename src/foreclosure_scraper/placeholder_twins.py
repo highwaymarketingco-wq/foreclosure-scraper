@@ -58,7 +58,21 @@ WHO USES IT
 The merge itself is always Listing.merge() with the re-scraped (fresh) row as the base, so fresh
 wins on conflicting fields and the old row backfills missing ones; fold() then keeps the old
 row's numbered situs over the fresh row's sentinel string, which is the address the board was
-already publishing.
+already publishing, BUT ONLY WHEN THAT NUMBER CAME FROM THE COUNTY (county_situs()).
+
+ADDRESS RULE (2026-10-06, measured on all 325 groups of the 10/5 pre_publish plan against the
+parcel cache, the county's own situs and owner-mailing record):
+    The twins are real duplicates (same valid parcel, shared source), but the old copy's NUMBERED
+    address was the county situs in only 69 groups, every one stamped
+    raw['situs_address_source'] = 'parcel_cache:exact'. In 208 it is the owner's MAILING address
+    (713272200834 '0 EMERALD CT' vs '100 MISTYBROOK DR'; 710297267572: county situs 'CONVAIR DR',
+    old copy '717 TABERNACLE LN' = owner mailing '717 TABERNACLE LN LYMAN SC'), in 25 another
+    street with no county support, in 18 the county says the parcel has no number at all, and 5
+    are a reverse geocode ('10, Reynolds Lane, Weaverville, ...'), a map reference
+    ('24 M 144   0 Barkley Dr') or a legal description ('1244 HIGHLANDS 2802252'). None of those
+    256 carries the parcel_cache provenance (182 carry raw['situs_road_only']: the county itself
+    said the parcel has no house number). So the old copy's number replaces a sentinel only when
+    county_situs() vouches for it; otherwise the merged row keeps the live row's own address.
 """
 from __future__ import annotations
 
@@ -71,7 +85,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Callable, Iterable, Optional
 
 from .dedupe import _house_no_of, drop_withdrawn_tags
-from .models import Listing, _UNIT_RE, _normalize_parcel
+from .models import Listing, _UNIT_RE, _deep_merge_dict, _normalize_parcel
 from .validation import _PARCEL_BAD_PATTERNS
 from .web_artifact import _PLACEHOLDER_HOUSE_NUM_RE
 
@@ -85,6 +99,12 @@ MAX_GROUP_ROWS = 4
 
 #: raw keys that mark a parcel id a resolver attached, rather than one the source published.
 RESOLVER_PARCEL_KEYS = ("parcel_from_geo", "parcel_from_address")
+
+#: raw['situs_address_source'] values that mean the street address was written from the county's
+#: own parcel record (scripts/fill_address_from_parcel.py via the parcel cache). See the module
+#: docstring's ADDRESS RULE for why nothing else qualifies ('gis_parcel_situs' wrote 47 owner
+#: mailing addresses among the 10/5 twins).
+COUNTY_SITUS_PREFIXES = ("parcel_cache:",)
 
 
 # ------------------------------------------------------------------------------ field rules
@@ -136,6 +156,13 @@ def resolver_parcel(raw: Any) -> bool:
     return isinstance(raw, dict) and any(raw.get(k) for k in RESOLVER_PARCEL_KEYS)
 
 
+def county_situs(row: Any) -> bool:
+    """``row``'s street address was written from the county's own parcel record (see the module
+    docstring's ADDRESS RULE). The only old-copy house number another row may take."""
+    src = _raw(row).get("situs_address_source")
+    return isinstance(src, str) and src.startswith(COUNTY_SITUS_PREFIXES)
+
+
 def _get(row: Any, name: str) -> Any:
     return row.get(name) if isinstance(row, dict) else getattr(row, name, None)
 
@@ -170,12 +197,18 @@ def twin_pair_ok(a: Any, b: Any) -> bool:
 
 def fold(base: Listing, other: Listing) -> Listing:
     """``base.merge(other)`` (fresh/live row first: its non-null fields win, ``other`` backfills),
-    except that a base whose situs is a no-number sentinel takes ``other``'s numbered situs.
-    Listing.merge() would keep the sentinel (it is non-null), and the sentinel is exactly what
-    _to_dict nulls on publish, so without this the address the board was showing would vanish."""
+    except that a base whose situs is a no-number sentinel takes ``other``'s numbered situs when
+    county_situs(other) says the county wrote it. Listing.merge() would keep the sentinel (it is
+    non-null), and the sentinel is exactly what _to_dict nulls on publish. Any other number on the
+    old copy (an owner's mailing address, a reverse geocode, a map reference) is not taken: the
+    merged row keeps the base's own address (see the module docstring's ADDRESS RULE). That
+    includes a base with no address at all, which Listing.merge() would otherwise backfill with
+    the old copy's number (SC|oconee|1450003017: '1244 HIGHLANDS 2802252', a legal description)."""
     merged = base.merge(other)
-    if is_sentinel_address(base.street_address) and real_house_no(other.street_address):
-        merged.street_address = other.street_address
+    base_addr = base.street_address
+    if real_house_no(other.street_address) and (
+            is_sentinel_address(base_addr) or not (base_addr or "").strip()):
+        merged.street_address = other.street_address if county_situs(other) else base_addr
     return merged
 
 
@@ -262,6 +295,33 @@ def _view(idx: int, row: Any, key: str, revived: frozenset = frozenset()) -> _Vi
 # result the tail would have produced without the tag. It cannot restore the live row's own
 # top-level values: the merge kept only the aged row's, the checkpoint holds no other copy, and
 # every enricher after dedupe2 ran on the merged row.
+#
+# THE WHOLE 10/5 CHECKPOINT (2026-10-06, streamed on the VM; the four-source replay above was a
+# sample). 6,414 tagged rows have last_seen at or after the run start; 5,493 of them are their
+# OWN prior copy (same source, first_seen and address/parcel) and only 1,545 show a second
+# source. The big class is an identity mismatch, not a fusion: validation nulls a parcel id
+# under 7 characters before publish, so Catawba's tax-account rows (3,737; parcel '65771' in the
+# scrape, None on the board) and other short-id rolls never matched their published copy in
+# merge_prior_board(), were aged, and dedupe2 met them again through the synthesized
+# 'Parcel - <owner> ...' address. Checked live on 10/6: all 3,519 Catawba rows that carry their
+# account number are on today's delinquent list, all 457 hud_reac_inspection rows are in
+# today's REAC pull. 143 fannie_homepath rows were revived by enrichment_reo_freshness (it set
+# last_seen when HomePath still listed them, 2026-10-06T03:2x, and left the tag).
+#
+# THE CUTOFF IS NOT ALWAYS THE RUN START. Rows from the Mac's stealth hand-off keep the Mac's
+# scrape time as last_seen (10/4 19:34:31 - 21:13:51 for the hand-off the 10/5 run ingested),
+# which is BEFORE the VM run's start: 266 tagged rows carry exactly such a stamp. What separates
+# "seen this run" from "aged" is the prior board: every aged row kept a last_seen from it, and
+# its newest is 2026-10-02T21:47:35.693631. So the cutoff is any instant after the prior board's
+# newest last_seen and no later than the oldest last_seen this run brought in (the hand-off's
+# oldest row when there is one); for the 10/5 run that is 2026-10-04T19:34:31Z, and it moves no
+# untagged-but-old row and no aged row (the newest tagged row before it is 10/2 21:31:37).
+#
+# STALE_CASE WITHOUT A TAG. board_quality sets raw['stale_case'] only for the two withdrawn
+# reasons, and merge_prior_board() cleared pulled_sale and the status on a matched row but kept
+# the prior copy's stale_case. So a row seen this run that carries stale_case and no tag
+# inherited it: 7,741 in the 10/5 checkpoint. The dashboard reads stale_case as "presumed
+# withdrawn" and lead_signals caps intent at 69 on it, so these are repaired the same way.
 
 
 def parse_stamp(v: Any) -> Optional[datetime]:
@@ -296,14 +356,16 @@ class _Reseen:
     status: Optional[str] = None
     hot_demoted: bool = False
     also_seen_in: tuple = ()
+    #: "tagged" (carries raw['pulled_sale']) or "stale_case" (an inherited stale_case, no tag)
+    kind: str = "tagged"
 
     def ident(self) -> list:
         return [self.source, self.street_address, self.first_seen, self.last_seen]
 
     def sample(self) -> dict:
-        return {"row": self.ident(), "parcel_id": self.parcel_id, "aged_copy_source":
-                self.aged_source, "also_seen_in": list(self.also_seen_in), "status": self.status,
-                "hot_demoted": self.hot_demoted}
+        return {"row": self.ident(), "kind": self.kind, "parcel_id": self.parcel_id,
+                "aged_copy_source": self.aged_source, "also_seen_in": list(self.also_seen_in),
+                "status": self.status, "hot_demoted": self.hot_demoted}
 
 
 def _reseen_view(idx: int, row: Any) -> _Reseen:
@@ -315,7 +377,15 @@ def _reseen_view(idx: int, row: Any) -> _Reseen:
                    parcel_id=_get(row, "parcel_id"), status=_get(row, "auction_status"),
                    aged_source=ps.get("last_seen_source") if isinstance(ps, dict) else None,
                    hot_demoted=_hot_demoted_by_tag(raw),
-                   also_seen_in=tuple(sorted(sources_of(None, raw))))
+                   also_seen_in=tuple(sorted(sources_of(None, raw))),
+                   kind="tagged" if ps else "stale_case")
+
+
+def _repairable(row: Any) -> bool:
+    """A row the reseen repair may touch: it carries the withdrawn tag, or the stale_case flag
+    that only the tag ever sets (see STALE_CASE WITHOUT A TAG above)."""
+    raw = _raw(row)
+    return bool(raw.get("pulled_sale") or raw.get("stale_case"))
 
 
 def repair_reseen(listings: list[Listing], today: Optional[date] = None) -> dict:
@@ -332,7 +402,12 @@ def repair_reseen(listings: list[Listing], today: Optional[date] = None) -> dict
         raw = li.raw if isinstance(li.raw, dict) else {}
         stats["status_cleared"] += li.auction_status == "presumed_withdrawn"
         stats["stale_case_cleared"] += bool(raw.get("stale_case"))
+        stats["stale_case_only"] += not raw.get("pulled_sale")
         drop_withdrawn_tags(li)
+        # No scraper writes this status; on a row this run saw it can only be inherited, with or
+        # without the miss counter that normally comes with it.
+        if li.auction_status == "presumed_withdrawn":
+            li.auction_status = None
         if _hot_demoted_by_tag(li.raw):
             ds = copy.deepcopy(li.raw["distress_stack"])
             ds["tier"] = "HOT"
@@ -399,11 +474,16 @@ class CollapsePlan:
                 "drop": [v.ident() for v in g["drop"]],
             })
         if self.seen_since is not None:
-            order = lambda v: (v.source, v.last_seen, v.idx)  # noqa: E731
+            order = lambda v: (v.kind != "tagged", v.source, v.last_seen, v.idx)  # noqa: E731
+            tagged = [v for v in self.reseen if v.kind == "tagged"]
+            stale = [v for v in self.reseen if v.kind != "tagged"]
             out["reseen"] = {
                 "seen_since": self.seen_since,
                 "rows_repaired": len(self.reseen),
-                "by_source": dict(Counter(v.source for v in self.reseen).most_common()),
+                "tagged_rows": len(tagged),
+                "stale_case_only_rows": len(stale),
+                "by_source": dict(Counter(v.source for v in tagged).most_common()),
+                "stale_case_only_by_source": dict(Counter(v.source for v in stale).most_common()),
                 "status_presumed_withdrawn": sum(v.status == "presumed_withdrawn"
                                                  for v in self.reseen),
                 "hot_demoted_by_tag": sum(v.hot_demoted for v in self.reseen),
@@ -421,10 +501,13 @@ def plan_collapse(rows: Callable[[], Iterable[Any]], seen_since: Any = None) -> 
     house number, plus the aging prior-only copies of the same parcel from the same source that
     the merge left beside it.
 
-    RESEEN ROWS (only when ``seen_since``, the run's start, is given): a row carrying
-    raw['pulled_sale'] whose last_seen is at or after ``seen_since`` absorbed a row created
-    this run (see the block comment above parse_stamp()) and is planned for repair_reseen().
-    A repaired row counts as live for the twin rule too.
+    RESEEN ROWS (only when ``seen_since`` is given): a row carrying raw['pulled_sale'] whose
+    last_seen is at or after ``seen_since`` absorbed a row this run brought in (see the block
+    comment above parse_stamp()) and is planned for repair_reseen(); so is an untagged row with
+    an inherited raw['stale_case'] at or after it. A repaired row counts as live for the twin
+    rule too. ``seen_since`` is NOT simply the run's start when the run ingested rows stamped
+    earlier (the Mac hand-off): it must sit after the prior board's newest last_seen and at or
+    before the oldest last_seen the run brought in. The evidence block shows where it falls.
 
     ``rows`` is called twice and must yield the same rows in the same order each time (dicts
     or Listings): pass 1 keeps only the parcel keys of live placeholder rows and a small view of
@@ -444,7 +527,7 @@ def plan_collapse(rows: Callable[[], Iterable[Any]], seen_since: Any = None) -> 
     seeds: dict[str, int] = {}
     revived: set[int] = set()
     below = above = None
-    carry_below = 0
+    below_days: Counter = Counter()
     n = 0
     for n, row in enumerate(rows(), start=1):
         raw = _raw(row)
@@ -453,14 +536,19 @@ def plan_collapse(rows: Callable[[], Iterable[Any]], seen_since: Any = None) -> 
                 continue
             ls = parse_stamp(_get(row, "last_seen"))
             if ls is None or ls < cut:
-                if ls is not None and (below is None or ls > below):
-                    below = ls
-                carry_below += bool(raw.get("carryover"))
+                if ls is not None:
+                    below_days[ls.date().isoformat()] += 1
+                    if below is None or ls > below:
+                        below = ls
                 continue
             if above is None or ls < above:
                 above = ls
             plan.reseen.append(_reseen_view(n - 1, row))
             revived.add(n - 1)
+        elif cut is not None and raw.get("stale_case"):
+            ls = parse_stamp(_get(row, "last_seen"))
+            if ls is not None and ls >= cut:
+                plan.reseen.append(_reseen_view(n - 1, row))
         addr = _get(row, "street_address")
         if real_house_no(addr) or has_unit(addr):
             continue
@@ -470,10 +558,15 @@ def plan_collapse(rows: Callable[[], Iterable[Any]], seen_since: Any = None) -> 
         seeds[k] = seeds.get(k, 0) + 1
     plan.rows_scanned = n
     if cut is not None:
+        # The newest days of tagged rows left alone: the cutoff should sit in a gap after them.
+        # (The old 'tagged_carryover_rows_before_cutoff_not_judged' count is gone: raw['carryover']
+        # is sticky from the 8/14 and 9/22 runs, so it counted 2,922 rows that had nothing to do
+        # with this run.)
         plan.evidence = {
             "newest_tagged_last_seen_before_cutoff": below.isoformat() if below else None,
             "oldest_tagged_last_seen_at_or_after_cutoff": above.isoformat() if above else None,
-            "tagged_carryover_rows_before_cutoff_not_judged": carry_below,
+            "tagged_rows_before_cutoff_newest_days": dict(sorted(below_days.items())[-4:]),
+            "stale_case_only_rows_at_or_after_cutoff": sum(v.kind != "tagged" for v in plan.reseen),
         }
 
     if not seeds:
@@ -534,8 +627,9 @@ def apply_collapse(listings: list[Listing], plan: CollapsePlan,
     """Apply ``plan`` to ``listings`` IN PLACE. Every planned row is re-checked against the
     plan's view of it first (CollapsePlanMismatch, nothing changed, if any differs). Then the
     reseen rows are repaired (repair_reseen()), and each twin group's live row absorbs its aging
-    copies via fold() (newest copy first), loses the copies' withdrawn tags, keeps its own
-    scored outputs, and the copies are removed."""
+    copies via fold() (newest copy first; a copy's house number only when county_situs()),
+    loses the copies' withdrawn tags, keeps its own raw values and scored outputs (a copy only
+    adds raw keys the live row lacks), and the copies are removed."""
     for g in plan.groups:
         for v in [g["keep"], *g["drop"]]:
             if v.idx >= len(listings):
@@ -550,7 +644,7 @@ def apply_collapse(listings: list[Listing], plan: CollapsePlan,
         li = listings[v.idx]
         now = _reseen_view(v.idx, li)
         ls = parse_stamp(li.last_seen)
-        if (now.ident() != v.ident() or not _raw(li).get("pulled_sale")
+        if (now.ident() != v.ident() or now.kind != v.kind or not _repairable(li)
                 or ls is None or cut is None or ls < cut):
             raise CollapsePlanMismatch(f"row {v.idx}: planned reseen {v.ident()} found {now.ident()}")
 
@@ -564,12 +658,17 @@ def apply_collapse(listings: list[Listing], plan: CollapsePlan,
         own = merged.raw if isinstance(merged.raw, dict) else {}
         keep_stale = bool(own.get("stale_case"))
         scored = {k: copy.deepcopy(own[k]) for k in _KEEP_SCORED_RAW_KEYS if k in own}
+        # The live row was enriched THIS run; an aging copy's raw is from an earlier one (and on
+        # the 10/5 twins often wrong: owner_mailing of another owner, old valuations). The copy
+        # only fills raw keys the live row lacks; every leaf both carry keeps the live value.
+        own_raw = copy.deepcopy(own)
         for v in g["drop"]:
             before = merged.street_address
             merged = fold(merged, listings[v.idx])
             if merged.street_address != before:
                 restored += 1
             dropped.add(v.idx)
+        merged.raw = _deep_merge_dict(merged.raw, own_raw)
         clear_reappeared(merged, keep_stale_case=keep_stale)
         merged.raw.update(scored)
         listings[keep_idx] = merged

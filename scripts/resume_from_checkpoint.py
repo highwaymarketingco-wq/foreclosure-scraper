@@ -50,10 +50,15 @@ RESEEN-ROW REPAIR (opt-in, same dry run, same digest, 2026-10-05)
     merge_prior_board() kept, aged rows first, so the live row came out tagged presumed
     withdrawn (raw['pulled_sale'], the status, then board_quality's stale_case and HOT->WARM).
     dedupe.merge_rows() fixes future runs; see placeholder_twins.repair_reseen() for this one.
-    Pass the run's start with --seen-since (dry run) and RESUME_SEEN_SINCE (publish), e.g.
-    2026-10-05T01:27:29Z for the 10/5 run (orchestrator.start in its log): a tagged row whose
-    last_seen is at or after it absorbed a row created this run. The plan, the digest and the
-    apply then cover both parts; without it they are the twins-only plan and digest, unchanged.
+    Pass a cutoff with --seen-since (dry run) and RESUME_SEEN_SINCE (publish): a tagged row whose
+    last_seen is at or after it absorbed a row this run brought in, and so did an untagged row
+    that still carries an inherited raw['stale_case']. The cutoff is NOT simply the run's start
+    when the run ingested the Mac's stealth hand-off: those rows keep the Mac's scrape time. It
+    must be after the prior board's newest last_seen and at or before the oldest last_seen the
+    run brought in. For the 10/5 run: prior board newest 2026-10-02T21:47:35.693631, hand-off
+    rows 2026-10-04T19:34:31 .. 21:13:51 (commit 3e418a6d), run start 2026-10-05T01:27:29Z, so
+    2026-10-04T19:34:31Z (the run start alone misses 266 hand-off rows). The plan, the digest
+    and the apply then cover both parts; without it they are the twins-only plan and digest.
 
 USAGE
     python3 scripts/resume_from_checkpoint.py                 # show the checkpoint, change nothing
@@ -286,8 +291,10 @@ def main() -> int:
                     metavar="DIGEST", help=f"collapse placeholder twins before publishing (also "
                     f"{COLLAPSE_ENV}=1|<digest>); off by default")
     ap.add_argument("--seen-since", default=None, metavar="ISO",
-                    help=f"--collapse-dry-run: the run's start; also plans the reseen-row repair "
-                         f"(publish reads {SEEN_SINCE_ENV}); off by default")
+                    help=f"--collapse-dry-run: the oldest last_seen this run brought in (the run "
+                         f"start, or the hand-off's oldest row when earlier; see the module "
+                         f"docstring); also plans the reseen-row repair (publish reads "
+                         f"{SEEN_SINCE_ENV}); off by default")
     ap.add_argument("--plan-out", default=None, help="--collapse-dry-run: write the full plan here")
     ap.add_argument("--sample", type=int, default=15, help="--collapse-dry-run: sample size")
     ap.add_argument("--max-age-h", type=float, default=None,

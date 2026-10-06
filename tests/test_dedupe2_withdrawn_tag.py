@@ -302,7 +302,11 @@ def test_plan_finds_exactly_the_rows_this_run_saw(tmp_path):
     ev = plan.evidence
     assert ev["newest_tagged_last_seen_before_cutoff"] == PRIOR_T.isoformat()
     assert ev["oldest_tagged_last_seen_at_or_after_cutoff"] == FRESH_T.isoformat()
-    assert ev["tagged_carryover_rows_before_cutoff_not_judged"] == 1
+    # The carryover count is gone (raw['carryover'] is sticky across runs, so it measured nothing
+    # about this run); the newest days of untouched tagged rows show where the cutoff sits.
+    assert "tagged_carryover_rows_before_cutoff_not_judged" not in ev
+    assert ev["tagged_rows_before_cutoff_newest_days"] == {PRIOR_T.date().isoformat(): 2}
+    assert ev["stale_case_only_rows_at_or_after_cutoff"] == 0
     p = _write(rows, tmp_path / "board.json.gz")
     from_file = PT.plan_collapse(lambda: iter_gz_rows(p), seen_since=RUN_START)
     assert from_file.digest() == plan.digest()                    # dry run == apply
@@ -372,7 +376,10 @@ def test_a_repaired_placeholder_row_counts_as_live_for_the_twin_rule():
     live = tagged_live[1]
     live.raw["pulled_sale"] = {"presumed_withdrawn": True, "consecutive_misses": 1}  # as dedupe2 left it
     live.auction_status = "presumed_withdrawn"
-    twin = _aged(src, ("714252203123", "499 PATCH DR SPARTANBURG", "OWNER"))
+    # The real 714252203123 copy got its number from the county record (parcel cache); only such
+    # a number may replace the sentinel (placeholder_twins' ADDRESS RULE).
+    twin = _aged(src, ("714252203123", "499 PATCH DR SPARTANBURG", "OWNER"),
+                 raw={"situs_address_source": "parcel_cache:exact"})
     rows = [twin, live]
     off = PT.plan_collapse(lambda: rows)
     assert off.groups == [] and not off.skipped

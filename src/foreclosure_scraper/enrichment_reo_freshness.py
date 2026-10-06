@@ -127,6 +127,7 @@ async def prune_stale_reo(listings: list[Listing]) -> tuple[list[Listing], dict]
     # module docstring — the fetch above already succeeded; discarding its
     # rows here was the actual gap, not a missing scraper capability.
     landed = {"matched": 0, "added": 0, "skipped_no_addr": 0, "skipped_out_of_scope": 0}
+    revived: list[Listing] = []
     _in_scope = None  # lazy-imported once, only if we actually have a candidate
     for slug, fresh in fresh_by_slug.items():
         for fr in fresh:
@@ -148,6 +149,11 @@ async def prune_stale_reo(listings: list[Listing]) -> tuple[list[Listing], dict]
                     existing.opening_bid = fr.opening_bid
                 if fr.last_seen:
                     existing.last_seen = fr.last_seen
+                # Still in HomePath's live inventory, so not withdrawn: drop a withdrawn tag
+                # the row carried in (2026-10-06: 143 fannie_homepath rows of the 10/5 run got
+                # this pull's last_seen and kept "presumed withdrawn").
+                if _drop_withdrawn(existing):
+                    revived.append(existing)
                 landed["matched"] += 1
                 continue
             # No board row for this address — a genuinely new listing the
@@ -165,5 +171,30 @@ async def prune_stale_reo(listings: list[Listing]) -> tuple[list[Listing], dict]
             existing_by_id[aid] = fr
             landed["added"] += 1
 
-    log.info("reo_freshness.done", pruned=pruned, kept=len(kept), landed=landed)
-    return kept, {"pruned": sum(pruned.values()), "by_source": pruned, "landed": landed}
+    if revived:
+        # intent_score ran before this step (main.run_enrich_tail: lead_signals, then reo
+        # freshness, then board quality) and was capped on the tag; redo it for these rows.
+        try:
+            from .enrichment_lead_signals import enrich_lead_signals
+            enrich_lead_signals(revived)
+        except Exception:  # noqa: BLE001 - a scoring hiccup must not undo the prune/upsert
+            log.warning("reo_freshness.intent_rescore_failed", rows=len(revived))
+    log.info("reo_freshness.done", pruned=pruned, kept=len(kept), landed=landed,
+             untagged=len(revived))
+    return kept, {"pruned": sum(pruned.values()), "by_source": pruned, "landed": landed,
+                  "untagged": len(revived)}
+
+
+def _drop_withdrawn(li: Listing) -> bool:
+    """Remove a withdrawn tag from a row the fresh pull just saw: the pulled_sale miss counter,
+    the 'presumed_withdrawn' status and raw['stale_case'] (dedupe.drop_withdrawn_tags, plus the
+    status even without a counter: no scraper writes it). True when anything was removed."""
+    from .dedupe import drop_withdrawn_tags
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    had = bool(raw.get("pulled_sale") or raw.get("stale_case")
+               or li.auction_status == "presumed_withdrawn")
+    if had:
+        drop_withdrawn_tags(li)
+        if li.auction_status == "presumed_withdrawn":
+            li.auction_status = None
+    return had

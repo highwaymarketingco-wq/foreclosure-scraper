@@ -238,9 +238,19 @@ def identity_conflict(x: Identity, y: Identity, evidence: str = ADDRESS) -> Opti
 
 def _merge(a: Listing, b: Listing) -> Listing:
     """merge_rows(), and an unnumbered merged row takes the numbered member's address (the
-    merge was allowed only because their valid parcels agree)."""
+    merge was allowed only because their valid parcels agree). An AGED member's number counts
+    only when the county wrote it (placeholder_twins.county_situs): on the 10/5 board most numbers
+    on aged copies of unnumbered parcels were the owner's mailing address (placeholder_twins'
+    ADDRESS RULE), and a live member that has no number must not take one of those, neither over
+    its sentinel nor into its empty address (Listing.merge() backfills that)."""
     out = merge_rows(a, b)
     pt = _pt()
+    if is_aged(a) != is_aged(b):
+        live, aged = (b, a) if is_aged(a) else (a, b)
+        if (pt.real_house_no(aged.street_address) and not pt.real_house_no(live.street_address)
+                and not pt.county_situs(aged)):
+            out.street_address = live.street_address
+            return out
     if not pt.real_house_no(out.street_address):
         for li in (a, b):
             if pt.real_house_no(li.street_address):

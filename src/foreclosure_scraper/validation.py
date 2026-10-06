@@ -135,6 +135,16 @@ _PARCEL_BAD_PATTERNS = (
 )
 
 
+def _record_nulled_parcel(li: Listing, pid: str, reason: str) -> None:
+    """Keep the id the source gave in raw['parcel_id_nulled'] when it is nulled here. It is
+    still that source's identifier for the row (Catawba's tax account '65771'), and the next
+    run's re-scrape carries it as parcel_id again: board_persist.merge_prior_board() rebuilds the
+    published row's key from it, or it never matches its own re-scrape (2026-10-06)."""
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    li.raw["parcel_id_nulled"] = {"value": pid, "reason": reason}
+
+
 def _validate_parcel_id(li: Listing, stats: dict) -> None:
     pid = (li.parcel_id or "").strip()
     if not pid:
@@ -142,12 +152,14 @@ def _validate_parcel_id(li: Listing, stats: dict) -> None:
     if len(pid) < 7:
         stats["parcel_nulled_too_short"] += 1
         log.warning("validation.parcel_too_short", source=li.source, pid=pid)
+        _record_nulled_parcel(li, pid, "too_short")
         li.parcel_id = None
         return
     for pat in _PARCEL_BAD_PATTERNS:
         if pat.match(pid):
             stats["parcel_nulled_bad_pattern"] += 1
             log.warning("validation.parcel_bad_pattern", source=li.source, pid=pid)
+            _record_nulled_parcel(li, pid, "bad_pattern")
             li.parcel_id = None
             return
 

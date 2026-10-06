@@ -133,7 +133,9 @@ from .web_artifact import (
 )
 from .dedupe import _house_no_of, different_valid_parcels as _different_valid_parcels_id
 from .dedupe import identity as _identity
-from .placeholder_twins import MAX_GROUP_ROWS, fold, real_house_no, twin_pair_ok
+from .models import _normalize_parcel
+from .placeholder_twins import MAX_GROUP_ROWS, fold, real_house_no, sources_of, twin_pair_ok
+from .validation import _PARCEL_BAD_PATTERNS
 
 log = structlog.get_logger()
 
@@ -257,6 +259,63 @@ def _different_valid_parcels(rec: dict, li: Listing) -> bool:
     return _different_valid_parcels_id(a, _identity(li))
 
 
+#: Where a source keeps, in its own raw block, the id it wrote as parcel_id: (block, key). Read
+#: only for a published row that predates raw['parcel_id_nulled'] (validation.py, 2026-10-06).
+#: Each entry is the scraper's own assignment, checked in its code: parcel_id=ident with
+#: county_id=ident (nc_county_pdf_delinquent_tax), parcel_id=parcel with "parcel": parcel
+#: (rutherford_tax, nc_ptscloud_delinquent_tax), parcel_id=PARCELID or PIN with "PARCELID"
+#: (lincoln_vacant; a PIN is 10 digits and never nulled).
+_SOURCE_PARCEL_FIELDS = {
+    "counties_nc.nc_county_pdf_delinquent_tax": ("nc_county_pdf_delinquent_tax", "county_id"),
+    "counties_nc.rutherford_tax": ("rutherford_tax", "parcel"),
+    "counties_nc.nc_ptscloud_delinquent_tax": ("nc_ptscloud_delinquent_tax", "parcel"),
+    "counties_nc.lincoln_vacant": ("lincoln_vacant", "PARCELID"),
+}
+
+
+def _restored_parcel_key(rec: dict) -> str | None:
+    """The dedupe_key() a published prior row had BEFORE validation nulled its short parcel id,
+    i.e. the key this run's re-scrape of it carries (fresh rows are not validated until after
+    the merge). None when the row has a parcel id or none was nulled.
+
+    Why (2026-10-06). validation._validate_parcel_id() nulls a parcel id under 7 characters, so
+    Catawba's tax-account rows publish with parcel None and dedupe_key 'url:<the county PDF>'
+    while the next scrape keys them 'parcel:NC:catawba:65771'. No signature matched, every one
+    was aged, and dedupe2 then fused the live row into its own aged copy (3,737 of the 6,414
+    wrongly "presumed withdrawn" rows of the 10/5 run). With dedupe()'s identity rule (240b8de9)
+    dedupe2 no longer fuses two unnumbered rows on a synthesized address, so the same miss would
+    leave the live row AND an aged copy on the board, one more copy every run."""
+    if rec.get("parcel_id"):
+        return None
+    raw = rec.get("raw")
+    raw = raw if isinstance(raw, dict) else {}
+    pid = None
+    nulled = raw.get("parcel_id_nulled")
+    if isinstance(nulled, dict) and nulled.get("reason") == "too_short":
+        pid = nulled.get("value")
+    if not pid:
+        spec = _SOURCE_PARCEL_FIELDS.get(rec.get("source") or "")
+        blk = raw.get(spec[0]) if spec else None
+        if isinstance(blk, dict):
+            pid = blk.get(spec[1])
+    pid = str(pid or "").strip()
+    norm = _normalize_parcel(pid)
+    # Too weak to identify one row: '0', '00', '123' and the like key many rows of a county.
+    if len(norm) < 4 or len(set(norm)) == 1 or any(p.match(pid) for p in _PARCEL_BAD_PATTERNS):
+        return None
+    try:
+        sigs = _append_dict_sigs({**rec, "parcel_id": pid})
+    except Exception:  # noqa: BLE001 - an unkeyable row simply gets no restored key
+        return None
+    key = next((s[1] for s in sigs if s[0] == "k"), None)
+    return key if isinstance(key, str) and key.startswith("parcel:") else None
+
+
+def _shares_source(rec: dict, li: Listing) -> bool:
+    raw = rec.get("raw")
+    return bool(sources_of(rec.get("source"), raw) & sources_of(li.source, li.raw))
+
+
 def _placeholder_twin_index(rec: dict, rec_sigs, fresh_sig_index: dict,
                             fresh_deduped: list[Listing]) -> int | None:
     """The fresh row a prior row is a placeholder twin of (placeholder_twins.py), or None.
@@ -314,6 +373,8 @@ def merge_prior_board(
         "matched_placeholder_twin": 0,
         "placeholder_twin_ambiguous": 0,
         "refused_different_parcel": 0,
+        "matched_restored_parcel": 0,
+        "reappeared_untagged": 0,
     }
     # Placeholder twins (placeholder_twins.py): on by default; FULLRUN_PERSIST_PLACEHOLDER_TWINS=0
     # restores the strict-only matching of the 2026-10-04 rewrite.
@@ -337,6 +398,10 @@ def merge_prior_board(
         for sig in _append_row_sigs(li):
             fresh_sig_index.setdefault(sig, []).append(i)
     fresh_matched = [False] * len(fresh_deduped)
+    # This run's own carryover replays (carryover.py), before any prior copy is folded in: the
+    # only fresh rows whose raw['carryover'] marker is their own.
+    fresh_carryover = {i for i, li in enumerate(fresh_deduped)
+                       if isinstance(li.raw, dict) and li.raw.get("carryover")}
 
     kept: list[Listing] = []
     prior_total = 0
@@ -412,6 +477,18 @@ def merge_prior_board(
                     break
                 if match_idx is not None:
                     break
+            # No signature matched: a prior row validation stripped of its short parcel id still
+            # matches its own re-scrape under the key it had before (_restored_parcel_key), from
+            # the same source only.
+            if match_idx is None:
+                rk = _restored_parcel_key(rec)
+                same = [i for i in fresh_sig_index.get(("k", rk), ())
+                        if _shares_source(rec, fresh_deduped[i])] if rk else []
+                # exactly one same-source fresh row under that key, or no match at all
+                if (len(same) == 1 and not _provably_different_dict(rec, fresh_deduped[same[0]])
+                        and not _different_valid_parcels(rec, fresh_deduped[same[0]])):
+                    match_idx = same[0]
+                    stats["matched_restored_parcel"] += 1
 
         if refused_parcel and match_idx is None:
             stats["refused_different_parcel"] += 1
@@ -503,12 +580,24 @@ def merge_prior_board(
             raw = li.raw if isinstance(li.raw, dict) else {}
             if raw.get("vision"):
                 stats["carried_vision"] += 1
-            if raw.get("pulled_sale"):
-                # A reappeared lead is active again — clear any stale pulled_sale
-                # miss counter + presumed-withdrawn tag it accumulated while gone.
-                raw.pop("pulled_sale", None)
-                if li.auction_status == "presumed_withdrawn":
-                    li.auction_status = None
+            # A reappeared lead is active again. Listing.merge() backfilled the prior copy's
+            # withdrawn tag onto it: the pulled_sale miss counter, the 'presumed_withdrawn'
+            # status (no scraper writes that value, so on a matched row it is always the
+            # prior's) and board_quality's raw['stale_case'] (set only for those two reasons;
+            # this run's board_quality re-derives it). Until 2026-10-06 stale_case was kept:
+            # 7,741 rows the 10/5 run re-scraped still carried it, and the dashboard reads it as
+            # "presumed withdrawn" and lead_signals caps intent at 69 on it.
+            stats["reappeared_untagged"] += bool(raw.get("pulled_sale") or raw.get("stale_case")
+                                                 or li.auction_status == "presumed_withdrawn")
+            raw.pop("pulled_sale", None)
+            raw.pop("stale_case", None)
+            if li.auction_status == "presumed_withdrawn":
+                li.auction_status = None
+            # raw['carryover'] marks a replay of last run's row for a source that returned zero
+            # (carryover.py). A re-scraped row inherits it from its prior copy and is then hinted
+            # as a stale link forever (3,647 live rows on 10/5 carried one from 8/14 or 9/22).
+            if raw.get("carryover") and i not in fresh_carryover:
+                raw.pop("carryover", None)
             li.raw = raw
         else:
             stats["fresh_only"] += 1
