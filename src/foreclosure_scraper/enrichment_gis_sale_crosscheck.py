@@ -22,9 +22,10 @@ Buncombe, this time keyed by ADDRESS rather than by parcel ring, and prefers
 the county's `SalePrice` over HomeHarvest's `sold_price` when:
 
   (a) the county has a parcel whose house number + street match the comp's
-      address (disambiguated by situs city when more than one candidate
-      shares that house number + street -- Buncombe has several, e.g. two
-      distinct "140 Old Leicester" parcels in different towns), AND
+      address (disambiguated by the parcel's own SITUS fields, `narrow_
+      candidates`, when more than one candidate shares that house number +
+      street -- Buncombe has several, e.g. "140 Old Leicester RD" and "140
+      Old Leicester HWY"), AND
   (b) that parcel's `DeedDate` falls within `DATE_TOLERANCE_DAYS` of the
       comp's claimed `sold_date` -- i.e. it is confidently the SAME closing,
       not an earlier or later one on the same parcel, AND
@@ -38,8 +39,17 @@ requirement here, distinct from the ring-based lookup `enrichment_recorded_
 sales.py` does):
 
   - Buncombe NC: `property_bc_dis/MapServer/1` carries `SalePrice`/`DeedDate`/
-    `Stamps` keyed to a clean `Address`/`HouseNumber`/`streetname`/`CityName`
-    -- confirmed live, wired here.
+    `Stamps` keyed to the situs `HouseNumber`/`NumberSuffix`/`direction`/
+    `streetname`/`StreetType` -- confirmed live, wired here.
+
+    NOT the layer's `Address`/`CityName`/`Zipcode`: live-checked 2026-10-06
+    they are the OWNER'S MAILING address, not the parcel's location (140 Old
+    Leicester RD: Address "PO BOX 304", CityName "ARDEN"; 140 Old Leicester
+    HWY: "27 AUDUBON DR", "ASHEVILLE"; 4 Heatherly Dr: CityName "BALTIMORE").
+    The first version narrowed candidates by CityName == the comp's city, so
+    the confirmed 140 Old Leicester Rd case (board comp city "Asheville")
+    picked the HWY parcel ($0 deed, 2016) and was never corrected. Those
+    columns are personal data and are not requested any more.
   - Anderson SC: its sales-roll layer (`ANDERSON_SALES`,
     `Parcel_Sales/MapServer/0`) has NO usable address field for this purpose
     -- live-queried 2026-10-04 and its `SALOCA` field is a lot/legal
@@ -80,7 +90,10 @@ NC_STAMP_PER_DOLLARS = 500.0  # NC excise tax: $1 per $500 of consideration
 
 BUNCOMBE_PARCELS = ("https://gis.buncombecounty.org/arcgis/rest/services/"
                     "property_bc_dis/MapServer/1/query")
-_BUNCOMBE_FIELDS = "pinnum,Address,HouseNumber,streetname,CityName,SalePrice,DeedDate,Stamps"
+# Situs + sale columns only. Never Address/CityName/Zipcode (the owner's mailing address)
+# or owner/CareOf: see the module docstring.
+_BUNCOMBE_FIELDS = ("pinnum,HouseNumber,NumberSuffix,direction,streetname,StreetType,"
+                    "SalePrice,DeedDate,Stamps,DeedBook,DeedPage")
 
 # (state, county) pairs this module can cross-check, in the SAME tuple shape
 # `enrichment_comps.py` already keys its county pools with (state upper-cased,
@@ -107,6 +120,121 @@ def split_house_street(addr: str) -> tuple[str, str] | None:
     num, rest = m.groups()
     street = _STREET_SUFFIX_RE.split(rest.upper(), maxsplit=1)[0].strip()
     return num, (street or rest.upper())
+
+
+# USPS street types beyond _STREET_SUFFIX_RE's list, as they appear on board comps
+# (measured 2026-10-06 on the 25,921 Buncombe comp entries: TRL 197, CV 103, VW 51, WALK 38,
+# VIS 33, RUN 32, RDG 29, ALY 27, PASS 22, XING 16, PT 15, DRIVE 13, EXT 10, ...). Only used
+# to recognise a trailing type the regex above does not split on.
+_EXTRA_TYPES = {
+    "TRL": "TRL", "TRAIL": "TRL", "CV": "CV", "VW": "VW",
+    "WALK": "WALK", "VIS": "VIS", "RUN": "RUN", "RDG": "RDG", "ALY": "ALY",
+    "PASS": "PASS", "XING": "XING", "PT": "PT", "DRIVE": "DR", "ROAD": "RD", "STREET": "ST",
+    "AVENUE": "AVE", "LANE": "LN", "COURT": "CT", "CIRCLE": "CIR", "PLACE": "PL",
+    "EXT": "EXT", "GRV": "GRV", "PKWY": "PKWY", "ROW": "ROW", "CROSS": "CROSS", "TRCE": "TRCE",
+    "SQ": "SQ", "PATH": "PATH", "GLN": "GLN", "HOLW": "HOLW", "KNL": "KNL", "MNR": "MNR",
+}
+_DIRECTIONS = {"N", "S", "E", "W", "NE", "NW", "SE", "SW"}
+_MULTI_PARCEL_RE = re.compile(r"^\s*\d+[A-Z]?\s*(AND|&|-)\s*\d+", re.I)
+_UNIT_RE = re.compile(r"\s+(?:UNIT|APT|STE|SUITE|#)\s*[\w-]+\s*$", re.I)
+_HOUSE_RE = re.compile(r"^\s*(\d+)([A-Z])?\s+(.*)$", re.I)
+
+
+def parse_address(addr: str | None) -> dict | None:
+    """A comp address as the parcel layer's situs columns spell it, or None when it names no
+    single numbered parcel. '140 Old Leicester Rd' -> {house: '140', number_suffix: '',
+    direction: '', street: 'OLD LEICESTER', street_type: 'RD'}; '4B Heather Way' -> house '4',
+    number_suffix 'B'. The street core is split_house_street()'s (the layer's `streetname`
+    holds no type); a trailing type that regex does not know (TRL, CV, ...) is cut too. A
+    'City, NC, zip' tail is dropped. None for no house number or a two-parcel address ('78 and
+    80 Taylor St'), which a single parcel record cannot confirm or contradict."""
+    a = str(addr or "").split(",")[0].strip()
+    if not a or _MULTI_PARCEL_RE.match(a):
+        return None
+    a = _UNIT_RE.sub("", a)
+    m = _HOUSE_RE.match(a)
+    if not m:
+        return None
+    house, letter, rest = m.group(1), (m.group(2) or "").upper(), m.group(3).strip()
+    split = split_house_street(f"{house} {rest}")
+    if not split:
+        return None
+    street = split[1]
+    t = _STREET_SUFFIX_RE.search(rest.upper())
+    stype = t.group(1) if t else ""
+    words = street.split()
+    if not t and len(words) > 1 and words[-1] in _EXTRA_TYPES:
+        stype = _EXTRA_TYPES[words[-1]]
+        words = words[:-1]
+    direction = ""
+    if len(words) > 1 and words[0] in _DIRECTIONS:
+        direction, words = words[0], words[1:]
+    if not words:
+        return None
+    return {"house": house, "number_suffix": letter, "direction": direction,
+            "street": " ".join(words), "street_type": stype}
+
+
+def street_where(parts: dict, *, broad: bool = False) -> str:
+    """The layer's WHERE clause for a parsed address. Broad: the longest word of the street
+    only (for a comp whose street spelling differs from the county's: 'Hemlock Rd' is
+    'HEMLOCK DR' there)."""
+    street = parts["street"]
+    if broad:
+        street = max(street.split(), key=len)
+    return (f"HouseNumber='{_esc(parts['house'])}' AND UPPER(streetname) LIKE "
+            f"'%{_esc(street)}%'")
+
+
+def _norm(v) -> str:
+    return str(v or "").strip().upper()
+
+
+def narrow_candidates(feats: list[dict], parts: dict) -> list[dict]:
+    """Narrow the parcels a HouseNumber + LIKE-streetname query returned by the parcel's own
+    situs columns, each step kept only when it leaves at least one candidate: exact
+    streetname ('WATERS' over 'WATERS COVE'), StreetType ('RD' over 'HWY'), the house-number
+    letter, the direction. Never the layer's CityName/Address (the owner's mailing address).
+    What is still ambiguous after this is left to _disambiguate()'s deed-date pin."""
+    out = list(feats)
+    for col, want in (("streetname", parts.get("street")), ("StreetType", parts.get("street_type")),
+                      ("NumberSuffix", parts.get("number_suffix")),
+                      ("direction", parts.get("direction"))):
+        if not want or len(out) <= 1:
+            continue
+        kept = [f for f in out if _norm(f.get(col)) == _norm(want)]
+        if kept:
+            out = kept
+    return out
+
+
+def deed_where(rec: dict) -> str | None:
+    """WHERE clause for every parcel conveyed by the same deed as `rec` (DeedBook + DeedPage),
+    or None when the record names no deed. A deed that conveys several parcels records its
+    TOTAL consideration on each of them, so its SalePrice is not one parcel's price: 117 Lookout
+    Rd (deed 6617/0478, 2026-07-31) shows $205,000 on each of 3 parcels against an MLS price of
+    $135,000 for the house (live-checked 2026-10-06)."""
+    book = str(rec.get("DeedBook") or "").strip()
+    page = str(rec.get("DeedPage") or "").strip()
+    if not book or not page:
+        return None
+    return f"DeedBook='{_esc(book)}' AND DeedPage='{_esc(page)}'"
+
+
+async def _deed_parcel_count(http, rec: dict) -> int | None:
+    where = deed_where(rec)
+    if not where:
+        return None
+    try:
+        r = await http.get(BUNCOMBE_PARCELS, params={"where": where, "returnCountOnly": "true",
+                                                      "f": "json"})
+        if r.status_code != 200:
+            return None
+        n = (r.json() or {}).get("count")
+        return int(n) if n is not None else None
+    except Exception as exc:  # noqa: BLE001
+        log.debug("gis_crosscheck.buncombe.deed_count_error", error=str(exc)[:120])
+        return None
 
 
 def _deed_date_iso(v) -> str | None:
@@ -137,8 +265,8 @@ def parse_any_date(v) -> date | None:
     return None
 
 
-async def _buncombe_lookup(http, house_num: str, street: str, city: str | None) -> list[dict]:
-    where = f"HouseNumber='{_esc(house_num)}' AND UPPER(streetname) LIKE '%{_esc(street)}%'"
+async def _buncombe_lookup(http, parts: dict) -> list[dict]:
+    where = street_where(parts)
     try:
         r = await http.get(BUNCOMBE_PARCELS, params={
             "where": where, "outFields": _BUNCOMBE_FIELDS,
@@ -153,12 +281,7 @@ async def _buncombe_lookup(http, house_num: str, street: str, city: str | None) 
     if not isinstance(data, dict) or data.get("error"):
         return []
     feats = [f.get("attributes") or {} for f in (data.get("features") or [])]
-    if city:
-        city_u = city.strip().upper()
-        narrowed = [f for f in feats if str(f.get("CityName") or "").strip().upper() == city_u]
-        if narrowed:
-            feats = narrowed
-    return feats
+    return narrow_candidates(feats, parts)
 
 
 def _disambiguate(feats: list[dict], claimed_date: date | None) -> dict | None:
@@ -204,13 +327,14 @@ async def crosscheck_sold_price(
     """
     if (state, county) not in SUPPORTED:
         return None
-    split = split_house_street(address or "")
-    if not split:
+    parts = parse_address(address)
+    if not parts:
         return None
-    house_num, street = split
     claimed_date = parse_any_date(claimed_sold_date)
 
-    feats = await _buncombe_lookup(http, house_num, street, city)
+    # `city` is kept in the signature for callers; it is not used to pick a parcel (the
+    # layer's CityName is the owner's mailing city, see the module docstring).
+    feats = await _buncombe_lookup(http, parts)
     rec = _disambiguate(feats, claimed_date)
     if not rec:
         return None
@@ -239,12 +363,22 @@ async def crosscheck_sold_price(
     except (TypeError, ValueError):
         stamps = None
 
-    return {
+    preferred = disagreement > PRICE_DISAGREEMENT_TOLERANCE
+    out = {
         "county_sale_price": county_price,
         "county_deed_date": deed_date.isoformat(),
         "county_stamps": stamps,
         "date_gap_days": gap_days,
         "disagreement_pct": round(disagreement * 100, 1),
         "source": "buncombe_property_bc_dis",
-        "preferred": disagreement > PRICE_DISAGREEMENT_TOLERANCE,
     }
+    if preferred and deed_where(rec):
+        # Only on a disagreement (one extra count request): a deed that conveys several
+        # parcels carries their combined price (deed_where), and an unanswered count is not
+        # evidence either way -- in both cases keep HomeHarvest's price.
+        n = await _deed_parcel_count(http, rec)
+        out["deed_parcels"] = n
+        if n is None or n > 1:
+            preferred = False
+    out["preferred"] = preferred
+    return out

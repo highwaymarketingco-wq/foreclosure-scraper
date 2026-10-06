@@ -162,23 +162,106 @@ def test_crosscheck_refuses_when_deed_date_too_far_from_claimed_date():
     assert result is None
 
 
-def test_crosscheck_disambiguates_by_city_when_house_number_collides():
-    """Buncombe really does carry >1 parcel sharing a house number + street
-    (e.g. two distinct '140 Old Leicester' parcels in different towns) --
-    the city field must pick the right one rather than averaging/guessing."""
-    http = _client_returning(_buncombe_response([
-        _feature(HouseNumber="140", streetname="OLD LEICESTER", CityName="ASHEVILLE",
-                 SalePrice=0.0, DeedDate="20160121", Stamps=0.0),
-        _feature(HouseNumber="140", streetname="OLD LEICESTER", CityName="ARDEN",
-                 SalePrice=REAL_COUNTY_SALE_PRICE, DeedDate=REAL_DEED_DATE, Stamps=REAL_STAMPS),
-    ]))
+# The two real "140 Old Leicester" parcels, as the layer answers today (situs + sale columns,
+# live 2026-10-06). The layer's CityName/Address are the OWNER'S MAILING address ("PO BOX 304"
+# ARDEN for the RD parcel, "27 AUDUBON DR" ASHEVILLE for the HWY one), so the first version,
+# which narrowed by CityName == the comp's city, picked the HWY parcel for the board's real comp
+# (city "Asheville") and never corrected the case it was built for.
+_OLD_LEICESTER_RD = dict(pinnum="972073757600000", HouseNumber="140", NumberSuffix="",
+                         direction="", streetname="OLD LEICESTER", StreetType="RD",
+                         SalePrice=REAL_COUNTY_SALE_PRICE, DeedDate=REAL_DEED_DATE,
+                         Stamps=REAL_STAMPS, DeedBook="6581", DeedPage="0333")
+_OLD_LEICESTER_HWY = dict(pinnum="972081073200000", HouseNumber="140", NumberSuffix="",
+                          direction="", streetname="OLD LEICESTER", StreetType="HWY",
+                          SalePrice=0.0, DeedDate="20160121", Stamps=0.0)
+
+
+def _router(features: list[dict], deed_count):
+    """A mocked httpx client: the parcel query answers `features`, the deed count query
+    answers {"count": deed_count} (an Exception to raise one)."""
+    http = MagicMock()
+    calls = []
+
+    async def _get(url, params=None, **kw):
+        calls.append(dict(params or {}))
+        if (params or {}).get("returnCountOnly") == "true":
+            if isinstance(deed_count, BaseException):
+                raise deed_count
+            return _resp({"count": deed_count})
+        return _resp(_buncombe_response([_feature(**f) for f in features]))
+
+    http.get = _get
+    http.calls = calls
+    return http
+
+
+def test_crosscheck_picks_the_parcel_by_its_situs_not_the_owners_mailing_city():
+    http = _router([_OLD_LEICESTER_HWY, _OLD_LEICESTER_RD], deed_count=1)
     result = asyncio.run(xc.crosscheck_sold_price(
         http, state="NC", county="Buncombe", address="140 Old Leicester Rd",
-        city="Arden", claimed_sold_price=REAL_HOMEHARVEST_SOLD_PRICE,
+        city="Asheville", claimed_sold_price=REAL_HOMEHARVEST_SOLD_PRICE,
         claimed_sold_date=REAL_SOLD_DATE,
     ))
     assert result is not None
     assert result["county_sale_price"] == REAL_COUNTY_SALE_PRICE
+    assert result["preferred"] is True and result["deed_parcels"] == 1
+    assert "CityName" not in http.calls[0]["outFields"]
+    assert "Address" not in http.calls[0]["outFields"].split(",")
+
+
+def test_crosscheck_keeps_homeharvest_when_the_deed_conveys_several_parcels():
+    """117 Lookout Rd, live 2026-10-06: deed 6617/0478 records $205,000 on each of 3 parcels;
+    HomeHarvest's $135,000 is the house. A combined price is not a correction."""
+    lookout = dict(pinnum="973080857100000", HouseNumber="117", NumberSuffix="", direction="",
+                   streetname="LOOKOUT", StreetType="RD", SalePrice=205000.0,
+                   DeedDate="20260731", Stamps=410.0, DeedBook="6617", DeedPage="0478")
+    http = _router([lookout], deed_count=3)
+    result = asyncio.run(xc.crosscheck_sold_price(
+        http, state="NC", county="Buncombe", address="117 Lookout Rd", city="Asheville",
+        claimed_sold_price=135000.0, claimed_sold_date="2026-07-31 00:00:00"))
+    assert result["preferred"] is False and result["deed_parcels"] == 3
+
+
+def test_crosscheck_keeps_homeharvest_when_the_deed_count_fails():
+    http = _router([_OLD_LEICESTER_RD], deed_count=RuntimeError("timeout"))
+    result = asyncio.run(xc.crosscheck_sold_price(
+        http, state="NC", county="Buncombe", address="140 Old Leicester Rd", city=None,
+        claimed_sold_price=REAL_HOMEHARVEST_SOLD_PRICE, claimed_sold_date=REAL_SOLD_DATE))
+    assert result["preferred"] is False and result["deed_parcels"] is None
+
+
+def test_no_deed_count_request_when_the_prices_agree():
+    http = _router([_OLD_LEICESTER_RD], deed_count=AssertionError("not needed"))
+    result = asyncio.run(xc.crosscheck_sold_price(
+        http, state="NC", county="Buncombe", address="140 Old Leicester Rd", city=None,
+        claimed_sold_price=158000.0, claimed_sold_date=REAL_SOLD_DATE))
+    assert result["preferred"] is False and len(http.calls) == 1
+
+
+@pytest.mark.parametrize("addr,want", [
+    ("140 Old Leicester Rd", ("140", "", "", "OLD LEICESTER", "RD")),
+    ("4B Heather Way", ("4", "B", "", "HEATHER", "WAY")),
+    ("50 N Main St Unit 4", ("50", "", "N", "MAIN", "ST")),
+    ("12 Mountain View Trl", ("12", "", "", "MOUNTAIN VIEW", "TRL")),
+    ("15 Eaglebear Dr, Asheville, NC 28806", ("15", "", "", "EAGLEBEAR", "DR")),
+    ("78 and 80 Taylor St, Woodfin, NC, 28804", None),
+    ("Old Leicester Rd", None),
+])
+def test_parse_address(addr, want):
+    p = xc.parse_address(addr)
+    got = None if p is None else (p["house"], p["number_suffix"], p["direction"], p["street"],
+                                  p["street_type"])
+    assert got == want
+
+
+def test_narrow_candidates_by_situs_columns():
+    parts = xc.parse_address("22 Waters Rd")
+    a = {"streetname": "WATERS", "StreetType": "RD"}
+    b = {"streetname": "WATERS COVE", "StreetType": "RD"}
+    assert xc.narrow_candidates([b, a], parts) == [a]
+    parts = xc.parse_address("4 Heather Way")          # the comp dropped the unit letter
+    a4, b4 = {"streetname": "HEATHER", "NumberSuffix": "A"}, {"streetname": "HEATHER", "NumberSuffix": "B"}
+    assert xc.narrow_candidates([a4, b4], parts) == [a4, b4]   # left to the deed-date pin
 
 
 def test_crosscheck_out_of_scope_county_returns_none_without_a_query():
