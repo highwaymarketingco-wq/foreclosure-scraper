@@ -90,7 +90,11 @@ DIFFERENT VALID PARCELS (2026-10-06). A strict match is also refused when the pr
 fresh candidate carry two different VALID parcels (_different_valid_parcels(); dedupe()'s own
 identity rule), so a shared address signature can no longer fold one parcel's prior row into
 another parcel's fresh row. stats['refused_different_parcel'] counts prior rows that were left
-unmatched only by this rule.
+unmatched only by this rule. The rule includes dedupe()'s same-source short-id one (two different
+parcel ids published by ONE source in one county never match, however short: Rutherford's 6- and
+7-digit ids, ptscloud's 6-digit accounts beside 10-digit PINs): a prior row's id that validation
+nulled is read back from raw['parcel_id_nulled'] / the source's own raw block (_prior_identity)
+and compared with the fresh row's, which is not validated yet at merge time.
 
 CONDOMINIUM UNITS (2026-10-06, condo_units.py). counties_nc.buncombe_elderly used to key every exempt
 unit of a building by the building's bare 10-digit pin and now keys a unit by its own pinnum
@@ -146,7 +150,9 @@ from .web_artifact import (
     # working. Removing this import silently breaks that script's import line.
 )
 from .dedupe import _house_no_of, different_valid_parcels as _different_valid_parcels_id
+from .dedupe import different_source_parcels as _different_source_parcels_id
 from .dedupe import identity as _identity
+from .dedupe import source_parcel as _source_parcel
 from .models import _normalize_parcel
 from .placeholder_twins import MAX_GROUP_ROWS, fold, real_house_no, sources_of, twin_pair_ok
 from .validation import _PARCEL_BAD_PATTERNS
@@ -297,19 +303,39 @@ def _provably_different_dict(rec: dict, li: Listing) -> bool:
 
 
 def _different_valid_parcels(rec: dict, li: Listing) -> bool:
-    """dedupe()'s parcel rule (dedupe.identity_conflict, 2026-10-06) between a streamed prior row
-    and a fresh candidate: two different VALID parcels (placeholder_twins.parcel_key, not attached
-    by a resolver) are two properties, whatever address signature they share. Without it a prior
-    row could fold into a DIFFERENT parcel's fresh row through an address signature ('115 SOUTHPORT
-    RD' is two parcels, so is '0 SOUTHPORT RD' on a board that kept the sentinel), carrying its
-    enrichment onto the wrong lead, and, when its own parcel was not re-scraped, vanishing instead
-    of aging. Only this rule is applied here: the house-number guard above stays as it was (the
-    placeholder-twin fallback below depends on it), and an unnumbered prior row may still match
-    its own re-scraped record."""
+    """dedupe()'s parcel rules (dedupe.identity_conflict) between a streamed prior row and a fresh
+    candidate: two different VALID parcels (placeholder_twins.parcel_key, not attached by a
+    resolver) are two properties, whatever address signature they share; so are two different
+    parcel ids published by ONE source in one county, however short (2026-10-06, 3: dedupe.
+    different_source_parcels). Without the first a prior row could fold into a DIFFERENT parcel's
+    fresh row through an address signature ('115 SOUTHPORT RD' is two parcels, so is '0 SOUTHPORT
+    RD' on a board that kept the sentinel), carrying its enrichment onto the wrong lead, and, when
+    its own parcel was not re-scraped, vanishing instead of aging. Without the second a prior row
+    whose short id validation nulled (Rutherford's 6-digit account, Madison's 6-digit bill) folded
+    into the fresh row of ANOTHER short id on the same address: the prior side carried no parcel,
+    the fresh side (not yet validated at merge time) carries its own. Only these two rules are
+    applied here: the house-number guard above stays as it was (the placeholder-twin fallback below
+    depends on it), and an unnumbered prior row may still match its own re-scraped record."""
+    return _prior_conflict(_prior_identity(rec), _identity(li))
+
+
+def _prior_conflict(a, b) -> bool:
+    """The parcel half of dedupe.identity_conflict for a prior row's identity `a` and a fresh row's
+    `b`: two different valid parcels, or two different parcel ids of one source in one county."""
+    return bool(_different_valid_parcels_id(a, b) or _different_source_parcels_id(a, b))
+
+
+def _prior_identity(rec: dict):
+    """dedupe.identity() of a streamed prior row, plus the id its source published that validation
+    nulled as too short (raw['parcel_id_nulled'], or the source's own raw block for a row published
+    before that field): a published row carries parcel None for it, but the source still gave the
+    row that id, and the re-scrape carries it again (_restored_parcel_key's reasoning)."""
     a = _identity(rec)
-    if not a.pk:
-        return False
-    return _different_valid_parcels_id(a, _identity(li))
+    pid = _nulled_parcel_id(rec)
+    if pid:
+        a = a._replace(sp=a.sp | _source_parcel(rec.get("state"), rec.get("county"), pid,
+                                                rec.get("raw"), rec.get("source")))
+    return a
 
 
 #: Where a source keeps, in its own raw block, the id it wrote as parcel_id: (block, key). Read
@@ -326,18 +352,10 @@ _SOURCE_PARCEL_FIELDS = {
 }
 
 
-def _restored_parcel_key(rec: dict) -> str | None:
-    """The dedupe_key() a published prior row had BEFORE validation nulled its short parcel id,
-    i.e. the key this run's re-scrape of it carries (fresh rows are not validated until after
-    the merge). None when the row has a parcel id or none was nulled.
-
-    Why (2026-10-06). validation._validate_parcel_id() nulls a parcel id under 7 characters, so
-    Catawba's tax-account rows publish with parcel None and dedupe_key 'url:<the county PDF>'
-    while the next scrape keys them 'parcel:NC:catawba:65771'. No signature matched, every one
-    was aged, and dedupe2 then fused the live row into its own aged copy (3,737 of the 6,414
-    wrongly "presumed withdrawn" rows of the 10/5 run). With dedupe()'s identity rule (240b8de9)
-    dedupe2 no longer fuses two unnumbered rows on a synthesized address, so the same miss would
-    leave the live row AND an aged copy on the board, one more copy every run."""
+def _nulled_parcel_id(rec: dict) -> str | None:
+    """The parcel id a published prior row's SOURCE gave it before validation nulled it as too short
+    (raw['parcel_id_nulled'], else the source's own raw block, _SOURCE_PARCEL_FIELDS), stripped; None
+    when the row carries a parcel id or none was nulled."""
     if rec.get("parcel_id"):
         return None
     raw = rec.get("raw")
@@ -351,7 +369,24 @@ def _restored_parcel_key(rec: dict) -> str | None:
         blk = raw.get(spec[0]) if spec else None
         if isinstance(blk, dict):
             pid = blk.get(spec[1])
-    pid = str(pid or "").strip()
+    return str(pid or "").strip() or None
+
+
+def _restored_parcel_key(rec: dict) -> str | None:
+    """The dedupe_key() a published prior row had BEFORE validation nulled its short parcel id,
+    i.e. the key this run's re-scrape of it carries (fresh rows are not validated until after
+    the merge). None when the row has a parcel id or none was nulled.
+
+    Why (2026-10-06). validation._validate_parcel_id() nulls a parcel id under 7 characters, so
+    Catawba's tax-account rows publish with parcel None and dedupe_key 'url:<the county PDF>'
+    while the next scrape keys them 'parcel:NC:catawba:65771'. No signature matched, every one
+    was aged, and dedupe2 then fused the live row into its own aged copy (3,737 of the 6,414
+    wrongly "presumed withdrawn" rows of the 10/5 run). With dedupe()'s identity rule (240b8de9)
+    dedupe2 no longer fuses two unnumbered rows on a synthesized address, so the same miss would
+    leave the live row AND an aged copy on the board, one more copy every run."""
+    pid = _nulled_parcel_id(rec)
+    if not pid:
+        return None
     norm = _normalize_parcel(pid)
     # Too weak to identify one row: '0', '00', '123' and the like key many rows of a county.
     if len(norm) < 4 or len(set(norm)) == 1 or any(p.match(pid) for p in _PARCEL_BAD_PATTERNS):
