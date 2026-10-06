@@ -477,3 +477,34 @@ def test_confirmed_or_unconfirmed_change_nothing(verdict):
     assert {"bankruptcy", "bankruptcy_stay"} <= _facet_signals(li, TODAY)
     ds.score_board([li], previous_path=None)
     assert li.raw["distress_stack"].get("stay")
+
+
+# ---------------------------------------------------------------------------
+# the ledger rule a VERSION bump depends on (verification/ledger.py _better)
+# ---------------------------------------------------------------------------
+
+def _answer(verdict, version, ts):
+    return core.result(b.SIGNAL, verdict, {"reason": "x"} if verdict == "unconfirmed" else {},
+                       source=b.SOURCE, version=version, verifier="bankruptcy_stay",
+                       now=datetime.fromisoformat(ts).replace(tzinfo=timezone.utc))
+
+
+def test_a_version_bump_can_retract_a_verdict_through_the_disk_merge(tmp_path):
+    """bankruptcy_stay v1 -> v2 (2026-10-06): record() let the v2 unconfirmed replace the v1
+    confirmed, then _save() merged the file on disk back in and the v1 confirmed won."""
+    from foreclosure_scraper.verification import ledger as L
+    disk = L.Ledger.load(b.SIGNAL, tmp_path)
+    disk.record(TOLLAND, _answer("confirmed", "v1", "2026-10-06T04:50:00"), ttl_days=30)
+    disk.save()
+    run_copy = L.Ledger.load(b.SIGNAL, tmp_path)
+    e = run_copy.record(TOLLAND, _answer("unconfirmed", "v2", "2026-10-06T05:10:00"), ttl_days=30)
+    assert e["latest"]["verifier_version"] == "v2"
+    run_copy.merge_from(L.Ledger.load(b.SIGNAL, tmp_path))      # what _save() does
+    (_, e), = run_copy.rows.items()
+    assert (e["latest"]["verdict"], e["latest"]["verifier_version"]) == ("unconfirmed", "v2")
+    # same version: a flaky unconfirmed still never erases a real verdict through the merge
+    run2 = L.Ledger.load(b.SIGNAL, tmp_path)
+    flaky = L.Ledger.load(b.SIGNAL, tmp_path)
+    flaky.rows[next(iter(flaky.rows))]["latest"] = _answer("unconfirmed", "v1", "2026-10-06T06:00:00").to_dict()
+    run2.merge_from(flaky)
+    assert next(iter(run2.rows.values()))["latest"]["verdict"] == "confirmed"

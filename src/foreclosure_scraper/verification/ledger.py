@@ -270,10 +270,14 @@ def _expired(rec: dict, ttl_days: Optional[float], now: datetime) -> bool:
 
 
 def _better(a: dict, b: dict) -> bool:
-    """Should latest `a` replace latest `b`? A decisive answer beats a non-decisive one; among
-    the same class the newer wins."""
+    """Should latest `a` replace latest `b`? A decisive answer beats a non-decisive one OF THE
+    SAME verifier and VERSION (record()'s rule); otherwise, and among the same class, the newer
+    wins. Without the version condition a VERSION bump could never retract a verdict: _save()
+    merges the file on disk back in and the old version's decisive answer beat the new
+    version's unconfirmed one (bankruptcy_stay v1 -> v2, 2026-10-06)."""
     ad, bd = a.get("verdict") in DECISIVE, b.get("verdict") in DECISIVE
-    if ad != bd:
+    if ad != bd and (a.get("verifier"), a.get("verifier_version")) == \
+            (b.get("verifier"), b.get("verifier_version")):
         return ad
     return str(a.get("checked_at") or "") > str(b.get("checked_at") or "")
 
