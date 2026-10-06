@@ -80,3 +80,52 @@ def test_reo_only_cell_ends_at_page_one(monkeypatch):
     calls, _ = _run_fetch(monkeypatch, [_prop("u1")])
     assert len(calls) == 1
     assert calls[0][1]["page"] == "1"
+
+
+def test_one_request_per_state_covers_the_whole_reo_inventory():
+    cells_nc = hp._subdivide(*hp.BBOXES[0][1:])
+    cells_sc = hp._subdivide(*hp.BBOXES[1][1:])
+    assert len(cells_nc) == 1 and len(cells_sc) == 1
+    assert cells_nc[0] == tuple(hp.BBOXES[0][1:])
+
+
+def test_a_timed_out_request_is_retried_not_dropped(monkeypatch):
+    # the 10/5 and 10/6 VM runs lost most cells to 30 s timeouts under event-loop contention
+    calls: list = []
+    attempts = {"n": 0}
+
+    class _Flaky(_FakeClient):
+        async def get(self, url, params=None, headers=None, follow_redirects=True):
+            attempts["n"] += 1
+            if attempts["n"] < 3:
+                raise TimeoutError()
+            return await super().get(url, params=params, headers=headers, follow_redirects=follow_redirects)
+
+    @asynccontextmanager
+    async def fake_client(**kwargs):
+        yield _Flaky(calls, [_prop("u9", addr="9 Retry Rd")])
+
+    monkeypatch.setattr(hp, "client", fake_client)
+    monkeypatch.setattr(hp, "_GET_RETRY_DELAY_S", 0.0)
+    out = asyncio.run(hp._fetch_bbox("SC", 34.4625, -82.075, 35.2625, -80.9375, "national.fannie_homepath"))
+    assert attempts["n"] == 3
+    assert len(out) == 1
+
+
+def test_gives_up_after_the_attempt_limit(monkeypatch):
+    attempts = {"n": 0}
+
+    class _Dead:
+        async def get(self, *a, **k):
+            attempts["n"] += 1
+            raise TimeoutError()
+
+    @asynccontextmanager
+    async def fake_client(**kwargs):
+        yield _Dead()
+
+    monkeypatch.setattr(hp, "client", fake_client)
+    monkeypatch.setattr(hp, "_GET_RETRY_DELAY_S", 0.0)
+    out = asyncio.run(hp._fetch_bbox("SC", 34.4625, -82.075, 35.2625, -80.9375, "national.fannie_homepath"))
+    assert out == []
+    assert attempts["n"] == hp._GET_ATTEMPTS

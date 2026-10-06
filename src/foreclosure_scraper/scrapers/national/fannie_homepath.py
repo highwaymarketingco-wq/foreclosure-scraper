@@ -79,8 +79,20 @@ BBOXES = (
 # smell CLAUDE.md calls out by name. _fetch_bbox now pages within each cell
 # (see MAX_PAGES_PER_CELL below) instead of trusting a single page=1 request
 # to be the whole cell.
-_GRID_ROWS = 4
-_GRID_COLS = 4
+#
+# 2026-10-06: with listingTypes=5 (REO only, see _fetch_bbox) the whole inventory is about 60 rows
+# across NC and SC, so ONE request per state returns all of it (live: NC box 57 rows with
+# totalProperties 57, SC box 22 with totalProperties 22). The 4x4 grid existed only to stay under
+# the 400-row cap on the retail-polluted feed. Sixteen concurrent requests per state also each had
+# a chance to time out at 30 s while 170 other scrapers shared the event loop (the 10/5 run lost 27
+# of 32 cells, the first run of 10/6 lost 24), and with a REO-only payload a lost cell is lost REO
+# rows that prune_stale_reo would then treat as sold. Two requests, retried, are far safer.
+_GRID_ROWS = 1
+_GRID_COLS = 1
+# Attempts per request, and the pause between them (a timeout under event-loop contention is
+# usually gone a few seconds later).
+_GET_ATTEMPTS = 3
+_GET_RETRY_DELAY_S = 3.0
 
 # A single page's hard cap, confirmed live 2026-10-01 (every request, every
 # cell, regardless of the pageSize value sent). Used to detect "this page was
@@ -263,11 +275,18 @@ async def _fetch_bbox(state: str, sw_lat: float, sw_lng: float, ne_lat: float, n
             # 9/10: 71 true REO rows replacing 494 mislabeled ones. With the filter a cell is far
             # below the 400-row page cap, so the paging below ends at page 1.
             params = {"bounds": bounds, "page": str(page), "listingTypes": "5"}
-            try:
-                r = await c.get(API, params=params, headers=HEADERS, follow_redirects=True)
-            except Exception as exc:
-                log.warning("fannie_homepath.fetch_failed", state=state, page=page,
-                            error=str(exc)[:200])
+            r = None
+            for attempt in range(1, _GET_ATTEMPTS + 1):
+                try:
+                    r = await c.get(API, params=params, headers=HEADERS, follow_redirects=True)
+                    break
+                except Exception as exc:
+                    log.warning("fannie_homepath.fetch_failed", state=state, page=page,
+                                attempt=attempt,
+                                error=(str(exc) or type(exc).__name__)[:200])
+                    if attempt < _GET_ATTEMPTS:
+                        await asyncio.sleep(_GET_RETRY_DELAY_S)
+            if r is None:
                 break
             if r.status_code != 200:
                 log.warning("fannie_homepath.bad_status", state=state, page=page,
