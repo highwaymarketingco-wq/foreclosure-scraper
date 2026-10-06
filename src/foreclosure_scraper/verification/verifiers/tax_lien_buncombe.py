@@ -92,9 +92,10 @@ def pin_of(row: dict) -> Optional[str]:
     (county GIS exports pad it with zeros, models._normalize_parcel strips them), so it gets
     its 00000 suffix back; 11-14 digits are accepted only when everything past the 10th digit
     is a zero pad. A condominium unit keeps its letter suffix ("9648-62-3059-C0401" ->
-    9648623059C0401, resolved live 2026-10-06). Anything else is not resolvable here."""
+    9648623059C0401, "9644-95-3081-C0D17" -> 9644953081C0D17; both resolved live 2026-10-06).
+    Anything else is not resolvable here."""
     an = re.sub(r"[^0-9A-Za-z]", "", str(row.get("parcel_id") or "")).upper()
-    if re.fullmatch(r"\d{10}[A-Z]\d{4}", an):
+    if re.fullmatch(r"\d{10}[A-Z][0-9A-Z]{4}", an):
         return an
     d = digits(an)
     if d != an:
