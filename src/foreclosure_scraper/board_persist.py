@@ -106,7 +106,10 @@ folded into the unit that is the same lead (condo_units.match_units: the owner, 
 breaking a tie, only from a source the fresh row shares) and carries its enrichment; a row with no
 such unit ages as any other. stats['folded_prior_keys'] lists [dedupe_key, source] of the rows
 folded under another key, which main.run()'s GRANDFATHER snapshot must not restore
-(drop_folded_prior). FULLRUN_PERSIST_CONDO_UNITS=0 turns it off.
+(drop_folded_prior). FULLRUN_PERSIST_CONDO_UNITS=0 turns it off. A prior row folded into its own
+re-scrape by its restored short parcel id (_restored_parcel_key: Catawba's 5-digit tax accounts,
+Guilford and Pitt ptscloud) is listed there too, as [restored_key, source, 'restored']: its own key
+is the county roll's URL, so the snapshot copy is matched by the account (_restored_key_of).
 
 WHAT THIS DOES NOT FIX: the return value is still a full ``list[Listing]`` of the
 merged board, because main.run() runs it through ~2,400 more lines of enrichment/
@@ -422,23 +425,54 @@ def _placeholder_twin_index(rec: dict, rec_sigs, fresh_sig_index: dict,
     return i if twin_pair_ok(rec, fresh_deduped[i]) else None
 
 
+def _restored_key_of(li: Listing) -> str | None:
+    """_restored_parcel_key() of a Listing (a GRANDFATHER snapshot row): the key its short parcel
+    id gave it before validation nulled it. None for a row that carries a parcel id."""
+    if li.parcel_id:
+        return None
+    return _restored_parcel_key({
+        "parcel_id": None, "source": li.source, "raw": li.raw, "state": li.state,
+        "county": li.county, "street_address": li.street_address, "zip_code": li.zip_code,
+        "case_number": li.case_number, "source_url": li.source_url,
+        "listing_type": li.listing_type})
+
+
 def drop_folded_prior(rows: list[Listing], stats: dict) -> list[Listing]:
     """`rows` without the prior rows merge_prior_board folded into a row of ANOTHER key
-    (stats['folded_prior_keys']: [dedupe_key, source] pairs, the condominium bare-pin rows of
-    condo_units.py). main.run()'s GRANDFATHER snapshot restores every prior row whose key the final
-    board lacks; such a row is on the board already, under its unit's key, so restoring it would
-    publish it a second time."""
-    folded = {(str(k), str(s)) for k, s in (stats.get("folded_prior_keys") or ())}
-    if not folded:
+    (stats['folded_prior_keys']). main.run()'s GRANDFATHER snapshot restores every prior row whose
+    key the final board lacks; such a row is on the board already, under the fresh row's key, so
+    restoring it would publish it a second time. Two shapes of entry:
+
+      [dedupe_key, source]               the prior row's OWN key: the condominium bare-pin rows of
+                                         condo_units.py, folded into their unit's row;
+      [restored_key, source, 'restored'] a prior row validation stripped of its short parcel id,
+                                         folded into its own re-scrape (_restored_parcel_key). Its
+                                         own key is the county roll's URL, shared by every row of
+                                         that roll (3,659 Catawba tax rows on the 10/5 board), so
+                                         the key that names the lead is the account's, rebuilt
+                                         from the snapshot row the same way (_restored_key_of)."""
+    folded: set[tuple[str, str]] = set()
+    restored: set[tuple[str, str]] = set()
+    for entry in stats.get("folded_prior_keys") or ():
+        (restored if len(entry) > 2 and entry[2] == "restored" else folded).add(
+            (str(entry[0]), str(entry[1])))
+    if not folded and not restored:
         return rows
+    restored_sources = {s for _, s in restored}
     out = []
     for li in rows:
+        src = str(li.source or "")
         try:
             key = li.dedupe_key()
         except Exception:  # noqa: BLE001 - an unkeyable row is not one of them
             key = None
-        if (key, str(li.source or "")) not in folded:
-            out.append(li)
+        if (key, src) in folded:
+            continue
+        if src in restored_sources and not li.parcel_id:
+            rk = _restored_key_of(li)
+            if rk and (rk, src) in restored:
+                continue
+        out.append(li)
     return out
 
 
@@ -525,6 +559,9 @@ def merge_prior_board(
     # prior rows keyed by that building's bare pin, decided after the stream: building -> [(row dict,
     # refused-by-different-parcel flag)]. Bounded by the buildings the fresh scrape lists units of.
     deferred_condo: dict[tuple, list[tuple[dict, bool]]] = {}
+    # [restored key, source, 'restored'] of every prior row folded into its own re-scrape by its
+    # restored short parcel id: drop_folded_prior() must not restore its snapshot copy either.
+    restored_folds: list[list[str]] = []
 
     kept: list[Listing] = []
     prior_total = 0
@@ -615,6 +652,7 @@ def merge_prior_board(
                         and not _different_valid_parcels(rec, fresh_deduped[same[0]])):
                     match_idx = same[0]
                     stats["matched_restored_parcel"] += 1
+                    restored_folds.append([rk, str(rec.get("source") or ""), "restored"])
 
         # A published row keyed by a condominium building's bare pin while the fresh scrape lists
         # that building by its units' own pinnums (condo_units.py): which unit is the same lead is
@@ -706,7 +744,7 @@ def merge_prior_board(
             if pk:
                 folded_prior.append([pk, str(prior_li.source or "")])
     deferred_condo.clear()
-    stats["folded_prior_keys"] = folded_prior
+    stats["folded_prior_keys"] = folded_prior + restored_folds
     if stats["matched_condo_unit"] or stats["condo_unit_unmatched"]:
         log.info("board_persist.condo_units", folded=stats["matched_condo_unit"],
                  unmatched_aged=stats["condo_unit_unmatched"], sample=condo_samples)
