@@ -49,8 +49,10 @@ VERDICTS (core.py's meanings):
                (identity_unverified) unless the verifier itself corroborates the person from
                the repo's own data (CORROBORATION below).
   refuted      the debtor is a different person (a proven middle conflict, or no debtor in the
-               case lines up with any board owner name), or the case does not exist.
-  unconfirmed  cannot decide: no person name (no owner of record) on the board to compare; two
+               case lines up with any board owner name, and no NAME PATTERN below says the owner
+               may be the debtor under another name), or the case does not exist.
+  unconfirmed  cannot decide: no person name (no owner of record) on the board to compare; a
+               NAME PATTERN fires in a court that can cover the property (v4); two
                board names disagree (one matches, another names someone else); an ALL-CAPS owner
                that matches only when read FIRST MIDDLE LAST (owner_last_first_middle reads
                ALL-CAPS surname-first, "MARY A SMITH"); a match whose court is in another state (the one place a
@@ -66,6 +68,32 @@ tell: unconfirmed, reason wrong_district, whatever the case's status (a debtor c
 they live, so it is never refuted on this alone). The first live sweep called a completed
 M.D.N.C. Chapter 13 stale for a McDowell County (W.D.N.C.) row whose docket caption had no middle
 name and was attached by name to five board rows.
+
+NAME PATTERNS (v4). The positional matcher compares first and last name in their places, so it
+cannot see a person who filed and owns under different names, and refuted removes the bankruptcy
+signal from the lead's score. A live re-check of 42 of the 75 refuted entries (2026-10-06, an
+independent agent) held 36 and found 2 plausibly the same person and 4 undecidable, all of one of
+these shapes (a names-only screen of all 75 found about 20 of them):
+  maiden_name      the owner has the debtor's FIRST name and the debtor's spelled-out MIDDLE name
+                   (3+ letters) is the owner's SURNAME: a woman who filed under a married name and
+                   owns under another. The first name may differ by one edit (4+ letters).
+  middle_as_first  the owner has the debtor's SURNAME and the debtor's spelled-out middle name
+                   (3+ letters) as FIRST name: a person who goes by the middle name.
+  across_debtors   (maiden_name only) in a joint filing the owner's first name is one debtor's and
+                   the owner's surname is the OTHER debtor's middle name. The first name of one
+                   debtor with the SURNAME of another is the phantom production's matcher exists
+                   to reject; a middle name is the extra coincidence that makes this one undecided.
+A name with no comma has no known order (capitals are surname first on the county rolls, but a
+Title Case roll entry is too), so both orders are read, the other one with exact first names only
+(a surname is not a typo of a first name): owner_readings.
+A pattern is only a reason NOT TO REFUTE: it runs when the plain match says none or conflict, and it
+counts only when the debtor's court can cover the property (the right state, a district that holds
+the county: wrong_district) and, where the board knows it, the owner's mailing state is the court's
+state. Then the verdict is unconfirmed, reason name_pattern_possible_same_person, so the claim keeps
+scoring; the case's status is not read (a closed case could not be called stale either: the identity
+is unverified). A court that cannot cover the property, a first-name-only or a same-surname-only
+overlap, a plain middle-name conflict and an entity debtor stay exactly as they were (refuted). The
+evidence names the pattern, never the names.
 
 CORROBORATION (v3, offline). A stale answer on an "unverified" name match stands only when the
 debtor's caption names a middle name or initial and, in the property's county, EITHER the NC
@@ -113,7 +141,8 @@ from urllib.parse import quote
 from ..core import VerificationResult, result
 
 SIGNAL = "bankruptcy_stay"
-VERSION = "v3"         # v3 (2026-10-06): wrong_district; stale needs a verified identity.
+VERSION = "v4"         # v4 (2026-10-06): NAME PATTERNS (maiden name, middle name as first name)
+                       # are unconfirmed, not refuted. v3: wrong_district; stale needs a verified identity.
                        # v2: a match in one board name beside a person in another
                        # who does not match (not only one who conflicts) is unconfirmed
 TTL_DAYS = 30          # refuted/stale (the verdicts that change the score) are durable facts;
@@ -726,6 +755,158 @@ def corroborate_identity(row: dict, person: Optional[str], case_name: str, *,
 
 
 # ---------------------------------------------------------------------------
+# name patterns the positional matcher cannot see (pure); see NAME PATTERNS in the docstring
+# ---------------------------------------------------------------------------
+
+_MIN_FULL_NAME = 3        # a spelled-out middle name: an initial or a two-letter token proves nothing
+_MIN_EDIT_NAME = 4        # a first name may differ by one edit only when the longer one has 4+ letters
+_AND_SEGMENT = re.compile(r"\s+and\s+", re.I)
+_ALIAS_SEGMENT = re.compile(r"\s+(?:a/?k/?a|f/?k/?a|n/?k/?a|d/?b/?a)\s+", re.I)
+_US_STATES = frozenset(
+    "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM "
+    "NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split())
+_MAIL_TAIL = re.compile(r"\b([A-Z]{2})\s+\d{5}(?:-\d{4})?\s*$")
+NAME_PATTERN_REASON = "name_pattern_possible_same_person"
+
+
+def debtor_segments(case_name: Any) -> list[tuple[str, tuple[str, ...], str]]:
+    """(first, (middle names...), last), upper case, of every one-person segment of a case caption:
+    split on a bare "and" (joint filers) and on aka / fka / nka / dba; suffixes dropped; an entity
+    segment and a segment of fewer than two words left out."""
+    from ...name_normalize import is_entity
+    out: list[tuple[str, tuple[str, ...], str]] = []
+    for side in _AND_SEGMENT.split(str(case_name or "")):
+        for part in _ALIAS_SEGMENT.split(side.replace(".", "")):
+            if not part.strip() or is_entity(part):
+                continue
+            toks = [t for t in re.sub(r"[^A-Za-z ]", " ", part).upper().split() if t not in _SUFFIXES]
+            if len(toks) >= 2:
+                out.append((toks[0], tuple(toks[1:-1]), toks[-1]))
+    return out
+
+
+def _same_given(a: str, b: str, typo_ok: bool = True) -> bool:
+    """A first name: equal, or (typo_ok, the longer one 4+ letters) one substitution, insertion or
+    deletion apart. No nickname table: this is not a person-matching rule, only the tolerance of
+    a typo."""
+    if len(a) < 2 or len(b) < 2:
+        return False
+    if a == b:
+        return True
+    if not typo_ok:
+        return False
+    short, long_ = sorted((a, b), key=len)
+    if len(long_) < _MIN_EDIT_NAME or len(long_) - len(short) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b)) == 1
+    return any(long_[:i] + long_[i + 1:] == short for i in range(len(long_)))
+
+
+def _full_middles(mids: tuple[str, ...]) -> set[str]:
+    return {m for m in mids if len(m) >= _MIN_FULL_NAME}
+
+
+def owner_readings(person: Optional[str]) -> list[tuple[str, str, bool]]:
+    """The (SURNAME, FIRST, typo_ok) readings of one board person for the pattern check. A comma
+    settles the order (name_normalize.owner_last_first_middle). Without one it is genuinely
+    ambiguous (the county rolls write SURNAME FIRST MIDDLE, in capitals and sometimes in Title
+    Case; the courts FIRST MIDDLE LAST), so both are read: the board's own convention first (capitals
+    = surname first, any lower case = first name first, as owner_last_first_middle reads it), the
+    other order second and only with exact first names (typo_ok False: a surname read as a first
+    name is not a typo of one). A pattern needs two names to line up, which a wrong reading rarely
+    does by chance, and a pattern only keeps a claim from being refuted."""
+    from ...name_normalize import owner_last_first_middle
+    raw = re.split(r"[;]|<br\s*/?>", str(person or ""), maxsplit=1)[0]
+    if not raw.strip():
+        return []
+    if "," in raw:
+        parts = owner_last_first_middle(raw)
+        return [(parts[0], parts[1], True)] if parts else []
+    toks = [t for t in re.sub(r"[^A-Za-z ]", " ", raw).upper().split() if t not in _SUFFIXES]
+    if len(toks) < 2:
+        return []
+    surname_first, first_first = (toks[0], toks[1]), (toks[-1], toks[0])
+    order = [first_first, surname_first] if re.search(r"[a-z]", raw) else [surname_first, first_first]
+    out = [(order[0][0], order[0][1], True)]
+    if order[1] != order[0]:
+        out.append((order[1][0], order[1][1], False))
+    return out
+
+
+def name_pattern(person: Optional[str], case_name: Any) -> Optional[dict]:
+    """{'pattern': 'maiden_name' | 'middle_as_first', 'across_debtors': bool} when the board
+    person's name stands in one of the two shapes of NAME PATTERNS to a debtor of the case caption
+    (under any owner_readings reading), else None. Pure. It says nothing about the court: see
+    pattern_court_ok."""
+    segs = debtor_segments(case_name)
+    found: list[dict] = []
+    for last, first, typo_ok in owner_readings(person):
+        for f, mids, surname in segs:                          # one debtor's own names
+            if last in _full_middles(mids) and _same_given(first, f, typo_ok):
+                found.append({"pattern": "maiden_name", "across_debtors": False})
+            if last == surname and first in _full_middles(mids):
+                found.append({"pattern": "middle_as_first", "across_debtors": False})
+        for i, (f, _m, _l) in enumerate(segs):                 # joint filers: first name of one,
+            if _same_given(first, f, typo_ok) and any(         # middle name of the other as surname
+                    j != i and last in _full_middles(mids)
+                    for j, (_f, mids, _l2) in enumerate(segs)):
+                found.append({"pattern": "maiden_name", "across_debtors": True})
+    found.sort(key=lambda h: h["across_debtors"])
+    return found[0] if found else None
+
+
+def row_name_pattern(row: dict, claim: dict, case_name: Any) -> Optional[dict]:
+    """name_pattern() over every person of every board name (board_names + persons_of), the
+    first debtor-internal hit before an across-debtors one; adds the board field it came from."""
+    hits = []
+    for field, name in board_names(row, claim):
+        for person in persons_of(name):
+            p = name_pattern(person, case_name)
+            if p:
+                hits.append({**p, "field": field})
+    hits.sort(key=lambda h: h["across_debtors"])
+    return hits[0] if hits else None
+
+
+def owner_mailing_state(row: dict) -> Optional[str]:
+    """The two-letter state of the owner's mailing address as the board knows it (the county
+    record's mail_state / state, skip-trace's mail_state, else the state and ZIP at the end of the
+    mailing line), or None. A state code is only read off a mailing line when a ZIP follows it
+    ("12 ELM CT" is a court, not Connecticut)."""
+    raw = _raw(row)
+
+    def sub(k: str) -> dict:
+        v = raw.get(k)
+        return v if isinstance(v, dict) else {}
+
+    om, st, g = sub("owner_mailing"), sub("skip_trace"), sub("gis")
+    for v in (om.get("mail_state"), om.get("state"), st.get("mail_state")):
+        s = str(v or "").strip().upper()
+        if s in _US_STATES:
+            return s
+    for v in (om.get("mailing"), st.get("owner_mailing_address"), g.get("mailing")):
+        m = _MAIL_TAIL.search(re.sub(r"\s+", " ", str(v or "").upper()).strip())
+        if m and m.group(1) in _US_STATES:
+            return m.group(1)
+    return None
+
+
+def pattern_court_ok(court: Any, court_state: Optional[str], row_state: Optional[str],
+                     county: Any, mail_state: Optional[str]) -> bool:
+    """May a name pattern count in this court? The court's state is the row's state (as
+    production's _COURT_STATE check), the court holds the property's county (wrong_district), and,
+    where the board knows it, the owner's mailing state is the court's state."""
+    if court_state and row_state and court_state != row_state:
+        return False
+    if wrong_district(court, row_state, county):
+        return False
+    if court_state and mail_state and court_state != mail_state:
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------------
 # what is published (pure)
 # ---------------------------------------------------------------------------
 
@@ -750,7 +931,7 @@ def middle_initials(person: Optional[str], debtor: str) -> tuple[Optional[str], 
 
 _PUBLIC_COMMON = ("decided_by", "reason", "owner_match", "match_field", "compared_fields",
                   "claimed_from", "court", "court_state", "expected_courts",
-                  "identity_corroborated_by")
+                  "identity_corroborated_by", "name_pattern", "name_pattern_across_debtors")
 _PUBLIC_CASE = ("docket_number", "docket_id", "chapter", "date_filed", "date_terminated")
 _PUBLIC_STATUS = ("status", "last_activity", "entries_seen")
 
@@ -870,6 +1051,17 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
                    "field": ident["field"], "person": ident["person"],
                    "per_field": ident["per_field"]}
     v = ident["verdict"]
+    if v in ("conflict", "none"):
+        # a pattern the positional matcher cannot see (a maiden name, a middle name used as the
+        # first name) in a court that can cover the property: not a different person, undecided
+        pat = row_name_pattern(row, claim, hit["case_name"])
+        if pat is not None and pattern_court_ok(hit["court"], court_state, row_state,
+                                                row.get("county"), owner_mailing_state(row)):
+            ev["name_pattern"] = pat["pattern"]
+            if pat["across_debtors"]:
+                ev["name_pattern_across_debtors"] = True
+            ev["reason"] = NAME_PATTERN_REASON
+            return _res("unconfirmed", ev)
     if v == "conflict":
         ev["decided_by"] = "middle_conflict"
         return _res("refuted", ev)

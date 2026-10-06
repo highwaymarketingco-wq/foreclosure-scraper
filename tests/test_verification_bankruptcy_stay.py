@@ -185,8 +185,14 @@ def test_stale_discharged_and_closed_long_open_case():
 
 def test_refuted_owner_is_not_the_debtor_and_the_status_is_not_even_fetched():
     """Owner 'ALLEN, JEFFREY' was matched to 'Jeffrey Allen Corwin and ...': Allen is the
-    debtor's middle name. A refuted record publishes how it was decided, nothing about the case."""
-    row = _row("ALLEN, JEFFREY", raw={"bankruptcy": _bk(
+    debtor's middle name. A refuted record publishes how it was decided, nothing about the case.
+
+    v4 (name patterns): this is the MAIDEN-NAME shape (the debtor's first name, the debtor's
+    middle name as the owner's surname), so in a county the court covers it is no longer
+    refuted (test_the_maiden_name_shape_in_a_covering_district_is_unconfirmed below). This test
+    keeps the refuted record's shape on a Guilford row, a county of the Middle District: the
+    W.D.N.C. court cannot cover it, the pattern does not count, and the verdict is what it was."""
+    row = _row("ALLEN, JEFFREY", county="Guilford", raw={"bankruptcy": _bk(
         "ncwb", "Jeffrey Allen Corwin and Sheri Dawn Fry Corwin", "15-31086", 7095900)})
     r, f = run(row)
     assert r.verdict == "refuted"
@@ -197,17 +203,45 @@ def test_refuted_owner_is_not_the_debtor_and_the_status_is_not_even_fetched():
                           "debtor_count": 2}
 
 
-@pytest.mark.parametrize("owner,court,case,dn,did", [
-    # position-blind: the owner's FIRST name is the debtor's middle name
-    ("NELSON, NEIL", "ncwb", "Gary Neil Nelson", "26-31203", 74733868),
+@pytest.mark.parametrize("owner,court,case,dn,did,county", [
+    # position-blind: the owner's FIRST name is the debtor's middle name. v4: the MIDDLE-AS-FIRST
+    # shape, refuted only where the court cannot cover the property (a Guilford row, M.D.N.C.;
+    # in a covering county it is unconfirmed: test_the_middle_as_first_shape_in_a_covering_...)
+    ("NELSON, NEIL", "ncwb", "Gary Neil Nelson", "26-31203", 74733868, "Guilford"),
     # joint-filer phantom: first name of debtor 1 + surname of debtor 2; no such person in the case
-    ("LANE, RONALD", "scb", "Ronald Curtis Bell and Sharon Marie Lane", "26-04126", 74756458),
+    ("LANE, RONALD", "scb", "Ronald Curtis Bell and Sharon Marie Lane", "26-04126", 74756458, "Buncombe"),
 ])
-def test_refuted_no_positional_match(owner, court, case, dn, did):
-    r, _ = run(_row(owner, raw={"bankruptcy": _bk(court, case, dn, did)}))
+def test_refuted_no_positional_match(owner, court, case, dn, did, county):
+    r, _ = run(_row(owner, county=county, raw={"bankruptcy": _bk(court, case, dn, did)}))
     assert r.verdict == "refuted"
     assert r.evidence["decided_by"] == "no_positional_match"
     assert "docket_number" not in r.evidence
+    _no_names(r.evidence)
+
+
+def test_the_maiden_name_shape_in_a_covering_district_is_unconfirmed():
+    """v3: refuted (no_positional_match). v4: the owner has the debtor's first name and the
+    debtor's middle name as the surname, in a Buncombe row the W.D.N.C. court covers: unconfirmed,
+    the claim keeps scoring. The same row in a county the court cannot cover stays refuted
+    (test_refuted_owner_is_not_the_debtor_and_the_status_is_not_even_fetched)."""
+    row = _row("ALLEN, JEFFREY", raw={"bankruptcy": _bk(
+        "ncwb", "Jeffrey Allen Corwin and Sheri Dawn Fry Corwin", "15-31086", 7095900)})
+    r, f = run(row)
+    assert r.verdict == "unconfirmed"
+    assert r.evidence["reason"] == "name_pattern_possible_same_person"
+    assert r.evidence["name_pattern"] == "maiden_name" and r.evidence["owner_match"] == "none"
+    assert f.asked == [b.SEARCH_BY_ID.format(id=7095900)]
+    _no_names(r.evidence)
+
+
+def test_the_middle_as_first_shape_in_a_covering_district_is_unconfirmed():
+    """v3: refuted. v4: owner 'NELSON, NEIL' has the debtor's surname and the debtor's middle
+    name ('Gary Neil Nelson') as the first name, on a Buncombe row the W.D.N.C. court covers."""
+    r, _ = run(_row("NELSON, NEIL", raw={"bankruptcy": _bk(
+        "ncwb", "Gary Neil Nelson", "26-31203", 74733868)}))
+    assert r.verdict == "unconfirmed"
+    assert r.evidence["reason"] == "name_pattern_possible_same_person"
+    assert r.evidence["name_pattern"] == "middle_as_first"
     _no_names(r.evidence)
 
 

@@ -227,5 +227,7 @@ def test_corroboration_never_raises_and_publishes_only_its_source(tmp_path, monk
         assert w not in blob
 
 
-def test_version_is_v3():
-    assert b.VERSION == "v3"
+def test_version_is_v4():
+    """v4 (name patterns): the wrong_district / identity corroboration rules above are v3's and
+    are unchanged."""
+    assert b.VERSION == "v4"
