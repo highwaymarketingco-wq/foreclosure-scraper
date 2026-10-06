@@ -74,7 +74,7 @@ def _canipe(**raw_extra):
 
 def test_registered_with_the_exact_scorer_names():
     v = next(v for v in discover() if v.name == "bankruptcy_stay")
-    assert (v.signal, v.version, v.ttl_days) == ("bankruptcy_stay", "v1", 30.0)
+    assert (v.signal, v.version, v.ttl_days) == ("bankruptcy_stay", "v2", 30.0)
     assert v.governs == ("bankruptcy", "bankruptcy_stay")
     # both are names the scorer and the lead-signal facets actually emit
     assert {"bankruptcy", "bankruptcy_stay"} <= set(ds.SIGNAL_CATEGORY)
@@ -117,7 +117,7 @@ def test_stale_dismissed_chapter_13_the_board_scores_as_open():
     assert ev["match"]["rule"].startswith("name_normalize.debtor_positional_match")
     assert any(e["date"] == "2026-09-02" for e in ev["relief_from_stay_entries"])
     assert r.signal == "bankruptcy_stay" and r.source == "courtlistener.com"
-    assert r.verifier == "bankruptcy_stay" and r.verifier_version == "v1"
+    assert r.verifier == "bankruptcy_stay" and r.verifier_version == b.VERSION
 
 
 def test_stale_found_by_docket_number_when_the_row_has_only_the_stay():
@@ -271,7 +271,17 @@ def test_unconfirmed_owner_name_and_defendant_disagree():
                defendant="Steven Edward Chastain", raw={"bankruptcy": _bk(
                    "scb", "Steven Edward Chastain and Katelyn Elizabeth Chastain", "26-03536", 73707954)})
     r, _ = run(row)
-    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "owner_name_and_defendant_disagree"
+    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "board_names_disagree"
+
+
+def test_unconfirmed_debtor_is_the_defendant_but_not_the_owner_of_record():
+    """The first live sweep's one doubtful 'confirmed' (v1): a distressed row whose defendant is
+    the debtor while its owner_name names two other people."""
+    row = _row("OVERCASH RODNEY A;OVERCASH FRANCINE M", defendant="Bryan Christopher Tallant",
+               raw={"bankruptcy": _bk("ncwb", "Bryan Christopher Tallant", "26-10161", 73600081)})
+    r, f = run(row)
+    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "board_names_disagree"
+    assert len(f.asked) == 1
 
 
 def test_unconfirmed_all_caps_owner_that_only_matches_read_first_last():

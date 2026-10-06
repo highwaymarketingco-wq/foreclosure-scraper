@@ -48,7 +48,7 @@ VERDICTS (core.py's meanings):
   refuted      the debtor is a different person (a proven middle conflict, or no debtor in the
                case lines up with any board owner name), or the case does not exist.
   unconfirmed  cannot decide: no person name (no owner of record) on the board to compare; two
-               board names disagree (one matches, another conflicts); an ALL-CAPS owner that matches only
+               board names disagree (one matches, another names someone else); an ALL-CAPS owner that matches only
                when read FIRST MIDDLE LAST (owner_last_first_middle reads ALL-CAPS surname-first,
                "KIMBERLY A GOODALL"); a match whose court is in another state (the one place a
                first+last match is not enough: production rejects it, nothing here says it is a
@@ -73,7 +73,8 @@ from urllib.parse import quote
 from ..core import VerificationResult, result
 
 SIGNAL = "bankruptcy_stay"
-VERSION = "v1"
+VERSION = "v2"         # v2 (2026-10-06): a match in one board name beside a person in another
+                       # who does not match (not only one who conflicts) is unconfirmed
 TTL_DAYS = 30          # refuted/stale (the verdicts that change the score) are durable facts;
                        # a confirmed-open case is re-read monthly
 RETRY_DAYS = 7
@@ -230,8 +231,10 @@ def person_verdict(person: str, debtors: list[str]) -> str:
 def judge_identity(row: dict, claim: dict, debtors: list[str]) -> dict:
     """{'verdict': agrees|unverified|conflict|names_disagree|order_ambiguous|none|no_person,
     'field', 'person', 'per_field'}. Within one field the best co-owner counts (a joint owner
-    string names several people); across owner_name and defendant a match beside a proven
-    conflict is a disagreement, not a match."""
+    string names several people). Across fields, a match beside a field naming someone else
+    (a conflict, or a person who does not line up at all) is a disagreement, not a match: the
+    first live sweep met defendant 'Cheryl Delaine Overcash' (the debtor) on a parcel whose
+    owner_name is 'OVERCASH RODNEY A;OVERCASH FRANCINE M'."""
     per_field: dict[str, dict] = {}
     for field, name in board_names(row, claim):
         persons = persons_of(name)
@@ -243,8 +246,8 @@ def judge_identity(row: dict, claim: dict, debtors: list[str]) -> dict:
     if not per_field:
         return {"verdict": "no_person", "field": None, "person": None, "per_field": per_field}
     matches = [(f, d) for f, d in per_field.items() if d["verdict"] in ("agrees", "unverified")]
-    conflicts = [f for f, d in per_field.items() if d["verdict"] == "conflict"]
-    if matches and conflicts:
+    others =[f for f, d in per_field.items() if d["verdict"] in ("conflict", "none")]
+    if matches and others:
         return {"verdict": "names_disagree", "field": None, "person": None, "per_field": per_field}
     if matches:
         f, d = max(matches, key=lambda fd: _RANK[fd[1]["verdict"]])
@@ -529,7 +532,7 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         ev["decided_by"] = "no_positional_match"
         return _res("refuted", ev)
     if v in ("names_disagree", "order_ambiguous", "no_person"):
-        ev["reason"] = {"names_disagree": "owner_name_and_defendant_disagree",
+        ev["reason"] = {"names_disagree": "board_names_disagree",
                         "order_ambiguous": "owner_name_order_ambiguous",
                         "no_person": "no_person_owner_on_board"}[v]
         return _res("unconfirmed", ev)
