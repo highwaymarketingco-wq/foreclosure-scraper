@@ -65,7 +65,7 @@ from .signal_freshness import (
     bankruptcy_lapsed, code_enforcement_open, has_real_probate, incarceration_active, to_date,
 )
 from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
-from .verification.core import suppressed_scorer_signals
+from .verification.core import block_suppressed, qualifiers, suppressed_scorer_signals
 
 log = structlog.get_logger()
 
@@ -849,8 +849,12 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     # (`has_open` False), and nothing clears it. Count it only while a case is open. A block
     # that says every case is closed also ends the `condemned` flag that rode with it; a bare
     # `condemned` flag with no case record beside it still counts.
+    # "code_enforcement:<source>" (a refuted/stale verification of that source's case,
+    # verification/verifiers/code_enforcement_henderson.py, vacant_structure_hendersonville.py)
+    # ends the credit only where the block is that source's.
     if ce:
-        if code_enforcement_open(ce, today):
+        if code_enforcement_open(ce, today) and not block_suppressed(
+                ce, qualifiers(drop, "code_enforcement")):
             sig.append(("code_enforcement", "PROPERTY", 14, REC))
     elif r.get("condemned"):
         sig.append(("code_enforcement", "PROPERTY", 14, REC))
@@ -859,7 +863,7 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     st = _storm_signal(r.get("storm_damage"))
     if st:
         sig.append((*st, REC))
-    if _vacant_structure(r):
+    if _vacant_structure(r, skip_sources=qualifiers(drop, "vacant_structure")):
         sig.append(("vacant_structure", "PROPERTY", 12, REC))
     if r.get("vacant_lot"):
         # vacant_lot (2026-10-02 audit dd19fa6a): SIGNAL_CATEGORY has carried a "vacant_lot" ->
@@ -906,13 +910,17 @@ def _distressed_flag_counts(li: Listing, r: dict) -> bool:
     return True
 
 
-def _vacant_structure(r: dict) -> bool:
+def _vacant_structure(r: dict, skip_sources: Optional[set] = None) -> bool:
     """A code officer confirmed the structure vacant or boarded up (raw['vacancy'], the
     Hendersonville register). `vacant_lot` is undeveloped land, not a vacant house, and the
-    USPS vacancy figure is ZIP-level context; neither is a seller-pressure signal."""
+    USPS vacancy figure is ZIP-level context; neither is a seller-pressure signal.
+    `skip_sources`: block sources a refuted/stale verification ended ("vacant_structure:<source>",
+    verification.core.qualifiers); such a block does not count."""
     for key in ("vacancy", "vacant"):
         v = r.get(key)
         if isinstance(v, dict) and (v.get("vacant") is True or v.get("boarded_up") is True):
+            if block_suppressed(v, skip_sources or set()):
+                continue
             return True
     return False
 

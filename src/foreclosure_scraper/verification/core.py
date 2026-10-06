@@ -307,6 +307,21 @@ def suppressed_scorer_signals(raw: Any, today: Any = None) -> set[str]:
     return out
 
 
+def qualifiers(drop: Any, signal: str) -> set[str]:
+    """The qualifiers a suppressed set holds for `signal`: {"x", ...} for its "<signal>:x"
+    entries. For code_enforcement and vacant_structure the qualifier is the raw block's
+    `source` (e.g. "code_enforcement:henderson_ordinance_violations_tracking"): the reader ends
+    that signal's credit only where the row's block came from that source, so a verdict about
+    one source's case never ends another source's block on the same parcel."""
+    p = f"{signal}:"
+    return {str(d)[len(p):] for d in (drop or ()) if str(d).startswith(p) and len(str(d)) > len(p)}
+
+
+def block_suppressed(block: Any, sources: set[str]) -> bool:
+    """A raw block (code_enforcement, vacancy) whose `source` is in `sources`."""
+    return bool(sources) and isinstance(block, dict) and block.get("source") in sources
+
+
 def verdict_badges(raw: Any, now: Optional[datetime] = None) -> dict[str, str]:
     """{signal: verdict} over the row's non-expired records -- what a dashboard badge shows
     ("tax_lien: confirmed"). Expired records are omitted, never shown as current."""

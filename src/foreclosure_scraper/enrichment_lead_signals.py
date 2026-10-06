@@ -56,7 +56,7 @@ from .signal_freshness import (
     bankruptcy_lapsed, code_enforcement_open, has_real_probate, incarceration_active,
     owner_names_a_death,
 )
-from .verification.core import suppressed_scorer_signals
+from .verification.core import block_suppressed, qualifiers, suppressed_scorer_signals
 
 log = structlog.get_logger()
 
@@ -164,12 +164,15 @@ def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
 
     # --- PROPERTY ---
     ce = raw.get("code_enforcement")
+    # "code_enforcement:<source>" / "vacant_structure:<source>": the same partial rule as
+    # distress_score._collect (a verdict ends only that source's block).
     if ce:
-        if code_enforcement_open(ce, today):
+        if code_enforcement_open(ce, today) and not block_suppressed(
+                ce, qualifiers(drop, "code_enforcement")):
             out.add("code_enforcement")
     elif _truthy(raw.get("condemned")):
         out.add("code_enforcement")
-    if _vacant_structure(raw):
+    if _vacant_structure(raw, skip_sources=qualifiers(drop, "vacant_structure")):
         out.add("vacant_structure")
     if _truthy(raw.get("vacant_lot")):
         out.add("vacant_lot")
