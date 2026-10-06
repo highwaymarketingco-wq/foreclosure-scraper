@@ -336,10 +336,95 @@ async def _fetch_long_open_bankruptcies(c, court: str, token: str, today: date |
     return out
 
 
+# ---------------------------------------------------------------------------
+# RE-JUDGING STORED MATCHES (2026-10-06)
+# ---------------------------------------------------------------------------
+# The MATCH-ACCURACY FIX above changed how a NEW match is made; the matches already on the
+# board were never looked at again (`_match_filings` only adds), so every raw['bankruptcy']
+# written by the old bag-of-tokens matcher stayed, and enrichment_bankruptcy_stay kept deriving
+# a stay from it. The bankruptcy_stay verifier measured it on the 2026-10-05 board: of the 234
+# stay rows, 172 (73.5%) name a different person than the owner. Scoring now ignores the
+# verifier's refuted ones, but the stranger's case is still displayed on the property.
+# So every run first re-applies the CURRENT rule to every stored match, offline: the stored
+# case_name and court are all it needs (same idea as enrichment_jail_bookings._reevaluate_stamp
+# for jail stamps). A match the rule rejects is removed with the stay derived from it; one it
+# still accepts, or cannot judge, is left exactly as it is.
+
+def rejudge_match(defendant: Optional[str], state: Optional[str], bk: object) -> tuple[bool, str]:
+    """(keep, reason) for one stored raw['bankruptcy'] under `_match_filings`' rule.
+
+    Rejected (keep False), exactly as a new match would be:
+      court_state_differs   the court's state (_COURT_STATE) is not the listing's state;
+      no_positional_match   no debtor segment of the case name has the defendant's FIRST name
+                            first and LAST name last (debtor_positional_match);
+      middle_conflict       a positional match, but every such debtor's middle initial
+                            contradicts the defendant's (debtor_middle_verdict == "conflict").
+    Kept: positional_match_agrees / positional_match_unverified (the rule accepts it), and
+    what the rule cannot judge: no stored case name, no defendant it can read as a person
+    (owner_last_first_middle is None), or an ALL-CAPS defendant without a comma that matches
+    only when read FIRST LAST (order_ambiguous: the rule reads ALL-CAPS as SURNAME FIRST, and
+    some sources write FIRST LAST in capitals; the bankruptcy_stay verifier leaves the same
+    case unconfirmed). An order-ambiguous name whose FIRST LAST reading is a proven middle
+    conflict is a different person either way and is rejected."""
+    from .name_normalize import owner_last_first_middle
+
+    if not isinstance(bk, dict):
+        return True, "not_a_match"
+    case_name = str(bk.get("case_name") or "").strip()
+    if not case_name:
+        return True, "unjudgeable_no_case_name"
+    court = str(bk.get("court") or "").strip().lower()
+    st = str(state or "").strip().upper()
+    if _COURT_STATE.get(court) and st and st != _COURT_STATE[court]:
+        return False, "court_state_differs"
+    d = str(defendant or "").strip()
+    if not d or owner_last_first_middle(d) is None:
+        return True, "unjudgeable_defendant"
+    if debtor_positional_match(d, [case_name]):
+        v = debtor_middle_verdict(d, [case_name])
+        return (False, "middle_conflict") if v == "conflict" else (True, f"positional_match_{v}")
+    if "," not in d and not re.search(r"[a-z]", d) and debtor_positional_match(d.title(), [case_name]):
+        if debtor_middle_verdict(d.title(), [case_name]) == "conflict":
+            return False, "middle_conflict"
+        return True, "order_ambiguous"
+    return False, "no_positional_match"
+
+
+def rejudge_existing_matches(listings) -> dict:
+    """Re-apply the current match rule to every stored raw['bankruptcy'] (rejudge_match), offline.
+    A rejected match is removed, and with it raw['bankruptcy_stay'] unless that stay names a
+    different docket (enrichment_bankruptcy_stay derives the stay from the match and never
+    clears it). Returns counts: checked, kept, cleared, cleared_stays, and one per reason."""
+    stats: dict[str, int] = {"checked": 0, "kept": 0, "cleared": 0, "cleared_stays": 0}
+    for li in listings:
+        raw = li.raw if isinstance(getattr(li, "raw", None), dict) else None
+        bk = raw.get("bankruptcy") if raw else None
+        if not isinstance(bk, dict):
+            continue
+        stats["checked"] += 1
+        keep, why = rejudge_match(li.defendant, li.state, bk)
+        stats[why] = stats.get(why, 0) + 1
+        if keep:
+            stats["kept"] += 1
+            continue
+        raw.pop("bankruptcy", None)
+        stats["cleared"] += 1
+        st = raw.get("bankruptcy_stay")
+        if isinstance(st, dict):
+            other = str(st.get("docket") or "").strip()
+            if not other or other == str(bk.get("docket_number") or "").strip():
+                raw.pop("bankruptcy_stay", None)
+                stats["cleared_stays"] += 1
+    return stats
+
+
 async def enrich_with_bankruptcy(listings: list[Listing]) -> None:
-    """Cross-reference defendants against recent bankruptcy filings."""
+    """Cross-reference defendants against recent bankruptcy filings. First, offline and with or
+    without a token, re-judge the matches already stored (rejudge_existing_matches)."""
     if not listings:
         return
+    rj = rejudge_existing_matches(listings)
+    log.info("bankruptcy.rejudged", **rj)
     token = _load_token()
     if not token:
         log.info("bankruptcy.no_token", hint="echo TOKEN > .secrets/courtlistener_token.txt to enable")
