@@ -228,13 +228,22 @@ async def _resolve(c, li: Listing, nominatim_delay: float,
 
     fast_only (set once the run's geocode budget is spent): use only cached
     lookups + the instant county-seat centroid — no new network and no rate-limited
-    Nominatim sleeps — so the loop can never run for hours."""
+    Nominatim sleeps — so the loop can never run for hours.
+
+    A row awaiting its parcel's point (enrichment_prior_correction.awaiting_parcel_point: the
+    prior correction replaced the owner's mailing address on it and cleared the point geocoded
+    from that address) is geocoded from its street only with a city or ZIP, and never gets a
+    city or county-seat centroid: the correction leaves it without city/ZIP, so Tier 4 would put
+    every one of them on the county seat, the shared fallback point of docs/HANDOFF.md item 70.
+    It stays unplaced instead, for the parcel layer or a later run."""
+    from .enrichment_prior_correction import awaiting_parcel_point
+    hold = awaiting_parcel_point(li.raw)
     # Build candidate address strings from most specific to least
     candidates: list[str] = []
-    if li.street_address:
+    if li.street_address and not (hold and not (li.city or li.zip_code)):
         bits = [li.street_address, li.city or "", f"{li.state or ''} {li.zip_code or ''}".strip()]
         candidates.append(", ".join(b for b in bits if b))
-    if li.city and li.state:
+    if li.city and li.state and not hold:
         candidates.append(f"{li.city}, {li.state} {li.zip_code or ''}".strip())
 
     # Tier 1: Census geocoder (fast, no rate limit)
@@ -263,6 +272,9 @@ async def _resolve(c, li: Listing, nominatim_delay: float,
             if res:
                 return res
 
+    if hold:
+        return None  # no centroid tiers for a row awaiting its parcel's point (docstring)
+
     # Tier 3: city centroid via Census (just city + state, no street)
     if li.city and li.state:
         q = f"{li.city}, {li.state}"
@@ -288,7 +300,13 @@ async def _resolve(c, li: Listing, nominatim_delay: float,
 
 
 async def enrich(listings: list[Listing], rate_per_sec: float = 1.0) -> list[Listing]:
-    """Multi-tier geocoder. Goal: 100% of listings get lat/lng (coarse OK)."""
+    """Multi-tier geocoder. Goal: 100% of listings get lat/lng (coarse OK), except a row awaiting
+    its parcel's point (see _resolve): the parcel layer or its corrected street, or nothing."""
+    from .enrichment_prior_correction import awaiting_parcel_point, mark_point_placed, place_parcel_points
+    for li in listings:
+        # placed since the correction by an earlier phase (the GIS phase's parcel centroid)
+        if li.latitude is not None and li.longitude is not None and awaiting_parcel_point(li.raw):
+            mark_point_placed(li, "before_geocode")
     targets = [li for li in listings if li.latitude is None or li.longitude is None]
     if not targets:
         return listings
@@ -301,7 +319,16 @@ async def enrich(listings: list[Listing], rate_per_sec: float = 1.0) -> list[Lis
     t0 = time.monotonic()
     budget_hit = False
 
+    waiting = [li for li in targets if awaiting_parcel_point(li.raw)]
+
     async with client(timeout=20.0) as c:
+        # Rows whose carried point the prior correction cleared (it was geocoded from the owner's
+        # mailing address shown as the property): the parcel's own polygon first, from the
+        # county layer, by parcel id (enrichment_prior_correction.place_parcel_points).
+        if waiting:
+            pp = await place_parcel_points(c, waiting)
+            log.info("geocode.parcel_points", awaiting=len(waiting), **dict(pp))
+            targets = [li for li in targets if li.latitude is None or li.longitude is None]
         # Bulk first, so the rate-limited per-lead tier only sees what is left.
         batch_filled = await _census_batch(c, targets)
         targets = [li for li in targets
@@ -318,6 +345,17 @@ async def enrich(listings: list[Listing], rate_per_sec: float = 1.0) -> list[Lis
             if res:
                 li.latitude, li.longitude = res
                 matched += 1
+
+    unplaced = 0
+    for li in waiting:
+        if li.latitude is not None and li.longitude is not None:
+            if awaiting_parcel_point(li.raw):
+                mark_point_placed(li, "geocode")     # the corrected street, with its city/ZIP
+        else:
+            unplaced += 1
+    if waiting:
+        log.info("geocode.awaiting_parcel_point_unplaced", rows=unplaced,
+                 note="left without a point rather than on a city or county-seat centroid")
 
     final_missing = sum(1 for li in listings if li.latitude is None or li.longitude is None)
     log.info("geocode.done",

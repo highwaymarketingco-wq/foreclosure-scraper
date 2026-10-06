@@ -54,6 +54,27 @@ merges on a withdrawn parcel or address. Every change keeps the old values under
    (asheville_helene, Lincoln PDF rows via the name resolver, Spartanburg lis pendens): same test,
    same correction. Audit: raw['address_was_owner_mailing']. Needs data/parcel_cache: a county
    without a cache is skipped and logged (never guessed).
+   THE POINT (map pin). Nothing records where a row's lat/lng came from except two tags, so it
+   was measured (docs/HANDOFF.md item 71, pins): on the 1,254 rows this corrects on the 10/6
+   board only 458 points lie inside the row's own parcel. 'census_geocode' points
+   (resolver_backfill_geocode / geocode_catchup geocoding the street, i.e. the mailing) sit
+   within 100 m of the mailing's own geocode on 326 of 383; the untagged ones (the run's
+   enrichment_geocode writes no tag) are half and half; centroid_snap / county_centroid ones are
+   shared fallbacks. Only raw['geo_source'] 'parcel_polygon_centroid' (a scraper's own parcel
+   polygon centroid, spartanburg_vacant) proves the point is the parcel's: 97 of 115 inside it.
+   So with a corrected street the point is KEPT only when it is the parcel's polygon centroid;
+   else REPLACED by the parcel's own point when the run already holds one (a same-parcel bag's
+   '_centroid', or another row of the same parcel whose point is that parcel's polygon centroid
+   or a precise resolver point of it, parcel_points()); else CLEARED. The tags that described the
+   old point go with it. Old point and tags: raw['address_was_owner_mailing']['point'].
+   A cleared row (or one that had no point) is 'awaiting_parcel_point': enrichment_geocode first
+   asks the county parcel layer for that parcel's polygon (place_parcel_points), then geocodes
+   the corrected street only when the row has a city or ZIP, and never puts it on a city or
+   county-seat centroid (its Tier 3/4): a corrected row has no city/ZIP, so Tier 4 would have
+   put it on the county seat, the shared fallback point of item 70. Unplaced, it waits for a
+   later run. Replayed on the 10/6 board: 115 kept, 19 replaced, 1,113 cleared and 7 without a
+   point; the layer placed 1,016 (115 s), 104 stay unplaced (Oconee's layer has no geometry: 70);
+   1,138 of the 1,254 pins end inside the row's own parcel polygon.
 
 3. SUPERSEDED MAILING COPIES. A prior copy whose street was the owner's mailing has a different
    house number from its fresh situs row, so merge_prior_board's house-number guard keeps it
@@ -65,16 +86,21 @@ merges on a withdrawn parcel or address. Every change keeps the old values under
    the earlier first_seen and a short record in raw['superseded_mailing_copies']. Without such
    a live row (the bill was paid) the corrected copy stays and ages as before.
 
-MEMORY. Two light passes and one correcting pass over the in-memory list; the lookup tables are
-the recorded resolver points (2,331 on the 10/6 board), their row counts, and the parcel keys of
-the corrected aged rows. No row is copied. County caches are read through CacheReader, which caps
+MEMORY. Three light passes and one correcting pass over the in-memory list; the lookup tables
+are the recorded resolver points (2,331 on the 10/6 board), their row counts, the parcel points
+of rows that carry one (parcel_points: polygon centroids and precise resolver points, a few
+thousand), and the parcel keys of the corrected aged rows. No row is copied. County caches are read through CacheReader, which caps
 SQLite's page cache and closes what it opened. main.run() wraps the call: it never fails a run.
 """
 from __future__ import annotations
 
+import asyncio
 import difflib
 import json
+import math
+import os
 import re
+import time
 from collections import Counter, defaultdict
 from datetime import datetime
 from typing import Any, Callable, Iterable, Optional
@@ -91,6 +117,20 @@ SUPERSEDED_KEY = "superseded_mailing_copies"
 
 #: raw['parcel_from_geo']['source'] values that record an id swap or an address match, not a point.
 NON_POINT_STAMPS = frozenset({"ptscloud_pts_to_pin", "burke_cache_situs_address"})
+
+#: raw['geo_source'] values that say the row's point is its own parcel's polygon centroid.
+PARCEL_POINT_SOURCES = frozenset({"parcel_polygon_centroid"})
+#: raw tags that describe the row's current point: they leave with a replaced or cleared point.
+POINT_TAGS = ("geo_imprecise", "geocoded_by_name", "geo_missing", "geo_source")
+#: Where a replacement point came from -> the raw['geo_source'] it is published with.
+_POINT_GEO_SOURCE = {"row_parcel_bag": "parcel_polygon_centroid",
+                     "sibling_parcel_centroid": "parcel_polygon_centroid",
+                     "sibling_resolver_point": "parcel_resolver_point",
+                     "parcel_layer": "parcel_polygon_centroid"}
+#: NC + SC, generously: a parcel point outside it is a projection or id mix-up, never used.
+_AREA = (32.0, 37.5, -85.0, -75.0)
+#: Two points of one parcel farther apart than this are not trusted as "the parcel's point".
+_SAME_PARCEL_M = 150.0
 
 #: Keys (lower case) under which a raw block names a parcel id.
 _PARCEL_ID_KEYS = frozenset({
@@ -153,6 +193,20 @@ def _point(lat: Any, lng: Any) -> Optional[tuple]:
         return (round(float(lat), 5), round(float(lng), 5))
     except (TypeError, ValueError):
         return None
+
+
+def _in_area(lat: Any, lng: Any) -> bool:
+    try:
+        la, lo = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return False
+    return _AREA[0] <= la <= _AREA[1] and _AREA[2] <= lo <= _AREA[3]
+
+
+def _dist_m(a: tuple, b: tuple) -> float:
+    la1, lo1, la2, lo2 = map(math.radians, (a[0], a[1], b[0], b[1]))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
+    return 2 * 6371000.0 * math.asin(math.sqrt(h))
 
 
 def county_name(county: Any) -> str:
@@ -324,6 +378,14 @@ def classify_street(street: Any, situs: Any, mailing: Any, state: Any) -> str:
 def mask_street(s: Any) -> str:
     """A street for a log or report: house numbers and unit numbers masked."""
     return re.sub(r"\d", "#", str(s or ""))[:60]
+
+
+def mask_point(p: Any) -> Optional[str]:
+    """A point for a log or report: two decimals (about 1 km), never the house."""
+    try:
+        return f"{float(p[0]):.2f},{float(p[1]):.2f}"
+    except (TypeError, ValueError, IndexError):
+        return None
 
 
 # ------------------------------------------------------------------------------ parcel cache
@@ -717,9 +779,111 @@ def situs_street(situs: Any) -> Optional[str]:
     return m.group(1).lstrip("0") + m.group(2) + " " + m.group(3)
 
 
-def restore_situs(li: Listing, cache: CacheReader) -> Optional[dict]:
+def bag_parcel_point(raw: Any, pid_norm: str) -> Optional[tuple]:
+    """The '_centroid' (lat, lng) an ArcGIS query left in the row's gis_attrs_full bag, when that
+    bag is the record of parcel `pid_norm`; else None."""
+    bag = raw.get("gis_attrs_full") if isinstance(raw, dict) else None
+    if not (isinstance(bag, dict) and names_parcel(bag, pid_norm)):
+        return None
+    c = bag.get("_centroid")
+    if isinstance(c, (list, tuple)) and len(c) == 2 and _in_area(c[0], c[1]):
+        return (float(c[0]), float(c[1]))
+    return None
+
+
+def parcel_points(listings: Iterable[Any], point_counts: Counter, min_rows: int) -> dict:
+    """parcel key -> (lat, lng, how) for parcels that some row of `listings` places at a point of
+    the parcel itself: its polygon centroid (raw['geo_source'] in PARCEL_POINT_SOURCES), or the
+    precise point enrichment_parcel_from_geo resolved this parcel at (not a fallback point, not a
+    flagged one). A parcel whose candidate points disagree by more than _SAME_PARCEL_M is left
+    out. Light: only rows carrying such a point are looked at."""
+    from .enrichment_geocode import imprecise_point_flag
+    from .placeholder_twins import parcel_key
+    cands: dict = defaultdict(list)
+    for li in listings:
+        pid = _get(li, "parcel_id")
+        if not pid:
+            continue
+        raw = _raw(li)
+        if raw.get("geo_source") in PARCEL_POINT_SOURCES:
+            p, how = _point(_get(li, "latitude"), _get(li, "longitude")), "sibling_parcel_centroid"
+        else:
+            p = recorded_point(raw)
+            if p is None or imprecise_point_flag(raw) or fallback_reason(li, point_counts, min_rows):
+                continue
+            how = "sibling_resolver_point"
+        if p is None or not _in_area(*p):
+            continue
+        k = parcel_key(_get(li, "state"), _get(li, "county"), pid)
+        if k:
+            cands[k].append((p, how))
+    out = {}
+    for k, lst in cands.items():
+        lst.sort(key=lambda x: x[1] != "sibling_parcel_centroid")       # a polygon centroid first
+        p0 = lst[0][0]
+        if all(_dist_m(p0, p) <= _SAME_PARCEL_M for p, _how in lst):
+            out[k] = (p0[0], p0[1], lst[0][1])
+    return out
+
+
+def plan_point(li: Listing, raw: dict, points: Optional[dict]) -> dict:
+    """What happens to the point of a row whose street correction 2 corrects (module docstring,
+    THE POINT): 'kept' (it is the parcel's polygon centroid), 'replaced' (by the parcel's own
+    point, from the row's bag or `points`), 'cleared', or 'absent' (no point and no replacement).
+    Pure: returns the plan, changes nothing."""
+    has = li.latitude is not None and li.longitude is not None
+    old = [li.latitude, li.longitude] if has else None
+    if has and raw.get("geo_source") in PARCEL_POINT_SOURCES:
+        return {"action": "kept", "old": old, "why": raw["geo_source"]}
+    new, how = bag_parcel_point(raw, _normalize_parcel(str(li.parcel_id))), "row_parcel_bag"
+    if new is None and points:
+        from .placeholder_twins import parcel_key
+        hit = points.get(parcel_key(li.state, li.county, li.parcel_id))
+        if hit:
+            new, how = (hit[0], hit[1]), hit[2]
+    plan: dict = {"action": "replaced" if new else ("cleared" if has else "absent"), "old": old}
+    tags = {k: raw[k] for k in POINT_TAGS if k in raw}
+    if tags:
+        plan["tags"] = tags
+    if new:
+        plan["new"] = [new[0], new[1]]
+        plan["from"] = how
+    return plan
+
+
+def _apply_point(li: Listing, raw: dict, plan: dict) -> None:
+    if plan["action"] == "kept":
+        return
+    for k in plan.get("tags", {}):
+        raw.pop(k, None)
+    if plan["action"] == "replaced":
+        li.latitude, li.longitude = plan["new"]
+        raw["geo_source"] = _POINT_GEO_SOURCE[plan["from"]]
+    else:
+        li.latitude = li.longitude = None
+
+
+def awaiting_parcel_point(raw: Any) -> bool:
+    """Correction 2 left this row without a point (cleared, or it had none) and nothing has
+    placed it since: enrichment_geocode asks the parcel layer first and never gives it a city or
+    county-seat centroid."""
+    a = raw.get(MAILING_KEY) if isinstance(raw, dict) else None
+    p = a.get("point") if isinstance(a, dict) else None
+    return isinstance(p, dict) and p.get("action") in ("cleared", "absent") and not p.get("placed")
+
+
+def mark_point_placed(li: Listing, how: str) -> None:
+    """Record on the audit that a later step placed the awaiting row (how, where)."""
+    raw = _raw(li)
+    p = (raw.get(MAILING_KEY) or {}).get("point")
+    if isinstance(p, dict):
+        p["placed"] = {"by": how, "at": [li.latitude, li.longitude]}
+
+
+def restore_situs(li: Listing, cache: CacheReader, points: Optional[dict] = None) -> Optional[dict]:
     """Correction 2 on one row. Returns the audit record when the street was replaced or nulled,
-    {'skip': reason} when the row could not be checked, else None."""
+    {'skip': reason} when the row could not be checked, else None. `points` is parcel_points()
+    of the rows being corrected (a replacement for a point derived from the mailing)."""
     pid, street, state = li.parcel_id, li.street_address, str(li.state or "").upper()
     if not (pid and street and state and li.county):
         return None
@@ -755,6 +919,8 @@ def restore_situs(li: Listing, cache: CacheReader) -> Optional[dict]:
     audit = {"class": cls, "street_address": street, "city": li.city, "zip_code": li.zip_code,
              "situs_address_source": raw.get("situs_address_source"), "parcel_id": pid,
              "situs": new_street, "cache_tier": tier}
+    audit["point"] = plan_point(li, raw, points)
+    _apply_point(li, raw, audit["point"])
     li.street_address = new_street
     li.city = new_city
     li.zip_code = new_zip
@@ -817,6 +983,232 @@ def drop_superseded(listings: list[Listing], corrected_aged: list[Listing]) -> t
     return dropped, by
 
 
+# ------------------------------------------ the parcel's own point, for rows awaiting one
+def _dashed(*widths: int) -> Callable:
+    """A formatter for a county that stores its PIN dashed while the board keeps the digits."""
+    def fmt(d: str) -> Optional[str]:
+        if not d.isdigit() or len(d) != sum(widths):
+            return None
+        out, i = [], 0
+        for w in widths:
+            out.append(d[i:i + w])
+            i += w
+        return "-".join(out)
+    return fmt
+
+
+#: Board ids a county layer stores formatted (the board keeps them with punctuation stripped).
+_LAYER_ID_FORMATS: dict = {
+    # parcel_cache's Spartanburg entry: board 12-digit id = GISParcelNumber (7102-28-3341.88)
+    ("SC", "Spartanburg"): (lambda d: f"{d[:4]}-{d[4:6]}-{d[6:10]}.{d[10:]}"
+                            if len(d) == 12 and d.isdigit() else None),
+    # NC OneMap parno for Transylvania is dashed 4-2-4-3; 136 of the 144 corrected Transylvania
+    # rows carry the 13 bare digits (measured 2026-10-06)
+    ("NC", "Transylvania"): _dashed(4, 2, 4, 3),
+}
+#: Wall-clock cap on the parcel-layer queries of one geocode phase. Queries are batched (an IN
+#: list per county), so the first run after this shipped (about 1,120 rows) needs a few dozen.
+PARCEL_POINT_BUDGET_S = float(os.environ.get("GEOCODE_PARCEL_POINT_BUDGET_S", "300"))
+#: Ids per IN (...) query: keeps the GET under ~2 KB.
+_IN_CHUNK = 40
+
+
+def layer_id_forms(pid: Any, county: str, state: str) -> list[str]:
+    """The id literals to try against the county layer for board parcel id `pid`: as written,
+    parcel_cache's exact and zero-suffix forms (never its zero-padded guesses), and the county's
+    own formatting when the board stores it stripped (_LAYER_ID_FORMATS). At most 4."""
+    from . import parcel_cache as pcache
+    s = " ".join(str(pid or "").split())
+    if not s:
+        return []
+    forms = [s] + [k for k, tier in pcache._lookup_candidates(s) if tier in ("exact", "zero_suffix")]
+    fmt = _LAYER_ID_FORMATS.get((state, county))
+    if fmt:
+        forms.append(fmt(re.sub(r"\D", "", s)))
+    out: list[str] = []
+    for f in forms:
+        if f and f not in out:
+            out.append(f)
+    return out[:4]
+
+
+def _ring_area2(ring: list) -> float:
+    ox, oy = ring[0]
+    a2 = 0.0
+    for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]):
+        a2 += (x0 - ox) * (y1 - oy) - (x1 - ox) * (y0 - oy)
+    return a2
+
+
+def _inside(x: float, y: float, ring: list) -> bool:
+    inside = False
+    for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]):
+        if (y0 > y) != (y1 > y) and x < (x1 - x0) * (y - y0) / (y1 - y0) + x0:
+            inside = not inside
+    return inside
+
+
+def polygon_centroid(geom: Any) -> Optional[tuple]:
+    """(lat, lng) of an ArcGIS geometry in WGS84 for a map pin INSIDE the parcel: a point as is;
+    for a polygon, the area-weighted centroid of its largest ring (by area), computed relative to
+    the ring's first vertex (raw-coordinate cross products lose metres to cancellation); when a
+    concave lot puts that centroid outside the ring (9 of the first replay's 880 placed points),
+    the middle of the widest stretch of the ring along the centroid's latitude.
+    None outside NC/SC."""
+    if not isinstance(geom, dict):
+        return None
+    if "x" in geom and "y" in geom:
+        lat, lng = geom.get("y"), geom.get("x")
+    else:
+        rings = []
+        for r in geom.get("rings") or []:
+            pts = [(float(p[0]), float(p[1])) for p in r if isinstance(p, (list, tuple)) and len(p) >= 2]
+            if len(pts) >= 3:
+                rings.append(pts)
+        if not rings:
+            return None
+        ring = max(rings, key=lambda r: abs(_ring_area2(r)))
+        ox, oy = ring[0]
+        rel = [(x - ox, y - oy) for x, y in ring]
+        a2 = cx = cy = 0.0
+        for (x0, y0), (x1, y1) in zip(rel, rel[1:] + rel[:1]):
+            cross = x0 * y1 - x1 * y0
+            a2 += cross
+            cx += (x0 + x1) * cross
+            cy += (y0 + y1) * cross
+        if abs(a2) < 1e-18:
+            lng, lat = sum(x for x, _ in ring) / len(ring), sum(y for _, y in ring) / len(ring)
+        else:
+            lng, lat = ox + cx / (3.0 * a2), oy + cy / (3.0 * a2)
+            if not _inside(lng, lat, ring):
+                xs = sorted((x0 + (lat - y0) * (x1 - x0) / (y1 - y0))
+                            for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]) if (y0 > lat) != (y1 > lat))
+                spans = [(xs[i + 1] - xs[i], (xs[i] + xs[i + 1]) / 2) for i in range(0, len(xs) - 1, 2)]
+                if spans:
+                    lng = max(spans)[1]
+    if not _in_area(lat, lng):
+        return None
+    return round(float(lat), 6), round(float(lng), 6)
+
+
+def _layer_cfg(county: str, state: str) -> Optional[dict]:
+    from . import parcel_cache as pcache
+    cfg = pcache.resolve_layer_cfg(county)
+    if not cfg or (cfg.get("state") and cfg["state"] != state) \
+            or (not cfg.get("state") and county in pcache.DUAL_STATE_COUNTIES):
+        return None
+    return cfg
+
+
+def _attr(attrs: dict, field: str) -> Any:
+    if field in attrs:
+        return attrs[field]
+    low = field.lower()
+    return next((v for k, v in attrs.items() if str(k).lower() == low), None)
+
+
+async def parcel_layer_points(c: Any, county: str, state: str, pids: list[str],
+                              deadline: Optional[float] = None) -> dict:
+    """{pid: (point, outcome)} for board parcel ids of one county: each parcel's pin from its
+    polygon on the county layer parcel_cache reads (parcel_cache.resolve_layer_cfg: the county's
+    own layer, or NC OneMap restricted to the county), queried as IN (...) lists of the exact id
+    forms (layer_id_forms), so a point is that parcel's or nothing. Outcomes: placed, not_found,
+    no_geometry (Oconee's assessor table), ambiguous (one id, polygons more than _SAME_PARCEL_M
+    apart), no_layer, layer_error, budget_skip (past `deadline`, a time.monotonic() value)."""
+    from .enrichment_parcel_from_geo import _arc_query
+    cfg = _layer_cfg(county, state)
+    if cfg is None:
+        return {p: (None, "no_layer") for p in pids}
+    base = cfg.get("where")
+    out: dict = {}
+    remaining = {p: layer_id_forms(p, county, state) for p in dict.fromkeys(pids)}
+    errored: set = set()
+    for field in list(cfg.get("id_fields") or [])[:2]:
+        if not remaining:
+            break
+        forms = list(dict.fromkeys(f for fs in remaining.values() for f in fs))
+        found: dict = defaultdict(list)                 # form (as the layer stores it) -> features
+        for i in range(0, len(forms), _IN_CHUNK):
+            part = forms[i:i + _IN_CHUNK]
+            if deadline is not None and time.monotonic() > deadline:
+                for p, fs in remaining.items():
+                    if p not in out and set(fs) & set(part):
+                        out[p] = (None, "budget_skip")
+                continue
+            cond = f"{field} IN (" + ",".join("'" + f.replace("'", "''") + "'" for f in part) + ")"
+            feats = await _arc_query(c, cfg["url"], {
+                "where": f"({base}) AND {cond}" if base else cond, "outFields": field,
+                "returnGeometry": "true", "outSR": "4326", "geometryPrecision": "6",
+                "resultRecordCount": str(3 * len(part) + 10), "f": "json"})
+            if feats is None:
+                errored.update(p for p, fs in remaining.items() if set(fs) & set(part))
+                continue
+            for f in feats:
+                v = _attr(f.get("attributes") or {}, field)
+                if v is not None:
+                    found[str(v).strip().upper()].append(f)
+        for p, fs in list(remaining.items()):
+            if p in out:
+                del remaining[p]
+                continue
+            hit = next((found[f.strip().upper()] for f in fs if found.get(f.strip().upper())), None)
+            if hit is None:
+                continue
+            pts = [q for q in (polygon_centroid(f.get("geometry")) for f in hit) if q]
+            if not pts:
+                out[p] = (None, "no_geometry")
+            elif any(_dist_m(pts[0], q) > _SAME_PARCEL_M for q in pts[1:]):
+                out[p] = (None, "ambiguous")
+            else:
+                out[p] = (pts[0], "placed")
+            del remaining[p]
+    for p in remaining:
+        out.setdefault(p, (None, "layer_error" if p in errored else "not_found"))
+    return out
+
+
+async def parcel_layer_point(c: Any, county: str, state: str, pid: str) -> tuple[Optional[tuple], str]:
+    """parcel_layer_points() for one parcel id."""
+    return (await parcel_layer_points(c, county, state, [pid]))[pid]
+
+
+async def place_parcel_points(c: Any, rows: list, budget_s: Optional[float] = None,
+                              concurrency: int = 4) -> Counter:
+    """Put each row of `rows` (awaiting_parcel_point) on its parcel's pin from the county layer
+    (parcel_layer_points, one batch of queries per county); raw['geo_source']
+    'parcel_polygon_centroid' and the audit's point.placed record it. A row the layer cannot
+    place keeps no point. Never raises; counts by outcome."""
+    budget = PARCEL_POINT_BUDGET_S if budget_s is None else budget_s
+    deadline = time.monotonic() + budget
+    n: Counter = Counter()
+    groups: dict = defaultdict(list)
+    for li in rows:
+        if li.parcel_id and li.county and li.state:
+            groups[(county_name(li.county), str(li.state).upper())].append(li)
+        else:
+            n["no_parcel"] += 1
+    sem = asyncio.Semaphore(concurrency)
+
+    async def one(county: str, state: str, lis: list) -> None:
+        async with sem:
+            try:
+                res = await parcel_layer_points(c, county, state, [str(li.parcel_id) for li in lis], deadline)
+            except Exception:  # noqa: BLE001 - a layer failure leaves the rows for the next run
+                res = {}
+        for li in lis:
+            p, outcome = res.get(str(li.parcel_id), (None, "error"))
+            n[outcome] += 1
+            if p and (li.latitude is None or li.longitude is None):
+                li.latitude, li.longitude = p
+                raw = _raw(li)
+                raw["geo_source"] = "parcel_polygon_centroid"
+                li.raw = raw
+                mark_point_placed(li, "parcel_layer")
+
+    await asyncio.gather(*(one(cty, st, lis) for (cty, st), lis in groups.items()))
+    return n
+
+
 # ------------------------------------------------------------------------------- the step
 def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = None,
                        min_rows: Optional[int] = None, sample: int = 6) -> dict:
@@ -838,6 +1230,8 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
     errors = 0
     keys = candidate_points(listings)
     point_counts = count_points(listings, keys)
+    points = parcel_points(listings, point_counts, min_rows)
+    c2_point: Counter = Counter()
     corrected_aged: list = []
     try:
         for li in listings:
@@ -859,13 +1253,21 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
                         if len(samples["fallback"]) < sample:
                             samples["fallback"].append((str(li.source).split(".")[-1], county_name(li.county),
                                                         a1["parcel_id"], a1["reason"], sorted(a1["cleared"])))
-                a2 = restore_situs(li, cache)
+                a2 = restore_situs(li, cache, points)
                 if a2 is not None:
                     if "skip" in a2:
                         c2["skip_" + a2["skip"]] += 1
                     else:
                         c2[a2["class"]] += 1
                         c2["nulled" if a2.get("nulled") else "replaced"] += 1
+                        pt = a2.get("point") or {}
+                        c2_point[pt.get("action")] += 1
+                        if pt.get("from"):
+                            c2_point["from_" + pt["from"]] += 1
+                        if pt.get("action") in ("replaced", "cleared") and len(samples["point"]) < sample:
+                            samples["point"].append((str(li.source).split(".")[-1], county_name(li.county),
+                                                     pt["action"], mask_point(pt.get("old")), mask_point(pt.get("new")),
+                                                     (pt.get("tags") or {}).get("geo_imprecise")))
                         c2_by[(li.source, county_name(li.county), a2["class"])] += 1
                         if _aged(li):
                             corrected_aged.append(li)
@@ -893,6 +1295,8 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
         "mailing_corrected": c2.get("definite", 0) + c2.get("likely", 0),
         "mailing_by_class": dict(c2),
         "mailing_by_source_county": {f"{s}|{c}|{k}": n for (s, c, k), n in c2_by.most_common(20)},
+        "mailing_point": dict(c2_point),
+        "parcel_points_indexed": len(points),
         "superseded_dropped": len(dropped),
         "superseded_by_source_county": {f"{s}|{c}": n for (s, c), n in c3_by.most_common(10)},
         "cache_missing_counties": dict(cache.missing.most_common(20)),
