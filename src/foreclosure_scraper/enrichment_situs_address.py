@@ -54,6 +54,7 @@ from .enrichment_gis_attrs import (
 )
 from .http_client import client
 from .models import Listing
+from .placeholder_twins import fallback_point_parcel
 
 log = structlog.get_logger()
 
@@ -313,6 +314,13 @@ async def enrich_situs_address(listings: list[Listing], concurrency: int = 16) -
         base = _resolve_layer(li)  # may be None for unsupported counties
         has_parcel = bool(li.parcel_id and li.parcel_id.strip())
         placeholder_pt = _is_placeholder_point(li)
+        # A parcel enrichment_parcel_from_geo attached at a geocoder fallback point (a county seat,
+        # a town centre) is whatever parcel lies under that point, and so is the bag it stashed:
+        # neither the parcel-id query nor the cache gives this lead's situs (2026-10-06, e.g.
+        # Rutherford 1654116 on 619 rows; placeholder_twins.fallback_point_parcel).
+        if has_parcel and fallback_point_parcel(li.raw):
+            stats["fallback_point_parcel_skipped"] = stats.get("fallback_point_parcel_skipped", 0) + 1
+            return
 
         # 1) Cheapest path: a previously-stashed full attribute bag.
         #    BUT distrust a cached bag for placeholder-point leads — gis_attrs

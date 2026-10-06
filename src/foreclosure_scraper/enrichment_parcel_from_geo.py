@@ -498,23 +498,61 @@ async def _resolve_one(c, li: Listing, counts: dict) -> None:
     counts["resolved"] += 1
 
 
+# FALLBACK POINTS (2026-10-06). The geocoder places a lead with no usable address on its city
+# centre (Tier 3) or county seat (Tier 4, enrichment_geocode.COUNTY_SEAT_CENTROIDS), and a
+# point-in-polygon query there returns whatever parcel lies under that point. On the 10/5
+# checkpoint Rutherford parcel 1654116 (a church in Rutherfordton, at the county-seat point) was
+# attached to 619 rows of 10 sources, New Hanover 3115-88-8610.000 to 121, Rutherford 1652469 to
+# 50; on the published board Lincoln 3633940779 sits on 1,618 rows and Anderson 1233003020 on 817.
+# The resolver stashed that parcel's attributes on every one of them (1654116: owner a church,
+# situs 252 N WASHINGTON ST), the situs writers copied the situs onto the address-less ones, and
+# dedupe() merged them (see dedupe.py's 'shared parcels' block). A fallback point is not the
+# property's location, so no parcel is resolved from it: a point flagged imprecise
+# (enrichment_geocode.imprecise_point_flag), a county-seat centroid, or a point shared by
+# _CENTROID_MIN_COLLISIONS or more of the listings passed in (enrichment_board_quality's own test
+# for a geocoder fallback, which flags the same rows centroid_snap later in the run).
+
+def _shared_points(listings: list[Listing]) -> set:
+    from collections import Counter
+    from .enrichment_board_quality import _CENTROID_MIN_COLLISIONS
+    n = Counter(
+        (round(li.latitude, 5), round(li.longitude, 5))
+        for li in listings
+        if li.latitude is not None and li.longitude is not None
+    )
+    return {p for p, c in n.items() if c >= _CENTROID_MIN_COLLISIONS}
+
+
+def _fallback_point(li: Listing, shared: set) -> bool:
+    from .enrichment_geocode import imprecise_point_flag, is_county_seat_point
+    if imprecise_point_flag(li.raw) or is_county_seat_point(li.latitude, li.longitude):
+        return True
+    return (round(li.latitude, 5), round(li.longitude, 5)) in shared
+
+
 async def enrich_parcel_from_geo(listings: list[Listing], concurrency: int = 8) -> dict:
     """Point-in-polygon resolve a parcel_id for every geo-bearing lead that has
     none. SC -> SCDOT SC_Parcels; NC -> NC OneMap NC1Map_Parcels. Writes only
     ``li.parcel_id`` (+ provenance). Idempotent: leads that already carry a
-    parcel_id are skipped, so re-runs are no-ops on resolved leads.
+    parcel_id are skipped, so re-runs are no-ops on resolved leads. A lead whose
+    point is a geocoder fallback (see FALLBACK POINTS above) is skipped too.
     """
-    targets = [
+    candidates = [
         li
         for li in listings
         if not li.parcel_id and li.state in ("SC", "NC") and li.county and _in_box(li) and not _withdrawn(li)
     ]
+    shared = _shared_points(listings) if candidates else set()
+    targets = [li for li in candidates if not _fallback_point(li, shared)]
+    skipped = len(candidates) - len(targets)
+    if skipped:
+        log.info("parcel_from_geo.skipped_fallback_points", leads=skipped, shared_points=len(shared))
     if not targets:
         log.info("parcel_from_geo.no_targets")
-        return {"queried": 0, "resolved": 0}
+        return {"queried": 0, "resolved": 0, "skipped_fallback_point": skipped}
 
     log.info("parcel_from_geo.start", target_count=len(targets))
-    counts = {"queried": 0, "resolved": 0}
+    counts = {"queried": 0, "resolved": 0, "skipped_fallback_point": skipped}
     sem = asyncio.Semaphore(concurrency)
 
     async def _bounded(c, li: Listing) -> None:

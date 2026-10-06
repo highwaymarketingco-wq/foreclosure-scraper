@@ -58,6 +58,39 @@ COUNTY_SEAT_CENTROIDS: dict[tuple[str, str], tuple[float, float]] = {
     ("NC", "Burke"):       (35.745, -81.685),
 }
 
+# 4 decimals (about 10 m): the fallback writes these exact 3-decimal values, while a real geocode
+# that merely lies near a county seat carries more digits and is not mistaken for it.
+_COUNTY_SEAT_POINTS = frozenset((round(a, 4), round(b, 4)) for a, b in COUNTY_SEAT_CENTROIDS.values())
+
+#: raw['geo_imprecise'] values that describe a REAL resolved address, not a shared fallback point
+#: (valuation/calc.py's _GEO_REAL_ADDRESS_TAGS, same reasoning).
+_PRECISE_GEO_TAGS = ("census_geocode",)
+
+
+def is_county_seat_point(lat, lng) -> bool:
+    """(lat, lng) is this geocoder's Tier-4 fallback: a county seat from COUNTY_SEAT_CENTROIDS,
+    shared by every lead of that county that had no usable address or city."""
+    try:
+        return (round(float(lat), 4), round(float(lng), 4)) in _COUNTY_SEAT_POINTS
+    except (TypeError, ValueError):
+        return False
+
+
+def imprecise_point_flag(raw) -> bool:
+    """The row's coordinate is flagged as a shared fallback, not its own location:
+    raw['geo_imprecise'] set to anything but a real-address tag (centroid_snap from
+    enrichment_board_quality, county_centroid / county_centroid_no_addr from the geocode scripts,
+    a {'state': ...} dict from scripts/fill_*_gaps.py), or raw['geocoded_by_name']['approx'] (a
+    city centroid for a named complex, enrichment_images)."""
+    if not isinstance(raw, dict):
+        return False
+    gi = raw.get("geo_imprecise")
+    tag = gi.get("state") if isinstance(gi, dict) else gi
+    if tag and tag not in _PRECISE_GEO_TAGS:
+        return True
+    gbn = raw.get("geocoded_by_name")
+    return isinstance(gbn, dict) and bool(gbn.get("approx"))
+
 
 async def _census_geocode(c, address: str) -> Optional[tuple[float, float]]:
     """Tier 1: US Census Geocoder. Free, fast, no key."""

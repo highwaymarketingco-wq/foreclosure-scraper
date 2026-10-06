@@ -147,11 +147,103 @@ def _provably_different_property(a: Listing, b: Listing) -> bool:
 # When a merge does join an unnumbered row to a numbered one (same valid parcel), the merged row
 # takes the numbered address (placeholder_twins.fold() does the same): a sentinel is nulled on
 # publish, and a numberless base must not go on matching other houses on its road.
+#
+# ---------------------------------------------------------------- shared parcels (2026-10-06, 2)
+# THE DEFECT LEFT AFTER THE RULE ABOVE (replay of main.run()'s second dedupe on the 10/5
+# checkpoint's 13 heaviest-loss counties, 75,124 rows): one row still absorbed 608 different
+# properties. Rutherford parcel 1654116 (a church at the Rutherfordton county-seat point) sat on
+# 619 rows of 10 sources (589 rutherford_tax lots, lis pendens, divorces, land listings), every
+# one attached by enrichment_parcel_from_geo at that point: the geocoder's Tier-4 fallback puts an
+# address-less row on its county seat, and the resolver then took whatever parcel lies under it.
+# A resolver parcel is no identity (pk None above), but pass 1 still BUCKETED the rows under it,
+# and a 'parcel:' key counts as PARCEL evidence, which lets two unnumbered rows merge. Then
+# scripts/fill_address_from_parcel.py wrote that parcel's situs onto the address-less rows
+# (raw['situs_address_source'] = 'parcel_cache:exact'): 104 New Hanover lis pendens and divorces
+# all read '100 RALEIGH ST', 30 Rutherford rows '139 RUNNING DEER LN', the same real house number
+# on every row, so they merged on ADDRESS evidence too. A source can also give one id to many
+# houses (liensnc master-tract PINs, a condo complex, spartanburg_property_cleanup's
+# 5-20-01-037.00 on '113 OAKDALE CT', '113 HOLMES DR' and '113 VICTORIA RD').
+# THE RULE (on top of the one above):
+#   * a parcel id the input attaches to OVERSHARED_MIN_STREETS or more different numbered streets
+#     (overshared_parcels(), any provenance) is not valid identity (placeholder_twins.parcel_key
+#     with `overshared`);
+#   * such a parcel, or one enrichment_parcel_from_geo attached at a fallback point
+#     (placeholder_twins.fallback_point_parcel), is no MATCH KEY either: pass 1 buckets the row
+#     under its next dedupe_key() branch (address or case; never the URL, which one county roll's
+#     PDF gives thousands of rows) and pass 3 drops its 'p' signature;
+#   * an address written from such a parcel's record (placeholder_twins.situs_from_parcel) is not
+#     a real house number for identity: the row matches on case number or URL, never on it.
+# A resolver parcel found at the row's own precise point still buckets as before (no evidence
+# either way, as above).
+
+#: A parcel id on this many different numbered streets is not one property's id. Of the published
+#: board's parcels (2026-10-06) 111,543 carry one numbered street, 819 two (a duplex, a corner
+#: lot, an owner-mailing address copied as the situs), and the 60 with exactly three are almost all
+#: several properties (master-tract PINs of a subdivision, condo complexes, a mobile-home park
+#: roll, three different streets under one cleanup-layer id); one was three spellings of one
+#: address. Twins and fusion checks elsewhere use 4 (placeholder_twins.MAX_GROUP_ROWS); this
+#: counts STREETS, not rows, so three is already three properties or a broken id.
+OVERSHARED_MIN_STREETS = 3
+
+_DIRECTIONS = frozenset({"n", "s", "e", "w", "ne", "nw", "se", "sw",
+                         "north", "south", "east", "west"})
+
 
 def _pt():
     """placeholder_twins, imported on first use (it imports this module at load time)."""
     from . import placeholder_twins
     return placeholder_twins
+
+
+def numbered_street(addr) -> str:
+    """'<real house number> <street>' for counting how many different numbered addresses one parcel
+    id sits on; '' without a real house number (placeholder_twins.real_house_no). Case, commas,
+    directionals, a trailing unit and anything after the street suffix (city, zip) are dropped and
+    the suffix standardized, so spellings of one address count once: '113 OAKDALE COURT,
+    SPARTANBURG, 29306' and '113 Oakdale Ct' are both '113 oakdale ct'."""
+    from .models import _UNIT_RE
+    hn = _pt().real_house_no(addr)
+    if not hn:
+        return ""
+    s = _norm_addr(addr)
+    m = _UNIT_RE.search(s)
+    if m:
+        s = s[:m.start()]
+    toks = s.split()
+    cs = _canon_street(s)
+    body = cs.split()[1:] if cs else toks[1:4]
+    return " ".join([hn] + [t for t in body if t not in _DIRECTIONS])
+
+
+def overshared_parcels(listings, min_streets: int = OVERSHARED_MIN_STREETS) -> frozenset[str]:
+    """placeholder_twins.parcel_ref() of every parcel id the rows attach to `min_streets` or more
+    different numbered streets (numbered_street()). Rows are Listings or board row dicts."""
+    pt = _pt()
+    streets: dict[str, set] = {}
+    for li in listings:
+        if isinstance(li, dict):
+            st, cty, pid, addr = (li.get("state"), li.get("county"), li.get("parcel_id"),
+                                  li.get("street_address"))
+        else:
+            st, cty, pid, addr = li.state, li.county, li.parcel_id, li.street_address
+        if not pid:
+            continue
+        ref = pt.parcel_ref(st, cty, pid)
+        s = numbered_street(addr) if ref else ""
+        if s:
+            streets.setdefault(ref, set()).add(s)
+    return frozenset(k for k, v in streets.items() if len(v) >= min_streets)
+
+
+def no_key_parcel(state, county, parcel_id, raw, overshared: frozenset = frozenset()) -> bool:
+    """The row's parcel id must not even bring rows together (pass 1 bucket, pass 3 signature): it
+    is over-shared, or enrichment_parcel_from_geo attached it at a fallback point."""
+    if not parcel_id or not str(parcel_id).strip():
+        return False
+    pt = _pt()
+    if pt.fallback_point_parcel(raw):
+        return True
+    return bool(overshared) and pt.parcel_ref(state, county, parcel_id) in overshared
 
 
 class Identity(NamedTuple):
@@ -180,13 +272,17 @@ def sig_evidence(sig: tuple) -> str:
     return _SIG_EVIDENCE.get(sig[0] if sig else "", ADDRESS)
 
 
-def identity_of(state, county, parcel_id, street_address, raw) -> Identity:
-    """Validity is placeholder_twins.parcel_key()'s (which also needs a known county)."""
+def identity_of(state, county, parcel_id, street_address, raw,
+                overshared: frozenset = frozenset()) -> Identity:
+    """Validity is placeholder_twins.parcel_key()'s (which also needs a known county). An address
+    written from a parcel that is no match key (no_key_parcel()) gives no house number."""
     pt = _pt()
     hn = pt.real_house_no(street_address)
+    if hn and pt.situs_from_parcel(raw) and no_key_parcel(state, county, parcel_id, raw, overshared):
+        hn = ""
     if pt.resolver_parcel(raw):
         return Identity(hn)
-    k = pt.parcel_key(state, county, parcel_id)
+    k = pt.parcel_key(state, county, parcel_id, overshared)
     if k is None:
         return Identity(hn)
     st, rest = k.split("|", 1)
@@ -201,12 +297,15 @@ def _same_county(a: str, b: str) -> bool:
     return a == b or a.startswith(b) or b.startswith(a)
 
 
-def identity(li) -> Identity:
-    """Identity of a Listing or of a board row dict."""
+def identity(li, overshared: frozenset = frozenset()) -> Identity:
+    """Identity of a Listing or of a board row dict. `overshared`: overshared_parcels() of the rows
+    being compared (dedupe() passes its own). Without it no parcel counts as over-shared;
+    board_persist uses this only to REFUSE a fold across two valid parcels, which an over-shared
+    parcel can then only do more often."""
     if isinstance(li, dict):
         return identity_of(li.get("state"), li.get("county"), li.get("parcel_id"),
-                           li.get("street_address"), li.get("raw"))
-    return identity_of(li.state, li.county, li.parcel_id, li.street_address, li.raw)
+                           li.get("street_address"), li.get("raw"), overshared)
+    return identity_of(li.state, li.county, li.parcel_id, li.street_address, li.raw, overshared)
 
 
 def _union(x: Identity, y: Identity) -> Identity:
@@ -356,9 +455,23 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     far (see the block comment above it): two different real house numbers or two different
     valid parcels never merge, and a row with no real house number needs agreeing valid parcels.
     A refused row stays its own row; nothing is dropped.
+
+    A parcel id the input puts on several different numbered streets, or one a resolver attached
+    at a geocoder fallback point, neither proves identity nor brings rows together, and an address
+    written from such a parcel is not a house number (see the 'shared parcels' block comment).
     """
     if not listings:
         return []
+
+    overshared = overshared_parcels(listings)
+    if overshared:
+        log.info("dedupe.overshared_parcels", parcels=len(overshared),
+                 sample=sorted(overshared)[:10],
+                 note=f"parcel ids on {OVERSHARED_MIN_STREETS}+ different numbered streets: no "
+                      "identity evidence and no match key")
+
+    def ident(li) -> Identity:
+        return identity(li, overshared)
 
     blocked: Counter = Counter()          # (pass, reason) -> merges refused
 
@@ -375,8 +488,18 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     # Pinehurst properties shared one key and collapsed into a single row. The run
     # logged nothing. Now it does.
     _addrs_per_key = addresses_per_dedupe_key(listings)
+    rekeyed = 0
     for li in listings:
         k = li.dedupe_key()
+        if k.startswith("parcel:") and no_key_parcel(li.state, li.county, li.parcel_id, li.raw,
+                                                     overshared):
+            # keyed as if it had no parcel id: address or case number. Not by URL: one county
+            # roll's PDF is the source_url of thousands of rows, and a row that has neither an
+            # address nor a case is better alone than in that bucket.
+            k = li.model_copy(update={"parcel_id": None}).dedupe_key()
+            if k.startswith("url:"):
+                k = f"nokey:{len(buckets)}:{id(li)}"
+            rekeyed += 1
         if k not in buckets:
             buckets[k] = li
             continue
@@ -385,10 +508,10 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
         # with, or opens a new one. (The old guard parked it under '<key>#hn<number>', and a
         # second row with that number OVERWROTE the first one there, deleting it.)
         ev = key_evidence(k)
-        li_id = identity(li)
+        li_id = ident(li)
         kk, n = k, 1
         while kk in buckets:
-            b_id = bucket_ids.get(kk) or identity(buckets[kk])
+            b_id = bucket_ids.get(kk) or ident(buckets[kk])
             why = identity_conflict(b_id, li_id, ev)
             if why is None:
                 buckets[kk] = _merge(buckets[kk], li)
@@ -401,6 +524,10 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
         else:
             buckets[kk] = li
 
+    if rekeyed:
+        log.info("dedupe.parcel_not_a_key", rows=rekeyed,
+                 note="parcel over-shared or attached at a geocoder fallback point: row keyed by "
+                      "its address or case number instead")
     _p1 = {r: c for (p, r), c in blocked.items() if p == 1}
     if _p1:
         log.info("dedupe.house_number_guard_pass1", blocked_merges=sum(_p1.values()),
@@ -443,7 +570,7 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     # every lot of a county's vacant roll (21,767 Gaston rows, each its own parcel) scores against
     # every other one, now that they are no longer folded away. Same merges as scoring them; only
     # the refusal counts logged below no longer include these pairs.
-    row_pks = [(merged_ids[j] or identity(merged[j])).pk for j in range(len(merged))]
+    row_pks = [(merged_ids[j] or ident(merged[j])).pk for j in range(len(merged))]
     by_zip: dict[str, list[int]] = {}
     by_locale: dict[tuple, list[int]] = {}
     for idx, li in enumerate(merged):
@@ -515,8 +642,8 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
                 # board -- which is a true number of comparisons and a useless number to
                 # log. Here it counts merges actually prevented.
                 if a_id is None:
-                    a_id = identity(a)
-                b_id = merged_ids[j] or identity(b)
+                    a_id = ident(a)
+                b_id = merged_ids[j] or ident(b)
                 why = identity_conflict(a_id, b_id, ADDRESS)
                 if why is not None:
                     blocked[(2, why)] += 1
@@ -552,14 +679,17 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     group_ids: dict[int, Identity] = {}
 
     def _row_id(x: int) -> Identity:
-        return final_ids[x] or identity(final[x])
+        return final_ids[x] or ident(final[x])
 
     def _group_id(r: int) -> Identity:
         return group_ids.get(r) or _row_id(r)
 
     sigmap: dict = {}
     for i, li in enumerate(final):
-        for s in _strong_sigs(li):
+        sigs = _strong_sigs(li)
+        if no_key_parcel(li.state, li.county, li.parcel_id, li.raw, overshared):
+            sigs = {s for s in sigs if s[0] != "p"}
+        for s in sigs:
             if s in sigmap:
                 j = sigmap[s]
                 ri, rj = _find(i), _find(j)

@@ -132,8 +132,27 @@ def has_unit(addr: Any) -> bool:
     return isinstance(addr, str) and bool(_UNIT_RE.search(addr.strip()))
 
 
-def parcel_key(state: Any, county: Any, parcel_id: Any) -> Optional[str]:
-    """"ST|county|normalized-parcel" for a parcel id this rule may trust, else None."""
+def parcel_ref(state: Any, county: Any, parcel_id: Any) -> Optional[str]:
+    """"ST|county|normalized-parcel" of ANY parcel id a row carries (no validity test), the form
+    dedupe.overshared_parcels() counts and parcel_key() checks against; None without a parcel id,
+    state or county."""
+    if parcel_id is None:
+        return None
+    p = _normalize_parcel(str(parcel_id).strip())
+    st = str(state or "").strip().upper()
+    cty = str(county or "").strip().lower()
+    if not p or not st or not cty:
+        return None
+    return f"{st}|{cty}|{p}"
+
+
+def parcel_key(state: Any, county: Any, parcel_id: Any,
+               overshared: frozenset = frozenset()) -> Optional[str]:
+    """"ST|county|normalized-parcel" for a parcel id this rule may trust, else None.
+
+    ``overshared`` (dedupe.overshared_parcels(), computed over the rows being compared) lists
+    parcel ids the rows attach to several different numbered streets: such an id is not one
+    property's id, so it is not trusted either (see dedupe.OVERSHARED_MIN_STREETS)."""
     if parcel_id is None:
         return None
     raw_pid = str(parcel_id).strip()
@@ -146,7 +165,10 @@ def parcel_key(state: Any, county: Any, parcel_id: Any) -> Optional[str]:
     cty = str(county or "").strip().lower()
     if not st or not cty:
         return None
-    return f"{st}|{cty}|{p}"
+    k = f"{st}|{cty}|{p}"
+    if overshared and k in overshared:
+        return None
+    return k
 
 
 def sources_of(source: Any, raw: Any) -> frozenset:
@@ -160,6 +182,35 @@ def sources_of(source: Any, raw: Any) -> frozenset:
 
 def resolver_parcel(raw: Any) -> bool:
     return isinstance(raw, dict) and any(raw.get(k) for k in RESOLVER_PARCEL_KEYS)
+
+
+def fallback_point_parcel(raw: Any) -> bool:
+    """The parcel was attached by enrichment_parcel_from_geo at a geocoder FALLBACK point, so it is
+    whichever parcel happens to sit at a county seat or town centre, not the row's property: the
+    recorded point (raw['parcel_from_geo'] lat/lng) is a county-seat centroid of
+    enrichment_geocode's Tier 4, or the row's coordinate is flagged as a shared fallback
+    (enrichment_geocode.imprecise_point_flag). Measured on the 10/5 checkpoint: Rutherford parcel
+    1654116 (a church at the Rutherfordton county-seat point) on 619 rows, New Hanover
+    3115-88-8610.000 on 121, Rutherford 1652469 on 50."""
+    if not isinstance(raw, dict):
+        return False
+    g = raw.get("parcel_from_geo")
+    if not isinstance(g, dict):
+        return False
+    from .enrichment_geocode import imprecise_point_flag, is_county_seat_point
+    return is_county_seat_point(g.get("lat"), g.get("lng")) or imprecise_point_flag(raw)
+
+
+def situs_from_parcel(raw: Any) -> bool:
+    """The row's street address was written from a parcel record (raw['situs_address_source']:
+    'parcel_cache:*' from scripts/fill_address_from_parcel.py, 'gis_parcel_situs' from
+    enrichment_situs_address), so it is only as good as that parcel. Both writers fill only an
+    address-LESS row."""
+    return isinstance(raw, dict) and bool(raw.get("situs_address_source"))
+
+
+#: raw keys dedupe.identity() reads; a light projection of a row (board_dedupe_stream) carries them.
+IDENTITY_RAW_KEYS = RESOLVER_PARCEL_KEYS + ("situs_address_source", "geo_imprecise", "geocoded_by_name")
 
 
 def county_situs(row: Any) -> bool:

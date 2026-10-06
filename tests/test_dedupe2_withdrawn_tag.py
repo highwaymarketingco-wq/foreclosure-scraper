@@ -105,7 +105,7 @@ def _old_matching():
     is no evidence), and a merged row keeps its base row's own address. Emulated by swapping the
     identity hooks, which is exact for the two- and three-row fixtures here."""
     saved = (D.identity, D.identity_conflict, D._union, D._merge)
-    D.identity = lambda li: D.Identity(D._house_no_of(li.street_address), None)
+    D.identity = lambda li, overshared=frozenset(): D.Identity(D._house_no_of(li.street_address), None)
     D.identity_conflict = lambda x, y, evidence=None: (
         "house_number" if x.hn and y.hn and x.hn != y.hn else None)
     D._union = lambda x, y: x

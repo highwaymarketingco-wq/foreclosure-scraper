@@ -2277,6 +2277,7 @@ RAW_KEEP = {
     "geocoded_by_name": "*",          # name-based geocoding provenance
     "gis_attrs_full": "*",            # full GIS attribute snapshot
     "situs_address_source": "*",      # situs address provenance
+    "address_not_property": "*",      # {address, reason, notices}: a court/office address taken from the notice text, removed (enrichment_address_final)
     "owner_email": "*",               # surfaced owner email from OCR/skip-trace
     "red_flags": "*",                  # unified red flag array [{severity, type, description, source}]
     "sos_dissolution": "*",            # NC SOS LLC dissolution status

@@ -50,6 +50,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _dq_common import (REPO, county_in_state, iter_rows, lt_str, norm_county,  # noqa: E402
                         print_counter)
+from foreclosure_scraper.placeholder_twins import fallback_point_parcel  # noqa: E402
 
 OVERLAY_DIR = REPO / "data" / "address_points"
 
@@ -173,7 +174,7 @@ _OVERLAY: dict = {}
 
 # ------------------------------------------------------------------------------------------- plan
 def plan_fill(*, state, county, listing_type, parcel_id, street, city, zip_code, mailing,
-              hit, tier, cache_exists=True, overlay=None) -> dict:
+              hit, tier, cache_exists=True, overlay=None, fallback_parcel=False) -> dict:
     """Pure decision for one lead. Returns
        {'pop': 'gap'|'name_only'|None, 'status': str, 'set': {...}, 'road_only': {...}|None,
         'replaced_street': str|None, 'kind': str|None}
@@ -196,6 +197,12 @@ def plan_fill(*, state, county, listing_type, parcel_id, street, city, zip_code,
         return out("skip_tax_sale_overage")      # the cache owner is not the claimant
     if not str(parcel_id or "").strip():
         return out("skip_no_parcel")
+    if fallback_parcel:
+        # enrichment_parcel_from_geo attached this parcel at a geocoder fallback point (a county
+        # seat, a town centre: placeholder_twins.fallback_point_parcel), so its situs is that
+        # point's address, not the lead's. Copied, it gave 104 New Hanover lis pendens and divorces
+        # '100 RALEIGH ST' and 30 Rutherford rows '139 RUNNING DEER LN' (2026-10-06).
+        return out("skip_fallback_point_parcel")
     if not county_in_state(county, state):
         return out("skip_county_not_in_state")
     if overlay is None and hit is None:
@@ -304,7 +311,7 @@ def plan_row(row: dict) -> dict:
     p = plan_fill(state=state, county=county, listing_type=row.get("listing_type"), parcel_id=pid,
                   street=street, city=row.get("city"), zip_code=row.get("zip_code"),
                   mailing=_mailing_of(row.get("raw")), hit=hit, tier=tier, cache_exists=exists,
-                  overlay=ov)
+                  overlay=ov, fallback_parcel=fallback_point_parcel(row.get("raw")))
     p["tier"] = tier
     p["cache_address"] = (hit or {}).get("address")
     return p
@@ -442,7 +449,8 @@ def apply_rows(rows: list, *, dry_run: bool = False) -> dict:
             exists, hit, tier, ov = _lookup(county, state, pid)
         p = plan_fill(state=state, county=county, listing_type=li.listing_type, parcel_id=pid,
                       street=street, city=li.city, zip_code=li.zip_code,
-                      mailing=_mailing_of(li.raw), hit=hit, tier=tier, cache_exists=exists, overlay=ov)
+                      mailing=_mailing_of(li.raw), hit=hit, tier=tier, cache_exists=exists, overlay=ov,
+                      fallback_parcel=fallback_point_parcel(li.raw))
         c[p["status"]] += 1
         s = p["set"]
         if p["status"] in ("filled", "upgraded"):
