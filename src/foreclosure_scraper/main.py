@@ -3061,6 +3061,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     _off_footprint_removed = st.off_footprint_removed
     _scoring_failed: str | None = None
 
+    # ---- County-jail stamps, re-read (2026-10-06) ----
+    # enrich_jail_bookings also runs BEFORE the dot_ocr checkpoint, and a resume from that checkpoint
+    # (scripts/resume_from_checkpoint.py --enrich-only, or --run) starts here, so it would keep a stamp
+    # the old rule had ended: a person still on the roster under a respelled name, or a stay of 60 days
+    # or more that may be a transfer to state prison (jail_matching, HANDOFF item 79). Re-stamping is
+    # idempotent and costs one fetch per roster, and it must precede verification and scoring, which
+    # read the stamp through signal_freshness.incarceration_active().
+    try:
+        from .enrichment_jail_bookings import enrich_jail_bookings
+        enrichment_stats["jail_bookings_tail"] = await _await_capped(
+            enrich_jail_bookings(enriched), "jail_bookings_tail")
+    except Exception:
+        log.error("jail_bookings_tail.failed", traceback=traceback.format_exc())
+
     # ---- Divorce enrichment group (concurrent) ----
     # NC and SC divorce enrichers hit different court portals and write the
     # same raw['divorce'] key, but for DISJOINT sets of leads (NC owners vs
