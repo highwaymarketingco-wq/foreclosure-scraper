@@ -589,3 +589,47 @@ def test_apply_then_score_end_to_end(tmp_path):
     assert {"code_enforcement", "vacant_structure"} <= before[3]
     assert not {"code_enforcement", "vacant_structure"} & after[3]
     assert after[4] == before[4] and "vacant_structure" in after[4]
+
+
+# --------------------------------------------------------------------------- #
+# the 2026-10-06 live sweep, reproduced                                        #
+# --------------------------------------------------------------------------- #
+# tests/fixtures/verification/code_enforcement_cases.json: the board rows the bounded live sweep
+# (43119aaa, --max-rows 50 per signal, HOT/WARM first) checked, cut to the fields the verifiers
+# read (no owner, no notes), with the verdict it pushed. The layer fixtures above are that same
+# sweep's responses (byte-identical to its --capture-dir).
+
+_CASES = json.loads((FIX / "code_enforcement_cases.json").read_text())["cases"]
+
+
+def test_the_live_sweep_verdicts_reproduce_exactly():
+    clients = {"code_enforcement": (ovt, ReplayFetcher(OVT_RESP)),
+               "vacant_structure": (vsr, ReplayFetcher(REG_RESP))}
+
+    async def go():
+        out = []
+        for c in _CASES:
+            mod, client = clients[c["signal"]]
+            assert mod.applies(c["row"])
+            res = await mod.verify(c["row"], client)
+            out.append((c["key"], res.verdict, res.evidence.get("reason")))
+        return out
+    got = run(go())
+    want = [(c["key"], c["verdict"], c["reason"]) for c in _CASES]
+    assert got == want
+    assert len(_CASES) == 100
+    # one load per layer for all 100 properties
+    assert len(clients["code_enforcement"][1].asked) == 4
+    assert len(clients["vacant_structure"][1].asked) == 3
+
+
+def test_the_live_split():
+    from collections import Counter
+    split = Counter((c["signal"], c["verdict"]) for c in _CASES)
+    assert split == Counter({("code_enforcement", "confirmed"): 37,
+                             ("code_enforcement", "refuted"): 12,
+                             ("code_enforcement", "stale"): 1,
+                             ("vacant_structure", "confirmed"): 28,
+                             ("vacant_structure", "unconfirmed"): 16,
+                             ("vacant_structure", "stale"): 5,
+                             ("vacant_structure", "refuted"): 1})
