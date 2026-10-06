@@ -38,14 +38,49 @@ ENDPOINTS (free, no login, no CAPTCHA, both live-checked 2026-10-06):
       NC G.S. 105-277.1 excludes the greater of $25,000 or half the appraised value (live:
       $52,600 -> $26,300 exempt), G.S. 105-277.1C the first $45,000 for a disabled veteran.
 
+WHICH PARCELS (v4, 2026-10-06; the live re-check of the 34 refuted entries found 3 wrong). The
+claim is "the row's owner has the exclusion". A row's parcel id and its street address can name
+DIFFERENT parcels (a lien row whose parcel id is another parcel's, a street address that is the
+taxpayer's mailing address, a '99999 <road>' placeholder parcel, an elderly row merged into a
+row of another parcel by the old address-key merge), so v3 judged a parcel that was not the row's
+and refuted real claims (31 MLK Jr Dr, 87 Elkwood Ave) or called a removed relief never-on-record
+(29 Ravenwood Dr). Now up to three parcels are judged, each by the same rules, and combined:
+  * the ADDRESS parcel: the one parcel that carries the row's address, exact house number and
+    street name after normalization (_tax_common.address_relation), found on the same county layer by
+    its situs columns (HouseNumber + streetname; a different house number is never followed to)
+    and, when the layer has none, by the tax site's address search (Search/Results?QueryType=
+    Address), then read from the layer by pinnum;
+  * the BOARD parcel: the row's parcel_id (the ledger key), as v3;
+  * the LIEN-BILL parcel: raw['arcgis_distress']['pin'] (or the county-tax-roll owner_mailing
+    parcel), when it is a third parcel.
+The verdict is the best of them: confirmed if any parcel shows the relief today with the row's
+owner (or the lien bill's owner) among its owners; else stale if any had it earlier; else refuted
+only if every judged parcel never showed it; else unconfirmed. When the address parcel is not the
+board parcel, evidence carries address_pin / board_pin (/ lien_pin) and a `parcels` list. An
+address parcel that is not the board's and is owned by someone else entirely (the row's address
+is the taxpayer's old mailing address) is NEUTRAL: nothing of it is read and it neither
+confirms nor blocks; a partial match (a shared surname) is not a confirmation either, and keeps
+the signal (`owner_differs_relief_present`) when that parcel shows the relief.
+A parcel whose layer carries another exemption code (EXO: a church, a government parcel) owns
+every exclusion its bills show, whatever their size: none of it is this relief (the first live
+run of v4 confirmed RIVERVIEW CHURCH RD from a $37,100 parcel excluded whole, the shape of the
+elderly exclusion on a residence worth under $45,000, until its EXO code was read).
+BILL LOOK-BACK (v4). The "never" in refuted is read from every levy bill of the parcel from
+LOOKBACK_YEARS back (2022 in 2026) to now, not the latest two: 9686053926 had half its value
+excluded on its 2022 to 2024 bills and none on 2025 and 2026 (v3 read 2025 and 2026 and said
+refuted; it is stale). The two newest bills still decide a confirmed or a stale as before; the
+older ones are read only when the answer would otherwise be "never".
+
 VERDICTS (core.py's meanings):
-  confirmed    today's layer shows ELD/DIS/BLD/VET on the parcel and the county owner is the
+  confirmed    today's layer shows ELD/DIS/BLD/VET on a judged parcel and the county owner is the
                board's owner (name_normalize match, or the same household: a surviving spouse).
+               On the ADDRESS parcel, when it is not the board parcel, the row's owner (or the
+               lien owner) must be among the parcel's owners: basis `exemption_on_address_parcel`.
                A changed code inside the set (ELD -> DIS) is still confirmed (`type_changed`).
   stale        the relief WAS on the record and is not today: (a) the owner changed since (a deed
                after the board first saw the row, or a different owner) and the relief is gone,
-               or (b) same owner, relief removed. "Was" = a relief-shaped Exempt Value on one of
-               the latest two levy bills, or the row is the buncombe_elderly scraper's own row
+               or (b) same owner, relief removed. "Was" = a relief-shaped Exempt Value on a levy
+               bill of the look-back window, or the row is the buncombe_elderly scraper's own row
                (it read this layer, by this PIN, with the code on it). "Gone" is read from the
                BILLS: when the layer's Exempt flag is blank the newest levy bill decides (v3; the
                flag alone called 1406 Hardscrabble Rd stale while its 8/15/2026 bill, paid,
@@ -58,9 +93,10 @@ VERDICTS (core.py's meanings):
                decision, so the evidence carries `exempt_value_by_year` and `owner_unchanged_since`
                (the earliest levy year of the unbroken run of bills naming the newest bill's owner)
                to make the call visible.
-  refuted      today's layer does not show it and neither of the latest two levy bills carried a
-               relief-shaped exclusion (the claim was attached to a parcel whose record never
-               showed it during the board's lifetime: a spatial-join neighbour, a wrong parcel).
+  refuted      no judged parcel shows it today, and none of the levy bills since LOOKBACK_YEARS
+               ago (2022 to now) carried a relief-shaped exclusion (the claim was attached to a
+               parcel whose record never showed it during the board's lifetime: a spatial-join
+               neighbour, a wrong parcel). A relief that WAS on an earlier bill is stale.
   unconfirmed  no resolvable PIN; the layer unreadable or the PIN not in it (a retired PIN);
                several parcels under the board's 10-digit pin ("pin_shared_by_units": the
                units of a condominium all carry the building's pin, so the board row and its
@@ -68,7 +104,12 @@ VERDICTS (core.py's meanings):
                a billing record that ended before last year ("parcel_record_ended");
                the relief is on the parcel but for an owner who is not the board's
                ("owner_differs_relief_present": the property fact holds, the board's person does
-               not; never suppresses); the bills unreadable when they were needed; or an Exempt
+               not; never suppresses; the address parcel's own owner only when that is a
+               shared surname); the bills unreadable when they were needed; a parcel that could
+               not be read, the address parcel ("address_parcel_unreadable"), the lien bill's
+               ("lien_parcel_unreadable") or several parcels carrying the row's address with none
+               the board's ("address_shared_by_parcels"), which also stops another parcel's stale
+               or refuted from standing alone (it might show the relief today); or an Exempt
                Value that matches no relief formula ("exempt_value_unexplained").
 
 VOTER STATUS (evidence only; it never changes the verdict and no scorer reads it; whether it
@@ -90,22 +131,34 @@ birth, age, address, voting history, or any other person's name. ROW_SUMMARY_EXC
 board's owner_name out of the ledger's row summaries too (the sweep honours it; migrate_ledger()
 rewrote the entries written before it, offline).
 
+COST (the per-host spacing is 1.5 s): a row whose board parcel's layer record shows the relief is
+one layer query. Otherwise: the address query (and, when it finds nothing, the site's address
+search), the lien parcel's layer query, then per parcel one parcel page and the two newest bills
+(the rest of the 2022 window only when those say "never": 5 bills): about 12 to 20 requests of the
+tax site, a minute at worst, inside the sweep's per-row timeout.
+
 TTL 60 days (an exemption changes on a death, a sale or the annual application), retry 7.
 """
 from __future__ import annotations
 
+import asyncio
 import html as _html
 import re
 from datetime import date, datetime
 from typing import Any, Optional
-from urllib.parse import urlencode
+from urllib.parse import quote_plus, urlencode
 
 from ..core import VerificationResult, result
-from .tax_lien_buncombe import (BILL_URL, PARCEL_URL, money, owner_match, parse_parcel_page,
-                                pin_of)
+from ._tax_common import address_key, address_query, address_relation
+from .tax_lien_buncombe import (BILL_URL, PARCEL_URL, SEARCH_URL, money, owner_match,
+                                parse_parcel_page, parse_search_results, pin_of)
 
 SIGNAL = "elderly_disabled"
-VERSION = "v3"         # v2 (2026-10-06): a 10-digit board pin is looked up as pin= (it can
+VERSION = "v4"         # v4 (2026-10-06): the check is bound to the parcel that carries the row's
+                       # ADDRESS as well as the board and lien-bill parcels (a confirmed there is
+                       # `exemption_on_address_parcel`), and the "never" is read from every levy
+                       # bill since 2022, not the latest two (an earlier relief is stale)
+                       # v2 (2026-10-06): a 10-digit board pin is looked up as pin= (it can
                        # cover many condominium units: unconfirmed), not padded to the
                        # common-area pinnum; a billing record that ended is unconfirmed
                        # v3 (2026-10-06): the bills decide, not the GIS flag: an exclusion on the
@@ -125,9 +178,18 @@ _NAME = __name__.rsplit(".", 1)[-1]
 #: does not pull the scraper stack in)
 LAYER_URL = "https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query"
 LAYER_FIELDS = "pinnum,pin,owner,TaxYear,UpdateDate,Exempt,AppraisedValue,DeedDate,Class"
+#: the address lookup also asks for the situs columns (the layer's own: Address / CityName are
+#: the OWNER'S MAILING address, see buncombe_elderly)
+ADDRESS_FIELDS = LAYER_FIELDS + ",HouseNumber,NumberSuffix,direction,streetname,StreetType,PostDirection"
 ELDERLY_SOURCE = "counties_nc.buncombe_elderly"
 VOTER_HOST = "vt.ncsbe.gov"
-MAX_BILL_CHECKS = 2
+MAX_BILL_CHECKS = 2        # the newest bills that decide a confirmed or a stale (as in v3)
+LOOKBACK_YEARS = 4         # the "never" reads the levy bills of today.year - 4 .. today (2022 on)
+MAX_BILL_FETCHES = 8       # per parcel: the window's bills, discovery bills included
+MAX_ADDRESS_CANDIDATES = 3  # parcels the tax site's address search may add to the answer
+LAYER_TRIES = 3            # the county layer answers an HTTP 200 {"error": {"code": 500}} now and
+LAYER_RETRY_WAIT_S = 4.0   # then (11 of 35 rows in one recheck window): retried, spaced, before
+                           # a parcel is called unreadable
 
 #: the claim's codes and what each means (the scraper's _TAGS, enrichment_tax_relief's kinds)
 CODE_TYPE = {"ELD": "elderly", "DIS": "disabled", "BLD": "blind", "VET": "disabled_veteran"}
@@ -199,6 +261,24 @@ def layer_url(field: str, value: str) -> str:
                                         "returnGeometry": "false", "f": "json"})
 
 
+async def get_layer(client, url: str) -> list[dict]:
+    """parse_layer(the layer's answer to `url`), retried LAYER_TRIES times, LAYER_RETRY_WAIT_S
+    apart, when the county's server answers with an error payload or a transport error. A URL a
+    replay has no recording for (LookupError) is never retried."""
+    last: Optional[BaseException] = None
+    for i in range(LAYER_TRIES):
+        try:
+            return parse_layer(await client.get_json(url))
+        except LookupError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            if i + 1 < LAYER_TRIES:
+                await asyncio.sleep(LAYER_RETRY_WAIT_S * (i + 1))
+    assert last is not None
+    raise last
+
+
 def _ymd(v: Any) -> Optional[str]:
     """'20240920' -> '2024-09-20'; junk -> None."""
     s = re.sub(r"\D", "", str(v or ""))
@@ -238,8 +318,19 @@ def parse_layer(data: Any) -> list[dict]:
                     "owner": (a.get("owner") or "").strip() or None,
                     "code": code or None, "tax_year": _tax_year(a.get("TaxYear")),
                     "updated": _ymd(a.get("UpdateDate")), "deed_date": _ymd(a.get("DeedDate")),
-                    "appraised": money(a.get("AppraisedValue"))})
+                    "appraised": money(a.get("AppraisedValue")), "situs": _situs(a)})
     return out
+
+
+def _situs(a: dict) -> Optional[str]:
+    """The parcel's own address from the layer's situs columns ("87 ELKWOOD AVE"); None when the
+    query did not ask for them or the parcel has no house number."""
+    hn = str(a.get("HouseNumber") or "").strip()
+    if not hn:
+        return None
+    parts = [hn + str(a.get("NumberSuffix") or "").strip(), a.get("direction"),
+             a.get("streetname"), a.get("StreetType"), a.get("PostDirection")]
+    return " ".join(str(p).strip() for p in parts if p and str(p).strip()) or None
 
 
 _VALUE_ROW = re.compile(r"<th>\s*(Real Value|Deferred Value|Exempt Value|Total Value|Levy Year)"
@@ -260,11 +351,13 @@ def parse_bill_values(text: str) -> dict:
 def relief_shape(real: Optional[float], exempt: Optional[float]) -> Optional[str]:
     """Which exclusion an Exempt Value is: half the value or $25,000 (G.S. 105-277.1, elderly /
     disabled), $45,000 (G.S. 105-277.1C, disabled veteran), the whole value (a residence worth
-    less than the exclusion), else 'other'. None when nothing is exempt."""
+    less than the exclusion: at most $45,000), else 'other'. None when nothing is exempt."""
     if not exempt or exempt <= 0:
         return None
     if real and abs(exempt - real) < 1:
-        return "full_value"
+        # a residence worth less than the exclusion is excluded whole; a larger value excluded
+        # whole is another exemption (a church, a government parcel: layer code EXO), not this
+        return "full_value" if real <= 45000 else "other"
     if abs(exempt - 45000) < 1:
         return "veteran_45000"
     if abs(exempt - 25000) < 1:
@@ -291,12 +384,74 @@ def scraped_from_layer(row: dict, pin: str) -> bool:
     return f"pin%3D%27{pin[:10]}%27" in str(row.get("source_url") or "")
 
 
+def lien_pin_query(row: dict) -> Optional[tuple[str, str]]:
+    """How to find the LIEN-BILL parcel on the layer, as layer_query() does for the board's:
+    the parcel the lien bill is for (raw['arcgis_distress']['pin'] of the county's unpaid-bill
+    layers, or the parcel of a county-tax-roll owner_mailing block). None when the row carries
+    none. It is a different parcel from the board's on 16 of the 32 refuted rows that carry one
+    (an elderly or tax row merged into a row of another parcel by the old address-key merge)."""
+    raw = _raw(row)
+    ad, om = raw.get("arcgis_distress"), raw.get("owner_mailing")
+    cands = []
+    if isinstance(ad, dict) and ad.get("pin"):
+        cands.append(ad["pin"])
+    if isinstance(om, dict) and om.get("source") == "county_tax_roll" and om.get("parcel_id"):
+        cands.append(om["parcel_id"])
+    for c in cands:
+        q = layer_query({"parcel_id": c})
+        if q:
+            return q
+    return None
+
+
+def owner_candidates(row: dict) -> list[str]:
+    """The owners whose exclusion the row claims: the board's owner and the lien bill's owner
+    ("LAST FIRST" of the county's unpaid-bill layer, or the tax-roll owner_mailing's owner). The
+    board's owner can be a later county-GIS refresh (enrichment_gis_attrs), so the lien bill's is
+    the person the lead was about."""
+    raw = _raw(row)
+    out = []
+    for name in (row.get("owner_name"),):
+        if name:
+            out.append(str(name))
+    om, ad = raw.get("owner_mailing"), raw.get("arcgis_distress")
+    if isinstance(om, dict) and om.get("source") == "county_tax_roll" and om.get("owner"):
+        out.append(str(om["owner"]))
+    if isinstance(ad, dict):
+        nm = " ".join(str(ad.get(k)).strip() for k in ("owner1_last_name", "owner1_first_name")
+                      if ad.get(k))
+        if nm:
+            out.append(nm)
+    return list(dict.fromkeys(out))
+
+
+_OWNER_RANK = {"same": 3, "partial": 2, "different": 1}
+
+
+def owner_category(candidates: list[str], county_owner: Optional[str]) -> Optional[str]:
+    """The best owner_match category between any of the row's owners and the county's owner
+    string, which names several owners with ';' (a household): the whole string and each owner
+    are compared. 'same' = a candidate IS one of the county's owners. The names never leave this
+    function."""
+    if not county_owner:
+        return None
+    pieces = [county_owner] + [p.strip() for p in str(county_owner).split(";") if p.strip()]
+    best: Optional[str] = None
+    for cand in candidates:
+        for piece in dict.fromkeys(pieces):
+            m = owner_match(cand, piece)
+            if m and (best is None or _OWNER_RANK[m] > _OWNER_RANK[best]):
+                best = m
+    return best
+
+
 def owner_state(row: dict, layer: dict) -> dict:
     """{'owner_match', 'transferred_since', 'owner_changed'}: owner_match is tax_lien_buncombe's
-    category (same / partial / different / None); transferred_since is a deed recorded after the
-    board first saw the row; owner_changed is a different owner, or a partial one (a shared
-    surname) with a deed since (an heir, a relative)."""
-    om = owner_match(row.get("owner_name"), layer.get("owner"))
+    category (same / partial / different / None), best over the row's owners (owner_candidates)
+    and the county's owner list; transferred_since is a deed recorded after the board first saw
+    the row; owner_changed is a different owner, or a partial one (a shared surname) with a deed
+    since (an heir, a relative)."""
+    om = owner_category(owner_candidates(row), layer.get("owner"))
     fs, dd = _first_seen(row), layer.get("deed_date")
     moved = bool(fs and dd and dd > fs)
     return {"owner_match": om, "transferred_since": moved,
@@ -450,18 +605,21 @@ def owner_unchanged_since(bills: list[dict]) -> Optional[int]:
     return since
 
 
-async def _bill_history(pin: str, client) -> dict:
-    """The latest MAX_BILL_CHECKS levy bills' Exempt Value: {'bills': [...], 'error': str|None,
-    'owner_unchanged_since': year|None}."""
-    url = PARCEL_URL.format(pin=pin)
+async def _bill_page(pin: str, client) -> tuple[Optional[dict], Optional[str]]:
+    """(the parsed parcel page, None) or (None, why it could not be read)."""
     try:
-        page = parse_parcel_page(await client.get_text(url))
+        page = parse_parcel_page(await client.get_text(PARCEL_URL.format(pin=pin)))
     except Exception as exc:  # noqa: BLE001
-        return {"bills": [], "error": f"parcel_page: {type(exc).__name__}"}
+        return None, f"parcel_page: {type(exc).__name__}"
     if not page["bills"]:
-        return {"bills": [], "error": "parcel_page: no_bills_parsed"}
+        return None, "parcel_page: no_bills_parsed"
+    return page, None
+
+
+async def _read_bills(bills: list[dict], client) -> list[dict]:
+    """Each bill's Exempt Value: [{year, exempt_value, shape[, deferred_value]} or {year, error}]."""
     out = []
-    for b in page["bills"][:MAX_BILL_CHECKS]:
+    for b in bills:
         burl = BILL_URL.format(bill=b["bill"])
         try:
             v = parse_bill_values(await client.get_text(burl))
@@ -471,116 +629,402 @@ async def _bill_history(pin: str, client) -> dict:
         if not v["readable"]:
             out.append({"year": b["year"], "error": "values_unreadable"})
             continue
-        shape = relief_shape(v["real"], v["exempt"])
-        rec = {"year": b["year"], "exempt_value": v["exempt"], "shape": shape}
+        rec = {"year": b["year"], "exempt_value": v["exempt"],
+               "shape": relief_shape(v["real"], v["exempt"])}
         if v["deferred"]:
             rec["deferred_value"] = v["deferred"]
         out.append(rec)
-    return {"bills": out, "error": None, "owner_unchanged_since": owner_unchanged_since(page["bills"])}
+    return out
 
 
-async def verify(row: dict, client, *, today: Optional[date] = None) -> VerificationResult:
-    today = today or date.today()
-    claimed = claimed_codes(row)
-    q = layer_query(row)
-    ev: dict[str, Any] = {"county": "Buncombe", "claimed_codes": claimed}
-    if not q:
-        return _res("unconfirmed", {**ev, "reason": "parcel_unresolvable",
-                                    "parcel_id": row.get("parcel_id")})
-    url = layer_url(*q)
-    ev.update({q[0]: q[1], "url": url})
-    try:
-        feats = parse_layer(await client.get_json(url))
-    except Exception as exc:  # noqa: BLE001
-        return _res("unconfirmed", {**ev, "reason": "layer_unreadable",
-                                    "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
-    if not feats:
-        return _res("unconfirmed", {**ev, "reason": "parcel_not_in_county_layer"})
-    if len(feats) > 1:
-        # several parcels under the board's 10-digit pin (condominium units): the board's
-        # parcel id, and so the ledger key every unit's row shares, cannot say which unit the
-        # claim is about, so no verdict here may speak for all of them. What the board owner's
-        # own unit shows is kept as evidence.
-        mine = [f for f in feats if owner_match(row.get("owner_name"), f["owner"]) == "same"]
-        ev.update({"reason": "pin_shared_by_units", "parcels_under_pin": len(feats),
-                   "coded_parcels_under_pin": sum(1 for f in feats if f["code"] in CODE_TYPE)})
-        if len(mine) == 1:
-            ev.update({"owner_unit": mine[0]["pinnum"], "owner_unit_code": mine[0]["code"]})
-        return _res("unconfirmed", ev)
+def _decide_bills(*, own: dict, bills: list[dict], latest: Optional[int], since: Optional[int],
+                  today: date, from_layer: bool, explained: bool, strict_owner: bool
+                  ) -> tuple[str, dict]:
+    """The verdict the levy bills read so far give for ONE parcel whose layer shows no relief
+    code: (status, info). status: confirmed | owner_differs | stale | unconfirmed | refuted.
+    `bills` are the ones read (newest first), `latest` the newest levy year on the parcel's page,
+    `since` the first year of the unbroken run of bills naming the newest owner. Pure."""
+    # the bills speak for the board's lifetime (2026 rows) only when they reach last year
+    recent = latest is not None and latest >= today.year - 1
+    read = [b for b in bills if "error" not in b]
+    shapes = [b.get("shape") for b in read]
+    # a non-relief exemption code on the layer (EXO: a church, a government parcel) owns every
+    # exclusion the parcel's bills show, whatever their size (a $37,100 parcel excluded whole is
+    # as much a "full value" as a residence worth less than the elderly exclusion): none of them
+    # is this relief
+    def relief(b: dict) -> bool:
+        return not explained and b.get("shape") in RELIEF_SHAPES
+    relief_years = sorted({b["year"] for b in read if relief(b)}, reverse=True)
+    info: dict[str, Any] = {}
+    if relief_years:
+        info["relief_years"] = relief_years
+    claimed_before = (recent and bool(relief_years)) or from_layer
+    # the newest levy bill is the county's current word on the exclusion; the layer's Exempt
+    # flag is not (a blank flag over a bill that excludes half the value: 1406 Hardscrabble Rd)
+    newest = next((b for b in bills if b.get("year") == latest), None)
+    newest_ok = newest is not None and "error" not in newest
+    newest_excludes = newest_ok and (newest.get("exempt_value") or 0) > 0
+    newest_zero = newest_ok and not newest_excludes
+    # (an exclusion that matches no relief formula counts only on the scraper's own row of this
+    # parcel; on a merged-in claim it stays "exempt_value_unexplained" below)
+    relief_now = newest_excludes and recent and (relief(newest) or (from_layer and not explained))
+    if relief_now and not own["owner_changed"]:
+        info.update(latest_bill_shape=newest.get("shape"), layer_flag_blank=True)
+        if strict_owner and own["owner_match"] != "same":
+            info["reason"] = "owner_differs_relief_present"
+            return "owner_differs", info
+        info["basis"] = "exemption_on_latest_bill"
+        return "confirmed", info
+    if own["owner_changed"] and claimed_before:
+        info["basis"] = "owner_changed"
+        return "stale", info
+    if claimed_before and newest_zero:
+        # relief gone from the newest bill. Was it THIS owner's? Relief only on bills of an
+        # earlier owner (before the run of bills that name today's) is stale all the same (it
+        # was on the record), but the evidence says whose it was.
+        mine = [y for y in relief_years if since is None or y >= since]
+        if relief_years and not mine and not from_layer:
+            info.update(basis="owner_changed", relief_under_earlier_owner=True)
+        else:
+            info["basis"] = "relief_removed"
+        return "stale", info
+    if claimed_before and not newest_ok:
+        # the bills cannot say the relief is gone when the newest one was not read, and the
+        # layer's flag alone is not proof (it can go blank over a bill that still excludes)
+        info["reason"] = "bills_unreadable"
+        return "unconfirmed", info
+    if latest is not None and not recent:
+        # the parcel's billing stopped years ago (a retired PIN): it cannot say "never"
+        info["reason"] = "parcel_record_ended"
+        return "unconfirmed", info
+    if not shapes or len(shapes) < len(bills):
+        # "never" needs every bill looked at: one unreadable year could be the one with it
+        info["reason"] = "bills_unreadable"
+        return "unconfirmed", info
+    if not explained and any(s == "other" for s in shapes):
+        info["reason"] = "exempt_value_unexplained"
+        return "unconfirmed", info
+    info["basis"] = "never_on_record"
+    return "refuted", info
 
-    layer = feats[0]
-    pinnum = layer["pinnum"] or (q[1] if q[0] == "pinnum" else q[1] + "00000")
-    ev["pinnum"] = pinnum
+
+def _layer_evidence(layer: dict, own: dict, claimed: list[str], pinnum: str) -> dict:
     code = layer["code"]
-    own = owner_state(row, layer)
-    ev.update({"county_code": code, "exemption_type": CODE_TYPE.get(code or ""),
-               "tax_year": layer["tax_year"], "layer_updated": layer["updated"],
-               "owner_match": own["owner_match"]})
+    ev: dict[str, Any] = {"pinnum": pinnum, "county_code": code,
+                          "exemption_type": CODE_TYPE.get(code or ""),
+                          "tax_year": layer["tax_year"], "layer_updated": layer["updated"],
+                          "owner_match": own["owner_match"]}
     if own["owner_changed"] or own["transferred_since"]:
         ev["deed_date"] = layer["deed_date"]
         ev["transferred_since"] = own["transferred_since"]
     if code in CODE_TYPE and claimed and code not in claimed:
         ev["type_changed"] = True
+    return ev
 
-    verdict: str
-    if code in CODE_TYPE:
-        if own["owner_changed"]:
-            verdict, ev["reason"] = "unconfirmed", "owner_differs_relief_present"
+
+def _by_layer(row: dict, layer: dict, pinnum: str, role: str, claimed: list[str], *,
+              strict_owner: bool) -> dict:
+    """One parcel judged from its layer record alone. status is 'confirmed' or 'owner_differs'
+    when the layer shows a relief code, else None (the bills decide: _by_bills)."""
+    own = owner_state(row, layer)
+    j: dict[str, Any] = {"role": role, "pinnum": pinnum, "layer": layer, "own": own,
+                         "ev": _layer_evidence(layer, own, claimed, pinnum), "status": None}
+    if strict_owner and own["owner_match"] == "different":
+        # the parcel at the row's address, which is not the board's, is another person's (the row
+        # carries the taxpayer's MAILING address, or a stale one): whatever it shows is not this
+        # owner's claim, for or against. Nothing of it is read further.
+        j["status"], j["ev"]["reason"] = "neutral", "address_parcel_other_owner"
+        return j
+    if layer["code"] in CODE_TYPE:
+        if own["owner_changed"] or (strict_owner and own["owner_match"] != "same"):
+            j["status"], j["ev"]["reason"] = "owner_differs", "owner_differs_relief_present"
         else:
-            verdict, ev["basis"] = "confirmed", "exemption_on_record"
+            j["status"], j["ev"]["basis"] = "confirmed", "exemption_on_record"
+    return j
+
+
+async def _by_bills(row: dict, client, j: dict, today: date, *, strict_owner: bool) -> None:
+    """Judge the parcel from its levy bills (j: a _by_layer() record without a status). The two
+    newest bills decide a confirmed or a stale as in v3; when they say "never", the rest of the
+    look-back window is read before that is believed."""
+    layer, pinnum, own, ev = j["layer"], j["pinnum"], j["own"], j["ev"]
+    page, error = await _bill_page(pinnum, client)
+    bills: list[dict] = []
+    latest = since = None
+    window: list[dict] = []
+    if page is not None:
+        raddr = row.get("street_address")
+        if address_query(raddr):
+            ev["address_relation"] = address_relation(raddr, page.get("situs"))
+        latest = max((b["year"] for b in page["bills"]), default=None)
+        since = owner_unchanged_since(page["bills"])
+        window = [b for b in page["bills"]
+                  if b["year"] >= today.year - LOOKBACK_YEARS][:MAX_BILL_FETCHES]
+        bills = await _read_bills(window[:MAX_BILL_CHECKS], client)
+    from_layer = scraped_from_layer(row, pinnum)
+    # a non-relief exemption code (EXO: a church or government parcel) explains an exclusion
+    # that matches no relief formula; it is not this relief and not an unexplained value
+    code = layer["code"]
+    explained = bool(code) and code not in CODE_TYPE
+
+    def decide() -> tuple[str, dict]:
+        return _decide_bills(own=own, bills=bills, latest=latest, since=since, today=today,
+                             from_layer=from_layer, explained=explained, strict_owner=strict_owner)
+
+    status, info = decide()
+    if status == "refuted" and len(window) > MAX_BILL_CHECKS:
+        bills = bills + await _read_bills(window[MAX_BILL_CHECKS:], client)
+        status, info = decide()
+    by_year: dict[str, float] = {}
+    for b in bills:
+        if "error" not in b and b.get("exempt_value") is not None:
+            k = str(b["year"])
+            by_year[k] = max(by_year.get(k, 0.0), b["exempt_value"])
+    ev["bills_checked"] = bills
+    if by_year:
+        ev["exempt_value_by_year"] = by_year
+    if since:
+        ev["owner_unchanged_since"] = since
+    if from_layer:
+        ev["layer_showed_it_on"] = str(row.get("last_seen") or "")[:10] or None
+    if explained:
+        ev["other_exemption_code"] = code
+    ev.update(info)
+    if status == "unconfirmed" and info.get("reason") == "bills_unreadable" and error:
+        ev["error"] = error
+    j["status"] = status
+
+
+#: reasons for which a parcel could not be READ: it might show the relief today, so no other
+#: parcel's stale or refuted answer may stand beside it
+_NOT_READ = frozenset({"bills_unreadable", "address_parcel_unreadable", "lien_parcel_unreadable",
+                       "address_shared_by_parcels"})
+
+
+def _combine(judged: list[dict]) -> tuple[str, dict]:
+    """(verdict, the judgement that decides it) from the judged parcels (address, board, lien
+    order): confirmed if any parcel confirms; stale if any is stale and every parcel could be
+    read; refuted only if every parcel is refuted (a neutral one, another person's parcel at the
+    row's address, counts for nothing); else unconfirmed (an owner-differs answer, the property
+    fact holding for someone near the owner, first)."""
+    live = [j for j in judged if j["status"] != "neutral"]
+    for j in live:
+        if j["status"] == "confirmed":
+            return "confirmed", j
+    unread = any(j["status"] == "unconfirmed" and j["ev"].get("reason") in _NOT_READ
+                 for j in live)
+    if not unread:
+        for j in live:
+            if j["status"] == "stale":
+                return "stale", j
+        if live and all(j["status"] == "refuted" for j in live):
+            return "refuted", live[0]
+    for status in ("owner_differs", "unconfirmed", "stale", "neutral"):
+        for j in judged:
+            if j["status"] == status:
+                return "unconfirmed", j
+    return "unconfirmed", judged[0]
+
+
+# ---------------------------------------------------------------------------
+# the parcel that carries the row's address
+# ---------------------------------------------------------------------------
+
+def address_layer_url(address: Any) -> Optional[str]:
+    """The layer query for the parcels that may carry a street address: its house number and one
+    word of the street name against the layer's own situs columns (exact matching is
+    address_relation()'s, after the query). None when the address has no house number."""
+    number, name, _tail = address_key(address)
+    if not number or not name or not address_query(address):
+        return None
+    digits = re.match(r"\d+", number).group(0)
+    word = max(sorted(name), key=len)
+    nums = ",".join(f"'{n}'" for n in dict.fromkeys([digits, digits.zfill(5)]))
+    where = f"HouseNumber IN ({nums}) AND streetname LIKE '%{word}%'"
+    return LAYER_URL + "?" + urlencode({"where": where, "outFields": ADDRESS_FIELDS,
+                                        "returnGeometry": "false", "f": "json"})
+
+
+async def _address_parcels(row: dict, client, ev: dict) -> tuple[str, list[dict], Optional[str]]:
+    """(state, parcels, how): the layer records of the parcels that carry the row's address,
+    exact house number and street name after normalization. state: 'ok' (>= 1 parcel), 'none'
+    (the sources were read and nothing carries it), 'unreadable', 'no_address' (the row has no
+    house-numbered address: nothing to bind). The layer's situs columns first; when they find
+    nothing, the tax site's address search, each hit then read from the layer by pinnum. A
+    parcel whose house number differs from the row's is never returned."""
+    addr = row.get("street_address")
+    url = address_layer_url(addr)
+    if not url:
+        return "no_address", [], None
+    ev["address_url"] = url
+    try:
+        feats = await get_layer(client, url)
+    except Exception as exc:  # noqa: BLE001
+        ev["address_error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+        return "unreadable", [], None
+    match = [f for f in feats if address_relation(addr, f.get("situs")) == "match"]
+    if match:
+        return "ok", match, "layer_situs"
+    surl = SEARCH_URL.format(q=quote_plus(address_query(addr)))
+    ev["address_search_url"] = surl
+    try:
+        found = parse_search_results(await client.get_text(surl))
+    except Exception as exc:  # noqa: BLE001
+        ev["address_search_error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+        return "none", [], None
+    if found is None:
+        ev["address_search_error"] = "unreadable"
+        return "none", [], None
+    pins = list(dict.fromkeys(f["pin"] for f in found
+                              if address_relation(addr, f["address"]) == "match"))
+    feats = []
+    for pin in pins[:MAX_ADDRESS_CANDIDATES]:
+        try:
+            feats.extend(await get_layer(client, layer_url("pinnum", pin)))
+        except Exception as exc:  # noqa: BLE001
+            ev["address_error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+            return "unreadable", [], None
+    return ("ok", feats, "site_search") if feats else ("none", [], None)
+
+
+# ---------------------------------------------------------------------------
+# verify
+# ---------------------------------------------------------------------------
+
+async def verify(row: dict, client, *, today: Optional[date] = None) -> VerificationResult:
+    today = today or date.today()
+    claimed = claimed_codes(row)
+    q = layer_query(row)
+    lien_q = lien_pin_query(row)
+    has_addr = address_layer_url(row.get("street_address")) is not None
+    ev: dict[str, Any] = {"county": "Buncombe", "claimed_codes": claimed}
+    if not q and not lien_q and not has_addr:
+        return _res("unconfirmed", {**ev, "reason": "parcel_unresolvable",
+                                    "parcel_id": row.get("parcel_id")})
+
+    # -- the board parcel (the row's parcel_id, the ledger key)
+    board: Optional[dict] = None
+    board_pin: Optional[str] = None
+    if q:
+        url = layer_url(*q)
+        ev.update({q[0]: q[1], "url": url})
+        try:
+            feats = await get_layer(client, url)
+        except Exception as exc:  # noqa: BLE001
+            return _res("unconfirmed", {**ev, "reason": "layer_unreadable",
+                                        "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
+        if len(feats) > 1:
+            # several parcels under the board's 10-digit pin (condominium units): the board's
+            # parcel id, and so the ledger key every unit's row shares, cannot say which unit the
+            # claim is about, so no verdict here may speak for all of them. What the board
+            # owner's own unit shows is kept as evidence.
+            mine = [f for f in feats if owner_match(row.get("owner_name"), f["owner"]) == "same"]
+            ev.update({"reason": "pin_shared_by_units", "parcels_under_pin": len(feats),
+                       "coded_parcels_under_pin": sum(1 for f in feats if f["code"] in CODE_TYPE)})
+            if len(mine) == 1:
+                ev.update({"owner_unit": mine[0]["pinnum"], "owner_unit_code": mine[0]["code"]})
+            return _res("unconfirmed", ev)
+        if feats:
+            board = feats[0]
+            board_pin = board["pinnum"] or (q[1] if q[0] == "pinnum" else q[1] + "00000")
+        else:
+            ev["board_pin_not_in_county_layer"] = True
+    judged: list[dict] = []
+    if board is not None:
+        jb = _by_layer(row, board, board_pin, "board", claimed, strict_owner=False)
+        if jb["status"] == "confirmed":          # the layer shows the relief on the board's parcel
+            return await _finish(row, client, ev, [jb], jb, "confirmed")
+        judged.append(jb)
+
+    # -- the parcel that carries the row's address
+    astate, afeats, how = await _address_parcels(row, client, ev)
+    if astate == "ok":
+        same = [f for f in afeats if board_pin and f["pinnum"] == board_pin]
+        mine = [f for f in afeats if owner_category(owner_candidates(row), f["owner"]) == "same"]
+        pick = same[0] if same else (afeats[0] if len(afeats) == 1
+                                     else (mine[0] if len(mine) == 1 else None))
+        if pick is None:
+            ev["address_parcels"] = len(afeats)
+            judged.insert(0, {"role": "address", "pinnum": None, "status": "unconfirmed",
+                              "ev": {"reason": "address_shared_by_parcels"}})
+            ev["address_binding"] = "ambiguous"
+        elif same:
+            ev["address_binding"] = "board_parcel"
+            if judged:
+                judged[0]["role"] = "board+address"
+        else:
+            ev["address_binding"] = how
+            judged.insert(0, _by_layer(row, pick, pick["pinnum"], "address", claimed,
+                                       strict_owner=True))
+    elif astate == "unreadable":
+        ev["address_binding"] = "unreadable"
+        judged.insert(0, {"role": "address", "pinnum": None, "status": "unconfirmed",
+                          "ev": {"reason": "address_parcel_unreadable"}})
     else:
-        hist = await _bill_history(pinnum, client)
-        ev["bills_checked"] = hist["bills"]
-        by_year = {str(b["year"]): b["exempt_value"] for b in hist["bills"]
-                   if "error" not in b and b.get("exempt_value") is not None}
-        if by_year:
-            ev["exempt_value_by_year"] = by_year
-        if hist.get("owner_unchanged_since"):
-            ev["owner_unchanged_since"] = hist["owner_unchanged_since"]
-        latest = max((b["year"] for b in hist["bills"]), default=None)
-        # the bills speak for the board's lifetime (2026 rows) only when they reach last year
-        recent = latest is not None and latest >= today.year - 1
-        shapes = [b.get("shape") for b in hist["bills"] if "error" not in b]
-        was_billed = recent and any(s in RELIEF_SHAPES for s in shapes)
-        from_layer = scraped_from_layer(row, pinnum)
-        if from_layer:
-            ev["layer_showed_it_on"] = str(row.get("last_seen") or "")[:10] or None
-        # the newest levy bill is the county's current word on the exclusion; the layer's Exempt
-        # flag is not (a blank flag over a bill that excludes half the value: 1406 Hardscrabble Rd)
-        newest = next((b for b in hist["bills"] if b.get("year") == latest), None)
-        newest_ok = newest is not None and "error" not in newest
-        newest_excludes = newest_ok and (newest.get("exempt_value") or 0) > 0
-        newest_zero = newest_ok and not newest_excludes
-        claimed_before = was_billed or from_layer
-        if (newest_excludes and recent and not own["owner_changed"]
-                and (newest.get("shape") in RELIEF_SHAPES or from_layer)):
-            # (an exclusion that matches no relief formula counts only on the scraper's own row of
-            # this parcel; on a merged-in claim it stays "exempt_value_unexplained" below)
-            verdict, ev["basis"] = "confirmed", "exemption_on_latest_bill"
-            ev["latest_bill_shape"] = newest.get("shape")
-            ev["layer_flag_blank"] = True
-        elif own["owner_changed"] and claimed_before:
-            verdict, ev["basis"] = "stale", "owner_changed"
-        elif claimed_before and newest_zero:
-            verdict, ev["basis"] = "stale", "relief_removed"
-        elif claimed_before and not newest_ok:
-            # the bills cannot say the relief is gone when the newest one was not read, and the
-            # layer's flag alone is not proof (it can go blank over a bill that still excludes)
-            verdict, ev["reason"] = "unconfirmed", "bills_unreadable"
-            if hist["error"]:
-                ev["error"] = hist["error"]
-        elif latest is not None and not recent:
-            # the parcel's billing stopped years ago (a retired PIN): it cannot say "never"
-            verdict, ev["reason"] = "unconfirmed", "parcel_record_ended"
-        elif not shapes or len(shapes) < len(hist["bills"]):
-            # "never" needs every bill looked at: one unreadable year could be the one with it
-            verdict, ev["reason"] = "unconfirmed", "bills_unreadable"
-            if hist["error"]:
-                ev["error"] = hist["error"]
-        elif any(s == "other" for s in shapes):
-            verdict, ev["reason"] = "unconfirmed", "exempt_value_unexplained"
-        else:
-            verdict, ev["basis"] = "refuted", "never_on_record"
+        ev["address_binding"] = "none_found" if astate == "none" else "no_row_address"
 
+    # -- the lien bill's parcel, when it is a third one
+    known = {j["pinnum"] for j in judged if j.get("pinnum")}
+    if lien_q and not (lien_q == q or (lien_q[0] == "pinnum" and lien_q[1] in known)
+                       or (lien_q[0] == "pin" and any(k[:10] == lien_q[1] for k in known))):
+        lurl = layer_url(*lien_q)
+        try:
+            lfeats = await get_layer(client, lurl)
+        except Exception as exc:  # noqa: BLE001
+            ev["lien_error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+            lfeats = None
+        if lfeats is None:
+            judged.append({"role": "lien_bill", "pinnum": None, "status": "unconfirmed",
+                           "ev": {"reason": "lien_parcel_unreadable"}})
+        elif len(lfeats) == 1 and lfeats[0]["pinnum"] not in known:
+            judged.append(_by_layer(row, lfeats[0], lfeats[0]["pinnum"], "lien_bill", claimed,
+                                    strict_owner=False))
+        elif not lfeats:
+            ev["lien_pin_not_in_county_layer"] = True
+
+    if not judged:
+        return _res("unconfirmed", {**ev, "reason": "parcel_not_in_county_layer" if q
+                                    else "parcel_unresolvable", "parcel_id": row.get("parcel_id")})
+
+    # -- a relief code on the layer decides without reading any bill
+    for j in judged:
+        if j["status"] == "confirmed":
+            return await _finish(row, client, ev, judged, j, "confirmed")
+    # -- the rest by their levy bills
+    for j in judged:
+        if j["status"] is None:
+            await _by_bills(row, client, j, today, strict_owner=j["role"] == "address")
+    verdict, deciding = _combine(judged)
+    return await _finish(row, client, ev, judged, deciding, verdict)
+
+
+async def _finish(row: dict, client, ev: dict, judged: list[dict], deciding: dict,
+                  verdict: str) -> VerificationResult:
+    """Put the deciding parcel's evidence on the answer, name the parcels when they differ, and
+    add the voter status."""
+    ev.update(deciding["ev"])
+    pins = {j["role"]: j["pinnum"] for j in judged if j.get("pinnum")}
+    if len(set(pins.values())) > 1:
+        for role in ("address", "board", "board+address", "lien_bill"):
+            if role in pins:
+                key = {"board+address": "board", "lien_bill": "lien"}.get(role, role)
+                ev[f"{key}_pin"] = pins[role]
+        ev["parcels"] = [
+            {k: v for k, v in {
+                "role": j["role"], "pinnum": j.get("pinnum"), "status": j["status"] or "not_read",
+                "basis": j["ev"].get("basis"), "reason": j["ev"].get("reason"),
+                "county_code": j["ev"].get("county_code"),
+                "owner_match": j["ev"].get("owner_match"),
+                "exempt_value_by_year": j["ev"].get("exempt_value_by_year"),
+                "relief_years": j["ev"].get("relief_years")}.items() if v is not None}
+            for j in judged]
+    if verdict == "confirmed" and deciding["role"] == "address":
+        ev["address_parcel_basis"] = ev.get("basis")
+        ev["basis"] = "exemption_on_address_parcel"
+    if verdict == "confirmed" and deciding["role"] == "lien_bill":
+        ev["lien_parcel_basis"] = ev.get("basis")
+        ev["basis"] = "exemption_on_lien_parcel"
+    if verdict == "unconfirmed" and "reason" not in ev:
+        ev["reason"] = "not_decidable"
     ev["voter"] = await voter_status(row, client)
     return _res(verdict, ev)
