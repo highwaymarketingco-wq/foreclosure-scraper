@@ -26,6 +26,7 @@ from typing import Optional
 import httpx
 import structlog
 
+from . import condo_units
 from .models import Listing, ListingType
 from .enrichment_arcgis import (  # SCDOT circuit-breaker
     scdot_walled, mark_host_walled, is_token_error,
@@ -51,6 +52,10 @@ COUNTY_GIS: dict[str, dict] = {
         "mail": ["Address", "CityName", "State", "Zipcode"], "mail_state": "State",
         "situs": ["HouseNumber", "NumberSuffix", "direction", "streetname", "StreetType", "PostDirection"],
         "situs_match": "streetname",  # split situs → LIKE the street-name field, not house#
+        # `pin` is the BUILDING's 10 digits; a condominium unit's parcel_id is its own pinnum
+        # ('9627023924C0102', condo_units.py), which `pin LIKE` never finds. A unit is matched on
+        # `pinnum` (live 2026-10-06, property_bc_dis/MapServer/1?f=json: pinnum string(15)).
+        "unit_parcel": "pinnum",
         "parcel": "pin"},
     "NC:Henderson": {"url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0",
         "owner": ["PROPERTY_OWNER"],
@@ -688,7 +693,12 @@ async def _match_attrs(http: httpx.AsyncClient, li: Listing, spec: dict) -> Opti
         parcel_fields = [spec["parcel"]]
         if spec.get("alt_parcel"):
             parcel_fields.append(spec["alt_parcel"])
-        for cand in _pid_variants(li.parcel_id):
+        cands = _pid_variants(li.parcel_id)
+        # a condominium unit is keyed by its own pinnum, never by the building's pin (condo_units.py)
+        unit = spec.get("unit_parcel") and condo_units.unit_pinnum(li.state, li.county, li.parcel_id)
+        if unit:
+            parcel_fields, cands = [spec["unit_parcel"]], [unit]
+        for cand in cands:
             safe = cand.replace("'", "''")
             for pf in parcel_fields:
                 rows = await _query(http, spec["url"], f"{pf} LIKE '%{safe}%'{cc}",

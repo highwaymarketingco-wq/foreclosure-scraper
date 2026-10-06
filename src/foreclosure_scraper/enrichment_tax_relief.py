@@ -91,6 +91,7 @@ from typing import Optional
 import httpx
 import structlog
 
+from . import condo_units
 from .models import Listing
 from .enrichment_owner_mailing import _query, _pid_variants
 
@@ -107,6 +108,10 @@ _RELIEF_LAYERS: dict[tuple[str, str], dict] = {
     ("NC", "Buncombe"): {
         "url": "https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/Property_2025/FeatureServer/0",
         "pin_field": "pin",
+        # A condominium unit's parcel_id is its own pinnum ('9627023924C0102', condo_units.py) and
+        # `pin` is the building's 10 digits: a unit is matched on `pinnum`, a plain parcel on `pin`.
+        # Live 2026-10-06 (Property_2025/FeatureServer/0?f=json): pinnum esriFieldTypeString(15).
+        "unit_field": "pinnum",
         "where_extra": "Exempt IN ('ELD','DIS','BLD')",
         "fields": "pin,owner,Exempt",
         "classify": "senior_exemption",
@@ -293,9 +298,12 @@ async def enrich_tax_relief(listings: list[Listing], max_queries: int = 200) -> 
             use_http = http_insecure if cfg.get("insecure_tls") else http
             counts["queried"] += 1
             hit = None
-            for pid in _pid_variants(li.parcel_id)[:3]:
+            unit = cfg.get("unit_field") and condo_units.unit_pinnum(li.state, county, li.parcel_id)
+            pin_field, pids = ((cfg["unit_field"], [unit]) if unit
+                               else (cfg["pin_field"], _pid_variants(li.parcel_id)[:3]))
+            for pid in pids:
                 safe = pid.replace("'", "''")
-                where = f"{cfg['pin_field']} LIKE '%{safe}%' AND {cfg['where_extra']}"
+                where = f"{pin_field} LIKE '%{safe}%' AND {cfg['where_extra']}"
                 rows = await _query(use_http, cfg["url"], where, out_fields=cfg["fields"], count=1)
                 if rows:
                     hit = _classify(cfg, rows[0])

@@ -76,6 +76,18 @@ def _is_buncombe(state, county) -> bool:
             and str(county or "").replace("County", "").strip().lower() == "buncombe")
 
 
+def unit_pinnum(state, county, parcel_id) -> Optional[str]:
+    """The layer's own `pinnum` ('9627023924C0102') of a Buncombe NC row keyed by a condominium unit,
+    whichever way the id is spelled ('9627-02-3924-c0102'); None for any other row.
+
+    The join key of every county-layer lookup that matches a lead to its record by parcel id: the
+    layer's `pin` is the BUILDING's 10 digits (a unit's id never matches it with LIKE), so a unit is
+    looked up by `pinnum`, and a plain parcel keeps its pin (enrichment_owner_mailing,
+    enrichment_tax_relief, enrichment_cama_condition)."""
+    parts = unit_parts(parcel_id) if _is_buncombe(state, county) else None
+    return parts[0] + parts[1] if parts else None
+
+
 def unit_pin_key(state, county, parcel_id) -> Optional[tuple[str, str]]:
     """('buncombe', pin) for a Buncombe NC row keyed by a unit's pinnum, else None."""
     if not _is_buncombe(state, county):
