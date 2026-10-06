@@ -38,7 +38,7 @@ def _lead(**kw) -> Listing:
 
 
 def test_eld_code_bridges_into_tax_relief_elderly():
-    li = _lead()
+    li = _lead(parcel_id="123")
     mod.apply_gis_attrs(li, {"PIN": "123", "Exempt": "ELD"})
     assert li.raw["gis_exempt"] == {"code": "ELD", "tag": "elderly_exemption"}
     assert li.raw["tax_relief"]["kind"] == "elderly"
@@ -48,7 +48,7 @@ def test_eld_code_bridges_into_tax_relief_elderly():
 
 
 def test_dis_code_bridges_into_tax_relief_disabled():
-    li = _lead()
+    li = _lead(parcel_id="123")
     mod.apply_gis_attrs(li, {"PIN": "123", "Exempt": "DIS"})
     assert li.raw["tax_relief"]["kind"] == "disabled"
     names = [n for n, _c, _w in _signals_for(li)]
@@ -56,7 +56,7 @@ def test_dis_code_bridges_into_tax_relief_disabled():
 
 
 def test_bld_code_bridges_into_tax_relief_blind():
-    li = _lead()
+    li = _lead(parcel_id="123")
     mod.apply_gis_attrs(li, {"PIN": "123", "Exempt": "BLD"})
     assert li.raw["tax_relief"]["kind"] == "blind"
     names = [n for n, _c, _w in _signals_for(li)]
@@ -68,14 +68,14 @@ def test_vet_code_is_tagged_but_deliberately_not_bridged():
     enrichment_tax_relief.py has never modeled "veteran" as a distress kind,
     so inventing one here would be a new scoring decision, not a key-naming
     fix -- gis_exempt still records it, tax_relief must not."""
-    li = _lead()
+    li = _lead(parcel_id="123")
     mod.apply_gis_attrs(li, {"PIN": "123", "Exempt": "VET"})
     assert li.raw["gis_exempt"] == {"code": "VET", "tag": "disabled_veteran_exemption"}
     assert "tax_relief" not in li.raw
 
 
 def test_no_exemption_code_leaves_both_keys_absent():
-    li = _lead()
+    li = _lead(parcel_id="123")
     mod.apply_gis_attrs(li, {"PIN": "123", "Exempt": "0"})
     assert "gis_exempt" not in li.raw
     assert "tax_relief" not in li.raw

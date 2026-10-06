@@ -406,10 +406,75 @@ def _exempt_signal(norm: dict) -> tuple[str, str] | None:
     return None
 
 
+#: The scraper whose own rows are read from the exempt parcel itself (counties_nc.buncombe_elderly:
+#: one bulk query of Exempt IN ('ELD','DIS','BLD','VET'); its parcel_id and situs ARE that parcel's).
+ELDERLY_SOURCE = "counties_nc.buncombe_elderly"
+
+#: Layer fields that carry the matched feature's own parcel id: the full PIN first.
+_PIN_FIELDS = ("pinnum", "pin") + _PARCEL_FIELDS
+
+
+def _same_parcel(a: Any, b: Any) -> bool:
+    """Two parcel-id spellings of one parcel: equal once punctuation is gone, or one is the other
+    plus a zero pad ('9648-69-0092-00000' == '9648690092'). A condominium unit's id
+    ('9627023924C0102') never equals its building's pad."""
+    na, nb = _norm_parcel(str(a or "")), _norm_parcel(str(b or ""))
+    if not na or not nb:
+        return False
+    if na == nb:
+        return True
+    short, long_ = sorted((na, nb), key=len)
+    return len(short) >= 6 and long_.startswith(short) and set(long_[len(short):]) <= {"0"}
+
+
+def exempt_parcel_relation(parcel_id: Any, street_address: Any, resolver_parcel: bool,
+                           attrs: dict[str, Any]) -> tuple[str, str]:
+    """(pin relation, address relation) of a row, as it was BEFORE this feature filled anything
+    in, to the parcel feature `attrs` it was matched to: ('same'|'different'|'unknown',
+    'match'|'conflict'|'unknown'). The pin is 'unknown' for a row without a parcel id, one a
+    resolver took from the same point (raw['parcel_from_geo'] / ['parcel_from_address']: it proves
+    nothing), or a feature that carries no recognizable parcel field. The address is the
+    feature's situs against the row's, exact house number and street name after normalization
+    (verification.verifiers._tax_common.address_relation)."""
+    norm = _norm(attrs)
+    pins = [str(norm[f.lower()]) for f in _PIN_FIELDS if norm.get(f.lower()) not in (None, "", " ")]
+    if not (parcel_id or "").strip() or resolver_parcel or not pins:
+        pin_rel = "unknown"
+    else:
+        pin_rel = "same" if any(_same_parcel(parcel_id, p) for p in pins) else "different"
+    situs = _pick(_norm(situs_view(attrs)), ADDRESS_FIELDS)
+    if not (street_address or "").strip() or not situs:
+        return pin_rel, "unknown"
+    from .verification.verifiers._tax_common import address_relation
+    return pin_rel, address_relation(street_address, situs)
+
+
+def exempt_is_rows_own(pin_rel: str, addr_rel: str) -> bool:
+    """May the exemption code of a matched parcel feature be attached to the row? Only when the
+    feature IS the row's parcel: the same parcel id and no conflicting address, or (no parcel id
+    to compare) the row's exact address. A feature found by POINT alone (a geocode that lands on
+    a neighbour's polygon or on the road beside it), one whose parcel id is another parcel's, or
+    a row with no identity to compare is not: the code is then somebody else's. Measured
+    2026-10-06 on the 2026-10-05 board (4,481 rows carry the claim; 51 only through this path): 41
+    of the 51 sit on a parcel that is not exempt today; of the 38 whose point still falls in a
+    polygon, 17 landed in an exempt polygon that is not the row's parcel (a different owner in
+    14 of the 17) and none in the row's own exempt parcel."""
+    return (pin_rel == "same" and addr_rel != "conflict") or (pin_rel == "unknown"
+                                                              and addr_rel == "match")
+
+
 def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
     """Backfill value/owner/specs from a matched GIS feature. Missing-only.
-    Returns per-field fill flags (1 = newly populated this call)."""
+    Returns per-field fill flags (1 = newly populated this call).
+
+    The statutory exemption code (raw['gis_exempt'], and raw['tax_relief'] bridged from it) is
+    attached only when the feature is the row's own parcel (exempt_is_rows_own); the row's
+    identity is read here BEFORE the street-address backfill below can copy the feature's own
+    situs onto it."""
     norm = _norm(attrs)
+    resolver0 = isinstance(li.raw, dict) and bool(li.raw.get("parcel_from_geo")
+                                                  or li.raw.get("parcel_from_address"))
+    pin_rel, addr_rel = exempt_parcel_relation(li.parcel_id, li.street_address, resolver0, attrs)
     flags = {k: 0 for k in ("market_value", "assessed_value", "owner_name",
                             "living_sqft", "year_built", "acreage", "land_use",
                             "street_address")}
@@ -508,8 +573,18 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
         # life-events enricher can flag elderly/disabled owners (survives to listings.json,
         # unlike gis_attrs_full which is stripped at publish).
         ex = _exempt_signal(norm)
+        own_row = li.source == ELDERLY_SOURCE and isinstance(li.raw.get("gis_exempt"), dict)
+        if ex and own_row:
+            # the elderly scraper's own row already carries the code it read from THIS parcel
+            # (care_of included): untouched, and the bridge below follows that code, not the
+            # polygon a geocode happened to land on
+            code0 = str(li.raw["gis_exempt"].get("code") or "").strip().upper()[:3]
+            ex = (code0, _EXEMPT_TABLE[code0]) if code0 in _EXEMPT_TABLE else None
+        elif ex and not exempt_is_rows_own(pin_rel, addr_rel):
+            ex = None            # a neighbour's (or an unidentified) parcel: no claim
         if ex:
-            li.raw["gis_exempt"] = {"code": ex[0], "tag": ex[1]}
+            if not own_row:
+                li.raw["gis_exempt"] = {"code": ex[0], "tag": ex[1]}
             # 2026-10-02 breadth fix (same shape as code_enforcement/condemned/
             # rollback_exposure the same day): also promote a real elderly/disabled/
             # blind hit into raw['tax_relief'], the key distress_score.py's
