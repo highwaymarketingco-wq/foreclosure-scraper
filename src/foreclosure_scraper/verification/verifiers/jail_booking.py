@@ -45,6 +45,10 @@ subject (the same key the run uses while the owner still yields that name):
                such a roster); or the county's vendor has no bulk roster
                ("per_name_search_vendor", "no_roster_for_county").
 
+SHARED RULES. The spelling-drift and long-stay rules below live in jail_matching, a neutral pure
+module the pipeline's own stamp (enrichment_jail_bookings._reevaluate_stamp) imports too, so the
+two cannot read the same roster differently.
+
 SPELLING DRIFT (v2). The exact first + last name lookup missed a person who IS on the roster whose
 first name the vendor later respelled by one character (Henderson, 2026-10-06: the stamp's name
 and the roster's differed by one inserted letter; the verifier read "absent" and said stale).
@@ -126,6 +130,8 @@ from types import SimpleNamespace
 from typing import Any, Optional
 from urllib.parse import urlsplit
 
+from ... import jail_matching as _jm
+from ...jail_matching import first_name_variant, spelling_variants, stay_days  # noqa: F401 (re-exported)
 from ..core import VerificationResult, iso_z, result, utc_now
 
 SIGNAL = "jail_booking"
@@ -138,8 +144,9 @@ ROW_SUMMARY_EXCLUDE = ("owner_name",)     # see EVIDENCE in the docstring
 IDENTITY = "case"      # one verdict per booking and property (case_identity), not per property
 #: a stay in the county jail of this many days or more cannot be read as a release when the person
 #: is no longer on the roster (a county roster cannot tell a release from a transfer to state
-#: prison): the answer is unconfirmed, possible_transfer_to_prison. The one place the number lives.
-JAIL_LONG_STAY_DAYS = 60
+#: prison): the answer is unconfirmed, possible_transfer_to_prison. The number and the rule live in
+#: jail_matching (shared with the pipeline's stamp); this is the verifier's name for it.
+JAIL_LONG_STAY_DAYS = _jm.JAIL_LONG_STAY_DAYS
 
 _NAME = __name__.rsplit(".", 1)[-1]
 _REPO = Path(__file__).resolve().parents[4]
@@ -400,89 +407,6 @@ def _owner_middle(owner: Optional[str]) -> str:
     return p[2] if p else ""
 
 
-def _lev(a: str, b: str) -> int:
-    """Levenshtein edit distance."""
-    prev = list(range(len(b) + 1))
-    for i, ca in enumerate(a, 1):
-        cur = [i]
-        for j, cb in enumerate(b, 1):
-            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
-        prev = cur
-    return prev[-1]
-
-
-def first_name_variant(a: str, b: str) -> Optional[int]:
-    """The edit distance between two normalized first names when they can be one person's
-    spelling variants, else None: within 2 edits (1 when the shorter is under 5 letters, none
-    when it is under 3), or the same first letter with one a prefix of the other (3+ letters)."""
-    if not a or not b or a == b:
-        return None
-    short = min(len(a), len(b))
-    if short < 3:
-        return None
-    d = _lev(a, b)
-    if d <= (2 if short >= 5 else 1):
-        return d
-    if a[0] == b[0] and (a.startswith(b) or b.startswith(a)):
-        return d
-    return None
-
-
-def _day(v: Any) -> Optional[date]:
-    from ...signal_freshness import to_date
-    return to_date(v)
-
-
-def _int(v: Any) -> Optional[int]:
-    try:
-        return int(str(v).strip())
-    except (TypeError, ValueError):
-        return None
-
-
-def spelling_variants(index: Any, jbk: dict, claimed: tuple[str, str]) -> list[dict]:
-    """Roster records that are the stamp's person under another spelling of the first name (see
-    SPELLING DRIFT in the module docstring), each {record, distance, basis}. Needs the stamp's
-    booking date; compares the date of birth when both sides have one, else the age."""
-    jb = _jb()
-    last, first = jb._norm_key(*claimed)
-    booked = _day(jbk.get("arrest_date"))
-    if booked is None or not last:
-        return []
-    sdob, sage = _day(jbk.get("roster_dob")), _int(jbk.get("roster_age"))
-    groups = getattr(index, "same_name", None) or {k: [v] for k, v in index.items()}
-    out = []
-    for (rlast, rfirst), recs in groups.items():
-        if rlast != last or rfirst == first:
-            continue
-        dist = first_name_variant(first, rfirst)
-        if dist is None:
-            continue
-        for rec in recs:
-            if _day(rec.get("arrest_date")) != booked:
-                continue
-            rdob = _day(rec.get("dob"))
-            if sdob is not None and rdob is not None:
-                basis = "dob" if sdob == rdob else None
-            else:
-                rage = _int(rec.get("age"))
-                basis = "age" if (sage is not None and rage is not None and sage == rage) else None
-            if basis:
-                out.append({"record": rec, "distance": dist, "basis": basis})
-    return out
-
-
-def stay_days(jbk: dict, today: date) -> Optional[int]:
-    """Days from the booking date to the last time the person was seen on the roster (the
-    stamp's last_confirmed_on_roster; today when it has none: an upper bound), else None when
-    the stamp has no booking date."""
-    booked = _day(jbk.get("arrest_date"))
-    if booked is None:
-        return None
-    seen = _day(jbk.get("last_confirmed_on_roster")) or today
-    return max((seen - booked).days, 0)
-
-
 async def verify(row: dict, client, *, today: Optional[date] = None) -> VerificationResult:
     from ...signal_freshness import is_prison_sourced
     jb = _jb()
@@ -533,7 +457,7 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
             variant = found[0]
             # the middle-name rule reads the roster's first name against the owner's; give it the
             # stamp's own spelling so only the middle name is judged
-            candidates = [dict(variant["record"], first=claimed[1])]
+            candidates = [_jm.variant_candidate(variant, claimed)]
             ev.update(name_variant=True, first_name_edit_distance=variant["distance"],
                       name_variant_basis=variant["basis"])
     ev["same_name_count"] = len(candidates)
@@ -565,10 +489,10 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         return _res("unconfirmed", ev)
     ev["on_roster"] = False
     if roster.healthy:
-        days = stay_days(jbk, today or date.today())
-        if days is not None and days >= JAIL_LONG_STAY_DAYS:
+        days = _jm.long_stay(jbk, today or date.today())
+        if days is not None:
             ev.update(stay_days=days, long_stay_days=JAIL_LONG_STAY_DAYS,
-                      reason="possible_transfer_to_prison")
+                      reason=_jm.POSSIBLE_TRANSFER)
             return _res("unconfirmed", ev)
         return _res("stale", ev)
     ev["reason"] = "roster_unhealthy"

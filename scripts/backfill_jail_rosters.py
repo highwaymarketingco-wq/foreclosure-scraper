@@ -19,10 +19,12 @@ Since 2026-10-05 that shared rule also (a) refuses a match whose roster middle
 name contradicts the owner's middle initial and (b) re-evaluates leads already
 carrying the enricher's own stamp: a middle-name conflict clears it, presence
 refreshes it, and absence from a roster the sidecar judges healthy marks the
-booking released_or_transferred (custody_ended). The dry run reports those
-counts too. The roster fetch honours the dry run: the sidecar diff and the
-roster-size log are only committed with --apply (same fix as the pipeline's
-2026-09-29 DRY-RUN SIDECAR BUG).
+booking released_or_transferred (custody_ended), unless the stay was 60 days or
+more (a county roster cannot tell a release from a transfer to state prison:
+the claim is kept) or the person is on the roster under a respelled first name
+(jail_matching). The dry run reports those counts too. The roster fetch honours
+the dry run: the sidecar diff and the roster-size log are only committed with
+--apply (same fix as the pipeline's 2026-09-29 DRY-RUN SIDECAR BUG).
 
 Politeness (owner decision): one request at a time, at least --interval seconds
 apart (default 1.0), a normal client, free public pages only. A host that answers
@@ -49,6 +51,7 @@ import re
 import sys
 import time
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlsplit
@@ -62,6 +65,7 @@ from foreclosure_scraper.enrichment_jail_bookings import (  # noqa: E402
     _hydrate_tyler_hits,
     _is_own_same_county_stamp,
     _load_roster,
+    _long_stay_days,
     _name_parts,
     _norm_key,
     _owner_of,
@@ -71,6 +75,7 @@ from foreclosure_scraper.enrichment_jail_bookings import (  # noqa: E402
     _roster_candidates,
     match_rosters,
 )
+from foreclosure_scraper.jail_matching import spelling_variants, variant_candidate  # noqa: E402
 from foreclosure_scraper.scrapers.national.jail_bookings import CITIZEN_CONNECT_BASE  # noqa: E402
 
 BOARD_GZ = REPO / "docs" / "listings.json.gz"
@@ -202,7 +207,8 @@ def scan_board(rows, wanted: set) -> dict:
         jbk = v.raw.get("jail_booking") if isinstance(v.raw, dict) else None
         if jbk:
             if parts and _is_own_same_county_stamp(v, jbk) and _owner_still_supports_match(v):
-                s["stamped"].append((_norm_key(*parts), _owner_of(v), bool(jbk.get("left_roster_detected_at"))))
+                s["stamped"].append((_norm_key(*parts), _owner_of(v),
+                                     bool(jbk.get("left_roster_detected_at")), _stamp_dates(jbk)))
             continue
         if parts:
             key = _norm_key(*parts)
@@ -210,6 +216,12 @@ def scan_board(rows, wanted: set) -> dict:
             s["keys"][key] += 1
             s["owners"].setdefault(key, Counter())[_owner_of(v)] += 1
     return out
+
+
+def _stamp_dates(jbk: dict) -> dict:
+    """The stamp's own booking facts the shared stay / spelling-drift rules read (no name)."""
+    return {k: jbk.get(k) for k in ("arrest_date", "roster_dob", "roster_age",
+                                    "last_confirmed_on_roster", "left_roster_detected_at")}
 
 
 def would_match(scan_entry: dict, index: dict) -> int:
@@ -227,17 +239,34 @@ def would_match(scan_entry: dict, index: dict) -> int:
     return total
 
 
-def reeval_preview(scan_entry: dict, index: dict) -> dict:
-    """What re-evaluating already-flagged leads would do (counts only)."""
-    out = {"rechecked": 0, "conflict_cleared": 0, "left_roster": 0}
+def reeval_preview(scan_entry: dict, index: dict, today=None) -> dict:
+    """What re-evaluating already-flagged leads would do (counts only), by the same rules as
+    enrichment_jail_bookings._reevaluate_stamp: a respelled first name on the roster is the same
+    person, and an absence after a long stay is kept, not read as 'left the roster'."""
+    out = {"rechecked": 0, "conflict_cleared": 0, "left_roster": 0, "long_stay_kept": 0,
+           "name_variant": 0, "ambiguous_variant": 0}
+    today = today or datetime.now(timezone.utc).date()
     healthy = bool(getattr(index, "healthy", False))
-    for key, owner, already_ended in scan_entry.get("stamped") or ():
+    for entry in scan_entry.get("stamped") or ():
+        key, owner, already_ended = entry[:3]
+        dates = entry[3] if len(entry) > 3 else {}
         out["rechecked"] += 1
         cands = _roster_candidates(index, key)
+        if not cands and dates:
+            found = spelling_variants(index, dates, key)
+            if len(found) > 1:
+                out["ambiguous_variant"] += 1
+                continue
+            if found:
+                out["name_variant"] += 1
+                cands = [variant_candidate(found[0], key)]
         if cands:
             out["conflict_cleared"] += _pick_hit(owner, cands)[1] == "conflict"
-        elif healthy and not already_ended:
-            out["left_roster"] += 1
+        elif healthy:
+            if dates and _long_stay_days(dates, today) is not None:
+                out["long_stay_kept"] += 1
+            elif not already_ended:
+                out["left_roster"] += 1
     return out
 
 
@@ -286,7 +315,8 @@ def report(entries, scan, rosters) -> list[str]:
     lines = [head, "-" * len(head)]
     total = 0
     rejected = 0
-    pre = {"rechecked": 0, "conflict_cleared": 0, "left_roster": 0}
+    pre = {"rechecked": 0, "conflict_cleared": 0, "left_roster": 0, "long_stay_kept": 0,
+           "name_variant": 0, "ambiguous_variant": 0}
     unhealthy = 0
     for state, county, vendor, _t in entries:
         s = scan[(state, county)]
@@ -306,8 +336,10 @@ def report(entries, scan, rosters) -> list[str]:
     lines.append(f"name matches refused (middle-name conflict): {rejected:,}")
     lines.append(f"already-flagged leads re-checked: {pre['rechecked']:,}; would clear "
                  f"{pre['conflict_cleared']:,} (middle-name conflict), would mark "
-                 f"{pre['left_roster']:,} left the roster; fetched rosters not trusted for "
-                 f"'left the roster' (empty/small/no history): {unhealthy:,}")
+                 f"{pre['left_roster']:,} left the roster (kept as a possible transfer to prison "
+                 f"after a 60+ day stay: {pre['long_stay_kept']:,}; found under a respelled first "
+                 f"name: {pre['name_variant']:,}; ambiguous: {pre['ambiguous_variant']:,}); fetched "
+                 f"rosters not trusted for 'left the roster' (empty/small/no history): {unhealthy:,}")
     return lines
 
 
@@ -350,17 +382,21 @@ async def _amain(args) -> int:
         assert len(rows) == n
         cleared = gate_stats.get("reeval_conflict_cleared", 0)
         ended = gate_stats.get("reeval_left_roster", 0)
+        restored = gate_stats.get("reeval_long_stay_restored", 0)
         print(f"\nboard rows: {n:,}; flagged {len(matched):,} leads; hydrated {hydrated}; "
               f"refused {gate_stats.get('middle_conflict_rejected', 0):,} (middle-name conflict); "
               f"re-checked {sum(v for k, v in gate_stats.items() if k.startswith('reeval_')):,}: "
-              f"cleared {cleared:,}, marked left the roster {ended:,}")
+              f"cleared {cleared:,}, marked left the roster {ended:,}, "
+              f"kept after a long stay {gate_stats.get('reeval_long_stay_kept', 0):,}, "
+              f"restored after a long stay {restored:,}")
         # A refreshed last_confirmed_on_roster date alone is not worth a whole-board write.
-        if not (matched or cleared or ended):
+        if not (matched or cleared or ended or restored):
             print("nothing matched or changed; board not rewritten.")
             return 0
         write_artifact(rows, {"notes": f"backfill_jail_rosters: {len(matched)} leads flagged, "
                                        f"{cleared} middle-name conflicts cleared, {ended} marked "
-                                       f"left the roster, from {len(usable)} county rosters"},
+                                       f"left the roster, {restored} restored after a long stay, "
+                                       f"from {len(usable)} county rosters"},
                        docs_dir=REPO / "docs")
         print(f"wrote board: {n:,} rows")
     return 0

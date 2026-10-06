@@ -230,6 +230,25 @@ Now:
     do too. The validation's "P2C publishes no middle" was its own fetcher not
     reading the field. Side effect, intended: the cross-county tier's strict
     'agrees' requirement can now be met for those vendors as well.
+
+SPELLING DRIFT + LONG STAYS (2026-10-06, HANDOFF item 79). The re-evaluation above made two
+mistakes the per-listing verifier (verification/verifiers/jail_booking.py, v2) had just been fixed
+for, and both ended an incarceration claim that was still true:
+  * it looked the stamp's person up by EXACT first + last name, so a person still on the roster
+    whose first name the vendor had respelled by a character or two (Henderson: one inserted
+    letter) read as "absent" and was marked released_or_transferred. Now, when nobody has the exact
+    name, one record with the same last name, the same booking date, the same date of birth (else
+    age) and a first name within the edit distance is the same person (middle-name rule as for an
+    exact match; two such records are 'ambiguous_variant', left as they were);
+  * it read ANY absence from a healthy roster as a release, but a county roster cannot tell a
+    release from a transfer to state prison. After a stay of jail_matching.JAIL_LONG_STAY_DAYS (60)
+    or more (booking date to last_confirmed_on_roster) the claim is kept, with roster_absence_reason
+    "possible_transfer_to_prison" on the stamp ('long_stay_kept'; a stamp an earlier run had already
+    marked ended is restored, 'long_stay_restored'). A stay under 60 days, or with no booking date
+    to measure from, is still a release.
+Both rules are jail_matching's (a neutral pure module the verifier imports too), so the stamp and
+the verifier cannot read the same roster differently. New matches stay exact-name: the variant rule
+needs the stamp's own booking date and date of birth, which a new match does not have yet.
 """
 from __future__ import annotations
 
@@ -241,12 +260,13 @@ from typing import Optional
 
 import structlog
 
-from . import jail_roster_history
+from . import jail_matching, jail_roster_history
 
 from .models import Listing
 from .enrichment_incarceration import DAC_SOURCE, SCDC_SOURCE, _name_parts, _owner_of
 from .enrichment_bop_federal import BOP_SOURCE
 from .name_normalize import party_middle_verdict
+from .signal_freshness import to_date
 # The Citizen Connect / Tyler fetchers are shared verbatim with the standalone
 # jail-bookings scraper rather than duplicated here.
 from .scrapers.national.jail_bookings import (
@@ -305,9 +325,9 @@ SEARCH_ROSTERS = [
 ]
 
 
-def _norm_key(last: str, first: str) -> tuple[str, str]:
-    return (re.sub(r"[^A-Z]", "", (last or "").upper()),
-            re.sub(r"[^A-Z]", "", (first or "").upper()))
+# The roster index key. Defined in jail_matching, the module the verifier shares, so a name is
+# normalised the same way wherever a stamp is compared with a roster.
+_norm_key = jail_matching.norm_key
 
 
 def _split_zuercher_name(name: str) -> Optional[tuple[str, str, str]]:
@@ -891,34 +911,101 @@ def _is_own_same_county_stamp(li, jbk) -> bool:
 
 # What custody_ended() (signal_freshness.py) recognises: any release_status that
 # starts with "released". "released_or_transferred" is the honest reading of a
-# name gone from a county roster -- it may be a release, a bond-out or a move to
-# state prison (which enrichment_incarceration's NC DAC / SC DOC lane covers).
+# name gone from a county roster after a SHORT stay: it may be a release or a bond-out
+# (after a long stay it may equally be a move to state prison, and then the claim is kept:
+# see _keep_after_long_stay).
 LEFT_ROSTER_STATUS = "released_or_transferred"
+
+# The stamp keys that record "gone from a healthy roster after a long stay, the claim kept". They
+# are removed again when the person is back on the roster. roster_absence_detected_at and
+# roster_absence_stay_days are written once (the first run that saw the absence), so a later run
+# does not move them.
+_ABSENCE_KEYS = ("roster_absence_reason", "roster_absence_detected_at", "roster_absence_stay_days")
+# The stamp keys that record "matched on the roster under a respelled first name" (counts and
+# basis only, never the roster's spelling).
+_VARIANT_KEYS = ("name_variant", "name_variant_edit_distance", "name_variant_basis")
+
+
+def _long_stay_days(jbk: dict, d: date) -> Optional[int]:
+    """The stay in days when an absence on `d` follows a stay of JAIL_LONG_STAY_DAYS or more
+    (jail_matching.long_stay), else None. The stay runs to the last time the person was seen on
+    the roster; a stamp from before that was recorded is bounded by `d`, or, once an earlier run
+    marked it ended, by the date it was marked (the person was gone by then), so the stay does
+    not keep growing and turn a short stay into a long one."""
+    bound = d
+    if not jbk.get("last_confirmed_on_roster") and jbk.get("left_roster_detected_at"):
+        bound = to_date(jbk["left_roster_detected_at"]) or d
+    return jail_matching.long_stay(jbk, bound)
+
+
+def _keep_after_long_stay(jbk: dict, days: int, d: date) -> str:
+    """The person is gone from a healthy roster after a stay of JAIL_LONG_STAY_DAYS or more: a
+    county roster cannot tell that from a transfer to state prison, so the incarceration claim is
+    NOT ended (jail_matching.long_stay). Records the reason on the stamp; release_status stays what
+    the roster last said. A stamp an earlier run had already marked released_or_transferred
+    (before this rule existed) is restored to in_custody: its absence was never decisive.
+    Returns 'long_stay_restored' for that case, else 'long_stay_kept'. Idempotent."""
+    restored = bool(jbk.get("left_roster_detected_at")) or jbk.get("release_status") == LEFT_ROSTER_STATUS
+    if restored:
+        jbk["release_status"] = "in_custody"
+        jbk.pop("left_roster_detected_at", None)
+    jbk["roster_absence_reason"] = jail_matching.POSSIBLE_TRANSFER
+    jbk.setdefault("roster_absence_detected_at", d.isoformat())
+    jbk.setdefault("roster_absence_stay_days", days)
+    return "long_stay_restored" if restored else "long_stay_kept"
 
 
 def _reevaluate_stamp(li: Listing, idx: dict, parts: tuple[str, str],
                       roster_complete: bool, today: Optional[date] = None) -> str:
     """Re-check an existing same-county stamp against today's roster.
 
+    The name lookup is the exact (last, first) key first; when nobody on the roster has that exact
+    name, one record that is the SAME person under a respelled first name (jail_matching.
+    spelling_variants: same last name, booking date and date of birth / age, a first name within
+    the edit distance) stands in for it, the middle-name rule applying as for an exact match; two
+    such records are ambiguous.
+
     Returns one of:
       'conflict_cleared'  the name is on today's roster but every same-name
                           record's middle name contradicts the owner's -- a
                           proven different person; stamp dropped (+ its own
                           incarceration flag under _drop_jail_match's rule).
-      'confirmed'         on today's roster; release_status/dates refreshed,
+      'confirmed'         on today's roster (under the stamp's spelling or a
+                          respelled one); release_status/dates refreshed,
                           middle_verdict + confidence re-stamped, and any
-                          earlier "left roster" marking undone (re-booked, or
-                          an earlier run's partial fetch -- this self-heals).
-      'left_roster'       absent from a roster `roster_complete` vouches for;
+                          earlier "left roster" or long-stay absence marking
+                          undone (re-booked, or an earlier run's partial fetch --
+                          this self-heals).
+      'left_roster'       absent from a roster `roster_complete` vouches for after
+                          a stay under JAIL_LONG_STAY_DAYS (or with no booking date);
                           marked ended so custody_ended() is True. The record
                           stays for history.
       'already_ended'     absent again; already marked on an earlier run.
+      'long_stay_kept'    absent from such a roster after a stay of
+                          JAIL_LONG_STAY_DAYS or more: possibly a transfer to state
+                          prison, so the claim is NOT ended; roster_absence_* keys
+                          record why (see _keep_after_long_stay).
+      'long_stay_restored' the same, for a stamp an earlier run had marked ended:
+                          restored to in_custody.
       'absent_unchecked'  absent, but the roster is not known to be complete
                           (failed / implausibly small / per-name search) --
                           left exactly as it was.
+      'ambiguous_variant' absent under the exact name and two or more records could
+                          be the same person respelled -- left exactly as it was.
     """
     jbk = li.raw["jail_booking"]
-    hit, verdict = _pick_hit(_owner_of(li), _roster_candidates(idx, _norm_key(*parts)))
+    owner = _owner_of(li)
+    d = today or datetime.now(timezone.utc).date()
+    candidates = _roster_candidates(idx, _norm_key(*parts))
+    variant = None
+    if not candidates:
+        found = jail_matching.spelling_variants(idx, jbk, parts)
+        if len(found) > 1:
+            return "ambiguous_variant"
+        if found:
+            variant = found[0]
+            candidates = [jail_matching.variant_candidate(variant, parts)]
+    hit, verdict = _pick_hit(owner, candidates)
     if hit is not None:
         if verdict == "conflict":
             _drop_jail_match(li)
@@ -934,12 +1021,20 @@ def _reevaluate_stamp(li: Listing, idx: dict, parts: tuple[str, str],
         jbk["confidence"] = _confidence_for(verdict)
         jbk["last_confirmed_on_roster"] = _today_iso(today)
         jbk.pop("left_roster_detected_at", None)
+        for key in _ABSENCE_KEYS + _VARIANT_KEYS:
+            jbk.pop(key, None)
+        if variant is not None:
+            jbk.update(name_variant=True, name_variant_edit_distance=variant["distance"],
+                       name_variant_basis=variant["basis"])
         inc = li.raw.get("incarceration")
         if isinstance(inc, dict) and inc.get("source") == f"{jbk.get('county')} County jail roster":
             inc["confidence"] = jbk["confidence"]
         return "confirmed"
     if not roster_complete:
         return "absent_unchecked"
+    days = _long_stay_days(jbk, d)
+    if days is not None:
+        return _keep_after_long_stay(jbk, days, d)
     if jbk.get("left_roster_detected_at"):
         jbk["release_status"] = LEFT_ROSTER_STATUS
         return "already_ended"
@@ -952,7 +1047,10 @@ _REEVAL_STAT = {"conflict_cleared": "reeval_conflict_cleared",
                 "confirmed": "reeval_confirmed",
                 "left_roster": "reeval_left_roster",
                 "already_ended": "reeval_already_ended",
-                "absent_unchecked": "reeval_absent_roster_unhealthy"}
+                "long_stay_kept": "reeval_long_stay_kept",
+                "long_stay_restored": "reeval_long_stay_restored",
+                "absent_unchecked": "reeval_absent_roster_unhealthy",
+                "ambiguous_variant": "reeval_ambiguous_name_variant"}
 
 
 def match_rosters(listings: list[Listing], rosters: dict,
@@ -974,7 +1072,10 @@ def match_rosters(listings: list[Listing], rosters: dict,
       * RE-EVALUATION: a listing already carrying this module's own same-county
         stamp is re-checked against today's roster instead of being skipped
         forever (see _reevaluate_stamp). "Left the roster" is applied ONLY
-        when the roster is non-empty and `healthy` per jail_roster_history.
+        when the roster is non-empty and `healthy` per jail_roster_history, and
+        never after a stay of JAIL_LONG_STAY_DAYS or more (possible transfer to
+        state prison: the claim is kept); a first name respelled by the vendor
+        is the same person (jail_matching).
 
     `stats` (optional) is incremented in place: middle_conflict_rejected,
     middle_corroborated and the reeval_* outcome counters."""

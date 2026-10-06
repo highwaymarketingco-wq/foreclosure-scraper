@@ -11,7 +11,8 @@ said in_custody for someone gone from the roster. What these pin:
     "name_only_low" exactly as before
   * an existing stamp that now conflicts is cleared, along with its own
     county-jail incarceration flag -- never an NC-DAC / SC-DOC / BOP one
-  * a stamped person missing from a HEALTHY roster is marked
+  * a stamped person missing from a HEALTHY roster after a SHORT stay (under 60
+    days; a longer one keeps the claim, 2026-10-06) is marked
     released_or_transferred (custody_ended() -> True, scorer drops it) and the
     record is kept; back on the roster later -> restored
   * a failed, empty, implausibly small or history-less roster NEVER marks
@@ -80,7 +81,10 @@ def _own_stamp(county="Cherokee", matched="CHRISTOPHER DAWKINS", **extra):
     stamp = {"county": county, "state": "SC", "matched_name": matched,
              "release_status": "in_custody", "scheduled_release": None,
              "confidence": "name_only_low", "facility_type": "jail",
-             "arrest_date": "2024-10-01"}
+             # a SHORT stay (34 days at D1): the absence tests below must read as a release. After
+             # 60 days or more an absence is a possible transfer to prison and the claim is kept
+             # (2026-10-06; tests/test_jail_stamp_variant_long_stay.py has the long-stay twins).
+             "arrest_date": "2026-09-01"}
     stamp.update(extra)
     return stamp
 
