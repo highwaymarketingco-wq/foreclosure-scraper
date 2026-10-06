@@ -57,6 +57,7 @@ from .signal_freshness import (
     owner_names_a_death,
 )
 from .verification.core import block_suppressed, qualifiers, suppressed_scorer_signals
+from .verification.verifiers._tax_common import PROPERTY_TAX
 
 log = structlog.get_logger()
 
@@ -108,7 +109,9 @@ def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
     # --- FINANCIAL ---
     if not tax_gone and _dollar((raw.get("tax_owed") or {}).get("balance")):
         out.add("recorded_debt")
-    if _truthy(raw.get("sc_tax_delinquent")):
+    # sc_tax_delinquent is the county's property-tax delinquency, so "tax_lien:property_tax" (a
+    # refuted/stale property-tax verdict, distress_score.tax_listing_drop) ends it on any row
+    if _truthy(raw.get("sc_tax_delinquent")) and PROPERTY_TAX not in qualifiers(drop, "tax_lien"):
         out.add("tax_lien")
     liens = raw.get("liens")
     if isinstance(liens, list) and liens:

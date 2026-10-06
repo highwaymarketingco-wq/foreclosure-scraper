@@ -1,11 +1,13 @@
-"""Shared pieces of the per-vendor tax_lien verifiers (tax_lien_ptscloud, tax_lien_qpaybill).
+"""Shared pieces of the tax_lien verifiers (tax_lien_buncombe, tax_lien_ptscloud,
+tax_lien_qpaybill).
 
 Private (the leading underscore keeps the registry from loading it as a verifier). Pure: no I/O.
+The scorer imports other_lien_listing() from here (stdlib-only at import time).
 
-WHICH ROWS CARRY THE PROPERTY-TAX CLAIM. The reference (tax_lien_buncombe.flagged) takes every
-row typed tax_lien plus the two derived delinquency flags. Outside Buncombe that is not safe: a
-large share of the rows typed tax_lien / tax_sale are OTHER liens that a county property-tax
-record cannot speak to, measured on the 2026-10-05 board (board_stream, read-only):
+WHICH ROWS CARRY THE PROPERTY-TAX CLAIM. The reference used to take every row typed tax_lien
+plus the two derived delinquency flags (tax_lien_buncombe v1/v2). That is not safe: a large
+share of the rows typed tax_lien / tax_sale are OTHER liens that a county property-tax record
+cannot speak to, measured on the 2026-10-05 board (board_stream, read-only):
 
     counties_sc.sc_dew_lien_registry          SC Dept. of Employment & Workforce UI-tax liens
                                               ("SC DEW UI-tax lien - balance $3,576"), 8,479
@@ -22,12 +24,20 @@ tax portal would strip a federal or state lien's signal because the PROPERTY tax
 listing-type claim from these sources is not a property-tax claim here; the row is still covered
 when it carries a property-tax claim of its own (a delinquency flag or the vendor's roll block),
 and then a refuted/stale answer is downgraded to unconfirmed (other_lien_listing) so the lien's
-listing-type signal is never removed by a property-tax record.
+listing-type signal is never removed by a property-tax record. All three verifiers apply this
+(tax_lien_buncombe since v3: 1,094 Buncombe rows typed tax_lien by liensnc / eCourts).
+
+THE SCORER SIDE (GOVERNS). The ledger is keyed by PROPERTY, so a separate board row of another
+lien on the same parcel inherits the parcel's property-tax verdict. GOVERNS therefore names the
+listing-type signals with a qualifier, "tax_lien:property_tax" / "tax_sale:property_tax" (the
+"incarceration:jail" pattern): both readers (distress_score._collect,
+enrichment_lead_signals._facet_signals) end tax_lien / tax_sale only where it comes from a
+property-tax claim, never the listing type of an other_lien_listing() row.
 """
 from __future__ import annotations
 
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Iterable, Optional
 
 #: board sources whose tax_lien / tax_sale listing type is NOT a county property-tax delinquency
@@ -42,6 +52,19 @@ NON_PROPERTY_TAX_SOURCES = frozenset({
 })
 
 TAX_LISTING_TYPES = frozenset({"tax_lien", "tax_sale"})
+
+#: the qualifier the scorer reads on tax_lien / tax_sale (module docstring, THE SCORER SIDE)
+PROPERTY_TAX = "property_tax"
+
+#: what a refuted/stale property-tax verdict takes out of scoring, the same for all three
+#: verifiers: the listing-type signals only where the row's claim is a property-tax one, the
+#: chronic-delinquency flag (Pickens' roll, property tax), and the recorded_debt credit only
+#: where the debt is the tax balance
+GOVERNS = (f"tax_lien:{PROPERTY_TAX}", f"tax_sale:{PROPERTY_TAX}", "tax_lien_chronic",
+           "recorded_debt:tax")
+
+#: verdicts the mixed-row rule downgrades
+_DOWNGRADED = frozenset({"refuted", "stale"})
 
 #: a confirmed balance under this is real but trivial (a payment shortfall); flagged, not dropped
 DE_MINIMIS = 25.0
@@ -79,8 +102,63 @@ def listing_tax_claim(row: Any) -> bool:
 
 
 def other_lien_listing(row: Any) -> bool:
-    """The row is typed tax_lien/tax_sale by a federal/state/lien-agent source (see module doc)."""
+    """The row is typed tax_lien/tax_sale by a federal/state/lien-agent source (see module doc).
+    Takes a board dict, a ledger entry's row summary or a models.Listing."""
     return ltype(row) in TAX_LISTING_TYPES and str(g(row, "source") or "") in NON_PROPERTY_TAX_SOURCES
+
+
+def other_lien_downgrade(verdict: str, ev: dict, row: Any) -> tuple[str, dict]:
+    """The mixed-row rule, one copy for every tax_lien verifier: a refuted or stale property-tax
+    answer on a row typed tax_lien/tax_sale by another lien's source is published `unconfirmed`
+    (reason other_lien_listing, the property-tax answer kept as property_tax_verdict), so a paid
+    property tax never removes that lien's signal. Anything else passes through unchanged."""
+    if verdict in _DOWNGRADED and row is not None and other_lien_listing(row):
+        return "unconfirmed", dict(ev, property_tax_verdict=verdict, reason="other_lien_listing",
+                                   listing_claim_source=g(row, "source"))
+    return verdict, ev
+
+
+def downgrade_other_lien_entries(led: Any, verifier: str, version: str, now: datetime
+                                 ) -> list[dict]:
+    """OFFLINE, no request: apply other_lien_downgrade() to the ledger entries `verifier` wrote
+    before it had the rule (tax_lien_buncombe v1/v2). An entry whose latest is that verifier's
+    refuted/stale answer on a row typed tax_lien/tax_sale by another lien's source (the entry's
+    `row` summary: the row that answer was recorded on) gets the answer the rule produces, as
+    `version`: verdict unconfirmed, the same evidence plus property_tax_verdict / reason /
+    listing_claim_source. The old latest goes to history; entry["migrated"] keeps its version,
+    verdict and checked_at. Its checked_at is `now`: ledger._better lets the newer of two
+    different-version answers win, so a merge with an older copy of the file cannot bring the
+    refuted/stale answer back. No entry is dropped. Returns one line per changed entry
+    ({key, from_verdict, from_version, source})."""
+    from ..core import iso_z         # lazy: this module stays stdlib-only at import time
+    from ..ledger import HISTORY_MAX
+    stamp = iso_z(now)
+    out = []
+    for key in sorted(led.rows):
+        e = led.rows[key]
+        lat = e.get("latest")
+        row = e.get("row")
+        if not isinstance(lat, dict) or lat.get("verifier") != verifier \
+                or lat.get("verifier_version") == version or not isinstance(row, dict):
+            continue
+        verdict, ev = other_lien_downgrade(str(lat.get("verdict") or ""),
+                                           dict(lat.get("evidence") or {}), row)
+        if verdict == lat.get("verdict"):
+            continue
+        hist = [{k: lat.get(k) for k in ("verdict", "checked_at", "verifier", "verifier_version")},
+                *(e.get("history") or [])]
+        e["history"] = hist[:HISTORY_MAX]
+        e["latest"] = dict(lat, verdict=verdict, evidence=ev, verifier_version=version,
+                           checked_at=stamp)
+        e["migrated"] = {"how": "offline: _tax_common.other_lien_downgrade, no request",
+                         "at": stamp, "from_version": lat.get("verifier_version"),
+                         "from_verdict": lat.get("verdict"),
+                         "from_checked_at": lat.get("checked_at")}
+        out.append({"key": key, "from_verdict": lat.get("verdict"),
+                    "from_version": lat.get("verifier_version"), "source": row.get("source")})
+    if out and hasattr(led, "_index"):
+        led._index = None
+    return out
 
 
 def aging_claim(row: Any) -> bool:

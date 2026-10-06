@@ -36,7 +36,7 @@ def test_attaches_the_latest_record_with_expiry_and_the_registry_governs(tmp_pat
     assert len(recs) == 1 and recs[0]["verdict"] == "refuted"
     # the module still exists: its CURRENT TTL (30 d) and GOVERNS win over the stored ones
     assert recs[0]["expires_at"] == core.iso_z(T0 + timedelta(days=30))
-    assert "tax_lien" in recs[0]["governs"] and "stored_name" not in recs[0]["governs"]
+    assert "tax_lien:property_tax" in recs[0]["governs"] and "stored_name" not in recs[0]["governs"]
     assert out["status"] == "ok" and out["rows"] == 1 and out["suppressing"] == 1
     assert out["signals"]["tax_lien"]["refuted"] == 1
 

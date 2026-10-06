@@ -83,7 +83,7 @@ VERSION = "v1"
 TTL_DAYS = 30
 RETRY_DAYS = 7
 SOURCE = "qpaybill.com"
-GOVERNS = ("tax_lien", "tax_sale", "tax_lien_chronic", "recorded_debt:tax")
+GOVERNS = tc.GOVERNS          # tax_lien:property_tax, tax_sale:property_tax, ... (_tax_common)
 ROW_SUMMARY_EXCLUDE = ("owner_name",)
 
 ROLL_SLUG = "counties_sc.qpaybill_delinquent_roll"
@@ -473,10 +473,7 @@ def public_evidence(ev: dict) -> dict:
 
 
 def _res(verdict: str, ev: dict, row: Any = None) -> VerificationResult:
-    if verdict in ("refuted", "stale") and row is not None and tc.other_lien_listing(row):
-        ev = dict(ev, property_tax_verdict=verdict, reason="other_lien_listing",
-                  listing_claim_source=tc.g(row, "source"))
-        verdict = "unconfirmed"
+    verdict, ev = tc.other_lien_downgrade(verdict, ev, row)
     return result(SIGNAL, verdict, public_evidence(ev), source=SOURCE, version=VERSION,
                   verifier=_NAME)
 

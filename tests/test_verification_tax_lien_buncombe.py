@@ -204,4 +204,4 @@ def test_a_parcel_record_that_ends_early_is_unconfirmed_not_stale():
     assert r.evidence["latest_levy_year"] == 2024
     assert r.evidence["latest_delinquent_eligible_levy"] == 2025
     assert len(f.asked) == 1
-    assert t.VERSION == "v2"
+    assert t.VERSION == "v3"         # v3: the other-lien guard (test_verification_tax_lien_other_lien)

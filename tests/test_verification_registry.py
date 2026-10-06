@@ -92,7 +92,7 @@ def test_the_real_package_holds_the_reference_verifier():
     assert "tax_lien_buncombe" in names
     v = names["tax_lien_buncombe"]
     assert v.signal == "tax_lien" and v.ttl_days == 30
-    assert "tax_lien" in v.governs and "recorded_debt:tax" in v.governs
+    assert "tax_lien:property_tax" in v.governs and "recorded_debt:tax" in v.governs
 
 
 def test_the_sc_divorce_verifier_is_a_wall_that_never_fetches():

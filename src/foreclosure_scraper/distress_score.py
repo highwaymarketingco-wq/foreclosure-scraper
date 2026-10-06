@@ -66,6 +66,7 @@ from .signal_freshness import (
 )
 from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 from .verification.core import block_suppressed, qualifiers, suppressed_scorer_signals
+from .verification.verifiers._tax_common import PROPERTY_TAX, other_lien_listing
 
 log = structlog.get_logger()
 
@@ -492,6 +493,20 @@ def _is_liensnc(li: Listing) -> bool:
     return "liensnc" in _slugs(li)
 
 
+def tax_listing_drop(li: Listing, drop: set[str]) -> set[str]:
+    """`drop` with "tax_lien" / "tax_sale" added where a "<name>:property_tax" verdict ends them
+    on THIS row: a refuted/stale county property-tax verdict (the tax_lien verifiers' GOVERNS)
+    ends the listing-type signal only when the row's tax claim is a property-tax one. A row
+    typed tax_lien/tax_sale by a federal/state/lien-agent source (an IRS or NCDOR judgment, an
+    SC DEW or DOR lien: _tax_common.other_lien_listing) keeps it. The ledger is per property, so
+    such a row on the same parcel as a paid-up roll row inherits that row's verdict, and a paid
+    property tax says nothing about the other lien. A plain "tax_lien" entry still ends it."""
+    names = {n for n in ("tax_lien", "tax_sale") if PROPERTY_TAX in qualifiers(drop, n)}
+    if names and not other_lien_listing(li):
+        return set(drop) | names
+    return drop
+
+
 def _is_county_owned_inventory(li: Listing) -> bool:
     """Forfeited-land / FLC inventory: the county already holds title, so the 'delinquent
     owner' the tax_sale weight assumes no longer exists (F10)."""
@@ -667,7 +682,7 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     # Per-listing verification (verification/, docs/HANDOFF.md item 66): a non-expired refuted
     # or stale verdict removes the scorer signals its record governs, at the end of this
     # function. "recorded_debt:tax" is the partial rule read in the debt block below.
-    drop = suppressed_scorer_signals(r, today)
+    drop = tax_listing_drop(li, suppressed_scorer_signals(r, today))
 
     # ---- the listing-type signal ---------------------------------------------------
     override = None
