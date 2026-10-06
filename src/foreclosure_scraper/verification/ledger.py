@@ -125,9 +125,34 @@ class Ledger:
                 c[v] += 1
         return c
 
+    def scrub_notice_text(self) -> dict:
+        """Remove foreclosure-notice text from this ledger: it is public, and such text names
+        private people (core._NOTICE_TEXT). An entry whose primary key carries it is dropped (the
+        next sweep re-creates it under its case or parcel key); from the others the notice-text
+        keys and the notice-text street_address are removed. Returns what it removed."""
+        from .core import has_notice_text, looks_like_address
+        gone = [k for k in self.rows if has_notice_text(k)]
+        for k in gone:
+            del self.rows[k]
+        keys_dropped = addr_dropped = 0
+        for e in self.rows.values():
+            ks = e.get("keys")
+            if isinstance(ks, list):
+                kept = [x for x in ks if not has_notice_text(x)]
+                keys_dropped += len(ks) - len(kept)
+                e["keys"] = kept
+            row = e.get("row")
+            if isinstance(row, dict) and "street_address" in row and not looks_like_address(row["street_address"]):
+                del row["street_address"]
+                addr_dropped += 1
+        if gone or keys_dropped or addr_dropped:
+            self._index = None
+        return {"entries": len(gone), "keys": keys_dropped, "street_addresses": addr_dropped}
+
     def save(self, path: Optional[Path] = None, *, host: Optional[str] = None,
              now: Optional[datetime] = None) -> Path:
         """Atomic write, one entry per line, sorted."""
+        self.scrub_notice_text()
         p = Path(path or self.path or ledger_path(self.signal))
         p.parent.mkdir(parents=True, exist_ok=True)
         head = {"schema": SCHEMA, "kind": KIND, "signal": self.signal,

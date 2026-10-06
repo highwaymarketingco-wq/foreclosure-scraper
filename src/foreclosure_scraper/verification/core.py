@@ -165,6 +165,28 @@ def _get(row: Any, k: str) -> Any:
     return row.get(k) if isinstance(row, dict) else getattr(row, k, None)
 
 
+#: Text that appears in a foreclosure NOTICE and never in a street address. Some sources put the
+#: first sentence of a notice in street_address ("Under and by virtue of the power of sale
+#: contained in a certain Deed of Trust made by <names> ..."), and a ledger key or row summary
+#: built from it would publish those people's names in the public ledger (found 2026-10-06:
+#: 5 foreclosure_rod entries; two named private individuals).
+_NOTICE_TEXT = re.compile(
+    r"deed of trust|power of sale|made by|in the matter|virtue of|pursuant to|substitute trustee|"
+    r"notice of (?:sale|foreclosure)|foreclos", re.I)
+MAX_ADDRESS_CHARS = 90
+
+
+def looks_like_address(value: Any) -> bool:
+    """True when `value` can be a street address: non-empty, short, and not notice text."""
+    s = str(value or "").strip()
+    return bool(s) and len(s) <= MAX_ADDRESS_CHARS and not _NOTICE_TEXT.search(s)
+
+
+def has_notice_text(value: Any) -> bool:
+    """True when `value` (a ledger key, a row summary field) carries notice text."""
+    return bool(_NOTICE_TEXT.search(str(value or "")))
+
+
 def row_keys(row: Any) -> list[str]:
     """Every property-identity key the row has, strongest first; the first is row_key().
 
@@ -189,7 +211,7 @@ def row_keys(row: Any) -> list[str]:
     if p and (st or co):
         out.append(f"parcel:{st}:{co}:{p}")
     a = _normalize_addr(_get(row, "street_address"))
-    if a and (st or co) and _house_numbered(a):
+    if a and (st or co) and _house_numbered(a) and looks_like_address(_get(row, "street_address")):
         out.append(f"addr:{st}:{co}:{a}")
     c = _normalize_case(_get(row, "case_number"))
     if c and co:
@@ -312,6 +334,8 @@ def row_summary(row: Any) -> dict:
     """The few fields a ledger entry keeps so a human can read it without the board."""
     out = {k: _get(row, k) for k in ("state", "county", "parcel_id", "street_address",
                                      "listing_type", "source", "owner_name")}
+    if not looks_like_address(out.get("street_address")):
+        out["street_address"] = None   # notice text in the address field: never published
     return {k: v for k, v in out.items() if v not in (None, "")}
 
 
