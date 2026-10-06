@@ -519,6 +519,7 @@ def test_case_identity_per_claim_on_board_dicts_and_listings():
     assert fr.case_identity(sp) == fr.case_identity(li) == fr.case_identity({**sp, "case_number": "22sp000481 100"})
     assert fr.case_identity(sp).startswith("fcrod:") and "481" not in fr.case_identity(sp)
     nod = {"state": "NC", "county": "Buncombe", "source": "counties.nod_discovery", "case_number": "6627/112",
+           "listing_type": "lis_pendens",
            "raw": {"nod": {"county": "Buncombe", "book": "6627", "page": "112"}}}
     other = {**nod, "raw": {"nod": {"county": "Cleveland", "book": "6627", "page": "112"}}}
     assert fr.case_identity(nod) != fr.case_identity(other)            # the recording county counts
@@ -529,3 +530,12 @@ def test_case_identity_per_claim_on_board_dicts_and_listings():
     b = v.ledger_keys({**sp, "parcel_id": "9701412633", "street_address": "16 Overlook Drive"})
     c = v.ledger_keys({**sp, "case_number": "26SP000061-100", "parcel_id": "9701412633"})
     assert a[0] == b[0] and a[0] != c[0]
+
+
+def test_case_identity_is_none_for_rows_it_does_not_cover():
+    """The case-scope migration and the VM's apply ask every board row: only this verifier's
+    claims may name a case (a case id for every row kept the whole board in memory)."""
+    assert fr.case_identity({"state": "NC", "county": "Buncombe", "listing_type": "tax_lien",
+                             "case_number": "26CV1"}) is None
+    assert fr.case_identity(Listing(source="s", source_url="https://x/y", listing_type=ListingType.AUCTION,
+                                    state="NC", county="Buncombe")) is None

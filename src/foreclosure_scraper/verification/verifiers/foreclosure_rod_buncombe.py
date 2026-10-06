@@ -231,6 +231,8 @@ def case_identity(row: Any) -> Optional[str]:
     d = row if isinstance(row, dict) else {k: getattr(row, k, None) for k in _ID_FIELDS}
     lt = d.get("listing_type")
     lt = getattr(lt, "value", lt)
+    if not applies({**d, "listing_type": lt}):
+        return None          # not a claim of this verifier's (the migration and apply ask every row)
     raw = d.get("raw") if isinstance(d.get("raw"), dict) else {}
     nod = raw.get("nod") if isinstance(raw.get("nod"), dict) else {}
     if nod.get("book") and nod.get("page"):
