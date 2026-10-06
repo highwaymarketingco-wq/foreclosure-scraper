@@ -467,7 +467,14 @@ class Listing(BaseModel):
         # Multi-source attribution — keep EVERY source AND its link so the operator can open each
         # source for one property (e.g. ROD + assessor + law-firm), instead of hunting them down
         # by hand. Stored as {source, url} dicts; the primary stays on source/source_url.
-        seen = [d for d in (out.raw.get("also_seen_in") or []) if isinstance(d, dict)]
+        #
+        # Start from SELF's list, not out.raw's (fixed 2026-10-06). _deep_merge_dict lets the
+        # other side's leaf win, and also_seen_in is a list leaf, so out.raw held only OTHER's
+        # list whenever other had one: every row self had already absorbed vanished from the
+        # attribution. A group merged one row at a time (dedupe, merge_prior_board) lost its
+        # earlier members' sources and links as soon as it took in a row that carried its own
+        # list, and with them the only trace of those rows (2026-10-05 VM run audit).
+        seen: list[dict] = []
 
         def _add(src, url):
             if not url or url == out.source_url:
@@ -475,6 +482,11 @@ class Listing(BaseModel):
             if not any(d.get("url") == url for d in seen):
                 seen.append({"source": src, "url": url})
 
+        for d in ((self.raw or {}).get("also_seen_in") or []):
+            # self's own entries are kept as they are (as before, when other had no list)
+            if isinstance(d, dict) and not (d.get("url")
+                                            and any(e.get("url") == d.get("url") for e in seen)):
+                seen.append(d)
         _add(other.source, other.source_url)
         for d in (other.raw.get("also_seen_in") or []):
             if isinstance(d, dict):

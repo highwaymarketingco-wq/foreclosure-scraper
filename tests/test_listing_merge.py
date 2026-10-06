@@ -149,6 +149,38 @@ def test_merge_preserves_already_seen_in():
     assert "src.c" in seen_srcs and "https://c.example/3" in seen_urls
 
 
+def test_merge_keeps_self_attribution_when_other_has_its_own_list():
+    """2026-10-06: _deep_merge_dict lets other's list leaf win, so (a+b).merge(c+d) used to
+    keep only c's list: b vanished from the attribution, and with it the only trace that b had
+    been folded in (the 2026-10-05 run audit found prior rows with no trace anywhere). Shapes
+    from that run: eCourts lis pendens rows, one link per case."""
+    u = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber="
+    src = "counties_nc.nc_ecourts_lis_pendens"
+    a = _li(source=src, source_url=u + "26M000535-640")
+    b = _li(source=src, source_url=u + "26M000545-640")
+    c = _li(source=src, source_url=u + "26M000752-640")
+    d = _li(source="nc_ecourts_judgments", source_url=u + "26M000777-640")
+    ab, cd = a.merge(b), c.merge(d)
+    assert cd.raw.get("also_seen_in")             # precondition: other carries its own list
+    merged = ab.merge(cd)
+    urls = [e["url"] for e in merged.raw["also_seen_in"]]
+    assert urls == [u + "26M000545-640", u + "26M000752-640", u + "26M000777-640"]
+    assert {e["source"] for e in merged.raw["also_seen_in"]} == {src, "nc_ecourts_judgments"}
+    # merging the same group again adds nothing
+    assert [e["url"] for e in merged.merge(cd).raw["also_seen_in"]] == urls
+
+
+def test_merge_keeps_self_entries_verbatim_and_never_lists_the_primary_link():
+    a = _li(source="src.a", source_url="https://a.example/1",
+            raw={"also_seen_in": [{"source": "src.b", "url": "https://b.example/2", "note": "x"}]})
+    c = _li(source="src.c", source_url="https://c.example/3",
+            raw={"also_seen_in": [{"source": "src.a", "url": "https://a.example/1"},
+                                  {"source": "src.b", "url": "https://b.example/2"}]})
+    seen = a.merge(c).raw["also_seen_in"]
+    assert seen[0] == {"source": "src.b", "url": "https://b.example/2", "note": "x"}
+    assert [e["url"] for e in seen] == ["https://b.example/2", "https://c.example/3"]
+
+
 def test_merge_does_not_duplicate_source_in_also_seen():
     """Merging the same scraper twice (e.g. two separate scrape runs
     of the same source) doesn't pile up duplicate also_seen entries."""
