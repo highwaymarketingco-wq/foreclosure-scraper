@@ -502,3 +502,30 @@ def test_scoring(lt, verdict, kept):
     names = {n for n, _c, _w in ds._signals_for(_row(lt, [_vrec(verdict)]), today=TODAY)}
     assert (lt.value in names) is kept
     assert lt.value in {n for n, _c, _w in ds._signals_for(_row(lt), today=TODAY)}
+
+
+# ---------------------------------------------------------------------------------------------
+# case-scoped identity
+# ---------------------------------------------------------------------------------------------
+
+def test_case_identity_per_claim_on_board_dicts_and_listings():
+    v = next(v for v in discover() if v.signal == "foreclosure_rod")
+    assert v.identity == "case"
+    sp = {"state": "NC", "county": "Buncombe", "source": "law_firms.hutchens",
+          "listing_type": "foreclosure_sale", "case_number": "22SP000481-100"}
+    li = Listing(source="law_firms.hutchens", source_url="https://x/y",
+                 listing_type=ListingType.FORECLOSURE_SALE, state="NC", county="Buncombe",
+                 case_number="22SP000481-100")
+    assert fr.case_identity(sp) == fr.case_identity(li) == fr.case_identity({**sp, "case_number": "22sp000481 100"})
+    assert fr.case_identity(sp).startswith("fcrod:") and "481" not in fr.case_identity(sp)
+    nod = {"state": "NC", "county": "Buncombe", "source": "counties.nod_discovery", "case_number": "6627/112",
+           "raw": {"nod": {"county": "Buncombe", "book": "6627", "page": "112"}}}
+    other = {**nod, "raw": {"nod": {"county": "Cleveland", "book": "6627", "page": "112"}}}
+    assert fr.case_identity(nod) != fr.case_identity(other)            # the recording county counts
+    no_case = {"state": "NC", "county": "Buncombe", "source": "national.distressed", "listing_type": "lis_pendens"}
+    assert fr.case_identity(no_case) and fr.case_identity(no_case) != fr.case_identity({**no_case, "source": "x"})
+    # two claims on one parcel are two ledger entries; one claim on two rows of a parcel is one
+    a = v.ledger_keys({**sp, "parcel_id": "9701412633"})
+    b = v.ledger_keys({**sp, "parcel_id": "9701412633", "street_address": "16 Overlook Drive"})
+    c = v.ledger_keys({**sp, "case_number": "26SP000061-100", "parcel_id": "9701412633"})
+    assert a[0] == b[0] and a[0] != c[0]

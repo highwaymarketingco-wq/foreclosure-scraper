@@ -110,6 +110,13 @@ Buncombe rows on 2026-10-06), auction (servicelink trustee AND REO auctions: a b
 is expected to follow a trustee deed, and suppressing it would be wrong) and court_sale /
 upset_bid (their own dates already end them) are not governed.
 
+IDENTITY "case" (registry contract, 2026-10-06): the ledger is keyed by the claim (case_identity:
+the cited ROD instrument, else the case number, else the source's claim) plus the property, so
+two foreclosure claims on one parcel get two verdicts. The checks read the parcel's chain either
+way; the scoping matters for the claim-specific answers: a resolver that put another county's
+foreclosure notice on a Buncombe parcel (refuted) must not end a real foreclosure listing of the
+same parcel, nor a claim person's old conveyance end the current owner's case.
+
 SIGNAL "foreclosure_rod", not "lis_pendens": the human lane writes its eCourts verdicts to
 docs/handoff/verification/lis_pendens.json; sharing that ledger would let a ROD re-check
 (is_due: "checked by another verifier") overwrite a human's court-record verdict. Separate
@@ -146,6 +153,7 @@ RETRY_DAYS = 7
 SOURCE = "registerofdeeds.buncombenc.gov"
 GOVERNS = ("lis_pendens", "foreclosure_sale")
 ROW_SUMMARY_EXCLUDE = ("owner_name",)
+IDENTITY = "case"      # one verdict per foreclosure claim and property (case_identity)
 
 LISTING_TYPES = ("lis_pendens", "foreclosure_sale")
 
@@ -208,6 +216,28 @@ def applies(row: dict) -> bool:
 
 
 _CASE = re.compile(r"^\s*(\d{2})\s*(SP|CVS|CVD|CV|M|E|SPS)\s*0*(\d+)", re.I)
+_ID_FIELDS = ("state", "county", "source", "listing_type", "case_number", "raw")
+
+
+def case_identity(row: Any) -> Optional[str]:
+    """The foreclosure claim this row makes, as a hashed core.case_id ("fcrod:<16 hex>"; keys
+    are public and a refuted claim is about someone else). The row's own cited ROD instrument
+    (raw.nod: its county and book/page), else its case number (an SP / CV file number, a
+    listing site's id) with state and county, else the source's claim on this property (the
+    ledger key adds the property). Two claims on one parcel are two verdicts: a refutation
+    about one (a cited instrument from another county, a person who conveyed the parcel years
+    before) never ends another. Works on a board dict and on a models.Listing (the VM)."""
+    from ..core import case_id
+    d = row if isinstance(row, dict) else {k: getattr(row, k, None) for k in _ID_FIELDS}
+    lt = d.get("listing_type")
+    lt = getattr(lt, "value", lt)
+    raw = d.get("raw") if isinstance(d.get("raw"), dict) else {}
+    nod = raw.get("nod") if isinstance(raw.get("nod"), dict) else {}
+    if nod.get("book") and nod.get("page"):
+        return case_id("fcrod", "rod", nod.get("county") or d.get("county"), nod["book"], nod["page"])
+    if str(d.get("case_number") or "").strip():
+        return case_id("fcrod", d.get("state"), d.get("county"), d.get("case_number"))
+    return case_id("fcrod", "src", d.get("source"), lt)
 
 
 def to_date(v: Any) -> Optional[date]:
