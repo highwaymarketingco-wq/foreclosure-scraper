@@ -1,4 +1,9 @@
-"""Flip leads are only in the 18 footprint counties; distress leads are anywhere in NC and SC.
+"""Flip leads are only in the 18 footprint counties (plus, since 2026-10-06, a coastal-county flip that
+is no more than a 5 minute drive from the beach); distress leads are anywhere in NC and SC.
+
+The coastal exception is pinned in tests/test_flip_beach_drive.py. Here: nothing but that exception
+shelters a coastal flip. The coastal-source bypass, the oceanfront tag/keyword override and downtown
+Charleston still do not.
 
 The owner's rule, 2026-09-15: "if its a flip, its only in the counties we talked about. if its
 a distressed property its anywhere in nc and sc." It was wired into two places in main.py while
@@ -34,11 +39,27 @@ def _lead(lt, county="Charleston", state="SC", source=COASTAL_SOURCE, **kw) -> L
                    county=county, state=state, street_address="1 Main St", raw=kw.pop("raw", {}), **kw)
 
 
+# a point about 12 km inland of the Charleston County coast (Ravenel area): the coastal source and the
+# coastal county shelter nothing, the beach-drive rule fails it
+INLAND = dict(latitude=32.785, longitude=-80.236)
+
+
 @pytest.mark.parametrize("lt", FLIP_TYPES)
 def test_a_coastal_flip_through_the_coastal_source_bypass_is_rejected(lt):
-    li = _lead(lt)
+    li = _lead(lt, **INLAND)
     assert _flip_outside_footprint(li) is True
     assert _in_scope(li) is False
+
+
+@pytest.mark.parametrize("lt", FLIP_TYPES)
+def test_a_coastal_flip_with_no_point_yet_is_provisional_never_admitted_outright(lt):
+    """The scope gate runs before geocoding, so a street-only row waits for a point; the bypass source
+    does not admit it, and it is not tagged as an admitted coastal row."""
+    li = _lead(lt)
+    assert _flip_outside_footprint(li) is True            # the post-enrichment view: nothing to measure
+    assert _in_scope(li) is True                           # the ingest view: provisional
+    assert li.raw.get("oceanfront_pending") is True
+    assert not li.raw.get("coastal_county") and not li.raw.get("oceanfront")
 
 
 @pytest.mark.parametrize("lt", DISTRESS_TYPES)
@@ -55,14 +76,19 @@ def test_a_coastal_tax_lien_is_admitted_and_tagged_as_a_coastal_county_row():
 
 
 def test_the_oceanfront_override_no_longer_admits_a_flip():
-    """A beach-town REO: keyword + street pass the 2-of-3 test, county is coastal."""
+    """A beach-town REO: keyword + street pass the 2-of-3 test, county is coastal. The keyword+street
+    heuristic admits no flip any more: with no point it is only provisional and untagged; the point decides."""
     kw = dict(description="True oceanfront 3br", street_address="123 N Lumina Ave",
               city="Wrightsville Beach")
     flip = Listing(source="national.fannie_homepath", source_url="https://x", listing_type=ListingType.REO,
                    county="New Hanover", state="NC", raw={}, **kw)
     assert ("New Hanover", "NC") in OCEANFRONT_COASTAL_COUNTIES
-    assert _in_scope(flip) is False
-    assert not flip.raw.get("oceanfront"), "a rejected flip must not be tagged as an admitted oceanfront row"
+    assert _in_scope(flip) is True and flip.raw.get("oceanfront_pending") is True
+    assert not flip.raw.get("oceanfront"), "a provisional flip must not be tagged as an admitted oceanfront row"
+    inland = Listing(source="national.fannie_homepath", source_url="https://x", listing_type=ListingType.REO,
+                     county="New Hanover", state="NC", latitude=34.2020, longitude=-77.8900, raw={}, **kw)
+    assert _in_scope(inland) is False, "the keyword and street do not outvote a point 4.9 km from the ocean"
+    assert not inland.raw.get("oceanfront")
     tax = Listing(source="counties_nc.nc_coastal_tax_foreclosure", source_url="https://x",
                   listing_type=ListingType.TAX_LIEN, county="New Hanover", state="NC", raw={}, **kw)
     assert _in_scope(tax) is True

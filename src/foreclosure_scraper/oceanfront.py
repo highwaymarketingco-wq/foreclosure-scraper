@@ -16,8 +16,10 @@ Signals
    the Atlantic Ocean shoreline polyline. The polyline runs from
    Currituck OBX south to Hilton Head, ocean-facing edges only (sound
    sides excluded — a property on Hilton Head's Calibogue Sound side
-   is NOT oceanfront). 150m default accommodates typical oceanfront
-   lot depth (~80-100m) plus geocoder centroid drift.
+   is NOT oceanfront). The 250 m default (150 m before 2026-06-22)
+   accommodates typical oceanfront lot depth (~80-100m) plus geocoder
+   centroid drift. NB the precise OSM shoreline used for the distance is
+   the nearest SHORE, not only the open ocean (see flip_near_beach).
 
 3. **Street whitelist** — the street_address sits on a known
    first-row oceanfront street. Manually curated list per beach town;
@@ -26,6 +28,16 @@ Signals
 Implementation note: the geofence uses local-Euclidean distance after
 converting lat/lng to meter offsets from a reference latitude. Accuracy
 is sub-meter over our coast (32°-36° N), no shapely dependency needed.
+
+Two different bars live in this module, and they must not be confused:
+
+* ``OCEANFRONT_DISTANCE_M`` (250 m) is the TRUE-BEACHFRONT bar behind
+  ``is_oceanfront`` and the ``raw.oceanfront`` tag ("on the beach or a couple
+  of blocks back", owner direction 2026-06-22). It is unchanged.
+* ``FLIP_COASTAL_MAX_M`` is the FLIP admission bar, ``flip_near_beach``: the
+  owner's rule of 2026-10-06 for a flip (a scheduled foreclosure / sheriff / HOA
+  sale, an auction or an REO) in a coastal county is "nothing more than a 5
+  minute drive to the beach". Distress leads are statewide and never see it.
 """
 from __future__ import annotations
 
@@ -38,8 +50,30 @@ from .coastal_geofilter import distance_to_ocean_m as _precise_ocean_dist
 
 # Distance threshold for the geofence signal (meters). 250m ≈ "on the beach or
 # within 2-3 blocks" (owner direction 2026-06-22), superseding the old 150m
-# "immediate oceanfront" bar. Measured against the real OSM ocean shoreline.
+# "immediate oceanfront" bar. Measured against the OSM shoreline. This is the bar
+# for the TRUE-beachfront tag (raw.oceanfront), NOT the flip admission bar: a flip
+# is admitted out to FLIP_COASTAL_MAX_M (below), the owner's "5 minute drive".
 OCEANFRONT_DISTANCE_M = 250.0
+
+# FLIP admission bar (owner, 2026-10-06: "nothing more than a 5 minute drive to the
+# beach", confirmed as "5 minute drive"), as a straight line to the shore.
+#   5 min at a 25 mph beach-town average (stops, lights, summer traffic) = 2.08 mi =
+#   3.35 km of road; roads run about 1.3x the straight line, so 3.35 / 1.3 = 2.6 km.
+#   (30 mph would give 3.1 km; 20 mph 2.1 km.) It is a hard cap, so the lower end of
+#   that range is used and rounded down: 2,500 m. One constant, change it here.
+FLIP_COASTAL_MAX_M = 2500.0
+
+# distance_to_ocean_m reads the OSM `natural=coastline`, and that line is NOT only the
+# open ocean: it also runs along Charleston Harbor, the Newport / White Oak rivers
+# (Morehead City, Swansboro), Roanoke Sound (Manteo) and the Pamlico / Currituck sound
+# shores. Measured 2026-10-06: the Charleston Battery is 123 m from it, Morehead City
+# downtown 237 m, Swansboro 118 m, Manteo 1.5 km, and 82% of its 30,416 points lie more
+# than 1 km from the curated ocean-facing polyline below. At 250 m that was a nuisance;
+# at 2.5 km it would admit every harbor, river and sound front property as "near the
+# beach". So a flip must ALSO be near the curated OCEAN-FACING polyline, within this
+# slack (the polyline is coarse: measured up to about 1.7 km off a real shore between its
+# vertices, e.g. Surf City, so a genuine lot 2+ km back there can fail on the guard; that is the safe side).
+OCEAN_FACING_SLACK_M = 1000.0
 
 
 # Keywords in description / source text that mean "true oceanfront" in
@@ -315,8 +349,9 @@ def is_oceanfront(*, description: str | None = None,
             geo_dist = None
     hits = sum((kw, st, geo))
     # When we have PRECISE coordinates, distance is AUTHORITATIVE — the owner's
-    # rule is "on the beach or within 2-3 blocks, hard pass on anything outside,"
-    # which is purely a distance test. So a listing with real coords passes iff
+    # true-beachfront rule (2026-06-22) is "on the beach or within 2-3 blocks, hard pass
+    # on anything outside," which is purely a distance test (a FLIP is admitted by
+    # flip_near_beach instead, owner 2026-10-06). So a listing with real coords passes iff
     # it's within the threshold of the true ocean shoreline, regardless of
     # keyword/street (a 'beachfront!' listing a mile inland must still fail).
     # Without coords we fall back to the 2-of-3 keyword/street heuristic.
@@ -331,4 +366,48 @@ def is_oceanfront(*, description: str | None = None,
         "geo_distance_m": round(geo_dist, 1) if geo_dist is not None else None,
         "geo_precise": geo_precise,
         "hits": hits,
+    }
+
+
+def flip_near_beach(latitude: float | None, longitude: float | None, raw: dict | None = None,
+                    *, max_m: float = FLIP_COASTAL_MAX_M) -> tuple[bool | None, dict]:
+    """The flip rule (owner 2026-10-06): is this point no more than a 5 minute drive from the
+    open-ocean beach, taken as ``max_m`` metres in a straight line?
+
+    Returns ``(True | False, signals)`` when the point can be measured, ``(None, {})`` when it
+    cannot: no coordinates, a value that is not a coordinate, or a point the row itself flags
+    as a shared fallback (``raw['geo_imprecise']`` other than a real-address geocode, a
+    named-complex city centroid), which stands for no place and so proves nothing in either
+    direction.
+
+    A point passes only when BOTH hold:
+      * the OSM shoreline is within ``max_m`` (``distance_m``), and
+      * the curated OCEAN-FACING polyline is within ``max_m + OCEAN_FACING_SLACK_M``
+        (``ocean_facing_m``), which rules out a harbor, river or sound front lot whose nearest
+        OSM shore is not the ocean (see OCEAN_FACING_SLACK_M).
+    Unlike ``is_oceanfront`` there is no keyword or street test here: with a point, distance
+    decides, so a "beachfront" listing 8 km inland fails.
+    """
+    if latitude is None or longitude is None:
+        return None, {}
+    try:
+        lat, lng = float(latitude), float(longitude)
+    except (TypeError, ValueError):
+        return None, {}
+    if not (math.isfinite(lat) and math.isfinite(lng)) or not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None, {}
+    from .enrichment_geocode import imprecise_point_flag   # lazy: it pulls the http client
+    if imprecise_point_flag(raw):
+        return None, {}
+    shore = _precise_ocean_dist(lat, lng)
+    facing = distance_to_shoreline_m(lat, lng)
+    precise = shore is not None
+    if shore is None:              # bundled coastline asset unavailable: the curated polyline alone
+        shore = facing
+    ok = shore <= max_m and facing <= max_m + OCEAN_FACING_SLACK_M
+    return ok, {
+        "distance_m": round(shore, 1),
+        "ocean_facing_m": round(facing, 1),
+        "max_m": max_m,
+        "geo_precise": precise,
     }

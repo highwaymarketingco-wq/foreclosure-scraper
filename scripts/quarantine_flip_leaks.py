@@ -4,6 +4,9 @@
 OWNER RULE (2026-09-15, main._FLIP_LISTING_TYPES): a FLIP (foreclosure_sale, auction, sheriff_sale,
 hoa_sale, reo: something you could bid on or buy today) is only in the 18 footprint counties
 (config.SC_COUNTIES + NC_COUNTIES). A distressed LEAD (tax, lien, probate ...) is anywhere in NC+SC.
+ONE EXCEPTION (owner, 2026-10-06): a flip in a coastal county that is no more than a 5 minute drive
+from the beach (a trusted point within oceanfront.FLIP_COASTAL_MAX_M of the ocean, main._flip_beach_check)
+is wanted, so it is NOT a leak and is not stamped (a stamp left on one earlier is cleared).
 
 Audit 2026-09-21 section 9: 102 flip rows sit outside the 18 counties (Charleston 33, Pender 24,
 Georgetown 15, Dare 11, Onslow 7, Carteret 6 ...) plus 21 REO rows with no county. WHY THEY GOT IN is
@@ -36,16 +39,35 @@ from _dq_common import (FLIP_TYPES, footprint, iter_rows, lt_str, norm_county,  
 STAMP = "flip_outside_footprint"
 
 
-def flip_verdict(state, county, listing_type, footprint_set=None) -> str:
+def _beach_drive_ok(state, county, lat, lng, raw) -> bool:
+    """A coastal-county flip the owner's beach-drive rule admits (a trusted point within
+    oceanfront.FLIP_COASTAL_MAX_M of the ocean). Needs a point; without one it is False."""
+    if lat is None or lng is None:
+        return False
+    try:
+        from foreclosure_scraper import main as M
+        from foreclosure_scraper.oceanfront import flip_near_beach
+    except Exception:  # noqa: BLE001
+        return False
+    key = (norm_county(county).title(), str(state or "").upper())
+    if key not in M.OCEANFRONT_COASTAL_COUNTIES:
+        return False
+    return flip_near_beach(lat, lng, raw if isinstance(raw, dict) else None)[0] is True
+
+
+def flip_verdict(state, county, listing_type, footprint_set=None, lat=None, lng=None, raw=None) -> str:
     """'leak' (a flip whose county is known and is outside the footprint), 'in_footprint',
-    'no_county' (a flip we cannot judge), or 'not_flip'."""
+    'near_beach' (a coastal-county flip within the beach-drive cutoff, owner 2026-10-06: not a
+    leak), 'no_county' (a flip we cannot judge), or 'not_flip'."""
     if lt_str(listing_type) not in FLIP_TYPES:
         return "not_flip"
     c = norm_county(county)
     if not c or c.lower() == "statewide":
         return "no_county"
     fp = footprint_set if footprint_set is not None else footprint()
-    return "in_footprint" if (str(state or "").upper(), c.lower()) in fp else "leak"
+    if (str(state or "").upper(), c.lower()) in fp:
+        return "in_footprint"
+    return "near_beach" if _beach_drive_ok(state, county, lat, lng, raw) else "leak"
 
 
 def admission_path(source, state, county, lat, lng, city) -> str:
@@ -100,7 +122,8 @@ def _dry_run(rows_file=None, derive=True, board_agg=None) -> int:
         n += 1
         if ev is not None and not board_agg and norm_county(r.get("county")):
             ev.add_board_row(r.get("state"), r.get("county"), r.get("zip_code"), r.get("city"))
-        v = flip_verdict(r.get("state"), r.get("county"), r.get("listing_type"), fp)
+        v = flip_verdict(r.get("state"), r.get("county"), r.get("listing_type"), fp,
+                         r.get("latitude"), r.get("longitude"), r.get("raw"))
         stamped = (r.get("raw") or {}).get("scope") == STAMP
         if v != "not_flip":
             flips += 1
@@ -165,7 +188,7 @@ def apply_rows(rows: list, *, dry_run: bool = False, derive_county: bool = False
         ev = B.build_evidence(rows)
     c: Counter = Counter()
     for li in rows:
-        v = flip_verdict(li.state, li.county, li.listing_type, fp)
+        v = flip_verdict(li.state, li.county, li.listing_type, fp, li.latitude, li.longitude, li.raw)
         leak = v == "leak"
         if v == "no_county":
             d = _derive_county(ev, li.state, li.zip_code, li.city, li.parcel_id) if ev is not None else None
@@ -183,7 +206,7 @@ def apply_rows(rows: list, *, dry_run: bool = False, derive_county: bool = False
                         li.raw = raw = {}
                     raw["scope"] = STAMP
         elif stamped:
-            c["stamp cleared (now in footprint or not a flip)"] += 1
+            c["stamp cleared (now in footprint, near the beach, or not a flip)"] += 1
             if not dry_run:
                 raw.pop("scope", None)
     assert len(rows) == n, "a quarantine must never change the row count"

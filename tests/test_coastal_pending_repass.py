@@ -4,10 +4,11 @@ THE BUG THIS PINS (found 2026-10-06, on the 2026-10-05 VM run)
     _in_scope() tags a coastal-county row that has an address or parcel but no coordinates
     yet (raw.oceanfront_pending). After geocoding, the re-pass in run() re-tested it and
     DROPPED every row that was not within a few hundred metres of the Atlantic or on the
-    Charleston peninsula. Only distress leads can carry that tag (a flip outside the 18
-    footprint counties is rejected before the coastal checks, and no coastal county is in
-    the footprint), and a distress lead is in scope in any NC or SC county (owner rule of
-    2026-09-15, config.in_scope_distressed). The same inland lead was KEPT when it arrived
+    Charleston peninsula. Only distress leads could carry that tag then (a flip outside the 18
+    footprint counties was rejected before the coastal checks, and no coastal county is in
+    the footprint; since 2026-10-06 a coastal flip can carry it too and the re-pass applies the
+    5 minute drive to it, see tests/test_flip_beach_drive.py), and a distress lead is in scope in
+    any NC or SC county (owner rule of 2026-09-15, config.in_scope_distressed). The same inland lead was KEPT when it arrived
     with coordinates. On the 10/5 run the pass dropped 9,840 rows, e.g. every
     nc_heir_estate_parcels row in Brunswick (77), Carteret (61) and Charleston (73 scraped,
     68 published before, 0 after), and qpaybill Colleton fell from 1,198 to 587.
@@ -106,11 +107,16 @@ def test_a_provisional_flip_inland_still_drops():
     assert _resolve_coastal_pending(li) is False
 
 
-def test_a_coastal_flip_is_rejected_at_ingest_so_only_distress_rows_are_provisional():
+def test_a_coastal_flip_with_an_address_is_provisional_and_the_repass_decides_it():
+    """Since 2026-10-06 (owner: a flip is wanted within a 5 minute drive of the beach) a coastal flip with
+    a street waits for its point like a distress row; the re-pass then applies the beach-drive cutoff,
+    which a distress row never meets (see tests/test_flip_beach_drive.py)."""
     li = _lead("law_firms.example", "Brunswick", "NC", ListingType.FORECLOSURE_SALE,
                street_address="10 Main St")
-    assert _in_scope(li) is False
-    assert not li.raw.get("oceanfront_pending")
+    assert _in_scope(li) is True
+    assert li.raw.get("oceanfront_pending") is True
+    li.latitude, li.longitude = 34.06, -78.23          # geocoded well inland
+    assert _resolve_coastal_pending(li) is False
 
 
 def test_non_provisional_row_is_left_to_the_other_passes():

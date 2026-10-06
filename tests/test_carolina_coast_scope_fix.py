@@ -63,7 +63,10 @@ def test_unfixed_foreclosure_sale_type_is_unreachable_even_though_coastal():
     _flip_outside_footprint() rejects a flip-type row BEFORE that carve-out
     can run -- "however it got its coastal credentials" per its own
     docstring. Confirms the type remap, not county/coastal status, is what
-    was blocking every row."""
+    was blocking every row. Since 2026-10-06 the one thing that admits a coastal flip is a point
+    within a 5 minute drive of the beach (oceanfront.FLIP_COASTAL_MAX_M), so the control row
+    carries an inland point (Croatan National Forest); a notice with no point at all would now be
+    provisional, and a distress type is admitted at any point."""
     from foreclosure_scraper.models import Listing, PropertyKind
     from datetime import datetime, UTC
 
@@ -75,6 +78,8 @@ def test_unfixed_foreclosure_sale_type_is_unreachable_even_though_coastal():
         state="NC",
         county="Carteret",
         street_address="168 Bayberry Rd",
+        latitude=34.85,
+        longitude=-77.10,
         first_seen=datetime.now(UTC),
         last_seen=datetime.now(UTC),
         raw={},

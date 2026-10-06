@@ -29,7 +29,7 @@ from .config import (
     in_scope,
     in_scope_distressed,
 )
-from .oceanfront import is_oceanfront
+from .oceanfront import OCEANFRONT_DISTANCE_M, flip_near_beach, is_oceanfront
 from .dedupe import dedupe
 from .email_sender import send_digest
 from .enrichment import enrich
@@ -119,9 +119,11 @@ async def _gather_phases(phases: dict, default_s: int = 900):
 
 
 # NC + SC ocean-facing counties. Listings in these counties are denied by
-# default (they're east of Charlotte / outside the upstate footprint), but
-# get re-admitted through the OCEANFRONT_OVERRIDE in _in_scope when the
-# listing's data passes the 2-of-3 oceanfront signal check.
+# default (they're east of Charlotte / outside the upstate footprint). A DISTRESS lead
+# is admitted anywhere in NC+SC regardless (in_scope_distressed); the oceanfront
+# override tags the true-beachfront ones. A FLIP here is admitted only by the owner's
+# beach-drive rule of 2026-10-06 (_flip_beach_check: a trusted point within
+# oceanfront.FLIP_COASTAL_MAX_M of the ocean, a "5 minute drive"), see _in_scope.
 OCEANFRONT_COASTAL_COUNTIES: frozenset[tuple[str, str]] = frozenset({
     ("Currituck", "NC"), ("Dare", "NC"), ("Hyde", "NC"), ("Carteret", "NC"),
     ("Onslow", "NC"), ("Pender", "NC"), ("New Hanover", "NC"), ("Brunswick", "NC"),
@@ -203,12 +205,13 @@ def _oceanfront_pending(li: Listing) -> bool:
     coords -> oceanfront 2-of-3 fallback fails) and never reach geocoding.
 
     So we admit them PROVISIONALLY, tagged ``raw.oceanfront_pending``, and the
-    post-geocode re-pass re-applies the strict near-beach test once coordinates
-    exist — dropping the ones that turn out inland.
+    post-geocode re-pass (_resolve_coastal_pending) re-applies the near-beach test once
+    coordinates exist: a flip is dropped when it lands beyond the beach-drive cutoff
+    (oceanfront.FLIP_COASTAL_MAX_M), a distress lead is kept anywhere in NC/SC.
 
     Requires a STREET ADDRESS or PARCEL id — something that geocodes to a real
     point. A bare city/zip is deliberately NOT enough: it only yields a coarse
-    centroid that would unreliably pass/fail the 250 m gate, and it would punch
+    centroid that would unreliably pass/fail the beach-distance gate, and it would punch
     a hole in the deny-list (a 28461 Brunswick zip-only row must still be denied,
     not provisionally admitted on a town centroid).
     """
@@ -272,28 +275,83 @@ def _county_in_scope(li: Listing) -> bool:
     return in_scope_distressed(li.county, li.state)
 
 
-def _flip_outside_footprint(li: Listing) -> bool:
-    """A flip whose county is KNOWN and is not one of the 18 footprint counties.
+def _flip_beach_check(li: Listing, *, tag: bool = False) -> Optional[bool]:
+    """The owner's beach-drive rule for a FLIP in a coastal county (2026-10-06: "nothing more than
+    a 5 minute drive to the beach"): True when the row's point is within FLIP_COASTAL_MAX_M of the
+    open-ocean shore, False when it is farther, None when there is no point to measure (none yet, or
+    a shared fallback point, see oceanfront.flip_near_beach). With a point, distance decides: no
+    keyword or street test.
 
-    The owner's rule of 2026-09-15 ("if its a flip, its only in the counties we talked
-    about. if its a distressed property its anywhere in nc and sc") is enforced here for
-    EVERY admission path. It used to be wired into only two places (_county_in_scope and the
-    deny check further down), while everything that admits a coastal row ran before both and
-    never asked whether the row was a flip: the oceanfront override, the coastal-source
-    bypass, downtown Charleston and their provisional variants, and then _denied_now
-    exempted the same rows a second time in the post-enrichment re-pass. Measured on the
-    2026-09-21 board: 102 flip rows outside the 18 counties (Charleston 33, Pender 24,
-    Georgetown 15, Dare 11, Onslow 7, Carteret 6 ...), about 56 through the oceanfront
-    override and 41 through the coastal-source bypass. Distressed types are unaffected."""
-    return (_is_flip(li) and bool((li.county or "").strip()) and bool(li.state)
-            and not in_scope(li.county, li.state))
+    tag=True stamps raw.near_beach_drive (the measured distances) on a pass, and raw.oceanfront too
+    when the row is also within OCEANFRONT_DISTANCE_M, so that tag keeps its meaning: true
+    beachfront, never merely "admitted"."""
+    ok, sig = flip_near_beach(li.latitude, li.longitude, li.raw if isinstance(li.raw, dict) else None)
+    if ok and tag:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["near_beach_drive"] = sig
+        if sig["distance_m"] <= OCEANFRONT_DISTANCE_M:
+            _check_oceanfront(li)
+    return ok
+
+
+def _flip_outside_footprint(li: Listing, *, ingest: bool = False) -> bool:
+    """A flip whose county is KNOWN and is not one of the 18 footprint counties, unless it is a
+    coastal-county flip the beach-drive rule admits.
+
+    The owner's rule of 2026-09-15 ("if its a flip, its only in the counties we talked about. if its
+    a distressed property its anywhere in nc and sc") is enforced here for EVERY admission path. It
+    used to be wired into only two places (_county_in_scope and the deny check further down), while
+    everything that admits a coastal row ran before both and never asked whether the row was a flip:
+    the oceanfront override, the coastal-source bypass, downtown Charleston and their provisional
+    variants, and then _denied_now exempted the same rows a second time in the post-enrichment
+    re-pass. Measured on the 2026-09-21 board: 102 flip rows outside the 18 counties (Charleston 33,
+    Pender 24, Georgetown 15, Dare 11, Onslow 7, Carteret 6 ...), about 56 through the oceanfront
+    override and 41 through the coastal-source bypass. Distressed types are unaffected.
+
+    THE ONE EXCEPTION (owner, 2026-10-06): the coastal rule applies to flips. A flip in an
+    OCEANFRONT_COASTAL_COUNTIES county is wanted when it is "nothing more than a 5 minute drive to the
+    beach", which is _flip_beach_check (a point within oceanfront.FLIP_COASTAL_MAX_M of the ocean).
+    Everything else about a coastal flip stays as the 9/15 rule left it: the coastal-source bypass,
+    the oceanfront tag and downtown Charleston still do not shelter one, and a coastal flip with no
+    usable point is out here. At ingest (ingest=True) a row that has no coordinates YET is let
+    through, because the scope gate runs before geocoding; _in_scope then admits it provisionally and
+    _resolve_coastal_pending decides once geocoding has placed it."""
+    if not (_is_flip(li) and bool((li.county or "").strip()) and bool(li.state)
+            and not in_scope(li.county, li.state)):
+        return False
+    if _in_oceanfront_county(li):
+        if _flip_beach_check(li) is True:
+            return False
+        if ingest and (li.latitude is None or li.longitude is None):
+            return False
+    return True
+
+
+def _admit_coastal_flip(li: Listing) -> bool:
+    """_in_scope for a flip in a coastal county (it is outside the 18-county footprint by
+    construction), decided by the beach-drive rule alone: a trusted point within the cutoff is
+    admitted (tagged raw.near_beach_drive); a point farther out, or a shared fallback point, is not;
+    a row with no point yet but a street or parcel is admitted provisionally
+    (raw.oceanfront_pending) for _resolve_coastal_pending to decide after geocoding."""
+    verdict = _flip_beach_check(li, tag=True)
+    if verdict is not None:
+        return verdict
+    if li.latitude is None or li.longitude is None:
+        return _oceanfront_pending(li)
+    return False
 
 
 def _in_scope(li: Listing) -> bool:
     # FIRST, before every coastal carve-out below: a flip outside the footprint is out,
     # however it got its coastal credentials (see _flip_outside_footprint).
-    if _flip_outside_footprint(li):
+    if _flip_outside_footprint(li, ingest=True):
         return False
+    # A flip that is still here is in a coastal county (the footprint has none) with a point, or
+    # waiting for one. The owner's beach-drive rule alone decides it (2026-10-06); none of the
+    # carve-outs below (oceanfront tag, coastal-source bypass, downtown Charleston) admits a flip.
+    if _is_flip(li) and _in_oceanfront_county(li):
+        return _admit_coastal_flip(li)
     # Oceanfront override — runs BEFORE the deny check so the otherwise-
     # denied coastal counties (New Hanover/Brunswick/Onslow + the SC
     # coast) can re-enter when a listing passes the strict 2-of-3
@@ -1140,6 +1198,8 @@ def _denied_now(li: Listing) -> bool:
         return True
     if _is_flip(li) and not (li.county or "").strip():
         return True
+    if _is_flip(li) and _in_oceanfront_county(li):
+        return False    # past the guard above: the beach-drive rule admitted it (spare it the deny list)
     raw = li.raw if isinstance(li.raw, dict) else {}
     if raw.get("oceanfront") or raw.get("downtown_charleston") or raw.get("coastal_county"):
         return False
@@ -1171,9 +1231,10 @@ def _resolve_coastal_pending(li: Listing) -> Optional[bool]:
     raw.downtown_charleston) and is kept, as before.
 
     THE BUG (fixed 2026-10-06). A row that FAILED both tests was dropped, whatever its listing
-    type. Every row that can carry the provisional tag is a DISTRESS lead: _in_scope() rejects
-    a flip outside the 18 footprint counties before it looks at the coast, and no coastal county
-    is in that footprint. The owner's rule of 2026-09-15 (config.in_scope_distressed) is that a
+    type. Every row that could carry the provisional tag then was a DISTRESS lead: _in_scope()
+    rejected a flip outside the 18 footprint counties before it looked at the coast, and no coastal
+    county is in that footprint (a coastal flip can carry the tag since the beach-drive rule, see
+    the end of this docstring). The owner's rule of 2026-09-15 (config.in_scope_distressed) is that a
     distress lead is in scope in any NC or SC county, with no carve-outs, and _in_scope() admits
     the very same inland lead when it arrives WITH coordinates (the provisional path is skipped
     and _county_in_scope() keeps it); _denied_now() never drops a coastal distress lead either.
@@ -1186,7 +1247,13 @@ def _resolve_coastal_pending(li: Listing) -> Optional[bool]:
 
     Now a provisional row that fails both tests is kept when it is not a flip and its county
     is in the distress scope (_county_in_scope); it just does not get the oceanfront or
-    downtown tag. A flip (possible only through a merge) still drops here, and _denied_now()
+    downtown tag.
+
+    A FLIP is decided by the owner's beach-drive rule alone (2026-10-06, "nothing more than a 5
+    minute drive to the beach"): once geocoding has given it a point, it is kept when that point is
+    within oceanfront.FLIP_COASTAL_MAX_M of the ocean (tagged raw.near_beach_drive, and raw.oceanfront
+    too when within OCEANFRONT_DISTANCE_M), and dropped otherwise, including when there is still no
+    point. A flip is never kept as a downtown-Charleston row or by the distress scope. _denied_now()
     runs next regardless."""
     if not isinstance(li.raw, dict):
         li.raw = {}
@@ -1195,6 +1262,8 @@ def _resolve_coastal_pending(li: Listing) -> Optional[bool]:
     pend_dt = raw.pop("downtown_charleston_pending", None)
     if not (pend_of or pend_dt):
         return None  # not a pending row — leave to the other passes
+    if _is_flip(li):
+        return bool(_in_oceanfront_county(li) and _flip_beach_check(li, tag=True))
     if pend_of and _in_oceanfront_county(li) and _check_oceanfront(li):
         return True  # confirmed near-beach -> tagged raw.oceanfront
     # Charleston is in OCEANFRONT_COASTAL_COUNTIES, so a peninsula (harbor-

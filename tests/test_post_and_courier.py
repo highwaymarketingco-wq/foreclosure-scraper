@@ -68,7 +68,8 @@ def test_remapped_row_passes_real_in_scope_gate(monkeypatch):
 def test_unfixed_type_would_have_been_dropped():
     """Documents the bug directly: FORECLOSURE_SALE for Charleston county is
     unreachable regardless of any other field, confirming the remap (not
-    some other field) is what fixes reachability."""
+    some other field) is what fixes reachability. (Since 2026-10-06 the one exception is a point
+    within a 5 minute drive of the beach, so the control carries an inland point.)"""
     import copy
     from datetime import datetime, UTC
 
@@ -82,6 +83,8 @@ def test_unfixed_type_would_have_been_dropped():
         state="SC",
         county="Charleston",
         street_address="123 Test St",
+        latitude=32.785,
+        longitude=-80.236,
         first_seen=datetime.now(UTC),
         last_seen=datetime.now(UTC),
         raw={},

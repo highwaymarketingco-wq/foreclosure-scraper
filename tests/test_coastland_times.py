@@ -191,7 +191,8 @@ def test_unfixed_foreclosure_sale_type_was_unreachable_for_dare():
     """Documents the bug directly: the OLD hardcoded
     listing_type=FORECLOSURE_SALE for Dare county is unreachable regardless
     of any other field -- confirming the type remap (not county) is what
-    fixes reachability."""
+    fixes reachability. (Since 2026-10-06 a coastal flip is admitted when its point is within a
+    5 minute drive of the beach, so the control carries an inland point on the Dare mainland.)"""
     import copy
 
     li = mod._parse_detail(
@@ -201,6 +202,7 @@ def test_unfixed_foreclosure_sale_type_was_unreachable_for_dare():
     )
     old = copy.copy(li)
     old.listing_type = ListingType.FORECLOSURE_SALE
+    old.latitude, old.longitude = 35.80, -76.20      # Dare mainland, tens of km from the ocean
     assert main._in_scope(old) is False
 
 

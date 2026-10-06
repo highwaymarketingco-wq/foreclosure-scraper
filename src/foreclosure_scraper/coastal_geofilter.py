@@ -1,18 +1,19 @@
-"""Ocean-proximity geofilter — "on the beach or within ~2-3 blocks of the Atlantic".
+"""Ocean-proximity geofilter: straight-line distance from a lat/lon to the Atlantic shore.
 
-The owner wants ONLY oceanfront / near-ocean coastal NC+SC properties (hard pass
-on anything further inland). This filters parcels/listings by straight-line
-distance from their lat/lon to the Atlantic OCEAN shoreline.
+Reference shoreline: OpenStreetMap `natural=coastline` for the NC+SC coast, fetched +
+decimated (~80 m spacing) into data/nc_sc_ocean_coastline.json. OSM's coastline is the
+land/water boundary. It excludes the Intracoastal Waterway proper (tagged `waterway`/`water`)
+but it is NOT only the open ocean: it also follows Charleston Harbor, the rivers and bays
+behind the Carolina barrier islands, and the Pamlico / Currituck / Roanoke sound shores.
+Measured 2026-10-06: the Charleston Battery is 123 m from it, Morehead City downtown 237 m,
+Swansboro 118 m, Manteo 1.5 km. So `distance_to_ocean_m` is the distance to the nearest
+SHORE, and "near the beach" for anything beyond a block or two needs the ocean-facing check in
+oceanfront.flip_near_beach (curated ocean-only polyline) on top of it.
 
-Reference shoreline: OpenStreetMap `natural=coastline` for the NC+SC coast,
-fetched + decimated (~80 m spacing) into data/nc_sc_ocean_coastline.json. OSM's
-coastline is the land/SEA boundary and EXCLUDES the Intracoastal Waterway /
-sounds (those are tagged `waterway`/`water`), so distance-to-coastline ≈
-distance-to-OPEN-OCEAN — which is exactly what "near the beach" means and is why
-sound-side and inland towns (Manteo, Morehead City, Wilmington, Mt. Pleasant
-city, Beaufort) correctly fall outside the threshold.
-
-Default threshold 250 m ≈ 2-3 standard blocks. Free, offline, no API at runtime.
+Two bars use this distance (see oceanfront.py): NEAR_BEACH_M below, the true "on the beach or
+a couple of blocks back" bar (250 m, owner 2026-06-22), and oceanfront.FLIP_COASTAL_MAX_M, the
+flip bar (owner 2026-10-06, "nothing more than a 5 minute drive to the beach"). Free, offline,
+no API at runtime.
 """
 from __future__ import annotations
 
@@ -25,7 +26,8 @@ from typing import Optional
 _COAST_FILE = pathlib.Path(__file__).parent / "data" / "nc_sc_ocean_coastline.json"
 
 # 2-3 blocks. A coastal "block" is ~80-100 m; 250 m keeps the first ~2-3 rows of
-# lots and drops everything behind them.
+# lots and drops everything behind them. This is the true-beachfront bar (raw.oceanfront);
+# a FLIP is admitted farther out, see oceanfront.FLIP_COASTAL_MAX_M.
 NEAR_BEACH_M = 250.0
 
 

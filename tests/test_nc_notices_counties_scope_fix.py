@@ -80,7 +80,8 @@ def test_haywood_is_remapped_and_reaches_the_board():
 
 def test_unfixed_type_would_have_been_dropped_for_a_coastal_county():
     """Documents the bug directly: a raw FORECLOSURE_SALE for Brunswick is
-    unreachable regardless of any other field."""
+    unreachable regardless of any other field. (Since 2026-10-06 the one exception is a point
+    within a 5 minute drive of the beach, so the control carries an inland point.)"""
     import copy
     from datetime import datetime, UTC
 
@@ -94,6 +95,8 @@ def test_unfixed_type_would_have_been_dropped_for_a_coastal_county():
         state="NC",
         county="Brunswick",
         street_address="123 Test St",
+        latitude=34.06,
+        longitude=-78.23,
         first_seen=datetime.now(UTC),
         last_seen=datetime.now(UTC),
         raw={},
