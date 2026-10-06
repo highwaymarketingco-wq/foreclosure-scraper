@@ -230,6 +230,112 @@ def owner_category(board: Optional[str], county_names: Iterable[Optional[str]]) 
     return best
 
 
+# ---------------------------------------------------------------------------
+# address binding: does the parcel / account that was checked carry the ROW's address?
+# ---------------------------------------------------------------------------
+#
+# WHY (2026-10-06 recheck of all 103 stale verdicts, 7 of them wrong): a row's parcel id and its
+# street address can belong to DIFFERENT parcels (a retired / recombined PIN, a roll block merged
+# into another parcel's row, a resolver that matched a road name). A stale or refuted verdict
+# removes the claim from the lead's score, so it may only be issued from the parcel that carries
+# the row's address. address_relation() is the shared yes / no / cannot-tell; each verifier
+# decides what to do with a "conflict" (follow the address, or answer unconfirmed).
+
+_ADDR_ALIAS = {
+    "ROAD": "RD", "STREET": "ST", "DRIVE": "DR", "TERRACE": "TER", "TERR": "TER",
+    "AVENUE": "AVE", "BOULEVARD": "BLVD", "LANE": "LN", "COURT": "CT", "CIRCLE": "CIR",
+    "TRAIL": "TRL", "HIGHWAY": "HWY", "EXTENSION": "EXT", "PLACE": "PL", "PARKWAY": "PKWY",
+    "MOUNTAIN": "MTN", "POINT": "PT", "COVE": "CV", "RIDGE": "RDG", "HEIGHTS": "HTS",
+    "NORTH": "N", "SOUTH": "S", "EAST": "E", "WEST": "W", "NORTHEAST": "NE",
+    "NORTHWEST": "NW", "SOUTHEAST": "SE", "SOUTHWEST": "SW",
+}
+_ADDR_SUFFIXES = frozenset({"RD", "ST", "DR", "TER", "AVE", "BLVD", "LN", "CT", "CIR", "TRL",
+                            "HWY", "EXT", "PL", "PKWY", "WAY", "LOOP", "PT", "CV", "RDG", "HTS",
+                            "PIKE", "ALY", "SQ", "XING", "TRCE", "RUN", "PATH", "BND", "CRK"})
+_ADDR_DIRECTIONS = frozenset({"N", "S", "E", "W", "NE", "NW", "SE", "SW"})
+_ADDR_UNIT = frozenset({"APT", "UNIT", "STE", "SUITE", "LOT", "TRLR", "BLDG", "BUILDING", "SPC",
+                        "SPACE", "FL", "FLOOR", "RM", "ROOM"})
+#: words the counties append that are not part of the street ("242 P GIBBS RD UNINCORPORATED")
+_ADDR_NOISE = frozenset({"UNINCORPORATED", "UNINCORPORAT", "UNINC", "NC", "SC", "USA", "UNITED",
+                         "STATES", "COUNTY"})
+
+
+def address_key(addr: Any) -> tuple[Optional[str], frozenset, frozenset]:
+    """(house number or None, street name tokens, suffix + direction tokens) of an address.
+    The city / state / zip after the first comma are dropped (a Nominatim style "804, Trailwinds
+    Drive, Oconee County, ..." keeps its second part), "1/2" and a unit tail are dropped, leading
+    zeros are stripped ("000399 OAKHILL DRIVE" == "399 OAKHILL DR"), suffixes are normalized
+    (ROAD == RD). A placeholder number (all nines, zero) is no number."""
+    s = str(addr or "").upper()
+    parts = [p.strip() for p in s.split(",")]
+    head = parts[0] if parts else ""
+    if re.fullmatch(r"\d+[A-Z]?", head) and len(parts) > 1:
+        head = f"{head} {parts[1]}"
+    head = re.sub(r"\b\d+\s*/\s*\d+\b", " ", head)
+    toks = re.findall(r"[A-Z0-9]+", head)
+    for i, t in enumerate(toks):
+        if i > 0 and t in _ADDR_UNIT:
+            toks = toks[:i]
+            break
+    number = None
+    if toks:
+        m = re.fullmatch(r"(\d+)([A-Z]?)", toks[0])
+        if m:
+            digits_ = m.group(1).lstrip("0")
+            if digits_ and not (len(digits_) >= 4 and set(digits_) == {"9"}):
+                number = digits_ + m.group(2)
+            toks = toks[1:]
+    toks = [_ADDR_ALIAS.get(t, t) for t in toks
+            if t not in _ADDR_NOISE and not re.fullmatch(r"\d{5}(\d{4})?", t)]
+    name = frozenset(t for t in toks if t not in _ADDR_SUFFIXES and t not in _ADDR_DIRECTIONS)
+    tail = frozenset(t for t in toks if t in _ADDR_SUFFIXES or t in _ADDR_DIRECTIONS)
+    return number, name, tail
+
+
+def address_relation(a: Any, b: Any) -> str:
+    """'match' | 'conflict' | 'unknown' between a row's address and the one on a county record.
+    unknown: either side has no usable house number or street name (a road name alone, a
+    placeholder number): nothing is claimed either way. match: same house number, same street
+    name tokens, and suffix / direction tokens equal or missing on one side. conflict: anything
+    else (a different number or street: the record is another property's)."""
+    na, sa, ta = address_key(a)
+    nb, sb, tb = address_key(b)
+    if not na or not nb or not sa or not sb:
+        return "unknown"
+    if na == nb and sa == sb and (ta == tb or not ta or not tb):
+        return "match"
+    return "conflict"
+
+
+def address_query(addr: Any) -> Optional[str]:
+    """The house number and street NAME of a row's address as a search string ("810 ROBINSON"
+    for "810 ROBINSON TERRACE"), or None when the row has no house-numbered address (a road name
+    alone cannot identify a parcel). The suffix is left off on purpose: the portals' address
+    searches match text as THEY write it (Henderson's "807 ROBINSON TER" is not found by
+    "807 ROBINSON TERRACE"); address_relation() then keeps only the exact matches."""
+    s = str(addr or "")
+    parts = [p.strip() for p in s.split(",")]
+    head = parts[0].upper() if parts else ""
+    if re.fullmatch(r"\d+[A-Z]?", head) and len(parts) > 1:
+        head = f"{head} {parts[1].upper()}"
+    head = re.sub(r"\b\d+\s*/\s*\d+\b", " ", head)
+    toks = re.findall(r"[A-Z0-9]+", head)
+    if not toks or not re.fullmatch(r"\d+[A-Z]?", toks[0]):
+        return None
+    number, name, _ = address_key(s)
+    if not number or not name:
+        return None
+    stem = [toks[0].lstrip("0") or toks[0]]
+    for t in toks[1:]:
+        if t in _ADDR_UNIT or t in _ADDR_NOISE:
+            break
+        a = _ADDR_ALIAS.get(t, t)
+        if (a in _ADDR_SUFFIXES or a in _ADDR_DIRECTIONS) and len(stem) > 1 and stem[-1] not in _ADDR_DIRECTIONS:
+            break
+        stem.append(t)
+    return " ".join(stem)
+
+
 def next_weekday(d: date) -> date:
     while d.weekday() >= 5:
         d += timedelta(days=1)

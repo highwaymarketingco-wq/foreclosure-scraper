@@ -43,7 +43,11 @@ VERDICTS (core.py's meanings):
                closing in the entries or dateTerminated; and a docket entry in the last
                ACTIVE_DAYS, so the stay is live.
   stale        the same real match, but the case was dismissed, discharged or closed (a later
-               reinstatement undoes a dismissal): the stay WAS live and has lifted.
+               reinstatement undoes a dismissal): the stay WAS live and has lifted. Needs a
+               VERIFIED identity (v3): a first + last match with no middle name to compare on
+               one side ("unverified", decided_by positional_match_unverified) is unconfirmed
+               (identity_unverified) unless the verifier itself corroborates the person from
+               the repo's own data (CORROBORATION below).
   refuted      the debtor is a different person (a proven middle conflict, or no debtor in the
                case lines up with any board owner name), or the case does not exist.
   unconfirmed  cannot decide: no person name (no owner of record) on the board to compare; two
@@ -53,6 +57,24 @@ VERDICTS (core.py's meanings):
                first+last match is not enough: production rejects it, nothing here says it is a
                different person); no docket entries, or none in ACTIVE_DAYS, so the status
                cannot be read; an API failure.
+
+WRONG DISTRICT (v3). Each NC county belongs to one federal bankruptcy district (E.D.N.C. nceb,
+M.D.N.C. ncmb, W.D.N.C. ncwb; five counties are split with the Fort Bragg / Butner reservations
+and hold two courts) and SC is one district (scb): NC_COUNTY_COURTS, from 28 U.S.C. 113. A docket
+whose court cannot cover the property's county is not this owner's as far as this verifier can
+tell: unconfirmed, reason wrong_district, whatever the case's status (a debtor can file where
+they live, so it is never refuted on this alone). The first live sweep called a completed
+M.D.N.C. Chapter 13 stale for a McDowell County (W.D.N.C.) row whose docket caption had no middle
+name and was attached by name to five board rows.
+
+CORROBORATION (v3, offline). A stale answer on an "unverified" name match stands only when the
+debtor's caption names a middle name or initial and, in the property's county, EITHER the NC
+voter file (data/ncvoter, 13 counties, VERIFY_NCVOTER_DIR) holds exactly one ACTIVE / INACTIVE
+registrant with the debtor's first name, middle and last name AND that registrant lives at the
+row's address, OR the parcel owner roll (data/parcel_cache/<county>.sqlite) names exactly one
+person on the row's parcel, with that full name. Neither source is asked for a name: they only
+corroborate the identity the docket and the board already claim, and nothing from them is
+published (evidence says only identity_corroborated_by).
 
 GOVERNS: a refuted or stale verdict removes the scorer's `bankruptcy` signal (raw.bankruptcy in
 distress_score._collect and the lead-signal facet, and the `bankruptcy` listing type) and the
@@ -79,6 +101,7 @@ verdict. The same case on two rows of one property still shares one.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -90,7 +113,8 @@ from urllib.parse import quote
 from ..core import VerificationResult, result
 
 SIGNAL = "bankruptcy_stay"
-VERSION = "v2"         # v2 (2026-10-06): a match in one board name beside a person in another
+VERSION = "v3"         # v3 (2026-10-06): wrong_district; stale needs a verified identity.
+                       # v2: a match in one board name beside a person in another
                        # who does not match (not only one who conflicts) is unconfirmed
 TTL_DAYS = 30          # refuted/stale (the verdicts that change the score) are durable facts;
                        # a confirmed-open case is re-read monthly
@@ -536,6 +560,172 @@ async def find_case(client, claim: dict) -> tuple[Optional[dict], dict]:
 
 
 # ---------------------------------------------------------------------------
+# district / county consistency (pure) and identity corroboration (offline)
+# ---------------------------------------------------------------------------
+
+#: 28 U.S.C. 113(a)-(c), the counties of the three NC federal districts (the bankruptcy courts
+#: sit in the same districts). Verified against the statute text 2026-10-06.
+_NC_EASTERN = (
+    "Beaufort Bertie Bladen Brunswick Camden Carteret Chowan Columbus Craven Cumberland Currituck "
+    "Dare Duplin Edgecombe Franklin Gates Granville Greene Halifax Harnett Hertford Hyde Johnston "
+    "Jones Lenoir Martin Nash|New_Hanover Northampton Onslow Pamlico Pasquotank Pender Perquimans "
+    "Pitt Robeson Sampson Tyrrell Vance Wake Warren Washington Wayne Wilson")
+_NC_MIDDLE = (
+    "Alamance Cabarrus Caswell Chatham Davidson Davie Durham Forsyth Guilford Hoke Lee Montgomery "
+    "Moore Orange Person Randolph Richmond Rockingham Rowan Scotland Stanly Stokes Surry Yadkin")
+_NC_WESTERN = (
+    "Alexander Alleghany Anson Ashe Avery Buncombe Burke Caldwell Catawba Cherokee Clay Cleveland "
+    "Gaston Graham Haywood Henderson Iredell Jackson Lincoln McDowell Macon Madison Mecklenburg "
+    "Mitchell Polk Rutherford Swain Transylvania Union Watauga Wilkes Yancey")
+#: counties the statute splits: the Fort Bragg Military Reservation and Camp Mackall (parts of
+#: Hoke, Moore, Richmond, Scotland) and the Butner FCI (part of Durham) are in the Eastern District
+_NC_SPLIT = frozenset({"durham", "hoke", "moore", "richmond", "scotland"})
+
+
+def _county_set(text: str) -> set[str]:
+    out = set()
+    for tok in text.replace("|", " ").split():
+        out.add(tok.replace("_", " ").lower())
+    return out
+
+
+def _build_nc_courts() -> dict[str, frozenset]:
+    out: dict[str, frozenset] = {}
+    for court, names in (("nceb", _NC_EASTERN), ("ncmb", _NC_MIDDLE), ("ncwb", _NC_WESTERN)):
+        for c in _county_set(names):
+            out[c] = frozenset(out.get(c, frozenset()) | {court})
+    for c in _NC_SPLIT:
+        out[c] = frozenset({"ncmb", "nceb"})
+    return out
+
+
+NC_COUNTY_COURTS: dict[str, frozenset] = _build_nc_courts()
+SC_COURT = "scb"
+
+
+def expected_courts(state: Any, county: Any) -> Optional[frozenset]:
+    """The bankruptcy court(s) that cover a county, or None when the state / county is not one
+    this table knows (nothing is then claimed)."""
+    st = str(state or "").strip().upper()
+    co = re.sub(r"\s+county$", "", str(county or "").strip(), flags=re.I).lower()
+    if st == "SC" and co:
+        return frozenset({SC_COURT})
+    if st == "NC":
+        return NC_COUNTY_COURTS.get(co)
+    return None
+
+
+def wrong_district(court: Any, state: Any, county: Any) -> Optional[frozenset]:
+    """The expected courts when `court` cannot cover the county, else None (covers, or unknown)."""
+    exp = expected_courts(state, county)
+    c = str(court or "").strip().lower()
+    return exp if exp and c and c not in exp else None
+
+
+VOTER_DIR = _REPO / "data" / "ncvoter"
+_VOTER_STATUS_OK = frozenset({"ACTIVE", "INACTIVE"})
+
+
+def _letters(s: Any) -> str:
+    return re.sub(r"[^A-Z]", "", str(s or "").upper())
+
+
+def debtor_full_name(person: Optional[str], case_name: str) -> Optional[tuple[str, str, str]]:
+    """(first, middle, last), upper case, of the debtor in the case caption whose first and last
+    name line up with the board person, or None when the caption names no middle name."""
+    from ...name_normalize import owner_last_first_middle
+    parts = owner_last_first_middle(person) if person else None
+    if not parts:
+        return None
+    last, first, _mid = parts
+    for side in re.split(r"\s+and\s+", str(case_name or ""), flags=re.I):
+        toks = [t for t in re.sub(r"[^A-Za-z ]", " ", side).upper().split() if t not in _SUFFIXES]
+        if len(toks) > 2 and toks[-1] == last and toks[0] == first:
+            return first, toks[1], last
+    return None
+
+
+def _middle_agrees(debtor_mid: str, other_mid: str) -> bool:
+    """Full middle names must be equal; when either side is an initial, the initials."""
+    a, b = _letters(debtor_mid), _letters(other_mid)
+    if not a or not b:
+        return False
+    return a == b if len(a) > 1 and len(b) > 1 else a[0] == b[0]
+
+
+def _voter_matches(county: str, full: tuple[str, str, str], voter_dir: Path) -> Optional[list[dict]]:
+    """The ACTIVE / INACTIVE registrants of the county's voter file with this full name, each
+    {address}; None when the county has no file here."""
+    import csv
+    from ...enrichment_nc_voter_lookup import NC_COUNTY_IDS
+    cid = NC_COUNTY_IDS.get(re.sub(r"\s+county$", "", county.strip(), flags=re.I).upper())
+    path = voter_dir / f"ncvoter{cid}.txt" if cid else None
+    if path is None or not path.is_file():
+        return None
+    first, mid, last = full
+    needle = max(re.findall(r"[A-Z]+", last) or [last], key=len).encode()
+    out = []
+    with open(path, "rb") as fh:
+        header = next(csv.reader([fh.readline().decode("utf-8", "replace")], delimiter="\t"))
+        ix = {h: i for i, h in enumerate(header)}
+        need = ("last_name", "first_name", "middle_name", "voter_status_desc", "res_street_address")
+        if not all(k in ix for k in need):
+            return None
+        for line in fh:
+            if needle not in line:
+                continue
+            cells = next(csv.reader([line.decode("utf-8", "replace")], delimiter="\t"))
+            if len(cells) < len(header) or cells[ix["voter_status_desc"]].strip().upper() not in _VOTER_STATUS_OK:
+                continue
+            if _letters(cells[ix["last_name"]]) == _letters(last) and \
+                    _letters(cells[ix["first_name"]]) == _letters(first) and \
+                    _middle_agrees(mid, cells[ix["middle_name"]]):
+                out.append({"address": re.sub(r"\s+", " ", cells[ix["res_street_address"]]).strip()})
+    return out
+
+
+def _roll_owner(row: dict) -> Optional[str]:
+    from ... import parcel_cache
+    try:
+        rec = parcel_cache.lookup(str(row.get("county") or ""), str(row.get("parcel_id") or ""),
+                                  str(row.get("state") or "") or None)
+    except Exception:  # noqa: BLE001
+        return None
+    return str((rec or {}).get("owner") or "") or None
+
+
+def corroborate_identity(row: dict, person: Optional[str], case_name: str, *,
+                         voter_dir: Optional[Path] = None, roll_owner: Any = None
+                         ) -> Optional[str]:
+    """'ncvoter' | 'parcel_roll' | None: does the repo's own data show exactly ONE person with
+    the debtor's full name (middle name or initial included) living at or owning the row's
+    property? See CORROBORATION in the module docstring. Offline; never raises."""
+    try:
+        full = debtor_full_name(person, case_name)
+        if full is None or str(row.get("state") or "").strip().upper() != "NC":
+            return None
+        first, mid, last = full
+        addr = row.get("street_address")
+        from . import _tax_common as tc
+        vdir = Path(voter_dir or os.environ.get("VERIFY_NCVOTER_DIR") or VOTER_DIR)
+        regs = _voter_matches(str(row.get("county") or ""), full, vdir)
+        if regs is not None and len(regs) == 1 and tc.address_query(addr) and \
+                tc.address_relation(addr, regs[0]["address"]) == "match":
+            return "ncvoter"
+        owner = (roll_owner or _roll_owner)(row)
+        if owner and not re.search(r"deceased|decd|estate|\bet\s*al\b|\betux\b", owner, re.I):
+            from ...name_normalize import owner_last_first_middle
+            people = persons_of(owner)
+            if len(people) == 1:
+                p = owner_last_first_middle(people[0])
+                if p and p[0] == last and p[1] == first and p[2] and _middle_agrees(mid, p[2]):
+                    return "parcel_roll"
+    except Exception:  # noqa: BLE001 - corroboration is a bonus, never a failure
+        return None
+    return None
+
+
+# ---------------------------------------------------------------------------
 # what is published (pure)
 # ---------------------------------------------------------------------------
 
@@ -559,7 +749,8 @@ def middle_initials(person: Optional[str], debtor: str) -> tuple[Optional[str], 
 
 
 _PUBLIC_COMMON = ("decided_by", "reason", "owner_match", "match_field", "compared_fields",
-                  "claimed_from", "court", "court_state")
+                  "claimed_from", "court", "court_state", "expected_courts",
+                  "identity_corroborated_by")
 _PUBLIC_CASE = ("docket_number", "docket_id", "chapter", "date_filed", "date_terminated")
 _PUBLIC_STATUS = ("status", "last_activity", "entries_seen")
 
@@ -693,6 +884,11 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     if court_state and row_state and court_state != row_state:
         ev["reason"] = "court_state_differs"
         return _res("unconfirmed", ev)
+    exp = wrong_district(hit["court"], row_state, row.get("county"))
+    if exp:
+        ev["expected_courts"] = sorted(exp)
+        ev["reason"] = "wrong_district"      # this court cannot cover the property's county
+        return _res("unconfirmed", ev)
 
     if not hit["docket_id"]:
         ev["reason"] = "no_docket_id"
@@ -713,6 +909,15 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     ev.update(st)
     if ev["status"] == "closed":
         ev["decided_by"] = f"{ev['event']['kind']}+positional_match_{v}"
+        if v != "agrees":
+            # "the case is over" needs a verified debtor: a first + last match with no middle
+            # name to compare is not one, unless the repo's own data corroborates the person
+            via = await asyncio.to_thread(corroborate_identity, row, ident["person"],
+                                          hit["case_name"])
+            if via is None:
+                ev["reason"] = "identity_unverified"
+                return _res("unconfirmed", ev)
+            ev["identity_corroborated_by"] = via
         return _res("stale", ev)
     if ev["status"] == "open":
         ev["decided_by"] = f"open+positional_match_{v}"

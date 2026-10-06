@@ -46,6 +46,27 @@ grid and searches the TMS; Orangeburg shows an account number): when the claim's
 nothing, the claim's own bills are read by notice number instead (Search By = Receipt Number,
 the block's notice_numbers, newest 2), which answers exactly the claimed bills.
 
+ROLLBACK BILLS (v2). A rollback tax (a change of use, e.g. out of agricultural valuation) is a
+separate bill whose Description says "<year> ROLLBACK TAX..." and that is filed under the year it
+was BILLED: Calhoun's map 053-00-01-112 had its regular 2025 bill paid on time on 2025-12-08 and
+three rollback bills (tax years 2022-2024) paid 2026-09-22, and the old verifier read all four as
+"the 2025 bill" and called it stale. Now the regular bills decide stale / refuted on their own and
+the rollback bills are read and reported separately (rollback_bills_checked). A regular bill paid
+on time beside a rollback bill paid late cannot be called either way and is unconfirmed
+(rollback_bills_mixed); an UNPAID rollback bill is still a delinquent balance (confirmed).
+
+ADDRESS BINDING (v2). The grid's Name / Property Address cell names the property address under the
+owner. Before a stale or refuted answer the account checked must be the one that carries the
+row's address (2026-10-06 recheck: Union 2383 JONESVILLE HWY had been judged on two other parcels
+while its own account, paid on time, was never delinquent; 844 RICE AVE EXT on a different account
+than the one the address belongs to). A matching address on the bills binds. Otherwise the row's
+address is searched (Search By = Property Address, "<number> <street>"): when the checked rows'
+notice numbers are among the address's rows it is the same account; when they are not, the
+ADDRESS'S rows decide instead (decided_on address_search), confirmed on an unpaid balance, stale
+on a late payment, refuted when paid on time; an address with no rows of its own, or a full page
+that may hide years, is unconfirmed (address_parcel_mismatch / page_capped). A row with no
+house-numbered address has nothing to bind and is judged on its parcel as before.
+
 VERDICTS (SC real-property tax is due January 15 of the next year, S.C. Code 12-45-70; unpaid
 after it, penalties attach, so a levy-year Y bill is delinquent from January 16 of Y+1; a
 deadline on a weekend rolls to Monday):
@@ -81,7 +102,7 @@ from ..core import VerificationResult, result
 from . import _tax_common as tc
 
 SIGNAL = "tax_lien"
-VERSION = "v1"
+VERSION = "v2"         # v2 (2026-10-06): rollback bills judged apart; address binding
 TTL_DAYS = 30
 RETRY_DAYS = 7
 SOURCE = "qpaybill.com"
@@ -244,7 +265,10 @@ def parse_grid(text: str) -> dict:
         year = tc.to_int(c[2])
         if not 1900 < year < 2100 or not c[4]:
             continue
+        lines = [ln for ln in c[1].split("\n") if ln.strip()]
         rows.append({"notice": c[0] or None, "owner": (c[1].split("\n")[0] or None),
+                     "address": lines[-1] if len(lines) >= 2 else None,
+                     "description": c[3] or None, "rollback": "ROLLBACK" in c[3].upper(),
                      "year": year, "ident": c[4], "type": c[5], "status": c[6],
                      "paid_on": _date(c[7]), "amount": _amount(c[8])})
     return {"rows": rows, "no_match": no_match and not rows, "grid": True}
@@ -316,9 +340,12 @@ def assess(mine: list[dict], today: date) -> dict:
     if sold:
         out["sold_at_tax_sale_years"] = sorted(set(sold), reverse=True)
     by_year: dict[int, list[dict]] = {}
+    rb_by_year: dict[int, list[dict]] = {}
     for r in mine:
-        by_year.setdefault(r["year"], []).append(r)
-    out["_by_year"] = by_year
+        (rb_by_year if r.get("rollback") else by_year).setdefault(r["year"], []).append(r)
+    out["_by_year"] = by_year             # regular bills: they decide stale / refuted
+    out["_rb_by_year"] = rb_by_year       # rollback bills: read and reported apart (v2)
+    out["_rows"] = mine
     return out
 
 
@@ -455,8 +482,8 @@ async def search(client: Any, county: str, sub: str, value: str, criteria: str =
 # ---------------------------------------------------------------------------
 
 _KEYS = ("reason", "url", "tenant", "county", "searched", "decided_on", "delinquent_parcel",
-         "claim_ident",
-         "board_parcel", "latest_levy_year", "latest_delinquent_eligible_levy",
+         "claim_ident", "address_relation", "address_binding", "address_matches",
+         "rollback_bills_checked", "board_parcel", "latest_levy_year", "latest_delinquent_eligible_levy",
          "delinquent_by_year", "total_delinquent", "years_delinquent", "under_500", "de_minimis",
          "not_yet_delinquent_due", "sold_at_tax_sale_years", "claimed_years", "bills_checked",
          "owner_match", "note", "error", "tenant_health")
@@ -484,8 +511,11 @@ def claim_receipts(row: Any) -> list[str]:
     return [str(n).strip() for n in reversed(blk.get("notice_numbers") or []) if str(n).strip()]
 
 
-def _decide_paid(a: dict, claimed: list[int], today: date) -> tuple[str, list[dict]]:
-    """('stale' | 'refuted' | 'none', checks) on one parcel with nothing delinquent."""
+def _decide_paid(a: dict, claimed: list[int], today: date) -> tuple[str, list[dict], list[dict]]:
+    """('stale' | 'refuted' | 'mixed' | 'none', regular checks, rollback checks) on one parcel
+    with nothing delinquent. The regular bills decide; the rollback bills (Description "<year>
+    ROLLBACK TAX") are checked apart: a regular bill on time beside a rollback paid late is
+    'mixed' (unconfirmed), and a parcel with only rollback rows is judged on them."""
     by_year = a.get("_by_year") or {}
     # the claimed years, then the two latest delinquent-eligible ones (the grid already holds
     # every payment date, so reading more years costs no request)
@@ -494,6 +524,7 @@ def _decide_paid(a: dict, claimed: list[int], today: date) -> tuple[str, list[di
         if y not in order:
             order.append(y)
     checks = []
+    verdict = "none"
     for y in order[:4]:
         c = paid_check(by_year, y)
         if c is None:
@@ -502,10 +533,22 @@ def _decide_paid(a: dict, claimed: list[int], today: date) -> tuple[str, list[di
             continue
         checks.append(c)
         if c["paid_late"]:
-            return "stale", checks
-    if any(c.get("paid_late") is False for c in checks):
-        return "refuted", checks
-    return "none", checks
+            verdict = "stale"
+            break
+    if verdict == "none" and any(c.get("paid_late") is False for c in checks):
+        verdict = "refuted"
+    rb = a.get("_rb_by_year") or {}
+    rb_checks = []
+    for y in sorted((y for y in rb if is_eligible(y, today)), reverse=True)[:4]:
+        c = paid_check(rb, y)
+        rb_checks.append(c or {"year": y, "status": "unread", "paid_late": None})
+    rb_late = any(c.get("paid_late") for c in rb_checks)
+    rb_ok = any(c.get("paid_late") is False for c in rb_checks)
+    if verdict == "refuted" and rb_late:
+        verdict = "mixed"
+    elif verdict == "none" and rb_checks:
+        verdict = "stale" if rb_late else "refuted" if rb_ok else "none"
+    return verdict, checks, rb_checks
 
 
 async def _lookup(client: Any, county: str, sub: str, value: str, role: str, today: date,
@@ -567,6 +610,9 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
                                 merged[k] = {**prev.get(k, {}), **ra.get(k, {})}
                             merged["_by_year"] = {**prev.get("_by_year", {}),
                                                   **ra.get("_by_year", {})}
+                            merged["_rb_by_year"] = {**prev.get("_rb_by_year", {}),
+                                                     **ra.get("_rb_by_year", {})}
+                            merged["_rows"] = [*prev.get("_rows", []), *ra.get("_rows", [])]
                             merged["latest_levy_year"] = max(prev["latest_levy_year"],
                                                              ra["latest_levy_year"])
                             found["claim"] = merged
@@ -612,15 +658,83 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
               delinquent_by_year={}, total_delinquent=0.0, years_delinquent=0)
     if any(s.get("page_capped") for s in searched if s.get("found")):
         return _res("unconfirmed", dict(ev, reason="page_capped"))
+
+    # nothing owed on the parcel checked. Before stale / refuted: does it carry the row's address?
+    try:
+        action, what = await _bind(row, client, county, sub, a, today, ev)
+    except TenantDown as exc:
+        return _res("unconfirmed", dict(ev, reason="tenant_unhealthy", searched=searched,
+                                        tenant_health=str(exc)[:200]))
+    except Exception as exc:  # noqa: BLE001
+        return _res("unconfirmed", dict(ev, reason="address_search_failed", searched=searched,
+                                        error=f"{type(exc).__name__}: {str(exc)[:160]}"))
+    if action == "unconfirmed":
+        return _res("unconfirmed", dict(ev, reason=what))
+    if action == "follow":
+        a = what                                   # the address's own rows decide (v2)
+        ev.update(decided_on="address_search", address_binding="followed",
+                  latest_levy_year=a["latest_levy_year"],
+                  not_yet_delinquent_due=a["not_yet_delinquent_due"],
+                  sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"))
+        if a["delinquent_by_year"]:
+            ev.update(delinquent_by_year=a["delinquent_by_year"],
+                      total_delinquent=tc.money_total(a["delinquent_by_year"]),
+                      years_delinquent=len(a["delinquent_by_year"]))
+            ev["under_500"] = ev["total_delinquent"] < 500
+            ev["de_minimis"] = ev["total_delinquent"] < tc.DE_MINIMIS
+            return _res("confirmed", ev)
     last_ok = latest_eligible(today)
     if not a.get("via_receipts") and a["latest_levy_year"] < last_ok:
         # a receipt answers only the claimed bills, so this history test needs the Map search
         return _res("unconfirmed", dict(ev, reason="parcel_record_ended",
                                         latest_delinquent_eligible_levy=last_ok))
-    verdict, checks = _decide_paid(a, claimed, today)
+    verdict, checks, rb_checks = _decide_paid(a, claimed, today)
     ev["bills_checked"] = checks
+    if rb_checks:
+        ev["rollback_bills_checked"] = rb_checks
     if verdict == "none":
         return _res("unconfirmed", dict(ev, reason="no_paid_row_to_read"))
+    if verdict == "mixed":
+        return _res("unconfirmed", dict(ev, reason="rollback_bills_mixed"))
     if verdict == "refuted" and a["not_yet_delinquent_due"]:
         ev["note"] = "only the current levy is unpaid; it is not delinquent yet"
     return _res(verdict, ev)
+
+
+ADDRESS_CRITERIA = "Address"
+
+
+async def _bind(row: dict, client, county: str, sub: str, a: dict, today: date, ev: dict
+                ) -> tuple[str, Any]:
+    """Does the account checked carry the row's address? ("ok", None), ("follow", assessment of
+    the address's own rows) or ("unconfirmed", reason); see ADDRESS BINDING in the module
+    docstring. Raises TenantDown / the fetch error like search()."""
+    addr = row.get("street_address")
+    query = tc.address_query(addr)
+    if query is None:
+        ev["address_binding"] = "no_row_address"
+        return "ok", None
+    rows = a.get("_rows") or []
+    rels = {tc.address_relation(addr, r.get("address")) for r in rows}
+    rel = "match" if "match" in rels else "conflict" if "conflict" in rels else "unknown"
+    ev["address_relation"] = rel
+    if rel == "match":
+        ev["address_binding"] = "bill_address"
+        return "ok", None
+    g = await search(client, county, sub, query, ADDRESS_CRITERIA)
+    mine = [r for r in g["rows"] if tc.address_relation(addr, r.get("address")) == "match"]
+    ev["address_matches"] = len(mine)
+    if not mine:
+        if rel == "conflict":
+            return "unconfirmed", "address_parcel_mismatch"
+        ev["address_binding"] = "unverified"
+        return "ok", None
+    notices = {tc.alnum(r["notice"]) for r in rows}
+    if notices & {tc.alnum(r["notice"]) for r in mine}:
+        ev["address_binding"] = "address_search"
+        return "ok", None
+    if g["capped"]:
+        return "unconfirmed", "page_capped"
+    a2 = assess(mine, today)
+    a2["role"] = "address"
+    return "follow", a2

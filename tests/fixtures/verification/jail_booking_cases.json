@@ -621,7 +621,8 @@
      "matched_name": "HUWUG WIVI",
      "confidence": "name_only_low",
      "release_status": "in_custody",
-     "arrest_date": "2026-01-01"
+     "arrest_date": "2026-01-01",
+     "last_confirmed_on_roster": "2026-01-01"
     },
     "incarceration": {
      "state": "NC",
@@ -652,7 +653,8 @@
      "matched_name": "JIZUVO PIJIKE",
      "confidence": "name_only_low",
      "release_status": "in_custody",
-     "arrest_date": "2026-01-01"
+     "arrest_date": "2026-01-01",
+     "last_confirmed_on_roster": "2026-01-01"
     },
     "incarceration": {
      "state": "NC",

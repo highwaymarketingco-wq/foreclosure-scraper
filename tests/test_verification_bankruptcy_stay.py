@@ -34,6 +34,14 @@ FIXTURE_NAMES = ("Tolland", "Corwin", "Nelson", "Bell", "Lane", "Barlow", "Merce
                  "Cole", "Goodwin", "Beal", "Kemp", "Chapman")
 
 
+@pytest.fixture(autouse=True)
+def _hermetic_corroboration(monkeypatch, tmp_path):
+    """v3: a stale answer on an unverified name match looks the person up in the repo's voter file
+    and parcel roll. These tests must not read the real data/ (and must not depend on it)."""
+    monkeypatch.setenv("VERIFY_NCVOTER_DIR", str(tmp_path / "no_voter_files"))
+    monkeypatch.setattr(b, "_roll_owner", lambda row: None)
+
+
 def served(*extra: tuple) -> ReplayFetcher:
     resp = dict(SERVED)
     resp.update(dict(extra))
@@ -69,6 +77,21 @@ def _cole(**raw_extra):
     raw.update(raw_extra)
     return _row("Marissa Beth Cole", county="Polk", lt="bankruptcy", case_number="26-50391",
                 source_url="https://www.courtlistener.com/docket/74829796/x/", raw=raw)
+
+
+def _voter_file(tmp_path, monkeypatch, people, county_id="11"):
+    """A made-up NC voter file (the real columns, tab-separated and quoted) for Buncombe (id 11):
+    people = [(last, first, middle, street address)], all ACTIVE."""
+    d = tmp_path / "voter"
+    d.mkdir(exist_ok=True)
+    head = ["county_id", "county_desc", "voter_reg_num", "last_name", "first_name", "middle_name",
+            "voter_status_desc", "res_street_address", "res_city_desc"]
+    lines = ["\t".join(f'"{h}"' for h in head)]
+    for i, (last, first, mid, addr) in enumerate(people):
+        cells = [county_id, "BUNCOMBE", f"{i:012d}", last, first, mid, "ACTIVE", f"{addr}   ", "ASHEVILLE"]
+        lines.append("\t".join(f'"{c}"' for c in cells))
+    (d / f"ncvoter{county_id}.txt").write_text("\n".join(lines) + "\n")
+    monkeypatch.setenv("VERIFY_NCVOTER_DIR", str(d))
 
 
 def _no_names(ev: dict) -> None:
@@ -110,11 +133,15 @@ def test_applies_to_rows_that_carry_a_case_reference():
 # verdicts on real responses
 # ---------------------------------------------------------------------------
 
-def test_stale_dismissed_chapter_13_the_board_scores_as_open():
+def test_stale_dismissed_chapter_13_the_board_scores_as_open(tmp_path, monkeypatch):
     """A Buncombe tax row's Chapter 13 match (owner LAST, FIRST with no middle). date_terminated
-    is null on CourtListener; entry 25 'Dismissal' (2026-09-21) says the stay is gone."""
+    is null on CourtListener; entry 25 'Dismissal' (2026-09-21) says the stay is gone. The match
+    is "unverified" (no middle on the board), so since v3 it is stale only because the voter file
+    holds exactly one registrant with the debtor's full name at the row's address."""
+    _voter_file(tmp_path, monkeypatch, [("TOLLAND", "BRIAN", "CARL", "1 MAIN ST")])
     r, f = run(TOLLAND)
     assert r.verdict == "stale"
+    assert r.evidence["identity_corroborated_by"] == "ncvoter"
     ev = r.evidence
     assert ev["event"] == {"kind": "dismissal", "date": "2026-09-21", "entry_number": 25}
     assert "date_terminated" not in ev                   # null at the source
@@ -131,7 +158,8 @@ def test_stale_dismissed_chapter_13_the_board_scores_as_open():
     _no_names(ev)
 
 
-def test_stale_found_by_docket_number_when_the_row_has_only_the_stay():
+def test_stale_found_by_docket_number_when_the_row_has_only_the_stay(tmp_path, monkeypatch):
+    _voter_file(tmp_path, monkeypatch, [("TOLLAND", "BRIAN", "CARL", "1 MAIN ST")])
     row = _row("TOLLAND, BRIAN", lt="foreclosure_sale", raw={"bankruptcy_stay": {
         "status": "stayed", "chapter": "13", "date_filed": "2026-07-10",
         "case": "Brian Carl Tolland", "docket": "26-10161", "court": "ncwb"}})
@@ -277,7 +305,7 @@ def test_unconfirmed_court_in_another_state():
 
 
 def test_unconfirmed_no_docket_entries():
-    row = _row("BARLOW, JOHN", raw={"bankruptcy": _bk("nceb", "John Henry Barlow, III", "26-04305", 74832823)})
+    row = _row("BARLOW, JOHN", county="Wake", raw={"bankruptcy": _bk("nceb", "John Henry Barlow, III", "26-04305", 74832823)})
     r, _ = run(row)
     assert r.verdict == "unconfirmed"
     assert (r.evidence["status"], r.evidence["reason"], r.evidence["entries_seen"]) == \

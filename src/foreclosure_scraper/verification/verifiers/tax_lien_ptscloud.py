@@ -43,12 +43,27 @@ the roll block's PARCEL_NUM (parcel_raw, parcel), the land-records REID (raw.lrc
 VERDICTS (a levy-year Y bill is delinquent once unpaid on January 6 of Y+1, G.S. 105-360; the
 bill's own interestBeginDate decides "paid late"):
   confirmed    a Real Property bill of a delinquent-eligible year with an amount due today.
-  stale        nothing delinquent today, and the claimed year (else the latest delinquent-eligible
-               year) was paid on or after its interest-begin date, or interest was paid on it.
-  refuted      nothing delinquent today and the bill(s) checked were paid before interest began.
+  stale        nothing delinquent today, the parcel carries the row's address (v2), and the claimed
+               year (else the latest delinquent-eligible year) was PAID on or after its
+               interest-begin date. Interest paid alone is not lateness (v2).
+  refuted      nothing delinquent today, the parcel carries the row's address, and the bill(s)
+               checked were paid before interest began.
   unconfirmed  no tenant / no parcel / not found / fetch or parse failure / tenant unhealthy this
                run / parcel billing ended before the latest eligible levy / only a deferred
-               balance / bill details unreadable.
+               balance / bill details unreadable / the parcel's property address is not the row's
+               and no parcel carrying the row's address could be followed
+               (address_parcel_mismatch) / interest was paid but no payment is dated after
+               interest began (interest_without_late_payment).
+
+ADDRESS BINDING (v2). Every bill the search returns carries propertyAddress1. Before a stale or
+refuted answer the parcel checked must carry the row's address: Henderson parcel 106171 is
+"807 ROBINSON TER", and a board row "810 ROBINSON TERRACE" had been bound to it through a roll
+block merge and judged stale (2026-10-06 recheck). A matching address binds; otherwise the row's
+address is searched (the same SimpleBillSearch, query "<number> <street>": the API matches text as
+the county writes it, so no suffix): this parcel among the matches binds, exactly one other
+parcel is verified INSTEAD (evidence followed_from_parcel), anything else is unconfirmed. A row
+with no house-numbered address, or a county address with no usable number ("0 NO ADDRESS
+ASSIGNED"), has nothing to compare and is judged on its parcel as before.
 A row typed tax_lien by another lien's source that is covered through its own claim (a mixed row)
 gets its verdict as is: the qualified GOVERNS (_tax_common) never ends that lien's listing type.
 Evidence (public ledger: a whitelist, no names, no mailing addresses): API and page URLs, tenant,
@@ -73,7 +88,7 @@ from ..core import VerificationResult, result
 from . import _tax_common as tc
 
 SIGNAL = "tax_lien"
-VERSION = "v1"
+VERSION = "v2"         # v2 (2026-10-06): address binding; interest alone is not lateness
 TTL_DAYS = 30
 RETRY_DAYS = 7
 SOURCE = "bcpwa.ncptscloud.com"
@@ -192,6 +207,7 @@ def bills_of(payload: Any, parcel: str) -> list[dict]:
             continue
         due = r.get("amountDue")
         out.append({"id": str(r.get("id") or ""), "bill": r.get("billNumber"), "year": y,
+                    "address": r.get("propertyAddress1") or r.get("propertyAddress"),
                     "status": str(r.get("billStatus") or "").upper(),
                     "due": round(float(due), 2) if isinstance(due, (int, float)) else 0.0,
                     "original": r.get("originalBillAmount"),
@@ -214,7 +230,9 @@ def _dt(v: Any) -> Optional[date]:
 
 
 def paid_late(detail: dict, year: int) -> dict:
-    """Late-payment evidence from a GetbillDetails answer."""
+    """Late-payment evidence from a GetbillDetails answer. `paid_late` is a payment dated on or
+    after the bill's interest-begin date and nothing else (v2: interest paid with every payment
+    dated earlier is flagged interest_without_late_payment, never counted as lateness)."""
     begin = _dt(detail.get("interestBeginDate")) or delinquent_from(year)
     pays = [d for d in (_dt(t.get("transactionCreationDate")) for t in detail.get("transactions") or []
                         if isinstance(t, dict) and str(t.get("transactionType") or "").upper() == "PAYMENT")
@@ -222,10 +240,15 @@ def paid_late(detail: dict, year: int) -> dict:
     last = _dt(detail.get("lastPaymentDate")) or (max(pays) if pays else None)
     interest = detail.get("interestPaid")
     interest = float(interest) if isinstance(interest, (int, float)) else 0.0
-    late = bool((last and last >= begin) or any(d >= begin for d in pays) or interest > 0)
-    return {"paid_on": last.isoformat() if last else None, "interest_begin": begin.isoformat(),
-            "interest_paid": round(interest, 2), "status": str(detail.get("statusType") or "").upper()
-            or None, "paid_late": late}
+    late = bool((last and last >= begin) or any(d >= begin for d in pays))
+    out = {"paid_on": last.isoformat() if last else None, "interest_begin": begin.isoformat(),
+           "interest_paid": round(interest, 2), "status": str(detail.get("statusType") or "").upper()
+           or None, "paid_late": late}
+    if interest > 0 and not late:
+        out["interest_without_late_payment"] = True
+    if last is None:
+        out["no_payment_on_bill"] = True
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +298,8 @@ _KEYS = ("reason", "url", "page_url", "tenant", "claim_county_differs", "tax_par
          "searched", "results_total", "latest_levy_year", "latest_delinquent_eligible_levy",
          "delinquent_by_year", "total_delinquent", "years_delinquent", "under_500", "de_minimis",
          "not_yet_delinquent_due", "deferred_by_year", "flags", "claimed_years", "claimed_bill",
-         "bills_checked", "owner_match", "note", "error", "tenant_health")
+         "bills_checked", "owner_match", "note", "error", "tenant_health", "address_relation",
+         "address_binding", "address_matches", "address_pins", "followed_from_parcel")
 
 
 def public_evidence(ev: dict) -> dict:
@@ -330,6 +354,66 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
                                         url=SEARCH_URL.format(q=quote(cands[0][0], safe=""),
                                                               tenant=quote(tenant))))
 
+    return await _decide(row, client, tenant, slug, bills, claimed, today, ev, can_follow=True)
+
+
+def _set_binding(ev: dict, how: str) -> None:
+    """Record how the parcel was bound to the row's address; a followed parcel stays "followed"."""
+    if "followed_from_parcel" not in ev:
+        ev["address_binding"] = how
+
+
+def _addresses(bills: list[dict]) -> list[str]:
+    return list(dict.fromkeys(b["address"] for b in bills if b.get("address")))
+
+
+async def _bind(row: dict, client, tenant: str, parcel: str, bills: list[dict], ev: dict,
+                *, can_follow: bool) -> tuple[str, Any]:
+    """Does the parcel checked carry the row's address? ("ok", None), ("follow", parcel) or
+    ("unconfirmed", reason); see ADDRESS BINDING in the module docstring."""
+    query = tc.address_query(row.get("street_address"))
+    if query is None:
+        _set_binding(ev, "no_row_address")
+        return "ok", None
+    addr = row.get("street_address")
+    rels = {tc.address_relation(addr, a) for a in _addresses(bills)}
+    rel = "match" if "match" in rels else "conflict" if "conflict" in rels else "unknown"
+    ev["address_relation"] = rel
+    if rel == "match":
+        _set_binding(ev, "bill_address")
+        return "ok", None
+    url = SEARCH_URL.format(q=quote(query, safe=""), tenant=quote(tenant))
+    try:
+        payload = await _get_json(client, url, tenant)
+    except TenantDown:
+        return "unconfirmed", "tenant_unhealthy"
+    except Exception as exc:  # noqa: BLE001
+        ev["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+        return "unconfirmed", "address_search_failed"
+    if not isinstance(payload, dict) or not isinstance(payload.get("results"), list):
+        return "unconfirmed", "address_search_unreadable"
+    carry: dict[str, str] = {}
+    for r in payload["results"]:
+        if isinstance(r, dict) and r.get("parcelId") and \
+                tc.address_relation(addr, r.get("propertyAddress1") or r.get("propertyAddress")) == "match":
+            carry.setdefault(str(r["parcelId"]), r.get("propertyAddress1") or "")
+    ev["address_matches"] = len(carry)
+    if any(tc.alnum(p) == tc.alnum(parcel) for p in carry):
+        _set_binding(ev, "address_search")
+        return "ok", None
+    if carry:
+        if can_follow and len(carry) == 1:
+            return "follow", next(iter(carry))
+        ev["address_pins"] = sorted(carry)[:4]
+        return "unconfirmed", "address_parcel_mismatch"
+    if rel == "conflict":
+        return "unconfirmed", "address_parcel_mismatch"
+    _set_binding(ev, "unverified")        # the county's address has no usable number
+    return "ok", None
+
+
+async def _decide(row: dict, client, tenant: str, slug: str, bills: list[dict], claimed: list[int],
+                  today: date, ev: dict, *, can_follow: bool) -> VerificationResult:
     latest = bills[0]
     ev["owner_match"] = tc.owner_category(row.get("owner_name"), latest["owners"])
     ev["latest_levy_year"] = latest["year"]
@@ -358,7 +442,34 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     if delinquent:
         ev["under_500"] = ev["total_delinquent"] < 500
         ev["de_minimis"] = ev["total_delinquent"] < tc.DE_MINIMIS
+        rels = {tc.address_relation(row.get("street_address"), a) for a in _addresses(bills)}
+        if tc.address_query(row.get("street_address")):
+            ev["address_relation"] = ("match" if "match" in rels else "conflict"
+                                      if "conflict" in rels else "unknown")
         return _res("confirmed", ev)
+
+    # nothing owed today. Before stale / refuted: is this the parcel that carries the row's address?
+    parcel = ev.get("tax_parcel") or ""
+    action, what = await _bind(row, client, tenant, parcel, bills, ev, can_follow=can_follow)
+    if action == "follow":
+        url = SEARCH_URL.format(q=quote(what, safe=""), tenant=quote(tenant))
+        try:
+            payload = await _get_json(client, url, tenant)
+            bills2 = bills_of(payload, what) if isinstance(payload, dict) else []
+        except Exception as exc:  # noqa: BLE001
+            ev["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+            return _res("unconfirmed", dict(ev, reason="address_parcel_fetch_failed"))
+        if not bills2:
+            return _res("unconfirmed", dict(ev, reason="address_parcel_unreadable"))
+        ev2 = {k: ev.get(k) for k in ("tenant", "board_parcel", "claimed_years", "claimed_bill",
+                                      "page_url", "searched", "claim_county_differs")}
+        ev2.update(url=url, tax_parcel=what, tax_parcel_from="address_search",
+                   followed_from_parcel=parcel, address_binding="followed",
+                   results_total=payload.get("totalCount"))
+        return await _decide(row, client, tenant, slug, bills2, claimed, today, ev2,
+                             can_follow=False)
+    if action == "unconfirmed":
+        return _res("unconfirmed", dict(ev, reason=what))
 
     last_ok = latest_eligible(today)
     if latest["year"] < last_ok:
@@ -406,6 +517,10 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         return _res("unconfirmed", dict(ev, reason="no_paid_bill_to_check"))
     if all("error" in c for c in checked):
         return _res("unconfirmed", dict(ev, reason="bill_details_unreadable"))
+    if any(c.get("interest_without_late_payment") for c in checked):
+        return _res("unconfirmed", dict(ev, reason="interest_without_late_payment"))
+    if any(c.get("no_payment_on_bill") for c in checked):
+        return _res("unconfirmed", dict(ev, reason="no_payment_on_bill"))
     if current:
         ev["note"] = "only the current levy is unpaid; it is not delinquent yet"
     return _res("refuted", ev)

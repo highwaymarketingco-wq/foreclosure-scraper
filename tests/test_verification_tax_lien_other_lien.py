@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import dataclasses
 import gzip
+import json
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -173,8 +175,17 @@ def page(name: str) -> str:
     return gzip.decompress((FIX / f"buncombe_tax_{name}.html.gz").read_bytes()).decode("utf-8")
 
 
+RECHECK = json.loads(gzip.decompress((FIX / "buncombe_tax_recheck.json.gz").read_bytes()))
+
+
 def served(*paths: str) -> dict:
-    return {f"{tlb.BASE}/{p}": page(p.replace("/", "_")) for p in paths}
+    """The county pages by path: the 2026-10-06 recheck captures (one JSON of {url: page}), else
+    the 2026-10-05 per-page captures."""
+    out = {}
+    for p in paths:
+        url = f"{tlb.BASE}/{p}"
+        out[url] = RECHECK[url] if url in RECHECK else page(p.replace("/", "_"))
+    return out
 
 
 def run(row, fetcher):
@@ -229,7 +240,10 @@ def dew_mixed_row() -> dict:
                                       "all_unpaid_years": ["2025", "2026"]}}}
 
 
-REFUTED_PAGES = ("Parcel/Details/968605392600000", "Bill/Details/0000667232-2025-2025-0000-00")
+#: 2614 Old Fort Rd (PIN 0646441079): nothing owed, the 2025 levy paid on time (2025-11-19). The
+#: 3 Eastcrest Dr pair these tests used for `refuted` through v3 is not one: its 2024 and 2015
+#: bills are in legal collection (See Legal), an unpaid balance (v4).
+REFUTED_PAGES = ("Parcel/Details/064644107900000", "Bill/Details/0000768692-2025-2025-0000-00")
 STALE_PAGES = ("Parcel/Details/963962247000000", "Bill/Details/0000739533-2025-2025-0000-00")
 
 
@@ -239,17 +253,17 @@ def test_the_real_mixed_rows_are_covered_by_their_county_verifier():
     assert not tlb.applies(dew_mixed_row()) and not tlq.applies(irs_mixed_row())
 
 
-@pytest.mark.parametrize("pages,parcel,verdict", [
-    (REFUTED_PAGES, "9686-05-3926-00000", "refuted"),   # the 2025 levy paid on time
-    (STALE_PAGES, "963962247000000", "stale"),          # the 2025 levy paid 2026-09-03 with interest
+@pytest.mark.parametrize("pages,parcel,verdict,street", [
+    (REFUTED_PAGES, "0646441079", "refuted", "2614 Old Fort Rd"),    # the 2025 levy paid on time
+    (STALE_PAGES, "963962247000000", "stale", "40 Boone St"),        # the 2025 levy paid 2026-09-03 with interest
 ])
-def test_a_mixed_row_gets_the_county_verdict_as_it_is(pages, parcel, verdict):
-    genuine = run(roll_row(parcel_id=parcel), ReplayFetcher(served(*pages)))
+def test_a_mixed_row_gets_the_county_verdict_as_it_is(pages, parcel, verdict, street):
+    genuine = run(roll_row(parcel_id=parcel, street_address=street), ReplayFetcher(served(*pages)))
     r = run(irs_mixed_row(parcel), ReplayFetcher(served(*pages)))
     assert genuine.verdict == r.verdict == verdict
     assert not {"property_tax_verdict", "listing_claim_source", "reason"} & set(r.evidence)
     assert r.evidence["bills_checked"] == genuine.evidence["bills_checked"]
-    assert r.verifier_version == tlb.VERSION == "v3"
+    assert r.verifier_version == tlb.VERSION == "v4"
 
 
 def test_confirmed_on_a_mixed_row():
@@ -377,7 +391,9 @@ def test_no_version_bump_is_needed_to_keep_the_restore_through_a_merge():
 
 
 def test_after_the_restore_the_verdict_is_due_on_its_own_ttl():
-    v = from_module(tlb)
+    # the entries are v3 answers: judge their TTL as the v3 verifier would (v4's bump alone makes
+    # every v3 entry due as "version", which is the point of the bump)
+    v = dataclasses.replace(from_module(tlb), version="v3")
     led = _ledger()
     tc.restore_property_tax_verdicts(led, NOW)
     e = led.rows["parcel:NC:buncombe:0606292040"]
@@ -523,7 +539,7 @@ def _record(res) -> dict:
 
 @pytest.mark.parametrize("pages,verdict", [(REFUTED_PAGES, "refuted"), (STALE_PAGES, "stale")])
 def test_irs_mixed_row_keeps_the_lien_and_loses_the_paid_property_tax(pages, verdict):
-    parcel = {"refuted": "9686-05-3926-00000", "stale": "963962247000000"}[verdict]
+    parcel = {"refuted": "0646441079", "stale": "963962247000000"}[verdict]
     row = irs_mixed_row(parcel)
     res = run(row, ReplayFetcher(served(*pages)))
     assert res.verdict == verdict                      # the county's own answer, not downgraded

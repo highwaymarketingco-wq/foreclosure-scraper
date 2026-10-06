@@ -142,23 +142,29 @@ def test_stale_paid_late_since():
     assert r.evidence["owner_match"] == "same"
 
 
-def test_refuted_paid_on_time_and_only_the_current_levy_unpaid():
-    """3 Eastcrest Dr: the board's claim rests on the 2026 levy, not delinquent until
-    2027-01-06; the 2025 levy was paid on time."""
+def test_see_legal_bills_are_unpaid_so_the_claim_holds():
+    """3 Eastcrest Dr (PIN 9686053926). This test used to expect `refuted` (v1-v3): the verifier
+    read only the 2025 bill (paid on time) and the unpaid 2026 levy, and its parser dropped every
+    bill whose Amount Due is not a number. The same captured page has its 2024 bill and a 2015
+    bill in legal collection ("See Legal", "Payment Unavailable"): an unpaid balance of unknown
+    size, so the claim is confirmed (v4). tests/test_verification_tax_lien_recheck_defects.py
+    holds the refuted / stale verdicts on pages built from the same markup."""
     f = ReplayFetcher(served("Parcel/Details/968605392600000",
                              "Bill/Details/0000667232-2025-2025-0000-00"))
     r = run(_row(parcel_id="9686-05-3926-00000", raw={"tax_owed": {"balance": 900.0, "year": 2026}}), f)
-    assert r.verdict == "refuted"
+    assert r.verdict == "confirmed"
+    assert r.evidence["see_legal_years"] == [2024, 2015]
     assert r.evidence["claimed_years"] == [2026]
-    assert r.evidence["bills_checked"] == [{
-        "year": 2025, "paid_late": False,
-        "url": f"{t.BASE}/Bill/Details/0000667232-2025-2025-0000-00"}]
 
 
 def test_the_same_page_reads_differently_once_the_levy_goes_delinquent():
-    """3 Eastcrest Dr on 2027-01-06: its unpaid 2026 levy ($1,421.35) is delinquent now."""
+    """3 Eastcrest Dr on 2027-01-06: its unpaid 2026 levy ($1,421.35) is delinquent now. On
+    2027-01-05 it is not yet (v4: the 2024 and 2015 See Legal bills still make the page confirmed,
+    but the 2026 levy is only 'not yet delinquent')."""
     f = ReplayFetcher(served("Parcel/Details/968605392600000"))
-    assert run(_row(parcel_id="9686053926"), f, today=date(2027, 1, 5)).verdict != "confirmed"
+    before = run(_row(parcel_id="9686053926"), f, today=date(2027, 1, 5))
+    assert before.evidence["delinquent_by_year"] == {}
+    assert before.evidence["not_yet_delinquent_due"] == {"2026": 1421.35}
     r = run(_row(parcel_id="9686053926"), f, today=date(2027, 1, 6))
     assert r.verdict == "confirmed"
     assert r.evidence["delinquent_by_year"] == {"2026": 1421.35}
@@ -185,8 +191,8 @@ def test_fetch_failure_and_unreadable_page_are_unconfirmed():
 
 
 def test_unreadable_bill_pages_are_unconfirmed_not_refuted():
-    f = ReplayFetcher(served("Parcel/Details/968605392600000"))   # bill page not recorded
-    r = run(_row(parcel_id="9686053926"), f)
+    f = ReplayFetcher(served("Parcel/Details/963962247000000"))   # bill page not recorded
+    r = run(_row(parcel_id="963962247000000"), f)
     assert r.verdict == "unconfirmed" and r.evidence["reason"] == "bill_pages_unreadable"
 
 
@@ -197,17 +203,15 @@ def test_owner_match():
     assert t.owner_match(None, "X") is None
 
 
-def test_a_parcel_record_that_ends_early_is_unconfirmed_not_stale():
-    """249 Main Ave S (PIN 965808521500000): billing stops at the 2024 levy (paid late, with
-    interest), but the row claims 2026. The PIN no longer carries the property's bills, so
-    the verdict is unconfirmed and no bill page is fetched (v2; v1 called this stale)."""
+def test_a_parcel_with_see_legal_bills_is_confirmed_not_record_ended():
+    """155 Tunnel Rd (PIN 965808521500000): billing LOOKED to stop at the 2024 levy (v2 called it
+    parcel_record_ended: unconfirmed) because the 2025 and 2026 bills are in legal collection and
+    the old parser skipped them. They are unpaid balances, so v4 confirms."""
     f = ReplayFetcher(served("Parcel/Details/965808521500000"))
     r = run(_row(parcel_id="9658-08-5215-00000", raw={"tax_owed": {"balance": 10.0, "year": 2026}}), f)
-    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "parcel_record_ended"
-    assert r.evidence["latest_levy_year"] == 2024
-    assert r.evidence["latest_delinquent_eligible_levy"] == 2025
-    assert len(f.asked) == 1
-    assert t.VERSION == "v3"         # v3: the other-lien guard (test_verification_tax_lien_other_lien)
+    assert r.verdict == "confirmed" and r.evidence["see_legal_years"] == [2026, 2025]
+    assert r.evidence["latest_levy_year"] == 2026
+    assert t.VERSION == "v4"
 
 
 # ---------------------------------------------------------------------------
