@@ -142,10 +142,12 @@ def test_county_from_text_never_overrides_the_courts_state():
     returns a state at all -- it takes the court-derived state as an input."""
     # "Clinton" alone, queried under NC, must resolve within NC (Sampson),
     # not silently jump state to SC's Clinton (Laurens).
-    assert _county_from_text("IN RE: Jane Doe of Clinton", "NC") == "Sampson"
-    assert _county_from_text("IN RE: John Roe of Clinton", "SC") == "Laurens"
-    assert _county_from_text("IN RE: A Debtor of Camden", "NC") == "Camden"
-    assert _county_from_text("IN RE: A Debtor of Camden", "SC") == "Kershaw"
+    # (organization names: a PERSON's name never yields a county, see
+    # tests/test_courtlistener_county_and_captions.py)
+    assert _county_from_text("IN RE: Acme Widgets of Clinton, LLC", "NC") == "Sampson"
+    assert _county_from_text("IN RE: Acme Widgets of Clinton, LLC", "SC") == "Laurens"
+    assert _county_from_text("IN RE: Acme Widgets of Camden, LLC", "NC") == "Camden"
+    assert _county_from_text("IN RE: Acme Widgets of Camden, LLC", "SC") == "Kershaw"
 
 
 def test_county_from_text_returns_none_not_a_tuple():
@@ -155,7 +157,7 @@ def test_county_from_text_returns_none_not_a_tuple():
     was updated; this pins the new contract so a future revert is caught."""
     result = _county_from_text("no city mentioned anywhere", "NC")
     assert result is None
-    result2 = _county_from_text("IN RE: Bob of Charlotte", "NC")
+    result2 = _county_from_text("IN RE: Bob's Diner of Charlotte, Inc.", "NC")
     assert result2 == "Mecklenburg"
     assert not isinstance(result2, tuple)
 

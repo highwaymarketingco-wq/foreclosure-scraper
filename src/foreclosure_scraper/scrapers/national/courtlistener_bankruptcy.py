@@ -15,8 +15,9 @@ are pre-foreclosure leads with even more lead time than NOD recordings.
 Emission strategy: bankruptcy dockets do NOT carry debtor addresses (verified
 via direct API probe — bankruptcy_information has chapter but no address).
 So we emit every filing from these 4 courts as a state-level lead with the
-debtor name as `defendant`. Best-effort county tag from city keywords in
-case name when present (rare — see `_county_from_text`'s docstring). The
+debtor name as `defendant`. A county is tagged only when the debtor is an
+ORGANIZATION named for its town (never from a person's name, which is a surname
+that merely equals a place; see `_county_from_text`'s docstring). The
 cross-reference enrichment in `enrichment_bankruptcy.py` then matches these
 debtor names to existing foreclosure-listing defendants for the BIG-signal
 join.
@@ -121,23 +122,93 @@ def _load_token() -> str | None:
 COURT_STATE = {"ncwb": "NC", "ncmb": "NC", "nceb": "NC", "scb": "SC"}
 
 
+# Corporate-form markers: the ONLY positive evidence that a case name is an
+# organization rather than a person. Deliberately narrow: "Trust", "Estate of",
+# "Church", "Farms", "Plumbing" and the like also name individuals' family
+# trusts, estates and sole proprietorships, so they are NOT evidence (a name
+# with no corporate-form marker is treated as a person or as unknown).
+# "Co", "P.A." and "P.C." count only in their punctuated, capitalised written
+# form, because bare "Co", "Pa" and "Pc" are also real given names and surnames.
+_ORG_FORM_RE = re.compile(
+    r"(?<![A-Za-z])(?:l\.?l\.?c|l\.?l\.?l\.?p|l\.?l\.?p|l\.?p|p\.?l\.?l\.?c|p\.?l\.?l\.?p|"
+    r"inc|incorporated|corp|corporation|company|ltd|limited)(?![A-Za-z])",
+    re.I,
+)
+_ORG_FORM_PUNCT_RE = re.compile(r"(?<![A-Za-z])(?:Co|P\.A|P\.C)\.")
+
+# A true adversary-proceeding caption, "<Plaintiff> v. <Defendant>". CASE-SENSITIVE
+# on purpose: CourtListener writes the connector in lower case ("v." / "vs."),
+# while an upper-case "V." is a middle initial ("Jane V. Doe"), a person's name.
+# Measured on the published board (2026-10-06): 110 lower-case captions, and 6
+# debtor names with a "V." middle initial that a case-insensitive match would
+# have split into a fake plaintiff and defendant.
+_ADVERSARY_CAPTION_RE = re.compile(r"\s(?:v|vs)\.\s")
+
+
+def _is_adversary_caption(case_name: str | None) -> bool:
+    """True for an adversary-proceeding caption ("<Plaintiff> v. <Defendant>").
+
+    Such a docket is not a debtor's petition: it is a lawsuit INSIDE a
+    bankruptcy (a trustee suing a lender, a creditor contesting a discharge,
+    ...), and neither party is known to be the person who filed. Measured on the
+    110 published captions: 37 have a trustee, committee or bankruptcy
+    administrator as plaintiff, 66 name an organization on the second side, and
+    the debtor is sometimes the plaintiff (student-loan dischargeability suits)
+    and sometimes the defendant, so a "Debtor:" label is wrong half the time."""
+    return bool(case_name) and bool(_ADVERSARY_CAPTION_RE.search(case_name))
+
+
+def _is_organization(name: str) -> bool:
+    """True only on positive corporate-form evidence (LLC, Inc, Corp, Ltd, ...)."""
+    return bool(_ORG_FORM_RE.search(name.replace(".", ""))
+                or _ORG_FORM_PUNCT_RE.search(name))
+
+
 def _county_from_text(text: str, state: str) -> str | None:
-    """Best-effort county recovery from a city keyword in the case name,
-    scoped to the docket's ALREADY-KNOWN state (from COURT_STATE) so a
-    same-named town in the other state never gets consulted. Covers all
-    146 NC+SC counties via _bankruptcy_city_to_county.py — see that
-    module's docstring for why this replaced a 21-county/~28-town dict
-    and how it handles cross-state/cross-county name collisions
-    (Camden, Columbia, Greenville, Henderson, Clinton, etc.)."""
-    if not text:
+    """County recovered from a city word in a case name, scoped to the docket's
+    ALREADY-KNOWN state (from COURT_STATE) so a same-named town in the other
+    state is never consulted. Covers all 146 NC+SC counties via
+    _bankruptcy_city_to_county.py -- see that module's docstring for how it
+    handles cross-state/cross-county name collisions (Camden, Columbia,
+    Greenville, Henderson, Clinton, etc.).
+
+    A bankruptcy docket's case name is the DEBTOR'S name, not an address. A
+    town word in it is a location hint ONLY when the debtor is an organization
+    named for its town ("Acme Widgets of Raleigh, Inc."). For a person it is a
+    surname or given name that happens to equal a place ("Wilson", "Marion",
+    "Jackson", "Clinton", "Charlotte"): the county that produced was unrelated to
+    where they live. Measured 2026-10-06 against the published board: of the 147
+    bankruptcy rows whose county came from this function, 123 matched a whole
+    word in a person's name, 15 matched inside a longer word, and only 3 were an
+    organization; 110 carried no street or parcel at all (their county was
+    nothing but that word) and 34 carried a parcel pinned at that wrong county's
+    point. So:
+
+      * a person, or a name with no corporate-form marker: never (None);
+      * a two-party caption ("A v. B"): never -- which party is the debtor is
+        unknown;
+      * an organization: the town must be a WHOLE word (never the middle of
+        "Vanderson" or "Camdenton"), and every whole-word town in the
+        name must agree on one county, else None. A missing county is far
+        better than a wrong one.
+    """
+    if not text or not state:
         return None
-    upper = text.upper()
-    for city in KNOWN_CITIES:
-        if city.upper() in upper:
-            county = bankruptcy_county_for(city, state)
-            if county:
-                return county
-    return None
+    if _is_adversary_caption(text):
+        return None
+    name = _IN_RE_RE.sub("", text).strip()
+    if not name or not _is_organization(name):
+        return None
+    counties = {
+        county
+        for city in KNOWN_CITIES
+        if re.search(r"(?<![A-Za-z])" + re.escape(city) + r"(?![A-Za-z])", name, re.I)
+        and (county := bankruptcy_county_for(city, state))
+    }
+    # "North Charleston" also contains the whole word "Charleston": today every
+    # such nested pair maps to one county, and a future pair that did not would
+    # land here as a disagreement, i.e. None -- the safe direction.
+    return next(iter(counties)) if len(counties) == 1 else None
 
 
 # A CourtListener case_name is NOT always "In re <Debtor>" — the /search/
@@ -154,7 +225,7 @@ def _county_from_text(text: str, state: str) -> str | None:
 # (extraction_gaps.md: "servicer/GSE as owner_name ... SERVICEMAC/FNMA/
 # case-caption"). Split the caption, and never let an institution occupy a
 # name-resolution field regardless of which side of "v." it was on.
-_CAPTION_RE = re.compile(r"^(.*?)\s+vs?\.\s+(.*)$", re.I)
+_CAPTION_RE = re.compile(r"^(.*?)\s+(?:v|vs)\.\s+(.*)$")  # case-sensitive: see _ADVERSARY_CAPTION_RE
 _IN_RE_RE = re.compile(r"^\s*in\s+re[:\s]+", re.I)
 _CAPTION_ETAL_RE = re.compile(r"\bet\.?\s*al\.?\b.*$", re.I)
 _INSTITUTION_RE = re.compile(
@@ -401,6 +472,9 @@ class CourtListenerBankruptcy(BaseScraper):
         # different case from NCEB 26-02017).
         seen_keys: set[tuple[str, str]] = set()
         dedup_dropped = 0
+        # Adversary-proceeding captions ("<Plaintiff> v. <Defendant>") are not
+        # debtor petitions -- see _is_adversary_caption. Counted, not emitted.
+        adversary_skipped = 0
 
         async with client(timeout=45.0) as c:
             for court in COURTS:
@@ -411,6 +485,22 @@ class CourtListenerBankruptcy(BaseScraper):
                     case_name = d.get("case_name") or ""
                     docket_no = d.get("docket_number") or ""
                     if not case_name and not docket_no:
+                        continue
+
+                    # This source's job is a PERSON'S OWN petition (the signal is
+                    # "this owner filed"). An adversary proceeding is a lawsuit
+                    # inside someone's bankruptcy: it says nothing about whether
+                    # either named party filed, and its second party is often a
+                    # lender, vendor or insurer rather than a distressed owner.
+                    # The /search/ feed mixes them in (measured 2026-10-06: 110
+                    # of 4,779 published rows, 84 with no county), where they
+                    # used to publish as "Debtor: <caption>" bankruptcy leads.
+                    # The lift-stay / sec.363 / abandonment motions that matter
+                    # for real property are the separate national.courtlistener_
+                    # adversary scraper's job, and it works on the main
+                    # "In re <Debtor>" dockets, not on these captions.
+                    if _is_adversary_caption(case_name):
+                        adversary_skipped += 1
                         continue
 
                     # Skip duplicates within the same scrape pass.
@@ -511,5 +601,6 @@ class CourtListenerBankruptcy(BaseScraper):
             lookback_days=LOOKBACK_DAYS,
             chapter_api_lookups=chapter_lookups,
             dedup_dropped=dedup_dropped,
+            adversary_captions_skipped=adversary_skipped,
         )
         return out
