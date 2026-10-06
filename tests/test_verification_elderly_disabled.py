@@ -77,6 +77,18 @@ def test_registered_with_governs_ttl():
     assert v.ttl_days == 60 and v.retry_days == 7 and not v.wall
 
 
+def test_owner_name_stays_out_of_the_public_ledger(tmp_path):
+    from foreclosure_scraper.verification.ledger import Ledger
+    assert e.ROW_SUMMARY_EXCLUDE == ("owner_name",)
+    c = case("confirmed_eld")
+    led = Ledger.load("elderly_disabled", tmp_path)
+    led.record(c["row"], run(c["row"], replay(c)), ttl_days=e.TTL_DAYS, governs=e.GOVERNS)
+    assert any("owner_name" in x["row"] for x in led.rows.values())   # what record() writes
+    assert e.migrate_ledger(led) == 1 and e.migrate_ledger(led) == 0
+    assert not any("owner_name" in x["row"] for x in led.rows.values())
+    assert [x["latest"]["verdict"] for x in led.rows.values()] == ["confirmed"]
+
+
 def test_governs_are_the_scorer_names_the_claim_feeds():
     from foreclosure_scraper import distress_score
     assert distress_score._LISTING_TYPE_SIGNAL["elderly_disabled"][0] == "LIFE_EVENT"

@@ -75,7 +75,9 @@ PRIVACY (the ledger is a committed file in a public repo). Evidence keeps the ve
 county, PIN, exemption codes and type, tax/levy years and exempt amounts, an owner-match
 CATEGORY (never the county's owner name), a deed date only as the evidence of a transfer, and the
 voter STATUS with a count of same-name records. Never a voter registration number, NCID, date of
-birth, age, address, voting history, or any other person's name.
+birth, age, address, voting history, or any other person's name. ROW_SUMMARY_EXCLUDE keeps the
+board's owner_name out of the ledger's row summaries too (the sweep honours it; migrate_ledger()
+rewrote the entries written before it, offline).
 
 TTL 60 days (an exemption changes on a death, a sale or the annual application), retry 7.
 """
@@ -99,6 +101,7 @@ TTL_DAYS = 60
 RETRY_DAYS = 7
 SOURCE = "gis.buncombecounty.org + tax.buncombenc.gov"
 GOVERNS = ("elderly_disabled", "senior_exemption")
+ROW_SUMMARY_EXCLUDE = ("owner_name",)    # the ledger is public; see PRIVACY above
 
 _NAME = __name__.rsplit(".", 1)[-1]
 
@@ -385,6 +388,20 @@ async def voter_status(row: dict, client) -> dict:
         err = str((res or {}).get("error") or "search_failed") if isinstance(res, dict) else "bad_result"
         return {"status": "error", "error": err.split(":")[0][:60]}
     return classify_voters(res.get("rows") or [], last, first, mid, row.get("city"))
+
+
+def migrate_ledger(led: Any) -> int:
+    """Drop ROW_SUMMARY_EXCLUDE from every entry's row summary of a loaded elderly_disabled
+    Ledger, in place. No fetch; verdicts, evidence and stamps unchanged. Returns the number of
+    entries changed."""
+    changed = 0
+    for entry in led.rows.values():
+        row = entry.get("row")
+        if isinstance(row, dict) and any(f in row for f in ROW_SUMMARY_EXCLUDE):
+            for f in ROW_SUMMARY_EXCLUDE:
+                row.pop(f, None)
+            changed += 1
+    return changed
 
 
 # ---------------------------------------------------------------------------
