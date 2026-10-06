@@ -1,7 +1,7 @@
 """counties_nc.transylvania_delinquent_tax — ViewTaxBill field gaps (audit 2026-10-01).
 
 Per-source extraction audit (docs/HERMES.md sec 8): live-queried the ViewTaxBill
-detail page (account 70094770, year 2025 bill 133) and found three published
+detail page (one live account, year 2025) and found three published
 fields `_parse_detail` never read: Outbuilding Value (a CAMA-spec gap -- HERMES
 sec 9 notes "only 32% have real CAMA specs"), Last Transaction Date, and Last
 Payment Date (a real distress-severity signal: no last_payment_date at all means
@@ -17,22 +17,22 @@ from __future__ import annotations
 
 from foreclosure_scraper.scrapers.counties_nc.transylvania_delinquent_tax import _parse_detail
 
-# Mirrors the live ViewTaxBill page's flattened text shape 1:1 (account
-# 70094770, live-verified 2026-10-01): owner has a transaction date but has
+# Mirrors the live ViewTaxBill page's flattened text shape 1:1 (live-verified
+# 2026-10-01; owner, mailing address, account and parcel numbers pseudonymized): owner has a transaction date but has
 # NEVER made a payment, so "Last Payment Date :" renders with nothing after it.
 _DETAIL_HTML_NEVER_PAID = """
 <div>Tax Bill Information</div>
 <div>Account Info</div>
-<div>Account Number :</div><div>70094770</div>
-<div>A &amp; T Holdings Trust</div>
-<div>73 Smokestone Ct</div>
-<div>Las Vegas, NV 89110</div>
+<div>Account Number :</div><div>70000001</div>
+<div>Example &amp; Sample Holdings Trust</div>
+<div>17 Example Ct</div>
+<div>Sampleton, NV 89000</div>
 <div>Bill Info</div>
-<div>Year-Bill Number :</div><div>2025-133</div>
-<div>Parcel Number :</div><div>8583012326000</div>
-<div>T361A01019 04 MS.03</div>
+<div>Year-Bill Number :</div><div>2025-101</div>
+<div>Parcel Number :</div><div>8500000001000</div>
+<div>T000A00001 01 MS.01</div>
 <div>Escrow :</div>
-<div>Legal Description :</div><div>U32 L053 DAWATUA CT</div>
+<div>Legal Description :</div><div>U01 L001 SAMPLE CT</div>
 <div>Taxable Values</div>
 <div>Building Value :</div><div>0</div>
 <div>Outbuilding Value :</div><div>0</div>
@@ -50,8 +50,8 @@ _DETAIL_HTML_NEVER_PAID = """
 _DETAIL_HTML_PAID_WITH_OUTBUILDING = """
 <div>Account Info</div>
 <div>Account Number :</div><div>99999</div>
-<div>Ashe Leesa G</div>
-<div>123 Main St</div>
+<div>Sample Pat Q</div>
+<div>123 Example St</div>
 <div>Brevard, NC 28712</div>
 <div>Bill Info</div>
 <div>Parcel Number :</div><div>12345</div>
@@ -91,19 +91,19 @@ def test_populated_outbuilding_value_and_both_dates_are_captured():
 # Live-sampled 30 current unpaid bills (2026-10-03): Net Taxable Valuation is
 # populated on every one (30/30), Personal Value on 12/30 (often a mobile home
 # riding on an otherwise-real-estate account), and Exemption on 1/30 -- a real
-# $116,285 homestead/elderly exemption on account 70527110. A probed companion
+# $116,285 homestead/elderly exemption on one account. A probed companion
 # "TaxDistrictsData" per-bill tax/fee breakdown table turned out to be dead on
 # the vendor's own site (its own AJAX call 404s: "the controller ... was not
 # found"), so that one was investigated and correctly NOT pursued.
 
 _DETAIL_HTML_WITH_EXEMPTION = """
 <div>Account Info</div>
-<div>Account Number :</div><div>70527110</div>
-<div>Baker Michael D &amp; Baker Elizabeth D</div>
-<div>44 Blantyre Church Rd</div>
+<div>Account Number :</div><div>70000002</div>
+<div>Doe John D &amp; Doe Jane D</div>
+<div>44 Example Church Rd</div>
 <div>Brevard, NC 28712</div>
 <div>Bill Info</div>
-<div>Parcel Number :</div><div>9518755741000</div>
+<div>Parcel Number :</div><div>9500000002000</div>
 <div>Legal Description :</div><div>LOT 9</div>
 <div>Taxable Values</div>
 <div>Building Value :</div><div>120,000</div>
