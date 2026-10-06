@@ -44,6 +44,7 @@ from .enrichment_courts import discover_lis_pendens, enrich_with_court_records
 from .enrichment_geocode import enrich as enrich_geocode
 from .flags import compute_flags
 from . import checkpoint
+from . import log_redact
 from .link_validator import validate
 from .models import Listing, ListingType, PropertyKind, TERMINAL_AUCTION_STATUSES
 from .scrapers._registry import all_scrapers
@@ -62,10 +63,12 @@ def _setup_logging() -> None:
         format="%(message)s",
         stream=sys.stdout,
     )
+    log_redact.install()
     structlog.configure(
         processors=[
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso"),
+            log_redact.structlog_processor,
             structlog.processors.JSONRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, level, logging.INFO)),
