@@ -617,7 +617,7 @@ def parcel_summary(a: dict) -> dict:
 # tying an instrument to the parcel (pure)
 # --------------------------------------------------------------------------------------------
 
-_LOT = re.compile(r"\b(?:LOT|LOTS|LT|LTS)\s*:?\s*([0-9A-Z]+(?:\s*(?:&|,|AND)\s*[0-9A-Z]+)*)", re.I)
+_LOT = re.compile(r"\b(?:LOTS|LOT|LTS|LT)\b\s*:?\s*([0-9A-Z]+(?:\s*(?:&|,|AND)\s*[0-9A-Z]+)*)", re.I)
 _PB = re.compile(r"\bPB\s*(\d+)\s*/\s*(\d+)", re.I)
 
 
@@ -938,6 +938,13 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
             ev["deciding"] = [_doc_pub(t, ties, ident(t))]
             return "unconfirmed", ev
         ev["decided_by"] = "trustee_deed_recorded"
+        cps = [x["subject"] for x in searches if x["role"] == "claim_person"] or \
+            [x["subject"] for x in searches if x["role"] in ("owner", "co_owner")]
+        if cps:
+            # is the trustee deed's borrower the claim's person? (the verdict is the parcel's:
+            # a foreclosure that concluded on it ends the claim either way; this says whose)
+            rels = [name_relation(cps[0], rod_name_parts(g)) for g in t.get("grantors") or []]
+            ev["claim_person_among_grantors"] = max(rels, key=lambda r: _REL_RANK[r], default="none")
         same = [f for f in fcls if set(f.get("refs") or []) & set(t.get("refs") or [])]
         ev["deciding"] = [_doc_pub(t, ties, ident(t))] + [_doc_pub(f, ties, ident(f)) for f in same[:1]]
         ev["county_layer_agrees"] = county_agrees
@@ -1036,7 +1043,7 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
 
 _PUBLIC = ("decided_by", "reason", "claim", "parcel", "searches", "chain", "deciding",
            "cited_instrument", "cited_found", "latest_initiation", "county_layer_agrees",
-           "ends_initiation",
+           "ends_initiation", "claim_person_among_grantors",
            "owner_relation", "deeds_of_trust_since_vesting", "last_satisfaction",
            "claim_person_deeds_of_trust", "human_lane", "url", "error", "blocked")
 _CLAIM_PUBLIC = ("listing_type", "source", "case_kind", "case_year", "earliest", "dates",

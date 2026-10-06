@@ -1,0 +1,1541 @@
+{
+ "cases": [
+  {
+   "decided_by": "initiation_on_record",
+   "key": "parcel:NC:buncombe:9701412633",
+   "reason": null,
+   "row": {
+    "case_number": "22SP000481-100",
+    "county": "Buncombe",
+    "first_seen": "2026-08-06T13:35:45.584918",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "PARONORE MANANE A",
+    "parcel_id": "9701412633",
+    "sale_date": "2026-09-22T00:00:00",
+    "source": "law_firms.hutchens",
+    "state": "NC",
+    "street_address": "16 Overlook Drive"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "initiation_on_record",
+   "key": "parcel:NC:buncombe:9770205617",
+   "reason": null,
+   "row": {
+    "case_number": "26SP000061-100",
+    "county": "Buncombe",
+    "first_seen": "2026-08-06T13:35:45.599825",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "HUSISAL MINORET",
+    "parcel_id": "9770205617",
+    "sale_date": "2026-10-13T00:00:00",
+    "source": "law_firms.hutchens",
+    "state": "NC",
+    "street_address": "28 Price Road"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "trustee_deed_recorded",
+   "key": "parcel:NC:buncombe:0634048334",
+   "reason": null,
+   "row": {
+    "case_number": "zillow-5590643",
+    "county": "Buncombe",
+    "first_seen": "2026-06-16T20:50:10.482935",
+    "listing_type": "lis_pendens",
+    "owner_name": "VONA REO LLC",
+    "parcel_id": "063404833400000",
+    "source": "national.zillow_foreclosures",
+    "state": "NC",
+    "street_address": "630 Shumont Rd"
+   },
+   "verdict": "stale"
+  },
+  {
+   "decided_by": "trustee_deed_recorded",
+   "key": "parcel:NC:buncombe:9677320315",
+   "reason": null,
+   "row": {
+    "case_number": "zillow-5630058",
+    "county": "Buncombe",
+    "first_seen": "2026-06-18T20:59:13.827564",
+    "listing_type": "lis_pendens",
+    "owner_name": "JISALORI CINUM BANK NATIONAL ASSOCIATION",
+    "parcel_id": "9677320315",
+    "source": "national.zillow_foreclosures",
+    "state": "NC",
+    "street_address": "67 Earwood Ridge Rd"
+   },
+   "verdict": "stale"
+  },
+  {
+   "decided_by": null,
+   "key": "case:NC:buncombe:26cv004293100",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "26CV004293-100",
+    "county": "Buncombe",
+    "defendant": "DARAN EENA WORI",
+    "first_seen": "2026-09-01T23:16:22.695605",
+    "listing_type": "lis_pendens",
+    "owner_name": "DARAN EENA WORI",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "case:NC:buncombe:26cv004306100",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "26CV004306-100",
+    "county": "Buncombe",
+    "defendant": "MALOLI MOLISUM",
+    "first_seen": "2026-09-01T23:16:22.695671",
+    "listing_type": "lis_pendens",
+    "owner_name": "MALOLI MOLISUM",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "case:NC:buncombe:26sp000376100",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "26SP000376-100",
+    "county": "Buncombe",
+    "defendant": "Daran Rirb Wetinale and Henali MANOS Wetinale",
+    "first_seen": "2026-09-01T23:16:22.696047",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "Daran Rirb Wetinale and Henali MANOS Wetinale",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "trustee_deed_recorded",
+   "key": "parcel:NC:buncombe:9688469881",
+   "reason": null,
+   "row": {
+    "case_number": "26SP000292-100",
+    "county": "Buncombe",
+    "defendant": "Aeto Jorol and Canaran Jorol and Aeto Jorol",
+    "first_seen": "2026-09-01T23:16:22.707512",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "Aeto Jorol and Canaran Jorol and Aeto Jorol",
+    "parcel_id": "9688469881",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "111 TELKAIF WAY"
+   },
+   "verdict": "stale"
+  },
+  {
+   "decided_by": null,
+   "key": "case:NC:buncombe:26sp000366100",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "26SP000366-100",
+    "county": "Buncombe",
+    "first_seen": "2026-08-16T19:49:53.025465",
+    "listing_type": "foreclosure_sale",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "case:NC:buncombe:26sp000255100",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "26SP000255-100",
+    "county": "Buncombe",
+    "first_seen": "2026-09-01T23:16:22.714340",
+    "listing_type": "foreclosure_sale",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "trustee_deed_recorded",
+   "key": "parcel:NC:buncombe:9658557367",
+   "reason": null,
+   "row": {
+    "case_number": "22SP000481-100",
+    "county": "Buncombe",
+    "defendant": "Manane A. Paronore and Linis O. Paronore",
+    "first_seen": "2026-08-06T13:35:57.732760",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "Manane A. Paronore and Linis O. Paronore",
+    "parcel_id": "9658557367",
+    "sale_date": "2026-08-18T00:00:00",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "100 Under and by virtue of the porir of sale contained in a certain Deed of Trust made by Manane A. Paronore and Linis O. Pl"
+   },
+   "verdict": "stale"
+  },
+  {
+   "decided_by": null,
+   "key": "addr:NC:buncombe:100 under and by virtue of the power of sale contained in a certain deed of trust made by beverly edward",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "26SP000083-100",
+    "county": "Buncombe",
+    "defendant": "Biralet Eonetin Setol and Ferolal Manelin Setol",
+    "first_seen": "2026-09-01T23:16:22.714634",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "Biralet Eonetin Setol and Ferolal Manelin Setol",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "100 Under and by virtue of the porir of sale contained in a certain Deed of Trust made by Biralet Ealume"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "row:1cd9f03c3a8d7c760551eeeb8e81d19e",
+   "reason": "no_property_identity",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "Wusalin E. Sisolora",
+    "first_seen": "2026-08-06T13:35:57.733423",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "Wusalin E. Sisolora",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "row:1360c88639a5a1b74a950c6c5ad15321",
+   "reason": "no_property_identity",
+   "row": {
+    "county": "Buncombe",
+    "first_seen": "2026-07-03T20:02:17.339334",
+    "listing_type": "foreclosure_sale",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "row:daeac82fe699a2d9e4fa5d9ddc7c78b2",
+   "reason": "no_property_identity",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "Jisis Rero Benum",
+    "first_seen": "2026-08-06T13:35:57.773305",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "Jisis Rero Benum",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "row:4306fe8714720b0962e0e0468127d3e2",
+   "reason": "no_property_identity",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "Cenalalo Wisu",
+    "first_seen": "2026-09-01T23:16:22.739312",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "Cenalalo Wisu",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9648130388",
+   "reason": "parcel_chain_not_found_at_rod",
+   "row": {
+    "case_number": "fc-66033266",
+    "county": "Buncombe",
+    "defendant": "ROLOLE, VERORORA",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "AENOL MUMERAR L",
+    "parcel_id": "9648130388",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "66 WALTON ST"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9648481742",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65860086",
+    "county": "Buncombe",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "MELIRORO RETELON D",
+    "parcel_id": "9648481742",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "155 LEXINGTON AVE"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9639850507",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65531077",
+    "county": "Buncombe",
+    "defendant": "JORUMOL, MUMERAR & KUSENARAR",
+    "first_seen": "2026-06-09T11:57:01.447685",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "VAN DENOLI EARELUSIR AISUSELE",
+    "parcel_id": "9639850507",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "17 HIBRITEN DR"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9658651469",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65992925",
+    "county": "Buncombe",
+    "defendant": "Firet, Aonora",
+    "first_seen": "2026-07-22T20:42:34.160035",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "FIRET AONORA J",
+    "parcel_id": "965865146900000",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "5 VIOLET HILL CIR"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9732606813",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65958980",
+    "county": "Buncombe",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "WETINALE JELP B",
+    "parcel_id": "9732606813",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "7 WESTMINSTER DR"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "trustee_deed_recorded",
+   "key": "parcel:NC:buncombe:9685484456",
+   "reason": null,
+   "row": {
+    "case_number": "fc-65896504",
+    "county": "Buncombe",
+    "defendant": "LUMO, BENORA GETI",
+    "first_seen": "2026-07-01T02:57:14.917030",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "LUMO, BENORA GETI",
+    "parcel_id": "968548445600000",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "16 SAXON HL"
+   },
+   "verdict": "stale"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9605553156",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65687887",
+    "county": "Buncombe",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "MISINE(LE) DARAN A;FANANO(LE) JINOR",
+    "parcel_id": "9605553156",
+    "sale_date": "2026-09-24T18:44:00",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "S And T Spirit Dr"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9634612194",
+   "reason": "parcel_chain_not_found_at_rod",
+   "row": {
+    "case_number": "fc-65546623",
+    "county": "Buncombe",
+    "first_seen": "2026-06-16T20:50:10.340729",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "MUMUSIN FINER E SR;MUMUSIN SUMALI",
+    "parcel_id": "963461219400000",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "S Ridge Pl"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9607623875",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65530757",
+    "county": "Buncombe",
+    "defendant": "MENARALE, CINALIROR",
+    "first_seen": "2026-06-16T20:50:10.621597",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "S & R PALETOLEL FAMILY TRUST",
+    "parcel_id": "960762387500000",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "Short St"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9618509822",
+   "reason": "no_person_to_search",
+   "row": {
+    "case_number": "fc-65524796",
+    "county": "Buncombe",
+    "first_seen": "2026-06-16T20:50:10.621797",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "RANA FONA PROPERTIES LLC",
+    "parcel_id": "961850982200000",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "Marathon Ln"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9710566078",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65352842",
+    "county": "Buncombe",
+    "first_seen": "2026-06-02T12:36:59.627631",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "SUSIROL JINUS H JR;SUSIROL WONIN M",
+    "parcel_id": "9710566078",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "24 KNOLLVIEW DR"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "trustee_deed_recorded",
+   "key": "parcel:NC:buncombe:9623271978",
+   "reason": null,
+   "row": {
+    "case_number": "fc-65318478",
+    "county": "Buncombe",
+    "defendant": "FONORANI, CANE FONORANI, TORO",
+    "first_seen": "2026-05-14T07:14:37.874079",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "FONORANI, CANE FONORANI, TORO",
+    "parcel_id": "962327197800000",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "1410 DOUBLE KNOB LOOP"
+   },
+   "verdict": "stale"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9730730142",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65277902",
+    "county": "Buncombe",
+    "defendant": "MUMER EELAL SERORAR",
+    "first_seen": "2026-05-14T07:14:39.624171",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "MUMER EELAL SERORAR",
+    "parcel_id": "9730730142",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "1 LOCUST ST"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9732328793",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65277555",
+    "county": "Buncombe",
+    "first_seen": "2026-05-14T07:14:39.624159",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "RISI LINUSUM FOLETIN",
+    "parcel_id": "973232879300000",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "Tiffany Ln"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9698390373",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65038244",
+    "county": "Buncombe",
+    "defendant": "FETINIS, PUMU",
+    "first_seen": "2026-06-18T20:59:09.617874",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "WARANU TUMISO J;WARANU SOREREN M",
+    "parcel_id": "9698390373",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "133 HARRISON ST"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9721193013",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-66104191",
+    "county": "Buncombe",
+    "defendant": "HETERUSI, CUMANOLEL LALER",
+    "first_seen": "2026-07-01T02:57:14.915852",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "MIRISO JERI A;TALE AUMORO R",
+    "parcel_id": "9721193013",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "15 STAR FLOWER RD"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:0629575994",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-66063930",
+    "county": "Buncombe",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "VORENET AORENEL",
+    "parcel_id": "0629575994",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "76 TUPPER RD"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9653883611",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-66033274",
+    "county": "Buncombe",
+    "first_seen": "2026-06-26T13:30:39.481156",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "MORIRENA RETELON HUMETA JR;MORIRENA EALI EUSENO",
+    "parcel_id": "9653883611",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "4 VIRGINIA COMMONS DR"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9763203198",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-66033265",
+    "county": "Buncombe",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "HARUSINU E EUMUMA JR;HARUSINU GALELOLOR H",
+    "parcel_id": "9763203198",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "67 BEECH VALLEY EST"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:8791352738",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-66033269",
+    "county": "Buncombe",
+    "defendant": "RARETUM WEST WELUS TRUSTEE",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "WELUS GINA WUSALIN",
+    "parcel_id": "8791352738",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "13 CALDWELL RD"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9701310646",
+   "reason": "parcel_chain_not_found_at_rod",
+   "row": {
+    "case_number": "fc-65828348",
+    "county": "Buncombe",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "NELINETOR BAREN L;NELINETOR CALUS",
+    "parcel_id": "9701310646",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "67 OVERLOOK DR"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9628240044",
+   "reason": "parcel_chain_not_found_at_rod",
+   "row": {
+    "case_number": "fc-65730922",
+    "county": "Buncombe",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "MANARI JINUS JANALELET JR",
+    "parcel_id": "9628240044",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "7 EVERGREEN AVE"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9608667860",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65702984",
+    "county": "Buncombe",
+    "defendant": "SEROLIN RELENU S & SEROLIN WELELE R",
+    "first_seen": "2026-07-01T02:57:14.915862",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "NISUSE JENP E",
+    "parcel_id": "9608667860",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "274 HOLCOMBE COVE RD"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "initiation_on_record",
+   "key": "parcel:NC:buncombe:9619936550",
+   "reason": null,
+   "row": {
+    "case_number": "fc-65703937",
+    "county": "Buncombe",
+    "first_seen": "2026-09-22T15:19:58.110740",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "961993655000000",
+    "sale_date": "2026-11-17T00:00:00",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "Mckinnish Cove Dr"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9638339948",
+   "reason": "parcel_chain_not_found_at_rod",
+   "row": {
+    "case_number": "fc-65523842",
+    "county": "Buncombe",
+    "defendant": "MUSUMO, KUSARANI",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "CARF JINUS",
+    "parcel_id": "9638339948",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "226 PENNSYLVANIA AVE"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9645714968",
+   "reason": "parcel_chain_not_found_at_rod",
+   "row": {
+    "case_number": "fc-65524093",
+    "county": "Buncombe",
+    "first_seen": "2026-09-22T15:19:59.156602",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "HELAM CISISAR (LE)",
+    "parcel_id": "9645714968",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "100 CEDAR FOREST TRL"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9619592261",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65524453",
+    "county": "Buncombe",
+    "defendant": "GALELO, DORIRE GALELO, JONINON M",
+    "first_seen": "2026-07-01T02:57:14.914935",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "GALELO, DORIRE GALELO, JONINON M",
+    "parcel_id": "961959226100000",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "37 ENGLISH IVY RD"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9654769061",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65480982",
+    "county": "Buncombe",
+    "defendant": "Aumo Jarareli Miro",
+    "first_seen": "2026-06-18T20:59:09.617920",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "MUMUSIN HOLERA EUMUMA;MUMUSIN NARAL HARELIROR",
+    "parcel_id": "9654769061",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "235 WESTON RD"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9638571737",
+   "reason": "parcel_chain_not_found_at_rod",
+   "row": {
+    "case_number": "fc-64771118",
+    "county": "Buncombe",
+    "defendant": "RALUSIS SALANE AISF EONETIN JELQ FALONE HEIRS",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "HONUSAL (LE) GOLELUM AISF",
+    "parcel_id": "9638571737",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "111 EDGAR ST"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9628375715",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-66060507",
+    "county": "Buncombe",
+    "defendant": "PEROLIRU, MUMERAR",
+    "first_seen": "2026-07-01T02:57:14.921861",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "ZETETOLAR EARELUSIR AISF",
+    "parcel_id": "9628375715",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "60 CUB RD"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9629666315",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65974761",
+    "county": "Buncombe",
+    "defendant": "MUMETOL KENERETI A;GELERU DONON L",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "MUMETOL KENERETI A;GELERU DONON L",
+    "parcel_id": "9629666315",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "47 VERDE DR"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9648730550",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65955243",
+    "county": "Buncombe",
+    "defendant": "RONER, RUSONU",
+    "first_seen": "2026-07-01T02:57:14.919424",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "RONER, RUSONU",
+    "parcel_id": "964873055000000",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "25 BUCKINGHAM CT"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:8698624233",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "fc-65943586",
+    "county": "Buncombe",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "CETENIRU MIRU I",
+    "parcel_id": "8698624233",
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "59 SNOW HILL CHURCH RD"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "case:NC:buncombe:26cv003997100",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "26CV003997-100",
+    "county": "Buncombe",
+    "defendant": "RELINU A. MUMELAN",
+    "first_seen": "2026-09-22T15:30:36.217064",
+    "listing_type": "lis_pendens",
+    "owner_name": "RELINU A. MUMELAN",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "addr:NC:buncombe:2023 and record",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "26SP000305-100",
+    "county": "Buncombe",
+    "defendant": "Kusarani A. Setol",
+    "first_seen": "2026-09-22T15:30:36.217290",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "Kusarani A. Setol",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "2023 and record"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "addr:NC:buncombe:100 notice of substitute trust",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "26SP000334-100",
+    "county": "Buncombe",
+    "defendant": "Jelo Ronumara Misaro",
+    "first_seen": "2026-09-13T22:36:12.986841",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "Jelo Ronumara Misaro",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "100 NOTICE OF SUBSTITUTE TRUST"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "addr:NC:buncombe:25 sp000828-100 under and by virtue of a power of sale contained in that certain deed of trust",
+   "reason": "no_property_identity",
+   "row": {
+    "county": "Buncombe",
+    "first_seen": "2026-09-13T22:36:12.987121",
+    "listing_type": "foreclosure_sale",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "25 SP000828-100 Under and by virtue of a Porir of Sale contained in that certain Deed of Trust"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "addr:NC:buncombe:100 in the matter of the foreclosure of a deed of trust",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "21SP000183-100",
+    "county": "Buncombe",
+    "defendant": "GERALI JININ",
+    "first_seen": "2026-09-13T22:36:12.987199",
+    "listing_type": "lis_pendens",
+    "owner_name": "GERALI JININ",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "100 IN THE MATTER OF THE FUSIRALISAN OF A DEED OF TRUST"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9730974557",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "county": "Buncombe",
+    "first_seen": "2026-09-17T13:40:07.441596",
+    "listing_type": "lis_pendens",
+    "owner_name": "META NERUMERA LINA",
+    "parcel_id": "9730974557",
+    "source": "national.distressed",
+    "state": "NC",
+    "street_address": "18 Mayfield Rd"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9617356894",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "26SP000410-100",
+    "county": "Buncombe",
+    "first_seen": "2026-07-22T20:22:45.369884",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "COLIR AALUMO",
+    "parcel_id": "9617356894",
+    "sale_date": "2027-01-04T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "6 Holcomb Drive"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "initiation_on_record",
+   "key": "parcel:NC:buncombe:9638570613",
+   "reason": null,
+   "row": {
+    "case_number": "26SP000063-100",
+    "county": "Buncombe",
+    "first_seen": "2026-07-22T20:22:45.367649",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "DOLUSU FORO;DOLUSU EUMERUM M",
+    "parcel_id": "9638570613",
+    "sale_date": "2026-10-20T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "191 Edgar Street"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "initiation_on_record",
+   "key": "parcel:NC:buncombe:8697520110",
+   "reason": null,
+   "row": {
+    "case_number": "25SP000429-100",
+    "county": "Buncombe",
+    "first_seen": "2026-07-22T20:22:45.367756",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "LONORIRUM MELEN REROL;DORAL HELET JELO",
+    "parcel_id": "8697520110",
+    "sale_date": "2026-10-27T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "272 Old US 19 23 Highway"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "initiation_on_record",
+   "key": "parcel:NC:buncombe:0616515989",
+   "reason": null,
+   "row": {
+    "case_number": "25SP000824-100",
+    "county": "Buncombe",
+    "first_seen": "2026-07-22T20:22:45.370941",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "CENARELER JENP M",
+    "parcel_id": "0616515989",
+    "sale_date": "2026-11-03T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "89 Reed Road"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "initiation_on_record",
+   "key": "addr:NC:buncombe:6 john hazel dr",
+   "reason": null,
+   "row": {
+    "case_number": "25SP000833-100",
+    "county": "Buncombe",
+    "first_seen": "2026-09-22T15:28:03.675076",
+    "listing_type": "foreclosure_sale",
+    "sale_date": "2026-11-03T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "6 John Hazel Drive"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:8687598883",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "26SP000533-100",
+    "county": "Buncombe",
+    "first_seen": "2026-09-22T15:28:03.676989",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "868759888300000",
+    "sale_date": "2026-11-10T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "141 Charity Lane"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "initiation_on_record",
+   "key": "addr:NC:buncombe:311 ne ave",
+   "reason": null,
+   "row": {
+    "case_number": "26SP000531-100",
+    "county": "Buncombe",
+    "first_seen": "2026-09-22T15:28:03.677031",
+    "listing_type": "foreclosure_sale",
+    "sale_date": "2026-11-10T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "311 Northeast Avenue"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9659405243",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "26SP000329-100",
+    "county": "Buncombe",
+    "first_seen": "2026-07-22T20:22:45.372077",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "OOLI PORANET M",
+    "parcel_id": "9659405243",
+    "sale_date": "2026-11-17T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "34 Waters Cove Road"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:0628335459",
+   "reason": "parcel_chain_not_found_at_rod",
+   "row": {
+    "county": "Buncombe",
+    "first_seen": "2026-09-22T15:28:03.677139",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "062833545900000",
+    "sale_date": "2026-11-17T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "92 Tupper Road"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9720709906",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "26SP000532-100",
+    "county": "Buncombe",
+    "first_seen": "2026-09-22T15:28:03.677573",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "972070990600000",
+    "sale_date": "2026-12-01T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "98 Wolfe Park Circle"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9647973127",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "26SP000247-100",
+    "county": "Buncombe",
+    "first_seen": "2026-08-16T19:47:44.638414",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "BERON SANOR K.",
+    "parcel_id": "964797312700000",
+    "sale_date": "2026-12-02T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "220 London Road"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9721270975",
+   "reason": "no_person_to_search",
+   "row": {
+    "county": "Buncombe",
+    "first_seen": "2026-09-22T15:28:03.678701",
+    "listing_type": "foreclosure_sale",
+    "parcel_id": "972127097500000",
+    "sale_date": "2026-12-11T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "57 Star Flower Road"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "initiation_on_record",
+   "key": "parcel:NC:buncombe:9608761080",
+   "reason": null,
+   "row": {
+    "case_number": "26SP000446-100",
+    "county": "Buncombe",
+    "first_seen": "2026-07-22T20:22:45.373133",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "PEROLIRU DETARA EETUSO;RIREROL EISAN JORE",
+    "parcel_id": "9608761080",
+    "sale_date": "2026-09-29T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "258 Holcombe Cove Road"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "cited_instrument_other_county",
+   "key": "parcel:NC:buncombe:9606599511",
+   "reason": null,
+   "row": {
+    "case_number": "200131511",
+    "county": "Buncombe",
+    "defendant": "HELE JALISET AELARA BUSAR",
+    "first_seen": "2026-08-16T20:24:16.498972",
+    "listing_type": "lis_pendens",
+    "owner_name": "HELE JALISET AELARA BUSAR",
+    "parcel_id": "960659951100000",
+    "raw": {
+     "nod": {
+      "book": "1980",
+      "county": "Cleveland",
+      "doc_type": "FCL",
+      "grantor": "HELE JALISET AELARA BUSAR",
+      "page": "823",
+      "recorded_date": "2026-07-27T00:00:00",
+      "state": "NC"
+     }
+    },
+    "sale_date": "2026-10-25T00:00:00",
+    "source": "counties.nod_discovery",
+    "state": "NC",
+    "street_address": "15 DYNASTY LN"
+   },
+   "verdict": "refuted"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:8696940598",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "26SP000291-100",
+    "county": "Buncombe",
+    "first_seen": "2026-07-22T20:22:45.369366",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "TETALO PUSALORO J;GELETO AUMB F",
+    "parcel_id": "869694059800000",
+    "sale_date": "2026-09-01T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "216 Joe Bailey Drive"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "initiation_on_record",
+   "key": "parcel:NC:buncombe:9666472425",
+   "reason": null,
+   "row": {
+    "case_number": "26SP000432-100",
+    "county": "Buncombe",
+    "first_seen": "2026-07-22T20:22:45.372110",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "PALALI TALETORO EUMUMA",
+    "parcel_id": "9666472425",
+    "sale_date": "2026-09-15T00:00:00",
+    "source": "law_firms.shapiro_ingle_powerbi",
+    "state": "NC",
+    "street_address": "22 Blue Marlin Drive"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:9654517386",
+   "reason": "no_foreclosure_instrument_at_rod",
+   "row": {
+    "case_number": "26CV003558-100",
+    "county": "Buncombe",
+    "defendant": "MORENER L. MENUSONEN",
+    "first_seen": "2026-08-16T19:49:53.046635",
+    "listing_type": "lis_pendens",
+    "owner_name": "MORENER L. MENUSONEN",
+    "parcel_id": "9654517386",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "54 PUNKIN ST"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "case:NC:buncombe:25sp000788100",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "25SP000788-100",
+    "county": "Buncombe",
+    "defendant": "Kirer Eonetin and Zerelu Yorus",
+    "first_seen": "2026-08-06T13:35:57.744155",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "Kirer Eonetin and Zerelu Yorus",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "case:NC:buncombe:26cv003847100",
+   "reason": "no_property_identity",
+   "row": {
+    "case_number": "26CV003847-100",
+    "county": "Buncombe",
+    "defendant": "MUMERAR CUMOROL RELALEN",
+    "first_seen": "2026-09-13T22:36:13.022883",
+    "listing_type": "lis_pendens",
+    "owner_name": "MUMERAR CUMOROL RELALEN",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "parcel:NC:buncombe:0619362197",
+   "reason": "parcel_chain_not_found_at_rod",
+   "row": {
+    "case_number": "26CV002591-100",
+    "county": "Buncombe",
+    "defendant": "JINUS DUMERE PARONORE",
+    "first_seen": "2026-08-16T19:49:53.046553",
+    "listing_type": "lis_pendens",
+    "owner_name": "JINUS DUMERE PARONORE",
+    "parcel_id": "061936219700000",
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "101 STATE ST"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "cited_instrument_on_record",
+   "key": "case:NC:buncombe:6627112",
+   "reason": null,
+   "row": {
+    "case_number": "6627/112",
+    "county": "Buncombe",
+    "defendant": "SENUS, MUMERAR EALUME LELETISE LOAN SERVICING, LLC/ BY AIF LALERENE, LLC/ AIF",
+    "first_seen": "2026-10-02T21:02:07.443578",
+    "listing_type": "lis_pendens",
+    "raw": {
+     "nod": {
+      "book": "6627",
+      "county": "Buncombe",
+      "doc_type": "SUBSTITUTE TRUSTEE",
+      "grantor": "SENUS, MUMERAR EALUME LELETISE LOAN SERVICING, LLC/ BY AIF LALERENE, LLC/ AIF",
+      "page": "112",
+      "recorded_date": "2026-09-03T00:00:00",
+      "state": "NC"
+     }
+    },
+    "sale_date": "2026-12-02T00:00:00",
+    "source": "counties.nod_discovery",
+    "state": "NC"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "case:NC:buncombe:66271708",
+   "reason": "foreclosure_record_without_trustee_deed",
+   "row": {
+    "case_number": "6627/1708",
+    "county": "Buncombe",
+    "defendant": "HISARIN, MENARI E LORUSI, NONUM L TRUSTEE SERVICES OF CAROLINA, LLC/ TR",
+    "first_seen": "2026-10-02T21:02:07.443711",
+    "listing_type": "lis_pendens",
+    "raw": {
+     "nod": {
+      "book": "6627",
+      "county": "Buncombe",
+      "doc_type": "FORECLOSURE",
+      "grantor": "HISARIN, MENARI E LORUSI, NONUM L TRUSTEE SERVICES OF CAROLINA, LLC/ TR",
+      "page": "1708",
+      "recorded_date": "2026-09-08T00:00:00",
+      "state": "NC"
+     }
+    },
+    "sale_date": "2026-12-07T00:00:00",
+    "source": "counties.nod_discovery",
+    "state": "NC"
+   },
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "cited_instrument_on_record",
+   "key": "case:NC:buncombe:66271043",
+   "reason": null,
+   "row": {
+    "case_number": "6627/1043",
+    "county": "Buncombe",
+    "defendant": "PARONORE, JUSUS M PALORIR, RUSUMIN R PARONORE, RUSUMIN R. TIRO BANK, N.A.",
+    "first_seen": "2026-10-02T21:02:07.443750",
+    "listing_type": "lis_pendens",
+    "raw": {
+     "nod": {
+      "book": "6627",
+      "county": "Buncombe",
+      "doc_type": "SUBSTITUTE TRUSTEE",
+      "grantor": "PARONORE, JUSUS M PALORIR, RUSUMIN R PARONORE, RUSUMIN R. TIRO BANK, N.A.",
+      "page": "1043",
+      "recorded_date": "2026-09-08T00:00:00",
+      "state": "NC"
+     }
+    },
+    "sale_date": "2026-12-07T00:00:00",
+    "source": "counties.nod_discovery",
+    "state": "NC"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "cited_instrument_on_record",
+   "key": "case:NC:buncombe:66281262",
+   "reason": null,
+   "row": {
+    "case_number": "6628/1262",
+    "county": "Buncombe",
+    "defendant": "SETOL, JISONE SOLIR BIREN, AELARA DARU SALARU PETARANEN SERVICING, INC.",
+    "first_seen": "2026-10-02T21:02:07.443782",
+    "listing_type": "lis_pendens",
+    "raw": {
+     "nod": {
+      "book": "6628",
+      "county": "Buncombe",
+      "doc_type": "SUBSTITUTE TRUSTEE",
+      "grantor": "SETOL, JISONE SOLIR BIREN, AELARA DARU SALARU PETARANEN SERVICING, INC.",
+      "page": "1262",
+      "recorded_date": "2026-09-11T00:00:00",
+      "state": "NC"
+     }
+    },
+    "sale_date": "2026-12-10T00:00:00",
+    "source": "counties.nod_discovery",
+    "state": "NC"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "cited_instrument_on_record",
+   "key": "case:NC:buncombe:6629803",
+   "reason": null,
+   "row": {
+    "case_number": "6629/803",
+    "county": "Buncombe",
+    "defendant": "NISI, AALUMO T. WELUS FISAL BANK, N.A./ BY AIF LUSA LETOL GROUP LLP/ AIF",
+    "first_seen": "2026-10-02T21:02:07.443841",
+    "listing_type": "lis_pendens",
+    "raw": {
+     "nod": {
+      "book": "6629",
+      "county": "Buncombe",
+      "doc_type": "SUBSTITUTE TRUSTEE",
+      "grantor": "NISI, AALUMO T. WELUS FISAL BANK, N.A./ BY AIF LUSA LETOL GROUP LLP/ AIF",
+      "page": "803",
+      "recorded_date": "2026-09-14T00:00:00",
+      "state": "NC"
+     }
+    },
+    "sale_date": "2026-12-13T00:00:00",
+    "source": "counties.nod_discovery",
+    "state": "NC"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "cited_instrument_on_record",
+   "key": "case:NC:buncombe:66281196",
+   "reason": null,
+   "row": {
+    "case_number": "6628/1196",
+    "county": "Buncombe",
+    "defendant": "THE SUSOLOLUSIN OENF EELORUSE LLC PONEN, JUME EELAL U.S. BANK TRUST NATIONAL ASSOCIATION/ TR&BY AIF HOMES MORTGAGE TRUST SISORA FINANCE LP/ AIF",
+    "first_seen": "2026-10-02T21:02:07.443880",
+    "listing_type": "lis_pendens",
+    "raw": {
+     "nod": {
+      "book": "6628",
+      "county": "Buncombe",
+      "doc_type": "SUBSTITUTE TRUSTEE",
+      "grantor": "THE SUSOLOLUSIN OENF EELORUSE LLC PONEN, JUME EELAL U.S. BANK TRUST NATIONAL ASSOCIATION/ TR&BY AIF HOMES MORTGAGE TRUST SISORA FINANCE LP/ AIF",
+      "page": "1196",
+      "recorded_date": "2026-09-11T00:00:00",
+      "state": "NC"
+     }
+    },
+    "sale_date": "2026-12-10T00:00:00",
+    "source": "counties.nod_discovery",
+    "state": "NC"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "cited_instrument_on_record",
+   "key": "case:NC:buncombe:6629335",
+   "reason": null,
+   "row": {
+    "case_number": "6629/335",
+    "county": "Buncombe",
+    "defendant": "PIRERO, PARON M PIRERO, DETARA L. FEDERAL HOME LOAN MORTGAGE CORPORATION/ TR&BY AIF FETONER MAC SORUMENE LOANS SINUSINUMU TELINIRELAL TRUST, SERIES 2019-1 SALARU PETARANEN SERVICING, INC./ AIF",
+    "first_seen": "2026-10-02T21:02:07.443912",
+    "listing_type": "lis_pendens",
+    "raw": {
+     "nod": {
+      "book": "6629",
+      "county": "Buncombe",
+      "doc_type": "SUBSTITUTE TRUSTEE",
+      "grantor": "PIRERO, PARON M PIRERO, DETARA L. FEDERAL HOME LOAN MORTGAGE CORPORATION/ TR&BY AIF FETONER MAC SORUMENE LOANS SINUSINUMU TELINIRELAL TRUST, SERIES 2019-1 SALARU PETARANEN SERVICING, INC./ AIF",
+      "page": "335",
+      "recorded_date": "2026-09-14T00:00:00",
+      "state": "NC"
+     }
+    },
+    "sale_date": "2026-12-13T00:00:00",
+    "source": "counties.nod_discovery",
+    "state": "NC"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "cited_instrument_on_record",
+   "key": "case:NC:buncombe:6629375",
+   "reason": null,
+   "row": {
+    "case_number": "6629/375",
+    "county": "Buncombe",
+    "defendant": "COLA, BINEL KISJ COLA, RELINU TUMISO VELARERELA MORTGAGE AND FINANCE, INC.",
+    "first_seen": "2026-10-02T21:02:07.443940",
+    "listing_type": "lis_pendens",
+    "raw": {
+     "nod": {
+      "book": "6629",
+      "county": "Buncombe",
+      "doc_type": "SUBSTITUTE TRUSTEE",
+      "grantor": "COLA, BINEL KISJ COLA, RELINU TUMISO VELARERELA MORTGAGE AND FINANCE, INC.",
+      "page": "375",
+      "recorded_date": "2026-09-14T00:00:00",
+      "state": "NC"
+     }
+    },
+    "sale_date": "2026-12-13T00:00:00",
+    "source": "counties.nod_discovery",
+    "state": "NC"
+   },
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "cited_instrument_on_record",
+   "key": "case:NC:buncombe:6631112",
+   "reason": null,
+   "row": {
+    "case_number": "6631/112",
+    "county": "Buncombe",
+    "defendant": "YIRANETO, NORELUS YIRANETO, NERONUMA LALAM, SETIRON THE UNITED STATES DEPARTMENT OF AGRICULTURE",
+    "first_seen": "2026-10-02T21:02:07.443966",
+    "listing_type": "lis_pendens",
+    "raw": {
+     "nod": {
+      "book": "6631",
+      "county": "Buncombe",
+      "doc_type": "SUBSTITUTE TRUSTEE",
+      "grantor": "YIRANETO, NORELUS YIRANETO, NERONUMA LALAM, SETIRON THE UNITED STATES DEPARTMENT OF AGRICULTURE",
+      "page": "112",
+      "recorded_date": "2026-09-21T00:00:00",
+      "state": "NC"
+     }
+    },
+    "sale_date": "2026-12-20T00:00:00",
+    "source": "counties.nod_discovery",
+    "state": "NC"
+   },
+   "verdict": "confirmed"
+  }
+ ],
+ "note": "The live foreclosure_rod verdicts of 2026-10-06 (docs/handoff/verification/foreclosure_rod.json, VERSION v2) for every captured row, rows reduced to the fields the verifier reads and pseudonymized with the bundle's mapping."
+}
