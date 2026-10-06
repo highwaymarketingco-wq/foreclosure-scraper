@@ -119,6 +119,7 @@ import structlog
 
 from .enrichment_pulled_sales import PULLED_RETENTION_WEEKS
 from .models import Listing
+from .row_keys import share_keys
 from .web_artifact import (
     BoardLoadDropError,
     _append_dict_sigs,
@@ -450,6 +451,9 @@ def merge_prior_board(
     # (all of a fresh row's twins must be seen before we know they agree on one house number).
     # Bounded by the prior rows the house-number guard refused on a single-row parcel key.
     deferred: dict[int, list[dict]] = {}
+    # One str per distinct raw key across all prior rows (row_keys.py): the stream decodes one row
+    # at a time, so without this every kept row holds its own copy of every key.
+    key_cache: dict = {}
 
     def _age(rec: dict) -> None:
         """Prior-only (persisted but not re-scraped this run) => AGE, entirely off the raw
@@ -479,7 +483,7 @@ def merge_prior_board(
             rec["auction_status"] = "presumed_withdrawn"
         streamed_for_drop_rate += 1
         try:
-            kept.append(Listing.model_validate(rec))
+            kept.append(Listing.model_validate(share_keys(rec, key_cache)))
         except Exception as exc:  # noqa: BLE001 - same drop tolerance as the matched branch
             drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
             stats["prior_drop_errors"] += 1
@@ -534,7 +538,7 @@ def merge_prior_board(
         if match_idx is not None:
             streamed_for_drop_rate += 1
             try:
-                prior_li = Listing.model_validate(rec)
+                prior_li = Listing.model_validate(share_keys(rec, key_cache))
             except Exception as exc:  # noqa: BLE001 - a malformed matched row is dropped, not fatal
                 drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
                 stats["prior_drop_errors"] += 1
@@ -581,7 +585,7 @@ def merge_prior_board(
         for rec in recs:
             streamed_for_drop_rate += 1
             try:
-                prior_li = Listing.model_validate(rec)
+                prior_li = Listing.model_validate(share_keys(rec, key_cache))
             except Exception as exc:  # noqa: BLE001 - same drop tolerance as the matched branch
                 drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
                 stats["prior_drop_errors"] += 1
