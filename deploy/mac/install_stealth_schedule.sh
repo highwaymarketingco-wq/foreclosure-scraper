@@ -47,7 +47,7 @@ cat > "$PLIST" <<PLIST
     <string>cd "$ROOT" &amp;&amp; exec "$UV_BIN" run python scripts/run_stealth_sources.py</string>
   </array>
 
-  <!-- Daily at 06:00 local (before the VM's default 07:00 UTC run). Missed
+  <!-- Daily at 06:00 local (before the VM's 13:00 UTC run; done ~7:40 ET). Missed
        runs (Mac asleep) fire once at next wake. -->
   <key>StartCalendarInterval</key>
   <dict>

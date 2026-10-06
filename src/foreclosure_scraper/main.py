@@ -2917,6 +2917,8 @@ async def run() -> int:
         sold_pool=sold_pool,
     )
     summary = await run_enrich_tail(_tail)
+    if os.environ.get(STOP_BEFORE_PUBLISH_ENV, "").strip().lower() in ("1", "true", "yes", "on"):
+        return stop_before_publish(_tail, summary)
     return publish_tail(_tail, summary)
 
 
@@ -4031,6 +4033,32 @@ async def run_enrich_tail(st: TailState) -> dict:
     st.enriched = enriched
     st.scoring_failed = _scoring_failed
     return summary
+
+
+#: Set (1/true/yes/on) to end the full run with a pre_publish checkpoint instead of publishing:
+#: deploy/oracle/vm_run.sh --stop-before-publish (the gated VM launch, docs/HANDOFF.md item 72).
+STOP_BEFORE_PUBLISH_ENV = "FULLRUN_STOP_BEFORE_PUBLISH"
+
+
+def stop_before_publish(st: TailState, summary: dict) -> int:
+    """End :func:`run` with the scored board checkpointed and NOTHING published.
+
+    Saves the board as phase ``pre_publish`` plus the run's publish inputs, through the same
+    ``checkpoint.save_pre_publish`` the checkpoint resume uses, so
+    ``scripts/resume_from_checkpoint.py --publish-only`` (deploy/oracle/vm_resume.sh
+    --publish-only) later runs :func:`publish_tail` on it: the board write, and, because this is
+    a full run, the sold pool, run_health, the Sheet export and the digest email it would have
+    done now. No board file, run_health or sold pool is written here, and nothing is committed.
+    Exit codes: 0 saved, 6 saved with stale tiers (SCORE_BOARD_FAIL_SOFT), 3 not saved."""
+    if not checkpoint.save_pre_publish(st, summary, extra={"origin": "main.run"}):
+        log.error("orchestrator.pre_publish_checkpoint_failed",
+                  note="stop-before-publish: the scored board was NOT saved and nothing was "
+                       "published; exit 3")
+        return EXIT_WRITE_FAILED
+    log.info("orchestrator.stopped_before_publish", leads=len(st.enriched),
+             checkpoint=str(checkpoint.CHECKPOINT_DIR), scoring_failed=st.scoring_failed,
+             next="review it, then: bash deploy/oracle/vm_resume.sh --publish-only")
+    return EXIT_SCORE_FAILED if st.scoring_failed else EXIT_OK
 
 
 def publish_tail(st: TailState, summary: dict) -> int:

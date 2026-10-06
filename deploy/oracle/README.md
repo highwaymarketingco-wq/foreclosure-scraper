@@ -80,14 +80,21 @@ rsync -av ~/foreclosure-scraper/.secrets/ ubuntu@<VM_IP>:~/foreclosure-scraper/.
 
 ## Part D — test one run, then schedule it
 
+The first run is a GATED launch (docs/HANDOFF.md item 72): copy the Mac's reference data,
+confirm swap, run pinned with `--stop-before-publish` (the scored board waits in
+`data/checkpoint/`, nothing is published), review it, then publish it with
+`vm_resume.sh --publish-only`. A full run now takes ~18-24 h.
+
 ```bash
 # on the VM
 cd ~/foreclosure-scraper
-bash deploy/oracle/vm_run.sh          # first run: ~1-3h (scrape + enrich + publish)
+git fetch origin && git merge --ff-only --autostash <sha>
+RUN_PIN_COMMIT=<sha> setsid nohup bash deploy/oracle/vm_run.sh --stop-before-publish >/dev/null 2>&1 < /dev/null &
 tail -f logs/vm-run-*.log             # watch it (another SSH tab)
 
-# once a run publishes cleanly, install the daily timer:
-bash deploy/oracle/install_timer.sh   # default 07:00 UTC daily
+# once a gated run has been reviewed and published cleanly, install the daily timer
+# (13:00 UTC, publishes; dry run without --install):
+bash deploy/oracle/install_timer.sh --install
 ```
 
 Check it:

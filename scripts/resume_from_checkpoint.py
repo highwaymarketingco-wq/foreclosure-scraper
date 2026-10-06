@@ -30,6 +30,18 @@ WHAT IT RUNS
     Committing and pushing docs/ is the wrapper's job (deploy/oracle/vm_resume.sh), the same way
     vm_run.sh does it after main.
 
+THE GATED FULL RUN (2026-10-06)
+    ``deploy/oracle/vm_run.sh --stop-before-publish`` (main.run() with
+    FULLRUN_STOP_BEFORE_PUBLISH=1) ends with the same pre_publish checkpoint, saved by the same
+    ``checkpoint.save_pre_publish``, and publishes nothing. ``--publish-only`` then publishes it
+    after a human review. Its resume_state.json records that it came from a full run
+    (``publish``: sold pool, run_health, Sheet export + digest email all on, and the sold pool is
+    saved beside the board), so --publish-only does what that run's own publish would have done;
+    a resume's checkpoint records them off and publishes as in step 5 above. A pre_publish
+    checkpoint may be published up to checkpoint.PRE_PUBLISH_MAX_AGE_H (96 h) after it was saved.
+    Run with no mode, the script previews a pre_publish checkpoint: the run's summary, tiers,
+    regressions, alarms and what the publish will write.
+
 PLACEHOLDER-TWIN CLEAN-UP (opt-in, 2026-10-05)
     The 10/5 run's merge kept ~380 parcels twice: the re-scraped row with a "no number" sentinel
     situs ("0 PATCH DR") beside the aging prior copy of the SAME source's row that the parcel
@@ -79,7 +91,6 @@ import argparse
 import asyncio
 import json
 import os
-import shutil
 import sys
 import time
 from pathlib import Path
@@ -90,7 +101,7 @@ sys.path.insert(0, str(REPO / "src"))
 from foreclosure_scraper import checkpoint  # noqa: E402
 from foreclosure_scraper import main as M  # noqa: E402  (also runs load_dotenv(), like the run)
 
-STATE_FILE = "resume_state.json"
+STATE_FILE = checkpoint.STATE_FILE      # resume_state.json (checkpoint.save_pre_publish writes it)
 
 
 def _rss() -> dict:
@@ -110,29 +121,48 @@ def _mark(stage: str, **kw) -> None:
     M.log.info("resume.stage", stage=stage, **_rss(), **kw)
 
 
-def _archive_checkpoint() -> Path | None:
-    """Copy the current checkpoint aside before it is overwritten (never moved: the live one
-    must stay loadable until the new save has atomically replaced it)."""
-    m = checkpoint.manifest() or {}
-    src = checkpoint.CHECKPOINT_DIR
-    board = src / checkpoint.BOARD_FILE
-    if not board.exists():
-        return None
-    tag = f"{m.get('phase', 'unknown')}_{str(m.get('saved_at', 'na')).replace(':', '')}"
-    dest = src.parent / "checkpoint_archive" / tag
-    if (dest / checkpoint.BOARD_FILE).exists():
-        return dest
-    free = shutil.disk_usage(src).free
-    need = board.stat().st_size * 2 + (1 << 30)
-    if free < need:
-        M.log.warning("resume.archive_skipped_low_disk", free_mb=free >> 20, need_mb=need >> 20)
-        return None
-    dest.mkdir(parents=True, exist_ok=True)
-    for name in (checkpoint.BOARD_FILE, checkpoint.MANIFEST_FILE):
-        if (src / name).exists():
-            shutil.copy2(src / name, dest / name)
-    M.log.info("resume.checkpoint_archived", path=str(dest))
-    return dest
+def _max_age_h(args, phase: str | None) -> float | None:
+    """--max-age-h, else the pre_publish limit for a pre_publish checkpoint (a reviewed board
+    waits for a human: checkpoint.PRE_PUBLISH_MAX_AGE_H, 96 h), else checkpoint.MAX_AGE_H."""
+    if args.max_age_h is not None:
+        return args.max_age_h
+    return checkpoint.PRE_PUBLISH_MAX_AGE_H if phase == checkpoint.PRE_PUBLISH else None
+
+
+def _preview_state(m: dict) -> None:
+    """The review view of a pre_publish checkpoint: the run's own summary as saved beside it."""
+    state, why = checkpoint.load_publish_state()
+    if why:
+        print(f"publish inputs: NOT USABLE: {why}")
+        return
+    if not state:
+        print("publish inputs: none saved (a resume publishes with a placeholder summary)")
+        return
+    s = state.get("summary") or {}
+    pub = state.get("publish") or {}
+    print(f"origin: {m.get('origin') or ('resume of ' + str(m.get('resumed_from')) if m.get('resumed_from') else 'unknown')}"
+          f"  publish limit: {checkpoint.PRE_PUBLISH_MAX_AGE_H:g}h")
+    print(f"publish will write: the board"
+          + "".join(f", {n}" for k, n in (("write_sold_pool", "sold pool"),
+                                           ("write_run_health", "run_health.json"),
+                                           ("export_and_email", "Sheet export + digest email"))
+                    if pub.get(k)))
+    print(f"summary: total={s.get('total')} new_this_week={s.get('new_this_week')} "
+          f"by_state={s.get('by_state')}")
+    print(f"scoring_failed={state.get('scoring_failed')!r}  errors={len(state.get('errors') or [])}"
+          f"  regressions={len(s.get('regressions') or [])}  source_alarms={len(s.get('source_alarms') or {})}")
+    if s.get("count_drop_alert"):
+        print(f"COUNT DROP ALERT: {s['count_drop_alert']}")
+    for r in (s.get("regressions") or [])[:10]:
+        print(f"  regression: {str(r)[:160]}")
+    for slug, a in list((s.get("source_alarms") or {}).items())[:15]:
+        print(f"  alarm: {slug}: {str((a or {}).get('reason') if isinstance(a, dict) else a)[:140]}")
+    tiers = (state.get("enrichment_stats") or {}).get("distress_stack")
+    if tiers:
+        print(f"tiers: {tiers}")
+    top = sorted((s.get("by_source") or {}).items(), key=lambda kv: -int(kv[1] or 0))[:15]
+    if top:
+        print("top sources: " + ", ".join(f"{k} {v}" for k, v in top))
 
 
 def _load(max_age_h: float | None, want_phase: str | None) -> list | None:
@@ -178,15 +208,6 @@ async def _enrich(listings: list, args) -> tuple[M.TailState, dict]:
 def _resume_note(m: dict) -> str:
     return (f"resumed from checkpoint phase {m.get('phase')!r} saved {m.get('saved_at')} "
             f"({m.get('count')} leads) by scripts/resume_from_checkpoint.py")
-
-
-def _save_state(st: M.TailState, summary: dict) -> None:
-    state = {"summary": summary, "enrichment_stats": st.enrichment_stats,
-             "errors": st.errors, "scoring_failed": st.scoring_failed}
-    p = checkpoint.CHECKPOINT_DIR / STATE_FILE
-    tmp = p.with_name(p.name + f".{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(state, default=str, ensure_ascii=False))
-    os.replace(tmp, p)
 
 
 COLLAPSE_ENV = "RESUME_COLLAPSE_PLACEHOLDER_TWINS"
@@ -312,7 +333,9 @@ def main() -> int:
     ap.add_argument("--plan-out", default=None, help="--collapse-dry-run: write the full plan here")
     ap.add_argument("--sample", type=int, default=15, help="--collapse-dry-run: sample size")
     ap.add_argument("--max-age-h", type=float, default=None,
-                    help="refuse a checkpoint older than this (default: checkpoint.MAX_AGE_H, 48)")
+                    help="refuse a checkpoint older than this (default: checkpoint."
+                         "PRE_PUBLISH_MAX_AGE_H, 96, for a pre_publish checkpoint; else "
+                         "checkpoint.MAX_AGE_H, 48)")
     ap.add_argument("--phase", default=None,
                     help="require this checkpoint phase (default: dot_ocr for --run/--enrich-only, "
                          "pre_publish for --publish-only)")
@@ -329,6 +352,8 @@ def main() -> int:
     if args.collapse_dry_run:
         return _collapse_dry_run(args)
     if not (args.run or args.enrich_only or args.publish_only):
+        if m.get("phase") == checkpoint.PRE_PUBLISH:
+            _preview_state(m)
         print("dry run -- pass --run, --enrich-only or --publish-only")
         return 0
     collapse = _collapse_wanted(args)
@@ -343,22 +368,41 @@ def main() -> int:
                         max_runtime=int(os.environ.get("FULLRUN_LOCK_MAX_RUNTIME", "259200"))):
             _mark("start", mode="publish-only" if args.publish_only else
                   "enrich-only" if args.enrich_only else "run", phase=m.get("phase"))
-            listings = _load(args.max_age_h, want)
+            if args.publish_only:
+                # Before the (minutes-long) load: a board whose publish inputs are missing or
+                # belong to another board is refused, never published with a made-up summary.
+                state, why = checkpoint.load_publish_state()
+                if why:
+                    print(f"not publishing: {why}", file=sys.stderr)
+                    return 1
+            listings = _load(_max_age_h(args, want), want)
             if not listings:
                 print("checkpoint could not be loaded (wrong phase, too old or unreadable)",
                       file=sys.stderr)
                 return 1
 
             if args.publish_only:
-                sp = checkpoint.CHECKPOINT_DIR / STATE_FILE
-                state = json.loads(sp.read_text()) if sp.exists() else {}
                 from foreclosure_scraper.config import RuntimeConfig
+                # What publish_tail writes besides the board: a resume's checkpoint says none of
+                # the four (it has no per-source data); a full run's (vm_run.sh
+                # --stop-before-publish) says what that run's own publish would have written.
+                pub = state.get("publish") or {}
+                sold = checkpoint.load_sold_pool() if pub.get("write_sold_pool") else None
+                if pub.get("write_sold_pool") and sold is None:
+                    M.log.error("resume.sold_pool_missing", note="the run's sold pool was not "
+                                "saved beside the board; docs/foreclosure_sold_pool.json is left "
+                                "as it is")
                 st = M.TailState(enriched=listings,
                                  enrichment_stats=state.get("enrichment_stats") or {},
                                  errors=state.get("errors") or [], cfg=RuntimeConfig.from_env(),
-                                 update_source_health=False, write_sold_pool=False,
-                                 write_run_health=False, export_and_email=False,
+                                 update_source_health=False,
+                                 write_sold_pool=sold is not None, sold_pool=sold or [],
+                                 write_run_health=bool(pub.get("write_run_health")),
+                                 export_and_email=bool(pub.get("export_and_email")),
                                  scoring_failed=state.get("scoring_failed"))
+                _mark("publish_state", **{k: bool(v) for k, v in pub.items()},
+                      sold_pool=None if sold is None else len(sold),
+                      origin=m.get("origin") or ("resume" if m.get("resumed_from") else None))
                 summary = state.get("summary") or {"notes": _resume_note(m)}
                 if collapse:
                     _collapse(st, summary, collapse)
@@ -366,7 +410,7 @@ def main() -> int:
 
             # Archived BEFORE the tail: a scoring failure checkpoints "score_failed" over it
             # (main.run_enrich_tail does that on purpose), and the next save is pre_publish.
-            _archive_checkpoint()
+            checkpoint.archive()
             st, summary = asyncio.run(_enrich(listings, args))
             del listings
             summary["notes"] = _resume_note(m) + "; " + str(summary.get("notes") or "")
@@ -374,10 +418,11 @@ def main() -> int:
             summary["checkpoint_phase"] = m.get("phase")
 
             t0 = time.monotonic()
-            saved = checkpoint.save(st.enriched, "pre_publish",
-                                    extra={"resumed_from": {k: m.get(k) for k in ("phase", "saved_at", "count")}})
-            if saved:
-                _save_state(st, summary)
+            # The same save the gated full run ends with (main.stop_before_publish): board +
+            # manifest + resume_state.json, publish switches all off for a resume.
+            saved = checkpoint.save_pre_publish(
+                st, summary,
+                extra={"resumed_from": {k: m.get(k) for k in ("phase", "saved_at", "count")}})
             _mark("pre_publish_checkpoint", saved=saved, seconds=round(time.monotonic() - t0, 1))
             if args.enrich_only:
                 return M.EXIT_SCORE_FAILED if st.scoring_failed else M.EXIT_OK

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Shared by deploy/oracle/vm_run.sh (the full run) and deploy/oracle/vm_resume.sh (finishing a
-# run from its checkpoint), so both load the same secrets and run config and publish the same
-# way. Source this; do not execute. Requires ROOT to be set and the CWD to be $ROOT.
+# run from its checkpoint), so both load the same secrets and run config, run under the same
+# safety (disk / swap / reference-data preflights, the commit pin, the memory watchdog; bottom of
+# this file) and publish the same way. Source this; do not execute. Requires ROOT to be set and
+# the CWD to be $ROOT.
 
 # vm_load_env <log>: secrets from .secrets/ + the VM run config, exported. Exits 1 when a
 # required secret is missing. (Moved verbatim from vm_run.sh, 2026-10-05.)
@@ -110,6 +112,191 @@ vm_publish_board() {
     fi
   else
     echo "==> dashboard unchanged — nothing to publish" | tee -a "$LOG"
+  fi
+  return 0
+}
+
+# =================================================================================================
+# Run safety, shared by vm_run.sh (the full run) and vm_resume.sh (finishing one from a
+# checkpoint), 2026-10-06. The 10/5 full run was killed by the KERNEL's OOM killer because
+# vm_run.sh had none of what vm_resume.sh already had; both now use these. docs/HANDOFF.md item 72.
+# =================================================================================================
+
+# ---- disk -----------------------------------------------------------------------------------------
+# What the board PUBLISH needs free, from the capacity proof on this VM (cf372926, scratchpad
+# scale/vm_evidence/pub2: the real 270,481-row checkpoint padded to 355,000 rows, the top of the
+# 320-355K projection for the next board; expected ~330K):
+#   * VM_PUBLISH_BASE_MB 7000: write_artifact's own writes at 355K rows, measured 6,612 MiB at the
+#     lowest point: the new listings.json (4.0 GiB) + detail sidecar, slim, parts and shards beside
+#     the old ones until the renames, and the 0.3 GiB pre_publish checkpoint; +6% margin.
+#   * + the size of the board being REPLACED (docs/listings.json; its parts when there is none):
+#     write_artifact copies it to backups/ first (pub2 hard-linked it: 2,432 MiB not counted
+#     there), so 9,044 MiB in all for today's 223,832-row board -> 9,432 here. A 355K board
+#     replacing a 355K board needs ~11.1 GB. backups/ keeps BOARD_BACKUP_KEEP (3) such copies.
+#   * the publish commit's git objects (~0.55 GB at 355K: today's committed payload is 343 MB at
+#     223,832 rows, already gzipped, stored ~1:1) land after the write's temp files are gone
+#     (pub2 freed 617 MiB between its low point and its end), so they do not raise the peak.
+VM_PUBLISH_BASE_MB="${VM_PUBLISH_BASE_MB:-7000}"
+# What the full run writes BEFORE it publishes, on top of that:
+#   * checkpoints: 0.3 GiB at 355K rows (311 MB measured), twice that while a save replaces the
+#     previous one, plus the archived pre-scoring checkpoint a --stop-before-publish run keeps
+#     (checkpoint.archive()): ~1 GB
+#   * the run log, new parcel photos under docs/parcel_photos (capped per run), data/ caches and
+#     browser temp files: not measured on the VM, budgeted at 1 GB
+VM_RUN_GROWTH_MB="${VM_RUN_GROWTH_MB:-2000}"
+
+# vm_board_bytes_mb: the size, in MB, of the board a publish replaces (and backs up).
+vm_board_bytes_mb() {
+  local kb
+  if [[ -f "$ROOT/docs/listings.json" ]]; then
+    kb=$(du -k "$ROOT/docs/listings.json" 2>/dev/null | awk '{print $1}')
+  else
+    kb=$(du -ck "$ROOT"/docs/listings_part_*.json.gz 2>/dev/null | awk 'END{print $1}')
+  fi
+  echo $(( ${kb:-0} / 1024 ))
+}
+
+# vm_publish_need_mb / vm_full_run_need_mb: the two disk thresholds, in MB (see above).
+vm_publish_need_mb() { echo $(( VM_PUBLISH_BASE_MB + $(vm_board_bytes_mb) )); }
+vm_full_run_need_mb() { echo $(( $(vm_publish_need_mb) + VM_RUN_GROWTH_MB )); }
+
+vm_free_mb() { df -Pm "$ROOT" | awk 'NR==2{print $4}'; }
+
+# vm_preflight_disk <log> <need_mb> <why>: 1 (refuse) when $ROOT's filesystem has less free.
+vm_preflight_disk() {
+  local LOG="$1" NEED="$2" WHY="$3" FREE
+  FREE=$(vm_free_mb)
+  if [[ -z "$FREE" || "$FREE" -lt "$NEED" ]]; then
+    echo "==> disk: ${FREE:-?} MB free, need ${NEED} MB ($WHY) — not starting." \
+         "Grow the volume or clear space (backups/, data/checkpoint_archive/, logs/)." | tee -a "$LOG"
+    return 1
+  fi
+  echo "==> disk: ${FREE} MB free, need ${NEED} MB ($WHY)" | tee -a "$LOG"
+  return 0
+}
+
+# ---- swap -----------------------------------------------------------------------------------------
+# vm_preflight_swap <log>: never refuses; LOUD when no swap is active. The VM's 4 GB swapfile was
+# enabled by hand and is not in /etc/fstab, so it is gone after any reboot. The publish peaks at
+# ~17.8 GB of the 23.4 GiB VM (cf372926); swap is the slack between that and the watchdog's
+# MemAvailable+SwapFree kill, and without it the watchdog kills at MemAvailable < 700 MB alone.
+vm_preflight_swap() {
+  local LOG="$1" SW="${VM_PROC_SWAPS:-/proc/swaps}" FSTAB="${VM_FSTAB:-/etc/fstab}" MB DEVS
+  MB=$(awk 'NR>1{s+=$3} END{print int(s/1024)}' "$SW" 2>/dev/null)
+  DEVS=$(awk 'NR>1{printf "%s%s", (n++?",":""), $1}' "$SW" 2>/dev/null)
+  if [[ -z "$MB" || "$MB" -le 0 ]]; then
+    {
+      echo "==> !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+      echo "==> !! NO SWAP IS ACTIVE. The 4 GB swapfile is not in /etc/fstab and vanishes on reboot."
+      echo "==> !! Re-enable it before a full run:  sudo swapon /swapfile   (swapon --show to check)"
+      echo "==> !! Persist it:  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab"
+      echo "==> !! Without swap the publish (~17.8 GB peak) has no slack and the memory watchdog"
+      echo "==> !! stops the run as soon as MemAvailable drops under 700 MB."
+      echo "==> !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    } | tee -a "$LOG"
+    return 0
+  fi
+  echo "==> swap: ${MB} MB active (${DEVS})" | tee -a "$LOG"
+  if ! awk '$1 !~ /^#/ && $3 == "swap" {f=1} END{exit !f}' "$FSTAB" 2>/dev/null; then
+    echo "==> ⚠️  swap is not in $FSTAB: it will be gone after a reboot" \
+         "(echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab)" | tee -a "$LOG"
+  fi
+  return 0
+}
+
+# ---- reference data -------------------------------------------------------------------------------
+# vm_preflight_refdata <log>: 1 (refuse) when the Mac reference data the run reads is missing or
+# damaged (deploy/oracle/refdata_check.py: parcel cache, footprints, parcel inventory, sources).
+vm_preflight_refdata() {
+  local LOG="$1"
+  python3 "$ROOT/deploy/oracle/refdata_check.py" verify --root "$ROOT" 2>&1 | tee -a "$LOG"
+  return "${PIPESTATUS[0]}"
+}
+
+# ---- the code to run ------------------------------------------------------------------------------
+# vm_checkout <log> <pin>: put the checkout at the code to run, or return 1 (refuse).
+#   pin set:   fast-forward to EXACTLY that commit; refuse unless HEAD is the pin afterwards (a
+#              checkout already past it is refused too). Never pulls anything newer: origin/main
+#              moves all day (other agents push). The Mac's stealth hand-off files come with the
+#              pinned commit too, so pin a commit made after the day's hand-off landed.
+#   no pin:    pull origin/main (code + the Mac's latest hand-off files), as before.
+vm_checkout() {
+  local LOG="$1" PIN="$2" WANT
+  if [[ -n "$PIN" ]]; then
+    git fetch origin >>"$LOG" 2>&1 || true
+    git merge --ff-only --autostash "$PIN" >>"$LOG" 2>&1 || true
+    WANT=$(git rev-parse --verify --quiet "$PIN^{commit}" || echo "unknown")
+    if [[ "$(git rev-parse HEAD)" != "$WANT" ]]; then
+      echo "==> code is $(git rev-parse --short HEAD), pinned $PIN ($WANT) — not starting" | tee -a "$LOG"
+      return 1
+    fi
+  else
+    git pull --rebase --autostash origin main >>"$LOG" 2>&1 || true
+  fi
+  echo "==> code at $(git rev-parse --short HEAD)${PIN:+ (pinned)}" | tee -a "$LOG"
+  return 0
+}
+
+# vm_handoff_note <log>: which stealth hand-off the run will ingest, and whether origin has a newer one.
+vm_handoff_note() {
+  local LOG="$1" F="docs/handoff/stealth_leads.json" HERE THERE
+  HERE=$(git log -1 --format='%ct %h %ci' -- "$F" 2>/dev/null)
+  THERE=$(git log -1 --format='%ct %h %ci' origin/main -- "$F" 2>/dev/null)
+  if [[ -z "$HERE" ]]; then
+    echo "==> ⚠️  no stealth hand-off ($F) in this checkout" | tee -a "$LOG"; return 0
+  fi
+  echo "==> stealth hand-off: ${HERE#* } ($(( ($(date +%s) - ${HERE%% *}) / 3600 ))h old)" | tee -a "$LOG"
+  if [[ -n "$THERE" && "${THERE%% *}" -gt "${HERE%% *}" ]]; then
+    echo "==> ⚠️  origin/main has a newer hand-off (${THERE#* }) than this pinned checkout" | tee -a "$LOG"
+  fi
+  return 0
+}
+
+# ---- one board job at a time ----------------------------------------------------------------------
+vm_board_job_active() {
+  pgrep -f -- "${VM_BOARD_JOB_PATTERN:--m foreclosure_scraper|resume_from_checkpoint\.py}" >/dev/null 2>&1
+}
+
+# ---- the memory watchdog --------------------------------------------------------------------------
+# vm_alive <pid>: 0 while the process runs (an exited child not yet reaped is a zombie: not alive)
+vm_alive() { local s; s=$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' '); [[ -n "$s" && "$s" != Z* ]]; }
+
+# vm_run_watched <log> <memlog> <env prefix> <command...>: run the command in the background under
+# deploy/oracle/mem_watchdog.py (dual signal: tree rss+swap > <P>_KILL_TOTAL_MB, or MemAvailable <
+# <P>_KILL_AVAIL_MB with SwapFree < <P>_KILL_SWAPFREE_MB; defaults 25600 / 700 / 400, the limits
+# vm_resume.sh has used since 10/5), wait, and set VM_RC: the command's exit code, 137 when the
+# watchdog stopped it, 70 when the watchdog could not run (the job is then stopped: never unwatched).
+vm_run_watched() {
+  local LOG="$1" MEMLOG="$2" P="$3"; shift 3
+  local KT="${P}_KILL_TOTAL_MB" KA="${P}_KILL_AVAIL_MB" KS="${P}_KILL_SWAPFREE_MB"
+  local WATCHDOG="${VM_MEM_WATCHDOG:-$ROOT/deploy/oracle/mem_watchdog.py}" PID WD
+  "$@" >>"$LOG" 2>&1 &
+  PID=$!
+  python3 "$WATCHDOG" --pid "$PID" --log "$MEMLOG" \
+    --kill-total-mb "${!KT:-25600}" --kill-avail-mb "${!KA:-700}" \
+    --kill-swapfree-mb "${!KS:-400}" >>"$LOG" 2>&1 &
+  WD=$!
+  sleep "${VM_WATCHDOG_GRACE_S:-3}"
+  if ! vm_alive "$WD"; then
+    # it exits 0 when the job ended and 9 when it killed it; anything else is a watchdog that
+    # never ran (no python3, no /proc, bad arguments)
+    wait "$WD"; local WRC=$?
+    if [[ "$WRC" -ne 0 && "$WRC" -ne 9 ]]; then
+      echo "==> ⚠️  the memory watchdog failed (exit $WRC, see the log): stopping the job rather" \
+           "than running it unwatched" | tee -a "$LOG"
+      if vm_alive "$PID"; then pkill -TERM -P "$PID" 2>/dev/null; kill -TERM "$PID" 2>/dev/null; fi
+      wait "$PID" 2>/dev/null
+      VM_RC=70
+      return 0
+    fi
+  fi
+  wait "$PID"
+  VM_RC=$?
+  wait "$WD" 2>/dev/null
+  tail -1 "$MEMLOG" 2>/dev/null | tee -a "$LOG"
+  if grep -q "^KILLED" "$MEMLOG" 2>/dev/null; then
+    echo "==> ⚠️  stopped by the memory watchdog: $(grep '^KILLED' "$MEMLOG" | tail -1)" | tee -a "$LOG"
+    VM_RC=137
   fi
   return 0
 }

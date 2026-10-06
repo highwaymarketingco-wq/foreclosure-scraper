@@ -44,6 +44,7 @@ USAGE
     uv run python scripts/board_selfcheck.py            # vs the last commit
     uv run python scripts/board_selfcheck.py --json     # machine-readable
     uv run python scripts/board_selfcheck.py --against <git-ref>
+    uv run python scripts/board_selfcheck.py --checkpoint [DIR]   # a checkpoint, before publishing
 
     Exit 0 = every invariant held. Exit 1 = at least one breached.
 """
@@ -172,6 +173,35 @@ def _current() -> Iterator[dict]:
         # No manifest, no parts, and no legacy single listings.json.gz either: there is no
         # board here at all (a bare checkout, or docs/ pointed at an empty scratch dir).
         raise SystemExit(f"no board found under {DOCS} — nothing to check ({exc})") from exc
+
+
+def _checkpoint_rows(ckpt_dir: Path) -> Iterator[dict]:
+    """Stream a CHECKPOINT's board (``<ckpt_dir>/board.json.gz``, full-fidelity Listing dumps) as
+    the rows it would PUBLISH: each row validated to a Listing and passed through
+    web_artifact._to_dict, the per-row transform write_artifact applies (RAW_KEEP trim, junk
+    street addresses nulled, ...). One row at a time, like _current().
+
+    For the gated launch (docs/HANDOFF.md item 72): ``--checkpoint`` grades the scored
+    pre_publish board that ``vm_run.sh --stop-before-publish`` left, against the published
+    board, BEFORE ``vm_resume.sh --publish-only`` publishes it. Rows that do not validate are
+    skipped (as checkpoint.load() skips them) and reported on stderr."""
+    from foreclosure_scraper.board_parts import iter_gz_rows
+    from foreclosure_scraper.models import Listing
+    from foreclosure_scraper.web_artifact import _to_dict
+    board = Path(ckpt_dir) / "board.json.gz"
+    if not board.exists():
+        raise SystemExit(f"no checkpoint board at {board} - nothing to check")
+    bad = 0
+    for rec in iter_gz_rows(board):
+        try:
+            li = Listing.model_validate(rec)
+        except Exception:  # noqa: BLE001 - counted, like checkpoint.load()
+            bad += 1
+            continue
+        yield _to_dict(li)
+    if bad:
+        print(f"note: {bad:,} checkpoint rows did not validate and were skipped "
+              f"(checkpoint.load() drops them too)", file=sys.stderr)
 
 
 def _previous(ref: str) -> Iterator[dict] | None:
@@ -550,6 +580,10 @@ def main() -> int:
     ap.add_argument("--against", default="HEAD",
                     help="git ref holding the board to compare against (default HEAD)")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--checkpoint", nargs="?", const="data/checkpoint", default=None,
+                    metavar="DIR", help="grade a checkpoint's board (default dir data/checkpoint) "
+                    "as it would publish, instead of the published board; movement is still "
+                    "against --against")
     args = ap.parse_args()
 
     # ONE streaming pass over the live board: _tee() counts rows and extracts movement()'s
@@ -557,7 +591,10 @@ def main() -> int:
     # rows (see the MEMORY HISTORY comment above _current()).
     total_box: list[int] = []
     light_rows: list[dict] = []
-    inv = invariants(_tee(_current(), total_box, light_rows))
+    src = (_checkpoint_rows(REPO / args.checkpoint if not Path(args.checkpoint).is_absolute()
+                            else Path(args.checkpoint))
+           if args.checkpoint else _current())
+    inv = invariants(_tee(src, total_box, light_rows))
     total = total_box[0] if total_box else 0
 
     prev = _previous(args.against)
@@ -569,7 +606,8 @@ def main() -> int:
                           "breached": len(breached)}, indent=1, default=str))
         return 1 if breached else 0
 
-    print(f"BOARD SELF-CHECK — {total:,} leads\n")
+    what = f" (checkpoint {args.checkpoint}, as it would publish)" if args.checkpoint else ""
+    print(f"BOARD SELF-CHECK — {total:,} leads{what}\n")
     print("INVARIANTS (a breach means a known defect is back)")
     for i in inv:
         mark = "ok " if i["ok"] else "FAIL"
