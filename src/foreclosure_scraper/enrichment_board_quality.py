@@ -11,6 +11,11 @@ Fixes verified 2026-06-30 against the live board:
     in the lis-pendens feed = likely resolved/withdrawn. Flag raw['stale_case'] and down-rank a
     stale HOT to WARM so the operator's HOT queue isn't dominated by dead leads (non-destructive —
     the lead stays on the board, just not prioritized).
+  * raw['stale_case'] is DERIVED, every run, from those two withdrawn tags and nothing else: it
+    is set when one is present and removed when none is. It used to be only ever set, so a row
+    whose tag was dropped later (a re-scraped row merge_prior_board() cleared before 2026-10-06,
+    a repaired row) kept the flag for good: 1,283 published rows on 2026-10-06 (see
+    downrank_if_stale).
   * a lead the source stopped listing (`pulled_sale.presumed_withdrawn`) or whose sale date is
     well past (`sale_date_passed`, outside the upset-bid window) is downranked HOT -> WARM on
     EITHER signal, not only on the exact status string `presumed_withdrawn` (audit 2026-09-21,
@@ -255,9 +260,20 @@ WITHDRAWN_TAG_REASONS = ("presumed_withdrawn", "pulled_sale_presumed_withdrawn")
 def downrank_if_stale(li, raw: dict, today: date, stats=None) -> None:
     """Step 3 of enrich_board_quality() for one lead: flag raw['stale_case'] and down-rank a HOT
     stack to WARM when _stale_reason() finds one. Also called by the pre-publish clean-up
-    (placeholder_twins.repair_reseen) after it removes a withdrawn tag a live row inherited."""
+    (placeholder_twins.repair_reseen) after it removes a withdrawn tag a live row inherited.
+
+    raw['stale_case'] is a pure function of the withdrawn tags, so it is also REMOVED here when
+    this run finds none (no reason, or only the past sale date, which never sets the flag).
+    Nothing else writes it (git history: the status before 2026-09-21, the two tags since), so a
+    flag with no tag behind it was inherited, never earned. Measured on the published board of
+    2026-10-06: 99,847 rows carried it, 98,564 with a tag; of the 1,283 without, 1,251 had no
+    reason at all and 32 only a passed sale date. A past sale date still down-ranks a HOT lead
+    on its own (reason 'sale_date_passed'); it is not stale_case, and it is left as it was."""
     stats = stats if stats is not None else collections.Counter()
     found = _stale_reason(li, raw, today)
+    if not (found and found[1]) and "stale_case" in raw:
+        if raw.pop("stale_case"):
+            stats["stale_case_cleared"] += 1
     if found:
         why, is_stale_case = found
         if is_stale_case:
