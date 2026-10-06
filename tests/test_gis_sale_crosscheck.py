@@ -245,6 +245,8 @@ def test_no_deed_count_request_when_the_prices_agree():
     ("12 Mountain View Trl", ("12", "", "", "MOUNTAIN VIEW", "TRL")),
     ("15 Eaglebear Dr, Asheville, NC 28806", ("15", "", "", "EAGLEBEAR", "DR")),
     ("78 and 80 Taylor St, Woodfin, NC, 28804", None),
+    ("99999 Lookout Rd", None),                 # the placeholder of an unaddressed lot
+    ("0 Old Leicester Rd", None),
     ("Old Leicester Rd", None),
 ])
 def test_parse_address(addr, want):

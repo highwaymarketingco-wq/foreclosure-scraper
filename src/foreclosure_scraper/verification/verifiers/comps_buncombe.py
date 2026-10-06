@@ -33,10 +33,16 @@ PER COMP (status in the evidence):
                narrowed by the situs columns) can mismatch: a parcel picked among several by
                deed date alone, or found only by the broad retry, can match (date AND price
                agree) but never refute.
-  not_found    neither query finds the house number on that street anywhere in the county,
-               for a comp whose ZIP lies wholly in Buncombe (a border ZIP, 28704 Arden, 28732
-               Fletcher, 28787 Weaverville, can be another county's parcel: unresolvable).
-  unresolvable no single parcel ('78 and 80 Taylor St', no house number), several candidates
+  not_found    the comp sale is not on the county's record at all: no parcel at the address
+               (the street query and the broad retry both empty), AND no parcel anywhere in the
+               county has a deed within 1% of the comp's price within 45 days of its date, for
+               a sale at least 90 days old (the layer lags recent deeds) in a ZIP wholly in
+               Buncombe (28704 Arden, 28732 Fletcher, 28787 Weaverville reach into Henderson /
+               Madison). An address alone is not enough: 12 Killian Ln ($95,000, 2026-04-23)
+               has no parcel, but its sale is on record as 3 "99999 TATOOINE LN" lots.
+  unresolvable no single parcel ('78 and 80 Taylor St', no house number, the placeholder 99999
+               of an unaddressed lot), a missing address whose sale IS on record elsewhere, a
+               not-found comp that is recent or in a border ZIP, several candidates
                the deed date cannot separate, the latest deed is a LATER sale (a resale: the
                layer only holds the latest) or the claimed sale is not recorded within 45 days
                (the layer can lag a deed: 205 Linden St), a $0 / unpriced deed, no sold_date, a
@@ -83,7 +89,10 @@ from ... import enrichment_gis_sale_crosscheck as xc
 from ..core import VerificationResult, result
 
 SIGNAL = "comps"
-VERSION = "v1"
+VERSION = "v2"         # v2 (2026-10-06, same night): not_found refutes only when no deed of that
+                       # price was recorded near that date anywhere in the county (12 Killian Ln:
+                       # a new address, the sale is on record as 3 "99999 TATOOINE LN" lots);
+                       # placeholder house numbers (99999, 0) are unresolvable
 TTL_DAYS = 30
 RETRY_DAYS = 14
 SOURCE = "Buncombe County parcel layer (gis.buncombecounty.org property_bc_dis)"
@@ -96,6 +105,11 @@ ROW_SUMMARY_EXCLUDE = ("owner_name",)
 FRESHNESS_WINDOW_DAYS = 180
 PRICE_TOLERANCE = xc.PRICE_DISAGREEMENT_TOLERANCE
 DATE_TOLERANCE_DAYS = xc.DATE_TOLERANCE_DAYS
+#: a comp sale this recent may not be on the layer yet (205 Linden St: a 2026-09-01 deed in the
+#: county's record-card history was not on the layer on 10/4), so its absence decides nothing
+RECORDING_LAG_DAYS = 90
+#: the county-wide search for a not-found comp's sale: a deed within this fraction of its price
+SALE_SEARCH_PRICE_BAND = 0.01
 LAYER_QUERY = xc.BUNCOMBE_PARCELS
 LAYER = LAYER_QUERY.rsplit("/query", 1)[0]
 RESULT_COUNT = "10"
@@ -115,7 +129,7 @@ _COMP_FIELDS = ("address", "status", "reason", "board_price", "county_price", "d
                 "delta_pct", "claimed_sold_date", "deed_date", "date_gap_days", "county_stamps",
                 "stamps_price", "county_pin", "match_basis", "candidates",
                 "county_correction_applied", "homeharvest_price", "zip", "deed",
-                "deed_parcels", "error")
+                "deed_parcels", "county_sales_matching", "error")
 _TOP_FIELDS = ("layer", "as_of", "price_tolerance_pct", "date_tolerance_days",
                "freshness_window_days", "comp_set_id", "comps_total", "comps_matched",
                "comps_mismatched", "comps_not_found", "comps_unresolvable",
@@ -227,7 +241,43 @@ def _done(view: dict, status: str, reason: Optional[str] = None) -> dict:
     return view
 
 
-async def check_comp(comp: dict, client: Any, counter: list) -> dict:
+def sale_where(claimed: date, price: float) -> str:
+    """Every parcel whose latest deed is within DATE_TOLERANCE_DAYS of `claimed` and within
+    SALE_SEARCH_PRICE_BAND of `price`, county-wide (DeedDate is a YYYYMMDD string)."""
+    lo = (claimed - timedelta(days=DATE_TOLERANCE_DAYS)).strftime("%Y%m%d")
+    hi = (claimed + timedelta(days=DATE_TOLERANCE_DAYS)).strftime("%Y%m%d")
+    plo = int(price * (1 - SALE_SEARCH_PRICE_BAND))
+    phi = int(price * (1 + SALE_SEARCH_PRICE_BAND)) + 1
+    return (f"DeedDate >= '{lo}' AND DeedDate <= '{hi}' AND SalePrice >= {plo} "
+            f"AND SalePrice <= {phi}")
+
+
+async def _not_found(view: dict, claimed: Optional[date], price: Optional[float], client: Any,
+                     counter: list, today: date) -> dict:
+    """No parcel at the comp's address. That alone does not make the comp a sale that never
+    happened: a newly assigned address is not on the layer (12 Killian Ln, $95,000 on
+    2026-04-23, is on record as the 3 "99999 TATOOINE LN" lots of deed 6586/1409), and the layer
+    lags recent deeds. So the comp is not_found (refuting) only when its ZIP is wholly in
+    Buncombe, its sale is at least RECORDING_LAG_DAYS old, and NO parcel in the county has a
+    deed within 1% of its price within DATE_TOLERANCE_DAYS of its date."""
+    z = view.get("zip")
+    if z not in BUNCOMBE_ONLY_ZIPS:
+        return _done(view, "unresolvable", "not_found_border_zip" if z else "not_found_no_zip")
+    if claimed is None or price is None:
+        return _done(view, "unresolvable", "not_found_undated")
+    if (today - claimed).days < RECORDING_LAG_DAYS:
+        return _done(view, "unresolvable", "not_found_recent_sale")
+    st, n = await _query(client, sale_where(claimed, price), counter, count=True)
+    if st != "ok":
+        view["error"] = n
+        return _done(view, "lookup_failed", "sale_search_error")
+    view["county_sales_matching"] = n
+    if n:
+        return _done(view, "unresolvable", "sale_on_record_at_another_address")
+    return _done(view, "not_found", "no_parcel_and_no_such_sale")
+
+
+async def check_comp(comp: dict, client: Any, counter: list, today: date) -> dict:
     addr = str(comp.get("address") or "").split(",")[0].strip()
     claimed = xc.parse_any_date(comp.get("sold_date"))
     board_price = _num(comp.get("sold_price"))
@@ -242,8 +292,12 @@ async def check_comp(comp: dict, client: Any, counter: list) -> dict:
         return _done(view, "unresolvable", "no_address")
     parts = xc.parse_address(addr)
     if parts is None:
-        multi = bool(xc._MULTI_PARCEL_RE.match(addr))
-        return _done(view, "unresolvable", "multi_parcel_address" if multi else "no_house_number")
+        if xc._MULTI_PARCEL_RE.match(addr):
+            return _done(view, "unresolvable", "multi_parcel_address")
+        m = xc._HOUSE_RE.match(addr)
+        if m and xc.is_placeholder_house(m.group(1)):
+            return _done(view, "unresolvable", "placeholder_house_number")
+        return _done(view, "unresolvable", "no_house_number")
 
     where = xc.street_where(parts)
     st, feats = await _query(client, where, counter)
@@ -260,10 +314,7 @@ async def check_comp(comp: dict, client: Any, counter: list) -> dict:
                 return _done(view, "lookup_failed", "lookup_error")
             identified = "street_broad"
     if not feats:
-        z = view.get("zip")
-        if z in BUNCOMBE_ONLY_ZIPS:
-            return _done(view, "not_found", "no_parcel_at_address")
-        return _done(view, "unresolvable", "not_found_border_zip" if z else "not_found_no_zip")
+        return await _not_found(view, claimed, board_price, client, counter, today)
 
     cands = xc.narrow_candidates(feats, parts)
     if len(cands) > 1:
@@ -369,7 +420,7 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     ev["comp_set_id"] = comp_set_id(comps)
 
     counter = [0]
-    views = [await check_comp(c, client, counter) for c in comps]
+    views = [await check_comp(c, client, counter, today) for c in comps]
     ev["comps"] = views
     ev["requests_this_row"] = counter[0]
     by = {s: [v for v in views if v["status"] == s]

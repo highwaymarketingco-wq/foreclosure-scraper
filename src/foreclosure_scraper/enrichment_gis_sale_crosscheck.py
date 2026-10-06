@@ -140,6 +140,14 @@ _UNIT_RE = re.compile(r"\s+(?:UNIT|APT|STE|SUITE|#)\s*[\w-]+\s*$", re.I)
 _HOUSE_RE = re.compile(r"^\s*(\d+)([A-Z])?\s+(.*)$", re.I)
 
 
+def is_placeholder_house(house: str) -> bool:
+    """0, or a run of 9s ("99999"): the county's (and the MLS's) number for an unaddressed lot,
+    shared by every such lot on the street. Live 2026-10-06: "99999 TATOOINE LN" is 3 parcels,
+    "99999 Lookout Rd" 10; a board comp "99999 Lookout Rd" names none of them in particular."""
+    h = str(house or "").strip()
+    return not h or int(h) == 0 or (len(h) >= 4 and set(h) == {"9"})
+
+
 def parse_address(addr: str | None) -> dict | None:
     """A comp address as the parcel layer's situs columns spell it, or None when it names no
     single numbered parcel. '140 Old Leicester Rd' -> {house: '140', number_suffix: '',
@@ -147,7 +155,8 @@ def parse_address(addr: str | None) -> dict | None:
     number_suffix 'B'. The street core is split_house_street()'s (the layer's `streetname`
     holds no type); a trailing type that regex does not know (TRL, CV, ...) is cut too. A
     'City, NC, zip' tail is dropped. None for no house number or a two-parcel address ('78 and
-    80 Taylor St'), which a single parcel record cannot confirm or contradict."""
+    80 Taylor St') or a placeholder number (is_placeholder_house), which a single parcel
+    record cannot confirm or contradict."""
     a = str(addr or "").split(",")[0].strip()
     if not a or _MULTI_PARCEL_RE.match(a):
         return None
@@ -156,6 +165,8 @@ def parse_address(addr: str | None) -> dict | None:
     if not m:
         return None
     house, letter, rest = m.group(1), (m.group(2) or "").upper(), m.group(3).strip()
+    if is_placeholder_house(house):
+        return None
     split = split_house_street(f"{house} {rest}")
     if not split:
         return None

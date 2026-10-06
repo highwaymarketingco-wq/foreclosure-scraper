@@ -6,8 +6,9 @@ verifier requests them) and six real 10/5 board rows (comps from the lazy-detail
 other personal fields dropped) whose comps include the validation's hard cases: 140 Old Leicester Rd
 (the confirmed MLS miskey), 117 Lookout Rd (a deed over 3 parcels), 4 Heather Way (really 4B),
 205 Linden St (deed not on the layer yet), 44 Haw Creek Cir (no such street at that number),
-78 and 80 Taylor St (two parcels); plus the layer's real (empty) answer for a street it does not
-have ("9 Nowhere Ln"). No network."""
+78 and 80 Taylor St (two parcels), 12 Killian Ln (a new address; its sale is on record as 3
+"99999 TATOOINE LN" lots); plus the layer's real (empty) answers for a street it does not have
+("9 Nowhere Ln") and for a sale nobody recorded. No network."""
 from __future__ import annotations
 
 import asyncio
@@ -53,7 +54,7 @@ def _comp(res, address):
 
 def test_module_meets_the_registry_contract():
     v = from_module(cb)
-    assert (v.signal, v.version, v.identity) == ("comps", "v1", "property")
+    assert (v.signal, v.version, v.identity) == ("comps", "v2", "property")
     assert v.governs == ()                       # informational: see the module docstring
     assert v.detail_keys == ("comps",)
     assert cb.ROW_SUMMARY_EXCLUDE == ("owner_name",)
@@ -101,6 +102,8 @@ LIVE = {  # what the 2026-10-06 live run answered for each row (same order, one 
     "117 lookout": ("refuted", "price_mismatch"),
     "205 linden": ("confirmed", None),
     "78 and 80 taylor": ("confirmed", None),
+    "739 patton cove": ("unconfirmed", "no_comp_resolvable"),
+    "s turkey creek": ("refuted", "price_mismatch"),
 }
 
 
@@ -111,7 +114,7 @@ def test_the_live_verdicts_reproduce_with_one_query_per_distinct_address():
         res = _run(_row(name), f)
         got[name] = (res.verdict, res.evidence.get("reason"))
     assert got == LIVE
-    assert len(f.asked) == len(set(f.asked)) == 16     # the per-run cache: never asked twice
+    assert len(f.asked) == len(set(f.asked)) == 20     # the per-run cache: never asked twice
 
 
 def test_refuted_the_140_old_leicester_miskey():
@@ -190,27 +193,49 @@ def test_refuted_wins_over_stale():
     assert res.verdict == "refuted"
 
 
-def _single(address, zip_code, sold="2026-08-01 00:00:00", price=300000.0):
+def test_a_missing_address_whose_sale_is_on_record_elsewhere_never_refutes():
+    """739 Patton Cove Rd's comps (live): '12 Killian Ln' ($95,000, 2026-04-23) has no parcel,
+    but a county-wide search finds the sale (3 '99999 TATOOINE LN' lots, deed 6586/1409); the
+    two '99999' comps are the placeholder number of unaddressed lots."""
+    res = _run(_row("739 patton cove"))
+    k = _comp(res, "12 Killian Ln")
+    assert k["status"] == "unresolvable" and k["reason"] == "sale_on_record_at_another_address"
+    assert k["county_sales_matching"] == 3
+    assert [c["reason"] for c in res.evidence["comps"] if c["address"].startswith("99999")] == \
+        ["placeholder_house_number"] * 2
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "no_comp_resolvable"
+
+
+def _single(address, zip_code, sold="2026-05-01 00:00:00", price=7654321.0):
     return {"state": "NC", "county": "Buncombe", "parcel_id": "9999999999", "street_address": "1 Test St",
             "raw": {"comps": [{"address": address, "zip": zip_code, "sold_price": price,
                                "sold_date": sold}]}}
 
 
-def test_not_found_refutes_only_inside_a_wholly_buncombe_zip():
-    # a real answer of the layer for a street it does not have (one word: no broad retry)
+def test_not_found_refutes_only_with_no_such_sale_anywhere_in_the_county():
+    # real answers: the layer has no "9 Nowhere Ln", and no deed near $7,654,321 near 2026-05-01
     res = _run(_single("9 Nowhere Ln", "28806"))
     assert res.verdict == "refuted" and res.evidence["reason"] == "comp_not_on_county_record"
-    assert res.evidence["comps"][0]["status"] == "not_found"
+    c = res.evidence["comps"][0]
+    assert c["status"] == "not_found" and c["reason"] == "no_parcel_and_no_such_sale"
+    assert c["county_sales_matching"] == 0
+
+
+def test_not_found_in_a_border_zip_or_recent_decides_nothing():
     for border in ("28732", "28704", "28787"):
         res = _run(_single("9 Nowhere Ln", border))
         assert res.verdict == "unconfirmed"
         assert res.evidence["comps"][0]["reason"] == "not_found_border_zip"
+    f = ReplayFetcher(RESP)
+    res = _run(_single("9 Nowhere Ln", "28806", sold="2026-08-01 00:00:00"), f)
+    assert res.evidence["comps"][0]["reason"] == "not_found_recent_sale"
+    assert res.verdict == "unconfirmed" and len(f.asked) == 1      # no county-wide search
 
 
 def test_a_two_word_street_is_retried_broadly_before_not_found():
     f = ReplayFetcher(RESP)
     res = _run(_single("9 Nowhere Valley Ln", "28806"), f)
-    assert len(f.asked) == 2 and res.verdict == "refuted"
+    assert len(f.asked) == 3 and res.verdict == "refuted"     # street, broad, sale search
 
 
 def test_lookup_failures_are_unconfirmed_never_refuted():
