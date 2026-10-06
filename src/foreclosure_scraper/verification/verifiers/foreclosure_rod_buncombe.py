@@ -70,7 +70,19 @@ the SP case is filed).
                agrees: the parcel's vesting deed is that trustee deed or the owner of record is no
                longer the borrower); or the deed of trust a recent substitute-trustee appointment
                refers to was satisfied after the appointment (payoff, refinance or sale), and the
-               satisfaction was not rescinded.
+               satisfaction was not rescinded. v3 (2026-10-06, after three agents re-checked all
+               103 stale verdicts live and found 8 wrong): a trustee deed ends THIS claim only
+               when the claim's identity ties to it (`claim_tie`): the deed forecloses the deed
+               of trust the claim itself cites (raw.rod_docs of a law-firm row, its description),
+               or a person the claim names (defendant, owner, cited grantor) is among the deed's
+               grantors / the grantors of the deed of trust it forecloses / on the confirming
+               initiation, or the claim names nobody (a property listing) and the board's address
+               is the county parcel's own. Otherwise the answer is `unconfirmed`
+               (tie_not_established): the same parcel or street is not the same foreclosure (a
+               notice for a loan on 16 Overlook Dr had been put on 19 Violet Hill Cir, whose
+               trustee deed closed ANOTHER borrower's loan). And a deed that describes another
+               lot (a weak street tie the county layer contradicts: 16 vs 18 Saxon Hl) is
+               `unconfirmed` (deed_describes_adjacent_parcel), never stale.
   refuted      ONLY on positive contrary evidence, three precise cases:
                (a) cited_instrument_other_county: the row's own cited ROD instrument (raw.nod) was
                    recorded in another county's register, and the parcel's owner of record is not
@@ -145,9 +157,14 @@ from urllib.parse import urlencode
 from ..core import VerificationResult, result
 
 SIGNAL = "foreclosure_rod"
-VERSION = "v2"         # v2 (2026-10-06, before any v1 verdict was used): a trustee deed is
+VERSION = "v3"         # v2 (2026-10-06, before any v1 verdict was used): a trustee deed is
                        # judged against its own borrower's acquisition (not the later buyer's),
                        # a description naming another lot never ties, no-chain reason split out
+                       # v3 (2026-10-06): a trustee deed ends the claim only when the claim's
+                       # identity ties to it (tie_not_established), a weak street tie the county
+                       # layer contradicts is unconfirmed (deed_describes_adjacent_parcel); stale
+                       # evidence records claim_tie, deed_predates_claim_days, an exact tie to the
+                       # deed of trust the claim itself cites
 TTL_DAYS = 14          # a sale, a trustee deed or a payoff can land within weeks
 RETRY_DAYS = 7
 SOURCE = "registerofdeeds.buncombenc.gov"
@@ -268,6 +285,30 @@ def to_date(v: Any) -> Optional[date]:
     return None
 
 
+_DOT_DESC = re.compile(r"deed of trust book/page\s*(\d{1,5})\s*/\s*(\d{1,5})", re.I)
+
+
+def cited_dots(row: dict) -> list[str]:
+    """The book/page keys of the deed of trust the CLAIM ITSELF names: a law firm's sale notice
+    gives the loan being foreclosed (law_firms.hutchens, brock_scott: the description's "deed of
+    trust book/page 2418/229" and a raw.rod_docs DEED OF TRUST entry whose source is the firm).
+    Another source's rod_docs (the ROD enrichers' name-index finds) are the property's history,
+    not the claim, and are never read here."""
+    keys: set[str] = set()
+    for m in _DOT_DESC.finditer(str(row.get("description") or "")):
+        k = bp_key(*m.groups())
+        if k:
+            keys.add(k)
+    docs = _raw(row).get("rod_docs")
+    for d in docs if isinstance(docs, list) else []:
+        if (isinstance(d, dict) and str(d.get("source") or "").startswith("law_firms.")
+                and _norm_type(d.get("doc_type")) in DOT_TYPES):
+            k = bp_key(d.get("book"), d.get("page"))
+            if k:
+                keys.add(k)
+    return sorted(keys)
+
+
 def claim_of(row: dict) -> dict:
     """What the row claims, from the board row alone: the case kind and year, the cited ROD
     instrument, the claim's dated facts and their earliest (C0), and whether it is a
@@ -302,6 +343,9 @@ def claim_of(row: dict) -> dict:
     out["dates"] = dates
     ds = [date.fromisoformat(v) for v in dates.values()]
     out["earliest"] = min(ds).isoformat() if ds else None
+    dots = cited_dots(row)
+    if dots:
+        out["cited_dot"] = dots
     src = str(row.get("source") or "")
     text = " ".join(str(x or "") for x in (row.get("description"), row.get("street_address"),
                                             row.get("legal_description"))).lower()
@@ -491,6 +535,27 @@ def claim_persons(row: dict) -> list[tuple[str, str, Person]]:
     for field, val, sfc in fields:
         for p in persons_in(val, surname_first_caps=sfc)[:1]:
             out.append((field, str(val), p))
+    return out
+
+
+def all_claim_people(row: dict) -> list[Person]:
+    """EVERY person the claim names (claim_persons keeps the first of each field to search; the
+    tie of a trustee deed to the claim needs them all: "X and Y" borrowers, a county co-owner
+    list), de-duplicated on LAST and FIRST. Same field order and reading conventions."""
+    raw = _raw(row)
+    nod = raw.get("nod") if isinstance(raw.get("nod"), dict) else {}
+    dfn = row.get("defendant")
+    fields = [(nod.get("grantor"), True)]
+    if str(row.get("source") or "") not in COMMA_ONLY_DEFENDANT_SOURCES or "," in str(dfn or ""):
+        fields.append((dfn, False))
+    fields.append((row.get("owner_name"), True))
+    seen: set = set()
+    out: list[Person] = []
+    for val, sfc in fields:
+        for p in persons_in(val, surname_first_caps=sfc):
+            if (p[0], p[1]) not in seen:
+                seen.add((p[0], p[1]))
+                out.append(p)
     return out
 
 
@@ -817,14 +882,46 @@ def _rescinded(sat: dict, docs: Iterable[dict]) -> bool:
     return False
 
 
+def _best_relation(people: list[Person], names: Iterable[str]) -> str:
+    """The best name_relation between any claim person and any ROD party name ('none' when no
+    claim person or no personal party)."""
+    best = "none"
+    for p in people:
+        for n in names:
+            r = name_relation(p, rod_name_parts(n))
+            if _REL_RANK[r] > _REL_RANK[best]:
+                best = r
+    return best
+
+
+def _mark_claim_dot(ev: dict, dots: set) -> None:
+    """The deciding instruments whose Ref IS the deed of trust the claim itself cites are an
+    exact tie (stronger than any description or street tie): re-label them in the evidence."""
+    if not dots:
+        return
+    hit = False
+    for key in ("deciding", "latest_initiation"):
+        v = ev.get(key)
+        for d in (v if isinstance(v, list) else [v] if isinstance(v, dict) else []):
+            if set(d.get("refs") or []) & dots or d.get("book_page") in dots:
+                d["tie"], d["tie_strength"] = "claim_cited_dot", "exact"
+                hit = True
+    if hit:
+        ev["claim_tie"] = "claim_cited_dot"
+
+
 def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: date,
-           owner_rel: Optional[str] = None) -> tuple[str, dict]:
+           owner_rel: Optional[str] = None, claim_people: Optional[list] = None,
+           address_agrees: Optional[bool] = None) -> tuple[str, dict]:
     """The verdict from what was fetched (the module docstring's VERDICTS, in that order).
 
     `searches`: [{'role': 'owner'|'co_owner'|'claim_person', 'subject': Person,
     'grid': parse_grid(...), 'complete': bool, 'narrowed': bool}]. `owner_rel`: owner_relation()
     of the parcel's owner of record to the claim's person ('entity', 'agrees', 'unverified',
-    'conflict', 'none', or None when the row names no person)."""
+    'conflict', 'none', or None when the row names no person). `claim_people`: every person the
+    claim names (all_claim_people; None = the searched claim person, else the owner when the owner
+    is the claim's person). `address_agrees`: the board's address is the county parcel's own
+    (verify's board_address_agrees), the only tie a claim that names nobody can have."""
     ev: dict[str, Any] = {}
     c0 = _dd(claim.get("earliest")) or today
     recent_from = c0 - timedelta(days=RECENT_DAYS)
@@ -936,6 +1033,39 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
     tdeeds = [d for d in tied if d["type"] in CONCLUSION_TYPES and d.get("refs")
               and ((ident(d) and "grantor" in (d.get("matched_side") or "")) or d.get("bp") == vest)]
     fcls = [d for d in tied if d["type"] == FORECLOSURE_TYPE]
+    claim_dots = set(claim.get("cited_dot") or [])
+    if claim_people is not None:
+        people = list(claim_people)
+    else:
+        people = [x["subject"] for x in searches if x["role"] == "claim_person"]
+        if not people and owner_rel in ("agrees", "unverified"):
+            people = [x["subject"] for x in searches if x["role"] in ("owner", "co_owner")]
+    claim_keys = set(by_role.get("claim_person", {}))
+    if owner_rel in ("agrees", "unverified"):       # the parcel's owner IS the claim's person
+        claim_keys |= set(by_role.get("owner", {})) | set(by_role.get("co_owner", {}))
+
+    def deed_tie(t: dict, chain: bool) -> tuple[Optional[str], str]:
+        """(how the trustee deed ties to THIS claim, the best person relation to its grantors).
+        None = no tie: the deed is another borrower's foreclosure on a neighbouring or shared
+        description. A deed of trust the claim cites; a person the claim names on the deed, on
+        the deed of trust the deed forecloses, or on the confirming initiation of that same
+        loan; or, for a claim that names nobody, the board's exact address."""
+        refs = set(t.get("refs") or [])
+        rel = _best_relation(people, t.get("grantors") or [])
+        if claim_dots and refs & claim_dots:
+            return "claim_cited_dot", rel
+        if rel in ("agrees", "unverified"):
+            return "claim_person_on_deed", rel
+        if people:
+            for d in all_docs:
+                if (d.get("type") in DOT_TYPES and d.get("bp") in refs
+                        and _best_relation(people, d.get("grantors") or []) in ("agrees", "unverified")):
+                    return "claim_person_on_deed_of_trust", rel
+            if chain and latest_init is not None and _key(latest_init) in claim_keys:
+                return "claim_person_on_initiation", rel
+            return None, rel
+        return ("property_address" if address_agrees is True else None), rel
+
     def acquired_before(t: dict) -> Optional[str]:
         """When the trustee deed's grantor (a searched person) last took title to the parcel: a
         tied conveyance in that person's own results with them on the grantee side. A later
@@ -950,7 +1080,8 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
                    "foreclosure_records": len(fcls)}
     latest_init = max(inits, key=lambda d: d.get("date") or "", default=None)
 
-    # stale (a): a trustee deed for this parcel, the owner among its grantors
+    # stale (a): a trustee deed for this parcel that closes THIS claim's foreclosure
+    tie_rejected: list[tuple[dict, str]] = []
     for t in sorted(tdeeds, key=lambda d: d.get("date") or "", reverse=True):
         td = _dd(t.get("date"))
         if td is None or td < recent_from:
@@ -965,22 +1096,47 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
         chain = bool(latest_init and set(t.get("refs") or []) & set(latest_init.get("refs") or []))
         if not strong and not county_agrees and not chain:
             continue
+        if not strong and not county_agrees:
+            # only a street / description tie holds this deed to the parcel and the county layer's
+            # parcel for the claim's property is not the one the deed describes: the lot next
+            # door (16 vs 18 Saxon Hl: one Lot 1 PB 151/6), not this one
+            ev["reason"] = "deed_describes_adjacent_parcel"
+            ev["deciding"] = [_doc_pub(t, ties, ident(t))]
+            ev["county_layer_agrees"] = False
+            ev["ends_initiation"] = True
+            return "unconfirmed", ev
+        basis, rel = deed_tie(t, chain)
+        if basis is None:
+            # the deed is on this parcel but forecloses a loan the claim does not name (another
+            # borrower's, a neighbouring or earlier one): not this claim's conclusion
+            if chain:
+                ev["reason"] = "tie_not_established"
+                ev["deciding"] = [_doc_pub(t, ties, ident(t))]
+                if people:
+                    ev["claim_person_among_grantors"] = rel
+                return "unconfirmed", ev
+            tie_rejected.append((t, rel))
+            continue
         if not county_agrees and (today - td).days > GIS_LAG_DAYS:
             ev["reason"] = "trustee_deed_not_reflected_on_parcel"
             ev["deciding"] = [_doc_pub(t, ties, ident(t))]
             return "unconfirmed", ev
         ev["decided_by"] = "trustee_deed_recorded"
-        cps = [x["subject"] for x in searches if x["role"] == "claim_person"] or \
-            [x["subject"] for x in searches if x["role"] in ("owner", "co_owner")]
-        if cps:
-            # is the trustee deed's borrower the claim's person? (the verdict is the parcel's:
-            # a foreclosure that concluded on it ends the claim either way; this says whose)
-            rels = [name_relation(cps[0], rod_name_parts(g)) for g in t.get("grantors") or []]
-            ev["claim_person_among_grantors"] = max(rels, key=lambda r: _REL_RANK[r], default="none")
+        ev["claim_tie"] = basis
+        if people:
+            # is the trustee deed's borrower the claim's person? (best relation, any person the
+            # claim names against any grantor of the deed)
+            ev["claim_person_among_grantors"] = rel
+        first_seen = _dd((claim.get("dates") or {}).get("first_seen"))
+        if first_seen and td < first_seen:
+            # the foreclosure ended before the board first saw the listing: an REO resale of an
+            # already-foreclosed home. The verdict is still stale (the claim is not live).
+            ev["deed_predates_claim_days"] = (first_seen - td).days
         same = [f for f in fcls if set(f.get("refs") or []) & set(t.get("refs") or [])]
         ev["deciding"] = [_doc_pub(t, ties, ident(t))] + [_doc_pub(f, ties, ident(f)) for f in same[:1]]
         ev["county_layer_agrees"] = county_agrees
         ev["ends_initiation"] = chain or None
+        _mark_claim_dot(ev, claim_dots)
         return "stale", ev
 
     # stale (b) / confirmed: the latest initiation and what happened to its deed of trust
@@ -993,6 +1149,7 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
             if sats:
                 ev["decided_by"] = "foreclosed_loan_satisfied"
                 ev["deciding"] = [_doc_pub(d, ties, ident(d)) for d in sats[:2]]
+                _mark_claim_dot(ev, claim_dots)
                 return "stale", ev
             if owner_changed and gis_vest_date and gis_vest_date > li:
                 ev["reason"] = "conveyed_after_initiation_no_satisfaction_yet"
@@ -1060,6 +1217,12 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
 
     if not tied:
         ev["reason"] = "parcel_chain_not_found_at_rod"
+    elif tie_rejected:
+        t, rel = tie_rejected[0]
+        ev["reason"] = "tie_not_established"
+        ev["deciding"] = [_doc_pub(t, ties, ident(t))]
+        if people:
+            ev["claim_person_among_grantors"] = rel
     elif fcls and not tdeeds:
         ev["reason"] = "foreclosure_record_without_trustee_deed"
     elif no_fc:
@@ -1075,11 +1238,12 @@ def decide(claim: dict, parcel: Optional[dict], searches: list[dict], *, today: 
 
 _PUBLIC = ("decided_by", "reason", "claim", "parcel", "searches", "chain", "deciding",
            "cited_instrument", "cited_found", "latest_initiation", "county_layer_agrees",
-           "ends_initiation", "claim_person_among_grantors",
+           "ends_initiation", "claim_person_among_grantors", "claim_tie",
+           "deed_predates_claim_days",
            "owner_relation", "deeds_of_trust_since_vesting", "last_satisfaction",
            "claim_person_deeds_of_trust", "human_lane", "url", "error", "blocked")
 _CLAIM_PUBLIC = ("listing_type", "source", "case_kind", "case_year", "earliest", "dates",
-                 "dot_foreclosure")
+                 "dot_foreclosure", "cited_dot")
 
 
 def public_evidence(verdict: str, ev: dict) -> dict:
@@ -1258,6 +1422,8 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     cp = claimers[0] if claimers else None
     rel = owner_relation(owners, cp[2] if cp else None, cp[1] if cp else "") if parcel else None
     ev["owner_relation"] = rel
+    people = all_claim_people(row)
+    addr_agrees = (ev.get("parcel") or {}).get("board_address_agrees")
     if cited and cp and owners:
         toks = {surname_key(t) for t in re.sub(r"[^A-Z ]", " ", cp[1].upper()).split()}
         claim["owner_shares_surname"] = any(surname_key(o[0]) in toks for o in owners)
@@ -1319,14 +1485,16 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
             for role, subj in subjects:
                 if await run(role, subj) is None:
                     return _res("unconfirmed", ev)
-            verdict, dev = decide(claim, parcel, searches, today=today, owner_rel=rel)
+            verdict, dev = decide(claim, parcel, searches, today=today, owner_rel=rel,
+                                  claim_people=people, address_agrees=addr_agrees)
             # a refutation from the owner's loans must cover every co-owner who could have
             # signed a deed of trust: search the next one before publishing it
             if verdict == "refuted" and dev.get("decided_by") == "no_open_deed_of_trust":
                 for o in owners[1:2]:
                     if await run("co_owner", o) is None:
                         return _res("unconfirmed", ev)
-                    verdict, dev = decide(claim, parcel, searches, today=today, owner_rel=rel)
+                    verdict, dev = decide(claim, parcel, searches, today=today, owner_rel=rel,
+                                          claim_people=people, address_agrees=addr_agrees)
     except Blocked as b:
         state["blocked"] = str(b)
         ev["blocked"] = str(b)

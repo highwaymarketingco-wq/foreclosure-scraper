@@ -46,7 +46,18 @@ VERDICTS (core.py's meanings):
                after the board first saw the row, or a different owner) and the relief is gone,
                or (b) same owner, relief removed. "Was" = a relief-shaped Exempt Value on one of
                the latest two levy bills, or the row is the buncombe_elderly scraper's own row
-               (it read this layer, by this PIN, with the code on it).
+               (it read this layer, by this PIN, with the code on it). "Gone" is read from the
+               BILLS: when the layer's Exempt flag is blank the newest levy bill decides (v3; the
+               flag alone called 1406 Hardscrabble Rd stale while its 8/15/2026 bill, paid,
+               excluded 103,900 = half of 207,800, owners unchanged). The newest bill with an
+               Exempt Value above zero (and the billing record reaching last year) is
+               `confirmed` ("exemption_on_latest_bill", `layer_flag_blank` noted); an unreadable
+               newest bill cannot show the relief removed (`unconfirmed`, bills_unreadable).
+               A same-owner removal on the newest bill stays stale (11 Cardinal Cove Rd: 118,350
+               on the 2025 bill, 0 on 2026): whether that should end the signal is a scoring
+               decision, so the evidence carries `exempt_value_by_year` and `owner_unchanged_since`
+               (the earliest levy year of the unbroken run of bills naming the newest bill's owner)
+               to make the call visible.
   refuted      today's layer does not show it and neither of the latest two levy bills carried a
                relief-shaped exclusion (the claim was attached to a parcel whose record never
                showed it during the board's lifetime: a spatial-join neighbour, a wrong parcel).
@@ -94,9 +105,14 @@ from .tax_lien_buncombe import (BILL_URL, PARCEL_URL, money, owner_match, parse_
                                 pin_of)
 
 SIGNAL = "elderly_disabled"
-VERSION = "v2"         # v2 (2026-10-06): a 10-digit board pin is looked up as pin= (it can
+VERSION = "v3"         # v2 (2026-10-06): a 10-digit board pin is looked up as pin= (it can
                        # cover many condominium units: unconfirmed), not padded to the
                        # common-area pinnum; a billing record that ended is unconfirmed
+                       # v3 (2026-10-06): the bills decide, not the GIS flag: an exclusion on the
+                       # newest bill is `confirmed` (exemption_on_latest_bill) whatever the
+                       # layer's Exempt flag says; stale needs the newest bill read and
+                       # showing no exclusion. Evidence adds exempt_value_by_year and
+                       # owner_unchanged_since
 TTL_DAYS = 60
 RETRY_DAYS = 7
 SOURCE = "gis.buncombecounty.org + tax.buncombenc.gov"
@@ -412,8 +428,31 @@ def _res(verdict: str, evidence: dict) -> VerificationResult:
     return result(SIGNAL, verdict, evidence, source=SOURCE, version=VERSION, verifier=_NAME)
 
 
+def _owner_key(owner: Any) -> tuple:
+    """A bill's owner string as a comparable set of words (order, case and punctuation do not
+    matter; a life-estate marker or a second owner does)."""
+    return tuple(sorted(set(re.sub(r"[^A-Z0-9 ]", " ", str(owner or "").upper()).split())))
+
+
+def owner_unchanged_since(bills: list[dict]) -> Optional[int]:
+    """The earliest levy year of the unbroken run of bills (newest first) that name the newest
+    bill's owner, or None when the newest bill names none. Words of the owner string only, so a
+    second owner who dropped off (or joined) ends the run. The name itself is never returned."""
+    rows = [b for b in sorted(bills, key=lambda b: b.get("year") or 0, reverse=True)
+            if b.get("year")]
+    if not rows or not _owner_key(rows[0].get("owner")):
+        return None
+    want, since = _owner_key(rows[0].get("owner")), rows[0]["year"]
+    for b in rows[1:]:
+        if _owner_key(b.get("owner")) != want:
+            break
+        since = b["year"]
+    return since
+
+
 async def _bill_history(pin: str, client) -> dict:
-    """The latest MAX_BILL_CHECKS levy bills' Exempt Value: {'bills': [...], 'error': str|None}."""
+    """The latest MAX_BILL_CHECKS levy bills' Exempt Value: {'bills': [...], 'error': str|None,
+    'owner_unchanged_since': year|None}."""
     url = PARCEL_URL.format(pin=pin)
     try:
         page = parse_parcel_page(await client.get_text(url))
@@ -437,7 +476,7 @@ async def _bill_history(pin: str, client) -> dict:
         if v["deferred"]:
             rec["deferred_value"] = v["deferred"]
         out.append(rec)
-    return {"bills": out, "error": None}
+    return {"bills": out, "error": None, "owner_unchanged_since": owner_unchanged_since(page["bills"])}
 
 
 async def verify(row: dict, client, *, today: Optional[date] = None) -> VerificationResult:
@@ -492,6 +531,12 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     else:
         hist = await _bill_history(pinnum, client)
         ev["bills_checked"] = hist["bills"]
+        by_year = {str(b["year"]): b["exempt_value"] for b in hist["bills"]
+                   if "error" not in b and b.get("exempt_value") is not None}
+        if by_year:
+            ev["exempt_value_by_year"] = by_year
+        if hist.get("owner_unchanged_since"):
+            ev["owner_unchanged_since"] = hist["owner_unchanged_since"]
         latest = max((b["year"] for b in hist["bills"]), default=None)
         # the bills speak for the board's lifetime (2026 rows) only when they reach last year
         recent = latest is not None and latest >= today.year - 1
@@ -500,9 +545,30 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         from_layer = scraped_from_layer(row, pinnum)
         if from_layer:
             ev["layer_showed_it_on"] = str(row.get("last_seen") or "")[:10] or None
-        if was_billed or from_layer:
-            verdict = "stale"
-            ev["basis"] = "owner_changed" if own["owner_changed"] else "relief_removed"
+        # the newest levy bill is the county's current word on the exclusion; the layer's Exempt
+        # flag is not (a blank flag over a bill that excludes half the value: 1406 Hardscrabble Rd)
+        newest = next((b for b in hist["bills"] if b.get("year") == latest), None)
+        newest_ok = newest is not None and "error" not in newest
+        newest_excludes = newest_ok and (newest.get("exempt_value") or 0) > 0
+        newest_zero = newest_ok and not newest_excludes
+        claimed_before = was_billed or from_layer
+        if (newest_excludes and recent and not own["owner_changed"]
+                and (newest.get("shape") in RELIEF_SHAPES or from_layer)):
+            # (an exclusion that matches no relief formula counts only on the scraper's own row of
+            # this parcel; on a merged-in claim it stays "exempt_value_unexplained" below)
+            verdict, ev["basis"] = "confirmed", "exemption_on_latest_bill"
+            ev["latest_bill_shape"] = newest.get("shape")
+            ev["layer_flag_blank"] = True
+        elif own["owner_changed"] and claimed_before:
+            verdict, ev["basis"] = "stale", "owner_changed"
+        elif claimed_before and newest_zero:
+            verdict, ev["basis"] = "stale", "relief_removed"
+        elif claimed_before and not newest_ok:
+            # the bills cannot say the relief is gone when the newest one was not read, and the
+            # layer's flag alone is not proof (it can go blank over a bill that still excludes)
+            verdict, ev["reason"] = "unconfirmed", "bills_unreadable"
+            if hist["error"]:
+                ev["error"] = hist["error"]
         elif latest is not None and not recent:
             # the parcel's billing stopped years ago (a retired PIN): it cannot say "never"
             verdict, ev["reason"] = "unconfirmed", "parcel_record_ended"

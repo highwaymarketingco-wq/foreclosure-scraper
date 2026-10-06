@@ -11,6 +11,10 @@ What these pin:
     ever asked for an owner, phone, email or note column, so there was nothing to scrub);
   * one layer load per sweep run whatever the number of rows, and a failed, empty or
     incomplete layer never yields refuted or stale;
+  * vacant_structure v2 (the three agents' live re-check of 2026-10-06: 91 of 103 stale verdicts
+    held, 8 did not): the notes and the demolition read only from the matched live register row
+    (never the board's copy), negation- and tense-aware, a mention needs the county parcel layer,
+    an occupancy value from the frozen register is too old to end a vacancy claim;
   * privacy: the requested columns, the evidence and the ledger row summary carry no owner,
     complainant, phone, email or free text;
   * scoring: "code_enforcement:<source>" / "vacant_structure:<source>" end the credit of that
@@ -19,8 +23,10 @@ What these pin:
 from __future__ import annotations
 
 import asyncio
+import copy
 import gzip
 import json
+import re
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -315,25 +321,261 @@ def test_register_confirmed_boarded_with_blank_occupancy():
     assert res.evidence["occupied"] is None and res.evidence["boarded_up"] is True
 
 
-def test_register_stale_marked_occupied():
+def test_register_occupied_from_the_frozen_layer_is_too_old_to_end_a_vacancy_claim():
+    """902 Sylvan Blvd: the only basis of v1's stale was OCCUPIED=YES on a row listed 2024-04-25 in
+    a layer last edited 2024-07-24 (803 days before the sweep). Too old to decide: unconfirmed."""
     res = _check_reg(_reg_row("902 SYLVAN BLVD"))
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "register_occupancy_too_old"
+    assert res.evidence["occupied"] is True and res.evidence["listed_date"] == "2024-04-25"
+    assert res.evidence["register_age_days"] > 365 and res.evidence["register_row_age_days"] > 180
+
+
+def _reg_resp(*, edited: str | None = None, dates: dict | None = None, edit: dict | None = None):
+    """The register fixture with the layer's last data edit (ISO date) and/or some rows' DATE
+    (FID -> value) and/or other cells ({FID: {col: value}}) changed."""
+    resp = dict(REG_RESP)
+    if edited:
+        meta_url = next(u for u in resp if u.endswith("/0?f=json"))
+        meta = json.loads(resp[meta_url])
+        meta["editingInfo"]["dataLastEditDate"] = int(
+            datetime.fromisoformat(edited).replace(tzinfo=timezone.utc).timestamp() * 1000)
+        resp[meta_url] = json.dumps(meta)
+    if dates or edit:
+        page_url = next(u for u in resp if "outFields" in u)
+        page = json.loads(resp[page_url])
+        for f in page["features"]:
+            a = f["attributes"]
+            if dates and a["FID"] in dates:
+                a["DATE"] = dates[a["FID"]]
+            for col, val in ((edit or {}).get(a["FID"]) or {}).items():
+                a[col] = val
+        resp[page_url] = json.dumps(page)
+    return resp
+
+
+def test_register_marked_occupied_still_ends_the_claim_when_the_register_is_fresh():
+    """The rule is about AGE: a layer edited within a year, or an occupied row dated within the
+    last 180 days, still decides (stale, marked_occupied)."""
+    res = _check_reg(_reg_row("902 SYLVAN BLVD"), _reg_resp(edited=date.today().isoformat()))
     assert res.verdict == "stale" and res.evidence["reason"] == "marked_occupied"
-    assert res.evidence["occupied"] is True
+    recent = (date.today() - timedelta(days=60)).isoformat()
+    res = _check_reg(_reg_row("902 SYLVAN BLVD"), _reg_resp(dates={48: recent}))
+    assert res.verdict == "stale" and res.evidence["reason"] == "marked_occupied"
+    assert res.evidence["register_row_age_days"] == 60
+    old_row = (date.today() - timedelta(days=200)).isoformat()      # layer old, row older than 180 d
+    res = _check_reg(_reg_row("902 SYLVAN BLVD"), _reg_resp(dates={48: old_row}))
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "register_occupancy_too_old"
+
+
+def test_register_a_blank_row_date_is_never_recent():
+    res = _check_reg(_reg_row("902 SYLVAN BLVD"), _reg_resp(dates={48: None}))
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "register_occupancy_too_old"
+    assert "register_row_age_days" not in res.evidence
 
 
 def test_register_stale_demolished_from_the_register():
     res = _check_reg(_reg_row("201 BLUE RIDGE ST"))
     assert res.verdict == "stale" and res.evidence["reason"] == "structure_demolished"
     assert res.evidence["demolished_basis"] == "register DELINQUENT_TAX"
+    assert res.evidence["demolition_note"] == "completed"
 
 
-def test_register_stale_demolished_from_the_board_block():
-    """120 N Blue Ridge Ave: the scraper read the demolition off NOTES, which the verifier
-    never fetches (owners' emails sit there); the block's own flag carries it."""
-    res = _check_reg(_reg_row("120 N BLUE RIDGE AVE", demolished=True))
+def test_register_a_completed_note_is_decisive_alone_and_asks_no_one_else():
+    """1030 N Justice St: NOTES 'DEMOED 7/25/2023'. A completed demolition word in the matched
+    row's own notes decides; the county layer is not even asked."""
+    client = ReplayFetcher(REG_RESP)
+    res = run(vsr.verify(_reg_row("1030 N JUSTICE ST"), client))
     assert res.verdict == "stale" and res.evidence["reason"] == "structure_demolished"
-    assert res.evidence["demolished_basis"].startswith("board block")
-    assert _check_reg(_reg_row("120 N BLUE RIDGE AVE")).verdict == "confirmed"
+    assert res.evidence["demolished_basis"] == "register NOTES"
+    assert not [u for u in client.asked if "hendersoncountync" in u]
+
+
+def test_register_the_boards_demolished_flag_is_never_a_source():
+    """112 N Blue Ridge Ave (the live case): the board's block carries the 'pulling demo permit'
+    note of the row next door (120, FID 7: its listed date, occupancy and a demolished flag) while
+    the matched register row (FID 4) holds a person's name, no date and no demolition word, and the
+    county layer shows the house standing (building value 13,900). v1 trusted the board's copy:
+    stale (structure_demolished). Now the matched live row is the only source."""
+    row = _reg_row("112 N BLUE RIDGE AVE", demolished=True)
+    row["parcel_id"] = "9579230754"
+    row["raw"]["code_enforcement"].update({"listed_date": "2023-02-13", "occupied": False,
+                                            "boarded_up": False, "condemned": None})
+    res = _check_reg(row)
+    ev = res.evidence
+    assert res.verdict == "unconfirmed" and ev["reason"] == "occupancy_not_recorded"
+    assert ev["register_fid"] == 4 and "demolished" not in ev and "demolition_note" not in ev
+    assert ev["board_block_agrees"] is False and ev["board_demolished_flag_ignored"] is True
+    assert ev["county_matched_by"] == "pin" and ev["county_building_value"] == 13900.0
+
+
+def test_register_112_and_120_n_blue_ridge_cannot_cross():
+    """Each address matches its own register row whatever block the board row carries, by the
+    whole normalized address (house number included), in either direction."""
+    for addr, fid in (("112 N BLUE RIDGE AVE", 4), ("120 N BLUE RIDGE AVE", 7)):
+        for demolished in (False, True):
+            res = _check_reg(_reg_row(addr, demolished=demolished))
+            assert res.evidence["register_fid"] == fid, (addr, demolished)
+    assert vsr._addr("112 N Blue Ridge Ave.") != vsr._addr("120 N. Blue Ridge Avenue")
+    a, b = _check_reg(_reg_row("112 N BLUE RIDGE AVE")), _check_reg(_reg_row("120 N BLUE RIDGE AVE"))
+    assert "listed_date" not in a.evidence and b.evidence["listed_date"] == "2023-02-13"
+
+
+def test_register_a_block_that_agrees_with_its_row_is_recorded_as_agreeing():
+    row = _reg_row("120 N BLUE RIDGE AVE")
+    row["parcel_id"] = "9579232596"
+    row["raw"]["code_enforcement"].update({"listed_date": "2023-02-13", "occupied": False,
+                                            "boarded_up": False, "condemned": None})
+    res = _check_reg(row)
+    assert res.evidence.get("board_block_agrees") is None        # only a disagreement is recorded
+    assert vsr.block_agrees(row["raw"]["code_enforcement"], vsr.register_view(
+        {"FID": 7, "DATE": "2023-02-13", "OCCUPIED": "NO", "BOARDED_UP": "NO", "CONDEMNED": None})) is True
+    assert vsr.block_agrees(row["raw"]["code_enforcement"], vsr.register_view(
+        {"FID": 4, "DATE": None, "OCCUPIED": None})) is False
+    assert vsr.block_agrees(None, {}) is None and vsr.block_agrees({"demolished": True}, {}) is None
+
+
+def test_register_two_rows_at_one_address_pick_the_one_the_board_block_names():
+    """410 Midway St has two register rows (FID 27 listed 2023-03-14, FID 28 listed 2023-10-09):
+    the first wins, as in the scraper, unless the board block's listed date names the other."""
+    row = _reg_row("410 MIDWAY ST")
+    first = _check_reg(row)
+    assert first.evidence["register_rows_at_address"] == 2 and first.evidence["register_fid"] == 27
+    row["raw"]["code_enforcement"]["listed_date"] = "2023-10-09"
+    second = _check_reg(row)
+    assert second.evidence["register_fid"] == 28 and second.evidence["listed_date"] == "2023-10-09"
+    assert second.evidence.get("board_block_agrees") is None            # it agrees with the row it picked
+
+
+def test_register_a_planned_demolition_is_stale_only_when_the_county_layer_agrees():
+    """120 N Blue Ridge Ave: the note says 'pulling demo permit to tear this down' (a plan, not a
+    demolition). The county layer (building value 0, no heated area, class VACANT LAND) backs it:
+    stale. Without the county layer's agreement it is unconfirmed (one weak source alone)."""
+    row = _reg_row("120 N BLUE RIDGE AVE", demolished=True)
+    row["parcel_id"] = "9579232596"
+    res = _check_reg(row)
+    ev = res.evidence
+    assert res.verdict == "stale" and ev["reason"] == "structure_demolished"
+    assert ev["demolition_note"] == "planned" and ev["demolished_basis"] == "county parcel layer and register NOTES"
+    assert ev["county_building_value"] == 0.0 and ev["county_land_class"] == "VACANT LAND"
+    assert ev["county_snapshot"] == "2023-07-07" and ev["county_matched_by"] == "pin"
+    # the board's flag alone changes nothing
+    assert _check_reg(_reg_row("120 N BLUE RIDGE AVE", demolished=True)).verdict == "stale"   # (by address)
+    # the county layer unreachable: the plan stands alone
+    nocounty = {u: b for u, b in REG_RESP.items() if "hendersoncountync" not in u}
+    res = _check_reg(row, nocounty)
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "demolition_not_established"
+    assert res.evidence["demolition_note"] == "planned" and "county_building_value" not in res.evidence
+    # the county layer shows a building: the plan did not happen (yet)
+    standing = dict(REG_RESP)
+    url = vsr.county_url_pin("9579232596")
+    d = json.loads(standing[url])
+    d["features"][0]["attributes"]["TOTAL_BLDG_VALUE_ASSESSED"] = 88000.0
+    standing[url] = json.dumps(d)
+    res = _check_reg(row, standing)
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "demolition_not_established"
+    assert res.evidence["county_building_value"] == 88000.0
+
+
+def test_register_no_plans_to_demo_is_not_a_demolition():
+    """618 Ferncliff Ln (the live case): NOTES 'NO IMMEDIATE PLANS TO DEMO AND REBUILD'. The
+    scraper's keyword read 'DEMO' as demolished and v1 took the board's flag: stale. The county
+    layer still carries building value 1,200 and 630 sq ft, so nothing here shows the structure
+    gone: unconfirmed (the aerials that do show it gone cannot be read by code)."""
+    row = _reg_row("618 FERNCLIFF", demolished=True)
+    row["parcel_id"] = "9569344337"
+    res = _check_reg(row)
+    ev = res.evidence
+    assert res.verdict == "unconfirmed" and ev["reason"] == "demolition_not_established"
+    assert ev["demolition_note"] == "negated" and "demolished" not in ev
+    assert ev["boarded_up"] is True and ev["condemned"] is True       # the register still says vacant
+    assert ev["county_building_value"] == 1200.0 and ev["county_heated_area"] == 630.0
+    # the same row with no county answer, or asked by address, decides nothing either
+    row2 = _reg_row("618 FERNCLIFF", demolished=True)                  # no PIN: matched by address
+    res2 = _check_reg(row2)
+    assert res2.verdict == "unconfirmed" and res2.evidence["county_matched_by"] == "address"
+
+
+def test_register_the_county_layer_alone_never_ends_a_row_the_notes_never_call_demolished():
+    """The board says demolished, the matched row never mentions it, and only the county layer
+    shows an empty parcel (building value 0): one weak source alone."""
+    row = _reg_row("112 N BLUE RIDGE AVE", demolished=True)
+    row["parcel_id"] = "9579230754"
+    empty = dict(REG_RESP)
+    url = vsr.county_url_pin("9579230754")
+    d = json.loads(empty[url])
+    d["features"][0]["attributes"].update(TOTAL_BLDG_VALUE_ASSESSED=0.0, HEATED_AREA=None)
+    empty[url] = json.dumps(d)
+    res = _check_reg(row, empty)
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "demolition_not_established"
+    assert res.evidence["board_demolished_flag_ignored"] is True
+
+
+@pytest.mark.parametrize("text,kind", [
+    ("DEMOED 7/25/2023", "completed"),
+    ("HOUSE DEMOLISHED 2023", "completed"),
+    ("NOT OCCUPIED - HOUSE TORN DOWN", "completed"),          # the dash starts a new clause
+    ("STRUCTURE WAS RAZED; ENUMERATION", "completed"),
+    ("BUILDING REMOVED IN 2022", "completed"),
+    ("DEMOLITION COMPLETE", "completed"),
+    ("JANE ROE - 2/13/2023 PULLING DEMO PERMIT TO TEAR THIS DOWN", "planned"),
+    ("TO BE DEMOLISHED", "planned"),
+    ("WILL BE DEMOLISHED SOON", "planned"),
+    ("DEMOLITION PERMIT ISSUED", "planned"),
+    ("PENDING DEMO", "planned"),
+    ("CITY ORDERED HOUSE DEMOLISHED", "planned"),
+    ("FIRE DAMAGE; HOUSE BOARDED UP NO IMMEDIATE PLANS TO DEMO AND REBUILD", "negated"),
+    ("NOT DEMOLISHED", "negated"),
+    ("NOT YET TORN DOWN", "negated"),
+    ("FIRE/VACANT - 2/17/2022 - CAME IN FOR A BUILDING PERMIT FOR REMODEL AND REPAIR", None),
+    ("YARD LEVELED, TRASH REMOVED", None),
+    ("", None), (None, None)])
+def test_classify_demolition(text, kind):
+    assert vsr.classify_demolition(text) == kind
+
+
+def test_classify_demolition_completed_beats_planned_beats_negated():
+    assert vsr.classify_demolition("NO PLANS TO DEMO", "DEMOED") == "completed"
+    assert vsr.classify_demolition("NO PLANS TO DEMO", "PULLING DEMO PERMIT") == "planned"
+
+
+def test_house_street_matches_the_register_and_the_county_spellings():
+    assert vsr.house_street("112 N BLUE RIDGE AVE") == ("112", "BLUE")
+    assert vsr.house_street("618 FERNCLIFF") == vsr.house_street("618 FERNCLIFF LN") == ("618", "FERNCLIFF")
+    assert vsr.house_street("0 FERNCLIFF") is None and vsr.house_street("FERNCLIFF LN") is None
+    assert vsr.house_street("112 N BLUE RIDGE AVE") != vsr.house_street("120 N BLUE RIDGE AVE")
+
+
+def test_county_parcel_must_be_this_address_and_falls_back_to_the_address_query():
+    """The board's PIN can be a resolver's mistake: a PIN whose parcel sits at another address is
+    not used, and the register's own address is asked instead."""
+    row = {"parcel_id": "9569419828", "street_address": "618 FERNCLIFF"}          # 902 Sylvan's PIN
+    res = run(vsr.county_parcel(row, "618 FERNCLIFF", ReplayFetcher(REG_RESP)))
+    assert res["matched_by"] == "address" and res["building_value"] == 1200.0 and not res["no_building"]
+    assert run(vsr.county_parcel({"parcel_id": None}, "", ReplayFetcher(REG_RESP))) is None
+    assert run(vsr.county_parcel(row, "618 FERNCLIFF", ReplayFetcher({}))) is None   # unreachable
+    err = {vsr.county_url_pin("9569419828"): json.dumps({"error": {"code": 400}}),
+           vsr.county_url_address("618 FERNCLIFF"): json.dumps({"features": []})}
+    assert run(vsr.county_parcel(row, "618 FERNCLIFF", ReplayFetcher(err))) is None
+
+
+def test_county_view_no_building_needs_an_explicit_zero():
+    assert vsr.county_view({"TOTAL_BLDG_VALUE_ASSESSED": 0.0, "HEATED_AREA": None})["no_building"] is True
+    assert vsr.county_view({"TOTAL_BLDG_VALUE_ASSESSED": 0, "HEATED_AREA": 0})["no_building"] is True
+    assert vsr.county_view({"TOTAL_BLDG_VALUE_ASSESSED": None, "HEATED_AREA": None})["no_building"] is False
+    assert vsr.county_view({"TOTAL_BLDG_VALUE_ASSESSED": 0.0, "HEATED_AREA": 630})["no_building"] is False
+    assert vsr.county_view({"TOTAL_BLDG_VALUE_ASSESSED": 1200.0, "HEATED_AREA": None})["no_building"] is False
+
+
+def test_county_layer_is_the_parcel_caches_and_never_asks_for_an_owner():
+    from foreclosure_scraper.parcel_cache import PARCEL_LAYERS
+    assert vsr.COUNTY_LAYER + "/query" == PARCEL_LAYERS["Henderson"]["url"]
+    asked = set(vsr.COUNTY_FIELDS.split(","))
+    assert asked == {"PIN", "LOCATION_ADDR", "LAND_CLASS", "TOTAL_BLDG_VALUE_ASSESSED", "HEATED_AREA",
+                     "AUT_SNAPSHOT_DATE"}
+    assert not any(c.startswith(("PROPERTY_OWNER", "OWNER_MAIL")) for c in asked)
+    for u in (vsr.county_url_pin("9579230754"), vsr.county_url_address("O'NEAL ST")):
+        assert "OWNER" not in u.upper().replace("LOCATION_ADDR", "")
+    assert "O%27%27NEAL" in vsr.county_url_address("o'neal st")          # a quote cannot break the query
 
 
 def test_register_refuted_when_the_register_has_not_changed_since_the_row_was_seen():
@@ -390,8 +632,9 @@ def test_register_one_load_per_run_and_only_safe_columns():
     page = next(u for u in client.asked if "outFields" in u)
     asked = set(parse_qs(urlsplit(page).query)["outFields"][0].split(","))
     assert asked == {"FID", "DATE", "ADDRESS", "OCCUPIED", "BOARDED_UP", "CONDEMNED",
-                     "DELINQUENT_TAX"}
+                     "DELINQUENT_TAX", "NOTES"}              # NOTES: classified in memory, never kept
     assert not asked & set(vsr.NEVER_FIELDS)
+    assert "NOTES" not in vsr.NEVER_FIELDS and "OWNER" in vsr.NEVER_FIELDS and "EMAIL" in vsr.NEVER_FIELDS
     assert vsr._fields_are_safe()
 
 
@@ -409,7 +652,11 @@ _REG_EVIDENCE_KEYS = {"layer", "fetched_at", "layer_count", "layer_rows_loaded",
                       "layer_data_last_edit", "layer_error", "register_age_days", "reason",
                       "matched_by", "register_fid", "listed_date", "occupied", "boarded_up",
                       "condemned", "condemned_date", "register_rows_at_address", "demolished",
-                      "demolished_basis", "row_first_seen"}
+                      "demolished_basis", "row_first_seen",
+                      # v2
+                      "register_row_age_days", "demolition_note", "board_block_agrees",
+                      "board_demolished_flag_ignored", "county_matched_by", "county_building_value",
+                      "county_heated_area", "county_land_class", "county_snapshot"}
 
 
 def test_evidence_is_a_closed_whitelist():
@@ -425,10 +672,24 @@ def test_evidence_is_a_closed_whitelist():
         for c in ev.get("cases", []):
             assert set(c) <= _CASE_KEYS
     for a in ("1001 TEMON ST", "601 E PACE ST", "902 SYLVAN BLVD", "113 S JUSTICE ST",
-              "1744 MEADOWBROOK TER", "201 BLUE RIDGE ST"):
+              "1744 MEADOWBROOK TER", "201 BLUE RIDGE ST", "1030 N JUSTICE ST", "618 FERNCLIFF",
+              "112 N BLUE RIDGE AVE", "120 N BLUE RIDGE AVE"):
         agl._RUNS.clear()
-        ev = _check_reg(_reg_row(a)).evidence
+        ev = _check_reg(_reg_row(a, demolished=True)).evidence
         assert set(ev) <= _REG_EVIDENCE_KEYS, set(ev) - _REG_EVIDENCE_KEYS
+        blob = json.dumps(ev)
+        for note in ("DOE", "ROE", "PERMIT", "REBUILD", "ENUMERATION", "TENANT"):   # no note text, no name
+            assert note not in blob.upper()
+
+
+#: the register page's NOTES cells in the fixture: the notes the verdicts turn on, in their real
+#: wording with every name replaced, and the placeholder NOTE for all others (officers' notes
+#: hold names and an owner's email; the live classification of every row is preserved)
+_FIXTURE_NOTES = {None, "NOTE", "DEMOED 7/25/2023", "JANE ROE", "FIRE DAMAGE ; ENUMERATION",
+                  "JOHN DOE - 2/13/2023 PULLING DEMO PERMIT TO TEAR THIS DOWN",
+                  "FIRE DAMAGE; HOUSE BOARDED UP NO IMMEDIATE PLANS TO DEMO AND REBUILD",
+                  "FIRE/VACANT/ENUMERATION - 2/17/2022 - A CONTRACTOR CAME IN TO GET A BUILDING PERMIT "
+                  "FOR REMODEL AND REPAIR", "TENANT IS JANE ROE, UTILITIES ACTIVE"}
 
 
 def test_fixtures_hold_no_personal_columns():
@@ -438,7 +699,11 @@ def test_fixtures_hold_no_personal_columns():
             for f in d.get("features") or []:
                 cols = set(f["attributes"])
                 assert not cols & {"parcelOwner", "OWNER", "MAILING_ADDRESS", "PHONE__", "EMAIL",
-                                   "NOTES", "column19", "MAIL_CITY", "ZIP", "ST"}
+                                   "column19", "MAIL_CITY", "ZIP", "ST", "PROPERTY_OWNER",
+                                   "OWNER_MAIL_1", "OWNER_MAIL_CITY"}
+                if "NOTES" in cols:
+                    assert url in REG_RESP and f["attributes"]["NOTES"] in _FIXTURE_NOTES
+    assert not re.search(r"@|\d{3}[-. ]\d{3}[-. ]\d{4}", "".join(REG_RESP.values()))
 
 
 def test_ledger_row_summary_drops_owner_name(tmp_path):
@@ -556,12 +821,13 @@ def test_vacancy_adjacent_false_still_wins_without_a_verdict():
 def test_apply_then_score_end_to_end(tmp_path):
     """Ledger -> apply_verification -> _signals_for, with verdicts produced by the verifiers on
     the real layers: the Zoning parcel and the closed-case parcel lose code_enforcement, the
-    confirmed parcel keeps it, the register's occupied structure loses both register signals."""
+    confirmed parcel keeps it, the register's demolished structure (201 Blue Ridge St, DEMOED)
+    loses both register signals."""
     pairs = [
         (_ovt_row("9661405931", "1772 HOWARD GAP ROAD", ["844"], ["Zoning"]), ovt, "refuted"),
         (_ovt_row("9660054549", "110 OAKWOOD RD", ["1994"], ["Solid Waste"]), ovt, "stale"),
         (_ovt_row("9681135571", "23 MONO LN", ["469"], ["Junkyard"]), ovt, "confirmed"),
-        (_reg_row("902 SYLVAN BLVD"), vsr, "stale"),
+        (_reg_row("201 BLUE RIDGE ST"), vsr, "stale"),
         (_reg_row("1001 TEMON ST"), vsr, "confirmed"),
     ]
     leds = {m.SIGNAL: Ledger(m.SIGNAL, path=tmp_path / f"{m.SIGNAL}.json") for m in (ovt, vsr)}
@@ -602,6 +868,15 @@ def test_apply_then_score_end_to_end(tmp_path):
 _CASES = json.loads((FIX / "code_enforcement_cases.json").read_text())["cases"]
 
 
+#: the three register verdicts vacant_structure v2 changed on the live sweep's own rows (the
+#: fixture's verdict/reason are what v1 answered): the keyword false positive (618 Ferncliff Ln),
+#: the occupied row from a layer 803 days old (902 Sylvan Blvd), and the block cross-wired from the
+#: row next door (112 N Blue Ridge Ave); see the tests of each above
+V2_CHANGED = {"parcel:NC:henderson:9569344337": ("unconfirmed", "demolition_not_established"),
+              "parcel:NC:henderson:9569419828": ("unconfirmed", "register_occupancy_too_old"),
+              "parcel:NC:henderson:9579230754": ("unconfirmed", "occupancy_not_recorded")}
+
+
 def test_the_live_sweep_verdicts_reproduce_exactly():
     clients = {"code_enforcement": (ovt, ReplayFetcher(OVT_RESP)),
                "vacant_structure": (vsr, ReplayFetcher(REG_RESP))}
@@ -615,15 +890,20 @@ def test_the_live_sweep_verdicts_reproduce_exactly():
             out.append((c["key"], res.verdict, res.evidence.get("reason")))
         return out
     got = run(go())
-    want = [(c["key"], c["verdict"], c["reason"]) for c in _CASES]
+    want = [(c["key"], *V2_CHANGED.get(c["key"], (c["verdict"], c["reason"]))) if c["signal"] == "vacant_structure"
+            else (c["key"], c["verdict"], c["reason"]) for c in _CASES]
     assert got == want
     assert len(_CASES) == 100
     # one load per layer for all 100 properties
     assert len(clients["code_enforcement"][1].asked) == 4
-    assert len(clients["vacant_structure"][1].asked) == 3
+    vs = clients["vacant_structure"][1].asked
+    assert len([u for u in vs if "hendersoncountync" not in u]) == 3
+    assert len([u for u in vs if "hendersoncountync" in u]) == 3        # only the three rows that need it
 
 
 def test_the_live_split():
+    """The sweep's split as v1 answered it (the fixture); V2_CHANGED moves three vacant_structure
+    rows (two stale and one more to unconfirmed): v2 is stale 2, unconfirmed 19."""
     from collections import Counter
     split = Counter((c["signal"], c["verdict"]) for c in _CASES)
     assert split == Counter({("code_enforcement", "confirmed"): 37,

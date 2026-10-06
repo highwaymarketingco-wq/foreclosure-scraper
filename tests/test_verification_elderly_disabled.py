@@ -72,7 +72,7 @@ def _row(**kw) -> dict:
 
 def test_registered_with_governs_ttl():
     v = {x.name: x for x in discover()}["elderly_disabled"]
-    assert v.signal == "elderly_disabled" and v.version == "v2"
+    assert v.signal == "elderly_disabled" and v.version == "v3"
     assert v.governs == ("elderly_disabled", "senior_exemption")
     assert v.ttl_days == 60 and v.retry_days == 7 and not v.wall
 
@@ -295,16 +295,31 @@ def _cases():
     return sorted(fixture()["cases"])
 
 
+#: what v3 changed on the live cases (the fixture's `expected` is what v2 answered): the one
+#: stale that the county's own bill contradicted
+V3_CHANGED = {"stale_billed_this_year": {"verdict": "confirmed", "basis": "exemption_on_latest_bill",
+                                         "reason": None, "voter_status": "not_found"}}
+
+
+#: 82 Black Bear Trl: its parcel page lists 2026 and 2025 bills in legal collection ("See Legal",
+#: no numeric Amount Due) above the paid 2024 / 2023 ones. tax_lien_buncombe's parse_parcel_page
+#: (the page parser this verifier shares) dropped such cards until its v4, so the newest bills it
+#: returned were 2024 and 2023 and the answer was parcel_record_ended; with them kept the newest
+#: two are the legal-collection bills, whose Bill Details pages the sweep never captured:
+#: bills_unreadable. Either way unconfirmed, never decisive.
+SHARED_PARSER_REASONS = {"unconfirmed_record_ended": {"parcel_record_ended", "bills_unreadable"}}
+
+
 @pytest.mark.parametrize("name", _cases())
 def test_live_verdicts_reproduce(name):
     c = case(name)
     res = run(c["row"], replay(c))
-    exp = c["expected"]
+    exp = V3_CHANGED.get(name, c["expected"])
     assert res.verdict == exp["verdict"]
     assert res.evidence.get("basis") == exp["basis"]
-    assert res.evidence.get("reason") == exp["reason"]
+    assert res.evidence.get("reason") in SHARED_PARSER_REASONS.get(name, {exp["reason"]})
     assert (res.evidence.get("voter") or {}).get("status") == exp["voter_status"]
-    assert res.verifier == "elderly_disabled" and res.verifier_version == "v2"
+    assert res.verifier == "elderly_disabled" and res.verifier_version == "v3"
 
 
 @pytest.mark.parametrize("name", _cases())
@@ -359,13 +374,88 @@ def test_condo_units_under_one_pin_never_decide():
     assert len(f.asked) == 1 and f.voter_asked == []
 
 
-def test_stale_relief_billed_this_year_but_gone_from_the_layer():
+def test_the_newest_bill_still_excludes_so_a_blank_layer_flag_is_not_stale():
+    """1406 Hardscrabble Rd (the live case, pseudonymized): the layer's Exempt flag is blank, but
+    the 2026 bill (8/15/2026, paid) excludes 103,900 = half of 207,800, the owners are unchanged on
+    every bill, and the scraper's own row read the code on 2026-08-16. v2 called this stale
+    (relief_removed) through `from_layer` and an `any()` over the two bills, against its own
+    bills_checked; the newest bill decides: confirmed."""
     c = case("stale_billed_this_year")
     res = run(c["row"], replay(c))
     ev = res.evidence
-    assert res.verdict == "stale" and ev["basis"] == "relief_removed" and ev["county_code"] is None
-    assert ev["bills_checked"][0]["year"] == 2026 and ev["bills_checked"][0]["shape"] == "elderly_disabled_half"
-    assert ev["layer_showed_it_on"] and e.scraped_from_layer(c["row"], ev["pinnum"])
+    assert res.verdict == "confirmed" and ev["basis"] == "exemption_on_latest_bill"
+    assert ev["county_code"] is None and ev["layer_flag_blank"] is True
+    assert ev["bills_checked"][0]["year"] == 2026 and ev["bills_checked"][0]["exempt_value"] == 103900.0
+    assert ev["bills_checked"][0]["shape"] == "elderly_disabled_half" == ev["latest_bill_shape"]
+    assert ev["layer_showed_it_on"] and e.scraped_from_layer(c["row"], ev["pinnum"])   # v2's trigger
+    assert ev["exempt_value_by_year"] == {"2026": 103900.0, "2025": 101800.0}
+    assert ev["owner_unchanged_since"] == 2020 and ev["owner_match"] == "same"
+
+
+def _with_bill_exempt(c: dict, year: int, exempt: str) -> Replay:
+    """The case's responses with the Exempt Value of one levy year's bill replaced."""
+    import re
+    resp = {}
+    for u, b in c["responses"].items():
+        if f"-{year}-{year}-" in u and "/Bill/Details/" in u:
+            b = re.sub(r"(<th>Exempt Value:</th>\s*<td[^>]*>)\s*[^<]*?\s*(</td>)",
+                       lambda m: m.group(1) + exempt + m.group(2), b)
+            assert exempt in b
+        resp[u] = b
+    return Replay(resp, c["voter"])
+
+
+def test_a_newest_bill_without_the_exclusion_is_still_stale_for_the_same_owner():
+    """The 1406 pages with the 2026 bill's exclusion removed: the newest bill is what says the
+    relief is gone, and an unchanged owner does not change that (v2 behaviour kept)."""
+    c = case("stale_billed_this_year")
+    res = run(c["row"], _with_bill_exempt(c, 2026, "$0.00"))
+    assert res.verdict == "stale" and res.evidence["basis"] == "relief_removed"
+    assert res.evidence["exempt_value_by_year"] == {"2026": 0.0, "2025": 101800.0}
+
+
+def test_an_unreadable_newest_bill_cannot_say_the_relief_is_gone():
+    """The layer's blank flag is not proof (1406 had one over a bill that still excluded half the
+    value), so with the 2026 bill unrecorded neither the older bill nor the scraper's own earlier
+    read of the layer makes a stale: unconfirmed, retried in a week."""
+    c = case("stale_billed_this_year")
+    resp = {u: b for u, b in c["responses"].items() if "-2026-2026-" not in u}
+    res = run(c["row"], Replay(resp, c["voter"]))
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "bills_unreadable"
+    assert [b.get("error") for b in res.evidence["bills_checked"]][0] == "LookupError"
+
+
+def test_an_unexplained_newest_exclusion_confirms_only_the_scrapers_own_row():
+    """118,350 of 258,700 is no relief formula ('other'): on the scraper's own row of the parcel
+    (it read ELD there) the newest bill's exclusion still confirms; on a claim merged in from
+    elsewhere it stays unexplained."""
+    c = case("stale_relief_removed")
+    res = run(c["row"], _with_bill_exempt(c, 2026, "$118,350.00"))
+    assert res.verdict == "confirmed" and res.evidence["basis"] == "exemption_on_latest_bill"
+    assert res.evidence["latest_bill_shape"] == "other"
+    merged = dict(c["row"], source="counties_generic.arcgis_distress.buncombe_unpaid_bills")
+    res = run(merged, _with_bill_exempt(c, 2026, "$118,350.00"))
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "exempt_value_unexplained"
+
+
+def test_a_new_owner_with_the_exclusion_on_the_newest_bill_is_still_stale_owner_changed():
+    """The newest bill cannot show a NEW owner's relief (the exclusion is personal): an owner
+    change since the board saw the row stays the v2 answer."""
+    c = case("stale_billed_this_year")
+    row = dict(c["row"], owner_name="BIRATU CAMOSE")
+    res = run(row, replay(c))
+    assert res.verdict == "stale" and res.evidence["basis"] == "owner_changed"
+
+
+def test_owner_unchanged_since_is_the_run_of_bills_naming_the_newest_owner():
+    bills = [{"year": 2026, "owner": "ROE JANE (LE)"}, {"year": 2025, "owner": "roe, jane (le)"},
+             {"year": 2024, "owner": "ROE JANE (LE)"},
+             {"year": 2023, "owner": "ROE JANE (LE) DOE JOHN (LE)"}, {"year": 2022, "owner": "ROE JANE (LE)"}]
+    assert e.owner_unchanged_since(bills) == 2024          # a second owner on 2023 ends the run
+    assert e.owner_unchanged_since(bills[:3]) == 2024
+    assert e.owner_unchanged_since([{"year": 2026, "owner": None}, {"year": 2025, "owner": "A B"}]) is None
+    assert e.owner_unchanged_since([]) is None
+    assert e.owner_unchanged_since([{"year": 2026, "owner": "A B"}, {"year": 2025, "owner": None}]) == 2026
 
 
 def test_stale_relief_removed_from_the_2026_bill():
@@ -375,11 +465,27 @@ def test_stale_relief_removed_from_the_2026_bill():
     assert ev["bills_checked"][0]["exempt_value"] == 0.0 and ev["bills_checked"][1]["exempt_value"] > 0
 
 
-def test_same_page_without_the_code_is_stale_for_the_scrapers_own_row():
-    """The confirmed parcel's layer answer with the code blanked, and its own scraper row: the
-    relief was on the record (the scraper read it there by this PIN) and is not now -> stale;
-    the same answer for a row that only carries the claim by a merge, bills unrecorded ->
-    unconfirmed (never refuted without every bill read)."""
+def test_a_same_owner_removal_stays_stale_and_shows_what_decides_it():
+    """11 Cardinal Cove Rd (parcel situs 7): 118,350 excluded on the 2025 bill, 0 on 2026, the
+    same life-estate owner on every bill since 2021 and no deed since 2010. Whether a same-owner
+    removal should suppress the signal is the owner's scoring decision, so the verdict is NOT
+    changed; the evidence now carries what that decision needs."""
+    c = case("stale_relief_removed")
+    res = run(c["row"], replay(c))
+    ev = res.evidence
+    assert res.verdict == "stale" and ev["basis"] == "relief_removed"
+    assert ev["exempt_value_by_year"] == {"2026": 0.0, "2025": 118350.0}
+    assert ev["owner_unchanged_since"] == 2021 and ev["owner_match"] == "same"
+    assert "transferred_since" not in ev and "deed_date" not in ev       # no deed since the board saw it
+    blob = json.dumps(ev).upper()
+    assert "REMIMU" not in blob and "WEMA" not in blob                    # the year only, never the name
+
+
+def test_same_page_without_the_code_cannot_be_stale_with_the_bills_unrecorded():
+    """The confirmed parcel's layer answer with the code blanked, and its own scraper row: with the
+    tax site answering nothing the bills cannot say the relief is gone (v2 called this stale from
+    the layer's blank flag alone, a flag that is blank over a still-excluding bill on 1406
+    Hardscrabble Rd) -> unconfirmed; a row that only carries the claim by a merge, same."""
     c = case("confirmed_eld")
     resp = {}
     for u, b in c["responses"].items():
@@ -389,7 +495,7 @@ def test_same_page_without_the_code_is_stale_for_the_scrapers_own_row():
     pin = e.layer_query(c["row"])[1]
     row = dict(c["row"], source_url=e.LAYER_URL + f"?where=pin%3D%27{pin[:10]}%27&outFields=*&f=html")
     res = run(row, Replay(resp, c["voter"]))
-    assert res.verdict == "stale" and res.evidence["basis"] == "relief_removed"
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "bills_unreadable"
     assert res.evidence["bills_checked"] == []          # the tax site was asked, nothing recorded
     res = run(dict(row, source="counties_generic.arcgis_distress.buncombe_unpaid_bills"),
               Replay(resp, c["voter"]))
