@@ -30,11 +30,28 @@ WHAT IT RUNS
     Committing and pushing docs/ is the wrapper's job (deploy/oracle/vm_resume.sh), the same way
     vm_run.sh does it after main.
 
+PLACEHOLDER-TWIN CLEAN-UP (opt-in, 2026-10-05)
+    The 10/5 run's merge kept ~380 parcels twice: the re-scraped row with a "no number" sentinel
+    situs ("0 PATCH DR") beside the aging prior copy of the SAME source's row that the parcel
+    cache had given a real situs ("499 PATCH DR"). See src/foreclosure_scraper/placeholder_twins.py
+    (rule, guards, real examples); board_persist.merge_prior_board() no longer does this.
+    --collapse-dry-run streams the checkpoint FILE (two passes, read-only, no lock, no Listing
+    objects) and prints the groups that would collapse: counts by source, skip reasons, a sample,
+    and a plan digest. Applying is OFF unless RESUME_COLLAPSE_PLACEHOLDER_TWINS is set (or
+    --collapse-placeholder-twins is passed) for --publish-only / --run: right after the
+    pre_publish checkpoint is loaded (or saved) and before write_artifact, each group's live row
+    absorbs its aging copies via Listing.merge() (live row first) and the copies are dropped.
+    Set the variable to the digest the dry run printed to apply exactly the reviewed plan (a
+    different plan is then skipped with an error and the board is published uncollapsed); "1"
+    applies whatever the plan is at publish time.
+
 USAGE
     python3 scripts/resume_from_checkpoint.py                 # show the checkpoint, change nothing
     python3 scripts/resume_from_checkpoint.py --run           # steps 1-5
     python3 scripts/resume_from_checkpoint.py --enrich-only   # steps 1-4 (stop before publish)
     python3 scripts/resume_from_checkpoint.py --publish-only  # step 5 from a pre_publish checkpoint
+    python3 scripts/resume_from_checkpoint.py --collapse-dry-run [--plan-out F] [--sample N]
+    RESUME_COLLAPSE_PLACEHOLDER_TWINS=<digest> bash deploy/oracle/vm_resume.sh --publish-only
 Exit codes follow main.cli(): 0 ok, 3 write failed, 6 scoring failed, 75 lock busy, 1 usage.
 """
 from __future__ import annotations
@@ -153,6 +170,70 @@ def _save_state(st: M.TailState, summary: dict) -> None:
     os.replace(tmp, p)
 
 
+COLLAPSE_ENV = "RESUME_COLLAPSE_PLACEHOLDER_TWINS"
+
+
+def _collapse_wanted(args) -> str:
+    """'' (off, the default), '1' (apply whatever the plan is) or a plan digest to require."""
+    v = (args.collapse_placeholder_twins or os.environ.get(COLLAPSE_ENV) or "").strip()
+    return "" if v.lower() in ("", "0", "no", "off", "false") else v
+
+
+def _collapse_dry_run(args) -> int:
+    """Read-only: stream the checkpoint file twice and print the placeholder-twin plan."""
+    from foreclosure_scraper.board_parts import iter_gz_rows
+    from foreclosure_scraper.placeholder_twins import plan_collapse
+
+    m = checkpoint.manifest() or {}
+    if args.phase and m.get("phase") != args.phase:
+        print(f"checkpoint phase is {m.get('phase')!r}, expected {args.phase!r}", file=sys.stderr)
+        return 1
+    board = checkpoint.CHECKPOINT_DIR / checkpoint.BOARD_FILE
+    t0 = time.monotonic()
+    plan = plan_collapse(lambda: iter_gz_rows(board))
+    if isinstance(m.get("count"), int) and plan.rows_scanned != m["count"]:
+        print(f"read {plan.rows_scanned} rows, manifest says {m['count']}: refusing a partial plan",
+              file=sys.stderr)
+        return 1
+    out = plan.summary(sample=args.sample)
+    out.update(phase=m.get("phase"), saved_at=m.get("saved_at"),
+               seconds=round(time.monotonic() - t0, 1), **_rss())
+    print(json.dumps(out, indent=1, default=str))
+    if args.plan_out:
+        full = plan.summary(sample=len(plan.groups))
+        Path(args.plan_out).write_text(json.dumps(full, indent=1, default=str))
+        print(f"full plan ({len(plan.groups)} groups) written to {args.plan_out}")
+    print(f"\nto apply exactly this plan at publish:\n  {COLLAPSE_ENV}={plan.digest()} "
+          "setsid nohup bash deploy/oracle/vm_resume.sh --publish-only >/dev/null 2>&1 < /dev/null &")
+    return 0
+
+
+def _collapse(st: M.TailState, summary: dict, wanted: str) -> None:
+    """Opt-in placeholder-twin collapse on the in-memory board, before write_artifact. Any
+    failure leaves the board as loaded (published uncollapsed), never half-collapsed."""
+    from foreclosure_scraper.placeholder_twins import apply_collapse, plan_collapse
+
+    t0 = time.monotonic()
+    rows = st.enriched
+    plan = plan_collapse(lambda: rows)
+    digest = plan.digest()
+    if wanted != "1" and wanted != digest:
+        M.log.error("resume.placeholder_twins_skipped", reason="plan digest differs from the "
+                    "reviewed one", wanted=wanted, digest=digest, groups=len(plan.groups),
+                    rows_dropped=plan.rows_dropped)
+        return
+    try:
+        res = apply_collapse(rows, plan)
+    except Exception as exc:  # noqa: BLE001 - apply_collapse checks everything before mutating
+        M.log.error("resume.placeholder_twins_skipped", reason=f"{type(exc).__name__}: {exc}")
+        return
+    summary["notes"] = (str(summary.get("notes") or "") +
+                        f"; collapsed {res['rows_dropped']} placeholder-twin duplicate rows "
+                        f"({res['groups']} parcels, plan {digest})")
+    _mark("placeholder_twins_collapsed", **res, by_source=dict(plan.by_source().most_common()),
+          seconds=round(time.monotonic() - t0, 1))
+
+
 def _publish(st: M.TailState, summary: dict) -> int:
     t0 = time.monotonic()
     rc = M.publish_tail(st, summary)
@@ -167,6 +248,13 @@ def main() -> int:
     g.add_argument("--run", action="store_true", help="enrich tail + pre_publish checkpoint + publish")
     g.add_argument("--enrich-only", action="store_true", help="stop after the pre_publish checkpoint")
     g.add_argument("--publish-only", action="store_true", help="publish a pre_publish checkpoint")
+    g.add_argument("--collapse-dry-run", action="store_true",
+                   help="read-only: print the placeholder-twin groups the checkpoint holds")
+    ap.add_argument("--collapse-placeholder-twins", nargs="?", const="1", default=None,
+                    metavar="DIGEST", help=f"collapse placeholder twins before publishing (also "
+                    f"{COLLAPSE_ENV}=1|<digest>); off by default")
+    ap.add_argument("--plan-out", default=None, help="--collapse-dry-run: write the full plan here")
+    ap.add_argument("--sample", type=int, default=15, help="--collapse-dry-run: sample size")
     ap.add_argument("--max-age-h", type=float, default=None,
                     help="refuse a checkpoint older than this (default: checkpoint.MAX_AGE_H, 48)")
     ap.add_argument("--phase", default=None,
@@ -182,9 +270,14 @@ def main() -> int:
     age = checkpoint.age_hours()
     print(f"checkpoint: phase={m.get('phase')!r} leads={m.get('count')} saved={m.get('saved_at')} "
           f"age={age:.1f}h dir={checkpoint.CHECKPOINT_DIR}" if age is not None else f"checkpoint: {m}")
+    if args.collapse_dry_run:
+        return _collapse_dry_run(args)
     if not (args.run or args.enrich_only or args.publish_only):
         print("dry run -- pass --run, --enrich-only or --publish-only")
         return 0
+    collapse = _collapse_wanted(args)
+    if collapse and args.enrich_only:
+        print("note: the placeholder-twin collapse only applies when publishing; ignored here")
 
     M._setup_logging()
     from foreclosure_scraper.web_artifact import BoardLockBusy, BoardMemoryPressure, board_lock
@@ -211,6 +304,8 @@ def main() -> int:
                                  write_run_health=False, export_and_email=False,
                                  scoring_failed=state.get("scoring_failed"))
                 summary = state.get("summary") or {"notes": _resume_note(m)}
+                if collapse:
+                    _collapse(st, summary, collapse)
                 return _publish(st, summary)
 
             # Archived BEFORE the tail: a scoring failure checkpoints "score_failed" over it
@@ -230,6 +325,8 @@ def main() -> int:
             _mark("pre_publish_checkpoint", saved=saved, seconds=round(time.monotonic() - t0, 1))
             if args.enrich_only:
                 return M.EXIT_SCORE_FAILED if st.scoring_failed else M.EXIT_OK
+            if collapse:
+                _collapse(st, summary, collapse)
             return _publish(st, summary)
     except BoardLockBusy as exc:
         print(f"resume: not started: {exc}", file=sys.stderr)

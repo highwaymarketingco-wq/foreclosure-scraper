@@ -74,6 +74,18 @@ and this function's own job has never been to re-discover THAT -- see
 merge_duplicate_rows() (web_artifact.py) for the dedicated, separately-measured
 tool that targets exactly that (rare, residual) case.
 
+PLACEHOLDER TWINS (2026-10-05). A prior row the house-number guard refuses is no longer aged
+straight away when the only disagreement is a "no number" sentinel: Spartanburg/Rutherford write
+an unnumbered lot as "0 PATCH DR", Buncombe as "99999 GREEN TREE LN", and the published copy of the
+same row later got its real situs from the parcel cache ("499 PATCH DR"). The guard read 0 vs 499
+as two houses and the 10/5 run kept ~380 such parcels twice (the pre-rewrite load_board()+dedupe()
+path splits the same pairs; replayed on the real rows). Such a prior row now folds into its fresh
+row when placeholder_twins.twin_pair_ok() holds (same valid parcel key, a shared source, at most
+one real house number, no unit, no resolver-derived parcel), exactly one fresh row carries that
+parcel key, and the fresh row plus all its twins agree on one real house number (else they age as
+before). The fold is Listing.merge() fresh-first, keeping the prior's numbered situs over the
+sentinel. FULLRUN_PERSIST_PLACEHOLDER_TWINS=0 turns it off.
+
 WHAT THIS DOES NOT FIX: the return value is still a full ``list[Listing]`` of the
 merged board, because main.run() runs it through ~2,400 more lines of enrichment/
 filtering before its own write_artifact() call -- peak memory for THAT part is
@@ -114,6 +126,7 @@ from .web_artifact import (
     # working. Removing this import silently breaks that script's import line.
 )
 from .dedupe import _house_no_of
+from .placeholder_twins import MAX_GROUP_ROWS, fold, real_house_no, twin_pair_ok
 
 log = structlog.get_logger()
 
@@ -221,6 +234,24 @@ def _provably_different_dict(rec: dict, li: Listing) -> bool:
     return bool(ha and hb and ha != hb)
 
 
+def _placeholder_twin_index(rec: dict, rec_sigs, fresh_sig_index: dict,
+                            fresh_deduped: list[Listing]) -> int | None:
+    """The fresh row a prior row is a placeholder twin of (placeholder_twins.py), or None.
+
+    Only reached when the strict match failed, i.e. when the house-number guard refused every
+    candidate. Reached through the parcel branch of dedupe_key() only, and only when exactly ONE
+    fresh row carries that key: a parcel the fresh scrape itself lists more than once (units of
+    one building, a master-tract PIN) never gets the relaxed rule."""
+    k = next((s for s in rec_sigs if s[0] == "k" and str(s[1]).startswith("parcel:")), None)
+    if k is None:
+        return None
+    cands = fresh_sig_index.get(k)
+    if not cands or len(cands) != 1:
+        return None
+    i = cands[0]
+    return i if twin_pair_ok(rec, fresh_deduped[i]) else None
+
+
 def merge_prior_board(
     fresh_deduped: list[Listing],
     docs_dir: Path | str | None = None,
@@ -257,7 +288,12 @@ def merge_prior_board(
         "aged_out_misses": 0,
         "carried_vision": 0,
         "prior_drop_errors": 0,
+        "matched_placeholder_twin": 0,
+        "placeholder_twin_ambiguous": 0,
     }
+    # Placeholder twins (placeholder_twins.py): on by default; FULLRUN_PERSIST_PLACEHOLDER_TWINS=0
+    # restores the strict-only matching of the 2026-10-04 rewrite.
+    twins_on = os.environ.get("FULLRUN_PERSIST_PLACEHOLDER_TWINS", "1") != "0"
 
     listings_path = docs / "listings.json"
     if not _board_file_present(listings_path):
@@ -282,10 +318,50 @@ def merge_prior_board(
     prior_total = 0
     streamed_for_drop_rate = 0
     drop_errors: list[str] = []
+    # fresh index -> prior row dicts that are placeholder twins of it. Decided after the stream
+    # (all of a fresh row's twins must be seen before we know they agree on one house number).
+    # Bounded by the prior rows the house-number guard refused on a single-row parcel key.
+    deferred: dict[int, list[dict]] = {}
+
+    def _age(rec: dict) -> None:
+        """Prior-only (persisted but not re-scraped this run) => AGE, entirely off the raw
+        dict -- no Listing constructed for a row that might still get dropped by this check."""
+        nonlocal streamed_for_drop_rate
+        if _is_terminal_dict(rec, now):
+            stats["aged_out_terminal"] += 1
+            return
+        raw = rec.get("raw")
+        raw = raw if isinstance(raw, dict) else {}
+        prev_pulled = raw.get("pulled_sale") or {}
+        consecutive = prev_pulled.get("consecutive_misses", 0) + 1
+        if consecutive > max_misses:
+            stats["aged_out_misses"] += 1
+            return
+        raw["pulled_sale"] = {
+            "first_missed_at": prev_pulled.get(
+                "first_missed_at", now.isoformat() + "Z"
+            ),
+            "consecutive_misses": consecutive,
+            "presumed_withdrawn": True,
+            "last_seen_source": rec.get("source"),
+            "last_seen_sale_date": rec.get("sale_date"),
+        }
+        rec["raw"] = raw
+        if not rec.get("auction_status"):
+            rec["auction_status"] = "presumed_withdrawn"
+        streamed_for_drop_rate += 1
+        try:
+            kept.append(Listing.model_validate(rec))
+        except Exception as exc:  # noqa: BLE001 - same drop tolerance as the matched branch
+            drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
+            stats["prior_drop_errors"] += 1
+            return
+        stats["prior_only_kept"] += 1
 
     for rec in _iter_board_records(docs):
         prior_total += 1
         match_idx: int | None = None
+        rec_sigs = ()
         if isinstance(rec, dict) and fresh_sig_index:
             try:
                 rec_sigs = _append_dict_sigs(rec)
@@ -327,41 +403,53 @@ def merge_prior_board(
             fresh_matched[match_idx] = True
             continue
 
-        # Not matched => prior-only (persisted but not re-scraped this run) => AGE,
-        # entirely off the raw dict -- no Listing constructed for a row that might
-        # still get dropped by this same check.
         if not isinstance(rec, dict):
             continue
-        if _is_terminal_dict(rec, now):
-            stats["aged_out_terminal"] += 1
+        # Strict match refused (by the house-number guard, the only way a shared parcel key
+        # fails): a placeholder twin of a single fresh row is deferred, not aged. 2026-10-05:
+        # the 10/5 run kept ~380 such parcels twice, '0 PATCH DR' fresh beside '499 PATCH DR'
+        # prior; see placeholder_twins.py.
+        if twins_on and rec_sigs:
+            ti = _placeholder_twin_index(rec, rec_sigs, fresh_sig_index, fresh_deduped)
+            if ti is not None:
+                deferred.setdefault(ti, []).append(rec)
+                continue
+        _age(rec)
+
+    # Placeholder twins, decided per fresh row now that all of its twins are known: folded only
+    # when the fresh row and every twin agree on at most ONE real house number and the group is
+    # small. Otherwise each twin goes down the ordinary prior-only aging path, exactly as before.
+    twin_samples: list[tuple] = []
+    for i, recs in deferred.items():
+        hns = {real_house_no(fresh_deduped[i].street_address)}
+        hns.update(real_house_no(r.get("street_address")) for r in recs)
+        hns.discard("")
+        if len(hns) > 1 or 1 + len(recs) > MAX_GROUP_ROWS:
+            stats["placeholder_twin_ambiguous"] += len(recs)
+            for rec in recs:
+                _age(rec)
             continue
-        raw = rec.get("raw")
-        raw = raw if isinstance(raw, dict) else {}
-        prev_pulled = raw.get("pulled_sale") or {}
-        consecutive = prev_pulled.get("consecutive_misses", 0) + 1
-        if consecutive > max_misses:
-            stats["aged_out_misses"] += 1
-            continue
-        raw["pulled_sale"] = {
-            "first_missed_at": prev_pulled.get(
-                "first_missed_at", now.isoformat() + "Z"
-            ),
-            "consecutive_misses": consecutive,
-            "presumed_withdrawn": True,
-            "last_seen_source": rec.get("source"),
-            "last_seen_sale_date": rec.get("sale_date"),
-        }
-        rec["raw"] = raw
-        if not rec.get("auction_status"):
-            rec["auction_status"] = "presumed_withdrawn"
-        streamed_for_drop_rate += 1
-        try:
-            kept.append(Listing.model_validate(rec))
-        except Exception as exc:  # noqa: BLE001 - same drop tolerance as the matched branch
-            drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
-            stats["prior_drop_errors"] += 1
-            continue
-        stats["prior_only_kept"] += 1
+        for rec in recs:
+            streamed_for_drop_rate += 1
+            try:
+                prior_li = Listing.model_validate(rec)
+            except Exception as exc:  # noqa: BLE001 - same drop tolerance as the matched branch
+                drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
+                stats["prior_drop_errors"] += 1
+                continue
+            if len(twin_samples) < 5:
+                twin_samples.append((fresh_deduped[i].source, fresh_deduped[i].parcel_id,
+                                     fresh_deduped[i].street_address, prior_li.street_address))
+            # fold(): Listing.merge() with fresh first (fresh wins, prior backfills), keeping the
+            # prior's numbered situs over the fresh row's no-number sentinel.
+            fresh_deduped[i] = fold(fresh_deduped[i], prior_li)
+            fresh_matched[i] = True
+            stats["matched_placeholder_twin"] += 1
+    deferred.clear()
+    if stats["matched_placeholder_twin"] or stats["placeholder_twin_ambiguous"]:
+        log.info("board_persist.placeholder_twins",
+                 folded=stats["matched_placeholder_twin"],
+                 ambiguous_aged=stats["placeholder_twin_ambiguous"], sample=twin_samples)
 
     if drop_errors:
         rate = stats["prior_drop_errors"] / streamed_for_drop_rate if streamed_for_drop_rate else 0.0
