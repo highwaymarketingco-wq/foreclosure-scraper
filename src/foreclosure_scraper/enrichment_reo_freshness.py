@@ -45,10 +45,16 @@ from __future__ import annotations
 
 import structlog
 
+from pathlib import Path
+
 from .models import Listing, _normalize_addr
 from .scrapers._registry import all_scrapers
 
 log = structlog.get_logger(__name__)
+
+# The prior run's board, for score_board's price_cut diff (the same absolute path main.py passes;
+# the publish has not overwritten it when this step runs). Read only if a scored row has MLS fields.
+_PREV_BOARD = Path(__file__).resolve().parent.parent.parent / "docs" / "listings.json"
 
 # Complete-inventory snapshot feeds with stable per-property URLs. Absence from a
 # fresh pull == the property sold / was withdrawn. Keep this list TIGHT.
@@ -128,6 +134,7 @@ async def prune_stale_reo(listings: list[Listing]) -> tuple[list[Listing], dict]
     # rows here was the actual gap, not a missing scraper capability.
     landed = {"matched": 0, "added": 0, "skipped_no_addr": 0, "skipped_out_of_scope": 0}
     revived: list[Listing] = []
+    added: list[Listing] = []
     _in_scope = None  # lazy-imported once, only if we actually have a candidate
     for slug, fresh in fresh_by_slug.items():
         for fr in fresh:
@@ -169,20 +176,44 @@ async def prune_stale_reo(listings: list[Listing]) -> tuple[list[Listing], dict]
                 continue
             kept.append(fr)
             existing_by_id[aid] = fr
+            added.append(fr)
             landed["added"] += 1
 
-    if revived:
-        # intent_score ran before this step (main.run_enrich_tail: lead_signals, then reo
-        # freshness, then board quality) and was capped on the tag; redo it for these rows.
+    # This step runs after score_board (main.run_enrich_tail: score_board, ..., lead_signals,
+    # then reo freshness), so a row it adds has no distress_stack and no tier. 2026-10-06: the
+    # 10/5 run's pre_publish checkpoint carried 415 fannie_homepath rows with no tier, the
+    # rows this upsert landed (the 9/23 run logged added=423). Score them in their parcel
+    # groups now; a scorer failure leaves them COLD with score_error, never tierless.
+    scored = None
+    if added:
+        from .distress_score import ScoreBoardError, score_late_rows
+        try:
+            scored = score_late_rows(kept, added, previous_path=_PREV_BOARD)
+        except ScoreBoardError as exc:
+            scored = exc.hist
+            log.error("reo_freshness.score_failed", groups=exc.failed, first=exc.failures[:3])
+        except Exception:  # noqa: BLE001 - a scoring hiccup must not undo the prune/upsert
+            log.error("reo_freshness.score_failed", rows=len(added), exc_info=True)
+            for li in added:
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                if not li.raw.get("distress_stack"):
+                    li.raw["distress_stack"] = {"tier": "COLD", "stack": 0, "categories": [],
+                                                "signals": [], "score": 0,
+                                                "score_error": "score_late_rows"}
+    rescore = revived + added
+    if rescore:
+        # intent_score ran before this step and was capped on the tag (revived rows) or never
+        # ran (added rows); redo it for these rows.
         try:
             from .enrichment_lead_signals import enrich_lead_signals
-            enrich_lead_signals(revived)
+            enrich_lead_signals(rescore)
         except Exception:  # noqa: BLE001 - a scoring hiccup must not undo the prune/upsert
-            log.warning("reo_freshness.intent_rescore_failed", rows=len(revived))
+            log.warning("reo_freshness.intent_rescore_failed", rows=len(rescore))
     log.info("reo_freshness.done", pruned=pruned, kept=len(kept), landed=landed,
-             untagged=len(revived))
+             untagged=len(revived), added_tiers=scored)
     return kept, {"pruned": sum(pruned.values()), "by_source": pruned, "landed": landed,
-                  "untagged": len(revived)}
+                  "untagged": len(revived), "added_tiers": scored}
 
 
 def _drop_withdrawn(li: Listing) -> bool:

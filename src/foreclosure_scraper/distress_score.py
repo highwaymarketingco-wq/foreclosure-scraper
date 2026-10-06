@@ -1434,7 +1434,8 @@ def _score_group(active: list[Listing], prior_prices: dict, today: date) -> dict
 
 
 def score_board(listings: list[Listing], previous_path: Optional[Path] = None,
-                today: Optional[date] = None) -> dict:
+                today: Optional[date] = None, *,
+                suspicious_keys: Optional[frozenset] = None) -> dict:
     """Compute and attach raw['distress_stack'] to each listing. Returns a
     tier histogram.
 
@@ -1443,7 +1444,8 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None,
     by comparing each listing's list price against its prior-run ask; it is only read when
     some listing actually has MLS fields. Defaults to docs/listings.json; pass a path (or a
     non-existent one) to control it. `today` (default date.today()) is the reference date
-    for the lifecycle rules and is injectable for tests.
+    for the lifecycle rules and is injectable for tests. `suspicious_keys` replaces the
+    over-shared parcel set computed from `listings` (score_late_rows passes the whole board's).
 
     Raises ScoreBoardError when any group could not be scored (after scoring the rest)."""
     today = _as_today(today)
@@ -1452,7 +1454,8 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None,
     # citing one pre-split tract PIN in a lien-agent filing batch) is not a real grouping key
     # and is ungrouped by _parcel_key (audit 2026-09-22, Pender County 3208-90-5620-0000).
     from .dedupe import suspicious_parcel_keys
-    suspicious = suspicious_parcel_keys(listings)
+    # suspicious_keys: the set computed over a larger board (score_late_rows scores a subset)
+    suspicious = suspicious_parcel_keys(listings) if suspicious_keys is None else suspicious_keys
     LAST_STATS["suspicious_parcel_ids"] = len(suspicious)
     groups: dict[str, list[Listing]] = {}
     for li in listings:
@@ -1519,3 +1522,37 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None,
             f"score_board: {counts['errors']} parcel group(s) failed to score; first: {failures[0]}",
             failed=counts["errors"], hist=hist, failures=failures)
     return hist
+
+
+def score_late_rows(board: list[Listing], late: list[Listing],
+                    previous_path: Optional[Path] = None,
+                    today: Optional[date] = None) -> dict:
+    """Score rows that joined the board AFTER `score_board` ran.
+
+    enrichment_reo_freshness lands HomePath listings the scrape phase never landed, and it
+    runs after the scorer (main.run_enrich_tail), so those rows reached the board with no
+    `distress_stack` and no tier (2026-10-06: 415 fannie_homepath rows of the 10/5 run).
+
+    Each late row is scored with every board row on its parcel group, through `score_board`
+    itself, so the stack equals what a whole-board pass would give that group. A late row with
+    no usable parcel id is its own group and the board is not scanned. `LAST_STATS` keeps the
+    whole-board call's counters (the run log reads them). Returns the tier histogram of the
+    groups scored; raises ScoreBoardError like `score_board` (failed groups are COLD)."""
+    if not late:
+        return {"HOT": 0, "WARM": 0, "COLD": 0}
+    from .dedupe import suspicious_parcel_keys
+    late_ids = {id(li) for li in late}
+    grouped = any(_parcel_key(li).startswith("p:") for li in late)
+    suspicious = suspicious_parcel_keys(board) if grouped else frozenset()
+    keys = {_parcel_key(li, suspicious) for li in late}
+    subset = list(late)
+    if any(k.startswith("p:") for k in keys):
+        subset += [li for li in board
+                   if id(li) not in late_ids and _parcel_key(li, suspicious) in keys]
+    saved = dict(LAST_STATS)
+    try:
+        return score_board(subset, previous_path=previous_path, today=today,
+                           suspicious_keys=suspicious)
+    finally:
+        LAST_STATS.clear()
+        LAST_STATS.update(saved)
