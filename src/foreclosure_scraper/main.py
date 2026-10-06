@@ -1513,6 +1513,25 @@ async def run() -> int:
         except Exception:  # noqa: BLE001 - never let the snapshot fail the run
             log.error("grandfather_capture.failed", traceback=traceback.format_exc())
 
+    # Correct bad data the prior board carried in (docs/HANDOFF.md item 71): parcels resolved at
+    # a geocoder fallback point and what was copied from them, the owner's mailing address shown
+    # as the property address, and the superseded aged copies of such rows. HERE, right after the
+    # merge and before any enricher and dedupe2, so the fixed enrichers refill what is withdrawn
+    # and dedupe2 never merges on it. Owner-mailing needs data/parcel_cache (a county without one
+    # is skipped and logged). Never fails the run; FULLRUN_PRIOR_CORRECTION=0 turns it off.
+    if persist_applied and os.environ.get("FULLRUN_PRIOR_CORRECTION", "1") != "0":
+        try:
+            from .enrichment_prior_correction import CacheReader, correct_prior_rows
+            _pc_cache = CacheReader()
+            log.info("orchestrator.prior_correction", **correct_prior_rows(deduped, cache=_pc_cache))
+            if _grandfather:
+                # the restore re-adds a snapshot row whose key the final board lacks: correct the
+                # snapshot the same way, or a withdrawn parcel's old key would bring the row back
+                log.info("orchestrator.prior_correction_grandfather",
+                         **correct_prior_rows(_grandfather, cache=_pc_cache))
+        except Exception:  # noqa: BLE001 - a correction pass must never cost the run
+            log.error("prior_correction.failed", traceback=traceback.format_exc())
+
     # Pulled-sale detection (dad's #6): listings that existed last week
     # but didn't show up this run get tagged raw['pulled_sale'] with
     # presumed_withdrawn=True and kept on the dashboard for up to 4

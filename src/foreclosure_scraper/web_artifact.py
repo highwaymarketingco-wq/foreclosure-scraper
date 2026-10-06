@@ -2278,6 +2278,10 @@ RAW_KEEP = {
     "gis_attrs_full": "*",            # full GIS attribute snapshot
     "situs_address_source": "*",      # situs address provenance
     "address_not_property": "*",      # {address, reason, notices}: a court/office address taken from the notice text, removed (enrichment_address_final)
+    # enrichment_prior_correction (HANDOFF item 71): audit records of carried data corrected in a run.
+    "parcel_withdrawn_fallback_point": "*",  # {parcel_id, reason, point, cleared, raw_removed}: a parcel resolved at a geocoder fallback point, withdrawn
+    "address_was_owner_mailing": "*",        # {class, street_address, city, zip_code, situs, ...}: the owner's mailing shown as the property, replaced by the situs
+    "superseded_mailing_copies": "*",        # [{street_address, first_seen, source}]: aged copies of this row that showed the owner's mailing, dropped
     "owner_email": "*",               # surfaced owner email from OCR/skip-trace
     "red_flags": "*",                  # unified red flag array [{severity, type, description, source}]
     "sos_dissolution": "*",            # NC SOS LLC dissolution status

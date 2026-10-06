@@ -464,7 +464,18 @@ def _withdrawn(li: Listing) -> bool:
     """True when repair_parcel_from_address withdrew this lead's neighbour-derived parcel (coordinates had
     attached a parcel next door). Re-attaching it here would let the next join refill the neighbour's values."""
     pfa = li.raw.get("parcel_from_address") if isinstance(li.raw, dict) else None
-    return isinstance(pfa, dict) and bool(pfa.get("withdrawn_parcel"))
+    if isinstance(pfa, dict) and bool(pfa.get("withdrawn_parcel")):
+        return True
+    # enrichment_prior_correction withdrew a parcel resolved at a fallback point (HANDOFF item 71):
+    # not again from that same point (a new, real point may resolve).
+    fb = li.raw.get("parcel_withdrawn_fallback_point") if isinstance(li.raw, dict) else None
+    pt = fb.get("point") if isinstance(fb, dict) else None
+    if isinstance(pt, list) and len(pt) == 2 and li.latitude is not None and li.longitude is not None:
+        try:
+            return (round(float(pt[0]), 5), round(float(pt[1]), 5)) == (round(li.latitude, 5), round(li.longitude, 5))
+        except (TypeError, ValueError):
+            return False
+    return False
 
 
 async def _resolve_one(c, li: Listing, counts: dict) -> None:
