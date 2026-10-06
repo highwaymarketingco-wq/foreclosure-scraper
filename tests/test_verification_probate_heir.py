@@ -89,6 +89,69 @@ def decide(parcel, death=MATCHED, chain=None, claim=None, dec=DEC, **kw):
 
 
 # ---------------------------------------------------------------------------------------------
+# the live sweep, reproduced
+# ---------------------------------------------------------------------------------------------
+
+with gzip.open(FIX / "probate_heir_buncombe.json.gz", "rt", encoding="utf-8") as _fh:
+    _BUNDLE = json.load(_fh)
+CASES = json.loads((FIX / "probate_heir_cases.json").read_text())["cases"]
+
+
+class Live(ReplayFetcher):
+    """The sweep's own responses; voter searches answered from the bundle."""
+
+    def __init__(self):
+        super().__init__(_BUNDLE["responses"])
+
+    async def voter_search(self, first, last, county):
+        self.asked.append(f"voter {first}|{last}|{county}")
+        return _BUNDLE["voters"][f"{first}|{last}|{county}"]
+
+
+def test_every_live_verdict_reproduces_from_the_captured_responses():
+    """The 55 claims of the 2026-10-06 sweeps (40 HOT/WARM, re-checked under v2, + 15 WARM
+    estate / obituary notices with a parcel), docs/handoff/verification/probate_heir.json."""
+    assert len(CASES) == 55
+    got = Counter()
+    for c in CASES:
+        F._RUNS.clear()
+        res = asyncio.run(ph.verify(copy.deepcopy(c["row"]), Live(), today=TODAY))
+        assert (res.verdict, res.evidence.get("decided_by"), res.evidence.get("reason")) == \
+            (c["verdict"], c["decided_by"], c["reason"]), c["key"]
+        got[res.verdict] += 1
+    assert got == {"confirmed": 19, "unconfirmed": 35, "refuted": 1}
+
+
+def test_the_live_rows_keys_are_case_scoped():
+    v = next(v for v in discover() if v.signal == "probate_heir")
+    for c in CASES:
+        k = v.ledger_keys(c["row"])[0]
+        assert k == c["key"] and k.startswith("estate:") and k.split("@")[1] == c["live_key_suffix"]
+
+
+def test_no_person_name_in_any_published_evidence_of_the_live_cases():
+    """No word of any name the row carries (decedent, owner, defendant, care-of, heir names,
+    personal representative) appears in the evidence of its verdict."""
+    checked = 0
+    for c in CASES:
+        F._RUNS.clear()
+        ev = json.dumps(asyncio.run(ph.verify(copy.deepcopy(c["row"]), Live(), today=TODAY)).evidence)
+        row, raw = c["row"], c["row"].get("raw") or {}
+        he, pr = raw.get("heir_estate") or {}, raw.get("probate") or {}
+        texts = [row.get("owner_name"), row.get("defendant"), pr.get("decedent"),
+                 pr.get("personal_representative"), (raw.get("obituary") or {}).get("decedent"),
+                 he.get("owner_of_record"), he.get("care_of")] + [h.get("name") for h in he.get("heir_names") or []]
+        for t in texts:
+            for w in re.findall(r"[A-Za-z]{4,}", str(t or "")):
+                if w.upper() in ("HEIRS", "ESTATE", "DECEASED"):
+                    continue
+                checked += 1
+                assert not re.search(r"\b%s\b" % re.escape(w), ev, re.I), (c["key"], w)
+        assert not re.search(r"VoterRegNum|NCID|ResAddress|\b\d{5}\b", ev), c["key"]
+    assert checked > 150
+
+
+# ---------------------------------------------------------------------------------------------
 # the contract
 # ---------------------------------------------------------------------------------------------
 

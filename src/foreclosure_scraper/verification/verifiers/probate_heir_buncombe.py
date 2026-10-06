@@ -52,7 +52,8 @@ not_found. A death outside Buncombe is recorded in that county, so not_found is 
 against the claim.
 
 CHECK 2, THE TRANSFER PATTERN. The county parcel layer (gis.buncombecounty.org property_bc_dis/
-MapServer/1, by PIN else house number + street; foreclosure_rod_buncombe.find_parcel) gives the
+MapServer/1; find_parcel(): by the row's PIN ONLY when it has one, else house number + street;
+an ArcGIS error body is a fetch failure, retried once, never "no parcel") gives the
 owner of record today and the vesting deed (book/page, date, instrument, excise stamps, price);
 the ROD name index (Consolidated Real Property) searched for the decedent gives the instruments
 the decedent signed or received, tied to the parcel as foreclosure_rod ties them (the vesting

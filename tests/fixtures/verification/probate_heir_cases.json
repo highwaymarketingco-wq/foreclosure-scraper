@@ -1,0 +1,2078 @@
+{
+ "cases": [
+  {
+   "decided_by": null,
+   "key": "estate:662d93f9234c21ed@parcel:NC:buncombe:0609950976",
+   "live_key_suffix": "parcel:NC:buncombe:0609950976",
+   "reason": "death_record_ambiguous",
+   "row": {
+    "city": "Cbm",
+    "county": "Buncombe",
+    "defendant": "NAJA (HEIRS) WONITUW EAWURIF",
+    "first_seen": "2026-07-01T02:57:14.921125",
+    "listing_type": "tax_lien",
+    "owner_name": "NAJA (HEIRS) WONITUW EAWURIF",
+    "parcel_id": "0609-95-0976-00000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties_nc.nc_heir_estate_parcels"
+      },
+      {
+       "source": "counties_nc.buncombe_delinquent_tax"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": null,
+      "mailing": "1 MAIN ST BAFEC MTN NC 28801",
+      "match": "heirs",
+      "owner_of_record": "NAJA (HEIRS) WONITUW EAWURIF"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties.multi_year_delinquent_tax",
+    "state": "NC"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:926ba9b7f5715492@parcel:NC:buncombe:9743049719",
+   "live_key_suffix": "parcel:NC:buncombe:9743049719",
+   "reason": null,
+   "row": {
+    "city": "FASEWEJO",
+    "county": "Buncombe",
+    "defendant": "NIJAW HITOSEN (HEIRS)",
+    "first_seen": "2026-09-15T14:56:18.823232",
+    "listing_type": "tax_lien",
+    "owner_name": "NIJAW HITOSEN (HEIRS)",
+    "parcel_id": "9743-04-9719-00000",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "201 WOROBIS FOCEPI CIR"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:fc8fc0cb9e4334d0@parcel:NC:buncombe:8678793986",
+   "live_key_suffix": "parcel:NC:buncombe:8678793986",
+   "reason": "death_record_not_found",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "WONITUW F KAKESO (HEIRS) EERUDILOR KAKESO (HEIRS)",
+    "first_seen": "2026-07-22T20:45:25.050964",
+    "listing_type": "estate_lead",
+    "owner_name": "SUWOBAROC WOGIH DEDAROCILAR LLC",
+    "parcel_id": "8678793986",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "GETEP W KAKESO",
+      "heir_names": [
+       {
+        "name": "WONITUW F KAKESO ( ) EERUDILOR KAKESO ( )",
+        "raw": "WONITUW F KAKESO (HEIRS) EERUDILOR KAKESO (HEIRS)",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST BOCA RATON FL 28801",
+      "match": "heirs",
+      "owner_of_record": "WONITUW F KAKESO (HEIRS) EERUDILOR KAKESO (HEIRS)"
+     },
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "273 BEAR WALLOW TRL"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_titled_to_decedent",
+   "key": "estate:7a6014c20ff7baf1@parcel:NC:buncombe:9744565607",
+   "live_key_suffix": "parcel:NC:buncombe:9744565607",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "Gulobevoma Hababi",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of Gulobevoma Hababi, deceased, late of Buncombe County",
+    "first_seen": "2026-08-16T19:51:56.778523",
+    "listing_type": "probate_notice",
+    "owner_name": "HABABI GULOBEVOMA",
+    "parcel_id": "9744565607",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "EXECUTOR",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.ncnotices",
+    "state": "NC",
+    "street_address": "1400 WAVERLY RD UNIT V56"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:4daa451e37a9362d@parcel:NC:buncombe:0614594089",
+   "live_key_suffix": "parcel:NC:buncombe:0614594089",
+   "reason": "decedent_name_unreadable",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "HUFE T B HEIRS",
+    "first_seen": "2026-08-06T13:43:08.858505",
+    "listing_type": "tax_lien",
+    "owner_name": "HUFE T B HEIRS",
+    "parcel_id": "0614-59-4089-00000",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "WAGU CLIFF TRL"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:367ad12ac2c0a924@parcel:NC:buncombe:9720111803",
+   "live_key_suffix": "parcel:NC:buncombe:9720111803",
+   "reason": "owner_unrelated_no_tie",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "Sebusuh Damocav Gavu",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of Sebusuh Damocav Gavu, deceased, late of Buncombe County",
+    "first_seen": "2026-06-24T00:00:00",
+    "listing_type": "probate_notice",
+    "owner_name": "Sebusuh Damocav Gavu",
+    "parcel_id": "9720111803",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties.column_legal_notices"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "ADMINISTRATOR",
+      "kind": "probate"
+     }
+    },
+    "source": "counties.column_legal_notices",
+    "state": "NC",
+    "street_address": "10068 CHELMSFORD TER"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_titled_to_decedent",
+   "key": "estate:fb90e4eed5107bcb@parcel:NC:buncombe:9625783851",
+   "live_key_suffix": "parcel:NC:buncombe:9625783851",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "Difinuc Fisul",
+    "first_seen": "2026-07-01T02:44:24.721687",
+    "listing_type": "probate_notice",
+    "owner_name": "FISUL MAGOZA L;FISUL DIFINUC M",
+    "parcel_id": "9625783851",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "public_notices.gannett_obituaries"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "obituary",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.gannett_obituaries",
+    "state": "NC",
+    "street_address": "226 BENT COJID RANCH RD"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:d08ffc10b42bda81@parcel:NC:buncombe:9701401648",
+   "live_key_suffix": "parcel:NC:buncombe:9701401648",
+   "reason": "owner_shares_decedent_surname",
+   "row": {
+    "city": "Weaverville",
+    "county": "Buncombe",
+    "defendant": "GOVE FOBAREB",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of GOVE FOBAREB, deceased, late of Buncombe County",
+    "first_seen": "2026-08-06T13:35:57.788645",
+    "listing_type": "probate_notice",
+    "owner_name": "GOVE FOBAREB",
+    "parcel_id": "9701401648",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "public_notices.nc_notices_counties"
+      },
+      {
+       "source": "public_notices.nc_notices_counties"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "EXECUTOR",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "333 OLD NC 63 HWY"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:5975a6d6f9482759@parcel:NC:buncombe:0656627043",
+   "live_key_suffix": "parcel:NC:buncombe:0656627043",
+   "reason": "owner_unrelated_no_tie",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "SIWUJ, RIKOVI V",
+    "first_seen": "2026-09-22T15:36:07.843688",
+    "listing_type": "tax_lien",
+    "owner_name": "SIWUJ, RIKOVI V",
+    "parcel_id": "065662704300000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties_nc.nc_heir_estate_parcels"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": null,
+      "mailing": "1 MAIN ST SARASOTA FL 28801",
+      "match": "heirs",
+      "owner_of_record": "LUCELEK W CEFA (HEIRS)"
+     },
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.buncombe_delinquent_tax",
+    "state": "NC"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:87946372b5907397@parcel:NC:buncombe:9628063694",
+   "live_key_suffix": "parcel:NC:buncombe:9628063694",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "DIRUFA LAVU BOLULO SR (HEIRS)",
+    "first_seen": "2026-07-22T20:45:25.050377",
+    "listing_type": "estate_lead",
+    "owner_name": "DIRUFA LAVU BOLULO SR (HEIRS)",
+    "parcel_id": "9628063694",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": null,
+      "heir_names": [
+       {
+        "name": "DIRUFA LAVU BOLULO SR ( )",
+        "raw": "DIRUFA LAVU BOLULO SR (HEIRS)",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST ASHEVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "DIRUFA LAVU BOLULO SR (HEIRS)"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "516 DEAVERVIEW RD"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:bff905c75941ef2a@parcel:NC:buncombe:9755791213",
+   "live_key_suffix": "parcel:NC:buncombe:9755791213",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "AEMOJ MOKAWAL HEIRS",
+    "first_seen": "2026-07-22T20:45:25.049951",
+    "listing_type": "estate_lead",
+    "owner_name": "SACUFOTO LEDAG AOKO",
+    "parcel_id": "9755791213",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "JEHE MOKAWAL",
+      "heir_names": [
+       {
+        "name": "AEMOJ MOKAWAL",
+        "raw": "AEMOJ MOKAWAL HEIRS",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST WEAVERVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "AEMOJ MOKAWAL HEIRS"
+     },
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "30 IOKE BIBATAV RD"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:fd4ca5f8c8fd3fc7@parcel:NC:buncombe:9645780786",
+   "live_key_suffix": "parcel:NC:buncombe:9645780786",
+   "reason": "death_record_not_found",
+   "row": {
+    "city": "Cas",
+    "county": "Buncombe",
+    "defendant": "RIKENA A HEPAJEJ HEIRS",
+    "first_seen": "2026-07-22T20:45:25.050643",
+    "listing_type": "estate_lead",
+    "owner_name": "MUWOJU COHAM;MUWOJU SIPEFUHOF",
+    "parcel_id": "9645780786",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": null,
+      "heir_names": [
+       {
+        "name": "RIKENA A HEPAJEJ",
+        "raw": "RIKENA A HEPAJEJ HEIRS",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST NW FLOYD VUZI 28801",
+      "match": "heirs",
+      "owner_of_record": "RIKENA A HEPAJEJ HEIRS"
+     },
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:7c93d658f014b27f@parcel:NC:buncombe:9751433155",
+   "live_key_suffix": "parcel:NC:buncombe:9751433155",
+   "reason": "death_record_not_found",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "HONADO E SICEF SR (HEIRS)",
+    "first_seen": "2026-07-22T20:45:25.050501",
+    "listing_type": "estate_lead",
+    "owner_name": "RIKENA S GUCOFAP LITOGE TRUST KOPIJUH R CEJIDAB LITOGE TRUST",
+    "parcel_id": "9751433155",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "DAMOCAV M SAZOB",
+      "heir_names": [
+       {
+        "name": "HONADO E SICEF SR ( )",
+        "raw": "HONADO E SICEF SR (HEIRS)",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST LOXAHATCHEE FL 28801",
+      "match": "heirs",
+      "owner_of_record": "HONADO E SICEF SR (HEIRS)"
+     },
+     "life_events": [
+      "trust"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:e55313c577fce71f@parcel:NC:buncombe:9639623518",
+   "live_key_suffix": "parcel:NC:buncombe:9639623518",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "CUGOMOG GUFEDU GELENOM (HEIRS)",
+    "first_seen": "2026-07-22T20:45:25.050339",
+    "listing_type": "estate_lead",
+    "owner_name": "CUGOMOG GUFEDU GELENOM (HEIRS)",
+    "parcel_id": "9639623518",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "WONITUW GUFEDU",
+      "heir_names": [
+       {
+        "name": "CUGOMOG GUFEDU GELENOM ( )",
+        "raw": "CUGOMOG GUFEDU GELENOM (HEIRS)",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST ASHEVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "CUGOMOG GUFEDU GELENOM (HEIRS)"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "50 BEDER ST"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "no_death_word_on_roll",
+   "key": "estate:5654706963abf951@parcel:NC:buncombe:9629666315",
+   "live_key_suffix": "parcel:NC:buncombe:9629666315",
+   "reason": null,
+   "row": {
+    "case_number": "fc-65974761",
+    "city": "Asheville",
+    "county": "Buncombe",
+    "defendant": "MAFIHUF KUSUSOTI A;GUHUWU DAREB L",
+    "first_seen": "2026-07-01T02:57:14.922879",
+    "listing_type": "foreclosure_sale",
+    "owner_name": "MAFIHUF KUSUSOTI A;GUHUWU DAREB L",
+    "parcel_id": "9629666315",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties_nc.nc_heir_estate_parcels"
+      },
+      {
+       "source": "national.foreclosure_dot_com"
+      },
+      {
+       "source": "counties_nc.buncombe_elderly"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": null,
+      "mailing": "1 MAIN ST ASHEVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "MAFIHUF KUSUSOTI A;GUHUWU DAREB L"
+     },
+     "life_events": [
+      "disabled_veteran_exemption"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "national.foreclosure_dot_com",
+    "state": "NC",
+    "street_address": "47 VERDE DR"
+   },
+   "tier": "WARM",
+   "verdict": "refuted"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:aeaa05850b933dab@parcel:NC:buncombe:9644053934",
+   "live_key_suffix": "parcel:NC:buncombe:9644053934",
+   "reason": "death_record_ambiguous",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "Guwuba H Huwuso III",
+    "first_seen": "2026-07-22T20:10:43.094670",
+    "listing_type": "probate_notice",
+    "owner_name": "HUWUSO GUWUBA H JR",
+    "parcel_id": "9644053934",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "obituary",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.gannett_obituaries",
+    "state": "NC",
+    "street_address": "53, Cave Lane, Buncombe County, North Carolina, 28704, Uumado Setimo"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:ccee04c34fd491eb@parcel:NC:buncombe:9658783699",
+   "live_key_suffix": "parcel:NC:buncombe:9658783699",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "PINUV R HICOFI HEIRS",
+    "first_seen": "2026-07-22T20:45:25.050264",
+    "listing_type": "estate_lead",
+    "owner_name": "JOZAF SIHOR E",
+    "parcel_id": "9658783699",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "PUHOS MOSEFI",
+      "heir_names": [
+       {
+        "name": "PINUV R HICOFI",
+        "raw": "PINUV R HICOFI HEIRS",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST ASHEVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "PINUV R HICOFI HEIRS"
+     },
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "505 NEKU HAW COJID RD"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:b7c49f9ddab74d60@parcel:NC:buncombe:9648009831",
+   "live_key_suffix": "parcel:NC:buncombe:9648009831",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "RIKENA C BUKEMA HEIRS",
+    "first_seen": "2026-09-22T15:36:54.466984",
+    "listing_type": "estate_lead",
+    "owner_name": "RIKENA C BUKEMA HEIRS",
+    "parcel_id": "9648009831",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "MUTAGAK REPIBASOF",
+      "heir_names": [
+       {
+        "name": "RIKENA C BUKEMA",
+        "raw": "RIKENA C BUKEMA HEIRS",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST ASHEVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "RIKENA C BUKEMA HEIRS"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:5f43ed09ebb4be34@parcel:NC:buncombe:0619977746",
+   "live_key_suffix": "parcel:NC:buncombe:0619977746",
+   "reason": "decedent_name_unreadable",
+   "row": {
+    "city": "BAFEC MTN",
+    "county": "Buncombe",
+    "defendant": "PAMEPU (HEIRS), CUKEZUWA",
+    "first_seen": "2026-07-01T02:57:14.918524",
+    "listing_type": "tax_lien",
+    "owner_name": "PAMEPU (HEIRS), CUKEZUWA",
+    "parcel_id": "0619-97-7746-00000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties_nc.nc_heir_estate_parcels"
+      },
+      {
+       "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills"
+      },
+      {
+       "source": "counties_nc.buncombe_delinquent_tax"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "118 ROCIRUZ LN"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:bb9e44a94c734eac@parcel:NC:buncombe:9628862283",
+   "live_key_suffix": "parcel:NC:buncombe:9628862283",
+   "reason": "owner_unrelated_no_tie",
+   "row": {
+    "case_number": "26E001202-100",
+    "city": "Asheville",
+    "county": "Buncombe",
+    "defendant": "Lucuso G. Lenal",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of Lucuso G. Lenal, deceased, late of Buncombe County",
+    "first_seen": "2026-06-19T00:00:00",
+    "listing_type": "probate_notice",
+    "owner_name": "Lucuso G. Lenal",
+    "parcel_id": "9628862283",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "public_notices.nc_notices_counties"
+      },
+      {
+       "source": "public_notices.nc_notices_counties"
+      },
+      {
+       "source": "public_notices.nc_notices_counties"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "probate": {
+      "decedent": "Hizeto W. Lovul",
+      "es_case_number": "26E001013-100",
+      "nc_estate_file_no": "25E001625-100"
+     },
+     "relationship_signal": {
+      "keyword": "EXECUTOR",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "100 Having qualified as Executor of the Est"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_titled_to_decedent",
+   "key": "estate:b0a4243c2b1a9d17@parcel:NC:buncombe:9667803626",
+   "live_key_suffix": "parcel:NC:buncombe:9667803626",
+   "reason": null,
+   "row": {
+    "case_number": "26E000064-100",
+    "city": "Asheville",
+    "county": "Buncombe",
+    "defendant": "Bolidew Aoko Hosig",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of Bolidew Aoko Hosig, deceased, late of Buncombe County",
+    "first_seen": "2026-08-06T13:35:57.783843",
+    "listing_type": "probate_notice",
+    "owner_name": "Bolidew Aoko Hosig",
+    "parcel_id": "9667803626",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "public_notices.nc_notices_counties"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "ADMINISTRATOR",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "1070 TUNNEL RD"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:31aefbb74c7a82e7@parcel:NC:buncombe:9700720768",
+   "live_key_suffix": "parcel:NC:buncombe:9700720768",
+   "reason": "death_record_ambiguous",
+   "row": {
+    "case_number": "fc-65327991",
+    "city": "ASHEVILLE",
+    "county": "Buncombe",
+    "defendant": "CAMASAK SANOJES HEIRS",
+    "first_seen": "2026-09-15T14:56:18.814746",
+    "listing_type": "tax_lien",
+    "owner_name": "CAMASAK SANOJES HEIRS",
+    "parcel_id": "9700-72-0768-00000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "national.foreclosure_dot_com"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "201 OLD COUNTY HOME RD"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:3925ca5b6b7e8ebf@parcel:NC:buncombe:9639856328",
+   "live_key_suffix": "parcel:NC:buncombe:9639856328",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "JIFE CURIVA JAGAV HEIRS",
+    "first_seen": "2026-07-22T20:45:25.050086",
+    "listing_type": "estate_lead",
+    "owner_name": "DEGO EOPALAPUZUD LLC",
+    "parcel_id": "9639856328",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "IALO BOLIZANA MISUZUSE",
+      "heir_names": [
+       {
+        "name": "JIFE CURIVA JAGAV",
+        "raw": "JIFE CURIVA JAGAV HEIRS",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST ASHEVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "JIFE CURIVA JAGAV HEIRS"
+     },
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "460 MONTFORD AVE"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:8d661abe5f2c0177@parcel:NC:buncombe:9755456514",
+   "live_key_suffix": "parcel:NC:buncombe:9755456514",
+   "reason": "decedent_name_unreadable",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "M P BAGODIM HEIRS",
+    "first_seen": "2026-09-15T14:56:18.820027",
+    "listing_type": "tax_lien",
+    "owner_name": "M P BAGODIM HEIRS",
+    "parcel_id": "9755-45-6514-00000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties_nc.buncombe_delinquent_tax"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "STOCKTON BEGADE RD"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:a335f2aa1ba1c28b@parcel:NC:buncombe:9647949993",
+   "live_key_suffix": "parcel:NC:buncombe:9647949993",
+   "reason": "death_record_not_found",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "MOLABO KOMU HEIRS",
+    "first_seen": "2026-09-15T14:56:18.820842",
+    "listing_type": "tax_lien",
+    "owner_name": "MOLABO KOMU HEIRS",
+    "parcel_id": "9647-94-9993-00000",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "CHAPEL PEHA PL"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:106561757eac59a2@parcel:NC:buncombe:9730717960",
+   "live_key_suffix": "parcel:NC:buncombe:9730717960",
+   "reason": "decedent_name_unreadable",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "J A SESOT HEIRS",
+    "first_seen": "2026-07-01T02:57:14.916153",
+    "listing_type": "tax_lien",
+    "owner_name": "J A SESOT HEIRS",
+    "parcel_id": "9730-71-7960-00000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "public_notices.nc_notices_counties"
+      },
+      {
+       "source": "counties_nc.buncombe_elderly"
+      },
+      {
+       "source": "counties_nc.buncombe_elderly"
+      },
+      {
+       "source": "public_notices.nc_notices_counties"
+      },
+      {
+       "source": "public_notices.nc_notices_counties"
+      },
+      {
+       "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills"
+      },
+      {
+       "source": "counties_nc.buncombe_delinquent_tax"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate",
+      "elderly_exemption"
+     ],
+     "relationship_signal": {
+      "keyword": "notice_to_creditors",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "87 ELKWOOD AVE"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:b79e69a47c51717b@parcel:NC:buncombe:9648901600",
+   "live_key_suffix": "parcel:NC:buncombe:9648901600",
+   "reason": "parcel_heirs_of_other_person",
+   "row": {
+    "city": "Cas",
+    "county": "Buncombe",
+    "defendant": "HETIBO (HEIRS) EIJEGA",
+    "first_seen": "2026-07-22T20:45:25.050301",
+    "listing_type": "estate_lead",
+    "owner_name": "HETIBO (HEIRS) EIJEGA",
+    "parcel_id": "9648901600",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "MAKICOK LOTALA",
+      "heir_names": [
+       {
+        "name": "AIJOFO D LOTALA SR ( )",
+        "raw": "AIJOFO D LOTALA SR (HEIRS)",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST ASHEVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "AIJOFO D LOTALA SR (HEIRS)"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:5de9886e33a6b250@parcel:NC:buncombe:0710406959",
+   "live_key_suffix": "parcel:NC:buncombe:0710406959",
+   "reason": "owner_unrelated_no_tie",
+   "row": {
+    "city": "ASHEVILLE",
+    "county": "Buncombe",
+    "defendant": "AAHEBURAS, WONITUW",
+    "first_seen": "2026-09-15T14:56:18.820703",
+    "listing_type": "tax_lien",
+    "owner_name": "AAHEBURAS, WONITUW",
+    "parcel_id": "0710-40-6959-00000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties_nc.nc_heir_estate_parcels"
+      }
+     ],
+     "distress_stack": {
+      "tier": "HOT"
+     },
+     "heir_estate": {
+      "care_of": "RIKENA L CEZEN",
+      "mailing": "1 MAIN ST WEAVERVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "WONITUW CADIJEHO (HEIRS)"
+     },
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "44 SUVOSOV CIR"
+   },
+   "tier": "HOT",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:f556f446dc161f63@parcel:NC:buncombe:9644921345",
+   "live_key_suffix": "parcel:NC:buncombe:9644921345",
+   "reason": "death_record_ambiguous",
+   "row": {
+    "city": "AETAW",
+    "county": "Buncombe",
+    "defendant": "EETIJE MIBIR (HEIRS)",
+    "first_seen": "2026-09-15T14:56:25.816748",
+    "listing_type": "tax_lien",
+    "owner_name": "EETIJE MIBIR (HEIRS)",
+    "parcel_id": "9644-92-1345-00000",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills_2024",
+    "state": "NC",
+    "street_address": "185 BELAFOV BEGADE RD LOT 10"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_titled_to_decedent",
+   "key": "estate:4e21a470668a4ff0@parcel:NC:buncombe:9616393669",
+   "live_key_suffix": "parcel:NC:buncombe:9616393669",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "Eipawini W Cijod Jr.",
+    "first_seen": "2026-07-01T02:44:24.721687",
+    "listing_type": "probate_notice",
+    "owner_name": "CIJOD EIPAWINI W JR;CIJOD JIRUK F",
+    "parcel_id": "9616393669",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "obituary",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.gannett_obituaries",
+    "state": "NC",
+    "street_address": "79 LIMI DR"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:8d3f852e0e3b675d@parcel:NC:buncombe:0710419321",
+   "live_key_suffix": "parcel:NC:buncombe:0710419321",
+   "reason": "death_record_not_found",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "REZI DOVEH FAWOH HEIRS",
+    "first_seen": "2026-07-22T20:45:25.050556",
+    "listing_type": "estate_lead",
+    "owner_name": "REZI DOVEH FAWOH HEIRS",
+    "parcel_id": "0710419321",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": null,
+      "heir_names": [
+       {
+        "name": "REZI DOVEH FAWOH",
+        "raw": "REZI DOVEH FAWOH HEIRS",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST MANASSAS VUZI 28801",
+      "match": "heirs",
+      "owner_of_record": "REZI DOVEH FAWOH HEIRS"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "119 EAST ST"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_titled_to_decedent",
+   "key": "estate:9eb025aa3ed643ce@parcel:NC:buncombe:0609962951",
+   "live_key_suffix": "parcel:NC:buncombe:0609962951",
+   "reason": null,
+   "row": {
+    "city": "Bafec Mewabula",
+    "county": "Buncombe",
+    "defendant": "SABE RUBA BAGODIM",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of SABE RUBA BAGODIM, deceased, late of Buncombe County",
+    "first_seen": "2026-08-06T13:35:57.782365",
+    "listing_type": "probate_notice",
+    "owner_name": "SABE RUBA BAGODIM",
+    "parcel_id": "0609962951",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "public_notices.nc_notices_counties"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "EXECUTOR",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "109 GRAGG ST"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:a3033f2eaa803fc3@parcel:NC:buncombe:9775738695",
+   "live_key_suffix": "parcel:NC:buncombe:9775738695",
+   "reason": "death_record_not_found",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "LOCOGI HUJONAL WATAJU (HEIRS)",
+    "first_seen": "2026-09-15T14:56:18.820579",
+    "listing_type": "tax_lien",
+    "owner_name": "LOCOGI HUJONAL WATAJU (HEIRS)",
+    "parcel_id": "9775-73-8695-00000",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "DENOJEWOCI RD"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:a3fccb75490cfef0@parcel:NC:buncombe:9775352351",
+   "live_key_suffix": "parcel:NC:buncombe:9775352351",
+   "reason": "no_decedent_name",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "GEZODI E WUFERESO HEIRS WUFERESO CEMETERY",
+    "first_seen": "2026-09-22T15:36:54.466151",
+    "listing_type": "estate_lead",
+    "owner_name": "GEZODI E WUFERESO HEIRS WUFERESO CEMETERY",
+    "parcel_id": "9775352351",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": null,
+      "heir_names": [
+       {
+        "name": "GEZODI E WUFERESO WUFERESO CEMETERY",
+        "raw": "GEZODI E WUFERESO HEIRS WUFERESO CEMETERY",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST ASHEVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "GEZODI E WUFERESO HEIRS WUFERESO CEMETERY"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:92adb81b52bd3f60@parcel:NC:buncombe:9669820497",
+   "live_key_suffix": "parcel:NC:buncombe:9669820497",
+   "reason": "death_record_ambiguous",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "Mese Nubun",
+    "first_seen": "2026-07-31T15:13:14.867203",
+    "listing_type": "probate_notice",
+    "owner_name": "NUBUN JUWEJ H;NUBUN MESE F",
+    "parcel_id": "9669820497",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "obituary",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.gannett_obituaries",
+    "state": "NC",
+    "street_address": "421 CLUB DR APT 1"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:c6dccc3c1b8e0f57@parcel:NC:buncombe:9648769287",
+   "live_key_suffix": "parcel:NC:buncombe:9648769287",
+   "reason": "owner_unrelated_no_tie",
+   "row": {
+    "city": "CAS",
+    "county": "Buncombe",
+    "defendant": "Juwej Sozec Jr.",
+    "first_seen": "2026-07-31T15:13:14.867203",
+    "listing_type": "probate_notice",
+    "owner_name": "TIMIPALADA JUWEJ A",
+    "parcel_id": "9648769287",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "obituary",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.gannett_obituaries",
+    "state": "NC",
+    "street_address": "9, LaGrange Drive, Asheville, Buncombe County, North Carolina, 28803, Uumado Setimo"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:7bab8fb0ce65bd4c@parcel:NC:buncombe:9686054607",
+   "live_key_suffix": "parcel:NC:buncombe:9686054607",
+   "reason": "decedent_name_unreadable",
+   "row": {
+    "city": "FAIRVIEW",
+    "county": "Buncombe",
+    "defendant": "JOZAF, LOWUFU",
+    "first_seen": "2026-07-22T20:45:25.058966",
+    "listing_type": "tax_lien",
+    "owner_name": "JOZAF, LOWUFU",
+    "parcel_id": "9686-05-4607-00000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills"
+      },
+      {
+       "source": "counties_nc.nc_heir_estate_parcels"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "LAZOD BIFUPEZAFOL",
+      "mailing": "1 MAIN ST SE CONCORD NC 28801",
+      "match": "heirs",
+      "owner_of_record": "A Z BIFUPEZAFOL HEIRS"
+     },
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "210 NUMBER NINE RD"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:76a2675ef59e5e4a@parcel:NC:buncombe:9688340298",
+   "live_key_suffix": "parcel:NC:buncombe:9688340298",
+   "reason": "owner_unrelated_no_tie",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "Goju Wewarus Kakoru",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of Goju Wewarus Kakoru, deceased, late of Buncombe County",
+    "first_seen": "2026-07-22T00:00:00",
+    "listing_type": "probate_notice",
+    "owner_name": "Goju Wewarus Kakoru",
+    "parcel_id": "968834029800000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties.column_legal_notices"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "ADMINISTRATOR",
+      "kind": "probate"
+     }
+    },
+    "source": "counties.column_legal_notices",
+    "state": "NC",
+    "street_address": "136 South Katu Street"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:ed54e62bf1e8a402@parcel:NC:buncombe:9644937186",
+   "live_key_suffix": "parcel:NC:buncombe:9644937186",
+   "reason": "death_record_ambiguous",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "FIVIR FASEWEJO HEIRS",
+    "first_seen": "2026-07-22T20:45:25.050222",
+    "listing_type": "estate_lead",
+    "owner_name": "FIVIR FASEWEJO HEIRS",
+    "parcel_id": "9644937186",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": null,
+      "heir_names": [
+       {
+        "name": "FIVIR FASEWEJO",
+        "raw": "FIVIR FASEWEJO HEIRS",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST AETAW NC 28801",
+      "match": "heirs",
+      "owner_of_record": "FIVIR FASEWEJO HEIRS"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "6 CUCEWU LN"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:12cc84b67509cab0@parcel:NC:buncombe:9649544610",
+   "live_key_suffix": "parcel:NC:buncombe:9649544610",
+   "reason": "death_record_ambiguous",
+   "row": {
+    "city": "NEWARK",
+    "county": "Buncombe",
+    "defendant": "JUWEJ FAJAVUDO HEIRS",
+    "first_seen": "2026-09-15T14:56:18.821354",
+    "listing_type": "tax_lien",
+    "owner_name": "JUWEJ FAJAVUDO HEIRS",
+    "parcel_id": "9649-54-4610-00000",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "24 STENGEL AVE"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:71764a7333569acf@parcel:NC:buncombe:9658648760",
+   "live_key_suffix": "parcel:NC:buncombe:9658648760",
+   "reason": "death_record_ambiguous",
+   "row": {
+    "city": "Weaverville",
+    "county": "Buncombe",
+    "defendant": "Bonih Jiha Mehaf",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of Bonih Jiha Mehaf, deceased, late of Buncombe County",
+    "first_seen": "2026-08-06T13:35:57.789820",
+    "listing_type": "probate_notice",
+    "owner_name": "Bonih Jiha Mehaf",
+    "parcel_id": "9658648760",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "public_notices.nc_notices_counties"
+      },
+      {
+       "source": "public_notices.nc_notices_counties"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "ADMINISTRATOR",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "110 LOVERS LOOP RD"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:69a1eb784248a734@parcel:NC:buncombe:9732081888",
+   "live_key_suffix": "parcel:NC:buncombe:9732081888",
+   "reason": "owner_unrelated_no_tie",
+   "row": {
+    "city": "Weaverville",
+    "county": "Buncombe",
+    "defendant": "Hazawu H. Hefo",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of Hazawu H. Hefo, deceased, late of Buncombe County",
+    "first_seen": "2026-08-06T13:35:57.821699",
+    "listing_type": "probate_notice",
+    "owner_name": "Hazawu H. Hefo",
+    "parcel_id": "9732081888",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "EXECUTOR",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "369, Monticello Road, Buncombe County, North Carolina, 28787, Uumado Setimo"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:ebea6bb9abdbe3e3@parcel:NC:buncombe:9795100665",
+   "live_key_suffix": "parcel:NC:buncombe:9795100665",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "HEIRS OF GIPUPE J SITOBIZUW",
+    "first_seen": "2026-07-22T20:45:25.050922",
+    "listing_type": "estate_lead",
+    "owner_name": "HEIRS OF GIPUPE J SITOBIZUW",
+    "parcel_id": "9795100665",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "RISOH HOTOLUL",
+      "heir_names": [
+       {
+        "name": "OF GIPUPE J SITOBIZUW",
+        "raw": "HEIRS OF GIPUPE J SITOBIZUW",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST BARNARDSVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "HEIRS OF GIPUPE J SITOBIZUW"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "6 POKAZAW COJID RD"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:2ab2410b972020b1@parcel:NC:buncombe:0629585399",
+   "live_key_suffix": "parcel:NC:buncombe:0629585399",
+   "reason": "owner_unrelated_no_tie",
+   "row": {
+    "case_number": "26E001269-100",
+    "city": "Bafec Mewabula",
+    "county": "Buncombe",
+    "defendant": "Eobot Dujovif",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of Eobot Dujovif, deceased, late of Buncombe County",
+    "first_seen": "2026-08-06T13:35:57.814676",
+    "listing_type": "probate_notice",
+    "owner_name": "Eobot Dujovif",
+    "parcel_id": "0629585399",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "public_notices.nc_notices_counties"
+      },
+      {
+       "source": "public_notices.nc_notices_counties"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "probate": {
+      "decedent": "Damocav Dude Tipiti",
+      "es_case_number": "26E001037-100",
+      "personal_representative": "Talan Tipiti",
+      "pr_role": "Administrator"
+     },
+     "relationship_signal": {
+      "keyword": "ADMINISTRATOR",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "100 Having qualified as Administrator of the Est"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:b569cec5665132a0@parcel:NC:buncombe:9634918859",
+   "live_key_suffix": "parcel:NC:buncombe:9634918859",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "JUWEJ B MOKAWAL (HEIRS)",
+    "first_seen": "2026-07-22T20:45:25.050759",
+    "listing_type": "estate_lead",
+    "owner_name": "JUWEJ B MOKAWAL (HEIRS)",
+    "parcel_id": "9634918859",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": null,
+      "heir_names": [
+       {
+        "name": "JUWEJ B MOKAWAL ( )",
+        "raw": "JUWEJ B MOKAWAL (HEIRS)",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST AETAW NC 28801",
+      "match": "heirs",
+      "owner_of_record": "JUWEJ B MOKAWAL (HEIRS)"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "40 TEZU DR"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:3841947c6da1d57f@parcel:NC:buncombe:9648261493",
+   "live_key_suffix": "parcel:NC:buncombe:9648261493",
+   "reason": "death_record_ambiguous",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "GANIZO (HEIRS) LAMA M",
+    "first_seen": "2026-07-22T20:45:25.050464",
+    "listing_type": "estate_lead",
+    "owner_name": "GANIZO (HEIRS) LAMA M",
+    "parcel_id": "9648261493",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "RUKOVEM H BAFUS",
+      "heir_names": [
+       {
+        "name": "GANIZO ( ) LAMA M",
+        "raw": "GANIZO (HEIRS) LAMA M",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST ASHEVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "GANIZO (HEIRS) LAMA M"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC",
+    "street_address": "10 SWINDALE ST"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:ecfa8ed574ca1f08@parcel:NC:buncombe:9688199972",
+   "live_key_suffix": "parcel:NC:buncombe:9688199972",
+   "reason": null,
+   "row": {
+    "city": "ASHEVILLE",
+    "county": "Buncombe",
+    "defendant": "MIGUSU MEWOGEKA (HEIRS)",
+    "first_seen": "2026-09-15T14:56:18.817335",
+    "listing_type": "tax_lien",
+    "owner_name": "MIGUSU MEWOGEKA (HEIRS)",
+    "parcel_id": "9688-19-9972-00000",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "116 CARRIAGE PEHA CT"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:b7917d57436bd496@parcel:NC:buncombe:8780599426",
+   "live_key_suffix": "parcel:NC:buncombe:8780599426",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "LEJIBEJO LAVU LEZITOBI (HEIRS)",
+    "first_seen": "2026-09-15T14:56:18.815717",
+    "listing_type": "tax_lien",
+    "owner_name": "LEJIBEJO LAVU LEZITOBI (HEIRS)",
+    "parcel_id": "8780-59-9426-00000",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "S TURKEY COJID RD"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:b7917d57436bd496@parcel:NC:buncombe:8793903364",
+   "live_key_suffix": "parcel:NC:buncombe:8793903364",
+   "reason": "owner_unrelated_no_tie",
+   "row": {
+    "county": "Buncombe",
+    "defendant": "FEKAJI ZUZUZEKO IATET & KAKOFUPUZEKE KUBIFICUNEDI",
+    "first_seen": "2026-09-22T15:36:07.836822",
+    "listing_type": "tax_lien",
+    "owner_name": "FEKAJI ZUZUZEKO IATET & KAKOFUPUZEKE KUBIFICUNEDI",
+    "parcel_id": "8793-90-3364-00000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties_nc.buncombe_delinquent_tax"
+      },
+      {
+       "source": "counties_nc.nc_heir_estate_parcels"
+      }
+     ],
+     "distress_stack": {
+      "tier": "HOT"
+     },
+     "heir_estate": {
+      "care_of": "AUPIPI FIDA",
+      "mailing": "1 MAIN ST ROXBORO NC 28801",
+      "match": "heirs",
+      "owner_of_record": "LEJIBEJO LAVU LEZITOBI (HEIRS)"
+     },
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties.multi_year_delinquent_tax",
+    "state": "NC"
+   },
+   "tier": "HOT",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:6939f86649ef3f78@parcel:NC:buncombe:9775726561",
+   "live_key_suffix": "parcel:NC:buncombe:9775726561",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "SEMODAFUK J AEBAW HEIRS",
+    "first_seen": "2026-07-22T20:45:25.050428",
+    "listing_type": "estate_lead",
+    "owner_name": "CIDIBAW MIZARAJA SIWUJ",
+    "parcel_id": "9775726561",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "heir_estate": {
+      "care_of": "WONITUW G HIMUFUKERA",
+      "heir_names": [
+       {
+        "name": "J G HIMUFUKERA",
+        "raw": "J G HIMUFUKERA HEIRS",
+        "role": "heir"
+       }
+      ],
+      "mailing": "1 MAIN ST BARNARDSVILLE NC 28801",
+      "match": "heirs",
+      "owner_of_record": "J G HIMUFUKERA HEIRS"
+     },
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_nc.nc_heir_estate_parcels",
+    "state": "NC"
+   },
+   "tier": "WARM",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:daa94f0d454a9f17@parcel:NC:buncombe:9626717285",
+   "live_key_suffix": "parcel:NC:buncombe:9626717285",
+   "reason": null,
+   "row": {
+    "county": "Buncombe",
+    "defendant": "SOHIBU D CIFE HEIRS",
+    "first_seen": "2026-07-22T20:45:25.051017",
+    "listing_type": "tax_lien",
+    "owner_name": "SOHIBU D CIFE HEIRS",
+    "parcel_id": "9626-71-7285-00000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties.multi_year_delinquent_tax"
+      },
+      {
+       "source": "counties_nc.nc_heir_estate_parcels"
+      }
+     ],
+     "distress_stack": {
+      "tier": "HOT"
+     },
+     "heir_estate": {
+      "care_of": "TAHI WIWOK",
+      "mailing": "1 MAIN ST ENKA NC 28801",
+      "match": "heirs",
+      "owner_of_record": "SOHIBU D CIFE HEIRS"
+     },
+     "life_events": [
+      "estate_probate"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "POLE CEDAJIBU RD"
+   },
+   "tier": "HOT",
+   "verdict": "confirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:daac67c422f08c2a@parcel:NC:buncombe:0605990142",
+   "live_key_suffix": "parcel:NC:buncombe:0605990142",
+   "reason": "decedent_name_unreadable",
+   "row": {
+    "county": "Buncombe",
+    "first_seen": "2026-09-15T14:56:27.776758",
+    "listing_type": "distressed",
+    "owner_name": "R E TUVICU (HEIRS)",
+    "parcel_id": "0605990142",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "life_events": [
+      "estate_probate"
+     ]
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_landslide_damage",
+    "state": "NC",
+    "street_address": "895 GARREN COJID RD"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:05a2922c0e1d7b62@parcel:NC:buncombe:9732937038",
+   "live_key_suffix": "parcel:NC:buncombe:9732937038",
+   "reason": "owner_shares_decedent_surname",
+   "row": {
+    "city": "CWV",
+    "county": "Buncombe",
+    "defendant": "Jiha Hefo",
+    "first_seen": "2026-07-01T02:44:24.721687",
+    "listing_type": "probate_notice",
+    "owner_name": "HEFO PEFALEBA JIHA",
+    "parcel_id": "9732937038",
+    "raw": {
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "obituary",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.gannett_obituaries",
+    "state": "NC",
+    "street_address": "5202 CAROLWOOD DR"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": null,
+   "key": "estate:89ca126ce7072d41@parcel:NC:buncombe:9796009369",
+   "live_key_suffix": "parcel:NC:buncombe:9796009369",
+   "reason": "death_record_not_found",
+   "row": {
+    "case_number": "26E001171-100",
+    "city": "Bafec Mewabula",
+    "county": "Buncombe",
+    "defendant": "Bamiz Dovi Bijenob",
+    "description": "NOTICE TO CREDITORS Having qualified as Executor of the Estate of Bamiz Dovi Bijenob, deceased, late of Buncombe County",
+    "first_seen": "2026-08-06T13:35:57.782255",
+    "listing_type": "probate_notice",
+    "owner_name": "Bamiz Dovi Bijenob",
+    "parcel_id": "9796009369",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "public_notices.nc_notices_counties"
+      }
+     ],
+     "distress_stack": {
+      "tier": "WARM"
+     },
+     "relationship_signal": {
+      "keyword": "EXECUTOR",
+      "kind": "probate"
+     }
+    },
+    "source": "public_notices.nc_notices_counties",
+    "state": "NC",
+    "street_address": "2599 BRADDY RD"
+   },
+   "tier": "WARM",
+   "verdict": "unconfirmed"
+  },
+  {
+   "decided_by": "death_record_and_heirs_of_record",
+   "key": "estate:2633a21a53d1086f@parcel:NC:buncombe:9742916139",
+   "live_key_suffix": "parcel:NC:buncombe:9742916139",
+   "reason": null,
+   "row": {
+    "city": "WEAVERVILLE",
+    "county": "Buncombe",
+    "defendant": "BONIH MEHAF PONASIF (HEIRS)",
+    "first_seen": "2026-07-01T02:57:14.912024",
+    "listing_type": "tax_lien",
+    "owner_name": "BONIH MEHAF PONASIF (HEIRS)",
+    "parcel_id": "9742-91-6139-00000",
+    "raw": {
+     "also_seen_in": [
+      {
+       "source": "counties_nc.buncombe_elderly"
+      },
+      {
+       "source": "counties_nc.buncombe_elderly"
+      },
+      {
+       "source": "counties_nc.buncombe_elderly"
+      },
+      {
+       "source": "counties_nc.buncombe_elderly"
+      },
+      {
+       "source": "counties_nc.buncombe_elderly"
+      },
+      {
+       "source": "counties_nc.buncombe_elderly"
+      },
+      {
+       "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills"
+      },
+      {
+       "source": "counties_nc.buncombe_delinquent_tax"
+      }
+     ],
+     "distress_stack": {
+      "tier": "HOT"
+     },
+     "life_events": [
+      "estate_probate",
+      "disabled_veteran_exemption"
+     ],
+     "relationship_signal": {
+      "keyword": "heir_estate_owner_of_record",
+      "kind": "probate"
+     }
+    },
+    "source": "counties_generic.arcgis_distress.buncombe_unpaid_bills",
+    "state": "NC",
+    "street_address": "263 LONGS CHAPEL RD"
+   },
+   "tier": "HOT",
+   "verdict": "confirmed"
+  }
+ ]
+}
