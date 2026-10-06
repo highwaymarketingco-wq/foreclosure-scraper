@@ -86,6 +86,37 @@ merges on a withdrawn parcel or address. Every change keeps the old values under
    the earlier first_seen and a short record in raw['superseded_mailing_copies']. Without such
    a live row (the bill was paid) the corrected copy stays and ages as before.
 
+4. A COUNTY READ OUT OF A PERSON'S CASE NAME (6de9dba1). courtlistener_bankruptcy._county_from_text
+   used to take any gazetteer town that was a substring of a docket's case name, so a debtor
+   whose surname or given name equals a town or county ("Wilson", "Marion", "Clinton", "Anderson")
+   got that county. 6de9dba1 stopped it (a county only for an ORGANIZATION named for its town),
+   but Listing.merge backfills a prior county into a re-scraped row, a prior-only row just ages,
+   and a prior row with no parcel does not even match its county-less re-scrape (its dedupe key
+   is case+county, the fresh one is the docket url), so the published wrong counties stay.
+   A row is corrected when ALL hold:
+     a. its source is national.courtlistener_bankruptcy / _adversary / _civil and its raw block
+        carries the docket's case_name;
+     b. its county is one the PRE-6de9dba1 function could have returned for that case name
+        (legacy_name_counties, a frozen copy of that logic) and today's _county_from_text
+        returns None for it (an organization named for its town keeps its county);
+     c. the county was not established by anything else: no street address (after correction 1,
+        which already takes back a street written from a withdrawn fallback parcel) and no
+        parcel, unless the parcel was attached from a county-level POINT (county seat, a point
+        8+ rows share, or a point the row flags as a shared fallback); a parcel from an
+        address, a name search or the source itself keeps the county. A name search runs INSIDE
+        the county it is given, so such a row is not proof either way and is left, not judged;
+     d. the row's own point, if any, is a county-level point (county seat, or flagged imprecise)
+        and not a measured location.
+   What goes: county; the county-level point (lat/lng and the tags that described it, as in
+   plan_point); a point-attached parcel correction 1 did not already withdraw (the same
+   withdrawal, reason 'county_name_derived_point'); and, when a parcel was withdrawn from the
+   row, the property facts that came with it and that a docket never carries (zip, city, values,
+   sizes: _NAME_COUNTY_FACTS). Audit: raw['county_was_name_derived'] with the old values. With
+   no county the geocoder has no Tier 4 and the parcel resolver never runs on the row, so
+   nothing refills it from the same wrong place. The cleared row's dedupe key becomes the
+   docket's url, the key of its county-less re-scrape, so dedupe2 folds a prior-only copy into
+   the fresh row instead of keeping both.
+
 MEMORY. Three light passes and one correcting pass over the in-memory list; the lookup tables
 are the recorded resolver points (2,331 on the 10/6 board), their row counts, the parcel points
 of rows that carry one (parcel_points: polygon centroids and precise resolver points, a few
@@ -114,6 +145,7 @@ log = structlog.get_logger()
 FALLBACK_KEY = "parcel_withdrawn_fallback_point"
 MAILING_KEY = "address_was_owner_mailing"
 SUPERSEDED_KEY = "superseded_mailing_copies"
+NAME_COUNTY_KEY = "county_was_name_derived"
 
 #: raw['parcel_from_geo']['source'] values that record an id swap or an address match, not a point.
 NON_POINT_STAMPS = frozenset({"ptscloud_pts_to_pin", "burke_cache_situs_address"})
@@ -140,6 +172,7 @@ _PARCEL_ID_KEYS = frozenset({
 #: Raw blocks a correction never touches: provenance, aging and the audit records themselves.
 _PROTECTED_RAW = frozenset({
     "also_seen_in", "pulled_sale", "parcel_id_nulled", FALLBACK_KEY, MAILING_KEY, SUPERSEDED_KEY,
+    NAME_COUNTY_KEY,
 })
 #: Blocks that are a parcel's own record: removed whole when they name the withdrawn parcel.
 _PARCEL_BLOCKS = frozenset({"gis_attrs_full", "situs_road_only", "lrcpwa"})
@@ -626,11 +659,15 @@ def _photo_token(pid: str) -> str:
 
 
 def withdraw_fallback_parcel(li: Listing, point_counts: Counter, min_rows: int,
-                             cache: Optional[CacheReader]) -> Optional[dict]:
+                             cache: Optional[CacheReader], force_reason: Optional[str] = None) -> Optional[dict]:
     """Correction 1 on one row. Returns the audit record when the parcel was withdrawn,
     {'exempt': reason} when the parcel was resolved at a fallback point but stays, else None.
-    Everything is planned first and applied at the end, so a failure leaves the row untouched."""
+    Everything is planned first and applied at the end, so a failure leaves the row untouched.
+    `force_reason` (correction 4) withdraws a point-attached parcel the point tests above did not
+    call a fallback, under that reason; the same exemptions apply."""
     reason = fallback_reason(li, point_counts, min_rows)
+    if reason is None and force_reason and recorded_point(_raw(li)) is not None and _get(li, "parcel_id"):
+        reason = force_reason
     if reason is None:
         return None
     raw = _raw(li)
@@ -983,6 +1020,151 @@ def drop_superseded(listings: list[Listing], corrected_aged: list[Listing]) -> t
     return dropped, by
 
 
+# ------------------------------------------- 4. a county read out of a person's case name
+#: source slug -> the raw block that holds the docket's case_name. The three CourtListener scrapers
+#: share courtlistener_bankruptcy._county_from_text (the function 6de9dba1 changed).
+_CASE_NAME_BLOCKS = {
+    "national.courtlistener_bankruptcy": "courtlistener",
+    "national.courtlistener_adversary": "courtlistener_adversary",
+    "national.courtlistener_civil": "courtlistener_civil",
+}
+#: Top-level property facts a docket never carries. When correction 4 finds the row's parcel
+#: withdrawn (by correction 1 earlier in the run, or by itself), these came with that parcel: on the
+#: 10/6 board 25 unrelated debtors of one county-seat parcel carry one identical zip, assessed value
+#: and living area, none of them in the docket.
+_NAME_COUNTY_FACTS = ("city", "zip_code", "market_value", "tax_value", "assessed_value", "acreage",
+                      "living_sqft", "lot_size_sqft", "year_built", "bedrooms", "bathrooms", "zoning",
+                      "land_use")
+
+
+def legacy_name_counties(text: Any, state: Any) -> set:
+    """The counties courtlistener_bankruptcy._county_from_text COULD return for `text` before
+    6de9dba1. FROZEN COPY of that logic; do not "fix" it, it exists to recognise what the old code
+    wrote onto published rows.
+
+    The old code walked KNOWN_CITIES (the gazetteer's towns, most words first, then most
+    characters) and returned the county of the first town that was a SUBSTRING of the upper-cased
+    case name ("Wilson" in "Wilson", "Camden" in "Camdenton", a surname in a person's name). Two
+    towns of the same length tie, and their order was the iteration order of a set (it changed
+    between processes), so the old result for such a name was one of several; this returns all of
+    them: the counties of the matching towns of the best rank. Empty when the name is empty, the
+    state unknown or no town matches. The gazetteer is imported as data; adding a town to it can
+    only widen what is recognised, and correction 4 still needs the row to carry that county with
+    no street or independent parcel."""
+    from ._bankruptcy_city_to_county import KNOWN_CITIES, bankruptcy_county_for
+    up = str(text or "").upper()
+    if not up or not state:
+        return set()
+    best: Optional[tuple] = None
+    out: set = set()
+    for city in KNOWN_CITIES:
+        if city.upper() not in up:
+            continue
+        county = bankruptcy_county_for(city, state)
+        if not county:
+            continue
+        rank = (-len(city.split()), -len(city))
+        if best is None or rank < best:
+            best, out = rank, {county}
+        elif rank == best:
+            out.add(county)
+    return out
+
+
+def _county_level_point(li: Listing, raw: dict) -> bool:
+    """The row's lat/lng is a county-level fallback, not a measured location: an
+    enrichment_geocode county seat, or a point the row itself flags as a shared fallback
+    (centroid_snap, county_centroid, county_centroid_no_addr)."""
+    from .enrichment_geocode import imprecise_point_flag, is_county_seat_point
+    return is_county_seat_point(li.latitude, li.longitude) or imprecise_point_flag(raw)
+
+
+def _parcel_from_county_point(li: Listing, raw: dict, point_counts: Counter, min_rows: int) -> bool:
+    """The parcel still on the row was attached at a county-level point: the recorded point is a
+    county seat or one 8+ rows stand on, or it is the row's own flagged fallback point."""
+    from .enrichment_geocode import imprecise_point_flag, is_county_seat_point
+    p = recorded_point(raw)
+    if p is None:
+        return False
+    g = raw["parcel_from_geo"]
+    if is_county_seat_point(g.get("lat"), g.get("lng")) or point_counts.get(p, 0) >= min_rows:
+        return True
+    return _point(li.latitude, li.longitude) == p and imprecise_point_flag(raw)
+
+
+def withdraw_name_derived_county(li: Listing, point_counts: Counter, min_rows: int,
+                                 cache: Optional[CacheReader]) -> Optional[dict]:
+    """Correction 4 on one row (module docstring). Returns the audit record when the county was
+    cleared, {'skip': reason} when the row's county is the old function's but the row stays (an
+    organization, or the county may rest on something else), None when the row is not a candidate.
+    Run it AFTER correction 1: that already takes back a fallback parcel and the street written
+    from it. Every test is made before anything is changed."""
+    block = _CASE_NAME_BLOCKS.get(str(li.source or ""))
+    county = (li.county or "").strip()
+    if not block or not county:
+        return None
+    raw = _raw(li)
+    blk = raw.get(block)
+    name = blk.get("case_name") if isinstance(blk, dict) else None
+    if not isinstance(name, str) or not name.strip():
+        return None
+    legacy = legacy_name_counties(name, li.state)
+    if county_name(county) not in {county_name(c) for c in legacy}:
+        return None                                     # not the old function's county: leave it
+    from .scrapers.national.courtlistener_bankruptcy import _county_from_text
+    if _county_from_text(name, li.state) is not None:
+        return {"skip": "organization_name"}            # an organization named for its town
+    # ---- was the county established by anything else?
+    if (li.street_address or "").strip():
+        return {"skip": "own_street"}
+    parcel_point_ok = False
+    if li.parcel_id:
+        if recorded_point(raw) is None:
+            return {"skip": "parcel_not_from_point"}    # address match, name search or the source's own id
+        parcel_point_ok = _parcel_from_county_point(li, raw, point_counts, min_rows)
+        if not parcel_point_ok:
+            return {"skip": "parcel_point_not_county_level"}
+    has_point = li.latitude is not None and li.longitude is not None
+    if has_point and not (_county_level_point(li, raw) or (parcel_point_ok and _point(li.latitude, li.longitude)
+                                                           == recorded_point(raw))):
+        return {"skip": "measured_point"}
+    parcel_withdrawn = bool(li.parcel_id) or isinstance(raw.get(FALLBACK_KEY), dict)
+    facts = [f for f in _NAME_COUNTY_FACTS if getattr(li, f, None) not in (None, "")]
+    if facts and not parcel_withdrawn:
+        return {"skip": "property_facts_without_parcel"}
+    # ---- apply
+    parcel_audit = None
+    if li.parcel_id:
+        parcel_audit = withdraw_fallback_parcel(li, point_counts, min_rows, cache,
+                                                force_reason="county_name_derived_point")
+        if not parcel_audit or "exempt" in parcel_audit:
+            return {"skip": "parcel_" + str((parcel_audit or {}).get("exempt", "kept"))}
+        facts = [f for f in _NAME_COUNTY_FACTS if getattr(li, f, None) not in (None, "")]
+    cleared = {}
+    for f in facts:
+        cleared[f] = getattr(li, f)
+        setattr(li, f, None)
+    point: dict = {"action": "absent"}
+    if has_point:
+        point = {"action": "cleared", "old": [li.latitude, li.longitude]}
+        tags = {k: raw[k] for k in POINT_TAGS if k in raw}
+        if tags:
+            point["tags"] = tags
+            for k in tags:
+                raw.pop(k, None)
+        li.latitude = li.longitude = None
+    li.county = None
+    audit = {"county": county, "state": li.state, "source": li.source,
+             "legacy_counties": sorted(legacy), "point": point}
+    if cleared:
+        audit["cleared"] = cleared
+    if parcel_audit:
+        audit["parcel_withdrawn"] = parcel_audit["parcel_id"]
+    raw[NAME_COUNTY_KEY] = audit
+    li.raw = raw
+    return audit
+
+
 # ------------------------------------------ the parcel's own point, for rows awaiting one
 def _dashed(*widths: int) -> Callable:
     """A formatter for a county that stores its PIN dashed while the board keeps the digits."""
@@ -1226,6 +1408,9 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
     c1_fields: Counter = Counter()
     c2: Counter = Counter()
     c2_by: Counter = Counter()
+    c4: Counter = Counter()
+    c4_by: Counter = Counter()
+    c4_fields: Counter = Counter()
     samples: dict = defaultdict(list)
     errors = 0
     keys = candidate_points(listings)
@@ -1253,6 +1438,18 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
                         if len(samples["fallback"]) < sample:
                             samples["fallback"].append((str(li.source).split(".")[-1], county_name(li.county),
                                                         a1["parcel_id"], a1["reason"], sorted(a1["cleared"])))
+                a4 = withdraw_name_derived_county(li, point_counts, min_rows, cache)
+                if a4 is not None:
+                    if "skip" in a4:
+                        c4["skip_" + a4["skip"]] += 1
+                    else:
+                        c4["cleared"] += 1
+                        c4_by[(li.source, a4["county"])] += 1
+                        c4["point_" + a4["point"]["action"]] += 1
+                        if a4.get("parcel_withdrawn"):
+                            c4["parcel_withdrawn_here"] += 1
+                        for f in a4.get("cleared", ()):
+                            c4_fields[f] += 1
                 a2 = restore_situs(li, cache, points)
                 if a2 is not None:
                     if "skip" in a2:
@@ -1296,6 +1493,10 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
         "mailing_by_class": dict(c2),
         "mailing_by_source_county": {f"{s}|{c}|{k}": n for (s, c, k), n in c2_by.most_common(20)},
         "mailing_point": dict(c2_point),
+        "name_county_cleared": c4.get("cleared", 0),
+        "name_county_detail": dict(c4),
+        "name_county_fields_cleared": dict(c4_fields.most_common()),
+        "name_county_by_source_county": {f"{s}|{c}": n for (s, c), n in c4_by.most_common(15)},
         "parcel_points_indexed": len(points),
         "superseded_dropped": len(dropped),
         "superseded_by_source_county": {f"{s}|{c}": n for (s, c), n in c3_by.most_common(10)},

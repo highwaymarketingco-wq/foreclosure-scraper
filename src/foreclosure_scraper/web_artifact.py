@@ -2282,6 +2282,7 @@ RAW_KEEP = {
     "parcel_withdrawn_fallback_point": "*",  # {parcel_id, reason, point, cleared, raw_removed}: a parcel resolved at a geocoder fallback point, withdrawn
     "address_was_owner_mailing": "*",        # {class, street_address, city, zip_code, situs, ...}: the owner's mailing shown as the property, replaced by the situs
     "superseded_mailing_copies": "*",        # [{street_address, first_seen, source}]: aged copies of this row that showed the owner's mailing, dropped
+    "county_was_name_derived": "*",          # {county, legacy_counties, point, cleared, parcel_withdrawn}: a county read out of a debtor's case name (pre-6de9dba1 _county_from_text), cleared
     "owner_email": "*",               # surfaced owner email from OCR/skip-trace
     "red_flags": "*",                  # unified red flag array [{severity, type, description, source}]
     "sos_dissolution": "*",            # NC SOS LLC dissolution status
