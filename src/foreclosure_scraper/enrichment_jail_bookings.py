@@ -602,7 +602,11 @@ class RosterIndex(dict):
 
 
 async def _load_roster(state: str, county: str, vendor: str, target: str,
-                       dry_run: bool = False):
+                       dry_run: bool = False, history_path=None):
+    # history_path: the jail_roster_history sidecar to judge health against and record
+    # into; None = the pipeline's own (jail_roster_history.DB_PATH). The per-listing
+    # verifier (verification/verifiers/jail_booking.py) passes its own file so a sweep
+    # never touches the pipeline's booking memory (is_new_booking) or its size baseline.
     if vendor == "zuercher":
         recs = await _fetch_zuercher(target)
     elif vendor == "p2c_centralsquare":
@@ -643,7 +647,7 @@ async def _load_roster(state: str, county: str, vendor: str, target: str,
         # match_rosters only applies its "left the roster -> custody ended"
         # rule when this says healthy; any sidecar failure fails closed.
         try:
-            con = jail_roster_history.connect()
+            con = jail_roster_history.connect(history_path)
             try:
                 health = jail_roster_history.assess_roster_health(
                     con, state, county, len(index))

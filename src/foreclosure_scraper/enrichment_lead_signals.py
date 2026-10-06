@@ -133,7 +133,8 @@ def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
     if isinstance(st, dict) and st.get("status") == "stayed":
         out.add("bankruptcy_stay")   # foreclosure paused by an automatic stay; will likely resume
     if _truthy(raw.get("incarceration")) and incarceration_active(
-            raw.get("incarceration"), raw.get("jail_booking"), today):
+            raw.get("incarceration"), raw.get("jail_booking"), today,
+            jail_verdict_suppresses="incarceration:jail" in drop):   # jail-sourced flags only
         out.add("incarceration")
 
     # --- LIFE_EVENT ---

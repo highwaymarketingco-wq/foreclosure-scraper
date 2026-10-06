@@ -198,14 +198,23 @@ def is_prison_sourced(incarceration: Any) -> bool:
 
 
 def incarceration_active(incarceration: Any, jail_booking: Any,
-                         today: Optional[date] = None) -> bool:
+                         today: Optional[date] = None, *,
+                         jail_verdict_suppresses: bool = False) -> bool:
     """Whether raw['incarceration'] still counts. A state/federal prison match stands on its own;
     only a county-jail (or legacy source-less) flag is tied to the jail booking's custody, so a
-    person moved from county jail to prison is not dropped when the jail stay ends."""
+    person moved from county jail to prison is not dropped when the jail stay ends.
+
+    `jail_verdict_suppresses`: the row carries a non-expired refuted/stale jail_booking
+    verification (GOVERNS "incarceration:jail", verification/verifiers/jail_booking.py; the
+    scorer and the lead-signal tagger pass `"incarceration:jail" in drop`). It ends a jail-sourced
+    flag only. The prison check runs first, so a NC DAC / SC DOC / BOP flag is never touched by
+    a county-jail verdict, including the jail -> prison move where the jail verdict is `stale`."""
     if not incarceration:
         return False
     if is_prison_sourced(incarceration):
         return True
+    if jail_verdict_suppresses:
+        return False
     return not custody_ended(jail_booking, today)
 
 

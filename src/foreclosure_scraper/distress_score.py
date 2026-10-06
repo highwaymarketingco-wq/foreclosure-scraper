@@ -780,7 +780,10 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     c.stay = stay
     if bk and not bankruptcy_lapsed(bk, today):
         sig.append(("bankruptcy", "LEGAL", 18, NO))
-    if incarceration_active(r.get("incarceration"), r.get("jail_booking"), today):
+    # "incarceration:jail" (a refuted/stale county-jail verification) is the partial rule: it
+    # ends a jail-sourced flag only, never a NC DAC / SC DOC / BOP one (incarceration_active)
+    if incarceration_active(r.get("incarceration"), r.get("jail_booking"), today,
+                            jail_verdict_suppresses="incarceration:jail" in drop):
         sig.append(("incarceration", "LEGAL", 8, NO))  # low-conf name-only signal
 
     # ---- life events -----------------------------------------------------------------
