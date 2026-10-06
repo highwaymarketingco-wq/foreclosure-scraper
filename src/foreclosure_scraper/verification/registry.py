@@ -52,6 +52,16 @@ Optional:
                                optional, only for ledger.migrate_to_case_scope(): the case a
                                stored ledger record's evidence names (e.g. bankruptcy
                                confirmed/stale publish court + docket number).
+    governs_for(record: dict) -> tuple[str, ...]
+                               optional, pure: the scorer signal names THIS answer's
+                               refuted/stale verdict removes, from the stored record
+                               ({verdict, evidence, ...}); GOVERNS is the default for an answer it
+                               returns nothing for. A verdict about the claim "this property is
+                               delinquent now" must not take away a signal the same evidence
+                               confirms (tax_lien: a chronic late payer keeps tax_lien_chronic
+                               when its current claim is refuted). The sweep stores the result in
+                               the ledger entry's `governs`; the apply step recomputes it from the
+                               record, so it never needs a ledger rewrite.
     DETAIL_KEYS: tuple         lazy-detail raw keys the verifier reads (e.g. ("comps",)). The
                                published board keeps comps/vision/cama/rent_comps/
                                foreclosure_sold_comps in the index-aligned sidecar
@@ -94,6 +104,20 @@ class Verifier:
     identity: str = "property"     # or "case" (see IDENTITY in the module docstring)
     case_identity: Optional[Callable[[Any], Optional[str]]] = None
     detail_keys: tuple[str, ...] = ()   # lazy-detail raw keys it reads (DETAIL_KEYS)
+    governs_fn: Optional[Callable[[dict], Any]] = None   # per-record governs (module governs_for)
+
+    def governs_of(self, record: Any) -> tuple[str, ...]:
+        """The scorer signals this record's refuted/stale verdict removes: the module's
+        governs_for(record) when it has one, else GOVERNS. Never raises."""
+        if self.governs_fn is None or not isinstance(record, dict):
+            return self.governs
+        try:
+            out = self.governs_fn(record)
+            return tuple(str(g) for g in out)
+        except Exception as exc:  # noqa: BLE001 - the module's GOVERNS is the safe default
+            log.warning("verification.governs_for_failed", verifier=self.name,
+                        error=f"{type(exc).__name__}: {str(exc)[:160]}")
+            return self.governs
 
     def case_of(self, row: Any) -> Optional[str]:
         """The row's case id (case-scoped verifiers), None for a property-scoped one or when
@@ -160,13 +184,17 @@ def from_module(mod: Any, name: Optional[str] = None) -> Verifier:
     dk = getattr(mod, "DETAIL_KEYS", ())
     if not isinstance(dk, (tuple, list)) or not all(isinstance(k, str) and k for k in dk):
         problems.append("DETAIL_KEYS must be a tuple of raw key names")
+    gf = getattr(mod, "governs_for", None)
+    if gf is not None and not callable(gf):
+        problems.append("governs_for must be a function of the stored record")
     if problems:
         raise ContractError(f"{name}: " + "; ".join(problems))
     return Verifier(name=name, signal=sig, version=ver, ttl_days=float(ttl), applies=ap,
                     verify=vf, governs=tuple(gov), source=str(getattr(mod, "SOURCE", "") or ""),
                     retry_days=float(getattr(mod, "RETRY_DAYS", DEFAULT_RETRY_DAYS)),
                     wall=bool(getattr(mod, "WALL", False)), module=mod, identity=ident,
-                    case_identity=cid if ident == "case" else None, detail_keys=tuple(dk))
+                    case_identity=cid if ident == "case" else None, detail_keys=tuple(dk),
+                    governs_fn=gf)
 
 
 def discover(package: str = PACKAGE) -> list[Verifier]:

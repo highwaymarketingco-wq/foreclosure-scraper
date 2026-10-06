@@ -9,7 +9,9 @@ WHAT A ROW GETS. raw['verification'] is a list, one record per signal (the spec'
 VERIFICATION_PIPELINE_SPEC.md section 1), each the ledger entry's `latest` plus:
     expires_at   checked_at + TTL_DAYS of the verifier that produced it (the registry's
                  current value when that module still exists, else the TTL the entry stored)
-    governs      the scorer signal names a refuted/stale verdict removes (same precedence)
+    governs      the scorer signal names a refuted/stale verdict removes (same precedence; a
+                 verifier's governs_for(record) can narrow it per record: a chronic late payer
+                 keeps tax_lien_chronic, see registry.py)
 Records for signals no ledger covers are left as they are. A row is matched to a ledger entry
 on any of its row_keys() that exactly one entry claims (ledger.Ledger.find), never to an entry
 holding a different parcel.
@@ -58,11 +60,14 @@ def _case_scoped(meta: dict) -> dict[str, list]:
 
 def find_entry(led, li: Any, base: list[str], case_verifiers: Optional[list] = None
                ) -> tuple[Optional[str], Optional[dict]]:
-    """The ledger entry for this row (see CASE-SCOPED SIGNALS in the module docstring)."""
+    """The ledger entry for this row (see CASE-SCOPED SIGNALS in the module docstring). In an
+    address-scoped ledger (ledger.ADDRESS_SCOPED_SIGNALS) an entry verified for a different
+    house-numbered address of the same parcel / case is not this row's (Ledger.find)."""
+    addr = getattr(li, "street_address", None) if not isinstance(li, dict) else li.get("street_address")
     if not case_verifiers:
-        return led.find(base)
+        return led.find(base, address=addr)
     cid = next((c for c in (v.case_of(li) for v in case_verifiers) if c), None)
-    ek, entry = led.find(scoped_keys(base, cid) + base if cid else base)
+    ek, entry = led.find(scoped_keys(base, cid) + base if cid else base, address=addr)
     if entry is not None and split_key(ek)[0] is None and \
             (entry.get("latest") or {}).get("verifier") in {v.name for v in case_verifiers}:
         return None, None
@@ -77,7 +82,7 @@ def attachable(entry: dict, meta: Optional[dict] = None) -> Optional[dict]:
     rec = dict(lat)
     v = (meta or {}).get(rec.get("verifier") or "")
     ttl = v.ttl_days if v is not None else entry.get("ttl_days")
-    gov = list(v.governs) if v is not None else list(entry.get("governs") or [])
+    gov = list(v.governs_of(rec)) if v is not None else list(entry.get("governs") or [])
     rec["expires_at"] = expires_at(rec.get("checked_at"), ttl)
     rec["governs"] = gov
     return rec

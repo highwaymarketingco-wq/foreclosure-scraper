@@ -202,7 +202,8 @@ def test_remaining_balance_reads_the_transactions_table():
 
 #: board address, board parcel -> the parcel that carries the address, its levy-2025 verdict
 FOLLOWS = [
-    ("0646441256", "2614 OLD FORT RD", "064644107900000", "refuted"),      # county shows 2610 Old Fort Rd
+    # (2614 Old Fort Rd, whose PIN shows 2610 Old Fort Rd, is no longer followed to the neighbor's
+    #  parcel: tests/test_verification_tax_lien_address_history.py)
     ("0710406959", "44 SKYLAND CIR", "973045193900000", "refuted"),        # county shows 99999 East St
     ("9605259489", "356 BEAVERDAM LOOP RD", "960525935900000", "stale"),   # inactive PIN
     ("9754697396", "7 ISLAND IN THE SKY TRL", "975469477200000", "refuted"),   # inactive; 78 Island... is another
@@ -254,7 +255,7 @@ def test_an_address_that_belongs_to_two_other_parcels_or_none_is_unconfirmed():
     assert sorted(r.evidence["address_pins"]) == ["111111111100000", "222222222200000"]
     none = search_html([])
     r, _ = brun(row, {url: BUNC[url], f"{tb.BASE}/Search/Results?QueryType=Address&Query=2614+OLD+FORT": none})
-    assert (r.verdict, r.evidence["reason"]) == ("unconfirmed", "address_parcel_mismatch")
+    assert (r.verdict, r.evidence["reason"]) == ("unconfirmed", "address_not_found")    # v5
     r, _ = brun(row, {url: BUNC[url]})                                  # the search page cannot be fetched
     assert (r.verdict, r.evidence["reason"]) == ("unconfirmed", "address_search_failed")
 
@@ -399,7 +400,7 @@ def test_a_payment_release_is_not_a_payment():
 
 
 def test_version_bumped_so_every_old_entry_is_due_again():
-    assert (tb.VERSION, tp.VERSION, tq.VERSION) == ("v4", "v2", "v2")
+    assert (tb.VERSION, tp.VERSION, tq.VERSION) == ("v5", "v3", "v3")
 
 
 # ===========================================================================
@@ -423,7 +424,7 @@ def test_henderson_810_robinson_terrace_is_not_the_billing_parcel_807_robinson_t
     """Board parcel 9569907747 (810 ROBINSON TERRACE) was bound to billing parcel 106171, which is
     807 ROBINSON TER; v1 judged that parcel and said stale. 810 has no billing record."""
     r, f = prun(prow("106171", "810 ROBINSON TERRACE"))
-    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "address_parcel_mismatch"
+    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "address_not_found"      # v3
     assert r.evidence["address_relation"] == "conflict" and r.evidence["address_matches"] == 0
     assert any("query=810%20ROBINSON" in u for u in f.asked)
 
@@ -492,27 +493,28 @@ UNION_2383 = ["uniontreasurer|Map|036-00-00-066 000", "uniontreasurer|Map|027-00
               "uniontreasurer|Address|2383 JONESVILLE"]
 
 
-def test_union_2383_jonesville_hwy_was_never_delinquent_its_own_account_paid_on_time():
-    """The verifier used the claim's map (329 Jonesville Lockhart Hwy, paid 2026-09-29: stale) and
-    the board's map (S Jonesville Hwy); the account that carries 2383 JONESVILLE HWY paid its 2025
-    bill 2026-01-07, before the January 15 deadline."""
+def test_union_2383_jonesville_hwy_is_ambiguous_between_the_boards_account_and_the_address_account():
+    """The claim's map (329 Jonesville Lockhart Hwy, paid 2026-09-29: late) and the board's map (S
+    Jonesville Hwy, paid 2026-09-17: late) against the account that carries 2383 JONESVILLE HWY
+    (paid 2026-01-07, on time). Two independent checks disagreed about which account the row is;
+    v2 followed the address and said refuted. The owner is a different one on both sides, so
+    nothing proves the row's own account is the wrong one: unconfirmed, never refuted or stale."""
     f = qserved(*UNION_2383)
     r = qrun(qrow("Union", "036-00-00-066 000", "027-00-00-008 000", addr="2383 Jonesville Hwy"), f)
-    assert r.verdict == "refuted"
+    assert (r.verdict, r.evidence["reason"]) == ("unconfirmed", "ambiguous_account")
     ev = r.evidence
-    assert ev["decided_on"] == "address_search" and ev["address_binding"] == "followed"
     assert ev["address_relation"] == "conflict" and ev["address_matches"] == 3
-    assert ev["bills_checked"][0] == {"year": 2025, "status": "Paid", "paid_on": "2026-01-07",
-                                      "deadline": "2026-01-15", "paid_late": False}
+    assert "bills_checked" not in ev and "decided_on" in ev        # nothing was judged on the address account
 
 
-def test_union_844_rice_ave_ext_is_another_account_than_the_claims():
-    """Claim map 072-00-00-052 000 shows 'RICE AVE EXT' (no number): both late-paid years belong
-    to it, not to the account that carries 844 RICE AVENUE EXT (paid on time)."""
+def test_union_844_rice_ave_ext_is_ambiguous_the_claim_account_is_on_the_same_street():
+    """Claim map 072-00-00-052 000 shows 'RICE AVE EXT' (no number: the same street): both
+    late-paid years belong to it, the account that carries 844 RICE AVENUE EXT paid on time.
+    v2 followed the address (refuted); the verifier cannot tell which account is the row's."""
     f = qserved("uniontreasurer|Map|072-00-00-052 000", "uniontreasurer|Address|844 RICE")
     r = qrun(qrow("Union", "072-00-00-052 000", "072-00-00-052 000", addr="844 RICE AVE EXT"), f)
-    assert r.verdict == "refuted" and r.evidence["decided_on"] == "address_search"
-    assert r.evidence["address_relation"] == "unknown"
+    assert (r.verdict, r.evidence["reason"]) == ("unconfirmed", "ambiguous_account")
+    assert r.evidence["address_relation"] == "unknown" and r.evidence["address_matches"] == 3
 
 
 def test_an_account_whose_bills_name_the_row_address_is_bound_without_a_search():
@@ -534,7 +536,7 @@ def test_a_conflicting_address_with_no_account_of_its_own_is_unconfirmed():
     f.responses[form_key(tq.form_url("uniontreasurer"),
                          tq.search_data(tq.viewstate(cp), "2383 JONESVILLE", "Address"))] = _no_records()
     r = qrun(qrow("Union", "036-00-00-066 000", "036-00-00-066 000", addr="2383 JONESVILLE HWY"), f)
-    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "address_parcel_mismatch"
+    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "address_not_found"      # v3
     assert r.evidence["address_matches"] == 0
 
 

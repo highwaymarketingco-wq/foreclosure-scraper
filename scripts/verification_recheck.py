@@ -6,6 +6,7 @@ order. This tool re-checks exactly the entries you name, right now, and tells yo
   uv run python scripts/verification_recheck.py --signal tax_lien --verdicts stale,refuted
   uv run python scripts/verification_recheck.py --signal jail_booking --keys-file keys.txt
   uv run python scripts/verification_recheck.py --signal tax_lien --verdicts stale --max-rows 20 --dry-run
+  uv run python scripts/verification_recheck.py --signal tax_lien --include-uncovered   # see find_rows()
   HANDOFF_PUSH=0 uv run python scripts/verification_recheck.py ... --ledger-dir /tmp/led
 
 WHICH ENTRIES. The ledger entries whose latest verdict is in --verdicts (default stale,refuted when
@@ -52,7 +53,7 @@ from foreclosure_scraper.board_stream import (  # noqa: E402
     detail_source, iter_board_rows, iter_board_rows_with_detail,
 )
 from foreclosure_scraper.verification import ledger as L  # noqa: E402
-from foreclosure_scraper.verification.core import iso_z, tier_rank, utc_now  # noqa: E402
+from foreclosure_scraper.verification.core import iso_z, row_keys, tier_rank, utc_now  # noqa: E402
 from foreclosure_scraper.verification.fetch import Fetcher  # noqa: E402
 from foreclosure_scraper.verification.registry import discover  # noqa: E402
 
@@ -96,11 +97,16 @@ def select_entries(led: L.Ledger, *, verdicts: set[str] | None, keys: list[str] 
     return ordered, missing
 
 
-def find_rows(board_path: Path, verifiers, led_by_signal: dict, wanted: dict[str, set[str]]
-              ) -> dict[str, dict]:
+def find_rows(board_path: Path, verifiers, led_by_signal: dict, wanted: dict[str, set[str]],
+              include_uncovered: bool = False) -> dict[str, dict]:
     """ONE read-only streaming pass. {signal: {entry key: (rank, row, verifier)}}: for every
     entry key in `wanted[signal]`, the best-ranked board row (HOT > WARM > COLD, then board
-    order) whose verifier applies and whose ledger_keys() finds that entry."""
+    order) whose verifier applies and whose ledger_keys() finds that entry.
+
+    include_uncovered: an entry whose board row no verifier applies to any more (a row a later
+    VERSION stopped covering, e.g. tax_lien v3 and the lien-agent filings that carry no property-tax
+    claim) is found by the row's plain keys and re-judged by the verifier that wrote the entry, so
+    its old answer is replaced by the current rules' (never preferred over an applicable row)."""
     found: dict[str, dict] = {sig: {} for sig in wanted}
     todo = {sig for sig, w in wanted.items() if w}
     if not todo:
@@ -116,13 +122,15 @@ def find_rows(board_path: Path, verifiers, led_by_signal: dict, wanted: dict[str
             print(f"!! lazy-detail sidecar unavailable ({exc}); rows carry no {detail_keys}",
                   flush=True)
     order = 0
+    uncovered: dict[str, dict] = {sig: {} for sig in wanted}
     for rec in rows:
         done: set[str] = set()
         for v in verifiers:
             if v.signal not in todo or v.signal in done or not v.safe_applies(rec):
                 continue
             done.add(v.signal)                     # the first applicable verifier owns the row
-            ek, entry = led_by_signal[v.signal].find(v.ledger_keys(rec))
+            ek, entry = led_by_signal[v.signal].find(v.ledger_keys(rec),
+                                                     address=rec.get("street_address"))
             if entry is None or ek not in wanted[v.signal]:
                 continue
             order += 1
@@ -130,6 +138,25 @@ def find_rows(board_path: Path, verifiers, led_by_signal: dict, wanted: dict[str
             cur = found[v.signal].get(ek)
             if cur is None or rank < cur[0]:
                 found[v.signal][ek] = (rank, rec, v)
+        if not include_uncovered:
+            continue
+        for sig in todo - done:                    # no verifier of this signal covers the row
+            ek, entry = led_by_signal[sig].find(row_keys(rec), address=rec.get("street_address"))
+            if entry is None or ek not in wanted[sig]:
+                continue
+            same = [v for v in verifiers if v.signal == sig and v.identity != "case"]
+            v = next((x for x in same if x.name == (entry.get("latest") or {}).get("verifier")),
+                     same[0] if same else None)
+            if v is None:
+                continue
+            order += 1
+            rank = (tier_rank(rec), order)
+            cur = uncovered[sig].get(ek)
+            if cur is None or rank < cur[0]:
+                uncovered[sig][ek] = (rank, rec, v)
+    for sig, items in uncovered.items():
+        for ek, item in items.items():
+            found[sig].setdefault(ek, item)        # an applicable row always wins
     return found
 
 
@@ -143,14 +170,15 @@ def build_plan(found: dict[str, dict]) -> dict:
     return plan
 
 
-def answer_of(led: L.Ledger, keys: list[str], started: float) -> tuple[str, str | None] | None:
+def answer_of(led: L.Ledger, keys: list[str], started: float, address: str | None = None
+              ) -> tuple[str, str | None] | None:
     """(this run's verdict, its reason) for the entry these keys find, or None when the entry was
     not answered in this run. The verdict is the run's own attempt (last_attempt); the reason is
     read from the entry's latest record when that is this run's answer. When an older decisive
     answer of the same verifier version is kept as `latest` (the ledger's rule: a flaky page never
     erases a verdict) the run's verdict is still what is reported."""
     from foreclosure_scraper.verification.core import parse_ts
-    _, e = led.find(keys)
+    _, e = led.find(keys, address=address)
     la = (e or {}).get("last_attempt") or {}
     t = parse_ts(la.get("checked_at"))
     if e is None or t is None or t.timestamp() < started - 1:
@@ -197,6 +225,10 @@ def main(argv=None) -> int:
     ap.add_argument("--row-timeout-s", type=float, default=120.0)
     ap.add_argument("--save-every", type=int, default=10)
     ap.add_argument("--capture-dir", default=None)
+    ap.add_argument("--include-uncovered", action="store_true",
+                    help="also re-judge entries whose board row no verifier applies to any more "
+                         "(by the verifier that wrote the entry), instead of leaving their old "
+                         "answer in the ledger")
     ap.add_argument("--dry-run", action="store_true",
                     help="select and find the board rows only: no fetch, nothing written")
     args = ap.parse_args(argv)
@@ -246,7 +278,8 @@ def run(args) -> int:
 
     t0 = time.monotonic()
     found = find_rows(Path(args.docs) / "listings.json.gz", verifiers, ledgers,
-                      {sig: set(e) for sig, e in selected.items()})
+                      {sig: set(e) for sig, e in selected.items()},
+                      include_uncovered=args.include_uncovered)
     print(f"board pass {time.monotonic() - t0:.0f}s (read-only)", flush=True)
     before = {sig: {ek: str((e.get("latest") or {}).get("verdict")) for ek, e in sel.items()}
               for sig, sel in selected.items()}
@@ -271,7 +304,7 @@ def run(args) -> int:
     for sig, led in ledgers.items():
         answered: dict[str, tuple[str, str | None]] = {}
         for ek, (_rank, row, v) in found[sig].items():
-            a = answer_of(led, v.ledger_keys(row), started)
+            a = answer_of(led, v.ledger_keys(row), started, row.get("street_address"))
             if a is not None:
                 answered[ek] = a
         led.last_run = {"at": iso_z(datetime.now(timezone.utc)), "host": host, "seconds": secs,

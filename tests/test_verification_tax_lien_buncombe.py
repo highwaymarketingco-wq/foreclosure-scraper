@@ -211,7 +211,7 @@ def test_a_parcel_with_see_legal_bills_is_confirmed_not_record_ended():
     r = run(_row(parcel_id="9658-08-5215-00000", raw={"tax_owed": {"balance": 10.0, "year": 2026}}), f)
     assert r.verdict == "confirmed" and r.evidence["see_legal_years"] == [2026, 2025]
     assert r.evidence["latest_levy_year"] == 2026
-    assert t.VERSION == "v4"
+    assert t.VERSION == "v5"
 
 
 # ---------------------------------------------------------------------------

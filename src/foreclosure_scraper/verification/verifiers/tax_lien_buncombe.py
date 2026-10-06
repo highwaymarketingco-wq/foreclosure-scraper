@@ -20,19 +20,32 @@ the 2025 one is. Verdicts:
                for its year: it counts as delinquent whatever year it is and the claim holds. Its
                remaining balance is read from its Bill Details page when that can be read
                (tax + interest + costs - payments), as evidence only.
-  stale        nothing delinquent today, the parcel carries the row's address, and the year the
-               board claimed (or, when the row names no year, the latest delinquent-eligible year)
-               has a PAYMENT dated on or after the January 6 interest date. Lateness comes from
-               the payment date against that date, never from interest charged alone (v4).
-  refuted      nothing delinquent today, the parcel carries the row's address, and the bill(s)
-               checked were paid on time (or the only unpaid bill is the current, not-yet-
+  stale        nothing delinquent today, the parcel is the row's (below), and the claim WAS true:
+               a year the board claimed has a PAYMENT dated on or after the January 6 interest
+               date, or a bill that was already delinquent the day the board first saw the row
+               (row first_seen) was paid late on or after that day (v5). Lateness comes from the
+               payment date against that date, never from interest charged alone (v4).
+  refuted      nothing delinquent today, the parcel is the row's, and the claimed years (or, when
+               the row names no year, the latest delinquent-eligible year) were paid on time and
+               no payment fits the stale rule (or the only unpaid bill is the current, not-yet-
                delinquent levy).
   unconfirmed  no usable PIN on the row, the page could not be fetched, no bills parsed, the
                parcel's billing ends before the latest delinquent-eligible levy (a PIN retired by
                a split/recombination), the PIN is Inactive and the address cannot be followed to
                its parcel (pin_inactive), the address belongs to another parcel and cannot be
-               followed (address_parcel_mismatch), interest was charged but no late payment is
-               on the bill (interest_without_late_payment), or the bill shows no payment at all.
+               followed (address_parcel_mismatch), the address belongs to another parcel and
+               nothing proves which is the row's (ambiguous_account, v5), no parcel carries the
+               row's address and the PIN's own page names another (address_not_found, v5),
+               interest was charged but no late payment is on the bill
+               (interest_without_late_payment), or the bill shows no payment at all.
+
+TWO CLAIMS, THE BILL HISTORY (v5; _tax_common, TWO CLAIMS). When nothing is owed, the Bill
+Details page of every delinquent-eligible regular bill from levy 2019 on is read (the claimed
+years' and the latest bills first, at most 12 bills) and the evidence records late_levy_years, the
+late payment dates per year, history_complete and the chronic_claim judged on them (confirmed at
+3 late levy years, the scorer's tax_lien_chronic rule). `governs` is per record: a parcel that is
+paid up today and paid late in most recent years is refuted or stale for `tax_lien`, and keeps
+`tax_lien_chronic`. A confirmed answer reads no history (nothing to suppress).
 
 BILLS ARE KEYED BY BILL NUMBER, NOT BY YEAR (v4). A bill number is
 "<account>-<levy year>-<tax year>-<sequence>-<suffix>". A regular bill has sequence 0000 and the
@@ -55,6 +68,19 @@ verified INSTEAD (evidence followed_from_pin); anything else is unconfirmed. A r
 house-numbered address has nothing to bind and is judged on its PIN (but an Inactive PIN is
 never judged: pin_inactive). A confirmed answer needs no binding (an unpaid balance on the
 parcel id the row carries is true of that parcel) but records address_relation and pin_inactive.
+
+WHICH PARCEL, WHEN THE ADDRESS NAMES ANOTHER (v5). The follow step used to go to the one other
+parcel that carries the row's address whenever the row's own PIN did not (2026-10-06: 2614 Old Fort
+Rd and 16 Rabbit Hill Dr were judged refuted from the neighbor's account while the row's own PIN,
+2610 Old Fort Rd / 18 Rabbit Hill Dr, had paid its 2025 bill late the week before). The address
+search always matched exactly (house number AND street name, _tax_common.address_relation: a
+different number on the same street, or "GLENN" for "GLEN", is another property and never binds);
+the defect was following AWAY from a county-supplied PIN. Now _tax_common.account_choice() decides:
+follow the address parcel only with proof the row's PIN is wrong (Inactive PIN, a resolver attached
+it, the board owner matches the address parcel and not the PIN's); judge the row's own PIN when the
+board's value equals its county value (the layer row IS that parcel's record; the address is the
+owner's mailing-style address); else `ambiguous_account`. A PIN whose own page names another
+address while no parcel carries the row's: `address_not_found`.
 
 Evidence also carries the two FINDINGS.md side checks: the county's current owner against the
 board's owner_name (Finding C), as the match CATEGORY only (same / partial / different; never a
@@ -91,17 +117,23 @@ from ..core import VerificationResult, digits, result
 from . import _tax_common as tc
 
 SIGNAL = "tax_lien"
-VERSION = "v4"         # v4 (2026-10-06): See Legal bills count as unpaid, bills keyed by bill
-                       # number (discovery bills), lateness from payment dates, interest counted
-                       # once, address binding / Inactive PINs. v3: another lien's tax_lien
-                       # listing type (liensnc, NC eCourts federal / NCDOR judgments) is not a
-                       # property-tax claim (applies(); _tax_common). v2: a parcel record that
-                       # ends before the latest delinquent-eligible levy is unconfirmed
+VERSION = "v5"         # v5 (2026-10-06): two claims judged apart (current vs chronic, from the
+                       # bill history of levy 2019 on; per-record governs), stale when a claimed
+                       # year or a bill delinquent at first_seen was paid late, the address is
+                       # followed only with proof (ambiguous_account / address_not_found), the
+                       # ledger is address-scoped. v4: See Legal bills count as unpaid, bills
+                       # keyed by bill number (discovery bills), lateness from payment dates,
+                       # interest counted once, address binding / Inactive PINs. v3: another
+                       # lien's tax_lien listing type (liensnc, NC eCourts federal / NCDOR
+                       # judgments) is not a property-tax claim (applies(); _tax_common). v2: a
+                       # parcel record that ends before the latest delinquent-eligible levy is
+                       # unconfirmed
 TTL_DAYS = 30          # a balance changes when paid; re-check monthly
 RETRY_DAYS = 7         # an unreadable page is retried after a week
 SOURCE = "tax.buncombenc.gov"
 GOVERNS = tc.GOVERNS   # tax_lien:property_tax, tax_sale:property_tax, tax_lien_chronic,
                        # recorded_debt:tax
+governs_for = tc.governs_for   # per record: a confirmed chronic claim keeps tax_lien_chronic
 ROLL_KEY = "buncombe_delinquent_tax"   # the county roll's own block (counties_nc scraper)
 ROW_SUMMARY_EXCLUDE = ("owner_name",)  # public ledger: no names (the sweep pops these)
 #: the county's own delinquent-roll blocks: a property-tax claim of their own on a row whose
@@ -268,11 +300,16 @@ def parse_parcel_page(text: str) -> dict:
                               and not any(b["see_legal"] for b in ordered)}
 
 
+_NO_RESULTS = re.compile(r"(?i)didn(?:'|&#39;|&#x27;|&apos;|\u2019)t find any results")
+
+
 def parse_search_results(text: str) -> Optional[list[dict]]:
     """[{pin, address}] for the PARCEL cards of an address Search page (the bill cards, whose
-    heading is a bill number, are skipped); None when the page is not a search-results page."""
+    heading is a bill number, are skipped); [] for the county's own "Sorry, we didn't find any
+    results" answer (v5: it used to be read as an unreadable page, so an address no parcel
+    carries was answered address_search_unreadable); None when the page is neither."""
     if 'class="search-results' not in text:
-        return None
+        return [] if _NO_RESULTS.search(text) else None
     return [{"pin": m.group(1), "address": _html.unescape(m.group(2)).strip()}
             for m in _SEARCH_CARD.finditer(text) if _PIN_RE.fullmatch(m.group(1))]
 
@@ -347,7 +384,8 @@ def payment_check(bill_year: int, bill: dict) -> dict:
     date (interest_without_late_payment) is not lateness (v4; the old rule counted it, and judged
     parcel 8792725038 stale from a paid discovery bill that way). `paid_on` is the last payment's
     date whenever any payment is on the page; `late_payments` how many fell on or after the
-    interest date."""
+    interest date, `late_payment_dates` those dates (v5: the bill history keeps them per year;
+    first / last_late_payment_on are the earliest and latest)."""
     cutoff = delinquent_after(bill_year).isoformat()
     pays = sorted(t["date"] for t in bill["transactions"] if _is_payment(t) and t["date"])
     late_pay = [d for d in pays if d >= cutoff]
@@ -357,6 +395,8 @@ def payment_check(bill_year: int, bill: dict) -> dict:
     if late_pay:
         out["late_payments"] = len(late_pay)
         out["first_late_payment_on"] = late_pay[0]
+        out["last_late_payment_on"] = late_pay[-1]
+        out["late_payment_dates"] = late_pay[:4]
     elif charged > 0:
         out["interest_without_late_payment"] = True
     if not pays:
@@ -368,6 +408,22 @@ def paid_late(bill_year: int, bill: dict) -> Optional[dict]:
     """payment_check() when the bill was paid late, else None (the pre-v4 call shape)."""
     c = payment_check(bill_year, bill)
     return c if c["paid_late"] else None
+
+
+def claim_pins(row: dict) -> set[str]:
+    """The PINs the row's own county roll blocks name (buncombe_delinquent_tax.pin,
+    multi_year_delinquent_tax.parcel_key): the parcel the CLAIM is about. A block merged into
+    another parcel's row (a shared lien-agent filing joined two rows: Pole Creasman 756 carries
+    586's roll block) names a PIN that is not the row's."""
+    raw = _raw(row)
+    out = set()
+    for key, field in (("buncombe_delinquent_tax", "pin"), ("multi_year_delinquent_tax", "parcel_key")):
+        blk = raw.get(key)
+        if isinstance(blk, dict) and blk.get(field):
+            p = pin_of({"parcel_id": blk[field]})
+            if p:
+                out.add(p)
+    return out
 
 
 def claimed_years(row: dict) -> list[int]:
@@ -511,13 +567,13 @@ async def _bind(row: dict, client, pin: str, page: dict, ev: dict, *, can_follow
     others = [p for p in dict.fromkeys(carry) if p != pin]
     if others:
         if can_follow and len(others) <= MAX_FOLLOW_CANDIDATES:
-            return "follow", others[0]
+            return "follow", others[0]      # _decide: account_choice() says whether it decides
         ev["address_pins"] = others[:4]
         return "unconfirmed", "address_parcel_mismatch"
     if inactive:
         return "unconfirmed", "pin_inactive"
-    if rel == "conflict":                   # the county's own page names another address
-        return "unconfirmed", "address_parcel_mismatch"
+    if rel == "conflict":                   # the county's own page names another address and no
+        return "unconfirmed", "address_not_found"   # parcel carries the row's (v5: own reason)
     _set_binding(ev, "unverified")    # unknown relation and nothing carries the address
     return "ok", None
 
@@ -546,6 +602,10 @@ async def _decide(row: dict, client, pin: str, page: dict, claimed: list[int], t
     })
     if page.get("inactive"):
         ev["pin_inactive"] = True
+    cp = claim_pins(row)
+    if cp and pin not in cp:
+        ev["claim_pin_differs"] = True       # the roll block on the row is another parcel's claim
+        ev["claim_pins"] = sorted(cp)
     rel_row = tc.address_query(row.get("street_address"))
     if rel_row:
         ev.setdefault("address_relation", tc.address_relation(row.get("street_address"),
@@ -585,12 +645,33 @@ async def _decide(row: dict, client, pin: str, page: dict, claimed: list[int], t
         if not page2["bills"]:
             ev["reason"] = "address_parcel_unreadable"
             return _res("unconfirmed", ev)
-        ev2: dict[str, Any] = {"url": url, "followed_from_pin": pin,
-                               "address_binding": "followed"}
-        if page.get("inactive"):
-            ev2["followed_from_inactive_pin"] = True
-        return await _decide(row, client, what, page2, claimed, today, ev2, can_follow=False)
-    if action == "unconfirmed":
+        # v5: two parcels, the row's own and the one the address search names. When the row's
+        # own PIN names a REAL other address the address account decides only with PROOF the
+        # PIN is wrong (tc.account_choice); a PIN whose page names no usable address (a 99999
+        # placeholder) contradicts nothing, and the one parcel that carries the address decides
+        owner_addr = tc.owner_category(row.get("owner_name"), [page2.get("owner")])
+        if not tc.needs_proof(row.get("street_address"), [page.get("situs")]):
+            choice, why = "follow", "pin_names_no_usable_address"
+        else:
+            choice, why = tc.account_choice(
+                own_retired=bool(page.get("inactive")), resolved=tc.parcel_resolved(row),
+                own_owner=ev.get("owner_match"), address_owner=owner_addr,
+                own_value_identity=tc.value_identity(row, page.get("value"), page2.get("value")))
+        if choice == "ambiguous":
+            ev.update(address_pins=[what], address_owner_match=owner_addr,
+                      value_county_address_parcel=page2.get("value"), reason=why)
+            return _res("unconfirmed", ev)
+        if choice == "follow":
+            ev2: dict[str, Any] = {"url": url, "followed_from_pin": pin,
+                                   "address_binding": "followed", "followed_because": why}
+            if page.get("inactive"):
+                ev2["followed_from_inactive_pin"] = True
+            return await _decide(row, client, what, page2, claimed, today, ev2, can_follow=False)
+        # "own": the row's data is its own parcel's record and the address is another property's
+        # (the board's value equals this parcel's county value, not the address parcel's)
+        ev.update(address_binding="own_parcel_value_identity", address_account_pin=what,
+                  value_county_address_parcel=page2.get("value"))
+    elif action == "unconfirmed":
         ev["reason"] = what
         return _res("unconfirmed", ev)
 
@@ -605,47 +686,78 @@ async def _decide(row: dict, client, pin: str, page: dict, claimed: list[int], t
         ev["latest_delinquent_eligible_levy"] = latest_eligible
         return _res("unconfirmed", ev)
 
-    # was it ever delinquent (paid late since) or not (paid on time)? The claimed years first
-    # (every bill of the year, discovery bills too), then the latest delinquent-eligible regular bill.
+    # Was it ever delinquent (paid late since) or not (paid on time)? Two claims, judged apart
+    # (_tax_common, TWO CLAIMS): the CURRENT one (tax_lien) on the claimed years' bills (else the
+    # latest delinquent-eligible regular bill), the CHRONIC one (tax_lien_chronic) on every bill
+    # from levy HISTORY_FROM_LEVY on. The decision bills (at most MAX_BILL_CHECKS) are read first.
     eligible = [b for b in bills if is_delinquent_year(b["year"], today)]
-    order: list[dict] = []
+    claimed_set = set(claimed)
+    decision: list[dict] = []
     for y in claimed:
-        order.extend(b for b in eligible if b["year"] == y)
+        decision.extend(b for b in eligible if b["year"] == y)
     first_regular = next((b for b in eligible if b["regular"]), None)
-    if first_regular is not None and first_regular["year"] not in {b["year"] for b in order}:
-        order.append(first_regular)
+    if first_regular is not None and first_regular["year"] not in {b["year"] for b in decision}:
+        decision.append(first_regular)
+    decision = decision[:MAX_BILL_CHECKS]
+    taken = {b["bill"] for b in decision}
+    extra = sorted((b for b in eligible if b["bill"] not in taken
+                    and (b["year"] >= tc.HISTORY_FROM_LEVY or b["year"] in claimed_set)),
+                   key=lambda b: (b["year"] not in claimed_set, -b["year"], not b["regular"]))
+    todo = (decision + extra)[:tc.MAX_HISTORY_BILLS]
+    truncated = len(decision) + len(extra) > len(todo)
     checked = []
-    for b in order[:MAX_BILL_CHECKS]:
+    for i, b in enumerate(todo):
         burl = BILL_URL.format(bill=b["bill"])
+        base = {"year": b["year"], "bill": b["bill"], "url": burl}
+        if not b["regular"]:
+            base["kind"] = "discovery"
         try:
             bill = parse_bill_page(await client.get_text(burl))
         except Exception as exc:  # noqa: BLE001
-            checked.append({"year": b["year"], "url": burl,
-                            "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
+            checked.append(dict(base, error=f"{type(exc).__name__}: {str(exc)[:120]}"))
             continue
         if not bill["readable"]:
-            checked.append({"year": b["year"], "url": burl, "error": "transactions_unreadable"})
+            checked.append(dict(base, error="transactions_unreadable"))
             continue
         chk = payment_check(b["year"], bill)
-        entry = {"year": b["year"], "url": burl, **chk}
-        if not b["regular"]:
-            entry["kind"] = "discovery"
-        checked.append(entry)
-        if chk["paid_late"]:
-            ev["bills_checked"] = checked
-            return _res("stale", ev)
+        if i >= len(decision):                     # history only: the fields the history needs
+            chk = {k: chk[k] for k in ("paid_late", "paid_on", "late_payment_dates",
+                                       "last_late_payment_on", "delinquent_from") if k in chk}
+            base.pop("url")
+        checked.append({**base, **chk})
+    ok = [c for c in checked if "error" not in c]
+    regular_late = {c["year"]: c for c in ok if c["paid_late"] and c.get("kind") != "discovery"}
+    complete = not truncated and len(ok) == len(checked)
+    ev.update(history_from_levy=tc.HISTORY_FROM_LEVY, history_bills_read=len(ok),
+              history_complete=complete, late_levy_years=sorted(regular_late),
+              late_payment_dates={str(y): regular_late[y]["late_payment_dates"]
+                                  for y in sorted(regular_late)},
+              chronic_claim=tc.history_claims(regular_late, complete))
     ev["bills_checked"] = checked
-    if checked and all("error" in c for c in checked):
+    first_seen = tc.first_seen_date(row)
+    dchecks = checked[:len(decision)]
+    claimed_late = sorted(c["year"] for c in ok if c["paid_late"] and c["year"] in claimed_set)
+    decision_late = sorted(c["year"] for c in dchecks if c.get("paid_late"))
+    seen_late = sorted(c["year"] for c in ok if c["paid_late"] and tc.paid_after_seen(
+        first_seen, delinquent_after(c["year"]), c.get("last_late_payment_on")))
+    if claimed_late or decision_late or seen_late:
+        ev["current_claim_basis"] = ("claimed_year_paid_late" if claimed_late
+                                     else "latest_year_paid_late" if decision_late
+                                     else "paid_late_after_first_seen")
+        return _res("stale", ev)
+    if dchecks and all("error" in c for c in dchecks):
         ev["reason"] = "bill_pages_unreadable"
         return _res("unconfirmed", ev)
-    if any(c.get("interest_without_late_payment") for c in checked):
+    if any(c.get("interest_without_late_payment") for c in dchecks):
         ev["reason"] = "interest_without_late_payment"   # charged interest is not a payment date
         return _res("unconfirmed", ev)
-    if any(c.get("no_payment_on_bill") for c in checked):
+    if any(c.get("no_payment_on_bill") for c in dchecks):
         ev["reason"] = "no_payment_on_bill"              # a zero balance with nothing paid
         return _res("unconfirmed", ev)
-    if current and not checked:
+    if current and not dchecks:
         ev["note"] = "only the current levy is unpaid; it is not delinquent yet"
+    ev["current_claim_basis"] = ("claimed_years_on_time" if claimed_set & {b["year"] for b in decision}
+                                 else "latest_year_on_time")
     return _res("refuted", ev)
 
 

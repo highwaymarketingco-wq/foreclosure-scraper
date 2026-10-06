@@ -64,6 +64,22 @@ the county writes it, so no suffix): this parcel among the matches binds, exactl
 parcel is verified INSTEAD (evidence followed_from_parcel), anything else is unconfirmed. A row
 with no house-numbered address, or a county address with no usable number ("0 NO ADDRESS
 ASSIGNED"), has nothing to compare and is judged on its parcel as before.
+WHICH PARCEL, WHEN THE ADDRESS NAMES ANOTHER (v3). When the row's own parcel carries a REAL other
+address and exactly one other parcel carries the row's, the one that carries it decides only with
+proof the row's parcel is wrong (_tax_common.account_choice: a resolver attached it, or the board
+owner matches the address parcel and not the row's own); otherwise the verifier cannot tell which
+account is right and answers unconfirmed, reason ambiguous_account (never stale or refuted). A
+county address with no usable number contradicts nothing (the address parcel decides, as in v2).
+The row's parcel names another address and nothing carries the row's: address_not_found.
+
+TWO CLAIMS, THE BILL HISTORY (v3; _tax_common, TWO CLAIMS). When nothing is owed, the bill details
+of every PAID delinquent-eligible bill from levy 2019 on are read (the claimed years' and the
+latest ones first, at most 12) and the evidence records late_levy_years, the late payment dates
+per year and the chronic_claim judged on them (confirmed at 3 late levy years: the scorer's
+tax_lien_chronic rule); `governs` is per record (governs_for), so a parcel that is paid up today
+and paid late in most recent years is refuted or stale for `tax_lien` and keeps `tax_lien_chronic`.
+stale: a claimed year, the latest year, or a bill that was already delinquent when the board first
+saw the row (first_seen) was paid late; refuted: those were paid on time.
 A row typed tax_lien by another lien's source that is covered through its own claim (a mixed row)
 gets its verdict as is: the qualified GOVERNS (_tax_common) never ends that lien's listing type.
 Evidence (public ledger: a whitelist, no names, no mailing addresses): API and page URLs, tenant,
@@ -88,11 +104,16 @@ from ..core import VerificationResult, result
 from . import _tax_common as tc
 
 SIGNAL = "tax_lien"
-VERSION = "v2"         # v2 (2026-10-06): address binding; interest alone is not lateness
+VERSION = "v3"         # v3 (2026-10-06): two claims judged apart (current vs chronic, bill history of
+                       # levy 2019 on, per-record governs), stale for a claimed year / a bill
+                       # delinquent at first_seen paid late, the address is followed only with
+                       # proof (ambiguous_account / address_not_found), address-scoped ledger.
+                       # v2: address binding; interest alone is not lateness
 TTL_DAYS = 30
 RETRY_DAYS = 7
 SOURCE = "bcpwa.ncptscloud.com"
 GOVERNS = tc.GOVERNS          # tax_lien:property_tax, tax_sale:property_tax, ... (_tax_common)
+governs_for = tc.governs_for  # per record: a confirmed chronic claim keeps tax_lien_chronic
 ROW_SUMMARY_EXCLUDE = ("owner_name",)
 
 BASE = "https://bcpwa.ncptscloud.com"
@@ -232,18 +253,25 @@ def _dt(v: Any) -> Optional[date]:
 def paid_late(detail: dict, year: int) -> dict:
     """Late-payment evidence from a GetbillDetails answer. `paid_late` is a payment dated on or
     after the bill's interest-begin date and nothing else (v2: interest paid with every payment
-    dated earlier is flagged interest_without_late_payment, never counted as lateness)."""
+    dated earlier is flagged interest_without_late_payment, never counted as lateness). v3 keeps
+    the late payments' dates (`late_payment_dates`, first / last_late_payment_on) for the bill
+    history; `delinquent_from` is the interest-begin date."""
     begin = _dt(detail.get("interestBeginDate")) or delinquent_from(year)
-    pays = [d for d in (_dt(t.get("transactionCreationDate")) for t in detail.get("transactions") or []
-                        if isinstance(t, dict) and str(t.get("transactionType") or "").upper() == "PAYMENT")
-            if d]
+    pays = sorted(d for d in (_dt(t.get("transactionCreationDate")) for t in detail.get("transactions") or []
+                              if isinstance(t, dict) and str(t.get("transactionType") or "").upper() == "PAYMENT")
+                  if d)
     last = _dt(detail.get("lastPaymentDate")) or (max(pays) if pays else None)
     interest = detail.get("interestPaid")
     interest = float(interest) if isinstance(interest, (int, float)) else 0.0
-    late = bool((last and last >= begin) or any(d >= begin for d in pays))
+    late_pays = [d for d in pays if d >= begin]
+    late = bool((last and last >= begin) or late_pays)
     out = {"paid_on": last.isoformat() if last else None, "interest_begin": begin.isoformat(),
            "interest_paid": round(interest, 2), "status": str(detail.get("statusType") or "").upper()
-           or None, "paid_late": late}
+           or None, "paid_late": late, "delinquent_from": begin.isoformat()}
+    if late:
+        dates = sorted({d.isoformat() for d in late_pays} | ({last.isoformat()} if last and last >= begin else set()))
+        out.update(late_payment_dates=dates[:4], first_late_payment_on=dates[0],
+                   last_late_payment_on=dates[-1])
     if interest > 0 and not late:
         out["interest_without_late_payment"] = True
     if last is None:
@@ -269,7 +297,10 @@ class TenantDown(RuntimeError):
     pass
 
 
-async def _get_json(client: Any, url: str, tenant: str) -> Any:
+async def _get_json(client: Any, url: str, tenant: str, *, health: bool = True) -> Any:
+    """GET + parse, cached for the run. `health=False` (the bill HISTORY reads of v3: old bills the
+    county may have purged) never counts a failure against the tenant: one unreadable old bill must
+    not take every later row of the county out of the run."""
     run = _run(client)
     if url in run["cache"]:
         return run["cache"][url]
@@ -280,10 +311,11 @@ async def _get_json(client: Any, url: str, tenant: str) -> Any:
                                      headers={"X-Tenant": tenant, "Accept": "application/json"})
         data = json.loads(text)
     except Exception as exc:  # noqa: BLE001
-        n = run["failures"][tenant] = run["failures"].get(tenant, 0) + 1
-        why = f"{type(exc).__name__}: {str(exc)[:120]}"
-        if n >= TENANT_MAX_FAILURES:
-            run["dead"][tenant] = f"{n} failures this run, last {why}"
+        if health:
+            n = run["failures"][tenant] = run["failures"].get(tenant, 0) + 1
+            why = f"{type(exc).__name__}: {str(exc)[:120]}"
+            if n >= TENANT_MAX_FAILURES:
+                run["dead"][tenant] = f"{n} failures this run, last {why}"
         raise
     run["failures"][tenant] = 0
     run["cache"][url] = data
@@ -299,7 +331,10 @@ _KEYS = ("reason", "url", "page_url", "tenant", "claim_county_differs", "tax_par
          "delinquent_by_year", "total_delinquent", "years_delinquent", "under_500", "de_minimis",
          "not_yet_delinquent_due", "deferred_by_year", "flags", "claimed_years", "claimed_bill",
          "bills_checked", "owner_match", "note", "error", "tenant_health", "address_relation",
-         "address_binding", "address_matches", "address_pins", "followed_from_parcel")
+         "address_binding", "address_matches", "address_pins", "followed_from_parcel",
+         "followed_because", "address_owner_match", "history_from_levy", "history_bills_read",
+         "history_complete", "late_levy_years", "late_payment_dates", "chronic_claim",
+         "current_claim_basis")
 
 
 def public_evidence(ev: dict) -> dict:
@@ -403,11 +438,11 @@ async def _bind(row: dict, client, tenant: str, parcel: str, bills: list[dict], 
         return "ok", None
     if carry:
         if can_follow and len(carry) == 1:
-            return "follow", next(iter(carry))
+            return "follow", next(iter(carry))      # _decide: account_choice() says if it decides
         ev["address_pins"] = sorted(carry)[:4]
         return "unconfirmed", "address_parcel_mismatch"
-    if rel == "conflict":
-        return "unconfirmed", "address_parcel_mismatch"
+    if rel == "conflict":                           # the county names another address and no
+        return "unconfirmed", "address_not_found"   # parcel carries the row's (v3: own reason)
     _set_binding(ev, "unverified")        # the county's address has no usable number
     return "ok", None
 
@@ -461,11 +496,25 @@ async def _decide(row: dict, client, tenant: str, slug: str, bills: list[dict], 
             return _res("unconfirmed", dict(ev, reason="address_parcel_fetch_failed"))
         if not bills2:
             return _res("unconfirmed", dict(ev, reason="address_parcel_unreadable"))
+        # v3: the address account decides only with PROOF the row's own parcel is the wrong one
+        # when the county names a REAL other address for it (tc.account_choice); a county address
+        # with no usable number contradicts nothing
+        owner_addr = tc.owner_category(row.get("owner_name"), bills2[0]["owners"])
+        if not tc.needs_proof(row.get("street_address"), _addresses(bills)):
+            choice, why = "follow", "parcel_names_no_usable_address"
+        else:
+            choice, why = tc.account_choice(
+                own_retired=False,
+                resolved=tc.parcel_resolved(row) and ev.get("tax_parcel_from") == "board_parcel",
+                own_owner=ev.get("owner_match"), address_owner=owner_addr)
+        if choice == "ambiguous":
+            return _res("unconfirmed", dict(ev, reason=why, address_pins=[what],
+                                            address_owner_match=owner_addr))
         ev2 = {k: ev.get(k) for k in ("tenant", "board_parcel", "claimed_years", "claimed_bill",
                                       "page_url", "searched", "claim_county_differs")}
         ev2.update(url=url, tax_parcel=what, tax_parcel_from="address_search",
                    followed_from_parcel=parcel, address_binding="followed",
-                   results_total=payload.get("totalCount"))
+                   followed_because=why, results_total=payload.get("totalCount"))
         return await _decide(row, client, tenant, slug, bills2, claimed, today, ev2,
                              can_follow=False)
     if action == "unconfirmed":
@@ -478,7 +527,9 @@ async def _decide(row: dict, client, tenant: str, slug: str, bills: list[dict], 
     if any(is_eligible(y, today) for y in deferred):
         return _res("unconfirmed", dict(ev, reason="only_deferred_balance"))
 
-    # was it ever delinquent (paid late since) or not (paid on time)?
+    # Was it ever delinquent (paid late since) or not (paid on time)? Two claims, judged apart
+    # (_tax_common, TWO CLAIMS): the CURRENT one on the claimed years' bills (else the latest
+    # delinquent-eligible ones), the CHRONIC one on every paid bill from levy HISTORY_FROM_LEVY on.
     def rank(b: dict) -> tuple:          # the claimed bill first, else the year's largest bill
         orig = b["original"] if isinstance(b["original"], (int, float)) else 0.0
         return (b["bill"] == ev.get("claimed_bill"), float(orig))
@@ -489,17 +540,23 @@ async def _decide(row: dict, client, tenant: str, slug: str, bills: list[dict], 
             continue
         if b["year"] not in paid or rank(b) > rank(paid[b["year"]]):
             paid[b["year"]] = b
-    # the claimed years first, then the latest delinquent-eligible ones (2 bill pages at most)
+    # the decision years first (the claimed ones, then the 2 latest eligible), then the history
     order = [y for y in claimed if y in paid]
     for y in sorted(paid, reverse=True)[:2]:
         if y not in order:
             order.append(y)
+    decision = order[:MAX_BILL_CHECKS]
+    claimed_set = set(claimed)
+    extra = sorted((y for y in paid if y not in decision
+                    and (y >= tc.HISTORY_FROM_LEVY or y in claimed_set)), reverse=True)
+    todo = (decision + extra)[:tc.MAX_HISTORY_BILLS]
+    truncated = len(decision) + len(extra) > len(todo)
     checked = []
-    for y in order[:MAX_BILL_CHECKS]:
+    for i, y in enumerate(todo):
         b = paid[y]
         durl = DETAIL_URL.format(bill_id=quote(b["id"]), tenant=quote(tenant))
         try:
-            d = await _get_json(client, durl, tenant)
+            d = await _get_json(client, durl, tenant, health=i < len(decision))
             if not isinstance(d, dict) or not d.get("statusType"):
                 raise ValueError("not a bill")
         except Exception as exc:  # noqa: BLE001
@@ -507,20 +564,43 @@ async def _decide(row: dict, client, tenant: str, slug: str, bills: list[dict], 
                             "error": f"{type(exc).__name__}: {str(exc)[:100]}"})
             continue
         late = paid_late(d, y)
-        checked.append({"year": y, "bill": b["bill"], "url": durl,
-                        "page_url": BILL_PAGE_URL.format(slug=slug, bill_id=b["id"]), **late})
-        if late["paid_late"]:
-            ev["bills_checked"] = checked
-            return _res("stale", ev)
+        if i >= len(decision):                     # history only: the fields the history needs
+            late = {k: late[k] for k in ("paid_late", "paid_on", "late_payment_dates",
+                                         "last_late_payment_on", "delinquent_from") if k in late}
+            checked.append({"year": y, "bill": b["bill"], **late})
+        else:
+            checked.append({"year": y, "bill": b["bill"], "url": durl,
+                            "page_url": BILL_PAGE_URL.format(slug=slug, bill_id=b["id"]), **late})
+    ok = [c for c in checked if "error" not in c]
+    late_years = {c["year"]: c for c in ok if c["paid_late"]}
+    complete = not truncated and len(ok) == len(checked)
     ev["bills_checked"] = checked
+    ev.update(history_from_levy=tc.HISTORY_FROM_LEVY, history_bills_read=len(ok),
+              history_complete=complete, late_levy_years=sorted(late_years),
+              late_payment_dates={str(y): late_years[y]["late_payment_dates"]
+                                  for y in sorted(late_years)},
+              chronic_claim=tc.history_claims(late_years, complete))
+    first_seen = tc.first_seen_date(row)
+    dchecks = checked[:len(decision)]
+    claimed_late = sorted(c["year"] for c in ok if c["paid_late"] and c["year"] in claimed_set)
+    decision_late = sorted(c["year"] for c in dchecks if c.get("paid_late"))
+    seen_late = sorted(c["year"] for c in ok if c["paid_late"] and tc.paid_after_seen(
+        first_seen, date.fromisoformat(c["delinquent_from"]), c.get("last_late_payment_on")))
+    if claimed_late or decision_late or seen_late:
+        ev["current_claim_basis"] = ("claimed_year_paid_late" if claimed_late
+                                     else "latest_year_paid_late" if decision_late
+                                     else "paid_late_after_first_seen")
+        return _res("stale", ev)
     if not checked:
         return _res("unconfirmed", dict(ev, reason="no_paid_bill_to_check"))
-    if all("error" in c for c in checked):
+    if all("error" in c for c in dchecks):
         return _res("unconfirmed", dict(ev, reason="bill_details_unreadable"))
-    if any(c.get("interest_without_late_payment") for c in checked):
+    if any(c.get("interest_without_late_payment") for c in dchecks):
         return _res("unconfirmed", dict(ev, reason="interest_without_late_payment"))
-    if any(c.get("no_payment_on_bill") for c in checked):
+    if any(c.get("no_payment_on_bill") for c in dchecks):
         return _res("unconfirmed", dict(ev, reason="no_payment_on_bill"))
     if current:
         ev["note"] = "only the current levy is unpaid; it is not delinquent yet"
+    ev["current_claim_basis"] = ("claimed_years_on_time" if claimed_set & set(decision)
+                                 else "latest_year_on_time")
     return _res("refuted", ev)

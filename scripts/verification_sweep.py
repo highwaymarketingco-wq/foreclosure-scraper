@@ -63,6 +63,12 @@ from foreclosure_scraper.verification.registry import discover  # noqa: E402
 RUN_LOCK = REPO / "logs" / ".verification_sweep.lock"
 
 
+def _ident(led, rec: dict) -> str:
+    """The address identity of a row in the sweep's queue: '' (one slot per ledger key) except in
+    an address-scoped ledger, where two house-numbered addresses of one parcel are two checks."""
+    return L.address_slot(rec.get("street_address")) if led.address_scoped else ""
+
+
 def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, cap: int,
            now: datetime, recheck_only: bool = False,
            tiers: set[str] | None = None,
@@ -73,7 +79,7 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
     only rows of these tiers (HOT/WARM/COLD; "-" for untiered), e.g. to sample the COLD tail.
     sources: only rows whose `source` equals one of these (e.g. re-verify one scraper)."""
     heaps: dict[str, list] = {v.signal: [] for v in verifiers}
-    inheap: dict[str, dict] = {v.signal: {} for v in verifiers}   # key -> item, per signal
+    inheap: dict[str, dict] = {v.signal: {} for v in verifiers}   # key -> {address identity -> item}
     why: dict[str, Counter] = {v.signal: Counter() for v in verifiers}
     want_county = county.strip().lower() if county else None
     order = 0
@@ -102,7 +108,8 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
                 continue
             done.add(v.signal)             # first applicable verifier of a signal owns the row
             keys = v.ledger_keys(rec)      # property keys, or case id + property (IDENTITY)
-            _, entry = ledgers[v.signal].find(keys)
+            led = ledgers[v.signal]
+            _, entry = led.find(keys, address=rec.get("street_address"))
             due, reason = L.is_due(entry, v, now)
             why[v.signal]["applies"] += 1
             if recheck_only and entry is None:
@@ -118,24 +125,37 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
             prio = (tier_rank(rec), 0 if lt is None else 1, lt.timestamp() if lt else 0.0, order)
             item = (tuple(-x for x in prio), keys[0], rec, v.name)
             h, seen = heaps[v.signal], inheap[v.signal]
-            prev = seen.get(keys[0])
+            slots = seen.setdefault(keys[0], {})        # address identity -> queued item
+            ident = _ident(led, rec)
+            prev = slots.get(ident)
+            if prev is None and led.address_scoped and slots:
+                if ident == "":
+                    # a row with no house-numbered address rides on a queued row of its property
+                    why[v.signal]["same_property_queued"] += 1
+                    continue
+                if "" in slots:                          # the numbered row replaces the rider
+                    old = slots.pop("")
+                    h.remove(old)
+                    heapq.heapify(h)
             if prev is not None:
                 # another board row of the same property (of the same case, for a case-scoped
                 # verifier) is already queued: one check covers both (they share the ledger
-                # entry); keep the better-ranked row
+                # entry); keep the better-ranked row. In an address-scoped ledger (tax_lien) rows
+                # of one parcel with DIFFERENT house-numbered addresses are different checks (a
+                # verdict is about the address it was verified for: ledger.ADDRESS_SCOPED_SIGNALS)
                 why[v.signal]["same_property_queued"] += 1
                 if item[0] > prev[0]:
                     h[h.index(prev)] = item
                     heapq.heapify(h)
-                    seen[keys[0]] = item
+                    slots[ident] = item
                 continue
             if len(h) < cap:
                 heapq.heappush(h, item)
-                seen[keys[0]] = item
+                slots[ident] = item
             elif h and item[0] > h[0][0]:
                 gone = heapq.heapreplace(h, item)
-                seen.pop(gone[1], None)
-                seen[keys[0]] = item
+                seen.get(gone[1], {}).pop(_ident(led, gone[2]), None)
+                slots[ident] = item
     out = {}
     byname = {v.name: v for v in verifiers}
     for sig, h in heaps.items():
@@ -167,7 +187,7 @@ async def run_checks(plan: dict, ledgers: dict, fetcher, *, budget_s: float, sav
                 res.verifier = v.name
             if not res.verifier_version:
                 res.verifier_version = v.version
-            entry = led.record(row, res, ttl_days=v.ttl_days, governs=v.governs,
+            entry = led.record(row, res, ttl_days=v.ttl_days, governs=v.governs_of(res.to_dict()),
                                keys=v.ledger_keys(row))
             for f in getattr(v.module, "ROW_SUMMARY_EXCLUDE", ()) or ():
                 (entry.get("row") or {}).pop(f, None)     # e.g. jail_booking: no owner_name

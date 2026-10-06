@@ -53,14 +53,48 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from .core import (DECISIVE, VERDICTS, VerificationResult, compact, iso_z, parse_ts,
-                   property_part, row_keys, row_summary, scoped_keys, split_key, utc_now)
+from .core import (DECISIVE, VERDICTS, VerificationResult, address_relation, compact, iso_z,
+                   parse_ts, property_part, row_keys, row_summary, scoped_keys, split_key,
+                   utc_now)
 
 SCHEMA = 1
 KIND = "verification_ledger"
 REPO = Path(__file__).resolve().parents[3]
 LEDGER_DIR = REPO / "docs" / "handoff" / "verification"
 HISTORY_MAX = 6
+
+#: Signals whose claim is a fact about the property AT ONE ADDRESS, in a property-keyed ledger
+#: (2026-10-06, tax_lien). Two board rows can share a ledger key (one parcel id, or one lien-agent
+#: case) and carry DIFFERENT addresses: Rabbit Hill 16 / 18 and Old Fort Rd 2614 / 2610 are one
+#: parcel id with a mailing-style address on one row, Pole Creasman 756 / 586 are two parcels
+#: that share one lien-agent filing and one copied county roll block. A verdict is about the
+#: parcel AND address its row was verified against, so for these signals an entry whose recorded
+#: address conflicts with a row's (different house number or street: core.address_relation) is
+#: never that row's entry: find() skips it, record() gives the row its own entry (keyed by its
+#: address), the sweep queues both rows, apply attaches the entry to the row it was about only.
+#: A row or an entry with no house-numbered address is never in conflict.
+ADDRESS_SCOPED_SIGNALS = frozenset({"tax_lien"})
+#: suffix of the entry that keeps the answer for a row with no house-numbered address on a parcel
+#: whose key several address-scoped entries claim (Ledger._own_keys)
+_UNADDRESSED = "#unaddressed"
+
+
+def _entry_address(entry: Any) -> Optional[str]:
+    row = entry.get("row") if isinstance(entry, dict) else None
+    return row.get("street_address") if isinstance(row, dict) else None
+
+
+def address_conflict(a: Any, b: Any) -> bool:
+    """True when both are house-numbered addresses of different properties."""
+    return bool(a) and bool(b) and address_relation(a, b) == "conflict"
+
+
+def address_slot(address: Any) -> str:
+    """The identity of a row's address for queueing: '<house number>|<street name tokens>', or ''
+    for an address with no house number. Two spellings of one address share a slot."""
+    from .core import address_key
+    number, name, _ = address_key(address)
+    return f"{number}|{' '.join(sorted(name))}" if number and name else ""
 
 
 def ledger_dir() -> Path:
@@ -116,6 +150,11 @@ class Ledger:
                   last_run=data.get("last_run") or {})
         led.generated_at = data.get("generated_at")
         return led
+
+    @property
+    def address_scoped(self) -> bool:
+        """See ADDRESS_SCOPED_SIGNALS."""
+        return self.signal in ADDRESS_SCOPED_SIGNALS
 
     def counts(self) -> dict:
         c = {"rows": len(self.rows), **{v: 0 for v in VERDICTS}}
@@ -188,14 +227,21 @@ class Ledger:
             self._index = {k: next(iter(v)) for k, v in owners.items() if len(v) == 1}
         return self._index
 
-    def find(self, keys: Iterable[str]) -> tuple[Optional[str], Optional[dict]]:
+    def find(self, keys: Iterable[str], address: Any = None
+             ) -> tuple[Optional[str], Optional[dict]]:
         """The entry for a row with these keys (row_keys(), or a case-scoped verifier's
         scoped_keys()): the first key exactly one entry claims, unless that entry holds a
         DIFFERENT parcel than the row (two parcels are two properties, whatever address or case
-        they share). The parcel comparison reads the property part of a case-scoped key."""
+        they share). The parcel comparison reads the property part of a case-scoped key.
+
+        `address` is the row's street address. In an address-scoped ledger
+        (ADDRESS_SCOPED_SIGNALS) an entry whose recorded address is a DIFFERENT house-numbered
+        address than the row's is skipped as well: it was verified for another address of the
+        shared parcel / case, and is not this row's verdict."""
         keys = list(keys)
         mine = _parcels(keys)
         idx = self.index()
+        scoped = self.address_scoped and bool(address)
         for k in keys:
             ek = idx.get(k)
             if ek is None:
@@ -204,11 +250,17 @@ class Ledger:
             theirs = _parcels((ek, *(e.get("keys") or [])))
             if mine and theirs and not (mine & theirs):
                 continue
+            if scoped and address_conflict(address, _entry_address(e)):
+                continue
             return ek, e
+        if self.address_scoped and keys:
+            fb = self.rows.get(f"{keys[0]}{_UNADDRESSED}")
+            if fb is not None and not address_slot(address):     # only an unaddressed row
+                return f"{keys[0]}{_UNADDRESSED}", fb
         return None, None
 
     def find_row(self, row: Any) -> tuple[Optional[str], Optional[dict]]:
-        return self.find(row_keys(row))
+        return self.find(row_keys(row), address=_row_address(row))
 
     # -- write ------------------------------------------------------------
     def record(self, row: Any, res: VerificationResult, *, ttl_days: Optional[float] = None,
@@ -219,7 +271,9 @@ class Ledger:
             raise ValueError(f"a {res.signal} result does not belong in the {self.signal} ledger")
         now = now or utc_now()
         keys = list(keys or row_keys(row))
-        old_key, entry = self.find(keys)
+        old_key, entry = self.find(keys, address=_row_address(row))
+        if entry is None and self.address_scoped and keys[0] in self.rows:
+            keys = self._own_keys(keys)
         if entry is not None and old_key != keys[0] and keys[0] not in self.rows:
             # the row's strongest key changed (e.g. a parcel was backfilled): re-key, keep all
             self.rows[keys[0]] = self.rows.pop(old_key)
@@ -259,16 +313,32 @@ class Ledger:
         entry["history"] = _dedupe_hist(hist)[:HISTORY_MAX]
         return entry
 
+    def _own_keys(self, keys: list[str]) -> list[str]:
+        """`keys` reordered so that the row gets an entry of its own. find() found no entry for
+        the row although keys[0] is held: by an entry verified for another address of the same
+        parcel, or by a key several entries claim. The row's address key leads (one entry per
+        address); a row with no address key is never in conflict, so only an ambiguous key can
+        reach here for it, and all such rows of a parcel share one fallback entry
+        ("<parcel key>#unaddressed", found again by find()) rather than overwrite the holder."""
+        for k in keys[1:]:
+            if k.startswith("addr:") and k not in self.rows:
+                return [k, *[x for x in keys if x != k]]
+        return [f"{keys[0]}{_UNADDRESSED}", *keys[1:]]
+
     def merge_from(self, other: "Ledger") -> "Ledger":
         """Union with another copy of the same signal's ledger (the file on disk vs. this run's
         copy): no entry is lost; per entry, the newer decisive latest wins under record()'s
         rule, histories are unioned, the larger check count is kept."""
         for k, o in other.rows.items():
             b = self.rows.get(k)
+            if b is not None and self.address_scoped and \
+                    address_conflict(_entry_address(o), _entry_address(b)):
+                b = None        # one key, two addresses: the other copy's entry is another row's
             if b is None:
-                _, b = self.find([k, *(o.get("keys") or [])])
+                _, b = self.find([k, *(o.get("keys") or [])], address=_entry_address(o))
                 if b is None:
-                    self.rows[k] = copy.deepcopy(o)
+                    nk = k if k not in self.rows else self._own_keys([k, *(o.get("keys") or [])])[0]
+                    self.rows[nk] = copy.deepcopy(o)
                     self._index = None
                     continue
             self._merge_entry(b, o)
@@ -392,6 +462,11 @@ def migrate_to_case_scope(led: "Ledger", verifier: Any, rows: Iterable[Any], *,
     led.rows = out
     led._index = None
     return report
+
+
+def _row_address(row: Any) -> Optional[str]:
+    v = row.get("street_address") if isinstance(row, dict) else getattr(row, "street_address", None)
+    return str(v) if v else None
 
 
 def _parcels(keys: Iterable[str]) -> set[str]:

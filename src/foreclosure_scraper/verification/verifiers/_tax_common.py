@@ -41,6 +41,40 @@ RETIRED (2026-10-06): a refuted/stale answer on a mixed row used to be published
 that only hid the county's answer about the row's own property-tax claim (a paid tax balance
 kept its debt credit), so it was dropped; restore_property_tax_verdicts() put the ledger's
 downgraded answers back, offline.
+
+TWO CLAIMS, JUDGED APART (2026-10-06 recheck of the 51 refuted entries: 25 were chronic late
+payers). A tax_lien row asserts (1) the property is delinquent NOW (`tax_lien`, `tax_sale`, the
+recorded_debt credit of the balance) and (2) it is a CHRONIC delinquent (`tax_lien_chronic`, the
+scorer's FINANCIAL 24 weight; its only producer is raw['pickens_delinquent']['chronic'] =
+len(cycles) >= 3, three or more separate delinquency publications). A parcel that is paid up today
+can still have paid LATE in most recent levy years: its current claim is refuted or stale, its
+chronic claim is confirmed by the bill history, and the verdict must not take the chronic signal
+away. So each verifier reads the bill history (levy HISTORY_FROM_LEVY on) when nothing is owed,
+records late_levy_years and the late payment dates in the evidence, judges the chronic claim
+(`chronic_claim`: confirmed at CHRONIC_MIN_LATE_YEARS late levy years, not_confirmed when the
+whole history was read and has fewer, unknown when part of it could not be read), and
+governs_for() narrows the record's `governs` (registry.py: governs_for): tax_lien_chronic is left
+out of it unless the chronic claim is not_confirmed. A discovery bill (omitted property, billed
+after the fact) is never a late payment of the owner's: it is read for the current claim but not
+counted toward late_levy_years.
+
+THE CURRENT CLAIM'S VERDICT. stale when the claim WAS true: a claimed year's bill was paid late,
+or a late payment of a bill that was already delinquent when the board first saw the row is dated
+on or after that day (first_seen: the board saw an open delinquency and it was paid since);
+refuted when the claimed years (else the latest delinquent-eligible year) were paid on time and no
+payment fits the first rule.
+
+WHICH ACCOUNT IS THE ROW'S (address vs parcel). A row's parcel id and its street address can name
+different accounts (2026-10-06: 2614 / 2610 Old Fort Rd, 16 / 18 Rabbit Hill Dr: one parcel id,
+one row with the owner's mailing-style address; 844 Rice Ave Ext, 2383 Jonesville Hwy in Union SC:
+the board's parcel and the address search point at different accounts, with different payment
+histories). account_choice() is the one policy: follow the address to the account that carries it
+only with PROOF the row's own account is the wrong one (the portal retired it, a resolver attached
+it, the board owner matches the address account and not the row's own); judge the row's own
+account when the row's own data is that account's (the board's value equals its county value,
+Buncombe); otherwise the verifier cannot tell which account is right and answers `unconfirmed`,
+reason `ambiguous_account`, never refuted or stale. No account carries the address and the row's
+own account carries another one: `address_not_found`.
 """
 from __future__ import annotations
 
@@ -73,6 +107,116 @@ GOVERNS = (f"tax_lien:{PROPERTY_TAX}", f"tax_sale:{PROPERTY_TAX}", "tax_lien_chr
 
 #: a confirmed balance under this is real but trivial (a payment shortfall); flagged, not dropped
 DE_MINIMIS = 25.0
+
+#: first levy year whose payment history is read (module doc, TWO CLAIMS)
+HISTORY_FROM_LEVY = 2019
+#: late levy years that make a parcel a chronic delinquent: the scorer's own rule for
+#: tax_lien_chronic (scrapers/counties_sc/pickens_delinquent_parcels.py: `len(cycles) >= 3`, read by
+#: distress_score._collect as raw['pickens_delinquent']['chronic'])
+CHRONIC_MIN_LATE_YEARS = 3
+#: cap on the bills (Buncombe, PTS Cloud) read for the history of one parcel
+MAX_HISTORY_BILLS = 12
+
+
+def history_claims(late_years: Iterable[int], history_complete: bool) -> str:
+    """The chronic claim judged on the bill history: 'confirmed' at CHRONIC_MIN_LATE_YEARS late
+    levy years, 'not_confirmed' when the whole history was read and has fewer, else 'unknown'."""
+    n = len(set(late_years))
+    if n >= CHRONIC_MIN_LATE_YEARS:
+        return "confirmed"
+    return "not_confirmed" if history_complete else "unknown"
+
+
+def governs_for(record: Any) -> tuple[str, ...]:
+    """The scorer signals a refuted / stale property-tax record removes (registry: governs_for).
+    GOVERNS, except tax_lien_chronic when the bill history confirms the chronic claim, or could
+    not be read completely: the record's current claim is refuted or stale, the chronic claim is
+    a different claim and the evidence does not refute it."""
+    ev = record.get("evidence") if isinstance(record, dict) else None
+    ev = ev if isinstance(ev, dict) else {}
+    if ev.get("chronic_claim") in ("confirmed", "unknown"):
+        return tuple(g for g in GOVERNS if g != "tax_lien_chronic")
+    return GOVERNS
+
+
+def first_seen_date(row: Any) -> Optional[date]:
+    """The day the board first saw the row (board rows carry first_seen), else None."""
+    v = g(row, "first_seen") or g(row, "first_seen_at")
+    if isinstance(v, datetime):
+        return v.date()
+    if isinstance(v, date):
+        return v
+    try:
+        return datetime.fromisoformat(str(v).replace("Z", "")[:19]).date()
+    except (TypeError, ValueError):
+        return None
+
+
+def paid_after_seen(first_seen: Optional[date], delinquent_from: date, last_late_payment: Any
+                    ) -> bool:
+    """A late payment dated on or after the day the board first saw the row, of a bill that was
+    already delinquent that day: the board saw an open delinquency and it was paid since."""
+    if first_seen is None or not last_late_payment:
+        return False
+    try:
+        paid = date.fromisoformat(str(last_late_payment)[:10])
+    except ValueError:
+        return False
+    return first_seen >= delinquent_from and paid >= first_seen
+
+
+#: raw keys a parcel RESOLVER leaves when it attached the row's parcel id (not the source)
+_RESOLVED_PARCEL_KEYS = ("parcel_from_geo", "parcel_from_address")
+
+
+def parcel_resolved(row: Any) -> bool:
+    """True when something other than the row's source attached its parcel id: a resolver
+    (raw parcel_from_address / parcel_from_geo), or, for a lien-agent filing, anything at all (a
+    liensnc filing names an address and, only when the filer typed one, a PIN: raw.liensnc.pin).
+    Such a parcel is a guess, and the address the row's source gave is the better evidence of the
+    property."""
+    raw = raw_of(row)
+    if any(raw.get(k) for k in _RESOLVED_PARCEL_KEYS):
+        return True
+    lien = raw.get("liensnc")
+    return isinstance(lien, dict) and not str(lien.get("pin") or "").strip() \
+        and bool(g(row, "parcel_id"))
+
+
+def value_identity(row: Any, own_value: Optional[float], other_value: Optional[float],
+                   tol: float = 0.01) -> bool:
+    """True when one of the row's own values (assessed / market / tax) equals the county value of
+    its own parcel within `tol` and none equals the other account's: the row's data IS its own
+    parcel's record (a county layer row carries the county's value for its PIN), whatever address
+    it carries."""
+    vals = [float(v) for k in ("assessed_value", "market_value", "tax_value")
+            if isinstance(v := g(row, k), (int, float)) and v > 0]
+
+    def near(x: Optional[float]) -> bool:
+        return bool(x) and any(abs(v - x) <= tol * x for v in vals)
+    return near(own_value) and not near(other_value)
+
+
+def account_choice(*, own_retired: bool, resolved: bool, own_owner: Optional[str],
+                   address_owner: Optional[str], own_value_identity: bool = False
+                   ) -> tuple[str, str]:
+    """Which account decides, when the row's own account does not carry the row's address and
+    exactly one other account does (module doc, WHICH ACCOUNT IS THE ROW'S). Returns
+      ("follow", why)     the address account decides: the portal retired the row's own account
+                          (own_retired), a resolver attached it (resolved), or the board owner
+                          matches the address account and not the row's own (owner_follows_address)
+      ("own", why)        the row's own account decides, the address is another property's
+                          (own_value_identity: the board's value is its county value)
+      ("ambiguous", "ambiguous_account")   nothing proves either: answer unconfirmed."""
+    if own_retired:
+        return "follow", "portal_retired"
+    if resolved:
+        return "follow", "parcel_resolved"
+    if own_value_identity:
+        return "own", "value_identity"
+    if own_owner == "different" and address_owner in ("same", "partial"):
+        return "follow", "owner_follows_address"
+    return "ambiguous", "ambiguous_account"
 
 
 def g(row: Any, k: str) -> Any:
@@ -234,106 +378,33 @@ def owner_category(board: Optional[str], county_names: Iterable[Optional[str]]) 
 # address binding: does the parcel / account that was checked carry the ROW's address?
 # ---------------------------------------------------------------------------
 #
-# WHY (2026-10-06 recheck of all 103 stale verdicts, 7 of them wrong): a row's parcel id and its
-# street address can belong to DIFFERENT parcels (a retired / recombined PIN, a roll block merged
-# into another parcel's row, a resolver that matched a road name). A stale or refuted verdict
-# removes the claim from the lead's score, so it may only be issued from the parcel that carries
-# the row's address. address_relation() is the shared yes / no / cannot-tell; each verifier
-# decides what to do with a "conflict" (follow the address, or answer unconfirmed).
-
-_ADDR_ALIAS = {
-    "ROAD": "RD", "STREET": "ST", "DRIVE": "DR", "TERRACE": "TER", "TERR": "TER",
-    "AVENUE": "AVE", "BOULEVARD": "BLVD", "LANE": "LN", "COURT": "CT", "CIRCLE": "CIR",
-    "TRAIL": "TRL", "HIGHWAY": "HWY", "EXTENSION": "EXT", "PLACE": "PL", "PARKWAY": "PKWY",
-    "MOUNTAIN": "MTN", "POINT": "PT", "COVE": "CV", "RIDGE": "RDG", "HEIGHTS": "HTS",
-    "NORTH": "N", "SOUTH": "S", "EAST": "E", "WEST": "W", "NORTHEAST": "NE",
-    "NORTHWEST": "NW", "SOUTHEAST": "SE", "SOUTHWEST": "SW",
-}
-_ADDR_SUFFIXES = frozenset({"RD", "ST", "DR", "TER", "AVE", "BLVD", "LN", "CT", "CIR", "TRL",
-                            "HWY", "EXT", "PL", "PKWY", "WAY", "LOOP", "PT", "CV", "RDG", "HTS",
-                            "PIKE", "ALY", "SQ", "XING", "TRCE", "RUN", "PATH", "BND", "CRK"})
-_ADDR_DIRECTIONS = frozenset({"N", "S", "E", "W", "NE", "NW", "SE", "SW"})
-_ADDR_UNIT = frozenset({"APT", "UNIT", "STE", "SUITE", "LOT", "TRLR", "BLDG", "BUILDING", "SPC",
-                        "SPACE", "FL", "FLOOR", "RM", "ROOM"})
-#: words the counties append that are not part of the street ("242 P GIBBS RD UNINCORPORATED")
-_ADDR_NOISE = frozenset({"UNINCORPORATED", "UNINCORPORAT", "UNINC", "NC", "SC", "USA", "UNITED",
-                         "STATES", "COUNTY"})
+# The implementation lives in verification.core (address_key / address_relation / address_query:
+# the ledger's address-aware lookup needs it too and must not import a verifier module). They are
+# re-exported here under their old names.
+from ..core import (  # noqa: E402,F401
+    address_key, address_query, address_relation, _ADDR_ALIAS, _ADDR_DIRECTIONS, _ADDR_NOISE,
+    _ADDR_SUFFIXES, _ADDR_UNIT)
 
 
-def address_key(addr: Any) -> tuple[Optional[str], frozenset, frozenset]:
-    """(house number or None, street name tokens, suffix + direction tokens) of an address.
-    The city / state / zip after the first comma are dropped (a Nominatim style "804, Trailwinds
-    Drive, Oconee County, ..." keeps its second part), "1/2" and a unit tail are dropped, leading
-    zeros are stripped ("000399 OAKHILL DRIVE" == "399 OAKHILL DR"), suffixes are normalized
-    (ROAD == RD). A placeholder number (all nines, zero) is no number."""
-    s = str(addr or "").upper()
-    parts = [p.strip() for p in s.split(",")]
-    head = parts[0] if parts else ""
-    if re.fullmatch(r"\d+[A-Z]?", head) and len(parts) > 1:
-        head = f"{head} {parts[1]}"
-    head = re.sub(r"\b\d+\s*/\s*\d+\b", " ", head)
-    toks = re.findall(r"[A-Z0-9]+", head)
-    for i, t in enumerate(toks):
-        if i > 0 and t in _ADDR_UNIT:
-            toks = toks[:i]
-            break
-    number = None
-    if toks:
-        m = re.fullmatch(r"(\d+)([A-Z]?)", toks[0])
-        if m:
-            digits_ = m.group(1).lstrip("0")
-            if digits_ and not (len(digits_) >= 4 and set(digits_) == {"9"}):
-                number = digits_ + m.group(2)
-            toks = toks[1:]
-    toks = [_ADDR_ALIAS.get(t, t) for t in toks
-            if t not in _ADDR_NOISE and not re.fullmatch(r"\d{5}(\d{4})?", t)]
-    name = frozenset(t for t in toks if t not in _ADDR_SUFFIXES and t not in _ADDR_DIRECTIONS)
-    tail = frozenset(t for t in toks if t in _ADDR_SUFFIXES or t in _ADDR_DIRECTIONS)
-    return number, name, tail
+def same_street(a: Any, b: Any) -> bool:
+    """True when both addresses name the same street (the name tokens, whatever the house number
+    or suffix): "RICE AVE EXT" is the street of "844 RICE AVENUE EXT"."""
+    _, sa, _ = address_key(a)
+    _, sb, _ = address_key(b)
+    return bool(sa) and sa == sb
 
 
-def address_relation(a: Any, b: Any) -> str:
-    """'match' | 'conflict' | 'unknown' between a row's address and the one on a county record.
-    unknown: either side has no usable house number or street name (a road name alone, a
-    placeholder number): nothing is claimed either way. match: same house number, same street
-    name tokens, and suffix / direction tokens equal or missing on one side. conflict: anything
-    else (a different number or street: the record is another property's)."""
-    na, sa, ta = address_key(a)
-    nb, sb, tb = address_key(b)
-    if not na or not nb or not sa or not sb:
-        return "unknown"
-    if na == nb and sa == sb and (ta == tb or not ta or not tb):
-        return "match"
-    return "conflict"
-
-
-def address_query(addr: Any) -> Optional[str]:
-    """The house number and street NAME of a row's address as a search string ("810 ROBINSON"
-    for "810 ROBINSON TERRACE"), or None when the row has no house-numbered address (a road name
-    alone cannot identify a parcel). The suffix is left off on purpose: the portals' address
-    searches match text as THEY write it (Henderson's "807 ROBINSON TER" is not found by
-    "807 ROBINSON TERRACE"); address_relation() then keeps only the exact matches."""
-    s = str(addr or "")
-    parts = [p.strip() for p in s.split(",")]
-    head = parts[0].upper() if parts else ""
-    if re.fullmatch(r"\d+[A-Z]?", head) and len(parts) > 1:
-        head = f"{head} {parts[1].upper()}"
-    head = re.sub(r"\b\d+\s*/\s*\d+\b", " ", head)
-    toks = re.findall(r"[A-Z0-9]+", head)
-    if not toks or not re.fullmatch(r"\d+[A-Z]?", toks[0]):
-        return None
-    number, name, _ = address_key(s)
-    if not number or not name:
-        return None
-    stem = [toks[0].lstrip("0") or toks[0]]
-    for t in toks[1:]:
-        if t in _ADDR_UNIT or t in _ADDR_NOISE:
-            break
-        a = _ADDR_ALIAS.get(t, t)
-        if (a in _ADDR_SUFFIXES or a in _ADDR_DIRECTIONS) and len(stem) > 1 and stem[-1] not in _ADDR_DIRECTIONS:
-            break
-        stem.append(t)
-    return " ".join(stem)
+def needs_proof(row_addr: Any, other_addrs: Iterable[Any]) -> bool:
+    """Does the row's own account NAME an address that does not carry the row's (so following the
+    row's address to another account needs proof the own account is wrong, account_choice)? Yes
+    when one of the account's addresses is a different house-numbered address (conflict), or is on
+    the row's street without a usable number (the account may well be the row's: same street). No
+    when the account names no usable address at all (a county placeholder): it contradicts
+    nothing, and the one account that carries the row's address decides."""
+    addrs = [x for x in other_addrs if x]
+    if any(address_relation(row_addr, x) == "conflict" for x in addrs):
+        return True
+    return any(same_street(row_addr, x) for x in addrs)
 
 
 def next_weekday(d: date) -> date:

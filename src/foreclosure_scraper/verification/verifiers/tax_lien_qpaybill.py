@@ -67,6 +67,29 @@ on a late payment, refuted when paid on time; an address with no rows of its own
 that may hide years, is unconfirmed (address_parcel_mismatch / page_capped). A row with no
 house-numbered address has nothing to bind and is judged on its parcel as before.
 
+WHICH ACCOUNT, WHEN THE ADDRESS NAMES ANOTHER (v3). In v2 the address's rows decided whenever the
+row's own account did not carry the address. That turned two Union SC rows from stale to refuted
+on the strength of an account the two independent checks disagreed about (844 Rice Ave Ext: the
+board / claim parcel paid its 2025 bill 2026-09-30 with a $2,336 penalty, the account the address
+search returns paid on time; 2383 Jonesville Hwy: three parcel ids). When the portal names a REAL
+other address for the row's own account and another account carries the row's address, the
+address account decides only with proof the row's account is wrong (_tax_common.account_choice: a
+resolver attached the board parcel, or the board owner matches the address account and not the
+row's own); otherwise the verifier cannot tell which account is right and answers unconfirmed,
+reason ambiguous_account, never stale or refuted. An account whose rows name no usable address
+contradicts nothing (the address account decides, as in v2). The row's account names another
+address and no account carries the row's: address_not_found.
+
+TWO CLAIMS, THE PAYMENT HISTORY (v3; _tax_common, TWO CLAIMS). The grid holds every year's payment
+date, so the history costs no request: the evidence records late_levy_years (regular bills of levy
+2019 on paid after their deadline), the late payment dates per year and the chronic_claim judged
+on them (confirmed at 3 late levy years, the scorer's tax_lien_chronic rule; `unknown` when the
+history is partial: a claim read by receipt number, or a year with no readable payment).
+`governs` is per record (governs_for): a parcel paid up today and paid late in most recent years is
+refuted or stale for `tax_lien` and keeps `tax_lien_chronic`. stale: a claimed year, the latest
+year, or a bill that was already delinquent when the board first saw the row (first_seen) was paid
+late; refuted: those were paid on time.
+
 VERDICTS (SC real-property tax is due January 15 of the next year, S.C. Code 12-45-70; unpaid
 after it, penalties attach, so a levy-year Y bill is delinquent from January 16 of Y+1; a
 deadline on a weekend rolls to Monday):
@@ -94,7 +117,7 @@ import html as _html
 import re
 import time
 import weakref
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 from typing import Any, Optional
 
@@ -102,11 +125,16 @@ from ..core import VerificationResult, result
 from . import _tax_common as tc
 
 SIGNAL = "tax_lien"
-VERSION = "v2"         # v2 (2026-10-06): rollback bills judged apart; address binding
+VERSION = "v3"         # v3 (2026-10-06): two claims judged apart (current vs chronic, the grid's
+                       # whole payment history, per-record governs), stale for a claimed year / a
+                       # bill delinquent at first_seen paid late, the address account decides only
+                       # with proof (ambiguous_account / address_not_found), address-scoped
+                       # ledger. v2: rollback bills judged apart; address binding
 TTL_DAYS = 30
 RETRY_DAYS = 7
 SOURCE = "qpaybill.com"
 GOVERNS = tc.GOVERNS          # tax_lien:property_tax, tax_sale:property_tax, ... (_tax_common)
+governs_for = tc.governs_for  # per record: a confirmed chronic claim keeps tax_lien_chronic
 ROW_SUMMARY_EXCLUDE = ("owner_name",)
 
 ROLL_SLUG = "counties_sc.qpaybill_delinquent_roll"
@@ -365,6 +393,13 @@ def paid_check(by_year: dict, year: int) -> Optional[dict]:
             "paid_late": last > dl}
 
 
+def late_payments(by_year: dict, year: int) -> list[str]:
+    """The dates (ISO, oldest first) of the year's payments made after its deadline."""
+    dl = deadline(year)
+    return sorted({r["paid_on"].isoformat() for r in by_year.get(year, [])
+                   if _kind(r["status"]) == "paid" and r["paid_on"] and r["paid_on"] > dl})
+
+
 # ---------------------------------------------------------------------------
 # the tenant sessions (one per county and search criteria per sweep run)
 # ---------------------------------------------------------------------------
@@ -486,7 +521,9 @@ _KEYS = ("reason", "url", "tenant", "county", "searched", "decided_on", "delinqu
          "rollback_bills_checked", "board_parcel", "latest_levy_year", "latest_delinquent_eligible_levy",
          "delinquent_by_year", "total_delinquent", "years_delinquent", "under_500", "de_minimis",
          "not_yet_delinquent_due", "sold_at_tax_sale_years", "claimed_years", "bills_checked",
-         "owner_match", "note", "error", "tenant_health")
+         "owner_match", "note", "error", "tenant_health", "followed_because",
+         "address_owner_match", "history_from_levy", "history_years_read", "history_complete",
+         "late_levy_years", "late_payment_dates", "chronic_claim", "current_claim_basis")
 _SEARCHED_KEYS = ("map_number", "receipt", "role", "found", "rows", "latest_levy_year",
                   "delinquent_by_year", "not_yet_delinquent_due", "sold_at_tax_sale_years",
                   "page_capped")
@@ -511,14 +548,19 @@ def claim_receipts(row: Any) -> list[str]:
     return [str(n).strip() for n in reversed(blk.get("notice_numbers") or []) if str(n).strip()]
 
 
-def _decide_paid(a: dict, claimed: list[int], today: date) -> tuple[str, list[dict], list[dict]]:
-    """('stale' | 'refuted' | 'mixed' | 'none', regular checks, rollback checks) on one parcel
-    with nothing delinquent. The regular bills decide; the rollback bills (Description "<year>
-    ROLLBACK TAX") are checked apart: a regular bill on time beside a rollback paid late is
-    'mixed' (unconfirmed), and a parcel with only rollback rows is judged on them."""
+def _decide_paid(a: dict, claimed: list[int], today: date, first_seen: Optional[date] = None
+                 ) -> tuple[str, list[dict], list[dict], dict]:
+    """('stale' | 'refuted' | 'mixed' | 'none', regular checks, rollback checks, history) on one
+    parcel with nothing delinquent. The regular bills decide; the rollback bills (Description
+    "<year> ROLLBACK TAX") are checked apart: a regular bill on time beside a rollback paid late
+    is 'mixed' (unconfirmed), and a parcel with only rollback rows is judged on them.
+
+    v3: stale also when a payment of a bill that was already delinquent the day the board first
+    saw the row (`first_seen`) is dated on or after that day, and the history (the grid already
+    holds every year, so reading it costs no request): {late_levy_years, late_payment_dates,
+    years_read, readable} over the regular bills of levy HISTORY_FROM_LEVY on."""
     by_year = a.get("_by_year") or {}
-    # the claimed years, then the two latest delinquent-eligible ones (the grid already holds
-    # every payment date, so reading more years costs no request)
+    # the claimed years, then the two latest delinquent-eligible ones
     order = [y for y in claimed if is_eligible(y, today) and y in by_year]
     for y in sorted((y for y in by_year if is_eligible(y, today)), reverse=True)[:2]:
         if y not in order:
@@ -537,6 +579,20 @@ def _decide_paid(a: dict, claimed: list[int], today: date) -> tuple[str, list[di
             break
     if verdict == "none" and any(c.get("paid_late") is False for c in checks):
         verdict = "refuted"
+    # the payment history, every delinquent-eligible regular year from HISTORY_FROM_LEVY on
+    window = sorted(y for y in by_year if is_eligible(y, today)
+                    and (y >= tc.HISTORY_FROM_LEVY or y in claimed))
+    hist_checks = {y: paid_check(by_year, y) for y in window}
+    late = {y: late_payments(by_year, y) for y, c in hist_checks.items() if c and c["paid_late"]}
+    hist = {"late_levy_years": sorted(late),
+            "late_payment_dates": {str(y): late[y][:4] for y in sorted(late)},
+            "years_read": sum(1 for c in hist_checks.values() if c),
+            "readable": all(c is not None for c in hist_checks.values())}
+    seen = [y for y, dates in late.items() if tc.paid_after_seen(
+        first_seen, deadline(y) + timedelta(days=1), dates[-1])]
+    if seen and verdict in ("refuted", "none"):
+        verdict = "stale"
+        hist["paid_late_after_first_seen"] = sorted(seen)
     rb = a.get("_rb_by_year") or {}
     rb_checks = []
     for y in sorted((y for y in rb if is_eligible(y, today)), reverse=True)[:4]:
@@ -548,7 +604,7 @@ def _decide_paid(a: dict, claimed: list[int], today: date) -> tuple[str, list[di
         verdict = "mixed"
     elif verdict == "none" and rb_checks:
         verdict = "stale" if rb_late else "refuted" if rb_ok else "none"
-    return verdict, checks, rb_checks
+    return verdict, checks, rb_checks, hist
 
 
 async def _lookup(client: Any, county: str, sub: str, value: str, role: str, today: date,
@@ -688,16 +744,30 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         # a receipt answers only the claimed bills, so this history test needs the Map search
         return _res("unconfirmed", dict(ev, reason="parcel_record_ended",
                                         latest_delinquent_eligible_levy=last_ok))
-    verdict, checks, rb_checks = _decide_paid(a, claimed, today)
+    verdict, checks, rb_checks, hist = _decide_paid(a, claimed, today, tc.first_seen_date(row))
     ev["bills_checked"] = checks
     if rb_checks:
         ev["rollback_bills_checked"] = rb_checks
+    complete = bool(hist["readable"]) and not a.get("via_receipts")
+    ev.update(history_from_levy=tc.HISTORY_FROM_LEVY, history_years_read=hist["years_read"],
+              history_complete=complete, late_levy_years=hist["late_levy_years"],
+              late_payment_dates=hist["late_payment_dates"],
+              chronic_claim=tc.history_claims(hist["late_levy_years"], complete))
     if verdict == "none":
         return _res("unconfirmed", dict(ev, reason="no_paid_row_to_read"))
     if verdict == "mixed":
         return _res("unconfirmed", dict(ev, reason="rollback_bills_mixed"))
     if verdict == "refuted" and a["not_yet_delinquent_due"]:
         ev["note"] = "only the current levy is unpaid; it is not delinquent yet"
+    if verdict == "stale":
+        late_dec = any(c.get("paid_late") for c in checks)
+        claimed_late = any(c.get("paid_late") and c["year"] in claimed for c in checks)
+        ev["current_claim_basis"] = ("claimed_year_paid_late" if claimed_late
+                                     else "latest_year_paid_late" if late_dec
+                                     else "paid_late_after_first_seen")
+    elif verdict == "refuted":
+        ev["current_claim_basis"] = ("claimed_years_on_time" if any(c["year"] in claimed for c in checks)
+                                     else "latest_year_on_time")
     return _res(verdict, ev)
 
 
@@ -725,8 +795,8 @@ async def _bind(row: dict, client, county: str, sub: str, a: dict, today: date, 
     mine = [r for r in g["rows"] if tc.address_relation(addr, r.get("address")) == "match"]
     ev["address_matches"] = len(mine)
     if not mine:
-        if rel == "conflict":
-            return "unconfirmed", "address_parcel_mismatch"
+        if rel == "conflict":              # the portal names another address for the account and
+            return "unconfirmed", "address_not_found"   # no account carries the row's (v3)
         ev["address_binding"] = "unverified"
         return "ok", None
     notices = {tc.alnum(r["notice"]) for r in rows}
@@ -737,4 +807,18 @@ async def _bind(row: dict, client, county: str, sub: str, a: dict, today: date, 
         return "unconfirmed", "page_capped"
     a2 = assess(mine, today)
     a2["role"] = "address"
+    # v3: the address's account is not the row's own account. When the portal names a REAL other
+    # address for the row's account, the address account decides only with proof the row's account
+    # is wrong (tc.account_choice); otherwise the verifier cannot tell which is right
+    if tc.needs_proof(addr, [r.get("address") for r in rows]):
+        owner_addr = tc.owner_category(row.get("owner_name"), [r.get("owner") for r in mine])
+        choice, why = tc.account_choice(
+            own_retired=False, resolved=a.get("role") == "board" and tc.parcel_resolved(row),
+            own_owner=ev.get("owner_match"), address_owner=owner_addr)
+        if choice == "ambiguous":
+            ev["address_owner_match"] = owner_addr
+            return "unconfirmed", why
+        ev["followed_because"] = why
+    else:
+        ev["followed_because"] = "account_names_no_usable_address"
     return "follow", a2

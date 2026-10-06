@@ -151,10 +151,18 @@ def test_refuted_orange_paid_before_interest():
     res = run(row, f)
     assert res.verdict == "refuted"
     checks = res.evidence["bills_checked"]
-    assert [c["year"] for c in checks] == [2024, 2025]
-    assert all(c["paid_late"] is False and c["paid_on"] < c["interest_begin"] for c in checks)
+    decision = checks[:2]                            # the claimed 2024 bill, then the latest 2025
+    assert [c["year"] for c in decision] == [2024, 2025]
+    assert all(c["paid_late"] is False and c["paid_on"] < c["interest_begin"] for c in decision)
     assert res.evidence["note"].startswith("only the current levy")
-    assert len(f.asked) == 3                         # one search, two bill pages
+    # v3: the bill history (levy 2019 on) is read too; the fixture holds no page for the older
+    # bills, so those reads fail and the chronic claim is `unknown`, never refuted
+    assert [c["year"] for c in checks[2:]] == sorted((c["year"] for c in checks[2:]), reverse=True)
+    assert all("error" in c for c in checks[2:]) and len(checks) > 2
+    assert res.evidence["history_complete"] is False and res.evidence["chronic_claim"] == "unknown"
+    assert res.evidence["late_levy_years"] == []
+    assert "tax_lien_chronic" not in p.governs_for(res.to_dict())
+    assert len(f.asked) == 1 + len(checks)           # one search, one bill page per bill read
 
 
 def test_other_lien_listing_is_never_suppressed():
