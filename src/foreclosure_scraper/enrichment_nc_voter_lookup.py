@@ -54,7 +54,7 @@ in this project).
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 import httpx
 
@@ -247,6 +247,76 @@ async def nc_voter_lookup(
                 if r4.status_code == 200:
                     out["most_recent_vote"] = _most_recent_vote(r4.text)
 
+            return out
+    except Exception as e:  # noqa: BLE001
+        out["error"] = f"{type(e).__name__}: {e}"[:300]
+        return out
+
+
+async def nc_voter_search(
+    first_name: str,
+    last_name: str,
+    county: str = "ALL",
+    *,
+    include_registered: bool = True,
+    include_removed: bool = False,
+    timeout: float = 20.0,
+    pace: Callable[[], Awaitable[Any]] | None = None,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> dict[str, Any]:
+    """The raw search (steps 1-3 above): {"ok", "error", "total", "rows"}, never raises.
+
+    `rows` are NCSBE's result rows as served ({FullName "LAST, FIRST MIDDLE", StatusDesc,
+    StatusLbl, CountyName, ResAddressCSZ, VoterRegNum, NCID, ...}); the caller decides what, if
+    anything, to keep. `include_removed` adds the "Removed or Denied" records (REMOVED/DENIED,
+    served with an empty ResAddressCSZ); both flags may be set in one search (live-checked
+    2026-10-06: 23 registered + 24 removed = 47 for one name). A fresh client per call, for
+    the sticky-session reason in the module docstring. `pace` is awaited before each of the
+    three requests (a caller's per-host spacing); `transport` lets a test replay recorded
+    responses (httpx.MockTransport)."""
+    county_id = NC_COUNTY_IDS.get((county or "ALL").strip().upper(), "0")
+    out: dict[str, Any] = {"ok": False, "error": None, "total": 0, "rows": []}
+
+    async def _step() -> None:
+        if pace is not None:
+            await pace()
+
+    try:
+        async with httpx.AsyncClient(
+            headers={"User-Agent": _UA}, follow_redirects=True, timeout=timeout,
+            transport=transport,
+        ) as c:
+            await _step()
+            r1 = await c.get(FORM_PAGE_URL)
+            r1.raise_for_status()
+            m = _TOKEN_RE.search(r1.text)
+            if not m:
+                out["error"] = "antiforgery token not found on form page"
+                return out
+            body = {
+                "VoterSearchEntryId": "",
+                "VoterSearchFilter.FirstName": first_name,
+                "VoterSearchFilter.MiddleInitial": "",
+                "VoterSearchFilter.LastName": last_name,
+                "VoterSearchFilter.BirthYear": "",
+                "VoterSearchFilter.SelectedCountyId": county_id,
+                "VoterSearchFilter.IsRegistered": "true" if include_registered else "false",
+                "VoterSearchFilter.IsRemovedOrDenied": "true" if include_removed else "false",
+                "__RequestVerificationToken": m.group(1),
+            }
+            await _step()
+            r2 = await c.post(SEARCH_URL, data=body)
+            r2.raise_for_status()
+            await _step()
+            r3 = await c.get(
+                RESULTS_URL,
+                params={"handler": "LoadResults", "sort": "", "group": "", "filter": ""},
+            )
+            r3.raise_for_status()
+            data = r3.json()
+            out["rows"] = list(data.get("Data") or [])
+            out["total"] = int(data.get("Total") or 0)
+            out["ok"] = True
             return out
     except Exception as e:  # noqa: BLE001
         out["error"] = f"{type(e).__name__}: {e}"[:300]
