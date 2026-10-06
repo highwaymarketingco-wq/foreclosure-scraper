@@ -17,11 +17,10 @@ only; this one asks the source. Same free API the scraper and the enricher use:
 WHY THE ENTRIES AND NOT dateTerminated. CourtListener fills dateTerminated only when someone pulls
 the docket from PACER; the bankruptcy courts' RSS feeds add entries but not that date. Measured
 2026-10-06: the RECAP index held 3 ncwb cases filed in 2026 with a dateTerminated, out of
-thousands. So the outcome is read from the entries. 26-10161 (Bryan Christopher Tallant, the
-Buncombe row at 539 Deaverview Rd the board scored as an open Chapter 13) has date_terminated
-null and entry 25 "Dismissal" on 2026-09-21. 15-31086 (Conrad, a board "long-open" match filed
-2015) has date_terminated null, "Discharge" on 2022-05-25 and "Final Decree/Case Closed" on
-2022-09-15.
+thousands. So the outcome is read from the entries. Two live examples: a Buncombe Chapter 13 the
+board scored as an open stay has date_terminated null and an entry "Dismissal" (2026-09-21); a
+2015 Chapter 13 the board carries as "long-open" has date_terminated null, "Discharge"
+(2022-05-25) and "Final Decree/Case Closed" (2022-09-15).
 
 THE MATCH IS PRODUCTION'S (enrichment_bankruptcy.py since e78fc0ae, 2026-10-02):
 `name_normalize.debtor_positional_match` (a debtor segment of the case name, split on a bare
@@ -35,7 +34,7 @@ for a listing-type bankruptcy row (a scraped filing the pipeline tied to a parce
 the parcel's owner of record from the county data on the row, never its owner_name when that is
 only the debtor's name copied (see board_names: 188 of 393 such rows, and the snapped parcel of
 many belongs to someone else, recorded by enrich_court_owner_verify in raw.owner_mismatch). Each
-co-owner of a joint owner string is checked separately ("LAW BRANDON PETER;LAW BRITTANY LENORA").
+co-owner of a joint owner string is checked separately ("SMITH JOHN A;SMITH MARY B").
 
 VERDICTS (core.py's meanings):
   confirmed    the case exists; a board owner name matches a debtor positionally with no middle
@@ -48,9 +47,9 @@ VERDICTS (core.py's meanings):
   refuted      the debtor is a different person (a proven middle conflict, or no debtor in the
                case lines up with any board owner name), or the case does not exist.
   unconfirmed  cannot decide: no person name (no owner of record) on the board to compare; two
-               board names disagree (one matches, another names someone else); an ALL-CAPS owner that matches only
-               when read FIRST MIDDLE LAST (owner_last_first_middle reads ALL-CAPS surname-first,
-               "KIMBERLY A GOODALL"); a match whose court is in another state (the one place a
+               board names disagree (one matches, another names someone else); an ALL-CAPS owner
+               that matches only when read FIRST MIDDLE LAST (owner_last_first_middle reads
+               ALL-CAPS surname-first, "MARY A SMITH"); a match whose court is in another state (the one place a
                first+last match is not enough: production rejects it, nothing here says it is a
                different person); no docket entries, or none in ACTIVE_DAYS, so the status
                cannot be read; an API failure.
@@ -60,9 +59,21 @@ distress_score._collect and the lead-signal facet, and the `bankruptcy` listing 
 stay (`bankruptcy_stay`: the facet, and distress_score's F3 WARM cap via _stay_block). Both
 follow the scorer's own reading of a lapsed bankruptcy: a case that is over is no signal and no
 stay. A stale verdict on a stayed foreclosure is the useful one: the sale can resume.
+
+WHAT IS PUBLISHED (the ledger is pushed to a PUBLIC repo, and the VM attaches it to the board):
+public_evidence() is a whitelist every answer goes through, the decision basis only, no person
+names. A refuted verdict means the debtor is someone else: naming them, or their docket, next to
+a property they have nothing to do with would create a false association, so a refuted record
+says only how it was decided (and, for a middle conflict, the two middle INITIALS). confirmed
+and stale (the case IS this owner's, as the board's raw.bankruptcy already says) add the court,
+docket number and id, chapter, filing date, the terminal event's kind and date, last activity
+and the dates of relief-from-stay entries. unconfirmed adds its reason and the status fields.
+ROW_SUMMARY_EXCLUDE keeps owner_name out of the ledger's row summary; migrate_ledger() rewrites
+a stored ledger to this shape offline.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 from datetime import date, timedelta
@@ -80,6 +91,7 @@ TTL_DAYS = 30          # refuted/stale (the verdicts that change the score) are 
 RETRY_DAYS = 7
 SOURCE = "courtlistener.com"
 GOVERNS = ("bankruptcy", "bankruptcy_stay")
+ROW_SUMMARY_EXCLUDE = ("owner_name",)   # the ledger is public; see WHAT IS PUBLISHED
 
 SITE = "https://www.courtlistener.com"
 API = SITE + "/api/rest/v4"
@@ -233,8 +245,8 @@ def judge_identity(row: dict, claim: dict, debtors: list[str]) -> dict:
     'field', 'person', 'per_field'}. Within one field the best co-owner counts (a joint owner
     string names several people). Across fields, a match beside a field naming someone else
     (a conflict, or a person who does not line up at all) is a disagreement, not a match: the
-    first live sweep met defendant 'Cheryl Delaine Overcash' (the debtor) on a parcel whose
-    owner_name is 'OVERCASH RODNEY A;OVERCASH FRANCINE M'."""
+    first live sweep met a defendant who is the debtor on a parcel whose owner_name names two
+    other people of the same family."""
     per_field: dict[str, dict] = {}
     for field, name in board_names(row, claim):
         persons = persons_of(name)
@@ -437,7 +449,7 @@ async def find_case(client, claim: dict) -> tuple[Optional[dict], dict]:
             if res:
                 return _hit_of(res[0]), look
         except Exception as exc:  # noqa: BLE001
-            errors.append(f"{type(exc).__name__}: {str(exc)[:120]}")
+            errors.append(type(exc).__name__)       # no message: it carries the URL
     if court and dn:
         url = SEARCH_BY_NUMBER.format(court=quote(court), dn=quote(dn))
         look["asked"].append(url)
@@ -452,7 +464,7 @@ async def find_case(client, claim: dict) -> tuple[Optional[dict], dict]:
                     return None, look
                 return _hit_of((same or res)[0]), look
         except Exception as exc:  # noqa: BLE001
-            errors.append(f"{type(exc).__name__}: {str(exc)[:120]}")
+            errors.append(type(exc).__name__)       # no message: it carries the URL
     if did:
         url = DOCKET_URL.format(id=did)
         look["asked"].append(url)
@@ -462,7 +474,7 @@ async def find_case(client, claim: dict) -> tuple[Optional[dict], dict]:
             if _status_code(exc) == 404:
                 look["not_found"] = True
                 return None, look
-            errors.append(f"{type(exc).__name__}: {str(exc)[:120]}")
+            errors.append(type(exc).__name__)       # no message: it carries the URL
     if errors:
         look["error"] = "; ".join(errors)
         return None, look
@@ -474,11 +486,101 @@ async def find_case(client, claim: dict) -> tuple[Optional[dict], dict]:
 
 
 # ---------------------------------------------------------------------------
+# what is published (pure)
+# ---------------------------------------------------------------------------
+
+_SUFFIXES = {"JR", "SR", "II", "III", "IV", "V"}
+
+
+def middle_initials(person: Optional[str], debtor: str) -> tuple[Optional[str], list[str]]:
+    """(the board person's middle initial, the middle initials of the debtors whose first and
+    last name line up with that person): the evidence behind a middle verdict, initials only."""
+    from ...name_normalize import owner_last_first_middle
+    parts = owner_last_first_middle(person) if person else None
+    if not parts:
+        return None, []
+    last, first, mid = parts
+    out = []
+    for side in re.split(r"\s+and\s+", str(debtor or ""), flags=re.I):
+        toks = [t for t in re.sub(r"[^A-Za-z ]", " ", side).upper().split() if t not in _SUFFIXES]
+        if len(toks) > 2 and toks[-1] == last and toks[0] == first:
+            out.append(toks[1][0])
+    return (mid or None), sorted(set(out))
+
+
+_PUBLIC_COMMON = ("decided_by", "reason", "owner_match", "match_field", "compared_fields",
+                  "claimed_from", "court", "court_state")
+_PUBLIC_CASE = ("docket_number", "docket_id", "chapter", "date_filed", "date_terminated")
+_PUBLIC_STATUS = ("status", "last_activity", "entries_seen")
+
+
+def public_evidence(verdict: str, ev: dict) -> dict:
+    """The evidence a verdict may publish (WHAT IS PUBLISHED in the module docstring): a
+    whitelist, so nothing new leaks by being added to the working dict. Idempotent, so
+    migrate_ledger() can run it over entries already stored in either shape."""
+    ev = dict(ev or {})
+    m = ev.get("match") if isinstance(ev.get("match"), dict) else {}
+    if m:
+        ev.setdefault("match_field", m.get("field"))
+        ev.setdefault("compared_fields", sorted((m.get("per_field") or {}).keys()))
+    claimed = ev.get("claimed") if isinstance(ev.get("claimed"), dict) else {}
+    if claimed.get("from"):
+        ev.setdefault("claimed_from", claimed["from"])
+    out = {k: ev.get(k) for k in _PUBLIC_COMMON}
+    if verdict in ("confirmed", "stale"):
+        out.update({k: ev.get(k) for k in _PUBLIC_CASE + _PUBLIC_STATUS})
+        out["owner_middle_initial"] = ev.get("owner_middle_initial")
+        out["debtor_middle_initials"] = ev.get("debtor_middle_initials")
+        relief = ev.get("relief_from_stay_entries") or ev.get("relief_from_stay_dates") or []
+        out["relief_from_stay_dates"] = [r.get("date") if isinstance(r, dict) else r for r in relief]
+        conv = ev.get("converted")
+        out["converted_on"] = conv.get("date") if isinstance(conv, dict) else ev.get("converted_on")
+        rein = ev.get("reinstated")
+        out["reinstated_on"] = rein.get("date") if isinstance(rein, dict) else ev.get("reinstated_on")
+        evt = ev.get("event")
+        if isinstance(evt, dict):
+            out["event"] = {k: evt.get(k) for k in ("kind", "date", "entry_number") if evt.get(k)}
+        term = ev.get("terminal_entries") or ev.get("terminal_events") or []
+        out["terminal_events"] = [{"kind": t.get("kind"), "date": t.get("date")}
+                                  for t in term if isinstance(t, dict)]
+    elif verdict == "refuted":
+        out["debtor_count"] = ev.get("debtor_count")
+        if ev.get("decided_by") == "middle_conflict":
+            out["owner_middle_initial"] = ev.get("owner_middle_initial")
+            out["debtor_middle_initials"] = ev.get("debtor_middle_initials")
+    else:
+        out.update({k: ev.get(k) for k in _PUBLIC_STATUS})
+        err = ev.get("error")
+        if err:
+            out["error"] = str(err).split(":", 1)[0][:60]      # the exception type, no URL
+    return {k: v for k, v in out.items() if v not in (None, "", [], {})}
+
+
+def migrate_ledger(led: Any) -> int:
+    """Rewrite a loaded bankruptcy_stay Ledger in place to the published shape: every entry's
+    latest.evidence through public_evidence(), ROW_SUMMARY_EXCLUDE dropped from its row summary.
+    No fetch; verdicts and stamps unchanged (history entries carry stamps only). Returns the
+    number of entries changed."""
+    changed = 0
+    for e in led.rows.values():
+        before = json.dumps(e, sort_keys=True, default=str)
+        lat = e.get("latest")
+        if isinstance(lat, dict) and isinstance(lat.get("evidence"), dict):
+            lat["evidence"] = public_evidence(str(lat.get("verdict")), lat["evidence"])
+        if isinstance(e.get("row"), dict):
+            for f in ROW_SUMMARY_EXCLUDE:
+                e["row"].pop(f, None)
+        changed += json.dumps(e, sort_keys=True, default=str) != before
+    return changed
+
+
+# ---------------------------------------------------------------------------
 # verify
 # ---------------------------------------------------------------------------
 
 def _res(verdict: str, evidence: dict) -> VerificationResult:
-    return result(SIGNAL, verdict, evidence, source=SOURCE, version=VERSION, verifier=_NAME)
+    return result(SIGNAL, verdict, public_evidence(verdict, evidence), source=SOURCE,
+                  version=VERSION, verifier=_NAME)
 
 
 async def verify(row: dict, client, *, today: Optional[date] = None) -> VerificationResult:
@@ -521,6 +623,8 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
 
     ident = judge_identity(row, claim, [hit["case_name"]])
     ev["owner_match"] = ident["verdict"]
+    ev["debtor_count"] = len([s for s in re.split(r"\s+and\s+", hit["case_name"], flags=re.I) if s.strip()])
+    ev["owner_middle_initial"], ev["debtor_middle_initials"] = middle_initials(ident["person"], hit["case_name"])
     ev["match"] = {"rule": "name_normalize.debtor_positional_match + debtor_middle_verdict",
                    "field": ident["field"], "person": ident["person"],
                    "per_field": ident["per_field"]}
