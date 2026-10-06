@@ -25,9 +25,16 @@ from .models import Listing
 log = structlog.get_logger()
 
 
+# The suffix must be a WHOLE word (fixed 2026-10-06). Without the word boundaries the greedy
+# body ran to the last "st"/"dr"/"ct" inside any word, so notice text became a street address:
+# "120 Having qualified as Executor of the Est(ate ...)" and "500 THE UNDERSIGNED having
+# qualified as Executor for the est(ate)" on Column probate notices, "2026 Tax Sale Li(st)" on
+# 397 Florence tax-sale rows. Every notice of one county then carried the same "address" with
+# the same house number, and dedupe() (even with the 2026-10-06 identity rule) merged them: 76
+# different Cabarrus decedents in one row, 121 in Johnston, on a replay of the 10/5 board.
 ADDR_RE = re.compile(
-    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
-    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    r"(\b\d+\s+[A-Z][\w .'\-]*?\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
+    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\b\.?)",
     re.I,
 )
 
