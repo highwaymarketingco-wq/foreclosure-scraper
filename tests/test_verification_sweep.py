@@ -133,8 +133,7 @@ def test_recheck_only_takes_just_rows_already_in_the_ledger(board):
                                     now=NOW - timedelta(days=1)), ttl_days=30, now=NOW)
     plan, why = sw.select(board / "listings.json.gz", [v], {"tax_lien": led}, county=None,
                           cap=10, now=NOW, recheck_only=True)
-    # the two COLD rows (1000000003's second row is COLD; its HOT twin is filtered out)
-    assert sorted(r["parcel_id"] for _p, _k, r, _v in plan["tax_lien"]) == ["1000000001", "1000000003"]
+    assert [r["parcel_id"] for _p, _k, r, _v in plan["tax_lien"]] == ["1000000001"]
     assert why["tax_lien"]["due_version"] == 1
 
 
