@@ -109,6 +109,53 @@ def _provably_different_property(a: Listing, b: Listing) -> bool:
     return bool(ha and hb and ha != hb)
 
 
+def is_aged(li) -> bool:
+    """A carried-forward row the run AGED: merge_prior_board() (or enrich_with_pulled_sales())
+    kept it because the scrape did NOT see it, and tagged raw['pulled_sale']. Every other row in
+    the run's list (fresh, matched, or created by an enricher) was seen this run."""
+    raw = getattr(li, "raw", None)
+    return isinstance(raw, dict) and bool(raw.get("pulled_sale"))
+
+
+def drop_withdrawn_tags(merged: Listing, *, keep_stale_case: bool = False) -> None:
+    """A row this run saw cannot be presumed withdrawn. After a live row absorbed aged copies,
+    drop what Listing.merge() carried over from them: the pulled_sale miss counter, the
+    'presumed_withdrawn' status _age() wrote, and board_quality's derived raw['stale_case'] flag
+    (kept only when the live row carried it itself). merge_prior_board() clears the first two
+    on a matched row the same way."""
+    raw = merged.raw if isinstance(merged.raw, dict) else {}
+    if raw.pop("pulled_sale", None) is not None and merged.auction_status == "presumed_withdrawn":
+        merged.auction_status = None
+    if not keep_stale_case:
+        raw.pop("stale_case", None)
+    merged.raw = raw
+
+
+def merge_rows(a: Listing, b: Listing) -> Listing:
+    """``a.merge(b)``, except across a live row and an aged one (is_aged()): the LIVE row is the
+    base and the result is not presumed withdrawn (drop_withdrawn_tags()). That is exactly
+    merge_prior_board()'s fresh.merge(prior): the live row's top-level fields win and the aged
+    copy backfills the empty ones; inside raw, Listing.merge() lets the aged copy win leaf
+    collisions (how prior enrichment is carried), and the tags are then dropped.
+
+    Why (2026-10-05). main.run()'s second dedupe() runs over merge_prior_board()'s output, which
+    holds this run's rows AND the prior rows it aged, and since the 2026-10-04 streaming rewrite
+    the aged rows come FIRST. Every pass of dedupe() keeps the earlier row as the merge base, so a
+    live row that met an aged row there took the aged row's parcel, address, owner, source and
+    status, and Listing.merge()'s raw deep-merge carried raw['pulled_sale'] onto it in either
+    order. board_quality then demoted a lead the run had just scraped. merge_prior_board() itself
+    merges fresh-first and clears the tag; this keeps dedupe() to the same rule. Two live rows,
+    or two aged rows, merge exactly as before."""
+    a_aged, b_aged = is_aged(a), is_aged(b)
+    if a_aged == b_aged:
+        return a.merge(b)
+    live, aged = (b, a) if a_aged else (a, b)
+    out = live.merge(aged)
+    live_raw = live.raw if isinstance(live.raw, dict) else {}
+    drop_withdrawn_tags(out, keep_stale_case=bool(live_raw.get("stale_case")))
+    return out
+
+
 def addresses_per_dedupe_key(listings) -> dict[str, set]:
     """dedupe_key() -> the set of distinct normalized street addresses that key covers.
 
@@ -150,6 +197,10 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     1. Bucket by primary dedupe_key (parcel/address/case)
     2. Within each bucket, merge using Listing.merge
     3. Cross-bucket fuzzy address match for stragglers
+
+    Every merge goes through merge_rows(): when a live row meets a row the run aged (raw
+    ['pulled_sale']), the live row is the base and the result is not presumed withdrawn,
+    whatever order the two arrived in. Which rows match is unchanged.
     """
     if not listings:
         return []
@@ -176,7 +227,7 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
                 _blocked_p1 += 1
                 buckets[f"{k}#hn{_house_no_of(li.street_address)}"] = li
             else:
-                buckets[k] = buckets[k].merge(li)
+                buckets[k] = merge_rows(buckets[k], li)
         else:
             buckets[k] = li
 
@@ -268,7 +319,7 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
                 if _provably_different_property(a, b):
                     _blocked_p2 += 1
                     continue
-                a = a.merge(b)
+                a = merge_rows(a, b)
                 consumed.add(j)
         final.append(a)
 
@@ -318,7 +369,7 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     for idxs in groups.values():
         m = final[idxs[0]]
         for j in idxs[1:]:
-            m = m.merge(final[j])
+            m = merge_rows(m, final[j])
         out.append(m)
         if len(idxs) >= 5:
             addrs = {_norm_addr(final[j].street_address) for j in idxs}

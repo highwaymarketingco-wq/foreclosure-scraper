@@ -51,7 +51,9 @@ WHO USES IT
       strict match was refused by the house-number guard (future runs).
     * scripts/resume_from_checkpoint.py --collapse-dry-run / RESUME_COLLAPSE_PLACEHOLDER_TWINS:
       a one-off, opt-in collapse of the twins already in the 10/5 run's pre_publish checkpoint,
-      planned here by plan_collapse() and applied by apply_collapse().
+      planned here by plan_collapse() and applied by apply_collapse(). With --seen-since /
+      RESUME_SEEN_SINCE the same plan, digest and apply also remove the presumed-withdrawn tag
+      that dedupe2 put on rows this run saw (repair_reseen(); see the block comment there).
 
 The merge itself is always Listing.merge() with the re-scraped (fresh) row as the base, so fresh
 wins on conflicting fields and the old row backfills missing ones; fold() then keeps the old
@@ -60,13 +62,15 @@ already publishing.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
 from typing import Any, Callable, Iterable, Optional
 
-from .dedupe import _house_no_of
+from .dedupe import _house_no_of, drop_withdrawn_tags
 from .models import Listing, _UNIT_RE, _normalize_parcel
 from .validation import _PARCEL_BAD_PATTERNS
 from .web_artifact import _PLACEHOLDER_HOUSE_NUM_RE
@@ -175,14 +179,11 @@ def fold(base: Listing, other: Listing) -> Listing:
     return merged
 
 
-def clear_reappeared(li: Listing) -> None:
-    """The live row absorbed an aging copy: drop the copy's pulled_sale miss counter and its
-    presumed_withdrawn tag (Listing.merge() backfills both onto the live row). Same clean-up
-    merge_prior_board() applies to a matched row."""
-    raw = li.raw if isinstance(li.raw, dict) else {}
-    if raw.pop("pulled_sale", None) is not None and li.auction_status == "presumed_withdrawn":
-        li.auction_status = None
-    li.raw = raw
+def clear_reappeared(li: Listing, *, keep_stale_case: bool = False) -> None:
+    """The live row absorbed an aging copy: drop the copy's pulled_sale miss counter, its
+    presumed_withdrawn tag and its raw['stale_case'] flag (Listing.merge() backfills all three
+    onto the live row); dedupe.drop_withdrawn_tags(), the rule dedupe() applies too."""
+    drop_withdrawn_tags(li, keep_stale_case=keep_stale_case)
 
 
 # ------------------------------------------------------------------- full-board cleanup plan
@@ -218,20 +219,133 @@ def _stamp(v: Any) -> str:
         return str(v)
 
 
-def _view(idx: int, row: Any, key: str) -> _View:
+def _view_fields(row: Any) -> dict:
     if isinstance(row, dict):
-        d = {k: row.get(k) for k in _VIEW_FIELDS}
-    else:
-        # The SAME serialization checkpoint.save() wrote, so a plan made by streaming the
-        # checkpoint file and a plan made from the loaded Listings compare equal.
-        d = row.model_dump(mode="json", include=set(_VIEW_FIELDS))
+        return {k: row.get(k) for k in _VIEW_FIELDS}
+    # The SAME serialization checkpoint.save() wrote, so a plan made by streaming the
+    # checkpoint file and a plan made from the loaded Listings compare equal.
+    return row.model_dump(mode="json", include=set(_VIEW_FIELDS))
+
+
+def _view(idx: int, row: Any, key: str, revived: frozenset = frozenset()) -> _View:
+    d = _view_fields(row)
     raw = _raw(row)
     addr = d.get("street_address")
     return _View(idx=idx, key=key, source=str(d.get("source") or ""), street_address=addr,
                  first_seen=_stamp(d.get("first_seen")), last_seen=_stamp(d.get("last_seen")),
-                 live=not raw.get("pulled_sale"), real_hn=real_house_no(addr),
+                 live=not raw.get("pulled_sale") or idx in revived, real_hn=real_house_no(addr),
                  unit=has_unit(addr), resolver=resolver_parcel(raw),
                  sources=sources_of(d.get("source"), raw))
+
+
+# --------------------------------------------- rows the run saw that dedupe2 left "withdrawn"
+# THE DEFECT (2026-10-05). main.run()'s second dedupe() ran over merge_prior_board()'s output,
+# aged prior-only rows first, so a live row that met an aged one there was folded INTO it:
+# Listing.merge() kept the aged row's top-level fields and backfilled raw['pulled_sale'] and
+# the 'presumed_withdrawn' status, and board_quality then flagged raw['stale_case'] and moved a
+# HOT stack to WARM. dedupe.merge_rows() fixes future runs. These rows are still in the 10/5
+# pre_publish checkpoint, and the only trace of the live row is last_seen: Listing.merge()
+# keeps the LATEST last_seen, and a row created this run has last_seen >= the run's start,
+# while every row the run aged kept the last_seen the prior board gave it (all older).
+#
+# WHAT THE ROWS ARE (real four-source replay, 23 such rows). Every one joined two DIFFERENT
+# parcels, and every one shows the aged row's parcel, address and owner. Every one of those
+# shown parcels WAS in this run's scrape: the first dedupe() had fused its fresh record into a
+# neighbour's (its fuzzy pass matches a numberless street, "LOOKOUT RD", to a numbered one,
+# "328 LOOKOUT RD"; the house-number guard needs two numbers), so merge_prior_board() found no
+# fresh row to match the prior copy and aged it, and dedupe2 matched the two again. So the tag
+# is wrong on all 23. A row whose shown property really left the source and that dedupe2 fused
+# into a live neighbour would lose a correct tag; none of the 23 was one.
+#
+# WHAT THE REPAIR DOES AND CANNOT DO. It removes the tag and its effects (pulled_sale, the
+# status, stale_case, a HOT->WARM down-rank whose reason is the tag, the intent cap), the same
+# result the tail would have produced without the tag. It cannot restore the live row's own
+# top-level values: the merge kept only the aged row's, the checkpoint holds no other copy, and
+# every enricher after dedupe2 ran on the merged row.
+
+
+def parse_stamp(v: Any) -> Optional[datetime]:
+    """A naive-UTC datetime from a datetime or an ISO string; None for anything else."""
+    if isinstance(v, str) and v:
+        s = v[:-1] + "+00:00" if v.endswith("Z") else v
+        try:
+            v = datetime.fromisoformat(s)
+        except ValueError:
+            return None
+    if not isinstance(v, datetime):
+        return None
+    return v.astimezone(timezone.utc).replace(tzinfo=None) if v.tzinfo else v
+
+
+def _hot_demoted_by_tag(raw: dict) -> bool:
+    from .enrichment_board_quality import WITHDRAWN_TAG_REASONS
+    ds = raw.get("distress_stack")
+    return (isinstance(ds, dict) and bool(ds.get("downranked_stale"))
+            and ds.get("downranked_reason") in WITHDRAWN_TAG_REASONS)
+
+
+@dataclass
+class _Reseen:
+    idx: int
+    source: str
+    street_address: Optional[str]
+    first_seen: str
+    last_seen: str
+    parcel_id: Optional[str] = None
+    aged_source: Optional[str] = None
+    status: Optional[str] = None
+    hot_demoted: bool = False
+    also_seen_in: tuple = ()
+
+    def ident(self) -> list:
+        return [self.source, self.street_address, self.first_seen, self.last_seen]
+
+    def sample(self) -> dict:
+        return {"row": self.ident(), "parcel_id": self.parcel_id, "aged_copy_source":
+                self.aged_source, "also_seen_in": list(self.also_seen_in), "status": self.status,
+                "hot_demoted": self.hot_demoted}
+
+
+def _reseen_view(idx: int, row: Any) -> _Reseen:
+    d = _view_fields(row)
+    raw = _raw(row)
+    ps = raw.get("pulled_sale")
+    return _Reseen(idx=idx, source=str(d.get("source") or ""), street_address=d.get("street_address"),
+                   first_seen=_stamp(d.get("first_seen")), last_seen=_stamp(d.get("last_seen")),
+                   parcel_id=_get(row, "parcel_id"), status=_get(row, "auction_status"),
+                   aged_source=ps.get("last_seen_source") if isinstance(ps, dict) else None,
+                   hot_demoted=_hot_demoted_by_tag(raw),
+                   also_seen_in=tuple(sorted(sources_of(None, raw))))
+
+
+def repair_reseen(listings: list[Listing], today: Optional[date] = None) -> dict:
+    """Remove the withdrawn tag from rows this run saw (see the block comment above), and redo,
+    for these rows only and in the tail's order, the steps that read it: the intent score
+    (enrichment_lead_signals, which runs before board quality) and board quality's stale check
+    (a sale date that is past can still down-rank the row; the tag no longer can)."""
+    from .enrichment_board_quality import downrank_if_stale
+    from .enrichment_lead_signals import enrich_lead_signals
+
+    today = today or date.today()
+    stats: Counter = Counter()
+    for li in listings:
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        stats["status_cleared"] += li.auction_status == "presumed_withdrawn"
+        stats["stale_case_cleared"] += bool(raw.get("stale_case"))
+        drop_withdrawn_tags(li)
+        if _hot_demoted_by_tag(li.raw):
+            ds = copy.deepcopy(li.raw["distress_stack"])
+            ds["tier"] = "HOT"
+            ds.pop("downranked_stale", None)
+            ds.pop("downranked_reason", None)
+            li.raw["distress_stack"] = ds
+            stats["hot_restored"] += 1
+    if listings:
+        enrich_lead_signals(listings)
+    for li in listings:
+        downrank_if_stale(li, li.raw, today, stats)
+    stats["rows"] = len(listings)
+    return dict(stats)
 
 
 @dataclass
@@ -239,6 +353,10 @@ class CollapsePlan:
     rows_scanned: int = 0
     groups: list = field(default_factory=list)   # [{"key", "keep": _View, "drop": [_View]}]
     skipped: Counter = field(default_factory=Counter)
+    #: ISO run start when the reseen repair is part of the plan (plan_collapse(seen_since=...))
+    seen_since: Optional[str] = None
+    reseen: list = field(default_factory=list)          # [_Reseen] to repair
+    evidence: dict = field(default_factory=dict)
 
     @property
     def rows_dropped(self) -> int:
@@ -249,12 +367,19 @@ class CollapsePlan:
 
     def digest(self) -> str:
         """sha256 prefix over every group's identity (parcel key + each member's source,
-        street_address, first_seen, last_seen) -- independent of row positions, so the dry run
-        over the checkpoint FILE and the apply over the loaded Listings agree."""
+        street_address, first_seen, last_seen) and, when the reseen repair is on, its run start
+        and each repaired row's identity -- independent of row positions, so the dry run over the
+        checkpoint FILE and the apply over the loaded Listings agree. Without the reseen part
+        it is the same digest the twins-only plan always had."""
+        # Members are ordered by their JSON text: an ident can hold None (a row with no street
+        # address), and None does not compare with a string.
+        def members(views):
+            return sorted((v.ident() for v in views), key=lambda i: json.dumps(i, default=str))
         items = sorted(
-            json.dumps([g["key"], g["keep"].ident(), sorted(v.ident() for v in g["drop"])],
-                       default=str)
+            json.dumps([g["key"], g["keep"].ident(), members(g["drop"])], default=str)
             for g in self.groups)
+        if self.seen_since is not None:
+            items.append(json.dumps(["reseen", self.seen_since, members(self.reseen)], default=str))
         return hashlib.sha256("\n".join(items).encode("utf-8")).hexdigest()[:16]
 
     def summary(self, sample: int = 10) -> dict:
@@ -273,33 +398,69 @@ class CollapsePlan:
                 "keep": g["keep"].ident(),
                 "drop": [v.ident() for v in g["drop"]],
             })
+        if self.seen_since is not None:
+            order = lambda v: (v.source, v.last_seen, v.idx)  # noqa: E731
+            out["reseen"] = {
+                "seen_since": self.seen_since,
+                "rows_repaired": len(self.reseen),
+                "by_source": dict(Counter(v.source for v in self.reseen).most_common()),
+                "status_presumed_withdrawn": sum(v.status == "presumed_withdrawn"
+                                                 for v in self.reseen),
+                "hot_demoted_by_tag": sum(v.hot_demoted for v in self.reseen),
+                "evidence": self.evidence,
+                "sample": [v.sample() for v in sorted(self.reseen, key=order)[:sample]],
+            }
         return out
 
 
-def plan_collapse(rows: Callable[[], Iterable[Any]]) -> CollapsePlan:
-    """Find the placeholder-twin groups in a WHOLE board (a checkpoint or the published board):
-    one LIVE row (re-scraped this run: no raw['pulled_sale']) with no real house number, plus the
-    aging prior-only copies of the same parcel from the same source that the merge left beside
-    it. Read-only.
+def plan_collapse(rows: Callable[[], Iterable[Any]], seen_since: Any = None) -> CollapsePlan:
+    """Plan the pre-publish clean-up of a WHOLE board (a checkpoint or the published board).
+    Read-only.
+
+    PLACEHOLDER TWINS: one LIVE row (re-scraped this run: no raw['pulled_sale']) with no real
+    house number, plus the aging prior-only copies of the same parcel from the same source that
+    the merge left beside it.
+
+    RESEEN ROWS (only when ``seen_since``, the run's start, is given): a row carrying
+    raw['pulled_sale'] whose last_seen is at or after ``seen_since`` absorbed a row created
+    this run (see the block comment above parse_stamp()) and is planned for repair_reseen().
+    A repaired row counts as live for the twin rule too.
 
     ``rows`` is called twice and must yield the same rows in the same order each time (dicts
-    or Listings): pass 1 keeps only the parcel keys of live placeholder rows, pass 2 keeps a
-    small view of only the rows under those keys. Memory is bounded by those candidates, never
-    by the board.
+    or Listings): pass 1 keeps only the parcel keys of live placeholder rows and a small view of
+    each reseen row, pass 2 keeps a small view of only the rows under those keys. Memory is
+    bounded by those candidates, never by the board.
 
-    A group is collapsed only when, under its parcel key: exactly one live placeholder row;
+    A twin group is collapsed only when, under its parcel key: exactly one live placeholder row;
     no other live row from a source it shares; at least one aging copy from a shared source
     with a real house number; at most ONE distinct real house number among ALL the key's rows
     (any source); no unit designator and no resolver-derived parcel on any member; and at most
     MAX_GROUP_ROWS members. Anything else is counted in ``skipped`` by reason and left alone.
     """
-    plan = CollapsePlan()
+    cut = parse_stamp(seen_since) if seen_since is not None else None
+    if seen_since is not None and cut is None:
+        raise ValueError(f"seen_since {seen_since!r} is not an ISO timestamp")
+    plan = CollapsePlan(seen_since=cut.isoformat() if cut is not None else None)
     seeds: dict[str, int] = {}
+    revived: set[int] = set()
+    below = above = None
+    carry_below = 0
     n = 0
     for n, row in enumerate(rows(), start=1):
         raw = _raw(row)
         if raw.get("pulled_sale"):
-            continue
+            if cut is None:
+                continue
+            ls = parse_stamp(_get(row, "last_seen"))
+            if ls is None or ls < cut:
+                if ls is not None and (below is None or ls > below):
+                    below = ls
+                carry_below += bool(raw.get("carryover"))
+                continue
+            if above is None or ls < above:
+                above = ls
+            plan.reseen.append(_reseen_view(n - 1, row))
+            revived.add(n - 1)
         addr = _get(row, "street_address")
         if real_house_no(addr) or has_unit(addr):
             continue
@@ -308,14 +469,21 @@ def plan_collapse(rows: Callable[[], Iterable[Any]]) -> CollapsePlan:
             continue
         seeds[k] = seeds.get(k, 0) + 1
     plan.rows_scanned = n
+    if cut is not None:
+        plan.evidence = {
+            "newest_tagged_last_seen_before_cutoff": below.isoformat() if below else None,
+            "oldest_tagged_last_seen_at_or_after_cutoff": above.isoformat() if above else None,
+            "tagged_carryover_rows_before_cutoff_not_judged": carry_below,
+        }
 
     if not seeds:
         return plan
+    frozen = frozenset(revived)
     groups: dict[str, list[_View]] = {}
     for idx, row in enumerate(rows()):
         k = parcel_key(_get(row, "state"), _get(row, "county"), _get(row, "parcel_id"))
         if k is not None and k in seeds:
-            groups.setdefault(k, []).append(_view(idx, row, k))
+            groups.setdefault(k, []).append(_view(idx, row, k, frozen))
     del seeds
 
     for k, views in groups.items():
@@ -355,11 +523,19 @@ class CollapsePlanMismatch(RuntimeError):
     """The rows a plan names are not the rows at those positions any more."""
 
 
-def apply_collapse(listings: list[Listing], plan: CollapsePlan) -> dict:
-    """Collapse ``plan``'s groups in ``listings`` IN PLACE: each group's live row absorbs its
-    aging copies via fold() (newest copy first), loses the copies' pulled_sale /
-    presumed_withdrawn tags, and the copies are removed. Every member is re-checked against the
-    plan's view of it first (CollapsePlanMismatch, nothing changed, if any differs)."""
+#: A twin group's live row keeps ITS OWN scored outputs from this run. Listing.merge() lets the
+#: absorbed copy win raw leaf collisions, and each aging copy was scored (and down-ranked for its
+#: tag) as a row of its own in the tail; nothing re-scores at publish.
+_KEEP_SCORED_RAW_KEYS = ("distress_stack", "signal_stack", "intent_score", "intent_band")
+
+
+def apply_collapse(listings: list[Listing], plan: CollapsePlan,
+                   today: Optional[date] = None) -> dict:
+    """Apply ``plan`` to ``listings`` IN PLACE. Every planned row is re-checked against the
+    plan's view of it first (CollapsePlanMismatch, nothing changed, if any differs). Then the
+    reseen rows are repaired (repair_reseen()), and each twin group's live row absorbs its aging
+    copies via fold() (newest copy first), loses the copies' withdrawn tags, keeps its own
+    scored outputs, and the copies are removed."""
     for g in plan.groups:
         for v in [g["keep"], *g["drop"]]:
             if v.idx >= len(listings):
@@ -367,21 +543,39 @@ def apply_collapse(listings: list[Listing], plan: CollapsePlan) -> dict:
             now = _view(v.idx, listings[v.idx], v.key)
             if now.ident() != v.ident() or now.key != v.key:
                 raise CollapsePlanMismatch(f"row {v.idx}: planned {v.ident()} found {now.ident()}")
+    cut = parse_stamp(plan.seen_since) if plan.seen_since is not None else None
+    for v in plan.reseen:
+        if v.idx >= len(listings):
+            raise CollapsePlanMismatch(f"row {v.idx} is past the end ({len(listings)} rows)")
+        li = listings[v.idx]
+        now = _reseen_view(v.idx, li)
+        ls = parse_stamp(li.last_seen)
+        if (now.ident() != v.ident() or not _raw(li).get("pulled_sale")
+                or ls is None or cut is None or ls < cut):
+            raise CollapsePlanMismatch(f"row {v.idx}: planned reseen {v.ident()} found {now.ident()}")
+
+    reseen_stats = repair_reseen([listings[v.idx] for v in plan.reseen], today=today)
+
     dropped: set[int] = set()
     restored = 0
     for g in plan.groups:
         keep_idx = g["keep"].idx
         merged = listings[keep_idx]
+        own = merged.raw if isinstance(merged.raw, dict) else {}
+        keep_stale = bool(own.get("stale_case"))
+        scored = {k: copy.deepcopy(own[k]) for k in _KEEP_SCORED_RAW_KEYS if k in own}
         for v in g["drop"]:
             before = merged.street_address
             merged = fold(merged, listings[v.idx])
             if merged.street_address != before:
                 restored += 1
             dropped.add(v.idx)
-        clear_reappeared(merged)
+        clear_reappeared(merged, keep_stale_case=keep_stale)
+        merged.raw.update(scored)
         listings[keep_idx] = merged
     before_n = len(listings)
     listings[:] = [li for i, li in enumerate(listings) if i not in dropped]
     return {"groups": len(plan.groups), "rows_dropped": before_n - len(listings),
             "addresses_restored": restored, "rows_after": len(listings),
+            "reseen_repaired": len(plan.reseen), "reseen": reseen_stats,
             "digest": plan.digest()}

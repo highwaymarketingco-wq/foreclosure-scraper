@@ -242,21 +242,34 @@ def enrich_board_quality(listings, today: "date | None" = None) -> dict:
 
         # 3. stale cases: flag + down-rank a stale HOT. Presumed-withdrawn by status, by the
         #    pulled-sales marker, or a past sale date outside the upset window (F2).
-        found = _stale_reason(li, raw, today)
-        if found:
-            why, is_stale_case = found
-            if is_stale_case:
-                raw["stale_case"] = True
-                stats["stale_flagged"] += 1
-            ds = raw.get("distress_stack")
-            if isinstance(ds, dict) and ds.get("tier") == "HOT":
-                # copy, never edit in place: a stack shared with a sibling listing on the same
-                # parcel would re-tier the sibling too (F9)
-                ds = copy.deepcopy(ds)
-                ds["tier"] = "WARM"
-                ds["downranked_stale"] = True
-                ds["downranked_reason"] = why
-                raw["distress_stack"] = ds
-                stats["hot_downranked"] += 1
+        downrank_if_stale(li, raw, today, stats)
 
     return dict(stats)
+
+
+#: _stale_reason() reasons that come from a withdrawn TAG (the status or the pulled-sales marker),
+#: as opposed to a past sale date. A row the run saw cannot carry either (dedupe.merge_rows).
+WITHDRAWN_TAG_REASONS = ("presumed_withdrawn", "pulled_sale_presumed_withdrawn")
+
+
+def downrank_if_stale(li, raw: dict, today: date, stats=None) -> None:
+    """Step 3 of enrich_board_quality() for one lead: flag raw['stale_case'] and down-rank a HOT
+    stack to WARM when _stale_reason() finds one. Also called by the pre-publish clean-up
+    (placeholder_twins.repair_reseen) after it removes a withdrawn tag a live row inherited."""
+    stats = stats if stats is not None else collections.Counter()
+    found = _stale_reason(li, raw, today)
+    if found:
+        why, is_stale_case = found
+        if is_stale_case:
+            raw["stale_case"] = True
+            stats["stale_flagged"] += 1
+        ds = raw.get("distress_stack")
+        if isinstance(ds, dict) and ds.get("tier") == "HOT":
+            # copy, never edit in place: a stack shared with a sibling listing on the same
+            # parcel would re-tier the sibling too (F9)
+            ds = copy.deepcopy(ds)
+            ds["tier"] = "WARM"
+            ds["downranked_stale"] = True
+            ds["downranked_reason"] = why
+            raw["distress_stack"] = ds
+            stats["hot_downranked"] += 1

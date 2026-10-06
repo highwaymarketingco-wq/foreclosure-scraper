@@ -373,6 +373,7 @@ def pre_publish(tmp_path, monkeypatch):
     monkeypatch.setattr(C, "CHECKPOINT_DIR", tmp_path / "data" / "checkpoint")
     monkeypatch.setattr(C, "ENABLED", True)
     monkeypatch.delenv("RESUME_COLLAPSE_PLACEHOLDER_TWINS", raising=False)
+    monkeypatch.delenv("RESUME_SEEN_SINCE", raising=False)
     C.save(_checkpoint_like(), "pre_publish")
     (C.CHECKPOINT_DIR / "resume_state.json").write_text(json.dumps(
         {"summary": {"notes": "x"}, "enrichment_stats": {}, "errors": [], "scoring_failed": None}))
@@ -441,3 +442,21 @@ def test_publish_only_with_a_stale_digest_publishes_uncollapsed(pre_publish, mon
 def test_cli_flag_applies_too(pre_publish, monkeypatch):
     rc, got = _run(monkeypatch, "--publish-only", "--collapse-placeholder-twins")
     assert rc == 0 and len(got["rows"]) == len(_checkpoint_like()) - len(REAL_PAIRS)
+
+
+def test_digest_handles_a_copy_with_no_street_address(tmp_path):
+    """Found 2026-10-05 replaying the planner over the whole published board: a group whose
+    copies include one with no street address made digest() raise (None vs str in sorted())."""
+    from foreclosure_scraper.board_parts import iter_gz_rows
+    import gzip
+    src = SPBG_VACANT
+    rows = [_aging(_prior(src, "714252203123", "499 PATCH DR SPARTANBURG")),
+            _aging(_prior(src, "714252203123", None)),
+            _row(src, "714252203123", "0 PATCH DR SPARTANBURG")]
+    plan = PT.plan_collapse(lambda: rows)
+    assert len(plan.groups) == 1 and plan.rows_dropped == 2
+    p = tmp_path / "board.json.gz"
+    with gzip.open(p, "wt", encoding="utf-8") as fh:
+        json.dump([li.model_dump(mode="json") for li in rows], fh)
+    assert PT.plan_collapse(lambda: iter_gz_rows(p)).digest() == plan.digest()
+    assert plan.summary()["digest"] == plan.digest()

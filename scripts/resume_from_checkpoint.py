@@ -45,13 +45,23 @@ PLACEHOLDER-TWIN CLEAN-UP (opt-in, 2026-10-05)
     different plan is then skipped with an error and the board is published uncollapsed); "1"
     applies whatever the plan is at publish time.
 
+RESEEN-ROW REPAIR (opt-in, same dry run, same digest, 2026-10-05)
+    main.run()'s second dedupe() folded some LIVE rows into the aged prior copies
+    merge_prior_board() kept, aged rows first, so the live row came out tagged presumed
+    withdrawn (raw['pulled_sale'], the status, then board_quality's stale_case and HOT->WARM).
+    dedupe.merge_rows() fixes future runs; see placeholder_twins.repair_reseen() for this one.
+    Pass the run's start with --seen-since (dry run) and RESUME_SEEN_SINCE (publish), e.g.
+    2026-10-05T01:27:29Z for the 10/5 run (orchestrator.start in its log): a tagged row whose
+    last_seen is at or after it absorbed a row created this run. The plan, the digest and the
+    apply then cover both parts; without it they are the twins-only plan and digest, unchanged.
+
 USAGE
     python3 scripts/resume_from_checkpoint.py                 # show the checkpoint, change nothing
     python3 scripts/resume_from_checkpoint.py --run           # steps 1-5
     python3 scripts/resume_from_checkpoint.py --enrich-only   # steps 1-4 (stop before publish)
     python3 scripts/resume_from_checkpoint.py --publish-only  # step 5 from a pre_publish checkpoint
-    python3 scripts/resume_from_checkpoint.py --collapse-dry-run [--plan-out F] [--sample N]
-    RESUME_COLLAPSE_PLACEHOLDER_TWINS=<digest> bash deploy/oracle/vm_resume.sh --publish-only
+    python3 scripts/resume_from_checkpoint.py --collapse-dry-run [--seen-since ISO] [--plan-out F] [--sample N]
+    RESUME_COLLAPSE_PLACEHOLDER_TWINS=<digest> [RESUME_SEEN_SINCE=ISO] bash deploy/oracle/vm_resume.sh --publish-only
 Exit codes follow main.cli(): 0 ok, 3 write failed, 6 scoring failed, 75 lock busy, 1 usage.
 """
 from __future__ import annotations
@@ -171,12 +181,20 @@ def _save_state(st: M.TailState, summary: dict) -> None:
 
 
 COLLAPSE_ENV = "RESUME_COLLAPSE_PLACEHOLDER_TWINS"
+SEEN_SINCE_ENV = "RESUME_SEEN_SINCE"
 
 
 def _collapse_wanted(args) -> str:
     """'' (off, the default), '1' (apply whatever the plan is) or a plan digest to require."""
     v = (args.collapse_placeholder_twins or os.environ.get(COLLAPSE_ENV) or "").strip()
     return "" if v.lower() in ("", "0", "no", "off", "false") else v
+
+
+def _seen_since(args) -> str | None:
+    """The run start that turns the reseen-row repair on (--seen-since, else RESUME_SEEN_SINCE);
+    None (the default) plans the placeholder twins only."""
+    v = (getattr(args, "seen_since", None) or os.environ.get(SEEN_SINCE_ENV) or "").strip()
+    return v or None
 
 
 def _collapse_dry_run(args) -> int:
@@ -190,7 +208,12 @@ def _collapse_dry_run(args) -> int:
         return 1
     board = checkpoint.CHECKPOINT_DIR / checkpoint.BOARD_FILE
     t0 = time.monotonic()
-    plan = plan_collapse(lambda: iter_gz_rows(board))
+    seen = _seen_since(args)
+    try:
+        plan = plan_collapse(lambda: iter_gz_rows(board), seen_since=seen)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     if isinstance(m.get("count"), int) and plan.rows_scanned != m["count"]:
         print(f"read {plan.rows_scanned} rows, manifest says {m['count']}: refusing a partial plan",
               file=sys.stderr)
@@ -200,10 +223,11 @@ def _collapse_dry_run(args) -> int:
                seconds=round(time.monotonic() - t0, 1), **_rss())
     print(json.dumps(out, indent=1, default=str))
     if args.plan_out:
-        full = plan.summary(sample=len(plan.groups))
+        full = plan.summary(sample=max(len(plan.groups), len(plan.reseen)))
         Path(args.plan_out).write_text(json.dumps(full, indent=1, default=str))
         print(f"full plan ({len(plan.groups)} groups) written to {args.plan_out}")
-    print(f"\nto apply exactly this plan at publish:\n  {COLLAPSE_ENV}={plan.digest()} "
+    env = f"{COLLAPSE_ENV}={plan.digest()}" + (f" {SEEN_SINCE_ENV}={seen}" if seen else "")
+    print(f"\nto apply exactly this plan at publish:\n  {env} "
           "setsid nohup bash deploy/oracle/vm_resume.sh --publish-only >/dev/null 2>&1 < /dev/null &")
     return 0
 
@@ -215,7 +239,11 @@ def _collapse(st: M.TailState, summary: dict, wanted: str) -> None:
 
     t0 = time.monotonic()
     rows = st.enriched
-    plan = plan_collapse(lambda: rows)
+    try:
+        plan = plan_collapse(lambda: rows, seen_since=os.environ.get(SEEN_SINCE_ENV) or None)
+    except ValueError as exc:
+        M.log.error("resume.placeholder_twins_skipped", reason=str(exc))
+        return
     digest = plan.digest()
     if wanted != "1" and wanted != digest:
         M.log.error("resume.placeholder_twins_skipped", reason="plan digest differs from the "
@@ -227,9 +255,13 @@ def _collapse(st: M.TailState, summary: dict, wanted: str) -> None:
     except Exception as exc:  # noqa: BLE001 - apply_collapse checks everything before mutating
         M.log.error("resume.placeholder_twins_skipped", reason=f"{type(exc).__name__}: {exc}")
         return
-    summary["notes"] = (str(summary.get("notes") or "") +
-                        f"; collapsed {res['rows_dropped']} placeholder-twin duplicate rows "
-                        f"({res['groups']} parcels, plan {digest})")
+    note = (f"; collapsed {res['rows_dropped']} placeholder-twin duplicate rows "
+            f"({res['groups']} parcels, plan {digest})")
+    if plan.seen_since is not None:
+        note += (f"; removed the presumed-withdrawn tag from {res['reseen_repaired']} rows this run "
+                 f"saw (HOT restored on {res['reseen'].get('hot_restored', 0)}; tier counts in this "
+                 f"summary predate it)")
+    summary["notes"] = str(summary.get("notes") or "") + note
     _mark("placeholder_twins_collapsed", **res, by_source=dict(plan.by_source().most_common()),
           seconds=round(time.monotonic() - t0, 1))
 
@@ -253,6 +285,9 @@ def main() -> int:
     ap.add_argument("--collapse-placeholder-twins", nargs="?", const="1", default=None,
                     metavar="DIGEST", help=f"collapse placeholder twins before publishing (also "
                     f"{COLLAPSE_ENV}=1|<digest>); off by default")
+    ap.add_argument("--seen-since", default=None, metavar="ISO",
+                    help=f"--collapse-dry-run: the run's start; also plans the reseen-row repair "
+                         f"(publish reads {SEEN_SINCE_ENV}); off by default")
     ap.add_argument("--plan-out", default=None, help="--collapse-dry-run: write the full plan here")
     ap.add_argument("--sample", type=int, default=15, help="--collapse-dry-run: sample size")
     ap.add_argument("--max-age-h", type=float, default=None,
