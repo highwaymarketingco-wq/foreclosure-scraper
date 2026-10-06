@@ -1160,6 +1160,54 @@ def _denied_now(li: Listing) -> bool:
     return not _county_in_scope(li)
 
 
+def _resolve_coastal_pending(li: Listing) -> Optional[bool]:
+    """Publish-time verdict on a row _in_scope() admitted PROVISIONALLY: True = keep, False =
+    drop, None = not a provisional row (left to the other passes).
+
+    _in_scope() tags a coastal-county row that has an address or parcel but no coordinates yet
+    (raw.oceanfront_pending, or raw.downtown_charleston_pending) because the near-beach and
+    downtown-peninsula tests need the coordinates that geocoding fills in later. Here, after
+    geocoding, a row that passes either test gets the confirmed tag (raw.oceanfront /
+    raw.downtown_charleston) and is kept, as before.
+
+    THE BUG (fixed 2026-10-06). A row that FAILED both tests was dropped, whatever its listing
+    type. Every row that can carry the provisional tag is a DISTRESS lead: _in_scope() rejects
+    a flip outside the 18 footprint counties before it looks at the coast, and no coastal county
+    is in that footprint. The owner's rule of 2026-09-15 (config.in_scope_distressed) is that a
+    distress lead is in scope in any NC or SC county, with no carve-outs, and _in_scope() admits
+    the very same inland lead when it arrives WITH coordinates (the provisional path is skipped
+    and _county_in_scope() keeps it); _denied_now() never drops a coastal distress lead either.
+    So the outcome depended only on whether the scraper supplied coordinates. The 9/15 change
+    updated _in_scope() and the deny re-pass but not this one. Measured on the 2026-10-05 VM
+    run: this pass dropped 9,840 rows; nc_heir_estate_parcels kept 77 Brunswick, 61 Carteret
+    and 73 Charleston rows at scrape time and the run's checkpoint holds 0 in each (the
+    published board had 77, 61 and 68), and qpaybill Colleton fell from 1,198 published rows
+    to 587 after scraping 11,309 rows there.
+
+    Now a provisional row that fails both tests is kept when it is not a flip and its county
+    is in the distress scope (_county_in_scope); it just does not get the oceanfront or
+    downtown tag. A flip (possible only through a merge) still drops here, and _denied_now()
+    runs next regardless."""
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    raw = li.raw
+    pend_of = raw.pop("oceanfront_pending", None)
+    pend_dt = raw.pop("downtown_charleston_pending", None)
+    if not (pend_of or pend_dt):
+        return None  # not a pending row — leave to the other passes
+    if pend_of and _in_oceanfront_county(li) and _check_oceanfront(li):
+        return True  # confirmed near-beach -> tagged raw.oceanfront
+    # Charleston is in OCEANFRONT_COASTAL_COUNTIES, so a peninsula (harbor-
+    # side) row gets oceanfront_pending but will FAIL the ocean-distance
+    # test; fall through to the downtown peninsula test before dropping it.
+    if _is_downtown_charleston(li):
+        return True  # tagged raw.downtown_charleston
+    # Inland: a distress lead stays in scope anywhere in NC/SC (owner rule 2026-09-15).
+    if not _is_flip(li) and _county_in_scope(li):
+        return True
+    return False
+
+
 class ScoreBoardFailed(RuntimeError):
     """score_board raised and SCORE_BOARD_FAIL_SOFT is not set (audit F17)."""
 
@@ -1893,31 +1941,16 @@ async def run() -> int:
     # now that geocode + parcel-lookup have filled lat/lng. At ingest these were
     # admitted address-only (raw.oceanfront_pending / downtown_charleston_pending)
     # because the scope gate runs before geocoding. Apply the strict near-beach /
-    # peninsula test on the now-final coordinates and DROP the ones that resolved
-    # inland. Survivors get the confirmed tag so the deny re-pass below spares
-    # them (New Hanover/Brunswick are in SCOPE_DENY but their oceanfront rows are
-    # the whole point of the coastal track).
-    def _resolve_pending(li: Listing) -> bool:
-        if not isinstance(li.raw, dict):
-            li.raw = {}
-        raw = li.raw
-        pend_of = raw.pop("oceanfront_pending", None)
-        pend_dt = raw.pop("downtown_charleston_pending", None)
-        if not (pend_of or pend_dt):
-            return None  # not a pending row — leave to the other passes
-        if pend_of and _in_oceanfront_county(li) and _check_oceanfront(li):
-            return True  # confirmed near-beach -> tagged raw.oceanfront
-        # Charleston is in OCEANFRONT_COASTAL_COUNTIES, so a peninsula (harbor-
-        # side) row gets oceanfront_pending but will FAIL the ocean-distance
-        # test; fall through to the downtown peninsula test before dropping it.
-        if _is_downtown_charleston(li):
-            return True  # tagged raw.downtown_charleston
-        return False
+    # peninsula test on the now-final coordinates; rows that pass get the confirmed
+    # tag. A row that resolved inland used to be DROPPED here; since 2026-10-06 a
+    # distress row is kept (in scope anywhere in NC/SC), see _resolve_coastal_pending.
+    # 2026-10-06: the verdict is _resolve_coastal_pending() (module level, tested); a provisional
+    # DISTRESS row that resolves inland is now kept (owner rule of 2026-09-15), only flips drop.
     _pre_pending = len(enriched)
     _kept = []
     for li in enriched:
         try:
-            verdict = _resolve_pending(li)
+            verdict = _resolve_coastal_pending(li)
         except Exception:
             log.error("oceanfront_repass.failed", source=getattr(li, "source", None),
                       traceback=traceback.format_exc())
