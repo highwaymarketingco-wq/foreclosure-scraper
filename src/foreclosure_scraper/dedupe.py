@@ -10,6 +10,7 @@ import structlog
 from rapidfuzz import fuzz
 
 from .models import Listing
+from .validation import _PARCEL_BAD_PATTERNS
 
 log = structlog.get_logger()
 
@@ -176,6 +177,21 @@ def _provably_different_property(a: Listing, b: Listing) -> bool:
 # A resolver parcel found at the row's own precise point still buckets as before (no evidence
 # either way, as above).
 
+# ---------------------------------------------------------------- short source parcels (2026-10-06, 3)
+# THE DEFECT LEFT AFTER THE TWO RULES ABOVE (the same four-source fresh scrape, 16,932 records): no
+# output row held two valid parcels or two real house numbers (the old rule left 755), but 21
+# rutherford_tax pairs were still merged: one real house number ('146 WALDO LN' twice, '173 E MAIN
+# ST' / '173 N MAIN ST'), an address score >= 92, and two different parcel ids on two different tax
+# bills, with different amounts and (19 of 21) different taxpayers. Rutherford's roll mixes 6-digit
+# and 7-digit ids, and an id under placeholder_twins.MIN_PARCEL_LEN is no valid parcel (validation.py
+# nulls it as not unique), so identity_conflict() saw no parcel on that side.
+# THE RULE (on top of the ones above): a short id cannot prove two rows are the SAME property, but
+# two different ids published by ONE source, in one county, are two entries of that source's roll
+# (source_parcel(), different_source_parcels()). Ids from two different sources are two id systems
+# and do not conflict; neither does an id a resolver attached, an over-shared one, one repeated
+# character, a recorded-document pattern, or one under MIN_SOURCE_PARCEL_LEN characters. A group
+# remembers every (parcel, source) it has taken in, like its valid parcel.
+
 #: A parcel id on this many different numbered streets is not one property's id. Of the published
 #: board's parcels (2026-10-06) 111,543 carry one numbered street, 819 two (a duplex, a corner
 #: lot, an owner-mailing address copied as the situs), and the 60 with exactly three are almost all
@@ -184,6 +200,10 @@ def _provably_different_property(a: Listing, b: Listing) -> bool:
 #: address. Twins and fusion checks elsewhere use 4 (placeholder_twins.MAX_GROUP_ROWS); this
 #: counts STREETS, not rows, so three is already three properties or a broken id.
 OVERSHARED_MIN_STREETS = 3
+
+#: Shortest normalized parcel id source_parcel() counts. board_persist._restored_parcel_key() uses
+#: the same floor for the short ids validation.py nulls ('0', '00', '123' key many rows of a county).
+MIN_SOURCE_PARCEL_LEN = 4
 
 _DIRECTIONS = frozenset({"n", "s", "e", "w", "ne", "nw", "se", "sw",
                          "north", "south", "east", "west"})
@@ -252,6 +272,8 @@ class Identity(NamedTuple):
     pk: Optional[str] = None   # 'ST|parcel' of a validated parcel; None when absent / invalid /
                                # resolver-derived
     cty: str = ""              # the county that parcel was given under (lowercased)
+    sp: frozenset = frozenset()  # {(parcel_ref, source)}: parcel ids a SOURCE published for the
+                               # row or group, however short (source_parcel()); a group keeps all
 
 
 #: Evidence that made two rows candidates. Only ADDRESS evidence needs a real house number.
@@ -272,22 +294,48 @@ def sig_evidence(sig: tuple) -> str:
     return _SIG_EVIDENCE.get(sig[0] if sig else "", ADDRESS)
 
 
+def source_parcel(state, county, parcel_id, raw, source,
+                  overshared: frozenset = frozenset()) -> frozenset:
+    """{(parcel_ref, source)} for the parcel id the row's own SOURCE published, or an empty set.
+
+    A short id (placeholder_twins.MIN_PARCEL_LEN) is too weak to say two rows are the SAME property
+    (validation.py nulls it as not unique), but two different ids from ONE source's roll are two
+    entries of that roll. The id must not be a resolver's (raw['parcel_from_geo'] /
+    ['parcel_from_address']), over-shared, one repeated character or a recorded-document
+    pattern, and needs MIN_SOURCE_PARCEL_LEN normalized characters."""
+    if not source or parcel_id is None:
+        return frozenset()
+    pt = _pt()
+    if pt.resolver_parcel(raw):
+        return frozenset()
+    ref = pt.parcel_ref(state, county, parcel_id)
+    if ref is None:
+        return frozenset()
+    p = ref.rsplit("|", 1)[1]
+    if (len(p) < MIN_SOURCE_PARCEL_LEN or len(set(p)) == 1
+            or any(pat.match(str(parcel_id).strip()) for pat in _PARCEL_BAD_PATTERNS)
+            or (overshared and ref in overshared)):
+        return frozenset()
+    return frozenset({(ref, str(source))})
+
+
 def identity_of(state, county, parcel_id, street_address, raw,
-                overshared: frozenset = frozenset()) -> Identity:
+                overshared: frozenset = frozenset(), source=None) -> Identity:
     """Validity is placeholder_twins.parcel_key()'s (which also needs a known county). An address
     written from a parcel that is no match key (no_key_parcel()) gives no house number."""
     pt = _pt()
     hn = pt.real_house_no(street_address)
     if hn and pt.situs_from_parcel(raw) and no_key_parcel(state, county, parcel_id, raw, overshared):
         hn = ""
+    sp = source_parcel(state, county, parcel_id, raw, source, overshared)
     if pt.resolver_parcel(raw):
         return Identity(hn)
     k = pt.parcel_key(state, county, parcel_id, overshared)
     if k is None:
-        return Identity(hn)
+        return Identity(hn, sp=sp)
     st, rest = k.split("|", 1)
     cty, parcel = rest.rsplit("|", 1)
-    return Identity(hn, f"{st}|{parcel}", cty)
+    return Identity(hn, f"{st}|{parcel}", cty, sp)
 
 
 def _same_county(a: str, b: str) -> bool:
@@ -304,13 +352,14 @@ def identity(li, overshared: frozenset = frozenset()) -> Identity:
     parcel can then only do more often."""
     if isinstance(li, dict):
         return identity_of(li.get("state"), li.get("county"), li.get("parcel_id"),
-                           li.get("street_address"), li.get("raw"), overshared)
-    return identity_of(li.state, li.county, li.parcel_id, li.street_address, li.raw, overshared)
+                           li.get("street_address"), li.get("raw"), overshared, li.get("source"))
+    return identity_of(li.state, li.county, li.parcel_id, li.street_address, li.raw, overshared,
+                       li.source)
 
 
 def _union(x: Identity, y: Identity) -> Identity:
     p = x if x.pk else y
-    return Identity(x.hn or y.hn, p.pk, p.cty)
+    return Identity(x.hn or y.hn, p.pk, p.cty, x.sp | y.sp)
 
 
 def different_valid_parcels(x: Identity, y: Identity) -> bool:
@@ -318,14 +367,31 @@ def different_valid_parcels(x: Identity, y: Identity) -> bool:
     return bool(x.pk and y.pk and (x.pk != y.pk or not _same_county(x.cty, y.cty)))
 
 
+def different_source_parcels(x: Identity, y: Identity) -> bool:
+    """Some source published a parcel id for one side and a DIFFERENT id, in the same county, for
+    the other: two entries of one source's roll are two properties, however short the ids."""
+    for rx, sx in x.sp:
+        stx, ctx, px = rx.split("|", 2)
+        for ry, sy in y.sp:
+            if sx != sy:
+                continue
+            sty, cty, py = ry.split("|", 2)
+            if stx == sty and px != py and _same_county(ctx, cty):
+                return True
+    return False
+
+
 def identity_conflict(x: Identity, y: Identity, evidence: str = ADDRESS) -> Optional[str]:
     """Why two rows (or merged groups) must NOT be merged, or None when they may be.
 
-    'house_number': two different real house numbers. 'parcel': two different valid parcels.
+    'house_number': two different real house numbers. 'parcel': two different valid parcels, or two
+    different parcel ids of one source in one county (different_source_parcels()).
     'unnumbered': one side has no real house number and the valid parcels do not agree (or, on
     address evidence, neither side has one and the valid parcels do not agree)."""
     if x.hn and y.hn and x.hn != y.hn:
         return "house_number"
+    if x.sp and y.sp and different_source_parcels(x, y):
+        return "parcel"
     if x.pk and y.pk:
         return "parcel" if different_valid_parcels(x, y) else None
     if x.hn != y.hn:                       # exactly one side carries a real house number
@@ -533,7 +599,7 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
         log.info("dedupe.house_number_guard_pass1", blocked_merges=sum(_p1.values()),
                  reasons=_p1,
                  note="rows sharing a primary key that are provably different properties "
-                      "(different house numbers or valid parcels, or an unnumbered row without "
+                      "(different house numbers or parcels, or an unnumbered row without "
                       "an agreeing valid parcel); merging would have deleted one of them")
 
     _fused = [(len(v), k) for k, v in _addrs_per_key.items() if len(v) >= 4]
@@ -661,7 +727,7 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     if _p2:
         log.info("dedupe.house_number_guard_pass2", blocked_merges=sum(_p2.values()),
                  reasons=_p2,
-                 note="fuzzy address match refused: different house numbers or valid parcels, "
+                 note="fuzzy address match refused: different house numbers or parcels, "
                       "or an unnumbered address without an agreeing valid parcel")
 
     # Pass 3 (2026-06-19): signature union-merge. dedupe_key is parcel>addr>case>
@@ -712,7 +778,7 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     if _p3:
         log.info("dedupe.house_number_guard", blocked_merges=sum(_p3.values()), reasons=_p3,
                  note="rows sharing a signature that are provably different properties "
-                      "(different house numbers or valid parcels, or an unnumbered row without "
+                      "(different house numbers or parcels, or an unnumbered row without "
                       "an agreeing valid parcel); a merge here would delete one of them")
     groups: dict = {}
     for i in range(len(final)):
