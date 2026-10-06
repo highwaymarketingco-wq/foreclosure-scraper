@@ -133,8 +133,14 @@ class TestRawKeepRegression:
             "fha_financing": "IN (Insured)", "listing_period": "Extended",
             "property_status": "", "bid_open_date": "10/05/2026",
             "period_deadline_date": "02/15/2027", "bedrooms": 2,
-            "bathrooms": 2.0, "sqft": 1460, "year_built": 1955,
+            "bathrooms": 2.0, "year_built": 1955,
         }
+        # The old shape also had a flat "sqft". RAW_KEEP has kept a flat "sqft" since 9d60dfe0
+        # (2026-10-04) for national.foreclosure_dot_com, whose raw carries beds/baths/sqft, so
+        # it is no longer dropped for any source. That does not touch this scraper's fix:
+        # hud_homestore writes living_sqft and nests the rest under raw["hud_homestore"]
+        # (see test_promoted_fields_are_first_class_and_need_no_registration below).
+        assert _slim_raw({"sqft": 1460}) == {"sqft": 1460}
         out = _slim_raw(would_be_dropped)
         assert out == {}, (
             "if this ever starts keeping these flat keys, the fix's "

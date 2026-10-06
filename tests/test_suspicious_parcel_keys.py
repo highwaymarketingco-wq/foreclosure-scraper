@@ -13,13 +13,22 @@ detector (dedupe.suspicious_parcel_keys) and both fixes.
 """
 from __future__ import annotations
 
+import sys
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
 from foreclosure_scraper.dedupe import addresses_per_dedupe_key, suspicious_parcel_keys
 from foreclosure_scraper.distress_score import _parcel_key, score_board
 from foreclosure_scraper.models import Listing, ListingType, PropertyKind
+
+# scripts/join_parcel_cache_to_board.py is a script, not a package module: put scripts/ on the
+# path here. Without this the two join tests passed only when an earlier test in the same
+# session had already inserted scripts/ (they failed run alone or first).
+_SCRIPTS = str(Path(__file__).resolve().parent.parent / "scripts")
+if _SCRIPTS not in sys.path:
+    sys.path.insert(0, _SCRIPTS)
 
 
 def L(addr, parcel=None, county="Pender", state="NC", src="counties_generic.liensnc", owner=None, raw=None):
@@ -140,9 +149,7 @@ def test_score_board_still_groups_a_real_shared_parcel_normally():
 # join_parcel_cache_to_board.apply_rows
 # --------------------------------------------------------------------------------------
 
-def test_join_refuses_a_suspicious_parcel_id(monkeypatch, tmp_path):
-    import sys
-    sys.path.insert(0, str(tmp_path.parent))  # no-op, keeps import path stable across test order
+def test_join_refuses_a_suspicious_parcel_id(monkeypatch):
     import importlib
     join = importlib.import_module("join_parcel_cache_to_board")
 

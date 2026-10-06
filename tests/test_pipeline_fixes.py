@@ -138,7 +138,13 @@ def test_scope_bypass_set_deliberately_scoped():
         violation sweep. No live scraper produces this slug anymore
         (orphaned pre-rename name for courtlistener_bankruptcy); 730 of
         737 rows are unique, non-duplicate real bankruptcy filings, not
-        covered by the live source's current output."""
+        covered by the live source's current output.
+      - fdic_failed_banks (2026-10-04, 8203dcbf): the FDIC table has no
+        county column; county is derived from City through the NC+SC
+        gazetteer, which misses some real towns (Pawleys Island, Myrtle
+        Beach, Fairfax SC). Same "state reliable, county may not resolve"
+        shape; see main.py's comment on the entry. This pin was not updated
+        in that commit and failed from then on."""
     assert SCOPE_BYPASS_SOURCES == {
         "national.courtlistener_bankruptcy",
         "national.courtlistener_civil",
@@ -146,4 +152,5 @@ def test_scope_bypass_set_deliberately_scoped():
         "national.craigslist_fsbo",
         "national.sc_public_index",
         "courtlistener.recap",
+        "national.fdic_failed_banks",
     }

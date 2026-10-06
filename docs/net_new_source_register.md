@@ -584,3 +584,21 @@ for any non-denied SC county, same as the pre-existing
 18-county list, but neither is denied either. A follow-up sweep of the
 remaining ~35 SC counties for the same roster-vs-form-only pattern is
 flagged as separate work (not yet done).
+
+That sweep (2026-10-04, 1449d702) found two more SC counties that publish a
+real roster; both built, same `ListingType.TAX_SALE_OVERAGE` and the same
+statewide `in_scope_distressed()` admission, and both whitelisted in
+`main.DATELESS_OK_SOURCES` (a claim has no sale date):
+- `counties_sc.fairfield_overage_claims`: `https://www.fairfieldsc.com/departments/tax-collector`
+  -> "Tax Sale Overage List & Public Records Notice"
+  (`https://www.fairfieldsc.com/uploads/uploads/Tax_Sale_Overage_List___Public_Records_Notice.pdf`,
+  the fallback when hub discovery fails). One text-layer PDF, 4 pages, tax
+  sales 2021-2024, one claimant per line (name, 5-segment TMS, amount): about
+  60 live rows. No situs: the county GIS sits behind Cloudflare and is not in
+  `parcel_cache`.
+- `counties_sc.calhoun_overage_claims`: `https://calhouncounty.sc.gov/departments/tax-collector`
+  -> "Overages", three yearly text-layer PDFs under
+  `https://calhouncounty.sc.gov/sites/calhouncounty/files/Documents/Calhoun%20County/Departments/Tax%20Collector/Overages/`
+  (`CALHOUN-TaxColOvr_2021.pdf`, `_2022.pdf`, `_2023.pdf`; hub discovery picks
+  up a new year). 74 live rows; situs from the `parcel_cache` Calhoun layer
+  (57 of 74).

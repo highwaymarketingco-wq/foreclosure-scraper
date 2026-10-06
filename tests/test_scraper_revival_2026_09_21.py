@@ -405,10 +405,22 @@ _FRAZER = """<?xml version="1.0"?><rss version="2.0"><channel><title>Recent Obit
 
 
 def _funeral_rows(monkeypatch):
+    """The scraper fetches with http_client.get_text(..., impersonate=True) since 5b7e3ae8
+    (2026-10-04; it used client() before), so that is what is scripted here. Patching the old
+    `client` name raised AttributeError, and without a patch the test would hit the real host."""
     monkeypatch.setattr(fh, "HOMES", {"sullivanking.com": ("Anderson", "SC", "frazer")})
     fake = FakeClient({"sullivanking": [Resp(200, _FRAZER)]})
-    _patch_client(monkeypatch, fh, fake)
-    return asyncio.run(fh.FuneralHomeRss().safe_run())
+
+    async def get_text(url, **kw):
+        r = await fake.get(url, **kw)
+        if r.status_code != 200:
+            raise httpx.HTTPStatusError(f"{r.status_code}", request=None, response=None)
+        return r.text
+
+    monkeypatch.setattr(fh, "get_text", get_text)
+    rows = asyncio.run(fh.FuneralHomeRss().safe_run())
+    assert fake.calls and all("sullivanking" in u for u in fake.calls)
+    return rows
 
 
 def test_funeral_rows_carry_county_state_and_the_owner_name(monkeypatch):
