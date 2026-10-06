@@ -117,7 +117,47 @@ merges on a withdrawn parcel or address. Every change keeps the old values under
    docket's url, the key of its county-less re-scrape, so dedupe2 folds a prior-only copy into
    the fresh row instead of keeping both.
 
-MEMORY. Three light passes and one correcting pass over the in-memory list; the lookup tables
+5. AN EXEMPTION CLAIM THAT IS ANOTHER PARCEL'S (2026-10-06). raw['gis_exempt'] {code, tag} is a
+   statutory elderly / disabled / blind / veteran property-tax exemption of ONE parcel. It does
+   not record which parcel: counties_nc.buncombe_elderly writes it for its own row's parcel, and
+   a row of any other source got it by (a) the old address-key dedupe merge of an elderly row
+   into a row of another parcel (the merge leaves the elderly entry, with its pin in the URL,
+   in raw['also_seen_in']) or (b) enrichment_gis_attrs, which copied the code off whatever
+   polygon the row's point fell in (fixed upstream by ee824ffc, but a carried row keeps what it
+   has). Measured on the 10/5 board (4,481 claim rows): 3,898 are the elderly scraper's own rows,
+   156 an elderly row merged into a row of the SAME parcel, 371 merged into a row of ANOTHER
+   parcel, 51 attached by point, 5 outside Buncombe (4 merged from Buncombe's layer into another
+   county's row). A row's claim is withdrawn when ALL hold:
+     a. its source is not counties_nc.buncombe_elderly and it is not an elderly_disabled row;
+     b. no OWN-PARCEL evidence: no merged-in elderly also_seen_in entry has the row's pin; the
+        row's pin is not on the county's exempt list (the elderly scraper's rows of the board
+        being corrected, aged ones included, so a failed scrape never empties it); neither is
+        the lien bill's parcel (raw['arcgis_distress']['pin']); and the row's street address is
+        not the situs of an exempt parcel (exact number and street name, the verifier's own
+        address rule). A row whose address IS the exempt parcel's is the same property under
+        another parcel id and its claim is the verifier's to judge;
+     c. a claim with no merged-in entry (attached by point) needs something to compare: a pin, a
+        numbered street, a lien pin, or a point parcel correction 1 has just taken back; and the
+        exempt list must be large enough to mean something (MIN_EXEMPT_REGISTRY rows; else the
+        whole step is skipped and logged, the elderly source did not run);
+     d. outside Buncombe the list says nothing, so such a row is withdrawn only when it carries
+        a merged-in Buncombe elderly entry (the claim crossed counties by the merge) or when
+        correction 1 took back its point parcel.
+   What goes: raw['gis_exempt']; the raw['tax_relief'] bridge enrichment_gis_attrs wrote from it
+   (kind elderly / disabled / blind, basis elderly_disabled_exclusion); the exemption tags
+   enrichment_life_events folded into raw['life_events'] (the scorer's senior_exemption signal
+   reads both); raw['life_event'] == 'elderly_disabled_homestead' (the scraper's marker, which
+   rode in with the merge). Nothing else: not the owner, parcel id, address, values, also_seen_in.
+   Audit: raw['exempt_claim_withdrawn']. Replayed on the 10/5 board's 4,481 claim rows with today's
+   county layer (4,352 parcels) as the exempt list: 392 withdrawn (344 merged in from another parcel,
+   43 point-attached, 4 merged across counties, 1 point parcel correction 1 took back), 35 left with
+   own-parcel evidence (19 on a parcel exempt today, 16 by address or lien parcel), 3,898 own rows and
+   156 same-parcel merges byte-identical, and a second pass changes nothing. After the withdrawal the
+   scorer's senior_exemption (the tax_relief path and the life_events tag path) is gone from every
+   withdrawn row and nothing else on its stack changes.
+
+MEMORY. Three light passes and one correcting pass over the in-memory list (correction 5 adds one
+light pass over the claim rows and one index of the elderly scraper's rows); the lookup tables
 are the recorded resolver points (2,331 on the 10/6 board), their row counts, the parcel points
 of rows that carry one (parcel_points: polygon centroids and precise resolver points, a few
 thousand), and the parcel keys of the corrected aged rows. No row is copied. County caches are read through CacheReader, which caps
@@ -146,6 +186,7 @@ FALLBACK_KEY = "parcel_withdrawn_fallback_point"
 MAILING_KEY = "address_was_owner_mailing"
 SUPERSEDED_KEY = "superseded_mailing_copies"
 NAME_COUNTY_KEY = "county_was_name_derived"
+EXEMPT_KEY = "exempt_claim_withdrawn"
 
 #: raw['parcel_from_geo']['source'] values that record an id swap or an address match, not a point.
 NON_POINT_STAMPS = frozenset({"ptscloud_pts_to_pin", "burke_cache_situs_address"})
@@ -172,7 +213,7 @@ _PARCEL_ID_KEYS = frozenset({
 #: Raw blocks a correction never touches: provenance, aging and the audit records themselves.
 _PROTECTED_RAW = frozenset({
     "also_seen_in", "pulled_sale", "parcel_id_nulled", FALLBACK_KEY, MAILING_KEY, SUPERSEDED_KEY,
-    NAME_COUNTY_KEY,
+    NAME_COUNTY_KEY, EXEMPT_KEY,
 })
 #: Blocks that are a parcel's own record: removed whole when they name the withdrawn parcel.
 _PARCEL_BLOCKS = frozenset({"gis_attrs_full", "situs_road_only", "lrcpwa"})
@@ -1165,6 +1206,243 @@ def withdraw_name_derived_county(li: Listing, point_counts: Counter, min_rows: i
     return audit
 
 
+# ------------------------------------- 5. an exemption claim that is another parcel's
+#: exemption tags enrichment_life_events folds out of raw['gis_exempt']['tag'] into raw['life_events']
+#: (enrichment_gis_attrs._EXEMPT_TABLE plus the generic one). The scorer's senior_exemption signal
+#: reads any tag of that list that is not one of the owner-name tags (enrichment_lead_signals).
+_EXEMPT_TAGS = frozenset({"elderly_exemption", "disabled_exemption", "blind_exemption",
+                          "disabled_veteran_exemption", "exemption"})
+#: raw['life_event'] the elderly scraper writes on its own rows; it rides into a row by the merge.
+_ELDERLY_MARKER = "elderly_disabled_homestead"
+#: The raw['tax_relief'] shape enrichment_gis_attrs bridges from a claim (enrichment_tax_relief
+#: writes the same shape for a row's OWN parcel, which the exempt-list test below keeps).
+_BRIDGE_KINDS = frozenset({"elderly", "disabled", "blind"})
+_BRIDGE_BASIS = "elderly_disabled_exclusion"
+#: The county's exempt list is the elderly scraper's rows (about 4,300 on the layer, 3,898 on the
+#: 10/5 board; the scraper's own expected_min_count is 2,000). Below this many the elderly source
+#: did not run and the list proves nothing: the step skips.
+MIN_EXEMPT_REGISTRY = 1000
+_ELDERLY_PIN = re.compile(r"\bpin='(\w+)'")
+
+
+def _pin10(pid: Any) -> Optional[str]:
+    """The 10-digit Buncombe pin of a parcel id written as '9648-69-0092-00000', '9648690092',
+    '964869009200000' or a condominium unit's '9627023924C0102'; None for any other shape."""
+    s = re.sub(r"[^0-9A-Za-z]", "", str(pid or "")).upper()
+    return s[:10] if len(s) >= 10 and s[:10].isdigit() else None
+
+
+def _elderly_source() -> str:
+    from .enrichment_gis_attrs import ELDERLY_SOURCE
+    return ELDERLY_SOURCE
+
+
+def merged_exempt_pins(raw: Any) -> list:
+    """The pins of the elderly scraper's rows that were merged into this one, read off the layer
+    URL of each raw['also_seen_in'] entry of that source (pin%3D%27<pin>%27). An entry whose URL
+    carries no pin is None. [] when nothing of that source was merged in."""
+    from urllib.parse import unquote
+    asi = raw.get("also_seen_in") if isinstance(raw, dict) else None
+    out: list = []
+    if isinstance(asi, list):
+        src = _elderly_source()
+        for d in asi:
+            if isinstance(d, dict) and d.get("source") == src:
+                m = _ELDERLY_PIN.search(unquote(str(d.get("url") or "")))
+                out.append(_pin10(m.group(1)) if m else None)
+    return out
+
+
+def _lien_pin10(raw: Any) -> Optional[str]:
+    """The parcel the lien bill is for (raw['arcgis_distress']['pin'] of the county's unpaid-bill
+    layers, or the parcel of a county-tax-roll owner_mailing block): the verifier's third parcel."""
+    ad, om = raw.get("arcgis_distress"), raw.get("owner_mailing")
+    if isinstance(ad, dict) and _pin10(ad.get("pin")):
+        return _pin10(ad.get("pin"))
+    if isinstance(om, dict) and om.get("source") == "county_tax_roll":
+        return _pin10(om.get("parcel_id"))
+    return None
+
+
+class ExemptRegistry:
+    """The county's exempt list as the run sees it: the pins and situs addresses of the elderly
+    scraper's rows (aged rows included: a scrape that failed or came back short must not make
+    every other row's claim look foreign)."""
+
+    def __init__(self, listings: Iterable[Any]):
+        from .verification.core import address_key
+        src = _elderly_source()
+        self.rows = 0
+        self.pins: set = set()
+        self.by_addr: dict = defaultdict(list)
+        for li in listings:
+            if _get(li, "source") != src:
+                continue
+            self.rows += 1
+            p = _pin10(_get(li, "parcel_id"))
+            if p:
+                self.pins.add(p)
+            st = _get(li, "street_address")
+            n, name, _tail = address_key(st)
+            if n and name:
+                self.by_addr[(n, name)].append(st)
+
+    def has_address(self, street: Any) -> bool:
+        from .verification.core import address_key, address_relation
+        n, name, _tail = address_key(street)
+        return bool(n and name) and any(address_relation(street, s) == "match" for s in self.by_addr.get((n, name), ()))
+
+
+def exempt_claim(raw: Any) -> Optional[dict]:
+    """raw['gis_exempt'] when it is a claim ({code, tag} of a statutory exemption), else None."""
+    c = raw.get("gis_exempt") if isinstance(raw, dict) else None
+    return c if isinstance(c, dict) and (c.get("code") or c.get("tag")) else None
+
+
+def _foreign_to_buncombe(li: Any) -> bool:
+    """The row is certainly not a Buncombe County NC row (another state, or another county)."""
+    state, county = str(_get(li, "state") or "").upper(), county_name(_get(li, "county"))
+    return bool((state and state != "NC") or (county and county != "Buncombe"))
+
+
+def exempt_own_parcel_evidence(li: Any, raw: dict, reg: ExemptRegistry, merged: list) -> list[str]:
+    """What shows that the claim on `li` is about its own property: the exempt parcel it was merged
+    from is its parcel, its parcel (or the lien bill's) is on the exempt list, or its street
+    address is an exempt parcel's situs. [] when none does."""
+    ev: list[str] = []
+    pid = _pin10(_get(li, "parcel_id"))
+    if pid and pid in merged:
+        ev.append("same_parcel_merge")
+    if pid and pid in reg.pins:
+        ev.append("parcel_on_exempt_list")
+    lien = _lien_pin10(raw)
+    if lien and (lien in merged or lien in reg.pins):
+        ev.append("lien_parcel_on_exempt_list")
+    if reg.has_address(_get(li, "street_address")):
+        ev.append("address_on_exempt_list")
+    return ev
+
+
+def withdraw_foreign_exempt_claim(li: Listing, reg: ExemptRegistry) -> Optional[dict]:
+    """Correction 5 on one row (module docstring). Returns the audit record when the claim was
+    withdrawn, {'kept': [evidence]} when it has own-parcel evidence, {'skip': reason} when the row
+    cannot be judged, None when the row carries no claim or is the elderly scraper's own.
+    Everything is decided before anything is changed."""
+    raw = _raw(li)
+    claim = exempt_claim(raw)
+    if claim is None:
+        return None
+    if li.source == _elderly_source() or getattr(li.listing_type, "value", li.listing_type) == "elderly_disabled":
+        return None                                     # the scraper's own read of its own parcel
+    merged = merged_exempt_pins(raw)
+    if None in merged:
+        return {"skip": "merged_entry_without_pin"}
+    pid = _pin10(li.parcel_id)
+    lien = _lien_pin10(raw)
+    from .verification.core import address_key
+    numbered = bool(address_key(li.street_address)[0])
+    fallback = isinstance(raw.get(FALLBACK_KEY), dict)   # correction 1 took back the row's point parcel
+    if _foreign_to_buncombe(li):
+        if merged:
+            reason = "merged_from_other_county"
+        elif fallback:
+            reason = "parcel_withdrawn_fallback_point"
+        else:
+            return {"skip": "other_county_not_merged"}  # the list proves nothing about another county
+    else:
+        ev = exempt_own_parcel_evidence(li, raw, reg, merged)
+        if ev:
+            return {"kept": ev}
+        if merged:
+            reason = "merged_from_another_parcel"
+        elif not (pid or numbered or lien or fallback):
+            return {"skip": "no_identity"}               # a point-attached claim, nothing to compare
+        else:
+            reason = "parcel_withdrawn_fallback_point" if fallback else "parcel_not_on_exempt_list"
+
+    cleared: dict = {}
+    tr = raw.get("tax_relief")
+    if (isinstance(tr, dict) and tr.get("kind") in _BRIDGE_KINDS and tr.get("basis") == _BRIDGE_BASIS):
+        cleared["tax_relief"] = tr
+    le = raw.get("life_events")
+    tags = [t for t in le if t in _EXEMPT_TAGS] if isinstance(le, list) else []
+    if tags:
+        cleared["life_events"] = tags
+    if raw.get("life_event") == _ELDERLY_MARKER:
+        cleared["life_event"] = _ELDERLY_MARKER
+    # ---- apply
+    raw.pop("gis_exempt", None)
+    if "tax_relief" in cleared:
+        raw.pop("tax_relief", None)
+    if tags:
+        keep = [t for t in le if t not in _EXEMPT_TAGS]
+        if keep:
+            raw["life_events"] = keep
+        else:
+            raw.pop("life_events", None)
+    if "life_event" in cleared:
+        raw.pop("life_event", None)
+    audit = {"reason": reason, "claim": claim, "merged_pins": merged, "row_pin": pid, "lien_pin": lien,
+             "numbered_address": numbered, "exempt_list_rows": reg.rows, "cleared": cleared}
+    earlier = raw.get(EXEMPT_KEY)
+    if isinstance(earlier, dict):                       # a claim re-attached since, withdrawn again
+        earlier.pop("earlier", None)
+        audit["earlier"] = earlier
+    raw[EXEMPT_KEY] = audit
+    li.raw = raw
+    return audit
+
+
+def correct_exempt_claims(listings: list[Listing], min_registry: Optional[int] = None, sample: int = 6) -> dict:
+    """Correction 5 over the board `listings`; runs after the other corrections so the street and
+    parcel it reads are the corrected ones. Returns counters for main.run()'s log."""
+    floor = MIN_EXEMPT_REGISTRY if min_registry is None else min_registry
+    out: dict = {"withdrawn": 0, "by_reason": {}, "kept": {}, "skipped": {}, "fields_cleared": {},
+                 "by_source": {}, "registry_rows": 0, "registry_pins": 0, "errors": 0, "samples": []}
+    cands = [li for li in listings if isinstance(_get(li, "raw"), dict) and exempt_claim(_raw(li)) is not None]
+    if not cands:
+        return out
+    reg = ExemptRegistry(listings)
+    out["registry_rows"], out["registry_pins"] = reg.rows, len(reg.pins)
+    if reg.rows < floor:
+        out["skipped"] = {"exempt_list_too_small": len(cands)}
+        log.warning("prior_correction.exempt_list_too_small", rows=reg.rows, floor=floor, claims=len(cands),
+                    note="exemption-claim correction skipped: the elderly source did not run")
+        return out
+    by_reason: Counter = Counter()
+    kept: Counter = Counter()
+    skipped: Counter = Counter()
+    fields: Counter = Counter()
+    by_source: Counter = Counter()
+    for li in cands:
+        try:
+            a = withdraw_foreign_exempt_claim(li, reg)
+        except Exception as exc:  # noqa: BLE001 - one malformed row never stops the step
+            out["errors"] += 1
+            if out["errors"] <= 3:
+                log.warning("prior_correction.exempt_row_failed", error=f"{type(exc).__name__}: {str(exc)[:160]}",
+                            source=getattr(li, "source", None))
+            continue
+        if a is None:
+            continue
+        if "skip" in a:
+            skipped[a["skip"]] += 1
+        elif "kept" in a:
+            kept["+".join(a["kept"])] += 1
+        else:
+            by_reason[a["reason"]] += 1
+            by_source[str(li.source)] += 1
+            for f in ("gis_exempt", *a["cleared"]):
+                fields[f] += 1
+            if len(out["samples"]) < sample:
+                out["samples"].append((str(li.source).split(".")[-1], county_name(li.county), a["reason"],
+                                       sorted(a["cleared"])))
+    out.update({"withdrawn": sum(by_reason.values()), "by_reason": dict(by_reason), "kept": dict(kept),
+                "skipped": dict(skipped), "fields_cleared": dict(fields),
+                "by_source": dict(by_source.most_common(10))})
+    return out
+
+
 # ------------------------------------------ the parcel's own point, for rows awaiting one
 def _dashed(*widths: int) -> Callable:
     """A formatter for a county that stores its PIN dashed while the board keeps the digits."""
@@ -1393,7 +1671,8 @@ async def place_parcel_points(c: Any, rows: list, budget_s: Optional[float] = No
 
 # ------------------------------------------------------------------------------- the step
 def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = None,
-                       min_rows: Optional[int] = None, sample: int = 6) -> dict:
+                       min_rows: Optional[int] = None, sample: int = 6,
+                       min_exempt_rows: Optional[int] = None) -> dict:
     """Correct, IN PLACE, the carried data described in the module docstring on the merged board
     `listings` (rows may be removed by correction 3). Returns the stats main.run() logs."""
     from .enrichment_board_quality import _CENTROID_MIN_COLLISIONS
@@ -1482,6 +1761,9 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
     if dropped:
         gone = {id(r) for r in dropped}
         listings[:] = [li for li in listings if id(li) not in gone]
+    c5 = correct_exempt_claims(listings, min_registry=min_exempt_rows, sample=sample)
+    if c5["samples"]:
+        samples["exempt"] = c5["samples"]
     stats.update({
         "fallback_withdrawn": sum(v for k, v in c1.items() if not k.startswith("exempt_")),
         "fallback_by_reason": dict(c1),
@@ -1497,6 +1779,14 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
         "name_county_detail": dict(c4),
         "name_county_fields_cleared": dict(c4_fields.most_common()),
         "name_county_by_source_county": {f"{s}|{c}": n for (s, c), n in c4_by.most_common(15)},
+        "exempt_claim_withdrawn": c5["withdrawn"],
+        "exempt_claim_by_reason": c5["by_reason"],
+        "exempt_claim_kept": c5["kept"],
+        "exempt_claim_skipped": c5["skipped"],
+        "exempt_claim_fields_cleared": c5["fields_cleared"],
+        "exempt_claim_by_source": c5["by_source"],
+        "exempt_list_rows": c5["registry_rows"],
+        "exempt_claim_row_errors": c5["errors"],
         "parcel_points_indexed": len(points),
         "superseded_dropped": len(dropped),
         "superseded_by_source_county": {f"{s}|{c}": n for (s, c), n in c3_by.most_common(10)},
