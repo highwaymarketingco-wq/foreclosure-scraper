@@ -30,7 +30,7 @@ from unittest.mock import patch
 
 import pytest
 
-from foreclosure_scraper.base_scraper import OUTCOME_BLOCKED, OUTCOME_DORMANT
+from foreclosure_scraper.base_scraper import OUTCOME_BLOCKED
 from foreclosure_scraper.scrapers.national.foreclosure_dot_com import ForeclosureDotCom
 
 # No "<N> Foreclosure Listings" title and no JSON-LD -> _get_total returns 0
@@ -153,7 +153,6 @@ async def test_a_real_403_is_classified_blocked_not_zero_via_safe_run(monkeypatc
 
     with patch("curl_cffi.requests.AsyncSession", lambda **kw: _FakeSession()):
         scraper = ForeclosureDotCom()
-        scraper.disabled = False   # the source is disabled (wall); this tests the transport path
         out = await scraper.safe_run()
 
     assert out == []
@@ -163,22 +162,3 @@ async def test_a_real_403_is_classified_blocked_not_zero_via_safe_run(monkeypatc
         "reported as a clean zero-result run again"
     )
 
-
-@pytest.mark.asyncio
-async def test_the_walled_source_is_disabled_and_sends_no_request():
-    """2026-10-06: foreclosure.com has answered every request since the 2026-09-23 run with its
-    403 network-security page (Mac and VM). A wall is not retried: safe_run() reports DORMANT
-    and never reaches the transport."""
-    calls = []
-
-    async def _no_network(url, **kwargs):
-        calls.append(url)
-        raise AssertionError("a disabled source must not send a request")
-
-    scraper = ForeclosureDotCom()
-    assert scraper.disabled and "403" in scraper.disabled_reason
-    with patch("foreclosure_scraper.scrapers.national.foreclosure_dot_com.get_text_impersonate",
-               side_effect=_no_network):
-        out = await scraper.safe_run()
-    assert out == [] and calls == []
-    assert scraper.last_outcome == OUTCOME_DORMANT

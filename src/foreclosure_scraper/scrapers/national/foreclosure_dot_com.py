@@ -302,8 +302,8 @@ async def _fetch_search(state: str, url: str, slug_name: str, pages_cap: int = 1
     `law_firms.ingle_firm` TLS-swallow bug. The run logs (corrected
     2026-10-06): 5,483 rows on 2026-08-27 and 5,475 on 08-28, 0 on the four
     2026-08-29 runs, 5,581 on 09-08 and 5,562 on 09-22, then 0 on 09-23 and
-    09-25 (logged ZERO_RESULT, not BLOCKED). The block has held since; the
-    scraper is disabled (ForeclosureDotCom.disabled_reason). `get_text_impersonate()` is the one fetch path in this
+    09-25 (logged ZERO_RESULT, not BLOCKED). The block has held since
+    (re-checked 2026-10-06). `get_text_impersonate()` is the one fetch path in this
     codebase that both honors the per-host politeness throttle AND records
     a block signal `base_scraper.safe_run()` reads to correctly promote a
     swallowed-exception zero-result run to BLOCKED (see http_client.py's
@@ -415,15 +415,8 @@ class ForeclosureDotCom(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 900.0  # 15 min for full search + city pagination
-    # A wall, not an outage (2026-10-06): every request since the 2026-09-23 run gets 403 with
-    # the site's "network security policies prohibit access ... VPN or proxy" page, from the VM
-    # (`impersonate got 403` in its run log) and from the Mac (re-checked 2026-10-06: one plain
-    # request and one through get_text_impersonate, both 403, served by awselb). Last rows:
-    # the 2026-09-22 Mac run (5,562 NC/SC listings). A source that refuses us is not retried
-    # with another fingerprint; the code stays for a re-check if the site lifts the block.
-    disabled = True
-    disabled_reason = ("foreclosure.com answers 403 (network-security block page) to every "
-                       "request since 2026-09-23, Mac and VM; re-verified 2026-10-06")
+    # Answers 403 to every request since 2026-09-23 (safe_run reports BLOCKED). Left enabled:
+    # retiring a source is the owner's call (standing rule, 2026-10-02).
 
     async def fetch(self) -> Iterable[Listing]:
         # REWRITTEN 2026-10-04 (see _fetch_search's docstring for the full
