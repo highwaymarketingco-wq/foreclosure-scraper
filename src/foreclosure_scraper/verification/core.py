@@ -170,7 +170,8 @@ def row_keys(row: Any) -> list[str]:
                                          there ("8772-95-9699-00000" == "877295969900000")
       addr:<STATE>:<county>:<address>    models._normalize_addr(), state+county qualified,
                                          WITHOUT the zip (a geocoder filling zip_code later
-                                         must not move the key)
+                                         must not move the key); only for an address with a
+                                         real house number (_house_numbered)
       case:<STATE>:<county>:<case>       models._normalize_case()
       row:<fingerprint>                  only when none of the above applies
 
@@ -186,7 +187,7 @@ def row_keys(row: Any) -> list[str]:
     if p and (st or co):
         out.append(f"parcel:{st}:{co}:{p}")
     a = _normalize_addr(_get(row, "street_address"))
-    if a and (st or co):
+    if a and (st or co) and _house_numbered(a):
         out.append(f"addr:{st}:{co}:{a}")
     c = _normalize_case(_get(row, "case_number"))
     if c and co:
@@ -194,6 +195,18 @@ def row_keys(row: Any) -> list[str]:
     if not out:
         out.append("row:" + _fingerprint(row))
     return out
+
+
+_HOUSE_NO = re.compile(r"(\d+)")
+
+
+def _house_numbered(addr: str) -> bool:
+    """An address identifies a property only with a real house number: a bare road name ("old
+    trull rd", "nc 9 hwy") is shared by every vacant lot on the road, and "0 ..." is a county
+    placeholder. Measured on the 2026-10-06 sweep: unnumbered road names on Buncombe vacant-land
+    rows tied up to four different parcels to one ledger entry before this rule."""
+    m = _HOUSE_NO.match(addr)
+    return bool(m) and int(m.group(1)) > 0
 
 
 def row_key(row: Any) -> str:

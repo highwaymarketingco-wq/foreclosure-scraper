@@ -161,3 +161,19 @@ def test_is_due_new_version_ttl_and_retry():
 def test_publish_is_skipped_with_handoff_push_0(monkeypatch, tmp_path):
     monkeypatch.setenv("HANDOFF_PUSH", "0")
     assert L.publish_ledgers([tmp_path / "x.json"], "msg") == ("skipped", "HANDOFF_PUSH=0")
+
+
+def test_a_shared_address_never_joins_two_different_parcels():
+    """The 2026-10-06 recheck: rows on different parcels that share an address key must not
+    land in (or re-key) one another's entry."""
+    led = L.Ledger("tax_lien")
+    a = dict(ROW, parcel_id="111111111100000", street_address="7 Eastwood Rd")
+    b = dict(ROW, parcel_id="222222222200000", street_address="7 Eastwood Rd")
+    led.record(a, _res("confirmed", T0, pin="a"), ttl_days=30, now=T0)
+    assert led.find(core.row_keys(b)) == (None, None)
+    led.record(b, _res("refuted", T0, pin="b"), ttl_days=30, now=T0)
+    assert len(led.rows) == 2
+    assert led.find_row(a)[1]["latest"]["evidence"]["pin"] == "a"
+    assert led.find_row(b)[1]["latest"]["evidence"]["pin"] == "b"
+    # the address alone (no parcel) is now ambiguous: it identifies neither
+    assert led.find(["addr:NC:buncombe:7 eastwood rd"]) == (None, None)

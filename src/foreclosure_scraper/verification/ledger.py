@@ -158,12 +158,21 @@ class Ledger:
         return self._index
 
     def find(self, keys: Iterable[str]) -> tuple[Optional[str], Optional[dict]]:
-        """The entry for a row with these row_keys() (first key that one entry claims)."""
+        """The entry for a row with these row_keys(): the first key exactly one entry claims,
+        unless that entry holds a DIFFERENT parcel than the row (two parcels are two
+        properties, whatever address or case they share)."""
+        keys = list(keys)
+        mine = {k for k in keys if k.startswith("parcel:")}
         idx = self.index()
         for k in keys:
             ek = idx.get(k)
-            if ek is not None:
-                return ek, self.rows[ek]
+            if ek is None:
+                continue
+            e = self.rows[ek]
+            theirs = {x for x in (ek, *(e.get("keys") or [])) if x.startswith("parcel:")}
+            if mine and theirs and not (mine & theirs):
+                continue
+            return ek, e
         return None, None
 
     def find_row(self, row: Any) -> tuple[Optional[str], Optional[dict]]:

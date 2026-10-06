@@ -153,3 +153,15 @@ def test_compact_bounds_evidence():
     ev = {"years": list(range(100)), "note": "x" * 2000}
     c = core.compact(ev)
     assert len(c["years"]) == 40 and len(c["note"]) < 600
+
+
+@pytest.mark.parametrize("addr", ["OLD TRULL RD", "NC 9 HWY", "0 NO ADDRESS ASSIGNED", "S TURKEY CREEK RD"])
+def test_an_address_without_a_real_house_number_is_not_an_identity(addr):
+    keys = core.row_keys({"state": "NC", "county": "Buncombe", "parcel_id": "8697194400",
+                          "street_address": addr})
+    assert keys == ["parcel:NC:buncombe:8697194400"]
+
+
+def test_a_numbered_address_with_a_unit_letter_is_an_identity():
+    keys = core.row_keys({"state": "NC", "county": "Buncombe", "street_address": "2514A South Blvd"})
+    assert keys[0].startswith("addr:NC:buncombe:2514")
