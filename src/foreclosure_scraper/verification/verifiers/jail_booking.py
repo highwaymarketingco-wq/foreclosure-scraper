@@ -66,15 +66,29 @@ the TTL under-counts that row until it expires (the pipeline's own re-evaluation
 booking on its next run); a flaky roster cannot erase a decisive verdict inside its TTL (the
 ledger's rule).
 
-Evidence: county, state, vendor, roster host, roster size and health (reason, baseline, basis),
-fetched_at, the board's matched name / release status / booking date, the owner string, the
-inmate record that decided it (first, middle, last, booking date, charge, age) and how many
-same-name inmates the roster carries, and the incarceration flag's source with whether it is
-prison-sourced (i.e. whether this verdict can touch the score at all). No DOB is copied.
+EVIDENCE: the decision basis only, never a third party's details (the ledger is pushed to a
+PUBLIC repo; public_evidence() is the one whitelist, applied to every answer and to the stored
+ledger by migrate_ledger()). Every verdict: state, county, vendor, roster host / size / health
+(reason, baseline, basis), fetched_at, the incarceration flag's source and whether it is
+prison-sourced (whether this verdict can touch the score at all), and `reason` when there is one.
+  confirmed    + on_roster, same_name_count, middle_agrees, the owner's and the inmate's middle
+               INITIAL, and the booking date (freshness). No name, no charge, no DOB, no age:
+               the board's own raw['jail_booking'] already carries the matched name.
+  refuted      + on_roster, same_name_count, middle_conflict, the owner's middle initial and the
+               conflicting inmates' middle INITIALS. Nothing else about the inmate (someone
+               else): no name, charge, booking date, DOB or age.
+  stale        + on_roster false. Nothing about anyone.
+  unconfirmed  + middle_missing_on / on_roster / same_name_count where they decided it; for
+               owner_no_longer_matches only the reason (the roster answer would be about
+               someone other than this property's owner).
+ROW_SUMMARY_EXCLUDE drops owner_name from the ledger's row summary (scripts/verification_sweep.py
+honours it): an owner-changed entry would otherwise name a matched person next to a property
+that is not theirs, and the board carries the names anyway.
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import weakref
 from collections import Counter
@@ -93,6 +107,7 @@ TTL_DAYS = 3           # custody changes daily
 RETRY_DAYS = 1         # a roster that failed or had no history is retried the next day
 SOURCE = "county jail rosters"
 GOVERNS = ("incarceration:jail",)
+ROW_SUMMARY_EXCLUDE = ("owner_name",)     # see EVIDENCE in the docstring
 
 _NAME = __name__.rsplit(".", 1)[-1]
 _REPO = Path(__file__).resolve().parents[4]
@@ -251,17 +266,67 @@ async def roster_for(client: Any, state: str, county: str, vendor: str, target: 
 # verify
 # ---------------------------------------------------------------------------
 
+_COMMON = ("state", "county", "vendor", "roster_host", "roster_size", "roster_healthy",
+           "roster_health_reason", "roster_baseline", "roster_health_basis", "fetched_at",
+           "roster_error", "incarceration_source", "incarceration_prison_sourced", "reason")
+
+
+def _initial(m: Any) -> Optional[str]:
+    m = "".join(ch for ch in str(m or "").upper() if ch.isalpha())
+    return m[0] if m else None
+
+
+def public_evidence(verdict: str, ev: dict) -> dict:
+    """The evidence a verdict may publish (see EVIDENCE in the module docstring): a whitelist,
+    so nothing new can leak by being added to the working dict. Idempotent, and it reads both
+    the working shape and the pre-2026-10-06 stored shape (`inmate`, `conflicting_middles`,
+    `same_name_on_roster`), which is how migrate_ledger() rewrites the stored ledger."""
+    out = {k: ev[k] for k in _COMMON if k in ev}
+    n = ev.get("same_name_count", ev.get("same_name_on_roster"))
+    hit = ev.get("hit") or ev.get("inmate") or {}
+    reason = ev.get("reason")
+    if verdict == "confirmed":
+        out.update(on_roster=True, same_name_count=n, middle_agrees=True,
+                   owner_middle_initial=_initial(ev.get("owner_middle_initial")),
+                   roster_middle_initial=_initial(hit.get("middle")
+                                                  or ev.get("roster_middle_initial")),
+                   booking_date=hit.get("arrest_date") or ev.get("booking_date"))
+    elif verdict == "refuted":
+        mids = ev.get("conflicting_middles") or ev.get("roster_middle_initials") or []
+        out.update(on_roster=True, same_name_count=n, middle_conflict=True,
+                   owner_middle_initial=_initial(ev.get("owner_middle_initial")),
+                   roster_middle_initials=sorted({i for i in map(_initial, mids) if i}))
+    elif verdict == "stale":
+        out["on_roster"] = False
+    elif reason == "middle_unverifiable":
+        out.update(on_roster=True, same_name_count=n,
+                   middle_missing_on=ev.get("middle_missing_on"))
+    elif reason == "roster_unhealthy":
+        out["on_roster"] = False
+    return {k: v for k, v in out.items() if v is not None}
+
+
 def _res(verdict: str, evidence: dict) -> VerificationResult:
-    return result(SIGNAL, verdict, evidence, source=evidence.get("roster_host") or SOURCE,
-                  version=VERSION, verifier=_NAME)
+    return result(SIGNAL, verdict, public_evidence(verdict, evidence),
+                  source=evidence.get("roster_host") or SOURCE, version=VERSION, verifier=_NAME)
 
 
-def _inmate(hit: dict) -> dict:
-    jb = _jb()
-    out = {"first": hit.get("first"), "middle": jb._clean_middle(hit.get("middle")) or None,
-           "last": hit.get("last"), "arrest_date": hit.get("arrest_date"),
-           "charge": hit.get("charge") or None, "age": hit.get("age")}
-    return {k: v for k, v in out.items() if v not in (None, "")}
+def migrate_ledger(led: Any) -> int:
+    """Rewrite a loaded jail_booking Ledger in place to the published shape: every entry's
+    latest.evidence through public_evidence(), ROW_SUMMARY_EXCLUDE dropped from its row
+    summary. No fetch, verdicts and stamps unchanged (history entries carry stamps only).
+    Returns the number of entries changed."""
+    changed = 0
+    for e in led.rows.values():
+        before = json.dumps(e, sort_keys=True, default=str)
+        lat = e.get("latest")
+        if isinstance(lat, dict) and isinstance(lat.get("evidence"), dict):
+            lat["evidence"] = public_evidence(str(lat.get("verdict")), lat["evidence"])
+        if isinstance(e.get("row"), dict):
+            for f in ROW_SUMMARY_EXCLUDE:
+                e["row"].pop(f, None)
+        changed += json.dumps(e, sort_keys=True, default=str) != before
+    return changed
 
 
 def matched_parts(matched_name: Any) -> Optional[tuple[str, str]]:
@@ -287,12 +352,9 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     jbk = li.raw.get("jail_booking") if isinstance(li.raw.get("jail_booking"), dict) else {}
     inc = li.raw.get("incarceration")
     county = jb._plain_county(li)
+    # the working dict; _res() publishes only public_evidence()'s whitelist of it
     ev: dict[str, Any] = {
         "state": li.state, "county": county,
-        "board_matched_name": jbk.get("matched_name"),
-        "board_release_status": jbk.get("release_status"),
-        "board_arrest_date": jbk.get("arrest_date"),
-        "board_confidence": jbk.get("confidence"),
         "incarceration_source": inc.get("source") if isinstance(inc, dict) else None,
         "incarceration_prison_sourced": is_prison_sourced(inc),
     }
@@ -305,7 +367,6 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     vendor, target = spec
     ev["vendor"] = vendor
     owner = jb._owner_of(li)
-    ev["owner"] = owner
     claimed = matched_parts(jbk.get("matched_name"))
     if claimed is None:
         ev["roster_host"] = roster_host(vendor, target)
@@ -322,29 +383,28 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         return _res("unconfirmed", ev)
 
     candidates = jb._roster_candidates(roster.index, jb._norm_key(*claimed))
-    ev["same_name_on_roster"] = len(candidates)
+    ev["same_name_count"] = len(candidates)
     if not owner_ok:
         # The board's owner is no longer the matched person (a sale, a resolver correction;
         # on the 2026-10-06 board, 91 Anderson court-case rows whose address resolved to one
         # city-owned parcel). The roster can say whether the matched PERSON is in custody,
         # not whether this property's owner is, and the ledger is keyed by property: a
         # verdict about one of those people would be attached to every row of the parcel.
-        # So never decisive; the roster answer stays as evidence. The run's
-        # _clear_stale_matches drops such a stamp on its next pass.
+        # So never decisive, and the roster answer is NOT published (it would be about
+        # someone other than this property's owner). The run's _clear_stale_matches drops
+        # such a stamp on its next pass.
         ev["on_roster"] = bool(candidates)
         ev["reason"] = "owner_no_longer_matches"
         return _res("unconfirmed", ev)
     hit, verdict = jb._pick_hit(owner, candidates)
     if hit is not None:
         ev["on_roster"] = True
-        ev["middle_verdict"] = verdict
         ev["owner_middle_initial"] = _owner_middle(owner) or None
-        ev["inmate"] = _inmate(hit)
+        ev["hit"] = hit                     # internal only: public_evidence() keeps initials/date
         if verdict == "agrees":
             return _res("confirmed", ev)
         if verdict == "conflict":
-            ev["conflicting_middles"] = sorted({jb._clean_middle(c.get("middle"))
-                                               for c in candidates} - {""})
+            ev["conflicting_middles"] = [jb._clean_middle(c.get("middle")) for c in candidates]
             return _res("refuted", ev)
         ev["reason"] = "middle_unverifiable"
         ev["middle_missing_on"] = ("roster" if not jb._clean_middle(hit.get("middle"))

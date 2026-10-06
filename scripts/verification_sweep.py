@@ -150,7 +150,9 @@ async def run_checks(plan: dict, ledgers: dict, fetcher, *, budget_s: float, sav
                 res.verifier = v.name
             if not res.verifier_version:
                 res.verifier_version = v.version
-            led.record(row, res, ttl_days=v.ttl_days, governs=v.governs)
+            entry = led.record(row, res, ttl_days=v.ttl_days, governs=v.governs)
+            for f in getattr(v.module, "ROW_SUMMARY_EXCLUDE", ()) or ():
+                (entry.get("row") or {}).pop(f, None)     # e.g. jail_booking: no owner_name
             tally[res.verdict] += 1
             tally["checked"] += 1
             print(f"  {sig} {res.verdict:11} {key}  {row.get('street_address') or ''} "

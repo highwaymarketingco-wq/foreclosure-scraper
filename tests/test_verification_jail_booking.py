@@ -12,15 +12,20 @@ What these pin:
   * parity with the run's own re-evaluation (_reevaluate_stamp) on the same roster;
   * scoring: a refuted/stale verdict ("incarceration:jail") ends a JAIL-sourced incarceration
     flag only; a NC DAC / SC DOC / BOP flag on the same row is never touched.
-Names are placeholders except the FINDINGS.md section 5 shape (owner "DAWKINS CHRISTOPHER A" vs
-inmate "Christopher Keith Dawkins").
+Every name here is a placeholder (the FINDINGS.md section 5 shape, owner "LAST FIRST A" vs an
+inmate "First Kxxx Last", is rebuilt with made-up names). The ledger is published in a PUBLIC
+repo, so the evidence tests also pin that no third party's name, charge, booking date, DOB or
+age is ever published, and the real-response fixtures carry pseudonyms and constants only.
 """
 from __future__ import annotations
 
 import asyncio
 import copy
+import gzip
+import json
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
@@ -53,7 +58,7 @@ def _own_history(monkeypatch, tmp_path):
 # rows                                                                        #
 # --------------------------------------------------------------------------- #
 
-def _stamp(county="Cherokee", state="SC", matched="CHRISTOPHER DAWKINS", **extra):
+def _stamp(county="Cherokee", state="SC", matched="PATRICK TESTOWNER", **extra):
     s = {"county": county, "state": state, "matched_name": matched,
          "release_status": "in_custody", "scheduled_release": None,
          "confidence": "name_only_low", "facility_type": "jail", "arrest_date": "2026-09-01"}
@@ -61,12 +66,12 @@ def _stamp(county="Cherokee", state="SC", matched="CHRISTOPHER DAWKINS", **extra
     return s
 
 
-def _jail_inc(county="Cherokee", matched="CHRISTOPHER DAWKINS"):
+def _jail_inc(county="Cherokee", matched="PATRICK TESTOWNER"):
     return {"state": "SC", "source": f"{county} County jail roster", "matched_name": matched,
             "confidence": "name_only_low"}
 
 
-def _row(owner="DAWKINS CHRISTOPHER A", county="Cherokee", state="SC", stamp=None, inc=None,
+def _row(owner="TESTOWNER PATRICK A", county="Cherokee", state="SC", stamp=None, inc=None,
          **kw):
     raw = {"owner_mailing": {"owner": owner},
            "jail_booking": stamp if stamp is not None else _stamp(county, state),
@@ -192,42 +197,50 @@ def run(row, client):
 
 def test_confirmed_when_the_inmate_middle_agrees(monkeypatch):
     _seed_history()
-    _install(monkeypatch, [[_zrec("Dawkins, Christopher Allen", "ASSAULT")] + _fillers(99)])
+    _install(monkeypatch, [[_zrec("Testowner, Patrick Allen", "ASSAULT")] + _fillers(99)])
     res = run(_row(), _Client())
     assert res.verdict == "confirmed"
     ev = res.evidence
-    assert ev["middle_verdict"] == "agrees" and ev["on_roster"] is True
-    assert ev["inmate"] == {"first": "CHRISTOPHER", "middle": "ALLEN", "last": "DAWKINS",
-                            "arrest_date": "2026-09-01T00:00:00.000Z", "charge": "ASSAULT"}
-    assert ev["roster_size"] == 100 and ev["roster_healthy"] is True
-    assert ev["roster_host"] == "cherokee-so-sc.zuercherportal.com" and ev["vendor"] == "zuercher"
+    assert ev == {
+        "state": "SC", "county": "Cherokee", "vendor": "zuercher",
+        "roster_host": "cherokee-so-sc.zuercherportal.com", "roster_size": 100,
+        "roster_healthy": True, "roster_health_reason": "ok", "roster_baseline": 100.0,
+        "roster_health_basis": "recent_fetches", "fetched_at": ev["fetched_at"],
+        "incarceration_source": "Cherokee County jail roster",
+        "incarceration_prison_sourced": False, "on_roster": True, "same_name_count": 1,
+        "middle_agrees": True, "owner_middle_initial": "A", "roster_middle_initial": "A",
+        "booking_date": "2026-09-01T00:00:00.000Z"}
     assert ev["fetched_at"].endswith("Z") and res.source == "cherokee-so-sc.zuercherportal.com"
     assert res.verifier == "jail_booking" and res.verifier_version == v.VERSION
+    _assert_no_third_party(ev)
 
 
 def test_refuted_when_every_same_name_inmate_has_a_conflicting_middle(monkeypatch):
-    """FINDINGS.md section 5's example: owner DAWKINS CHRISTOPHER A, inmate Christopher Keith."""
+    """FINDINGS.md section 5's shape: owner initial A, the only same-name inmate is a Kxxx."""
     _seed_history()
-    _install(monkeypatch, [[_zrec("Dawkins, Christopher Keith")] + _fillers(99)])
+    _install(monkeypatch, [[_zrec("Testowner, Patrick Kyle", "ASSAULT")] + _fillers(99)])
     res = run(_row(), _Client())
     assert res.verdict == "refuted"
-    assert res.evidence["middle_verdict"] == "conflict"
-    assert res.evidence["conflicting_middles"] == ["KEITH"]
-    assert res.evidence["owner_middle_initial"] == "A"
+    ev = res.evidence
+    assert (ev["middle_conflict"], ev["owner_middle_initial"], ev["roster_middle_initials"],
+            ev["same_name_count"], ev["roster_size"]) == (True, "A", ["K"], 1, 100)
+    for k in ("booking_date", "roster_middle_initial", "middle_agrees", "reason"):
+        assert k not in ev
+    _assert_no_third_party(ev)
 
 
 def test_two_same_name_inmates_the_agreeing_one_confirms(monkeypatch):
     _seed_history()
-    _install(monkeypatch, [[_zrec("Dawkins, Christopher Keith"),
-                            _zrec("Dawkins, Christopher Allen")] + _fillers(98)])
+    _install(monkeypatch, [[_zrec("Testowner, Patrick Kyle"),
+                            _zrec("Testowner, Patrick Allen")] + _fillers(98)])
     res = run(_row(), _Client())
-    assert res.verdict == "confirmed" and res.evidence["same_name_on_roster"] == 2
-    assert res.evidence["inmate"]["middle"] == "ALLEN"
+    assert res.verdict == "confirmed" and res.evidence["same_name_count"] == 2
+    assert res.evidence["roster_middle_initial"] == "A"
 
 
 @pytest.mark.parametrize("roster_name, missing_on", [
-    ("Dawkins, Christopher", "roster"),               # the vendor printed no middle
-    ("Dawkins, Christopher NMN", "roster"),           # a placeholder is no middle
+    ("Testowner, Patrick", "roster"),               # the vendor printed no middle
+    ("Testowner, Patrick NMN", "roster"),           # a placeholder is no middle
 ])
 def test_on_the_roster_without_a_middle_to_compare_is_unconfirmed(monkeypatch, roster_name,
                                                                   missing_on):
@@ -236,12 +249,13 @@ def test_on_the_roster_without_a_middle_to_compare_is_unconfirmed(monkeypatch, r
     res = run(_row(), _Client())
     assert res.verdict == "unconfirmed" and res.evidence["reason"] == "middle_unverifiable"
     assert res.evidence["on_roster"] is True and res.evidence["middle_missing_on"] == missing_on
+    _assert_no_third_party(res.evidence)
 
 
 def test_owner_without_a_middle_is_unconfirmed(monkeypatch):
     _seed_history()
-    _install(monkeypatch, [[_zrec("Dawkins, Christopher Keith")] + _fillers(99)])
-    res = run(_row(owner="DAWKINS CHRISTOPHER"), _Client())
+    _install(monkeypatch, [[_zrec("Testowner, Patrick Kyle")] + _fillers(99)])
+    res = run(_row(owner="TESTOWNER PATRICK"), _Client())
     assert res.verdict == "unconfirmed" and res.evidence["middle_missing_on"] == "owner"
 
 
@@ -251,6 +265,7 @@ def test_stale_when_absent_from_a_healthy_roster(monkeypatch):
     res = run(_row(), _Client())
     assert res.verdict == "stale"
     assert res.evidence["on_roster"] is False and res.evidence["roster_healthy"] is True
+    _assert_no_third_party(res.evidence)
     assert res.evidence["roster_health_reason"] == "ok" and res.evidence["roster_baseline"] == 100
 
 
@@ -282,20 +297,22 @@ def test_owner_no_longer_the_matched_person_is_never_decisive(monkeypatch):
     """On the 2026-10-06 board, 91 Anderson court-case rows share one city-owned parcel: the
     roster answers for the matched person, not for the property's owner."""
     _seed_history()
-    _install(monkeypatch, [[_zrec("Dawkins, Christopher Allen")] + _fillers(99)])
+    _install(monkeypatch, [[_zrec("Testowner, Patrick Allen")] + _fillers(99)])
     on = run(_row(owner="CHEROKEE COUNTY"), _Client())
     assert on.verdict == "unconfirmed" and on.evidence["reason"] == "owner_no_longer_matches"
-    assert on.evidence["on_roster"] is True and "inmate" not in on.evidence
+    # the roster answer is about someone other than this property's owner: not published
+    for k in ("on_roster", "same_name_count", "owner_middle_initial"):
+        assert k not in on.evidence
     v._RUNS.clear()
     _install(monkeypatch, [_fillers(100)])
     off = run(_row(owner="SMITH JOHN Q"), _Client())     # absent from a HEALTHY roster
-    assert off.verdict == "unconfirmed" and off.evidence["on_roster"] is False
+    assert off.verdict == "unconfirmed" and "on_roster" not in off.evidence
 
 
 def test_counties_without_a_bulk_roster_are_unconfirmed_without_a_fetch(monkeypatch):
     z = _install(monkeypatch, [_fillers(100)])
-    gvl = _row(owner="WATERS JIMMY S", county="Greenville",
-               stamp=_stamp(county="Greenville", matched="JIMMY WATERS"))
+    gvl = _row(owner="SAMPLER JOE S", county="Greenville",
+               stamp=_stamp(county="Greenville", matched="JOE SAMPLER"))
     res = run(gvl, _Client())
     assert res.verdict == "unconfirmed" and res.evidence["reason"] == "per_name_search_vendor"
     assert res.evidence["vendor"] == "lansa"
@@ -311,7 +328,7 @@ def test_counties_without_a_bulk_roster_are_unconfirmed_without_a_fetch(monkeypa
 
 def test_one_roster_fetch_per_county_per_run(monkeypatch):
     _seed_history()
-    z = _install(monkeypatch, [[_zrec("Dawkins, Christopher Allen")] + _fillers(99)])
+    z = _install(monkeypatch, [[_zrec("Testowner, Patrick Allen")] + _fillers(99)])
     client = _Client()
     rows = [_row(), _row(owner="FILLERA PERSON M", stamp=_stamp(matched="PERSON FILLERA")),
             _row(owner="NOBODY SOME X", stamp=_stamp(matched="SOME NOBODY"))]
@@ -370,9 +387,9 @@ _REEVAL_TO_VERDICT = {"conflict_cleared": {"refuted"}, "left_roster": {"stale"},
 
 
 @pytest.mark.parametrize("roster, healthy", [
-    ([_zrec("Dawkins, Christopher Allen")] + _fillers(99), True),
-    ([_zrec("Dawkins, Christopher Keith")] + _fillers(99), True),
-    ([_zrec("Dawkins, Christopher")] + _fillers(99), True),
+    ([_zrec("Testowner, Patrick Allen")] + _fillers(99), True),
+    ([_zrec("Testowner, Patrick Kyle")] + _fillers(99), True),
+    ([_zrec("Testowner, Patrick")] + _fillers(99), True),
     (_fillers(100), True),
     (_fillers(100), False),
 ])
@@ -394,6 +411,139 @@ def test_verdict_agrees_with_reevaluate_stamp_on_the_same_roster(monkeypatch, ro
 
 
 # --------------------------------------------------------------------------- #
+# what may be published (the ledger is in a PUBLIC repo)                       #
+# --------------------------------------------------------------------------- #
+
+_FORBIDDEN_KEYS = {"inmate", "hit", "owner", "charge", "charges", "dob", "age", "first", "last",
+                   "middle", "conflicting_middles", "board_matched_name", "board_arrest_date",
+                   "matched_name", "name", "middle_verdict", "owner_name"}
+
+
+def _assert_no_third_party(ev):
+    flat = json.dumps(ev)
+    assert not (_FORBIDDEN_KEYS & set(ev)), set(ev) & _FORBIDDEN_KEYS
+    for word in ("PATRICK", "TESTOWNER", "Testowner", "Patrick", "ALLEN", "Allen", "KYLE",
+                 "Kyle", "ASSAULT", "PLACEHOLDER CHARGE", "Filler"):
+        assert word not in flat, word
+
+
+# the evidence shape published before the 2026-10-06 trim (rewritten by migrate_ledger)
+_OLD = {"board_arrest_date": "2026-09-01", "board_confidence": "name_only_low",
+        "board_matched_name": "PATRICK TESTOWNER", "board_release_status": "in_custody",
+        "county": "Cherokee", "fetched_at": "2026-10-06T04:49:30Z",
+        "incarceration_prison_sourced": False, "incarceration_source": "Cherokee County jail roster",
+        "owner": "TESTOWNER PATRICK A", "roster_baseline": 288.0,
+        "roster_health_basis": "recent_fetches", "roster_health_reason": "ok",
+        "roster_healthy": True, "roster_host": "cherokee-so-sc.zuercherportal.com",
+        "roster_size": 288, "same_name_on_roster": 1, "state": "SC", "vendor": "zuercher"}
+_OLD_HIT = {"inmate": {"first": "PATRICK", "middle": "KYLE", "last": "TESTOWNER",
+                       "arrest_date": "2026-09-01", "charge": "ASSAULT", "age": "41"},
+            "middle_verdict": "conflict", "owner_middle_initial": "A", "on_roster": True}
+_OLD_AGREE = {**_OLD_HIT, "middle_verdict": "agrees",
+              "inmate": {**_OLD_HIT["inmate"], "middle": "ALLEN"}}
+
+
+@pytest.mark.parametrize("verdict, extra, published", [
+    ("confirmed", _OLD_AGREE,
+     {"on_roster": True, "same_name_count": 1, "middle_agrees": True, "owner_middle_initial": "A",
+      "roster_middle_initial": "A", "booking_date": "2026-09-01"}),
+    ("refuted", {**_OLD_HIT, "conflicting_middles": ["KYLE"]},
+     {"on_roster": True, "same_name_count": 1, "middle_conflict": True,
+      "owner_middle_initial": "A", "roster_middle_initials": ["K"]}),
+    ("stale", {"on_roster": False}, {"on_roster": False}),
+    ("unconfirmed", {**_OLD_HIT, "middle_verdict": "unverified", "reason": "middle_unverifiable",
+                     "middle_missing_on": "roster"},
+     {"on_roster": True, "same_name_count": 1, "reason": "middle_unverifiable",
+      "middle_missing_on": "roster"}),
+    ("unconfirmed", {"on_roster": True, "reason": "owner_no_longer_matches"},
+     {"reason": "owner_no_longer_matches"}),
+    ("unconfirmed", {"on_roster": False, "reason": "roster_unhealthy"},
+     {"on_roster": False, "reason": "roster_unhealthy"}),
+])
+def test_public_evidence_reads_the_old_shape_and_is_idempotent(verdict, extra, published):
+    common = {k: _OLD[k] for k in v._COMMON if k in _OLD}
+    out = v.public_evidence(verdict, {**_OLD, **extra})
+    assert out == {**common, **published}
+    assert v.public_evidence(verdict, out) == out
+    _assert_no_third_party(out)
+
+
+def test_migrate_ledger_trims_every_entry_without_touching_verdicts(tmp_path):
+    led = Ledger("jail_booking", path=tmp_path / "jail_booking.json")
+    shapes = [("confirmed", _OLD_AGREE), ("refuted", {**_OLD_HIT, "conflicting_middles": ["KYLE"]}),
+              ("stale", {"on_roster": False}),
+              ("unconfirmed", {"reason": "owner_no_longer_matches", "on_roster": True})]
+    for i, (verdict, extra) in enumerate(shapes):
+        res = core.VerificationResult(signal="jail_booking", verdict=verdict,
+                                      evidence={**_OLD, **extra},
+                                      checked_at="2026-10-06T04:49:30Z", verifier_version="v1",
+                                      verifier="jail_booking")
+        row = {"state": "SC", "county": "Cherokee", "parcel_id": f"99999{i}0000",
+               "owner_name": "TESTOWNER PATRICK A", "street_address": f"{i + 1} SAMPLE RD"}
+        led.record(row, res, ttl_days=v.TTL_DAYS, governs=v.GOVERNS)
+    stamps = lambda L: {k: (e["latest"]["verdict"], e["latest"]["checked_at"],  # noqa: E731
+                            e["latest"]["verifier_version"], e["checks"], e["keys"])
+                        for k, e in L.rows.items()}
+    before = stamps(led)
+    assert v.migrate_ledger(led) == 4
+    assert v.migrate_ledger(led) == 0                    # idempotent
+    led.save()
+    again = Ledger.load("jail_booking", tmp_path)
+    assert stamps(again) == before                       # verdicts, stamps, version, keys kept
+    for e in again.rows.values():
+        assert "owner_name" not in e["row"]
+        _assert_no_third_party(e["latest"]["evidence"])
+        _assert_no_third_party(e["row"])
+
+
+def test_the_sweep_leaves_owner_name_out_of_the_row_summary(monkeypatch, tmp_path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "verification_sweep",
+        Path(__file__).resolve().parent.parent / "scripts" / "verification_sweep.py")
+    sweep = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sweep)
+    _seed_history()
+    _install(monkeypatch, [[_zrec("Testowner, Patrick Allen")] + _fillers(99)])
+    reg = {x.name: x for x in discover()}["jail_booking"]
+    row = {**_row(), "owner_name": "TESTOWNER PATRICK A"}
+    led = Ledger("jail_booking", path=tmp_path / "jail_booking.json")
+    plan = {"jail_booking": [((2, 0, 0.0, 1), core.row_keys(row)[0], row, reg)]}
+    tallies = asyncio.run(sweep.run_checks(plan, {"jail_booking": led}, _Client(), budget_s=60,
+                                           save_every=10, row_timeout_s=30, host="test"))
+    assert tallies["jail_booking"]["confirmed"] == 1
+    entry = next(iter(Ledger.load("jail_booking", tmp_path).rows.values()))
+    assert "owner_name" not in entry["row"] and entry["row"]["county"] == "Cherokee"
+    _assert_no_third_party(entry["latest"]["evidence"])
+
+
+def test_the_real_fixtures_hold_pseudonyms_and_constants_only():
+    """Every non-name field of the captured roster bodies is one constant (no charge, booking
+    date, age, race, sex, bond, DOB, mugshot, image id, docket/warrant number, address), the
+    cookies are placeholders, and the cases carry fixture parcels and a constant booking date."""
+    name_keys = {"name", "firstname", "middlename", "lastname", "suffix"}
+    for county in ("Buncombe", "Cherokee", "Lincoln"):
+        values: dict = {}
+        for rec in _recorded(county):
+            assert set(rec["cookies"].values()) <= {"fixture-token"}
+            if not rec["text"]:
+                continue
+            body = json.loads(rec["text"])
+            recs = body.get("Inmates") or body.get("rows") or (
+                body.get("records") if isinstance(body.get("records"), list) else [])
+            assert recs
+            for r in recs:
+                for k, val in r.items():
+                    if k.lower() not in name_keys:
+                        values.setdefault(k, set()).add(json.dumps(val))
+        assert all(len(vals) == 1 for vals in values.values()), {
+            k: len(vals) for k, vals in values.items() if len(vals) > 1}
+    for c in CASES:
+        assert c["row"]["parcel_id"].startswith("FIXTURE") and c["row"]["source"] == "fixture"
+        assert c["row"]["raw"]["jail_booking"]["arrest_date"] == "2026-01-01"
+
+
+# --------------------------------------------------------------------------- #
 # scoring: jail-sourced flags only                                            #
 # --------------------------------------------------------------------------- #
 
@@ -408,14 +558,14 @@ def _vrec(verdict, *, expires_in_days=2):
 
 def _listing(inc_source="Cherokee County jail roster", verification=None, jail=True,
              parcel="1234567890", address="12 PLACEHOLDER RD"):
-    raw = {"owner_mailing": {"owner": "DAWKINS CHRISTOPHER A"}}
+    raw = {"owner_mailing": {"owner": "TESTOWNER PATRICK A"}}
     if jail:
         raw["jail_booking"] = _stamp()
     if inc_source is not None:
         raw["incarceration"] = {"state": "SC", "source": inc_source,
-                                "matched_name": "CHRISTOPHER DAWKINS"}
+                                "matched_name": "PATRICK TESTOWNER"}
     elif jail:
-        raw["incarceration"] = {"state": "SC", "matched_name": "CHRISTOPHER DAWKINS"}  # legacy
+        raw["incarceration"] = {"state": "SC", "matched_name": "PATRICK TESTOWNER"}  # legacy
     if verification is not None:
         raw["verification"] = verification
     return Listing(source="counties_sc.placeholder", source_url="http://x", state="SC",
@@ -492,10 +642,6 @@ def test_apply_then_score_end_to_end(tmp_path):
 # DOB / mugshots / image ids / warrant and docket numbers / marks / addresses removed.
 # jail_booking_cases.json: the 34 sweep rows of those counties (owner and matched names through
 # the same pseudonym map) with the verdict the live sweep gave each.
-
-import gzip  # noqa: E402
-import json  # noqa: E402
-from pathlib import Path  # noqa: E402
 
 FIX = Path(__file__).parent / "fixtures" / "verification"
 CASES = json.loads((FIX / "jail_booking_cases.json").read_text())
@@ -592,13 +738,10 @@ def test_real_roster_reproduces_the_live_verdict(monkeypatch, case):
     _seed_warmup()
     _install_recorded(monkeypatch, [case["row"]["county"]])
     res = run(case["row"], _Client())
-    exp = case["expect"]
-    assert (res.verdict, res.evidence.get("reason"), res.evidence.get("middle_verdict"),
-            res.evidence.get("on_roster")) == (exp["verdict"], exp["reason"],
-                                               exp["middle_verdict"], exp["on_roster"])
-    if exp["verdict"] in ("confirmed", "refuted"):
-        assert res.evidence["inmate"]["last"] and res.evidence["inmate"]["first"]
-        assert "dob" not in res.evidence["inmate"]
+    exp = dict(case["expect"])
+    assert res.verdict == exp.pop("verdict")
+    assert {k: res.evidence.get(k) for k in exp} == exp
+    _assert_no_third_party(res.evidence)
 
 
 def test_real_rosters_one_load_per_county_for_every_case(monkeypatch):

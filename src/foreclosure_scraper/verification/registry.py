@@ -28,6 +28,9 @@ Optional:
     RETRY_DAYS: float          when an `unconfirmed` answer is retried (default 7)
     WALL: bool                 True for a ToS/CAPTCHA-walled signal whose verify() never
                                touches the network and always returns "wall"
+    ROW_SUMMARY_EXCLUDE: tuple core.row_summary() fields the sweep leaves out of this signal's
+                               ledger entries (the ledger is pushed to a PUBLIC repo; e.g.
+                               jail_booking drops owner_name)
 """
 from __future__ import annotations
 
