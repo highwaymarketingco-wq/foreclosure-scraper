@@ -46,7 +46,10 @@ _UA = {
     "Accept": "application/json, text/plain, */*",
 }
 # A Spatialest/GIS PIN is the 15-digit pinnum (10-digit pin + 5-digit ext).
-_PIN_FROM_PROPCARD = re.compile(r"/property/(\d{6,})")
+# A condominium unit's key keeps its pinext letters ('9645995181C0013': the layer's own propcard
+# link, live 2026-10-06), so the capture takes the whole alphanumeric key, not just its digits.
+_PIN_FROM_PROPCARD = re.compile(r"/property/(\d{6,}[0-9A-Za-z]*)")
+_UNIT_PINNUM = re.compile(r"\d{10}[0-9A-Z]{5}")
 
 
 def _to_int(v) -> int | None:
@@ -102,7 +105,11 @@ def _saledate_iso(v) -> str | None:
 # --- PIN resolution via county ArcGIS (plain httpx) -------------------------
 
 def _pin_candidate(li) -> str | None:
-    """If li.parcel_id already looks like a Spatialest/GIS PIN, return its digits."""
+    """If li.parcel_id already looks like a Spatialest/GIS PIN, return its digits (a condominium
+    unit's pinnum is returned whole, letters included)."""
+    alnum = re.sub(r"[^0-9A-Za-z]", "", getattr(li, "parcel_id", "") or "").upper()
+    if _UNIT_PINNUM.fullmatch(alnum) and not alnum.isdigit():
+        return alnum
     digits = re.sub(r"\D", "", getattr(li, "parcel_id", "") or "")
     return digits if len(digits) in (10, 15) else None
 
@@ -126,7 +133,7 @@ async def _gis_query(c, where: str) -> list[dict]:
 
 def _pin_from_attrs(a: dict) -> str | None:
     pinnum = _clean(a.get("pinnum"))
-    if pinnum and pinnum.isdigit():
+    if pinnum and (pinnum.isdigit() or _UNIT_PINNUM.fullmatch(pinnum.upper())):
         return pinnum
     m = _PIN_FROM_PROPCARD.search(a.get("propcard") or "")
     return m.group(1) if m else None

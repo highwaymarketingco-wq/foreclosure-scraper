@@ -1465,7 +1465,8 @@ async def run() -> int:
         try:
             from .board_persist import merge_prior_board
             deduped, persist_stats = merge_prior_board(deduped)
-            log.info("orchestrator.board_persist", **persist_stats)
+            log.info("orchestrator.board_persist",
+                     **{k: v for k, v in persist_stats.items() if k != "folded_prior_keys"})
             # If load_board found no prior board (first run), fall through to the
             # pulled-sales enricher below — nothing was persisted/aged here.
             persist_applied = persist_stats.get("prior_count", 0) > 0
@@ -1491,6 +1492,7 @@ async def run() -> int:
     # published board stayed frozen at a stale, inflated 94,384.
     _off_footprint_removed = 0
     if persist_applied and os.environ.get("GRANDFATHER_CARRIED") == "1":
+        from .board_persist import drop_folded_prior
         # Snapshot the PRIOR PUBLISHED board (pre-merge) as a ROW LIST, not a
         # key-dict: the board keeps rows the simple dedupe_key() would collapse
         # (it dedupes with a fuzzier matcher), so a dict silently loses ~10k
@@ -1508,6 +1510,10 @@ async def run() -> int:
                     _grandfather.append(Listing.model_validate(_r))
                 except Exception:  # noqa: BLE001 - skip a malformed prior row
                     pass
+            # Leave out the prior rows merge_prior_board folded into a row of ANOTHER key (a
+            # condominium's bare-pin row into its unit's row): each is on the board under the new
+            # key already, and restoring it would publish it twice.
+            _grandfather = drop_folded_prior(_grandfather, persist_stats)
             log.info("orchestrator.grandfather_captured",
                      count=len(_grandfather), source="prior_board")
         except Exception:  # noqa: BLE001 - never let the snapshot fail the run

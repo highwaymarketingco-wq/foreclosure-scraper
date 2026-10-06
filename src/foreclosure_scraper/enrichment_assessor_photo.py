@@ -228,6 +228,12 @@ def buncombe_pin_variants(parcel: str | None) -> list[str]:
     """Buncombe's image key is the 15-digit pinnum (10-digit pin + 5-digit ext).
     Board leads carry either form, so try the 15-digit shape first (that's what
     the image host indexes) then the raw digits."""
+    # A condominium unit's pinnum ('9627023924C0102') is already the image key: the host indexes
+    # each unit under its own pinnum (live 2026-10-06), and stripping it to digits would build a
+    # key of no parcel. The bare 10-digit form is the building's common area, never a unit.
+    alnum = re.sub(r"[^0-9A-Za-z]", "", parcel or "").upper()
+    if re.fullmatch(r"\d{10}[0-9A-Z]{5}", alnum) and not alnum.isdigit():
+        return [alnum]
     d = _digits(parcel)
     if not d:
         return []

@@ -16,6 +16,19 @@ street now comes from the situs columns (enrichment_arcgis.situs_city_zip); city
 which the layer does not publish for the situs, are filled only when the owner's mailing
 street IS the situs street (owner-occupied). The mailing block goes to raw['owner_mailing'].
 
+CONDOMINIUM UNITS KEEP THEIR OWN PARCEL ID (fixed 2026-10-06). Every unit of a condominium
+carries the building's 10-digit `pin` plus its own `pinext`; `pinnum` = pin + pinext (pin
+9627023924 returns 226 parcels: the 00000 common area plus 225 units, 9658735582 returns 202).
+parcel_id used to be the bare `pin`, so all of a building's exempt units were one property to
+Listing.dedupe_key() and verification.core.row_key(), and anything padding the pin to
+'<pin>00000' (tax_lien_buncombe.pin_of, enrichment_assessor_photo.buncombe_pin_variants) looked up
+the common area. Now a unit's parcel_id is its pinnum ('9627023924C0102', which tax.buncombenc.gov
+/Parcel/Details/ and the Spatialest image host take as they are) and its source_url narrows the
+layer query to that parcel; every other parcel keeps the bare pin (a '<pin>00000' pinnum has the
+same dedupe key, and the string the dashboard's saved notes are keyed by). Of the 4,352 exempt
+parcels 130 (43 buildings) are units. See condo_units.py, and board_persist.merge_prior_board for
+how the published bare-pin rows are carried over to their units.
+
 Free, anonymous, compliant (public ArcGIS, no auth/captcha). ~4,300 parcels, paginated.
 Gate with FORECLOSURE_ELDERLY_SOURCE=0 to skip.
 
@@ -46,6 +59,7 @@ from datetime import datetime
 from typing import Iterable
 
 from ...base_scraper import BaseScraper
+from ...condo_units import board_parcel_id
 from ...enrichment_arcgis import situs_city_zip
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
@@ -58,6 +72,16 @@ _OUT = ("pin,pinnum,owner,HouseNumber,NumberSuffix,direction,streetname,StreetTy
 _PAGE = 2000
 _TAGS = {"ELD": "elderly_exemption", "DIS": "disabled_exemption",
          "BLD": "blind_exemption", "VET": "disabled_veteran_exemption"}
+
+
+def _source_url(pin: str, parcel_id: str) -> str:
+    """The layer's own page for the row. A building's `pin` alone is every unit of it (200+ parcels);
+    the unit's row narrows it to its pinnum, and keeps the `pin='...'` clause that
+    verification.verifiers.elderly_disabled.scraped_from_layer reads."""
+    where = f"pin%3D%27{pin}%27"
+    if parcel_id != pin:
+        where += f"+AND+pinnum%3D%27{parcel_id}%27"
+    return f"{QUERY_URL}?where={where}&outFields=*&f=html"
 
 
 def _iso_date(yyyymmdd) -> str | None:
@@ -117,9 +141,11 @@ class BuncombeElderly(BaseScraper):
         async with client(timeout=60.0) as c:
             offset = 0
             while offset < 50000:  # hard backstop; real set ~4,300
+                # pinnum is in the order: a building's units share a pin, so paging on the pin
+                # alone has no stable order inside it (a page edge could drop or repeat a unit)
                 params = {"where": _WHERE, "outFields": _OUT, "returnGeometry": "false",
                           "resultRecordCount": str(_PAGE), "resultOffset": str(offset),
-                          "orderByFields": "pin", "f": "json"}
+                          "orderByFields": "pin,pinnum", "f": "json"}
                 try:
                     r = await c.get(QUERY_URL, params=params)
                     if r.status_code != 200:
@@ -160,11 +186,12 @@ class BuncombeElderly(BaseScraper):
                         raw["gis_exempt"]["care_of"] = care_of
 
                     situs, city, zip5 = situs_city_zip(a)
-                    raw["owner_mailing"] = _owner_mailing(a, owner, pin, situs)
+                    parcel = board_parcel_id(pin, a.get("pinnum"))
+                    raw["owner_mailing"] = _owner_mailing(a, owner, parcel, situs)
 
                     out.append(Listing(
                         source=self.slug,
-                        source_url=f"{QUERY_URL}?where=pin%3D%27{pin}%27&outFields=*&f=html",
+                        source_url=_source_url(pin, parcel),
                         listing_type=ListingType.ELDERLY_DISABLED,
                         property_kind=pk,
                         owner_name=owner,
@@ -173,7 +200,7 @@ class BuncombeElderly(BaseScraper):
                         state="NC",
                         county="Buncombe",
                         zip_code=zip5,
-                        parcel_id=pin,
+                        parcel_id=parcel,
                         market_value=_f(a.get("TotalMarketValue")),
                         assessed_value=_f(a.get("TaxValue")),
                         land_use=(a.get("LandUse") or "").strip() or None,

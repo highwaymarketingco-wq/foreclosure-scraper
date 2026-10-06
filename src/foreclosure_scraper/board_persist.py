@@ -92,6 +92,18 @@ identity rule), so a shared address signature can no longer fold one parcel's pr
 another parcel's fresh row. stats['refused_different_parcel'] counts prior rows that were left
 unmatched only by this rule.
 
+CONDOMINIUM UNITS (2026-10-06, condo_units.py). counties_nc.buncombe_elderly used to key every exempt
+unit of a building by the building's bare 10-digit pin and now keys a unit by its own pinnum
+('9627023924C0102'); a plain parcel's key is unchanged ('<pin>00000' normalizes to the pin). A
+published row keyed by the bare pin of a building whose units the fresh scrape lists is therefore
+unmatched by dedupe_key, and would be aged beside the new unit rows (measured on the real board: 91
+rows, 33 buildings; replayed on them 4,352 fresh rows gave 91 carried folds, 0 aged). Such a row is
+folded into the unit that is the same lead (condo_units.match_units: the owner, the unit's situs
+breaking a tie, only from a source the fresh row shares) and carries its enrichment; a row with no
+such unit ages as any other. stats['folded_prior_keys'] lists [dedupe_key, source] of the rows
+folded under another key, which main.run()'s GRANDFATHER snapshot must not restore
+(drop_folded_prior). FULLRUN_PERSIST_CONDO_UNITS=0 turns it off.
+
 WHAT THIS DOES NOT FIX: the return value is still a full ``list[Listing]`` of the
 merged board, because main.run() runs it through ~2,400 more lines of enrichment/
 filtering before its own write_artifact() call -- peak memory for THAT part is
@@ -117,6 +129,7 @@ from typing import Optional
 
 import structlog
 
+from . import condo_units
 from .enrichment_pulled_sales import PULLED_RETENTION_WEEKS
 from .models import Listing
 from .row_keys import share_keys
@@ -374,6 +387,26 @@ def _placeholder_twin_index(rec: dict, rec_sigs, fresh_sig_index: dict,
     return i if twin_pair_ok(rec, fresh_deduped[i]) else None
 
 
+def drop_folded_prior(rows: list[Listing], stats: dict) -> list[Listing]:
+    """`rows` without the prior rows merge_prior_board folded into a row of ANOTHER key
+    (stats['folded_prior_keys']: [dedupe_key, source] pairs, the condominium bare-pin rows of
+    condo_units.py). main.run()'s GRANDFATHER snapshot restores every prior row whose key the final
+    board lacks; such a row is on the board already, under its unit's key, so restoring it would
+    publish it a second time."""
+    folded = {(str(k), str(s)) for k, s in (stats.get("folded_prior_keys") or ())}
+    if not folded:
+        return rows
+    out = []
+    for li in rows:
+        try:
+            key = li.dedupe_key()
+        except Exception:  # noqa: BLE001 - an unkeyable row is not one of them
+            key = None
+        if (key, str(li.source or "")) not in folded:
+            out.append(li)
+    return out
+
+
 def merge_prior_board(
     fresh_deduped: list[Listing],
     docs_dir: Path | str | None = None,
@@ -414,11 +447,16 @@ def merge_prior_board(
         "placeholder_twin_ambiguous": 0,
         "refused_different_parcel": 0,
         "matched_restored_parcel": 0,
+        "matched_condo_unit": 0,
+        "condo_unit_unmatched": 0,
         "reappeared_untagged": 0,
     }
     # Placeholder twins (placeholder_twins.py): on by default; FULLRUN_PERSIST_PLACEHOLDER_TWINS=0
     # restores the strict-only matching of the 2026-10-04 rewrite.
     twins_on = os.environ.get("FULLRUN_PERSIST_PLACEHOLDER_TWINS", "1") != "0"
+    # Condominium units (condo_units.py): on by default; FULLRUN_PERSIST_CONDO_UNITS=0 leaves a
+    # published bare-pin row to the ordinary aging.
+    condo_on = os.environ.get("FULLRUN_PERSIST_CONDO_UNITS", "1") != "0"
 
     listings_path = docs / "listings.json"
     if not _board_file_present(listings_path):
@@ -442,6 +480,16 @@ def merge_prior_board(
     # only fresh rows whose raw['carryover'] marker is their own.
     fresh_carryover = {i for i, li in enumerate(fresh_deduped)
                        if isinstance(li.raw, dict) and li.raw.get("carryover")}
+    # Fresh rows keyed by a condominium unit's own pinnum, by building: ('buncombe', pin) -> indexes.
+    fresh_units: dict[tuple, list[int]] = {}
+    if condo_on:
+        for i, li in enumerate(fresh_deduped):
+            uk = condo_units.unit_pin_key(li.state, li.county, li.parcel_id)
+            if uk:
+                fresh_units.setdefault(uk, []).append(i)
+    # prior rows keyed by that building's bare pin, decided after the stream: building -> [(row dict,
+    # refused-by-different-parcel flag)]. Bounded by the buildings the fresh scrape lists units of.
+    deferred_condo: dict[tuple, list[tuple[dict, bool]]] = {}
 
     kept: list[Listing] = []
     prior_total = 0
@@ -533,6 +581,15 @@ def merge_prior_board(
                     match_idx = same[0]
                     stats["matched_restored_parcel"] += 1
 
+        # A published row keyed by a condominium building's bare pin while the fresh scrape lists
+        # that building by its units' own pinnums (condo_units.py): which unit is the same lead is
+        # decided after the stream, once all of the building's published rows are known.
+        if match_idx is None and fresh_units and isinstance(rec, dict):
+            ck = condo_units.bare_pin_key(rec.get("state"), rec.get("county"), rec.get("parcel_id"))
+            if ck and any(_shares_source(rec, fresh_deduped[i]) for i in fresh_units.get(ck, ())):
+                deferred_condo.setdefault(ck, []).append((rec, refused_parcel))
+                continue
+
         if refused_parcel and match_idx is None:
             stats["refused_different_parcel"] += 1
         if match_idx is not None:
@@ -568,6 +625,56 @@ def merge_prior_board(
                 deferred.setdefault(ti, []).append(rec)
                 continue
         _age(rec)
+
+    # Condominium units, decided per building now that all of its published rows are known: a row
+    # folds into the unit that is the same lead (owner, then the unit's situs); a row with no such
+    # unit goes down the ordinary aging path (its owner no longer holds the exemption on a unit of
+    # the building), exactly as before. folded_prior_keys lists the dedupe keys the folded rows
+    # had: main.run()'s GRANDFATHER snapshot must not restore them as a second copy.
+    folded_prior: list[list[str]] = []
+    condo_samples: list[tuple] = []
+    for ck, entries in deferred_condo.items():
+        for rec, refused in entries:
+            # this row's own candidates: the building's fresh units from a source it shares
+            cands = [i for i in fresh_units[ck] if _shares_source(rec, fresh_deduped[i])]
+            (pick,) = condo_units.match_units(
+                [condo_units.View(rec.get("owner_name"), rec.get("street_address"))],
+                [condo_units.View(fresh_deduped[i].owner_name, fresh_deduped[i].street_address)
+                 for i in cands])
+            if pick is None:
+                stats["condo_unit_unmatched"] += 1
+                if refused:
+                    stats["refused_different_parcel"] += 1
+                _age(rec)
+                continue
+            ti = cands[pick]
+            streamed_for_drop_rate += 1
+            try:
+                prior_li = Listing.model_validate(share_keys(rec, key_cache))
+            except Exception as exc:  # noqa: BLE001 - same drop tolerance as the matched branch
+                drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
+                stats["prior_drop_errors"] += 1
+                continue
+            fresh_li = fresh_deduped[ti]
+            merged = fresh_li.merge(prior_li)
+            if keep_mailing_off_address(fresh_li, prior_li, merged):
+                stats["mailing_address_not_inherited"] = stats.get("mailing_address_not_inherited", 0) + 1
+            if len(condo_samples) < 5:
+                condo_samples.append((prior_li.parcel_id, fresh_li.parcel_id))
+            fresh_deduped[ti] = merged
+            fresh_matched[ti] = True
+            stats["matched_condo_unit"] += 1
+            try:
+                pk = prior_li.dedupe_key()
+            except Exception:  # noqa: BLE001 - an unkeyable row has nothing to restore under
+                pk = None
+            if pk:
+                folded_prior.append([pk, str(prior_li.source or "")])
+    deferred_condo.clear()
+    stats["folded_prior_keys"] = folded_prior
+    if stats["matched_condo_unit"] or stats["condo_unit_unmatched"]:
+        log.info("board_persist.condo_units", folded=stats["matched_condo_unit"],
+                 unmatched_aged=stats["condo_unit_unmatched"], sample=condo_samples)
 
     # Placeholder twins, decided per fresh row now that all of its twins are known: folded only
     # when the fresh row and every twin agree on at most ONE real house number and the group is
@@ -651,5 +758,5 @@ def merge_prior_board(
 
     stats["prior_count"] = prior_total
     stats["merged_count"] = len(kept)
-    log.info("board_persist.done", **stats)
+    log.info("board_persist.done", **{k: v for k, v in stats.items() if k != "folded_prior_keys"})
     return kept, stats
