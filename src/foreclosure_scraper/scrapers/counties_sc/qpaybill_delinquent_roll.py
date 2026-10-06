@@ -798,6 +798,64 @@ _ZERO_TOKEN_RE = re.compile(r"\s+0+$")
 _ALL_ZEROS_RE = re.compile(r"0+")
 
 
+#: "PO BOX 12", "P O BOX 12", "P.O. BOX 12", "POB 12", "BOX 12", "PO DRAWER 5": a mailbox.
+_PO_BOX_RE = re.compile(r"^\s*(?:P\.?\s*O\.?\s*(?:BOX|BX|DRAWER)|POB\b|POST\s+OFFICE\s+BOX|BOX\s+\d)", re.I)
+
+
+_MAIL_STATE_RE = re.compile(r"\b([A-Z]{2})\s*\d{5}(?:-?\d{4})?\s*$")
+
+
+_ROAD_NOISE = frozenset("""N S E W NE NW SE SW NORTH SOUTH EAST WEST RD ROAD ST STREET DR DRIVE
+    AVE AV AVENUE LN LANE CT COURT CIR CIRCLE PL PLACE TRL TRAIL HWY HIGHWAY PKWY PARKWAY BLVD
+    BOULEVARD TER TERRACE WAY EXT EXTENSION LOOP RDG RIDGE CV COVE PT POINT XING SQ""".split())
+
+
+def _road_core(street: str) -> tuple[str, tuple[str, ...]]:
+    """(house number, street-name words) with directions and street types dropped, so
+    '948 WINDY ROAD' == '948 WINDY RD' and '512 SOUTH BOUNDARY ST' == '512 BOUNDARY ST S'."""
+    toks = re.sub(r"[^A-Z0-9 ]", " ", str(street or "").upper()).split()
+    num = toks.pop(0) if toks and re.fullmatch(r"\d+[A-Z]?", toks[0]) else ""
+    return num, tuple(t for t in toks if t not in _ROAD_NOISE)
+
+
+def _owner_mailing_not_situs(county: str, ident: str, address: str | None) -> str | None:
+    """Why `address` (the portal's "Property Address" cell) is the owner's MAILING street and
+    not the parcel's location, or None. Read from the county's own parcel record in the
+    local parcel cache (parcel_cache.lookup; no network, None on any miss):
+      'out_of_state_mailing'  the cell IS the owner's mailing street and that mailing
+                              address is outside SC: a SC parcel cannot be there;
+      'mailing_not_situs'     the cell IS the owner's mailing street and the county's situs
+                              for the parcel is on a different road."""
+    if not address or not ident:
+        return None
+    try:
+        from ...parcel_cache import lookup
+        hit = lookup(county, ident, "SC")
+    except Exception:  # noqa: BLE001 - the cache is optional here
+        return None
+    if not hit or not hit.get("owner_mailing"):
+        return None
+    a_num, a_road = _road_core(address)
+    if not a_road:
+        return None
+    mail_txt = re.sub(r"\s+", " ", str(hit["owner_mailing"]).upper()).strip()
+    m_num, m_road = _road_core(mail_txt)
+    # the cell is the mailing street: same number, and the mailing text continues with the
+    # cell's street words (the mailing also carries city/state/ZIP after them)
+    if a_num != m_num or m_road[:len(a_road)] != a_road:
+        return None
+    s_num, s_road = _road_core(hit.get("address") or "")
+    if s_road and (s_road[:len(a_road)] == a_road or a_road[:len(s_road)] == s_road) and \
+            (not s_num or s_num == a_num):
+        return None                      # owner-occupied: mailing IS the situs
+    m = _MAIL_STATE_RE.search(mail_txt)
+    if m and m.group(1) != "SC":
+        return "out_of_state_mailing"
+    if s_road and not (s_road[:len(a_road)] == a_road or a_road[:len(s_road)] == s_road):
+        return "mailing_not_situs"       # the parcel lies on another road entirely
+    return None
+
+
 def _clean_situs(addr: str | None) -> str | None:
     """Drop the zero-padded city/ZIP columns qPayBill appends to the situs line.
 
@@ -1041,6 +1099,20 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
         # and the grid row had nothing.
         if not address and det.get("property_address"):
             address = _clean_situs(det["property_address"])
+        # A PO box is never a parcel's location. Some portals put the owner's mailing PO
+        # box in the "Property Address" cell (Oconee: 53 board rows, 2026-10-06, e.g.
+        # "PO BOX ..." on a parcel the county's own layer lists the owner as mailing
+        # from); published, it put the owner's mailbox on the map as the property.
+        listed_pobox = None
+        if address and _PO_BOX_RE.match(address):
+            listed_pobox, address = address, None
+        # Some portals fill the cell with the owner's mailing STREET (Oconee: 53 board rows
+        # on 2026-10-06 carry an owner's out-of-state street; Lancaster: 23 an in-county
+        # street other than the parcel's). The cell alone cannot tell, so check it against
+        # the county's own parcel record (local parcel cache, no network).
+        mailing_reason = None if account_only else _owner_mailing_not_situs(county, ident, address)
+        if mailing_reason:
+            listed_pobox, address = address, None
         raw_owner_mailing = None
         if det.get("owner_occupied") is not None:
             # SC's own statutory 4%-legal-residence vs 6%-everything-else ratio is an
@@ -1053,6 +1125,11 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
             # the owner's actual mailing address).
             raw_owner_mailing = {"absentee": not det["owner_occupied"],
                                  "source": "qpaybill_assessment_ratio"}
+        if listed_pobox:
+            # The PO box is where the owner gets mail: record it as such (it also keeps
+            # board_persist from re-inheriting it as the property address from a prior row).
+            raw_owner_mailing = {**(raw_owner_mailing or {"source": "qpaybill_address_cell"}),
+                                 "mailing": listed_pobox}
         out.append(Listing(
             source="counties_sc.qpaybill_delinquent_roll",
             source_url=_url(QPAYBILL_SUBS[county]),
@@ -1076,6 +1153,8 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
                 "subdomain": QPAYBILL_SUBS[county],
                 "owner": owner,
                 "property_address": address,
+                **({"address_cell_owner_mailing": listed_pobox,
+                    "address_cell_reason": mailing_reason or "po_box"} if listed_pobox else {}),
                 "balance_owed": total,
                 "years_unpaid": years,
                 "all_unpaid_years": all_years,   # incl. any not-yet-due current year

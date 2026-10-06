@@ -36,6 +36,7 @@ from .enrichment_arcgis import (
     SCDOT_BASE,
     _detect_addr_field,
     _pick,
+    situs_view,
 )
 from .http_client import client
 from .models import Listing
@@ -180,7 +181,12 @@ def _populate_from_attrs(li: Listing, attrs: dict[str, Any]) -> int:
 
     filled = 0
 
-    site = _pick(attrs, FIELD_ALIASES["site_address"])
+    # The property's own street/city/ZIP, read from a view of the bag with the layer's
+    # owner-MAILING columns removed (enrichment_arcgis.situs_view). Read off the raw bag,
+    # Buncombe's `Address`/`CityName`/`Zipcode` and Lincoln's/Pickens' bare CITY/ZIP are
+    # where the owner gets mail, and were written here as the property address.
+    sv = situs_view(attrs)
+    site = _pick(sv, FIELD_ALIASES["site_address"])
     if site and not li.street_address:
         site_str = str(site).strip()
         # Filter out GIS placeholder strings (counties use these for parcels
@@ -196,12 +202,12 @@ def _populate_from_attrs(li: Listing, attrs: dict[str, Any]) -> int:
             li.street_address = site_str
             filled += 1
 
-    city = _pick(attrs, FIELD_ALIASES["city"])
+    city = _pick(sv, FIELD_ALIASES["city"])
     if city and not li.city:
         li.city = str(city).strip()
         filled += 1
 
-    z = _pick(attrs, FIELD_ALIASES["zip"])
+    z = _pick(sv, FIELD_ALIASES["zip"])
     if z and not li.zip_code:
         zs = str(z).strip()
         if zs.isdigit() and len(zs) >= 5:

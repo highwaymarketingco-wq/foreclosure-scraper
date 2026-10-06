@@ -47,7 +47,7 @@ import structlog
 
 from pathlib import Path
 
-from .enrichment_arcgis import NC_GIS, SCDOT_BASE, SC_LAYER, SC_GIS, host_walled
+from .enrichment_arcgis import NC_GIS, SCDOT_BASE, SC_LAYER, SC_GIS, host_walled, situs_view
 from .http_client import client
 from . import owner_freshness
 
@@ -184,9 +184,13 @@ ACRE_FIELDS = ("Acreage", "ACREAGE", "ACRES", "Acres", "CalcAcres", "TACRES",
 LANDUSE_FIELDS = ("LandUse", "LANDUSE", "Land_Use", "LandUseDesc", "PROPTYPE",
                   "PropertyType", "ZONINGDESC", "use_desc", "USE_DESC",
                   "PropClass", "PROP_CLASS", "NLUCDESC")
-# Situs / physical address — the street address of the property itself.
+# Situs / physical address — the street address of the property itself. Read through
+# enrichment_arcgis.situs_view(): "StreetAddress" and "ADDRESS" are the OWNER'S MAILING
+# street on Spartanburg's CAMA layer and Buncombe's parcel layer (this list wrote the
+# mailing street on 40/40 live records of each, 2026-10-06). SITUS_ADDR is the split
+# situs situs_view() stitches (Buncombe HouseNumber + streetname ...).
 ADDRESS_FIELDS = (
-    "StreetAddress", "situs", "siteadd", "Physical_Address", "LOCATION_ADDR",
+    "SITUS_ADDR", "StreetAddress", "situs", "siteadd", "Physical_Address", "LOCATION_ADDR",
     "LOCATE_ADDRESS", "Property_Address", "ADDRESS", "SiteAddr", "SITUS",
     "address", "phys_addr", "PHYS_ADDR", "propertyaddress", "PropAddr",
     "PropertyAddress", "PHYSICALADDRESS", "physicaladdress",
@@ -471,7 +475,7 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
     # Backfill street_address from the GIS situs field — addresses the 27%
     # gap where tax-sale / PDF-sourced leads have a parcel ID but no situs.
     if not (li.street_address or "").strip():
-        ad = _pick(norm, ADDRESS_FIELDS)
+        ad = _pick(_norm(situs_view(attrs)), ADDRESS_FIELDS)
         if ad:
             s = re.sub(r"\s+", " ", str(ad).strip())
             # Skip PO boxes, vacant lot markers, and noise.

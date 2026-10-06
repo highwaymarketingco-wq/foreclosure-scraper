@@ -21,10 +21,15 @@ Confidence policy (intentionally conservative — investors will use this data):
 
 Address policy:
 
-  * Real situs field (when available) → commit.
-  * Mailing fallback for non-fiduciary individuals when mailing has a
-    street number (not P.O. box) AND owner-occupancy flag is set
-    (or county GIS exposes no occupancy flag — most don't).
+  * Real situs field (when available) → commit. Split situs needs its house number.
+  * Mailing fallback ONLY for non-fiduciary individuals whose layer flags the parcel
+    owner-occupied (then the mailing address IS the property). Until 2026-10-06 a
+    layer with no occupancy flag also took the mailing address as the property
+    ("individual mailings ... are overwhelmingly the property itself"); for an
+    absentee owner that published where the owner gets mail as the property.
+  * City/ZIP: the layer's situs city/ZIP columns when it has them; its mailing
+    city/ZIP only for an owner-occupied parcel. The mailing ZIP is kept as
+    `mailing_zip`, never written to the listing.
   * Otherwise: leave placeholder; record parcel_id + centroid lat/lng.
 
 Defense-in-depth for the weekly run: also re-tags ``li.county`` from the
@@ -110,9 +115,11 @@ COUNTY_SCHEMA: dict[str, dict[str, Any]] = {
         # LOCADD/LOCCITY/LOCZIP). The old config set situs=() with a comment
         # claiming "no street-address field" — wrong, so Pickens lis-pendens
         # got parcel-only and never a real address. Read LOCADD as the situs.
+        # LOCCITY/LOCZIP are the situs city/ZIP; CITY/ZIP the owner's mailing ones.
         "owner": ("NAME1", "OwnerAll"), "situs": ("LOCADD",), "situs_parts": (),
-        "mailing": (), "city": ("LOCCITY", "CITY"),
-        "zip": ("LOCZIP", "ZIP"), "parcel": ("PIN",), "owner_occ": (),
+        "situs_city": ("LOCCITY",), "situs_zip": ("LOCZIP",),
+        "mailing": ("ADD1",), "city": ("CITY",),
+        "zip": ("ZIP",), "parcel": ("PIN",), "owner_occ": (),
     },
     "Laurens": {
         "owner": ("Name1", "Owner", "OwneAll"), "situs": (),
@@ -130,19 +137,28 @@ COUNTY_SCHEMA: dict[str, dict[str, Any]] = {
     },
     "Greenville": {
         # Layer 23 schema: PIN, OWNAM1/2, NAMECO, STREET, CITY, ZIP5/4, LOCATE.
-        # STREET holds the situs.
+        # STREET/CITY/ZIP5 are the OWNER'S MAILING block, not the situs: on the county's
+        # own QueryLayers/0 (the same CAMA columns) STREET differs from the situs parts
+        # on 39 of 40 live records (2026-10-06; parcel_cache.PARCEL_LAYERS["Greenville"]).
+        # The situs is STRNUM + STRPRE + LOCATE + STRTYP + STRSUF.
         "owner": ("OWNAM1", "OWNAM2", "NAMECO", "OwnerAll"),
-        "situs": ("STREET",), "situs_parts": (),
-        "mailing": (), "city": ("CITY",), "zip": ("ZIP5",),
+        "situs": (), "situs_parts": ("STRNUM", "STRPRE", "LOCATE", "STRTYP", "STRSUF"),
+        "mailing": ("STREET",), "city": ("CITY",), "zip": ("ZIP5",),
         "parcel": ("PIN",), "owner_occ": (),
     },
     "Spartanburg": {
         # Layer 42 schema: TAXPIN, PARCELNUMBER, OwnerName, StreetAddress,
         # PropertyLocation, City, Zip, plus parts (StreetNumber+StreetName).
+        # StreetAddress/City/State/Zip are the OWNER'S MAILING block (parcel_cache
+        # 2026-09-13: 44% absentee). StreetAddress used to be read FIRST as the situs;
+        # 5 Spartanburg lis-pendens rows on the 2026-10-06 board carry the owner's
+        # mailing street that way. The situs is PropertyLocation / StreetNumber+StreetName,
+        # its city StreetCommunity and ZIP StreetZip.
         "owner": ("OwnerName", "TaxpayerName"),
-        "situs": ("StreetAddress", "PropertyLocation"),
+        "situs": ("PropertyLocation",),
         "situs_parts": ("StreetNumber", "StreetName"),
-        "mailing": (), "city": ("City",), "zip": ("Zip", "StreetZip"),
+        "situs_city": ("StreetCommunity",), "situs_zip": ("StreetZip",),
+        "mailing": ("StreetAddress",), "city": ("City",), "zip": ("Zip",),
         "parcel": ("TAXPIN", "PARCELNUMBER", "MAPNUMBER"), "owner_occ": (),
     },
     "Abbeville": {
@@ -310,56 +326,70 @@ def _resolve_address(attrs: dict, schema: dict, defendant: str) -> dict:
         out["lat"] = centroid[0]
         out["lon"] = centroid[1]
 
-    z = _pick(attrs, schema["zip"])
-    if z:
+    def _zip5(z):
+        if not z:
+            return None
         digits = re.sub(r"\D", "", z)
         # Cherokee SCDOT layer pads zip+4 with a leading zero ("0293400000"
         # → real zip 29340) — strip it.
         if len(digits) >= 9 and digits.startswith("0"):
             digits = digits[1:]
-        out["zip"] = digits[:5] if len(digits) >= 5 else None
+        return digits[:5] if len(digits) >= 5 and digits[:5] != "00000" else None
+
+    # The layer's explicit owner-occupancy flag, when it has one.
+    owner_occ = False
+    for k in schema.get("owner_occ", ()):
+        v = _pick(attrs, (k,))
+        if v and str(v).upper().startswith(("Y", "T", "1")):
+            owner_occ = True
+            break
+
+    # schema["zip"] / schema["city"] are the owner's MAILING city/ZIP on these layers.
+    mailing_zip = _zip5(_pick(attrs, schema["zip"]))
+    if mailing_zip:
+        out["mailing_zip"] = mailing_zip
 
     if fiduciary:
         # Fiduciary defendants (PR, Trustee, Executor) → parcel of record
         # may not be the estate property under lien. Commit nothing.
         return out
 
-    # Real situs path
+    # Real situs path. A split situs needs a real house number: a bare street name
+    # (or a "0"/"99999" lot) is not a building's address.
     situs = _pick(attrs, schema["situs"])
     if not situs and schema["situs_parts"]:
         parts = [_pick(attrs, (p,)) for p in schema["situs_parts"]]
-        parts = [p for p in parts if p]
-        if parts:
-            situs = " ".join(parts)
+        if parts and parts[0] and not re.fullmatch(r"0+|9{4,}", parts[0].strip()):
+            situs = " ".join(p for p in parts if p)
     if situs:
         situs = re.sub(r"\s+", " ", situs).strip()
         if situs and not re.fullmatch(r"\W*", situs) and not situs.upper().startswith("0 "):
             out["street_address"] = situs
             out["address_source"] = "situs"
 
-    # Mailing fallback for non-fiduciary individuals.
-    if "street_address" not in out and not _is_company(defendant):
+    # Mailing fallback: only for an individual on a parcel the layer flags owner-occupied,
+    # where the mailing address IS the property. Without that flag an individual's mailing
+    # address is just as often a different house (absentee owner, landlord, heir).
+    if "street_address" not in out and not _is_company(defendant) and owner_occ:
         mailing = _pick(attrs, schema["mailing"])
-        owner_occ = False
-        for k in schema.get("owner_occ", ()):
-            v = _pick(attrs, (k,))
-            if v and str(v).upper().startswith(("Y", "T", "1")):
-                owner_occ = True
-                break
         if mailing and not PO_BOX_RE.search(mailing) and re.match(r"\s*\d", mailing):
-            # If the GIS layer carries an explicit owner-occupancy flag we
-            # require it to be Y. If it doesn't (most counties don't),
-            # individual mailings with a street number are overwhelmingly
-            # the property itself.
-            if owner_occ or schema.get("owner_occ") == ():
-                out["street_address"] = mailing
-                out["address_source"] = "mailing_homestead" if owner_occ else "mailing"
+            out["street_address"] = mailing
+            out["address_source"] = "mailing_homestead"
 
-    city = _pick(attrs, schema["city"])
+    # City / ZIP of the PROPERTY: the layer's situs columns, else (owner-occupied only)
+    # the mailing ones.
+    situs_zip = _zip5(_pick(attrs, schema.get("situs_zip", ())))
+    city = _pick(attrs, schema.get("situs_city", ()))
+    if not city and owner_occ and out.get("street_address"):
+        city = _pick(attrs, schema["city"])
     if city:
         # Some layers concatenate "CITY  STATE" — split.
         m = re.match(r"^(.*?)\s+(?:S\.?\s*C\.?|SC|N\.?\s*C\.?|NC)\s*\d{0,5}\s*$", city, re.I)
         out["city"] = (m.group(1) if m else city).strip()
+    if situs_zip:
+        out["zip"] = situs_zip
+    elif owner_occ and out.get("street_address") and mailing_zip:
+        out["zip"] = mailing_zip
     return out
 
 

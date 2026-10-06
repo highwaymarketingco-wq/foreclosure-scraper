@@ -61,7 +61,15 @@ PARCEL_LAYERS: dict[str, dict] = {
         "url": "https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query",
         # board ids are the 15-digit PIN (pinnum); index pin (10-digit) too for robustness.
         "id_fields": ["pinnum", "pin"],
-        "map": {"owner": "owner", "address": "Address", "market_value": "TotalMarketValue",
+        # `address` is the SITUS columns. It was "Address", which on this layer is the
+        # OWNER'S MAILING street (Address/CityName/State/Zipcode, live 2026-10-06). The
+        # live cache never used it -- resolve_layer_cfg() builds Buncombe from NC OneMap
+        # (siteadd, verified situs) because this entry publishes no mailing -- but any
+        # direct reader of this entry would have cached owners' mailing streets.
+        "map": {"owner": "owner",
+                "address": ["HouseNumber", "NumberSuffix", "direction", "streetname",
+                            "StreetType", "PostDirection"],
+                "market_value": "TotalMarketValue",
                 "tax_value": "TaxValue", "acreage": "Acreage",
                 "sale_price": "SalePrice"},
     },

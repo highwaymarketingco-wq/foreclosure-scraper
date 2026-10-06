@@ -5,8 +5,18 @@ from foreclosure_scraper import parcel_inventory as pi
 
 
 def test_scdot_situs_prefers_full_street_address():
-    assert pi._scdot_situs({"StreetAddress": "1101 PARTRIDGE RD"}) == "1101 PARTRIDGE RD"
+    assert pi._scdot_situs({"PropertyLocation": "1101 PARTRIDGE RD SPARTANBURG"}) == \
+        "1101 PARTRIDGE RD SPARTANBURG"
     assert pi._scdot_situs({"Property_A": "88 COLONIAL ACRES ROAD"}) == "88 COLONIAL ACRES ROAD"
+
+
+def test_scdot_situs_never_reads_spartanburg_streetaddress():
+    """2026-10-06: Spartanburg's StreetAddress/City/State/Zip are the OWNER'S MAILING block
+    (an absentee owner's "194 WATERFRONT ROW, PROSPERITY" on a parcel at 251 NEAL RD). It
+    used to be read first, ahead of PropertyLocation."""
+    a = {"StreetAddress": "194 WATERFRONT ROW", "PropertyLocation": "251 NEAL RD SPARTANBURG"}
+    assert pi._scdot_situs(a) == "251 NEAL RD SPARTANBURG"
+    assert pi._scdot_situs({"StreetAddress": "194 WATERFRONT ROW"}) == ""
 
 
 def test_scdot_situs_composes_number_and_name():
@@ -29,8 +39,10 @@ def test_scdot_situs_ignores_owner_mailing_block():
     # Union's Address_1 'C/O ...' is owner mailing, not situs -> not returned
     assert pi._scdot_situs({"Address_1": "C/O TRANSPORTATION BANK"}) == ""
     assert pi._scdot_situs({"Address_1": "DONALD"}) == ""
-    # ...but a street-looking Address1 is accepted
-    assert pi._scdot_situs({"Address1": "123 OAK ST"}) == "123 OAK ST"
+    # ...and so is a street-looking one: on every audited layer carrying ADDRESS1 /
+    # Address1 / Address_1 (Lincoln, Laurens, Barnwell, Saluda) it is the owner's MAILING
+    # street (2026-10-06), so it is never read as the situs.
+    assert pi._scdot_situs({"Address1": "123 OAK ST"}) == ""
 
 
 def test_scdot_situs_empty_when_no_address():
@@ -63,6 +75,7 @@ def test_scdot_parcel_picks_unique_not_subsequence():
 
 
 def test_extract_scdot_parcel_in_full_extract():
-    out = pi._extract({"TAXPIN": "713320362391", "PARCELNUMBER": "41",
-                       "OWNER": "SMITH", "StreetAddress": "1101 PARTRIDGE RD"}, {"scdot": True})
-    assert out["parcel_id"] == "713320362391" and out["situs"] == "1101 PARTRIDGE RD"
+    out = pi._extract({"TAXPIN": "713320362391", "PARCELNUMBER": "41", "OWNER": "SMITH",
+                       "StreetAddress": "194 WATERFRONT ROW",
+                       "PropertyLocation": "1101 PARTRIDGE RD SPARTANBURG"}, {"scdot": True})
+    assert out["parcel_id"] == "713320362391" and out["situs"] == "1101 PARTRIDGE RD SPARTANBURG"

@@ -66,7 +66,7 @@ _WHERE = "ConditionFactor IN ('DL','VP')"
 
 _OUT_FIELDS = ",".join([
     "GISParcelNumber", "MAPNUMBER", "PARCELNUMBER", "OwnerName", "TaxpayerName",
-    "PropertyLocation", "StreetAddress", "City", "State", "Zip",
+    "PropertyLocation", "StreetZip", "StreetAddress", "City", "State", "Zip",
     "YearBuilt", "LivingArea", "BedRooms", "FullBaths", "HalfBaths",
     "ConditionFactor", "CDUC", "PropertyType", "BuildingType", "LandUse",
     "CurrentAppraisedBuildingValue", "CurrentAppraisedLandValue",
@@ -312,7 +312,9 @@ class SpartanburgCondemned(BaseScraper):
             state="SC",
             county="Spartanburg",
             street_address=situs,
-            zip_code=(_clean(a.get("Zip")) or None),
+            # StreetZip is the situs ZIP; Zip belongs to the owner's MAILING block
+            # (StreetAddress/City/State/Zip), e.g. a Fort Worth TX ZIP on a Spartanburg parcel.
+            zip_code=(_clean(a.get("StreetZip")) or None),
             parcel_id=parcel,
             latitude=lat,
             longitude=lon,

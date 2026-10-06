@@ -259,7 +259,11 @@ NC_GIS: dict[str, dict[str, Any]] = {
     },
     "Buncombe": {
         "url": "https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query",
-        "addr_field": "Address",
+        # NOT `Address`: on this layer Address/CityName/State/Zipcode are the OWNER'S
+        # MAILING address (live 2026-10-06, see _LAYER_SCHEMAS), and the old string sent
+        # the auto-detector to it, so a lead's street was LIKE-matched against where
+        # owners get mail. The situs is split; match HouseNumber + streetname.
+        "addr_field": "__concat:HouseNumber+NumberSuffix+direction+streetname+StreetType+PostDirection__",
     },
     "Henderson": {
         "url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0/query",
@@ -576,8 +580,14 @@ FIELD_ALIASES = {
     "improvement_value": ("improvval", "Dwelling", "BLDG_VAL", "ImpValue",
                           "Improvement", "STRUCT_VAL",
                           "FMV_IMPRV", "COUNTY_BUILDING_VALUE"),
-    "city": ("CITY", "City", "PROP_CITY", "MAIL_CITY"),
-    "zip": ("ZIP", "Zip", "PROP_ZIP", "ZIPCODE", "ZipCode", "MAIL_ZIP"),
+    # The PROPERTY's city and ZIP (both callers write li.city / li.zip_code). MAIL_CITY and
+    # MAIL_ZIP were in these two lists until 2026-10-06: Carteret's MAIL_CITY put
+    # "WASHINGTON" (a federal owner's DC mailing city) on all 40 of 40 live-sampled
+    # parcels. A mailing column is never the property's city, so they are gone; layers
+    # whose bare CITY/ZIP columns are themselves the mailing block are handled by
+    # situs_view() below.
+    "city": ("CITY", "City", "PROP_CITY"),
+    "zip": ("ZIP", "Zip", "PROP_ZIP", "ZIPCODE", "ZipCode"),
     # Beaufort county-native only (2026-10-02, docs/sc_gis_endpoints_coastal.md):
     # a senior/legal-residence exemption code. No other county layer audited so
     # far publishes an equivalent column, so this is a single-alias role for now.
@@ -591,6 +601,187 @@ FIELD_ALIASES = {
     # above found nothing.
     "deed_combined": ("LegalReference", "DEED_BOOK_PAGE"),
 }
+
+
+# ---- Owner-MAILING blocks on audited county layers ------------------------------
+#
+# Every generic situs picker in this package (_apply_attrs here, enrichment_address_
+# backfill, enrichment_parcel_lookup, enrichment_gis_attrs, enrichment_situs_address,
+# enrichment_address_owner_v2 and the name resolver through them) reads a county
+# layer's attribute bag through case-insensitive alias lists such as "ADDRESS",
+# "StreetAddress", "CITY" and "ZIP". On several layers those exact names are the
+# OWNER'S MAILING block, not the parcel's location. Running each picker on 40 live
+# records per layer (2026-10-06) showed:
+#
+#   Buncombe NC property_bc_dis  Address/CityName/State/Zipcode are the owner's mailing
+#       address (36 ASHER LN situs; a parcel whose owner mails from Pittsburgh PA shows
+#       "120 BEECH ST"); `City` is a jurisdiction code ("CAS"). Situs exists only as
+#       HouseNumber/NumberSuffix/direction/streetname/StreetType/PostDirection. All six
+#       pickers wrote the mailing street on 40/40 records, four of them the mailing ZIP.
+#   Spartanburg SC CAMA_Parcels  StreetAddress/City/State/Zip = mailing (the parcel_cache
+#       comment of 2026-09-13 measured 44% absentee). enrichment_gis_attrs lists
+#       "StreetAddress" first and wrote the mailing street on 40/40.
+#   Lincoln NC TaxParcelViewer   ADDRESS1/ADDRESS2/CITY/STATE/ZIP = mailing (a Lincoln
+#       parcel "in" LAKE LURE); PHYSICALADDR is the situs. The LIKE-field detector fell
+#       through to ADDRESS1, the first field containing "addr".
+#   Transylvania NC Parcels      ADDRESS_1 = the second owner's NAME, ADDRESS_2/3 +
+#       CITY/STATE/ZIP_CODE = mailing; no situs column at all.
+#   Pender NC Layers/4           ADDR/CITY/STATE/ZIP = mailing; PROPERTY_ADDRESS = situs.
+#   Pickens SC Open_data/6       ADD1/CITY/STATE/ZIP = mailing; LOCADD/LOCCITY/LOCZIP = situs.
+#   Georgetown SC Energov/2      BillingAddress(2)/City/State/ZipCode = mailing (billing);
+#       situs is StreetNumber + StreetName.
+#   Carteret NC Parceldata/0     MAIL_* = mailing; PropertyAddress/SITE_CITY = situs.
+#
+# Burke, Cleveland, Gaston, Henderson, McDowell, Mecklenburg, Mitchell, Polk, NC OneMap,
+# Anderson, Beaufort, Colleton and Laurens were checked the same way and the pickers
+# already land on situs there.
+#
+# A schema is recognised by a SIGNATURE of field names that only that layer carries, so
+# the attribute bag alone is enough (most pickers never see the URL). `mailing` names the
+# columns a situs picker must never read; `situs` is the single situs column (None when
+# the layer has none); `situs_parts` builds a situs from split columns; `city`/`zip` name
+# the situs city/zip columns, injected as PROP_CITY/PROP_ZIP (keys every picker knows).
+_LAYER_SCHEMAS: tuple[dict, ...] = (
+    {"name": "buncombe_property_bc_dis",
+     "sig": ("pinnum", "cityname", "housenumber", "streetname"),
+     "mailing": ("address", "cityname", "state", "zipcode", "careof", "city"),
+     "situs": None,
+     "situs_parts": ("HouseNumber", "NumberSuffix", "direction", "streetname",
+                     "StreetType", "PostDirection"),
+     # No situs city/ZIP on this layer. When the owner's mailing street IS the situs
+     # street (owner-occupied), the mailing city/ZIP are the property's postal city/ZIP.
+     "owner_occupied_city_zip": ("Address", "CityName", "State", "Zipcode")},
+    {"name": "spartanburg_cama_parcels",
+     "sig": ("streetaddress", "streetcommunity", "propertylocation"),
+     "mailing": ("streetaddress", "city", "state", "zip"),
+     "situs": "PropertyLocation", "situs_parts": ("StreetNumber", "StreetName"),
+     "city": "StreetCommunity", "zip": "StreetZip"},
+    {"name": "lincoln_taxparcelviewer",
+     "sig": ("physicaladdr", "address1", "streetnum"),
+     "mailing": ("address1", "address2", "city", "state", "zip"),
+     "situs": "PHYSICALADDR"},
+    {"name": "transylvania_parcels",
+     "sig": ("address_3", "legal_addr"),
+     "mailing": ("address_1", "address_2", "address_3", "city", "state", "zip_code"),
+     "situs": None},
+    {"name": "pender_layers_4",
+     "sig": ("property_address", "addr", "city"),
+     "mailing": ("addr", "city", "state", "zip"),
+     "situs": "PROPERTY_ADDRESS"},
+    {"name": "pickens_open_data",
+     "sig": ("locadd", "add1"),
+     "mailing": ("add1", "add2", "city", "state", "zip"),
+     "situs": "LOCADD", "city": "LOCCITY", "zip": "LOCZIP"},
+    {"name": "georgetown_energov",
+     "sig": ("billingaddress", "streetnumber", "streetname"),
+     "mailing": ("billingaddress", "billingaddress2", "city", "state", "zipcode"),
+     "situs": None, "situs_parts": ("StreetNumber", "StreetName")},
+    {"name": "carteret_parceldata",
+     "sig": ("propertyaddress", "mail_city", "site_city"),
+     "mailing": ("mail_address1", "mail_address2", "mail_city", "mail_state",
+                 "mail_zi5", "mail_zi4", "fullmailingaddress"),
+     "situs": "PropertyAddress", "city": "SITE_CITY"},
+)
+
+#: NC/SC "no house number assigned" sentinels in a split house-number column ("0", "00",
+#: "99999"). A road with no number is not a building's address.
+_NO_HOUSE_NUMBER_RE = re.compile(r"^(?:0+|9{4,})$")
+
+
+def layer_schema(field_names) -> dict | None:
+    """The audited schema (see _LAYER_SCHEMAS) whose signature fields are all present in
+    `field_names` (any case), or None for a layer that is not registered."""
+    have = {str(f).lower() for f in field_names}
+    for s in _LAYER_SCHEMAS:
+        if all(f in have for f in s["sig"]):
+            return s
+    return None
+
+
+def _ci_get(attrs: dict[str, Any], field: str | None) -> Any:
+    if not field:
+        return None
+    if field in attrs:
+        return attrs[field]
+    fl = field.lower()
+    for k, v in attrs.items():
+        if k.lower() == fl:
+            return v
+    return None
+
+
+def _clean_part(v: Any) -> str:
+    s = "" if v is None else str(v).strip()
+    return "" if s in ("<Null>", "NULL", "None") else re.sub(r"\s+", " ", s)
+
+
+def split_situs(attrs: dict[str, Any], parts) -> str | None:
+    """A situs street line from split columns, the first being the house number. None when
+    the house number is missing or a no-number sentinel, or no street name is present."""
+    vals = [_clean_part(_ci_get(attrs, p)) for p in parts]
+    if not vals or not vals[0] or _NO_HOUSE_NUMBER_RE.match(vals[0]):
+        return None
+    vals[0] = vals[0].lstrip("0") or vals[0]
+    if not any(any(ch.isalpha() for ch in v) for v in vals[1:]):
+        return None
+    return " ".join(v for v in vals if v) or None
+
+
+def _street_key(s: Any) -> str:
+    return re.sub(r"[^A-Z0-9]", "", str(s or "").upper())
+
+
+def situs_view(attrs: dict[str, Any]) -> dict[str, Any]:
+    """A copy of a county layer's attribute bag that a generic situs picker can read safely.
+
+    For a registered layer (_LAYER_SCHEMAS) the owner-mailing columns are removed, a split
+    situs is stitched into SITUS_ADDR, and the layer's situs city/ZIP are copied to
+    PROP_CITY/PROP_ZIP. An unregistered bag is returned as an unchanged copy. The input is
+    never modified, so callers that stash the full bag (raw['gis_attrs_full']) still keep
+    the mailing block for the owner-mailing enrichers.
+    """
+    if not isinstance(attrs, dict):
+        return {}
+    schema = layer_schema(attrs.keys())
+    if schema is None:
+        return dict(attrs)
+    drop = set(schema["mailing"])
+    view = {k: v for k, v in attrs.items() if k.lower() not in drop}
+    situs = _clean_part(_ci_get(attrs, schema.get("situs"))) if schema.get("situs") else ""
+    if not situs and schema.get("situs_parts"):
+        situs = split_situs(attrs, schema["situs_parts"]) or ""
+    # Under SITUS_ADDR, a key every picker's alias list carries (Lincoln's PHYSICALADDR is
+    # in none of them), unless a caller already put a situs there.
+    if situs and not _ci_get(view, "SITUS_ADDR"):
+        view["SITUS_ADDR"] = situs
+    for key, col in (("PROP_CITY", schema.get("city")), ("PROP_ZIP", schema.get("zip"))):
+        v = _clean_part(_ci_get(attrs, col)) if col else ""
+        if v and v not in ("0",) and not _ci_get(view, key):
+            view[key] = v
+    occ = schema.get("owner_occupied_city_zip")
+    if occ and situs:
+        m_street, m_city, m_state, m_zip = (_clean_part(_ci_get(attrs, f)) for f in occ)
+        if m_street and _street_key(m_street) == _street_key(situs) and \
+                (not m_state or m_state.upper() in ("NC", "SC")):
+            if m_city and not _ci_get(view, "PROP_CITY"):
+                view["PROP_CITY"] = m_city
+            if m_zip and not _ci_get(view, "PROP_ZIP"):
+                view["PROP_ZIP"] = m_zip
+    return view
+
+
+def situs_city_zip(attrs: dict[str, Any]) -> tuple[str | None, str | None, str | None]:
+    """(street, city, zip) of the PROPERTY from a registered layer's attribute bag, never the
+    owner's mailing block. Used by scrapers that read a registered layer directly
+    (counties_nc.buncombe_elderly)."""
+    v = situs_view(attrs)
+    street = _clean_part(_ci_get(v, "SITUS_ADDR")) or None
+    schema = layer_schema(attrs.keys())
+    if not street and schema and schema.get("situs"):
+        street = _clean_part(_ci_get(v, schema["situs"])) or None
+    city = _clean_part(_ci_get(v, "PROP_CITY")) or None
+    z = re.sub(r"\D", "", _clean_part(_ci_get(v, "PROP_ZIP")))[:5] or None
+    return street, city, (z if z and len(z) == 5 else None)
 
 
 def _pick(attrs: dict[str, Any], candidates: tuple[str, ...]) -> Any:
@@ -797,6 +988,12 @@ async def _detect_addr_field(c: httpx.AsyncClient, base_url: str) -> str | None:
             _FIELD_CACHE[base_url] = fields
         except (httpx.HTTPError, ValueError, TimeoutError):
             return None
+    # A registered layer (see _LAYER_SCHEMAS) names its own situs column, or None when it
+    # has only split situs columns. Name-based guessing there lands on the owner's
+    # mailing street: Lincoln's ADDRESS1, Buncombe's Address (verified live 2026-10-06).
+    schema = layer_schema(fields)
+    if schema is not None:
+        return schema.get("situs")
     # Match against known candidates (case-insensitive). A candidate that is an
     # owner-mailing field on THIS layer is skipped so situs always wins.
     field_lower = {f.lower(): f for f in fields}
@@ -852,13 +1049,21 @@ async def _arcgis_query(
     keyword = _street_keywords(street)
     if not keyword:
         return []
-    patterns = []
-    if house_no and not concat_situs:
-        patterns.append(f"%{house_no}%{keyword}%")
-    patterns.append(f"%{keyword}%")
+    def _like(pat: str) -> str:
+        return f"UPPER({addr_field}) LIKE UPPER('{pat.replace(chr(39), chr(39)+chr(39))}')"
 
-    for pat in patterns:
-        where = f"UPPER({addr_field}) LIKE UPPER('{pat.replace(chr(39), chr(39)+chr(39))}')"
+    wheres = []
+    if house_no and concat_situs and concat_fields and concat_fields[0] != addr_field:
+        # Split-situs layer: pin the house number on its own column. Without it the
+        # street-name LIKE alone returns the first 8 parcels on the road, and a long
+        # road's real parcel is often not among them. A layer whose number column is
+        # numeric answers this with an error, which falls through to the LIKE below.
+        wheres.append(f"{concat_fields[0]}='{house_no}' AND " + _like(f"%{keyword}%"))
+    if house_no and not concat_situs:
+        wheres.append(_like(f"%{house_no}%{keyword}%"))
+    wheres.append(_like(f"%{keyword}%"))
+
+    for where in wheres:
         params = {
             "where": where,
             "outFields": out_fields,
@@ -1065,8 +1270,10 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
     # on "StreetName" alone against Georgetown-shaped attrs (no "HouseNumber"
     # key) and silently return the street name with the house number dropped.
     if not li.street_address:
-        site = _pick(attrs, FIELD_ALIASES["site_address"])
-        if not site:
+        # situs_view: on a registered layer the owner-mailing columns are not readable
+        # here (Buncombe's `Address` matched the "ADDRESS" alias on 40/40 live records).
+        site = _pick(situs_view(attrs), FIELD_ALIASES["site_address"])
+        if not site and layer_schema(attrs.keys()) is None:
             if "HouseNumber" in attrs:
                 site = _stitch_situs(attrs)
             elif "StreetNumber" in attrs:
@@ -1436,11 +1643,24 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
             best = results[0]
             confident = len(results) == 1  # single hit = fairly confident
             if house_no:
-                for r in results:
-                    if str(_pick(r, ("STRNUM", "HouseNumber", "ADDRNO", "house_num"))).strip() == house_no:
-                        best = r
-                        confident = True  # house_no matched explicitly
-                        break
+                hits = [r for r in results
+                        if str(_pick(r, ("STRNUM", "HouseNumber", "ADDRNO", "house_num"))).strip() == house_no]
+                if hits:
+                    # Several parcels can share the house number on streets that contain the
+                    # keyword (21 LAUREL AVE / 21 MOUNTAIN LAUREL DR / 21 LAUREL PARK DR, live
+                    # Buncombe 2026-10-06). Prefer the one whose own situs is the lead's
+                    # street; with no such parcel and several candidates, do not claim one.
+                    want = _street_key(li.street_address)
+
+                    def _same_street(r: dict) -> bool:
+                        k = _street_key(_pick(situs_view(r), FIELD_ALIASES["site_address"]))
+                        return bool(want and k and (k.startswith(want) or want.startswith(k)))
+
+                    same = [r for r in hits if _same_street(r)]
+                    if same:
+                        best, confident = same[0], len(same) == 1
+                    else:
+                        best, confident = hits[0], len(hits) == 1
             # Stash confidence on the chosen result so _apply_attrs can be picky
             # about which fields to write. Specifically: parcel_id only when
             # confident, since a wrong parcel_id corrupts the dedupe key.

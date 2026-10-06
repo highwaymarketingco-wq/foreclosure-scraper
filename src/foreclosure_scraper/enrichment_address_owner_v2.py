@@ -66,6 +66,7 @@ from .enrichment_arcgis import (
     SC_GIS,
     _detect_addr_field,
     _pick,
+    layer_schema,
 )
 from .http_client import client
 from .models import Listing
@@ -463,6 +464,12 @@ def _synth_split_situs(attrs: dict[str, Any]) -> Optional[str]:
 def _inject_site_alias(attrs: dict[str, Any], site_field: Optional[str]) -> None:
     """If the detected situs field isn't one _populate_from_attrs knows, copy
     its value into a recognized alias key so the standard writer picks it up."""
+    # A registered layer (enrichment_arcgis._LAYER_SCHEMAS: Buncombe, Lincoln, Spartanburg,
+    # ...) gets its situs from situs_view() inside _populate_from_attrs, or none at all.
+    # Injecting a guessed column here would put a bare road name (Buncombe `streetname`
+    # on a no-number lot) or a mailing line under SITUS_ADDR, where situs_view keeps it.
+    if layer_schema(attrs.keys()) is not None:
+        return
     # Prefer a synthesized split-situs (number + name) — strictly better than a
     # street-name-only single field on layers that split the address.
     split = _synth_split_situs(attrs)

@@ -54,7 +54,14 @@ SC_CAMA: dict[tuple[str, str], dict] = {
     ("SC", "Spartanburg"): {
         "kind": "csv",
         "csv_url": "https://www.arcgis.com/sharing/rest/content/items/1f190ebd48c1402a918c3bc315431a1b/data",
-        "tms_col": "GISParcelNumber", "map_col": "MAPNUMBER", "addr_col": "StreetAddress",
+        # The situs is StreetNumber + StreetDirection + StreetName. NOT StreetAddress: in this
+        # CSV (header checked 2026-10-06) StreetAddress/City/State/Zip are the OWNER'S MAILING
+        # block, and 865 of 1,916 cached Spartanburg rows held a mailing street that is not
+        # the parcel's situs. lookup() joins an address-only lead to a parcel by this column,
+        # so a lead at the owner's home matched the owner's OTHER parcel and took its
+        # parcel_id, value and condition.
+        "tms_col": "GISParcelNumber", "map_col": "MAPNUMBER",
+        "addr_col": ("StreetNumber", "StreetDirection", "StreetName"),
         "land_val_col": "CurrentAppraisedLandValue", "bldg_val_col": "CurrentAppraisedBuildingValue",
         "year_col": "YearBuilt", "beds_col": "BedRooms", "fullbath_col": "FullBaths",
         "halfbath_col": "HalfBaths", "cond_col": "ConditionFactor", "grade_col": "BuildingGrade",
@@ -182,10 +189,16 @@ def _build_from_csv(state: str, county: str, spec: dict, *, max_rows: int | None
         fb = _num(row.get(spec["fullbath_col"])) or 0
         hb = _num(row.get(spec["halfbath_col"])) or 0
         rec = _blank_rec()
+        ac = spec["addr_col"]
+        if isinstance(ac, (tuple, list)):
+            bits = [(row.get(c) or "").strip() for c in ac]
+            situs = " ".join(b for b in bits if b) if bits and bits[0] not in ("", "0") else ""
+        else:
+            situs = (row.get(ac) or "").strip()
         rec.update({
             "tms": tms, "map_digits": _norm_tms(row.get(spec["map_col"])),
-            "address_norm": norm_addr(row.get(spec["addr_col"])),
-            "street_address": (row.get(spec["addr_col"]) or "").strip(),
+            "address_norm": norm_addr(situs),
+            "street_address": situs,
             "market_value": round(market, 2),
             "year_built": int(_num(row.get(spec["year_col"])) or 0) or None,
             "beds": _num(row.get(spec["beds_col"])),

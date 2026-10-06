@@ -71,9 +71,15 @@ def _scdot_parcel(attrs: dict) -> str:
 def _scdot_situs(attrs: dict) -> str:
     """Build a property SITUS from the SCDOT layer's per-county field variants.
     Prefer a complete street-address field; else compose number + name; never
-    return the owner MAILING block (Address_1 'C/O ...' etc.)."""
-    for f in ("StreetAddress", "PropertyLocation", "SITUS", "Situs", "Property_A",
-              "PropertyAddress", "SITE_ADDR", "LocationLookup"):
+    return the owner MAILING block.
+
+    2026-10-06: "StreetAddress" was read FIRST; on Spartanburg's CAMA columns it is the
+    owner's MAILING street (PropertyLocation is the situs). "LocationLookup" is a numeric
+    key, not an address. The ADDRESS1/Address1/Address_1 fallback is gone too: on every
+    audited layer carrying those names (Lincoln, Laurens, Barnwell, Saluda, Darlington)
+    they are the owner's mailing street."""
+    for f in ("PropertyLocation", "SITUS", "Situs", "Property_A",
+              "PropertyAddress", "SITE_ADDR"):
         v = attrs.get(f)
         if v and str(v).strip():
             return str(v).strip()
@@ -85,11 +91,6 @@ def _scdot_situs(attrs: dict) -> str:
             num = str(attrs.get(numf) or "").strip()
             num = "" if (not num or set(num) == {"0"}) else num + " "  # vacant parcels carry "0"/"000"
             return f"{num}{str(nam).strip()}".strip()
-    # ADDRESS1 only if it looks like a street (leading number), not a name / C/O.
-    for f in ("ADDRESS1", "Address1", "Address_1"):
-        a = attrs.get(f)
-        if a and re.match(r"^\s*\d", str(a)):
-            return str(a).strip()
     return ""
 
 

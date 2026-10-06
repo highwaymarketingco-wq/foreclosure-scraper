@@ -230,6 +230,45 @@ def _is_terminal_dict(rec: dict, now: datetime) -> bool:
     return False
 
 
+def _addr_key(v) -> str:
+    return "".join(ch for ch in str(v or "").upper() if ch.isalnum())
+
+
+def keep_mailing_off_address(fresh: Listing, prior: Listing, merged: Listing) -> bool:
+    """Undo Listing.merge()'s backfill of the PROPERTY address from a prior row when what it
+    backfilled is the owner's MAILING address. True when anything was undone.
+
+    merge() fills every field the fresh row left empty from the prior copy. Sources that used
+    to publish the owner's mailing address as the property (counties_nc.transylvania_
+    delinquent_tax, counties_nc.buncombe_elderly, the Buncombe unpaid-bill layers before
+    2026-09-29; docs/HANDOFF.md item 69) now leave street/city/ZIP empty when the parcel's
+    situs is unknown and keep the mailing block in raw['owner_mailing']. Without this, the
+    first full run after the fix re-inherited the very mailing address from the prior board,
+    because this merge runs before any enricher could resolve the situs.
+
+    Only a field the FRESH row left empty is touched, only when the backfilled value is part
+    of the fresh row's own owner-mailing text, and never when the prior street came from the
+    county's own situs by parcel id (raw['situs_address_source'] 'parcel_cache:*')."""
+    om = fresh.raw.get("owner_mailing") if isinstance(fresh.raw, dict) else None
+    mailing = om.get("mailing") if isinstance(om, dict) else (om if isinstance(om, str) else None)
+    key = _addr_key(mailing)
+    if not key:
+        return False
+    praw = prior.raw if isinstance(prior.raw, dict) else {}
+    if str(praw.get("situs_address_source") or "").startswith("parcel_cache:"):
+        return False
+    undone = False
+    for f in ("street_address", "city", "zip_code"):
+        if getattr(fresh, f, None) in (None, "") and getattr(merged, f, None):
+            v = _addr_key(getattr(merged, f))
+            if len(v) >= 4 and v in key:
+                setattr(merged, f, None)
+                undone = True
+    if undone and isinstance(merged.raw, dict):
+        merged.raw["mailing_address_not_inherited"] = True
+    return undone
+
+
 def _provably_different_dict(rec: dict, li: Listing) -> bool:
     """dedupe.py's house-number guard (_provably_different_property), applied
     between a streamed prior-row DICT and a candidate fresh Listing, without
@@ -506,7 +545,10 @@ def merge_prior_board(
             # match this same fresh row (a dedupe_key() matching more than one
             # existing row is rare but possible — same tolerance patch_existing_rows()
             # applies), not just the first.
-            fresh_deduped[match_idx] = fresh_deduped[match_idx].merge(prior_li)
+            merged = fresh_deduped[match_idx].merge(prior_li)
+            if keep_mailing_off_address(fresh_deduped[match_idx], prior_li, merged):
+                stats["mailing_address_not_inherited"] = stats.get("mailing_address_not_inherited", 0) + 1
+            fresh_deduped[match_idx] = merged
             fresh_matched[match_idx] = True
             continue
 

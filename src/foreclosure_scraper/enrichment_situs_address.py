@@ -46,6 +46,7 @@ import structlog
 from .enrichment_arcgis import (
     _detect_addr_field,
     _MAILING_FIELD_MARKERS,
+    situs_view,
 )
 from .enrichment_gis_attrs import (
     _query_parcel,
@@ -172,7 +173,13 @@ def apply_situs_address(li: Listing, attrs: dict[str, Any], addr_field: str | No
     if li.street_address and li.street_address.strip():
         return 0  # already has a real address — nothing to do
 
-    norm = _norm_ci(attrs)
+    # Read through situs_view(): on a registered layer (enrichment_arcgis._LAYER_SCHEMAS)
+    # the owner-MAILING columns are removed first. The candidate lists below include
+    # "ADDRESS", "StreetAddress", "City" and "ZIP", which on Buncombe's and Spartanburg's
+    # layers are where the owner gets mail (and Buncombe's `City` is a jurisdiction code,
+    # the "Cas" seen on Helene rows); this wrote the mailing street + ZIP on 38/40 live
+    # Buncombe records (2026-10-06).
+    norm = _norm_ci(situs_view(attrs))
     filled = 0
 
     # Resolve the situs value. Prefer the layer-detected situs field (already

@@ -351,7 +351,10 @@ def _sale(parcel_id, price, sale_date, *, book=None, page=None, grantor=None,
 _BUNCOMBE_SALE_FIELDS = ("PINN,Grantor1,Grantee1,SellingPrice,AdjustedSalePrice,"
                          "DeedBook,DeedPage,SellDate,QualifiedSale,VacantLot,Acres,"
                          "Class,Address")
-_BUNCOMBE_PARCEL_FIELDS = "pin,pinnum,Acreage,Class,Improved,TaxValue,Address"
+# No `Address`: on the parcel layer it is the owner's MAILING street (and was never read
+# here). The comp address comes from saledata's own Address, which IS the situs (136 of
+# 146 live 2026-10-06 sales matched the parcel's situs columns exactly).
+_BUNCOMBE_PARCEL_FIELDS = "pin,pinnum,Acreage,Class,Improved,TaxValue"
 
 
 async def _buncombe_sale_index(http) -> dict[str, list[dict]]:

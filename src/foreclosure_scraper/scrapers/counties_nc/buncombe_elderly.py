@@ -6,6 +6,16 @@ motivated-seller prospects (downsizing, can't maintain, or heirs about to inheri
 name-indexed lane this is property-keyed: ONE bulk query returns owner + situs address + value +
 parcel — a complete lead, no name-resolution needed.
 
+PROPERTY ADDRESS = THE SITUS COLUMNS, NOT `Address` (fixed 2026-10-06). On this layer
+`Address`/`CityName`/`State`/`Zipcode` are the OWNER'S MAILING address and `City` is a
+jurisdiction code; the parcel's own location exists only as HouseNumber/NumberSuffix/
+direction/streetname/StreetType/PostDirection. The scraper used to publish the mailing
+block as the property: 271 of 3,898 board rows (2026-10-06) showed a street other than
+the parcel's, e.g. a Lytle Cove Rd parcel listed at its owner's Virginia address. The
+street now comes from the situs columns (enrichment_arcgis.situs_city_zip); city and ZIP,
+which the layer does not publish for the situs, are filled only when the owner's mailing
+street IS the situs street (owner-occupied). The mailing block goes to raw['owner_mailing'].
+
 Free, anonymous, compliant (public ArcGIS, no auth/captcha). ~4,300 parcels, paginated.
 Gate with FORECLOSURE_ELDERLY_SOURCE=0 to skip.
 
@@ -36,12 +46,14 @@ from datetime import datetime
 from typing import Iterable
 
 from ...base_scraper import BaseScraper
+from ...enrichment_arcgis import situs_city_zip
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
 QUERY_URL = "https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query"
 _WHERE = "Exempt IN ('ELD','DIS','BLD','VET')"
-_OUT = ("pin,owner,Address,CityName,State,Zipcode,TotalMarketValue,TaxValue,LandUse,Class,"
+_OUT = ("pin,pinnum,owner,HouseNumber,NumberSuffix,direction,streetname,StreetType,PostDirection,"
+        "Address,CityName,State,Zipcode,TotalMarketValue,TaxValue,LandUse,Class,"
         "Acreage,Exempt,CareOf,SalePrice,DeedDate,DeedBook,DeedPage,Instrument")
 _PAGE = 2000
 _TAGS = {"ELD": "elderly_exemption", "DIS": "disabled_exemption",
@@ -66,6 +78,28 @@ def _f(v) -> float | None:
         return f if f > 0 else None
     except (ValueError, TypeError):
         return None
+
+
+def _owner_mailing(a: dict, owner: str, pin: str, situs: str | None) -> dict | None:
+    """The layer's owner-mailing block, in the raw['owner_mailing'] shape the absentee and
+    contact consumers read (mailing_shape.mailing_of). None when the row has no mailing."""
+    street = re.sub(r"\s+", " ", str(a.get("Address") or "")).strip()
+    city = re.sub(r"\s+", " ", str(a.get("CityName") or "")).strip()
+    state = str(a.get("State") or "").strip().upper()[:2] or None
+    zipc = str(a.get("Zipcode") or "").strip()
+    mailing = " ".join(b for b in (street, city, state or "", zipc) if b) or None
+    if not mailing:
+        return None
+    same = bool(situs and street and re.sub(r"[^A-Z0-9]", "", street.upper())
+                == re.sub(r"[^A-Z0-9]", "", situs.upper()))
+    return {
+        "owner": owner, "mailing": mailing, "situs": situs, "parcel_id": pin,
+        "mail_state": state,
+        # Unknown (None) when the parcel has no situs to compare against.
+        "absentee": (not same) if situs else None,
+        "out_of_state": bool(state and state != "NC"),
+        "source": "buncombe_elderly_gis",
+    }
 
 
 class BuncombeElderly(BaseScraper):
@@ -125,17 +159,20 @@ class BuncombeElderly(BaseScraper):
                     if care_of:
                         raw["gis_exempt"]["care_of"] = care_of
 
+                    situs, city, zip5 = situs_city_zip(a)
+                    raw["owner_mailing"] = _owner_mailing(a, owner, pin, situs)
+
                     out.append(Listing(
                         source=self.slug,
                         source_url=f"{QUERY_URL}?where=pin%3D%27{pin}%27&outFields=*&f=html",
                         listing_type=ListingType.ELDERLY_DISABLED,
                         property_kind=pk,
                         owner_name=owner,
-                        street_address=(a.get("Address") or "").strip() or None,
-                        city=((a.get("CityName") or "").strip().title() or None),
+                        street_address=situs,
+                        city=(city.title() if city else None),
                         state="NC",
                         county="Buncombe",
-                        zip_code=(str(a.get("Zipcode") or "").strip() or None),
+                        zip_code=zip5,
                         parcel_id=pin,
                         market_value=_f(a.get("TotalMarketValue")),
                         assessed_value=_f(a.get("TaxValue")),

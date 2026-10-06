@@ -6,6 +6,11 @@ the parcel being resolved. Example: Buncombe was set to "streetname"
 which returns "OTEEN CHURCH" (street name only, no house #) instead of
 "Address" which returns "72 OTEEN CHURCH RD".
 
+CORRECTED 2026-10-06: Buncombe's "Address" is the OWNER'S MAILING street (it matched the
+2026-06-15 sample only because that owner lives there). Buncombe is now a "__concat:"
+sentinel over the situs columns (HouseNumber + streetname + ...), which this test stitches
+the way enrichment_arcgis._arcgis_query does.
+
 This test queries each NC county FeatureServer with a known-good parcel
 and asserts the configured addr_field returns a value that LOOKS like
 a real street address (starts with a number, has letters after).
@@ -23,7 +28,7 @@ import re
 import httpx
 import pytest
 
-from foreclosure_scraper.enrichment_arcgis import NC_GIS
+from foreclosure_scraper.enrichment_arcgis import NC_GIS, _concat_fields, _stitch_situs
 
 # Verified-real parcel IDs per county. Updated when a county's parcel layer
 # rotates IDs (rare). To refresh: pull a real parcel from
@@ -73,6 +78,8 @@ def test_nc_gis_addr_field_returns_real_address(county: str) -> None:
         pytest.skip(f"{county} has no addr layer (documented)")
 
     pid = KNOWN_GOOD_PARCELS[county]
+    concat = addr_field.startswith("__concat:")
+    out_fields = ",".join(_concat_fields(addr_field)) if concat else addr_field
     feats = None
     last_err = None
     for wf in WHERE_CANDIDATES:
@@ -81,7 +88,7 @@ def test_nc_gis_addr_field_returns_real_address(county: str) -> None:
                 cfg["url"],
                 params={
                     "where": f"{wf}='{pid}'",
-                    "outFields": addr_field,
+                    "outFields": out_fields,
                     "returnGeometry": "false",
                     "f": "json",
                 },
@@ -96,7 +103,8 @@ def test_nc_gis_addr_field_returns_real_address(county: str) -> None:
             last_err = e
 
     assert feats, f"{county}: no parcel matched PID={pid!r} (last err: {last_err})"
-    val = feats[0]["attributes"].get(addr_field)
+    attrs = feats[0]["attributes"]
+    val = _stitch_situs(attrs, _concat_fields(addr_field)) if concat else attrs.get(addr_field)
     assert val, f"{county}: configured addr_field {addr_field!r} returned empty"
     assert isinstance(val, str), f"{county}: addr_field returned non-string: {val!r}"
 

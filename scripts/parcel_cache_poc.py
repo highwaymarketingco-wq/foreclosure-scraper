@@ -13,8 +13,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from foreclosure_scraper.http_client import get_text  # noqa: E402
 
 LAYER = "https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query"
-FIELDS = "pin,pinnum,owner,Address,TotalMarketValue,TaxValue,AppraisedValue,Acreage"
-DB = Path(__file__).resolve().parent.parent / "data" / "parcel_cache" / "buncombe.sqlite"
+# Situs columns, NOT `Address`: on this layer Address/CityName/State/Zipcode are the OWNER'S
+# MAILING address (live 2026-10-06), so the POC used to cache owners' mailing streets as the
+# parcel address.
+FIELDS = ("pin,pinnum,owner,HouseNumber,NumberSuffix,direction,streetname,StreetType,"
+          "PostDirection,TotalMarketValue,TaxValue,AppraisedValue,Acreage")
+_SITUS = ("HouseNumber", "NumberSuffix", "direction", "streetname", "StreetType", "PostDirection")
+# Its own file. This used to be data/parcel_cache/buncombe.sqlite -- the LIVE cache
+# parcel_cache.lookup() reads -- which a POC run deleted and rebuilt in a different schema.
+DB = Path(__file__).resolve().parent.parent / "data" / "parcel_cache" / "buncombe_poc.sqlite"
 PAGE = 2000
 
 
@@ -38,6 +45,13 @@ async def download() -> list[dict]:
     return rows
 
 
+def _situs(r: dict) -> str | None:
+    parts = [str(r.get(f) or "").strip() for f in _SITUS]
+    if not parts[0] or parts[0].strip("0") == "" or parts[0] == "99999":
+        return None          # no house number assigned: not a building address
+    return " ".join(p for p in parts if p) or None
+
+
 def build_db(rows: list[dict]) -> None:
     DB.parent.mkdir(parents=True, exist_ok=True)
     if DB.exists():
@@ -47,7 +61,7 @@ def build_db(rows: list[dict]) -> None:
                    market_value REAL, tax_value REAL, acreage REAL)""")
     con.executemany(
         "INSERT INTO parcels VALUES(?,?,?,?,?,?)",
-        [(_norm(r.get("pin") or r.get("pinnum")), r.get("owner"), r.get("Address"),
+        [(_norm(r.get("pin") or r.get("pinnum")), r.get("owner"), _situs(r),
           r.get("TotalMarketValue") or r.get("AppraisedValue"), r.get("TaxValue"),
           r.get("Acreage")) for r in rows])
     con.execute("CREATE INDEX idx_pin ON parcels(pin)")

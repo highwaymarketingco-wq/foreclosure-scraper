@@ -135,6 +135,37 @@ def _label_value(lines: list[str], label: str) -> str | None:
     return lines[i + 1] if i + 1 < len(lines) else None
 
 
+def _owner_mailing_block(det: dict, owner: str | None, parcel: str | None) -> dict | None:
+    """The bill's owner MAILING address as raw['owner_mailing'] (the shape mailing_shape.
+    mailing_of() reads), or None. It is never the property's street/city/ZIP: the bill
+    carries no situs at all."""
+    street = det.get("mailing_street")
+    city = det.get("mailing_city")
+    zipc = det.get("mailing_zip")
+    mail_state = det.get("mailing_state")
+    # Drop a "street" that is really just the owner name or the city echoed (mailing
+    # blocks with no street line) -- not a mailable street.
+    if street and owner and street.strip().lower() == owner.strip().lower():
+        street = None
+    if street and city and street.strip().lower() == city.strip().lower():
+        street = None
+    mailing = det.get("mailing_full") or " ".join(
+        b for b in (street, city, mail_state, zipc) if b) or None
+    if not mailing:
+        return None
+    out_of_state = bool(mail_state and mail_state.upper() != "NC")
+    return {
+        "owner": owner or None, "mailing": mailing,
+        "street": street, "city": city, "state": mail_state, "zip": zipc,
+        "situs": None, "parcel_id": parcel, "mail_state": mail_state,
+        "out_of_state": out_of_state,
+        # An out-of-state owner is absentee; otherwise unknown until a situs is
+        # resolved to compare against.
+        "absentee": True if out_of_state else None,
+        "source": "transylvania_tax_bill",
+    }
+
+
 def _parse_detail(page_html: str) -> dict:
     """Extract owner mailing address, parcel, legal, and taxable value from a ViewTaxBill page."""
     lines = _text_lines(page_html)
@@ -332,18 +363,15 @@ class TransylvaniaDelinquentTax(BaseScraper):
                             if am and am.group(2) == "AC":
                                 acreage = _f(am.group(1))
 
-                        # street/city/zip come from the owner MAILING address; the property
-                        # itself is in Transylvania County, NC (state stays NC for footprint).
-                        street = det.get("mailing_street")
-                        city = det.get("mailing_city")
-                        zipc = det.get("mailing_zip")
+                        # The bill carries only the OWNER'S MAILING address, not the parcel's
+                        # location. It used to be published as the property's street/city/
+                        # ZIP: 137 of 195 board rows (2026-10-06) showed a street other than
+                        # the parcel's, e.g. owners' Las Vegas NV and Angier NC addresses on
+                        # Transylvania parcels. It now goes to raw['owner_mailing'] only; the
+                        # situs is resolved from parcel_id downstream (parcel cache / GIS),
+                        # and stays empty when the county has none.
                         mail_state = det.get("mailing_state")
-                        # Drop a "street" that is really just the owner name or the city
-                        # echoed (mailing blocks with no street line) — not a mailable street.
-                        if street and owner and street.strip().lower() == owner.strip().lower():
-                            street = None
-                        if street and city and street.strip().lower() == city.strip().lower():
-                            street = None
+                        owner_mailing = _owner_mailing_block(det, owner, parcel)
 
                         amount = balance or det.get("current_balance")
                         amt_str = f"${amount:,.2f}" if amount else "unknown amount"
@@ -353,11 +381,11 @@ class TransylvaniaDelinquentTax(BaseScraper):
                             listing_type=ListingType.TAX_LIEN,
                             property_kind=pk,
                             owner_name=owner or None,
-                            street_address=street,
-                            city=city,
+                            street_address=None,
+                            city=None,
                             state="NC",
                             county="Transylvania",
-                            zip_code=zipc,
+                            zip_code=None,
                             parcel_id=parcel,
                             legal_description=det.get("legal_description") or None,
                             assessed_value=_f(value),
@@ -365,11 +393,11 @@ class TransylvaniaDelinquentTax(BaseScraper):
                             market_value=_f(value),
                             acreage=acreage,
                             description=(f"Delinquent {year} property tax bill #{bill_no} "
-                                         f"(balance {amt_str}) open with Transylvania County. "
-                                         f"Address shown is the owner mailing address."),
+                                         f"(balance {amt_str}) open with Transylvania County."),
                             first_seen=now,
                             last_seen=now,
-                            raw={"transylvania_tax": {
+                            raw={**({"owner_mailing": owner_mailing} if owner_mailing else {}),
+                                 "transylvania_tax": {
                                 "tax_year": year,
                                 "bill_number": bill_no,
                                 "account_number": account or det.get("account_number"),

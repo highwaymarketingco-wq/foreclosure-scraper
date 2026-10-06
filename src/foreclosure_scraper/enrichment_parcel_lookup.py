@@ -32,6 +32,7 @@ from .enrichment_arcgis import (
     SCDOT_BASE,
     _apply_attrs,
     _pick,
+    situs_view,
 )
 from .http_client import client
 from .models import Listing, PropertyKind
@@ -250,8 +251,10 @@ def _populate_from_parcel(li: Listing, attrs: dict[str, Any]) -> int:
     """
     filled = 0
 
-    # Primary: read site_address from any of the common field names
-    site = _pick(attrs, FIELD_ALIASES["site_address"])
+    # Primary: read site_address from any of the common field names, on a view of the bag
+    # without the layer's owner-MAILING columns (enrichment_arcgis.situs_view).
+    sv = situs_view(attrs)
+    site = _pick(sv, FIELD_ALIASES["site_address"])
     if site:
         site_str = str(site).strip()
         upper = site_str.upper()
@@ -271,13 +274,13 @@ def _populate_from_parcel(li: Listing, attrs: dict[str, Any]) -> int:
             filled += 1
 
     # City/zip
-    city = _pick(attrs, FIELD_ALIASES["city"])
+    city = _pick(sv, FIELD_ALIASES["city"])
     if city and not li.city:
         c = str(city).strip().title()
         if c and c.upper() != "NO ADDRESS":
             li.city = c
             filled += 1
-    z = _pick(attrs, FIELD_ALIASES["zip"])
+    z = _pick(sv, FIELD_ALIASES["zip"])
     if z and not li.zip_code:
         zs = str(z).strip()
         if zs.isdigit() and len(zs) >= 5:

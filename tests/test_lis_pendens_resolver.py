@@ -206,7 +206,10 @@ def test_resolve_strips_cherokee_leading_zero_zip():
         "ParcelPoly": "0010000123000",
     }
     out = _resolve_address(attrs, schema, "Christie M Mcdaniel")
-    assert out["zip"] == "29340"
+    # The SHEET1 columns are the owner's MAILING block and the layer has no occupancy flag,
+    # so the ZIP is kept as mailing_zip and never written as the property's ZIP (2026-10-06).
+    assert out["mailing_zip"] == "29340"
+    assert "zip" not in out and "street_address" not in out
 
 
 # ---------- _is_target ----------
