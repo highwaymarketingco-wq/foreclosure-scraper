@@ -10,6 +10,7 @@
 # Run DETACHED so an SSH drop cannot kill it:
 #   setsid nohup bash deploy/oracle/vm_resume.sh --run >/dev/null 2>&1 < /dev/null &
 # Modes (passed through): --run (default) | --enrich-only | --publish-only
+# RESUME_PIN_COMMIT=<sha>: run exactly that commit instead of pulling origin/main (see below).
 # Logs: logs/vm-resume-<stamp>.log (run) and logs/vm-resume-<stamp>.mem.log (watchdog).
 set -uo pipefail
 
@@ -41,9 +42,25 @@ if [[ "$FREE_MB" -lt "$NEED_MB" ]]; then
 fi
 
 uv sync --frozen >>"$LOG" 2>&1 || uv sync >>"$LOG" 2>&1
-# Same as vm_run.sh: code + the Mac's latest hand-off files (the SOS ledger the resume applies).
-git pull --rebase --autostash origin main >>"$LOG" 2>&1 || true
-echo "==> code at $(git rev-parse --short HEAD)" | tee -a "$LOG"
+PIN="${RESUME_PIN_COMMIT:-}"
+if [[ -n "$PIN" ]]; then
+  # PINNED (2026-10-06): run exactly the reviewed commit or nothing. origin/main moves all day
+  # (other agents push), so pulling it would run whatever is newest. Fast-forward to the pin
+  # and refuse to start unless HEAD IS the pin (a checkout already past it is refused too).
+  # Check the pin out BEFORE starting this script, so the copy bash is executing is the pinned
+  # one:  git fetch origin && git merge --ff-only --autostash <sha>
+  git fetch origin >>"$LOG" 2>&1 || true
+  git merge --ff-only --autostash "$PIN" >>"$LOG" 2>&1 || true
+  WANT=$(git rev-parse --verify --quiet "$PIN^{commit}" || echo "unknown")
+  if [[ "$(git rev-parse HEAD)" != "$WANT" ]]; then
+    echo "==> code is $(git rev-parse --short HEAD), pinned $PIN ($WANT) — not starting" | tee -a "$LOG"
+    exit 1
+  fi
+else
+  # Same as vm_run.sh: code + the Mac's latest hand-off files (the SOS ledger the resume applies).
+  git pull --rebase --autostash origin main >>"$LOG" 2>&1 || true
+fi
+echo "==> code at $(git rev-parse --short HEAD)${PIN:+ (pinned)}" | tee -a "$LOG"
 
 START=$(date +%s)
 uv run python scripts/resume_from_checkpoint.py "$MODE" >>"$LOG" 2>&1 &

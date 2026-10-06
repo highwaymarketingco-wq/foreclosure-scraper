@@ -55,10 +55,16 @@ WHO USES IT
       RESUME_SEEN_SINCE the same plan, digest and apply also remove the presumed-withdrawn tag
       that dedupe2 put on rows this run saw (repair_reseen(); see the block comment there).
 
-The merge itself is always Listing.merge() with the re-scraped (fresh) row as the base, so fresh
-wins on conflicting fields and the old row backfills missing ones; fold() then keeps the old
-row's numbered situs over the fresh row's sentinel string, which is the address the board was
-already publishing, BUT ONLY WHEN THAT NUMBER CAME FROM THE COUNTY (county_situs()).
+The two callers merge differently:
+  * merge_prior_board() (future runs) uses fold(): Listing.merge() with the re-scraped (fresh)
+    row as the base, so fresh wins on conflicting fields and the old row backfills missing ones
+    (merge_prior_board's rule for every matched prior row); fold() then keeps the old row's
+    numbered situs over the fresh row's sentinel string, BUT ONLY WHEN THAT NUMBER CAME FROM THE
+    COUNTY (county_situs()).
+  * the one-off collapse (apply_collapse()) uses absorb_copies(): the live row is the published
+    row, and an aged copy gives it ONLY what COPY_ALLOWLIST names (the county situs number and
+    its provenance, and the earlier first_seen when the owners match). See the block comment
+    above COPY_ALLOWLIST for why nothing else on these copies can be trusted.
 
 ADDRESS RULE (2026-10-06, measured on all 325 groups of the 10/5 pre_publish plan against the
 parcel cache, the county's own situs and owner-mailing record):
@@ -85,9 +91,9 @@ from datetime import date, datetime, timezone
 from typing import Any, Callable, Iterable, Optional
 
 from .dedupe import _house_no_of, drop_withdrawn_tags
-from .models import Listing, _UNIT_RE, _deep_merge_dict, _normalize_parcel
+from .models import Listing, _UNIT_RE, _normalize_parcel
 from .validation import _PARCEL_BAD_PATTERNS
-from .web_artifact import _PLACEHOLDER_HOUSE_NUM_RE
+from .web_artifact import _PLACEHOLDER_HOUSE_NUM_RE, _identity_keys, _to_dict
 
 #: validation.py nulls a parcel id under 7 characters as too short to be unique; same floor.
 MIN_PARCEL_LEN = 7
@@ -212,11 +218,99 @@ def fold(base: Listing, other: Listing) -> Listing:
     return merged
 
 
-def clear_reappeared(li: Listing, *, keep_stale_case: bool = False) -> None:
-    """The live row absorbed an aging copy: drop the copy's pulled_sale miss counter, its
-    presumed_withdrawn tag and its raw['stale_case'] flag (Listing.merge() backfills all three
-    onto the live row); dedupe.drop_withdrawn_tags(), the rule dedupe() applies too."""
-    drop_withdrawn_tags(li, keep_stale_case=keep_stale_case)
+# ------------------------------------------------------- what an aged copy may give the live row
+# THE DEFECT (dress rehearsal of the 10/5 publish on the VM, 2026-10-06, real checkpoint).
+# apply_collapse() used to fold each aged copy into the live row with Listing.merge() and then
+# lay the live row's raw back on top: the live row won every field BOTH rows carried, and
+# everything it LACKED (top-level fields, raw keys, nested leaves) came from the copy. In 208 of
+# the 325 groups the copy names a DIFFERENT owner (one name, HALLIDAY Q STANFORD IV, sits on
+# about 180 of those copies), so the published rows carried another person's outreach letter and
+# skip-trace (245 rows; NC|rutherford|1616705: live FOSTER, TAMMIE, letter "Dear Francis," to
+# WALSH, FRANCIS ROBERT), phones (10), email (1), divorce (184), deed chain (155), owner cluster
+# (146), CRM (206), owner mailing (4) and the detail file's sale fields (deed ref, previous owner,
+# sale amount; 9). And 9 rows published max_bid_70 / wholesale_mao / equity that the live row had
+# withheld on a contradicted ARV (SC|spartanburg|713272200834: live ARV $300 flagged
+# arv_land_sqft_mismatch; published max bid $121,200 from the copy's $271,600 ARV), breaking
+# three board_selfcheck money rules that are 0 on the uncollapsed board.
+#
+# THE COPIES ARE NOT A SOURCE OF PROPERTY FACTS EITHER (measured on all 325 groups). Every
+# enricher ran on the live row THIS run; a block the live row lacks is one this run did not
+# produce for it, mostly because its address is a sentinel or its point a road or county
+# centroid (325 of 325 live rows have no photos). The copies have those blocks because their
+# address and point were another place: the owner's mailing address in 208 groups, and even
+# where the owner matches, 47 of 116 copies' photos are centred more than 60 m from the live
+# row's point (Buncombe: 2.8 to 20 km, e.g. live '99999 HUMMINGBIRD HL', copy '3 CARRERE CT').
+# The property facts follow the wrong place: 713272200834 is a vacant HOA subdivision lot, and
+# its copy says 4 beds, 3 baths, built 1956, a roof graded 'major', another building footprint
+# and an aerial photo about 170 m away. The parcel-keyed blocks do not qualify either: gis,
+# gis_attrs_full, lrcpwa, septic, assessor_card and cama carry an owner, a mailing address or a
+# sale; vacant_lot, storm_damage, property_category, land_ratio and the top-level sqft/beds/
+# baths/year/acreage/assessed values feed the score or the valuation, which the live row was
+# scored without (nothing re-scores at publish), and carry no per-field provenance.
+#
+# THE RULE. The live row is the published row. absorb_copies() starts from a deep copy of it and
+# takes from a copy ONLY what COPY_ALLOWLIST names. The publish holds the same line for the
+# detail sidecar: write_artifact() must not backfill a kept row's vision/comps/cama/rent_comps
+# from the prior board, whose row for that parcel IS the aged copy (it would have, through the
+# parcel id the collapse makes unique, for 284 of the 325 kept rows: 243 vision reports, 282
+# comps, 22 cama), and must not join another row to the prior board through a key only a
+# dropped copy shared with it (apply_collapse(kept_out=...) / resume_from_checkpoint._collapse).
+
+#: Everything absorb_copies() may take from an aged copy. An ALLOWLIST: whatever the live row
+#: lacks, a field that is not named here is never taken.
+COPY_ALLOWLIST = {
+    "street_address": "the copy's numbered address over the live row's sentinel or empty one, "
+                      "only when county_situs(copy): written from the county's own parcel record, "
+                      "looked up by the parcel id the twin rule already requires to be the same "
+                      "(re-checked 2026-10-06: all 69 such copies equal today's parcel cache, the "
+                      "43 whose owner differs included, so the copy's owner data cannot reach it)",
+    "raw.situs_address_source": "only together with that address: its provenance",
+    "first_seen": "the earlier one, only when same_owner(): when this source first listed this "
+                  "parcel; written by the scraper, never by an enricher",
+}
+
+
+def owner_tokens(name: Any) -> frozenset:
+    """An owner name's identity tokens: enrichment_board_qa._name_tokens (upper case, 3+
+    characters, no punctuation, suffixes, role words or digits)."""
+    from .enrichment_board_qa import _name_tokens
+    return frozenset(_name_tokens(name if isinstance(name, str) else ""))
+
+
+def same_owner(a: Any, b: Any) -> bool:
+    """Both rows name an owner and one name's identity tokens contain the other's ('ALLISON,
+    WAYNE' and 'ALLISON, WAYNE L ALLISON, L MARLENE'). A missing owner, or two names that merely
+    overlap ('SMITH JOHN' and 'SMITH MARY'), is not the same owner."""
+    ta, tb = owner_tokens(_get(a, "owner_name")), owner_tokens(_get(b, "owner_name"))
+    return bool(ta and tb and (ta <= tb or tb <= ta))
+
+
+def absorb_copies(live: Listing, copies: list[Listing]) -> tuple[Listing, list[str]]:
+    """The live row with its aged ``copies`` (newest first) absorbed under COPY_ALLOWLIST:
+    returns (merged row, the allowlisted fields actually taken). The merged row is a deep copy of
+    ``live``; neither input is changed."""
+    merged = live.model_copy(deep=True)
+    taken: list[str] = []
+    base_addr = live.street_address
+    if is_sentinel_address(base_addr) or not (base_addr or "").strip():
+        for c in copies:
+            if real_house_no(c.street_address) and county_situs(c):
+                merged.street_address = c.street_address
+                raw = merged.raw if isinstance(merged.raw, dict) else {}
+                raw["situs_address_source"] = _raw(c)["situs_address_source"]
+                merged.raw = raw
+                taken += ["street_address", "raw.situs_address_source"]
+                break
+    for c in copies:
+        cf, mf = parse_stamp(c.first_seen), parse_stamp(merged.first_seen)
+        if same_owner(live, c) and cf is not None and mf is not None and cf < mf:
+            merged.first_seen = c.first_seen
+            if "first_seen" not in taken:
+                taken.append("first_seen")
+    unknown = set(taken) - set(COPY_ALLOWLIST)
+    if unknown:     # a code change that takes more must extend the allowlist (and its reasons)
+        raise AssertionError(f"absorb_copies took {sorted(unknown)} outside COPY_ALLOWLIST")
+    return merged, taken
 
 
 # ------------------------------------------------------------------- full-board cleanup plan
@@ -616,20 +710,19 @@ class CollapsePlanMismatch(RuntimeError):
     """The rows a plan names are not the rows at those positions any more."""
 
 
-#: A twin group's live row keeps ITS OWN scored outputs from this run. Listing.merge() lets the
-#: absorbed copy win raw leaf collisions, and each aging copy was scored (and down-ranked for its
-#: tag) as a row of its own in the tail; nothing re-scores at publish.
-_KEEP_SCORED_RAW_KEYS = ("distress_stack", "signal_stack", "intent_score", "intent_band")
-
-
 def apply_collapse(listings: list[Listing], plan: CollapsePlan,
-                   today: Optional[date] = None) -> dict:
+                   today: Optional[date] = None, *, kept_out: Optional[dict] = None) -> dict:
     """Apply ``plan`` to ``listings`` IN PLACE. Every planned row is re-checked against the
     plan's view of it first (CollapsePlanMismatch, nothing changed, if any differs). Then the
     reseen rows are repaired (repair_reseen()), and each twin group's live row absorbs its aging
-    copies via fold() (newest copy first; a copy's house number only when county_situs()),
-    loses the copies' withdrawn tags, keeps its own raw values and scored outputs (a copy only
-    adds raw keys the live row lacks), and the copies are removed."""
+    copies via absorb_copies() (newest copy first): the published row is the live row, plus only
+    what COPY_ALLOWLIST names. Its own raw, scores, tags and valuation are untouched, so a
+    copy's withdrawn tag, stale_case, owner data or money never reaches it. The copies are
+    removed.
+
+    ``kept_out``, when given, is filled for the publish (write_artifact's prior-detail
+    exclusions, see the block comment above COPY_ALLOWLIST): ``rows`` the kept Listing objects,
+    ``keys`` the published identity keys (web_artifact._identity_keys) of the dropped copies."""
     for g in plan.groups:
         for v in [g["keep"], *g["drop"]]:
             if v.idx >= len(listings):
@@ -648,33 +741,38 @@ def apply_collapse(listings: list[Listing], plan: CollapsePlan,
                 or ls is None or cut is None or ls < cut):
             raise CollapsePlanMismatch(f"row {v.idx}: planned reseen {v.ident()} found {now.ident()}")
 
+    # The dropped copies' published identity keys, read before anything changes (pure: each
+    # _to_dict runs on a deep copy).
+    copy_keys: set[str] = set()
+    if kept_out is not None:
+        for g in plan.groups:
+            for v in g["drop"]:
+                copy_keys.update(_identity_keys(_to_dict(listings[v.idx].model_copy(deep=True))))
+
     reseen_stats = repair_reseen([listings[v.idx] for v in plan.reseen], today=today)
 
-    dropped: set[int] = set()
-    restored = 0
+    # Every merged row is built (absorb_copies() changes neither input) before any is swapped in.
+    merged_rows: list[tuple[int, Listing]] = []
+    taken_n: Counter = Counter()
+    owner_differs = 0
     for g in plan.groups:
-        keep_idx = g["keep"].idx
-        merged = listings[keep_idx]
-        own = merged.raw if isinstance(merged.raw, dict) else {}
-        keep_stale = bool(own.get("stale_case"))
-        scored = {k: copy.deepcopy(own[k]) for k in _KEEP_SCORED_RAW_KEYS if k in own}
-        # The live row was enriched THIS run; an aging copy's raw is from an earlier one (and on
-        # the 10/5 twins often wrong: owner_mailing of another owner, old valuations). The copy
-        # only fills raw keys the live row lacks; every leaf both carry keeps the live value.
-        own_raw = copy.deepcopy(own)
-        for v in g["drop"]:
-            before = merged.street_address
-            merged = fold(merged, listings[v.idx])
-            if merged.street_address != before:
-                restored += 1
-            dropped.add(v.idx)
-        merged.raw = _deep_merge_dict(merged.raw, own_raw)
-        clear_reappeared(merged, keep_stale_case=keep_stale)
-        merged.raw.update(scored)
+        live = listings[g["keep"].idx]
+        copies = [listings[v.idx] for v in g["drop"]]          # newest first (plan order)
+        merged, taken = absorb_copies(live, copies)
+        taken_n.update(taken)
+        owner_differs += any(not same_owner(live, c) for c in copies)
+        merged_rows.append((g["keep"].idx, merged))
+    dropped = {v.idx for g in plan.groups for v in g["drop"]}
+    for keep_idx, merged in merged_rows:
         listings[keep_idx] = merged
     before_n = len(listings)
     listings[:] = [li for i, li in enumerate(listings) if i not in dropped]
+    if kept_out is not None:
+        kept_out["rows"] = [m for _, m in merged_rows]
+        kept_out["keys"] = copy_keys
     return {"groups": len(plan.groups), "rows_dropped": before_n - len(listings),
-            "addresses_restored": restored, "rows_after": len(listings),
+            "addresses_restored": taken_n["street_address"],
+            "first_seen_taken": taken_n["first_seen"],
+            "groups_copy_owner_differs": owner_differs, "rows_after": len(listings),
             "reseen_repaired": len(plan.reseen), "reseen": reseen_stats,
             "digest": plan.digest()}

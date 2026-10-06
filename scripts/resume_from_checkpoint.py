@@ -40,7 +40,11 @@ PLACEHOLDER-TWIN CLEAN-UP (opt-in, 2026-10-05)
     and a plan digest. Applying is OFF unless RESUME_COLLAPSE_PLACEHOLDER_TWINS is set (or
     --collapse-placeholder-twins is passed) for --publish-only / --run: right after the
     pre_publish checkpoint is loaded (or saved) and before write_artifact, each group's live row
-    absorbs its aging copies via Listing.merge() (live row first) and the copies are dropped.
+    absorbs its aging copies via placeholder_twins.absorb_copies() and the copies are dropped.
+    The live row is the published row: a copy gives it only what COPY_ALLOWLIST names (the
+    county situs number and its provenance; the earlier first_seen when the owners match),
+    never another owner's data or a valuation (2026-10-06 dress rehearsal), and write_artifact
+    does not backfill a kept row's detail sidecar from the prior board (which holds the copy).
     Set the variable to the digest the dry run printed to apply exactly the reviewed plan (a
     different plan is then skipped with an error and the board is published uncollapsed); "1"
     applies whatever the plan is at publish time.
@@ -255,11 +259,21 @@ def _collapse(st: M.TailState, summary: dict, wanted: str) -> None:
                     "reviewed one", wanted=wanted, digest=digest, groups=len(plan.groups),
                     rows_dropped=plan.rows_dropped)
         return
+    kept: dict = {}
     try:
-        res = apply_collapse(rows, plan)
+        res = apply_collapse(rows, plan, kept_out=kept)
     except Exception as exc:  # noqa: BLE001 - apply_collapse checks everything before mutating
         M.log.error("resume.placeholder_twins_skipped", reason=f"{type(exc).__name__}: {exc}")
         return
+    # The kept rows publish their OWN detail sidecar: the prior board's row for their parcel is
+    # the aged copy just refused, and a key only a dropped copy shared must not join another row
+    # to it (placeholder_twins, block comment above COPY_ALLOWLIST; write_artifact's
+    # PRIOR-DETAIL EXCLUSIONS). write_artifact refuses to write if a kept row is not on the board.
+    st.write_artifact_kwargs = {**st.write_artifact_kwargs,
+                                "no_prior_detail_rows": list(kept.get("rows") or []),
+                                "no_prior_detail_keys": frozenset(kept.get("keys") or ())}
+    res["prior_detail_excluded"] = {"rows": len(kept.get("rows") or []),
+                                    "keys": len(kept.get("keys") or ())}
     note = (f"; collapsed {res['rows_dropped']} placeholder-twin duplicate rows "
             f"({res['groups']} parcels, plan {digest})")
     if plan.seen_since is not None:

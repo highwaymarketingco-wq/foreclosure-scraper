@@ -2903,6 +2903,10 @@ class TailState:
     write_run_health: bool = True
     export_and_email: bool = True
     scoring_failed: Optional[str] = None
+    #: extra keyword arguments for write_artifact(); empty for every run. The placeholder-twin
+    #: collapse of a checkpoint resume sets its prior-detail exclusions here
+    #: (no_prior_detail_rows / no_prior_detail_keys, see web_artifact.write_artifact).
+    write_artifact_kwargs: dict = field(default_factory=dict)
 
 
 async def run_enrich_tail(st: TailState) -> dict:
@@ -3989,7 +3993,7 @@ def publish_tail(st: TailState, summary: dict) -> int:
     # GitHub Actions then commits docs/ back to the repo, GitHub Pages serves it.
     _write_ok = False
     try:
-        write_artifact(enriched, summary)
+        write_artifact(enriched, summary, **(getattr(st, "write_artifact_kwargs", None) or {}))
         # Published successfully — drop the checkpoint so the next run
         # starts clean instead of resuming onto a board that shipped.
         checkpoint.clear()

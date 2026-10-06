@@ -372,7 +372,7 @@ def test_an_owner_mailing_address_on_the_old_copy_is_not_published():
     assert res["addresses_restored"] == 0
     assert li.street_address == "0 CONVAIR DR SPARTANBURG" and li.owner_name == "DARABAN CORNEL &"
     assert li.raw["owner_mailing"] == {"name": "DARABAN CORNEL &", "mailing": "SPARTANBURG SC"}
-    assert li.raw["vision"] == {"condition": "poor"}               # copy-only keys still added
+    assert "vision" not in li.raw                     # nothing the live row lacks comes from the copy
     assert not _tagged(li) and "stale_case" not in li.raw
 
 

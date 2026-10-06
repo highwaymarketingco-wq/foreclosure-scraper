@@ -319,7 +319,9 @@ def test_apply_collapses_in_place_and_keeps_the_address():
         li = mine[0]
         assert li.street_address == prior_addr and _to_dict(li)["street_address"] == prior_addr
         assert "pulled_sale" not in li.raw and li.auction_status is None
-        assert li.first_seen == PRIOR_T and li.last_seen == FRESH_T
+        # neither row names an owner, so the copy's earlier first_seen is not taken
+        # (placeholder_twins.COPY_ALLOWLIST: only when same_owner())
+        assert li.first_seen == FRESH_T and li.last_seen == FRESH_T
     # what must not collapse is untouched
     assert sum(1 for li in rows if li.parcel_id == "711295579416") == 3
     assert sum(1 for li in rows if li.parcel_id == "1603396") == 2

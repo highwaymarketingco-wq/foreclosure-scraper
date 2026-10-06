@@ -401,7 +401,7 @@ def test_twin_collapse_keeps_the_live_rows_own_scores_and_drops_the_copys_stale_
     (li,) = rows
     assert li.raw["distress_stack"]["tier"] == "HOT" and "downranked_stale" not in li.raw["distress_stack"]
     assert li.raw["intent_score"] == 88 and "stale_case" not in li.raw
-    assert li.raw["vision"] == {"condition": "fair"}
+    assert "vision" not in li.raw                     # the copy's vision is not the live row's
 
 
 # ------------------------------------------------------------------ resume script (VM entry)

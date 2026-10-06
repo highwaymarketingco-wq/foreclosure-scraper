@@ -4290,12 +4290,24 @@ def write_artifact(
     listings: list[Listing],
     summary: dict,
     docs_dir: Path | str = "docs",
+    *,
+    no_prior_detail_rows: list[Listing] | tuple = (),
+    no_prior_detail_keys: set[str] | frozenset = frozenset(),
 ) -> tuple[Path, Path]:
     """Write the whole payload set, then the manifest that seals it.
 
     Refuses (BoardLockNotHeld) unless the caller holds the board lock, and
     (BoardChangedSinceLoad) if listings.json is not the file this process loaded
     — see require_board_lock / _check_not_changed_since_load and audit O3.
+
+    PRIOR-DETAIL EXCLUSIONS (2026-10-06, placeholder_twins.apply_collapse). The sidecar of a row
+    in ``no_prior_detail_rows`` (Listing objects that must be in ``listings``) is exactly its own:
+    the cross-run backfill from the prior board is skipped for it. A key in
+    ``no_prior_detail_keys`` is never used to join a row to the prior board. The twin collapse
+    passes its kept rows (the prior board's row for their parcel is the aged copy it refused)
+    and its dropped copies' keys (dropping a copy can make a key unique that was not, and would
+    join another row to the copy's prior detail). Both default to empty: nothing changes. A row
+    that is not in ``listings`` raises ValueError before anything is written.
 
     MEMORY (rewritten 2026-10-05). The VM's 18h full run (270,232 rows) was OOM-killed one
     step short of this call: on top of the ~270K live Listings the publish tail held, in
@@ -4366,17 +4378,26 @@ def write_artifact(
     # from one ArcGIS URL); carrying detail across it would fan one report out to all of them,
     # so only keys unique on BOTH sides are allowed to match.
     _key_freq: dict = {}
+    _skip_rows = {id(li) for li in no_prior_detail_rows}
+    _skip_found = 0
     for li in listings:
+        _skip_found += id(li) in _skip_rows
         for key in _identity_keys(_to_dict(li)):
             _key_freq[key] = _key_freq.get(key, 0) + 1
-    payload_unique = {k: (c == 1) for k, c in _key_freq.items()}
+    if _skip_found != len(_skip_rows):
+        raise ValueError(f"write_artifact: {len(_skip_rows) - _skip_found} of {len(_skip_rows)} "
+                         "no_prior_detail_rows are not on the board being written")
+    payload_unique = {k: (c == 1 and k not in no_prior_detail_keys) for k, c in _key_freq.items()}
+    _keys_withheld = {k for k, c in _key_freq.items() if c == 1 and k in no_prior_detail_keys}
     del _key_freq
+    prior_withheld: collections.Counter = collections.Counter()
 
     # Prior sidecar, keyed by identity — lets a full re-scrape (which only re-visions a capped
     # subset) KEEP vision/comps/cama for the leads it didn't touch this run, instead of
     # overwriting details[i] with {}. Fresh detail from THIS run always wins; prior only
     # backfills missing keys.
-    prior = _prior_detail_index(docs, payload_unique)
+    # (the withheld keys are looked up too, only so the log can count the joins they would make)
+    prior = _prior_detail_index(docs, {**payload_unique, **dict.fromkeys(_keys_withheld, True)})
     if not prior:
         payload_unique = {}
 
@@ -4432,6 +4453,16 @@ def write_artifact(
                     if payload_unique.get(key) and key in prior:
                         pri_text = prior[key]
                         break
+                if pri_text is None and _keys_withheld:
+                    if any(k in _keys_withheld and k in prior for k in _identity_keys(rec)):
+                        prior_withheld["rows_by_excluded_key"] += 1
+                if pri_text and id(li) in _skip_rows:
+                    pri = json.loads(pri_text)
+                    if any(k not in d and k in pri for k in LAZY_DETAIL_KEYS):
+                        prior_withheld["rows"] += 1
+                        prior_withheld.update(f"withheld_{k}" for k in LAZY_DETAIL_KEYS
+                                              if k not in d and k in pri)
+                    pri_text = None
                 if pri_text:
                     pri = json.loads(pri_text)
                     for k in LAZY_DETAIL_KEYS:
@@ -4731,6 +4762,9 @@ def write_artifact(
     if str(listings_path.resolve()) in _LOAD_STAMPS:
         _remember_load(docs, listings_path)
 
+    if _skip_rows or no_prior_detail_keys:
+        log.info("web_artifact.prior_detail_withheld", rows_excluded=len(_skip_rows),
+                 keys_excluded=len(no_prior_detail_keys), **dict(prior_withheld))
     log.info("web_artifact.written", listings=len(listings), bytes=listings_path.stat().st_size)
     return listings_path, meta_path
 

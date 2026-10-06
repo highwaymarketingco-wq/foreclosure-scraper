@@ -92,7 +92,7 @@ def test_a_failed_board_write_skips_every_downstream_export():
     for later in ("foreclosure_sold_pool.json", "write_health_artifact(", "write_listings(", "send_digest("):
         assert src.index(later, abort) > abort, f"{later} must come AFTER the abort"
     # ...and no export appears BEFORE the write attempt
-    write = src.index("write_artifact(enriched, summary)")
+    write = src.index("write_artifact(enriched, summary")
     for early in ("write_health_artifact(", "write_listings(", "send_digest("):
         assert src.find(early) == -1 or src.find(early) > write, f"{early} runs before the board write"
     assert "checkpoint.clear()" in src[write: write + 400], "the checkpoint is dropped only on success"
