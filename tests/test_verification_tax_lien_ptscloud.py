@@ -158,15 +158,17 @@ def test_refuted_orange_paid_before_interest():
 
 
 def test_other_lien_listing_is_never_suppressed():
-    """A lien-agent row carrying a delinquency flag on the same parcel: a stale property-tax
-    answer would also remove that row's own tax_lien listing signal, so it is not published."""
+    """A lien-agent row carrying a delinquency flag (a mixed row): the stale property-tax answer
+    is published as it is (the downgrade to unconfirmed is retired, _tax_common); the qualified
+    GOVERNS keeps it from ending the row's own listing type (test_verification_tax_lien_other_lien)."""
     row = {"state": "NC", "county": "Hyde", "parcel_id": "9501107720", "listing_type": "tax_lien",
            "source": "liensnc", "raw": {"lrcpwa": {"reid": "15796"},
                                         "two_year_delinquent": {"is_two_year_plus": True, "tax_year": "2021"}}}
     res = run(row, served())
-    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "other_lien_listing"
-    assert res.evidence["property_tax_verdict"] == "stale"
+    assert res.verdict == "stale"
+    assert not {"reason", "property_tax_verdict", "listing_claim_source"} & set(res.evidence)
     assert res.evidence["tax_parcel_from"] == "lrcpwa_reid"
+    assert "tax_lien:property_tax" in p.GOVERNS and "tax_lien" not in p.GOVERNS
 
 
 def test_falls_back_to_the_next_parcel_number():

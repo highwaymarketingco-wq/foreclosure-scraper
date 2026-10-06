@@ -24,12 +24,13 @@ the 2025 one is. Verdicts:
   unconfirmed  no usable PIN on the row, the page could not be fetched, no bills parsed, or
                the parcel's billing ends before the latest delinquent-eligible levy (a PIN
                retired by a split/recombination: this record no longer answers for the
-               property); or a refuted/stale answer on a row typed tax_lien by another lien's
-               source (other_lien_listing, see _tax_common: v3).
+               property).
 
 Evidence also carries the two FINDINGS.md side checks: the county's current owner against the
-board's owner_name (Finding C) and the county's assessed value against the board's value with
-the ratio (Finding B). They are evidence only; the verdict is about the tax balance.
+board's owner_name (Finding C), as the match CATEGORY only (same / partial / different; never a
+name: the ledger is pushed to a PUBLIC repo, and ROW_SUMMARY_EXCLUDE keeps owner_name out of the
+entry's row summary too), and the county's assessed value against the board's value with the
+ratio (Finding B). They are evidence only; the verdict is about the tax balance.
 
 WHICH ROWS (v3). The validator's selection, except that a tax_lien listing type set by another
 lien's source is not a property-tax claim (_tax_common.NON_PROPERTY_TAX_SOURCES: 1,094 Buncombe
@@ -37,14 +38,16 @@ rows on the 2026-10-06 board, liensnc lien-agent filings and NC eCourts federal 
 judgments). Checked against the county's property-tax record, a paid tax bill refuted them and
 the verdict took a real lien's signal away. Such a row is still covered when it carries a
 property-tax claim of its own (a delinquency flag, or a county roll's block merged into it),
-and then a refuted/stale answer is published unconfirmed (other_lien_listing), the same rule
-and the same code as tax_lien_ptscloud and tax_lien_qpaybill.
+the same rule as tax_lien_ptscloud and tax_lien_qpaybill (_tax_common), and its verdict is
+published as it is: the qualified GOVERNS below ends only the property-tax-derived signals on
+that row, never the lien's own listing type.
 
 GOVERNS (_tax_common.GOVERNS, shared): a refuted or stale verdict removes the scorer's
 `tax_lien` listing-type signal (and `tax_sale` / `tax_lien_chronic`, the same fact under other
 names) where the row's claim is a property-tax one ("tax_lien:property_tax": never the listing
-type of another lien's row on the same parcel), and the `recorded_debt` credit where that debt
-is the tax balance ("recorded_debt:tax"; a judgment or an opening bid still counts).
+type of another lien's row, whether it is the row checked or another row of the parcel), and the
+`recorded_debt` credit where that debt is the tax balance ("recorded_debt:tax"; a judgment or an
+opening bid still counts).
 """
 from __future__ import annotations
 
@@ -58,16 +61,16 @@ from . import _tax_common as tc
 
 SIGNAL = "tax_lien"
 VERSION = "v3"         # v3 (2026-10-06): another lien's tax_lien listing type (liensnc, NC
-                       # eCourts federal / NCDOR judgments) is not a property-tax claim, and a
-                       # refuted/stale answer on such a row is unconfirmed (_tax_common).
-                       # v2: a parcel record that ends before the latest delinquent-eligible
-                       # levy is unconfirmed, not refuted/stale
+                       # eCourts federal / NCDOR judgments) is not a property-tax claim
+                       # (applies(); _tax_common). v2: a parcel record that ends before the
+                       # latest delinquent-eligible levy is unconfirmed, not refuted/stale
 TTL_DAYS = 30          # a balance changes when paid; re-check monthly
 RETRY_DAYS = 7         # an unreadable page is retried after a week
 SOURCE = "tax.buncombenc.gov"
 GOVERNS = tc.GOVERNS   # tax_lien:property_tax, tax_sale:property_tax, tax_lien_chronic,
                        # recorded_debt:tax
 ROLL_KEY = "buncombe_delinquent_tax"   # the county roll's own block (counties_nc scraper)
+ROW_SUMMARY_EXCLUDE = ("owner_name",)  # public ledger: no names (the sweep pops these)
 #: the county's own delinquent-roll blocks: a property-tax claim of their own on a row whose
 #: listing type is another lien's (multi_year_delinquent_tax: the county's per-year unpaid-bill
 #: layers, counties_generic.multi_year_delinquent_tax)
@@ -295,8 +298,8 @@ def owner_match(board: Optional[str], county: Optional[str]) -> Optional[str]:
 
 
 def side_checks(row: dict, page: dict) -> dict:
-    out: dict[str, Any] = {"owner_county": page.get("owner"), "owner_board": row.get("owner_name"),
-                           "owner_match": owner_match(row.get("owner_name"), page.get("owner"))}
+    """Finding C as a category only (the names never leave this function) and Finding B."""
+    out: dict[str, Any] = {"owner_match": owner_match(row.get("owner_name"), page.get("owner"))}
     cv, bv = page.get("value"), board_value(row)
     out["value_county"] = cv
     out["value_board"] = bv
@@ -308,8 +311,7 @@ def side_checks(row: dict, page: dict) -> dict:
 # verify
 # ---------------------------------------------------------------------------
 
-def _res(verdict: str, evidence: dict, row: Optional[dict] = None) -> VerificationResult:
-    verdict, evidence = tc.other_lien_downgrade(verdict, evidence, row)   # the mixed-row rule
+def _res(verdict: str, evidence: dict) -> VerificationResult:
     return result(SIGNAL, verdict, evidence, source=SOURCE, version=VERSION, verifier=_NAME)
 
 
@@ -346,7 +348,7 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     }
     if delinquent:
         ev["under_500"] = ev["total_delinquent"] < 500
-        return _res("confirmed", ev, row)
+        return _res("confirmed", ev)
 
     # nothing delinquent today. If the parcel's billing stops before the latest levy that
     # could be delinquent (a PIN retired by a split or recombination: the 2026-10-06 sweep
@@ -381,11 +383,11 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         checked.append({"year": year, "url": burl, "paid_late": bool(late), **(late or {})})
         if late:
             ev["bills_checked"] = checked
-            return _res("stale", ev, row)
+            return _res("stale", ev)
     ev["bills_checked"] = checked
     if checked and all("error" in c for c in checked):
         ev["reason"] = "bill_pages_unreadable"
         return _res("unconfirmed", ev)
     if current and not checked:
         ev["note"] = "only the current levy is unpaid; it is not delinquent yet"
-    return _res("refuted", ev, row)
+    return _res("refuted", ev)

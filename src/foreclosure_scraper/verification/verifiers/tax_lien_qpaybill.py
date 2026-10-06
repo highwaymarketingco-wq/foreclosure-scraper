@@ -57,8 +57,10 @@ deadline on a weekend rolls to Monday):
   refuted      nothing delinquent today and the year(s) checked were paid by the deadline.
   unconfirmed  no identifier, not on the portal, tenant unhealthy, page unreadable, a full page
                that may hide older years, billing ended before the latest eligible levy, no paid
-               row to read, identity_conflict; or a refuted/stale answer on a row typed by a DEW /
-               DOR lien source (other_lien_listing, see _tax_common).
+               row to read, identity_conflict.
+A row typed tax_lien by a DEW / DOR lien source that is covered through its own claim (a mixed
+row) gets its verdict as is: the qualified GOVERNS (_tax_common) never ends that lien's listing
+type.
 Evidence (public ledger: a whitelist, no names, no addresses): the portal URL, tenant, the map
 numbers searched and what each showed, per-year delinquent amounts, total, years, the
 not-yet-delinquent current levy, tax-sale years, claimed years, the paid rows read (payment date,
@@ -457,8 +459,7 @@ _KEYS = ("reason", "url", "tenant", "county", "searched", "decided_on", "delinqu
          "board_parcel", "latest_levy_year", "latest_delinquent_eligible_levy",
          "delinquent_by_year", "total_delinquent", "years_delinquent", "under_500", "de_minimis",
          "not_yet_delinquent_due", "sold_at_tax_sale_years", "claimed_years", "bills_checked",
-         "owner_match", "note", "error", "tenant_health", "property_tax_verdict",
-         "listing_claim_source")
+         "owner_match", "note", "error", "tenant_health")
 _SEARCHED_KEYS = ("map_number", "receipt", "role", "found", "rows", "latest_levy_year",
                   "delinquent_by_year", "not_yet_delinquent_due", "sold_at_tax_sale_years",
                   "page_capped")
@@ -472,8 +473,7 @@ def public_evidence(ev: dict) -> dict:
     return out
 
 
-def _res(verdict: str, ev: dict, row: Any = None) -> VerificationResult:
-    verdict, ev = tc.other_lien_downgrade(verdict, ev, row)
+def _res(verdict: str, ev: dict) -> VerificationResult:
     return result(SIGNAL, verdict, public_evidence(ev), source=SOURCE, version=VERSION,
                   verifier=_NAME)
 
@@ -602,7 +602,7 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         ev["years_delinquent"] = len(a["delinquent_by_year"])
         ev["under_500"] = ev["total_delinquent"] < 500
         ev["de_minimis"] = ev["total_delinquent"] < tc.DE_MINIMIS
-        return _res("confirmed", ev, row)
+        return _res("confirmed", ev)
 
     a = primary
     ev.update(decided_on=claim_via if claim else "board_parcel",
@@ -623,4 +623,4 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         return _res("unconfirmed", dict(ev, reason="no_paid_row_to_read"))
     if verdict == "refuted" and a["not_yet_delinquent_due"]:
         ev["note"] = "only the current levy is unpaid; it is not delinquent yet"
-    return _res(verdict, ev, row)
+    return _res(verdict, ev)

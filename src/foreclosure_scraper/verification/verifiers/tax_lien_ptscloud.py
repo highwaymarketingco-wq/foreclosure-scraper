@@ -48,8 +48,9 @@ bill's own interestBeginDate decides "paid late"):
   refuted      nothing delinquent today and the bill(s) checked were paid before interest began.
   unconfirmed  no tenant / no parcel / not found / fetch or parse failure / tenant unhealthy this
                run / parcel billing ended before the latest eligible levy / only a deferred
-               balance / bill details unreadable; or a refuted/stale answer on a row typed by
-               another lien's source (other_lien_listing, see _tax_common).
+               balance / bill details unreadable.
+A row typed tax_lien by another lien's source that is covered through its own claim (a mixed row)
+gets its verdict as is: the qualified GOVERNS (_tax_common) never ends that lien's listing type.
 Evidence (public ledger: a whitelist, no names, no mailing addresses): API and page URLs, tenant,
 the tax parcel searched and where it came from, the board parcel, per-year delinquent amounts,
 total, years, the not-yet-delinquent current levy, deferred amounts, the county's bill flags
@@ -274,16 +275,14 @@ _KEYS = ("reason", "url", "page_url", "tenant", "claim_county_differs", "tax_par
          "searched", "results_total", "latest_levy_year", "latest_delinquent_eligible_levy",
          "delinquent_by_year", "total_delinquent", "years_delinquent", "under_500", "de_minimis",
          "not_yet_delinquent_due", "deferred_by_year", "flags", "claimed_years", "claimed_bill",
-         "bills_checked", "owner_match", "note", "error", "tenant_health", "property_tax_verdict",
-         "listing_claim_source")
+         "bills_checked", "owner_match", "note", "error", "tenant_health")
 
 
 def public_evidence(ev: dict) -> dict:
     return tc.pick(ev, _KEYS)
 
 
-def _res(verdict: str, ev: dict, row: Any = None) -> VerificationResult:
-    verdict, ev = tc.other_lien_downgrade(verdict, ev, row)
+def _res(verdict: str, ev: dict) -> VerificationResult:
     return result(SIGNAL, verdict, public_evidence(ev), source=SOURCE, version=VERSION,
                   verifier=_NAME)
 
@@ -359,7 +358,7 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     if delinquent:
         ev["under_500"] = ev["total_delinquent"] < 500
         ev["de_minimis"] = ev["total_delinquent"] < tc.DE_MINIMIS
-        return _res("confirmed", ev, row)
+        return _res("confirmed", ev)
 
     last_ok = latest_eligible(today)
     if latest["year"] < last_ok:
@@ -401,7 +400,7 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
                         "page_url": BILL_PAGE_URL.format(slug=slug, bill_id=b["id"]), **late})
         if late["paid_late"]:
             ev["bills_checked"] = checked
-            return _res("stale", ev, row)
+            return _res("stale", ev)
     ev["bills_checked"] = checked
     if not checked:
         return _res("unconfirmed", dict(ev, reason="no_paid_bill_to_check"))
@@ -409,4 +408,4 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         return _res("unconfirmed", dict(ev, reason="bill_details_unreadable"))
     if current:
         ev["note"] = "only the current levy is unpaid; it is not delinquent yet"
-    return _res("refuted", ev, row)
+    return _res("refuted", ev)

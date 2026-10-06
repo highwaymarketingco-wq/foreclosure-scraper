@@ -190,17 +190,18 @@ def test_refuted_paid_on_time_and_no_claimed_year():
 
 
 def test_other_lien_listing_is_never_suppressed():
-    """A DEW lien row carrying a delinquency flag: the county says the property tax was paid on
-    time, but a refuted verdict would also remove the DEW lien's tax_lien signal."""
+    """A DEW lien row carrying a delinquency flag (a mixed row): the county says the property tax
+    was paid on time, and that refuted answer is published as it is (the downgrade to unconfirmed
+    is retired, _tax_common); the qualified GOVERNS keeps it from ending the DEW lien's own
+    tax_lien signal (test_verification_tax_lien_other_lien)."""
     row = {"state": "SC", "county": "Spartanburg", "parcel_id": "7-16-09-062.00",
            "listing_type": "tax_lien", "source": "counties_sc.sc_dew_lien_registry",
            "raw": {"two_year_delinquent": {"is_two_year_plus": True, "tax_year": "2024"}}}
     assert q.applies(row)
     res = run(row, served("spartanburgcountytax|Map|7-16-09-062.00"))
-    assert res.verdict == "unconfirmed"
-    assert res.evidence["reason"] == "other_lien_listing"
-    assert res.evidence["property_tax_verdict"] == "refuted"
-    assert res.evidence["listing_claim_source"] == "counties_sc.sc_dew_lien_registry"
+    assert res.verdict == "refuted"
+    assert not {"reason", "property_tax_verdict", "listing_claim_source"} & set(res.evidence)
+    assert "tax_lien:property_tax" in q.GOVERNS and "tax_lien" not in q.GOVERNS
 
 
 def test_receipt_fallback_horry_reads_the_claimed_bills():

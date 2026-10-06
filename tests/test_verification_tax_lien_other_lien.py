@@ -6,16 +6,16 @@ were checked by tax_lien_buncombe against the county's PROPERTY-tax record, and 
 refuted them. Covered here, on real rows from the 2026-10-06 board (board_stream, read-only):
 names, filers, case and entry numbers and street addresses made up, every field and raw block
 shape and every amount as the board carries it; the county pages are the real captures in
-tests/fixtures/verification/:
+tests/fixtures/verification/ (owner names made up there too):
 
   * the guard: which Buncombe rows the verifier covers (1,078 board rows drop out, 16 that carry
     a county roll block of their own stay, nothing else changes);
-  * the mixed-row downgrade: refuted/stale on such a row is published unconfirmed, by the one
-    shared function all three tax_lien verifiers call;
-  * the offline ledger migration of the v2 entries, and why it needs the VERSION bump;
+  * a MIXED row (another lien's listing type plus a property-tax claim of its own) gets the
+    county's verdict as it is; the retired downgrade to unconfirmed is gone from all three;
   * the scorer: a property-tax verdict ends tax_lien / tax_sale only where the row's claim is a
-    property-tax one (GOVERNS "tax_lien:property_tax"), so another lien's row on the same parcel
-    keeps its signal.
+    property-tax one (GOVERNS "tax_lien:property_tax"), so the lien keeps its own signal, on its
+    own row and on another row of the parcel, while the property-tax-derived signals end;
+  * the offline restore of the ledger entries the retired downgrade wrote.
 No network.
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ from pathlib import Path
 import pytest
 
 from foreclosure_scraper import distress_score as ds
-from foreclosure_scraper.enrichment_lead_signals import _facet_signals
+from foreclosure_scraper.enrichment_lead_signals import _facet_signals, _signal_stack
 from foreclosure_scraper.models import Listing, ListingType
 from foreclosure_scraper.verification import apply as A
 from foreclosure_scraper.verification import core
@@ -166,7 +166,7 @@ def test_the_three_verifiers_never_cover_one_row_twice():
 
 
 # ---------------------------------------------------------------------------
-# the mixed-row downgrade, on real county pages
+# mixed rows: the county's verdict is published as it is (real county pages)
 # ---------------------------------------------------------------------------
 
 def page(name: str) -> str:
@@ -181,166 +181,223 @@ def run(row, fetcher):
     return asyncio.run(tlb.verify(row, fetcher, today=TODAY))
 
 
-def _covered_liensnc(parcel: str) -> dict:
-    row = liensnc_row(parcel_id=parcel)
-    row["raw"]["buncombe_delinquent_tax"] = dict(ROLL_BLOCK, tax_year=2025)
-    assert tlb.applies(row)
-    return row
+def irs_mixed_row(parcel: str = "9686-05-3926-00000") -> dict:
+    """nc_ecourts_judgments, Buncombe: an IRS federal tax lien judgment on a parcel, into which
+    the county roll's block (and the multi-year unpaid-bill layers) merged, so it carries the
+    parcel's PROPERTY-tax balance as tax_owed (2 such Buncombe rows, 2 in Henderson). Case
+    number made up, every block as the board carries it."""
+    return {"state": "NC", "county": "Buncombe", "source": "nc_ecourts_judgments",
+            "listing_type": "tax_lien", "parcel_id": parcel, "case_number": "26M009996-100",
+            "defendant": "EXAMPLE, ROBIN",
+            "raw": {"nc_ecourts": {"source": "nc_ecourts_judgments",
+                                   "cause_of_action": "CV - Federal Tax Lien",
+                                   "court_name": "Buncombe District Court", "county": "Buncombe",
+                                   "judgment_type": "Recorded", "civil_judgment_status": "Active"},
+                    "buncombe_delinquent_tax": {"pin": "971265893300000", "principal_tax_due": 225.36,
+                                                "tax_year": 2025},
+                    "multi_year_delinquent_tax": dict(MULTI_YEAR_BLOCK, per_year={"2025": 266.38,
+                                                                                  "2026": 247.02}),
+                    "tax_owed": {"balance": 225.36, "kind": "delinquent_tax",
+                                 "source": "nc_ecourts_judgments", "year": 2025,
+                                 "basis": "own_record", "years_delinquent": 2},
+                    "amount_owed": {"value": 225.36, "source": "tax_owed",
+                                    "label": "Delinquent property tax owed", "confidence": "high",
+                                    "is_actual_debt": True}}}
+
+
+def dew_mixed_row() -> dict:
+    """counties_sc.sc_dew_lien_registry, Colleton SC: a DEW unemployment-insurance tax lien whose
+    row also carries the county's qPayBill delinquent-roll block for the parcel (20 such rows).
+    Its tax_owed is the DEW balance; the DEW amount is a judgment-sourced amount_owed."""
+    return {"state": "SC", "county": "Colleton", "source": "counties_sc.sc_dew_lien_registry",
+            "listing_type": "tax_lien", "parcel_id": "163-07-00-075.000",
+            "street_address": "117 EXAMPLE ST", "owner_name": "EXAMPLE FUNERAL SERVICES LLC",
+            "description": "SC DEW UI-tax lien \u2014 balance $8,231", "judgment_amount": 8231.27,
+            "raw": {"tax_owed": {"balance": 8231.27, "kind": "delinquent_tax",
+                                 "source": "counties_sc.sc_dew_lien_registry", "year": None,
+                                 "basis": "own_record", "years_delinquent": 1},
+                    "amount_owed": {"value": 8231.27, "source": "judgment",
+                                    "label": "Judgment / indebtedness", "confidence": "high",
+                                    "is_actual_debt": True},
+                    "sc_state_tax_lien": {"balance": 8231.27, "source": "sc_dew_lien_registry"},
+                    "qpaybill_roll": {"identification_no": "163-07-00-075.000",
+                                      "is_account_id_not_parcel": False, "county": "Colleton",
+                                      "subdomain": "colleton", "balance_owed": 16923.86,
+                                      "years_unpaid": ["2025"], "years_delinquent": 1,
+                                      "is_two_year_plus": False, "statuses": ["Unpaid"],
+                                      "notice_numbers": ["013300001", "013400001"], "rows": 2,
+                                      "all_unpaid_years": ["2025", "2026"]}}}
 
 
 REFUTED_PAGES = ("Parcel/Details/968605392600000", "Bill/Details/0000667232-2025-2025-0000-00")
 STALE_PAGES = ("Parcel/Details/963962247000000", "Bill/Details/0000739533-2025-2025-0000-00")
 
 
+def test_the_real_mixed_rows_are_covered_by_their_county_verifier():
+    assert tc.other_lien_listing(irs_mixed_row()) and tlb.applies(irs_mixed_row())
+    assert tc.other_lien_listing(dew_mixed_row()) and tlq.applies(dew_mixed_row())
+    assert not tlb.applies(dew_mixed_row()) and not tlq.applies(irs_mixed_row())
+
+
 @pytest.mark.parametrize("pages,parcel,verdict", [
     (REFUTED_PAGES, "9686-05-3926-00000", "refuted"),   # the 2025 levy paid on time
     (STALE_PAGES, "963962247000000", "stale"),          # the 2025 levy paid 2026-09-03 with interest
 ])
-def test_refuted_or_stale_on_another_liens_row_is_unconfirmed(pages, parcel, verdict):
+def test_a_mixed_row_gets_the_county_verdict_as_it_is(pages, parcel, verdict):
     genuine = run(roll_row(parcel_id=parcel), ReplayFetcher(served(*pages)))
-    assert genuine.verdict == verdict                    # the property-tax answer itself
-    r = run(_covered_liensnc(parcel), ReplayFetcher(served(*pages)))
-    assert r.verdict == "unconfirmed"
-    ev = r.evidence
-    assert ev["reason"] == "other_lien_listing" and ev["property_tax_verdict"] == verdict
-    assert ev["listing_claim_source"] == "liensnc"
-    assert ev["bills_checked"] == genuine.evidence["bills_checked"]      # the answer is kept
+    r = run(irs_mixed_row(parcel), ReplayFetcher(served(*pages)))
+    assert genuine.verdict == r.verdict == verdict
+    assert not {"property_tax_verdict", "listing_claim_source", "reason"} & set(r.evidence)
+    assert r.evidence["bills_checked"] == genuine.evidence["bills_checked"]
     assert r.verifier_version == tlb.VERSION == "v3"
 
 
-def test_confirmed_on_another_liens_row_passes_through():
-    row = _covered_liensnc("9686540826")
-    r = run(row, ReplayFetcher(served("Parcel/Details/968654082600000")))
-    assert r.verdict == "confirmed" and "property_tax_verdict" not in r.evidence
+def test_confirmed_on_a_mixed_row():
+    r = run(irs_mixed_row("9686540826"), ReplayFetcher(served("Parcel/Details/968654082600000")))
+    assert r.verdict == "confirmed"
 
 
 @pytest.mark.parametrize("mod", [tlb, tlp, tlq])
-def test_one_shared_rule_for_all_three_verifiers(mod):
-    for row in (liensnc_row(), ecourts_row(), {"source": "counties_sc.sc_dew_lien_registry",
-                                                "listing_type": "tax_lien"}):
-        for verdict in ("refuted", "stale"):
-            r = mod._res(verdict, {"total_delinquent": 0}, row)
-            assert r.verdict == "unconfirmed"
-            assert r.evidence["property_tax_verdict"] == verdict
-            assert r.evidence["reason"] == "other_lien_listing"
-        assert mod._res("confirmed", {}, row).verdict == "confirmed"
-    assert mod._res("refuted", {}, roll_row()).verdict == "refuted"
+def test_no_verifier_downgrades_any_more(mod):
+    for verdict in ("refuted", "stale", "confirmed"):
+        assert mod._res(verdict, {"total_delinquent": 0}).verdict == verdict
     assert mod.GOVERNS == tc.GOVERNS
+    assert not hasattr(tc, "other_lien_downgrade")
 
 
 # ---------------------------------------------------------------------------
-# the offline ledger migration (v2 entries written before the guard)
+# the offline restore of what the retired downgrade wrote to the ledger
 # ---------------------------------------------------------------------------
 
-def _entry(key, source, verdict, *, verifier="tax_lien_buncombe", version="v2",
-           checked="2026-10-06T04:23:09Z", claimed=()):
-    """A ledger entry as the 10/6 sweep wrote it (docs/handoff/verification/tax_lien.json),
-    owner names and the street dropped."""
+MIGRATED_AT = "2026-10-06T07:54:33Z"
+
+
+def _entry(key, source, verdict, *, verifier="tax_lien_buncombe", version="v3",
+           checked="2026-10-06T04:23:09Z", claimed=(), downgraded=None, migrated=False):
+    """A ledger entry as docs/handoff/verification/tax_lien.json holds it (names already
+    gone, the street dropped). downgraded="refuted"/"stale": the answer the retired downgrade
+    published as unconfirmed; migrated=True: by the 2026-10-06 offline migration (c1abaf1d),
+    which also moved checked_at to the migration time and kept the check's own in `migrated`."""
     ev = {"url": f"{tlb.BASE}/Parcel/Details/060629204000000", "pin": "060629204000000",
           "latest_levy_year": 2026, "delinquent_by_year": {}, "total_delinquent": 0,
           "years_delinquent": 0, "not_yet_delinquent_due": {"2026": 5787.21},
           "claimed_years": list(claimed), "owner_match": "same",
-          "bills_checked": [{"paid_late": verdict == "stale", "year": 2025,
+          "bills_checked": [{"paid_late": (downgraded or verdict) == "stale", "year": 2025,
                              "url": f"{tlb.BASE}/Bill/Details/0000753537-2025-2025-0000-00"}]}
     if verdict == "confirmed":
         ev.update(delinquent_by_year={"2019": 1261.52}, total_delinquent=1261.52,
                   years_delinquent=1, under_500=False)
+    if downgraded:
+        ev.update(property_tax_verdict=downgraded, reason="other_lien_listing",
+                  listing_claim_source=source)
     rec = {"signal": "tax_lien", "verdict": verdict, "evidence": ev, "source": tlb.SOURCE,
-           "checked_at": checked, "verifier_version": version, "verifier": verifier}
+           "checked_at": MIGRATED_AT if migrated else checked, "verifier_version": version,
+           "verifier": verifier}
     pid = key.rsplit(":", 1)[-1]
-    return {"keys": [key], "checks": 1, "first_checked_at": checked, "history": [],
-            "last_attempt": {"verdict": verdict, "checked_at": checked}, "latest": rec,
-            "governs": ["tax_lien", "tax_sale", "tax_lien_chronic", "recorded_debt:tax"],
-            "ttl_days": 30.0,
-            "row": {"state": "NC", "county": "Buncombe", "listing_type": "tax_lien",
-                    "parcel_id": pid, "source": source}}
+    e = {"keys": [key], "checks": 1, "first_checked_at": checked, "history": [],
+         "last_attempt": {"verdict": downgraded or verdict, "checked_at": checked}, "latest": rec,
+         "governs": ["tax_lien", "tax_sale", "tax_lien_chronic", "recorded_debt:tax"],
+         "ttl_days": 30.0,
+         "row": {"state": "NC", "county": "Buncombe", "listing_type": "tax_lien",
+                 "parcel_id": pid, "source": source}}
+    if migrated:
+        e["history"] = [{"verdict": downgraded, "checked_at": checked,
+                         "verifier": verifier, "verifier_version": "v2"}]
+        e["migrated"] = {"how": "offline: _tax_common.other_lien_downgrade, no request",
+                         "at": MIGRATED_AT, "from_version": "v2", "from_verdict": downgraded,
+                         "from_checked_at": checked}
+    return e
 
 
 def _ledger() -> L.Ledger:
+    k = "parcel:NC:buncombe:"
     rows = {
-        "parcel:NC:buncombe:0606292040": _entry("parcel:NC:buncombe:0606292040", "liensnc", "refuted"),
-        "parcel:NC:buncombe:8792236335": _entry("parcel:NC:buncombe:8792236335",
-                                                "counties_generic.liensnc", "stale", claimed=(2026,)),
-        "parcel:NC:buncombe:062577987400000": _entry("parcel:NC:buncombe:062577987400000",
-                                                     "liensnc", "confirmed"),
-        "parcel:NC:buncombe:061605416400000": _entry("parcel:NC:buncombe:061605416400000",
-                                                     "counties_nc.buncombe_delinquent_tax",
-                                                     "refuted", claimed=(2025,)),
-        "parcel:NC:buncombe:0710500622": _entry("parcel:NC:buncombe:0710500622", "liensnc",
-                                                "unconfirmed"),
-        "parcel:NC:henderson:9528188660": dict(
-            _entry("parcel:NC:henderson:9528188660", "counties_nc.nc_ecourts_lis_pendens", "stale",
-                   verifier="tax_lien_ptscloud", version="v1"),
-            row={"state": "NC", "county": "Henderson", "listing_type": "tax_lien",
-                 "source": "counties_nc.nc_ptscloud_delinquent_tax"}),
+        k + "0606292040": _entry(k + "0606292040", "liensnc", "unconfirmed", downgraded="refuted",
+                                 migrated=True),
+        k + "8792236335": _entry(k + "8792236335", "counties_generic.liensnc", "unconfirmed",
+                                 downgraded="stale", migrated=True, claimed=(2026,),
+                                 checked="2026-10-06T04:24:00Z"),
+        k + "062577987400000": _entry(k + "062577987400000", "liensnc", "confirmed"),
+        k + "061605416400000": _entry(k + "061605416400000", "counties_nc.buncombe_delinquent_tax",
+                                      "refuted", version="v2", claimed=(2025,)),
+        k + "0710500622": _entry(k + "0710500622", "liensnc", "unconfirmed"),
+        # qpaybill's own live downgrade (v1, never migrated): an SC DEW row with a roll block
+        "parcel:SC:colleton:163070007500": dict(
+            _entry("parcel:SC:colleton:163070007500", "counties_sc.sc_dew_lien_registry",
+                   "unconfirmed", downgraded="stale", verifier="tax_lien_qpaybill", version="v1",
+                   checked="2026-10-06T07:18:40Z"),
+            row={"state": "SC", "county": "Colleton", "listing_type": "tax_lien",
+                 "source": "counties_sc.sc_dew_lien_registry"}),
     }
     return L.Ledger("tax_lien", copy.deepcopy(rows))
 
 
-def test_migration_downgrades_exactly_the_other_lien_refuted_and_stale_entries():
+def test_restore_gives_back_exactly_the_downgraded_answers():
     led = _ledger()
     before = copy.deepcopy(led.rows)
-    lines = tc.downgrade_other_lien_entries(led, "tax_lien_buncombe", tlb.VERSION, NOW)
-    assert sorted((ln["key"], ln["from_verdict"]) for ln in lines) == [
-        ("parcel:NC:buncombe:0606292040", "refuted"), ("parcel:NC:buncombe:8792236335", "stale")]
+    lines = tc.restore_property_tax_verdicts(led, NOW)
+    assert sorted((ln["key"], ln["verdict"], ln["version"]) for ln in lines) == [
+        ("parcel:NC:buncombe:0606292040", "refuted", "v3"),
+        ("parcel:NC:buncombe:8792236335", "stale", "v3"),
+        ("parcel:SC:colleton:163070007500", "stale", "v1")]
     for ln in lines:
         e, old = led.rows[ln["key"]], before[ln["key"]]
-        lat = e["latest"]
-        # exactly what the verifier now publishes for that row: the shared rule's output
-        assert lat["verdict"] == "unconfirmed" and lat["verifier_version"] == "v3"
-        assert lat["evidence"]["property_tax_verdict"] == old["latest"]["verdict"]
-        assert lat["evidence"]["reason"] == "other_lien_listing"
-        assert lat["evidence"]["listing_claim_source"] == old["row"]["source"]
-        assert lat["evidence"]["bills_checked"] == old["latest"]["evidence"]["bills_checked"]
-        assert lat["checked_at"] == core.iso_z(NOW)
-        assert e["history"][0] == {"verdict": old["latest"]["verdict"],
-                                   "checked_at": old["latest"]["checked_at"],
-                                   "verifier": "tax_lien_buncombe", "verifier_version": "v2"}
-        assert e["migrated"]["from_checked_at"] == old["latest"]["checked_at"]
-        assert e["keys"] == old["keys"] and e["row"] == old["row"]
-    # everything else is untouched: a confirmed other-lien entry, a genuine roll entry, an
-    # unconfirmed one, another verifier's
+        lat, olat = e["latest"], old["latest"]
+        assert lat["verdict"] == olat["evidence"]["property_tax_verdict"]
+        assert lat["verifier_version"] == olat["verifier_version"]          # no bump
+        # the county check's own time, not the migration's
+        assert lat["checked_at"] == old.get("migrated", {}).get("from_checked_at", olat["checked_at"])
+        assert lat["checked_at"] == old["last_attempt"]["checked_at"]
+        # the evidence is the answer's, minus what the downgrade added
+        assert lat["evidence"] == {k: v for k, v in olat["evidence"].items()
+                                   if k not in ("property_tax_verdict", "reason",
+                                                "listing_claim_source")}
+        assert e["history"][0] == {k: olat[k] for k in ("verdict", "checked_at", "verifier",
+                                                        "verifier_version")}
+        assert e["history"][1:] == old["history"]
+        assert e["migrated"]["restored"]["from_checked_at"] == olat["checked_at"]
+        assert {k: e[k] for k in ("keys", "row", "checks", "first_checked_at", "last_attempt")} \
+            == {k: old[k] for k in ("keys", "row", "checks", "first_checked_at", "last_attempt")}
     for k in set(before) - {ln["key"] for ln in lines}:
         assert led.rows[k] == before[k]
-    assert tc.downgrade_other_lien_entries(led, "tax_lien_buncombe", tlb.VERSION, NOW) == []
+    assert tc.restore_property_tax_verdicts(led, NOW) == []
 
 
-def test_the_version_bump_is_what_keeps_the_downgrade_through_a_merge():
+def test_no_version_bump_is_needed_to_keep_the_restore_through_a_merge():
     """The sweep merges the file on disk back into its copy (verification_sweep._save). A copy
-    loaded before the migration must not bring the refuted answer back, in either direction."""
-    old = _ledger()
-    new = _ledger()
-    tc.downgrade_other_lien_entries(new, "tax_lien_buncombe", tlb.VERSION, NOW)
-    k = "parcel:NC:buncombe:0606292040"
-    a = copy.deepcopy(new).merge_from(copy.deepcopy(old))
-    b = copy.deepcopy(old).merge_from(copy.deepcopy(new))
-    assert a.rows[k]["latest"]["verdict"] == b.rows[k]["latest"]["verdict"] == "unconfirmed"
-    # without the bump (same version) a decisive answer beats the unconfirmed one: reverted
-    same = dict(new.rows[k]["latest"], verifier_version="v2")
-    assert L._better(old.rows[k]["latest"], same)
+    holding the downgraded answer (same version, later checked_at) never wins over the
+    restored decisive one, in either direction."""
+    old, new = _ledger(), _ledger()
+    tc.restore_property_tax_verdicts(new, NOW)
+    for k in ("parcel:NC:buncombe:0606292040", "parcel:SC:colleton:163070007500"):
+        assert old.rows[k]["latest"]["checked_at"] >= new.rows[k]["latest"]["checked_at"]
+        a = copy.deepcopy(new).merge_from(copy.deepcopy(old))
+        b = copy.deepcopy(old).merge_from(copy.deepcopy(new))
+        assert a.rows[k]["latest"] == b.rows[k]["latest"] == new.rows[k]["latest"]
 
 
-def test_after_the_migration_a_covered_row_is_retried_and_v2_entries_are_due():
+def test_after_the_restore_the_verdict_is_due_on_its_own_ttl():
     v = from_module(tlb)
     led = _ledger()
-    tc.downgrade_other_lien_entries(led, "tax_lien_buncombe", tlb.VERSION, NOW)
-    migrated = led.rows["parcel:NC:buncombe:0606292040"]
-    assert L.is_due(migrated, v, NOW) == (False, "retry")
-    assert L.is_due(migrated, v, NOW + timedelta(days=tlb.RETRY_DAYS)) == (True, "retry")
+    tc.restore_property_tax_verdicts(led, NOW)
+    e = led.rows["parcel:NC:buncombe:0606292040"]
+    checked = core.parse_ts(e["latest"]["checked_at"])
+    assert L.is_due(e, v, checked + timedelta(days=29)) == (False, "ttl")
+    assert L.is_due(e, v, checked + timedelta(days=tlb.TTL_DAYS)) == (True, "ttl")
     assert L.is_due(led.rows["parcel:NC:buncombe:061605416400000"], v, NOW) == (True, "version")
 
 
-def test_apply_attaches_the_migrated_answer_and_it_suppresses_nothing(tmp_path):
+def test_apply_attaches_the_restored_answer_and_it_ends_only_property_tax_signals(tmp_path):
     led = _ledger()
-    tc.downgrade_other_lien_entries(led, "tax_lien_buncombe", tlb.VERSION, NOW)
+    tc.restore_property_tax_verdicts(led, NOW)
     led.save(tmp_path / "tax_lien.json")
     li = Listing.model_validate(dict(liensnc_row(parcel_id="0606292040",
                                                  street_address="62 Example Leaf Rd"),
                                      source_url="https://apps.liensnc.com/x"))
     A.apply_verification([li], tmp_path, now=NOW)
     (rec,) = li.raw["verification"]
-    assert rec["verdict"] == "unconfirmed" and rec["governs"] == list(tc.GOVERNS)
-    assert core.suppressed_scorer_signals(li.raw, NOW) == set()
+    assert rec["verdict"] == "refuted" and rec["governs"] == list(tc.GOVERNS)
+    assert core.suppressed_scorer_signals(li.raw, NOW) == set(tc.GOVERNS)
 
 
 # ---------------------------------------------------------------------------
@@ -449,3 +506,58 @@ def test_lead_signal_facets():
     assert "recorded_debt" in after                # the DEW judgment amount is not tax_owed
     sc.raw["verification"] = [_vrec("confirmed", verifier="tax_lien_qpaybill")]
     assert {"tax_lien", "recorded_debt"} <= _facet_signals(sc, TODAY)
+
+
+# ---------------------------------------------------------------------------
+# a MIXED row under a refuted / stale property-tax verdict: the property-tax-derived signals
+# end, the lien's own survive, in the scorer and in the lead-signal stack
+# ---------------------------------------------------------------------------
+
+def _record(res) -> dict:
+    """A verifier's real answer as the VM's apply step attaches it (fixed stamps)."""
+    checked = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    return dict(res.to_dict(), checked_at=core.iso_z(checked),
+                expires_at=core.iso_z(checked + timedelta(days=tlb.TTL_DAYS)),
+                governs=list(tlb.GOVERNS))
+
+
+@pytest.mark.parametrize("pages,verdict", [(REFUTED_PAGES, "refuted"), (STALE_PAGES, "stale")])
+def test_irs_mixed_row_keeps_the_lien_and_loses_the_paid_property_tax(pages, verdict):
+    parcel = {"refuted": "9686-05-3926-00000", "stale": "963962247000000"}[verdict]
+    row = irs_mixed_row(parcel)
+    res = run(row, ReplayFetcher(served(*pages)))
+    assert res.verdict == verdict                      # the county's own answer, not downgraded
+    plain, checked = _li(row), _li(row, [_record(res)])
+    # scorer: before, the IRS lien (listing type) and the property-tax balance (tax_owed)
+    assert {"tax_lien", "recorded_debt"} <= _names(plain)
+    after = _names(checked)
+    assert "tax_lien" in after                         # the IRS lien's own signal survives
+    assert "recorded_debt" not in after                # the county says that tax is not owed
+    # facets: the only debt facet was the property-tax balance
+    assert "recorded_debt" in _facet_signals(plain, TODAY)
+    assert "recorded_debt" not in _facet_signals(checked, TODAY)
+    # the lead-signal stack (scorer signals + facets) after a full score_board (each row alone:
+    # score_board unions a parcel's rows)
+    ds.score_board([plain], previous_path=None)
+    ds.score_board([checked], previous_path=None)
+    assert {"tax_lien", "recorded_debt"} <= set(_signal_stack(plain, TODAY)["signals"])
+    stack = set(_signal_stack(checked, TODAY)["signals"])
+    assert "tax_lien" in stack and "recorded_debt" not in stack
+
+
+@pytest.mark.parametrize("verdict", ["refuted", "stale"])
+def test_dew_mixed_row_keeps_the_lien_and_its_debt(verdict):
+    """qPayBill's verdict on the roll block (property tax) sits on the DEW lien's row. The DEW
+    lien's listing type and its judgment amount are not property tax: both stay."""
+    row = dew_mixed_row()
+    plain, checked = _li(row), _li(row, [_vrec(verdict, verifier="tax_lien_qpaybill")])
+    assert {"tax_lien", "recorded_debt"} <= _names(plain)
+    assert {"tax_lien", "recorded_debt"} <= _names(checked)
+    assert "recorded_debt" in _facet_signals(checked, TODAY)
+    ds.score_board([checked], previous_path=None)
+    assert {"tax_lien", "recorded_debt"} <= set(_signal_stack(checked, TODAY)["signals"])
+    # the property-tax-derived facet on the same row would end (sc_tax_delinquent)
+    checked.raw["sc_tax_delinquent"] = {"year": 2025}
+    assert "tax_lien" not in _facet_signals(checked, TODAY)
+    assert "tax_lien" in _signal_stack(checked, TODAY)["signals"]     # the lien's, from the scorer
+

@@ -1,9 +1,11 @@
 """The reference verifier, against REAL responses captured from tax.buncombenc.gov during the
-2026-10-05 live sweep (tests/fixtures/verification/, gzipped as served). No network."""
+2026-10-05 live sweep (tests/fixtures/verification/, gzipped as served; the owner names in them
+replaced by made-up ones, 2026-10-06: the repo is public). No network."""
 from __future__ import annotations
 
 import asyncio
 import gzip
+import json
 import re
 from datetime import date
 from pathlib import Path
@@ -11,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from foreclosure_scraper.verification.fetch import ReplayFetcher
+from foreclosure_scraper.verification.ledger import Ledger
 from foreclosure_scraper.verification.verifiers import tax_lien_buncombe as t
 
 FIX = Path(__file__).parent / "fixtures" / "verification"
@@ -129,7 +132,7 @@ def test_stale_paid_late_since():
     """40 Boone St: nothing owed now, the 2025 levy was paid on 2026-09-03 with interest."""
     f = ReplayFetcher(served("Parcel/Details/963962247000000",
                              "Bill/Details/0000739533-2025-2025-0000-00"))
-    r = run(_row(parcel_id="963962247000000", owner_name="REVIS, PATRICIA ANN L",
+    r = run(_row(parcel_id="963962247000000", owner_name="SAMPLE, PAT ANN L",
                  raw={"buncombe_delinquent_tax": {"tax_year": 2025}}), f)
     assert r.verdict == "stale"
     chk = r.evidence["bills_checked"][0]
@@ -205,3 +208,50 @@ def test_a_parcel_record_that_ends_early_is_unconfirmed_not_stale():
     assert r.evidence["latest_delinquent_eligible_levy"] == 2025
     assert len(f.asked) == 1
     assert t.VERSION == "v3"         # v3: the other-lien guard (test_verification_tax_lien_other_lien)
+
+
+# ---------------------------------------------------------------------------
+# the ledger is public: no names
+# ---------------------------------------------------------------------------
+
+STALE_ROW = dict(parcel_id="963962247000000", owner_name="SAMPLE, PAT ANN L",
+                 raw={"buncombe_delinquent_tax": {"tax_year": 2025}})
+
+
+def _stale():
+    f = ReplayFetcher(served("Parcel/Details/963962247000000",
+                             "Bill/Details/0000739533-2025-2025-0000-00"))
+    return run(_row(**STALE_ROW), f)
+
+
+def test_evidence_carries_the_owner_match_category_never_a_name():
+    r = _stale()
+    assert r.evidence["owner_match"] == "same"                 # Finding C, as a category
+    assert r.evidence["value_county"] and "value_ratio_board_to_county" in r.evidence
+    blob = json.dumps(r.to_dict())
+    assert "SAMPLE" not in blob                                 # neither the board's name...
+    assert not {"owner_board", "owner_county"} & set(r.evidence)   # ...nor the county's
+
+
+def test_the_sweep_keeps_owner_name_out_of_the_row_summary(tmp_path):
+    """verification_sweep.run_checks pops ROW_SUMMARY_EXCLUDE from every entry it records."""
+    assert t.ROW_SUMMARY_EXCLUDE == ("owner_name",)
+    led = Ledger("tax_lien", path=tmp_path / "tax_lien.json")
+    entry = led.record(_row(**STALE_ROW), _stale(), ttl_days=t.TTL_DAYS, governs=t.GOVERNS)
+    for f in t.ROW_SUMMARY_EXCLUDE:
+        entry["row"].pop(f, None)
+    led.save()
+    text = (tmp_path / "tax_lien.json").read_text()
+    assert "SAMPLE" not in text and "owner_name" not in text and "owner_board" not in text
+
+
+def test_the_committed_ledger_holds_no_owner_names():
+    """docs/handoff/verification/tax_lien.json is pushed to a PUBLIC repo."""
+    path = Path(__file__).resolve().parents[1] / "docs" / "handoff" / "verification" / "tax_lien.json"
+    if not path.exists():
+        pytest.skip("no ledger in this checkout")
+    led = Ledger.load_file(path)
+    for e in led.rows.values():
+        assert "owner_name" not in (e.get("row") or {})
+        for rec in (e.get("latest"), e.get("superseded")):
+            assert not {"owner_board", "owner_county"} & set((rec or {}).get("evidence") or {})
