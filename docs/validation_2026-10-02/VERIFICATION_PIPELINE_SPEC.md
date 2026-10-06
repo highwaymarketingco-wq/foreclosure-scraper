@@ -1,5 +1,10 @@
 # From sampled validation to permanent, per-lead verification
 
+> **Implemented (2026-10-06): `src/foreclosure_scraper/verification/`**, with the Mac sweep
+> `scripts/verification_sweep.py`, the per-signal ledgers `docs/handoff/verification/<signal>.json`
+> and the VM apply step in `main.py` `run_enrich_tail()`. Where everything lives, the live results
+> and how to add a verifier: `docs/HANDOFF.md` item 66. Pointers per section below.
+
 ## What changed since FINDINGS.md
 
 FINDINGS.md (2026-10-02) and the follow-up round (2026-10-03, probate/heir +
@@ -39,6 +44,12 @@ raw["verification"] = [
 ]
 ```
 
+**Implemented in** `verification/core.py` (`VerificationResult`, the verdict definitions,
+`row_key()`) and attached by `verification/apply.py`, which adds three stamps to each record:
+`verifier` (module name), `expires_at` (checked_at + the verifier's TTL) and `governs` (the
+scorer signals a refuted/stale verdict removes). `stale` means the claim WAS true and no longer
+is (e.g. a delinquent bill paid late), not "an old record"; age is `expires_at`'s job.
+
 `unconfirmed` = checked, source didn't have enough to decide either way.
 `wall` = genuinely can't be checked by code (NC eCourts, NC SOS) — label it
 honestly rather than silently treating it as either confirmed or refuted.
@@ -66,11 +77,25 @@ first):
 | `probate`/`heir_estate` | `validate_probate_heir_buncombe.py` | ROD DEATHS index (`ddlIndexType=DTH`) + transfer history + voter lookup | Proven 2026-10-03; heir-name coverage gap (`task_c638bfb4`) limits what fraction of rows can get the voter-liveness check |
 | `comps` | `validate_comps_buncombe.py` + `crosscheck_comps_arcgis_live_snapshot.py` | Spatialest record card + ArcGIS live attributes | Proven 2026-10-03, already 93.7% accurate — lowest-priority to verify continuously, but wire in for drift detection |
 
+**Implemented so far:** `tax_lien` (Buncombe) in `verification/verifiers/tax_lien_buncombe.py`
+(the reference verifier; 280 properties verified live 2026-10-06), and SC `divorce` in
+`verification/verifiers/divorce_sc_wall.py`, which never queries the SC Public Index (its terms
+restrict bulk/automated querying) and answers `wall`. Verifiers are auto-discovered from
+`verification/verifiers/`; the steps to add one are in `docs/HANDOFF.md` item 66.
+
 NC eCourts-dependent checks (the underlying case for a lis pendens/divorce,
 heir discovery beyond already-named parties) stay a real wall. No code
 closes that — see "The honest gap" below.
 
 ### 3. This cannot be a blocking full-pipeline step — incremental by design
+
+**Implemented in** `scripts/verification_sweep.py` (read-only board stream, HOT -> WARM -> COLD
+then oldest check, per-signal cap, time budget, per-host pacing, run lock) and
+`verification/ledger.py` (per-signal TTL/version re-check, incremental saves). One change from the
+text below: the Mac does not patch the board (it cannot, the board is over its ceilings); it
+pushes the ledger and the VM's nightly run attaches it (`verification/apply.py`, before
+`score_board`). Scoring: `distress_score._collect` and `enrichment_lead_signals._facet_signals`
+drop the signals a non-expired refuted/stale verdict governs.
 
 ~219K rows × live HTTP per signal type is not something that runs inside a
 normal pipeline cycle. Required:
@@ -123,8 +148,9 @@ replicates it at scale. Two honest options, not mutually exclusive:
    to the two highest-priority types above (`probate`/`heir_estate`,
    `lis_pendens`/`divorce`), covering both NC eCourts Smart Search and NC SOS.
    Never solves the CAPTCHA — queues it, opens the real search for a human, and
-   stops until a saved page is handed back. Not yet wired to a board write; see
-   that module's docstring and `docs/HANDOFF.md`.
+   stops until a saved page is handed back. **Since 2026-10-06 its verdicts go into
+   the same ledger** (`verification_human_lane.record_to_ledger()`), so they reach the
+   board through the VM apply step; see `docs/HANDOFF.md` item 66.
 
 ## What this is NOT
 

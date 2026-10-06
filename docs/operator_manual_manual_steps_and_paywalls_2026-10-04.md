@@ -134,6 +134,11 @@ bulk/background sweep) — confirmed by reading that section directly.
    the "Boone St" lead was manually checked. This is what `VERIFICATION_PIPELINE_SPEC.md`
    defines and what "100% per listing" refers to.
 
+**Update 2026-10-06:** this is no longer true for `tax_lien` (Buncombe): `raw.verification` is
+live through `scripts/verification_sweep.py` (Mac) and the VM's apply step, SC divorce is
+labelled `wall`, and the human lane writes its verdicts into the same ledger. See
+`docs/HANDOFF.md` item 66. The paragraph below describes 2026-10-04.
+
 **Current state of (2), stated plainly: it is not wired into production for
 any signal type yet.** The `raw.verification` field does not exist on live
 board rows. What exists instead, per signal type, is either (a) a one-off
