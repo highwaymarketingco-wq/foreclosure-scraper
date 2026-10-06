@@ -68,6 +68,7 @@ from typing import Any
 import httpx
 import structlog
 
+from . import condo_units
 from .http_client import client
 from .models import Listing, PropertyKind
 
@@ -94,6 +95,10 @@ CAMA_SOURCES: dict[tuple[str, str], dict[str, Any]] = {
         "year_field": "YearBuilt",
         "join": "pin",
         "pin_pad15": True,
+        # PIN holds the unit's full pinnum for a condominium unit ('9627023924C0102'), letters and
+        # all: keys keep them (condo_units.py; live 2026-10-06 130 of the 130 exempt units' pinnums
+        # are in the table, none of the digits-only keys the old _pin_key built).
+        "pin_units": True,
     },
     ("NC", "Carteret"): {
         # County parcel MapServer — Condition spelled out (Average/Good/Poor/...).
@@ -200,20 +205,38 @@ def _normalize_condition(raw_val: Any) -> tuple[str | None, bool]:
     return key.lower(), False
 
 
-def _pin_key(parcel_id: str | None, pad15: bool) -> str | None:
+def _pin_key(parcel_id: str | None, pad15: bool, units: bool = False) -> str | None:
     """Build the county's stored PIN from a lead's parcel_id.
 
     Digits only. When the layer stores 15-digit PIN15 (short 10-digit pin +
     '00000') and the lead carries the 10-digit short form, zero-extend it.
+    `units`: the layer's PIN holds a condominium unit's full pinnum, letters included
+    ('9627023924C0102'; Buncombe), so a lead keyed by a unit's pinnum looks up by it. Stripping
+    its letter gave '96270239240102', a key the layer does not hold (and one two units of a building
+    ('C0102', 'D0102') would share).
     """
     if not parcel_id:
         return None
+    if units:
+        parts = condo_units.unit_parts(parcel_id)
+        if parts:
+            return parts[0] + parts[1]
     digits = re.sub(r"\D", "", str(parcel_id))
     if not digits:
         return None
     if pad15 and len(digits) == 10:
         return digits + "00000"
     return digits
+
+
+def _stored_key(pin: Any, units: bool = False) -> str:
+    """The lookup key of a PIN value the layer returned, built the way _pin_key builds a lead's:
+    digits only, except a condominium unit's pinnum (`units`), which keeps its letters."""
+    if units:
+        parts = condo_units.unit_parts(pin)
+        if parts:
+            return parts[0] + parts[1]
+    return re.sub(r"\D", "", str(pin))
 
 
 def _year_int(val: Any) -> int | None:
@@ -276,7 +299,7 @@ async def _fetch_by_pins(
             pin = attrs.get(pin_field)
             if pin is None:
                 continue
-            key = re.sub(r"\D", "", str(pin))
+            key = _stored_key(pin, bool(cfg.get("pin_units")))
             # Prefer the record that actually has a building condition/grade over
             # a bare parcel row (a PIN can have >1 building card).
             rec = {
@@ -453,7 +476,7 @@ async def enrich_cama_condition(listings: list[Listing], concurrency: int = 6) -
         pin_map: dict[str, list[Listing]] = {}
         no_pin: list[Listing] = []
         for li in leads:
-            pk = _pin_key(li.parcel_id, pad15)
+            pk = _pin_key(li.parcel_id, pad15, bool(cfg.get("pin_units")))
             if pk:
                 pin_map.setdefault(pk, []).append(li)
             elif li.street_address:
