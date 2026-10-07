@@ -10,9 +10,10 @@ portal's default 60 days.
 
 WHAT CAN BE READ. Only the results grid: each row shows a ~250-character preview of the notice.
 Details.aspx (the full text) sits behind a click-through Terms of Use and a Cloudflare Turnstile
-CAPTCHA, the same wall publicnoticesc.py documents; it is not fetched. On the live grid about one
-row in four shows the caption 'IN THE MATTER OF: <DECEDENT> ... CASE NUMBER: 2026-ES-27-00206' in
-the preview; the rest are cut off inside the boilerplate before any name. The personal
+CAPTCHA, the same wall publicnoticesc.py documents; it is not fetched. On the live grid (2026-10-07,
+3 pages a preset) 25 of 150 Notice to Creditors rows and 1 of 150 Probate Notices rows showed the
+caption 'IN THE MATTER OF: <DECEDENT> ... CASE NUMBER: 2026-ES-27-00206' in the preview; the rest
+are cut off inside the boilerplate before any name. The personal
 representative's name and address always sit past the cut, so this reader yields the DECEDENT and
 the CASE NUMBER (the county is the case number's two-digit code), never a representative. A
 person opens the Details link (and passes the CAPTCHA themselves) to read the representative.

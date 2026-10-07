@@ -158,7 +158,9 @@ def _decedent_tokens(row: Any) -> set[tuple[frozenset, Optional[str]]]:
     out: set[tuple[frozenset, Optional[str]]] = set()
     strings: list[str] = []
     gis = raw.get("gis") if isinstance(raw.get("gis"), dict) else {}
-    for owner in (_get(row, "owner_name"), _get(row, "defendant"), gis.get("owner")):
+    # not the row's `defendant`: on a probate-index row it is the personal representative
+    # (sc_probate_net), and on a court row a living party
+    for owner in (_get(row, "owner_name"), gis.get("owner")):
         if not owner:
             continue
         parts = split_owners(owner)

@@ -247,3 +247,13 @@ def test_publish_keeps_summary_and_drops_names():
     assert "heir_candidates" not in pub and "obituary_match" not in pub
     assert pub["heir_candidates_summary"]["count"] == 3
     assert "Lunetta" not in json.dumps(pub)
+
+
+def test_probate_index_representative_is_not_read_as_the_decedent():
+    row = _lead("Theron Mabry Wick", county="Oconee", state="SC",
+                sc_probate_net={"record_kind": "probate", "decedent": "Theron Mabry Wick",
+                                "case_type": "STANDARD ESTATE INTESTATE", "appointment_date": "2026-08-01",
+                                "personal_representative": {"name": "Ulla Wick Danner", "type": "PR"}})
+    row["defendant"] = "Ulla Wick Danner"          # the scraper puts the PR in `defendant`
+    c = candidates_for(row)
+    assert [(x["name"], x["source_kind"]) for x in c] == [("Ulla Wick Danner", "probate_record_personal_representative")]
