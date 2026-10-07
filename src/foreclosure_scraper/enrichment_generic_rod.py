@@ -124,6 +124,9 @@ SC_ROD_CONFIG = {
     # Harris AcclaimWeb by name (rod/acclaim_names.py); rod/acclaim.py's Pickens date sweep is separate
     ("SC", "Horry"):         ("acclaim_names", "FORECLOSURE_SC_ACCLAIM_ROD", "0"),
     ("SC", "Pickens"):       ("acclaim_names", "FORECLOSURE_SC_ACCLAIM_ROD", "0"),
+    # ACPASS by name, 7/1/1974-2/20/2026 (rod/anderson_acpass_rod.py). Later deeds are in a
+    # bot-checked system a script may not read; every chain result says so (after_index).
+    ("SC", "Anderson"):      ("anderson_acpass_rod", "FORECLOSURE_SC_ACPASS_ROD", "0"),
 }
 SC_CHAIN_ONLY_CONFIG = {
     ("SC", "Oconee"):        ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "0"),
