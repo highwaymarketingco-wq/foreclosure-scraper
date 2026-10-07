@@ -103,6 +103,9 @@ def test_out_of_state_mailing_surfaces_owner_mailing_and_absentee_flag():
         # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
         # bare raw['absentee_owner'] key below -- both must agree.
         "absentee": True,
+        # 2026-10-07 audit: the standard keys the phone payload (_SLIM_RAW) keeps.
+        "mailing": "2646 GOLDENROD LN, UNIT 4, GLENVIEW IL 60026",
+        "mail_state": "IL", "out_of_state": True,
     }
     assert li.raw["absentee_owner"] is True
     assert li.raw["lincoln_vacant"]["co_owner"] == "LUTZ THOMAS L"
@@ -155,3 +158,36 @@ def test_is_absentee_runs_street_check_only_with_house_numbered_situs():
     assert m._is_absentee("NC", "123 ELM ST", "OAK RD") is False  # no house # on situs
     assert m._is_absentee("SC", "123 ELM ST", "OAK RD") is True   # out of state
     assert m._is_absentee("NC", "PO BOX 5", "OAK RD") is True     # PO box
+
+
+# --- 2026-10-07 extraction audit. Values below are made up. ---
+
+ROW_NEW = {**ROW_SPARSE, "PARCELID": "00777", "PIN": "1234567890",
+           "LANDVALUE": 30000, "ACRE": 2.5, "MAPPEDACRE": 2.61, "LANDEFERRED": 12000,
+           "QUALIFIEDCODE": "U", "ZONING": "R-T", "TAXYEAR": 2026,
+           "SALEPRICE": 41000, "SDATE": "01/02/2020"}
+
+
+def test_parcel_identity_is_unchanged_and_the_pin_stays_in_raw():
+    """parcel_id stays PARCELID: board_persist restores prior rows' identity from it."""
+    li = _run_fetch([{"attributes": ROW_NEW}])[0]
+    assert li.parcel_id == "00777"
+    assert li.raw["lincoln_vacant"]["PIN"] == "1234567890"
+
+
+def test_new_layer_columns_are_requested_and_captured():
+    for col in ("LANDVALUE", "ACRE", "MAPPEDACRE", "LANDEFERRED", "QUALIFIEDCODE", "ZONING"):
+        assert col in m._OUT.split(","), col
+    li = _run_fetch([{"attributes": ROW_NEW}])[0]
+    b = li.raw["lincoln_vacant"]
+    assert b["land_value"] == 30000.0 and b["land_deferred"] == 12000.0
+    assert b["acre"] == 2.5 and b["mapped_acre"] == 2.61
+    assert b["sale_qualified_code"] == "U" and b["zoning"] == "R-T" and b["tax_year"] == 2026
+    assert li.acreage == 2.5 and li.zoning == "R-T"
+    assert li.raw["gis"]["last_sale"]["qualification"] == "U"
+
+
+def test_in_state_mailing_carries_the_standard_keys():
+    om = _run_fetch([{"attributes": ROW_NEW}])[0].raw["owner_mailing"]
+    assert om["mailing"] == "7347 HENRY RD, VALE NC 28168"
+    assert om["mail_state"] == "NC" and om["out_of_state"] is False

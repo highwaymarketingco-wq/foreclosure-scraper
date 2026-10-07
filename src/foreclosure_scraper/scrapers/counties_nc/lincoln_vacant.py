@@ -50,7 +50,12 @@ _WHERE = "VACANT='YES'"
 # is minor context, kept in raw only.
 _OUT = ("PARCELID,PIN,PHYSICALADDR,NAME1,NAME2,ADDRESS1,ADDRESS2,CITY,STATE,ZIP,"
         "IMPROVALUE,TOTALVALUE,MAINAREASQFT,SALEPRICE,SDATE,DEEDBK,DEEDPG,DEEDYR,"
-        "PLATBK,PLATPG,SBDIVN")
+        "PLATBK,PLATPG,SBDIVN,"
+        # 2026-10-07 extraction audit: LANDVALUE (98% filled), ACRE/MAPPEDACRE (78%/100%),
+        # LANDEFERRED (26%: present-use value deferral, i.e. rollback taxes come due on a
+        # sale), QUALIFIEDCODE (83%: is the recorded sale a qualified one), ZONING (100%)
+        # and TAXYEAR were on the layer and never requested.
+        "LANDVALUE,ACRE,MAPPEDACRE,LANDEFERRED,QUALIFIEDCODE,ZONING,TAXYEAR")
 _PAGE = 2000
 
 
@@ -153,6 +158,13 @@ class LincolnVacant(BaseScraper):
                         "deed_year": a.get("DEEDYR"),
                         "plat_book": _s(a.get("PLATBK")), "plat_page": _s(a.get("PLATPG")),
                         "subdivision": _s(a.get("SBDIVN")),
+                        "land_value": _f(a.get("LANDVALUE")),
+                        "acre": _f(a.get("ACRE")),
+                        "mapped_acre": _f(a.get("MAPPEDACRE")),
+                        "land_deferred": _f(a.get("LANDEFERRED")),
+                        "sale_qualified_code": _s(a.get("QUALIFIEDCODE")),
+                        "zoning": _s(a.get("ZONING")),
+                        "tax_year": a.get("TAXYEAR"),
                         "signal": "vacant_parcel"},
                     }
                     if mail_street or mail_city:
@@ -160,6 +172,16 @@ class LincolnVacant(BaseScraper):
                             "street": mail_street, "street2": mail_street2,
                             "city": mail_city, "state": mail_state, "zip": mail_zip,
                             "source": "lincoln_county_gis",
+                            # The standard keys (2026-10-07 extraction audit): the phone
+                            # payload (_SLIM_RAW owner_mailing) keeps only mailing /
+                            # mail_state / absentee / out_of_state, so the street/city/zip
+                            # above never reached it.
+                            "mailing": ", ".join(x for x in (
+                                ", ".join(y for y in (mail_street, mail_street2) if y),
+                                " ".join(y for y in (mail_city, mail_state, mail_zip) if y),
+                            ) if x) or None,
+                            "mail_state": (mail_state or "").upper() or None,
+                            "out_of_state": bool(mail_state and mail_state.strip().upper() != "NC"),
                         }
                         if _is_absentee(mail_state, mail_street, situs):
                             raw["absentee_owner"] = True
@@ -182,6 +204,8 @@ class LincolnVacant(BaseScraper):
                             "amount": sale_amt, "date": sale_dt,
                             "source": "lincoln_county_gis",
                         }}
+                        if _s(a.get("QUALIFIEDCODE")):
+                            raw["gis"]["last_sale"]["qualification"] = _s(a.get("QUALIFIEDCODE"))
 
                     out.append(Listing(
                         source=self.slug,
@@ -193,7 +217,17 @@ class LincolnVacant(BaseScraper):
                         street_address=situs,
                         state="NC",
                         county="Lincoln",
+                        # NOTE (2026-10-07 audit): PARCELID is 5-6 characters, so validation.py
+                        # nulls it and ~15.9k of 16.1k board rows publish with no parcel_id,
+                        # while PIN (the 10-digit NC PIN) sits in raw.lincoln_vacant. Switching
+                        # parcel_id to PIN is deliberately NOT done here: board_persist's
+                        # prior-row matching restores this row's identity from PARCELID
+                        # (_SOURCE_PARCEL_FIELDS) and refuses two different ids from one source,
+                        # so the switch would duplicate every row on the next merge. It needs a
+                        # coordinated identity migration (see docs/extraction_audit_2026-10-07.md).
                         parcel_id=parcel or pin,
+                        acreage=_f(a.get("ACRE")) or _f(a.get("MAPPEDACRE")),
+                        zoning=_s(a.get("ZONING")),
                         living_sqft=_f(a.get("MAINAREASQFT")),
                         assessed_value=_f(a.get("TOTALVALUE")),
                         market_value=_f(a.get("TOTALVALUE")),
