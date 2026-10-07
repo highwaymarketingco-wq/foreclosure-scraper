@@ -186,3 +186,47 @@ def test_stray_nul_byte_does_not_nuke_the_roll():
     by = {l.parcel_id: l for l in leads}
     assert set(by) == {"1234", "5678"}
     assert by["1234"].raw["nc_ptscloud_delinquent_tax"]["principal_tax_due"] == 800.50
+
+
+# --- 2026-10-07 extraction audit: the per-year bill history was read and dropped ---
+
+_YEARS_CSV = (
+    "BILL_NUMBER,BILL_TYPE,PARCEL_NUM,TAX_YEAR,OWNER_NAME,ABSTRACT_ASSESS_VALUE,"
+    "BILL_STATUS,BILL_AMOUNT,BILL_DUE_AMT,INTEREST_DUE,TOTAL_DUE_AMOUNT,BILL_DUE_DATE\n"
+    "B21,REI,7001,2021,\"SAMPLE, PAT\",90000,DLQ,400.00,400.00,120.00,520.00,01/05/2022\n"
+    "B23,REI,7001,2023,\"SAMPLE, PAT\",90000,DLQ,410.00,410.00,60.00,470.00,01/05/2024\n"
+    "B24,REI,7001,2024,\"SAMPLE, PAT\",90000,DLQ,420.00,200.00,10.00,210.00,01/05/2025\n"
+    "B25,REI,7002,2024,\"EXAMPLE, LEE\",50000,DLQ,300.00,300.00,5.00,305.00,01/05/2025\n"
+)
+
+
+def test_every_delinquent_year_is_kept_not_just_the_newest():
+    by = {l.parcel_id: l for l in m._parse_csv(_YEARS_CSV, "Madison", "NC", "Madison")}
+    b = by["7001"].raw["nc_ptscloud_delinquent_tax"]
+    assert b["tax_year"] == "2024"                       # unchanged: newest year
+    assert b["years_unpaid"] == ["2021", "2023", "2024"]
+    assert b["years_delinquent"] == 3
+    assert b["oldest_year"] == "2021"
+    assert [y["tax_year"] for y in b["by_year"]] == ["2024", "2023", "2021"]
+    assert [y["bill_number"] for y in b["by_year"]] == ["B24", "B23", "B21"]
+    assert b["by_year"][0]["bill_due_amt"] == 200.0
+    assert b["by_year"][0]["interest_due"] == 10.0
+    assert b["by_year"][2]["total_due"] == 520.0
+    assert b["by_year"][1]["bill_status"] == "DLQ"
+    assert b["unpaid_bill_amount"] == 1010.0             # 400 + 410 + 200
+    assert b["principal_tax_due"] == 1200.0              # unchanged: TOTAL_DUE summed
+
+
+def test_single_year_parcel_reports_one_year():
+    by = {l.parcel_id: l for l in m._parse_csv(_YEARS_CSV, "Madison", "NC", "Madison")}
+    b = by["7002"].raw["nc_ptscloud_delinquent_tax"]
+    assert b["years_delinquent"] == 1 and b["oldest_year"] == "2024"
+    assert len(b["by_year"]) == 1
+
+
+def test_years_reach_the_normalized_tax_block():
+    """enrichment_tax_owed promotes years_delinquent from a sibling block."""
+    from foreclosure_scraper import enrichment_tax_owed as t
+    li = next(l for l in m._parse_csv(_YEARS_CSV, "Madison", "NC", "Madison")
+              if l.parcel_id == "7001")
+    assert t._find_years_delinquent(li.raw) == 3

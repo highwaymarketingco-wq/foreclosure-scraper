@@ -264,6 +264,38 @@ async def _download_delinquent_csv(c, tenant: str) -> str | None:
     return r3.content.decode("utf-8-sig", errors="replace")
 
 
+def _bill_entry(r: dict, owed: float) -> dict:
+    """One delinquent bill (one tax year) of a parcel, as the roll states it."""
+    return {
+        "tax_year": (r.get("TAX_YEAR") or "").strip() or None,
+        "bill_number": (r.get("BILL_NUMBER") or "").strip() or None,
+        "bill_amount": _money(r.get("BILL_AMOUNT")),
+        "bill_due_amt": _money(r.get("BILL_DUE_AMT")),
+        "interest_due": _money(r.get("INTEREST_DUE")),
+        "total_due": round(owed, 2),
+        "bill_status": (r.get("BILL_STATUS") or "").strip() or None,
+        "bill_due_date": (r.get("BILL_DUE_DATE") or "").strip() or None,
+    }
+
+
+def _year_summary(by_year: list[dict], bill_due_amt: float) -> dict:
+    """years_unpaid / years_delinquent / oldest_year / by_year for the raw block.
+
+    years_unpaid and years_delinquent use the key names enrichment_tax_owed already
+    promotes into raw['tax_owed'] (_YEARS_LIST_KEYS / _YEARS_DELINQUENT_KEYS), so the
+    depth reaches the normalized tax block without a new reader."""
+    years = sorted({b["tax_year"] for b in by_year if b.get("tax_year")})
+    return {
+        "years_unpaid": years or None,
+        "years_delinquent": len(years) or None,
+        "oldest_year": years[0] if years else None,
+        # BILL_DUE_AMT summed: the unpaid tax itself, without the interest that
+        # TOTAL_DUE_AMOUNT (principal_tax_due above) folds in.
+        "unpaid_bill_amount": round(bill_due_amt, 2) if bill_due_amt else None,
+        "by_year": sorted(by_year, key=lambda b: b.get("tax_year") or "", reverse=True),
+    }
+
+
 def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]:
     # Some extracts carry a stray NUL byte inside a field (seen in Pitt's roll),
     # which makes csv.DictReader raise "line contains NUL" and drop the whole
@@ -291,8 +323,15 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
         a = agg.setdefault(identity_key, {"owed": 0.0, "year": "", "row": r,
                                            "parcel_id": parcel_id, "parcel_raw": parcel,
                                            "interest_due": 0.0, "bill_amount": 0.0,
+                                           "bill_due_amt": 0.0, "by_year": [],
                                            "flags_seen": []})
         a["owed"] += owed
+        # Per-bill history (2026-10-07 extraction audit). The aggregation below keeps
+        # only the newest year's row, so a parcel owing 2019-2025 used to publish as
+        # "tax_year 2025" with one summed amount: the multi-year depth (the strongest
+        # tax-distress signal on this roll) was read and thrown away.
+        a["by_year"].append(_bill_entry(r, owed))
+        a["bill_due_amt"] += _money(r.get("BILL_DUE_AMT")) or 0.0
         a["interest_due"] += _money(r.get("INTEREST_DUE")) or 0.0
         a["bill_amount"] += _money(r.get("BILL_AMOUNT")) or 0.0
         flags_this_row = (r.get("FLAGS") or "").strip()
@@ -387,6 +426,7 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
                     "mailing": mail,
                     "bill_number": (r.get("BILL_NUMBER") or "").strip() or None,
                     "flags": flags,
+                    **_year_summary(a["by_year"], a["bill_due_amt"]),
                 },
                 # Same key + value nc_its_public_tax.py already publishes for
                 # the identical concept (the county's own in-rem foreclosure
