@@ -118,7 +118,7 @@ def test_search_by_name_end_to_end(fake):
     assert len(docs) == 4 and docs[2].book == "500" and docs[2].grantee == "TESTER, ALVIN Q; TESTER, BERTHA"
     assert docs[1].raw["kind"] == "deed_of_trust" and docs[0].raw["xref"] == "640 / 88"
     assert [c[0] for c in sess.calls] == ["GET", "POST"]
-    assert asyncio.run(cott.search_by_name("NC", "Rutherford", "TESTER ALVIN")) == []   # not configured
+    assert asyncio.run(cott.search_by_name("NC", "Wake", "TESTER ALVIN")) == []         # not configured
     assert asyncio.run(cott.search_by_name("SC", "Nash", "TESTER ALVIN")) == []
 
 
@@ -204,3 +204,110 @@ def test_registry_entries_are_off_by_default():
         module, flag, default = g.ROD_CONFIG[("NC", county)]
         assert (module, flag, default) == ("nc_cott_v4", cott.ENV_FLAG, "0")
     assert g.ROD_CONFIG[("NC", "Polk")][:2] == ("cott", "FORECLOSURE_COTT_ROD")      # unchanged
+
+
+# -- guest sign-in tenants (the 'Sign in as a Guest' button, ruled a click-through 2026-10-07) ----
+
+GUEST_BASE = cott.COUNTIES["Edgecombe"].base
+SIGNIN_URL = ("https://cotthosting.com/ncedgecombeexternal/User/Login.aspx?ReturnUrl="
+              "%2fncedgecombeexternal%2fLandRecords%2fprotected%2fv4%2fSrchName.aspx")
+
+
+def signin_page(*, guest=True, captcha=False):
+    return FakeResp(
+        "<html><head><title>eSearch | Account Sign In</title>"
+        "<script src='https://www.google.com/recaptcha/api.js'></script></head><body>"
+        '<form name="aspnetForm" method="post" action="./Login.aspx?ReturnUrl=%2fncedgecombeexternal%2fLandRecords'
+        '%2fprotected%2fv4%2fSrchName.aspx" onsubmit="javascript:return WebForm_OnSubmit();" id="aspnetForm">'
+        '<input type="hidden" name="__EVENTTARGET" value="" /><input type="hidden" name="__VIEWSTATE" value="vs1" />'
+        '<input name="ctl00$cphMain$blkLogin$txtUsername" type="text" />'
+        '<input name="ctl00$cphMain$blkLogin$txtPassword" type="password" />'
+        '<input type="submit" name="ctl00$cphMain$blkLogin$btnLogin" value="Sign In" />'
+        + ('<input type="submit" name="ctl00$cphMain$blkLogin$btnGuestLogin" value="Sign in as a Guest" />'
+           if guest else "")
+        + ("<div class='g-recaptcha' data-sitekey='x'></div>" if captcha else "")
+        + '<input type="checkbox" name="ctl00$cphMain$cbDownloadSignAcknowledge" /></form>'
+        "<p>Click Sign in as a Guest in box to the left. (You no longer Need a User ID and Password)</p>"
+        "</body></html>", 200, SIGNIN_URL)
+
+
+FORM_AT = FakeResp(FORM, 200, GUEST_BASE + "SrchName.aspx")
+
+
+def test_guest_signin_detection_and_the_fields_posted():
+    page = signin_page().text
+    assert cott.is_guest_signin(page)
+    assert not cott.is_guest_signin(signin_page(guest=False).text)
+    assert not cott.is_guest_signin(FORM)
+    action, data = cott.guest_signin_form(page)
+    assert action.startswith("./Login.aspx?ReturnUrl=")
+    assert data == {"__EVENTTARGET": "", "__VIEWSTATE": "vs1", "ctl00$cphMain$blkLogin$txtUsername": "",
+                    "ctl00$cphMain$blkLogin$txtPassword": "",
+                    "ctl00$cphMain$blkLogin$btnGuestLogin": "Sign in as a Guest"}
+    assert cott.guest_signin_form(signin_page(guest=False).text) == (None, {})
+
+
+def test_guest_county_presses_the_button_then_searches(fake):
+    sess = fake([("GET", "SrchName.aspx", signin_page()), ("POST", "Login.aspx", FORM_AT),
+                 ("POST", "SrchName.aspx", FakeResp(OWNER_GRID))])
+    res = cott.ADAPTER.search("Edgecombe", OwnerName(raw="x", last="TESTER", first="ALVIN"))
+    assert res.status == "ok" and len(res.records) == 4
+    assert [(c[0], c[1].split("?")[0].rsplit("/", 1)[-1]) for c in sess.calls] == \
+        [("GET", "SrchName.aspx"), ("POST", "Login.aspx"), ("POST", "SrchName.aspx")]
+    guest_post = sess.calls[1]
+    assert guest_post[1] == SIGNIN_URL                         # the form's own action, resolved
+    assert guest_post[3]["ctl00$cphMain$blkLogin$btnGuestLogin"] == "Sign in as a Guest"
+    assert guest_post[3]["ctl00$cphMain$blkLogin$txtUsername"] == ""
+    assert guest_post[3]["ctl00$cphMain$blkLogin$txtPassword"] == ""
+    assert "ctl00$cphMain$blkLogin$btnLogin" not in guest_post[3]
+    assert nc_polite.walled_reason(cott.PLATFORM, "NC", "Edgecombe") is None
+
+
+def test_guest_landing_elsewhere_opens_the_form_again(fake):
+    welcome = FakeResp("<html><body>Welcome, Guest User</body></html>", 200, GUEST_BASE + "../Welcome.aspx")
+    sess = fake([("GET", "SrchName.aspx", [signin_page(), FORM_AT]), ("POST", "Login.aspx", welcome),
+                 ("POST", "SrchName.aspx", FakeResp(OWNER_GRID))])
+    res = cott.ADAPTER.search("Edgecombe", OwnerName(raw="x", last="TESTER", first="ALVIN"))
+    assert res.status == "ok"
+    assert [c[0] for c in sess.calls] == ["GET", "POST", "GET", "POST"]
+
+
+def test_expired_guest_session_presses_the_button_once_more(fake):
+    sess = fake([("GET", "SrchName.aspx", [signin_page(), signin_page()]), ("POST", "Login.aspx", FORM_AT),
+                 ("POST", "SrchName.aspx", _post_router({"TESTER": OWNER_GRID, "SAMPLE": SAMPLE_GRID}))])
+    assert cott.ADAPTER.search("Edgecombe", OwnerName(raw="x", last="TESTER", first="ALVIN")).status == "ok"
+    assert cott.ADAPTER.search("Edgecombe", OwnerName(raw="x", last="SAMPLE", first="CORA")).status == "ok"
+    assert sum(1 for c in sess.calls if "Login.aspx" in c[1]) == 2
+
+
+@pytest.mark.parametrize("first_page,reason", [
+    (signin_page(guest=False), "login page"),          # credentials only: no guest button
+    (signin_page(captcha=True), "CAPTCHA"),             # a CAPTCHA on the sign-in page
+    (CLOUDFLARE_403, "HTTP 403"),
+])
+def test_guest_county_walls(fake, first_page, reason):
+    sess = fake([("GET", "SrchName.aspx", first_page), ("POST", "Login.aspx", FORM_AT)])
+    res = cott.ADAPTER.search("Edgecombe", OwnerName(raw="x", last="TESTER", first="ALVIN"))
+    assert res.status == "walled" and res.reason == reason
+    assert [c[0] for c in sess.calls] == ["GET"]            # the button was never pressed
+    assert cott.chain("Edgecombe", "SAMPLE CORA")["status"] == "walled"
+    assert len(sess.calls) == 1
+
+
+def test_a_second_signin_after_the_button_is_walled(fake):
+    sess = fake([("GET", "SrchName.aspx", signin_page()), ("POST", "Login.aspx", signin_page())])
+    res = cott.ADAPTER.search("Edgecombe", OwnerName(raw="x", last="TESTER", first="ALVIN"))
+    assert res.status == "walled" and res.reason == "login page"
+    assert [c[0] for c in sess.calls] == ["GET", "POST"]
+    assert cott.ADAPTER.search("Edgecombe", OwnerName(raw="x", last="SAMPLE", first="CORA")).status == "walled"
+    assert len(sess.calls) == 2
+
+
+def test_guest_registry_entries_are_off_by_default():
+    from foreclosure_scraper import enrichment_generic_rod as g
+    guests = [c for c, cfg in cott.COUNTIES.items() if cfg.guest]
+    assert sorted(guests) == ["Alamance", "Edgecombe", "Halifax", "Lenoir", "Onslow", "Pitt", "Rutherford",
+                              "Scotland", "Wilson"]
+    for county in guests:
+        assert g.ROD_CONFIG[("NC", county)] == ("nc_cott_v4", cott.ENV_FLAG, "0")
+    assert ("NC", "Rowan") not in g.ROD_CONFIG and "Rowan" not in cott.COUNTIES

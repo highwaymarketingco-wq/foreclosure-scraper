@@ -184,7 +184,12 @@ class PoliteClient:
         _last_request[host] = clock()
 
     def request(self, method: str, url: str, *, params: Any = None, data: Any = None,
-                headers: Optional[dict] = None) -> Page:
+                headers: Optional[dict] = None,
+                accept_signin: Optional[Callable[[Page], bool]] = None) -> Page:
+        """accept_signin: for a register whose public search sits behind a no-credential guest
+        button (ruled a click-through on 2026-10-07). A page the wall detector reads as a login
+        page is returned instead of raising ONLY when this callable says it is such a guest page;
+        a CAPTCHA, a challenge or a block status still walls the county."""
         why = walled_reason(self.platform, self.state, self.county)
         if why:
             raise RodWalled(url, why)
@@ -199,6 +204,8 @@ class PoliteClient:
                 _last_request[host] = clock()   # the gap runs from the END of a slow answer too
         page = Page(int(r.status_code), url, str(getattr(r, "url", url)), r.text or "")
         why = wall_reason(page.status, page.final_url, page.text)
+        if why == "login page" and accept_signin is not None and accept_signin(page):
+            return page
         if why:
             mark_walled(self.platform, self.state, self.county, why)
             raise RodWalled(page.final_url or url, why)

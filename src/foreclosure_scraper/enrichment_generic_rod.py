@@ -52,6 +52,16 @@ ROD_CONFIG = {
     ("NC", "Nash"):          ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
     ("NC", "Pamlico"):       ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
     ("NC", "Wayne"):         ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    # the same app behind the vendor's no-credential 'Sign in as a Guest' button (a click-through)
+    ("NC", "Alamance"):      ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Edgecombe"):     ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Halifax"):       ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Lenoir"):        ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Onslow"):        ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Pitt"):          ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Rutherford"):    ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Scotland"):      ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Wilson"):        ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
     # 'The Lookup' (Logan / BIS) name index (rod/nc_lookup.py). Clay, Haywood, Yancey are also read
     # by enrichment_rod_lookup (raw['rod_lookup']) and Transylvania, McDowell, Mitchell by the
     # rod/logan.py NOD sweep; neither writes raw['rod'], so these entries add, not replace.
