@@ -134,6 +134,10 @@ SC_ROD_CONFIG = {
     # the county's own document search (rod/greenwood_docsearch.py); 2 of 6 real board owners gave a
     # chain and a third the owner's liens, about 5 s a lookup (2026-10-07)
     ("SC", "Greenwood"):     ("greenwood_docsearch", "FORECLOSURE_SC_GREENWOOD_ROD", "1"),
+    # Cott RecordRoom by name (rod/sc_recordroom.py) and the older Cott eSearch (rod/sc_cott_esearch.py);
+    # real board owners 2026-10-07: Union 1 chain + 3 owners' liens of 6, Marlboro 2 chains of 5
+    ("SC", "Union"):         ("sc_recordroom", "FORECLOSURE_SC_RECORDROOM_ROD", "1"),
+    ("SC", "Marlboro"):      ("sc_cott_esearch", "FORECLOSURE_SC_COTT_ESEARCH_ROD", "1"),
 }
 SC_CHAIN_ONLY_CONFIG = {
     ("SC", "Oconee"):        ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "1"),
