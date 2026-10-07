@@ -71,6 +71,18 @@ _OUT_FIELDS = ",".join([
     "ConditionFactor", "CDUC", "PropertyType", "BuildingType", "LandUse",
     "CurrentAppraisedBuildingValue", "CurrentAppraisedLandValue",
     "CurrentTaxableBuildingValue", "CurrentTaxableLandValue",
+    # 2026-10-07 extraction audit: on the CAMA layer, never requested (fill on the live
+    # 1,778-row condemned set in parens). StreetCommunity is the situs city (100%; the
+    # board had a city on 88 of 1,754 rows); LegalDescription (100%); SaleDate (100%,
+    # epoch ms -- SaleAmount is empty here); CurrentAssessed* (95-97%); DeedBook/
+    # DeedPage/InstrumentNumber (96-99%); PreviousOwnerName (97%); ReviewDate (when the
+    # assessor last rated the building, 100%); Units (87%); Acreage/DEEDACREAGE (~49%);
+    # building facts the condition rating rests on.
+    "StreetCommunity", "LegalDescription", "SaleDate", "CurrentAssessedBuildingValue",
+    "CurrentAssessedLandValue", "DeedBook", "DeedPage", "InstrumentNumber",
+    "PreviousOwnerName", "ReviewDate", "Units", "Acreage", "DEEDACREAGE",
+    "AccountNumber", "AssessmentCode", "BuildingGrade", "StoryHeight", "Foundation",
+    "RoofCover", "HeatType", "LandSizeDescription",
 ])
 
 _PAGE = 2000  # matches the service maxRecordCount
@@ -172,6 +184,26 @@ def _appraised_total(a: dict) -> float | None:
     land = _num(a.get("CurrentAppraisedLandValue")) or 0
     tot = b + land
     return tot or None
+
+
+def _assessed_total(a: dict) -> float | None:
+    b = _num(a.get("CurrentAssessedBuildingValue")) or 0
+    land = _num(a.get("CurrentAssessedLandValue")) or 0
+    return (b + land) or None
+
+
+def _epoch_date(v: Any) -> str | None:
+    """ISO date from an ArcGIS epoch-milliseconds value (None for empty/zero/bad)."""
+    try:
+        ms = int(v)
+    except (TypeError, ValueError):
+        return None
+    if ms <= 0:
+        return None
+    try:
+        return datetime.utcfromtimestamp(ms / 1000).date().isoformat()
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 def _taxable_total(a: dict) -> float | None:
@@ -276,6 +308,23 @@ class SpartanburgCondemned(BaseScraper):
                 ("condition", cduc),
                 ("land_use", _clean(a.get("LandUse"))),
                 ("building_type", _clean(a.get("BuildingType"))),
+                # 2026-10-07 extraction audit (see _OUT_FIELDS)
+                ("last_sale_date", _epoch_date(a.get("SaleDate"))),
+                ("review_date", _epoch_date(a.get("ReviewDate"))),
+                ("deed_book", _clean(a.get("DeedBook"))),
+                ("deed_page", _clean(a.get("DeedPage"))),
+                ("instrument", _clean(a.get("InstrumentNumber"))),
+                ("previous_owner", _clean(a.get("PreviousOwnerName"))),
+                ("units", _int(a.get("Units"))),
+                ("assessed_value", _assessed_total(a)),
+                ("account_number", _clean(a.get("AccountNumber"))),
+                ("assessment_code", _clean(a.get("AssessmentCode"))),
+                ("building_grade", _clean(a.get("BuildingGrade"))),
+                ("story_height", _clean(a.get("StoryHeight"))),
+                ("foundation", _clean(a.get("Foundation"))),
+                ("roof_cover", _clean(a.get("RoofCover"))),
+                ("heat_type", _clean(a.get("HeatType"))),
+                ("land_size", _clean(a.get("LandSizeDescription"))),
             ) if v not in (None, "", 0)
         }
 
@@ -315,6 +364,11 @@ class SpartanburgCondemned(BaseScraper):
             # StreetZip is the situs ZIP; Zip belongs to the owner's MAILING block
             # (StreetAddress/City/State/Zip), e.g. a Fort Worth TX ZIP on a Spartanburg parcel.
             zip_code=(_clean(a.get("StreetZip")) or None),
+            # StreetCommunity is the situs community; City is the owner's MAILING city.
+            city=(_clean(a.get("StreetCommunity")) or "").title() or None,
+            legal_description=_clean(a.get("LegalDescription")),
+            acreage=_num(a.get("Acreage")) or _num(a.get("DEEDACREAGE")),
+            assessed_value=_assessed_total(a),
             parcel_id=parcel,
             latitude=lat,
             longitude=lon,

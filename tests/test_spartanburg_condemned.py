@@ -216,3 +216,39 @@ def test_live_yields_condemned_rows_with_parcels():
     # every condemned row carries the code_enforcement distress hook
     for li in condemned:
         assert li.raw.get("code_enforcement") is True
+
+
+# --- 2026-10-07 extraction audit. Values below are made up. ---
+
+def test_new_cama_columns_are_requested():
+    from foreclosure_scraper.scrapers.counties_sc import spartanburg_condemned as sc
+    for col in ("StreetCommunity", "LegalDescription", "SaleDate", "DeedBook", "DeedPage",
+                "InstrumentNumber", "PreviousOwnerName", "ReviewDate", "Units",
+                "CurrentAssessedBuildingValue", "CurrentAssessedLandValue", "Acreage"):
+        assert col in sc._OUT_FIELDS.split(","), col
+
+
+def test_situs_city_legal_assessed_and_deed_reach_the_lead():
+    from foreclosure_scraper.scrapers.counties_sc import spartanburg_condemned as sc
+    a = {"OwnerName": "SAMPLE OWNER", "PropertyLocation": "1 TEST ST",
+         "GISParcelNumber": "7000-00-0000.00", "ConditionFactor": "DL", "CDUC": "DELAPITATED",
+         "StreetCommunity": "SAMPLE MILLS", "City": "ELSEWHERE", "LegalDescription": "LOT 1 TEST",
+         "CurrentAssessedBuildingValue": 1000.0, "CurrentAssessedLandValue": 500.0,
+         "SaleDate": 1262304000000, "ReviewDate": 1704067200000, "DeedBook": "12",
+         "DeedPage": "34", "InstrumentNumber": "2010-9", "PreviousOwnerName": "EXAMPLE PAT",
+         "Units": 2, "DEEDACREAGE": 0.4}
+    li = sc.SpartanburgCondemned()._to_listing({"attributes": a, "geometry": {"x": -81.9, "y": 34.9}})
+    assert li.city == "Sample Mills"          # situs community, not the mailing City
+    assert li.legal_description == "LOT 1 TEST"
+    assert li.assessed_value == 1500.0 and li.acreage == 0.4
+    c = li.raw["cama_specs"]
+    assert c["last_sale_date"] == "2010-01-01" and c["review_date"] == "2024-01-01"
+    assert c["deed_book"] == "12" and c["deed_page"] == "34" and c["instrument"] == "2010-9"
+    assert c["previous_owner"] == "EXAMPLE PAT" and c["units"] == 2
+
+
+def test_condemned_signal_survives_the_publish_slim():
+    from foreclosure_scraper.web_artifact import RAW_KEEP, _slim_raw
+    assert RAW_KEEP.get("condemned_signal") == "*"
+    assert _slim_raw({"condemned_signal": {"tier": "condemned"}}) == {
+        "condemned_signal": {"tier": "condemned"}}
