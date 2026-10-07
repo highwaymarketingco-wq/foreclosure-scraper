@@ -2291,6 +2291,7 @@ RAW_KEEP = {
     "bankruptcy_relief_from_stay": "*",  # CM/ECF RSS relief-from-stay motion/order: court, case, chapter, events
     "geocoded_by_name": "*",          # name-based geocoding provenance
     "gis_attrs_full": "*",            # full GIS attribute snapshot
+    "foreclosure_judgment_entered": "*",  # Charleston/SC Public Index: foreclosure judgment entered, Master-in-Equity sale likely ahead
     "situs_address_source": "*",      # situs address provenance
     "address_not_property": "*",      # {address, reason, notices}: a court/office address taken from the notice text, removed (enrichment_address_final)
     # enrichment_prior_correction (HANDOFF item 71): audit records of carried data corrected in a run.
