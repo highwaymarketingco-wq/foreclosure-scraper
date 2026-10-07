@@ -114,7 +114,11 @@ async def enrich_rod_chain(listings: Iterable[Listing]) -> dict:
                 break
             stats["targets"] += 1
             try:
-                res = await asyncio.to_thread(mod.chain, county, li.owner_name, state=state, depth=depth)
+                # the lead's parcel id, for adapters whose chain() takes one (Anderson SC: flags a
+                # vesting deed newer than its online index from the county parcel layer)
+                _code = getattr(mod.chain, "__code__", None)
+                _kw = {"parcel_id": li.parcel_id} if _code is not None and "parcel_id" in _code.co_varnames else {}
+                res = await asyncio.to_thread(mod.chain, county, li.owner_name, state=state, depth=depth, **_kw)
             except Exception as exc:  # noqa: BLE001 - one lead never kills the pass
                 log.warning("rod_chain.failed", county=county, error=f"{type(exc).__name__}: {str(exc)[:120]}")
                 stats["errors"] += 1

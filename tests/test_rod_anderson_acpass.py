@@ -184,3 +184,23 @@ def test_ingenuity_bot_check_page_is_a_wall():
 def test_not_anderson():
     with pytest.raises(KeyError):
         ac.chain("Greenville", "X Y")
+
+
+def test_rod_chain_enricher_passes_parcel_id_only_where_taken(monkeypatch):
+    import asyncio as _asyncio
+
+    from foreclosure_scraper.enrichment_rod_chain import enrich_rod_chain
+    from foreclosure_scraper.models import Listing, ListingType
+
+    seen = []
+
+    def fake_chain(county, owner_name, *, state="SC", depth=3, parcel_id=None):
+        seen.append(parcel_id)
+        return {"status": "ok", "last_deed": None, "prior_instruments": [], "liens": {}}
+    monkeypatch.setattr(ac, "chain", fake_chain)
+    monkeypatch.setenv("FORECLOSURE_ROD_CHAIN", "1")
+    monkeypatch.setenv("FORECLOSURE_SC_ACPASS_ROD", "1")
+    li = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE, state="SC",
+                 county="Anderson", owner_name="WINTERBOURNE CALLISTA R", parcel_id="123-45-67-890", raw={})
+    stats = _asyncio.run(enrich_rod_chain([li]))
+    assert seen == ["123-45-67-890"] and stats["stamped"] == 1 and li.raw["rod_chain"]["status"] == "ok"
