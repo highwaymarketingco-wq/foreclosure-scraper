@@ -105,6 +105,18 @@ CHAIN_ONLY_CONFIG = {
 SC_ROD_CONFIG = {
     # GovOS (Kofile) PublicSearch (rod/publicsearch.py); Oconee's raw['rod'] stays on rod/kofile.py
     ("SC", "Greenville"):    ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "0"),
+    # 'Online Record System' (rod/sc_online_record_system.py). The first eight are also read by
+    # enrichment_rod_name_index (raw['rod_name_index'], no chain); none of them had raw['rod'].
+    ("SC", "Abbeville"):     ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
+    ("SC", "Barnwell"):      ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
+    ("SC", "Berkeley"):      ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
+    ("SC", "Colleton"):      ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
+    ("SC", "Dorchester"):    ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
+    ("SC", "Florence"):      ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
+    ("SC", "Georgetown"):    ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
+    ("SC", "York"):          ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
+    ("SC", "Laurens"):       ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
+    ("SC", "Lancaster"):     ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
 }
 SC_CHAIN_ONLY_CONFIG = {
     ("SC", "Oconee"):        ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "0"),

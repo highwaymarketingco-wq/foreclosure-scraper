@@ -271,3 +271,13 @@ def test_polite_session_raises_on_wall():
 
 def test_min_gap_floor():
     assert sc_polite.MIN_GAP_S >= 1.6
+
+
+def test_failed_chain_step_keeps_the_last_deed():
+    def reg(q, side, d):
+        if q.term == "QUILLFEATHER ROSALIND":
+            return [doc("2019-05-02", "DEED", SELLER, OWNER, "2100", "10")]
+        raise TimeoutError("read timed out")
+    res = build_chain(reg, state="SC", county="Testcounty", owner_name=OWNER, platform="test")
+    assert res.status == "ok" and res.last_deed.book == "2100" and res.prior == []
+    assert "did not answer" in res.chain_stopped

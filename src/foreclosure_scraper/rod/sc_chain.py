@@ -504,6 +504,10 @@ def build_chain(searcher: Searcher, *, state: str, county: str, owner_name: str,
             res.walled, res.wall_reason = True, w.reason
             res.stop(f"Chain step {step} stopped at a wall ({w.reason}); nothing was retried.")
             break
+        except Exception as exc:  # noqa: BLE001 - a slow or failed step keeps what was found
+            res.stop(f"Chain step {step}: the register did not answer the search for {g} "
+                     f"({type(exc).__name__}); the chain stops there.")
+            break
         cands = _deeds_into(gq, docs, upto, exclude=(cur.book, cur.page))
         if not cands:
             res.stop(f"No earlier deed into {g} was found in the online index (chain step {step}); "

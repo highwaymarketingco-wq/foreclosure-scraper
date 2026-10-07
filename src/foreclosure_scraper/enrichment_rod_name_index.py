@@ -58,15 +58,19 @@ log = structlog.get_logger()
 
 #: county -> host. Confirmed by fetching NameSearch.php and seeing a real search
 #: UI (110-470 KB with an instType enumeration), not by URL pattern.
+#: 2026-10-07: all https. The http hosts answer the NamePick POST with a 302 to https; the client
+#: follows it as a GET without the form, and NamePick then lists the first 2000 names of the whole
+#: index whatever was typed, so every lookup in these five counties hit the cap and returned [].
+#: rod/sc_online_record_system.py (the same platform, with the deed chain) found it.
 NAME_INDEX_HOSTS: dict[tuple[str, str], str] = {
-    ("abbeville", "SC"): "http://search.abbevilledeeds.com",
+    ("abbeville", "SC"): "https://search.abbevilledeeds.com",
     ("barnwell", "SC"): "https://barnwelldeeds.com",
-    ("berkeley", "SC"): "http://search.berkeleydeeds.com",
-    ("colleton", "SC"): "http://search.colletondeeds.com",
-    ("dorchester", "SC"): "http://search.dorchesterdeeds.com",
-    ("florence", "SC"): "http://search.florencedeeds.com",
+    ("berkeley", "SC"): "https://search.berkeleydeeds.com",
+    ("colleton", "SC"): "https://search.colletondeeds.com",
+    ("dorchester", "SC"): "https://search.dorchesterdeeds.com",
+    ("florence", "SC"): "https://search.florencedeeds.com",
     ("georgetown", "SC"): "https://georgetowndeeds.com",
-    ("york", "SC"): "http://search.yorkdeeds.com",
+    ("york", "SC"): "https://search.yorkdeeds.com",
 }
 
 #: Does the county actually apply start_date/end_date? MEASURED, by comparing a
@@ -74,6 +78,9 @@ NAME_INDEX_HOSTS: dict[tuple[str, str], str] = {
 #: True  -> counts differ and sit below the cap; the window is real.
 #: False -> identical counts at the 2000 cap for every window; dates ignored.
 #: None  -> not established (York timed out repeatedly on its 470 KB page).
+#: The five False rows were measured over http, where the form never reached the server (see
+#: NAME_INDEX_HOSTS); Abbeville honoured a September window over https on 2026-10-07. They stay
+#: False (bulk_by_date refuses) until each is re-measured over https.
 DATE_FILTER: dict[tuple[str, str], bool | None] = {
     ("barnwell", "SC"): True,     # 24 in 7 days vs 230 in January
     ("georgetown", "SC"): True,   # 161 / 527 / 1374 across three windows
