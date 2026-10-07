@@ -139,10 +139,18 @@ _QUERIES: tuple[tuple[str, str, int, str], ...] = (
     # the word "foreclosure" in the caption.
     ("foreclosure", "AND", _MAX_PAGES, _DAYS),
     ("delinquent taxes", "AND", 3, _YEAR_DAYS),
+    # 2026-10-07 title-clearing lanes (docs/new_sources_2026-10-07_liens_courts.md,
+    # NC-NOTICES-TITLE): partition proceedings, quiet-title suits and the service-by-
+    # publication notices that name a record owner's unknown heirs. These are other
+    # people's title-clearing work, published; until now no query asked for them.
+    ("partition", "AND", 3, _DAYS),
     # NCGS 105-369 annual tax-lien advertisement — exact caption, few hits.
     ("advertisement of tax liens", "EXACT", 2, _YEAR_DAYS),
     # NCGS 28A-14-1 estate notice — exact caption keeps out generic "creditors".
     ("notice to creditors", "EXACT", _MAX_PAGES, _DAYS),
+    ("quiet title", "EXACT", 3, _DAYS),
+    ("unknown heirs", "EXACT", 3, _DAYS),
+    ("heirs at law", "EXACT", 3, _DAYS),
 )
 
 # ---- classification -------------------------------------------------------
@@ -245,6 +253,41 @@ _COUNTY_OF_RE = re.compile(
     r"\bCOUNTY OF\s+(" + "|".join(FOOTPRINT) + r")\b", re.I)
 
 
+# Title-clearing language (2026-10-07). Checked on EVERY row, not only the rows the
+# title queries bring in: an NC tax-foreclosure summons by publication routinely names
+# "the unknown heirs of" the record owner, and that fact is worth keeping on the row
+# whichever branch classifies it.
+_QUIET_TITLE_RE = re.compile(r"\bquiet(?:ing)?\s+(?:tax\s+)?title\b", re.I)
+_PARTITION_RE = re.compile(r"\bpartition(?:ing)?\b(?!\s+wall)", re.I)
+_UNKNOWN_HEIRS_RE = re.compile(
+    r"\bunknown\s+heirs\b|\bheirs[-\s]+at[-\s]+law\b|\ball\s+persons\s+claiming\b", re.I)
+_HEIRS_OF_RE = re.compile(
+    r"\bheirs(?:[-\s]+at[-\s]+law)?(?:\s*,?\s*(?:and\s+)?(?:devisees|assigns|spouses)"
+    r"(?:\s*,?\s*(?:and\s+)?(?:devisees|assigns|spouses))*)?\s+of\s+"
+    r"([A-Z][A-Za-z.'\- ]{2,60}?)(?:\s*,|;|\s+deceased|\s+and\b|\s+who\b|\s*\(|$)", re.I)
+
+
+def title_action(text: str) -> dict | None:
+    """Which title-clearing proceeding the notice is, or None.
+
+    Returns {"kind": quiet_title | partition | heirs, "unknown_heirs": bool,
+    "decedent": <record owner whose heirs are named> or None}."""
+    if _QUIET_TITLE_RE.search(text):
+        kind = "quiet_title"
+    elif _PARTITION_RE.search(text):
+        kind = "partition"
+    elif _UNKNOWN_HEIRS_RE.search(text):
+        kind = "heirs"
+    else:
+        return None
+    m = _HEIRS_OF_RE.search(text)
+    decedent = _tidy_name(m.group(1)) if m else None
+    if decedent and re.match(r"(?i)^(?:the|said|all|any|each)\b", decedent):
+        decedent = None
+    return {"kind": kind, "unknown_heirs": bool(_UNKNOWN_HEIRS_RE.search(text)),
+            "decedent": decedent}
+
+
 def _tidy_name(value: str | None) -> str | None:
     """Trim a captured party name of trailing connectives and stray punctuation."""
     if not value:
@@ -295,6 +338,11 @@ def _classify(text: str) -> tuple[ListingType, str] | None:
         if _SALE_RE.search(text):
             return ListingType.FORECLOSURE_SALE, "foreclosure"
         return ListingType.LIS_PENDENS, "foreclosure"
+    # 2026-10-07: a partition proceeding, a quiet-title suit or an unknown-heirs
+    # publication is a pending action against the title -- the lis pendens lane.
+    ta = title_action(text)
+    if ta:
+        return ListingType.LIS_PENDENS, ta["kind"]
     return None
 
 
@@ -311,6 +359,10 @@ def _party(text: str, kind: str) -> str | None:
     if kind == "estate":
         m = _ESTATE_RE.search(text)
         return _tidy_name(m.group(1)) if m else None
+    if kind in ("quiet_title", "partition", "heirs"):
+        ta = title_action(text)
+        if ta and ta.get("decedent"):
+            return ta["decedent"]   # the record owner whose heirs the suit names
     for pattern in (_RECORD_OWNER_RE, _GRANTOR_RE, _VS_RE):
         m = pattern.search(text)
         if m:
@@ -390,6 +442,13 @@ def _to_listing(notice: dict, slug: str) -> Listing | None:
             "preview_truncated": True,
         }
     }
+    ta = title_action(text)
+    if ta:
+        raw["public_notice"]["title_action"] = ta
+        if ta["kind"] == "partition":
+            raw["relationship_signal"] = {
+                "kind": "partition", "keyword": "partition_notice",
+                "tagged_at": datetime.utcnow().isoformat() + "Z"}
     if book_m:
         # Deed-of-Trust book/page — the join key for a ROD document pull.
         raw["public_notice"]["deed_of_trust"] = {
@@ -612,7 +671,8 @@ class NCNoticesCounties(BaseScraper):
     name = "NC Public Notices, county-scoped (ncnotices.com — foreclosure/tax/estate)"
     category = "public_notices"
     expected_min_count = 0
-    # 11 county postbacks + 4 queries x up to 6 paged loads, all in one session.
+    # 20 county postbacks + 8 queries (4 added 2026-10-07 at up to 3 pages each),
+    # all in one session.
     timeout_s = 900.0
 
     async def fetch(self) -> Iterable[Listing]:
