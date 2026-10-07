@@ -278,3 +278,48 @@ Status: `no` = not ingested, `partial` = ingested in part, `yes` = ingested (two
 - The Jasper layer is a city's copy last edited 2025-08-12; owners and mailing can trail the county roll by a year. Its values pass the cache's 10-day freshness gate because the gate reads the file date, not the data date.
 - Lift estimates outside the two builds are arithmetic on board counts times an assumed hit rate; each is marked as a guess in the JSON.
 - Board numbers are from the published board of 2026-10-07 and move with every run.
+
+## 11. Update, later on 2026-10-07: what landed and the re-measured lift
+
+Five changes, each committed locally (pathspec commits, nothing pushed, nothing written to the board). Every figure below is a count from one read-only streaming pass of the 350,013-row board (`scripts/measure_cache_facts_lift.py`), unless marked as a projection.
+
+**1. The cache join now runs over every row in a normal pipeline run.** The 36,469 rows (36,638 on the board re-read this evening) had a parcel id and no mailing while their cache held one because `enrich_gis_attrs` read the cache only inside its per-lead coroutine: behind the "core attrs complete" skip gate (11,436 of the gap rows returned before the lookup), behind the batch loop that the 2,400 s `RESOLVER_PHASE_MAX_SECONDS` cap stops part way through a 350k-row board (the other 25,033 rows never reached the lookup; most were added by scoped ingests after the last full run), and writing only `raw["gis"]["mailing"]`, never the canonical `raw["owner_mailing"]` block. Fix: one shared, fill-only join (`src/foreclosure_scraper/parcel_cache_join.py`: overage rows skipped, over-shared parcel ids refused, dual-state names need a state, the mailing withheld when the address resolver said the parcel's owner differs) that `enrich_gis_attrs` runs over every listing before its live loop; `scripts/join_parcel_cache_to_board.py` uses the same code plus its numbered-situs rule. **No main.py change is needed** (main already calls `enrich_gis_attrs`); `FORECLOSURE_CACHE_JOIN=0` turns it off. Bounded proof (`scripts/prove_cache_join_prepass.py`, 5,000 gap rows from 51 counties): mail 0 -> 3,694; the other 1,306 were withheld by the owner-differs rule. Board-wide, the join fills **owner mailing on 35,512 rows** (NC Gaston 15,641, Transylvania 5,439, SC Charleston 1,932, NC Perquimans 1,518, Onslow 1,087, Chowan 878, SC Dorchester 841, NC Mecklenburg 726, Forsyth 581, SC Jasper 460), last sale on 3,958 and county value on 997. It lands on the board at the next full pipeline run, or sooner with `scripts/apply_board_fixes.py --steps join --apply` as the only board process (owner's call, VM).
+
+**2. Fact columns.** `parcel_cache` gained `year_built`, `bedrooms`, `bathrooms`, `stories` (the table DDL is now built from `_COLS`), a `{"baths": [full, half]}` spec (a half bath counts 0.5), `FACT_MAPS` for the eleven already-downloaded layers whose field names were verified live today (Gaston, McDowell, Spartanburg, Darlington, Greenville, York, Lexington, Greenwood, Barnwell, Saluda, Chester; Gaston and McDowell also gain last sale), and `structyear` -> year built on the NC OneMap fallback (every NC county it serves). Migration: a cache file written before the columns existed stays readable (columns are read per file); `parcel_cache.ensure_columns()` adds them in place for a writer. Measured after refreshing Gaston and Transylvania today: Gaston year built **+1,653**, bedrooms +1,345, bathrooms +1,346, last sale +1,221; Transylvania year built +128. The earlier "about 23,300 Gaston year-built fills" counted every Gaston row without a year; most Gaston board rows are vacant land from `gaston_vacant`, which has no building. The other nine layers and every OneMap county fill at the next weekly refresh.
+
+**3. Dorchester SC parcel layer**, built on the owner's decision. The licence wording ("not to be added to any pay for use locations without prior written approval of Dorchester County Assessor or GIS Director") is kept beside the config in `parcel_cache.py`: the board is free and public; putting it behind a paywall would need that approval first. 80,311 parcels cached. Measured: mail **0 -> 841 of 1,735 rows (48.5%)**, last sale 0 -> 616 (1,306 rows carry a parcel id; 841 hit). It also supplies a mailing for all 17 Dorchester rows of the 249 big-old tax rows with no contact.
+
+**4. Richland SC map-viewer reader** (`src/foreclosure_scraper/enrichment_richland_parcel.py`), built on the owner's decision (the viewer's disclaimer is a click-through). Per row: the viewer's address search (high-confidence hit, same house number and street words) then its parcel-at-point call; fills TMS, owner, owner mailing, value, heated sqft, beds, baths, year built, acreage, last sale. OptedOut owners keep name and mailing off; a different owner name withholds the mailing. One request at a time, 1.7 s apart, 300 rows per run, 30-day retry. Bounded live proof on 12 board rows: 9 matched, 9 mailing fills. 2,028 of the 2,229 Richland rows are eligible; at the proof rate that is **about 1,500 rows of mail (projection)** over seven capped runs. **main.py wiring (for the coordinator), right after the `enrich_gis_attrs` block (main.py, the `# CAMA per-parcel condition` comment is the next block):**
+
+```python
+    try:
+        from .enrichment_richland_parcel import enrich_richland_parcel
+        s = await asyncio.wait_for(
+            enrich_richland_parcel(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+        if s:
+            enrichment_stats["richland_parcel"] = s
+    except asyncio.TimeoutError:
+        log.warning("richland_parcel.time_capped")
+    except Exception:
+        log.error("richland_parcel.failed", traceback=traceback.format_exc())
+```
+
+**5. County roll loader** for the records-request files: `scripts/ingest_county_roll.py --county <name> --state SC|NC --file <path> [--file ...] [--map <json>] [--dry-run] [--report]` (code in `src/foreclosure_scraper/county_roll.py`). Reads CSV, TSV, pipe or semicolon text, fixed-width text (layout from the mapping JSON or inferred from the header), .xlsx and a .zip holding one of those; legacy .xls is refused with a save-as instruction. Every SSN, licence or birth-date column is dropped before any value is read (`sensitive_fields.is_sensitive_field` now treats spaces, dots and hyphens as underscores, so "DATE OF BIRTH" is caught). Auto-detects parcel/TMS/PIN/REID/account/bill ids (all of them become keys, which is the crosswalk Hyde, Washington and Perquimans need), owner, mailing parts, situs, land use, market and assessed value, acreage, sqft, year built, beds, baths, stories, last sale. It writes a SIDECAR, `data/parcel_cache/<county>.roll.sqlite`, with provenance `county_roll_request` and the file's date: the weekly layer refresh cannot wipe it, and `parcel_cache.lookup` lets it fill only what the layer cache lacks (Beaufort SC merges with `beaufort_sc.sqlite` instead of replacing it). Roll values are handed out for 400 days after the file date; owner and mailing without a limit. Re-running the same file gives the same sidecar. Synthetic proof on the real board (made-up owners keyed by the 15 real Kershaw parcel ids of the 249 list, written to a scratch cache dir): mail, value and year built 0 -> 15 each. Tests: one fixture per format.
+
+### The weakest 10, re-measured
+
+| County | Rows | Parcel-id rows | Mail before | Mail after (measured) | What moves it next |
+|---|--:|--:|--:|--:|---|
+| Williamsburg SC | 2,476 | 2,252 | 0 | 0 | roll request (2,252 rows join by id the day it lands) |
+| Richland SC | 2,229 | 4 | 0 | 0 (about 1,500 projected) | wire `enrich_richland_parcel` into main.py |
+| Dorchester SC | 1,735 | 1,306 | 0 | **841 (48.5%)** | done; roll request for the 465 misses |
+| Clarendon SC | 1,649 | 1,424 | 0 | 0 | roll request |
+| Chesterfield SC | 1,011 | 725 | 0 | 0 | roll request |
+| Newberry SC | 977 | 530 | 0 | 0 | roll request (county layer service stopped) |
+| Edgefield SC | 921 | 750 | 0 | 0 | roll request |
+| Marlboro SC | 1,250 | 1,023 | 3 | 3 | roll request |
+| Beaufort SC | 1,695 | 25 | 3 | 28 by id (94 with the address resolver, section 3) | roll request merges with the layer |
+| Kershaw SC | 1,927 | 1,697 | 4 | 4 | roll request (its open layer has no owner) |
+
+Next tier: Jasper SC 5 -> 465 by id (built earlier today); Hyde NC 538 parcel-id rows, 34 cache hits, none with a new mailing (the roll's account/REID columns are the crosswalk); Washington NC 6 parcel-id rows. Year-built, bedroom and bathroom fills in these counties stay at 0 until a roll lands: none of them has a layer that publishes them.
