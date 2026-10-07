@@ -65,6 +65,7 @@ def row_check(grid: str, row: int, col: int = 0) -> str:
 @dataclass(frozen=True)
 class RemoteCounty:
     root: str                      # ends with '/'
+    entry: str = ""                # the disclaimer page under root ('' = root; Bladen, Warren: opening.asp)
 
 
 COUNTIES: dict[str, RemoteCounty] = {
@@ -74,10 +75,10 @@ COUNTIES: dict[str, RemoteCounty] = {
     "Martin": RemoteCounty("https://www.martinrod.org/"),
     "Cherokee": RemoteCounty("https://www.cherokeencrod.org/"),
     "Anson": RemoteCounty("https://www.ansonncrod.org/"),
-    "Bladen": RemoteCounty("https://www.bladenncrod.org/"),
+    "Bladen": RemoteCounty("https://www.bladenncrod.org/", "opening.asp"),
     "Ashe": RemoteCounty("https://www.ashencrod.org/"),
     "Northampton": RemoteCounty("https://northamptonrod.org/"),
-    "Warren": RemoteCounty("https://warrenrod.org/"),
+    "Warren": RemoteCounty("https://warrenrod.org/", "opening.asp"),
     "Swain": RemoteCounty("https://www.swaincorod.org/"),
 }
 
@@ -157,7 +158,7 @@ class LoganRemote(NcRenderPlatform):
     def _render_search(self, rp: RenderPage, cfg: RemoteCounty, who: OwnerName, side: str,
                        date_thru: Optional[str], date_from: Optional[str] = None) -> SearchResult:
         url = self.source_url(cfg)
-        rp.goto(cfg.root)
+        rp.goto(cfg.root + cfg.entry)
         if rp.has(ACK):
             rp.click_nav(ACK)
         else:

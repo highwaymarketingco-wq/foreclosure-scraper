@@ -150,3 +150,13 @@ def test_registry_entries_are_off_by_default():
     assert len(lr.COUNTIES) == 11
     for county in lr.COUNTIES:
         assert g.RENDER_ROD_CONFIG[("NC", county)] == ("nc_logan_remote", lr.ENV_FLAG, "0")
+
+
+def test_entry_page_for_opening_asp_counties(fake, monkeypatch):
+    made = fake()
+    monkeypatch.setitem(lr.COUNTIES, "Vance", lr.RemoteCounty(ROOT, "opening.asp"))
+    made[:] = []
+    install_render(monkeypatch, lambda: made.append(site()) or made[-1])
+    lr.ADAPTER.search("Vance", OwnerName(raw="x", last="TESTER", first="ALVIN"))
+    assert made[0].log[0] == ("goto", ROOT + "opening.asp") and ("click", lr.ACK) in made[0].log
+    assert lr.COUNTIES["Warren"].entry == "opening.asp" and lr.COUNTIES["Bladen"].entry == "opening.asp"
