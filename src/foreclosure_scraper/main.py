@@ -581,6 +581,14 @@ DATELESS_OK_SOURCES = {
     "counties_nc.rocky_mount_blight_survey",     # condition survey rows: no sale date
     "city_websites.raleigh_structure_fires",     # fire addresses: no sale date
     "counties_nc.kinston_proposed_demolition",   # proposed demolition list: no sale date
+    # 2026-10-07 second round of new sources: none of their rows carries a sale date.
+    "counties_sc.charleston_energov_history",    # Charleston County permit/code history (code cases, demolition permits)
+    "counties_nc.nc_metro_demolition_permits",   # Mecklenburg, Durham, Greensboro, Cary demolition permits
+    "counties_nc.rowan_delinquent_tax",
+    "counties_nc.cumberland_delinquent_tax",
+    "counties_nc.iredell_delinquent_tax",
+    "counties_nc.wake_code_cases",
+    "counties_nc.nc_tax_lien_ads",               # Hoke, Lee, Davidson, Randolph tax-lien advertisements
     # 2026-08-30 new county sources (dateless: vacant / tax-delinquent / probate —
     # no sale_date, so they must be whitelisted or _active_only drops every row).
     "counties_nc.gaston_vacant",
