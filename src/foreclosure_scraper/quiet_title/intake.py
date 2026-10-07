@@ -164,10 +164,13 @@ def classify_deaths(ds: DeathSearch, person: PersonName, vesting_year: Optional[
                                       f"as the middle name on the record")
 
 
-def owner_people(owner: Optional[str], bill_owners: list[str], grantees: list[str]
-                 ) -> list[dict]:
+def owner_people(owner: Optional[str], bill_owners: list[str], grantees: list[str],
+                 marked_order: str = "first_last") -> list[dict]:
     """The people named as owner of record, each read as LAST, FIRST MIDDLE, with how it was read.
-    Entities are listed with person=None."""
+    Entities are listed with person=None. A comma after the first word means the roll wrote the
+    surname first. Otherwise an heirs or estate entry is read in `marked_order`: Buncombe's own
+    layer writes 'FIRST LAST (HEIRS)'; the statewide layer copies assessor rolls that write
+    'LAST FIRST MIDDLE HEIRS'."""
     out: list[dict] = []
     markers = roll_markers(owner)
     for s in split_owners(owner)[:MAX_PEOPLE + 1]:
@@ -192,11 +195,19 @@ def owner_people(owner: Optional[str], bill_owners: list[str], grantees: list[st
                         hit = (pn, f"the county layer writes '{s}' and the tax bill writes '{bo}', so the surname "
                                    f"is {pn.last}")
                     break
+        if hit is None and re.match(r"^\s*[A-Z][A-Z'\-]*(?:\s+(?:JR|SR|II|III|IV))?\s*,", clean(s)):
+            pn = parse_roll(s, "last_first")
+            if pn:
+                hit = (pn, f"read as LAST, FIRST: the roll puts a comma after the surname ('{s}')")
         if hit is None:
-            if markers:
+            if markers and marked_order == "first_last":
                 pn = parse_roll(s, "first_last")
                 why = (f"read as FIRST ... LAST, the usual order of an heirs or estate entry on this roll ('{s}'); "
                        f"the order is not confirmed by another record")
+            elif markers:
+                pn = parse_roll(s, "last_first")
+                why = (f"read as LAST FIRST, the order the assessor's roll uses for heirs and estate entries too "
+                       f"('{s}'); the order is not confirmed by another record")
             else:
                 pn = parse_roll(s, "last_first")
                 why = (f"read as LAST FIRST, the county layer's usual order ('{s}'); the order is not confirmed by "
@@ -374,7 +385,7 @@ def _run(adapter: CountyAdapter, res: IntakeResult, pin: str, today: date, max_c
         # a county whose register this tool does not search: no deed, chain, name or deaths search;
         # the sheet gives the register link (the where-to-look block) and says so in each section
         register_not_fetched(res, p)
-        res.owner_people = owner_people(p.owner, [], [])
+        res.owner_people = owner_people(p.owner, [], [], adapter.marked_roll_order)
         people = [d["person"] for d in res.owner_people if d["person"] is not None][:MAX_PEOPLE]
         res.obituary = adapter.obituary(people)
         return
@@ -415,7 +426,7 @@ def _run(adapter: CountyAdapter, res: IntakeResult, pin: str, today: date, max_c
     # the people on the roll
     bill_owners = [b.owner for b in (res.tax.bills if res.tax else []) if b.owner][:3]
     grantees = res.vesting.grantees if res.vesting else []
-    res.owner_people = owner_people(p.owner, bill_owners, grantees)
+    res.owner_people = owner_people(p.owner, bill_owners, grantees, adapter.marked_roll_order)
     people = [d["person"] for d in res.owner_people if d["person"] is not None][:MAX_PEOPLE]
 
     # instruments under the owner's name (all dates, both sides)

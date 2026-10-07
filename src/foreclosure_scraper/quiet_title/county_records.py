@@ -103,6 +103,16 @@ class WhereToLook:
         return asdict(self)
 
 
+_INTERNAL = re.compile(r"\brepo\b|\.py\b|\bsrc/|enrichment_|parcel_cache|\bHANDOFF\b", re.I)
+
+
+def public_text(text: Optional[str]) -> str:
+    """The matrix notes without the sentences about this codebase (file names, 'the repo ...'):
+    the sheet goes to an attorney."""
+    parts = re.split(r"(?<=[.;])\s+", (text or "").strip())
+    return " ".join(x for x in parts if x and not _INTERNAL.search(x)).strip()
+
+
 def _yn(v: Any) -> str:
     s = str(v if v is not None else "unknown").strip().lower()
     return s if s in ("yes", "no") else "unknown"
@@ -131,8 +141,8 @@ def where_to_look(county: str, state: str = "NC", path: Optional[Path] = None) -
     w.rod_back_to = int(by) if isinstance(by, int) or (isinstance(by, str) and by.isdigit()) else None
     w.rod_plats_online = _yn(rod.get("plat_books_or_maps_online"))
     w.rod_terms_forbid_automation = _yn(rod.get("terms_forbid_automation"))
-    w.rod_notes = (rod.get("notes") or "").strip()
-    w.manual_lane = (rec.get("manual_lane") or "").strip()
+    w.rod_notes = public_text(rod.get("notes"))
+    w.manual_lane = public_text(rec.get("manual_lane"))
     w.rod_script_ok, why = _person(w.rod_access)
     if w.rod_terms_forbid_automation == "yes":
         w.rod_script_ok, why = False, (why + "; " if why else "") + "the site's terms forbid automated searching"
@@ -147,10 +157,10 @@ def where_to_look(county: str, state: str = "NC", path: Optional[Path] = None) -
     w.probate_url, w.probate_system = prob.get("url"), (prob.get("system") or "").strip()
     pok, pwhy = _person(prob.get("access"))
     w.probate_person = "no" if pok else f"yes, a person does it: {pwhy}"
-    w.tax_url, w.tax_access, w.tax_notes = tax.get("url"), tax.get("access"), (tax.get("notes") or "").strip()
+    w.tax_url, w.tax_access, w.tax_notes = tax.get("url"), tax.get("access"), public_text(tax.get("notes"))
     tok, twhy = _person(w.tax_access)
     w.tax_person = "no for the page itself" if tok else f"yes: {twhy}"
-    w.gis_url, w.gis_notes = gis.get("url"), (gis.get("notes") or "").strip()
+    w.gis_url, w.gis_notes = gis.get("url"), public_text(gis.get("notes"))
     w.confidence = rec.get("confidence")
 
     back = (f"{w.rod_back_to}" if w.rod_back_to else "not stated by the register")
@@ -160,7 +170,7 @@ def where_to_look(county: str, state: str = "NC", path: Optional[Path] = None) -
         ("Online index goes back to", back),
         ("Person needed for the register", w.rod_person_needed),
         ("Plat books and old books", f"plats or maps online: {w.rod_plats_online}. {w.rod_notes}".strip()),
-        ("What a person does here", w.manual_lane or "nothing beyond the steps above was recorded"),
+        ("What a person does here", w.manual_lane or "the matrix records no step beyond the rows above"),
         ("Probate (estates)", f"{w.probate_system or 'statewide eCourts'}: {w.probate_url or ''}. "
                               f"Person needed: {w.probate_person}."),
         ("County tax site", f"{w.tax_url or 'not found'}. Person needed: {w.tax_person}. {w.tax_notes}".strip()),

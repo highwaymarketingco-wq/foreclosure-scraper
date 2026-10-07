@@ -29,6 +29,9 @@ class CountyAdapter(ABC):
     #: False for a register with no deaths index online; deaths_note says so on the sheet
     deaths_index: bool = True
     deaths_note: Optional[str] = None
+    #: how an heirs / estate entry without a comma is written on this roll: 'first_last'
+    #: ('ANNA MARIE TESTER (HEIRS)', Buncombe's layer) or 'last_first' (assessor rolls)
+    marked_roll_order: str = "first_last"
     #: the records-table name of the parcel record
     parcel_record_label: str = "County parcel record (tax parcel layer)"
 

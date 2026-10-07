@@ -58,6 +58,14 @@ def parse_rod_grid(html: str) -> dict:
     from, thru)]}. Deaths are masked to the year ('**/**/1983')."""
     s = BeautifulSoup(html or "", "lxml")
     rows: list[Instrument] = []
+    # the Images column: td10 on Buncombe's grid (..., Ref, Images, GIS, Tax), td11 on Polk's
+    # (..., Ref, Amount, Images): read from the header row when there is one
+    img = 10
+    for tr in s.find_all("tr"):
+        heads = [th.get_text(" ", strip=True).lower() for th in tr.find_all("th", recursive=False)]
+        if "images" in heads and "book/page" in heads:
+            img = heads.index("images")
+            break
     for tr in s.find_all("tr"):
         tds = tr.find_all("td", recursive=False)
         if len(tds) < 11 or not tds[0].get_text(strip=True).isdigit():
@@ -73,7 +81,7 @@ def parse_rod_grid(html: str) -> dict:
         if a is not None:
             mm = re.search(r'WebForm_PostBackOptions\("([^"]+)"', a.get("href", ""))
             target = mm.group(1) if mm else None
-        pages_txt = re.sub(r"\D", "", tds[10].get_text(" ", strip=True))
+        pages_txt = re.sub(r"\D", "", tds[img].get_text(" ", strip=True)) if img < len(tds) else ""
         y = re.search(r"(\d{4})\s*$", d)
         side = "both" if gm and em else ("grantor" if gm else ("grantee" if em else None))
         rows.append(Instrument(date=d, date_iso=mdy_iso(d), year=int(y.group(1)) if y else None,

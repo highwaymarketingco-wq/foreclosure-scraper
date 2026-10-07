@@ -278,3 +278,43 @@ def test_polk_reads_its_register_picks_the_deed_by_year_and_has_no_deaths_index(
     h = render_html(res)
     assert "Legal description: needs the deed image" in h and "no deaths index online" in h
     assert "searched this county's register index live" in h
+
+
+def test_owner_names_with_a_comma_or_on_an_assessor_roll_are_read_surname_first():
+    from foreclosure_scraper.quiet_title.intake import owner_people
+    a = owner_people("TESTER, ANNA M HEIRS", [], [], "first_last")
+    assert a[0]["person"].last == "TESTER" and a[0]["person"].given == ["ANNA", "M"]
+    assert "comma after the surname" in a[0]["reading"]
+    b = owner_people("TESTER ANNA MARIE ESTATE", [], [], "last_first")
+    assert b[0]["person"].last == "TESTER" and "assessor's roll" in b[0]["reading"]
+    c = owner_people("ANNA MARIE TESTER (HEIRS)", [], [], "first_last")      # Buncombe's own layer
+    assert c[0]["person"].last == "TESTER"
+
+
+def test_care_of_inside_the_owner_field_is_split_out():
+    from foreclosure_scraper.quiet_title.adapters.nc_onemap import split_care_of
+    assert split_care_of("TESTER ANNA HEIRS & C/O JOHN SAMPLE") == ("TESTER ANNA HEIRS", "JOHN SAMPLE")
+    assert split_care_of("TESTER ANNA") == ("TESTER ANNA", None)
+    p = parcel_from_onemap("1", dict(ATTRS, ownname="TESTER ANNA HEIRS & C/O JOHN SAMPLE", ownname2=""), [])
+    assert p.owner == "TESTER ANNA HEIRS" and p.care_of == "JOHN SAMPLE"
+
+
+def test_polk_grid_layout_reads_pages_from_the_images_column():
+    from foreclosure_scraper.quiet_title.adapters.cott_v4 import parse_rod_grid
+    html = ("<table id='x_cpgvInstruments'><tr><th></th><th>Date Filed</th><th>Index</th><th>Kind</th><th>Grantor</th>"
+            "<th>Grantee</th><th>Description (Not Warranted)</th><th>File Number</th><th>Book/Page</th><th>Ref</th>"
+            "<th>Amount</th><th>Images</th><th></th></tr>"
+            "<tr><td>1</td><td>05/05/2020</td><td>CRP</td><td>DEED</td><td>SELLER, SAM</td><td>BUYER, BOB</td>"
+            "<td>LOT 3</td><td>1</td><td><a>448 / 1232</a></td><td></td><td>$250</td><td>3</td><td></td></tr>"
+            "<tr><td>2</td><td></td><td>REL</td><td></td><td></td><td></td><td></td><td></td><td><a>198 / 520</a></td>"
+            "<td></td><td></td><td>1</td><td></td></tr></table>")
+    g = parse_rod_grid(html)
+    assert [(r.book, r.page, r.pages) for r in g["rows"]] == [("448", "1232", 3), ("198", "520", 1)]
+    assert g["rows"][1].date_iso is None and g["rows"][1].index_code == "REL"
+
+
+def test_acreage_prefers_the_recorded_area_and_ignores_a_unit_error():
+    p = parcel_from_onemap("1", dict(ATTRS, gisacres=1.63e-05, recareano=0.71, recareatx=""), [])
+    assert p.acreage == 0.71 and "unit error" in p.extra["acreage_note"]
+    q = parcel_from_onemap("1", dict(ATTRS, gisacres=0.68, recareano=0.0, recareatx=""), [])
+    assert q.acreage == 0.68

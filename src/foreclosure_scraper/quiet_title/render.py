@@ -426,7 +426,7 @@ def render_html(res: IntakeResult) -> str:
     # ---- at a glance
     H.append("<h2>At a glance</h2>")
     glance = []
-    pin_txt = f"{p.pin} ({src}; " + (f"record revised {p.layer_updated})" if p.layer_label and p.layer_updated else
+    pin_txt = f"{p.pin} ({src}; " + (f"record revised {p.layer_updated or 'date not shown'})" if p.layer_label else
                                      f"layer updated {p.layer_updated or 'date not shown'})")
     if res.pin != p.pin:
         pin_txt += f"; searched as {res.pin}"
@@ -495,6 +495,7 @@ def render_html(res: IntakeResult) -> str:
                 f"{p.deed_date_text or '(no date given)'}; as written on the layer: {p.deed_ref_text or 'blank'}")
         kv = [("PIN", f"{p.pin} (parno); alternate number on the layer: {p.extra.get('altparno') or 'none'}"),
               ("Owner of record (taxpayer) as the layer shows it", p.owner or ""),
+              ("Care of (written inside the owner field: a mailing contact)", p.care_of or "none"),
               ("Mailing address on the record", p.mailing or ""),
               ("Situs (house number and road) on the record",
                (p.situs or "") + (f" ({p.situs_note})" if p.situs_note else "")),

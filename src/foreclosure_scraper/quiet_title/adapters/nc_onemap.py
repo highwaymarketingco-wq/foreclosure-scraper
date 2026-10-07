@@ -203,6 +203,15 @@ def layer_date(text: Optional[str]) -> Optional[str]:
     return None
 
 
+def split_care_of(name: str) -> tuple[str, Optional[str]]:
+    """'TESTER ANNA HEIRS & C/O JOHN SAMPLE' -> ('TESTER ANNA HEIRS', 'JOHN SAMPLE'): a care-of
+    contact written inside the owner field is a mailing contact, not an owner."""
+    m = re.search(r"\s*(?:&\s*)?\bC\s*/\s*O\b\s*(.*)$", name or "", re.I)
+    if not m:
+        return name, None
+    return name[:m.start()].strip(" &,;"), (m.group(1).strip() or None)
+
+
 def _num(v: Any) -> Optional[float]:
     try:
         return float(str(v).replace(",", "")) if v not in (None, "") else None
@@ -217,8 +226,10 @@ def _s(a: dict, k: str) -> str:
 def parcel_from_onemap(pin: str, a: dict, fields: list[str]) -> Parcel:
     """Fill the sheet's parcel record from one OneMap attribute bag (already through drop_sensitive)."""
     p = Parcel(pin=_s(a, "parno") or pin, found=True, field_names=list(fields), layer_label=LAYER_LABEL)
-    own, own2 = _s(a, "ownname"), _s(a, "ownname2")
+    own, co1 = split_care_of(_s(a, "ownname"))
+    own2, co2 = split_care_of(_s(a, "ownname2"))
     p.owner = (f"{own}; {own2}" if own2 and own2 not in own else own) or None
+    p.care_of = "; ".join(x for x in (co1, co2) if x) or None
     mail = " ".join(x for x in (_s(a, "mailadd"), _s(a, "munit")) if x)
     city = " ".join(x for x in (_s(a, "mcity"), _s(a, "mstate"), _s(a, "mzip")) if x)
     p.mailing = ", ".join(x for x in (mail, city) if x) or None
@@ -243,9 +254,14 @@ def parcel_from_onemap(pin: str, a: dict, fields: list[str]) -> Parcel:
     gis, rec = _num(a.get("gisacres")), _num(a.get("recareano"))
     if rec in (None, 0.0):
         rec = _num(a.get("recareatx"))
-    p.acreage = gis if gis else (rec if rec else None)
-    p.extra["acreage_note"] = (f"map-computed acres (gisacres) {gis if gis is not None else 'blank'}; recorded area "
-                               f"(recareano / recareatx) {rec if rec else 'blank'}")
+    # the recorded area (the assessor's acreage) first; the map-computed acres otherwise. Cumberland's
+    # gisacres is acres divided by 43,560 (0.71 acre written 1.63e-05, measured 2026-10-07): a value
+    # under a thousandth of an acre is read as a unit error and not used
+    gis_bad = gis is not None and 0 < gis < 0.001
+    p.acreage = rec if rec else (gis if gis and not gis_bad else None)
+    p.extra["acreage_note"] = (f"recorded area (recareano / recareatx) {rec if rec else 'blank'}; map-computed acres "
+                               f"(gisacres) {gis if gis is not None else 'blank'}"
+                               + (" (implausibly small, a unit error on the layer: not used)" if gis_bad else ""))
     p.land_class = _s(a, "parusedesc") or None
     p.improved = _s(a, "struct") or None
     p.tax_value, p.land_value, p.building_value = _num(a.get("parval")), _num(a.get("landval")), _num(a.get("improvval"))
@@ -298,6 +314,7 @@ class NcOneMapAdapter(CountyAdapter):
     county = ""
     register_fetched = False
     parcel_record_label = "Parcel record (NC OneMap statewide parcel layer)"
+    marked_roll_order = "last_first"
 
     @classmethod
     def for_county(cls, county: str) -> type["NcOneMapAdapter"]:

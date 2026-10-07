@@ -102,3 +102,10 @@ def test_the_sheet_prints_the_block(matrix, tmp_path):
     h2 = render_html(res2)
     assert "https://alpha.example.invalid/rod" in h2 and "a CAPTCHA" in h2 and "deed images are paid" in h2
     assert res2.where["rod_back_to"] == 1966
+
+
+def test_notes_about_this_codebase_are_left_off_the_sheet():
+    from foreclosure_scraper.quiet_title.county_records import public_text
+    t = ("Land records site works. Repo found the bill search answers HTTP 500 (enrichment_x.py). "
+         "The delinquent roll is a downloadable file.")
+    assert public_text(t) == "Land records site works. The delinquent roll is a downloadable file."
