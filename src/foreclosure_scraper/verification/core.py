@@ -172,7 +172,10 @@ def _get(row: Any, k: str) -> Any:
 #: 5 foreclosure_rod entries; two named private individuals).
 _NOTICE_TEXT = re.compile(
     r"deed of trust|power of sale|made by|in the matter|virtue of|pursuant to|substitute trustee|"
-    r"notice of (?:sale|foreclosure)|foreclos", re.I)
+    r"notice of (?:sale|foreclosure)|foreclos|"
+    # the NC PTS Cloud roll scraper's stand-in for a missing address ("Parcel - <OWNER> - Orange NC
+    # delinquent tax $200 owed (parcel 9..."): it names the owner (2 ledger entries, 2026-10-07)
+    r"^\s*parcel\s+[\u2014\u2013-]\s|delinquent tax \$", re.I)
 MAX_ADDRESS_CHARS = 90
 
 

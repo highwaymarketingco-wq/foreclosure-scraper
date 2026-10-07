@@ -77,3 +77,18 @@ def test_save_never_writes_notice_text(tmp_path):
     p = led.save(tmp_path / "foreclosure_rod.json")
     text = p.read_text()
     assert "Example" not in text and "power of sale" not in text.lower()
+
+
+def test_the_roll_scrapers_stand_in_for_a_missing_address_names_an_owner_and_is_dropped():
+    """nc_ptscloud_delinquent_tax writes "Parcel - <OWNER> - <County> NC delinquent tax $N owed (parcel
+    ..." into street_address when the roll has no situs; two ledger entries carried it (an agency and
+    an association; an individual's would be the same). Invented names."""
+    standin = "Parcel \u2014 EXAMPLE FAMILY HOLDINGS \u2014 Orange NC delinquent tax $200 owed (parcel 9"
+    assert not core.looks_like_address(standin)
+    assert not core.looks_like_address("Parcel - EXAMPLE FAMILY HOLDINGS - Orange NC delinquent tax $200 owed")
+    assert core.looks_like_address("98 Dorman Drive") and core.looks_like_address("12 Parcel Rd")
+    assert "street_address" not in core.row_summary(_row(standin))
+    led = Ledger("tax_lien", {"parcel:NC:orange:1": {"keys": ["parcel:NC:orange:1"], "latest": {"verdict": "confirmed"},
+                                                      "row": {"street_address": standin, "county": "Orange"}}})
+    assert led.scrub_notice_text()["street_addresses"] == 1
+    assert "street_address" not in led.rows["parcel:NC:orange:1"]["row"]
