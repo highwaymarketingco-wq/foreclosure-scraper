@@ -2673,6 +2673,17 @@ RAW_KEEP = {
     # weight 12) before this fix, so the number on the board was right but the evidence
     # an operator would open the row to check was not there to back it up.
 
+    # 2026-10-07 new distress sources (docs/new_sources_2026-10-07_distress.md). Registered
+    # in the same change that writes them, so the evidence survives the publish slim.
+    "york_tax_sale": "*",        # counties_sc.york_tax_sale_parcels: TMS, tax year, sold flag, land use, values
+    "tax_sale_year": "*",        # ^ the sale's tax year
+    "sold_flag": "*",            # ^ county's SOLD Y/N on the sale layer (kept, never made terminal)
+    "blight_survey": "*",        # counties_nc.rocky_mount_blight_survey: 2025 survey classes per parcel
+    "fire_incident": "*",        # city_websites.raleigh_structure_fires: incident numbers, dates, types
+    "kinston_demolition": "*",   # counties_nc.kinston_proposed_demolition: list, tax year, condemned date
+    "utility_cutoff": "*",       # ^ city-recorded power/sewer/gas cut-off on a condemned building
+    "heir_property": "*",        # ^ city's HEIR_PROPERTY flag
+
 }
 
 
