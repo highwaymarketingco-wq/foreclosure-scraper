@@ -6,22 +6,22 @@ SOURCE
     by cntyname). Fields read live 2026-10-07; the ones this adapter asks for are OUT_FIELDS (an
     explicit list, never *), and every attribute bag passes sensitive_fields.drop_sensitive first.
       parno / altparno   the county's parcel number and its alternate (the format differs from
-                         county to county and from the board's: 0438-49-3494 vs 0438493494, or
-                         R05618-001-070-000 vs R05618001070000). The join compares letters and
+                         county to county and from the board's: 0000-12-3456 vs 0000123456, or
+                         R00001-002-003-000 vs R00001002003000). The join compares letters and
                          digits only (pin_key); the one request asks for the PIN as given, its
                          usual NC spellings, and a LIKE pattern with every separator wild.
       ownname, ownname2  the taxpayer of record as the assessor's roll shows it
       siteadd / mailadd  situs and mailing address (mailadd + munit, mcity, mstate, mzip)
       gisacres           acres computed from the map; recareano/recareatx: the recorded area
       parval, landval, improvval, parvaltype   the TAX value (the layer's value type, e.g. Assessed)
-      sourceref          the deed the assessor cites: 'Deed Book/Page 001662/00668' (New Hanover:
+      sourceref          the deed the assessor cites: 'Deed Book/Page 001234/00567' (New Hanover:
                          'Sale Book/Page'; Guilford: the book only); sourcedatx its date as written
                          (MM/DD/YYYY, YYYYMM, YYYY or blank, county by county)
-      legdecfull         the assessor's SHORT legal ('LOT 15 GREEN ACRES SEC C'). It is NOT the
+      legdecfull         the assessor's SHORT legal ('LOT 7 EXAMPLE ACRES SEC B'). It is NOT the
                          deed's full legal description; the sheet says so and points to the deed
-                         image. Caldwell writes the deed reference here instead ('BK 2072 PG 2122');
+                         image. Caldwell writes the deed reference here instead ('BK 1111 PG 2222');
                          that is read as a deed reference, never shown as a legal description.
-      mapref             the plat reference ('Plat Book/Page 0094/0123', 'Plat Book-Page 194-57')
+      mapref             the plat reference ('Plat Book/Page 0012/0034', 'Plat Book-Page 123-45')
       revdatetx, sourceagnt   when the record was revised and which assessor supplied it
     Coverage (county_records_matrix.json, measured 2026-10-07): the deed book/page is on 78 to 100
     percent of parcels in nearly every county (Swain none, Robeson about 35 percent, Union about
@@ -111,7 +111,7 @@ def pin_variants(pin: str) -> list[str]:
 
 
 def like_pattern(pin: str) -> str:
-    """'0438493494' -> '0%4%3%8%4%9%3%4%9%4': matches the same characters with any separators."""
+    """'0000123456' -> '0%0%0%0%1%2%3%4%5%6': matches the same characters with any separators."""
     return "%".join(pin_key(pin))
 
 
@@ -153,8 +153,8 @@ _SLASH_ONLY = re.compile(r"^\s*(\d{1,6})\s*/\s*(\d{1,6})(?:\s+(\d{4}))?(?:\s+\d+
 
 def parse_ref(text: Optional[str]) -> tuple[Optional[str], Optional[str], Optional[str]]:
     """(the layer's word for it, book, page) from a sourceref / mapref value.
-    'Deed Book/Page 000246/00588' -> ('Deed', '246', '588'); 'Plat Book-Page 194-57' ->
-    ('Plat', '194', '57'); 'Deed Book/Page 008311' -> ('Deed', '8311', None); 'Plat Book/Page /' ->
+    'Deed Book/Page 000321/00654' -> ('Deed', '321', '654'); 'Plat Book-Page 123-45' ->
+    ('Plat', '123', '45'); 'Deed Book/Page 007777' -> ('Deed', '7777', None); 'Plat Book/Page /' ->
     ('Plat', None, None)."""
     s = (text or "").strip()
     m = _REF.match(s)
@@ -168,8 +168,8 @@ def parse_ref(text: Optional[str]) -> tuple[Optional[str], Optional[str], Option
 
 
 def legal_as_deed_ref(text: Optional[str]) -> Optional[tuple[str, Optional[str], Optional[str]]]:
-    """Caldwell writes the deed reference in legdecfull ('BK 2072 PG 2122 YR 22 ST 300.00',
-    '1097/0502 1993  0.00'). Returns (book, page, year or None) for such a value, else None."""
+    """Caldwell writes the deed reference in legdecfull ('BK 1111 PG 2222 YR 22 ST 100.00',
+    '3333/0444 1990  0.00'). Returns (book, page, year or None) for such a value, else None."""
     s = (text or "").strip()
     m = _BK_PG.match(s)
     if m:
@@ -182,8 +182,8 @@ def legal_as_deed_ref(text: Optional[str]) -> Optional[tuple[str, Optional[str],
 
 
 def layer_date(text: Optional[str]) -> Optional[str]:
-    """A date as the layer writes it -> ISO, as precise as the text: '07/05/1989' -> '1989-07-05';
-    '20260507' -> '2026-05-07'; '2024-07-03 19:49:45.' -> '2024-07-03'; '202508' -> '2025-08';
+    """A date as the layer writes it -> ISO, as precise as the text: '03/04/1979' -> '1979-03-04';
+    '20260102' -> '2026-01-02'; '2024-01-02 10:11:12.' -> '2024-01-02'; '202401' -> '2024-01';
     '2006' -> '2006'; '' -> None."""
     s = (text or "").strip()
     if not s:
@@ -296,7 +296,7 @@ def parcel_from_onemap(pin: str, a: dict, fields: list[str]) -> Parcel:
         p.extra["mapref"] = _s(a, "mapref")
     pl = re.search(r"\bPL\s*:\s*([A-Z]?\d+)\s*-\s*(\d+[A-Z]?)\b", p.legal_description or "")
     if not p.plat_book and pl and _z(pl.group(1)):
-        # Cumberland writes the plat inside the short legal ('... LO:19 PL:0037-0023') and leaves mapref blank
+        # Cumberland writes the plat inside the short legal ('... LO:19 PL:0056-0078') and leaves mapref blank
         p.plat_book, p.plat_page = _z(pl.group(1)), _z(pl.group(2))
         p.extra["plat_from_legal"] = True
     p.subdivision = _s(a, "subdivisio") or None

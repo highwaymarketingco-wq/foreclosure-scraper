@@ -25,7 +25,7 @@ ATTRS = {
     "recareatx": "1.50", "parval": 52000.0, "landval": 20000.0, "improvval": 32000.0, "parvaltype": "Assessed",
     "presentval": "", "saledatetx": "", "legdecfull": "LOT 7 EXAMPLE ACRES SEC B", "sourceref":
     "Deed Book/Page 000123/00045", "sourcedatx": "03/04/1979", "subdivisio": "EXAMPLE ACRES",
-    "mapref": "Plat Book/Page 0012/0034", "revdatetx": "20260507", "sourceagnt": "Testcounty County Assessor",
+    "mapref": "Plat Book/Page 0012/0034", "revdatetx": "20260102", "sourceagnt": "Testcounty County Assessor",
     "struct": "N", "structyear": 0, "parusedesc": "VACANT", "owntype": "",
 }
 
@@ -53,15 +53,15 @@ def matrix(tmp_path, monkeypatch):
 
 
 def test_pin_join_helpers():
-    assert pin_key("0438-49-3494") == "0438493494" and pin_key("r05618-001-070-000") == "R05618001070000"
-    assert pin_variants("0438493494") == ["0438493494", "0438-49-3494"]
-    v = pin_variants("8586223397000")
-    assert "8586-22-3397-000" in v and "8586-22-3397.000" in v and "8586223397" in v
-    assert pin_variants("R05618001070000") == ["R05618001070000"]
+    assert pin_key("0000-12-3456") == "0000123456" and pin_key("r00001-002-003-000") == "R00001002003000"
+    assert pin_variants("0000123456") == ["0000123456", "0000-12-3456"]
+    v = pin_variants("1234567890000")
+    assert "1234-56-7890-000" in v and "1234-56-7890.000" in v and "1234567890" in v
+    assert pin_variants("R00001002003000") == ["R00001002003000"]
     assert pin_variants("1234'; DROP") == ["1234DROP"]           # nothing but letters, digits, - and .
     assert like_pattern("04-38") == "0%4%3%8"
-    w = parcel_where("New Hanover", "R05618001070000")
-    assert w.startswith("cntyname='New Hanover' AND (") and "altparno LIKE 'R%0%5" in w and "parno IN (" in w
+    w = parcel_where("New Hanover", "R00001002003000")
+    assert w.startswith("cntyname='New Hanover' AND (") and "altparno LIKE 'R%0%0" in w and "parno IN (" in w
 
 
 def test_pick_feature_joins_on_parno_then_altparno():
@@ -76,11 +76,11 @@ def test_pick_feature_joins_on_parno_then_altparno():
 
 
 @pytest.mark.parametrize("text,want", [
-    ("Deed Book/Page 000246/00588", ("Deed", "246", "588")),
-    ("Sale Book/Page 005832/001727", ("Sale", "5832", "1727")),
-    ("Deed Book/Page 008311", ("Deed", "8311", None)),
-    ("Plat Book-Page 194-57", ("Plat", "194", "57")),
-    ("Plat Book/Page B/128A", ("Plat", "B", "128A")),
+    ("Deed Book/Page 000321/00654", ("Deed", "321", "654")),
+    ("Sale Book/Page 004321/001234", ("Sale", "4321", "1234")),
+    ("Deed Book/Page 007777", ("Deed", "7777", None)),
+    ("Plat Book-Page 123-45", ("Plat", "123", "45")),
+    ("Plat Book/Page C/45A", ("Plat", "C", "45A")),
     ("Plat Book/Page /", ("Plat", None, None)),
     ("Plat Book/Page 00000/00000", ("Plat", None, None)),
     ("", (None, None, None)),
@@ -90,14 +90,14 @@ def test_parse_ref(text, want):
 
 
 def test_legal_field_holding_a_deed_reference():
-    assert legal_as_deed_ref("BK 2072 PG 2122 YR 22 ST 300.00") == ("2072", "2122", "22")
-    assert legal_as_deed_ref("1097/0502 1993      0.00") == ("1097", "502", "1993")
+    assert legal_as_deed_ref("BK 1111 PG 2222 YR 22 ST 100.00") == ("1111", "2222", "22")
+    assert legal_as_deed_ref("3333/0444 1990      0.00") == ("3333", "444", "1990")
     assert legal_as_deed_ref("LOT 7 EXAMPLE ACRES SEC B") is None
     assert legal_as_deed_ref("12/13 INT IN TRACT 4") is None
 
 
-@pytest.mark.parametrize("text,want", [("07/05/1989", "1989-07-05"), ("20260507", "2026-05-07"),
-                                       ("2024-07-03 19:49:45.", "2024-07-03"), ("202508", "2025-08"),
+@pytest.mark.parametrize("text,want", [("03/04/1979", "1979-03-04"), ("20260102", "2026-01-02"),
+                                       ("2024-01-02 10:11:12.", "2024-01-02"), ("202401", "2024-01"),
                                        ("2006", "2006"), ("", None), ("00000000", None)])
 def test_layer_date(text, want):
     assert layer_date(text) == want
@@ -119,15 +119,15 @@ def test_parcel_record_from_layer_attributes():
     assert (p.plat_book, p.plat_page) == ("12", "34")
     assert p.legal_kind == "assessor_short" and p.legal_field == "legdecfull"
     assert p.legal_description == "LOT 7 EXAMPLE ACRES SEC B"
-    assert p.layer_updated == "2026-05-07" and p.improved == "N"
+    assert p.layer_updated == "2026-01-02" and p.improved == "N"
 
 
 def test_caldwell_style_legal_is_read_as_the_deed_reference_not_a_legal():
-    a = dict(ATTRS, sourceref="", sourcedatx="", legdecfull="BK 2072 PG 2122 YR 22 ST 300.00")
+    a = dict(ATTRS, sourceref="", sourcedatx="", legdecfull="BK 1111 PG 2222 YR 22 ST 100.00")
     p = parcel_from_onemap("0000112222", a, [])
     assert p.legal_description is None and p.legal_kind is None
-    assert (p.deed_book, p.deed_page) == ("2072", "2122")
-    assert p.extra["legdecfull_holds_deed_ref"].startswith("BK 2072")
+    assert (p.deed_book, p.deed_page) == ("1111", "2222")
+    assert p.extra["legdecfull_holds_deed_ref"].startswith("BK 1111")
 
 
 def test_adapter_registry_falls_back_to_the_statewide_layer():
@@ -243,8 +243,8 @@ class _PolkSession:
         if "nconemap" in url:
             return _Resp(url, self.onemap)
         if "SrchBookPage" in url and method == "GET":
-            body = _grid([("05/05/2020", "CRP", "DEED OF TRUST", "BUYER, BOB", "LENDER INC", "448 / 1232", "9"),
-                          ("05/05/2020", "CRP", "DEED", "SELLER, SAM", "BUYER, BOB", "448 / 1232", "3")])
+            body = _grid([("05/05/2020", "CRP", "DEED OF TRUST", "BUYER, BOB", "LENDER INC", "111 / 2222", "9"),
+                          ("05/05/2020", "CRP", "DEED", "SELLER, SAM", "BUYER, BOB", "111 / 2222", "3")])
         elif "SrchBookPage" in url:
             body = "<html><body><table id='ctl00_cphMain_gvParties1'><tr><td>SELLER, SAM</td></tr></table></body></html>"
         elif method == "GET":
@@ -259,13 +259,13 @@ class _PolkSession:
 def test_polk_reads_its_register_picks_the_deed_by_year_and_has_no_deaths_index(tmp_path, matrix):
     cls = adapter_class("Polk", "NC")
     assert cls.__name__ == "PolkAdapter" and cls.register_fetched is True and cls.deaths_index is False
-    attrs = dict(ATTRS, parno="P00-11", altparno="", sourceref="Deed Book/Page 448/1232", sourcedatx="2020",
+    attrs = dict(ATTRS, parno="P00-11", altparno="", sourceref="Deed Book/Page 111/2222", sourcedatx="2020",
                  legdecfull="", mailadd="PO BOX 1", ownname="BUYER BOB", ownname2="")
     ses = _PolkSession(_body(attrs))
     f = PoliteFetcher(tmp_path, session_factory=lambda: ses, sleep=lambda s: None)
     res = IntakeResult(county="Polk", state="NC", pin="P0011", started=datetime(2026, 10, 7, tzinfo=timezone.utc))
     run_intake(cls(f, res, "20261007"), "P0011", date(2026, 10, 7))
-    assert res.parcel.found and (res.parcel.deed_book, res.parcel.deed_page, res.parcel.deed_date) == ("448", "1232", "2020")
+    assert res.parcel.found and (res.parcel.deed_book, res.parcel.deed_page, res.parcel.deed_date) == ("111", "2222", "2020")
     assert res.vesting is not None and res.vesting.kind == "DEED" and res.vesting.grantees == ["BUYER, BOB"]
     assert "the year only" in res.vesting_note and "the deed among the entries" in res.vesting_note
     assert res.deed_link.startswith("https://cotthosting.com/ncpolkexternal/LandRecords/protected/v4/SrchBookPage.aspx")
@@ -305,11 +305,11 @@ def test_polk_grid_layout_reads_pages_from_the_images_column():
             "<th>Grantee</th><th>Description (Not Warranted)</th><th>File Number</th><th>Book/Page</th><th>Ref</th>"
             "<th>Amount</th><th>Images</th><th></th></tr>"
             "<tr><td>1</td><td>05/05/2020</td><td>CRP</td><td>DEED</td><td>SELLER, SAM</td><td>BUYER, BOB</td>"
-            "<td>LOT 3</td><td>1</td><td><a>448 / 1232</a></td><td></td><td>$250</td><td>3</td><td></td></tr>"
-            "<tr><td>2</td><td></td><td>REL</td><td></td><td></td><td></td><td></td><td></td><td><a>198 / 520</a></td>"
+            "<td>LOT 3</td><td>1</td><td><a>111 / 2222</a></td><td></td><td>$250</td><td>3</td><td></td></tr>"
+            "<tr><td>2</td><td></td><td>REL</td><td></td><td></td><td></td><td></td><td></td><td><a>99 / 88</a></td>"
             "<td></td><td></td><td>1</td><td></td></tr></table>")
     g = parse_rod_grid(html)
-    assert [(r.book, r.page, r.pages) for r in g["rows"]] == [("448", "1232", 3), ("198", "520", 1)]
+    assert [(r.book, r.page, r.pages) for r in g["rows"]] == [("111", "2222", 3), ("99", "88", 1)]
     assert g["rows"][1].date_iso is None and g["rows"][1].index_code == "REL"
 
 
@@ -321,8 +321,8 @@ def test_acreage_prefers_the_recorded_area_and_ignores_a_unit_error():
 
 
 def test_plat_written_inside_the_short_legal():
-    p = parcel_from_onemap("1", dict(ATTRS, mapref="", legdecfull="EXAMPLE HEIGHTS LO:19 PL:0037-0023"), [])
-    assert (p.plat_book, p.plat_page) == ("37", "23") and p.extra["plat_from_legal"]
+    p = parcel_from_onemap("1", dict(ATTRS, mapref="", legdecfull="EXAMPLE HEIGHTS LO:19 PL:0056-0078"), [])
+    assert (p.plat_book, p.plat_page) == ("56", "78") and p.extra["plat_from_legal"]
     q = parcel_from_onemap("1", ATTRS, [])
     assert (q.plat_book, q.plat_page) == ("12", "34") and "plat_from_legal" not in q.extra
 
