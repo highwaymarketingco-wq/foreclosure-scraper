@@ -6166,6 +6166,52 @@
    "confidence": "medium"
   },
   {
+   "county": "mccormick",
+   "state": "SC",
+   "rod": {
+    "platform": null,
+    "url": "https://mccormickcountysc.org/departments/clerk_of_court.php",
+    "free_name_search": "no",
+    "access": "unreachable",
+    "index_online_back_to_year": null,
+    "images_free": "no",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: mccormickcountysc.org Clerk of Court page (the Clerk of Court is also the Register of Deeds) gives recording requirements and fees and links only to the state e-filing and child-support pages; no online land-records search is linked anywhere on the county site. TitleSearcher's landing page does not list McCormick. A search-engine check found no McCormick deed index; third-party directories say records are by request at the office. Six requests in all.",
+    "notes": "No online ROD index found. 'unreachable' here means no online system located, not a failed fetch."
+   },
+   "probate": {
+    "system": "McCormick County Probate Court (county office); its page offers forms, an estate work packet and outside links, no online case search. Not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read.",
+    "url": "https://mccormickcountysc.org/departments/probate_court.php",
+    "free_search": "no",
+    "access": null,
+    "notes": "Call or visit."
+   },
+   "tax": {
+    "url": "https://mccormicktreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill (Springbrook) Type4 tax search loaded with no login or CAPTCHA on 2026-10-07: search by notice number, map number, owner name, tax ID or property address; paid, unpaid or all; tax years 2016-2026. Delinquent taxes are inquiry-only (cannot be paid online)."
+   },
+   "gis": {
+    "url": "https://mccormicksc.wthgis.com/",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "WTH GIS viewer (the page loads as a map-only shell). No open ArcGIS parcel REST layer known."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "tax: qpaybill_delinquent_roll ('mccormicktreasurer'); mccormick_flc reads the Treasurer page (no online FLC list). No ROD module; no McCormick layer in parcel_cache/owner_mailing."
+   },
+   "manual_lane": "Deeds, mortgages and plats are read at the Clerk of Court (Register of Deeds) office in McCormick or by the abstractor; probate by call or visit; taxpayer and bills on the free qPayBill tax search.",
+   "confidence": "medium"
+  },
+  {
    "county": "newberry",
    "state": "SC",
    "rod": {

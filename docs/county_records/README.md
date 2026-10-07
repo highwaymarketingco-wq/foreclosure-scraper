@@ -2,7 +2,7 @@
 
 Built 2026-10-07 by reading each county's own portals (read-only, polite, no CAPTCHA/login/paywall touched). Source data: `nc_batch1.json`, `nc_batch2.json`, `nc_batch3.json`, `sc_batch1.json`, `sc_batch2.json`, merged in `county_records_matrix.json`. Purpose: a title check per lead needs the legal description, the last deed and a few deeds back, the taxpayer, heirs and probate. This says, per county, what we can fetch for free and where a person (or the attorney's own subscription) is needed.
 
-Known gaps: McCormick SC is missing (the older county registry has a junk row in its place). `docs/county_systems_registry.json` word-matches 'login'/'CAPTCHA' and is wrong for several counties; this matrix supersedes it where they disagree. Probate: every NC estate search is the statewide eCourts portal (free to a person, CAPTCHA to scripts, so a person does it). 'We read it' is the repo state on 2026-10-07.
+Known gaps: McCormick SC was missing from the first pass (the older county registry has a junk row in its place); its entry was added on 2026-10-07 from its own county pages. `docs/county_systems_registry.json` word-matches 'login'/'CAPTCHA' and is wrong for several counties; this matrix supersedes it where they disagree. Probate: every NC estate search is the statewide eCourts portal (free to a person, CAPTCHA to scripts, so a person does it). 'We read it' is the repo state on 2026-10-07.
 
 | county | st | deed index | back to | images free | legal desc online | bots banned by terms | we read it | a person needed |
 |---|---|---|---|---|---|---|---|---|
@@ -140,6 +140,7 @@ Known gaps: McCormick SC is missing (the older county registry has a junk row in
 | lexington | SC | walled (Kofile/GovOS CountyFusion) | 1984 | yes | yes | unknown | no | GIS gives the legal and current deed book/page free; walking the deed chain needs a person with a free CountyF... |
 | marion | SC | none/unreachable () |  | no | ? | unknown | no | Everything is manual: a person or the abstractor searches the deed books at the Clerk of Court in Marion, prob... |
 | marlboro | SC | free index (Cott Systems eSearch (cottho) |  | no | ? | unknown | no | The deed index can be read free as a guest; a person (or the abstractor) must buy copies of the deeds to read ... |
+| mccormick | SC | none/unreachable () |  | no | ? | unknown | no | Deeds, mortgages and plats are read at the Clerk of Court (Register of Deeds) office in McCormick or by the ab... |
 | newberry | SC | walled (Neumo Records Management (fo) | 1983 | no | ? | unknown | no | A person with a free Neumo account reads the 1983+ index; deed images (2003+) cost $5/day, so the legal descri... |
 | oconee | SC | free index (Kofile PublicSearch (now bra) | 1955 | unknown | yes | unknown | partial | GIS gives legal and current deed book/page free and the index is open; a person may need to buy clean copies, ... |
 | orangeburg | SC | walled (County-run 'Register Of Deed) |  | yes | ? | no | no | A person with a free ROD account reads the index and PDF deeds; probate needs a call or visit; GIS was down to... |
