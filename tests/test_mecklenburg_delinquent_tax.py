@@ -121,8 +121,54 @@ class _Ctx:
         return False
 
 
-def test_fetch_follows_share_page_to_workbook_and_skips_a_broken_list(monkeypatch):
-    monkeypatch.delenv(mod.ENV_OFF, raising=False)
+def _cache(tmp_path):
+    """A tiny parcel-cache file in the real schema; ids and streets are made up."""
+    import sqlite3
+    db = tmp_path / "mecklenburg.sqlite"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE parcels(id TEXT, owner TEXT, address TEXT, owner_mailing TEXT, market_value REAL, "
+                "tax_value REAL, acreage REAL, living_sqft REAL, land_use TEXT, sale_price REAL, sale_date TEXT)")
+    rows = [("99900001", "1511 EXAMPLE AV CHARLOTTE NC"), ("3711999900001", "1511 EXAMPLE AV CHARLOTTE NC"),
+            ("99900002", "88 PRETEND LN MINT HILL NC"),
+            ("99900003", "15100 FICTION RD, 1 NC"), ("99900004", "15100 FICTION RD, 2 NC")]
+    con.executemany("INSERT INTO parcels(id, address) VALUES (?, ?)", rows)
+    con.commit(); con.close()
+    return db
+
+
+def test_street_keys_line_up_between_workbook_and_cache():
+    assert mod.street_key("1511 Example Avenue") == "1511 EXAMPLE AV"
+    assert mod.cache_street_key("1511 EXAMPLE AV CHARLOTTE NC") == "1511 EXAMPLE AV"
+    assert mod.cache_street_key("1000 E SAMPLE RD, 203 CHARLOTTE NC") == "1000 E SAMPLE RD"
+    assert mod.street_variants("9325 200 EXAMPLE DR") == ["9325 200 EXAMPLE DR", "200 EXAMPLE DR", "9325 EXAMPLE DR"]
+    assert mod.street_variants("0 VARIOUS") == [] and mod.street_variants(None) == []
+
+
+def test_resolve_parcels_unique_ambiguous_unresolved_and_no_street(tmp_path):
+    db = _cache(tmp_path)
+    got, stats = mod.resolve_parcels(["1511 EXAMPLE AV", "15100 FICTION RD", "7 NOWHERE CT", None], db)
+    assert got == [("99900001", "resolved"), (None, "ambiguous"), (None, "unresolved"), (None, "no_street")]
+    assert stats["resolved"] == 1 and stats["cache_present"] is True
+
+
+def test_resolve_parcels_without_a_cache_resolves_nothing(tmp_path):
+    got, stats = mod.resolve_parcels(["1511 EXAMPLE AV"], tmp_path / "missing.sqlite")
+    assert got == [(None, "unresolved")] and stats["cache_present"] is False
+
+
+def test_scraper_is_off_by_default(monkeypatch):
+    monkeypatch.delenv(mod.ENV_ON, raising=False)
+    http = _Http({})
+    monkeypatch.setattr(mod, "client", lambda *a, **kw: _Ctx(http))
+    assert asyncio.run(mod.MecklenburgDelinquentTax().fetch()) == []
+    assert http.calls == []
+
+
+def test_fetch_follows_share_page_to_workbook_and_skips_a_broken_list(monkeypatch, tmp_path):
+    monkeypatch.setenv(mod.ENV_ON, "1")
+    monkeypatch.setenv(mod.ENV_RESOLVED_ONLY, "0")
+    db = _cache(tmp_path)
+    monkeypatch.setattr(mod.parcel_cache, "_db_path", lambda county, state=None: db)
     http = _Http({
         "/s/vb8vhrwvtm/": _Resp(text=SHARE_HTML),
         "/content/abc123xyz/": _Resp(content=_workbook()),
@@ -136,8 +182,21 @@ def test_fetch_follows_share_page_to_workbook_and_skips_a_broken_list(monkeypatc
     assert len(http.calls) == 3, "two share pages and one workbook, nothing else"
 
 
+def test_resolved_only_default_emits_parcel_matched_rows(monkeypatch, tmp_path):
+    monkeypatch.setenv(mod.ENV_ON, "1")
+    monkeypatch.delenv(mod.ENV_RESOLVED_ONLY, raising=False)
+    db = _cache(tmp_path)
+    monkeypatch.setattr(mod.parcel_cache, "_db_path", lambda county, state=None: db)
+    http = _Http({"/s/vb8vhrwvtm/": _Resp(text=SHARE_HTML), "/content/abc123xyz/": _Resp(content=_workbook()),
+                  "/s/slsnqr9prl/": _Resp(text="<html>moved</html>")})
+    monkeypatch.setattr(mod, "client", lambda *a, **kw: _Ctx(http))
+    rows = asyncio.run(mod.MecklenburgDelinquentTax().fetch())
+    assert sorted(li.parcel_id for li in rows) == ["99900001", "99900002"]
+    assert {li.raw["mecklenburg_delinquent_tax"]["parcel_resolution"] for li in rows} == {"resolved"}
+
+
 def test_non_xlsx_download_is_ignored(monkeypatch):
-    monkeypatch.delenv(mod.ENV_OFF, raising=False)
+    monkeypatch.setenv(mod.ENV_ON, "1")
     http = _Http({
         "/s/vb8vhrwvtm/": _Resp(text=SHARE_HTML),
         "/content/abc123xyz/": _Resp(content=b"<html>error</html>"),

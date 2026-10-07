@@ -37,13 +37,29 @@ filter"); ``total_due`` lets scoring sort the large balances to the top.
 Access: open, no login, no CAPTCHA (the Widen share page and the original file are
 public links the county publishes). Four GETs per run. Nothing is written to disk.
 
-Gate with FORECLOSURE_MECKLENBURG_DELINQUENT=0 to skip.
+PARCEL RESOLUTION AND RUN COST (2026-10-07). The workbook has no parcel number, and
+the board's geocode step (Census batch, 250 rows a chunk, about 1,000 rows per 25 s;
+then a 1-per-second tier capped by GEOCODE_BUDGET_S) would see every row. So before a
+row is emitted its street is matched, locally and in one pass, against the Mecklenburg
+parcel cache (data/parcel_cache/mecklenburg.sqlite, the NC OneMap snapshot
+parcel_cache.py already builds; no network). Measured on the live workbooks: 43,355
+rows, 41,574 with a house-numbered street, 29,152 (67.2%) resolve to exactly one parcel
+in about 2 s, 1,273 match more than one parcel (condos, no unit) and 12,930 match none.
+The cache carries no coordinates, so a resolved row still needs a map point.
+
+Defaults, because the geocode cost is not bounded by this module: the scraper is OFF
+unless FORECLOSURE_MECKLENBURG_DELINQUENT=1, and when on it emits only parcel-resolved
+rows (MECKLENBURG_DELINQUENT_RESOLVED_ONLY=0 adds the unresolved ones). Separately, the
+rows carry no sale date, so main.DATELESS_OK_SOURCES needs this slug before any of them
+survives the board's active filter.
 """
 from __future__ import annotations
 
 import html
 import os
 import re
+import sqlite3
+import time
 import zipfile
 from datetime import datetime
 from io import BytesIO
@@ -51,6 +67,7 @@ from typing import Any, Iterable
 
 import structlog
 
+from ... import parcel_cache
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
@@ -67,7 +84,8 @@ LISTS: tuple[tuple[str, str], ...] = (
     ("individual", f"{WIDEN_HOST}/s/vb8vhrwvtm/ind_taxbills_advertisement"),
     ("business", f"{WIDEN_HOST}/s/slsnqr9prl/busoth_taxbills_advertisement"),
 )
-ENV_OFF = "FORECLOSURE_MECKLENBURG_DELINQUENT"
+ENV_ON = "FORECLOSURE_MECKLENBURG_DELINQUENT"          # "1" turns the scraper on (default off)
+ENV_RESOLVED_ONLY = "MECKLENBURG_DELINQUENT_RESOLVED_ONLY"   # default "1": parcel-resolved rows only
 
 _DOWNLOAD_RE = re.compile(r'href="(/content/[^"]+?\.xlsx\?[^"]*download=true)"', re.I)
 
@@ -112,6 +130,88 @@ def split_address(text: str | None) -> tuple[str | None, str | None, str | None]
     if zip_code == "00000":
         zip_code = None
     return (s or None), city, zip_code
+
+
+_SUFFIX = {"AVENUE": "AV", "AVE": "AV", "STREET": "ST", "ROAD": "RD", "DRIVE": "DR", "LANE": "LN",
+           "COURT": "CT", "CIRCLE": "CIR", "CR": "CIR", "PLACE": "PL", "BOULEVARD": "BLVD", "BV": "BLVD",
+           "HIGHWAY": "HWY", "PARKWAY": "PKWY", "PY": "PKWY", "TRAIL": "TRL", "TL": "TRL", "TR": "TRL",
+           "TERRACE": "TER", "WY": "WAY"}
+
+
+def street_key(street: str | None) -> str | None:
+    """Comparable form of a street line: upper case, no unit, suffixes abbreviated."""
+    s = re.sub(r"\s+", " ", (street or "").upper()).strip().split(",")[0].strip()
+    if not s:
+        return None
+    return " ".join(_SUFFIX.get(t, t) for t in s.split())
+
+
+def street_variants(street: str | None) -> list[str]:
+    """The workbook sometimes prints a unit number before the house number
+    ('9325 200 EXAMPLE DR'); try the line as printed, then each number alone."""
+    k = street_key(street)
+    if not k or not re.match(r"^[1-9]\d*\b", k):
+        return []
+    out = [k]
+    t = k.split()
+    if len(t) >= 3 and t[0].isdigit() and t[1].isdigit():
+        out += [" ".join(t[1:]), " ".join([t[0]] + t[2:])]
+    return out
+
+
+def cache_street_key(address: str | None) -> str | None:
+    """Parcel-cache situs ('1511 EXAMPLE AV CHARLOTTE NC', '1000 E EX RD, 203 CHARLOTTE NC')
+    -> the same comparable form as street_key()."""
+    s = re.sub(r"\s+", " ", (address or "").upper()).strip().split(",")[0].strip()
+    s = re.sub(r"\s+NC$", "", s)
+    m = _CITY_RE.search(s)
+    if m and m.start() > 0:
+        s = s[: m.start()]
+    return street_key(s)
+
+
+def resolve_parcels(streets: list[str | None], db_path) -> tuple[list[tuple[str | None, str]], dict]:
+    """Match each street to one Mecklenburg parcel id, locally, in one table scan.
+
+    Returns ([(parcel_id or None, status)], stats) with status 'resolved', 'ambiguous',
+    'unresolved' or 'no_street'. Only the 8-digit Mecklenburg parcel number is used as
+    the id (the cache also stores 13-digit statewide variants of the same parcel)."""
+    variants = [street_variants(s) for s in streets]
+    need = {v for vs in variants for v in vs}
+    index: dict[str, set[str]] = {}
+    t0 = time.monotonic()
+    if need and db_path and os.path.exists(str(db_path)):
+        con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            for pid, addr in con.execute(
+                    "SELECT id, address FROM parcels WHERE address IS NOT NULL AND address != ''"):
+                if not pid or len(pid) != 8:
+                    continue
+                k = cache_street_key(addr)
+                if k in need:
+                    index.setdefault(k, set()).add(pid)
+        finally:
+            con.close()
+    out: list[tuple[str | None, str]] = []
+    for vs in variants:
+        if not vs:
+            out.append((None, "no_street"))
+            continue
+        hit: tuple[str | None, str] = (None, "unresolved")
+        for v in vs:
+            ids = index.get(v)
+            if ids and len(ids) == 1:
+                hit = (next(iter(ids)), "resolved")
+                break
+            if ids:
+                hit = (None, "ambiguous")
+                break
+        out.append(hit)
+    stats = dict(rows=len(streets), scan_s=round(time.monotonic() - t0, 2),
+                 cache_present=bool(db_path and os.path.exists(str(db_path))))
+    for _, status in out:
+        stats[status] = stats.get(status, 0) + 1
+    return out, stats
 
 
 def _money(v: Any) -> float | None:
@@ -163,7 +263,9 @@ def parse_rows(rows: list[list[str]]) -> list[dict[str, Any]]:
 
 
 def build_listing(rec: dict[str, Any], *, kind: str, share_url: str,
-                  meta: dict[str, str | None], now: datetime) -> Listing:
+                  meta: dict[str, str | None], now: datetime,
+                  parcel: tuple[str | None, str] = (None, "not_attempted"),
+                  cache_age_days: float | None = None) -> Listing:
     street, city, zip_code = split_address(rec.get("address"))
     amt = rec["total_due"]
     created = meta.get("created")
@@ -184,6 +286,7 @@ def build_listing(rec: dict[str, Any], *, kind: str, share_url: str,
         zip_code=zip_code,
         state="NC",
         county="Mecklenburg",
+        parcel_id=parcel[0],
         foreclosure_process="tax",
         description=(f"Mecklenburg NC advertisement of unpaid tax liens (NCGS 105-369, "
                      f"{kind} list): ${amt:,.2f} owed")[:300],
@@ -198,6 +301,9 @@ def build_listing(rec: dict[str, Any], *, kind: str, share_url: str,
             "advertisement_sheet": meta.get("sheet"),
             "file_created": created,
             "index_page": INDEX_PAGE,
+            "parcel_resolution": parcel[1],
+            "parcel_resolution_source": "parcel_cache:mecklenburg (street match)",
+            "parcel_cache_age_days": round(cache_age_days, 1) if cache_age_days is not None else None,
             "signal": "tax_lien_advertisement",
         }},
     )
@@ -212,11 +318,12 @@ class MecklenburgDelinquentTax(BaseScraper):
     optional = True
 
     async def fetch(self) -> Iterable[Listing]:
-        if os.environ.get(ENV_OFF, "1") == "0":
-            log.info("mecklenburg_delinquent.disabled")
+        if os.environ.get(ENV_ON, "0").strip() != "1":
+            log.info("mecklenburg_delinquent.off_by_default", enable=f"{ENV_ON}=1")
             return []
         now = datetime.utcnow()
         out: list[Listing] = []
+        parsed: list[tuple[dict[str, Any], str, str, dict[str, str | None]]] = []
         async with client(timeout=90.0) as http:
             for kind, share_url in LISTS:
                 try:
@@ -241,10 +348,20 @@ class MecklenburgDelinquentTax(BaseScraper):
                     continue
                 meta = workbook_meta(resp.content)
                 recs = parse_rows(read_rows(resp.content))
-                for rec in recs:
-                    out.append(build_listing(rec, kind=kind, share_url=share_url, meta=meta, now=now))
+                parsed += [(rec, kind, share_url, meta) for rec in recs]
                 log.info("mecklenburg_delinquent.parsed", kind=kind, rows=len(recs),
                          sheet=meta.get("sheet"), created=meta.get("created"))
+        db = parcel_cache._db_path("Mecklenburg")
+        matches, stats = resolve_parcels([split_address(r[0].get("address"))[0] for r in parsed], db)
+        age = parcel_cache.cache_age_days("Mecklenburg")
+        resolved_only = os.environ.get(ENV_RESOLVED_ONLY, "1").strip() != "0"
+        for (rec, kind, share_url, meta), parcel in zip(parsed, matches):
+            if resolved_only and parcel[1] != "resolved":
+                continue
+            out.append(build_listing(rec, kind=kind, share_url=share_url, meta=meta, now=now,
+                                     parcel=parcel, cache_age_days=age))
+        log.info("mecklenburg_delinquent.resolved", emitted=len(out), resolved_only=resolved_only,
+                 cache_age_days=round(age, 1) if age is not None else None, **stats)
         return out
 
 
@@ -258,7 +375,8 @@ if __name__ == "__main__":
         print(f"outcome={s.last_outcome} count={len(rows)}")
         blocks = [li.raw["mecklenburg_delinquent_tax"] for li in rows]
         print(Counter(b["list"] for b in blocks).most_common())
-        print("tax_year", Counter(b["tax_year"] for b in blocks).most_common(3))
+        print("tax_year", Counter(b["tax_year"] for b in blocks).most_common(3),
+              "resolution", Counter(b["parcel_resolution"] for b in blocks).most_common())
         print("with_street", sum(1 for li in rows if li.street_address),
               "with_city", sum(1 for li in rows if li.city),
               "with_zip", sum(1 for li in rows if li.zip_code),
