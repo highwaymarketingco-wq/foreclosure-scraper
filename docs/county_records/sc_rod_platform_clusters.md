@@ -31,8 +31,8 @@ name search. "Before" is the repo on the morning of 2026-10-07.
 | 6 | County-built document search | Greenwood (1) | not read | chain + liens: `rod/greenwood_docsearch.py`, `FORECLOSURE_SC_GREENWOOD_ROD`, ON |
 | 7 | County-built document search | Charleston (1) | not read | walled: the search hands off to docviewer.charlestoncounty.gov, which loads reCAPTCHA (person) |
 | 8 | GovOS CountyFusion | Sumter (1) | not read | walled: 'Login as Guest' is a button on the CountyFusion login form (username/password page); not entered (person) |
-| 9 | Cott RecordRoom | Union (1) | recent-recordings sweep (`rod/cott_recordroom.py`) | not built: replaying the page's name search returned the whole date window unfiltered (and the quick-search box returned nothing); needs one more browser network capture |
-| 10 | Cott eSearch (older, guest) | Marlboro (1) | not read | not built: the name-search postback returned the blank form in the time box; images are paid |
+| 9 | Cott RecordRoom | Union (1) | recent-recordings sweep (`rod/cott_recordroom.py`) | chain + liens by name: `rod/sc_recordroom.py`, `FORECLOSURE_SC_RECORDROOM_ROD`, ON |
+| 10 | Cott eSearch (older, guest) | Marlboro (1) | not read | chain + liens by name: `rod/sc_cott_esearch.py`, `FORECLOSURE_SC_COTT_ESEARCH_ROD`, ON (images are paid and never touched) |
 
 Round two (same day) went in board-value order (board rows with an owner name, counts only):
 Spartanburg 18,509; Charleston 8,746; Sumter 3,528; Marlboro 1,244; Union 1,215; Greenwood 1,033;
@@ -42,7 +42,7 @@ Defaults come from a yield check on four real board owners per platform (chain r
 PublicSearch Greenville 4 of 4 chains at about 15 s a lookup, Oconee 2 of 4; AcclaimWeb Horry 4 of 4 owners
 found, 2 with a deed; Online Record System Laurens 2 of 4, one lookup took 200 s; ACPASS Anderson 1 of 4;
 Spartanburg (round two) 4 of 4 chains at one to four minutes each; Greenwood 2 of 6 chains plus a third
-owner's liens at about 5 s.
+owner's liens at about 5 s; Union 1 chain and 3 more owners' liens of 6; Marlboro 2 chains of 5 distinct owners.
 
 Board leads in the counties now read (owner name present, 2026-10-07): Horry 6,442; Greenville 5,257;
 Pickens 5,124; Oconee 3,401; Laurens 2,925; Berkeley 2,786; Anderson 2,709; Florence 2,095; Colleton 1,711;
@@ -77,6 +77,22 @@ Dorchester 1,712; Barnwell 1,222; Lancaster 1,169; Georgetown 818; York 803 (Abb
   or 'Party 2' (grantee side); the render reader (`rod/logan._parse_records`) reads 'Party 2' as the grantor
   side and joins the `<br>` names into one, which matters for anything that relies on its sides. Its types
   are coarse (DEED, MORTGAGE, LIEN, UCC, PLATS; satisfactions are not indexed as their own type).
+* **Spartanburg's stored liens had buyer and seller swapped on deeds (fixed 2026-10-07).** `rod/logan.
+  _parse_records` and `enrichment_dot_ocr._parse_image_rows` put the searched owner on the grantor side of
+  every row, so each 'Party 2' row (a deed into the owner) read as a sale by the owner, and co-owners in one
+  `<br>` cell were glued into one name. One board pass: 560 rows carry a Spartanburg raw['rod'] (9,733
+  instruments; 5,693 deeds on 542 rows; 433 rows with a glued multi-name party). Mortgages and liens list
+  the owner as 'Party 1' and were stored the right way round. A deed's true side cannot be recovered from
+  the stored row (the role was not kept, and the owner sits on the grantor side either way), so there is no
+  offline correction: new stamps carry `party_sides: 'v2'` and older ones count as never fetched, so the
+  next run refetches them first. `enrichment_derivation_flags` reads only mortgage lenders, which were right.
+* **Union filters on the quick name box.** RecordRoom's `SearchTerm` ('LAST FIRST', parsed by the register)
+  is the filter; the advanced `Names[0]` boxes are ignored unless that panel is on, which is why a replay
+  with only them returned the whole date window.
+* **Marlboro signs a visitor in as guest by redirect** (no form, no credential). Its search post must carry
+  every field the page posts (the ScriptManager hidden field, empty ClientState fields,
+  `hiddenInputToUpdateATBuffer_CommonToolkitScripts=1`), or it re-renders the blank form. Older rows carry
+  the kind as a `[TAG]` in the description.
 * **Greenwood answers JSON.** The React page posts `asp/webAPI` (Accept: application/json; XML otherwise)
   with the name, dates as MM/DD/YYYY and doc-type switches; each row lists grantors and grantees with a
   `match` flag for the searched party, the index's legal description and linked instruments.
@@ -124,7 +140,6 @@ Ingenuity.
 | Calhoun | TitleSearcher | paid subscription |
 | Richland | county Online Data Services | paid subscription |
 | Allendale, Marion, McCormick | none | no online index; books at the Clerk of Court (McCormick added to the matrix 2026-10-07) |
-| Union, Marlboro | Cott RecordRoom / older Cott eSearch | no wall; readers not built yet (see the ranking table) |
 
 ## Per-county status (SC)
 
@@ -163,7 +178,7 @@ Ingenuity.
 | Lee | Neumo | person (paid) |
 | Lexington | GovOS CountyFusion | person (account) |
 | Marion | none | person |
-| Marlboro | Cott eSearch (older) | not built |
+| Marlboro | Cott eSearch (older) | chain + liens (`sc_cott_esearch`, ON) |
 | McCormick | none | person (no online index) |
 | Newberry | Neumo | person (login) |
 | Oconee | GovOS PublicSearch | liens (`kofile`) + chain (`publicsearch`, ON) |
@@ -173,7 +188,7 @@ Ingenuity.
 | Saluda | Cott RecordHub | person |
 | Spartanburg | Logan 'The Lookup' | liens (`enrichment_spartanburg_rod`) + chain (`sc_lookup`, ON) |
 | Sumter | GovOS CountyFusion | person (login form) |
-| Union | Cott RecordRoom | distress sweep only; reader not built |
+| Union | Cott RecordRoom | chain + liens (`sc_recordroom`, ON); distress sweep (`cott_recordroom`) |
 | Williamsburg | Neumo | person (login) |
 | York | Online Record System | chain + liens (`sc_online_record_system`, OFF) |
 
@@ -198,7 +213,8 @@ Both enrichers are already called from `main.py` (`enrich_generic_rod` in the RO
 `enrich_rod_chain` after it). Switches:
 
 * Per platform, shared by both enrichers: `FORECLOSURE_SC_PUBLICSEARCH_ROD`, `FORECLOSURE_SC_ACCLAIM_ROD`,
-  `FORECLOSURE_SC_LOOKUP_ROD` (Spartanburg, chain only), `FORECLOSURE_SC_GREENWOOD_ROD` (default 1);
+  `FORECLOSURE_SC_LOOKUP_ROD` (Spartanburg, chain only), `FORECLOSURE_SC_GREENWOOD_ROD`,
+  `FORECLOSURE_SC_RECORDROOM_ROD` (Union), `FORECLOSURE_SC_COTT_ESEARCH_ROD` (Marlboro) (default 1);
   `FORECLOSURE_SC_ORS_ROD`, `FORECLOSURE_SC_ACPASS_ROD` (default 0).
 * `FORECLOSURE_ROD_CHAIN=1`: the chain enricher's master switch (default off) for `raw['rod_chain']`.
 * `SC_ROD_MAX_LOOKUPS_PER_COUNTY` (default 30): owner lookups per county per run; the owner search
