@@ -375,6 +375,28 @@ def _legal(res: IntakeResult, p) -> tuple[str, str]:
     return glance, box
 
 
+def _where_block(res: IntakeResult) -> str:
+    """'Where to look in this county': the county records matrix, printed for a person. Static text:
+    nothing here is fetched, and the tool never fetches from a site walled to scripts."""
+    w = res.where or {}
+    if not w:
+        return ""
+    head = (f"<h2>Where to look in {e(res.county)} County</h2>"
+            f"<p class='small'>From the county records matrix (docs/county_records, built "
+            f"{e(w.get('matrix_date') or 'date not recorded')}{', confidence ' + e(w['confidence']) if w.get('confidence') else ''}): "
+            f"where each record lives, whether it is free, and why a person is needed. ")
+    if res.register_fetched:
+        head += ("This tool searched this county's register live (sections 2 and 4); the links below are for a person "
+                 "checking it again or going further back.</p>")
+    else:
+        head += ("This tool did not search this county's register, tax site or probate files: those sections say "
+                 "'not fetched by the tool: use the link above' and point here. A site the matrix marks as walled to "
+                 "scripts (a CAPTCHA, a login, a payment, a Cloudflare check) is never fetched; a person or the "
+                 "attorney goes there.</p>")
+    rows = "".join(f"<tr><th>{e(a)}</th><td>{e(b)}</td></tr>" for a, b in (w.get("rows") or []))
+    return head + f"<table class='kv'><tbody>{rows}</tbody></table>"
+
+
 def render_html(res: IntakeResult) -> str:
     p = res.parcel
     gen = fmt_both(res.finished or res.started)
@@ -389,7 +411,10 @@ def render_html(res: IntakeResult) -> str:
     if res.notes:
         H.append("<div class='warn'><b>Run notes.</b><br>" + "<br>".join(e(n) for n in res.notes) + "</div>")
     if p is None or not p.found:
-        H.append("<div class='warn'>No parcel record was found for this PIN; nothing else was searched.</div>")
+        H.append("<div class='warn'>No parcel record was found for this PIN; nothing else was searched."
+                 + (f" {e(str(p.extra.get('join_note')))}" if p is not None and p.extra.get("join_note") else "")
+                 + "</div>")
+        H.append(_where_block(res))
         return _wrap(title, H, res)
 
     tr = (tax_rows(res.tax, (res.finished or res.started).astimezone(EASTERN).date(), res.state)
@@ -450,6 +475,9 @@ def render_html(res: IntakeResult) -> str:
     glance.append(("5. Records not reached", "; ".join(walled) or "none"))
     H.append("<table class='kv'><tbody>" + "".join(f"<tr><th>{e(a)}</th><td>{e(b)}</td></tr>" for a, b in glance)
              + "</tbody></table>")
+
+    # ---- where to look (the county records matrix; nothing fetched)
+    H.append(_where_block(res))
 
     # ---- 1 parcel
     H.append("<h2>1. Parcel record</h2>")

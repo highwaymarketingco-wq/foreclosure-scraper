@@ -18,6 +18,7 @@ from datetime import date
 from typing import Optional
 
 from .adapters.base import CountyAdapter
+from .county_records import where_to_look
 from .fetch import Walled
 from .model import (DeathSearch, Instrument, IntakeResult, NameSearch, RecordCheck, TaxBill, TaxStatus,
                     utc_now)
@@ -318,6 +319,11 @@ def run_intake(adapter: CountyAdapter, pin: str, today: date, *, max_chain: int 
     res.register_fetched = adapter.register_fetched
     if not adapter.register_fetched:
         res.register_link = adapter.register_link()
+    try:
+        res.where = where_to_look(adapter.county, adapter.state).to_json()
+    except Exception as exc:  # noqa: BLE001 - a broken matrix file must not stop the sheet
+        res.notes.append(f"The county records matrix could not be read ({type(exc).__name__}); the where-to-look "
+                         f"block is missing.")
     try:
         _run(adapter, res, pin, today, max_chain)
     except Walled as w:
