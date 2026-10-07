@@ -577,6 +577,10 @@ DATELESS_OK_SOURCES = {
     "public_notices.publicnoticesc_estates",
     "national.bankruptcy_rss_relief_from_stay",   # lender motions to resume foreclosure (debtor + district, no sale date)
     "counties_sc.horry_probate",                 # Horry estates filed in the last year (no sale date)
+    "counties_sc.york_tax_sale_parcels",         # York tax sale parcels (the sale date is on the row; listed for safety)
+    "counties_nc.rocky_mount_blight_survey",     # condition survey rows: no sale date
+    "city_websites.raleigh_structure_fires",     # fire addresses: no sale date
+    "counties_nc.kinston_proposed_demolition",   # proposed demolition list: no sale date
     # 2026-08-30 new county sources (dateless: vacant / tax-delinquent / probate —
     # no sale_date, so they must be whitelisted or _active_only drops every row).
     "counties_nc.gaston_vacant",
@@ -1879,6 +1883,20 @@ async def run() -> int:
                     note="proceeding; unenriched leads keep prior fields")
     except Exception:
         log.error("gis_attrs.failed", traceback=traceback.format_exc())
+
+    # Richland SC map-viewer reader (the county's parcel viewer shows owner mailing, value and sale facts
+    # that no layer we read carries; its disclaimer is a click-through). Capped like every resolver phase.
+    try:
+        from .enrichment_richland_parcel import enrich_richland_parcel
+        s = await asyncio.wait_for(
+            enrich_richland_parcel(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+        if s:
+            enrichment_stats["richland_parcel"] = s
+    except asyncio.TimeoutError:
+        log.warning("richland_parcel.time_capped")
+    except Exception:
+        log.error("richland_parcel.failed", traceback=traceback.format_exc())
 
     # CAMA per-parcel condition/grade/year (open ArcGIS) — near-universal free
     # condition layer; backfills year_built + a distressed-condition signal.
