@@ -1175,6 +1175,11 @@ def _active_only(li: Listing, horizon_days: int, *, now: datetime | None = None)
     # title for ~12 months and can redeem, so it stays active while that clock runs.
     if sale <= cutoff_future and sc_tax_redemption_open(li, ref):
         return True
+    # A filing-date source (LiensNC, NC SoS UCC) stores the FILING date where an auction would have its
+    # sale date; a filing does not expire after 14 days, so the lower bound is a year, not the upset window.
+    from .distress_score import FILING_DATE_SOURCES
+    if any(part in FILING_DATE_SOURCES for part in (li.source or "").split(".")):
+        return ref - timedelta(days=365) <= sale <= cutoff_future
     return cutoff_past <= sale <= cutoff_future
 
 

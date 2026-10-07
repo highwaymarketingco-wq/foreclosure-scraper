@@ -183,6 +183,11 @@ PRIOR_MERGE_MAX_DROP_RATE = float(
 )
 
 
+#: Sources whose rows are recorded FILINGS fed by an incremental hand-off (only new filings arrive each
+#: cycle): a prior row that is absent from a run is not "pulled", so these never age toward the miss limit.
+AGE_EXEMPT_SOURCES = frozenset({"liensnc"})
+
+
 def _naive(dt: Optional[datetime]) -> Optional[datetime]:
     """Drop tzinfo so prior-board (often tz-aware ISO) dates compare against a
     naive utcnow() without raising."""
@@ -508,6 +513,7 @@ def merge_prior_board(
         "matched": 0,
         "fresh_only": 0,
         "prior_only_kept": 0,
+        "prior_only_kept_age_exempt": 0,
         "aged_out_terminal": 0,
         "aged_out_misses": 0,
         "carried_vision": 0,
@@ -584,6 +590,22 @@ def merge_prior_board(
             return
         raw = rec.get("raw")
         raw = raw if isinstance(raw, dict) else {}
+        if any(part in AGE_EXEMPT_SOURCES for part in str(rec.get("source") or "").split(".")):
+            # A recorded filing is history, not a listing that can be 'pulled': it is fed by an incremental
+            # hand-off (only NEW filings arrive), so absence from a run says nothing about it.
+            raw.pop("pulled_sale", None)
+            rec["raw"] = raw
+            if rec.get("auction_status") == "presumed_withdrawn":
+                rec["auction_status"] = None
+            try:
+                kept.append(Listing.model_validate(share_keys(rec, key_cache)))
+            except Exception as exc:  # noqa: BLE001
+                drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
+                stats["prior_drop_errors"] += 1
+                return
+            stats["prior_only_kept"] += 1
+            stats["prior_only_kept_age_exempt"] += 1
+            return
         prev_pulled = raw.get("pulled_sale") or {}
         consecutive = prev_pulled.get("consecutive_misses", 0) + 1
         if consecutive > max_misses:
