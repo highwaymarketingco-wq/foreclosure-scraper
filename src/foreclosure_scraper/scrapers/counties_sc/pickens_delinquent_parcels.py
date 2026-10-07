@@ -222,22 +222,29 @@ LAYERS: tuple[Layer, ...] = (
           # from the service's own schema, not just blank) -- SALEP/SALEDT
           # still present and real (313/954 rows).
           sale_price="SALEP", sale_date_col="SALEDT"),
-    # --- current cycle: published-but-unsold ---------------------------------
-    Layer("DelParces_October2025NewsAd", 2025, True, pin="PIN",
+    # --- 2025 cycle: the PRIOR cycle since the 2026 list was posted (owner decision
+    # 2026-10-07). A parcel on these lists and NOT on the 2026 list is not counted as
+    # currently delinquent: raw['pickens_prior_cycle_only'] (see build_listing).
+    Layer("DelParces_October2025NewsAd", 2025, False, pin="PIN",
           owner="OWNER__NOW", amount="AMOUNT_DUE", acres="CALCACRE"),
-    Layer("DelqParcels_Ad_paperlisting2", 2025, True, pin="DelqParcel",
+    Layer("DelqParcels_Ad_paperlisting2", 2025, False, pin="DelqParcel",
           owner="DelqParc_4", amount="DelqParc_5", acres="DelqParc_1"),
-    Layer("Posting3", 2025, True, pin="PIN", owner="OWNER__NOW",
+    Layer("Posting3", 2025, False, pin="PIN", owner="OWNER__NOW",
           amount="AMOUNT_DUE", acres="CALCACRE", pin_ext="PIN_SUF"),
     # 2026 cycle, first publication week (2026-10-07 extraction audit: a new service on
     # the same org, 801 parcels, not wired). Column aliases checked live on a 200-row
     # sample: GISADMIN_P is aliased "PIN" (dashed Pickens PIN on every row), T_WEEK_1_1 is
     # the owner name, T_WEEK_1_2 is aliased "AMOUNT DUE"; T_WEEK_1__ repeats the PIN.
-    # The 2025 posting layers stay current too: whether that cycle has closed is the
-    # owner's call (see docs/extraction_audit_2026-10-07.md), not something to guess here.
+    # This is the CURRENT cycle (owner decision 2026-10-07). NOTE: it is the first
+    # publication WEEK; when the county posts later weeks as their own services, add
+    # them here as current 2026 layers or their parcels read as prior-cycle-only.
     Layer("DELQ_TAX_WEEK1_2026", 2026, True, pin="GISADMIN_P", owner="T_WEEK_1_1",
           amount="T_WEEK_1_2"),
 )
+
+#: The current publication cycle and the one before it.
+CURRENT_CYCLE = max(L.cycle for L in LAYERS if L.current)
+PRIOR_CYCLE = CURRENT_CYCLE - 1
 
 #: Government / institutional owners are not sellers.
 _GOV = re.compile(
@@ -467,6 +474,10 @@ def build_listing(pin: str, rows: list[Row], now: datetime | None = None) -> Lis
     # The balance that matters is the one on the most recent publication.
     amount = next((r.amount for r in rows if r.amount), None)
     cycles = sorted({r.cycle for r in rows})
+    # On the prior cycle's list, absent from the current one (owner decision 2026-10-07):
+    # not counted as currently delinquent. The scorer drops its tax credit (same as the
+    # not-yet-late rule); the row stays on the board as context.
+    prior_cycle_only = PRIOR_CYCLE in cycles and CURRENT_CYCLE not in cycles
 
     # Taken as a PAIR from one row — never a latitude from one cycle's polygon
     # and a longitude from another's.
@@ -515,6 +526,8 @@ def build_listing(pin: str, rows: list[Row], now: datetime | None = None) -> Lis
             "source": "pickens_county_gis_delinquent_layers",
         },
     }
+    if prior_cycle_only:
+        raw["pickens_prior_cycle_only"] = True
     if mail_addr or mail_city:
         raw["owner_mailing"] = {
             "street": mail_addr, "city": mail_city,
@@ -554,6 +567,8 @@ def build_listing(pin: str, rows: list[Row], now: datetime | None = None) -> Lis
         + (f"; published in {len(cycles)} roll years ({cycles[0]}-{cycles[-1]})"
            if len(cycles) > 1 else f"; {cycles[0]} roll")
         + ("; CURRENT cycle, not yet sold" if current_rows else "")
+        + (f"; on the {PRIOR_CYCLE} list but not the current {CURRENT_CYCLE} list"
+           if prior_cycle_only else "")
     )
 
     return Listing(

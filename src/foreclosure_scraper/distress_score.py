@@ -553,6 +553,14 @@ def tax_not_yet_late(li: Listing, today: Optional[date] = None) -> bool:
                                  li.source, today)
 
 
+def tax_prior_cycle_only(li: Listing) -> bool:
+    """Pickens: the parcel is on the prior cycle's delinquent list and absent from the current
+    one (raw['pickens_prior_cycle_only'], owner decision 2026-10-07). Not counted as currently
+    delinquent: no tax credit, the same way tax_not_yet_late earns none; the row stays as context.
+    A row on both lists never carries the flag and keeps its credit."""
+    return bool(isinstance(li.raw, dict) and li.raw.get("pickens_prior_cycle_only"))
+
+
 def amount_is_this_tax_balance(li: Listing, amount_owed) -> bool:
     """amount_is_tax_balance, or an amount_owed whose value IS the row's tax_owed balance whatever
     its label (a merged roll balance some rows still carry as `judgment`). Used only where the tax
@@ -814,6 +822,8 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
                 pass        # an interest-only residue on a standing roll is not distress (TRIVIAL_TAX_BALANCE)
             elif name in ("tax_lien", "tax_sale") and not sale_upcoming and tax_not_yet_late(li, today):
                 pass        # the only unpaid bill is not late yet (tax_calendar): not a delinquency
+            elif name in ("tax_lien", "tax_sale") and not sale_upcoming and tax_prior_cycle_only(li):
+                pass        # Pickens: prior cycle's list only, not on the current one
             else:
                 sig.append((name, cat, w, ev))
                 if days is not None and days >= 0 and name in _LANE_KINDS and days <= _LANE_WINDOW_DAYS:
@@ -853,7 +863,7 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     # governed by the tax rules below (a refuted/stale tax verdict, the trivial floor) and never
     # credited as if it were a court judgment. A real judgment or opening bid is unchanged.
     _ao_is_tax = amount_is_tax_balance(li, _ao)
-    _not_late = tax_not_yet_late(li, today)
+    _not_late = tax_not_yet_late(li, today) or tax_prior_cycle_only(li)
     if _not_late:
         _ao_is_tax = amount_is_this_tax_balance(li, _ao)
     if "recorded_debt:tax" in drop or trivial_tax_roll(li) or _not_late:
@@ -871,7 +881,7 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
         # the real balance is credited directly.
         sig.append(("recorded_debt", "FINANCIAL", 12, REC))
     pd = r.get("pickens_delinquent")
-    if isinstance(pd, dict) and pd.get("chronic"):
+    if isinstance(pd, dict) and pd.get("chronic") and not tax_prior_cycle_only(li):
         # Three or more separate delinquency publications is not an oversight. It used to be
         # a raw['distressed'] boolean read as PROPERTY, so one tax record completed a stack of
         # two (F5). It is the same fact as the tax lien, so it raises that category's weight.

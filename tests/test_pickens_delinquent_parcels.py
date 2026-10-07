@@ -105,11 +105,20 @@ def test_layers_are_ordered_oldest_to_newest():
     assert cycles == sorted(cycles)
 
 
-def test_only_the_2025_and_2026_posting_layers_are_the_current_cycle():
-    assert {L.service for L in mod.LAYERS if L.current} == {
-        "DelParces_October2025NewsAd", "DelqParcels_Ad_paperlisting2", "Posting3",
-        "DELQ_TAX_WEEK1_2026"}
-    assert all(L.cycle in (2025, 2026) for L in mod.LAYERS if L.current)
+def test_only_the_2026_layer_is_the_current_cycle():
+    """Owner decision 2026-10-07: the 2026 list is current; 2025 is the prior cycle."""
+    assert {L.service for L in mod.LAYERS if L.current} == {"DELQ_TAX_WEEK1_2026"}
+    assert (mod.CURRENT_CYCLE, mod.PRIOR_CYCLE) == (2026, 2025)
+
+
+def _with_2026(pins: list[str], payloads: dict | None = None) -> FakeHttp:
+    """The recorded fixture (which predates the 2026 list) plus a 2026 list naming `pins`."""
+    routes = _routes(payloads)
+    routes["/services/DELQ_TAX_WEEK1_2026/FeatureServer"] = {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": i + 1, "GISADMIN_P": p, "T_WEEK_1_1": "SAMPLE OWNER",
+                            "T_WEEK_1_2": 100.0 + i}} for i, p in enumerate(pins)]}
+    return FakeHttp(routes)
 
 
 def test_out_fields_are_enumerated_never_star():
@@ -184,8 +193,10 @@ def test_current_cycle_rows_are_backfilled_with_situs_and_mailing_from_older_rol
     """The 2025 posting layers publish owner + amount ONLY. Everything that
     makes the lead mailable (situs, owner mailing address) comes from the
     2022-2024 rolls at the same parcel."""
-    li = next(li for li in _run() if li.parcel_id == "4065-16-73-6947")
+    li = next(li for li in _run(_with_2026(["4065-16-73-6947"]))
+              if li.parcel_id == "4065-16-73-6947")
     assert li.raw["pickens_delinquent"]["pre_sale"] is True
+    assert "pickens_prior_cycle_only" not in li.raw
     assert li.street_address                      # from a 20xx roll
     assert li.city and li.zip_code
     assert li.raw["owner_mailing"]["street"]      # from a 20xx roll
@@ -193,10 +204,12 @@ def test_current_cycle_rows_are_backfilled_with_situs_and_mailing_from_older_rol
 
 
 def test_a_2025_only_parcel_has_owner_and_amount_but_no_situs():
-    """Honest about what the current cycle actually carries — no invention."""
+    """Honest about what the 2025 posting layers actually carry — no invention. Since the
+    2026 list is current (2026-10-07) a parcel on 2025 only is prior-cycle-only."""
     li = next(li for li in _run() if li.parcel_id == "4053-10-46-7469")
     d = li.raw["pickens_delinquent"]
-    assert d["cycles"] == [2025] and d["pre_sale"] is True
+    assert d["cycles"] == [2025] and d["pre_sale"] is False
+    assert li.raw["pickens_prior_cycle_only"] is True
     assert li.owner_name and d["amount_owed"]
     assert li.street_address is None
     assert "owner_mailing" not in li.raw
@@ -342,7 +355,8 @@ def test_chronic_delinquency_raises_the_tax_weight_and_is_not_a_property_signal(
     # made FINANCIAL 20 + PROPERTY 8 = stack 2. Three roll years is a tax fact: it stays as
     # raw['pickens_delinquent']['chronic'] and now raises the FINANCIAL weight (tax_lien_chronic).
     from foreclosure_scraper.distress_score import _signals_for
-    li = next(li for li in _run()
+    chronic = [li.parcel_id for li in _run() if li.raw["pickens_delinquent"]["cycle_count"] >= 3]
+    li = next(li for li in _run(_with_2026(chronic))     # on the current 2026 list too
               if li.raw["pickens_delinquent"]["cycle_count"] >= 3)
     assert li.raw["pickens_delinquent"]["chronic"] is True
     assert "distressed" not in li.raw
@@ -551,3 +565,42 @@ def test_the_pickens_block_keeps_cycle_history_through_the_publish_slim():
               "improved_vacant", "account_no", "pin_ext"):
         assert k in out, k
     assert "parcel_id" not in out          # a duplicate of the row's own parcel_id
+
+
+
+# --- owner decision 2026-10-07: the 2025 list is the prior cycle ---------------------------
+
+def _sig_names(li):
+    from foreclosure_scraper.distress_score import _signals_for
+    return [n for n, _c, _w in _signals_for(li)]
+
+
+def test_a_2025_only_parcel_earns_no_tax_credit_but_stays_as_context():
+    rows = _run()
+    prior = [li for li in rows if li.raw.get("pickens_prior_cycle_only")]
+    assert prior, "fixture parcels are on the 2025 lists and no 2026 list"
+    for li in prior:
+        names = _sig_names(li)
+        assert "tax_lien" not in names and "tax_lien_chronic" not in names
+        assert li.raw["pickens_delinquent"]["pre_sale"] is False
+        assert "not the current 2026 list" in li.description
+
+
+def test_a_parcel_on_both_lists_keeps_its_tax_credit():
+    pins = [li.parcel_id for li in _run()]
+    rows = _run(_with_2026(pins))
+    assert not any(li.raw.get("pickens_prior_cycle_only") for li in rows)
+    both = next(li for li in rows if li.raw["pickens_delinquent"]["chronic"])
+    names = _sig_names(both)
+    assert "tax_lien" in names and "tax_lien_chronic" in names
+    assert both.raw["pickens_delinquent"]["pre_sale"] is True
+
+
+def test_an_old_roll_only_parcel_is_not_marked_prior_cycle():
+    """Only the prior (2025) cycle is in the rule; a 2023-only parcel is unchanged."""
+    payload = {"/services/dqnt_2023/FeatureServer": {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "PIN": "4000-00-00-0001", "NAME1": "SAMPLE PAT",
+                            "AMOUNT_DUE": 50.0}}]}}
+    li = _run(_only(payload))[0]
+    assert "pickens_prior_cycle_only" not in li.raw

@@ -2600,6 +2600,10 @@ RAW_KEEP = {
                            # parcel appears on (at most nine): the per-cycle amount history.
                            "cycles", "publications", "tax_year", "acres", "buildings",
                            "improved_vacant", "account_no", "pin_ext"),
+    # Pickens: on the prior cycle's delinquent list and absent from the current one (owner
+    # decision 2026-10-07). The scorer reads it to drop the tax credit; a board reloaded from
+    # the published files must keep it or the credit comes back.
+    "pickens_prior_cycle_only": "*",
     "vacancy": "*",
 
     # docs/extraction_gaps.md verification pass (2026-09-28): these scrapers were fixed
