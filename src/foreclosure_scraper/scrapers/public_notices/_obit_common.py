@@ -72,6 +72,7 @@ class PoliteFetcher:
         self._locks: dict[str, asyncio.Lock] = {}
         self.walled: dict[str, str] = {}
         self.requests: dict[str, int] = {}
+        self.last_url = ""
         self._client: Optional[httpx.AsyncClient] = None
 
     async def __aenter__(self) -> "PoliteFetcher":
@@ -109,7 +110,34 @@ class PoliteFetcher:
             raise Walled(url, why)
         if r.status_code >= 400:
             raise httpx.HTTPStatusError(f"HTTP {r.status_code}", request=r.request, response=r)
+        self.last_url = str(r.url)
         return r.text
+
+
+    async def post(self, url: str, data: dict) -> str:
+        """A form postback (an ASP.NET grid's own next-page / preset button), same pacing and wall
+        check as get(). Only the site's own public search form is ever posted."""
+        host = (urlsplit(url).hostname or "").lower()
+        if host in self.walled:
+            raise Walled(url, self.walled[host])
+        await self._pace(host)
+        self.requests[host] = self.requests.get(host, 0) + 1
+        assert self._client is not None, "use 'async with PoliteFetcher()'"
+        r = await self._client.post(url, data=data)
+        why = wall_reason(r.status_code, str(r.url), r.text)
+        if why:
+            self.walled[host] = why
+            log.warning("obituary_reader.walled", host=host, reason=why)
+            raise Walled(url, why)
+        if r.status_code >= 400:
+            raise httpx.HTTPStatusError(f"HTTP {r.status_code}", request=r.request, response=r)
+        self.last_url = str(r.url)
+        return r.text
+
+    async def get_with_url(self, url: str) -> tuple[str, str]:
+        """get(), also returning the final URL (a session-in-path site redirects)."""
+        text = await self.get(url)
+        return text, self.last_url
 
 
 _TITLE_NOISE = re.compile(r"^\s*(?:obituary|obituaries|in\s+memory\s+of|in\s+loving\s+memory\s+of)\s*[:\-|]\s*|"
