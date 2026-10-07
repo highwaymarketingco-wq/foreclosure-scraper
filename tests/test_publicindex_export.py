@@ -92,14 +92,14 @@ DISCLAIMER_ONLY_HTML = """
 
 def test_row_count_dedup_and_malformed_dropped():
     listings = parse_publicindex_html(MIXED_HTML)
-    # 4 unique valid rows: 1 foreclosure (dupe collapsed) + partition +
-    # possession + judgment. Malformed row dropped.
-    assert len(listings) == 4
+    # 3 unique valid rows: 1 foreclosure (dupe collapsed) + partition +
+    # judgment. Malformed row dropped; the Ejectment / Possession row is an
+    # eviction (names the tenant) and is skipped (2026-10-07).
+    assert len(listings) == 3
     cases = sorted(li.case_number for li in listings)
     assert cases == [
         "2026-CP-04-00099",
         "2026-CP-23-04567",
-        "2026-CP-39-00123",
         "2026-CP-42-01547",
     ]
 
@@ -119,7 +119,7 @@ def test_empty_html_yields_empty():
 def test_lane_for_subtype_mapping():
     assert lane_for_subtype("Foreclosure 420") == ListingType.LIS_PENDENS
     assert lane_for_subtype("Partition of Real Property") == ListingType.LIS_PENDENS
-    assert lane_for_subtype("Ejectment / Possession") == ListingType.LIS_PENDENS
+    assert lane_for_subtype("Ejectment / Possession") is None  # eviction: skipped
     assert lane_for_subtype("State Tax Lien") == ListingType.TAX_LIEN
     assert lane_for_subtype("Transcript of Judgment") == ListingType.LIS_PENDENS
     assert lane_for_subtype("Something Unknown") is None
@@ -141,7 +141,7 @@ def test_listing_type_per_lane():
     by_case = {li.case_number: li for li in parse_publicindex_html(MIXED_HTML)}
     assert by_case["2026-CP-42-01547"].listing_type == ListingType.LIS_PENDENS  # foreclosure
     assert by_case["2026-CP-04-00099"].listing_type == ListingType.LIS_PENDENS  # partition
-    assert by_case["2026-CP-39-00123"].listing_type == ListingType.LIS_PENDENS  # possession
+    assert "2026-CP-39-00123" not in by_case  # possession = eviction: skipped
     assert by_case["2026-CP-23-04567"].listing_type == ListingType.LIS_PENDENS  # judgment
 
 
@@ -185,7 +185,6 @@ def test_county_decoded_from_case_number():
     by_case = {li.case_number: li for li in parse_publicindex_html(MIXED_HTML)}
     assert by_case["2026-CP-42-01547"].county == "Spartanburg"
     assert by_case["2026-CP-04-00099"].county == "Anderson"
-    assert by_case["2026-CP-39-00123"].county == "Pickens"
     assert by_case["2026-CP-23-04567"].county == "Greenville"
 
 
@@ -339,3 +338,79 @@ def test_module_imports_no_fetcher():
         assert not re.search(rf"\b{re.escape(banned)}\b", src), (
             f"offline parser must not reference {banned!r}"
         )
+
+
+# --------------------------------------------------------------------------- #
+# Evictions are skipped (2026-10-07): they name the tenant, not the owner, and
+# distress_score has no eviction signal. Made-up names and case numbers.
+# --------------------------------------------------------------------------- #
+
+_EVICTION_HTML = """
+<html><body>
+<table id="ContentPlaceHolder1_SearchResults">
+  <tr>
+    <th>Name</th><th>Party Type</th><th>Case Number</th><th>Filed Date</th>
+    <th>Case Status</th><th>Disposition Date</th><th>Type</th><th>Subtype</th>
+    <th>Judgment #</th><th>Court Agency</th>
+  </tr>
+  <tr class="standardRow">
+    <td>Tenant Tina</td><td>Defendant</td>
+    <td title="SAMPLE RENTALS LLC VS Tenant Tina"><a>2026CP4200111</a></td>
+    <td>05/02/2026</td><td>Pending</td><td></td><td>Common Pleas</td><td>Possession 450</td>
+    <td></td><td>Common Pleas</td>
+  </tr>
+  <tr class="altRow">
+    <td>Renter Ron</td><td>Defendant</td>
+    <td title="SAMPLE APARTMENTS VS Renter Ron"><a>2026CV4210000222</a></td>
+    <td>05/03/2026</td><td>Pending</td><td></td><td>Ejectment</td><td>Summons &amp; Complaint</td>
+    <td></td><td>Spartanburg Magistrate</td>
+  </tr>
+  <tr class="standardRow">
+    <td>Occupant Olive</td><td>Plaintiff</td>
+    <td title="Occupant Olive VS Record Owner Otto"><a>2026CP4200333</a></td>
+    <td>05/04/2026</td><td>Pending</td><td></td><td>Common Pleas</td><td>Adverse Possession</td>
+    <td></td><td>Common Pleas</td>
+  </tr>
+  <tr class="altRow">
+    <td>Member Mia</td><td>Defendant</td>
+    <td title="SAMPLE HOA VS Member Mia"><a>2026CV4210000444</a></td>
+    <td>05/05/2026</td><td>Pending</td><td></td><td>Civil</td><td>Summons &amp; Complaint</td>
+    <td></td><td>Spartanburg Magistrate</td>
+  </tr>
+</table>
+</body></html>
+"""
+
+
+def test_is_eviction_subtype():
+    assert mod.is_eviction_subtype("Possession 450")
+    assert mod.is_eviction_subtype("Ejectment / Possession")
+    assert mod.is_eviction_subtype("Summons & Complaint", "Ejectment")
+    assert mod.is_eviction_subtype("Landlord/Tenant")
+    assert not mod.is_eviction_subtype("Adverse Possession")
+    assert not mod.is_eviction_subtype("Foreclosure 420", "Common Pleas")
+    assert not mod.is_eviction_subtype("Claim & Delivery 400")
+    assert not mod.is_eviction_subtype("", "")
+
+
+def test_evictions_skipped_adverse_possession_and_hoa_suit_kept():
+    by_case = {li.case_number: li
+               for li in parse_publicindex_html(_EVICTION_HTML, default_county="Spartanburg")}
+    assert sorted(by_case) == ["2026-CP-42-00333", "2026-CV-42-10000444"]
+    assert by_case["2026-CP-42-00333"].listing_type == ListingType.LIS_PENDENS
+    assert by_case["2026-CV-42-10000444"].listing_type == ListingType.LIS_PENDENS
+    assert all(li.listing_type != ListingType.LIS_PENDENS or
+               not mod.is_eviction_subtype(li.raw["sc_public_index"]["subtype"])
+               for li in by_case.values())
+
+
+def test_evictions_skipped_even_with_override_or_keep_all():
+    forced = parse_publicindex_html(_EVICTION_HTML, default_county="Spartanburg",
+                                    lane_override=ListingType.LIS_PENDENS)
+    kept = parse_publicindex_html(_EVICTION_HTML, default_county="Spartanburg",
+                                  keep_all_subtypes=True)
+    for rows in (forced, kept):
+        cases = {li.case_number for li in rows}
+        assert "2026-CP-42-00111" not in cases
+        assert "2026-CV-42-10000222" not in cases
+        assert len(rows) == 2

@@ -15,9 +15,12 @@ block, the reader records it and stops. It never solves or routes around one.
 **A technical barrier exists today on `publicindex.sccourts.org`. Nothing was
 built against it.** The automatic lanes for foreclosure, lis pendens,
 partition, quiet title, judgments and divorce from the Public Index were not
-built, and no scraper flag was changed. The hand-save lane
-([OWNER_MANUAL_LANES.md, "SC Judicial Public Index: hand-save
-fallback"](OWNER_MANUAL_LANES.md)) is the path for these case lists.
+built for the 45 counties it serves, and no scraper flag was changed. The
+hand-save lane ([OWNER_MANUAL_LANES.md](OWNER_MANUAL_LANES.md), Public Index
+card) is the path for those counties. Charleston's own copy of the Index has no
+barrier, and its existing reader now labels partition, quiet-title and judgment
+cases. Family Court divorce reaches all 46 counties with no barrier (sections
+below).
 
 ## The probe (2026-10-07, about 15:00 ET)
 
@@ -79,21 +82,88 @@ Forty-five of the 46 counties are served from `publicindex.sccourts.org/<County>
 and are behind the barrier. Charleston runs its own copy of the Index at
 `jcmsweb.charlestoncounty.org`, which answered normally (probe 4). Charleston is
 already read every run by `national.sc_public_index`'s Charleston path.
-Widening that path to partition, quiet title and judgments is possible
-without passing any barrier; Charleston is coastal, outside the core footprint,
-so it is the owner's call and was not done here.
+Distressed leads are statewide with no coastal exclusion (owner's rule), so that
+path now labels partition, quiet title and judgments too (next section).
+
+## Charleston case-type lanes (built 2026-10-07)
+
+Coordinator decision, same day: the five stealth paths stay exactly as they are
+(not touched, extended or copied); the open Charleston copy is extended with
+plain requests and the disclaimer click-through it already performs.
+
+- **What changed** (`scrapers/national/sc_public_index.py`, Charleston path
+  only): `_parse_charleston_results()` reads the SearchResults grid by column
+  header, including Type, Subtype, Judgment # and Court Agency, which the shared
+  six-column positional parser drops. Each Common Pleas case gets
+  `raw['sc_public_index']['lane']`: `foreclosure`, `partition`, `quiet_title`
+  (also adverse possession), `lis_pendens`, `judgment` (Transcript, Foreign,
+  Magistrate's, Confession of Judgment) or `other`, plus `subtype`, `case_type`,
+  `judgment_number`, `court_agency`, and plaintiff/defendant from the case
+  cell's caption, as the other court scrapers do.
+- **Judgments** become `judgment_lien` leads: source
+  `national.sc_public_index.judgment_lien`, listing type `distressed`, which the
+  scorer names `judgment_lien` (FINANCIAL 12, the NC docketed-judgment signal).
+  A transcribed judgment is a lien on the debtor's SC real property (S.C. Code
+  15-35-810). Every other lane stays `lis_pendens` under the old source, as
+  before.
+- **Dropped:** evictions (name the tenant), minors' settlements (name a minor),
+  sealed, protection-order and family matters. Previously every Charleston
+  Common Pleas case was kept.
+- **Dedupe:** one row per case, and the defendant's party row now wins (it was
+  the first party seen, often the plaintiff).
+- **Pacing:** 2 s now also after the landing GET and after the Accept POST, then
+  26 letter searches 2 s apart, one thread, about 28 requests a run.
+- **Unchanged:** the other 44 counties' rows (no lane keys; a test pins their
+  output). If Charleston's grid lacks a "Case Number" header, the parser falls
+  back to the old positional one and rows carry no lane.
+- **Wiring:** none. The rows pass `_in_scope` and `_active_only` as they are
+  (tested; `DATELESS_OK_SOURCES` matches the judgment sub-slug by prefix).
+- **Tests:** `tests/test_sc_public_index_charleston_lanes.py` (6, made-up
+  names and case numbers).
+- **Live proof: not run yet.** It POSTs the Charleston disclaimer's Accept
+  button. Accepting terms needs the owner's own yes in a direct message, not a
+  relay through another agent. Once he says yes, or if he runs it himself:
+  `uv run python scripts/charleston_lane_proof.py` (5 requests, 2 s apart,
+  prints counts per lane only). Until it runs, the Charleston grid's column
+  headers are an assumption taken from the state grid. If they differ, the
+  fallback keeps today's rows.
+- **Not changed, worth a decision:** the `other` lane (auto accidents,
+  contracts and the rest) is still typed `lis_pendens`, as it always was for
+  Charleston. With the lane now on each row, the scorer could stop counting
+  `other` as a property suit.
 
 ## Divorce is not in the Public Index
 
 SC divorce filings are Family Court records. They are not in the Public Index;
 they are in the Family Court portal `portal.fccms.sccourts.org`, a different
 system, read today by `enrichment_sc_divorce.py` (party-name searches against
-the portal's JSON API, `curl_cffi` with a Chrome fingerprint). Probe 5 shows
-no challenge on that portal's front page today. Open question for the owner:
-the attorney's clearance named the Public Index; the 2026-10-01 audit recorded
-that the Family Court portal has its own terms page against automated use.
-If the clearance also covers that portal (it is terms only), nothing further
-is needed for the divorce signal's access path.
+the portal's JSON API, `curl_cffi` with a Chrome fingerprint). The attorney's
+clearance covers its terms (coordinator, 2026-10-07).
+
+**What it covers today: 8 counties.** All 5,105 SC divorce rows on the board
+come from it: Spartanburg, Pickens, Greenville, Cherokee, Oconee, Laurens,
+Anderson, Union. The limit is our code, not the portal: `_COUNTY_CODE` in
+`enrichment_sc_divorce.py` maps only those 8 counties to portal location codes.
+
+**The other 38 counties are reachable with no barrier.** Bounded probe,
+2026-10-07, ordinary headers, 3 s apart, no person searched: GET `/` (200, the
+search application, no CAPTCHA, challenge, login or terms markers), then the two
+calls the search form makes when it loads: POST `/Home/GetAntiForgeryToken`
+(200, token) and POST `/apiurl/api/FEPublicAccessValidationCodes/Validationcode`
+with `{"codeType":"LOCATION"}` (200). The location list has all **46** counties,
+codeIDs 1005 to 1050 in alphabetical order: Abbeville 1005, Aiken 1006,
+Allendale 1007, Anderson 1008, Bamberg 1009, Barnwell 1010, Beaufort 1011,
+Berkeley 1012, Calhoun 1013, Charleston 1014, Cherokee 1015, Chester 1016,
+Chesterfield 1017, Clarendon 1018, Colleton 1019, Darlington 1020, Dillon 1021,
+Dorchester 1022, Edgefield 1023, Fairfield 1024, Florence 1025, Georgetown 1026,
+Greenville 1027, Greenwood 1028, Hampton 1029, Horry 1030, Jasper 1031,
+Kershaw 1032, Lancaster 1033, Laurens 1034, Lee 1035, Lexington 1036,
+Marion 1037, Marlboro 1038, McCormick 1039, Newberry 1040, Oconee 1041,
+Orangeburg 1042, Pickens 1043, Richland 1044, Saluda 1045, Spartanburg 1046,
+Sumter 1047, Union 1048, Williamsburg 1049, York 1050. The 8 codes in
+`_COUNTY_CODE` match this list. Extending divorce statewide means adding the
+other 38 entries there (an enricher change, not done here; per-run cap and
+pacing unchanged).
 
 ## Premise check: the "disabled" scrapers are already running
 
@@ -140,13 +210,10 @@ the build is straightforward, because the form and parser are already known:
   grid `table#ContentPlaceHolder1_SearchResults`, capped at 250 rows, so the
   window must shrink when it fills.
 - Parser: `ingest_sc_publicindex_export.py` already maps each Case Sub-Type to
-  a `ListingType` (lis pendens, foreclosure, partition, quiet title and
-  judgments to `lis_pendens`; tax liens to `tax_lien`) and keeps the sub-type
-  in `raw['sc_public_index']['subtype']`; a live reader would reuse it. One
-  thing to fix first: its lane list also takes "possession", "ejectment" and
-  "eviction" (meant to catch adverse possession), so a saved eviction grid
-  would load tenants as `lis_pendens` rows, while the owner card says to skip
-  evictions.
+  a `ListingType` (lis pendens, foreclosure, partition, quiet title, adverse
+  possession and judgments to `lis_pendens`; tax liens to `tax_lien`) and keeps
+  the sub-type in `raw['sc_public_index']['subtype']`; a live reader would
+  reuse it.
 - Shape: one county at a time, one request at a time, 2 s or more apart,
   per-run caps on pages and requests, resumable per-county
   last-filed-date state, skip Family Court, sealed and protection-order case
@@ -199,3 +266,15 @@ county's Public Index count can exceed its lis_pendens count.)
   (`national.sc_public_index` docstring). If the owner keeps the hand-save
   lane, the gap it would fill is largest in the 35 counties with no Index rows
   at all, and in partition, quiet-title and judgment lists everywhere.
+
+## Hand-save loader: evictions skipped (2026-10-07)
+
+`ingest_sc_publicindex_export.py` used to file "Possession", "Ejectment" and
+"Eviction" cases as `lis_pendens`, putting the tenant's name on the board.
+`distress_score.py` has no eviction signal (only the county-level LSC
+eviction-rate context), so these rows are now skipped by `is_eviction_subtype()`
+on the Subtype or Type cell, even under `lane_override` or `keep_all_subtypes`.
+"Adverse possession" (an occupant's title claim) still loads as `lis_pendens`.
+Magistrate civil rows with the generic "Summons & Complaint" sub-type (for
+example an HOA collection suit against the owner) still load. Tests:
+`tests/test_publicindex_export.py` (3 new, 2 updated).

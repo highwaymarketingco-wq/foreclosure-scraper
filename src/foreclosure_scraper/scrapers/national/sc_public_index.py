@@ -189,6 +189,140 @@ def _parse_search_results(html: str) -> list[dict[str, str]]:
     return results
 
 
+# --------------------------------------------------------------------------- #
+# Charleston case-type lanes (2026-10-07).
+#
+# Charleston County runs its own copy of the Index (jcmsweb.charlestoncounty.org),
+# which answers ordinary requests with no bot check; the attorney cleared the
+# court's terms (Rule 610) the same day. Its SearchResults grid carries Type,
+# Subtype, Judgment # and Court Agency columns past the six the shared positional
+# parser reads, so the Charleston path parses the grid by HEADER and labels each
+# Common Pleas case with a lane: foreclosure, partition, quiet title, lis pendens,
+# judgment, or other. Judgments (Transcript / Foreign / Magistrate's / Confession
+# of Judgment) are liens on the debtor's real property (S.C. Code 15-35-810) and
+# go out under JUDGMENT_LIEN_SOURCE so the scorer names them 'judgment_lien'
+# (distress_score._SOURCE_OVERRIDE), the same signal the NC docketed judgments
+# use. Evictions (they name the tenant) and minors' settlements (they name a
+# minor) are dropped. The other counties' path (_nodriver_search_county) and its
+# parser are untouched; their rows carry none of these keys and convert exactly
+# as before.
+# --------------------------------------------------------------------------- #
+JUDGMENT_LIEN_SOURCE = "national.sc_public_index.judgment_lien"
+
+_CHARLESTON_SKIP_RE = re.compile(
+    r"minor|sealed|protection order|restraining|domestic|juvenile|adoption", re.I)
+
+
+def charleston_lane(subtype: str, case_type: str = "") -> str | None:
+    """The lane of one Common Pleas case from its Subtype (and Type) text, or None
+    when the grid gave neither (no label: the row converts exactly as before)."""
+    s = f"{subtype or ''} {case_type or ''}".strip().lower()
+    if not s:
+        return None
+    if "quiet title" in s or "adverse possession" in s:
+        return "quiet_title"
+    if "partition" in s:
+        return "partition"
+    if "foreclosure" in s:
+        return "foreclosure"
+    if "lis pendens" in s:
+        return "lis_pendens"
+    if "judgment" in s:
+        return "judgment"
+    return "other"
+
+
+def charleston_skip(subtype: str, case_type: str = "") -> bool:
+    """True for a case that must not become a row: an eviction (names the tenant,
+    not the owner), a minor's settlement, or a sealed / protective / family matter."""
+    from ...ingest_sc_publicindex_export import is_eviction_subtype
+
+    if is_eviction_subtype(subtype, case_type):
+        return True
+    return bool(_CHARLESTON_SKIP_RE.search(f"{subtype or ''} {case_type or ''}"))
+
+
+_VS_RES = (re.compile(r"^\s*(.*?)\s+VS\.?\s+(.*?)\s*$", re.I),
+           re.compile(r"^\s*(.*?)\s+V\.?\s+(.*?)\s*$", re.I))
+_ROLE_TAIL_RE = re.compile(r",\s*(defendant|plaintiff)(\s*,\s*et\s*al\.?)?\s*$", re.I)
+
+
+def _parse_charleston_results(html: str) -> list[dict[str, str]]:
+    """Charleston's SearchResults grid, read by column HEADER, with the case-type
+    columns. Falls back to the shared positional parser when the grid or its
+    "Case Number" header is missing, so a layout change degrades to today's rows."""
+    tree = HTMLParser(html)
+    grid = tree.css_first("table#ContentPlaceHolder1_SearchResults")
+    headers = [th.text(strip=True).lower() for th in grid.css("th")] if grid else []
+
+    def col(*names: str, exact: bool = False) -> int | None:
+        for n in names:
+            for i, h in enumerate(headers):
+                if (h == n) if exact else (n in h):
+                    return i
+        return None
+
+    case_i = col("case number")
+    if grid is None or case_i is None:
+        return _parse_search_results(html)
+    name_i, role_i = col("name", exact=True), col("party type")
+    filed_i, status_i = col("filed date"), col("case status")
+    disp_i, type_i = col("disposition date"), col("type", exact=True)
+    sub_i, judg_i, agency_i = col("subtype", "sub-type", "sub type"), col("judgment #"), col("court agency")
+
+    def cell(cells, i) -> str:
+        return cells[i].text(strip=True) if i is not None and i < len(cells) else ""
+
+    out: list[dict[str, str]] = []
+    for row in grid.css("tr"):
+        cells = row.css("td")
+        if len(cells) <= case_i:
+            continue
+        case_number = cell(cells, case_i)
+        if not re.search(r"\d{4}CP\d+", case_number):
+            continue
+        subtype, case_type = cell(cells, sub_i), cell(cells, type_i)
+        if charleston_skip(subtype, case_type):
+            continue
+        rec = {
+            "name": cell(cells, name_i),
+            "role": cell(cells, role_i),
+            "case_number": case_number,
+            "date_filed": cell(cells, filed_i),
+            "status": cell(cells, status_i),
+            "date_disposed": cell(cells, disp_i),
+            "case_type": case_type,
+            "subtype": subtype,
+            "judgment_number": cell(cells, judg_i),
+            "court_agency": cell(cells, agency_i),
+            "lane": charleston_lane(subtype, case_type) or "",
+        }
+        title = cells[case_i].attributes.get("title") or ""
+        m = _VS_RES[0].match(title) or _VS_RES[1].match(title)
+        if m:
+            rec["plaintiff"] = m.group(1).strip()
+            rec["defendant"] = _ROLE_TAIL_RE.sub("", m.group(2)).strip()
+        out.append(rec)
+    return out
+
+
+def _dedupe_prefer_defendant(results: list[dict[str, str]]) -> list[dict[str, str]]:
+    """One record per case number, in first-seen order. The grid has one row per
+    party; the defendant's row wins (the owner, debtor or co-owner being sued)."""
+    by_case: dict[str, dict[str, str]] = {}
+    for r in results:
+        cn = r.get("case_number", "")
+        if not cn:
+            continue
+        cur = by_case.get(cn)
+        if cur is None:
+            by_case[cn] = r
+        elif ("defendant" not in (cur.get("role") or "").lower()
+              and "defendant" in (r.get("role") or "").lower()):
+            by_case[cn] = r
+    return list(by_case.values())
+
+
 def _get_hidden_fields(html: str) -> dict[str, str]:
     """Extract all ASP.NET hidden form fields from HTML."""
     tree = HTMLParser(html)
@@ -396,6 +530,7 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
         r1 = await asyncio.to_thread(session.get, base_url, impersonate="chrome", timeout=15)
         if r1.status_code != 200:
             return []
+        await asyncio.sleep(REQUEST_DELAY)
 
         hidden = _get_hidden_fields(r1.text)
         hidden["ctl00$ContentPlaceHolder1$ButtonAccept"] = "Accept"
@@ -410,6 +545,7 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
         search_hidden = _get_hidden_fields(r2.text)
         if not search_hidden:
             return []
+        await asyncio.sleep(REQUEST_DELAY)
 
         # Step 3: Search by last name prefix
         for prefix in SEARCH_PREFIXES:
@@ -425,7 +561,9 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
                 if r3.status_code != 200:
                     continue
 
-                page_results = _parse_search_results(r3.text)
+                # Header-aware Charleston parse (case-type lanes, 2026-10-07);
+                # falls back to _parse_search_results on an unknown layout.
+                page_results = _parse_charleston_results(r3.text)
                 results.extend(page_results)
                 search_hidden = _get_hidden_fields(r3.text)
                 await asyncio.sleep(REQUEST_DELAY)
@@ -436,15 +574,8 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
         log.error("sc_public_index.curl_error", county=county, error=str(exc)[:200])
         return []
 
-    # Deduplicate
-    seen = set()
-    deduped = []
-    for r in results:
-        cn = r.get("case_number", "")
-        if cn and cn not in seen:
-            seen.add(cn)
-            deduped.append(r)
-    return deduped
+    # One record per case; the defendant's party row wins (2026-10-07).
+    return _dedupe_prefer_defendant(results)
 
 
 class SCPublicIndexScraper(BaseScraper):
@@ -591,26 +722,35 @@ class SCPublicIndexScraper(BaseScraper):
             county_raw = case.get("_county")
             county = county_raw.strip().title() if county_raw else None
 
+            block = {
+                "name": name,
+                "role": role,
+                "case_number": case_num,
+                "date_filed": date_filed,
+                "status": status,
+                "date_disposed": date_disposed,
+                "court": "SC Common Pleas",
+                "source": "publicindex.sccourts.org",
+            }
+            # Charleston case-type lanes (2026-10-07, _parse_charleston_results):
+            # only a Charleston record carries these keys, so every other row
+            # converts exactly as before.
+            for k in ("case_type", "subtype", "judgment_number", "court_agency", "lane"):
+                if case.get(k):
+                    block[k] = case[k]
+            judgment = case.get("lane") == "judgment"
+
             li = Listing(
-                source=self.slug,
+                source=JUDGMENT_LIEN_SOURCE if judgment else self.slug,
                 source_url="https://publicindex.sccourts.org/",
-                listing_type=ListingType.LIS_PENDENS,
+                listing_type=ListingType.DISTRESSED if judgment else ListingType.LIS_PENDENS,
                 property_kind=PropertyKind.UNKNOWN,
                 state="SC",
                 county=county,
                 case_number=case_num,
-                raw={
-                    "sc_public_index": {
-                        "name": name,
-                        "role": role,
-                        "case_number": case_num,
-                        "date_filed": date_filed,
-                        "status": status,
-                        "date_disposed": date_disposed,
-                        "court": "SC Common Pleas",
-                        "source": "publicindex.sccourts.org",
-                    }
-                },
+                plaintiff=case.get("plaintiff") or None,
+                defendant=case.get("defendant") or None,
+                raw={"sc_public_index": block},
             )
             listings.append(li)
         return listings

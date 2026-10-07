@@ -240,7 +240,7 @@ For Common Pleas (`'CP  '`):
 |---|---|---|---|
 | `'420   '` | Foreclosure 420 | Pre-sale foreclosure complaint (lis pendens) | Captured by `sc_public_index_lis_pendens.py` (stealth) and `ingest_sc_publicindex_export.py` (manual) |
 | `'440   '` | Partition 440 | Partition action (co-owner forced sale) | Captured by manual parser (`lane_for_subtype`: "partition" -> LIS_PENDENS) |
-| `'450   '` | Eviction / Possession 450 | Summary ejectment | Captured by manual parser ("ejectment"/"possession"/"eviction" -> LIS_PENDENS) |
+| `'450   '` | Eviction / Possession 450 | Summary ejectment | Skipped since 2026-10-07 (names the tenant, not the owner; `is_eviction_subtype`). "Adverse possession" still -> LIS_PENDENS |
 | `'432   '` | State Tax Lien 432 | SC DOR tax lien on real property | Captured by manual parser ("state tax lien" -> TAX_LIEN). NOTE: blueprint says skip this lane (already have ~8,000 from SC DOR list). |
 | (other) | Lis Pendens | Recorded lis pendens notice | Captured by manual parser ("lis pendens" -> LIS_PENDENS) |
 | (other) | Judgment / Transcript of Judgment | Judgment lien on real property | Captured by manual parser ("judgment" -> LIS_PENDENS) |

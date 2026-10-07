@@ -21,9 +21,11 @@ We REUSE the SearchResults table-parsing logic from the live scraper — the
 selectors, the ``title="Plaintiff VS Defendant"`` extraction, the case-number
 normalization, and the ``§15-11-10`` county-from-case-number decode — but
 GENERALIZE it beyond Foreclosure-420: each row's Case Sub-Type text is mapped to
-the best-fit ``ListingType`` so partition / possession / tax-lien / judgment
+the best-fit ``ListingType`` so partition / quiet-title / tax-lien / judgment
 lanes all flow through the same parser. The exact sub-type string is always
-stashed in ``raw['sc_public_index']['subtype']`` so nothing is lost.
+stashed in ``raw['sc_public_index']['subtype']`` so nothing is lost. Eviction
+cases (Possession 450, ejectment) are skipped: they name the tenant, not the
+owner (2026-10-07).
 """
 from __future__ import annotations
 
@@ -119,12 +121,10 @@ _SUBTYPE_LANES: tuple[tuple[str, ListingType], ...] = (
     # State / county tax lien. Closest real member is TAX_LIEN.
     ("state tax lien", ListingType.TAX_LIEN),
     ("tax lien", ListingType.TAX_LIEN),
-    # Ejectment / eviction / possession (landlord-tenant, summary ejectment).
-    # No eviction enum member; these are still name-indexed distress/court
-    # signals, so the closest fit is LIS_PENDENS.
-    ("ejectment", ListingType.LIS_PENDENS),
-    ("possession", ListingType.LIS_PENDENS),
-    ("eviction", ListingType.LIS_PENDENS),
+    # Adverse possession is a title claim by the occupant (quiet-title shape),
+    # NOT an eviction: it keeps the lis pendens lane. Evictions (Possession 450,
+    # ejectment) are skipped outright, see is_eviction_subtype() below.
+    ("adverse possession", ListingType.LIS_PENDENS),
     # Money judgment / transcript of judgment — a lien-generating court result.
     # Closest real member is TAX_LIEN? No: a civil judgment is a general lien,
     # not a tax lien. There is no JUDGMENT member, so map to LIS_PENDENS (the
@@ -136,10 +136,24 @@ _SUBTYPE_LANES: tuple[tuple[str, ListingType], ...] = (
     # Scoped 2026-10-01 (adverse-possession research), implemented 2026-10-02:
     # before this entry a "Quiet Title" Case Sub-Type matched no lane and was
     # silently dropped (`continue` in parse_publicindex_html, keep_all_subtypes
-    # defaults False) rather than ingested. NB "adverse possession" needs no
-    # separate entry — it already matches the "possession" substring above.
+    # defaults False) rather than ingested.
     ("quiet title", ListingType.LIS_PENDENS),
 )
+
+# Evictions (Possession 450, summary ejectment, landlord-tenant) name the TENANT,
+# not the owner, and distress_score has no eviction signal: every such row would
+# put a wrong person on the board. 2026-10-07: they are skipped outright, whatever
+# lane_override or keep_all_subtypes says (they used to be filed as LIS_PENDENS).
+_EVICTION_RE = re.compile(r"\b(possession|ejectment|eviction|evict|landlord|tenant)\b", re.I)
+
+
+def is_eviction_subtype(*texts: str) -> bool:
+    """True when the Case Sub-Type (or Type) text is an eviction / possession case.
+    "Adverse possession" (an occupant's title claim) is not an eviction."""
+    s = " ".join(t for t in texts if t)
+    if not s or "adverse possession" in s.lower():
+        return False
+    return bool(_EVICTION_RE.search(s))
 
 # Sub-types we consider "known lanes" worth ingesting when the operator exported
 # a mixed grid. Anything not matching any lane substring is skipped (keeps the
@@ -234,6 +248,8 @@ def parse_publicindex_html(
     # that genuinely is labeled that way (this module's own synthetic test fixtures use it).
     judgment_i = col_idx("judgment amount")
     agency_i = col_idx("court agency", "agency")
+    # The bare "Type" column (exact header: "party type" and "subtype" also contain "type").
+    type_i = next((i for i, h in enumerate(headers) if h == "type"), None)
 
     seen: set[str] = set()
 
@@ -254,10 +270,22 @@ def parse_publicindex_html(
             else ""
         )
 
+        case_type = (
+            cells[type_i].text(strip=True)
+            if type_i is not None and type_i < len(cells)
+            else ""
+        )
+        # Evictions name the tenant, not the owner: never a row, whatever the
+        # override or keep-all flag says (see is_eviction_subtype).
+        if is_eviction_subtype(subtype, case_type):
+            continue
+
         # Map to a lane. Priority: caller-forced override (single-lane exports
-        # named by the operator, e.g. a "possession" file) > sub-type text >
-        # court-agency heuristic (magistrate rows are ejectment/eviction, whose
-        # sub-type is the generic "Summons & Complaint" and won't match a needle).
+        # named by the operator) > sub-type text > court-agency heuristic
+        # (magistrate civil rows whose sub-type is the generic "Summons &
+        # Complaint", e.g. an HOA collection suit against the owner, match no
+        # needle; a magistrate eviction carries an eviction sub-type or type and
+        # was already skipped above).
         lane = lane_override or lane_for_subtype(subtype)
         if lane is None and "magistrate" in agency:
             lane = ListingType.LIS_PENDENS  # summary-court ejectment (eviction)
