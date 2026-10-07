@@ -389,6 +389,10 @@ _OCR_HYPHEN = re.compile(r"([A-Za-z])-\s+([a-z])")
 _OCR_HYPHEN_MC = re.compile(r"\b(Ma?c|O')-\s+([A-Z])")
 
 
+#: Most characters of a notice's full text kept in raw['column']['text'].
+_TEXT_CAP = 8000
+
+
 def _norm(text: str) -> str:
     t = (text or "").replace("\xa0", " ")
     t = _WS.sub(" ", t).strip()
@@ -883,12 +887,61 @@ _PR_REJECT = re.compile(
 )
 
 
+# --------------------------------------------------------------------------- #
+# Personal representative's mailing address (owner decision 2026-10-07: when the
+# public notice prints it, it may be captured and published, like an owner mailing).
+# --------------------------------------------------------------------------- #
+_US_STATE = (r"(?:NC|SC|GA|VA|TN|FL|N\.\s?C\.|S\.\s?C\.|North Carolina|South Carolina|"
+             r"[A-Z]{2})")
+#: "<number> <street>[, unit], <city>, <ST> <zip>" or "P.O. Box <n>, <city>, <ST> <zip>".
+_MAIL_ADDR = re.compile(
+    r"((?:P\.?\s?O\.?\s*Box\s*\d+|\d{1,6}\s+[A-Za-z0-9.#'\- ]{2,60}?)"
+    r"[,\s]+(?:(?:Apt|Suite|Ste|Unit|#)\.?\s*[\w-]+[,\s]+)?"
+    r"[A-Za-z][A-Za-z .'\-]{1,30}?,?\s+" + _US_STATE + r"\s*,?\s*\d{5}(?:-\d{4})?)\b"
+)
+#: Between the PR's name and the address: the address is the attorney's, not the PR's.
+_VIA_COUNSEL = re.compile(r"\b(?:c/o|care of|attorney|law|pllc|p\.\s?a\.|llp|esq)\b", re.I)
+_PR_LABEL = re.compile(r"Personal\s+Representative\b", re.I)
+
+
+def _pr_mailing(text: str, pr_name: str | None, role: str | None = None) -> dict:
+    """The personal representative's mailing address printed in the notice, if any.
+
+    Read from the PR's own name (or the 'Personal Representative' label, or the role
+    word) forward, at most 300 characters: the court's address and the decedent's own
+    'late of' address sit BEFORE it and are never taken. When an attorney/firm/'c/o'
+    sits between the name and the address, the address is counsel's: kept apart as
+    pr_mailing_care_of. Returns {} when no address follows."""
+    t = _norm(text)
+    start = -1
+    if pr_name:
+        start = t.lower().find(pr_name.lower())
+    if start < 0:
+        m = _PR_LABEL.search(t)
+        if m:
+            start = m.start()
+    if start < 0 and role:
+        start = t.find(role)
+    if start < 0:
+        return {}
+    win = t[start:start + 300]
+    m = _MAIL_ADDR.search(win, len(pr_name or ""))
+    if not m:
+        return {}
+    addr = re.sub(r"^(?:Address\s*:\s*)", "", m.group(1).strip(" ,:"), flags=re.I)
+    between = win[len(pr_name or ""):m.start()]
+    key = "pr_mailing_care_of" if _VIA_COUNSEL.search(between) else "pr_mailing"
+    return {key: addr}
+
+
 def _parse_nc_estate(text: str) -> dict:
     """Extract decedent + NC file# + executor/PR from an NC creditor notice.
 
-    Address-less by design — owner_name = decedent drives the owner-to-GIS
-    backfill downstream. Any address in the body is the PR's mailing address,
-    NOT the decedent's property, so we deliberately do NOT parse it.
+    Address-less by design for the PROPERTY — owner_name = decedent drives the
+    owner-to-GIS backfill downstream. An address in the body is the PR's (or their
+    attorney's) mailing address, NOT the decedent's property, so it never becomes
+    street_address; since 2026-10-07 the PR's own printed address is kept as
+    raw['probate']['pr_mailing'] (see _pr_mailing; owner decision).
     """
     t = _norm(text)
     out: dict = {}
@@ -1319,6 +1372,17 @@ class ColumnLegalNotices(BaseScraper):
                 "publishedtimestamp": it.get("publishedtimestamp"),
             }
         }
+        # The full notice (2026-10-07 extraction audit): only an 800-character snippet was
+        # kept, which cut the personal representative's address, the attorney block and the
+        # sale terms off most notices (live median ~1,000-1,200 characters). Up to
+        # _TEXT_CAP characters are kept here; the phone payload (_SLIM_RAW) carries no
+        # `column` block at all, and `snippet` / Listing.description stay short.
+        full = _norm(it.get("text") or "")
+        if full:
+            raw["column"]["text"] = full[:_TEXT_CAP]
+            raw["column"]["text_len"] = len(full)
+            if len(full) > _TEXT_CAP:
+                raw["column"]["text_truncated"] = True
         nc = _notice_email(it.get("text") or "")
         if nc:
             raw["notice_contact"] = nc   # attributable attorney/trustee email
@@ -1439,6 +1503,7 @@ class ColumnLegalNotices(BaseScraper):
             probate["date_of_death"] = parsed["date_of_death_raw"]
         if parsed.get("personal_representative"):
             probate["personal_representative"] = parsed["personal_representative"]
+            probate.update(_pr_mailing(text, parsed["personal_representative"]))
         if probate:
             raw["probate"] = probate
 
@@ -1521,6 +1586,8 @@ class ColumnLegalNotices(BaseScraper):
             probate["personal_representative"] = parsed["personal_representative"]
         if parsed.get("pr_role"):
             probate["pr_role"] = parsed["pr_role"]
+        probate.update(_pr_mailing(text, parsed.get("personal_representative"),
+                                   parsed.get("pr_role")))
         if probate:
             raw["probate"] = probate
         src_url = it.get("pdfurl") or f"{API_URL}#{it.get('id') or ''}"
