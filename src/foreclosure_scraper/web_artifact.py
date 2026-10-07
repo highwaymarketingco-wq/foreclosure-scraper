@@ -2692,6 +2692,7 @@ RAW_KEEP = {
     "kinston_demolition": "*",   # counties_nc.kinston_proposed_demolition: list, tax year, condemned date
     "utility_cutoff": "*",       # ^ city-recorded power/sewer/gas cut-off on a condemned building
     "heir_property": "*",        # ^ city's HEIR_PROPERTY flag
+    "richland_parcel": "*",      # enrichment_richland_parcel: TMS, attempted date, opted_out, owner_agrees
 
 }
 
