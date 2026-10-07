@@ -309,7 +309,7 @@ Five changes, each committed locally (pathspec commits, nothing pushed, nothing 
 
 ### The weakest 10, re-measured
 
-| County | Rows | Parcel-id rows | Mail before | Mail after (measured) | What moves it next |
+| County | Rows | Parcel-id rows | Mail on parcel-id rows, before | After the join (measured) | What moves it next |
 |---|--:|--:|--:|--:|---|
 | Williamsburg SC | 2,476 | 2,252 | 0 | 0 | roll request (2,252 rows join by id the day it lands) |
 | Richland SC | 2,229 | 4 | 0 | 0 (about 1,500 projected) | wire `enrich_richland_parcel` into main.py |
@@ -318,8 +318,8 @@ Five changes, each committed locally (pathspec commits, nothing pushed, nothing 
 | Chesterfield SC | 1,011 | 725 | 0 | 0 | roll request |
 | Newberry SC | 977 | 530 | 0 | 0 | roll request (county layer service stopped) |
 | Edgefield SC | 921 | 750 | 0 | 0 | roll request |
-| Marlboro SC | 1,250 | 1,023 | 3 | 3 | roll request |
-| Beaufort SC | 1,695 | 25 | 3 | 28 by id (94 with the address resolver, section 3) | roll request merges with the layer |
+| Marlboro SC | 1,250 | 1,023 | 2 | 2 | roll request |
+| Beaufort SC | 1,695 | 25 | 0 | 25 by id (94 board-wide with the address resolver, section 3) | roll request merges with the layer |
 | Kershaw SC | 1,927 | 1,697 | 4 | 4 | roll request (its open layer has no owner) |
 
-Next tier: Jasper SC 5 -> 465 by id (built earlier today); Hyde NC 538 parcel-id rows, 34 cache hits, none with a new mailing (the roll's account/REID columns are the crosswalk); Washington NC 6 parcel-id rows. Year-built, bedroom and bathroom fills in these counties stay at 0 until a roll lands: none of them has a layer that publishes them.
+Next tier: Jasper SC 5 -> 465 on parcel-id rows (built earlier today); Hyde NC 538 parcel-id rows, 34 cache hits, all 34 already carrying a mailing (the roll's account/REID columns are the crosswalk); Washington NC 6 parcel-id rows. Year-built, bedroom and bathroom fills in these counties stay at 0 until a roll lands: none of them has a layer that publishes them.
