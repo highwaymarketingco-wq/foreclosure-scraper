@@ -11,7 +11,7 @@ Public repo: no owner names, phone numbers or private addresses appear here. Fie
 - By access class, new records: open 168, bot-check 28, absent 22, JS-app 16, public-records-request 10, login 4, terms-only 2, disclaimer-click 2, paid 1.
 - By category: code_enforcement 74, tax_sale 63, delinquent_tax 40, county_surplus 38, condemned_demolition_unsafe 33, building_permits 31, auction 12, vacant_registry 10, sheriff_or_mie_sale 8, str_registration 7, eviction 7, fire_incident 6, flood_storm_damage 4, municipal_tax_or_fee_lien 4, utility_shutoff 4, absentee_owner 2, other 2, land_bank 2, probate 1, usps_vacancy 1, hoa 1.
 
-Coverage grid (section 5): agol_none 978, none_found 663, not_checked 651, built 343, open 326, walled 258, absent 24 cells over 146 counties and 213 municipalities.
+Coverage grid (section 5): agol_none 978, none_found 663, not_checked 651, built 344, open 326, walled 257, absent 24 cells over 146 counties and 213 municipalities.
 
 How the search ran:
 - ArcGIS Online item search over the NC/SC extent for 45 distress terms (5,584 items, 949 inside NC/SC, 556 distress-titled), then ?f=json + returnCountOnly probes on 100 candidate layers
@@ -55,7 +55,7 @@ Value = net-new distressed rows the source would put on the board, weighted by h
 | Salisbury chronic abatement layer | Salisbury, Rowan, NC | login | ArcGIS Online item search (45 distress terms, NC/SC extent, 2026-10-07) then layer ?f=json + returnCountOnly; 499 Token Required | Request the chronic-abatement list from Salisbury code services (layer answers 499 Token Required). |
 | Iredell County delinquent taxes layer | Iredell, NC | absent | ArcGIS Online item search (45 distress terms, NC/SC extent, 2026-10-07) then layer ?f=json + returnCountOnly; old service answers HTTP 500 | Old host only: the live layer is maps.iredellcountync.gov/server/rest/services/Data/DelinquentTaxes/MapServer/0 (2,391 parcels, see its own record). |
 | Craven County foreclosure parcels layer | Craven, NC | absent | ArcGIS Online item search (45 distress terms, NC/SC extent, 2026-10-07) then layer ?f=json + returnCountOnly; 404 Service not found | Check the Craven tax office foreclosure page by hand. |
-| Dorchester County parcel layer (owner + mailing, open, licence clause) | Dorchester, SC | terms-only | 2026-10-07: FULL_TMS IN (17 target TMS) returnCountOnly = 17, all with MAILING_ADDRESS | Owner decision: the service licence says 'not to be added to any pay for use locations without prior written approval'; ask the Dorchester GIS Director for approval, then add the PARCEL_LAYERS entry … |
+| Dorchester County parcel layer (owner + mailing, open, licence clause) | Dorchester, SC | terms-only | 2026-10-07: FULL_TMS IN (17 target TMS) returnCountOnly = 17, all with MAILING_ADDRESS | Cleared by the owner's attorney and built 2026-10-07; the licence wording ('not to be added to any pay for use locations without prior written approval') is kept beside the config: written approval i… |
 | NERIS Public Incident Basics | national, US | terms-only | Item 241c7985c3b14da39ae67d2925a677e0 licenseInfo + neris.fsri.org/terms-of-use: 'agree not to ... systematically retrieve data ... through… | A person can look up structure fires per county in the NERIS Explorer (neris.fsri.org/public/incident-basics) in a browser, or ask FSRI for written permission/licence; the terms forbid automated retr… |
 | NC eCourts Smart Search: summary ejectment filings | statewide, NC | CAPTCHA |  | A person searches Smart Search by case type 'Summary Ejectment' and county in a browser and solves the image check. |
 | SC Public Index magistrate (summary court) cases | statewide, SC | terms-only |  | A person searches each county's Public Index by party name for a held lead (Rule 610 per-case use); bulk sweeps are barred by the terms. |
@@ -292,7 +292,7 @@ Statewide lanes applied to every county: NC eviction = O (NC Judgment Search sum
 | Colleton | B | B | - | B | A | N | - | n | n | W | n | B |
 | Darlington | B | A | - | - | O | O | - | O | n | W | n | B |
 | Dillon | B | B | - | B | - | - | - | n | n | W | n | - |
-| Dorchester | B | W | O | W | W | N | - | n | n | W | n | W |
+| Dorchester | B | W | O | W | W | N | - | n | n | W | n | B |
 | Edgefield | B | W | - | O | N | - | - | n | n | W | n | - |
 | Fairfield | B | B | A | - | N | - | - | n | n | W | n | - |
 | Florence | B | B | O | O | N | O | - | n | n | W | n | B |
@@ -553,7 +553,7 @@ big_old_unlock_targets.csv (249 property-tax rows, $7,000+ and 2+ years late, no
 |---|---|---|---|
 | Dorchester County parcel layer (owner + mailing, open, licence clause) | Dorchester SC | 17 | measured join (FULL_TMS) |
 
-None of the four new scrapers unlocks any of the 249 rows: none of the 249 sits in York, Nash, Edgecombe, Wake or Lenoir. The one source that measurably unlocks rows is the Dorchester parcel layer (all 17 Dorchester rows matched on FULL_TMS, all with a mailing address), held back since 2026-09-21 by its licence clause. Guilford's 34 rows carry no parcel id, so no layer can join them by parcel; Kershaw's open parcel layer has no owner field (15 rows stay locked).
+None of the four new scrapers unlocks any of the 249 rows: none of the 249 sits in York, Nash, Edgecombe, Wake or Lenoir. The Dorchester parcel layer unlocks all 17 Dorchester rows (FULL_TMS join, all with a mailing address); it was built later the same day (parcel_cache, owner decision on its licence clause; see docs/new_sources_2026-10-07_contact_and_facts.md section 11). Guilford's 34 rows carry no parcel id, so no layer can join them by parcel; Kershaw's 15 wait for the county roll (scripts/ingest_county_roll.py).
 
 ## 7. Every source
 
@@ -827,7 +827,7 @@ Short form; the JSON carries fields, cadence, evidence and notes for each row. `
 | Darlington County Delinquent Tax Collector page | Darlington, SC | tax_sale | absent |  | - | 0 | yes | subagent: SC counties (46) ta… |
 | City of Darlington vacant building registration program (no public roster) | Darlington, Darlington, SC | vacant_registry | public-records-request |  | - |  | yes | subagent: SC cities (66) + SC… |
 | Dillon County delinquent tax sale list (PAPER.xlsx) | Dillon, SC | tax_sale | open | 343 rows (2026-09-22 export, per module docstring); link ti… | counties_sc.dillon_delinquent_tax | 0 | no | subagent: SC counties (46) ta… |
-| Dorchester County parcel layer (owner + mailing, open, licence clause) | Dorchester, SC | absentee_owner | terms-only | 80,111 parcels | - | 1 | no | lead agent: ArcGIS Online sea… |
+| Dorchester County parcel layer (owner + mailing, open, licence clause) | Dorchester, SC | absentee_owner | terms-only | 80,311 parcels (cached 2026-10-07) | parcel_cache.PARCEL_LAYERS['Dorchester'] (bu… | 1 | no | lead agent: ArcGIS Online sea… |
 | Town of Summerville code cases (CitizenServe portal, installation 301) | Summerville, Dorchester, SC | code_enforcement | JS-app |  | - |  | yes | subagent: SC cities (66) + SC… |
 | Dorchester County Lands (county-owned parcels) | Dorchester, SC | county_surplus | open | 631 rows (2026-10-07) | - | 1 | yes | subagent: SC cities (66) + SC… |
 | Dorchester County delinquent tax 2025 (real property + mobile homes) ArcGIS | Dorchester, SC | delinquent_tax | open | RP_2025 584 rows; MH_2025 263 rows (2026-10-07) | - | 2 | yes | subagent: SC cities (66) + SC… |
