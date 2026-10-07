@@ -528,6 +528,13 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     """
     if not listings:
         return []
+    # Parcel-id aliases (parcel_alias.py, 2026-10-07): a row whose parcel_id is a county's SHORT
+    # id takes the PIN an alias source (Lincoln PARCELID, Rutherford Parcel_Number) published for
+    # the same property in this batch, so rows of other sources still meet it on the parcel.
+    from . import parcel_alias as _pa
+    _pa.apply(listings, _pa.build(listings))
+    if not listings:
+        return []
 
     overshared = overshared_parcels(listings)
     if overshared:

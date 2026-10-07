@@ -168,11 +168,12 @@ ROW_NEW = {**ROW_SPARSE, "PARCELID": "00777", "PIN": "1234567890",
            "SALEPRICE": 41000, "SDATE": "01/02/2020"}
 
 
-def test_parcel_identity_is_unchanged_and_the_pin_stays_in_raw():
-    """parcel_id stays PARCELID: board_persist restores prior rows' identity from it."""
+def test_parcel_id_is_the_ten_digit_pin_and_parcelid_stays_as_the_alias():
+    """Owner decision 2026-10-07: PIN is the identity; PARCELID (5-6 chars, nulled by
+    validation) stays in raw, where parcel_alias.py reads it to fold the old rows in."""
     li = _run_fetch([{"attributes": ROW_NEW}])[0]
-    assert li.parcel_id == "00777"
-    assert li.raw["lincoln_vacant"]["PIN"] == "1234567890"
+    assert li.parcel_id == "1234567890"
+    assert li.raw["lincoln_vacant"]["PARCELID"] == "00777"
 
 
 def test_new_layer_columns_are_requested_and_captured():

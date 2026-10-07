@@ -217,15 +217,13 @@ class LincolnVacant(BaseScraper):
                         street_address=situs,
                         state="NC",
                         county="Lincoln",
-                        # NOTE (2026-10-07 audit): PARCELID is 5-6 characters, so validation.py
-                        # nulls it and ~15.9k of 16.1k board rows publish with no parcel_id,
-                        # while PIN (the 10-digit NC PIN) sits in raw.lincoln_vacant. Switching
-                        # parcel_id to PIN is deliberately NOT done here: board_persist's
-                        # prior-row matching restores this row's identity from PARCELID
-                        # (_SOURCE_PARCEL_FIELDS) and refuses two different ids from one source,
-                        # so the switch would duplicate every row on the next merge. It needs a
-                        # coordinated identity migration (see docs/extraction_audit_2026-10-07.md).
-                        parcel_id=parcel or pin,
+                        # PIN first (owner decision 2026-10-07). PARCELID is 5-6 characters, so
+                        # validation.py nulled it and ~15.9k of 16.1k board rows published with
+                        # no parcel_id; PIN is the 10-digit NC PIN every other NC source keys on.
+                        # parcel_alias.py maps the old PARCELID rows onto it in the board merge
+                        # and dedupe (raw.lincoln_vacant.PARCELID is the alias), so the switch
+                        # does not publish any property twice.
+                        parcel_id=pin or parcel,
                         acreage=_f(a.get("ACRE")) or _f(a.get("MAPPEDACRE")),
                         zoning=_s(a.get("ZONING")),
                         living_sqft=_f(a.get("MAINAREASQFT")),

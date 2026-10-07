@@ -136,7 +136,7 @@ from typing import Optional
 
 import structlog
 
-from . import condo_units
+from . import condo_units, parcel_alias
 from .enrichment_pulled_sales import PULLED_RETENTION_WEEKS
 from .models import Listing
 from .row_keys import share_keys
@@ -407,6 +407,21 @@ def _restored_parcel_key(rec: dict) -> str | None:
     return key if isinstance(key, str) and key.startswith("parcel:") else None
 
 
+def _alias_fold_entry(rec: dict) -> list[str] | None:
+    """The drop_folded_prior() entry for a prior row matched under a parcel alias, computed from
+    the row AS PUBLISHED: its own dedupe key when it carried a parcel id, else (a nulled short id,
+    whose own key is the roll's shared URL) the restored-key entry."""
+    src = str(rec.get("source") or "")
+    if rec.get("parcel_id"):
+        try:
+            key = next((s[1] for s in _append_dict_sigs(rec) if s[0] == "k"), None)
+        except Exception:  # noqa: BLE001
+            key = None
+        return [key, src] if key else None
+    rk = _restored_parcel_key(rec)
+    return [rk, src, "restored"] if rk else None
+
+
 def _shares_source(rec: dict, li: Listing) -> bool:
     raw = rec.get("raw")
     return bool(sources_of(rec.get("source"), raw) & sources_of(li.source, li.raw))
@@ -522,6 +537,8 @@ def merge_prior_board(
         "placeholder_twin_ambiguous": 0,
         "refused_different_parcel": 0,
         "matched_restored_parcel": 0,
+        "matched_parcel_alias": 0,
+        "prior_parcel_aliased": 0,
         "matched_condo_unit": 0,
         "condo_unit_unmatched": 0,
         "reappeared_untagged": 0,
@@ -632,11 +649,30 @@ def merge_prior_board(
             return
         stats["prior_only_kept"] += 1
 
+    # Parcel-id aliases (parcel_alias.py, 2026-10-07): a prior row published under a county's
+    # SHORT id is matched under the PIN the fresh scrape now publishes for the same property (or,
+    # when the fresh scrape fell back to the short id, a prior PIN row under that short id).
+    alias_table = parcel_alias.build(fresh_deduped)
+    alias_short = parcel_alias.fresh_short_keys(fresh_deduped)
+
     for rec in _iter_board_records(docs):
         prior_total += 1
         match_idx: int | None = None
         rec_sigs = ()
         refused_parcel = False
+        alias_fold = None
+        if isinstance(rec, dict) and (alias_table or alias_short):
+            canon, how = parcel_alias.canonical_prior(rec, alias_table, alias_short,
+                                                      _nulled_parcel_id(rec))
+            if how:
+                # Recorded whether or not the row then matches: it is kept, aged or dropped from
+                # here on UNDER THE NEW ID, so its old key must never come back through the
+                # GRANDFATHER snapshot (that would publish the property twice).
+                alias_fold = _alias_fold_entry(rec)
+                rec = canon
+                if alias_fold:
+                    restored_folds.append(alias_fold)
+                stats["prior_parcel_aliased"] += 1
         if isinstance(rec, dict) and fresh_sig_index:
             try:
                 rec_sigs = _append_dict_sigs(rec)
@@ -675,6 +711,8 @@ def merge_prior_board(
                     match_idx = same[0]
                     stats["matched_restored_parcel"] += 1
                     restored_folds.append([rk, str(rec.get("source") or ""), "restored"])
+            if match_idx is not None and alias_fold:
+                stats["matched_parcel_alias"] += 1
 
         # A published row keyed by a condominium building's bare pin while the fresh scrape lists
         # that building by its units' own pinnums (condo_units.py): which unit is the same lead is

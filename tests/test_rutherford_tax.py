@@ -171,3 +171,84 @@ def test_money_helper():
     assert m._money("0") is None
     assert m._money("") is None
     assert m._money(None) is None
+
+
+# --- owner decision 2026-10-07: the 10-digit PIN from the county parcel layer is parcel_id;
+# the roll's Parcel_Number stays in raw (parcel_alias.py's alias). Made-up ids. ---
+
+import asyncio as _asyncio
+
+from foreclosure_scraper.models import Listing as _Listing, ListingType as _LT
+from foreclosure_scraper.scrapers.counties_nc import rutherford_tax as _rt
+
+
+class _PinResp:
+    status_code = 200
+
+    def __init__(self, body):
+        self._b = body
+
+    def json(self):
+        return self._b
+
+
+class _PinHttp:
+    def __init__(self, pages):
+        self.pages = pages
+        self.calls = []
+
+    async def get(self, url, params=None, timeout=None):
+        self.calls.append(dict(params))
+        i = len(self.calls) - 1
+        return _PinResp(self.pages[i] if i < len(self.pages) else {"features": []})
+
+
+def _f(num, pin):
+    return {"attributes": {"Parcel_Number": num, "PIN": pin}}
+
+
+def test_pin_map_pages_politely_and_keeps_only_ten_digit_pins(monkeypatch):
+    sleeps = []
+
+    async def fake_sleep(s):
+        sleeps.append(s)
+    monkeypatch.setattr(_rt.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(_rt, "_PIN_PAGE", 2)
+    http = _PinHttp([{"features": [_f("123456", "1600000001"), _f("1234567", "160-000-0002")],
+                      "exceededTransferLimit": True},
+                     {"features": [_f("7654321", "BAD")]}])
+    m = _asyncio.run(_rt._pin_map(http))
+    assert m == {"123456": "1600000001", "1234567": "1600000002"}
+    assert [c["resultOffset"] for c in http.calls] == ["0", "2"]
+    assert sleeps == [_rt._PIN_PAGE_PAUSE_S] and _rt._PIN_PAGE_PAUSE_S >= 1.6
+
+
+def test_apply_pins_switches_parcel_id_and_keeps_the_roll_id():
+    li = _Listing(source="counties_nc.rutherford_tax", source_url="u", listing_type=_LT.TAX_LIEN,
+                  state="NC", county="Rutherford", parcel_id="123456",
+                  raw={"rutherford_tax": {"parcel": "123456"}})
+    other = _Listing(source="counties_nc.rutherford_tax", source_url="u", listing_type=_LT.TAX_LIEN,
+                     state="NC", county="Rutherford", parcel_id="999999",
+                     raw={"rutherford_tax": {"parcel": "999999"}})
+    assert _rt.apply_pins([li, other], {"123456": "1600000001"}) == 1
+    assert li.parcel_id == "1600000001" and li.raw["rutherford_tax"]["parcel"] == "123456"
+    assert li.raw["rutherford_tax"]["pin"] == "1600000001"
+    assert other.parcel_id == "999999"            # no PIN: keeps the roll id (alias still works)
+
+
+def test_a_failed_pin_map_read_returns_what_it_has():
+    class _Boom:
+        async def get(self, *a, **k):
+            raise RuntimeError("down")
+    assert _asyncio.run(_rt._pin_map(_Boom())) == {}
+
+
+def test_a_pin_shared_by_two_roll_parcels_is_not_applied():
+    a = _Listing(source="counties_nc.rutherford_tax", source_url="u", listing_type=_LT.TAX_LIEN,
+                 state="NC", county="Rutherford", parcel_id="111111",
+                 raw={"rutherford_tax": {"parcel": "111111"}})
+    b = _Listing(source="counties_nc.rutherford_tax", source_url="u", listing_type=_LT.TAX_LIEN,
+                 state="NC", county="Rutherford", parcel_id="222222",
+                 raw={"rutherford_tax": {"parcel": "222222"}})
+    assert _rt.apply_pins([a, b], {"111111": "1600000009", "222222": "1600000009"}) == 0
+    assert (a.parcel_id, b.parcel_id) == ("111111", "222222")

@@ -93,8 +93,10 @@ from xml.etree.ElementTree import iterparse
 import structlog
 from selectolax.parser import HTMLParser
 
+import asyncio
+
 from ...base_scraper import BaseScraper
-from ...http_client import get_bytes, get_text
+from ...http_client import client, get_bytes, get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -412,6 +414,75 @@ def _discover_xlsx_url(html: str, page_url: str = PAGE_URL) -> str:
     return _encode_spaces(urljoin(base, best))
 
 
+#: The county parcel layer: Parcel_Number (the roll's 6-7 digit id) -> PIN (the 10-digit NC PIN).
+PARCEL_LAYER = ("https://gis.rutherfordcountync.gov/server/rest/services/"
+                "MapMetricsServiceRutherford/MapServer/7/query")
+_PIN_PAGE = 2000          # the layer's maxRecordCount
+_PIN_PAGE_PAUSE_S = 1.6   # polite: one page at a time, at least 1.6 s apart
+_PIN_RE = re.compile(r"^\d{10}$")
+
+
+async def _pin_map(http) -> dict[str, str]:
+    """{Parcel_Number: PIN} for the whole county (about 58k parcels, ~29 pages of two columns).
+
+    Owner decision 2026-10-07: the roll's Parcel_Number is 6-7 digits and validation.py nulls the
+    2,600 six-digit ones as too short, so those rows published with no parcel at all; every other
+    NC source keys on the PIN. A failed or partial read returns what it has: a parcel without a
+    PIN keeps its Parcel_Number (parcel_alias.py matches either way)."""
+    out: dict[str, str] = {}
+    offset = 0
+    while True:
+        if offset:
+            await asyncio.sleep(_PIN_PAGE_PAUSE_S)
+        try:
+            r = await http.get(PARCEL_LAYER, params={
+                "where": "1=1", "outFields": "Parcel_Number,PIN", "returnGeometry": "false",
+                "orderByFields": "OBJECTID", "resultOffset": str(offset),
+                "resultRecordCount": str(_PIN_PAGE), "f": "json"}, timeout=60.0)
+            body = r.json() if r.status_code == 200 else {}
+        except Exception as exc:  # noqa: BLE001
+            log.warning("rutherford_tax.pin_map_failed", offset=offset, error=str(exc)[:160])
+            break
+        if not isinstance(body, dict) or body.get("error"):
+            log.warning("rutherford_tax.pin_map_error", offset=offset,
+                        error=str((body or {}).get("error"))[:160])
+            break
+        feats = body.get("features") or []
+        for f in feats:
+            a = f.get("attributes") or {}
+            num = str(a.get("Parcel_Number") or "").strip()
+            pin = re.sub(r"\D", "", str(a.get("PIN") or ""))
+            if num and _PIN_RE.match(pin):
+                out.setdefault(num, pin)
+        offset += len(feats)
+        if not feats or (len(feats) < _PIN_PAGE and not body.get("exceededTransferLimit")):
+            break
+    log.info("rutherford_tax.pin_map", parcels=len(out))
+    return out
+
+
+def apply_pins(rows: list[Listing], pins: dict[str, str]) -> int:
+    """parcel_id := the 10-digit PIN where the county layer has one; the roll's own Parcel_Number
+    stays in raw['rutherford_tax']['parcel'] (the alias parcel_alias.py matches on)."""
+    def roll_id(li):
+        return str(((li.raw or {}).get("rutherford_tax") or {}).get("parcel") or li.parcel_id or "").strip()
+
+    # A PIN the county gives to more than one Parcel_Number of THIS roll (a split account, a
+    # mobile home on the same land: 8 of 9,328 on 2026-10-07) is not one property's id here;
+    # those rows keep their own Parcel_Number rather than collapse into one lead.
+    shared = {p for p, c in __import__("collections").Counter(
+        pins.get(roll_id(li)) for li in rows).items() if p and c > 1}
+    n = 0
+    for li in rows:
+        blk = (li.raw or {}).get("rutherford_tax") or {}
+        pin = pins.get(roll_id(li))
+        if pin and pin not in shared:
+            blk["pin"] = pin
+            li.parcel_id = pin
+            n += 1
+    return n
+
+
 class RutherfordDelinquentTax(BaseScraper):
     slug = SLUG
     name = "Rutherford NC delinquent tax roll (county TR-452 .xlsx)"
@@ -420,7 +491,7 @@ class RutherfordDelinquentTax(BaseScraper):
     #: county swapped/pulled the file or the sheet layout moved.
     expected_min_count = 100
     requires_apify = False
-    timeout_s = 120.0
+    timeout_s = 300.0   # 120 -> 300 (2026-10-07): + the county PIN map (~29 polite pages)
 
     async def fetch(self) -> Iterable[Listing]:
         xlsx_url = _FALLBACK_XLSX
@@ -448,7 +519,14 @@ class RutherfordDelinquentTax(BaseScraper):
             log.warning("rutherford_tax.parse_failed", error=str(exc)[:160])
             return []
 
+        try:
+            async with client(timeout=60.0) as http:
+                pinned = apply_pins(out, await _pin_map(http))
+        except Exception as exc:  # noqa: BLE001 - rows keep their Parcel_Number
+            pinned = 0
+            log.warning("rutherford_tax.pin_apply_failed", error=str(exc)[:160])
+
         total = round(sum(li.judgment_amount or 0.0 for li in out), 2)
-        log.info("rutherford_tax.done", count=len(out),
+        log.info("rutherford_tax.done", count=len(out), pinned=pinned,
                  total_owed=total, url=xlsx_url)
         return out
