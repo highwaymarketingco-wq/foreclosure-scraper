@@ -124,3 +124,53 @@ def test_sparse_row_does_not_fabricate_optional_fields():
     assert "gis" not in li.raw
     assert li.raw["gaston_gis"]["deed_book"] is None
     assert li.raw["gaston_gis"]["owner_mailing"]["name2"] is None
+
+
+# --- 2026-10-07 extraction audit: five more layer columns, and the standard top-level
+# owner_mailing block (mailing_shape.mailing_of reads only raw['owner_mailing']). ---
+
+ROW_NEW = {**ROW_FULL, "PIN": "3546-11-1111",
+           "CURR_ADDR1": "9 SAMPLE RD", "CURR_ADDR2": "", "CURR_CITY": "SAMPLETOWN",
+           "CURR_STATE": "SC", "CURR_ZIPCODE": "29000",
+           "DEEDQUAL_CODEDESC": "UNQUALIFIED", "EXEMPT_COD": "EX1",
+           "PRVYRNAME1": "EXAMPLE PAT", "PRVYRNAME2": "", "FLOODAREA": "Y"}
+
+
+def test_new_layer_columns_are_requested():
+    for col in ("DEEDQUAL_CODEDESC", "EXEMPT_COD", "PRVYRNAME1", "PRVYRNAME2", "FLOODAREA"):
+        assert col in m._OUT.split(","), col
+
+
+def test_new_columns_land_in_the_raw_block():
+    li = _run_fetch([{"attributes": ROW_NEW}])[0]
+    g = li.raw["gaston_gis"]
+    assert g["deed_qualification"] == "UNQUALIFIED"
+    assert g["exempt_code"] == "EX1"
+    assert g["prior_year_owner"] == "EXAMPLE PAT" and g["prior_year_owner2"] is None
+    assert g["flood_area"] == "Y"
+    assert li.raw["gis"]["last_sale"]["qualification"] == "UNQUALIFIED"
+
+
+def test_standard_owner_mailing_block_is_written_for_the_scorer():
+    from foreclosure_scraper.mailing_shape import mailing_of
+    li = _run_fetch([{"attributes": ROW_NEW}])[0]
+    om = mailing_of(li)
+    assert om["mailing"] == "9 SAMPLE RD, SAMPLETOWN SC 29000"
+    assert om["mail_state"] == "SC" and om["out_of_state"] is True
+    assert om["absentee"] is True
+    assert om["parcel_id"] == "3546-11-1111" and om["source"] == "gaston_county_gis"
+    assert om["owner"] == "DOE JOHN & DOE JANE"
+
+
+def test_owner_occupied_parcel_is_not_absentee():
+    row = {**ROW_NEW, "CURR_ADDR1": "123 MAIN ST", "CURR_CITY": "GASTONIA",
+           "CURR_STATE": "NC", "CURR_ZIPCODE": "28052"}
+    om = _run_fetch([{"attributes": row}])[0].raw["owner_mailing"]
+    assert om["absentee"] is False and om["out_of_state"] is False
+
+
+def test_no_mailing_columns_means_no_owner_mailing_block():
+    row = {**ROW_NEW, "CURR_ADDR1": "", "CURR_ADDR2": "", "CURR_CITY": "",
+           "CURR_STATE": "", "CURR_ZIPCODE": ""}
+    li = _run_fetch([{"attributes": row}])[0]
+    assert "owner_mailing" not in li.raw

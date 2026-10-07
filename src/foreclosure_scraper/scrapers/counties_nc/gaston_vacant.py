@@ -46,6 +46,7 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 from ...base_scraper import BaseScraper
+from ...enrichment_owner_mailing import _is_absentee
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
@@ -60,7 +61,12 @@ _OUT = (
     "CURR_STATE,CURR_ZIPCODE,"
     "Latitude,Longitude,FMV_TOTAL,FMV_LAND,FMV_IMPRV,TOTVAL,"
     "SALEDATE,SALESAMT,SQFT,YEARBLT,property_use,DESC1_DESC,VacantImpro,CALCAC,DEEDAC,"
-    "ImagePath,LEGDESC_1,DEED_BOOK,DEED_PAGE,DEEDTYPE"
+    "ImagePath,LEGDESC_1,DEED_BOOK,DEED_PAGE,DEEDTYPE,"
+    # 2026-10-07 extraction audit: on the layer, never requested. DEEDQUAL_CODEDESC says
+    # whether the last sale was a qualified (arm's-length) one, so SALESAMT can be read as
+    # a price or not; EXEMPT_COD marks exempt (government/church) parcels; PRVYRNAME1/2 is
+    # the prior year's owner (a recent transfer shows as a change); FLOODAREA the flood flag.
+    "DEEDQUAL_CODEDESC,EXEMPT_COD,PRVYRNAME1,PRVYRNAME2,FLOODAREA"
 )
 _PAGE = 2000
 # The county's GIS ImagePath is an internal UNC share path
@@ -110,6 +116,25 @@ def _s(v) -> str | None:
         return None
     s = str(v).strip()
     return s or None
+
+
+def _owner_mailing_block(a: dict, situs: str | None, parcel: str | None) -> dict | None:
+    """raw['owner_mailing'] in the pipeline's standard shape, from the CURR_* columns."""
+    addr = ", ".join(x for x in (_s(a.get("CURR_ADDR1")), _s(a.get("CURR_ADDR2"))) if x)
+    city, st, z = _s(a.get("CURR_CITY")), _s(a.get("CURR_STATE")), _s(a.get("CURR_ZIPCODE"))
+    tail = " ".join(x for x in (city, st, z) if x)
+    mailing = ", ".join(x for x in (addr, tail) if x) or None
+    if not mailing:
+        return None
+    mail_state = (st or "").upper() or None
+    owner = " & ".join(x for x in (_s(a.get("CURR_NAME1")), _s(a.get("CURR_NAME2"))) if x) or None
+    return {
+        "owner": owner, "mailing": mailing, "situs": situs, "parcel_id": parcel,
+        "mail_state": mail_state,
+        "absentee": _is_absentee(situs, mailing),
+        "out_of_state": bool(mail_state and mail_state != "NC"),
+        "source": "gaston_county_gis",
+    }
 
 
 def _epoch_ms_to_dt(v) -> datetime | None:
@@ -201,6 +226,11 @@ class GastonVacant(BaseScraper):
                         "deed_book": _s(a.get("DEED_BOOK")),
                         "deed_page": _s(a.get("DEED_PAGE")),
                         "deed_type": _s(a.get("DEEDTYPE")),
+                        "deed_qualification": _s(a.get("DEEDQUAL_CODEDESC")),
+                        "exempt_code": _s(a.get("EXEMPT_COD")),
+                        "prior_year_owner": _s(a.get("PRVYRNAME1")),
+                        "prior_year_owner2": _s(a.get("PRVYRNAME2")),
+                        "flood_area": _s(a.get("FLOODAREA")),
                         "legal_description": legal_desc,
                         "owner_mailing": {
                             "name": _s(a.get("CURR_NAME1")),
@@ -220,6 +250,19 @@ class GastonVacant(BaseScraper):
                             "amount": last_sale_amt,
                             "source": "gaston_gis",
                         }}
+                        # the county's own sale-qualification code for this sale
+                        if _s(a.get("DEEDQUAL_CODEDESC")):
+                            raw_payload["gis"]["last_sale"]["qualification"] = _s(
+                                a.get("DEEDQUAL_CODEDESC"))
+                    # The standard top-level owner_mailing block. The CURR_* mailing above
+                    # lived only inside raw.gaston_gis, and mailing_shape.mailing_of (the
+                    # scorer, skip-trace, mail merge) reads raw['owner_mailing'] only, so the
+                    # ~2/3 of rows the owner-mailing enricher never reached carried no
+                    # absentee/out-of-state signal at all. Same shape and helper as
+                    # henderson_foreclosure_parcels; the enricher skips a row that has it.
+                    om = _owner_mailing_block(a, situs, pin or pid)
+                    if om:
+                        raw_payload["owner_mailing"] = om
                     if photo_url:
                         raw_payload["images"] = {"real": [photo_url]}
                     out.append(Listing(
