@@ -329,3 +329,54 @@ def test_every_layer_has_a_distinct_process_tag():
     surplus parcel and a delinquent owner are three different workflows."""
     for lay in M.LAYERS:
         assert lay.process, f"{lay.slug} has no process tag"
+
+
+# --- 2026-10-07 extraction audit. Values below are made up. ---
+
+def _layer(slug):
+    return next(lay for lay in M.LAYERS if lay.slug == slug)
+
+
+def test_greenville_requests_sale_deed_value_and_building_columns():
+    f = set(_layer("greenville_unpaid_tax_parcels").fields)
+    for col in ("SLPRICE", "DEEDDATE", "CUBOOK", "CUPAGE", "FAIRMKTVAL", "LANDVAL",
+                "BLDGVAL", "SQFEET", "BEDROOMS", "BATHRMS", "POWNNM", "GIS_ACRES"):
+        assert col in f, col
+
+
+def test_greenville_new_columns_land_in_the_raw_block():
+    li = M._to_listing({"PIN": "0000000000002", "OWNAM1": "SAMPLE OWNER", "STRNUM": "5",
+                        "LOCATE": "TEST", "STRTYP": "RD", "TAXMKTVAL": 1000, "TOTTAX": 10.0,
+                        "SLPRICE": 90000, "DEEDDATE": 1577836800000, "CUBOOK": "1234",
+                        "CUPAGE": 56, "FAIRMKTVAL": 120000, "SQFEET": 1400, "BEDROOMS": 3,
+                        "POWNNM": "EXAMPLE PAT", "GIS_ACRES": 0.3},
+                       _layer("greenville_unpaid_tax_parcels"))
+    b = li.raw["arcgis_distress"]
+    assert b["SLPRICE"] == 90000 and b["CUBOOK"] == "1234" and b["CUPAGE"] == 56
+    assert b["FAIRMKTVAL"] == 120000 and b["SQFEET"] == 1400 and b["BEDROOMS"] == 3
+    assert b["POWNNM"] == "EXAMPLE PAT" and b["GIS_ACRES"] == 0.3
+
+
+def test_new_hanover_uses_its_own_coordinates_and_keeps_the_permit_description():
+    lay = _layer("new_hanover_demolition_permits")
+    li = M._to_listing({"PERMIT_NUMBER": "P-1", "WORK_CLASS": "Demolition",
+                        "PERMIT_STATUS": "Issued", "NUMBER": "1", "STREET": "TEST",
+                        "TYPE": "ST", "PID": "R00000-000-000-000", "DESCRIPTION": "Demo house",
+                        "ISSUE_DATE": 1704067200000, "Lat": 34.2, "Lon": -77.9}, lay)
+    assert (li.latitude, li.longitude) == (34.2, -77.9)
+    assert li.raw["arcgis_distress"]["DESCRIPTION"] == "Demo house"
+    assert li.raw["arcgis_distress"]["ISSUE_DATE"] == 1704067200000
+
+
+def test_zero_or_missing_own_coordinates_are_not_used():
+    lay = _layer("new_hanover_demolition_permits")
+    base = {"NUMBER": "1", "STREET": "TEST", "TYPE": "ST", "PID": "R00000-000-000-001"}
+    assert M._to_listing({**base, "Lat": 0, "Lon": 0}, lay).latitude is None
+    assert M._to_listing(base, lay).latitude is None
+
+
+def test_an_ssn_like_column_never_reaches_the_raw_block():
+    li = M._to_listing({"PIN": "0000000000003", "OWNAM1": "SAMPLE", "STRNUM": "1",
+                        "LOCATE": "TEST", "TCSSN1": "000-00-0000"},
+                       _layer("greenville_unpaid_tax_parcels"))
+    assert "TCSSN1" not in li.raw["arcgis_distress"]

@@ -59,6 +59,7 @@ from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...layer_guard import LayerHarvest
 from ...models import Listing, ListingType, PropertyKind
+from ...sensitive_fields import drop_sensitive
 
 log = structlog.get_logger()
 
@@ -96,6 +97,12 @@ class Layer(NamedTuple):
     #: -- see multi_year_delinquent_tax.py, which reads this exact Buncombe schema
     #: the same way. Absentee-owner signal, never the property's own address.
     mailing_parts: tuple[str, ...] = ()
+    #: The layer's OWN coordinate columns (WGS84 degrees), when it publishes them as
+    #: attributes. Used directly as Listing.latitude/longitude instead of leaving the row
+    #: to the address geocoder (2026-10-07 extraction audit: New Hanover's permits layer
+    #: carries Lat/Lon on 92% of rows and they were never requested).
+    lat_field: Optional[str] = None
+    lon_field: Optional[str] = None
     #: Field holding the mailing address's state abbreviation, for absentee /
     #: out-of-state detection (mail_state != the layer's own `state`).
     mail_state: Optional[str] = None
@@ -338,9 +345,15 @@ LAYERS: tuple[Layer, ...] = (
              "BuildingPermits/FeatureServer/0"),
         listing_type=ListingType.DISTRESSED,
         fields=("PERMIT_NUMBER", "WORK_CLASS", "PERMIT_STATUS", "APPLICATION_DATE",
-                "NUMBER", "DIR", "STREET", "TYPE", "CITY", "ZIPCODE", "PID"),
+                "NUMBER", "DIR", "STREET", "TYPE", "CITY", "ZIPCODE", "PID",
+                # 2026-10-07 extraction audit: the permit's own description (99%), its
+                # type, issue/final/expiration/last-inspection dates, unit, zoning and
+                # the layer's own Lat/Lon (92%) were never requested.
+                "DESCRIPTION", "PERMIT_TYPE", "ISSUE_DATE", "FINALED_DATE",
+                "EXPIRATION_DATE", "LAST_INSPECTION_DATE", "UNIT", "MAIN_ZONE",
+                "Lat", "Lon"),
         where="WORK_CLASS LIKE '%Demolition%'",
-        parcel="PID",
+        parcel="PID", lat_field="Lat", lon_field="Lon",
         situs_parts=("NUMBER", "DIR", "STREET", "TYPE"),
         city="CITY", zip_="ZIPCODE",
         detail="PERMIT_STATUS", process="demolition_permit",
@@ -454,9 +467,21 @@ LAYERS: tuple[Layer, ...] = (
         listing_type=ListingType.TAX_LIEN,
         where="TOTTAX > 0 AND PAIDDATE IS NULL",
         fields=("PIN", "OWNAM1", "OWNAM2", "STRNUM", "STRPRE", "LOCATE", "STRTYP",
-                "STRSUF", "TAXMKTVAL", "TOTTAX", "ACCTNO", "PROPTYPE"),
+                "STRSUF", "TAXMKTVAL", "TOTTAX", "ACCTNO", "PROPTYPE",
+                # 2026-10-07 extraction audit: on the layer, never requested (fill on a
+                # live 2,000-row sample): last sale price SLPRICE (56%) + DEEDDATE and
+                # deed book/page CUBOOK/CUPAGE (99%); FAIRMKTVAL/LANDVAL (100%) and
+                # BLDGVAL (41%); SQFEET/BEDROOMS/BATHRMS/HALFBATH (~30%); prior owner
+                # POWNNM (82%); GIS_ACRES (100%); care-of NAMECO; SUBDIV; LANDUSE;
+                # IMPROVED; and the OWNER'S MAILING address STREET/CITY/STATE/ZIP5
+                # (100%; only ~26% equal the situs), which now feeds raw.owner_mailing.
+                "SLPRICE", "DEEDDATE", "CUBOOK", "CUPAGE", "FAIRMKTVAL", "LANDVAL",
+                "BLDGVAL", "SQFEET", "BEDROOMS", "BATHRMS", "HALFBATH", "POWNNM",
+                "GIS_ACRES", "NAMECO", "SUBDIV", "LANDUSE", "IMPROVED",
+                "STREET", "CITY", "STATE", "ZIP5"),
         parcel="PIN", owner_last="OWNAM1",
         situs_parts=("STRNUM", "STRPRE", "LOCATE", "STRTYP", "STRSUF"),
+        mailing_parts=("STREET", "CITY", "STATE", "ZIP5"), mail_state="STATE",
         value="TAXMKTVAL", detail="ACCTNO", process="tax", amount="TOTTAX",
         source_page="https://www.greenvillecounty.org/TaxCollector/OnlineTax.aspx",
     ),
@@ -809,10 +834,31 @@ def _owner(a: dict, lay: Layer) -> Optional[str]:
     return last or first
 
 
+def _own_coords(a: dict, lay: Layer) -> dict:
+    """latitude/longitude from the layer's own coordinate columns, when it declares them
+    and they are real degrees (0 and out-of-range values are this kind of layer's nulls)."""
+    if not (lay.lat_field and lay.lon_field):
+        return {}
+    try:
+        lat, lon = float(a.get(lay.lat_field)), float(a.get(lay.lon_field))
+    except (TypeError, ValueError):
+        return {}
+    if not (-90 < lat < 90 and -180 < lon < 180) or lat == 0 or lon == 0:
+        return {}
+    return {"latitude": lat, "longitude": lon}
+
+
 def _raw_block(a: dict, lay: Layer) -> dict:
     """The raw["arcgis_distress"] sub-dict: every non-blank requested attribute, plus a
     normalised `amount_owed` when the layer declares an amount field."""
-    blk = {"layer": lay.slug, **{k: v for k, v in a.items() if v not in (None, "")}}
+    # An attribute bag from a county layer: explicit outFields only (Layer.fields), and
+    # never an SSN/licence/birth-date-like column (sensitive_fields.drop_sensitive).
+    # The owner's MAILING columns are kept out of this property-shaped block: they belong
+    # in raw["owner_mailing"] only, so nothing can read a mailing CITY/STREET here as the
+    # property's own (the guard test_arcgis_distress_breadth's Greenville test pins).
+    mail_cols = set(lay.mailing_parts) | ({lay.mail_state} if lay.mail_state else set())
+    blk = {"layer": lay.slug, **{k: v for k, v in drop_sensitive(a).items()
+                                 if v not in (None, "") and k not in mail_cols}}
     if lay.amount:
         amt = _num(a.get(lay.amount))
         if amt:
@@ -902,6 +948,7 @@ def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
         city=_clean(a.get(lay.city)) if lay.city else None,
         zip_code=_clean(a.get(lay.zip_)) if lay.zip_ else None,
         parcel_id=parcel,
+        **_own_coords(a, lay),
         owner_name=owner, defendant=owner,
         tax_value=_num(a.get(lay.value)) if lay.value else None,
         foreclosure_process=lay.process,

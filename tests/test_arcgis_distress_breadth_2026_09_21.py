@@ -115,7 +115,21 @@ def test_greenville_never_maps_the_owner_mailing_city_onto_the_property():
     as the property city would put the owner's home town on every absentee's property."""
     lay = _lay(GREENVILLE)
     assert lay.city is None and lay.zip_ is None
-    assert not ({"STREET", "CITY", "STATE", "ZIP5", "DESCR"} & set(lay.fields))
+    assert "DESCR" not in lay.fields
+    # 2026-10-07: the mailing columns ARE requested now, but only as the declared
+    # mailing_parts: they feed raw["owner_mailing"] and never the property-shaped
+    # raw["arcgis_distress"] block or the Listing's own city/zip.
+    mail = {"STREET", "CITY", "STATE", "ZIP5"}
+    assert mail & set(lay.fields) <= set(lay.mailing_parts) | {lay.mail_state}
+    li = M._to_listing({"PIN": "0000000000001", "OWNAM1": "SAMPLE OWNER", "STRNUM": "2",
+                        "LOCATE": "TEST", "STRTYP": "CT", "TAXMKTVAL": 1000, "TOTTAX": 10.0,
+                        "STREET": "9 MAIL RD", "CITY": "ELSEWHERE", "STATE": "FL",
+                        "ZIP5": "33000"}, lay)
+    assert li.city is None and li.zip_code is None
+    assert not (mail & set(li.raw["arcgis_distress"]))
+    om = li.raw["owner_mailing"]
+    assert om["mailing"] == "9 MAIL RD ELSEWHERE FL 33000"
+    assert om["out_of_state"] is True and om["absentee"] is True
 
 
 def test_greenville_row_carries_owner_situs_parcel_value_and_the_bill():
