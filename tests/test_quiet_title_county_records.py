@@ -93,7 +93,7 @@ def test_the_sheet_prints_the_block(matrix, tmp_path):
     run_intake(FakeAdapter(PoliteFetcher(tmp_path), res, "20261007"), PIN, date(2026, 10, 7))
     h = render_html(res)
     assert "Where to look in Testshire County" in h and "No entry for Testshire County" in h
-    assert "searched this county's register live" in h
+    assert "searched this county's register index live" in h
 
     class Alpha(FakeAdapter):
         county = "Alpha"

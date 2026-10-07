@@ -385,11 +385,11 @@ def _run(adapter: CountyAdapter, res: IntakeResult, pin: str, today: date, max_c
         if got:
             rows, link = got
             res.deed_rows, res.deed_link = rows, link
-            same = [r for r in rows if p.deed_date and r.date_iso == p.deed_date]
+            same, how = vesting_candidates(rows, p.deed_date)
             if len(same) == 1:
                 res.vesting = same[0]
                 res.vesting_note = (f"The entry at book {p.deed_book} page {p.deed_page} dated {same[0].date} "
-                                    f"matches the county's deed date ({p.deed_date}).")
+                                    f"matches the county's deed date ({p.deed_date}){how}.")
             elif len(same) > 1:
                 res.vesting_note = (f"{len(same)} entries at book {p.deed_book} page {p.deed_page} carry the "
                                     f"county's deed date; none is picked.")
@@ -433,7 +433,9 @@ def _run(adapter: CountyAdapter, res: IntakeResult, pin: str, today: date, max_c
 
     # deaths index
     vy = int(res.vesting.date_iso[:4]) if res.vesting and res.vesting.date_iso else None
-    for d in res.owner_people:
+    if not adapter.deaths_index:
+        res.deaths_note = adapter.deaths_note or "This register has no deaths index online."
+    for d in (res.owner_people if adapter.deaths_index else []):
         person = d["person"]
         if person is None or len(res.death_searches) >= MAX_PEOPLE:
             continue
@@ -446,6 +448,25 @@ def _run(adapter: CountyAdapter, res: IntakeResult, pin: str, today: date, max_c
 
 
 NOT_FETCHED = "Not fetched by the tool: use the link above"
+
+
+def vesting_candidates(rows: list[Instrument], deed_date: Optional[str]) -> tuple[list[Instrument], str]:
+    """The entries at the cited book/page whose filing date agrees with the record's deed date, and
+    a few words on how. A full date must be equal; a year ('2020') or a year and month ('2025-08'),
+    as the statewide layer often gives it, must agree as far as it goes, and when that leaves more
+    than one entry, the deeds among them are kept (a deed of trust in the other book series is not
+    the deed the record cites)."""
+    if not deed_date:
+        return [], ""
+    same = [r for r in rows if r.date_iso and r.date_iso.startswith(deed_date)]
+    if len(deed_date) >= 10:
+        return same, ""
+    how = f" as far as the record goes (it gives {'the year' if len(deed_date) == 4 else 'the year and month'} only)"
+    if len(same) > 1:
+        deeds = [r for r in same if is_conveyance(r)]
+        if deeds:
+            same, how = deeds, how + "; the deed among the entries of that date is taken"
+    return same, how
 
 
 def register_not_fetched(res: IntakeResult, p) -> None:
@@ -563,7 +584,10 @@ def records_table(res: IntakeResult, adapter: CountyAdapter) -> list[RecordCheck
                                    "; ".join(ob.get("searches") or []) or "none", ob.get("reason") or ""))
         out.extend(adapter.static_records())
         return out
-    if ts is not None:
+    if ts is not None and not ts.fetched:
+        out.append(RecordCheck("Tax records (county tax bills)", "not run",
+                               "Not fetched by the tool for this county.", ts.note or ""))
+    elif ts is not None:
         if ts.walled:
             out.append(RecordCheck("Tax records (county tax bills)", "walled", "Parcel tax page", ts.wall_reason or ""))
         else:
@@ -586,7 +610,10 @@ def records_table(res: IntakeResult, adapter: CountyAdapter) -> list[RecordCheck
                                "Name search, both sides, all dates (index only; other spellings not searched).",
                                "; ".join(f"{ns.last}, {ns.first}: {ns.shown} entries kept of {ns.total if ns.total is not None else '?'} returned"
                                          for ns in res.after_vesting)))
-    if res.death_searches:
+    if res.deaths_note:
+        out.append(RecordCheck("Register of Deeds deaths index", "not run", res.deaths_note,
+                               "A person asks the register's office or searches the state's vital records."))
+    elif res.death_searches:
         out.append(RecordCheck("Register of Deeds deaths index", "checked",
                                "Surname exactly, given name begins with, per owner of record.",
                                "; ".join(f"{d.person}: {len(d.entries)} entries" + (" (walled)" if d.walled else "")

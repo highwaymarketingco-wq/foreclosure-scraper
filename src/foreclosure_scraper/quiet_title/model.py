@@ -280,6 +280,8 @@ class IntakeResult:
     #: False: the tool does not search this county's register; the sheet gives the register link
     register_fetched: bool = True
     register_link: Optional[str] = None
+    #: why the deaths index was not searched although the register was (e.g. it has none online)
+    deaths_note: Optional[str] = None
     #: the 'where to look' block for this county (county_records.WhereToLook, as a dict)
     where: dict = field(default_factory=dict)
 

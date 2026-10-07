@@ -7,9 +7,11 @@ from __future__ import annotations
 from .base import CountyAdapter
 from .buncombe import BuncombeAdapter
 from .nc_onemap import NcOneMapAdapter, canonical_county
+from .polk import PolkAdapter
 
 ADAPTERS: dict[tuple[str, str], type[CountyAdapter]] = {
     ("NC", "buncombe"): BuncombeAdapter,
+    ("NC", "polk"): PolkAdapter,          # statewide parcel record + the county's open Cott register
 }
 
 
@@ -24,4 +26,4 @@ def adapter_class(county: str, state: str = "NC") -> type[CountyAdapter]:
                      f"statewide parcel layer.") from None
 
 
-__all__ = ["ADAPTERS", "CountyAdapter", "BuncombeAdapter", "NcOneMapAdapter", "adapter_class"]
+__all__ = ["ADAPTERS", "CountyAdapter", "BuncombeAdapter", "NcOneMapAdapter", "PolkAdapter", "adapter_class"]

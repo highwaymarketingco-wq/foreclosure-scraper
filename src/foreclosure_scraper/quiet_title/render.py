@@ -386,8 +386,9 @@ def _where_block(res: IntakeResult) -> str:
             f"{e(w.get('matrix_date') or 'date not recorded')}{', confidence ' + e(w['confidence']) if w.get('confidence') else ''}): "
             f"where each record lives, whether it is free, and why a person is needed. ")
     if res.register_fetched:
-        head += ("This tool searched this county's register live (sections 2 and 4); the links below are for a person "
-                 "checking it again or going further back.</p>")
+        head += ("This tool searched this county's register index live (section 2"
+                 + ("" if res.deaths_note else ", and its deaths index in section 4")
+                 + "); the links below are for a person checking it again or going further back.</p>")
     else:
         head += ("This tool did not search this county's register, tax site or probate files: those sections say "
                  "'not fetched by the tool: use the link above' and point here. A site the matrix marks as walled to "
@@ -469,7 +470,8 @@ def render_html(res: IntakeResult) -> str:
     fits = sum(1 for d in res.death_searches for x in d.entries if x.fit == "fit")
     cands = sum(1 for d in res.death_searches for x in d.entries if x.fit == "candidate")
     glance.append(("4. Heirs signals", f"Heirs / estate wording on the roll: {marks}. " + (
-        f"Death-index entries that fit the full name: {fits}; candidates that may not fit: {cands}."
+        (f"The deaths index was not searched: {res.deaths_note}" if res.deaths_note else
+         f"Death-index entries that fit the full name: {fits}; candidates that may not fit: {cands}.")
         if res.register_fetched else "The deaths index was not searched by the tool for this county.")))
     walled = [r.record for r in res.records if r.status in ("walled", "not run", "not checked", "not opened")]
     glance.append(("5. Records not reached", "; ".join(walled) or "none"))
@@ -642,7 +644,9 @@ def render_html(res: IntakeResult) -> str:
     else:
         H.append(f"<p>{_tag('No heirs wording', 'vd-na')} The county roll's owner name ('{e(p.owner or '')}') carries "
                  f"no heirs or estate wording. Tax notices can still go to a person who has died; "
-                 + ("the deaths index was searched for the owner's name below.</p>" if res.register_fetched else
+                 + (f"the deaths index was not searched: {e(res.deaths_note)}</p>" if res.register_fetched and
+                    res.deaths_note else
+                    "the deaths index was searched for the owner's name below.</p>" if res.register_fetched else
                     "the register's deaths index was not searched by the tool for this county (a person searches it: "
                     "see where to look).</p>"))
     if p.care_of:
@@ -685,6 +689,8 @@ def render_html(res: IntakeResult) -> str:
     if not res.register_fetched:
         H.append(f"<p>No deaths-index search was run: {e(NOT_FETCHED.lower())} "
                  f"(<span class='url'>{e(res.register_link or 'see where to look')}</span>).</p>")
+    elif res.deaths_note:
+        H.append(f"<p>No deaths-index search was run: {e(res.deaths_note)}</p>")
     elif not res.death_searches:
         H.append("<p>No deaths-index search was run (no owner of record could be read as a person's name).</p>")
 

@@ -217,3 +217,64 @@ def test_no_record_for_the_pin(tmp_path, matrix):
     assert res.parcel.found is False
     assert "none has a parcel number equal" in res.parcel.extra["join_note"]
     assert "No parcel record was found" in render_html(res)
+
+
+# ---- Polk: the statewide parcel record plus the county's open Cott register ----------------------
+
+def _grid(rows):
+    tr = ""
+    for i, (d, idx, kind, gr, ge, bp, pages) in enumerate(rows, 1):
+        tr += (f"<tr><td>{i}</td><td>{d}</td><td>{idx}</td><td>{kind}</td>"
+               f"<td><div><table><tr><td>{gr}</td></tr></table></div></td>"
+               f"<td><div><table><tr><td><b>{ge}</b></td></tr></table></div></td><td>LOT 3 EXAMPLE</td><td></td>"
+               f"<td><a href='javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(\"ctl00$g$ctl0{i}$lbBP\", \"\", true))'>{bp}</a></td>"
+               f"<td></td><td>{pages}</td><td></td><td></td></tr>")
+    n = len(rows)
+    return (f"<html><body><span>{'1 - ' + str(n) + ' of ' + str(n) if n else ''}</span><table id='x_cpgvInstruments'>{tr}</table>"
+            f"<input type='hidden' name='__VIEWSTATE' value=''/></body></html>")
+
+
+class _PolkSession:
+    def __init__(self, onemap):
+        self.onemap, self.calls = onemap, []
+
+    def request(self, method, url, params=None, data=None, timeout=None):
+        self.calls.append((method, url, dict(params or {}), dict(data or {})))
+        if "nconemap" in url:
+            return _Resp(url, self.onemap)
+        if "SrchBookPage" in url and method == "GET":
+            body = _grid([("05/05/2020", "CRP", "DEED OF TRUST", "BUYER, BOB", "LENDER INC", "448 / 1232", "9"),
+                          ("05/05/2020", "CRP", "DEED", "SELLER, SAM", "BUYER, BOB", "448 / 1232", "3")])
+        elif "SrchBookPage" in url:
+            body = "<html><body><table id='ctl00_cphMain_gvParties1'><tr><td>SELLER, SAM</td></tr></table></body></html>"
+        elif method == "GET":
+            body = "<html><body><form><input type='hidden' name='__VIEWSTATE' value=''/></form></body></html>"
+        else:
+            body = _grid([])
+        r = _Resp(url, {})
+        r.text, r.content, r.url = body, body.encode(), url
+        return r
+
+
+def test_polk_reads_its_register_picks_the_deed_by_year_and_has_no_deaths_index(tmp_path, matrix):
+    cls = adapter_class("Polk", "NC")
+    assert cls.__name__ == "PolkAdapter" and cls.register_fetched is True and cls.deaths_index is False
+    attrs = dict(ATTRS, parno="P00-11", altparno="", sourceref="Deed Book/Page 448/1232", sourcedatx="2020",
+                 legdecfull="", mailadd="PO BOX 1", ownname="BUYER BOB", ownname2="")
+    ses = _PolkSession(_body(attrs))
+    f = PoliteFetcher(tmp_path, session_factory=lambda: ses, sleep=lambda s: None)
+    res = IntakeResult(county="Polk", state="NC", pin="P0011", started=datetime(2026, 10, 7, tzinfo=timezone.utc))
+    run_intake(cls(f, res, "20261007"), "P0011", date(2026, 10, 7))
+    assert res.parcel.found and (res.parcel.deed_book, res.parcel.deed_page, res.parcel.deed_date) == ("448", "1232", "2020")
+    assert res.vesting is not None and res.vesting.kind == "DEED" and res.vesting.grantees == ["BUYER, BOB"]
+    assert "the year only" in res.vesting_note and "the deed among the entries" in res.vesting_note
+    assert res.deed_link.startswith("https://cotthosting.com/ncpolkexternal/LandRecords/protected/v4/SrchBookPage.aspx")
+    assert res.searches, "the chain was searched"
+    assert res.death_searches == [] and "no deaths index" in res.deaths_note
+    posted = [c[3] for c in ses.calls if c[0] == "POST" and "SrchName" in c[1]]
+    assert posted and all(d.get("ctl00$cphMain$tcMain$tpNewSearch$ucSrchNames$ddlIndexType") != "DTH" for d in posted)
+    st = {r.record: r.status for r in res.records}
+    assert st["Register of Deeds deaths index"] == "not run" and st["Tax records (county tax bills)"] == "not run"
+    h = render_html(res)
+    assert "Legal description: needs the deed image" in h and "no deaths index online" in h
+    assert "searched this county's register index live" in h

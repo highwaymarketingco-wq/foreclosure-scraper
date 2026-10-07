@@ -26,6 +26,9 @@ class CountyAdapter(ABC):
     #: False for a county whose register this tool does not search: intake.py then runs no deed,
     #: chain, name or deaths search and the sheet says 'not fetched by the tool: use the link above'
     register_fetched: bool = True
+    #: False for a register with no deaths index online; deaths_note says so on the sheet
+    deaths_index: bool = True
+    deaths_note: Optional[str] = None
     #: the records-table name of the parcel record
     parcel_record_label: str = "County parcel record (tax parcel layer)"
 
