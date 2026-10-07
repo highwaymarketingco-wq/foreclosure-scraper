@@ -575,6 +575,8 @@ DATELESS_OK_SOURCES = {
     "public_notices.obituary_feeds",
     "public_notices.echovita_obituaries",
     "public_notices.publicnoticesc_estates",
+    "national.bankruptcy_rss_relief_from_stay",   # lender motions to resume foreclosure (debtor + district, no sale date)
+    "counties_sc.horry_probate",                 # Horry estates filed in the last year (no sale date)
     # 2026-08-30 new county sources (dateless: vacant / tax-delinquent / probate —
     # no sale_date, so they must be whitelisted or _active_only drops every row).
     "counties_nc.gaston_vacant",
