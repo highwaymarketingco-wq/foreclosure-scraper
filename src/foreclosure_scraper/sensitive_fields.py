@@ -23,8 +23,15 @@ FORBIDDEN_FIELD = re.compile(
 )
 
 
+_SEP = re.compile(r"[\s.\-]+")
+
+
 def is_sensitive_field(name: Any) -> bool:
-    return bool(FORBIDDEN_FIELD.search(str(name)))
+    """True for a column name that looks like an SSN, licence number or birth date. Spaces,
+    dots and hyphens count as underscores, so a records-request roll's "DATE OF BIRTH" or
+    "Driver License #" header is caught the same way a GIS layer's DATE_OF_BIRTH is."""
+    s = str(name)
+    return bool(FORBIDDEN_FIELD.search(s) or FORBIDDEN_FIELD.search(_SEP.sub("_", s)))
 
 
 def drop_sensitive(attrs: Mapping[str, Any]) -> dict[str, Any]:
