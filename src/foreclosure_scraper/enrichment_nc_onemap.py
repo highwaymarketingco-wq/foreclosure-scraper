@@ -7,8 +7,8 @@ For each listing's lat/lon (NC properties only), we query:
   2. Zoning — zoning designation at the property location
   3. Floodplains — FEMA flood zone overlay
 
-Endpoint: https://services.nconemap.gov/arcgis/rest/services
-Format: JSON (ArcGIS REST), no key needed for public services
+Endpoints: the parcel layer is services.nconemap.gov/secure/rest/services/NC1Map_Parcels/
+FeatureServer/1 (open, no key, despite the 'secure' path; see PARCEL_URL). Format: JSON (ArcGIS REST).
 
 This enricher fills: raw["nc_onemap"] dict with parcel, zoning, floodplain data.
 """
@@ -21,6 +21,7 @@ import structlog
 
 from .http_client import client
 from .models import Listing
+from .sensitive_fields import drop_sensitive
 
 log = structlog.get_logger()
 
@@ -28,14 +29,26 @@ ONEMAP_BASE = "https://services.nconemap.gov/arcgis/rest/services"
 _SEMAPHORE = asyncio.Semaphore(3)  # be polite, 3 concurrent
 
 # Known NC OneMap ArcGIS REST service endpoints for property-relevant layers.
-# These are the public (non-secure) MapServer endpoints that don't require auth.
-PARCEL_URL = f"{ONEMAP_BASE}/NC_Parcels/MapServer/0/query"
+#
+# PARCEL_URL CHANGED 2026-10-07: the old {ONEMAP_BASE}/NC_Parcels/MapServer/0/query answers
+# HTTP 404 (an HTML 'not found' page), so this enricher has been writing an empty parcel block
+# for every NC lead. The statewide parcels now live in the NC1Map_Parcels feature service (the
+# same layer parcel_cache.NC_ONEMAP_URL reads; open, no key, despite the 'secure' path). A
+# point-in-polygon query on it (geometry=lng,lat, inSR=4326) was checked live the same day: it
+# returned the parcel the point sits in.
+PARCEL_URL = ("https://services.nconemap.gov/secure/rest/services/"
+              "NC1Map_Parcels/FeatureServer/1/query")
+#: the parcel fields asked for, by name (never *). The short legal (legdecfull) and the deed
+#: reference (sourceref) are deliberately NOT requested: the board does not carry legal
+#: descriptions (the quiet-title intake tool reads them live, per lead).
+PARCEL_OUT_FIELDS = ("parno,altparno,cntyname,ownname,ownname2,siteadd,scity,szip,gisacres,"
+                     "parval,landval,improvval,parusedesc,saledatetx,structyear")
 FLOODPLAIN_URL = f"{ONEMAP_BASE}/NFHL/MapServer/0/query"
 ZONING_URL = f"{ONEMAP_BASE}/NC_Zoning/MapServer/0/query"
 
 
 async def _query_arcgis_point(
-    url: str, lat: float, lon: float
+    url: str, lat: float, lon: float, out_fields: str = "*"
 ) -> list[dict[str, Any]]:
     """Generic ArcGIS REST point-intersection query on a MapServer layer."""
     try:
@@ -50,7 +63,7 @@ async def _query_arcgis_point(
                     "returnGeometry": "false",
                     "returnCountOnly": "false",
                     "f": "json",
-                    "outFields": "*",
+                    "outFields": out_fields,
                 },
                 headers={"Accept": "application/json"},
             )
@@ -67,7 +80,7 @@ async def _query_arcgis_point(
 
     results: list[dict[str, Any]] = []
     for feat in features:
-        attrs = feat.get("attributes", {})
+        attrs = drop_sensitive(feat.get("attributes", {}) or {})
         if attrs:
             results.append(attrs)
     return results
@@ -98,7 +111,7 @@ async def enrich_nc_onemap(listing: Listing) -> Listing:
 
             # Query parcel boundaries
             async with _SEMAPHORE:
-                parcels = await _query_arcgis_point(PARCEL_URL, lat_f, lon_f)
+                parcels = await _query_arcgis_point(PARCEL_URL, lat_f, lon_f, PARCEL_OUT_FIELDS)
             if parcels:
                 raw_update["nc_onemap"]["parcel"] = parcels[0]
 
