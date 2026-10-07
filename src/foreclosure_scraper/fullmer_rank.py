@@ -54,9 +54,11 @@ from __future__ import annotations
 
 from typing import Optional
 
+from .enrichment_tax_owed import tax_not_yet_late
 from .mailing_shape import mailing_of
 from .models import Listing
 from .signal_freshness import has_real_probate
+from .verification.verifiers._tax_common import other_lien_listing
 
 # ---------------------------------------------------------------- thresholds
 # Every constant below is a quote, kept as a named POINT weight rather than a
@@ -214,6 +216,14 @@ def cad_value(li: Listing) -> tuple[Optional[float], Optional[str]]:
     return None, None
 
 
+def _not_late(li: Listing) -> bool:
+    """The row's only unpaid property-tax bill is not late yet (enrichment_tax_owed.tax_not_yet_late,
+    owner + attorney rule 2026-10-07): it feeds neither ripeness nor arrears."""
+    if other_lien_listing(li):
+        return False
+    return tax_not_yet_late(_raw(li), li.state, li.county, li.source)
+
+
 def tax_arrears(li: Listing) -> tuple[Optional[float], bool]:
     """(dollars, is_county_stated).
 
@@ -227,6 +237,8 @@ def tax_arrears(li: Listing) -> tuple[Optional[float], bool]:
     ao = _raw(li).get("amount_owed")
     if not isinstance(ao, dict):
         return None, False
+    if str(ao.get("source") or "") == "tax_owed" and _not_late(li):
+        return None, False          # the only unpaid bill is not late yet: no arrears (tax_calendar)
     val = _num(ao.get("value"))
     if val is None:
         return None, False
@@ -244,6 +256,8 @@ def years_delinquent(li: Listing) -> tuple[Optional[float], bool]:
     signal is answerable for ~2,400 leads and not 33,000.
     """
     raw = _raw(li)
+    if _not_late(li):
+        return None, False          # the only unpaid bill is not late yet: no ripeness (tax_calendar)
     surf = raw.get("tax_aging_surfaced") if isinstance(raw.get("tax_aging_surfaced"), dict) else {}
     tad = raw.get("two_year_delinquent") if isinstance(raw.get("two_year_delinquent"), dict) else {}
     yrs = _num(surf.get("years_delinquent"))

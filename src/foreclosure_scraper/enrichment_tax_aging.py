@@ -67,8 +67,9 @@ from __future__ import annotations
 from datetime import date
 from typing import Iterable, Optional
 
-from .enrichment_tax_owed import tax_year_status
+from .enrichment_tax_owed import tax_not_yet_late, tax_year_status
 from .models import Listing
+from .verification.verifiers._tax_common import other_lien_listing
 
 _MIN_YEAR = 1990
 
@@ -86,20 +87,28 @@ def enrich_tax_aging(listings: Iterable[Listing], today: Optional[date] = None) 
     derived raw['tax_aging_high'] flag) for every listing where a real tax
     source already states it. Returns run stats; never raises."""
     today = today or date.today()
-    stats = {"surfaced": 0, "high_2yr_plus": 0, "not_yet_late": 0,
+    stats = {"surfaced": 0, "high_2yr_plus": 0, "not_yet_late": 0, "not_yet_late_only": 0,
              "by_source": {"nc_ptscloud": 0, "tax_owed": 0}}
 
     for li in listings:
         raw = li.raw if isinstance(li.raw, dict) else None
         if raw is None:
             continue
+        # raw['tax_not_yet_late']: the row's only unpaid property-tax bill is not late yet. Context
+        # for the board (the scorer, lead_signals, fullmer_rank and the amount_owed promotion each
+        # apply the same rule themselves); cleared once it no longer holds (the bill went late).
+        if not other_lien_listing(li) and tax_not_yet_late(raw, li.state, li.county, li.source, today):
+            raw["tax_not_yet_late"] = True
+            stats["not_yet_late_only"] += 1
+        else:
+            raw.pop("tax_not_yet_late", None)
         pts = raw.get("nc_ptscloud_delinquent_tax")
         to = raw.get("tax_owed")
         pts_year = _year(pts.get("tax_year")) if isinstance(pts, dict) else None
         to_year = _year(to.get("year")) if isinstance(to, dict) else None
         if pts_year is not None:
             source, tax_year = "nc_ptscloud", pts_year
-        elif isinstance(to, dict) and (to_year is not None or to.get("years_delinquent")):
+        elif isinstance(to, dict) and (to_year is not None or isinstance(to.get("years_delinquent"), (int, float))):
             source, tax_year = "tax_owed", to_year
         else:
             continue  # no real measurement this run -- leave whatever's there alone

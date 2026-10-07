@@ -50,7 +50,7 @@ from .models import Listing
 from .mailing_shape import mailing_of
 from .distress_score import (
     SIGNAL_CATEGORY, _is_liensnc, _storm_signal, _upset_open, _vacant_structure,
-    amount_is_tax_balance, trivial_tax_roll,
+    amount_is_tax_balance, amount_is_this_tax_balance, tax_not_yet_late, trivial_tax_roll,
 )
 from .enrichment_equity import is_countable_debt
 from .signal_freshness import (
@@ -108,9 +108,11 @@ def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
     tax_gone = "recorded_debt:tax" in drop
 
     # --- FINANCIAL ---
-    # the same rule as distress_score._collect: a refuted/stale tax verdict or a trivial balance on a
-    # standing tax-roll row (TRIVIAL_TAX_BALANCE) ends the tax-balance credit
-    tax_gone = tax_gone or trivial_tax_roll(li)
+    # the same rule as distress_score._collect: a refuted/stale tax verdict, a trivial balance on a
+    # standing tax-roll row (TRIVIAL_TAX_BALANCE) or a bill that is not late yet (tax_not_yet_late)
+    # ends the tax-balance credit
+    not_late = tax_not_yet_late(li, today)
+    tax_gone = tax_gone or trivial_tax_roll(li) or not_late
     if not tax_gone and _dollar((raw.get("tax_owed") or {}).get("balance")):
         out.add("recorded_debt")
     # sc_tax_delinquent is the county's property-tax delinquency, so "tax_lien:property_tax" (a
@@ -126,7 +128,7 @@ def _facet_signals(li: Listing, today: Optional[date] = None) -> set[str]:
     # the same predicate the scorer and the equity engine use: an assessed-value placeholder in
     # amount_owed is not a debt
     ao = raw.get("amount_owed")
-    if tax_gone and amount_is_tax_balance(li, ao):
+    if tax_gone and (amount_is_this_tax_balance(li, ao) if not_late else amount_is_tax_balance(li, ao)):
         ao = None
     if is_countable_debt(ao):
         out.add("recorded_debt")

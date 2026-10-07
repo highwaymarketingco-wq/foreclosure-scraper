@@ -35,6 +35,7 @@ import structlog
 
 from . import tax_calendar as _cal
 from .models import Listing
+from .verification.verifiers._tax_common import NON_PROPERTY_TAX_SOURCES
 
 log = structlog.get_logger()
 
@@ -272,10 +273,45 @@ _LIVE_ROLL_BLOCKS = frozenset({"qpaybill_roll", "catalis_roll", "nc_ptscloud_del
                                "greenwood_corebtpay_delinquent_tax"})
 
 
+_PTS_BILL_RE = re.compile(r"^\d+-(\d{4})-(\d{4})-")
+_DUE_DATE_RE = re.compile(r"\b(\d{1,2})/(\d{1,2})/(\d{4})\b")
+_PTS = "nc_ptscloud_delinquent_tax"
+
+
+def ptscloud_levy_year(bill: dict) -> Optional[int]:
+    """The LEVY year of a PTS Cloud bill (one roll row, or the block's representative row).
+
+    TAX_YEAR is not always it. 218 rows of the 10/7 board carried TAX_YEAR 2026 on a bill numbered
+    "<account>-2026-2025-0070-00" and due 09/01/2025: the 2025 levy (an NC bill is due September 1
+    of its levy year, G.S. 105-360), late since January 6, 2026, not a current bill. Ordinary bills
+    read "<account>-2025-2025-0000-00". So: the due date's year (a due date before July is the
+    previous year's levy), else the bill number's second year, else TAX_YEAR."""
+    if not isinstance(bill, dict):
+        return None
+    m = _DUE_DATE_RE.search(str(bill.get("bill_due_date") or ""))
+    if m:
+        y = int(m.group(3)) - (1 if int(m.group(1)) < 7 else 0)
+        if _cal.levy_year(y):
+            return y
+    m = _PTS_BILL_RE.match(str(bill.get("bill_number") or ""))
+    if m and _cal.levy_year(m.group(2)):
+        return int(m.group(2))
+    return _cal.levy_year(bill.get("tax_year"))
+
+
+def _unpaid_bill_layer_year(name: str, blk: dict) -> Optional[int]:
+    """An ArcGIS unpaid-bill layer row (arcgis_distress_layers.py buncombe_unpaid_bills*: one row
+    per unpaid bill of a past levy) names its bill's levy year."""
+    if name == "arcgis_distress" and "unpaid" in str(blk.get("layer") or ""):
+        return _cal.levy_year(blk.get("levy_year"))
+    return None
+
+
 def unpaid_levy_years(raw: dict) -> list[int]:
     """Every unpaid levy year the row's tax source blocks LIST, oldest first: the union across the
     live-roll blocks when one lists years (_LIVE_ROLL_BLOCKS), else across every tax source block
-    (a merged row's blocks describe the same parcel's bills). [] when no block lists years."""
+    (a merged row's blocks describe the same parcel's bills). [] when no block lists years. PTS Cloud
+    bills count by their levy year (ptscloud_levy_year), an ArcGIS unpaid-bill row by its own."""
     if not isinstance(raw, dict):
         return []
     def listed(v) -> set[int]:
@@ -284,7 +320,18 @@ def unpaid_levy_years(raw: dict) -> list[int]:
     live: set[int] = set()
     years: set[int] = set()
     for name, blk in raw.items():
-        if not isinstance(blk, dict) or not _is_tax_source_block(name):
+        if not isinstance(blk, dict):
+            continue
+        layer_year = _unpaid_bill_layer_year(name, blk)
+        if layer_year is not None:
+            years.add(layer_year)
+            continue
+        if not _is_tax_source_block(name):
+            continue
+        if name == _PTS and isinstance(blk.get("by_year"), list) and blk["by_year"]:
+            got = {y for y in (ptscloud_levy_year(b) for b in blk["by_year"]) if y is not None}
+            years |= got
+            live |= got
             continue
         got: set[int] = set()
         for k in _UNPAID_YEAR_LIST_KEYS:
@@ -331,6 +378,18 @@ def _amounts_by_year(raw: dict) -> dict[int, float]:
     return out
 
 
+_SCALAR_YEAR_KEYS = ("year", "tax_year", "levy_year", "bill_year", "taxyear", "latest_year")
+
+
+def _source_names_year(raw: dict, year: int) -> bool:
+    """A tax source block on the row states `year` in a scalar year key."""
+    for name, blk in raw.items():
+        if isinstance(blk, dict) and (_is_tax_source_block(name) or _unpaid_bill_layer_year(name, blk)):
+            if any(_cal.levy_year(blk.get(k)) == year for k in _SCALAR_YEAR_KEYS):
+                return True
+    return False
+
+
 def tax_year_status(raw: dict, state: Optional[str], county: Optional[str],
                     today: Optional[date] = None) -> Optional[dict]:
     """How many levy years the row's tax record shows as LATE, and which unpaid bills are not late
@@ -345,6 +404,7 @@ def tax_year_status(raw: dict, state: Optional[str], county: Optional[str],
       basis               year_list (a source lists the unpaid years), stated_count (a count
                           and the newest year only), single_year (one year: delinquent since then,
                           tax_calendar.years_since_levy)
+      year_from_source    single_year only: a source block names that year (else only tax_owed)
     """
     if not isinstance(raw, dict):
         return None
@@ -360,7 +420,9 @@ def tax_year_status(raw: dict, state: Optional[str], county: Optional[str],
         out = {"basis": "year_list", "unpaid_bill_years": len(years), "years_delinquent": len(done),
                "delinquent_years": done, "not_yet_late_years": [y for y in years if not late(y)]}
     else:
-        top_year = _cal.levy_year(to.get("year"))
+        # the newest year: a PTS Cloud roll's own levy year beats its TAX_YEAR label on tax_owed
+        pts_year = ptscloud_levy_year(raw.get(_PTS))
+        top_year = pts_year or _cal.levy_year(to.get("year"))
         stamped = to.get("years_basis") in ("year_list", "stated_count")
         # the raw count: this module's own stamp, or a count an older run promoted as stated
         n = to.get("unpaid_bill_years") if stamped else to.get("years_delinquent")
@@ -374,8 +436,7 @@ def tax_year_status(raw: dict, state: Optional[str], county: Optional[str],
             out = {"basis": "stated_count", "unpaid_bill_years": n,
                    "years_delinquent": max(0, n - len(pending)), "not_yet_late_years": pending}
         else:
-            pts = raw.get("nc_ptscloud_delinquent_tax")
-            y = (_cal.levy_year(pts.get("tax_year")) if isinstance(pts, dict) else None) or top_year
+            y = top_year
             if y is None or y > today.year + 1:
                 return None
             if late(y):
@@ -385,6 +446,9 @@ def tax_year_status(raw: dict, state: Optional[str], county: Optional[str],
             else:
                 out = {"basis": "single_year", "unpaid_bill_years": 1, "years_delinquent": 0,
                        "not_yet_late_years": [y]}
+            # whether a source block names the year, or only tax_owed does (a year an older run
+            # carried forward from a block that is gone, or read off an unrelated block)
+            out["year_from_source"] = bool(pts_year) or _source_names_year(raw, y)
     pending = out["not_yet_late_years"]
     if pending:
         bal = _money(to.get("balance"))
@@ -394,6 +458,70 @@ def tax_year_status(raw: dict, state: Optional[str], county: Optional[str],
         elif amounts and all(y in amounts for y in pending):
             out["not_yet_late_amount"] = round(sum(amounts[y] for y in pending), 2)
     return out
+
+
+#: A row whose tax_owed is not a county PROPERTY-tax balance: the verification registry's other
+#: liens (_tax_common.NON_PROPERTY_TAX_SOURCES: SC DEW and DOR liens, LiensNC, eCourts judgments)
+#: and the UST registries (their tax_owed is a merged-in SC state lien). Matched on the row's
+#: source and on tax_owed's own source.
+_NOT_PROPERTY_TAX_MARKS = ("sc_dew_lien_registry", "sc_state_tax_lien", "ust_registry",
+                           "ust_incidents", "liensnc", "ecourts")
+#: Sources that emit a parcel only when one of its levy years is already late, so a row from one (or
+#: merged with one, raw['also_seen_in']) is never "only a current bill" whatever is left of its year
+#: list: multi_year_delinquent_tax drops a parcel with no matured year (its build_listing), and 57
+#: buncombe_elderly rows of the 10/7 board merged with it read only "2026" once its block was gone;
+#: buncombe_delinquent_tax is the county's advertisement of delinquent taxes (G.S. 105-369).
+_PAST_DUE_ONLY_SOURCES = frozenset({"counties.multi_year_delinquent_tax",
+                                    "counties_nc.buncombe_delinquent_tax"})
+
+
+def property_tax_balance(raw: dict, source: Optional[str] = None) -> Optional[float]:
+    """raw['tax_owed']'s balance when it is a county property-tax delinquency (kind delinquent_tax,
+    not another lien, see _NOT_PROPERTY_TAX_MARKS); else None."""
+    to = raw.get("tax_owed") if isinstance(raw, dict) else None
+    if not isinstance(to, dict) or to.get("kind") != "delinquent_tax":
+        return None
+    srcs = (str(source or ""), str(to.get("source") or ""))
+    if any(m in s for s in srcs for m in _NOT_PROPERTY_TAX_MARKS) or srcs[0] in NON_PROPERTY_TAX_SOURCES:
+        return None
+    return _money(to.get("balance"))
+
+
+def _past_due_source(raw: dict, source: Optional[str]) -> bool:
+    """The row, its tax_owed, or a source merged into it (raw['also_seen_in']) is one of
+    _PAST_DUE_ONLY_SOURCES."""
+    to = raw.get("tax_owed") if isinstance(raw.get("tax_owed"), dict) else {}
+    seen = raw.get("also_seen_in") if isinstance(raw.get("also_seen_in"), list) else []
+    srcs = {source, to.get("source")} | {e.get("source") for e in seen if isinstance(e, dict)}
+    return bool(srcs & _PAST_DUE_ONLY_SOURCES)
+
+
+def tax_not_yet_late(raw: dict, state: Optional[str], county: Optional[str],
+                     source: Optional[str] = None, today: Optional[date] = None) -> bool:
+    """True when the row's ONLY unpaid property-tax bill is one that is not late yet (the current
+    levy, tax_calendar): such a row earns no tax credit (distress_score, lead_signals, fullmer_rank,
+    the amount_owed promotion) and stays on the board as context with raw['tax_not_yet_late'].
+    A row with an older unpaid year as well keeps its credit.
+
+    It takes evidence, not the absence of it: the not-late year has to come from a source block
+    (a year list, a stated count, or a block naming the year), not only from tax_owed.year, and
+    nothing on the row may show a late bill (a past-due source, a PTS Cloud roll charging interest,
+    which only a bill past its delinquent date does)."""
+    if not isinstance(raw, dict) or _past_due_source(raw, source):
+        return False
+    to = raw.get("tax_owed")
+    pts = raw.get(_PTS)
+    if isinstance(to, dict) and _money(to.get("balance")):
+        if property_tax_balance(raw, source) is None:
+            return False
+    elif not isinstance(pts, dict):
+        return False
+    if isinstance(pts, dict) and _money(pts.get("interest_due")):
+        return False
+    st = tax_year_status(raw, state, county, today)
+    if not st or st["years_delinquent"] != 0 or not st["not_yet_late_years"]:
+        return False
+    return st["basis"] != "single_year" or bool(st.get("year_from_source"))
 
 
 def _years_fields(status: Optional[dict]) -> dict:

@@ -2308,6 +2308,9 @@ RAW_KEEP = {
     # old one-shot script.
     "tax_aging_high": "*",             # 2yr+ delinquent flag read by enrichment_equity.py
     "two_year_delinquent": "*",        # 2yr+ delinquent flag for all listings
+    # 2026-10-07: the row's only unpaid property-tax bill is not late yet (tax_calendar); the row
+    # stays on the board as context and earns no tax credit. Written by enrich_tax_aging.
+    "tax_not_yet_late": "*",
 
     # ------------------------------------------------------------------
     # 2026-09-10 SCRAPER-KEY AUDIT. Measured, not suspected: of 191 distinct raw

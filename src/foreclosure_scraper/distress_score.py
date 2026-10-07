@@ -67,6 +67,7 @@ from .signal_freshness import (
 from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 from .verification.core import block_suppressed, qualifiers, suppressed_scorer_signals
 from .enrichment_amount_owed import is_standing_tax_roll_row
+from .enrichment_tax_owed import tax_not_yet_late as _tax_not_yet_late_raw
 from .verification.verifiers._tax_common import DE_MINIMIS, PROPERTY_TAX, other_lien_listing
 
 log = structlog.get_logger()
@@ -536,6 +537,34 @@ def trivial_tax_roll(li: Listing) -> bool:
     return amt is not None and amt < TRIVIAL_TAX_BALANCE
 
 
+def tax_not_yet_late(li: Listing, today: Optional[date] = None) -> bool:
+    """The row's ONLY unpaid property-tax bill is one that is not late yet: the current levy, before
+    its delinquent date (tax_calendar: NC January 6, SC January 16 of the next year). Owner and
+    attorney rule, 2026-10-07: that is not a delinquency, so the row earns no tax credit, the same
+    way a trivial balance earns none (TRIVIAL_TAX_BALANCE). It stays on the board as context
+    (raw['tax_not_yet_late']). A row with an older unpaid year keeps its credit, and another lien's
+    row (an SC DEW / DOR lien, a LiensNC filing, an eCourts judgment) is never one.
+    enrichment_tax_owed.tax_not_yet_late has the evidence rule."""
+    if other_lien_listing(li):
+        return False
+    return _tax_not_yet_late_raw(li.raw if isinstance(li.raw, dict) else {}, li.state, li.county,
+                                 li.source, today)
+
+
+def amount_is_this_tax_balance(li: Listing, amount_owed) -> bool:
+    """amount_is_tax_balance, or an amount_owed whose value IS the row's tax_owed balance whatever
+    its label (a merged roll balance some rows still carry as `judgment`). Used only where the tax
+    balance has to go (tax_not_yet_late), so the trivial and verification rules are unchanged."""
+    if amount_is_tax_balance(li, amount_owed):
+        return True
+    to = (li.raw or {}).get("tax_owed") if isinstance(li.raw, dict) else None
+    try:
+        return (isinstance(amount_owed, dict) and isinstance(to, dict)
+                and abs(float(amount_owed.get("value")) - float(to.get("balance"))) < 0.01)
+    except (TypeError, ValueError):
+        return False
+
+
 def amount_is_tax_balance(li: Listing, amount_owed) -> bool:
     """raw['amount_owed'] is the county's tax balance: labelled `tax_owed`, or still labelled
     `judgment` on a standing tax-roll row (an older enrich_amount_owed, or a checkpoint from before
@@ -763,11 +792,13 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
             ev = NJ
         kind = name if name in _SALE_LIFECYCLE_TYPES else None
         live, days, why = (True, None, None)
+        sale_upcoming = False
         if kind:
             live, days, why = _sale_status(li, r, today, kind)
         if kind == "tax_sale":
             sd = _sale_date_of(li, r)
             upcoming = sd is not None and sd >= today
+            sale_upcoming = upcoming
             if _is_county_owned_inventory(li) and not upcoming:
                 live, why = True, None
                 name = None                                            # F10: county holds title
@@ -778,6 +809,8 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
                 c.stale.append(why)
             elif name == "tax_lien" and trivial_tax_roll(li):
                 pass        # an interest-only residue on a standing roll is not distress (TRIVIAL_TAX_BALANCE)
+            elif name in ("tax_lien", "tax_sale") and not sale_upcoming and tax_not_yet_late(li, today):
+                pass        # the only unpaid bill is not late yet (tax_calendar): not a delinquency
             else:
                 sig.append((name, cat, w, ev))
                 if days is not None and days >= 0 and name in _LANE_KINDS and days <= _LANE_WINDOW_DAYS:
@@ -817,10 +850,13 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     # governed by the tax rules below (a refuted/stale tax verdict, the trivial floor) and never
     # credited as if it were a court judgment. A real judgment or opening bid is unchanged.
     _ao_is_tax = amount_is_tax_balance(li, _ao)
-    if "recorded_debt:tax" in drop or trivial_tax_roll(li):
+    _not_late = tax_not_yet_late(li, today)
+    if _not_late:
+        _ao_is_tax = amount_is_this_tax_balance(li, _ao)
+    if "recorded_debt:tax" in drop or trivial_tax_roll(li) or _not_late:
         # the county says the tax balance behind this debt is not owed (refuted) or was paid
-        # since (stale), or the whole balance is a trivial residue: a judgment or an opening bid
-        # still counts, the tax balance does not
+        # since (stale), or the whole balance is a trivial residue, or it is a bill that is not
+        # late yet: a judgment or an opening bid still counts, the tax balance does not
         _real_tax = False
         if _ao_is_tax:
             _ao = None

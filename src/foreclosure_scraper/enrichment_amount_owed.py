@@ -43,6 +43,7 @@ from typing import Optional
 
 import structlog
 
+from .enrichment_tax_owed import tax_not_yet_late
 from .models import Listing, ListingType
 from .verification.verifiers._tax_common import g as _g, ltype as _ltype, other_lien_listing
 
@@ -146,6 +147,9 @@ def _tax_owed_promotion(raw: dict, row=None) -> Optional[dict]:
     earlier pass (an older enrich_amount_owed, or a checkpoint written before this rule) labelled
     as a court judgment: it is promoted like any other tax balance, so the equity engine and the
     scorer read its true kind. Without `row` the old rule holds (a judgment is never overwritten).
+    Also with `row`: a balance whose only unpaid bill is not late yet (tax_not_yet_late, the
+    current levy before its delinquent date) is not promoted as "Delinquent property tax owed";
+    the scorer and lead_signals drop such an amount the same way (2026-10-07).
     """
     if not isinstance(raw, dict):
         return None
@@ -157,6 +161,9 @@ def _tax_owed_promotion(raw: dict, row=None) -> Optional[dict]:
     except (TypeError, ValueError):
         return None
     if balance <= 0:
+        return None
+    if row is not None and not other_lien_listing(row) and tax_not_yet_late(
+            raw, _g(row, "state"), _g(row, "county"), _g(row, "source")):
         return None
     ao = raw.get("amount_owed")
     ao_src = ao.get("source") if isinstance(ao, dict) else None
