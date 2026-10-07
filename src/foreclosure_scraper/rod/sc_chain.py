@@ -192,18 +192,25 @@ _LIEN = re.compile(r"JUDG|\bLIENS?\b|/LIEN|LIEN/|EXECUTION|MECHANIC|TAX\s+LIEN|L
 _NOT_REALTY = re.compile(r"AIRPLANE|AIRCRAFT|\bUCC\b|VESSEL|\bBOAT\b|MENTAL HEALTH|CHILD SUPPORT", re.I)
 _NOT_CONVEYANCE = re.compile(r"DEED BOOK|BOOK - NO CHARGE|POWER OF ATTORNEY|\bP\s*/\s*ATTY\b|EASEMENT|"
                              r"RESTRICT|DECLARATION|\bPLAT\b|AFFIDAVIT|\bLEASE\b|OPTION|MEMORANDUM|"
-                             r"TIME\s*SHARE|TIMESHARE", re.I)
+                             r"TIME\s*SHARE|TIMESHARE|ASSIGN|^MASTER DEED$", re.I)
+KINDS = ("deed", "mortgage", "satisfaction", "lis_pendens", "lis_pendens_release", "foreclosure_notice", "lien",
+         "lien_release", "other")
+_FCL_NOTICE = re.compile(r"NOTICE OF (?:FORECLOSURE|SALE|DEFAULT)|FORECLOSURE NOTICE", re.I)
 
 
 def kind_of(doc: RodDoc) -> str:
     """deed | mortgage | satisfaction | lis_pendens | lis_pendens_release | lien | lien_release | other."""
     raw = doc.raw if isinstance(doc.raw, dict) else {}
+    if raw.get("kind_hint") in KINDS:          # an adapter that knows its county's codes
+        return raw["kind_hint"]
     label = " ".join(x for x in (doc.doc_type, raw.get("doc_type_label"), raw.get("doc_type_code")) if x)
     s = label.upper()
-    if not s.strip():
+    if not s.strip() or re.search(r"\bUCC\b", s):
         return "other"
     if _LP.search(s):
         return "lis_pendens_release" if _RELEASE.search(s) else "lis_pendens"
+    if _FCL_NOTICE.search(s):
+        return "other" if _RELEASE.search(s) else "foreclosure_notice"
     if _RELEASE.search(s):
         if _LIEN.search(s) or re.search(r"\bTAX\b|JUDG", s):
             return "lien_release" if not _NOT_REALTY.search(s) else "other"
@@ -282,6 +289,7 @@ class ChainResult:
     mortgages: list[ChainEntry] = field(default_factory=list)
     satisfactions: list[ChainEntry] = field(default_factory=list)
     lis_pendens: list[ChainEntry] = field(default_factory=list)
+    foreclosure_notices: list[ChainEntry] = field(default_factory=list)
     other_liens: list[ChainEntry] = field(default_factory=list)
     walled: bool = False
     wall_reason: Optional[str] = None
@@ -362,7 +370,8 @@ class ChainResult:
             "liens": {"deeds_of_trust": [x.to_dict() for x in self.mortgages],
                       "satisfactions": [x.to_dict() for x in self.satisfactions],
                       "lis_pendens": [x.to_dict() for x in self.lis_pendens],
-                      "substitutions_of_trustee": [], "foreclosure_notices": [],
+                      "substitutions_of_trustee": [],
+                      "foreclosure_notices": [x.to_dict() for x in self.foreclosure_notices],
                       "other_liens": [x.to_dict() for x in self.other_liens],
                       "open_deeds_of_trust_est": summ["open_mortgages_est"],
                       "since": since, "security_instrument": "mortgage", "summary": summ},
@@ -471,6 +480,7 @@ def build_chain(searcher: Searcher, *, state: str, county: str, owner_name: str,
 
     buckets = {"mortgage": res.mortgages, "satisfaction": res.satisfactions,
                "lis_pendens": res.lis_pendens, "lis_pendens_release": res.lis_pendens,
+               "foreclosure_notice": res.foreclosure_notices,
                "lien": res.other_liens, "lien_release": res.other_liens}
     for d in sorted(mine, key=lambda x: _day(x) or date.min, reverse=True):
         k = kind_of(d)

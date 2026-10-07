@@ -117,6 +117,9 @@ SC_ROD_CONFIG = {
     ("SC", "York"):          ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
     ("SC", "Laurens"):       ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
     ("SC", "Lancaster"):     ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
+    # Harris AcclaimWeb by name (rod/acclaim_names.py); rod/acclaim.py's Pickens date sweep is separate
+    ("SC", "Horry"):         ("acclaim_names", "FORECLOSURE_SC_ACCLAIM_ROD", "0"),
+    ("SC", "Pickens"):       ("acclaim_names", "FORECLOSURE_SC_ACCLAIM_ROD", "0"),
 }
 SC_CHAIN_ONLY_CONFIG = {
     ("SC", "Oconee"):        ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "0"),
