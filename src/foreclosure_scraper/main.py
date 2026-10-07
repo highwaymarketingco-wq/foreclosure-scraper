@@ -567,6 +567,14 @@ def _coastal_county_source(li: Listing) -> bool:
 # inventory, not historical events. For everything else (court rosters, law-firm
 # trustee calendars, tax-sale lists, public notices) we require a parseable date.
 DATELESS_OK_SOURCES = {
+    # 2026-10-07 new sources: standing tax balances, tax-foreclosure parcels and obituary/estate lists carry
+    # no sale date, so they must be whitelisted or _active_only drops every row.
+    "counties_nc.mecklenburg_delinquent_tax",
+    "counties_nc.guilford_tax_foreclosures",
+    "counties_nc.mecklenburg_tax_foreclosures",
+    "public_notices.obituary_feeds",
+    "public_notices.echovita_obituaries",
+    "public_notices.publicnoticesc_estates",
     # 2026-08-30 new county sources (dateless: vacant / tax-delinquent / probate —
     # no sale_date, so they must be whitelisted or _active_only drops every row).
     "counties_nc.gaston_vacant",
@@ -2958,11 +2966,30 @@ async def run() -> int:
         _rod_phases["spartanburg_rod"] = enrich_spartanburg_rod(enriched)
     except Exception:
         log.error("spartanburg_rod.failed", traceback=traceback.format_exc())
+    # 2026-10-07: the platform adapters for the other NC/SC counties whose register of deeds a plain
+    # script can read (rod/nc_cott_v4, nc_lookup, nc_ors, nc_cchs_classic ...): each platform is OFF
+    # until its FORECLOSURE_NC_*_ROD env flag is 1 (enrichment_generic_rod's platform registry).
+    try:
+        from .enrichment_generic_rod import enrich_generic_rod
+        _rod_phases["generic_rod"] = enrich_generic_rod(enriched)
+    except Exception:
+        log.error("generic_rod.failed", traceback=traceback.format_exc())
     _rod_results = await _gather_phases(_rod_phases)
-    for _rod_name in ("gaston_rod", "cchs_rod", "aumentum_rod", "spartanburg_rod"):
+    for _rod_name in ("gaston_rod", "cchs_rod", "aumentum_rod", "spartanburg_rod", "generic_rod"):
         _rs = _rod_results.get(_rod_name)
         if _rs and "skipped" not in _rs:
             enrichment_stats[_rod_name] = _rs
+
+    # Deed chain per lead (last deed + up to 3 prior instruments, liens, substitutions of trustee) for the
+    # counties whose register adapters expose chain(): the attorney's title-check input. Runs on its own
+    # (one lookup at a time per county, capped); OFF unless FORECLOSURE_ROD_CHAIN=1.
+    try:
+        from .enrichment_rod_chain import enrich_rod_chain
+        _chain_budget_s = float(os.environ.get("FORECLOSURE_ROD_CHAIN_BUDGET_S", "1800")) + 120
+        s = await _await_capped(enrich_rod_chain(enriched), "rod_chain", default_s=_chain_budget_s)
+        if s and "skipped" not in s: enrichment_stats["rod_chain"] = s
+    except Exception:
+        log.error("rod_chain.failed", traceback=traceback.format_exc())
 
     # Spartanburg DOT loan-amount OCR — turns raw['rod'] mortgage EXISTENCE into a
     # dollar figure (free view_image PDF -> Gemini OCR) so the equity engine has a
@@ -3665,6 +3692,29 @@ async def run_enrich_tail(st: TailState) -> dict:
         if s and s.get("tagged"): enrichment_stats["liensnc_posthumous"] = s
     except Exception:
         log.error("liensnc_posthumous.failed", traceback=traceback.format_exc())
+
+    # 2026-10-07: dead-owner leads get an obituary match and possible-heir CANDIDATES for the attorney.
+    # Lookups make network calls and are OFF unless OBITUARY_LOOKUPS=<n leads>; the match and the
+    # candidates read what is already on the rows (names go to the private data/heirs/ store, the public
+    # board only gets counts: RAW_KEEP heir_candidates_summary). OBITUARY_MATCH=0 / HEIR_CANDIDATES=0 turn off.
+    try:
+        from .obituary_lookup import enrich_obituary_lookups
+        s = await _await_capped(enrich_obituary_lookups(enriched), "obituary_lookups")
+        if s and "skipped" not in s: enrichment_stats["obituary_lookups"] = s
+    except Exception:
+        log.error("obituary_lookups.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_obituary_match import enrich_obituary_match
+        s = enrich_obituary_match(enriched)
+        if s and "skipped" not in s: enrichment_stats["obituary_match"] = s
+    except Exception:
+        log.error("obituary_match.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_heir_candidates import enrich_heir_candidates
+        s = enrich_heir_candidates(enriched)
+        if s and "skipped" not in s: enrichment_stats["heir_candidates"] = s
+    except Exception:
+        log.error("heir_candidates.failed", traceback=traceback.format_exc())
 
     # Legal-description multi-lot / deeded-vs-assessor acreage mismatch
     # (Dirty Deeds Tier A #9) — a regex pass over legal_description/
