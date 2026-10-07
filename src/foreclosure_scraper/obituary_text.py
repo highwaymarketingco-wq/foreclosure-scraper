@@ -41,6 +41,7 @@ def clean_text(raw: Optional[str]) -> str:
     t = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", t)
     t = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</li>", " ", t)
     t = _TAG.sub(" ", t)
+    t = re.sub(r"<[^>]*$", " ", t)              # a tag cut off at the end of a fragment
     t = _html.unescape(t).replace("\xa0", " ")
     t = t.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
     t = t.replace("–", "-").replace("—", " - ")
