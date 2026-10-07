@@ -49,6 +49,7 @@ from pathlib import Path
 
 from .enrichment_arcgis import NC_GIS, SCDOT_BASE, SC_LAYER, SC_GIS, host_walled, situs_view
 from .http_client import client
+from .sensitive_fields import drop_sensitive
 from . import owner_freshness
 
 # ---------------------------------------------------------------------------
@@ -294,7 +295,7 @@ async def _query_point(c: httpx.AsyncClient, base: str, lat: float, lng: float,
             return None
         feats = data.get("features") or []
         if feats and feats[0].get("attributes"):
-            return dict(feats[0]["attributes"])
+            return drop_sensitive(feats[0]["attributes"])
     except httpx.HTTPError as e:
         if raise_on_net_error:
             raise _GISNetworkError from e
@@ -346,7 +347,7 @@ async def _query_parcel(c: httpx.AsyncClient, base: str, parcel: str,
                 data = r.json()
                 feats = data.get("features") or []
                 if feats and feats[0].get("attributes"):
-                    return dict(feats[0]["attributes"])
+                    return drop_sensitive(feats[0]["attributes"])
             except httpx.HTTPError as e:
                 if raise_on_net_error:
                     raise _GISNetworkError from e
@@ -568,7 +569,7 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
         # new HTTP) so downstream enrichers — e.g. enrichment_gis_derived — can mine
         # per-county fields (last sale price/date, deed book/page, tax-paid date)
         # that this generic mapper doesn't promote to first-class Listing fields.
-        li.raw["gis_attrs_full"] = attrs
+        li.raw["gis_attrs_full"] = drop_sensitive(attrs)
         # Promote a recognized statutory exemption to a durable, whitelisted signal so the
         # life-events enricher can flag elderly/disabled owners (survives to listings.json,
         # unlike gis_attrs_full which is stripped at publish).

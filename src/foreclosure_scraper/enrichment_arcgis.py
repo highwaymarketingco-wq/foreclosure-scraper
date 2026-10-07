@@ -23,6 +23,7 @@ import structlog
 from .http_client import client
 from .models import Listing, ListingType, PropertyKind
 from . import owner_freshness
+from .sensitive_fields import drop_sensitive
 
 log = structlog.get_logger()
 
@@ -1086,7 +1087,7 @@ async def _arcgis_query(
                 continue
             out: list[dict[str, Any]] = []
             for f in data.get("features", []):
-                attrs = dict(f.get("attributes", {}) or {})
+                attrs = drop_sensitive(f.get("attributes", {}) or {})
                 # Rebuild Brunswick's situs from its component fields and stash it
                 # under a real situs key so _pick(site_address) resolves it.
                 if concat_situs:

@@ -69,6 +69,7 @@ from .enrichment_arcgis import (
     layer_schema,
 )
 from .http_client import client
+from .sensitive_fields import drop_sensitive
 from .models import Listing
 
 log = structlog.get_logger()
@@ -331,7 +332,7 @@ async def _query_owner(
             if "error" in data:
                 continue
             for f in data.get("features", []):
-                attrs = dict(f.get("attributes", {}) or {})
+                attrs = drop_sensitive(f.get("attributes", {}) or {})
                 oid = attrs.get("OBJECTID") or attrs.get("FID")
                 if oid is not None and oid in seen:
                     continue
