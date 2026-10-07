@@ -1908,6 +1908,9 @@ RAW_KEEP = {
     "lrcpwa": "*",                       # land-records parcel resolve: assessed/mailing/absentee   # PTS delinquent roll: parcel/assessed/mailing/tax_year (skip-trace)
     "nc_county_pdf_delinquent_tax": "*",
     "nc_county_csv_delinquent_tax": "*",
+    "mecklenburg_delinquent_tax": "*",  # NCGS 105-369 advertisement: total_due, list, tax_year
+    "mecklenburg_tax_foreclosure": "*", # county tax-foreclosure pipeline: total_due, bill_count, attorney
+    "guilford_tax_foreclosure": "*",    # county tax-foreclosure pipeline: flag_status, auction date, deed
     "buncombe_delinquent_tax": "*",     # delinquent tax roll: balance + tax_year (needed for tax_owed year extraction)
     "rutherford_wildfire": "*",         # delinquent tax roll: taxes_owed + tax_years (list)
     "multi_year_delinquent_tax": "*",   # delinquent tax roll: total_due + year
