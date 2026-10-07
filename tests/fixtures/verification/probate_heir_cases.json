@@ -4,7 +4,7 @@
    "decided_by": null,
    "key": "estate:662d93f9234c21ed@parcel:NC:buncombe:0609950976",
    "live_key_suffix": "parcel:NC:buncombe:0609950976",
-   "reason": "death_record_ambiguous",
+   "reason": "death_entry_name_mismatch",
    "row": {
     "city": "Cbm",
     "county": "Buncombe",
@@ -46,10 +46,10 @@
    "verdict": "unconfirmed"
   },
   {
-   "decided_by": "death_record_and_heirs_of_record",
+   "decided_by": null,
    "key": "estate:926ba9b7f5715492@parcel:NC:buncombe:9743049719",
    "live_key_suffix": "parcel:NC:buncombe:9743049719",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "city": "FASEWEJO",
     "county": "Buncombe",
@@ -71,7 +71,7 @@
     "street_address": "201 WOROBIS FOCEPI CIR"
    },
    "tier": "WARM",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   },
   {
    "decided_by": null,
@@ -205,10 +205,10 @@
    "verdict": "unconfirmed"
   },
   {
-   "decided_by": "death_record_and_titled_to_decedent",
+   "decided_by": null,
    "key": "estate:fb90e4eed5107bcb@parcel:NC:buncombe:9625783851",
    "live_key_suffix": "parcel:NC:buncombe:9625783851",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "Difinuc Fisul",
@@ -235,7 +235,7 @@
     "street_address": "226 BENT COJID RANCH RD"
    },
    "tier": "WARM",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   },
   {
    "decided_by": null,
@@ -317,7 +317,7 @@
    "decided_by": "death_record_and_heirs_of_record",
    "key": "estate:87946372b5907397@parcel:NC:buncombe:9628063694",
    "live_key_suffix": "parcel:NC:buncombe:9628063694",
-   "reason": null,
+   "reason": "roll_says_heirs",
    "row": {
     "county": "Buncombe",
     "defendant": "DIRUFA LAVU BOLULO SR (HEIRS)",
@@ -361,7 +361,7 @@
    "decided_by": "death_record_and_heirs_of_record",
    "key": "estate:bff905c75941ef2a@parcel:NC:buncombe:9755791213",
    "live_key_suffix": "parcel:NC:buncombe:9755791213",
-   "reason": null,
+   "reason": "roll_says_heirs",
    "row": {
     "county": "Buncombe",
     "defendant": "AEMOJ MOKAWAL HEIRS",
@@ -486,7 +486,7 @@
    "decided_by": "death_record_and_heirs_of_record",
    "key": "estate:e55313c577fce71f@parcel:NC:buncombe:9639623518",
    "live_key_suffix": "parcel:NC:buncombe:9639623518",
-   "reason": null,
+   "reason": "roll_says_heirs",
    "row": {
     "county": "Buncombe",
     "defendant": "CUGOMOG GUFEDU GELENOM (HEIRS)",
@@ -580,7 +580,7 @@
    "decided_by": null,
    "key": "estate:aeaa05850b933dab@parcel:NC:buncombe:9644053934",
    "live_key_suffix": "parcel:NC:buncombe:9644053934",
-   "reason": "death_record_ambiguous",
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "Guwuba H Huwuso III",
@@ -605,10 +605,10 @@
    "verdict": "unconfirmed"
   },
   {
-   "decided_by": "death_record_and_heirs_of_record",
+   "decided_by": null,
    "key": "estate:ccee04c34fd491eb@parcel:NC:buncombe:9658783699",
    "live_key_suffix": "parcel:NC:buncombe:9658783699",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "PINUV R HICOFI HEIRS",
@@ -643,13 +643,13 @@
     "street_address": "505 NEKU HAW COJID RD"
    },
    "tier": "WARM",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   },
   {
-   "decided_by": "death_record_and_heirs_of_record",
+   "decided_by": null,
    "key": "estate:b7c49f9ddab74d60@parcel:NC:buncombe:9648009831",
    "live_key_suffix": "parcel:NC:buncombe:9648009831",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "RIKENA C BUKEMA HEIRS",
@@ -686,7 +686,7 @@
     "state": "NC"
    },
    "tier": "WARM",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   },
   {
    "decided_by": null,
@@ -818,7 +818,7 @@
    "decided_by": null,
    "key": "estate:31aefbb74c7a82e7@parcel:NC:buncombe:9700720768",
    "live_key_suffix": "parcel:NC:buncombe:9700720768",
-   "reason": "death_record_ambiguous",
+   "reason": "death_entry_name_mismatch",
    "row": {
     "case_number": "fc-65327991",
     "city": "ASHEVILLE",
@@ -849,10 +849,10 @@
    "verdict": "unconfirmed"
   },
   {
-   "decided_by": "death_record_and_heirs_of_record",
+   "decided_by": null,
    "key": "estate:3925ca5b6b7e8ebf@parcel:NC:buncombe:9639856328",
    "live_key_suffix": "parcel:NC:buncombe:9639856328",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "JIFE CURIVA JAGAV HEIRS",
@@ -887,7 +887,7 @@
     "street_address": "460 MONTFORD AVE"
    },
    "tier": "WARM",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   },
   {
    "decided_by": null,
@@ -1088,10 +1088,10 @@
    "verdict": "unconfirmed"
   },
   {
-   "decided_by": null,
+   "decided_by": "death_record_and_heirs_of_record",
    "key": "estate:f556f446dc161f63@parcel:NC:buncombe:9644921345",
    "live_key_suffix": "parcel:NC:buncombe:9644921345",
-   "reason": "death_record_ambiguous",
+   "reason": "roll_says_heirs",
    "row": {
     "city": "AETAW",
     "county": "Buncombe",
@@ -1113,13 +1113,13 @@
     "street_address": "185 BELAFOV BEGADE RD LOT 10"
    },
    "tier": "WARM",
-   "verdict": "unconfirmed"
+   "verdict": "confirmed"
   },
   {
-   "decided_by": "death_record_and_titled_to_decedent",
+   "decided_by": null,
    "key": "estate:4e21a470668a4ff0@parcel:NC:buncombe:9616393669",
    "live_key_suffix": "parcel:NC:buncombe:9616393669",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "Eipawini W Cijod Jr.",
@@ -1141,7 +1141,7 @@
     "street_address": "79 LIMI DR"
    },
    "tier": "WARM",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   },
   {
    "decided_by": null,
@@ -1296,7 +1296,7 @@
    "decided_by": null,
    "key": "estate:92adb81b52bd3f60@parcel:NC:buncombe:9669820497",
    "live_key_suffix": "parcel:NC:buncombe:9669820497",
-   "reason": "death_record_ambiguous",
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "Mese Nubun",
@@ -1471,10 +1471,10 @@
    "verdict": "unconfirmed"
   },
   {
-   "decided_by": null,
+   "decided_by": "death_record_and_heirs_of_record",
    "key": "estate:12cc84b67509cab0@parcel:NC:buncombe:9649544610",
    "live_key_suffix": "parcel:NC:buncombe:9649544610",
-   "reason": "death_record_ambiguous",
+   "reason": "roll_says_heirs",
    "row": {
     "city": "NEWARK",
     "county": "Buncombe",
@@ -1496,7 +1496,7 @@
     "street_address": "24 STENGEL AVE"
    },
    "tier": "WARM",
-   "verdict": "unconfirmed"
+   "verdict": "confirmed"
   },
   {
    "decided_by": null,
@@ -1567,10 +1567,10 @@
    "verdict": "unconfirmed"
   },
   {
-   "decided_by": "death_record_and_heirs_of_record",
+   "decided_by": null,
    "key": "estate:ebea6bb9abdbe3e3@parcel:NC:buncombe:9795100665",
    "live_key_suffix": "parcel:NC:buncombe:9795100665",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "HEIRS OF GIPUPE J SITOBIZUW",
@@ -1608,7 +1608,7 @@
     "street_address": "6 POKAZAW COJID RD"
    },
    "tier": "WARM",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   },
   {
    "decided_by": null,
@@ -1656,10 +1656,10 @@
    "verdict": "unconfirmed"
   },
   {
-   "decided_by": "death_record_and_heirs_of_record",
+   "decided_by": null,
    "key": "estate:b569cec5665132a0@parcel:NC:buncombe:9634918859",
    "live_key_suffix": "parcel:NC:buncombe:9634918859",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "JUWEJ B MOKAWAL (HEIRS)",
@@ -1697,13 +1697,13 @@
     "street_address": "40 TEZU DR"
    },
    "tier": "WARM",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   },
   {
-   "decided_by": null,
+   "decided_by": "death_record_and_heirs_of_record",
    "key": "estate:3841947c6da1d57f@parcel:NC:buncombe:9648261493",
    "live_key_suffix": "parcel:NC:buncombe:9648261493",
-   "reason": "death_record_ambiguous",
+   "reason": "roll_says_heirs",
    "row": {
     "county": "Buncombe",
     "defendant": "GANIZO (HEIRS) LAMA M",
@@ -1741,13 +1741,13 @@
     "street_address": "10 SWINDALE ST"
    },
    "tier": "WARM",
-   "verdict": "unconfirmed"
+   "verdict": "confirmed"
   },
   {
    "decided_by": "death_record_and_heirs_of_record",
    "key": "estate:ecfa8ed574ca1f08@parcel:NC:buncombe:9688199972",
    "live_key_suffix": "parcel:NC:buncombe:9688199972",
-   "reason": null,
+   "reason": "roll_says_heirs",
    "row": {
     "city": "ASHEVILLE",
     "county": "Buncombe",
@@ -1775,7 +1775,7 @@
    "decided_by": "death_record_and_heirs_of_record",
    "key": "estate:b7917d57436bd496@parcel:NC:buncombe:8780599426",
    "live_key_suffix": "parcel:NC:buncombe:8780599426",
-   "reason": null,
+   "reason": "roll_says_heirs",
    "row": {
     "county": "Buncombe",
     "defendant": "LEJIBEJO LAVU LEZITOBI (HEIRS)",
@@ -1840,10 +1840,10 @@
    "verdict": "unconfirmed"
   },
   {
-   "decided_by": "death_record_and_heirs_of_record",
+   "decided_by": null,
    "key": "estate:6939f86649ef3f78@parcel:NC:buncombe:9775726561",
    "live_key_suffix": "parcel:NC:buncombe:9775726561",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "SEMODAFUK J AEBAW HEIRS",
@@ -1877,13 +1877,13 @@
     "state": "NC"
    },
    "tier": "WARM",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   },
   {
-   "decided_by": "death_record_and_heirs_of_record",
+   "decided_by": null,
    "key": "estate:daa94f0d454a9f17@parcel:NC:buncombe:9626717285",
    "live_key_suffix": "parcel:NC:buncombe:9626717285",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "county": "Buncombe",
     "defendant": "SOHIBU D CIFE HEIRS",
@@ -1922,7 +1922,7 @@
     "street_address": "POLE CEDAJIBU RD"
    },
    "tier": "HOT",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   },
   {
    "decided_by": null,
@@ -2016,10 +2016,10 @@
    "verdict": "unconfirmed"
   },
   {
-   "decided_by": "death_record_and_heirs_of_record",
+   "decided_by": null,
    "key": "estate:2633a21a53d1086f@parcel:NC:buncombe:9742916139",
    "live_key_suffix": "parcel:NC:buncombe:9742916139",
-   "reason": null,
+   "reason": "death_entry_name_mismatch",
    "row": {
     "city": "WEAVERVILLE",
     "county": "Buncombe",
@@ -2072,7 +2072,7 @@
     "street_address": "263 LONGS CHAPEL RD"
    },
    "tier": "HOT",
-   "verdict": "confirmed"
+   "verdict": "unconfirmed"
   }
  ]
 }

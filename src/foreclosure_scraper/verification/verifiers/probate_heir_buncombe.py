@@ -51,6 +51,21 @@ read two or three different people); only other-middle records = conflict_only; 
 not_found. A death outside Buncombe is recorded in that county, so not_found is never evidence
 against the claim.
 
+THE FULL NAME (v3, 2026-10-07). First name, last name and middle INITIAL are not enough to call an
+index entry the decedent: the live re-check for the lawyer package found a Buncombe parcel titled
+to "<FIRST> <MAIDEN NAME> <LAST> (HEIRS)" confirmed from the entry "<LAST>, <FIRST> MAE" (the
+initials agree by chance; the entry's parents did not fit, and a better-fitting entry with another
+middle name and the maiden name as a parent sat beside it: the index alone cannot decide). So a
+record that passed the rules above is the decedent's only when its given + middle names EQUAL, word
+for word, what the owner of record (the county layer's string) or the claim's own decedent name
+spells (given_tokens(); suffixes and the surname words ignored). Otherwise match = name_mismatch
+(death_entry_name_mismatch, unconfirmed), with name_agreement 'differs' (both sides spell a middle
+name and they are different words) or 'initial_only' (compatible, but at least one side gives only
+an initial or no middle name: unproven). DEATH_NAME_INITIALS_OK = True would let 'initial_only'
+stand as before; the default follows the lawyer-package rule (never claim a death entry unless the
+full names equal). A name_mismatch record is used for nothing else (no death year, so no (A) / (R1)
+timing, and (R2) needs the record not found).
+
 CHECK 2, THE TRANSFER PATTERN. The county parcel layer (gis.buncombecounty.org property_bc_dis/
 MapServer/1; find_parcel(): by the row's PIN ONLY when it has one, else house number + street;
 an ArcGIS error body is a fetch failure, retried once, never "no parcel") gives the
@@ -72,7 +87,13 @@ ROD index after the death that the county layer has not caught up with.
 
 VERDICTS (core.py's meanings):
   confirmed    the death record matched AND the estate looks unsettled (titled_to_decedent or
-               heirs_of_record, no recorded conveyance out after the death).
+               heirs_of_record, no recorded conveyance out after the death). For heirs_of_record
+               the county's own title wording ("<name> HEIRS" / "ESTATE OF") is the roll fact the
+               verdict stands on, and says so: reason roll_says_heirs. A death entry that is not
+               the decedent's by the full name rule leaves the claim unconfirmed
+               (death_entry_name_mismatch); the roll fact alone is NOT the claim of this verifier
+               (it reads "the person is dead on the county's record AND the estate holds the
+               property"), so it does not stand in for the death record.
   stale        the property has already been conveyed out of the estate, to a third party for
                value: the owner of record is unrelated to the decedent (no shared surname with
                the decedent, the care-of or the personal representative), the vesting deed
@@ -168,7 +189,11 @@ from ..core import VerificationResult, case_id, result
 from . import foreclosure_rod_buncombe as F
 
 SIGNAL = "probate_heir"
-VERSION = "v2"         # v2 (2026-10-06, the same night as v1's first sweep): a row's PIN is
+VERSION = "v3"         # v3 (2026-10-07): a death-index entry is the decedent's only when its FULL
+                       # given and middle names equal the ones the owner of record / the claim
+                       # spell (death_entry_name_mismatch otherwise); a confirmed heirs-of-record
+                       # verdict says reason roll_says_heirs.
+                       # v2 (2026-10-06, the same night as v1's first sweep): a row's PIN is
                        # authoritative (no address fallback: an unpaid-bill row's street_address
                        # can be the owner's MAILING address), and an ArcGIS error body is a
                        # fetch failure (one retry), never "no parcel"
@@ -183,6 +208,9 @@ LISTING_TYPES = ("probate_notice", "estate_lead")
 VOTER_HOST = "vt.ncsbe.gov"
 
 DEATH_BEFORE_CASE_YEARS = 5    # an estate file is opened within a few years of the death
+DEATH_NAME_INITIALS_OK = False  # True: an entry whose names agree only down to an initial (or one
+                                # side has no middle name) still counts (the v2 rule); False (v3):
+                                # only an entry whose full given + middle names equal the claim's
 ACTED_AFTER_DAYS = 90          # (R2): a deed signed before the death can be recorded weeks later
 LAYER_LAG_DAYS = 365           # (D): a deed out the county layer has not caught up with
 MAX_DEATH_SEARCHES = 2
@@ -529,10 +557,76 @@ def relation(a: Optional[Person], b: Optional[Person], a_sfx: Optional[str] = No
     return r
 
 
-def death_match(grid: dict, subject: Person, claim: dict, subject_sfx: Optional[str] = None) -> dict:
-    """Which DEATHS records are the subject's (module docstring, CHECK 1). Returns the public
-    summary: match, basis, the record's year and book/page, the identity (initials + verdict),
-    counts of same-name records."""
+_NAME_SFX = {"JR", "SR", "II", "III", "IV"}
+
+
+def _words(text: Any) -> list[str]:
+    return [w for w in re.sub(r"[^A-Za-z ]", " ", str(text or "").replace("'", "")).upper().split()
+            if w not in _NAME_SFX]
+
+
+def given_tokens(source: Any, person: Person) -> Optional[list[str]]:
+    """The given + middle names of `person` as `source` spells them, upper case, in order
+    (["BETTY", "MOORE"] for "BETTY MOORE PENLAND (HEIRS)" and for "PENLAND (HEIRS) BETTY MOORE"):
+    the cleaned name's words minus its generational suffixes and the surname words. None when the
+    source does not hold the person's surname as a run of words or does not start its given names
+    with the person's first name (it names somebody else, or cannot be read)."""
+    words = _words(clean_name(source))
+    sur = F.surname_key(person[0])
+    n = len(words)
+    for i in range(n):
+        acc = ""
+        for j in range(i, n):
+            acc += words[j]
+            if acc == sur:
+                given = words[:i] + words[j + 1:]
+                return given if given and given[0] == person[1] else None
+            if len(acc) >= len(sur):
+                break
+    return None
+
+
+def rod_given_tokens(name: Any) -> list[str]:
+    """The given + middle words of an ROD party ("PENLAND, BETTY MAE/ TR" -> ["BETTY", "MAE"])."""
+    n = re.sub(r"/.*$", "", str(name or ""))
+    return _words(n.split(",", 1)[1]) if "," in n else []
+
+
+def name_agreement(source: list[str], record: list[str]) -> str:
+    """'full' | 'initial_only' | 'differs' between the given + middle words one source spells and
+    the index entry's. full: the same words. differs: at the same position both give a spelled-out
+    word (two or more letters) and the words are different, or an initial and a word that does not
+    start with it. initial_only: nothing disagrees but at least one side stops at an initial or
+    has no middle name, so the full names are not proven equal."""
+    if source == record:
+        return "full"
+    for a, b in zip(source, record):
+        if a == b:
+            continue
+        if len(a) == 1 or len(b) == 1:
+            if a[0] != b[0]:
+                return "differs"
+            continue
+        return "differs"
+    return "initial_only"
+
+
+def _agreement(sources: list[list[str]], record: list[str]) -> str:
+    """The agreement over every source that spells the decedent's name: any 'differs' decides
+    (the more informative spelling disagrees), else any 'full', else 'initial_only'."""
+    got = [name_agreement(s, record) for s in sources]
+    if "differs" in got:
+        return "differs"
+    return "full" if "full" in got else "initial_only"
+
+
+def death_match(grid: dict, subject: Person, claim: dict, subject_sfx: Optional[str] = None,
+                subject_names: Optional[list[list[str]]] = None) -> dict:
+    """Which DEATHS records are the subject's (module docstring, CHECK 1 and THE FULL NAME).
+    Returns the public summary: match, basis, the record's year and book/page, the identity
+    (initials + verdict), counts of same-name records. `subject_names`: the given + middle words
+    each source spells for the decedent (given_tokens()); when given, a record that passed the
+    first-name / last-name / middle-initial rules still has to agree by name_agreement()."""
     death_by = F.to_date(claim.get("death_by"))
     cy = claim.get("case_year")
     keep: list[tuple[str, dict, Person]] = []
@@ -546,6 +640,7 @@ def death_match(grid: dict, subject: Person, claim: dict, subject_sfx: Optional[
             continue
         best: Optional[tuple[str, Person]] = None
         best_sfx: Optional[str] = None
+        best_nm = ""
         for nm in doc.get("matched") or []:
             if nm not in (doc.get("grantors") or []):
                 continue
@@ -557,7 +652,7 @@ def death_match(grid: dict, subject: Person, claim: dict, subject_sfx: Optional[
                 conflicts += 1
                 continue
             if best is None or (best[0] == "unverified" and r == "agrees"):
-                best, best_sfx = (r, p), suffix_of(nm)
+                best, best_sfx, best_nm = (r, p), suffix_of(nm), nm
         if best is None:
             continue
         y = doc.get("year")
@@ -565,9 +660,25 @@ def death_match(grid: dict, subject: Person, claim: dict, subject_sfx: Optional[
                   or (cy and y < cy - DEATH_BEFORE_CASE_YEARS)):
             implausible += 1
             continue
-        keep.append((best[0], doc, best[1], best_sfx))
+        keep.append((best[0], doc, best[1], best_sfx, best_nm))
     out: dict[str, Any] = {"records": len(grid.get("docs") or []), "same_name": len(keep),
                            "other_middle": conflicts}
+    # THE FULL NAME (v3): a record that passed the initial rules is the decedent's only when its
+    # given + middle words equal what the claim / the owner of record spell (DEATH_NAME_INITIALS_OK
+    # lets an unproven 'initial_only' agreement stand)
+    named = [(k, _agreement(subject_names, rod_given_tokens(k[4]))) for k in keep] \
+        if subject_names else [(k, "full") for k in keep]
+    ok_levels = ("full", "initial_only") if DEATH_NAME_INITIALS_OK else ("full",)
+    refused = [(k, a) for k, a in named if a not in ok_levels]
+    keep = [k for k, a in named if a in ok_levels]
+    if refused and not keep:
+        out["match"] = "name_mismatch"
+        out["name_agreement"] = "initial_only" if any(a == "initial_only" for _, a in refused) \
+            else "differs"
+        out["name_mismatch_records"] = len(refused)
+        return out
+    if refused:
+        out["name_mismatch_records"] = len(refused)
     if implausible:
         out["outside_claim_dates"] = implausible
     if as_parent:
@@ -586,7 +697,7 @@ def death_match(grid: dict, subject: Person, claim: dict, subject_sfx: Optional[
     if pick is None:
         out["match"] = "ambiguous"
         return out
-    verdict, doc, p, _ = pick[0]
+    verdict, doc, p, _, _ = pick[0]
     out.update({"match": "matched",
                 "basis": basis or ("middle_agrees" if verdict == "agrees" else "first_last"),
                 "recorded_year": doc.get("year"), "recorded": doc.get("date"),
@@ -788,8 +899,11 @@ def decide(claim: dict, parcel: Optional[dict], dec: Person, death: dict,
                 return finish("stale", "conveyed_out", decided_by="deed_out_not_yet_on_layer",
                               deciding=[_pub(doc, ties, ps[0][0], estate)])
         if death.get("match") == "matched":
+            if rel["relation"] == "heirs_of_record":
+                ev["reason"] = "roll_says_heirs"      # the county's own title wording is the roll fact
             return finish("confirmed", rel["relation"], decided_by="death_record_and_" + rel["relation"])
         ev["reason"] = {"ambiguous": "death_record_ambiguous",
+                        "name_mismatch": "death_entry_name_mismatch",
                         "conflict_only": "death_record_not_found",
                         "not_found": "death_record_not_found"}.get(death.get("match"),
                                                                     "death_record_not_checked")
@@ -971,7 +1085,8 @@ _CLAIM_PUBLIC = ("listing_type", "source", "case_kind", "case_year", "death_by",
 _DECEDENT_PUBLIC = ("field", "initials", "readings", "order_fixed_by_owner")
 _DEATH_PUBLIC = ("searched", "match", "basis", "recorded_year", "recorded", "book_page",
                  "identity", "records", "same_name", "other_middle", "outside_claim_dates",
-                 "named_as_parent", "valid_thru", "complete", "reason")
+                 "named_as_parent", "valid_thru", "complete", "reason", "name_agreement",
+                 "name_mismatch_records")
 _LIVENESS_STATUSES = {"active", "inactive", "removed", "not_found", "ambiguous", "error",
                       "not_checked"}
 
@@ -1086,6 +1201,21 @@ def _heir_roll_on_pin(row: dict, parcel: Optional[dict], how: Optional[str]) -> 
     return "counties_nc.nc_heir_estate_parcels" in srcs
 
 
+def subject_names(dec: dict, parcel: Optional[dict], reading: Person) -> list[list[str]]:
+    """The given + middle words each source spells for the decedent `reading`: the claim's own
+    decedent name and every owner-of-record segment of the county layer that names the same person
+    (given_tokens(); a source that names somebody else, or cannot be read, is left out)."""
+    sources = [dec.get("raw")]
+    if parcel:
+        sources += [seg for seg in str(parcel.get("owner") or "").split(";") if seg.strip()]
+    out: list[list[str]] = []
+    for src in sources:
+        got = given_tokens(src, reading) if src else None
+        if got and got not in out:
+            out.append(got)
+    return out
+
+
 async def verify(row: dict, client, *, today: Optional[date] = None) -> VerificationResult:
     today = today or date.today()
     claim = claim_of(row)
@@ -1165,16 +1295,16 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
                     if i == 0:
                         death = {"match": "not_checked", "reason": got["error"], "searched": 1}
                     break
-                dm = death_match(got["grid"], p, claim, sfx)
+                dm = death_match(got["grid"], p, claim, sfx, subject_names(dec, parcel, p))
                 dm.update({"searched": i + 1, "valid_thru": got["grid"].get("valid_thru"),
                            "complete": got["complete"]})
-                if i == 0 or dm.get("match") in ("matched", "ambiguous"):
+                if i == 0 or dm.get("match") in ("matched", "ambiguous", "name_mismatch"):
                     death, dec_p = dm, p
                 else:
                     death["searched"] = i + 1
-                if (dm.get("match") in ("matched", "ambiguous")
+                if (dm.get("match") in ("matched", "ambiguous", "name_mismatch")
                         or ev["decedent"].get("order_fixed_by_owner")):
-                    break
+                    break              # name_mismatch: this reading HAS a same-name record
             if parcel is not None:
                 narrow = None
                 vd = F.to_date(parcel.get("DeedDate"))

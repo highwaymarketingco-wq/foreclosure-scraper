@@ -110,7 +110,14 @@ class Live(ReplayFetcher):
 
 def test_every_live_verdict_reproduces_from_the_captured_responses():
     """The 55 claims of the 2026-10-06 sweeps (40 HOT/WARM, re-checked under v2, + 15 WARM
-    estate / obituary notices with a parcel), docs/handoff/verification/probate_heir.json."""
+    estate / obituary notices with a parcel), docs/handoff/verification/probate_heir.json.
+
+    Re-pinned under v3 (2026-10-07, THE FULL NAME): of the 19 confirmed under v2, 11 became
+    unconfirmed death_entry_name_mismatch (2 whose index entry spells ANOTHER middle name, 9 whose
+    name agrees only down to an initial or lacks a middle name), 3 unconfirmed 'ambiguous' ones
+    became confirmed (exactly one of the several same-name entries has the full names), and the
+    confirmed heirs-of-record verdicts say reason roll_says_heirs. DEATH_NAME_INITIALS_OK = True
+    keeps the 9 initial-only ones confirmed (test_initials_only_agreement_follows_the_switch)."""
     assert len(CASES) == 55
     got = Counter()
     for c in CASES:
@@ -119,7 +126,7 @@ def test_every_live_verdict_reproduces_from_the_captured_responses():
         assert (res.verdict, res.evidence.get("decided_by"), res.evidence.get("reason")) == \
             (c["verdict"], c["decided_by"], c["reason"]), c["key"]
         got[res.verdict] += 1
-    assert got == {"confirmed": 19, "unconfirmed": 35, "refuted": 1}
+    assert got == {"confirmed": 11, "unconfirmed": 43, "refuted": 1}
 
 
 def test_the_live_rows_keys_are_case_scoped():
@@ -587,7 +594,7 @@ def _vrow(name, status, city=""):
             "NCID": "NCID98765", "CountyName": "BUNCOMBE"}
 
 
-def _heir_row(owner="ODESSA M PELLWORTH HEIRS", **kw):
+def _heir_row(owner="ODESSA MAE PELLWORTH HEIRS", **kw):
     row = {**BUN, "source": "counties_nc.nc_heir_estate_parcels", "listing_type": "estate_lead",
            "parcel_id": "9700000001", "street_address": "12 QUILL RD", "first_seen": "2026-07-22T20:45:25",
            "owner_name": owner, "defendant": owner,
@@ -598,7 +605,7 @@ def _heir_row(owner="ODESSA M PELLWORTH HEIRS", **kw):
     return row
 
 
-def _responses(owner_now="ODESSA M PELLWORTH HEIRS", deaths=DEATHS_PAGE, crp=None):
+def _responses(owner_now="ODESSA MAE PELLWORTH HEIRS", deaths=DEATHS_PAGE, crp=None):
     return {F.gis_url_pin("970000000100000"): _gis(owner_now),
             F.SEARCH_URL: "<html><body><div id='ucSrchNames'>search</div></body></html>",
             form_key(F.SEARCH_URL, ph.death_body("PELLWORTH", "ODESSA")): deaths,
@@ -617,6 +624,7 @@ def test_verify_confirmed_with_heir_liveness_as_counts_only():
     c = Voters(_responses(), voters)
     res = run(_heir_row(), c)
     assert res.verdict == "confirmed" and res.evidence["decided_by"] == "death_record_and_heirs_of_record"
+    assert res.evidence["reason"] == "roll_says_heirs"
     hl = res.evidence["heir_liveness"]
     assert hl == {"named": 2, "searched": 2, "decedent_named": {"removed": 1}, "care_of": {"active": 1}}
     assert ("Odessa", "Pellworth", "ALL") in c.voter_asked
