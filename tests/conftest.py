@@ -84,3 +84,19 @@ def _isolate_board_ops(monkeypatch, tmp_path_factory):
                 "BOARD_PARTS_ALLOW_UNLISTED", "BOARD_PART_MAX_BYTES"):
         monkeypatch.delenv(var, raising=False)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _qpaybill_detail_pass_off_in_tests(monkeypatch):
+    """The qPayBill staged detail pass is ON by default since 2026-10-07 and reads the real
+    published board (iter_board_rows, ~40 s) for its tier plan. A test that drives fetch()
+    must never do either: it is switched off here, and the tests of the pass itself turn it
+    back on with their own canned plan."""
+    try:
+        from foreclosure_scraper.scrapers.counties_sc import qpaybill_delinquent_roll as _qp
+    except Exception:  # noqa: BLE001
+        yield
+        return
+    monkeypatch.setattr(_qp, "DETAIL_ENABLED", False)
+    monkeypatch.setattr(_qp, "DETAIL_BOARD", "/nonexistent/board-for-tests.json.gz")
+    yield

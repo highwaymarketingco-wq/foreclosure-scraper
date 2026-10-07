@@ -319,10 +319,24 @@ REQUEST_BUDGET_PER_COUNTY = int(os.getenv("QPAYBILL_ROLL_BUDGET", "2500"))
 
 _PER_HOST_CONCURRENCY = 3
 
-#: Second, opt-in pass: fetch each parcel's detail page for the county appraised value and the
-#: 4%/6% owner-occupancy ratio. One request PER PARCEL, so it is off by default and bounded.
-DETAIL_ENABLED = os.getenv("QPAYBILL_ROLL_DETAIL", "") not in ("", "0", "false", "False")
-DETAIL_MAX = int(os.getenv("QPAYBILL_ROLL_DETAIL_MAX", "400"))
+#: Second pass: each parcel's detail page (appraised value, 4%/6% owner-occupancy ratio, acres,
+#: legal, penalty/cost/fees). One request PER PARCEL. STAGED since 2026-10-07 (owner decision):
+#: ON by default, at most DETAIL_MAX parcels per run across all counties, HOT then WARM then
+#: COLD (the board's raw.distress_stack.tier), largest balance first within a tier, skipping
+#: every parcel whose board row already carries the detail (the prior board's detail survives
+#: the merge), so coverage grows run over run: ~19.3k undetailed parcels / 2,000 = ~10 runs.
+#: QPAYBILL_ROLL_DETAIL=0 turns it off.
+DETAIL_ENABLED = os.getenv("QPAYBILL_ROLL_DETAIL", "1") not in ("0", "false", "False")
+DETAIL_MAX = int(os.getenv("QPAYBILL_ROLL_DETAIL_MAX", "2000"))
+#: Seconds between two detail requests to one county host (one request at a time per host).
+DETAIL_PACE_S = float(os.getenv("QPAYBILL_ROLL_DETAIL_PACE_S", "1.6"))
+#: County hosts detailed at the same time (each its own subdomain, each one-at-a-time).
+DETAIL_COUNTY_CONCURRENCY = int(os.getenv("QPAYBILL_ROLL_DETAIL_COUNTIES", "3"))
+#: The published board, read once (streamed, constant memory) for the staging plan.
+DETAIL_BOARD = os.getenv(
+    "QPAYBILL_ROLL_DETAIL_BOARD",
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "docs", "listings.json.gz"))
+_TIER_RANK = {"HOT": 0, "WARM": 1, "COLD": 2}
 
 #: Ceiling across ALL counties at once. Nineteen counties x 3 = 57 simultaneous new
 #: clients, each doing its own DNS lookup, and macOS's resolver started returning
@@ -989,6 +1003,91 @@ def parse_detail(text: str) -> dict:
     return {k: v for k, v in out.items() if v not in (None, "")}
 
 
+def board_detail_plan(path: str = None) -> dict:
+    """{(county, identification_no): {"tier": str|None, "has_detail": bool}} for this source's
+    rows on the published board, read with board_stream.iter_board_rows (constant memory, read
+    only). {} when the board cannot be read: the pass then simply ranks by balance."""
+    try:
+        from ...board_stream import iter_board_rows
+        plan: dict = {}
+        for row in iter_board_rows(path or DETAIL_BOARD):
+            if row.get("source") != "counties_sc.qpaybill_delinquent_roll":
+                continue
+            raw = row.get("raw") or {}
+            qr = raw.get("qpaybill_roll") or {}
+            ident = qr.get("identification_no")
+            county = qr.get("county") or row.get("county")
+            if not ident or not county:
+                continue
+            tier = (raw.get("distress_stack") or {}).get("tier")
+            prev = plan.get((county, ident))
+            has = bool(qr.get("detail")) or bool(prev and prev["has_detail"])
+            best = tier if not prev else min((tier, prev["tier"]),
+                                              key=lambda t: _TIER_RANK.get(t or "", 3))
+            plan[(county, ident)] = {"tier": best, "has_detail": has}
+        return plan
+    except Exception as exc:  # noqa: BLE001 - a missing board only loses the tier ordering
+        log.warning("qpaybill_roll.detail_plan_unavailable", error=str(exc)[:160])
+        return {}
+
+
+def stage_detail_targets(rows_by_county: dict, kept: dict, plan: dict, cap: int) -> dict:
+    """ordered_detail_targets grouped by county: {county: [row, ...]}, each in priority order."""
+    out: dict = {}
+    for county, r in ordered_detail_targets(rows_by_county, kept, plan, cap):
+        out.setdefault(county, []).append(r)
+    return out
+
+
+def ordered_detail_targets(rows_by_county: dict, kept: dict, plan: dict, cap: int) -> list:
+    """This run's detail targets as [(county, row)]: one row per parcel (its highest-amount
+    row), only parcels that survived the delinquency filter (`kept`), never one whose board row
+    already carries the detail, ordered HOT, WARM, COLD, unknown, then largest balance; at most
+    `cap` in total."""
+    cands = []
+    for county, rows in rows_by_county.items():
+        keep = kept.get(county)
+        best: dict = {}
+        for r in rows:
+            ident = r.get("ident")
+            if not r.get("detail_href") or (keep and ident not in keep):
+                continue
+            key = ident or r["detail_href"]
+            if key not in best or (r.get("amount") or 0) > (best[key].get("amount") or 0):
+                best[key] = r
+        for ident, r in best.items():
+            p = plan.get((county, ident)) or {}
+            if p.get("has_detail"):
+                continue
+            cands.append((_TIER_RANK.get(p.get("tier") or "", 3), -(r.get("amount") or 0),
+                          county, r))
+    cands.sort(key=lambda c: (c[0], c[1]))
+    return [(county, r) for _rank, _amt, county, r in cands[:max(0, cap)]]
+
+
+async def fetch_details_paced(client: httpx.AsyncClient, sub: str, hrefs: list[str],
+                              stats: dict, pace_s: float = None) -> dict[str, dict]:
+    """fetch_details, politely: ONE request at a time to this county host, DETAIL_PACE_S apart."""
+    pace = DETAIL_PACE_S if pace_s is None else pace_s
+    got: dict[str, dict] = {}
+    for n, href in enumerate(hrefs):
+        if n:
+            await asyncio.sleep(pace)
+        m = re.search(r"receiptNo=([^&\"]+)", href)
+        receipt = m.group(1) if m else ""
+        try:
+            r = await client.get(_detail_url(sub, href))
+            d = parse_detail(r.text)
+            if d:
+                got[receipt] = d
+            else:
+                stats["detail_empty"] = stats.get("detail_empty", 0) + 1
+        except Exception as exc:  # noqa: BLE001
+            stats["detail_errors"] = stats.get("detail_errors", 0) + 1
+            log.warning("qpaybill_roll.detail_fail", receipt=receipt, error=str(exc)[:120])
+    return got
+
+
 async def fetch_details(client: httpx.AsyncClient, sub: str, hrefs: list[str],
                         budget: "_Budget", stats: dict) -> dict[str, dict]:
     """Fetch detail pages, keyed by receiptNo so they join back to the grid rows."""
@@ -1339,69 +1438,38 @@ class QPayBillDelinquentRoll(BaseScraper):
                                 note="owners whose name starts with these were never "
                                      "read; this county's roll is INCOMPLETE")
 
-        # OPT-IN DETAIL PASS. One request per parcel, so it is bounded and it spends its budget
-        # on the LARGEST BALANCES first -- if only 400 of a county's parcels can be detailed, the
-        # $19,000 arrears should be among them and the $12 should not.
+        # STAGED DETAIL PASS (2026-10-07, owner decision; see DETAIL_ENABLED). One request per
+        # parcel, so it is bounded per run and spends that bound where it matters: HOT, then
+        # WARM, then COLD leads (the board's own tier), largest balance first, and never on a
+        # parcel whose published row already has its detail. Earlier history of this pass:
+        # it details only parcels that survived the delinquency filter (Colleton 2026-09-13:
+        # 18,285 raw idents -> 1,494 real delinquents), and one row per parcel (the grid has
+        # a row per unpaid year; the detail is a property attribute).
         if DETAIL_ENABLED and detail_rows:
+            plan = board_detail_plan()
+            targets = stage_detail_targets(detail_rows, kept_idents, plan, DETAIL_MAX)
+            undetailed = sum(1 for k, v in plan.items() if not v.get("has_detail"))
+            log.info("qpaybill_roll.detail_stage", cap=DETAIL_MAX,
+                     targets=sum(len(v) for v in targets.values()),
+                     board_rows_known=len(plan), board_rows_without_detail=undetailed,
+                     runs_to_finish_at_cap=(-(-undetailed // DETAIL_MAX) if DETAIL_MAX else None))
+            sem = asyncio.Semaphore(max(1, DETAIL_COUNTY_CONCURRENCY))
             async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                          headers={"User-Agent": _UA}) as dclient:
-                for county, rows in sorted(detail_rows.items()):
-                    # DETAIL ONLY WHAT SURVIVED THE FILTER.
-                    #
-                    # This pass runs on the RAW grid rows, but _to_listings has already
-                    # dropped every parcel whose only unpaid year is the current one
-                    # (an SC bill is not late until 15 January of the following year).
-                    # Colleton 2026-09-13: 18,285 raw idents -> 1,494 real delinquents.
-                    # Detailing the raw set spent a 3,000-request budget almost entirely
-                    # on parcels that were then discarded, and returned value on 98.
-                    #
-                    # An earlier attempt deduped per parcel on the theory that the grid
-                    # returned ~14 rows per parcel. It does not — 20,876 rows over
-                    # 18,285 idents is 1.14 — so that fix bought nothing. The waste was
-                    # never duplication; it was ORDERING.
-                    keep = kept_idents.get(county)
-                    with_href = [r for r in rows if r.get("detail_href")
-                                 and (not keep or r.get("ident") in keep)]
-                    with_href.sort(key=lambda r: -(r.get("amount") or 0))
-                    # ONE DETAIL PER PARCEL, not per row.
-                    #
-                    # The grid returns a row per unpaid YEAR, so a parcel 14 years
-                    # behind appears 14 times — and the detail page yields the
-                    # APPRAISED VALUE, which is a property attribute, not a per-year
-                    # one. Fetching it once per row bought the same number 14 times.
-                    #
-                    # Measured on Colleton 2026-09-13: 20,895 rows for 1,495 parcels.
-                    # A 4,000-request detail pass spent itself on the highest-arrears
-                    # rows, which are exactly the parcels with the MOST duplicate
-                    # years, and came back with value on 136 parcels. Deduping first
-                    # covers all 1,495 for ~1,495 requests.
-                    #
-                    # The highest-amount row per parcel is kept, so the sort above
-                    # still decides which parcels are reached when the cap bites.
-                    seen_ident: set[str] = set()
-                    unique_rows = []
-                    for r in with_href:
-                        key = r.get("ident") or r["detail_href"]
-                        if key in seen_ident:
-                            continue
-                        seen_ident.add(key)
-                        unique_rows.append(r)
-                    picked = unique_rows[:DETAIL_MAX]
-                    if not picked:
-                        continue
-                    dstats: dict = {}
-                    got = await fetch_details(dclient, QPAYBILL_SUBS[county],
-                                              [r["detail_href"] for r in picked],
-                                              budgets[county], dstats)
-                    for r in rows:
-                        rec = re.search(r"receiptNo=([^&]+)", r.get("detail_href") or "")
-                        if rec and rec.group(1) in got:
-                            r["detail"] = got[rec.group(1)]
-                    filled = sum(1 for r in rows if r.get("detail"))
-                    log.info("qpaybill_roll.detail_done", county=county,
-                             requested=len(picked), parsed=len(got), rows_filled=filled,
-                             skipped_over_cap=max(0, len(unique_rows) - DETAIL_MAX),
-                             rows=len(with_href), parcels=len(unique_rows), **dstats)
+
+                async def detail_county(county: str, picked: list[dict]) -> None:
+                    async with sem:
+                        dstats: dict = {}
+                        got = await fetch_details_paced(dclient, QPAYBILL_SUBS[county],
+                                                        [r["detail_href"] for r in picked], dstats)
+                        for r in detail_rows.get(county, []):
+                            rec = re.search(r"receiptNo=([^&]+)", r.get("detail_href") or "")
+                            if rec and rec.group(1) in got:
+                                r["detail"] = got[rec.group(1)]
+                        log.info("qpaybill_roll.detail_done", county=county,
+                                 requested=len(picked), parsed=len(got), **dstats)
+
+                await asyncio.gather(*(detail_county(c, p) for c, p in targets.items()))
             out = []
             for county, rows in sorted(detail_rows.items()):
                 got = _to_listings(county, rows)
