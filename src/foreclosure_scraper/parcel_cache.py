@@ -18,6 +18,7 @@ Design:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from urllib.parse import quote
 import re
@@ -28,6 +29,8 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+
+from .sensitive_fields import drop_sensitive
 
 log = structlog.get_logger()
 
@@ -670,6 +673,73 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "acreage": "TACRES", "living_sqft": "SQFEET", "land_use": "PROPTYPE",
                 "sale_price": "SLPRICE", "sale_date": "DEEDDATE"},
     },
+    "Jasper": {
+        # ADDED 2026-10-07 (docs/new_sources_2026-10-07_contact_and_facts.md). Jasper sat at
+        # 0.5% owner mailing and 0% value on 989 board rows, 816 of them already carrying a
+        # parcel id (qPayBill delinquent roll). The county's own parcel site is qPublic, which
+        # answers with a Cloudflare challenge (a wall, never automated). This is the COUNTY
+        # parcel layer as the City of Hardeeville publishes it on ArcGIS Online: item
+        # 43bd2a2f6efa4ddb8c8c6d8379ee2f77, access public, no license text, 20,258 parcels,
+        # layer lastEditDate 2025-08-12. A city's copy, so it can trail the county roll by
+        # a year: owners who sold since then still show; the source date is in the doc.
+        #
+        # Field semantics read off a 2,000-row page on 2026-10-07 (shapes and fill counts,
+        # no values kept): TaxPIN is the dashed TMS with an embedded space ("081-00 -01-024"
+        # shape, the same shape the qPayBill rows carry, so the normalised ids are equal);
+        # Expr3 is the owner name; Address1 is a care-of / second-owner line (35% filled) and
+        # is left out of the mailing; Address2 is the mailing street (98% start with a house
+        # number or PO BOX); Address3 is "CITY ST"; ZipCode is ten digits, a leading 0 then
+        # ZIP5 then ZIP4 ("0" + "29927" + "0000"), which _tidy_mailing turns back into a
+        # ZIP. StreetNumberE911 + StreetNameE911 is the situs. TotMarketAppr is the market
+        # appraisal; Consideration is the deed consideration (sale price). YearBuilt is on
+        # 2% of rows, and the cache has no year column, so it is not read.
+        "state": "SC",
+        "url": "https://services6.arcgis.com/UXJOITFCLbn0Ibm0/arcgis/rest/services/Jasper_County_Parcels/FeatureServer/2/query",
+        "id_fields": ["TaxPIN"],
+        "page_delay_s": 1.7,      # polite: >= 1.6 s between requests to one host
+        "map": {"owner": "Expr3",
+                "address": ["StreetNumberE911", "StreetNameE911"],
+                "owner_mailing": ["Address2", "Address3", "ZipCode"],
+                "market_value": "TotMarketAppr", "acreage": "TotNumberAcres",
+                "sale_price": "Consideration"},
+    },
+}
+
+#: South Carolina halves of the DUAL_STATE_COUNTIES names (Beaufort, Cherokee, Union, Lee,
+#: Anson, Chester). Kept OUT of PARCEL_LAYERS on purpose: PARCEL_LAYERS is keyed by bare county
+#: name, and resolve_layer_cfg("Beaufort") with no state must keep returning the NC OneMap
+#: config that builds beaufort_nc.sqlite every week. An SC entry there would silently turn the
+#: NC refresh into an SC one. These configs are reached only with an explicit state="SC"
+#: (resolve_layer_cfg(county, "SC"), refresh_county(county, "SC"),
+#: scripts/refresh_parcel_cache.py "Beaufort:SC"), and every one MUST carry state="SC" so the
+#: cache lands in <county>_sc.sqlite.
+SC_DUAL_LAYERS: dict[str, dict] = {
+    "Beaufort": {
+        # ADDED 2026-10-07 (docs/new_sources_2026-10-07_contact_and_facts.md). Beaufort SC sat
+        # at 0.2% owner mailing on 1,695 board rows; only 25 carry a parcel id, the rest carry
+        # a street (SC DEW lien registry, SC UST registry), so this cache earns its keep through
+        # the situs-address resolver (scripts/resolve_parcel_from_address.py) as much as through
+        # a parcel-id join. County EnerGov service, open, no token, 141,367 parcels,
+        # maxRecordCount 10,000, pagination supported; the service iteminfo carries no license
+        # text (checked 2026-10-07). GisFile_PIN is the 18-character PIN
+        # ("R600 012 00A 0123 0000" shape, the board's own shape). GisFile_Appraised is the full
+        # market appraisal (Land + Improvements); GisFile_Capped / Assessed / Taxable are the
+        # Act 388 capped and 4%/6% ratio figures and are NOT mapped (tax_value is the ARV
+        # fallback). GisFile_ResSquareF is residential heated area (on 56% of a 2,000-row page);
+        # SaleDate is "M/D/YYYY" text, SalePrice comma/text, both handled by _map_val.
+        "state": "SC",
+        "url": "https://gis.beaufortcountysc.gov/server/rest/services/EnerGov/MapServer/1/query",
+        "id_fields": ["GisFile_PIN"],
+        "page": 5000,             # 29 requests instead of 71 at the default 2,000
+        "page_delay_s": 1.7,      # polite: >= 1.6 s between requests to one host
+        "map": {"owner": "GisFile_Owner1",
+                "address": "GisFile_SitusAddre",
+                "owner_mailing": ["GisFile_MailingAdd", "GisFile_City", "GisFile_State",
+                                  "GisFile_ZIP"],
+                "market_value": "GisFile_Appraised", "acreage": "GisFile_Acres",
+                "living_sqft": "GisFile_ResSquareF", "land_use": "GisFile_ClassCode",
+                "sale_price": "GisFile_SalePrice", "sale_date": "GisFile_SaleDate"},
+    },
 }
 
 # schema columns of the local `parcels` table, in insert order
@@ -698,10 +768,27 @@ def _squash(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+#: Jasper SC serves the mailing ZIP as ten digits: a leading 0, ZIP5, then ZIP4 ("0" + "29927"
+#: + "0000"). Rewritten only as the LAST token of a line whose previous token is a word (a state
+#: code, a state name such as "TEXAS", or a city), never a bare number. Its city line also
+#: spells the state "S C" on about 9% of parcels (measured 2026-10-07), joined back to "SC"
+#: when the two letters are a real state code.
+_ZERO_LED_ZIP10 = re.compile(r"(?<=[A-Za-z.] )0(\d{5})(\d{4})$")
+_SPACED_STATE_BEFORE_ZIP10 = re.compile(r"(?<![A-Za-z0-9])([A-Z]) ([A-Z]) (?=0\d{9}$)")
+
+
 def _tidy_mailing(s: str) -> str:
     """Florence serves the city/state/zip line as "LYNCHBURG            SC29080" (state
     glued to the ZIP). Insert the missing space, but only when the glued token is a
-    real two-letter US state code at the very end of the string."""
+    real two-letter US state code at the very end of the string. Jasper's ten-digit
+    "0"+ZIP5+ZIP4 is turned back into ZIP5 (or ZIP5-ZIP4 when the +4 is not 0000)."""
+    sp = _SPACED_STATE_BEFORE_ZIP10.search(s)
+    if sp and sp.group(1) + sp.group(2) in _US_STATE_CODES:
+        s = s[:sp.start()] + sp.group(1) + sp.group(2) + " " + s[sp.end():]
+    z = _ZERO_LED_ZIP10.search(s)
+    if z:
+        plus4 = "" if z.group(2) == "0000" else f"-{z.group(2)}"
+        return s[:z.start()] + f"{z.group(1)}{plus4}"
     m = _STATE_ZIP_GLUE.search(s)
     if m and m.group(1) in _US_STATE_CODES:
         return s[:m.start()] + f"{m.group(1)} {m.group(2)}"
@@ -1086,13 +1173,23 @@ def nc_onemap_cfg(county: str) -> dict:
     }
 
 
-def resolve_layer_cfg(county: str) -> dict | None:
+def resolve_layer_cfg(county: str, state: str | None = None) -> dict | None:
     """Dedicated county layer first, NC OneMap as the statewide fallback.
 
     The fallback only applies to counties that have no dedicated config, or whose
     dedicated config publishes no mailing address -- Buncombe, Lincoln and Transylvania
     are the three footprint counties in that position.
+
+    `state` matters only for the DUAL_STATE_COUNTIES names. state="SC" on one of them reads
+    SC_DUAL_LAYERS (None when that name has no SC config yet; the NC OneMap fallback is never
+    handed to an SC caller). With no state, or state="NC", the answer is exactly what it
+    always was, so the weekly NC refresh of Beaufort/Cherokee/Lee/Union is unchanged.
     """
+    st = (state or "").strip().upper()
+    if st == "SC":
+        dual = {k.lower(): k for k in DUAL_STATE_COUNTIES}.get((county or "").strip().lower())
+        if dual:
+            return SC_DUAL_LAYERS.get(dual)
     cfg = PARCEL_LAYERS.get(county) or _layer_cfg_ci(county)
     if cfg and (cfg.get("map", {}).get("owner_mailing") or county in _NC_DEDICATED_WITH_MAILING):
         return cfg
@@ -1141,7 +1238,8 @@ def _src_fields(id_fields, spec_map) -> str:
     return ",".join(sorted(src))
 
 
-async def _download_rows(base: str, where: str, out_fields: str, page: int | None = None):
+async def _download_rows(base: str, where: str, out_fields: str, page: int | None = None,
+                         delay_s: float = 0.0):
     """Count-verified bulk download of one ArcGIS layer. Returns (rows, expected).
 
     COUNT-DRIVEN pagination: keep pulling until we've collected `exp` rows. Advance by
@@ -1149,6 +1247,12 @@ async def _download_rows(base: str, where: str, out_fields: str, page: int | Non
     up to 3x on a transient empty/error response instead of ending the loop early (which
     is what silently truncated Burke @30k / Laurens @22.9k on the first pass).
     Raises RuntimeError("count: ...") when the expected count cannot be read.
+
+    `delay_s` (a config's "page_delay_s") sleeps that long before every request after the
+    count, so a county host sees at most one request per `delay_s` seconds. Every attribute
+    dict goes through sensitive_fields.drop_sensitive as it is read, on top of the explicit
+    outFields list, so a column that looks like an SSN, licence number or birth date never
+    reaches memory past this point whatever a layer starts publishing.
     """
     from .http_client import get_text
     # A STATEWIDE layer needs a per-county filter. NC OneMap publishes all 5,938,900 NC
@@ -1167,6 +1271,8 @@ async def _download_rows(base: str, where: str, out_fields: str, page: int | Non
     while exp is None or len(rows) < exp:
         url = (f"{base}?where={where_q}&outFields={out_fields}&returnGeometry=false"
                f"&resultOffset={offset}&resultRecordCount={page or _PAGE}&f=json")
+        if delay_s:
+            await asyncio.sleep(delay_s)
         try:
             data = json.loads(await get_text(url, timeout=90, impersonate=True))
             feats = data.get("features") or []
@@ -1178,7 +1284,7 @@ async def _download_rows(base: str, where: str, out_fields: str, page: int | Non
                 break            # genuinely no more rows at this offset — stop
             continue
         empties = 0
-        rows.extend(f["attributes"] for f in feats)
+        rows.extend(drop_sensitive(f.get("attributes") or {}) for f in feats)
         offset += len(feats)     # advance by what we actually got, not a fixed page size
         if offset > 3_000_000:
             break
@@ -1243,16 +1349,19 @@ def overlay_address(keys, overlay) -> "str | None":
     return best[1] if best else None
 
 
-async def refresh_county(county: str) -> dict:
-    """Bulk-download + verify + replace the cache for one county. Returns a status dict."""
-    cfg = resolve_layer_cfg(county)
+async def refresh_county(county: str, state: str | None = None) -> dict:
+    """Bulk-download + verify + replace the cache for one county. Returns a status dict.
+    `state="SC"` selects the SC half of a DUAL_STATE_COUNTIES name (SC_DUAL_LAYERS)."""
+    cfg = resolve_layer_cfg(county, state)
     if not cfg:
         return {"county": county, "ok": False, "error": "no config"}
     base = cfg["url"]
     out_fields = _src_fields(cfg["id_fields"], cfg["map"])
+    delay = float(cfg.get("page_delay_s") or 0.0)
     t0 = time.time()
     try:
-        rows, exp = await _download_rows(base, cfg.get("where", "1=1"), out_fields, cfg.get("page"))
+        rows, exp = await _download_rows(base, cfg.get("where", "1=1"), out_fields, cfg.get("page"),
+                                         delay_s=delay)
     except RuntimeError as e:
         return {"county": county, "ok": False, "error": str(e)}
 
@@ -1269,7 +1378,8 @@ async def refresh_county(county: str) -> dict:
         o_fields = _src_fields(ocfg["id_fields"], {"address": ocfg["address"],
                                                    "unit": ocfg.get("unit")})
         try:
-            o_rows, o_exp = await _download_rows(ocfg["url"], ocfg.get("where", "1=1"), o_fields)
+            o_rows, o_exp = await _download_rows(ocfg["url"], ocfg.get("where", "1=1"), o_fields,
+                                                 delay_s=delay)
         except RuntimeError as e:
             return {"county": county, "ok": False, "error": f"address overlay {e}"}
         if not _complete(o_rows, o_exp):
