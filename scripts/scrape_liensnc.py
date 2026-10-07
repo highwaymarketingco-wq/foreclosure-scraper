@@ -6,8 +6,16 @@ from selectolax.parser import HTMLParser
 from datetime import datetime
 from collections import Counter
 
-LIENSNC_USER = os.environ.get("LIENSNC_USER", "cashhigh")
-LIENSNC_PASS = os.environ.get("LIENSNC_PASS", "!F8Bb8i8am$NtiZ")
+LIENSNC_USER = os.environ.get("LIENSNC_USER", "")
+LIENSNC_PASS = os.environ.get("LIENSNC_PASS", "")
+
+
+def require_credentials() -> None:
+    """The LiensNC login lives in the environment only (LIENSNC_USER / LIENSNC_PASS). A password
+    default was committed to this public repo on 2026-08-30 and has to be treated as exposed."""
+    if not LIENSNC_USER or not LIENSNC_PASS:
+        raise SystemExit("LIENSNC_USER and LIENSNC_PASS must be set in the environment "
+                         "(never put them in the repo).")
 
 OUTPUT_FILE = "/tmp/liensnc_results.json"
 CHECKPOINT_FILE = "/tmp/liensnc_checkpoint.json"
@@ -162,6 +170,7 @@ async def scrape_all():
     else:
         start_page = 1
     
+    require_credentials()
     async with httpx.AsyncClient(follow_redirects=True, headers=HEADERS, timeout=30) as c:
         # Login
         print("Logging in to LiensNC...")
