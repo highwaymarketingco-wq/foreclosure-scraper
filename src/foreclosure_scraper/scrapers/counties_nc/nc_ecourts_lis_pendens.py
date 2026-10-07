@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 from datetime import datetime, timedelta
 from typing import Iterable
@@ -158,6 +159,33 @@ FORECLOSURE_CAUSES = {
 # NCGS 50-20 equitable-distribution timeline than a raw CVD filing — the
 # raw filings live only in the WAF-walled Smart Search nc_ecourts_divorce.py
 # already drives), not a duplicate of that source.
+# 2026-10-07 -- docketed MONEY judgments, kept as their own lead signal ('judgment_lien').
+# Under NCGS 1-234 a judgment docketed in a county's Superior or District Court is a lien
+# on every piece of real property the judgment debtor owns in that county, for ten years.
+# docs/case_type_code_map.md had filed these causes under "no real-property nexus"; the
+# statute says otherwise. Measured on the 2026-10-07 production run (logs, 100 counties,
+# 90 days, 79,316 hits): Collection on Account 7,926, Money Owed 5,878, Contract 614 --
+# 14,418 hits (18%) the scraper fetched and threw away. The open index carries NO dollar
+# amount (no amount field on any hit; the amount lives in the case file, which is behind
+# the eCourts Portal CAPTCHA), and the creditor list is often blank on intake.
+# Rows are emitted under the sub-slug JUDGMENT_LIEN_SOURCE so the scorer can name the
+# signal (distress_score._SOURCE_OVERRIDE['judgment_lien']) and main's dateless whitelist
+# (prefix match on 'counties_nc.nc_ecourts_lis_pendens.') keeps them. No new access path:
+# same endpoint, same pages, zero extra requests. NC_ECOURTS_JUDGMENT_LIENS=0 turns it off.
+JUDGMENT_LIEN_CAUSES = {
+    "CV - Money Owed",
+    "CV - Collection on Account",
+    "CV - Contract",
+    "CV - US District Court Judgment",
+}
+JUDGMENT_LIEN_SOURCE = "counties_nc.nc_ecourts_lis_pendens.judgment_lien"
+JUDGMENT_LIEN_ENV = "NC_ECOURTS_JUDGMENT_LIENS"
+
+
+def judgment_liens_enabled() -> bool:
+    return os.environ.get(JUDGMENT_LIEN_ENV, "1").strip() != "0"
+
+
 DIVORCE_CAUSES = {
     "FAM - Divorce",
 }
@@ -465,6 +493,79 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
     )
 
 
+def _judgment_lien_listing(hit: dict) -> Listing | None:
+    """A docketed money judgment (JUDGMENT_LIEN_CAUSES) -> one 'judgment_lien' lead.
+
+    Same terminal-status and DV/50B exclusions as `_hit_to_listing`. The debtor is the
+    judgment debtor (defendant); downstream name resolution ties the lien to the debtor's
+    parcels in the same county, which is where NCGS 1-234 attaches it."""
+    cause = hit.get("causeOfActionDesc") or ""
+    if cause not in JUDGMENT_LIEN_CAUSES:
+        return None
+    status = (hit.get("civilJudgmentStatus") or "").strip().lower()
+    if any(t in status for t in ("cancel", "satisf", "dismiss", "vacat",
+                                 "withdraw", "expired", "released")):
+        return None
+    case_number = (hit.get("caseNumber") or "").strip()
+    location = hit.get("location") or ""
+    county = _strip_court_suffix(location)
+    debtors = hit.get("debtors") or []
+    creditors = hit.get("creditors") or []
+    debtor = "; ".join(d.get("name", "") for d in debtors if d.get("name"))[:300] or None
+    creditor = "; ".join(c.get("name", "") for c in creditors if c.get("name"))[:300] or None
+    if not (case_number and county and debtor):
+        return None
+    if _DV50B_RE.search(" ".join(filter(None, [cause, hit.get("judgmentType") or "",
+                                               debtor, creditor or ""]))):
+        return None
+    od = hit.get("orderedDate")
+    ordered = None
+    if od:
+        try:
+            ordered = datetime.fromisoformat(od.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            ordered = None
+    court = "Superior" if "Superior" in location else ("District" if "District" in location else None)
+    now = datetime.utcnow()
+    return Listing(
+        source=JUDGMENT_LIEN_SOURCE,
+        source_url=f"{APP_BASE}#/search?caseNumber={case_number}",
+        listing_type=ListingType.DISTRESSED,
+        property_kind=PropertyKind.UNKNOWN,
+        state="NC",
+        county=county,
+        case_number=case_number,
+        plaintiff=creditor,
+        defendant=debtor,
+        judgment_amount=None,  # not published in the open index (see JUDGMENT_LIEN_CAUSES note)
+        description=(f"Docketed money judgment ({cause}) in {location}: {case_number} - "
+                     f"{creditor or 'creditor not shown'} v. {debtor}; a lien on the debtor's "
+                     f"real property in {county} County (NCGS 1-234)")[:300],
+        first_seen=now,
+        last_seen=now,
+        raw={
+            "nc_ecourts": {
+                "signal": "judgment_lien",
+                "cause": cause,
+                "court": court,
+                "judgmentType": hit.get("judgmentType"),
+                "civilJudgmentStatus": hit.get("civilJudgmentStatus"),
+                "caseCategoryKey": hit.get("caseCategoryKey"),
+                "caseID": hit.get("caseID"),
+                "judgmentId": hit.get("judgmentId"),
+                "orderedDate": od,
+                "ordered_date_iso": ordered.isoformat() if ordered else None,
+                "location": location,
+                "creditor": creditor,
+                "debtor": debtor,
+                "amount": None,
+                "amount_published": False,
+                "lien_statute": "NCGS 1-234",
+            },
+        },
+    )
+
+
 class NCECourtsLisPendens(BaseScraper):
     slug = "counties_nc.nc_ecourts_lis_pendens"
     name = "NC eCourts Lis Pendens (Tyler Odyssey Judgment Search)"
@@ -593,8 +694,11 @@ class NCECourtsLisPendens(BaseScraper):
         # Step 3: convert hits to listings, filtering to foreclosure-relevant causes
         listings: list[Listing] = []
         seen_keys: set[str] = set()
+        want_judgments = judgment_liens_enabled()
         for h in all_hits:
             listing = _hit_to_listing(h, self.slug)
+            if listing is None and want_judgments:
+                listing = _judgment_lien_listing(h)
             if listing is None:
                 continue
             # Dedupe on (case_number, county, cause)
@@ -609,7 +713,8 @@ class NCECourtsLisPendens(BaseScraper):
             listings.append(listing)
 
         log.info("nc_ecourts.parsed", listings=len(listings),
-                 raw_hits=len(all_hits), lookback_days=self.LOOKBACK_DAYS)
+                 raw_hits=len(all_hits), lookback_days=self.LOOKBACK_DAYS,
+                 judgment_liens=sum(1 for x in listings if x.source == JUDGMENT_LIEN_SOURCE))
         return listings
 
 

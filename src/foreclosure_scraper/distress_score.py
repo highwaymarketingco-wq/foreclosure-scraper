@@ -330,6 +330,7 @@ SIGNAL_CATEGORY = {
     "hoa_sale": "FINANCIAL", "tax_sale_overage": "FINANCIAL", "court_sale": "FINANCIAL",
     "upset_bid": "FINANCIAL", "recorded_debt": "FINANCIAL", "str_permit_lapsed": "FINANCIAL",
     "deferral_rollback": "FINANCIAL", "lien": "FINANCIAL", "builder_distress": "FINANCIAL",
+    "judgment_lien": "FINANCIAL",
     "auction": "SALES", "reo": "SALES", "mls_withdrawn_expired": "SALES",
     "stale_on_market": "SALES", "price_cut": "SALES", "partition": "SALES",
     "distressed": "PROPERTY", "code_enforcement": "PROPERTY", "distressed_condition": "PROPERTY",
@@ -423,6 +424,10 @@ _CONTEXT_ONLY_DISTRESSED_SOURCES = frozenset({
 _SOURCE_OVERRIDE = {
     "mcdowell_probate": ("estate_lead", "LIFE_EVENT", 20, REC),
     "greenville_mie_adverts": ("lis_pendens", "FINANCIAL", 28, REC),
+    # 2026-10-07: a docketed NC money judgment (counties_nc.nc_ecourts_lis_pendens.judgment_lien)
+    # is a lien on the debtor's real property in that county (NCGS 1-234). Weighted like
+    # recorded_debt: a real recorded debt, usually consumer, with no sale in motion.
+    "judgment_lien": ("judgment_lien", "FINANCIAL", 12, REC),
 }
 
 #: Sources whose `sale_date` is really a lien FILING date, not an auction. scripts/ingest_all.py
