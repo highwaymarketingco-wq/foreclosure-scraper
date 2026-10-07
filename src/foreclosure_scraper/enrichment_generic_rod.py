@@ -88,6 +88,10 @@ ROD_CONFIG = {
     ("NC", "Orange"):        ("nc_cchs_classic", "FORECLOSURE_NC_CCHS_CLASSIC_ROD", "0"),
     ("NC", "Stanly"):        ("nc_cchs_classic", "FORECLOSURE_NC_CCHS_CLASSIC_ROD", "0"),
     ("NC", "Surry"):         ("nc_cchs_classic", "FORECLOSURE_NC_CCHS_CLASSIC_ROD", "0"),
+    # Tyler Technologies register search (rod/nc_tyler.py): Self-Service (Durham), EagleWeb
+    # (Johnston). Wake (Self-Service with a reCAPTCHA) is left to a person.
+    ("NC", "Durham"):        ("nc_tyler", "FORECLOSURE_NC_TYLER_ROD", "0"),
+    ("NC", "Johnston"):      ("nc_tyler", "FORECLOSURE_NC_TYLER_ROD", "0"),
 }
 
 #: chain()-only registrations: counties whose lien existence another enricher already writes
