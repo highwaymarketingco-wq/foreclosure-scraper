@@ -27,15 +27,22 @@ name search. "Before" is the repo on the morning of 2026-10-07.
 | 2 | GovOS (Kofile) PublicSearch | Greenville, Oconee (2) | Oconee lien rows (`rod/kofile.py`); Greenville not read | both with chain: `rod/publicsearch.py`, `FORECLOSURE_SC_PUBLICSEARCH_ROD`, ON (Greenville in the lien registry, Oconee chain-only) |
 | 3 | Harris AcclaimWeb | Horry, Pickens (2; Clarendon is walled) | Pickens: recent-recordings distress sweep only; Horry not read | both by owner name with chain: `rod/acclaim_names.py`, `FORECLOSURE_SC_ACCLAIM_ROD`, ON |
 | 4 | ACPASS (county-built) | Anderson (1; index ends 2026-02-20) | power-of-attorney and court-order type sweep only | by owner name with chain and the gap flag: `rod/anderson_acpass_rod.py`, `FORECLOSURE_SC_ACPASS_ROD`, OFF |
-| 5 | Logan 'The Lookup' (render) | Spartanburg (1) | lien existence by render (`enrichment_spartanburg_rod.py`) | unchanged; a `chain()` on top of `rod/logan_render.py` is the next step |
-| 6 | Cott RecordRoom | Union (1) | recent-recordings sweep (`rod/cott_recordroom.py`) | not built (one county) |
-| 7 | Cott eSearch (guest) | Marlboro (1) | not read | not built (one county; images paid) |
-| 8 | County-built document search | Greenwood (1), Charleston (1) | not read | not built (one county each; Greenwood is the best free index in SC, deeds to 1897) |
-| 9 | GovOS CountyFusion (guest click) | Sumter (1) | not read | not built (one county; Lexington's tenant needs an account) |
+| 5 | Logan 'The Lookup' (newer build) | Spartanburg (1) | lien existence by headless browser (`enrichment_spartanburg_rod.py`, from 2010) | chain over plain HTTP, no browser: `rod/sc_lookup.py`, `FORECLOSURE_SC_LOOKUP_ROD`, ON, chain-only (raw['rod'] stays on the render enricher) |
+| 6 | County-built document search | Greenwood (1) | not read | chain + liens: `rod/greenwood_docsearch.py`, `FORECLOSURE_SC_GREENWOOD_ROD`, ON |
+| 7 | County-built document search | Charleston (1) | not read | walled: the search hands off to docviewer.charlestoncounty.gov, which loads reCAPTCHA (person) |
+| 8 | GovOS CountyFusion | Sumter (1) | not read | walled: 'Login as Guest' is a button on the CountyFusion login form (username/password page); not entered (person) |
+| 9 | Cott RecordRoom | Union (1) | recent-recordings sweep (`rod/cott_recordroom.py`) | not built: replaying the page's name search returned the whole date window unfiltered (and the quick-search box returned nothing); needs one more browser network capture |
+| 10 | Cott eSearch (older, guest) | Marlboro (1) | not read | not built: the name-search postback returned the blank form in the time box; images are paid |
+
+Round two (same day) went in board-value order (board rows with an owner name, counts only):
+Spartanburg 18,509; Charleston 8,746; Sumter 3,528; Marlboro 1,244; Union 1,215; Greenwood 1,033;
+McCormick 358.
 
 Defaults come from a yield check on four real board owners per platform (chain run, counts kept only):
 PublicSearch Greenville 4 of 4 chains at about 15 s a lookup, Oconee 2 of 4; AcclaimWeb Horry 4 of 4 owners
-found, 2 with a deed; Online Record System Laurens 2 of 4, one lookup took 200 s; ACPASS Anderson 1 of 4.
+found, 2 with a deed; Online Record System Laurens 2 of 4, one lookup took 200 s; ACPASS Anderson 1 of 4;
+Spartanburg (round two) 4 of 4 chains at one to four minutes each; Greenwood 2 of 6 chains plus a third
+owner's liens at about 5 s.
 
 Board leads in the counties now read (owner name present, 2026-10-07): Horry 6,442; Greenville 5,257;
 Pickens 5,124; Oconee 3,401; Laurens 2,925; Berkeley 2,786; Anderson 2,709; Florence 2,095; Colleton 1,711;
@@ -64,6 +71,17 @@ Dorchester 1,712; Barnwell 1,222; Lancaster 1,169; Georgetown 818; York 803 (Abb
 * **Pickens files non-conveyances under 'DEED ...' labels** (DEED EASEMENT, DEED NOTICE, ...). Only its
   conveyance codes (DEED, D/DIST, D/FORECLOSE, D/PER REP, D/DEV, D/NO FEE, D/EXEMPT, D/INDENT, D/TRANS)
   count as deeds in the chain.
+* **Spartanburg needs no browser.** The pick list (`content.php?embed=1&...&show_pick_list=1`), `storeEID` per
+  name, `checkEID`, `storeDataString` with the pick form, then `content.php?embedded=1` is exactly what the
+  page does. Its party cells hold several names split by `<br>` and the role reads 'Party 1' (grantor side)
+  or 'Party 2' (grantee side); the render reader (`rod/logan._parse_records`) reads 'Party 2' as the grantor
+  side and joins the `<br>` names into one, which matters for anything that relies on its sides. Its types
+  are coarse (DEED, MORTGAGE, LIEN, UCC, PLATS; satisfactions are not indexed as their own type).
+* **Greenwood answers JSON.** The React page posts `asp/webAPI` (Accept: application/json; XML otherwise)
+  with the name, dates as MM/DD/YYYY and doc-type switches; each row lists grantors and grantees with a
+  `match` flag for the searched party, the index's legal description and linked instruments.
+* **Business names.** Board owners like 'X APARTMENTS' are indexed as 'X APARTMENTS LP'; common business words
+  now make the owner an entity so the two fit.
 * **SC lis pendens are mostly court filings.** Horry indexes NOTICE OF FORECLOSURE and LIS PENDENS in the
   register; Pickens and Oconee have no lis pendens type. The court side is the SC Public Index, which
   forbids automated querying (left to a person).
@@ -90,6 +108,8 @@ Ingenuity.
 | county | platform | the wall |
 |---|---|---|
 | Anderson (deeds since 2026-02-21 only) | Ingenuity 'Online Services' | client-side bot check posted before the lookup |
+| Charleston | county ROD search, results on docviewer.charlestoncounty.gov | the results page loads reCAPTCHA (checked 2026-10-07) |
+| Sumter | GovOS CountyFusion | the guest entry is a button on the login form (username/password page) |
 | Bamberg, Cherokee, Chester, Chesterfield, Dillon, Edgefield, Fairfield | Neumo (formerly Avenu) GRIDS | the public search redirects to `account/login` with a password form (all 7 checked 2026-10-07); accounts may not be created |
 | Hampton, Kershaw, Newberry, Williamsburg | Neumo Records Management | free account login (Kershaw and Williamsburg terms also ban robots; Newberry and Williamsburg images paid) |
 | Lee | Neumo Records Management | paid subscription ($5/day) plus login |
@@ -103,8 +123,8 @@ Ingenuity.
 | Orangeburg | county 'Register Of Deeds Remote Access Site' | free account login |
 | Calhoun | TitleSearcher | paid subscription |
 | Richland | county Online Data Services | paid subscription |
-| Allendale, Marion | none | no online index; books at the Clerk of Court |
-| McCormick | not in the matrix | not checked |
+| Allendale, Marion, McCormick | none | no online index; books at the Clerk of Court (McCormick added to the matrix 2026-10-07) |
+| Union, Marlboro | Cott RecordRoom / older Cott eSearch | no wall; readers not built yet (see the ranking table) |
 
 ## Per-county status (SC)
 
@@ -119,7 +139,7 @@ Ingenuity.
 | Beaufort | NewVision BrowserView | person (CAPTCHA) |
 | Berkeley | Online Record System | chain + liens (`sc_online_record_system`, OFF) |
 | Calhoun | TitleSearcher | person (paid) |
-| Charleston | county document search | not built |
+| Charleston | county document search | person (reCAPTCHA on the results viewer) |
 | Cherokee | Neumo GRIDS | person (login) |
 | Chester | Neumo GRIDS | person (login) |
 | Chesterfield | Neumo GRIDS | person (login) |
@@ -133,7 +153,7 @@ Ingenuity.
 | Florence | Online Record System | chain + liens (`sc_online_record_system`, OFF) |
 | Georgetown | Online Record System | chain + liens (`sc_online_record_system`, OFF) |
 | Greenville | GovOS PublicSearch | chain + liens (`publicsearch`, ON) |
-| Greenwood | county document search | not built |
+| Greenwood | county document search | chain + liens (`greenwood_docsearch`, ON) |
 | Hampton | Neumo | person (login) |
 | Horry | Harris AcclaimWeb | chain + liens (`acclaim_names`, ON) |
 | Jasper | CCHS | person (CAPTCHA) |
@@ -143,16 +163,17 @@ Ingenuity.
 | Lee | Neumo | person (paid) |
 | Lexington | GovOS CountyFusion | person (account) |
 | Marion | none | person |
-| Marlboro | Cott eSearch | not built |
+| Marlboro | Cott eSearch (older) | not built |
+| McCormick | none | person (no online index) |
 | Newberry | Neumo | person (login) |
 | Oconee | GovOS PublicSearch | liens (`kofile`) + chain (`publicsearch`, ON) |
 | Orangeburg | county remote access site | person (account) |
 | Pickens | Harris AcclaimWeb | chain + liens (`acclaim_names`, ON); distress sweep (`acclaim`) |
 | Richland | county Online Data Services | person (paid) |
 | Saluda | Cott RecordHub | person |
-| Spartanburg | Logan 'The Lookup' (render) | liens (`enrichment_spartanburg_rod`); chain not built |
-| Sumter | GovOS CountyFusion (guest) | not built |
-| Union | Cott RecordRoom | distress sweep only; chain not built |
+| Spartanburg | Logan 'The Lookup' | liens (`enrichment_spartanburg_rod`) + chain (`sc_lookup`, ON) |
+| Sumter | GovOS CountyFusion | person (login form) |
+| Union | Cott RecordRoom | distress sweep only; reader not built |
 | Williamsburg | Neumo | person (login) |
 | York | Online Record System | chain + liens (`sc_online_record_system`, OFF) |
 
@@ -168,19 +189,21 @@ Ingenuity.
 | AcclaimWeb | Horry | 2026-09: 29 / 26 (all grantee rows 'To') | ok: last deed, 3 earlier, liens, 4 foreclosure notices |
 | AcclaimWeb | Pickens | 2026-09: 23 / 23 | ok: last deed, 3 earlier, liens |
 | ACPASS | Anderson | (one county) | ok: last deed and liens; the walk stopped at a six-grantor deed, as designed |
+| The Lookup | Spartanburg | 2026-09: 14 / 14 | ok: last deed, 2 earlier, liens (154 s) |
+| Greenwood document search | Greenwood | 2026-09 SMITH: 10 | ok: last deed, 3 earlier, liens (10 s) |
 
 ## Running it
 
 Both enrichers are already called from `main.py` (`enrich_generic_rod` in the ROD lien group,
 `enrich_rod_chain` after it). Switches:
 
-* `FORECLOSURE_SC_PUBLICSEARCH_ROD`, `FORECLOSURE_SC_ACCLAIM_ROD` (default 1),
-  `FORECLOSURE_SC_ORS_ROD`, `FORECLOSURE_SC_ACPASS_ROD` (default 0): per platform, shared by both enrichers.
+* Per platform, shared by both enrichers: `FORECLOSURE_SC_PUBLICSEARCH_ROD`, `FORECLOSURE_SC_ACCLAIM_ROD`,
+  `FORECLOSURE_SC_LOOKUP_ROD` (Spartanburg, chain only), `FORECLOSURE_SC_GREENWOOD_ROD` (default 1);
+  `FORECLOSURE_SC_ORS_ROD`, `FORECLOSURE_SC_ACPASS_ROD` (default 0).
 * `FORECLOSURE_ROD_CHAIN=1`: the chain enricher's master switch (default off) for `raw['rod_chain']`.
 * `SC_ROD_MAX_LOOKUPS_PER_COUNTY` (default 30): owner lookups per county per run; the owner search
   `enrich_generic_rod` makes is cached and reused by the chain enricher without a second lookup.
 * `SC_ROD_MIN_GAP_S` can only raise the 1.6 s gap.
 
-Not wired: the Anderson parcel flag needs the lead's parcel id passed to `chain()`
-(`enrichment_rod_chain` calls `mod.chain(county, owner, state=..., depth=...)`; adding
-`parcel_id=li.parcel_id` for modules whose `chain` takes it turns the flag on).
+The Anderson parcel flag is wired: `enrichment_rod_chain` passes `parcel_id=li.parcel_id` to any adapter
+whose `chain()` takes it (only Anderson's does).
