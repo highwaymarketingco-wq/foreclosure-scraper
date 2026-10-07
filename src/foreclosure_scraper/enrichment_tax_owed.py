@@ -56,6 +56,9 @@ _SOURCES = {
     # (confirmed 2026-09-29, see georgetown_civicengage.py's docstring) and MIE rows use
     # a different raw shape. Added 2026-09-29 auditing the 355-row "no tax amount" gap.
     "georgetown_civicengage": ("georgetown_civicengage", "opening_bid", "flc_opening_bid"),
+    # Horry's delinquent tax sale workbooks gained an "FLC Bid Amount" column (October 2026
+    # editions, every row): the county's own minimum bid, same convention as above.
+    "horry_delinquent_xlsx": ("horry_delinquent_xlsx", "flc_bid_amount", "flc_opening_bid"),
 }
 
 # generic amount keys scanned for any other tax/FLC/lien source subdict
