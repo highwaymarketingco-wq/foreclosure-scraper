@@ -1,0 +1,145 @@
+"""The plumbing every NC register platform adapter shares: one reused cookie session per county,
+the per-run lookup cap, the walled-county registry, a per-process result cache (so the lien
+enricher and the chain enricher never search the same name twice in one run), the async
+search_by_name bridge the generic ROD enricher calls, and chain().
+
+A platform module subclasses NcRodPlatform, fills `platform`, `counties` and the two protocol
+hooks (_open, _search), and exposes module-level search_by_name / chain bound to one instance.
+"""
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass
+from typing import Any, Optional
+
+import structlog
+
+from . import nc_polite
+from .models import RodDoc
+from .nc_chain import OwnerName, SearchResult, build_chain, merge_records, parse_owner, to_rod_doc
+from .nc_polite import PoliteClient, RodWalled
+
+log = structlog.get_logger()
+
+SESSION_TTL_S = 20 * 60
+
+
+def county_key(county: str) -> str:
+    return " ".join((county or "").replace("-", " ").replace("_", " ").split()).lower()
+
+
+@dataclass
+class _Held:
+    client: PoliteClient
+    ready: bool = False
+    ctx: Any = None                  # whatever the platform's _open() wants to keep (a form token, a code map)
+
+
+class NcRodPlatform:
+    platform: str = ""
+    state: str = "NC"
+    #: county display name -> platform config (host, tenant path, ...)
+    counties: dict[str, Any] = {}
+
+    def __init__(self) -> None:
+        self._held: dict[str, _Held] = {}
+        self._cache: dict[tuple, SearchResult] = {}
+
+    # -- config ------------------------------------------------------------------------------
+    def config(self, county: str) -> Optional[tuple[str, Any]]:
+        k = county_key(county)
+        for name, cfg in self.counties.items():
+            if county_key(name) == k:
+                return name, cfg
+        return None
+
+    def source_url(self, cfg: Any) -> str:          # the page a person opens; platform overrides
+        return ""
+
+    # -- protocol hooks ----------------------------------------------------------------------
+    def _open(self, client: PoliteClient, cfg: Any) -> Any:
+        """Clear the county's disclaimer / open its search; return context kept with the session."""
+        return None
+
+    def _search(self, client: PoliteClient, cfg: Any, ctx: Any, who: OwnerName, side: str,
+                date_thru: Optional[str]) -> SearchResult:
+        raise NotImplementedError
+
+    # -- sessions ----------------------------------------------------------------------------
+    def _client(self, name: str, cfg: Any) -> _Held:
+        h = self._held.get(name)
+        if h is not None and nc_polite.clock() - h.client.opened > SESSION_TTL_S:
+            h = None
+        if h is None:
+            h = self._held[name] = _Held(PoliteClient(self.platform, self.state, name))
+        if not h.ready:
+            h.ctx = self._open(h.client, cfg)
+            h.ready = True
+        return h
+
+    def drop_sessions(self) -> None:
+        self._held.clear()
+        self._cache.clear()
+
+    # -- the one search everything goes through ---------------------------------------------
+    def search(self, county: str, who: OwnerName, side: str = "both",
+               date_thru: Optional[str] = None) -> SearchResult:
+        hit = self.config(county)
+        if hit is None:
+            return SearchResult(status="error", reason=f"{county} is not a {self.platform} county")
+        name, cfg = hit
+        url = self.source_url(cfg)
+        why = nc_polite.walled_reason(self.platform, self.state, name)
+        if why:
+            return SearchResult(status="walled", reason=why, url=url)
+        ck = (county_key(name), who.last, who.first, who.entity, side, date_thru or "")
+        if ck in self._cache:
+            return self._cache[ck]
+        if not nc_polite.take_lookup(self.platform, self.state, name):
+            return SearchResult(status="capped", url=url,
+                                reason=f"per-run cap of {nc_polite.max_lookups_per_county()} lookups for "
+                                       f"{name} reached")
+        try:
+            held = self._client(name, cfg)
+            res = self._search(held.client, cfg, held.ctx, who, side, date_thru)
+        except RodWalled as w:
+            self._held.pop(name, None)
+            return SearchResult(status="walled", reason=w.reason, url=url)
+        except Exception as exc:  # noqa: BLE001 - a lookup never kills a run
+            self._held.pop(name, None)          # a broken session is not reused
+            log.warning("nc_rod.search_failed", platform=self.platform, county=name,
+                        error=f"{type(exc).__name__}: {str(exc)[:160]}")
+            return SearchResult(status="error", reason=f"{type(exc).__name__}: {str(exc)[:160]}", url=url)
+        res.url = res.url or url
+        res.records = merge_records(res.records)
+        if res.status == "ok":
+            self._cache[ck] = res
+        return res
+
+    # -- the shared interfaces ---------------------------------------------------------------
+    def search_by_name_sync(self, state: str, county: str, name: str, max_docs: int = 80) -> list[RodDoc]:
+        if (state or "").upper() != self.state or self.config(county) is None:
+            return []
+        who = parse_owner(name)
+        if who is None:
+            return []
+        res = self.search(county, who, "both", None)
+        if res.status != "ok":
+            return []
+        shown = self.config(county)[0]
+        return [to_rod_doc(r, self.state, shown, self.platform) for r in res.records[:max_docs]]
+
+    async def search_by_name(self, state: str, county: str, name: str, max_docs: int = 80) -> list[RodDoc]:
+        """The interface every rod module exposes (enrichment_generic_rod calls it). Runs the
+        blocking, paced search in a worker thread; the per-host lock keeps one host serial."""
+        return await asyncio.to_thread(self.search_by_name_sync, state, county, name, max_docs)
+
+    def chain(self, county: str, owner_name: Optional[str], *, state: str = "NC", depth: int = 3) -> dict:
+        hit = self.config(county)
+        if (state or "").upper() != self.state or hit is None:
+            return {"state": state, "county": county, "platform": self.platform, "status": "error",
+                    "reason": f"{county}, {state} is not a {self.platform} county"}
+        name, cfg = hit
+        return build_chain(platform=self.platform, state=self.state, county=name, owner_name=owner_name,
+                           search=lambda who, side, thru: self.search(name, who, side, thru),
+                           depth=depth, source_url=self.source_url(cfg))

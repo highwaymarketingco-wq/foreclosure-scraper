@@ -1970,6 +1970,9 @@ RAW_KEEP = {
     "situs_road_only": "*",           # road name for a parcel with NO house number — CONTEXT, never mailable
     "lis_pendens_resolution": "*",    # SC lis-pendens GIS resolver provenance
     "rod_docs": "*",                  # ROD recorded documents (deeds, mortgages, satisfactions)
+    # Deed chain + lien picture from an NC register name index (enrichment_rod_chain.py, shape in
+    # rod/nc_chain.py). Registered 2026-10-07 BEFORE its first run (the enricher ships off).
+    "rod_chain": "*",
     "lien_priority": "*",             # senior/junior liens + super-priority warnings
     "propwire": "*",                  # equity, owner, last sale (when present)
     "loopnet": "*",                   # multifamily-specific cap rate, units, etc.

@@ -30,13 +30,44 @@ from .name_normalize import first_last_parts
 
 log = structlog.get_logger()
 
-# (state, county) -> (module_name, env_flag)
+# (state, county) -> (module_name, env_flag[, default])
 # Acclaim (Pickens SC) and cott_recordroom (Union SC) only have discover_recent_nods,
 # not search_by_name — they're covered by rod_name_index enricher instead.
+# The optional third element is the flag's default when the env var is unset: "1" (on, the
+# original entries) or "0" (off until the owner turns the platform on). The NC platform adapters
+# added 2026-10-07 (rod/nc_cott_v4.py, ...) are proven live on test searches but their yield on
+# board leads is not, so they ship OFF; set the platform's flag to 1 to run them. Those modules
+# also expose chain() (the deed chain + lien picture), read by enrichment_rod_chain.py from this
+# same registry. Their per-run cap is NC_ROD_MAX_LOOKUPS_PER_COUNTY (default 30), enforced inside
+# the adapter whatever _MAX_PER_COUNTY below says.
 ROD_CONFIG = {
     ("NC", "Polk"):          ("cott",  "FORECLOSURE_COTT_ROD"),
     ("SC", "Oconee"):        ("kofile", "FORECLOSURE_KOFILE_ROD"),
+    # Cott eSearch v4, guest name index with no sign-in (rod/nc_cott_v4.py)
+    ("NC", "Alexander"):     ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Graham"):        ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Granville"):     ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Jackson"):       ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Jones"):         ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Nash"):          ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Pamlico"):       ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Wayne"):         ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
 }
+
+#: chain()-only registrations: counties whose lien existence another enricher already writes
+#: (Buncombe: enrichment_aumentum_rod; Polk: the cott entry above) but whose deed chain comes from
+#: an NC platform adapter. enrichment_rod_chain.py reads these together with ROD_CONFIG.
+CHAIN_ONLY_CONFIG = {
+    ("NC", "Buncombe"):      ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    ("NC", "Polk"):          ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+}
+
+
+def platform_enabled(entry: tuple) -> bool:
+    """Whether a registry entry's platform flag is on (env var, else the entry's default)."""
+    env_flag = entry[1]
+    default = entry[2] if len(entry) > 2 else "1"
+    return os.environ.get(env_flag, default) != "0"
 
 _MORTGAGE_N = {"DT", "DOT", "DOFTR", "MORT", "MTG", "MORTGAGE", "DEEDOFTRUST"}
 _ADVERSE_N = {"LIEN", "TAXLIEN", "TAX", "JUDG", "JUDGMENT", "LP", "LISP",
@@ -108,9 +139,10 @@ async def enrich_generic_rod(listings: list[Listing]) -> dict:
              "with_instruments": 0, "with_mortgage": 0, "with_adverse": 0}
 
     for (state, county), targets in targets_by_county.items():
-        module_name, env_flag = ROD_CONFIG[(state, county)]
-        if os.environ.get(env_flag, "1") == "0":
-            log.info("generic_rod.skipped", county=county, reason=f"disabled ({env_flag}=0)")
+        entry = ROD_CONFIG[(state, county)]
+        module_name, env_flag = entry[0], entry[1]
+        if not platform_enabled(entry):
+            log.info("generic_rod.skipped", county=county, reason=f"disabled ({env_flag}=0 or default off)")
             continue
 
         mod = _get_module(module_name)
