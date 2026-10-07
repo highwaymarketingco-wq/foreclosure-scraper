@@ -14,6 +14,11 @@ hand-kept list: any scraper whose module drives the Scrapling stealth browser
 residential host. curl_cffi impersonate (http_client.get_text_impersonate) is
 TLS-fingerprint stealth, not a browser and not location-bound, so those stay on
 the VM. Add or remove a scraper and the split re-derives correctly.
+
+A scraper can also declare ``mac_only = True``: it is not a stealth browser, but it has to
+run on the Mac for another reason (counties_generic.liensnc logs in with the owner's own
+account, which is used on the Mac only). It is counted with the residential sources, so the
+Mac's hand-off lane runs it and the VM skips it.
 """
 from __future__ import annotations
 
@@ -37,13 +42,21 @@ def _module_source(scraper) -> str:
         return ""
 
 
+def needs_mac(scraper) -> bool:
+    """True when the scraper must run on the residential host: it drives a stealth browser
+    (RESIDENTIAL_MARKERS in its module) or declares ``mac_only``."""
+    if getattr(scraper, "mac_only", False):
+        return True
+    src = _module_source(scraper)
+    return any(m in src for m in RESIDENTIAL_MARKERS)
+
+
 @functools.lru_cache(maxsize=1)
 def _classify() -> tuple[frozenset, frozenset]:
     residential: set[str] = set()
     datacenter: set[str] = set()
     for s in all_scrapers():
-        src = _module_source(s)
-        target = residential if any(m in src for m in RESIDENTIAL_MARKERS) else datacenter
+        target = residential if needs_mac(s) else datacenter
         target.add(s.slug)
     return frozenset(residential), frozenset(datacenter)
 

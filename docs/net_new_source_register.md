@@ -602,3 +602,15 @@ statewide `in_scope_distressed()` admission, and both whitelisted in
   (`CALHOUN-TaxColOvr_2021.pdf`, `_2022.pdf`, `_2023.pdf`; hub discovery picks
   up a new year). 74 live rows; situs from the `parcel_cache` Calhoun layer
   (57 of 74).
+
+LiensNC as a registry source (2026-10-07). The ~45,000 LiensNC rows on the board
+(`counties_generic.liensnc` plus the bare `liensnc` slug) came from operator-run
+scripts and were never re-scraped by a run. They now refresh on the Mac:
+- `counties_generic.liensnc`: `https://apps.liensnc.com/scr/filing/advancedSearch.html`
+  (login-gated; the owner's own account, used on the Mac only). Incremental:
+  the search bounded by filing date, newest first, 50 rows a page, stopping at
+  the board's newest filing; at least 1.6 s between requests. `mac_only`, so
+  `scripts/run_stealth_sources.py` runs it and hands the rows to the VM in
+  `docs/handoff/stealth_leads.json`. Lien-agent appointments are
+  construction-start filings, not distress: context-only in `distress_score`.
+  `national.liensnc` (the old public-search attempt) stays disabled.
