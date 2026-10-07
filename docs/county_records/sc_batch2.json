@@ -1,0 +1,1027 @@
+{
+ "batch": "sc_batch2",
+ "generated": "2026-10-07",
+ "counties": [
+  {
+   "county": "greenwood",
+   "state": "SC",
+   "rod": {
+    "platform": "County-built 'Greenwood County Document Search' (React app run by the Clerk of Court, who is ROD here)",
+    "url": "https://www.greenwoodsc.gov/docsearchrod/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1897,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: opened docsearchrod/ and its Bundle.js. App help lists indexed Deeds 1897-present, Mortgages Jul-1980, Plats 1854, tax liens 2000; images Deeds 1897, Mortgages Apr-2001, Plats 1854. Search tabs: Name, Book-Page, Legal Description, Document#, Advanced. Entry is an Agree/Disagree disclaimer dialog (accuracy-only text). Image links are plain hrefs to /ClerkOfCourtHome/...pdf; a deed PDF linked from the county GIS returned HTTP 200 application/pdf with no login. No search was run.",
+    "notes": "Best free ROD in the batch. Judgments, lis pendens and mechanics liens are NOT here; the disclaimer points to the SC Public Index for those (automation forbidden there). Mortgage images only from Apr-2001."
+   },
+   "probate": {
+    "system": "Spartan Technology 'Public Probate Inquiry' (Search Cases / Search Parties), reached from greenwoodsc.gov/probate/. Not a southcarolinaprobate.net feed per the repo's 2026-10-02 read of that site's county dropdown (the site returned HTTP 403 to a plain client on 2026-10-07, so the dropdown could not be re-read today).",
+    "url": "https://scportal.hostedbyspartan.com/GreenwoodPublicPortal/",
+    "free_search": "yes",
+    "access": "open",
+    "notes": "Landing page has no login or disclaimer gate. No paid subscription seen. Search not run."
+   },
+   "tax": {
+    "url": "https://greenwoodco.corebtpay.com/egov/apps/bill/pay.egov",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "unreachable",
+    "notes": "CORE eGov payment portal. Repo verified 2026-09-30 that it searches by map/account number or last name (greenwood_corebtpay_delinquent_tax.py). On 2026-10-07 it answered HTTP 504, so 'unreachable' today; likely transient."
+   },
+   "gis": {
+    "url": "https://www.greenwoodsc.gov/arcgis/rest/services/Operational_Layers/CAMA/MapServer/9 (viewer https://www.greenwoodsc.gov/greenwoodjs/)",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Layer fields include Owner, Deed ('695-194' style), DeedLink and PlatLink (direct PDF paths to the deed and plat images), Description (short assessor legal, e.g. '1 LOT'). DeedLink gives the current deed image free per parcel, which is the shortest path to the vesting deed."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "tax: counties_sc.greenwood_corebtpay_delinquent_tax + greenwood_delinquent_tax (tax-sale list). gis: parcel_cache.py 'Greenwood' reads owner/situs/mailing/value but not Deed/DeedLink/Description. rod: no module reads docsearchrod (rod/kofile.py notes Greenwood dropped)."
+   },
+   "manual_lane": "Free route covers deed chain, legal description and plats back to 1897; a person (or the abstractor) is only needed for mortgage images before April 2001, anything not indexed, and judgments/lis pendens on the SC Public Index.",
+   "confidence": "high"
+  },
+  {
+   "county": "hampton",
+   "state": "SC",
+   "rod": {
+    "platform": "Neumo Records Management (formerly Avenu Insights 'SC Land Records'); Clerk of Court is ROD",
+    "url": "https://hamptonsc.avenuinsights.com/Public/HamptonSC/",
+    "free_name_search": "yes",
+    "access": "login",
+    "index_online_back_to_year": 2000,
+    "images_free": "yes",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: hamptoncountysc.org/14/Register-of-Deeds links sclandrecords.com, whose county picker sends Hampton to hamptonsc.avenuinsights.com. County info page says online search covers 1/3/2000 to present and 'Index Search and Image Viewing/Printing are provided free of charge' but a sign-up login is required. /Public/HamptonSC/ redirects to the login page.",
+    "notes": "Free, but behind an account login (we may not create accounts). Hampton's login page shows only an accuracy disclaimer; sister Neumo tenants (Kershaw, Lee, Williamsburg) add a ban on data mining/robots, so the same may apply after login."
+   },
+   "probate": {
+    "system": "Hampton County Probate Court (county office). No online estate search linked from hamptoncountysc.org (Court Services and Public Records pages checked). Not a southcarolinaprobate.net participant per repo's 2026-10-02 dropdown read.",
+    "url": null,
+    "free_search": "unknown",
+    "access": null,
+    "notes": "No online index found; check by phone or in person."
+   },
+   "tax": {
+    "url": "https://hamptoncountytax.org/",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Catalis/Sturgis tax SPA (page loads, data via API). Repo's sc_catalis_delinquent_roll.py queries it by name with multi-year bill records. The API CDN host serves robots Disallow: / (operator-authorized source class per that module). hamptontreasurer.qpaybill.com is an empty stub. Not re-queried today."
+   },
+   "gis": {
+    "url": "https://services8.arcgis.com/6eabNhFouHU5vuYk/arcgis/rest/services/Parcels_Published_view/FeatureServer/1 (web map hamptoncountysc.maps.arcgis.com; qPublic card)",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields Deed_Book, Deed_Page, Plat_Book, Plat_Page, Name1/Name2, Consideration, Instrmnt_Dt; no legal description. qPublic (Schneider) answered a Cloudflare 'Just a moment' challenge when checked 2026-10-07, and the SC DNR viewer table marks Hampton qPublic login_required=yes."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "tax: counties_sc.sc_catalis_delinquent_roll (Hampton). gis: parcel_cache.py 'Hampton' reads owner/situs/mailing/value/consideration, not deed or plat book."
+   },
+   "manual_lane": "A person signs up for a free Neumo account (or the abstractor searches) to read the ROD index and images from 2000 on; records before 2000 and probate need an office visit, call, or the abstractor. GIS gives the current deed book/page free.",
+   "confidence": "medium"
+  },
+  {
+   "county": "horry",
+   "state": "SC",
+   "rod": {
+    "platform": "Harris AcclaimWeb",
+    "url": "https://acclaimweb.horrycounty.org/AcclaimWeb",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: county ROD page links 'Index to Database' to acclaimweb.horrycounty.org. Landing shows 'Welcome Guest', an Accept Disclaimer button (accuracy-only text) and search types Name, Book/Page, New Legal Description, Legal Description/Memo, Document Type, Consideration, Record Date. Opening the name search redirects to the disclaimer. A notice says redaction bars are removed 'upon purchase' and there is a cart, so image cost is unclear. No search run; index start year not stated on pages read.",
+    "notes": "Guest search after a disclaimer click. Images appear viewable with redactions; purchase may be needed for clean copies. The repo's rod/acclaim.py reader (Pickens) is the same platform."
+   },
+   "probate": {
+    "system": "Spartan Technology 'Public Probate Portal' (HorryACMSPortal), linked from the county Probate Court page. Not a southcarolinaprobate.net participant.",
+    "url": "https://scportal.hostedbyspartan.com/HorryACMSPortal/",
+    "free_search": "yes",
+    "access": "login",
+    "notes": "Landing is an account login with a Register link; county publishes 'how to create a Records Portal account' instructions. Free registration, but still a login."
+   },
+   "tax": {
+    "url": "https://horrycountytreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: search by Map Number, Owner Name or Notice Number; Paid/Unpaid/All; tax years 2016-2026 in the selector (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://www.horrycountysc.gov/parcelapp/rest/services/HorryCountyGISApp/MapServer/24 (viewer https://www.horrycounty.org/gis/parcels/)",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields LegalDescr, DeedBook, DeedPage, SaleDate, OwnerName + owner mailing, TMS/PIN."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "tax: qpaybill_delinquent_roll (Horry) + horry_delinquent_xlsx. gis: parcel_cache.py 'Horry' reads owner/mailing/value/sale date, not LegalDescr or DeedBook. rod: rod/acclaim.py only maps Pickens."
+   },
+   "manual_lane": "Deed chain and legal description are free after the disclaimer click; a person may need to buy a copy if a clean image is needed, and probate needs a free portal account (person) or a call to the court.",
+   "confidence": "medium"
+  },
+  {
+   "county": "jasper",
+   "state": "SC",
+   "rod": {
+    "platform": "Courthouse Computer Systems (CCHS) Registrar",
+    "url": "https://us6.courthousecomputersystems.com/jasperSC",
+    "free_name_search": "unknown",
+    "access": "captcha",
+    "index_online_back_to_year": 2007,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: jaspercountysc.gov/services/register-of-deeds links 'Register of Deeds Online Service' to us6.courthousecomputersystems.com/jasperSC. That page opens with 'Please Verify You are Not a Robot / complete the CAPTCHA to enter'. Stopped there. County page says recording is 'more or less complete from April 2007', some earlier documents online.",
+    "notes": "CAPTCHA wall at entry; not attempted. Disclaimer text is accuracy-only. Year 2007 is the county's own statement of completeness."
+   },
+   "probate": {
+    "system": "Jasper County Probate Court (county office). County probate page lists no online estate search. Not a southcarolinaprobate.net participant per repo's 2026-10-02 dropdown read.",
+    "url": "https://www.jaspercountysc.gov/public-safety-offices/county-courts/probate-court/",
+    "free_search": "no",
+    "access": null,
+    "notes": "No online index found."
+   },
+   "tax": {
+    "url": "https://jaspercountydelinquenttax.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Delinquent bills on qPayBill (same Type4 form: Map Number search, Paid/Unpaid/All by year). Current-year bills are on jaspercountysc-payments.com (different vendor, not checked). Repo verified the qPayBill tenant 2026-09-15; re-fetched 2026-10-07: form live, Map Number search, tax years 2016-2026."
+   },
+   "gis": {
+    "url": "https://qpublic.schneidercorp.com/Application.aspx?AppID=921&LayerID=17896&PageTypeID=1&PageID=7979",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "County's maps page points to qPublic, which returned HTTP 403 with a Cloudflare 'Just a moment...' challenge on 2026-10-07. No open ArcGIS parcel REST layer found in the repo or on the county page."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "tax: qpaybill_delinquent_roll ('Jasper': jaspercountydelinquenttax). gis: only the statewide SCDOT layer index, which is token-walled."
+   },
+   "manual_lane": "A person must open the CCHS ROD site and pass its CAPTCHA by hand (or the abstractor searches); records before 2007, probate, and the qPublic parcel card all need a person.",
+   "confidence": "medium"
+  },
+  {
+   "county": "kershaw",
+   "state": "SC",
+   "rod": {
+    "platform": "Neumo Records Management (formerly Avenu Insights 'SC Land Records')",
+    "url": "https://kershawsc.avenuinsights.com/Public/KershawSC/",
+    "free_name_search": "yes",
+    "access": "login",
+    "index_online_back_to_year": 1990,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "yes",
+    "how_verified": "2026-10-07: sclandrecords.com picker sends Kershaw to kershawsc.avenuinsights.com. County info page: documents searchable from 12/03/1990 to present; index search, viewing and printing need a Sign-Up login; no fee is listed. /Public/KershawSC/ redirects to login, and the login page bans 'data mining, robots, spiders, data harvesting'.",
+    "notes": "Login wall plus explicit no-automation terms. Office holds land records back to 1791 (per search snippet; not opened)."
+   },
+   "probate": {
+    "system": "Kershaw County Probate Court site (kershaw.sc.gov). Listed in the southcarolinaprobate.net dropdown but returned 'no records' when the repo probed it 2026-10-02.",
+    "url": "https://www.kershaw.sc.gov/government/departments-h-q/probate-court/estates",
+    "free_search": "unknown",
+    "access": "blocked",
+    "notes": "kershaw.sc.gov answered HTTP 403 'Access Denied' to a plain client on 2026-10-07. A search-engine summary says an estate index 1981-present is online with no documents; not verified."
+   },
+   "tax": {
+    "url": "https://kershawcounty.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill Type4 (verified by repo 2026-09-13; same form read on Horry today: Map Number search, Paid/Unpaid/All by year). Re-fetched 2026-10-07: form live, Map Number search, tax years 2016-2026."
+   },
+   "gis": {
+    "url": "https://kershawcountydataportal-kershawcounty.hub.arcgis.com/ (not opened)",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "SC DNR viewer table lists kershawsc.wthgis.com, which returned HTTP 400 'Invalid Hostname' on 2026-10-07. Registry also lists a qPublic Kershaw app (qPublic showed a Cloudflare challenge today). Field list not established."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "tax: qpaybill_delinquent_roll ('Kershaw': kershawcounty) + kershaw_flc. No county GIS layer in parcel_cache or enrichment_owner_mailing."
+   },
+   "manual_lane": "A person (not a script: the site's terms forbid robots) logs in with a free Neumo account to read the 1990+ index; pre-1990 records, probate, and the parcel card need a person or the abstractor.",
+   "confidence": "medium"
+  },
+  {
+   "county": "lancaster",
+   "state": "SC",
+   "rod": {
+    "platform": "'Online Record System' (same vendor platform the repo reads for York/Georgetown in enrichment_rod_name_index.py)",
+    "url": "https://lancasterscdeeds.com/NameSearch.php",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: lancastercountysc.gov/403/Land-Records-Search links lancasterscdeeds.com (and the paid TitleSearcher). Landing is a disclaimer (accuracy and anti-tampering text, no automation language) whose Accept is a plain GET to NameSearch.php?Accept=Accept. That page loaded with no CAPTCHA: 'Instruments Verified Through: October 7, 2026', name search with date range, Book-Page search, and a Property Description search (subdivision/lot/block/section/map/phase/unit). Book types include DEED, MORTGAGE, PLAT, LIS PENDENS, JUDGMENTS, TAX LIENS, MECHANICS LIENS and 'INDEX BOOKS'. No search run.",
+    "notes": "The registry's CAPTCHA flag came from a reCAPTCHA elsewhere, not this search. 'INDEX BOOKS' as a book type suggests scanned old index books are online, which may reach well before the computer index; start year not stated."
+   },
+   "probate": {
+    "system": "southcarolinaprobate.net: the county Probate Court page's 'Public Records Search' link points there and Lancaster is in its dropdown, but the repo's 2026-10-02 probe returned 'no records' for a common surname, so the court does not appear to feed it.",
+    "url": "https://www.southcarolinaprobate.net/search/",
+    "free_search": "unknown",
+    "access": "blocked",
+    "notes": "southcarolinaprobate.net returned HTTP 403 to a plain client on 2026-10-07. Treat probate as call/visit until the court actually posts data there."
+   },
+   "tax": {
+    "url": "https://lancastersctax.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://services3.arcgis.com/rJcpRneDUBgTeCT3/arcgis/rest/services/LC_Parcels/FeatureServer/0",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields OWNER_NAME + mailing, SALE_PRICE/SALE date parts, DEED_BOOK, DEED_PAGE, PLAT_BOOK, PLAT_PAGE, PIN. No legal description field. Viewer also on qPublic (Cloudflare challenge 2026-10-07)."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "tax: qpaybill_delinquent_roll ('Lancaster') + lancaster_delinquent_tax. gis: parcel_cache.py 'Lancaster' reads owner/situs/mailing/sale price, not deed or plat book. rod: lancasterscdeeds.com is not in enrichment_rod_name_index.NAME_INDEX_HOSTS."
+   },
+   "manual_lane": "Index, deed chain and lot/subdivision legal are free after a plain disclaimer GET; a person is needed only if images turn out to be paid, for probate (call the court), and for anything older than the online index.",
+   "confidence": "high"
+  },
+  {
+   "county": "laurens",
+   "state": "SC",
+   "rod": {
+    "platform": "'Online Record System' (NameSearch.php/NamePick.php; the repo's rod/logan.py calls it 'older Logan')",
+    "url": "https://search.laurensdeeds.com/NameSearch.php",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: laurensdeeds.com (info site; its reCAPTCHA belongs to a contact form) links search.laurensdeeds.com. Disclaimer (accuracy-only) posts to NameSearch.php?Accept=Accept; that GET loaded with no CAPTCHA, 'Instruments Verified Through: October 6, 2026', a Property Description search, and book types DEED BOOK, MORTGAGE BOOK, SMALL PLAT BOOK, LARGE PLAT CABINET, LIS PENDENS, MECHANICS LIENS, JUDGEMENTS, SC and FEDERAL LIENS. Images marked free in the repo's rod/doc_images.py audit; not re-opened today. No search run.",
+    "notes": "Name required; no name-less date sweep (per rod/logan.py). Instrument list includes DEED OF DISTRIBUTION, useful for heirs. Earliest index year not stated."
+   },
+   "probate": {
+    "system": "Laurens County Probate Court (county site). Its page offers estate information and 'Request Public Records' only; no online case index is linked. A Spartan Technology public probate app also answers at scportal.hostedbyspartan.com/LaurensPublicPortal/ (same shell as Greenwood's), found by probing the vendor host, not via a county link; contents not opened. Not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read.",
+    "url": "https://laurenscountysc.gov/government/elected_officials/probate_court/index.php",
+    "free_search": "unknown",
+    "access": null,
+    "notes": "Needs one manual look at the Spartan app to confirm it carries Laurens estates; otherwise records request or visit."
+   },
+   "tax": {
+    "url": "https://laurenstreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5 (viewer https://www.laurenscountygis.org/parcel/)",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields TMS, Owner/Name1/Name2, Sale_Price, Sale_Date, Deed_Book, Deed_Page, Plat_Book, Plat_Page. No legal description."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "yes",
+    "gis": "yes",
+    "evidence": "rod: rod/doc_images.py lists Laurens as a free image route; no name-index reader is wired for Laurens. tax: qpaybill_delinquent_roll + enrichment_qpaybill_tax. gis: enrichment_arcgis SC_GIS, parcel_cache and enrichment_owner_mailing (deed book/page pattern) all read this layer."
+   },
+   "manual_lane": "Free route gives deed chain, property-description legal and images; a person is needed to confirm/check probate and for anything older than the online index.",
+   "confidence": "high"
+  },
+  {
+   "county": "lee",
+   "state": "SC",
+   "rod": {
+    "platform": "Neumo Records Management (formerly Avenu Insights 'SC Land Records')",
+    "url": "https://leesc.avenuinsights.com/Public/LeeSC/",
+    "free_name_search": "no",
+    "access": "payment",
+    "index_online_back_to_year": 1902,
+    "images_free": "no",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "yes",
+    "how_verified": "2026-10-07: sclandrecords.com picker sends Lee to leesc.avenuinsights.com. County info page: 'For index searches, viewing and printing ... you will need to purchase a Casual Daily Use or Commercial Monthly Use Subscription' ($5.00 per day casual). Certification dates: Deeds and Plats 12/10/1902 to current, Mortgages 9/19/1972 to current. /Public/LeeSC/ redirects to login; login page bans data mining, robots and spiders and notes PayPal payments.",
+    "notes": "Even the index is paid. Deep online history (1902) for whoever subscribes."
+   },
+   "probate": {
+    "system": "Lee County Probate Court (Bishopville). No online estate search found; not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read.",
+    "url": null,
+    "free_search": "unknown",
+    "access": null,
+    "notes": "Not verified on the county site (leecountysc.org not opened); call the court."
+   },
+   "tax": {
+    "url": "https://leetreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://qpublic.schneidercorp.com/Application.aspx?AppID=913&LayerID=17622&PageTypeID=1&PageID=7893",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "Only qPublic is listed (SC DNR viewer table); qPublic answered a Cloudflare challenge on 2026-10-07. No open ArcGIS parcel layer known."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "tax: qpaybill_delinquent_roll ('Lee'). No Lee GIS layer in parcel_cache or owner_mailing (only the token-walled statewide SCDOT index)."
+   },
+   "manual_lane": "ROD search needs a paid subscription ($5/day) and the terms forbid robots, so a person (or the attorney's abstractor) must search it; probate and the qPublic parcel card also need a person.",
+   "confidence": "medium"
+  },
+  {
+   "county": "lexington",
+   "state": "SC",
+   "rod": {
+    "platform": "Kofile/GovOS CountyFusion",
+    "url": "https://countyfusion14.govos.com/countyweb/loginDisplay.action?countyname=LexingtonSC",
+    "free_name_search": "yes",
+    "access": "login",
+    "index_online_back_to_year": 1984,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: lex-co.sc.gov/departments/register-deeds says online records run from 8/1/1984 with images from 1/1/1997, searchable by name, book/page or legal description. Its 'ROD Online Services' link redirects to countyfusion14.govos.com, whose page says documents 'can be printed free of charge' and 'As of 1/1/2026, you will be required to create a User Name and Password'. No guest button is shown. Stopped at login.",
+    "notes": "Free but account-only since 2026-01-01. Terms behind login not read."
+   },
+   "probate": {
+    "system": "County-run estate search on lex-co.com (Estate 1865-1994, Estate 1995-present, marriage indexes), reached through an acknowledgement disclaimer. Not a southcarolinaprobate.net participant.",
+    "url": "https://www.lex-co.com/ProbateSearch/estates",
+    "free_search": "yes",
+    "access": "disclaimer_click",
+    "notes": "The disclaimer cites the SC Family Privacy Protection Act of 2002: personal information from these records may not be obtained or used for commercial solicitation. That applies to SC public records generally and matters for a lead business. Search not run."
+   },
+   "tax": {
+    "url": "https://lexingtoncountytreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07). Assessment data also at www.lex-co.com/PropSearch/ (not opened)."
+   },
+   "gis": {
+    "url": "https://maps.lex-co.com/agstserver/rest/services/Property/MapServer/4",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields Owner, TMS, Legal_1_2, Legal_3, DOT_/TM_/CAMA_ DeedBook and DeedPage, PlatBook/PlatPage, SaleDate, SalePrice. maxRecordCount 10000."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "tax: qpaybill_delinquent_roll ('Lexington') + lexington_flc; enrichment_lexington_assessment.py. gis: parcel_cache.py 'Lexington' reads owner/situs/mailing/value/sale, not Legal_* or deed book."
+   },
+   "manual_lane": "GIS gives the legal and current deed book/page free; walking the deed chain needs a person with a free CountyFusion account (or the abstractor); pre-1984 needs the office or an abstractor.",
+   "confidence": "high"
+  },
+  {
+   "county": "marion",
+   "state": "SC",
+   "rod": {
+    "platform": null,
+    "url": null,
+    "free_name_search": "no",
+    "access": "unreachable",
+    "index_online_back_to_year": null,
+    "images_free": "no",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: marionsc.org Clerk of Court page (ROD is part of the Clerk's office) describes recording duties and links only to the state court case search; no online land-records search is linked. Probate and Treasurer pages also have none. Search engines return only Ohio's Marion County portal.",
+    "notes": "No online ROD index found. 'unreachable' here means no online system located, not a failed fetch."
+   },
+   "probate": {
+    "system": "Marion County Probate Judge (county office); page offers an estate-administration PDF only. Not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read.",
+    "url": "https://www.marionsc.org/departments/probate_judge/index.php",
+    "free_search": "no",
+    "access": null,
+    "notes": "Call or visit."
+   },
+   "tax": {
+    "url": "https://www.marionsc.org/how_do_i/online_payments.php",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "Treasurer's 'Search, View, and Pay Current Taxes' page embeds a Catalis widget (d1ebsyxxbc7tep.cloudfront.net, tenant 7426f91e-...) - the same vendor/API sc_catalis_delinquent_roll.py reads for Pickens/Hampton, but Marion is not in its CATALIS_COUNTIES. marioncounty.qpaybill.com answers with a form but no tax-year data (repo found 0 rows). Search options not tested."
+   },
+   "gis": {
+    "url": "https://marionsc.wthgis.com/",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "WTH GIS viewer (page loads, map-only shell). No open ArcGIS parcel REST layer known."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "no",
+    "evidence": "Marion is deliberately absent from qpaybill_delinquent_roll (empty tenant) and not in sc_catalis_delinquent_roll; no GIS layer in parcel_cache/owner_mailing."
+   },
+   "manual_lane": "Everything is manual: a person or the abstractor searches the deed books at the Clerk of Court in Marion, probate by call or visit; the Catalis tax widget may give taxpayer and bills by hand.",
+   "confidence": "medium"
+  },
+  {
+   "county": "marlboro",
+   "state": "SC",
+   "rod": {
+    "platform": "Cott Systems eSearch (cotthosting.com)",
+    "url": "http://www.cotthosting.com/scmarlboro/LandRecords/protected/SrchQuickName.aspx",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": null,
+    "images_free": "no",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: marlborocounty.sc.gov links 'Indexed Records' to cotthosting.com/scmarlboro. Requesting the name search passes through User/Login.aspx and lands as 'Guest User' on the name search form (no password asked). Index types LAND RECORDS and PLAT; groups DEED BOOK, MORTGAGE BOOK, PLATS, SATISFACTION BOOK. Page carries a shopping cart with 'guestPurchaseConfirm' / 'Please confirm your purchase', so images are sold. No terms text with automation language seen on the page. No search run.",
+    "notes": "Free guest index; images appear to be pay-per-copy (same vendor the repo found paywalled for Polk NC). Start year of index not shown."
+   },
+   "probate": {
+    "system": "Marlboro County Probate Court. Listed in the southcarolinaprobate.net dropdown, but the repo's 2026-10-02 probe returned 'no records', so the court does not appear to feed it.",
+    "url": "https://www.southcarolinaprobate.net/search/",
+    "free_search": "unknown",
+    "access": "blocked",
+    "notes": "southcarolinaprobate.net returned HTTP 403 to a plain client on 2026-10-07. No county-hosted estate search found. Call the court."
+   },
+   "tax": {
+    "url": "https://marlborocountytax.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07). County site also links historical tax records at the SC State Library digital collections."
+   },
+   "gis": {
+    "url": "https://marlborosc.wthgis.com/",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "WTH GIS viewer (loads as a map shell); qPublic also listed (Cloudflare challenge 2026-10-07). No open ArcGIS parcel REST layer known."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "tax: qpaybill_delinquent_roll ('Marlboro') + marlboro_delinquent_tax. No Marlboro GIS layer in parcel_cache/owner_mailing."
+   },
+   "manual_lane": "The deed index can be read free as a guest; a person (or the abstractor) must buy copies of the deeds to read legal descriptions, and probate needs a call to the court.",
+   "confidence": "medium"
+  },
+  {
+   "county": "newberry",
+   "state": "SC",
+   "rod": {
+    "platform": "Neumo Records Management (formerly Avenu Insights 'SC Land Records')",
+    "url": "https://newberrysc.avenuinsights.com/Public/NewberrySC/",
+    "free_name_search": "yes",
+    "access": "login",
+    "index_online_back_to_year": 1983,
+    "images_free": "no",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: sclandrecords.com picker sends Newberry to newberrysc.avenuinsights.com. County info page: index July 1983 to current, images October 2003 to current; 'Index Searches are provided as a free service. Viewing Images and Printing/downloading will require a subscription' ($5/day, $30/month); account sign-up required. /Public/NewberrySC/ redirects to login; Newberry's login page did not show the data-mining clause seen on Kershaw/Lee/Williamsburg.",
+    "notes": "Free index behind a free account; images paid."
+   },
+   "probate": {
+    "system": "Newberry County Probate Court. A Spartan Technology public probate app answers at scportal.hostedbyspartan.com/NewberryPublicPortal/ (same shell as Greenwood's), found by probing the vendor host, not via a county link; its contents were not opened. Not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read.",
+    "url": "https://scportal.hostedbyspartan.com/NewberryPublicPortal/",
+    "free_search": "unknown",
+    "access": "open",
+    "notes": "Needs one manual look to confirm it carries Newberry estates."
+   },
+   "tax": {
+    "url": "https://newberrytreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://map.newberrycounty.net/gis/rest/services/PropertyParcel/MapServer (viewer https://map.newberrycounty.net/parcel/)",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "Viewer's web map points at the county ArcGIS Server PropertyParcel service, which answered {'code':500,'Service PropertyParcel/MapServer not started'} on 2026-10-07, so fields could not be read. qPublic also listed."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "tax: qpaybill_delinquent_roll ('Newberry') + newberry_delinquent_tax. No Newberry GIS layer in parcel_cache/owner_mailing."
+   },
+   "manual_lane": "A person with a free Neumo account reads the 1983+ index; deed images (2003+) cost $5/day, so the legal description needs a paid day or the abstractor; pre-1983 needs the office.",
+   "confidence": "medium"
+  },
+  {
+   "county": "oconee",
+   "state": "SC",
+   "rod": {
+    "platform": "Kofile PublicSearch (now branded 'neumo' in the UI)",
+    "url": "https://oconee.sc.publicsearch.us/",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": 1955,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: landing loads as 'Official Record Search - Quick Search - Oconee County Register of Deeds' with optional Sign In/Register, a Cart, and an anonymous session. robots.txt is 'Allow: /$, Disallow: /'. Year 1955 is from the repo's rod/kofile.py (2026-10-02), which read the doc-type facets across '1955-2026 history'. No search run. Contrast: the Greenwood tenant of the same platform (greenwood.sc.publicsearch.us) now says a verified account is required.",
+    "notes": "Anonymous search works per repo (WebSocket API). robots.txt disallows everything but the home page (owner policy: robots is not a wall, but noted). Cart suggests paid copies; repo's doc_images.py lists Oconee images as free via a stealth browser."
+   },
+   "probate": {
+    "system": "southcarolinaprobate.net: Oconee Probate's own page says 'Our records are now available online' at the SC Probate Website, index only (no document images), marriage licenses from 1988. The repo's 2026-10-02 probe of that site returned 'no records' for a common surname, which conflicts with the county's statement.",
+    "url": "https://www.southcarolinaprobate.net/search/",
+    "free_search": "yes",
+    "access": "blocked",
+    "notes": "Free index per the county; southcarolinaprobate.net returned HTTP 403 to a plain client on 2026-10-07."
+   },
+   "tax": {
+    "url": "https://oconeesctax.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://arcserver2.oconeesc.com/arcgis/rest/services/CitizenServe/MapServer/5",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Owner table fields pin, current_owner, owner mailing, deed_book, deed_page, legal_descr, proval_acres. No situs field (repo walls_register)."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "rod: rod/kofile.py (Oconee) for distress doc types + doc_images.py image route. tax: qpaybill_delinquent_roll + enrichment_qpaybill_tax + oconee tax-sale/FLC scrapers. gis: enrichment_owner_mailing reads deed_book/deed_page; parcel_cache maps legal_descr into land_use (not as a legal description)."
+   },
+   "manual_lane": "GIS gives legal and current deed book/page free and the index is open; a person may need to buy clean copies, and probate is a manual look-up on southcarolinaprobate.net (blocked to scripts today).",
+   "confidence": "medium"
+  },
+  {
+   "county": "orangeburg",
+   "state": "SC",
+   "rod": {
+    "platform": "County-run 'Register Of Deeds Remote Access Site' (ASP, PDF images)",
+    "url": "https://www.orangeburgscrod.org/",
+    "free_name_search": "yes",
+    "access": "login",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: orangeburgscrod.org landing says access is 'by subscription only' but 'granted free of charge to all registered subscribers'; login with a username/password (set up via AccountNew.asp); images are PDFs. Disclaimer is a reliance/warranty disclaimer plus the SC Code 30-2-50 notice (no commercial solicitation using personal information from public records). No automation clause seen.",
+    "notes": "Free account required. The 30-2-50 notice is a use restriction relevant to lead marketing."
+   },
+   "probate": {
+    "system": "Orangeburg County Probate Court. Listed in the southcarolinaprobate.net dropdown but the repo's 2026-10-02 probe returned 'no records'. A volunteer genealogy index (General Index to Probate Court 1865-1947) is at ogsgs.org.",
+    "url": "https://mail.ogsgs.org/probate/",
+    "free_search": "unknown",
+    "access": null,
+    "notes": "No modern online estate index found. The 1865-1947 index is third-party and only helps old chains."
+   },
+   "tax": {
+    "url": "https://orangeburgtreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07). Repo notes Orangeburg's ID column is an account number, not a TMS. County also has www.orangeburgcounty.org/194/Search-Taxes (not opened)."
+   },
+   "gis": {
+    "url": "https://gis2.orangeburgcounty.org/maps/",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "Connection timed out on 2026-10-07. No REST layer known to the repo."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "tax: qpaybill_delinquent_roll ('Orangeburg', account-id only) + orangeburg_overage_claims. No GIS layer in parcel_cache/owner_mailing."
+   },
+   "manual_lane": "A person with a free ROD account reads the index and PDF deeds; probate needs a call or visit; GIS was down today.",
+   "confidence": "medium"
+  },
+  {
+   "county": "pickens",
+   "state": "SC",
+   "rod": {
+    "platform": "Harris AcclaimWeb (county page links the older /oncoreweb/ path)",
+    "url": "https://www.pickensscrod.us/AcclaimWeb",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: county ROD page links pickensscrod.us/oncoreweb/; AcclaimWeb landing shows an Accept Disclaimer (accuracy-only text) for guests and search types Official Records Name, Document Type, Description, Consideration, TMS #, Record Date. No search run. Repo's rod/doc_images.py marks Pickens images 'unconfirmed' (cart/shopping-cart controllers live).",
+    "notes": "TMS # search lets a lead's parcel number go straight to its recorded documents. Image cost unknown."
+   },
+   "probate": {
+    "system": "Pickens County Probate Court (county page: marriage/estate information only, no online index). Not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read.",
+    "url": "https://www.co.pickens.sc.us/departments/probate_court/index.php",
+    "free_search": "no",
+    "access": null,
+    "notes": "Call or visit."
+   },
+   "tax": {
+    "url": "https://pickenscountysctax.us/",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Catalis/Sturgis tax site linked as 'Pay Taxes' from the county home page. Repo's sc_catalis_delinquent_roll.py reads it (multi-year bill records, owner mailing); API CDN robots Disallow: / (operator-authorized). Not re-queried today."
+   },
+   "gis": {
+    "url": "https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services/Pickens_Open_data/FeatureServer/6",
+    "legal_description_field": "no",
+    "deed_book_page_field": "no",
+    "owner_field": "yes",
+    "notes": "Fields PIN, NAME1/NAME2, owner mailing, SALEDT, SALEP, LOCADD; no deed book or legal. qPublic card also listed (Cloudflare challenge 2026-10-07)."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "yes",
+    "gis": "yes",
+    "evidence": "rod: rod/acclaim.py + counties_sc.sc_rod_acclaim sweep recent recordings for probate/lien distress (not a per-lead chain). tax: sc_catalis_delinquent_roll + pickens_delinquent_parcels + pickens_tax_sale. gis: SC_GIS, parcel_cache, owner_mailing."
+   },
+   "manual_lane": "Index, TMS search and legal descriptions are free after the disclaimer click; a person may need to buy images, and probate is call/visit.",
+   "confidence": "medium"
+  },
+  {
+   "county": "richland",
+   "state": "SC",
+   "rod": {
+    "platform": "Richland County 'Online Data Services' subscription system (vendor not identified)",
+    "url": "https://www.richlandcountysc.gov/Online-Services/Online-Data-Services",
+    "free_name_search": "no",
+    "access": "payment",
+    "index_online_back_to_year": null,
+    "images_free": "no",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: richlandcountysc.gov answered HTTP 403 'Access Denied' (Akamai) to a plain client, so the county pages could not be read directly. Search-engine extracts of the county's own 'Subscription Data Services' page describe a fee-based subscription (daily/weekly/monthly/annual) for Register of Deeds and/or Probate, searchable by tax map, book/page, name, address or legal description. Not verified first-hand.",
+    "notes": "Paid subscription; county site blocks scripts. Low confidence on details."
+   },
+   "probate": {
+    "system": "County 'Richland County Estate Inquiry' (free name search for estates filed after 1983; older estates at the courthouse). Probate documents are in the paid Online Data Services subscription. Not a southcarolinaprobate.net participant.",
+    "url": "https://www7.richlandcountysc.gov/EstateInquiry/main.aspx",
+    "free_search": "yes",
+    "access": "open",
+    "notes": "Page loaded 2026-10-07 with a decedent last/first name form and no gate. Search not run."
+   },
+   "tax": {
+    "url": null,
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "blocked",
+    "notes": "County site (richlandcountysc.gov) 403 to a plain client; no qPayBill/Catalis tenant known to the repo."
+   },
+   "gis": {
+    "url": "https://www.richlandmaps.com/apps/dataviewer/",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "Custom Leaflet/GeoServer viewer serving parcel tiles; no attribute REST endpoint identified from the page."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "no",
+    "evidence": "Only richland_flc.py (forfeited land list). No Richland tax, GIS or ROD reader."
+   },
+   "manual_lane": "ROD and probate documents need a paid county subscription (the attorney's or abstractor's); a person can use the free Estate Inquiry for post-1983 estates; tax and parcel lookups are by hand on the county site.",
+   "confidence": "low"
+  },
+  {
+   "county": "saluda",
+   "state": "SC",
+   "rod": {
+    "platform": "Cott Systems RecordHub",
+    "url": "https://recordhub.cottsystems.com/SaludaSC/",
+    "free_name_search": "unknown",
+    "access": "unreachable",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: saludacounty.sc.gov home links 'Real Estate Records Search' to recordhub.cottsystems.com/SaludaSC/. Two attempts a few seconds apart both timed out on connect.",
+    "notes": "Platform known, terms and cost not read. Re-check by hand."
+   },
+   "probate": {
+    "system": "Saluda County Probate (county site page with an Estate Division link; no online case index). Not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read.",
+    "url": "https://saludacounty.sc.gov/departments/probate",
+    "free_search": "no",
+    "access": null,
+    "notes": "Call or visit."
+   },
+   "tax": {
+    "url": "https://saludacountytreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://saludacountysc.net/arcgis/rest/services/ParcelViewers/PublicWebsite_Pro/MapServer/4 (viewer https://saludacountysc.net/SaludaCountyViewer/)",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields Name/Name_2, Deed_Book, Deed_Page, Plat_Book, Plat_Page, Legal_Description1/2, Description_Location, Prev_Owner and Prev_Deed_Ref (previous owner and prior deed reference = two links of the chain, free), Instrmnt_Dt."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "tax: qpaybill_delinquent_roll ('Saluda') + saluda_delinquent_tax. gis: parcel_cache.py 'Saluda' reads owner/situs/mailing/value, not legal, deed, or Prev_Owner/Prev_Deed_Ref."
+   },
+   "manual_lane": "GIS gives legal, current deed and the prior deed reference free; deeper chain needs a person on Cott RecordHub (unreachable today) or the abstractor; probate is call/visit.",
+   "confidence": "medium"
+  },
+  {
+   "county": "spartanburg",
+   "state": "SC",
+   "rod": {
+    "platform": "Logan Systems 'The Lookup' (newer deployment)",
+    "url": "https://search.spartanburgdeeds.com/index.php",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1785,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: landing is a legal disclaimer (warranty/Tort Claims Act text, no automation language; says 'Indexes are currently in quality control'). A plain GET of index.php?Accept=Accept opened the Lookup with Name, Book/Page (DEEDS, MORTGAGES, PLATS, liens), Instrument Types and UCC searches, and an 'Old Index Books' panel: scanned grantor/grantee index books for deeds 1785-1919, 1919-1959, 1923-1969, 1960-1969, 1976-1979; mortgages 1904-1934, 1935-1977, 1978-1989; plats 1800-1973 and 1974-1992. Opening '1785-1919deeds' showed an alphabetical grantor/grantee page viewer (no search run on names). A book/page test for deed books 'A' and '1' returned only the empty results shell, because results load by DataTables AJAX (repo's logan_render.py needs a rendering browser), so whether pre-computer deed books themselves are imaged was not confirmed. Result header includes a Legal Description column. robots.txt now 404 (repo had recorded 'Disallow: /'). Images free per repo's rod/doc_images.py audit.",
+    "notes": "Owner's claim confirmed for the INDEX: old grantor/grantee index books are online back to 1785 and plats to 1800. Pre-computer deed images not confirmed."
+   },
+   "probate": {
+    "system": "Spartanburg County Probate Court. No online estate search found; spartanburgcounty.gov returned a Cloudflare block page on 2026-10-07. Not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read. Estate notices are published in the Spartan Weekly (repo reads them).",
+    "url": "https://www.spartanburgcounty.gov/153/Probate-Court",
+    "free_search": "unknown",
+    "access": "blocked",
+    "notes": "Use published notices (repo: spartan_weekly_legals, sc_probate_notices) or call the court."
+   },
+   "tax": {
+    "url": "https://spartanburgcountytax.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://maps.spartanburgcounty.org/server/rest/services/GIS/CAMA_Parcels/FeatureServer/0",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields OwnerName, TaxpayerName, PreviousOwnerName, LegalDescription, DeedBook, DeedPage, InstrumentNumber, SaleDate, SaleAmount, MAPNUMBER/PARCELNUMBER."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "rod: enrichment_spartanburg_rod.py (rendered name search, capped 30 owners/run) + rod/doc_images.py images. tax: qpaybill_delinquent_roll + enrichment_qpaybill_tax + spartanburg_delinquent_tax. gis: SC_GIS, parcel_cache and owner_mailing read owner/situs/mailing/value and deed book; LegalDescription, TaxpayerName and PreviousOwnerName are not read."
+   },
+   "manual_lane": "Free route covers deed chain, legal and plats; a person browses the scanned old index books (1785-1992) by hand to trace pre-computer chains, and probate is by notice or call.",
+   "confidence": "high"
+  },
+  {
+   "county": "sumter",
+   "state": "SC",
+   "rod": {
+    "platform": "Kofile/GovOS CountyFusion",
+    "url": "https://countyfusion2.kofiletech.us/countyweb/loginDisplay.action?countyname=SumterSC",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: sumtercountysc.gov ROD page links 'RoD Document Search' to countyfusion2.kofiletech.us (SumterSC). Its page says 'Click the Login as Guest button to begin' and has a 'Login as Guest' button (no password), alongside optional accounts. County page warns not to rely on the database for title searches. Stopped before entering.",
+    "notes": "Guest click-through, no credentials. Coverage dates appear only after entry."
+   },
+   "probate": {
+    "system": "Sumter County Probate Court. Listed in the southcarolinaprobate.net dropdown, but the repo's 2026-10-02 probe returned 'no records', so the court does not appear to feed it.",
+    "url": "https://www.southcarolinaprobate.net/search/",
+    "free_search": "unknown",
+    "access": "blocked",
+    "notes": "southcarolinaprobate.net returned HTTP 403 to a plain client on 2026-10-07. No county-hosted estate search found. Call the court."
+   },
+   "tax": {
+    "url": "https://sumtercounty.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://gis.sumter-sc.com/server/rest/services/BaseMaps/Sumter_City_County/FeatureServer/7 (viewer http://svr4.sumtercountysc.org/parcelsearch/)",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields owner_name + mailing, deed_book, deed_page, legal_description, parcel_address_one, deedacre."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "tax: qpaybill_delinquent_roll ('Sumter') + sumter_surplus. gis: parcel_cache.py 'Sumter' reads owner/situs/mailing/value, not legal_description or deed book."
+   },
+   "manual_lane": "GIS gives legal and current deed book/page free; walking the chain is a guest-click CountyFusion search (a person, or a script if terms allow once read); probate is call/visit.",
+   "confidence": "medium"
+  },
+  {
+   "county": "union",
+   "state": "SC",
+   "rod": {
+    "platform": "Cott Systems RecordRoom",
+    "url": "https://recordroom.cottsystems.com/unionsc/guest/Search/records",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: guest search page loaded ('Union, South Carolina, Clerk of Court's Office Records Search') with Party Name, Property and Book Page search and date range, no login prompt. The page loads Google's reCAPTCHA script but no challenge was shown on the search form. The repo's rod/cott_recordroom.py (browserless guest index) says images are pay-per-view, while rod/doc_images.py lists Union images as free; the two disagree, so 'unknown'.",
+    "notes": "Open guest index with a Property search (parcel #/address/legal in the Property cell per the repo). Image cost conflicting in repo."
+   },
+   "probate": {
+    "system": "Union County Probate Court. No online estate search found; not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read. Deeds of distribution are recorded at ROD (repo reads them via sc_rod_cott).",
+    "url": null,
+    "free_search": "unknown",
+    "access": null,
+    "notes": "County probate page not opened. Call the court."
+   },
+   "tax": {
+    "url": "https://uniontreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://services6.arcgis.com/xQgypOVdY84tFTiW/arcgis/rest/services/UNION_SC_PARCELS_WFL1/FeatureServer/2",
+    "legal_description_field": "no",
+    "deed_book_page_field": "no",
+    "owner_field": "yes",
+    "notes": "Fields MapNumber, ParcelID, Name, Address_1-3 (owner mailing). County's own ArcGIS (unionco.org) WAF-403s per repo walls_register. qPublic also listed (Cloudflare challenge 2026-10-07)."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "yes",
+    "gis": "yes",
+    "evidence": "rod: rod/cott_recordroom.py + counties_sc.sc_rod_cott sweep recent probate/lien recordings (not a per-lead chain). tax: qpaybill_delinquent_roll + enrichment_qpaybill_tax + union_delinquent_tax. gis: owner_mailing and resolve_name_to_property read this layer."
+   },
+   "manual_lane": "Index and deed chain are free as a guest; a person may need to buy images to read full legal descriptions; probate is call/visit.",
+   "confidence": "medium"
+  },
+  {
+   "county": "williamsburg",
+   "state": "SC",
+   "rod": {
+    "platform": "Neumo Records Management (formerly Avenu Insights 'SC Land Records')",
+    "url": "https://williamsburgsc.avenuinsights.com/Public/WilliamsburgSC/",
+    "free_name_search": "yes",
+    "access": "login",
+    "index_online_back_to_year": null,
+    "images_free": "no",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "yes",
+    "how_verified": "2026-10-07: sclandrecords.com picker sends Williamsburg to williamsburgsc.avenuinsights.com. County info page: images $1.00 per page (pay-per-access) or $1.10 with a $0/month commercial membership, 'commercial users will not be charged for search'; registration required; coverage given only as 'Certification Dates on the search page'. /Public/WilliamsburgSC/ redirects to login (first attempt hit an SSL EOF, second succeeded); login page bans data mining, robots and spiders.",
+    "notes": "Search free once registered; every image costs."
+   },
+   "probate": {
+    "system": "Williamsburg County Probate Court. No online estate search found; not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read.",
+    "url": null,
+    "free_search": "unknown",
+    "access": null,
+    "notes": "County probate page not opened. Call the court."
+   },
+   "tax": {
+    "url": "https://williamsburgtreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "qPayBill: Map Number search, Paid/Unpaid/All, years 2016-2026 (read 2026-10-07)."
+   },
+   "gis": {
+    "url": "https://williamsburgsc.wthgis.com/",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "WTH GIS viewer per SC DNR table (not opened). No open ArcGIS parcel REST layer known."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "tax: qpaybill_delinquent_roll ('Williamsburg'). No GIS layer in parcel_cache/owner_mailing."
+   },
+   "manual_lane": "A person registers (free) to search the index, but terms forbid robots and every deed image costs $1/page, so legal descriptions and the chain come from a person or the abstractor; probate is call/visit.",
+   "confidence": "medium"
+  },
+  {
+   "county": "york",
+   "state": "SC",
+   "rod": {
+    "platform": "'Online Record System' (NameSearch.php/NamePick.php/NameDisplay.php)",
+    "url": "https://search.yorkdeeds.com/NameSearch.php",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: search.yorkdeeds.com is a disclaimer (accuracy/anti-tampering text, no automation language); a plain GET of NameSearch.php?Accept=Accept loaded (497 KB) with no CAPTCHA, 'Instruments Verified Through: October 7, 2026', Property Description search (subdivision/lot/unit) and book codes RECORD BOOK, DEEDS, MORTGAGES, PLATS, TAX LIENS INDEX, SPECIALS, MISCELLANEOUS. 'Old Index Books' and 'Non-Indexed Plats' panels exist only as HTML comments (switched off). No search run.",
+    "notes": "Repo's enrichment_rod_name_index.py already reads this host by owner name (index rows carry an Amount column). Start year not stated; date-window behaviour undetermined per repo."
+   },
+   "probate": {
+    "system": "southcarolinaprobate.net participant: the repo's 2026-10-02 probe returned real York Probate hits; per-case docket rows link to a PAID document viewer (repo sc_probate_net.py).",
+    "url": "https://www.southcarolinaprobate.net/search/",
+    "free_search": "yes",
+    "access": "blocked",
+    "notes": "Index free, documents paid. southcarolinaprobate.net returned HTTP 403 to a plain client on 2026-10-07 (repo's sc_probate_net scraper may be failing today too)."
+   },
+   "tax": {
+    "url": "https://www.yorkcountysc.gov/789/Tax-Information",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "blocked",
+    "notes": "yorkcountysc.gov answered with a Cloudflare 'Attention Required' block on 2026-10-07; no qPayBill/Catalis tenant known. The repo's york_delinquent_tax.py reads the county's /216 tax-collection page, which sits behind the same block."
+   },
+   "gis": {
+    "url": "https://services1.arcgis.com/2AGLxyiJoNiVHKwq/arcgis/rest/services/Parcels/FeatureServer/0 (viewer https://maps.yorkcountygov.com/gvh5/index.html?viewer=planning)",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields Owner1-3, PreviousOwner, LegalDescription, TransferBook, TransferPage, PlatBook, PlatPage, SalePrice, TAXMAPID/ParcelID."
+   },
+   "we_already_read": {
+    "rod": "yes",
+    "tax": "partial",
+    "gis": "partial",
+    "evidence": "rod: enrichment_rod_name_index.py (York host, name lookup). tax: york_delinquent_tax (tax-sale list page, now Cloudflare-blocked) + york_overage_claims. gis: parcel_cache and owner_mailing read owner/mailing/value and TransferBook; LegalDescription and PreviousOwner not read."
+   },
+   "manual_lane": "Free route covers deed chain and property legal; a person may need to buy images, read probate documents (paid viewer) and look up tax bills on the county site by hand.",
+   "confidence": "high"
+  }
+ ],
+ "summary": {
+  "rod_open_free": 11,
+  "rod_walled": 9,
+  "rod_unreachable": 2,
+  "images_free": 3,
+  "legal_description_online": 12,
+  "index_back_to_before_1980": 4
+ },
+ "summary_definitions": "rod_open_free = free name search reachable with no login/payment (open or simple disclaimer click). rod_walled = login, CAPTCHA, payment or block in front of the index (free-account logins count as walled because we may not create accounts). images_free = document images free AND reachable without login. legal_description_online = legal description readable free either in an open ROD index or in a free GIS field. index_back_to_before_1980 = earliest online index year stated by the portal is before 1980 (any open or walled portal)."
+}
