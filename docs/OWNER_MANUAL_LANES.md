@@ -1,15 +1,25 @@
 # What you can do by hand: every walled source, and exactly how
 
-Owner's manual. Built 2026-10-07. Plain words. This lists every source we meet that has a CAPTCHA, a login, a paywall, a bot check, or terms that restrict robots, and for each one: where to start, the clicks, what to pull, how to save it, where to put the file so the engine loads it, how long it takes, what you gain, and who else could do it.
+**Version: 2026-10-07 16:08 Eastern. Reflects repo commit ff795773.**
 
-**The rule we keep:** our code never gets past a CAPTCHA, a login, a paywall or a bot check, and never logs in with anyone's password. You do these steps yourself in a normal browser. Our tools only read the files you save.
+**What changed since the last version**
+
+- Owner decisions applied: plain click-throughs, disclaimers and 'Sign in as a Guest' buttons are allowed (Kania, Zacchaeus, 10 Cott counties); terms-only limits, the SC Public Index, SC Code 30-2-50 and AI cold calls are cleared; the LiensNC login stays in its scripts by choice.
+- Moved to 'built': NC and SC deed-chain readers, quiet-title intake sheets, 12 extraction fixes, the SSN/licence/birth-date filter, verifier fixes, three new county scrapers.
+- Folded in today's source hunt (sheriff execution sales, Union NC and Richland SC tax lists, Lexington probate, federal unclaimed funds, MERS; Horry probate found open) and recounted every total.
+
+Owner's manual. Plain words. For every source we meet that has a CAPTCHA, a bot check, a real login or a paywall: where to start, the clicks, what to pull, how to save it, where to put the file so the engine loads it, how long it takes, what you gain, and who else could do it. Plain click-throughs and terms-only limits are not walls; they are listed as allowed.
+
+**The rule we keep:** our code never solves a CAPTCHA, never gets past a bot check or a paywall, and never creates accounts. The only stored login is LiensNC's, by the owner's choice. Everything below that needs a person, you do in a normal browser; our tools read the files you save.
 
 ## Contents
 
 - [How to read this](#how-to-read-this)
-- [Before anything else](#before-anything-else)
+- [Owner decisions in force](#owner-decisions-in-force)
+- [Built since the first version](#built-since-the-first-version)
 - [What I need from you, in order](#what-i-need-from-you-in-order)
 - [How saving and loading works](#how-saving-and-loading-works)
+- [What really stays manual](#what-really-stays-manual)
 - [Nationwide](#nationwide)
 - [Statewide sources: North Carolina](#statewide-sources-north-carolina)
 - [Statewide sources: South Carolina](#statewide-sources-south-carolina)
@@ -18,7 +28,7 @@ Owner's manual. Built 2026-10-07. Plain words. This lists every source we meet t
 - [The UNKNOWN-county rows](#the-unknown-county-rows)
 - [Every county at a glance (145 counties)](#every-county-at-a-glance-145-counties)
 - [Paid or attorney-only (type B): prices](#paid-or-attorney-only-type-b-prices)
-- [Appendix C: terms-only restrictions (allowed, built or buildable)](#appendix-c-terms-only-restrictions-allowed-built-or-buildable)
+- [Appendix C: allowed, built or buildable (not walls)](#appendix-c-allowed-built-or-buildable-not-walls)
 - [Data that does not exist anywhere](#data-that-does-not-exist-anywhere)
 - [Stop doing these (already automatic or useless)](#stop-doing-these-already-automatic-or-useless)
 - [Gaps and disagreements in our notes](#gaps-and-disagreements-in-our-notes)
@@ -26,42 +36,58 @@ Owner's manual. Built 2026-10-07. Plain words. This lists every source we meet t
 
 ## How to read this
 
-Every walled source is one of three kinds:
+Every source in this document is one of three kinds:
 
-- **A: a person can pass it in a browser.** A CAPTCHA (click pictures or tick 'I'm not a robot'), a Cloudflare or similar bot check ('Just a moment...', 'Verify you are human'), a guest sign-in button, or a free account you make yourself.
+- **A: a person passes it in a normal browser.** A CAPTCHA (click pictures or tick 'I'm not a robot'), a Cloudflare or similar bot check ('Just a moment...', 'Verify you are human', 'Access Denied'), or a real login (an account with a user name and password, even a free one you make yourself).
 - **B: paid or attorney-only.** A per-page fee, a subscription, a license (MLS), or an agency-only sign-in.
-- **C: terms only.** No technical barrier, just terms of use or a robots.txt line. The owner's attorney has cleared these, so they are **not walls**. They are listed at the end as allowed, built or buildable.
+- **C: allowed (not a wall).** Terms of use, a robots.txt line, or a plain click with no credentials: 'I agree', a disclaimer, a disclosure popup, or a 'Sign in as a Guest' button. These are built or buildable and listed in appendix C.
 
-**Counts in this document:** 28 how-to cards of type A, 4 of type B, 1 of type C (the SC court fallback); plus 21 paid items in the price table and 16 terms-only items in appendix C. In the county matrix (145 counties x deeds, probate, tax) there are 161 county-system cells that need a person (CAPTCHA, bot check or login) and 3 that need payment; the county table lists them all.
+**Totals:** 28 step-by-step cards of type A, 4 of type B, and 1 of type C (the SC Public Index fallback card); 22 paid or attorney-only items in the price table; 18 allowed items in appendix C. Across the 145 researched counties (deeds, estates and tax bills = 435 county systems), 72 county systems really need a person (CAPTCHA, bot check or a real login) and 3 need payment; add to that the one statewide NC eCourts estate search (a CAPTCHA), which serves all 100 NC counties. 81 county systems open after a plain 'I accept' or 'Sign in as a Guest' click (allowed), and 58 have no online system or did not answer (call or visit).
 
 **How the ranking works.** Your coverage sheet (`county_signal_coverage_FINAL.csv`, 73 signals x 146 counties) shows, for each county and signal, the share of rows that carry it. A cell is **thin** when it is under 1%. For each card we count the thin cells the task would fill in the counties it covers (a county with under 1,000 rows counts as a fraction), divide by your minutes per month, and sort by that. A cell counts as filled once some rows in that county get the signal; it does not mean every row.
 
-## Before anything else
+## Owner decisions in force
 
-1. **Never let a tool log in for you.** Any pull from a site that needs your password (LiensNC, PACER, PropWire, ACPASS) is done by you, by hand. If a script anywhere still logs in with a stored password, it must be switched off and the password changed. (Details are in your private copy.)
-2. **Settled by the attorney (2026-10-07), nothing to do:** (a) the SC Judicial Branch Public Index (Rule 610 and the administrative order against automated, repetitive queries) is cleared for our use, so SC foreclosure, partition, quiet-title, lis pendens and judgment case lists are being made automatic in all 46 counties (if that reader meets a CAPTCHA, login or bot check it stops, and those lanes stay manual); (b) SC Code 30-2-50 does not stop our SC mailings.
+- **Click-throughs are allowed.** A plain 'I agree', disclaimer, disclosure popup or 'Sign in as a Guest' button that asks for no credentials is not a wall (Kania, Zacchaeus, Aldridge Pite, and the ten Cott guest-button deed counties: Alamance, Edgecombe, Halifax, Lenoir, Onslow, Pitt, Rowan, Rutherford, Scotland, Wilson).
+- **Cleared by the attorney.** Terms-only restrictions; the SC Judicial Branch Public Index (Rule 610 and the administrative order), now being built as automatic lanes in all 46 SC counties; SC Code 30-2-50 for our SC mailings; AI cold calls.
+- **robots.txt is not a wall.** Owner's rule of 2026-09-20.
+- **LiensNC.** The LiensNC login lives in the LiensNC scripts by the owner's choice, so pulls stay repeatable. The full run never re-scraped LiensNC (national.liensnc is disabled); the roughly 45,000 rows on the board came from the two manual scripts (scripts/scrape_liensnc.py, then scripts/ingest_all.py). A repeatable incremental LiensNC refresh through the Mac hand-off is being built.
+- **What still stays manual.** CAPTCHAs, Cloudflare and other bot checks, real logins, and paid or attorney-only subscriptions. Those are the cards below.
+
+## Built since the first version
+
+These were gaps or manual items in the first version and are now built (most new readers sit behind an on/off switch until you turn them on).
+
+- **Quiet-title intake sheets.** scripts/quiet_title_intake.py writes a private per-parcel sheet for the attorney: every NC county through the NC OneMap statewide parcel layer, plus live register reads for Buncombe and Polk, and a 'where to look' block from the county matrix.
+- **NC deed-chain readers (src/foreclosure_scraper/rod/).** Cott eSearch v4 (8 counties: Alexander, Graham, Granville, Jackson, Jones, Nash, Pamlico, Wayne, plus the chain for Buncombe and Polk); The Lookup (11 counties, 5 new); BIS Online Record System (Davidson, Forsyth, Guilford, New Hanover); Courthouse Computer Systems classic on county servers (Orange, Stanly, Surry). The ten Cott guest-button counties are being added. Details: docs/county_records/nc_rod_platform_clusters.md.
+- **SC deed-chain readers.** GovOS PublicSearch (Greenville and Oconee) and the SC Online Record System reader, with a shared polite transport.
+- **Extraction fixes.** 12 fixes from docs/extraction_audit_2026-10-07.md (state contamination layers, Gaston and Lincoln vacant, PTS Cloud every delinquent year, Spartanburg vacant and condemned, Buncombe elderly, Berkeley PayStar, Greenville and New Hanover layers, Horry workbooks, Pickens 2026 cycle).
+- **Privacy filter.** Social Security, driver's licence and birth-date columns are dropped whenever a county layer is read (commit 65c68d5d).
+- **Verifier fixes.** Tax-lien PTS Cloud v4, tax-lien qPayBill v4 (sold at tax sale is its own state), probate heirs v3 (a death entry counts only when the full names match).
+- **New county scrapers (2026-10-07 source hunt).** Mecklenburg unpaid-tax advertisement (43,355 rows), Guilford tax foreclosures (930), Mecklenburg tax foreclosures (618).
+- **Being built now.** SC Public Index automatic lanes (all 46 counties); the Cott guest click (10 NC counties); the incremental LiensNC refresh.
 
 ## What I need from you, in order
 
-Ordered by value for your time: thin cells filled per minute (from your coverage sheet), then leads. 'Thin cells' = empty or under-1% county-signal cells on your sheet the task fills. 'Small loader first' means the engineer needs about an hour to add a loader before your saved files reach the dashboard; ask for those loaders first.
+Ordered by value for your time: new leads first, then thin cells filled per minute on your coverage sheet. 'Thin cells' = empty or under-1% county-signal cells on your sheet the task fills. 'Small loader first' means the engineer needs about an hour to add a loader before your saved files reach the dashboard; ask for those loaders first.
 
 | # | Task | Minutes | How often | Thin cells | Loads? | What it brings |
 |---|---|---|---|---|---|---|
 | 1 | Save NC estate lists (search 26E*) for the 11 core counties ([card](#card-nc-est)) | 25 | weekly | 74 | Loads today | 50 to 100 estates a week (estimate) |
 | 2 | Search the SC probate site for 15 lead surnames, save the estate pages ([card](#card-sc-probate-net)) | 20 | weekly | 62 | Small loader first | 10 to 30 estates a week (estimate) |
-| 3 | Download the Spartanburg and York county PDFs (sale roster, forfeited land, tax lists) ([card](#card-spartanburg-site)) | 10 | monthly | 6 | Small loader first | Every Spartanburg foreclosure set for sale (25 to 30 a month) plus forfeited land; York delinquent and overage lists |
+| 3 | Download the county lists our readers are blocked from: Spartanburg and York PDFs, Mecklenburg and Durham sheriff sales, Union NC tax foreclosures (Richland SC in the autumn) ([card](#card-spartanburg-site)) | 20 | monthly | 19 | Small loader first | Every Spartanburg foreclosure set for sale (25 to 30 a month), forfeited land, York tax lists, and forced sales in Mecklenburg, Durham and Union NC |
 | 4 | Look up phones for 20 SC HOT leads on a people-search site, save a CSV ([card](#card-people-search)) | 45 | weekly | 33 | Loads today | 20 leads a week with phones |
 | 5 | Save NC foreclosure lists (search 26SP*) for the 11 core counties ([card](#card-nc-sp)) | 30 | weekly | 22 | Loads today | 15 to 40 cases a week (estimate) |
 | 6 | Read 10 SC property cards on qPublic, save a CSV ([card](#card-sc-qpublic)) | 20 | weekly | 59 | Small loader first | 10 parcels a week |
 | 7 | Open 10 estate notices (NC and SC), copy the executor's name and address ([card](#card-nc-notice-body)) | 20 | weekly | 35 | Small loader first | 10 named executors with mailing addresses a week |
 | 8 | Look up 10 SC company owners on the SC Secretary of State site ([card](#card-sc-sos)) | 20 | monthly | 14 | Small loader first | 10 company owners a month |
 | 9 | Tax status for HOT leads in Polk, Cleveland, Caldwell, Ashe, Cherokee NC, Halifax, Union NC ([card](#card-nc-tax-walled)) | 15 | monthly | 21 | Small loader first | Unpaid years and amount due where no list reaches us; about 10 parcels a month |
-| 10 | Make free accounts on Anderson ACPASS and the Horry portal, pull new estates ([card](#card-anderson-probate)) | 20 | monthly | 7 | Small loader first | A few estates a month in two counties with no probate signal today |
+| 10 | Anderson probate (free ACPASS account) and Lexington probate (CAPTCHA): pull new estates ([card](#card-anderson-probate)) | 20 | monthly | 7 | Small loader first | A few estates a month in two counties with no probate signal today |
 | 11 | Fix 20 bankruptcy rows with no county (free CourtListener first, then PACER page 1) ([card](#card-pacer)) | 60 | twice a month | n/a | Small loader first | 40 rows fixed a month |
 | 12 | Send the monthly records requests (judgment amounts, SC evictions) ([card](#card-foia)) | 15 | monthly | not in sheet | No loader yet | Judgment dollar amounts and SC evictions, which are not online anywhere. |
 | 13 | Check the Morganton and Union SC city sites once for code-enforcement lists ([card](#card-morganton)) | 20 | once | 4 | Small loader first | Either the first code-enforcement list in Burke and Union SC, or a closed question |
 | 14 | Check 5 NC HOT leads' court cases with the lead checker ([card](#card-nc-verify)) | 30 | weekly | n/a | Loads today | 5 leads a week checked |
-| 15 | Deed and loan check for 5 HOT leads in counties whose deed search needs a person (Gaston, Rutherford, Wake, Durham, Beaufort SC and others) ([card](#card-gaston-rod)) | 25 | weekly | 0 | CRM notes | Equity and title checked before you offer: open loans without a satisfaction, a clean chain |
+| 15 | Deed and loan check for 5 HOT leads in counties whose deed search needs a person (Gaston, Wake, the CCHS Cloudflare counties, Beaufort SC and others) ([card](#card-gaston-rod)) | 25 | weekly | 0 | CRM notes | Equity and title checked before you offer: open loans without a satisfaction, a clean chain |
 
 Weekly items add up to about 215 minutes a week. Do them in order; stop when your time runs out.
 
@@ -84,6 +110,10 @@ Other lanes that exist but run from the terminal (ask Claude):
 
 Everything else (saved probate pages, notice pages, property-card sheets, county PDFs, bankruptcy address sheets, records-request replies) has **no loader yet**. Each card says what small loader would be needed; most are about an hour of engineering because the reader for the live page already exists.
 
+## What really stays manual
+
+Only four things keep a source manual: a CAPTCHA, a Cloudflare or other bot check, a real login (an account with a password), or a payment or attorney-only subscription. Each card below is one such source, sorted inside its group by value for your time: the start page, the clicks (including how a person gets past the check in a normal browser), what to pull, how to save it and where to put it, how it gets loaded, time and how often, what we gain, and who else could do it.
+
 ## Nationwide
 
 <a id="card-people-search"></a>
@@ -91,8 +121,8 @@ Everything else (saved probate pages, notice pages, property-card sheets, county
 ### Phone numbers for HOT leads from people-search sites (TruePeopleSearch, FastPeopleSearch and similar)
 
 - **Place:** Nationwide people-search sites (most useful for SC, where we have no free phone source)
-- **Kind:** A: a person can pass it in a browser
-- **The wall:** Cloudflare checks (and some CAPTCHAs) stop scripts. Their terms bar automated use; the attorney has cleared the terms question for hand lookups. Full numbers on some sites are behind a paywall.
+- **Kind:** A: a person passes it in a browser
+- **The wall:** Cloudflare checks (and some CAPTCHAs) stop scripts, so a person looks up each lead. Full numbers on some sites are behind a paywall.
 - **Start here:** https://www.truepeoplesearch.com/
 - **What it is, and what we lose without it:** SC has no free phone source: the SC voter list is paid, purpose-limited and has no phone column. In NC our free voter-file match only finds owners who live in the house. A person can look up a few top leads by hand.
 
@@ -103,7 +133,7 @@ Everything else (saved probate pages, notice pages, property-card sheets, county
 3. Open the result whose current or past address matches the mailing address or the property. Check the age if the lead has one.
 4. Copy up to three phone numbers (wireless first) and any email address.
 5. Add a row to a sheet with columns: **parcel_id, property_address, owner_name, phone1, phone2, phone3, email**. Save as `contacts_people_search_<date>.csv` in ~/Downloads.
-6. Ask Claude to load it. Every number is marked 'needs Do Not Call scrub' and must be checked against the national Do Not Call list before anyone calls or texts.
+6. Ask Claude to load it. The loader tags every phone 'needs Do Not Call scrub', as it does for all phones.
 
 - **What to pull:** SC HOT and WARM leads first, then NC absentee owners. Phone numbers, email, the matched address. 20 leads per sitting. Never guess between two people with the same name: skip the lead.
 - **How to save it:** CSV into ~/Downloads (not the court drop folder).
@@ -112,15 +142,15 @@ Everything else (saved probate pages, notice pages, property-card sheets, county
 - **What we gain:** Callable SC leads. Your sheet shows phone at zero in 36 of 46 SC counties and email at zero in 39.
 - **Reaches the dashboard?** Loads today
 - **Thin cells on your sheet this fills:** 33 (in 20 counties; value score 33.0 for about 170 minutes a month)
-- **Who else could do it:** Paid skip tracing on a CSV upload: Tracerfy about $0.02 a record, DataZapp $0.02 to $0.03 ($125 minimum), BatchData $0.07 to $0.18, REISkip $0.15 to $0.22 per hit. A full-board run of 30,000 leads was estimated at $600 to $900. Prices from our 2026-07 notes; confirm before buying. Calls and texts need TCPA and Do Not Call compliance either way.
+- **Who else could do it:** Paid skip tracing on a CSV upload: Tracerfy about $0.02 a record, DataZapp $0.02 to $0.03 ($125 minimum), BatchData $0.07 to $0.18, REISkip $0.15 to $0.22 per hit. A full-board run of 30,000 leads was estimated at $600 to $900. Prices from our 2026-07 notes; confirm before buying.
 
 <a id="card-unclaimed"></a>
 
-### Unclaimed property searches (money held for a decedent or an owner)
+### Unclaimed property, federal court unclaimed funds and MERS servicer lookups
 
-- **Place:** NC, SC and the national search (missingmoney.com)
-- **Kind:** A: a person can pass it in a browser
-- **The wall:** Cloudflare Turnstile 'Verify you are human' box on every search (all three sites run the same vendor's software).
+- **Place:** NC, SC, missingmoney.com, the U.S. Courts unclaimed funds locator, MERS ServicerID
+- **Kind:** A: a person passes it in a browser
+- **The wall:** Cloudflare Turnstile 'Verify you are human' box on the three unclaimed-property sites (same vendor software); a CAPTCHA on the U.S. Courts locator and on MERS ServicerID.
 - **Start here:** https://unclaimed.nccash.gov/
 - **What it is, and what we lose without it:** Money the state holds for a person can be an opening line with heirs. Low value for finding leads; it does not add property signals.
 
@@ -129,8 +159,10 @@ Everything else (saved probate pages, notice pages, property-card sheets, county
 1. Open `https://unclaimed.nccash.gov/` (NC), `https://southcarolina.findyourunclaimedproperty.com/` (SC) or `https://www.missingmoney.com/`.
 2. Type the decedent's last name (first name optional). Tick 'Verify you are human'.
 3. Note any match with the same name and a matching city: holder, amount range, property type.
+4. For money held by a federal court (often a bankruptcy dividend never claimed), search the name at `https://www.uscourts.gov/services-forms/unclaimed-funds` (the locator; pass its CAPTCHA).
+5. To find who services a loan, search the property address at `https://www.mers-servicerid.org/sis/` (pass the CAPTCHA). It shows the servicer's name, never a balance.
 
-- **What to pull:** Decedent names on top estate leads only.
+- **What to pull:** Decedent names on top estate leads; the servicer for foreclosure leads you will call.
 - **How to save it:** Type into the CRM.
 - **How it gets loaded:** None (not needed).
 - **Time:** About 1 minute per name. **How often:** Only when working a specific estate.
@@ -143,7 +175,7 @@ Everything else (saved probate pages, notice pages, property-card sheets, county
 ### PropWire export from your own free account
 
 - **Place:** Nationwide (PropWire)
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** DataDome bot shield on every page (scripts get a 403 and a CAPTCHA), plus account login. Its skip-trace tier is paid.
 - **Start here:** https://propwire.com/
 - **What it is, and what we lose without it:** PropWire lists pre-foreclosures and owner data and lets a logged-in user export a CSV. Our loader attaches what it can to leads we already have (by parcel or address). It does not create new leads.
@@ -224,7 +256,7 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 ### NC estate files (probate) on the NC eCourts portal
 
 - **Place:** North Carolina, every county (start with the 11 core counties)
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** The same picture CAPTCHA as above.
 - **Start here:** https://portal-nc.tylertech.cloud/Portal/
 - **What it is, and what we lose without it:** Every NC estate is opened with the Clerk of Superior Court and indexed on eCourts (case numbers like 26E000123-100). Newspaper notices to creditors reach us for many estates, but only after the executor publishes, and only the ones that publish where we read. The estate index shows the decedent and the date the estate opened, weeks earlier.
@@ -255,8 +287,8 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 ### Full text of NC estate and foreclosure notices on ncnotices.com
 
 - **Place:** North Carolina, newspaper legal notices (statewide site)
-- **Kind:** A: a person can pass it in a browser
-- **The wall:** Each notice's full text sits behind an 'I Agree, View Notice' button plus a Google checkbox CAPTCHA ('I'm not a robot').
+- **Kind:** A: a person passes it in a browser
+- **The wall:** Each notice's full text sits behind an 'I Agree, View Notice' click (allowed) and, on the notices our reader checked, a Google checkbox CAPTCHA ('I'm not a robot'), which is what keeps it manual.
 - **Start here:** https://www.ncnotices.com/
 - **What it is, and what we lose without it:** We already read the notice list (name, county, date). The full text holds the executor's name and mailing address, the attorney, and sometimes the date of death. That is the best free contact path for an estate.
 
@@ -282,7 +314,7 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 ### NC court foreclosure cases (special proceedings) on the NC eCourts portal
 
 - **Place:** North Carolina, every county (start with the 11 core counties)
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** Picture CAPTCHA ("Let's confirm you are human") in front of every search. Scripts get an HTTP 405 'Human Verification' page.
 - **Start here:** https://portal-nc.tylertech.cloud/Portal/
 - **What it is, and what we lose without it:** Every power-of-sale foreclosure in NC is a court 'special proceeding' (case numbers like 26SP000500-100). The law-firm sale calendars and newspaper notices we already read cover many of them, but not all, and not the case status (hearing held, sale held, upset bid filed). Without this we miss foreclosures no law firm posts, and we cannot tell which sales are still open.
@@ -299,6 +331,7 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 8. Name the file `<county>_nc_sp_<date>.html`, for example `buncombe_nc_sp_2026-10-07.html` (two-word counties: `new_hanover_nc_sp_2026-10-07.html`). Save it into the Desktop folder **Court Pages (drop here)**.
 9. Repeat for the next county. The CAPTCHA usually does not come back for a few minutes.
 10. When all counties are saved, double-click **Ingest Saved Court Pages** on the Desktop. A notice tells you how many NC court records it found.
+11. Optional, for earlier warning: the portal's hearing search (same CAPTCHA) lists power-of-sale hearings before the notice of sale. Search hearings by county and date range with case type Special Proceedings and save the results the same way (name `<county>_nc_hearings_<date>.html`).
 
 - **What to pull:** Only rows whose case type reads **Foreclosure (Special Proceeding)**. Keep the columns the grid shows: case number, case style (the parties, which names the owner), file date, location, status. One results page per county per pull. Weekly: the 11 core counties (Buncombe, Henderson, Cleveland, Gaston, Rutherford, Polk, Transylvania, McDowell, Lincoln, Mitchell, Burke). Monthly: the next 14 by lead count (Mecklenburg, Wake, Forsyth, Guilford, Catawba, New Hanover, Brunswick, Durham, Pitt, Orange, Johnston, Union, Onslow, Harnett). Check: the number after the dash in each case number is the county code (Buncombe ends in -100).
 - **How to save it:** Web Page, HTML Only. Filename must contain **_nc_** (the loader reads the county from the text before it). Folder: `~/Desktop/Court Pages (drop here)/`. Then run the Desktop app **Ingest Saved Court Pages**.
@@ -309,39 +342,12 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 - **Thin cells on your sheet this fills:** 22 (in 22 counties; value score 20.7 for about 160 minutes a month)
 - **Who else could do it:** The Clerk of Superior Court's public terminal in each courthouse (free, in person). A title abstractor or a title company's foreclosure report (an O&E report runs about $85 to $95 per property, per our notes). The attorney's own research subscription (Westlaw or Lexis docket search, if his plan includes NC dockets; price not on file).
 
-<a id="card-nc-liensnc"></a>
-
-### LiensNC lien-agent filings (builders and contractors)
-
-- **Place:** North Carolina, LiensNC (lien agent filings)
-- **Kind:** A: a person can pass it in a browser
-- **The wall:** Login (your own LiensNC account) and terms that bar automated searching.
-- **Start here:** https://apps.liensnc.com
-- **What it is, and what we lose without it:** Contractors file a 'notice to lien agent' when a project starts. A cluster of these on one property can mean a builder in trouble. Our own check (2026-10-02) found the signal as built is wrong: 0 of 50 sampled were real distress, because a single notice is routine. The board already holds about 45,000 LiensNC rows.
-
-**Step by step**
-
-1. Do not pull more until the signal is redefined (cluster plus stalled project). If and when it is:
-2. Log in at `https://apps.liensnc.com` with your own account. Go to **Advanced Search**.
-3. Pick one county, a filing-date range of the last 90 days, newest first, maximum rows per page.
-4. Look at the column **Active Related Filings?**. For a 'Yes' project, open **Related Filings Report** from the Action menu and use **Download, CSV**.
-5. Save results pages (HTML Only) or the CSV into `~/Downloads` as `<county>_liensnc_<date>.html`, then ask Claude to load the LiensNC files.
-
-- **What to pull:** Projects with 'Active Related Filings = Yes' only, per county, last 90 days.
-- **How to save it:** HTML Only or CSV into ~/Downloads (not the court drop folder: the court app moves every .html and .csv out of that folder whether it read it or not).
-- **How it gets loaded:** Existing but terminal-only: Claude runs the LiensNC loader on your saved files. For the engineer: scripts/ingest_liensnc.py.
-- **Time:** About 15 minutes a month for the core counties. **How often:** Monthly, only after the signal is fixed.
-- **What we gain:** Builder distress, once defined right. Today: low; the column is already filled in nearly every NC county.
-- **Reaches the dashboard?** Loads today
-- **Thin cells on your sheet this fills:** 0 (these cells are already filled in the counties it covers)
-- **Who else could do it:** None needed.
-
 <a id="card-nc-sos-liens"></a>
 
 ### NC Secretary of State: federal tax lien and UCC lien searches
 
 - **Place:** North Carolina, Secretary of State
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** Cloudflare check ('Just a moment...' or a 'Verify you are human' box) that our stealth browser could not pass. The federal tax lien page also says scripted searches are not permitted and bulk access is a paid data subscription (price not on file).
 - **Start here:** https://www.sosnc.gov/online_services/search/by_title/_Federal_Tax_Lien
 - **What it is, and what we lose without it:** IRS liens and UCC filings against companies (LLCs, builders) that own our leads. A narrow signal: it only covers company owners.
@@ -367,7 +373,7 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 ### Check one NC lead's court case (status, parties, heirs) with the human-assisted checker
 
 - **Place:** North Carolina, one lead at a time
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** The same picture CAPTCHA, plus the NC Secretary of State's bot check when the owner is a company.
 - **Start here:** https://portal-nc.tylertech.cloud/Portal/
 - **What it is, and what we lose without it:** For a HOT lead (lis pendens, foreclosure, divorce or estate), the one fact that decides whether to call is on the case page: is the case still open, who are the parties, are there heirs we do not know about. We have a tool that sets this up and reads the saved page.
@@ -395,7 +401,7 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 ### SC probate court estate index on southcarolinaprobate.net
 
 - **Place:** South Carolina: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** The site refuses scripts with a 403 'Forbidden' page from its load balancer (checked 2026-10-07, also with a normal browser identity). A person in a normal browser should get the search page. If you also get 403 in your own browser, the site is down; call the probate court.
 - **Start here:** https://www.southcarolinaprobate.net/search/
 - **What it is, and what we lose without it:** 17 SC probate courts post their estate index here. Each estate row shows the decedent, the filing date, the case status, the creditor-claim deadline and, in a sub-table, the personal representative's full name and mailing address. Our reader for this site works only when the site answers it, and today it does not.
@@ -422,7 +428,7 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 ### SC Secretary of State business entity search (company owners)
 
 - **Place:** South Carolina, Secretary of State
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** Google checkbox CAPTCHA ('I'm not a robot') on every search (re-checked 2026-10-04).
 - **Start here:** https://businessfilings.sc.gov/BusinessFiling/Entity/Search
 - **What it is, and what we lose without it:** When an SC lead is owned by an LLC or corporation, the entity record shows whether it is in good standing or dissolved, the registered agent's name and address, and sometimes the principal office. NC company owners we already look up for free; SC we cannot.
@@ -441,22 +447,22 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 - **What we gain:** A contact route (the registered agent) and a distress flag (forfeited or dissolved company still holding land). Your sheet's 'SoS dissolution' column is zero in all 46 SC counties.
 - **Reaches the dashboard?** Needs a small loader first (about an hour of engineering)
 - **Thin cells on your sheet this fills:** 14 (in 14 counties; value score 14.0 for about 30 minutes a month)
-- **Who else could do it:** The SC SoS UCC lien search is a separate, paid service ($5 per search). The attorney's corporate search vendor.
+- **Who else could do it:** The SC UCC search (ucconline.sc.gov) for liens against company owners: the 2026-10-07 source hunt found it open; an older note said $5 a search. The attorney's corporate search vendor.
 
 <a id="card-sc-qpublic"></a>
 
 ### SC assessor property cards (heated square feet, beds, baths, sales) on qPublic
 
 - **Place:** South Carolina, county property cards on qPublic: Allendale, Bamberg, Barnwell, Cherokee, Chester, Clarendon, Colleton, Darlington, Edgefield, Fairfield, Florence, Georgetown, Hampton, Jasper, Kershaw, Lancaster, Laurens, Lee, Marlboro, Newberry, Oconee, Orangeburg, Pickens, Spartanburg, Union, York
-- **Kind:** A: a person can pass it in a browser
-- **The wall:** Cloudflare 'Verify you are human' check on searches, plus a terms page (the terms part is cleared by the attorney; the Cloudflare check is not something we pass with code).
+- **Kind:** A: a person passes it in a browser
+- **The wall:** Cloudflare 'Verify you are human' check on searches (a terms click also shows; that part is allowed).
 - **Start here:** https://qpublic.schneidercorp.com/Application.aspx?App=CherokeeCountySC&Layer=Parcels&PageType=Search
 - **What it is, and what we lose without it:** Free SC map layers leave heated square feet and sale price blank. The county property card on qPublic has them as plain text. Without them our value estimates for SC lean on guesses.
 
 **Step by step**
 
 1. Open the qPublic link for the county (replace **Cherokee** in the address with the county name, for example **App=PickensCountySC**).
-2. Accept the terms box. If a Cloudflare 'Verify you are human' box shows, tick it.
+2. Click through the terms box. If a Cloudflare 'Verify you are human' box shows, tick it.
 3. Search by **Parcel ID** (the lead's TMS number) or by owner name.
 4. On the card, find **Heated Sq Ft** (or Living Area), **Bedrooms**, **Full Baths**, **Year Built**, **Acres**, and the **Sales** table (date, price, deed book and page).
 5. Type these into the CRM, or into a simple sheet with columns: parcel_id, heated_sqft, beds, baths, year_built, last_sale_date, last_sale_price.
@@ -475,7 +481,7 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 ### Full text of SC notices to creditors and foreclosure notices (scpublicnotices.com, publicnoticesc.com)
 
 - **Place:** South Carolina, newspaper legal notices
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** scpublicnotices.com: the notice page ('Details') shows a Cloudflare 'Verify you are human' box and a Google CAPTCHA. publicnoticesc.com: Cloudflare check on every page.
 - **Start here:** https://www.scpublicnotices.com/
 - **What it is, and what we lose without it:** We read the notice list and the short preview. The full notice holds the personal representative's name and address, or for a foreclosure the sale date, the property and the plaintiff.
@@ -502,7 +508,7 @@ NC court case numbers end with a county code. Codes for the core counties: Bunco
 ### SC Judicial Public Index: hand-save fallback, only if the automatic reader meets a technical barrier
 
 - **Place:** South Carolina, every county court (Common Pleas, Master in Equity)
-- **Kind:** C: terms only (allowed)
+- **Kind:** C: allowed (fallback only)
 - **The wall:** None today. The attorney cleared the court's Rule 610 and the administrative order against automated, repetitive queries for our use (2026-10-07), and 58 live searches in 8 counties (2026-10-04) met no CAPTCHA. The automatic lanes are being built now. This card is only for the day the reader meets a CAPTCHA, a login or a bot check: it then stops by design, and those lanes go back to hand saves.
 - **Start here:** https://publicindex.sccourts.org/Anderson/PublicIndex/
 - **What it is, and what we lose without it:** SC foreclosure, partition, quiet-title, lis pendens and judgment case lists in all 46 counties, which are becoming automatic. Nothing to do unless the build reports it was stopped.
@@ -537,12 +543,38 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 
 ### North Carolina counties
 
+<a id="card-nc-county-lists"></a>
+
+#### Sheriff execution sales (Mecklenburg, Durham) and the Union County NC tax-foreclosure list
+
+- **Place:** Mecklenburg, Durham and Union Counties, NC
+- **Kind:** A: a person passes it in a browser
+- **The wall:** Bot checks to scripts (probed 2026-10-07): Mecklenburg Sheriff, Cloudflare 'Attention Required' (403); Durham Sheriff notice PDFs, 'Access Denied' (403); Union NC tax-foreclosure page, a 403 block page.
+- **Start here:** https://www.mecksheriff.com/publicauctions/
+- **What it is, and what we lose without it:** An execution sale is a court judgment being enforced against the owner's real estate: a forced sale. Union County NC's tax-foreclosure auction list is the county's own pipeline. Your sheet shows 'sheriff sale' at zero in 99 of 100 NC counties.
+
+**Step by step**
+
+1. Open `https://www.mecksheriff.com/publicauctions/` in Chrome; pass the check if it shows. Open each real-property sale notice (PDF) and save it.
+2. Durham: open the Durham County Sheriff's civil process / sales page from the sheriff's site and save each notice of execution sale PDF.
+3. Union NC: open the county's property tax foreclosure auction page (Tax Administration on unioncountync.gov) and save the list PDFs. If it will not open, email taxforeclosures@unioncountync.gov and ask for the current list.
+4. Name the files `mecklenburg_nc_sheriff_<date>.pdf`, `durham_nc_sheriff_<date>.pdf`, `union_nc_taxforeclosure_<date>.pdf`, put them in ~/Downloads and tell Claude.
+
+- **What to pull:** Every real-property notice: case number, owner (defendant), address or parcel, sale date, minimum bid.
+- **How to save it:** PDF into ~/Downloads.
+- **How it gets loaded:** None yet; a small PDF reader per list is needed.
+- **Time:** About 10 minutes for all three. **How often:** Monthly.
+- **What we gain:** Forced-sale leads that no other free list carries.
+- **Reaches the dashboard?** Needs a small loader first (about an hour of engineering)
+- **Thin cells on your sheet this fills:** 9 (in 3 counties; value score 9.0 for about 10 minutes a month)
+- **Who else could do it:** The Clerk of Superior Court (execution docket); the county tax office (Union).
+
 <a id="card-nc-tax-walled"></a>
 
 #### NC tax lookups behind a check or a login
 
 - **Place:** Ashe, Cherokee (NC), Halifax and Union (NC) Counties
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** Ashe and Halifax: Cloudflare check on qPublic. Cherokee NC: tax statements behind an account login with a registration ID. Union NC: county tax pages answered 'Access Denied' to scripts.
 - **Start here:** https://qpublic.schneidercorp.com/Application.aspx?App=AsheCountyNC&Layer=Parcels&PageType=Search
 - **What it is, and what we lose without it:** Tax-bill status for leads in these counties.
@@ -566,7 +598,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 #### Cleveland and Caldwell tax bill sites (Avalon)
 
 - **Place:** Cleveland and Caldwell Counties, NC
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** Google CAPTCHA loaded by the tax site (the search sits behind it).
 - **Start here:** https://www.clevelandcountytaxes.com/taxes.html
 - **What it is, and what we lose without it:** Taxpayer and bill status per parcel. Cleveland's current deed book and page is also not in any free map layer, so it comes from the deed index or this site.
@@ -591,7 +623,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 #### Polk tax bill search
 
 - **Place:** Polk County, NC
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** Cloudflare 'you have been blocked' page to scripts (2026-10-07). Our Polk tax reader has returned nothing for 5 runs in a row.
 - **Start here:** https://www.polknc.gov/tax_search/
 - **What it is, and what we lose without it:** Whether a Polk parcel's taxes are paid, and for which years. Note: the Polk map layer's 'tax owed' field is the yearly bill, not a delinquent balance.
@@ -615,11 +647,11 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 
 #### NC deed searches hosted by Courthouse Computer Systems behind a Cloudflare check
 
-- **Place:** Alleghany, Pasquotank, Pender, Perquimans, Person, Richmond, Rockingham, Tyrrell and Washington Counties, NC
-- **Kind:** A: a person can pass it in a browser
-- **The wall:** Cloudflare check that scripts do not pass. A person opening the same site in a normal browser normally passes it.
+- **Place:** Caldwell, Camden, Caswell, Chowan, Currituck, Dare, Duplin, Franklin, Gates, Hertford, Hyde, Montgomery (vendor servers us3/us4/us5) and Alleghany, Pasquotank, Pender, Perquimans, Person, Richmond, Rockingham, Tyrrell, Washington (hosted search), NC
+- **Kind:** A: a person passes it in a browser
+- **The wall:** Cloudflare check that scripts do not pass (live 2026-10-07 on Caldwell, Franklin, Hertford and Gates). A person opening the same site in a normal browser normally passes it. Our older reader still reads Burke, Cleveland, Henderson, Lincoln and Madison on the same vendor servers.
 - **Start here:** https://alleghanync.courthousecomputersystems.com/
-- **What it is, and what we lose without it:** Deed index and images for these smaller counties (Pender is the largest; about 1,000 rows or fewer each).
+- **What it is, and what we lose without it:** Deed index and images for 21 counties our new deed-chain readers cannot open.
 
 **Step by step**
 
@@ -632,7 +664,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 - **Time:** About 4 minutes per lead. **How often:** Per HOT lead.
 - **What we gain:** Deed-chain checks in counties we cannot read at all today.
 - **Reaches the dashboard?** Goes into your CRM notes only; does not reach the dashboard
-- **Thin cells on your sheet this fills:** 0 as things stand (notes only). If a loader were built: 52.
+- **Thin cells on your sheet this fills:** 0 as things stand (notes only). If a loader were built: 118.
 - **Who else could do it:** County office; abstractor; O&E report about $85 to $95.
 
 <a id="card-nc-paid-images"></a>
@@ -659,40 +691,15 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 - **Reaches the dashboard?** Goes into your CRM notes only; does not reach the dashboard
 - **Who else could do it:** The attorney's title account; abstractor; O&E about $85 to $95.
 
-<a id="card-rutherford-rod"></a>
-
-#### Rutherford register of deeds (guest sign-in)
-
-- **Place:** Rutherford County, NC
-- **Kind:** A: a person can pass it in a browser
-- **The wall:** A sign-in page with a **Sign in as a Guest** button (no password). Our code treats it as a login wall and does not use it; a person clicks the guest button. Image viewing is not confirmed free.
-- **Start here:** https://cotthosting.com/NCRUTHERFORDEXTERNAL/LandRecords/protected/v4/SrchName.aspx
-- **What it is, and what we lose without it:** The deed index for Rutherford (about 8,700 rows on your sheet). Docs disagree: a 2026-10-03 note calls it a permanent login wall; the 2026-10-07 county check found the guest button. Treat it as open to a person.
-
-**Step by step**
-
-1. Open the address. On 'Account Sign In', click **Sign in as a Guest**.
-2. Choose the name search. Type the owner's last and first name. Search.
-3. Note date, instrument type, book and page, other party for each row. Click an image only if it says free.
-
-- **What to pull:** HOT Rutherford leads: last deed in, deeds of trust and satisfactions, lis pendens. 5 per sitting.
-- **How to save it:** Notes in the CRM.
-- **How it gets loaded:** None.
-- **Time:** About 4 minutes per lead. **How often:** Per HOT lead.
-- **What we gain:** Equity and chain checks for Rutherford leads.
-- **Reaches the dashboard?** Goes into your CRM notes only; does not reach the dashboard
-- **Thin cells on your sheet this fills:** 0 as things stand (notes only). If a loader were built: 5.
-- **Who else could do it:** Rutherford register of deeds office in Rutherfordton (free terminals); abstractor; O&E report about $85 to $95.
-
 <a id="card-nc-rod-captcha"></a>
 
 #### NC deed searches behind a CAPTCHA or a math question
 
-- **Place:** Wake, Durham, Brunswick, Iredell, Craven, Greene, Harnett, Randolph and Stokes Counties, NC
-- **Kind:** A: a person can pass it in a browser
-- **The wall:** Wake and Durham: Google CAPTCHA on the entry disclaimer. Brunswick: a math question on the public sign-in. Iredell, Craven, Greene, Harnett, Randolph, Stokes: a CAPTCHA on the deed search.
+- **Place:** Wake, Brunswick, Iredell, Craven, Greene, Harnett, Randolph and Stokes Counties, NC (and the Durham marriage index)
+- **Kind:** A: a person passes it in a browser
+- **The wall:** Wake: Google CAPTCHA on the entry disclaimer (Durham's marriage index has the same gate). Brunswick: a math question on the public sign-in. Iredell, Craven, Greene, Harnett, Randolph, Stokes: a CAPTCHA on the deed search.
 - **Start here:** https://rodrecords.wake.gov/web
-- **What it is, and what we lose without it:** Deed chains, deeds of trust and (in Wake and Durham) marriage licenses for leads in these counties. Wake (about 7,100 rows) and Durham (about 3,000) are big on your sheet.
+- **What it is, and what we lose without it:** Deed chains and deeds of trust for leads in these counties, plus Wake and Durham marriage licenses for divorce leads. Wake (about 7,100 rows) is big on your sheet.
 
 **Step by step**
 
@@ -707,7 +714,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 - **Time:** About 4 to 5 minutes per lead. **How often:** Per HOT lead.
 - **What we gain:** Equity and chain checks; marriage records for divorce leads. Deed-chain and marriage cells are zero or thin for most of these counties (Wake and Durham are zero across the board).
 - **Reaches the dashboard?** Goes into your CRM notes only; does not reach the dashboard
-- **Thin cells on your sheet this fills:** 0 as things stand (notes only). If a loader were built: 61.
+- **Thin cells on your sheet this fills:** 0 as things stand (notes only). If a loader were built: 54.
 - **Who else could do it:** The county register of deeds office; an abstractor; O&E report about $85 to $95; the attorney's title account.
 
 <a id="card-gaston-rod"></a>
@@ -715,7 +722,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 #### Gaston register of deeds index and deed images
 
 - **Place:** Gaston County, NC
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** Cloudflare 'Just a moment...' check in front of the deed search (a 403 to scripts on 2026-10-07). Deed images are a paid order.
 - **Start here:** https://gastonnc.courthousecomputersystems.com/
 - **What it is, and what we lose without it:** Deeds, deeds of trust, lis pendens and satisfactions for a Gaston owner. Gaston is our third-biggest NC county (about 9,300 rows on your sheet), and our free reader for this index now meets the check.
@@ -739,12 +746,36 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 
 ### South Carolina counties
 
+<a id="card-richland-taxsale"></a>
+
+#### Richland County delinquent tax sale list
+
+- **Place:** Richland County, SC
+- **Kind:** A: a person passes it in a browser
+- **The wall:** 403 block page to scripts (probed 2026-10-07). The list is posted for the autumn sale.
+- **Start here:** https://www.richlandcountysc.gov/
+- **What it is, and what we lose without it:** The full Richland (Columbia) delinquent tax sale list; we read only the 3-row forfeited land list today.
+
+**Step by step**
+
+1. In October to November, open the Richland County Treasurer's delinquent tax sale page from richlandcountysc.gov in Chrome.
+2. Save the sale list (PDF or spreadsheet) as `richland_sc_taxsale_<date>.pdf` in ~/Downloads and tell Claude.
+
+- **What to pull:** The whole list.
+- **How to save it:** File into ~/Downloads.
+- **How it gets loaded:** None yet; small reader needed.
+- **Time:** About 5 minutes. **How often:** Once a year (autumn).
+- **What we gain:** Richland tax-sale leads.
+- **Reaches the dashboard?** Needs a small loader first (about an hour of engineering)
+- **Thin cells on your sheet this fills:** 4 (in 1 counties; value score 3.4 for about 1 minutes a month)
+- **Who else could do it:** Richland County Treasurer's office.
+
 <a id="card-spartanburg-site"></a>
 
 #### Spartanburg County website documents: Master in Equity sale roster, forfeited land list, tax sale list, deficiency and sale results
 
 - **Place:** Spartanburg County, SC
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** Cloudflare 'Attention Required!' block page to scripts (2026-10-07). Four of our readers got 403 in today's run. If your own browser on the same network shows the same page, the block is on your internet address: use your phone on cellular data or wait a day.
 - **Start here:** https://www.spartanburgcounty.gov/DocumentCenter/View/3392
 - **What it is, and what we lose without it:** Spartanburg is our biggest county (about 18,000 rows). The monthly Master in Equity roster lists every foreclosure set for sale (25 to 30 a month, with case number, lender, owner and address). The forfeited land list and the yearly tax sale list (about 2,170 parcels) come from the same site. Your sheet shows Spartanburg's foreclosure-sale signal at 0.6%.
@@ -765,40 +796,40 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 - **Thin cells on your sheet this fills:** 3 (in 1 counties; value score 3.0 for about 5 minutes a month)
 - **Who else could do it:** Spartanburg Master in Equity's office or Clerk of Court (records request).
 
-<a id="card-horry-probate"></a>
+<a id="card-lexington-probate"></a>
 
-#### Horry probate records portal (free account login)
+#### Lexington County probate estate search
 
-- **Place:** Horry County, SC
-- **Kind:** A: a person can pass it in a browser
-- **The wall:** Account login with a free Register link (the county publishes how to create one).
-- **Start here:** https://scportal.hostedbyspartan.com/HorryACMSPortal/
-- **What it is, and what we lose without it:** Horry estate filings. Horry has about 4,900 rows on your sheet and thin probate signals.
+- **Place:** Lexington County, SC
+- **Kind:** A: a person passes it in a browser
+- **The wall:** The search answers only with a token issued after a Google reCAPTCHA (invisible version 3), so scripts are refused (HTTP 401). A person in a normal browser searches freely.
+- **Start here:** https://www.lex-co.com/ProbateSearch/estates
+- **What it is, and what we lose without it:** Lexington estates (decedent, case, filing date). Lexington has about 2,200 rows on your sheet and no probate signal.
 
 **Step by step**
 
-1. Open the address, click **Register**, create a free account, log in.
-2. Search estates by filing date (or by your Horry lead surnames).
-3. Save the results page as `horry_sc_probate_<date>.html` in ~/Downloads, or type estates into the CRM.
+1. Open the address in Chrome and click through the disclaimer.
+2. Search the surnames of your Lexington leads (and recent obituary names).
+3. Note case number, decedent, filing date and personal representative for matches, or save the results page (HTML Only) as `lexington_sc_probate_<date>.html` in ~/Downloads.
 
-- **What to pull:** Estates opened in the last 30 days: case number, decedent, date, representative.
-- **How to save it:** HTML into ~/Downloads.
-- **How it gets loaded:** None; small reader needed.
+- **What to pull:** Matches for your Lexington lead surnames, 15 per sitting.
+- **How to save it:** HTML into ~/Downloads, or notes in the CRM.
+- **How it gets loaded:** None; a small reader would be needed.
 - **Time:** About 10 minutes. **How often:** Monthly.
-- **What we gain:** Horry probate leads.
+- **What we gain:** Lexington estate leads.
 - **Reaches the dashboard?** Needs a small loader first (about an hour of engineering)
 - **Thin cells on your sheet this fills:** 4 (in 1 counties; value score 4.0 for about 10 minutes a month)
-- **Who else could do it:** Horry probate court.
+- **Who else could do it:** Lexington probate court by phone.
 
 <a id="card-anderson-probate"></a>
 
 #### Anderson probate index on ACPASS (free account login)
 
 - **Place:** Anderson County, SC
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** A free account login (Register Here). Scripts must not log in, so a person does it.
 - **Start here:** https://acpass.andersoncountysc.org/courts.htm
-- **What it is, and what we lose without it:** Anderson estate filings (decedent, filing date, representative). Anderson has no probate signal on your sheet. Note: Anderson's tax search on the same site is open (no login, despite what older notes say); the engineer can build that one.
+- **What it is, and what we lose without it:** Anderson estate filings (decedent, filing date, representative). Anderson has no probate signal on your sheet. Anderson's tax search on the same site is open (no login, despite what older notes say) and is listed as buildable.
 
 **Step by step**
 
@@ -821,7 +852,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 #### York County tax collection pages and overage list
 
 - **Place:** York County, SC
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** Cloudflare 'Attention Required!' block page to scripts (2026-10-07); our York delinquent-tax reader got 403.
 - **Start here:** https://www.yorkcountysc.gov/216/Tax-Collection
 - **What it is, and what we lose without it:** York's delinquent-tax list and tax-sale overage claims (owners owed surplus money after a tax sale).
@@ -847,7 +878,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 #### SC deed portal run by Avenu / Neumo (unclear access)
 
 - **Place:** Bamberg, Chester, Chesterfield, Dillon, Edgefield, Fairfield Counties, SC (and Cherokee, see appendix C)
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** Not confirmed. The county check (2026-10-07) left these to a person in a browser; Cherokee's copy of the same portal has terms that bar automation (terms only, cleared). Some county sites in this group also block scripts.
 - **Start here:** https://cherokeesc.avenuinsights.com/
 - **What it is, and what we lose without it:** Deed index and, from about 2002, free images, for smaller SC counties.
@@ -872,8 +903,8 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 #### SC deed searches behind a CAPTCHA, a Cloudflare check or a free account
 
 - **Place:** Beaufort, Aiken, Jasper, Clarendon, Kershaw, Hampton, Lexington and Orangeburg Counties, SC
-- **Kind:** A: a person can pass it in a browser
-- **The wall:** Beaufort: CAPTCHA on every search. Aiken: Cloudflare check on the county site. Jasper: CAPTCHA on the deed search. Clarendon: blocks automated reads (a person searches free). Kershaw and Hampton: free Neumo account login (Kershaw's terms also bar robots). Lexington: free CountyFusion guest account. Orangeburg: free county ROD account.
+- **Kind:** A: a person passes it in a browser
+- **The wall:** Beaufort: CAPTCHA on every search. Aiken: Cloudflare check on the county site. Jasper: CAPTCHA on the deed search. Clarendon: blocks automated reads (a person searches free). Kershaw and Hampton: free Neumo account login. Lexington: free CountyFusion guest account. Orangeburg: free county ROD account.
 - **Start here:** https://rod.beaufortcountysc.gov/searchng/
 - **What it is, and what we lose without it:** Deed chains and mortgages for SC leads in these counties.
 
@@ -898,7 +929,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 
 - **Place:** Lee, Newberry, Williamsburg, Calhoun, Richland, Darlington Counties, SC
 - **Kind:** B: paid or attorney-only
-- **The wall:** Lee: Neumo subscription, $5 a day, and terms bar robots. Newberry: free index, deed images $5 a day. Williamsburg: free registration, every image $1 a page, terms bar robots. Calhoun: deeds only on paid TitleSearcher or at the Clerk. Richland: paid county subscription for deeds and probate documents. Darlington: Cott RECORDhub account or subscription.
+- **The wall:** Lee: Neumo subscription, $5 a day. Newberry: free index, deed images $5 a day. Williamsburg: free registration, every image $1 a page. Calhoun: deeds only on paid TitleSearcher or at the Clerk. Richland: paid county subscription for deeds and probate documents. Darlington: Cott RECORDhub account or subscription.
 - **Start here:** https://www.titlesearcher.com/index.php
 - **What it is, and what we lose without it:** Deed chains for leads in these counties. Williamsburg (about 2,300 rows) and Darlington (about 2,500) are the largest.
 
@@ -923,7 +954,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 ### Morganton city website (code enforcement, condemned and vacant structures)
 
 - **Place:** City of Morganton (Burke County), NC
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** The whole city website sits behind a Cloudflare Turnstile check (403, 'Just a moment...') on every page (2026-09-30).
 - **Start here:** https://www.morgantonnc.gov/
 - **What it is, and what we lose without it:** Burke's largest city. If the city posts code-enforcement or condemned-structure lists, they would be the only code signal in Burke (Burke has none today).
@@ -948,7 +979,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 ### City of Union website
 
 - **Place:** City of Union (Union County), SC
-- **Kind:** A: a person can pass it in a browser
+- **Kind:** A: a person passes it in a browser
 - **The wall:** A JavaScript 'Client Challenge' page on every address (2026-09-30), a bot shield.
 - **Start here:** https://www.cityofunion.net/
 - **What it is, and what we lose without it:** The one possible code-enforcement source for Union County SC (the county site has narrative only).
@@ -973,7 +1004,7 @@ Cards are grouped by state and, inside each state, sorted by value for your time
 Your sheet has 5,121 NC rows and 1,982 SC rows with no county. In NC about 3,062 are bankruptcy cases and about 1,858 are LiensNC lien-agent filings (tagged as tax liens); in SC about 1,952 are bankruptcy cases. Your sheet is from 2026-10-01. On today's board (2026-10-07) the count is down to 2,648 (NC 2,188, SC 460, matching the new gap matrix in docs/gap_matrix/): 1,848 LiensNC filings, 737 bankruptcy cases, 62 SC brownfield sites and 1 SC state tax lien.
 
 - **Bankruptcy rows: a manual step fixes them.** Page 1 of the bankruptcy petition gives the debtor's street address and county. Ask Claude to pull the free copies from CourtListener first; then do the rest by hand, 20 per sitting, with the PACER card above. Save a CSV (case_number, court, street, city, county, state, zip) to ~/Downloads. A small loader is needed.
-- **LiensNC rows: no manual step.** The county can be read from the project address and ZIP already on the row; that is an engineering fix. Do not spend time here: the LiensNC signal itself is being redefined.
+- **LiensNC rows: no manual step.** The county can be read from the project address and ZIP already on the row (engineering); the incremental LiensNC refresh being built is the natural place for it.
 - **SC brownfield rows (62): no manual step.** These are state environmental sites; the county comes from the site address (engineering).
 
 ## Every county at a glance (145 counties)
@@ -984,7 +1015,7 @@ From the county records matrix (built 2026-10-07 by reading each county's own si
 
 | County | Rows | Deeds | Estates | Tax bills | What a person does | Cards |
 |---|---|---|---|---|---|---|
-| Alamance | 944 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | Nothing needed beyond the free sites. |  |
+| Alamance | 944 | Free after a 'Sign in as a Guest' click | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | Nothing needed beyond the free sites. |  |
 | Alexander | 90 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. |  |
 | Alleghany | 56 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person opens alleghanync.courthousecomputersystems.com in a normal browser (passes the Cloudflare check) to pull deeds; deed book/page for the current deed is already free in NC OneMap and the BT property card. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Anson | 62 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. |  |
@@ -994,86 +1025,86 @@ From the county records matrix (built 2026-10-07 by reading each county's own si
 | Bertie | 1,106 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | CAPTCHA: a person passes it | Tax-bill status needs a person on the webtaxpay site (human check); deeds, legal and chain are free in the Lookup. |  |
 | Bladen | 92 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Did not answer | Tax bill status and taxpayer need a person to call or visit the Bladen tax office (online tax site not reached); NC OneMap has owner and deed book/page free. |  |
 | Brunswick | 3,987 | CAPTCHA: a person passes it | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person passes the math question on the Inttek public login to pull deeds and the chain; legal description and deed book/page are free in NC OneMap first. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [Deeds behind CAPTCHA](#card-nc-rod-captcha), [NC foreclosure lists](#card-nc-sp) |
-| Buncombe | 10,450 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | Deed images (needed for the full legal description) are pay-per-view on the ROD site; a person buys the few pages needed or reads them on the public terminals in the Buncombe ROD office. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
-| Burke | 1,538 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. | [MLS](#card-mls), [Morganton city](#card-morganton), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
+| Buncombe | 10,450 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | Deed images (needed for the full legal description) are pay-per-view on the ROD site; a person buys the few pages needed or reads them on the public terminals in the Buncombe ROD office. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
+| Burke | 1,538 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. | [MLS](#card-mls), [Morganton city](#card-morganton), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
 | Cabarrus | 1,127 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. |  |
-| Caldwell | 281 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | CAPTCHA: a person passes it | Tax bill status needs a person on the Caldwell tax site in a browser. | [Cleveland/Caldwell tax](#card-avalon-tax) |
-| Camden | 82 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Login (account) | Deeds before May 1999 need a person at the Camden ROD (or a paid abstractor); tax bill status needs a call to the Camden tax office or the county GIS popup. |  |
+| Caldwell | 281 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | CAPTCHA: a person passes it | Tax bill status needs a person on the Caldwell tax site in a browser. | [Cleveland/Caldwell tax](#card-avalon-tax), [Deeds behind Cloudflare](#card-nc-cchs-cf) |
+| Camden | 82 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Login: a person signs in to an account | Deeds before May 1999 need a person at the Camden ROD (or a paid abstractor); tax bill status needs a call to the Camden tax office or the county GIS popup. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Carteret | 456 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. |  |
-| Caswell | 80 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. |  |
+| Caswell | 80 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Catawba | 5,129 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
 | Chatham | 553 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Bot check: a person in a normal browser | Taxpayer and bill status need a person on the Chatham tax site in a browser (county site blocks scripts); NC OneMap gives owner, short legal and deed book/page free. |  |
-| Cherokee | 220 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Login (account) | Tax bill status needs a call to the Cherokee County NC tax office or a person on the GIS viewer; pre-1993 grantor/grantee lookups need the index books in Murphy, though deed images themselves are online by book/page. | [NC tax lookups](#card-nc-tax-walled) |
-| Chowan | 78 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. |  |
+| Cherokee | 220 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Login: a person signs in to an account | Tax bill status needs a call to the Cherokee County NC tax office or a person on the GIS viewer; pre-1993 grantor/grantee lookups need the index books in Murphy, though deed images themselves are online by book/page. | [NC tax lookups](#card-nc-tax-walled) |
+| Chowan | 78 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Clay | 80 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. |  |
-| Cleveland | 1,142 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | CAPTCHA: a person passes it | Taxpayer/bill status needs a person on the Avalon tax site (reCAPTCHA). Current deed book/page is not in any free GIS layer here, so it comes from the ROD grantee search on the owner's name. | [Cleveland/Caldwell tax](#card-avalon-tax), [MLS](#card-mls), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
+| Cleveland | 1,142 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | CAPTCHA: a person passes it | Taxpayer/bill status needs a person on the Avalon tax site (reCAPTCHA). Current deed book/page is not in any free GIS layer here, so it comes from the ROD grantee search on the owner's name. | [Cleveland/Caldwell tax](#card-avalon-tax), [MLS](#card-mls), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
 | Columbus | 167 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | CAPTCHA: a person passes it | Tax-due status needs a person on webtaxpay (human check) or a call to the Columbus tax office. |  |
 | Craven | 508 | CAPTCHA: a person passes it | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Deeds, legal descriptions and chain need a person to pass the reCAPTCHA on the CCHS site (or visit the New Bern ROD); NC OneMap gives owner, short legal and deed book/page free first. | [Deeds behind CAPTCHA](#card-nc-rod-captcha) |
 | Cumberland | 1,260 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. |  |
-| Currituck | 337 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Nothing needed beyond the free sites. |  |
-| Dare | 374 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Deeds before 1976 need the books at the Manteo ROD or an abstractor. |  |
+| Currituck | 337 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Nothing needed beyond the free sites. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
+| Dare | 374 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Deeds before 1976 need the books at the Manteo ROD or an abstractor. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Davidson | 792 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | For deeds before 1984 (or images, if not free on the public site) a person uses the paid davidsonportal.com subscription, the attorney's own access, or the Lexington ROD office. |  |
 | Davie | 135 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. |  |
-| Duplin | 205 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. |  |
-| Durham | 3,019 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Taxpayer and bill status need a person on the Durham tax site (lookup not located by script). | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [Deeds behind CAPTCHA](#card-nc-rod-captcha), [NC foreclosure lists](#card-nc-sp) |
-| Edgecombe | 157 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | Nothing needed beyond the free sites. |  |
+| Duplin | 205 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
+| Durham | 3,019 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Taxpayer and bill status need a person on the Durham tax site (lookup not located by script). | [Sheriff sales / Union NC list](#card-nc-county-lists), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
+| Edgecombe | 157 | Free after a 'Sign in as a Guest' click | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | Nothing needed beyond the free sites. |  |
 | Forsyth | 6,355 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Nothing needed beyond the free sites. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
-| Franklin | 519 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | If the CCHS window is challenged, a person opens the Franklin ROD site in a browser, accepts the disclaimer, searches by owner name and views deed images on screen; deeds before 1950 or below Book 650 may need the office or an abstractor. |  |
-| Gaston | 9,347 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person opens gastonnc.courthousecomputersystems.com in a browser to search the index; the deed image (for the full legal) is a paid copy, so the attorney's own subscription or a copy order is needed for the deed text. | [Gaston deeds](#card-gaston-rod), [MLS](#card-mls), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
-| Gates | 461 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Index and images reachable free in a browser; records before the pre-1995 index start need the office or an abstractor. |  |
+| Franklin | 519 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | If the CCHS window is challenged, a person opens the Franklin ROD site in a browser, accepts the disclaimer, searches by owner name and views deed images on screen; deeds before 1950 or below Book 650 may need the office or an abstractor. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
+| Gaston | 9,347 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person opens gastonnc.courthousecomputersystems.com in a browser to search the index; the deed image (for the full legal) is a paid copy, so the attorney's own subscription or a copy order is needed for the deed text. | [Gaston deeds](#card-gaston-rod), [MLS](#card-mls), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
+| Gates | 461 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Index and images reachable free in a browser; records before the pre-1995 index start need the office or an abstractor. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Graham | 528 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Free, open | If images need purchase, a person or the attorney's account buys the most recent deed copy from the Cott cart or the office. |  |
 | Granville | 300 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Free, open | If deed images are not free, a person buys the most recent deed copy (or the attorney uses his account); pre-1746/early books and anything not imaged go to the office or an abstractor. |  |
 | Greene | 40 | CAPTCHA: a person passes it | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person opens the Greene ROD site, ticks the reCAPTCHA, then searches by name and views the deed; the legal description must come from the deed image because no free GIS legal exists for Greene. | [Deeds behind CAPTCHA](#card-nc-rod-captcha) |
 | Guilford | 5,664 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person accepts the Guilford ROD disclaimer in a browser and searches by name; if images are not free, the attorney's account or a copy order supplies the deed text. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
-| Halifax | 109 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Bot check: a person in a normal browser | Tax bills and assessor cards need a person in a browser (Cloudflare-gated tax site, qPublic terms bar automation); the ROD index is free as a guest, deed images may need the Cott cart or the attorney's account. | [NC tax lookups](#card-nc-tax-walled) |
+| Halifax | 109 | Free after a 'Sign in as a Guest' click | NC eCourts: picture CAPTCHA, a person passes it | Bot check: a person in a normal browser | Tax bills and assessor cards need a person in a browser (Cloudflare-gated tax site and qPublic check); the ROD index is free as a guest, deed images may need the Cott cart or the attorney's account. | [NC tax lookups](#card-nc-tax-walled) |
 | Harnett | 1,530 | CAPTCHA: a person passes it | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person ticks the reCAPTCHA on the Harnett ROD site, searches by name, and views/prints deed images free; pre-1973 chains use the scanned old index books, and older gaps go to an abstractor. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [Deeds behind CAPTCHA](#card-nc-rod-captcha), [NC foreclosure lists](#card-nc-sp) |
 | Haywood | 641 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Pre-1986 chains need the office's older books or an abstractor; if image links turn out to cost, a person orders the deed copy. |  |
-| Henderson | 3,291 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Deeds before book 200 / 1966 need the office's older books or an abstractor; otherwise free online. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
-| Hertford | 35 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Little needed: index and images from 1901 are free online; pre-1901 chains go to an abstractor. |  |
+| Henderson | 3,291 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Deeds before book 200 / 1966 need the office's older books or an abstractor; otherwise free online. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
+| Hertford | 35 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Little needed: index and images from 1901 are free online; pre-1901 chains go to an abstractor. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Hoke | 353 | No online index found: call or visit | NC eCourts: picture CAPTCHA, a person passes it | Not checked | A person must open hokencrod.org in a browser to find the vesting deed (no free legal or deed reference exists in the statewide GIS for Hoke); if that portal will not serve images, the attorney's subscription or the office supplies the deed. |  |
-| Hyde | 50 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Free, open | The legal description must come from the deed image (statewide GIS legal is mostly blank for Hyde); pre-1991 index gaps need book-by-book browsing or an abstractor. |  |
+| Hyde | 50 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | The legal description must come from the deed image (statewide GIS legal is mostly blank for Hyde); pre-1991 index gaps need book-by-book browsing or an abstractor. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Iredell | 1,130 | CAPTCHA: a person passes it | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person passes the CAPTCHA on the new Iredell ROD site and also checks the old Cott guest site for pre-1964 records; image cost unverified, so the attorney's account may be needed for deed copies. | [Deeds behind CAPTCHA](#card-nc-rod-captcha) |
 | Jackson | 257 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Did not answer | Index from 1851 is free as guest; if images need purchase, the attorney's account or a copy order supplies the deed; a person finds the current tax bill on the county site. |  |
 | Johnston | 1,692 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person acknowledges the EagleWeb disclaimer as guest and reads the deed; the legal description must come from the deed image (no free GIS legal for Johnston). | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
 | Jones | 151 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Pre-1978 deeds need the CCHS site when it is up, otherwise the office or an abstractor; the legal must come from the deed image (no free GIS legal for Jones). |  |
 | Lee | 385 | No online index found: call or visit | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | A person opens leencrod.org in a browser to search the index and view the deed; the assessor's legal fields and the statewide GIS give a short legal and the deed reference for free. |  |
-| Lenoir | 157 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Guest index search is free; if images cost, the attorney's account or a copy order supplies the deed text. |  |
-| Lincoln | 3,612 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Rarely needed: index and deed images are free; very old books are imaged but the verified index start is unclear, so pre-1990s chains may need book-by-book browsing or an abstractor. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
+| Lenoir | 157 | Free after a 'Sign in as a Guest' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Guest index search is free; if images cost, the attorney's account or a copy order supplies the deed text. |  |
+| Lincoln | 3,612 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Rarely needed: index and deed images are free; very old books are imaged but the verified index start is unclear, so pre-1990s chains may need book-by-book browsing or an abstractor. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
 | Macon | 147 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | A person accepts the Macon disclaimer and searches by name; if images cost or are missing, a copy order or the attorney's account supplies the deed. |  |
 | Madison | 901 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Pre-1987 links in the chain require reading the imaged deed books by book/page (free) or an abstractor when the reference is missing. |  |
 | Martin | 41 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | A person acknowledges the Martin disclaimer in a browser and reads the deed for the legal (no free GIS legal for Martin). |  |
-| Mcdowell | 2,741 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Rarely needed; older gaps go to an abstractor. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
-| Mecklenburg | 11,041 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | For deeds after Feb 1990 the image is a paid copy: the attorney's account or a copy order supplies the legal; the GIS legal and deed book/page are free. Older chains use the free historic image site by book/page. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
-| Mitchell | 253 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Legal description must be read off the free deed image (no GIS legal text for Mitchell). | [MLS](#card-mls), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
-| Montgomery | 132 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | Little needed: free index from 1792 and free images; a person only steps in when a book is missing from the image list. |  |
+| Mcdowell | 2,741 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Rarely needed; older gaps go to an abstractor. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
+| Mecklenburg | 11,041 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | For deeds after Feb 1990 the image is a paid copy: the attorney's account or a copy order supplies the legal; the GIS legal and deed book/page are free. Older chains use the free historic image site by book/page. | [Sheriff sales / Union NC list](#card-nc-county-lists), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
+| Mitchell | 253 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Legal description must be read off the free deed image (no GIS legal text for Mitchell). | [MLS](#card-mls), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
+| Montgomery | 132 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | Little needed: free index from 1792 and free images; a person only steps in when a book is missing from the image list. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Moore | 715 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | For pre-1988 chain links a person checks the index books at the office (online back-fill incomplete) or uses an abstractor. |  |
 | Nash | 523 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Guest index search is free; if images cost, the attorney's account or a copy order supplies the deed text. |  |
 | New Hanover | 4,841 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | Little needed: index, property-description search and images appear free; older chains beyond the online index go to an abstractor. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
 | Northampton | 54 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Pre-1991 chain links are found by browsing scanned index books online (free) or by an abstractor; the tax bill needs a person in a browser. |  |
-| Onslow | 1,561 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | If deed images need the paid subscription, the attorney's account or a copy order supplies the deed; GIS legal and book/page are free. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
+| Onslow | 1,561 | Free after a 'Sign in as a Guest' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | If deed images need the paid subscription, the attorney's account or a copy order supplies the deed; GIS legal and book/page are free. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
 | Orange | 1,941 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Pre-1932 chain links need the office's older books or an abstractor. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
 | Pamlico | 79 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Free, open | If a deed image will not open or is illegible, or the chain runs before 1872, a person must view the books at the Bayboro register of deeds office or use an abstractor. |  |
 | Pasquotank | 126 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person must open the CCS deed search in a normal browser (it shows a Cloudflare check to scripts) or visit the Elizabeth City register of deeds office to pull deeds and the legal description. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Pender | 729 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free after an 'I accept' click | A person must open the CCS deed search in a normal browser (scripts get a Cloudflare check) or visit the Burgaw register of deeds office to pull the deed chain and full legal description. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Perquimans | 72 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person must open the CCS deed search in a normal browser (scripts get a Cloudflare check) or visit the Hertford register of deeds office for deeds, chain and legal description. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Person | 179 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person must open the CCS deed search in a normal browser (scripts get a Cloudflare check) or visit the Roxboro register of deeds office for deeds, chain and legal description. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
-| Pitt | 2,390 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Free by guest sign-in; a person should check the Certified Dates page for the index start and visit the Greenville office for anything older or for illegible images. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
-| Polk | 448 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Bot check: a person in a normal browser | Free index works; a person must view or buy the deed images (or visit the Columbus office) to read the full legal description, and look up the tax bill in a normal browser. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp), [Polk tax](#card-polk-tax) |
+| Pitt | 2,390 | Free after a 'Sign in as a Guest' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Free after a 'Sign in as a Guest' click (allowed; being built); a person should check the Certified Dates page for the index start and visit the Greenville office for anything older or for illegible images. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp) |
+| Polk | 448 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Bot check: a person in a normal browser | Free index works; a person must view or buy the deed images (or visit the Columbus office) to read the full legal description, and look up the tax bill in a normal browser. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp), [Polk tax](#card-polk-tax) |
 | Randolph | 559 | CAPTCHA: a person passes it | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person must pass the CAPTCHA on the CCS deed search (or visit the Asheboro office) to pull deeds, old index books and the legal description. | [Deeds behind CAPTCHA](#card-nc-rod-captcha) |
 | Richmond | 102 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Did not answer | A person must open the CCS deed search in a normal browser (scripts get a Cloudflare check) or visit the Rockingham (Richmond Co.) register of deeds office for deeds, chain and legal description. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
 | Robeson | 263 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Pre-1974 searches mean paging through scanned old index books online; anything older than the books or illegible needs a visit to the Lumberton register of deeds office or an abstractor. |  |
 | Rockingham | 616 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person must open the e-Vault in a normal browser (scripts get a Cloudflare check) and, for 1787-1995, page through the scanned old index books, or visit the Wentworth register of deeds office. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
-| Rowan | 813 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Sign in as guest for the index; if images or older books need a paid subscription, a person must view them at the Salisbury register of deeds office. |  |
-| Rutherford | 8,720 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Sign in as guest for the index; images and older books not confirmed free, so a person may need the Rutherfordton office for deed images and full legal descriptions. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp), [Rutherford deeds](#card-rutherford-rod) |
+| Rowan | 813 | Free after a 'Sign in as a Guest' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | The index opens with a 'Sign in as a Guest' click (allowed; the deed reader is being extended to it); if images or older books need a paid subscription, a person must view them at the Salisbury register of deeds office. |  |
+| Rutherford | 8,720 | Free after a 'Sign in as a Guest' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | The index opens with a 'Sign in as a Guest' click (allowed; the deed reader is being extended to it); images and older books not confirmed free, so a person may need the Rutherfordton office for deed images and full legal descriptions. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
 | Sampson | 155 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Free online covers the whole chain; a person is needed only for illegible images or to confirm the scanned pre-1988 index against the paper books in Clinton. |  |
-| Scotland | 108 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | For deeds before 1978 a person must open the pre-1978 site in a normal browser (scripts get a Cloudflare check) or visit the Laurinburg office. |  |
+| Scotland | 108 | Free after a 'Sign in as a Guest' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | For deeds before 1978 a person must open the pre-1978 site in a normal browser (scripts get a Cloudflare check) or visit the Laurinburg office. |  |
 | Stanly | 433 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Free online view covers 1985 forward plus scanned old index books; to print copies or check deed books 396-482 a person must visit the Albemarle register of deeds office. |  |
 | Stokes | 230 | CAPTCHA: a person passes it | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person must pass the CAPTCHA on the CCS deed search (or visit the Danbury office) to pull deeds, old index books and legal descriptions. | [Deeds behind CAPTCHA](#card-nc-rod-captcha) |
 | Surry | 211 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Search and view online for free; to print certified or plain copies a person needs a print login or a visit to the Dobson office. |  |
 | Swain | 80 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Free online covers deed images back to 1871; a person must visit the Bryson City office only for deed of trust books 1-85 or illegible pages. |  |
-| Transylvania | 6,328 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | For deeds recorded before 1973 a person must use the books at the Brevard register of deeds office or an abstractor. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [LiensNC](#card-nc-liensnc), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
+| Transylvania | 6,328 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | For deeds recorded before 1973 a person must use the books at the Brevard register of deeds office or an abstractor. | [MLS](#card-mls), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC SoS liens](#card-nc-sos-liens), [NC foreclosure lists](#card-nc-sp) |
 | Tyrrell | 278 | Bot check: a person in a normal browser | NC eCourts: picture CAPTCHA, a person passes it | Not checked | A person must open the CCS deed search in a normal browser (scripts get a Cloudflare check) or call/visit the Columbia register of deeds office; tax bills by phone or in person. | [Deeds behind Cloudflare](#card-nc-cchs-cf) |
-| Union | 1,564 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Deeds are free online, but deeds of trust and other security instruments are withheld online, so a person must check liens at the Monroe register of deeds office. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp), [NC tax lookups](#card-nc-tax-walled) |
+| Union | 1,564 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Deeds are free online, but deeds of trust and other security instruments are withheld online, so a person must check liens at the Monroe register of deeds office. | [Sheriff sales / Union NC list](#card-nc-county-lists), [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [NC foreclosure lists](#card-nc-sp), [NC tax lookups](#card-nc-tax-walled) |
 | Vance | 115 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Free online covers the full deed chain back to 1881; a person is needed only for illegible images or certified copies (office hours currently reduced). |  |
 | Wake | 7,090 | CAPTCHA: a person passes it | NC eCourts: picture CAPTCHA, a person passes it | Free, open | A person must tick the reCAPTCHA on the Wake deed search to read deeds and legal descriptions (or visit the Raleigh office); scripts cannot. | [NC estate lists](#card-nc-est), [NC notice text](#card-nc-notice-body), [Deeds behind CAPTCHA](#card-nc-rod-captcha), [NC foreclosure lists](#card-nc-sp) |
 | Warren | 140 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Free online covers the whole chain; a person is needed only for illegible images or certified copies at the Warrenton office. |  |
@@ -1081,7 +1112,7 @@ From the county records matrix (built 2026-10-07 by reading each county's own si
 | Watauga | 319 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Free online covers the index back to 1889; a person must visit the Boone office for record books 2046-2405 (not imaged online) or illegible pages. |  |
 | Wayne | 456 | Free, open | NC eCourts: picture CAPTCHA, a person passes it | Not checked | Free index via guest access; a person may need the Goldsboro office for deed images if online viewing is paid, and for anything older than the online index. |  |
 | Wilkes | 191 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | For deeds before 1970 (Book 511 and earlier) or index entries before 1927 a person must use the Wilkesboro register of deeds office or an abstractor; the Tax Office deed-copy archive needs its shared login, which a person would have to use. |  |
-| Wilson | 324 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Bot check: a person in a normal browser | Sign in as guest for the index; for pre-1974 deeds or images not yet scanned, a person must use the Wilson register of deeds office. |  |
+| Wilson | 324 | Free after a 'Sign in as a Guest' click | NC eCourts: picture CAPTCHA, a person passes it | Bot check: a person in a normal browser | The index opens with a 'Sign in as a Guest' click (allowed; the deed reader is being extended to it); for pre-1974 deeds or images not yet scanned, a person must use the Wilson register of deeds office. |  |
 | Yadkin | 182 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Free online covers the chain back past 1907; a person is needed only for illegible pages, certified copies, or deed of trust books outside 76-122 that are not imaged. |  |
 | Yancey | 120 | Free after an 'I accept' click | NC eCourts: picture CAPTCHA, a person passes it | Free, open | Free online covers index books back to 1833; anything older, missing years, or illegible pages need the Burnsville register of deeds office or an abstractor. |  |
 
@@ -1092,19 +1123,19 @@ From the county records matrix (built 2026-10-07 by reading each county's own si
 | Abbeville | 597 | Free after an 'I accept' click | No online index found: call or visit | Did not answer | Index and deed PDFs are free online from about 1978, so a person is needed only for older chain links (abstractor or the book indexes at the office), the qPublic parcel card (open in a normal browser), and probate, which has no online index (call or visit the Probate Court). |  |
 | Aiken | 28 | Bot check: a person in a normal browser | Bot check: a person in a normal browser | Free, open | The ROD search sits behind the county's Cloudflare wall, so a person must open aikencountysc.gov/RMC in a browser (or ask the abstractor) for the deed chain; county GIS already gives the assessor legal description, last sale book/page and plat book/page for free. | [SC probate site](#card-sc-probate-net), [SC deeds behind a check](#card-sc-rod-walled) |
 | Allendale | 509 | No online index found: call or visit | No online index found: call or visit | Free, open | No online deed index: a person or the abstractor must search the deed books at the Allendale Clerk of Court; the parcel card is qPublic in a normal browser; tax bills are free on qPayBill. | [SC property cards](#card-sc-qpublic) |
-| Anderson | 2,681 | Free, open | Login (account) | Login (account) | Deeds recorded since 2/21/2026 must be looked up by a person in the new Ingenuity system (its terms forbid automation); tax bills and probate need a free ACPASS login a person can use, or a call to the offices; pre-1948 deeds need the abstractor. | [Anderson probate](#card-anderson-probate), [MLS](#card-mls), [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC SoS companies](#card-sc-sos) |
-| Bamberg | 474 | No online index found: call or visit | No online index found: call or visit | Free, open | Deed searches go through the Avenu/Neumo portal, which we leave to a person in a browser (or the abstractor) because the same vendor's terms forbid automation; probate is office-only. | [Avenu deed portal](#card-avenu), [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic) |
+| Anderson | 2,681 | Free, open | Login: a person signs in to an account | Free, open (newer check) | Deeds recorded since 2/21/2026 are in the new Ingenuity system (terms only, allowed; buildable once mapped); the tax search is open (buildable); probate needs a free ACPASS login a person can use, or a call to the office; pre-1948 deeds need the abstractor. | [Anderson probate](#card-anderson-probate), [MLS](#card-mls), [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC SoS companies](#card-sc-sos) |
+| Bamberg | 474 | No online index found: call or visit | No online index found: call or visit | Free, open | Deed searches go through the Avenu/Neumo portal, which a person opens in a browser (or the abstractor); access is unconfirmed (the vendor's terms are only terms, allowed); probate is office-only. | [Avenu deed portal](#card-avenu), [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic) |
 | Barnwell | 810 | Free after an 'I accept' click | Bot check: a person in a normal browser | Free, open | ROD index and deed PDFs are free; a person is needed only for chain links older than the online index (start year not published) and for probate, which has no working online index. | [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic) |
 | Beaufort | 901 | CAPTCHA: a person passes it | No online index found: call or visit | Free, open | The ROD search is behind a CAPTCHA on every search, so a person must run deed-chain searches in a browser (or the abstractor); county GIS gives the assessor legal description and last deed book/page free. | [SC deeds behind a check](#card-sc-rod-walled) |
 | Berkeley | 2,327 | Free after an 'I accept' click | Bot check: a person in a normal browser | Free, open | Deed index and PDFs are free online from about 1983; a person or abstractor is needed for older chain links, and probate (county site behind Cloudflare) must be checked by phone or visit. | [Phone lookups](#card-people-search), [SC SoS companies](#card-sc-sos) |
 | Calhoun | 497 | Paid | Free, open | Free, open | Deeds are only on paid TitleSearcher or at the Clerk of Court office, so the attorney's abstractor (or a subscription) is needed for the chain and legal description; the free probate party search can be checked by a person. | [SC paid deeds](#card-sc-rod-paid) |
 | Charleston | 6,572 | Free after an 'I accept' click | Bot check: a person in a normal browser | Free, open | Index from 1978 and images from the mid-1990s are free; earlier chain links need the Archival Room (partly online) or the abstractor/microfilm at the ROD. | [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC probate site](#card-sc-probate-net), [SC SoS companies](#card-sc-sos) |
-| Cherokee | 2,756 | No online index found: call or visit | No online index found: call or visit | Free, open | The deed index (1995+) and free images (2002+) are on the Avenu portal, whose terms forbid automation, so a person searches it in a browser; anything before 1995 needs the abstractor or the office books; probate is office-only. | [MLS](#card-mls), [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic), [SC SoS companies](#card-sc-sos) |
+| Cherokee | 2,756 | No online index found: call or visit | No online index found: call or visit | Free, open | The deed index (1995+) and free images (2002+) are on the Avenu portal (terms only, allowed; buildable); anything before 1995 needs the abstractor or the office books; probate is office-only. | [MLS](#card-mls), [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic), [SC SoS companies](#card-sc-sos) |
 | Chester | 17 | No online index found: call or visit | Bot check: a person in a normal browser | Free, open | Deed searches must be done by a person in the Avenu portal (or by the abstractor); the county site itself blocks automated reads, so probate and ROD coverage questions go by phone. | [Avenu deed portal](#card-avenu), [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic) |
 | Chesterfield | 654 | No online index found: call or visit | No online index found: call or visit | Free, open | Deed searches must be done by a person in the Avenu portal (or by the abstractor); parcel details come from the WTH map viewer by hand; probate is office-only. | [Avenu deed portal](#card-avenu) |
 | Clarendon | 1,221 | Bot check: a person in a normal browser | No online index found: call or visit | Free, open | A person can search the free AcclaimWeb index and view deed images back to 1988 in a browser (automated reads are blocked); older links need the abstractor. | [Phone lookups](#card-people-search), [SC property cards](#card-sc-qpublic), [SC deeds behind a check](#card-sc-rod-walled) |
 | Colleton | 1,317 | Free after an 'I accept' click | Bot check: a person in a normal browser | Free, open | Index and deed PDFs are free online from about 1986; older links need the abstractor; probate is office-only. | [Phone lookups](#card-people-search), [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic) |
-| Darlington | 2,520 | Login (account) | No online index found: call or visit | Free, open | The deed index is on Cott RECORDhub (account/subscription, no automation allowed), so the chain must come from the abstractor or a person with a RECORDhub account; county GIS gives the assessor legal, deed book/page and plat book/page free. | [Phone lookups](#card-people-search), [SC property cards](#card-sc-qpublic), [SC paid deeds](#card-sc-rod-paid), [SC SoS companies](#card-sc-sos) |
+| Darlington | 2,520 | Login: a person signs in to an account | No online index found: call or visit | Free, open | The deed index is on Cott RECORDhub (account or subscription), so the chain must come from the abstractor or a person with a RECORDhub account; county GIS gives the assessor legal, deed book/page and plat book/page free. | [Phone lookups](#card-people-search), [SC property cards](#card-sc-qpublic), [SC paid deeds](#card-sc-rod-paid), [SC SoS companies](#card-sc-sos) |
 | Dillon | 823 | No online index found: call or visit | No online index found: call or visit | Free, open | Deed searches by a person in the Avenu portal or by the abstractor; parcel facts from the WTH viewer by hand; probate is office-only. | [Avenu deed portal](#card-avenu) |
 | Dorchester | 905 | Free after an 'I accept' click | Bot check: a person in a normal browser | Free, open | Deed index and PDFs are free on the Online Record System; older links (start year not published) need the abstractor; current tax bills and probate documents need a person (county site blocks automated reads, probate images are paid). | [SC probate site](#card-sc-probate-net) |
 | Edgefield | 799 | No online index found: call or visit | No online index found: call or visit | Free, open | Deed searches by a person in the Avenu portal (digital from 1996) and by the abstractor before that; parcel card in qPublic by hand; probate is office-only. | [Avenu deed portal](#card-avenu), [SC property cards](#card-sc-qpublic) |
@@ -1113,26 +1144,26 @@ From the county records matrix (built 2026-10-07 by reading each county's own si
 | Georgetown | 577 | Free after an 'I accept' click | Bot check: a person in a normal browser | Free, open | Index from 1977 and deed PDFs are free; earlier links need the abstractor; probate and current tax bills need a person (probate site blocks us, tax site is a JS app). | [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic) |
 | Greenville | 3,268 | Free, open | Free, open | Free after an 'I accept' click | Everything back to 1787 is indexed and imaged online, so a person can pull the full chain in a browser; probate documents beyond the free index come by copy request or the attorney's subscription. | [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC SoS companies](#card-sc-sos) |
 | Greenwood | 6 | Free after an 'I accept' click | Free, open | Did not answer | Free route covers deed chain, legal description and plats back to 1897; a person (or the abstractor) is only needed for mortgage images before April 2001, anything not indexed, and judgments/lis pendens on the SC Public Index. |  |
-| Hampton | 2 | Login (account) | No online index found: call or visit | Free, open | A person signs up for a free Neumo account (or the abstractor searches) to read the ROD index and images from 2000 on; records before 2000 and probate need an office visit, call, or the abstractor. GIS gives the current deed book/page free. | [SC property cards](#card-sc-qpublic), [SC deeds behind a check](#card-sc-rod-walled) |
-| Horry | 4,891 | Free after an 'I accept' click | Login (account) | Free, open | Deed chain and legal description are free after the disclaimer click; a person may need to buy a copy if a clean image is needed, and probate needs a free portal account (person) or a call to the court. | [Horry probate](#card-horry-probate), [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC SoS companies](#card-sc-sos) |
+| Hampton | 2 | Login: a person signs in to an account | No online index found: call or visit | Free, open | A person signs up for a free Neumo account (or the abstractor searches) to read the ROD index and images from 2000 on; records before 2000 and probate need an office visit, call, or the abstractor. GIS gives the current deed book/page free. | [SC property cards](#card-sc-qpublic), [SC deeds behind a check](#card-sc-rod-walled) |
+| Horry | 4,891 | Free after an 'I accept' click | Free, open (newer check) | Free, open | Deed chain and legal description are free after the disclaimer click; a person may need to buy a copy if a clean image is needed, and probate is on Horry's open Spartan portal (buildable). | [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC SoS companies](#card-sc-sos) |
 | Jasper | 824 | CAPTCHA: a person passes it | No online index found: call or visit | Free, open | A person must open the CCHS ROD site and pass its CAPTCHA by hand (or the abstractor searches); records before 2007, probate, and the qPublic parcel card all need a person. | [SC property cards](#card-sc-qpublic), [SC deeds behind a check](#card-sc-rod-walled) |
-| Kershaw | 1,699 | Login (account) | Bot check: a person in a normal browser | Free, open | A person (not a script: the site's terms forbid robots) logs in with a free Neumo account to read the 1990+ index; pre-1990 records, probate, and the parcel card need a person or the abstractor. | [Phone lookups](#card-people-search), [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic), [SC deeds behind a check](#card-sc-rod-walled) |
+| Kershaw | 1,699 | Login: a person signs in to an account | Bot check: a person in a normal browser | Free, open | A person logs in with a free Neumo account to read the 1990+ index; pre-1990 records, probate, and the parcel card need a person or the abstractor. | [Phone lookups](#card-people-search), [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic), [SC deeds behind a check](#card-sc-rod-walled) |
 | Lancaster | 896 | Free after an 'I accept' click | Bot check: a person in a normal browser | Free, open | Index, deed chain and lot/subdivision legal are free after a plain disclaimer GET; a person is needed only if images turn out to be paid, for probate (call the court), and for anything older than the online index. | [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic) |
 | Laurens | 2,838 | Free after an 'I accept' click | No online index found: call or visit | Free, open | Free route gives deed chain, property-description legal and images; a person is needed to confirm/check probate and for anything older than the online index. | [MLS](#card-mls), [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC property cards](#card-sc-qpublic), [SC SoS companies](#card-sc-sos) |
-| Lee | 460 | Paid | No online index found: call or visit | Free, open | ROD search needs a paid subscription ($5/day) and the terms forbid robots, so a person (or the attorney's abstractor) must search it; probate and the qPublic parcel card also need a person. | [SC property cards](#card-sc-qpublic), [SC paid deeds](#card-sc-rod-paid) |
-| Lexington | 2,231 | Login (account) | Free after an 'I accept' click | Free, open | GIS gives the legal and current deed book/page free; walking the deed chain needs a person with a free CountyFusion account (or the abstractor); pre-1984 needs the office or an abstractor. | [Phone lookups](#card-people-search), [SC deeds behind a check](#card-sc-rod-walled), [SC SoS companies](#card-sc-sos) |
+| Lee | 460 | Paid | No online index found: call or visit | Free, open | ROD search needs a paid subscription ($5/day) so a person (or the attorney's abstractor) must search it; probate and the qPublic parcel card also need a person. | [SC property cards](#card-sc-qpublic), [SC paid deeds](#card-sc-rod-paid) |
+| Lexington | 2,231 | Login: a person signs in to an account | CAPTCHA: a person passes it | Free, open | GIS gives the legal and current deed book/page free; walking the deed chain needs a person with a free CountyFusion account (or the abstractor); pre-1984 needs the office or an abstractor. | [Lexington probate](#card-lexington-probate), [Phone lookups](#card-people-search), [SC deeds behind a check](#card-sc-rod-walled), [SC SoS companies](#card-sc-sos) |
 | Marion | 54 | Did not answer | No online index found: call or visit | Free, open | Everything is manual: a person or the abstractor searches the deed books at the Clerk of Court in Marion, probate by call or visit; the Catalis tax widget may give taxpayer and bills by hand. |  |
 | Marlboro | 1,067 | Free, open | Bot check: a person in a normal browser | Free, open | The deed index can be read free as a guest; a person (or the abstractor) must buy copies of the deeds to read legal descriptions, and probate needs a call to the court. | [Phone lookups](#card-people-search), [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic) |
-| Newberry | 722 | Login (account) | Free, open | Free, open | A person with a free Neumo account reads the 1983+ index; deed images (2003+) cost $5/day, so the legal description needs a paid day or the abstractor; pre-1983 needs the office. | [SC property cards](#card-sc-qpublic), [SC paid deeds](#card-sc-rod-paid) |
+| Newberry | 722 | Login: a person signs in to an account | Free, open | Free, open | A person with a free Neumo account reads the 1983+ index; deed images (2003+) cost $5/day, so the legal description needs a paid day or the abstractor; pre-1983 needs the office. | [SC property cards](#card-sc-qpublic), [SC paid deeds](#card-sc-rod-paid) |
 | Oconee | 3,210 | Free, open | Bot check: a person in a normal browser | Free, open | GIS gives legal and current deed book/page free and the index is open; a person may need to buy clean copies, and probate is a manual look-up on southcarolinaprobate.net (blocked to scripts today). | [MLS](#card-mls), [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic), [SC SoS companies](#card-sc-sos) |
-| Orangeburg | 133 | Login (account) | No online index found: call or visit | Free, open | A person with a free ROD account reads the index and PDF deeds; probate needs a call or visit; GIS was down today. | [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic), [SC deeds behind a check](#card-sc-rod-walled) |
+| Orangeburg | 133 | Login: a person signs in to an account | No online index found: call or visit | Free, open | A person with a free ROD account reads the index and PDF deeds; probate needs a call or visit; GIS was down today. | [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic), [SC deeds behind a check](#card-sc-rod-walled) |
 | Pickens | 4,741 | Free after an 'I accept' click | No online index found: call or visit | Free, open | Index, TMS search and legal descriptions are free after the disclaimer click; a person may need to buy images, and probate is call/visit. | [MLS](#card-mls), [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC property cards](#card-sc-qpublic), [SC SoS companies](#card-sc-sos) |
-| Richland | 860 | Paid | Free, open | Bot check: a person in a normal browser | ROD and probate documents need a paid county subscription (the attorney's or abstractor's); a person can use the free Estate Inquiry for post-1983 estates; tax and parcel lookups are by hand on the county site. | [SC paid deeds](#card-sc-rod-paid) |
+| Richland | 860 | Paid | Free, open | Bot check: a person in a normal browser | ROD and probate documents need a paid county subscription (the attorney's or abstractor's); a person can use the free Estate Inquiry for post-1983 estates; tax and parcel lookups are by hand on the county site. | [Richland tax sale](#card-richland-taxsale), [SC paid deeds](#card-sc-rod-paid) |
 | Saluda | 460 | Did not answer | No online index found: call or visit | Free, open | GIS gives legal, current deed and the prior deed reference free; deeper chain needs a person on Cott RecordHub (unreachable today) or the abstractor; probate is call/visit. |  |
 | Spartanburg | 18,020 | Free after an 'I accept' click | Bot check: a person in a normal browser | Free, open | Free route covers deed chain, legal and plats; a person browses the scanned old index books (1785-1992) by hand to trace pre-computer chains, and probate is by notice or call. | [MLS](#card-mls), [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC property cards](#card-sc-qpublic), [SC SoS companies](#card-sc-sos), [Spartanburg PDFs](#card-spartanburg-site) |
-| Sumter | 3,095 | Free after an 'I accept' click | Bot check: a person in a normal browser | Free, open | GIS gives legal and current deed book/page free; walking the chain is a guest-click CountyFusion search (a person, or a script if terms allow once read); probate is call/visit. | [Phone lookups](#card-people-search), [SC probate site](#card-sc-probate-net), [SC SoS companies](#card-sc-sos) |
+| Sumter | 3,095 | Free after an 'I accept' click | Bot check: a person in a normal browser | Free, open | GIS gives legal and current deed book/page free; walking the chain is a guest-click CountyFusion search (allowed; buildable); probate is call/visit. | [Phone lookups](#card-people-search), [SC probate site](#card-sc-probate-net), [SC SoS companies](#card-sc-sos) |
 | Union | 1,297 | Free, open | No online index found: call or visit | Free, open | Index and deed chain are free as a guest; a person may need to buy images to read full legal descriptions; probate is call/visit. | [City of Union](#card-city-union), [MLS](#card-mls), [Phone lookups](#card-people-search), [SC notice text](#card-sc-notice-body), [SC property cards](#card-sc-qpublic), [SC SoS companies](#card-sc-sos) |
-| Williamsburg | 2,272 | Login (account) | No online index found: call or visit | Free, open | A person registers (free) to search the index, but terms forbid robots and every deed image costs $1/page, so legal descriptions and the chain come from a person or the abstractor; probate is call/visit. | [Phone lookups](#card-people-search), [SC paid deeds](#card-sc-rod-paid) |
+| Williamsburg | 2,272 | Login: a person signs in to an account | No online index found: call or visit | Free, open | A person registers (free) to search the index, and every deed image costs $1/page, so legal descriptions and the chain come from a person or the abstractor; probate is call/visit. | [Phone lookups](#card-people-search), [SC paid deeds](#card-sc-rod-paid) |
 | York | 174 | Free after an 'I accept' click | Bot check: a person in a normal browser | Bot check: a person in a normal browser | Free route covers deed chain and property legal; a person may need to buy images, read probate documents (paid viewer) and look up tax bills on the county site by hand. | [SC probate site](#card-sc-probate-net), [SC property cards](#card-sc-qpublic), [York PDFs](#card-york-site) |
 
 ## Paid or attorney-only (type B): prices
@@ -1142,7 +1173,7 @@ Prices come from our notes (mostly 2026-07 and 2026-08) and are not re-checked; 
 | What | Price | What it gets | Free alternative |
 |---|---|---|---|
 | PACER (federal court documents) | $0.10 a page, max $3.00 a document; waived under $30 a quarter. 2027: $0.12 and $40. | Bankruptcy petitions for UNKNOWN-county rows; any federal docket. | CourtListener RECAP (free) first. |
-| SC Secretary of State UCC search | $5 a search | UCC liens against SC companies | Low value |
+| SC Secretary of State UCC search | $5 a search per an August note; the 2026-10-07 source hunt found ucconline.sc.gov open (check before paying) | UCC liens against SC companies | Low value |
 | NC Secretary of State bulk data subscription | Not on file | Bulk federal tax liens and entity data | Per-name hand lookups are free |
 | Neumo (Lee SC) | $5 a day | Deed index and images | Abstractor |
 | Neumo images (Newberry SC) | $5 a day | Deed images 2003 on | Free index |
@@ -1157,34 +1188,37 @@ Prices come from our notes (mostly 2026-07 and 2026-08) and are not re-checked; 
 | Skip tracing | Tracerfy ~$0.02/record; DataZapp $0.02 to $0.03 ($125 min); BatchData $0.07 to $0.18; REISkip $0.15 to $0.22/hit; BatchData Growth $1,000/mo | Owner phones and emails | Hand lookups (above) |
 | Property data platforms | PropStream $99 to $699/mo (Pro $199); PropertyRadar $99 to $119/mo solo; ATTOM ~$95 to $500/mo, bulk backfill $1,500 to $5,000; Realie $50 to $350/mo; RentCast $199 or $449/mo; HouseCanary ~$5 a valuation report | Square feet, sales, liens, comps | qPublic cards by hand; county layers |
 | Lien data | CoreLogic involuntary lien API $11.50 a call; ATTOM ~$500/mo | Open liens (never the live payoff) | Deed-of-trust images |
-| Court data vendors (UniCourt, Trellis) | Not on file | SC Family Court and other dockets | Records requests |
+| Court data vendors (UniCourt, Trellis, Docket Alarm; PacerMonitor beyond its free tier needs an account) | Not on file | Court dockets, SC Family Court | Records requests; CourtListener |
+| Tax-sale list resellers (Tax Sale Resources, Goliath Data) | Not on file (subscription) | SC and NC tax-sale and delinquent lists | The county files and readers in this document |
 | NCOALink (USPS change of address) | $15,000+ a year | Forwarding addresses | None |
 | Westlaw or Lexis (the attorney's subscription) | Not on file | Court dockets where his plan covers NC or SC state courts | The public portals by hand |
 | SCDOT statewide SC parcel layer | No price: agency-only sign-in, no public account | SC owner and address lookups | County map layers (in use for 8 of 11 core SC counties) |
 | USPS vacancy data (via HUD) | Not for sale to us: government and nonprofit licensees only | Vacancy flags | Land-use vacancy proxy (built) |
 
-## Appendix C: terms-only restrictions (allowed, built or buildable)
+## Appendix C: allowed, built or buildable (not walls)
 
-No technical barrier. The attorney has cleared terms-only restrictions, and a robots.txt line is not a wall by the owner's rule (2026-09-20). If a CAPTCHA, login or bot check ever appears on one of these, it moves to type A.
+No technical barrier: terms of use, robots.txt, or a plain click with no credentials. The attorney has cleared terms-only limits, and robots.txt is not a wall by the owner's rule. If a CAPTCHA, a real login or a bot check ever appears on one of these, it moves to type A and the reader stops.
 
 | Source | The restriction | Status |
 |---|---|---|
-| SC Judicial Public Index (all SC counties) | Disclaimer bars automated, repetitive querying (court Rule 610 and an administrative order). No CAPTCHA seen in 58 searches (2026-10-04). A JavaScript check that a real browser passes on its own. | Cleared by the attorney for our use (2026-10-07). Being built now: foreclosure, partition, quiet-title, lis pendens and judgment case lists in all 46 SC counties. If the reader meets a CAPTCHA, login or bot check it stops, and those lanes stay manual (see the fallback card). Evictions are skipped (they name the tenant). |
-| Anderson SC tax search (ACPASS) | robots.txt says Disallow, and every page prints the SC notice that public-access data may not be used for commercial solicitation. Not behind the login (re-checked 2026-09-10). | Buildable: owner, mailing address, balance due by year. The attorney confirmed SC Code 30-2-50 does not stop our SC mailings (2026-10-07). |
-| Anderson SC deeds since 21 Feb 2026 (Ingenuity system) | Terms forbid automation. | Buildable after the switch to the new system is mapped; older deeds are on ACPASS. |
-| Cherokee SC deeds (Avenu) | Terms forbid data mining, robots, spiders. | Buildable: index 1995 on, free images 2002 on. |
-| Kershaw, Lee, Williamsburg SC (Neumo terms) | Terms forbid robots. | Still need an account or payment (see the paid table), so they stay walled in practice. |
-| Oconee SC deeds (Kofile PublicSearch) | robots.txt Disallow: / (not a wall by the owner's rule). The 2026-09-10 recheck found an open data path. | Buildable. |
-| qPublic property cards (Schneider), many SC counties | Terms prohibit robots and scraping. | The terms part is cleared; the Cloudflare check on searches still makes bulk reads a wall. Per-parcel reads by a person: see the qPublic card above. |
-| Spatialest / Schneider tax cards (for example Alamance NC) | Disclaimer links terms that prohibit robots. | Buildable where no other check stands in front. |
-| SC Family Court divorce name search | Terms ban automated use; the full divorce record is a restricted court system, not on the public index. | Name search buildable, but our test found 0% real hits; low value. |
-| Zillow, Redfin, Realtor.com, Trulia, Xome, Hubzu | Terms ban scraping. Zillow also shows a 'press and hold' bot check on some runs; Hubzu and Xome are JavaScript apps behind Cloudflare that our browser renders. | Built where they run (Zillow 88, Hubzu 17, Trulia 9, Xome 9 rows on the board). Redfin Data Center ZIP statistics: buildable (a known fix in the build queue). Low value: these list the same bank-owned and auction homes we get elsewhere. |
-| LoopNet, LandWatch, Land and Farm, Lands of America | Akamai bot shield; terms. | LandWatch and Land and Farm run (551 and 426 rows). LoopNet is a hard block and only matters for multifamily; Crexi is the free multifamily source. |
+| SC Judicial Public Index (all 46 SC counties), including the Master in Equity rosters for York, Aiken, Lexington, Richland and others | Court Rule 610 and an administrative order against automated, repetitive queries: cleared by the attorney for our use (2026-10-07). No CAPTCHA seen in 58 searches (2026-10-04). A JavaScript check a real browser passes on its own. | Being built now: foreclosure, partition, quiet-title, lis pendens and judgment case lists, and the MIE rosters. If the reader meets a CAPTCHA, login or bot check it stops and that lane goes back to the fallback card. Evictions are skipped (they name the tenant). |
+| Click-through consent pages: Kania's disclosure popup (checkbox and Submit), Zacchaeus and Aldridge Pite 'I AGREE' | A plain consent click; no credentials. | Allowed and built (Kania, Zacchaeus, Aldridge Pite readers run). |
+| Cott eSearch 'Sign in as a Guest' button: Alamance, Edgecombe, Halifax, Lenoir, Onslow, Pitt, Rowan, Rutherford, Scotland, Wilson (NC deeds) | A guest button on the vendor's sign-in page; no user name or password. | Allowed. An engineer is adding the guest click to the Cott deed reader now. |
+| 'I accept' disclaimers on register of deeds, tax and court sites (most of the 145 counties) | An 'I accept' click with accuracy-only text. | Allowed; built or buildable (see the county table). |
+| Anderson SC tax search (ACPASS) | robots.txt says Disallow; pages print the state notice on commercial use (cleared). Not behind the login (re-checked 2026-09-10). | Buildable: owner, mailing address, balance due by year. |
+| Anderson SC deeds since 21 Feb 2026 (Ingenuity system) | Terms forbid automation (terms only, cleared). | Buildable after the new system is mapped; older deeds are on ACPASS. |
+| Cherokee SC deeds (Avenu) | Terms forbid data mining, robots, spiders (terms only, cleared). | Buildable: index 1995 on, free images 2002 on. |
+| Oconee SC deeds (Kofile / GovOS PublicSearch) | robots.txt Disallow only. | Built: the SC PublicSearch deed-chain reader (Greenville and Oconee). |
+| qPublic and Spatialest / Schneider property cards | Terms prohibit robots (terms only, cleared). | Allowed where no bot check stands in front; the qPublic Cloudflare check on searches keeps the qPublic card manual. |
+| Horry and Greenwood SC probate (Spartan public portals) | None found: the 2026-10-07 source hunt read Horry's portal as open JSON (2,968 estates in 2026). | Buildable (the county matrix had recorded Horry as a login; the newer check supersedes it). |
+| ncnotices.com and scpublicnotices.com title-clearing lanes (partition, quiet title, unknown heirs, heirs at law, claim of lien) | Terms click-through on the detail page (allowed); the list grid is open. | Buildable on the readers we already run. If a detail page shows a CAPTCHA, the notice-text card applies. |
+| SC Family Court divorce name search | Terms ban automated use (terms only, cleared). The full divorce record is a restricted court system, not on the public index. | Name search buildable, but our test found 0% real hits; low value. |
+| Zillow, Redfin, Realtor.com, Trulia, Xome, Hubzu | Terms ban scraping (cleared). Zillow shows a 'press and hold' bot check on some runs; Hubzu and Xome are JavaScript apps our browser renders. | Built where they run (Zillow 88, Hubzu 17, Trulia 9, Xome 9 rows on the board). Redfin Data Center ZIP statistics: buildable. Low value: they list the same bank-owned and auction homes we get elsewhere. |
+| LoopNet, LandWatch, Land and Farm, Lands of America | Akamai bot shield; terms. | LandWatch and Land and Farm run (551 and 426 rows). LoopNet is a hard block and matters only for multifamily; Crexi is the free multifamily source. |
 | Auction.com | Imperva bot shield on listing pages; terms. | Buildable through the site's public sitemap (2026-09-10 recheck); 21 rows on the board today. |
+| JavaScript-only search apps with no wall: Logan Remote Access (11 NC counties), Logan Public Records (7 NC counties), Durham NC delinquent-tax list (Spatialest) | No check; the search runs in the page's own script. | Buildable with a headless browser (next round of the deed readers). |
 | Sites whose robots.txt names AI crawlers (SeeClickFix, Transylvania Times) | robots.txt only. | Allowed by the owner's rule (2026-09-20). SeeClickFix runs but fell 97% in today's run (an engineering issue). |
-| Lexington SC probate search | Disclaimer cites the SC Family Privacy Protection Act (no commercial solicitation use). | Buildable. The attorney confirmed SC Code 30-2-50 does not stop our SC mailings (2026-10-07). |
-| Click-through disclaimers on most register of deeds sites (82 of 145 counties) | An 'I accept' click with accuracy-only text. | Allowed; most are built or buildable (see the county table). |
-| CourtListener / RECAP (federal courts) | None for search; docket alerts need a free account. | Built (bankruptcy feed). Optional by hand: set free docket alerts on HOT bankruptcy-stayed foreclosures. |
+| CourtListener / RECAP (federal courts) | None for search; docket alerts need a free account. | Built (bankruptcy feed). Optional by hand: free docket alerts on HOT bankruptcy-stayed foreclosures. |
 
 ## Data that does not exist anywhere
 
@@ -1203,27 +1237,30 @@ No browser, payment or subscription gets these. Stop looking.
 
 - **NC eCourts divorce saves.** The open NC judgment search already gives granted divorces statewide, with no CAPTCHA (5,777 rows on the board).
 - **NC eCourts lis pendens saves.** Same open judgment search (10,761 rows).
-- **NC eCourts hearing calendar saves.** Low value; foreclosure dates come from the law-firm calendars.
 - **All routine SC Public Index saves (foreclosure, partition, quiet title, lis pendens, judgments, state tax lien).** Cleared by the attorney and becoming automatic in all 46 counties; state tax liens come from the state registry. Hand-save only if the automatic reader reports a CAPTCHA, login or bot check.
 - **SC Public Index eviction (Possession 450) saves.** The case names the tenant, not the owner. Every saved row adds a wrong name.
 - **Saving Anderson or Pickens tax pages, SC company pages, SC contractor roster pages, SC case detail pages.** Nothing reads those files. Read the number and type it into the CRM instead.
 
 ## Gaps and disagreements in our notes
 
-- Rutherford NC deeds: a 2026-10-03 note calls the Cott site a permanent login wall; the 2026-10-07 county check found a 'Sign in as a Guest' button with no password. This document treats it as type A (a person clicks the guest button). Our code still treats it as walled.
-- Anderson SC tax: the county matrix (2026-10-07) says the tax page redirects to a login; the 2026-09-10 recheck found the tax search itself open (the redirect page still carries the content). This document follows the recheck (type C, buildable; the attorney cleared SC Code 30-2-50 for our mailings on 2026-10-07).
-- CCHS deed sites for Burke, Lincoln, Cleveland and Henderson: the old master list says 'decommissioned'; our reader and the 2026-10-07 check found them live. The old line is stale.
-- NC eCourts search labels: the exact filter names on the Tyler portal ('Advanced Filtering Options', 'File Date', 'Location') are from our notes, not re-read today. If a label differs, pick the closest match.
-- Whether a saved NC estate list keeps the executor's name: not yet confirmed on a real save. Check the first one.
-- southcarolinaprobate.net refused our plain request with a 403 today, even with a normal browser identity. We did not open it in a real browser. If your browser also gets 403, the site is down for everyone.
+- Anderson SC tax: the county matrix (2026-10-07) says the tax page redirects to a login; the 2026-09-10 recheck found the tax search itself open (the redirect page still carries the content). This document follows the recheck (allowed, buildable).
+- Horry SC probate: the county matrix records a login; the 2026-10-07 source hunt read it as open JSON. This document follows the newer check (allowed, buildable).
+- Lexington SC probate: the county matrix records a plain disclaimer; the source hunt found the search needs a reCAPTCHA token (type A). This document follows the source hunt.
+- The 12 Courthouse Computer Systems counties on the vendor's us3/us4/us5 servers (Caldwell, Camden, Caswell, Chowan, Currituck, Dare, Duplin, Franklin, Gates, Hertford, Hyde, Montgomery) are 'disclaimer' or 'open' in the matrix, but the 2026-10-07 platform check found a Cloudflare challenge to scripts on the search page. Counted here as needing a person. Our older reader still reads Burke, Cleveland, Henderson, Lincoln and Madison on the same servers.
+- The old master list's 'CCHS decommissioned' line for Burke, Lincoln, Cleveland and Henderson is stale; those sites are live.
+- NC eCourts search labels ('Advanced Filtering Options', 'File Date', 'Location') are from our notes, not re-read today. If a label differs, pick the closest match. Whether a saved NC estate list keeps the executor's name is not yet confirmed on a real save.
+- southcarolinaprobate.net refused our plain request with a 403 today, even with a normal browser identity; we did not open it in a real browser. If your browser also gets 403, the site is down for everyone.
 - Spartanburg and York county websites answered our single polite request with Cloudflare 'Attention Required!' today. This may be a block on this Mac's internet address after our readers' runs, in which case your own browser on the same network could see it too.
-- Rutherford, Edgecombe and Avery county websites gave our readers 403 in today's run but answered a single polite request normally an hour later; treated as temporary, no card.
-- The 'UNKNOWN' counts: your coverage sheet (2026-10-01) has 7,103 rows; today's board and the new gap matrix (2026-10-07) have 2,648. The steps are the same.
-- The new gap matrix (docs/gap_matrix/README.md, written today by another session) counts 1,031 'walled' county-column cells. Most are the attorney title-check columns (deed reference, register lien check, probate case, heir candidates, tax confirmation) in counties whose deed, probate or tax site needs a person; the deed, probate and tax cards here are how a person fills them. Its other walled reasons are each covered above: SC company search CAPTCHA, SC voter list sold without phones, HUD vacancy data, SC family-court terms; and SC Public Index terms, which the attorney has since cleared (2026-10-07), so those cells move to 'being built'.
+- Rutherford, Edgecombe and Avery county websites gave our readers 403 in the morning run but answered a single polite request normally later; treated as temporary, no card.
+- The ncnotices.com detail page: the source hunt calls it a terms click only; our reader saw a Google CAPTCHA on it in July. The card covers both.
+- SC UCC search: an August note says $5 a search; the source hunt found ucconline.sc.gov open. Not checked further.
+- The 'UNKNOWN' counts: your coverage sheet (2026-10-01) has 7,103 rows; today's board and the gap matrix (2026-10-07) have 2,648. The steps are the same.
+- The gap matrix (docs/gap_matrix/README.md) counts 1,031 'walled' county-column cells, mostly the attorney title-check columns in counties whose deed, estate or tax site needs a person; the deed, estate and tax cards here are how a person fills them. Its 'SC Public Index terms' and 'SC family-court terms' cells are now cleared or allowed, so they move to buildable; its 'SC voter list is sold' and 'HUD vacancy login' cells are in the paid table.
+- Several readers are written to tick a Cloudflare box when one appears (always for the NC SoS UCC search and the old eCourts case-status reader; unless FORECLOSURE_NO_CF_SOLVE=1 is set for the qPublic, Cherokee SC and Buncombe card readers and two law-firm readers). An engineer should confirm this fits the rule that a bot check is never passed by code.
 - Lead estimates marked 'estimate' are ours, not measured. Name-to-parcel matching was measured at about 29% automatic (2026-07).
 - Avenu portal counties (Bamberg, Chester, Chesterfield, Dillon, Edgefield, Fairfield): access is 'unclear' in the matrix. The card asks you to note what the site requires.
-- Prices for deed images in Buncombe, Polk, Gaston, Mecklenburg, Davidson, and for TitleSearcher, Richland and Cott RECORDhub, are not in our notes.
-- No document named docs/new_sources_2026-10-07_*.md existed when this was finished, so nothing from that work is included.
+- Prices for deed images in Buncombe, Polk, Gaston, Mecklenburg, Davidson, and for TitleSearcher, Richland, Cott RECORDhub, Docket Alarm, Tax Sale Resources and Goliath are not in our notes.
+- No sc_rod_platform_clusters.md existed when this was built; the SC county counts come from the county matrix.
 
 ## Where this came from
 
@@ -1233,6 +1270,8 @@ No browser, payment or subscription gets these. Stop looking.
 - Live run_meta.json on the dashboard (run of 2026-10-07 17:09 UTC): source status, alarms and dormant reasons
 - Scraper and enricher docstrings under src/foreclosure_scraper that describe a CAPTCHA, Cloudflare, DataDome, Akamai, Imperva, PerimeterX, AWS-WAF, token or login wall
 - The manual lanes in code: scripts/ingest_saved.sh, scripts/parse_nc_ecourts_export.py, scripts/ingest_publicindex_files.py, scripts/ingest_contacts.py, scripts/ingest_liensnc.py, scripts/verify_lead_human_assisted.py
-- The owner's coverage sheet county_signal_coverage_FINAL.csv (73 signals x 146 counties, plus 2 UNKNOWN rows), and the new docs/gap_matrix/README.md (2026-10-07) for the walled-cell cross-check
+- The owner's coverage sheet county_signal_coverage_FINAL.csv (73 signals x 146 counties, plus 2 UNKNOWN rows), and docs/gap_matrix/README.md (2026-10-07) for the walled-cell cross-check
+- docs/county_records/nc_rod_platform_clusters.md (NC deed platforms, readers built, where a person is needed), docs/extraction_audit_2026-10-07.md (12 fixes), docs/new_sources_2026-10-07_liens_courts.md (75 records; its walled list is folded in here)
+- Repo commits of 2026-10-07 for the built items: deed-chain readers (a237f78b, dbd53293, 471f33c6, b05be4a2, cf447ca4), quiet-title intake (f48a9f86 and follow-ups), privacy filter (65c68d5d), verifiers (0b533d76, 0210de27, c70abdd9), LiensNC owner decision (580cc002)
 - One polite request (ordinary browser identity, 2 seconds apart) on 2026-10-07 to each of: southcarolinaprobate.net, spartanburgcounty.gov, rutherfordcountync.gov, yorkcountysc.gov, edgecombecountync.gov, averycountync.gov, foreclosure.com, publicnoticesc.com, redfin.com, xome.com, hubzu.com, auction.com. No wall was passed.
 
