@@ -381,10 +381,12 @@ def _amounts_by_year(raw: dict) -> dict[int, float]:
 _SCALAR_YEAR_KEYS = ("year", "tax_year", "levy_year", "bill_year", "taxyear", "latest_year")
 
 
-def _source_names_year(raw: dict, year: int) -> bool:
-    """A tax source block on the row states `year` in a scalar year key."""
+def _roll_names_year(raw: dict, year: int) -> bool:
+    """A live bill roll on the row (_LIVE_ROLL_BLOCKS, or an ArcGIS unpaid-bill row) states `year` in
+    a scalar year key. Only a roll says what is unpaid NOW: a sale list or an advertisement naming
+    one year (often the sale's or the ad's year) says nothing about the current bill."""
     for name, blk in raw.items():
-        if isinstance(blk, dict) and (_is_tax_source_block(name) or _unpaid_bill_layer_year(name, blk)):
+        if isinstance(blk, dict) and (name in _LIVE_ROLL_BLOCKS or _unpaid_bill_layer_year(name, blk)):
             if any(_cal.levy_year(blk.get(k)) == year for k in _SCALAR_YEAR_KEYS):
                 return True
     return False
@@ -404,7 +406,7 @@ def tax_year_status(raw: dict, state: Optional[str], county: Optional[str],
       basis               year_list (a source lists the unpaid years), stated_count (a count
                           and the newest year only), single_year (one year: delinquent since then,
                           tax_calendar.years_since_levy)
-      year_from_source    single_year only: a source block names that year (else only tax_owed)
+      year_from_roll      single_year only: a live bill roll names that year (_roll_names_year)
     """
     if not isinstance(raw, dict):
         return None
@@ -446,9 +448,9 @@ def tax_year_status(raw: dict, state: Optional[str], county: Optional[str],
             else:
                 out = {"basis": "single_year", "unpaid_bill_years": 1, "years_delinquent": 0,
                        "not_yet_late_years": [y]}
-            # whether a source block names the year, or only tax_owed does (a year an older run
-            # carried forward from a block that is gone, or read off an unrelated block)
-            out["year_from_source"] = bool(pts_year) or _source_names_year(raw, y)
+            # whether a live roll names the year, or only tax_owed / a list does (a year an older
+            # run carried forward from a block that is gone, a sale's or an ad's year)
+            out["year_from_roll"] = bool(pts_year) or _roll_names_year(raw, y)
     pending = out["not_yet_late_years"]
     if pending:
         bal = _money(to.get("balance"))
@@ -503,10 +505,10 @@ def tax_not_yet_late(raw: dict, state: Optional[str], county: Optional[str],
     the amount_owed promotion) and stays on the board as context with raw['tax_not_yet_late'].
     A row with an older unpaid year as well keeps its credit.
 
-    It takes evidence, not the absence of it: the not-late year has to come from a source block
-    (a year list, a stated count, or a block naming the year), not only from tax_owed.year, and
-    nothing on the row may show a late bill (a past-due source, a PTS Cloud roll charging interest,
-    which only a bill past its delinquent date does)."""
+    It takes evidence, not the absence of it: the not-late year has to come from a source's year
+    list or stated count, or from a live bill roll naming it (not only tax_owed.year, not a sale
+    list's single year), and nothing on the row may show a late bill (a past-due source, a PTS
+    Cloud roll charging interest, which only a bill past its delinquent date does)."""
     if not isinstance(raw, dict) or _past_due_source(raw, source):
         return False
     to = raw.get("tax_owed")
@@ -521,7 +523,7 @@ def tax_not_yet_late(raw: dict, state: Optional[str], county: Optional[str],
     st = tax_year_status(raw, state, county, today)
     if not st or st["years_delinquent"] != 0 or not st["not_yet_late_years"]:
         return False
-    return st["basis"] != "single_year" or bool(st.get("year_from_source"))
+    return st["basis"] != "single_year" or bool(st.get("year_from_roll"))
 
 
 def _years_fields(status: Optional[dict]) -> dict:

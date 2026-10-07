@@ -105,7 +105,11 @@ def test_evidence_is_required_a_bare_tax_owed_year_is_not_enough():
     raw = {"tax_owed": {"balance": 1700.0, "kind": "delinquent_tax", "year": 2026,
                         "source": "counties_nc.some_list", "basis": "own_record"}}
     assert not tax_not_yet_late(raw, "NC", "Buncombe", "counties_nc.some_list", TODAY)
-    raw["some_list_tax"] = {"tax_year": 2026, "principal_tax_due": 1700.0}
+    # a sale list or an advertisement naming one year is not evidence either (often the sale's year)
+    raw["some_tax_sale_list"] = {"tax_year": 2026, "opening_bid": 1700.0}
+    assert not tax_not_yet_late(raw, "NC", "Buncombe", "counties_nc.some_list", TODAY)
+    # a live bill roll naming the year is
+    raw["catalis_roll"] = {"year": 2026, "total_due": 1700.0}
     assert tax_not_yet_late(raw, "NC", "Buncombe", "counties_nc.some_list", TODAY)
 
 
