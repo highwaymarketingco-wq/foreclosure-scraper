@@ -65,7 +65,7 @@ class FakeFetcher:
     async def __aexit__(self, *a):
         return None
 
-    async def get(self, url, params=None):
+    async def get(self, url, params=None, content_rx=None):
         self.calls.append(url)
         for k, why in self.walled_map.items():
             if k in url:
@@ -84,6 +84,17 @@ def test_wall_reason():
     assert wall_reason(200, "https://x.test/", "<title>Just a moment...</title><div class='cf-chl'>") == "challenge page"
     assert wall_reason(429, "https://x.test/", "Too many") == "HTTP 429"
     assert wall_reason(402, "https://x.test/", "Access Restricted") == "HTTP 402"
+
+
+def test_captcha_in_a_share_form_on_a_served_page_is_not_a_gate():
+    served = OBIT_PAGE.replace("</body>", '<form id="share-obituary-form"><div class="g-recaptcha" '
+                                            'data-sitekey="x"></div></form></body>')
+    assert wall_reason(200, "https://x.test/", served) == "CAPTCHA"            # no content check: a wall
+    assert wall_reason(200, "https://x.test/", served, ev.CONTENT_RX) is None  # content is on the page
+    gate = ('<html><body><form id="gate"><div class="g-recaptcha"></div></form>'
+            '<div id="obituary"></div></body></html>')
+    assert wall_reason(200, "https://x.test/", gate, ev.CONTENT_RX) == "CAPTCHA"  # nothing served: a wall
+    assert wall_reason(403, "https://x.test/", served, ev.CONTENT_RX) == "HTTP 403"
 
 
 def test_decedent_from_title():

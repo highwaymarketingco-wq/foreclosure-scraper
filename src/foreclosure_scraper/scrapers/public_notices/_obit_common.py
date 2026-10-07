@@ -41,11 +41,24 @@ MIN_GAP_S = 1.6
 _PASSIVE_JSD = re.compile(r"/cdn-cgi/challenge-platform/scripts/jsd/[^\"'\s<>]*|challenge-platform/scripts/jsd/[^\"'\s<>]*")
 
 
-def wall_reason(status: int, final_url: str, text: str) -> Optional[str]:
-    """detect_wall, except that Cloudflare's passive detection script on a served page is not a wall."""
+_FORM = re.compile(r"(?is)<form\b[^>]*>.*?</form>")
+
+
+def wall_reason(status: int, final_url: str, text: str, content_rx: Optional[re.Pattern] = None) -> Optional[str]:
+    """detect_wall, with two narrow exceptions on a page that was SERVED (HTTP 200, no challenge
+    interstitial):
+      * Cloudflare's passive detection script is not a wall;
+      * a CAPTCHA widget inside a <form> (Echovita's 'share this obituary by e-mail' form, a
+        WordPress comment form) is not a wall WHEN the page also carries the content we came for
+        outside any form (`content_rx`). Those forms are never submitted. A CAPTCHA that stands in
+        front of the content (no content outside the form) is still a wall."""
     t = text or ""
     if status == 200 and "Just a moment" not in t[:5000]:
         t = _PASSIVE_JSD.sub(" ", t)
+        if content_rx is not None:
+            outside = _FORM.sub(" ", t)
+            if content_rx.search(outside):
+                t = outside
     return detect_wall(status, final_url, t)
 
 
@@ -80,7 +93,8 @@ class PoliteFetcher:
                     await asyncio.sleep(wait)
             self._last[host] = time.monotonic()
 
-    async def get(self, url: str, params: Optional[dict] = None) -> str:
+    async def get(self, url: str, params: Optional[dict] = None,
+                  content_rx: Optional[re.Pattern] = None) -> str:
         host = (urlsplit(url).hostname or "").lower()
         if host in self.walled:
             raise Walled(url, self.walled[host])
@@ -88,7 +102,7 @@ class PoliteFetcher:
         self.requests[host] = self.requests.get(host, 0) + 1
         assert self._client is not None, "use 'async with PoliteFetcher()'"
         r = await self._client.get(url, params=params)
-        why = wall_reason(r.status_code, str(r.url), r.text)
+        why = wall_reason(r.status_code, str(r.url), r.text, content_rx)
         if why:
             self.walled[host] = why
             log.warning("obituary_reader.walled", host=host, reason=why)

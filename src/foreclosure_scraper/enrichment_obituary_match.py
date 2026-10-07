@@ -316,6 +316,8 @@ def record_from_row(row: Any) -> Optional[dict]:
         "survivors": priv.get("survivors") or [],
         "unnamed": priv.get("unnamed") or [],
         "predeceased": priv.get("predeceased") or [],
+        "detail_read": bool(ob.get("detail_read")) or bool(priv.get("survivors")),
+        "county_basis": ob.get("county_basis"),
     }
 
 
@@ -336,9 +338,9 @@ def county_fit(rec: dict, lead_county: str, lead_state: str) -> tuple[bool, str]
                 return True, f"the obituary's residence ({city}) lies in {lead_county} County"
             return False, f"the obituary's residence ({city}) lies in {', '.join(sorted(cs))} County, not {lead_county}"
     if _norm_county(rec.get("county")) == lc:
-        why = ("the obituary prints no residence the city tables know; the county is that of the funeral "
-               "home or paper that published it") if city else \
-              "the obituary prints no residence; the county is that of the funeral home or paper that published it"
+        basis = rec.get("county_basis") or "the funeral home or paper that published it"
+        why = (f"the obituary prints no residence the city tables know; the county is that of {basis}" if city
+               else f"the record prints no residence; the county is that of {basis}")
         return True, why
     return False, f"the obituary's county ({rec.get('county')}) is not {lead_county}"
 
@@ -409,26 +411,30 @@ def date_checks(row: Any, rec: dict) -> tuple[bool, list[str]]:
     return conflict, notes
 
 
-def _death_key(rec: dict) -> tuple:
-    p = obit_person(rec.get("decedent"))
-    nm = (p.last, tuple(p.given), p.suffix) if p else (str(rec.get("decedent")).upper(),)
-    return nm, rec.get("death_date") or ""
+def _same_death(a: dict, b: dict) -> bool:
+    """Two records are one death: same surname and given name, middle names that do not conflict
+    (QUIMBY / Q), and the same death date; without a date on both, the names must be identical."""
+    from .quiet_title.names import name_compat
+    pa, pb = obit_person(a.get("decedent")), obit_person(b.get("decedent"))
+    if not pa or not pb:
+        return str(a.get("decedent")).upper() == str(b.get("decedent")).upper()
+    if pa.last != pb.last or pa.first != pb.first or name_compat(pa, pb) is None:
+        return False
+    da, db = a.get("death_date"), b.get("death_date")
+    if da and db:
+        return da == db
+    return pa.given == pb.given and pa.suffix == pb.suffix
 
 
 def _distinct_deaths(recs: list[dict]) -> list[list[dict]]:
-    """Group records that are the same death (same full name; same death date, or one of them
-    without a date)."""
+    """Group records that are the same death (_same_death)."""
     groups: list[list[dict]] = []
     for r in recs:
-        nm, dd = _death_key(r)
-        placed = False
         for g in groups:
-            gnm, gdd = _death_key(g[0])
-            if gnm == nm and (not dd or not gdd or dd == gdd):
+            if any(_same_death(r, x) for x in g):
                 g.append(r)
-                placed = True
                 break
-        if not placed:
+        else:
             groups.append([r])
     return groups
 
@@ -527,8 +533,27 @@ class ObituaryIndex:
         return list(best.values())
 
 
-def _attached(f: dict) -> dict:
+def _merged_survivors(fits: list[dict]) -> tuple[list[dict], list[dict], list[str]]:
+    """Survivors from every record of the one death (an obituary and a memorial of the same
+    person), each tagged with the record it came from; one entry per (name, relation)."""
+    surv, unnamed, urls, seen = [], [], [], set()
+    for f in sorted(fits, key=lambda x: -_RANK[x["level"]]):
+        rec = f["rec"]
+        urls.append(rec.get("url"))
+        for p in rec.get("survivors") or []:
+            k = (str(p.get("name", "")).lower(), p.get("relation"))
+            if k in seen:
+                continue
+            seen.add(k)
+            surv.append({**p, "source_url": rec.get("url"),
+                         "source_date": rec.get("death_date") or rec.get("published")})
+        unnamed += rec.get("unnamed") or []
+    return surv, unnamed, urls
+
+
+def _attached(f: dict, group: Optional[list[dict]] = None) -> dict:
     rec = f["rec"]
+    surv, unnamed, urls = _merged_survivors(group or [f])
     return {
         "status": "attached",
         "url": rec.get("url"),
@@ -538,8 +563,9 @@ def _attached(f: dict) -> dict:
                      "decedent_reading": f["decedent_reading"]},
         "county_fit": f["county_fit"],
         "date_checks": f["date_checks"],
-        "survivors": rec.get("survivors") or [],
-        "unnamed": rec.get("unnamed") or [],
+        "survivors": surv,
+        "unnamed": unnamed,
+        "also_found_in": [u for u in urls if u and u != rec.get("url")],
         "note": NOTE,
     }
 
@@ -609,7 +635,7 @@ def match_rows(rows: list[Any], records: Iterable[dict]) -> dict:
                       "the owner died")
             stats["ambiguous"] += 1
             continue
-        raw["obituary_match"] = _attached(best)
+        raw["obituary_match"] = _attached(best, fits)
         stats["attached"] += 1
     return stats
 

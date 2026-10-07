@@ -56,6 +56,9 @@ _AGE = re.compile(r"\((\d{1,3}) years? old\)")
 _DATES = re.compile(r'<span class="my-auto">([^<]{4,60})</span>')
 _LD = re.compile(r'<script[^>]*application/ld\+json[^>]*>(.*?)</script>', re.S | re.I)
 _TEXT = re.compile(r'<div[^>]*id="obituary"[^>]*>(.*?)</div>', re.S | re.I)
+#: the obituary text is on the served page (outside any form): what makes a share-form CAPTCHA a
+#: form widget rather than a gate (see _obit_common.wall_reason)
+CONTENT_RX = re.compile(r'<div[^>]*id="obituary"[^>]*>\s*(?:<h1[^>]*>.*?</h1>)?\s*<p[^>]*>[^<]{40,}', re.S | re.I)
 
 
 def parse_listing(html: str) -> list[dict]:
@@ -114,11 +117,12 @@ def _county(city: Optional[str], state: str) -> Optional[str]:
 
 
 def _known() -> tuple[set[str], set[str]]:
-    """(urls in the private store, urls stored with survivors)."""
+    """(urls whose obituary page was already read, urls stored with survivors)."""
     try:
         from ...heirs_store import ObituaryStore
         recs = ObituaryStore().load().records
-        return set(recs), {u for u, r in recs.items() if r.get("survivors")}
+        return ({u for u, r in recs.items() if r.get("detail_read") or r.get("survivors")},
+                {u for u, r in recs.items() if r.get("survivors")})
     except Exception:  # noqa: BLE001
         return set(), set()
 
@@ -154,7 +158,7 @@ class EchovitaObituaries(BaseScraper):
                         break
                     cards += got
                     if stored and all(c["url"] in stored for c in got):
-                        break                      # caught up with what a previous run stored
+                        break                      # caught up: every card's page was read before
                 if "walled" in stats:
                     break
             stats["cards"] = len(cards)
@@ -166,10 +170,10 @@ class EchovitaObituaries(BaseScraper):
                 if len(details) >= MAX_DETAIL or "walled" in stats:
                     break
                 c = cards[i]
-                if c["url"] in with_surv:
+                if c["url"] in stored or c["url"] in with_surv:
                     continue
                 try:
-                    details[c["url"]] = parse_obituary_page(await pf.get(c["url"]))
+                    details[c["url"]] = parse_obituary_page(await pf.get(c["url"], content_rx=CONTENT_RX))
                     stats["detail"] += 1
                 except Walled as w:
                     stats["walled"] = w.reason

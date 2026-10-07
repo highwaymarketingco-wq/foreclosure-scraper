@@ -232,8 +232,8 @@ def _obituary_candidates(row: Any) -> list[dict]:
                 bits.append("the obituary gives no surname for this person")
             if s.get("surname_from_list"):
                 bits.append("surname taken from the list it is printed in")
-            out.append(_cand(s["name"], word, "obituary_survivor", src.get("url"),
-                             src.get("death_date") or src.get("published"),
+            out.append(_cand(s["name"], word, "obituary_survivor", s.get("source_url") or src.get("url"),
+                             s.get("source_date") or src.get("death_date") or src.get("published"),
                              "; ".join(b for b in bits if b) + ". A candidate, not a finding that this person is "
                                                               "an heir."))
     return out

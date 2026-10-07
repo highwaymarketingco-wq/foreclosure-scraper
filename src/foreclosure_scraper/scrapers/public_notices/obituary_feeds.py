@@ -9,13 +9,15 @@ no cookies, >= 1.6 s between requests to one host) and either carry the full tex
   host                              county         kind      what the feed gives
   tryondailybulletin.com            Polk NC        wp        full text in the feed
   laurenscountyadvertiser.net       Laurens SC     wp        full text in the feed
-  yourpickenscounty.com             Pickens SC     wp        excerpt; article page has the text
-  edgefieldadvertiser.com           Edgefield SC   wp        full text in the feed
+  edgefieldadvertiser.com           Edgefield SC   wp        excerpt; article page has the text
   grocefuneralhome.com              Buncombe NC    ltobits   excerpt; obituary page has the text
-  salisburypost.com                 Rowan NC       wp        excerpt; article page has the text
-  bladenjournal.com                 Bladen NC      wp        excerpt; article page has the text
   wataugademocrat.com               Watauga NC     townnews  name + date only (article pages 403)
   averyjournal.com                  Avery NC       townnews  name + date only (article pages 403)
+
+Checked and left out (live run 2026-10-07): yourpickenscounty.com (Pickens SC) posts one weekly
+round-up ('Obituaries 10-7-26') holding several obituaries, which needs a per-obituary splitter
+this reader does not have; salisburypost.com's obituary category carries news headlines, not
+obituaries; bladenjournal.com's items have empty or surname-only titles.
 
 The county a row carries is the decedent's own residence county when the obituary prints a town
 the city tables know, else the paper's / funeral home's county. Walled hosts (TownNews papers that
@@ -64,16 +66,10 @@ FEEDS: tuple[Feed, ...] = (
          "Polk", "NC", "wp", "Tryon Daily Bulletin", True),
     Feed("laurenscountyadvertiser.net", "https://www.laurenscountyadvertiser.net/category/obituaries/feed/",
          "Laurens", "SC", "wp", "The Laurens County Advertiser", True),
-    Feed("yourpickenscounty.com", "https://www.yourpickenscounty.com/category/obituaries/feed/",
-         "Pickens", "SC", "wp", "Pickens County Courier", True),
     Feed("edgefieldadvertiser.com", "https://www.edgefieldadvertiser.com/category/obituaries/feed/",
          "Edgefield", "SC", "wp", "The Edgefield Advertiser", True),
     Feed("grocefuneralhome.com", "https://www.grocefuneralhome.com/?feed=rss2&post_type=ltobits",
          "Buncombe", "NC", "ltobits", "Groce Funeral Home", True),
-    Feed("salisburypost.com", "https://www.salisburypost.com/category/obituaries/feed/",
-         "Rowan", "NC", "wp", "Salisbury Post", True),
-    Feed("bladenjournal.com", "https://www.bladenjournal.com/category/obituaries/feed/",
-         "Bladen", "NC", "wp", "Bladen Journal", True),
     Feed("wataugademocrat.com", "https://www.wataugademocrat.com/search/?f=rss&t=article&c=obituaries&l=50"
                                 "&s=start_time&sd=desc", "Watauga", "NC", "townnews", "Watauga Democrat", False),
     Feed("averyjournal.com", "https://www.averyjournal.com/search/?f=rss&t=article&c=obituaries&l=50"
@@ -192,7 +188,7 @@ class ObituaryFeeds(BaseScraper):
                     if (feed.detail and not _TRIGGER_HINT.search(body) and details < DETAIL_MAX
                             and link not in known and feed.host not in pf.walled):
                         try:
-                            page = await pf.get(link)
+                            page = await pf.get(link, content_rx=_CONTENT_START)
                             details += 1
                             st["detail"] += 1
                             body = article_text(page) or body
