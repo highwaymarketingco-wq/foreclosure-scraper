@@ -211,3 +211,90 @@ def test_registries_cover_all_100_nc_counties_not_just_the_old_footprint():
     # no collisions: every real NC county resolves to itself, not a neighbor
     for c in NC_COUNTIES:
         assert S._county_of(c.upper()) == c, c
+
+
+# --- 2026-10-07 extraction audit: fields on the layers that were never requested,
+# and offset paging that ordered by a column that is empty on ~10k UST rows. ---
+
+import asyncio
+
+
+def _reg(slug):
+    return next(r for r in S.REGISTRIES if r.slug == slug)
+
+
+def test_ust_requests_the_facility_and_risk_columns_it_used_to_drop():
+    f = set(_reg("nc_ust_incidents").fields)
+    for col in ("USTNum", "FacilID", "Comm", "ConfRisk", "LandUse",
+                "RRADate", "RRARisk", "RRARank", "RRAAbate"):
+        assert col in f, col
+
+
+def test_dam_requests_the_enforcement_resolution_and_condition_columns():
+    """NOD_DATE alone cannot say whether a notice of deficiency is still open."""
+    f = set(_reg("nc_dam_safety").fields)
+    for col in ("CONDITION_ASSESSMENT", "NOD_RESOLVED", "NOD_DEADLINE_DATE",
+                "DSO_RESOLVED", "DSO_DEADLINE", "LAST_INSPECTION_DATE",
+                "NEXT_INSPECTION_DATE", "STATE_ID", "YEAR_CONSTRUCTED"):
+        assert col in f, col
+    assert "INSPECTORS" not in f          # staff names, not property data
+
+
+def test_hazardous_requests_its_update_date():
+    assert "Update_Dat" in _reg("nc_inactive_hazardous").fields
+
+
+def test_a_ust_row_carries_the_new_columns_into_raw():
+    li = S._to_listing({"IncidentNumber": "", "USTNum": "0-000001", "FacilID": "0-000002",
+                        "IncidentName": "SAMPLE RESIDENCE", "Address": "1 Test Lane",
+                        "County": "BUNCO", "Comm": "N", "ConfRisk": "H",
+                        "RRARank": 3, "LandUse": "Residential"}, _reg("nc_ust_incidents"))
+    sc = li.raw["state_contamination"]
+    assert sc["Comm"] == "N" and sc["ConfRisk"] == "H"
+    assert sc["USTNum"] == "0-000001" and sc["FacilID"] == "0-000002"
+    assert sc["RRARank"] == 3 and sc["LandUse"] == "Residential"
+    assert "IncidentNumber" not in sc       # empty values are still left out
+
+
+def test_an_ssn_like_column_never_reaches_raw():
+    li = S._to_listing({"Address": "1 Test Lane", "County": "BUNCO",
+                        "IncidentName": "SAMPLE", "OWNER_SSN": "000-00-0000",
+                        "DOB": "1900-01-01"}, _reg("nc_ust_incidents"))
+    sc = li.raw["state_contamination"]
+    assert "OWNER_SSN" not in sc and "DOB" not in sc
+
+
+class _Resp:
+    def __init__(self, payload):
+        self.status_code = 200
+        self._p = payload
+
+    def json(self):
+        return self._p
+
+
+class _PagingClient:
+    """Two pages: a full one flagged exceededTransferLimit, then a short one."""
+
+    def __init__(self, reg):
+        self.calls = []
+        self.reg = reg
+
+    async def post(self, url, data=None, timeout=None):
+        self.calls.append(dict(data))
+        n = S._PAGE if len(self.calls) == 1 else 2
+        key = self.reg.situs or self.reg.id_field
+        feats = [{"attributes": {key: f"{len(self.calls)}-{i} Test Lane",
+                                 self.reg.county_field: "BUNCO"}}
+                 for i in range(n)]
+        return _Resp({"features": feats, "exceededTransferLimit": len(self.calls) == 1})
+
+
+def test_offset_pages_are_ordered_by_the_unique_object_id():
+    for slug, oid in (("nc_ust_incidents", "OBJECTID"), ("nc_dam_safety", "ObjectId"),
+                      ("nc_inactive_hazardous", "OBJECTID")):
+        c = _PagingClient(_reg(slug))
+        out = asyncio.run(S._fetch(c, _reg(slug)))
+        assert [k["orderByFields"] for k in c.calls] == [oid, oid], slug
+        assert [k["resultOffset"] for k in c.calls] == [0, S._PAGE]
+        assert len(out) == S._PAGE + 2, slug

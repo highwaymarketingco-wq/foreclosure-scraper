@@ -54,6 +54,7 @@ from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...layer_guard import LayerHarvest
 from ...models import Listing, ListingType, PropertyKind
+from ...sensitive_fields import drop_sensitive
 from ...validation import NC_COUNTIES as _NC_COUNTY_NAMES
 
 log = structlog.get_logger()
@@ -118,6 +119,11 @@ class Registry(NamedTuple):
     # zip_code (which the geocode backfill treats as the property's location) --
     # stashed under raw['state_contamination']['owner_mailing'] for contact purposes only.
     mailing_fields: tuple[str, ...] = ()
+    # oid_field: the layer's objectIdField, used to ORDER the offset pages. Paging used
+    # to order by fields[0] (IncidentNumber on the UST layer), which is EMPTY on ~10k of
+    # its ~45k rows: a non-unique sort key lets offset pages repeat or skip rows. The
+    # object id is unique by definition. (2026-10-07 extraction audit.)
+    oid_field: str = "OBJECTID"
 
 
 DEQ = "https://services2.arcgis.com/kCu40SDxsCGcuUWO/arcgis/rest/services"
@@ -143,7 +149,15 @@ REGISTRIES: tuple[Registry, ...] = (
         fields=("IncidentNumber", "IncidentName", "Address", "CityTown",
                 "County", "ZipCode", "DateReported", "DateOccurred", "Risk",
                 "CurrStatus", "CloseOut", "LURFiled", "LUR_Resc", "LUR_State",
-                "LatDec", "LongDec", "DocsLink"),
+                "LatDec", "LongDec", "DocsLink",
+                # 2026-10-07 extraction audit: on the layer, never requested.
+                # USTNum/FacilID tie the incident to its tank facility record;
+                # Comm 'N' marks a non-commercial (typically home heating-oil)
+                # tank, i.e. a residential owner; ConfRisk is the confirmed
+                # risk class; LandUse the site use; RRA* the risk-reduction
+                # assessment (date, risk, rank, abatement); Reg the regulated flag.
+                "USTNum", "FacilID", "Comm", "ConfRisk", "LandUse", "Reg",
+                "RRADate", "RRARisk", "RRARank", "RRAAbate"),
         county_field="County", situs="Address", owner="IncidentName",
         city="CityTown", zip_="ZipCode", detail="CurrStatus",
         lat_field="LatDec", lon_field="LongDec",
@@ -178,7 +192,9 @@ REGISTRIES: tuple[Registry, ...] = (
         where=_prefix("SITECOUNTY", NC_PREFIX),
         fields=("EPAID", "SITENAME", "SITEADDR", "SITECITY", "SITECOUNTY",
                 "Land_Use_R", "Vol_Cleanu", "SOURCE", "LATITUDE", "LONGITUDE",
-                "Laserfiche"),
+                "Laserfiche",
+                # 2026-10-07 extraction audit: last-update date of the site record.
+                "Update_Dat"),
         county_field="SITECOUNTY", situs="SITEADDR", owner="SITENAME",
         city="SITECITY", detail="SOURCE",
         lat_field="LATITUDE", lon_field="LONGITUDE",
@@ -217,12 +233,23 @@ REGISTRIES: tuple[Registry, ...] = (
         fields=("Dam_Name", "Owner", "Owner_Type", "ADDR_LINE1", "ADDR_LINE2",
                 "CITY", "STATE", "ZIP", "Phone", "COUNTY", "DAM_STATUS",
                 "NID_ID", "LATITUDE", "LONGITUDE", "NOD_DATE", "DSO_DATE",
-                "DAM_HAZARD_POTENTIAL_DESCRIPTI"),
+                "DAM_HAZARD_POTENTIAL_DESCRIPTI",
+                # 2026-10-07 extraction audit: on the layer, never requested.
+                # NOD_DATE/DSO_DATE alone cannot say whether the enforcement is
+                # still open: the *_RESOLVED / *_DEADLINE pair does. The
+                # condition assessment and inspection dates are the dam's
+                # current state; the rest describe the structure.
+                "STATE_ID", "CONDITION_ASSESSMENT", "LAST_INSPECTION_DATE",
+                "NEXT_INSPECTION_DATE", "NOD_DEADLINE_DATE", "NOD_RESOLVED",
+                "NOV_RESOLVED", "DSO_DEADLINE", "DSO_RESOLVED", "EAP", "EAP_DATE",
+                "HAZARD_DATE", "YEAR_CONSTRUCTED", "DAM_TYPE", "DAM_PURPOSE",
+                "SURFACE_AREA_Ac_"),
         county_field="COUNTY",
         owner="Owner",
         lat_field="LATITUDE", lon_field="LONGITUDE", id_field="NID_ID",
         mailing_fields=("ADDR_LINE1", "ADDR_LINE2", "CITY", "STATE", "ZIP", "Phone"),
         detail="DAM_HAZARD_POTENTIAL_DESCRIPTI", process="dam_liability",
+        oid_field="ObjectId",
         source_page="https://www.deq.nc.gov/about/divisions/energy-mineral-land-resources/dam-safety",
     ),
 )
@@ -313,7 +340,9 @@ def _to_listing(a: dict, reg: Registry) -> Optional[Listing]:
     raw_extra: dict = {"registry": reg.slug}
     if mailing:
         raw_extra["owner_mailing"] = mailing
-    raw_extra.update({k: v for k, v in a.items() if v not in (None, "")})
+    # An attribute bag from a statewide layer: explicit outFields only (see
+    # REGISTRIES), and never an SSN/licence/birth-date-like column.
+    raw_extra.update({k: v for k, v in drop_sensitive(a).items() if v not in (None, "")})
 
     return Listing(
         source=f"counties_generic.state_contamination.{reg.slug}",
@@ -341,7 +370,7 @@ async def _fetch(c, reg: Registry) -> list[Listing]:
         r = await c.post(reg.url, data={
             "where": reg.where, "outFields": ",".join(reg.fields),
             "returnGeometry": "false", "resultOffset": offset,
-            "resultRecordCount": _PAGE, "orderByFields": reg.fields[0],
+            "resultRecordCount": _PAGE, "orderByFields": reg.oid_field,
             "f": "json",
         }, timeout=90.0)
         if r.status_code != 200:
