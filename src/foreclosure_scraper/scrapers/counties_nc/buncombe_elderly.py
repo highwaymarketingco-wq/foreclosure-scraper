@@ -68,7 +68,15 @@ QUERY_URL = "https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis
 _WHERE = "Exempt IN ('ELD','DIS','BLD','VET')"
 _OUT = ("pin,pinnum,owner,HouseNumber,NumberSuffix,direction,streetname,StreetType,PostDirection,"
         "Address,CityName,State,Zipcode,TotalMarketValue,TaxValue,LandUse,Class,"
-        "Acreage,Exempt,CareOf,SalePrice,DeedDate,DeedBook,DeedPage,Instrument")
+        "Acreage,Exempt,CareOf,SalePrice,DeedDate,DeedBook,DeedPage,Instrument,"
+        # 2026-10-07 extraction audit: on the layer, never requested (fill on a live
+        # 2,000-row sample): propcard, the county's own property-record-card URL (100%);
+        # Land/Building/Appraised/ImprovementValue (98-100%, ImprovementValue 32%);
+        # SubName/SubLot/SubBlock/SubSect and PlatBook/PlatPage (the recorded plat
+        # reference, 99.8%); Stamps (deed excise stamps, 36%); Reason (sale reason code);
+        # Improved; NeighborhoodCode; Township.
+        "propcard,LandValue,BuildingValue,AppraisedValue,ImprovementValue,SubName,SubLot,"
+        "SubBlock,SubSect,PlatBook,PlatPage,Stamps,Reason,Improved,NeighborhoodCode,Township")
 _PAGE = 2000
 _TAGS = {"ELD": "elderly_exemption", "DIS": "disabled_exemption",
          "BLD": "blind_exemption", "VET": "disabled_veteran_exemption"}
@@ -94,6 +102,35 @@ def _iso_date(yyyymmdd) -> str | None:
     except ValueError:
         return None
     return f"{s[:4]}-{s[4:6]}-{s[6:]}"
+
+
+def _s(v) -> str | None:
+    return str(v).strip() or None if v not in (None, "") else None
+
+
+def _card_facts(a: dict) -> dict:
+    """The property-card facts this layer carries beyond owner/situs/value (2026-10-07
+    extraction audit). Only non-empty values are returned, so no key is fabricated."""
+    url = _s(a.get("propcard"))
+    facts = {
+        "propcard": url if url and url.lower().startswith("http") else None,
+        "land_value": _f(a.get("LandValue")),
+        "building_value": _f(a.get("BuildingValue")),
+        "appraised_value": _f(a.get("AppraisedValue")),
+        "improvement_value": _f(a.get("ImprovementValue")),
+        "subdivision": _s(a.get("SubName")),
+        "sub_lot": _s(a.get("SubLot")),
+        "sub_block": _s(a.get("SubBlock")),
+        "sub_section": _s(a.get("SubSect")),
+        "plat_book": _s(a.get("PlatBook")),
+        "plat_page": _s(a.get("PlatPage")),
+        "deed_stamps": _f(a.get("Stamps")),
+        "sale_reason": _s(a.get("Reason")),
+        "improved": _s(a.get("Improved")),
+        "neighborhood": _s(a.get("NeighborhoodCode")),
+        "township": _s(a.get("Township")),
+    }
+    return {k: v for k, v in facts.items() if v is not None}
 
 
 def _f(v) -> float | None:
@@ -184,6 +221,7 @@ class BuncombeElderly(BaseScraper):
                     care_of = (a.get("CareOf") or "").strip() or None
                     if care_of:
                         raw["gis_exempt"]["care_of"] = care_of
+                    raw["gis_exempt"].update(_card_facts(a))
 
                     situs, city, zip5 = situs_city_zip(a)
                     parcel = board_parcel_id(pin, a.get("pinnum"))

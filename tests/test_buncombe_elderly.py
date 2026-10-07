@@ -100,3 +100,40 @@ def test_registered_in_the_scraper_registry():
     from foreclosure_scraper.scrapers._registry import discover
     slugs = {c.slug for c in discover()}
     assert m.BuncombeElderly.slug in slugs
+
+
+# --- 2026-10-07 extraction audit: property-card columns never requested. Values made up. ---
+
+ROW_CARD = {
+    "pin": "9600000001", "owner": "SAMPLE PAT", "Address": "1 TEST LN", "CityName": "ASHEVILLE",
+    "State": "NC", "Zipcode": "28801", "TotalMarketValue": "200000", "TaxValue": "200000",
+    "Class": "100", "Exempt": "ELD",
+    "propcard": "https://example.invalid/propcard?pin=9600000001",
+    "LandValue": "50000", "BuildingValue": "150000", "AppraisedValue": "200000",
+    "ImprovementValue": "", "SubName": "TEST ACRES", "SubLot": "12", "SubBlock": "B",
+    "SubSect": "", "PlatBook": "0099", "PlatPage": "0042", "Stamps": 300.0, "Reason": "Q",
+    "Improved": "Y", "NeighborhoodCode": "N1", "Township": "AS",
+}
+
+
+def test_card_columns_are_requested():
+    for col in ("propcard", "LandValue", "BuildingValue", "AppraisedValue", "SubName",
+                "SubLot", "PlatBook", "PlatPage", "Stamps"):
+        assert col in m._OUT.split(","), col
+
+
+def test_card_facts_land_in_gis_exempt():
+    li = _run_fetch([{"attributes": ROW_CARD}])[0]
+    g = li.raw["gis_exempt"]
+    assert g["propcard"].startswith("https://")
+    assert g["land_value"] == 50000.0 and g["building_value"] == 150000.0
+    assert g["appraised_value"] == 200000.0
+    assert (g["subdivision"], g["sub_lot"], g["sub_block"]) == ("TEST ACRES", "12", "B")
+    assert (g["plat_book"], g["plat_page"]) == ("0099", "0042")
+    assert g["deed_stamps"] == 300.0 and g["sale_reason"] == "Q" and g["improved"] == "Y"
+    assert "improvement_value" not in g and "sub_section" not in g   # empty -> absent
+
+
+def test_rows_without_card_columns_gain_no_keys():
+    li = _run_fetch([{"attributes": ROW_NO_SALE_NO_CARE_OF}])[0]
+    assert set(li.raw["gis_exempt"]) == {"code", "tag"}
