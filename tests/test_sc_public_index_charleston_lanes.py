@@ -139,3 +139,56 @@ def test_other_counties_rows_convert_exactly_as_before():
         "name": "Owner Mike", "role": "Defendant", "case_number": "2026CP4200110",
         "date_filed": "05/01/2026", "status": "Pending", "date_disposed": "",
         "court": "SC Common Pleas", "source": "publicindex.sccourts.org"}}
+
+
+# --------------------------------------------------------------------------- #
+# The Charleston pass end to end against a fake session (no network): 'other'
+# cases are counted, not emitted; dropped party rows and headers are recorded.
+# --------------------------------------------------------------------------- #
+
+class _Resp:
+    def __init__(self, text, status=200):
+        self.text, self.status_code = text, status
+
+
+class _FakeCurlSession:
+    HIDDEN = '<input type="hidden" name="__VIEWSTATE" value="x" />'
+
+    def __init__(self, *a, **k):
+        self.posts = 0
+
+    def get(self, url, **k):
+        return _Resp("<html><body>" + self.HIDDEN + "</body></html>")
+
+    def post(self, url, data=None, **k):
+        self.posts += 1
+        if url.endswith("PISearch.aspx"):
+            return _Resp(GRID.replace("<html><body>", "<html><body>" + self.HIDDEN))
+        return _Resp("<html><body>" + self.HIDDEN + "</body></html>")
+
+
+def test_charleston_pass_counts_other_and_does_not_emit_it(monkeypatch):
+    import asyncio
+
+    import curl_cffi.requests as cf
+
+    monkeypatch.setattr(cf, "Session", _FakeCurlSession)
+    monkeypatch.setattr(mod, "REQUEST_DELAY", 0)
+    monkeypatch.setattr(mod, "SEARCH_PREFIXES", ["A"])
+    rows = asyncio.run(mod._curl_search_county("charleston"))
+    assert sorted(r["lane"] for r in rows) == ["foreclosure", "judgment", "partition", "quiet_title"]
+    st = mod.LAST_CHARLESTON_STATS
+    assert st["cases"] == 5 and st["other_not_emitted"] == 1
+    assert st["lanes"] == {"foreclosure": 1, "partition": 1, "quiet_title": 1,
+                           "judgment": 1, "other": 1}
+    assert st["dropped_party_rows"] == 2  # the eviction and the minor's settlement
+    assert "subtype" in st["headers"] and "judgment #" in st["headers"]
+
+
+def test_header_variants_are_read():
+    html = GRID.replace("<th>Case Number</th>", "<th>Case #</th>").replace(
+        "<th>Subtype</th>", "<th>Case Sub-Type</th>").replace("<th>Judgment #</th>",
+                                                             "<th>Judgment Number</th>")
+    by = _by_case(mod._parse_charleston_results(html))
+    assert by["2026CP1000102"]["lane"] == "partition"
+    assert by["2026CP1000104"]["judgment_number"] == "2026JG1000001"

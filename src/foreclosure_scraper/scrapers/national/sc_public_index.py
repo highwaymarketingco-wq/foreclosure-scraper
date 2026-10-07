@@ -209,6 +209,11 @@ def _parse_search_results(html: str) -> list[dict[str, str]]:
 # --------------------------------------------------------------------------- #
 JUDGMENT_LIEN_SOURCE = "national.sc_public_index.judgment_lien"
 
+#: The last Charleston pass's counts (cases per lane, 'other' cases not emitted,
+#: party rows dropped, the grid's header labels). Logged as
+#: sc_public_index.charleston_lanes and copied onto the scraper as `lane_stats`.
+LAST_CHARLESTON_STATS: dict = {}
+
 _CHARLESTON_SKIP_RE = re.compile(
     r"minor|sealed|protection order|restraining|domestic|juvenile|adoption", re.I)
 
@@ -247,10 +252,15 @@ _VS_RES = (re.compile(r"^\s*(.*?)\s+VS\.?\s+(.*?)\s*$", re.I),
 _ROLE_TAIL_RE = re.compile(r",\s*(defendant|plaintiff)(\s*,\s*et\s*al\.?)?\s*$", re.I)
 
 
-def _parse_charleston_results(html: str) -> list[dict[str, str]]:
+def _parse_charleston_results(html: str, stats: dict | None = None) -> list[dict[str, str]]:
     """Charleston's SearchResults grid, read by column HEADER, with the case-type
     columns. Falls back to the shared positional parser when the grid or its
-    "Case Number" header is missing, so a layout change degrades to today's rows."""
+    "Case Number" header is missing, so a layout change degrades to today's rows.
+
+    `stats` (optional) collects the header labels seen and how many party rows were
+    dropped (eviction / minor / sealed). Header names below are the state grid's,
+    with common variants, until a live Charleston page confirms its own labels.
+    """
     tree = HTMLParser(html)
     grid = tree.css_first("table#ContentPlaceHolder1_SearchResults")
     headers = [th.text(strip=True).lower() for th in grid.css("th")] if grid else []
@@ -262,13 +272,20 @@ def _parse_charleston_results(html: str) -> list[dict[str, str]]:
                     return i
         return None
 
-    case_i = col("case number")
+    case_i = col("case number", "case #", "case no")
+    if stats is not None:
+        stats["headers"] = headers
     if grid is None or case_i is None:
         return _parse_search_results(html)
-    name_i, role_i = col("name", exact=True), col("party type")
-    filed_i, status_i = col("filed date"), col("case status")
-    disp_i, type_i = col("disposition date"), col("type", exact=True)
-    sub_i, judg_i, agency_i = col("subtype", "sub-type", "sub type"), col("judgment #"), col("court agency")
+    name_i = col("name", "party name", exact=True)
+    role_i = col("party type", "role")
+    filed_i = col("filed date", "date filed", "filing date")
+    status_i = col("case status", "status")
+    disp_i = col("disposition date", "disposed")
+    type_i = col("type", "case type", exact=True)
+    sub_i = col("subtype", "sub-type", "sub type")
+    judg_i = col("judgment #", "judgment number", "judgment no")
+    agency_i = col("court agency", "agency")
 
     def cell(cells, i) -> str:
         return cells[i].text(strip=True) if i is not None and i < len(cells) else ""
@@ -283,6 +300,8 @@ def _parse_charleston_results(html: str) -> list[dict[str, str]]:
             continue
         subtype, case_type = cell(cells, sub_i), cell(cells, type_i)
         if charleston_skip(subtype, case_type):
+            if stats is not None:
+                stats["dropped_party_rows"] = stats.get("dropped_party_rows", 0) + 1
             continue
         rec = {
             "name": cell(cells, name_i),
@@ -523,6 +542,7 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
     search_url = "https://jcmsweb.charlestoncounty.org/PublicIndex/PISearch.aspx"
 
     results = []
+    parse_stats: dict = {}
     try:
         session = cf.Session()
 
@@ -563,7 +583,7 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
 
                 # Header-aware Charleston parse (case-type lanes, 2026-10-07);
                 # falls back to _parse_search_results on an unknown layout.
-                page_results = _parse_charleston_results(r3.text)
+                page_results = _parse_charleston_results(r3.text, parse_stats)
                 results.extend(page_results)
                 search_hidden = _get_hidden_fields(r3.text)
                 await asyncio.sleep(REQUEST_DELAY)
@@ -575,7 +595,24 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
         return []
 
     # One record per case; the defendant's party row wins (2026-10-07).
-    return _dedupe_prefer_defendant(results)
+    cases = _dedupe_prefer_defendant(results)
+    # Charleston 'other' cases (auto, contracts, torts...) are not property
+    # suits: counted in the run stats, never emitted as leads (2026-10-07).
+    # Unlabeled cases (the grid had no Subtype column) still go out as before.
+    lanes: dict[str, int] = {}
+    for c in cases:
+        k = c.get("lane") or "unlabeled"
+        lanes[k] = lanes.get(k, 0) + 1
+    LAST_CHARLESTON_STATS.clear()
+    LAST_CHARLESTON_STATS.update({
+        "cases": len(cases), "lanes": lanes,
+        "other_not_emitted": lanes.get("other", 0),
+        "dropped_party_rows": parse_stats.get("dropped_party_rows", 0),
+        "headers": parse_stats.get("headers", []),
+    })
+    log.info("sc_public_index.charleston_lanes", **{k: v for k, v in LAST_CHARLESTON_STATS.items()
+                                                     if k != "headers"})
+    return [c for c in cases if c.get("lane") != "other"]
 
 
 class SCPublicIndexScraper(BaseScraper):
@@ -600,6 +637,7 @@ class SCPublicIndexScraper(BaseScraper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._counties = SC_COUNTIES
+        self.lane_stats: dict = {}
 
     async def fetch(self) -> list[Listing]:
         """Search Charleston (every run) plus a bounded, rotating BATCH of
@@ -640,6 +678,7 @@ class SCPublicIndexScraper(BaseScraper):
 
         if "charleston" in counties:
             charleston_results = await _curl_search_county("charleston")
+            self.lane_stats = dict(LAST_CHARLESTON_STATS)
             _salvage("charleston", charleston_results)
             log.info("sc_public_index.county_done", county="charleston",
                      cp_cases=len(charleston_results))

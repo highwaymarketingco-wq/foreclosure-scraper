@@ -19,8 +19,8 @@ built for the 45 counties it serves, and no scraper flag was changed. The
 hand-save lane ([OWNER_MANUAL_LANES.md](OWNER_MANUAL_LANES.md), Public Index
 card) is the path for those counties. Charleston's own copy of the Index has no
 barrier, and its existing reader now labels partition, quiet-title and judgment
-cases. Family Court divorce reaches all 46 counties with no barrier (sections
-below).
+cases. Family Court divorce now covers all 46 counties; the portal shows no barrier
+(sections below).
 
 ## The probe (2026-10-07, about 15:00 ET)
 
@@ -104,8 +104,13 @@ plain requests and the disclaimer click-through it already performs.
   `national.sc_public_index.judgment_lien`, listing type `distressed`, which the
   scorer names `judgment_lien` (FINANCIAL 12, the NC docketed-judgment signal).
   A transcribed judgment is a lien on the debtor's SC real property (S.C. Code
-  15-35-810). Every other lane stays `lis_pendens` under the old source, as
-  before.
+  15-35-810). Foreclosure, partition, quiet title and lis pendens stay
+  `lis_pendens` under the old source.
+- **`other` is no longer a lead** (coordinator, 2026-10-07): auto accidents,
+  contracts, torts and the rest are counted, not emitted
+  (`LAST_CHARLESTON_STATS['other_not_emitted']`, the
+  `sc_public_index.charleston_lanes` log line, the scraper's `lane_stats`).
+  Cases with no Subtype column (unknown layout) still go out as before.
 - **Dropped:** evictions (name the tenant), minors' settlements (name a minor),
   sealed, protection-order and family matters. Previously every Charleston
   Common Pleas case was kept.
@@ -118,19 +123,22 @@ plain requests and the disclaimer click-through it already performs.
   back to the old positional one and rows carry no lane.
 - **Wiring:** none. The rows pass `_in_scope` and `_active_only` as they are
   (tested; `DATELESS_OK_SOURCES` matches the judgment sub-slug by prefix).
-- **Tests:** `tests/test_sc_public_index_charleston_lanes.py` (6, made-up
-  names and case numbers).
-- **Live proof: not run yet.** It POSTs the Charleston disclaimer's Accept
-  button. Accepting terms needs the owner's own yes in a direct message, not a
-  relay through another agent. Once he says yes, or if he runs it himself:
-  `uv run python scripts/charleston_lane_proof.py` (5 requests, 2 s apart,
-  prints counts per lane only). Until it runs, the Charleston grid's column
-  headers are an assumption taken from the state grid. If they differ, the
-  fallback keeps today's rows.
-- **Not changed, worth a decision:** the `other` lane (auto accidents,
-  contracts and the rest) is still typed `lis_pendens`, as it always was for
-  Charleston. With the lane now on each row, the scorer could stop counting
-  `other` as a property suit.
+- **Tests:** `tests/test_sc_public_index_charleston_lanes.py` (8, made-up
+  names and case numbers, including a full pass against a fake session).
+- **Live proof: still not run by the agent.** It POSTs the Charleston
+  disclaimer's Accept button, and the agent's own rules require the owner's yes
+  given directly, not relayed by another agent. The owner can run it in one
+  line: `uv run python scripts/charleston_lane_proof.py` (5 requests, 2 s apart).
+  It prints the grid's real column labels and the counts per lane, including
+  `other`. Until then the header names are the state grid's, with common
+  variants (`Case #`, `Case Sub-Type`, `Judgment Number` ...). If Charleston
+  uses none of them, the parser falls back and today's rows go out unchanged.
+- **How many of today's 1,549 Charleston rows are `other`: unknown.** One board
+  pass on 2026-10-07: all 1,549 come from `national.sc_public_index`, all typed
+  `lis_pendens`, and `raw['sc_public_index']` keeps only name, role, case
+  number, dates, status, court and source: no case-type label. Counting them
+  needs a sample from the live site, behind the same disclaimer click. The
+  proof script's `by_lane` gives the share for 3 letters of the alphabet.
 
 ## Divorce is not in the Public Index
 
@@ -140,10 +148,10 @@ system, read today by `enrichment_sc_divorce.py` (party-name searches against
 the portal's JSON API, `curl_cffi` with a Chrome fingerprint). The attorney's
 clearance covers its terms (coordinator, 2026-10-07).
 
-**What it covers today: 8 counties.** All 5,105 SC divorce rows on the board
-come from it: Spartanburg, Pickens, Greenville, Cherokee, Oconee, Laurens,
-Anderson, Union. The limit is our code, not the portal: `_COUNTY_CODE` in
-`enrichment_sc_divorce.py` maps only those 8 counties to portal location codes.
+**Covered until 2026-10-07: 8 counties.** All 5,105 SC divorce rows on the
+board come from them: Spartanburg, Pickens, Greenville, Cherokee, Oconee,
+Laurens, Anderson, Union. The limit was our code, not the portal: `_COUNTY_CODE`
+in `enrichment_sc_divorce.py` mapped only those 8 counties.
 
 **The other 38 counties are reachable with no barrier.** Bounded probe,
 2026-10-07, ordinary headers, 3 s apart, no person searched: GET `/` (200, the
@@ -161,9 +169,19 @@ Kershaw 1032, Lancaster 1033, Laurens 1034, Lee 1035, Lexington 1036,
 Marion 1037, Marlboro 1038, McCormick 1039, Newberry 1040, Oconee 1041,
 Orangeburg 1042, Pickens 1043, Richland 1044, Saluda 1045, Spartanburg 1046,
 Sumter 1047, Union 1048, Williamsburg 1049, York 1050. The 8 codes in
-`_COUNTY_CODE` match this list. Extending divorce statewide means adding the
-other 38 entries there (an enricher change, not done here; per-run cap and
-pacing unchanged).
+`_COUNTY_CODE` match this list.
+
+**Now all 46 (2026-10-07).** `_COUNTY_CODE` holds the full list, looked up
+case-insensitively (`_county_code`: "Mccormick", "York County"). Per-run cap
+(400), refresh windows, 30-minute budget, 3 workers and the 12-failure abort are
+unchanged, so the newly eligible leads in 38 counties are worked through over
+several runs. Tests: `tests/test_sc_divorce_all_counties.py` (4, made-up names).
+Live proof, 2 new counties, counts only, nothing written to the board: 2 person
+owners each in Horry (1030) and Lexington (1036), one worker, 3 s before each
+lead: 4 searched, 12 category calls, 0 errors, 0 divorce cases for those 4
+owners. One common-surname query per county (category 110 - Divorce) confirms
+the codes return cases: Horry 1,505 and Lexington 1,288 matches (over the
+portal's 500 display cap). No CAPTCHA, challenge or login at any point.
 
 ## Premise check: the "disabled" scrapers are already running
 
@@ -278,3 +296,10 @@ on the Subtype or Type cell, even under `lane_override` or `keep_all_subtypes`.
 Magistrate civil rows with the generic "Summons & Complaint" sub-type (for
 example an HOA collection suit against the owner) still load. Tests:
 `tests/test_publicindex_export.py` (3 new, 2 updated).
+
+Test fixture names (2026-10-07): `tests/test_publicindex_export.py` carried
+party names and case numbers copied from a live Spartanburg export; they are
+now made up, with the test logic unchanged. Still to clean, outside this task:
+`tests/test_sc_divorce_search.py` and
+`tests/test_sc_divorce_party_role_and_middle_match.py` use real-looking owner
+names and divorce captions ("real board shapes").

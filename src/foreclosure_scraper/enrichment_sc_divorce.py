@@ -10,7 +10,7 @@ overlays the foreclosure/tax distress with a 'divorce' situation the board
 otherwise can't see, in the SAME enricher shape as the ROD + nc_divorce
 enrichers (idempotent, env-gated, HOT/stale-first, capped, fetched_at refresh).
 
-It searches each SC core-county lead's owner_name by PARTY NAME in the SC
+It searches each SC lead's owner_name (all 46 counties since 2026-10-07) by PARTY NAME in the SC
 Family Court FCCMS PublicAccess portal (https://portal.fccms.sccourts.org), a
 SEPARATE portal from the publicindex foreclosure portal. This is the
 Family-Court (Marital Dissolution / Domestic Relations) index — the only public
@@ -138,20 +138,38 @@ API = BASE + "/apiurl/api/"
 TOKEN_URL = BASE + "/Home/GetAntiForgeryToken"
 SEARCH_URL = API + "PublicPersonSearch"
 
-# 7 Upstate-SC core counties -> FCCMS LOCATION codeID (live-pulled from the
-# Validationcode LOCATION list 2026-06-30; matches config.SC_COUNTIES).
+# All 46 SC counties -> FCCMS LOCATION codeID. The first 8 (Spartanburg 1046,
+# Anderson 1008, Pickens 1043, Oconee 1041, Cherokee 1015, Union 1048, Laurens 1034,
+# Greenville 1027) were live-pulled 2026-06-30 and re-checked 2026-10-02. The other
+# 38 were added 2026-10-07 (distressed leads are statewide, owner's rule) from the
+# same Validationcode LOCATION list, re-pulled live that day: 46 entries, codeIDs
+# 1005-1050 in alphabetical order, no CAPTCHA, challenge or login on the portal.
+# Per-run cap, refresh windows, budget and worker count are unchanged.
 _COUNTY_CODE = {
-    "Spartanburg": 1046,
-    "Anderson": 1008,
-    "Pickens": 1043,
-    "Oconee": 1041,
-    "Cherokee": 1015,
-    "Union": 1048,
-    "Laurens": 1034,
-    # Greenville is geographically core but pruned from the scrape footprint;
-    # included so a stray Greenville lead still resolves a code if present.
-    "Greenville": 1027,
+    "Abbeville": 1005, "Aiken": 1006, "Allendale": 1007, "Anderson": 1008,
+    "Bamberg": 1009, "Barnwell": 1010, "Beaufort": 1011, "Berkeley": 1012,
+    "Calhoun": 1013, "Charleston": 1014, "Cherokee": 1015, "Chester": 1016,
+    "Chesterfield": 1017, "Clarendon": 1018, "Colleton": 1019, "Darlington": 1020,
+    "Dillon": 1021, "Dorchester": 1022, "Edgefield": 1023, "Fairfield": 1024,
+    "Florence": 1025, "Georgetown": 1026, "Greenville": 1027, "Greenwood": 1028,
+    "Hampton": 1029, "Horry": 1030, "Jasper": 1031, "Kershaw": 1032,
+    "Lancaster": 1033, "Laurens": 1034, "Lee": 1035, "Lexington": 1036,
+    "Marion": 1037, "Marlboro": 1038, "McCormick": 1039, "Newberry": 1040,
+    "Oconee": 1041, "Orangeburg": 1042, "Pickens": 1043, "Richland": 1044,
+    "Saluda": 1045, "Spartanburg": 1046, "Sumter": 1047, "Union": 1048,
+    "Williamsburg": 1049, "York": 1050,
 }
+_COUNTY_CODE_BY_KEY = {k.lower(): v for k, v in _COUNTY_CODE.items()}
+
+
+def _county_code(county) -> int | None:
+    """The FCCMS LOCATION codeID for a board county ("McCormick", "Mccormick",
+    "York County" all resolve), or None outside SC's 46 counties."""
+    c = (county or "").strip()
+    if c.lower().endswith(" county"):
+        c = c[:-7].strip()
+    return _COUNTY_CODE_BY_KEY.get(c.lower())
+
 
 # Divorce / marital-dissolution CASECATEGORY codeIDs (live-pulled). We search
 # each so a separate-support or "other dissolution" filing is also caught.
@@ -546,7 +564,7 @@ async def _search_one(session, headers, last: str, first: str, county_code: int)
 # ---------- Main entry -------------------------------------------------------------
 
 async def enrich_sc_divorce(listings, max_lookups: int | None = None) -> dict:
-    """For SC Upstate core-county leads with an owner_name, find Family-Court
+    """For SC leads (all 46 counties since 2026-10-07) with an owner_name, find Family-Court
     divorce / marital-dissolution cases by party name and attach raw['divorce']
     + the 'divorce' distress category.
 
@@ -566,7 +584,7 @@ async def enrich_sc_divorce(listings, max_lookups: int | None = None) -> dict:
 
     targets = [li for li in listings
                if li.state == "SC"
-               and (li.county or "").strip() in _COUNTY_CODE
+               and _county_code(li.county) is not None
                and li.owner_name
                and _stale(li, now)]
     # Never-fetched first, then stalest first — a cap-trimmed run still progresses.
@@ -622,7 +640,7 @@ async def enrich_sc_divorce(listings, max_lookups: int | None = None) -> dict:
                 last, first = _name_parts(li.owner_name)
                 if not last:
                     continue
-                county_code = _COUNTY_CODE[(li.county or "").strip()]
+                county_code = _county_code(li.county)
                 try:
                     cases = await _search_one(s, headers, last, first, county_code)
                     consec_err = 0

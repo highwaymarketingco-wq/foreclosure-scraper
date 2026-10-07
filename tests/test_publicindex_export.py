@@ -42,7 +42,7 @@ def _table(rows: str) -> str:
 MIXED_HTML = _table(
     """
     <tr class="standardRow">
-      <td title="US BANK NA VS Doe Jane, defendant"><a>2026CP4201547</a></td>
+      <td title="SAMPLE BANK NA VS Doe Jane, defendant"><a>2026CP4201547</a></td>
       <td>05/01/2026</td><td>Active</td>
       <td>Foreclosure 420</td><td>Defendant</td><td>Doe Jane</td><td></td>
     </tr>
@@ -70,7 +70,7 @@ MIXED_HTML = _table(
     </tr>
     <!-- duplicate of the first foreclosure case number (second party row) -->
     <tr class="altRow">
-      <td title="US BANK NA VS Doe John, defendant, et al"><a>2026CP4201547</a></td>
+      <td title="SAMPLE BANK NA VS Doe John, defendant, et al"><a>2026CP4201547</a></td>
       <td>05/01/2026</td><td>Active</td>
       <td>Foreclosure 420</td><td>Defendant</td><td>Doe John</td><td></td>
     </tr>
@@ -176,7 +176,7 @@ def test_subtype_stashed_in_raw():
 def test_plaintiff_defendant_from_title_attr():
     by_case = {li.case_number: li for li in parse_publicindex_html(MIXED_HTML)}
     li = by_case["2026-CP-42-01547"]
-    assert li.plaintiff == "US BANK NA"
+    assert li.plaintiff == "SAMPLE BANK NA"
     # trailing ", defendant" role tag stripped
     assert li.defendant == "Doe Jane"
 
@@ -235,7 +235,7 @@ def test_source_and_state_stamped():
 
 
 # --------------------------------------------------------------------------- #
-# Real-world formats (from live Spartanburg exports 2026-07-01): LP lis-pendens
+# Real-world formats (shapes from live Spartanburg exports 2026-07-01; names and case numbers made up): LP lis-pendens
 # numbers, 8-digit CV magistrate numbers, the generic "Summons & Complaint"
 # magistrate subtype, and the real 10-column grid incl. Court Agency.
 # --------------------------------------------------------------------------- #
@@ -249,14 +249,14 @@ _REAL_HTML = """
     <th>Judgment #</th><th>Court Agency</th>
   </tr>
   <tr class="standardRow">
-    <td>1095 Simuel Road, Llc</td><td>Defendant</td>
-    <td title="HRH ENGINEERING VS 1095 Simuel Road, Llc"><a>2026LP4200339</a></td>
+    <td>100 Sample Lane, Llc</td><td>Defendant</td>
+    <td title="SAMPLE ENGINEERING VS 100 Sample Lane, Llc"><a>2026LP4200901</a></td>
     <td>05/12/2026</td><td>Pending</td><td></td><td>Lis Pendens</td><td>Lis Pendens</td>
     <td></td><td>Common Pleas</td>
   </tr>
   <tr class="altRow">
-    <td>Anderson, Lorinna D</td><td>Defendant</td>
-    <td title="VILLAGE AT ANDERSON MILL HOA V Anderson, Lorinna D"><a>2026CV4210105780</a></td>
+    <td>Member, Mona Q</td><td>Defendant</td>
+    <td title="SAMPLE VILLAGE HOA V Member, Mona Q"><a>2026CV4210000901</a></td>
     <td>06/24/2026</td><td>Pending</td><td></td><td>Civil</td><td>Summons &amp; Complaint</td>
     <td></td><td>Spartanburg Magistrate</td>
   </tr>
@@ -271,12 +271,12 @@ def test_real_lis_pendens_and_magistrate_formats():
         for li in parse_publicindex_html(_REAL_HTML, default_county="Spartanburg")
     }
     # "Lis Pendens" subtype now maps to the lane (previously fell to UNKNOWN).
-    lp = by_case["2026-LP-42-00339"]
+    lp = by_case["2026-LP-42-00901"]
     assert lp.listing_type == ListingType.LIS_PENDENS
     assert lp.county == "Spartanburg"
     # 8-digit magistrate CV number is accepted (regex used to cap at 7) and the
     # generic "Summons & Complaint" subtype is caught via the Magistrate agency.
-    cv = by_case["2026-CV-42-10105780"]
+    cv = by_case["2026-CV-42-10000901"]
     assert cv.listing_type == ListingType.LIS_PENDENS
     assert cv.county == "Spartanburg"
     assert cv.raw["sc_public_index"]["subtype"] == "Summons & Complaint"
