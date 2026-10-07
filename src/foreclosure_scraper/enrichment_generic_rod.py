@@ -72,6 +72,12 @@ ROD_CONFIG = {
     ("NC", "Davidson"):      ("nc_ors", "FORECLOSURE_NC_ORS_ROD", "0"),
     ("NC", "Forsyth"):       ("nc_ors", "FORECLOSURE_NC_ORS_ROD", "0"),
     ("NC", "Guilford"):      ("nc_ors", "FORECLOSURE_NC_ORS_ROD", "0"),
+    # Courthouse Computer Systems classic search on a county-run server (rod/nc_cchs_classic.py).
+    # The vendor-hosted us3/us4/us5 tenants answer an ordinary browser with a Cloudflare challenge
+    # and are left to a person.
+    ("NC", "Orange"):        ("nc_cchs_classic", "FORECLOSURE_NC_CCHS_CLASSIC_ROD", "0"),
+    ("NC", "Stanly"):        ("nc_cchs_classic", "FORECLOSURE_NC_CCHS_CLASSIC_ROD", "0"),
+    ("NC", "Surry"):         ("nc_cchs_classic", "FORECLOSURE_NC_CCHS_CLASSIC_ROD", "0"),
 }
 
 #: chain()-only registrations: counties whose lien existence another enricher already writes
