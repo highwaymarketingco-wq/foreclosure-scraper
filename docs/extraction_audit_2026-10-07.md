@@ -66,8 +66,8 @@ not carry (before this pass) | RAW_KEEP drop | status.
 | counties_sc.sc_probate_notices | 909 | WordPress JSON + articles | NO for one paper (cap applied before de-dupe; 20 posts unread), another fetches 120 of 557-718 hits | estate attorney name/address, post date | none | remaining |
 | counties_sc.terry_howe_auctions | 351 | WordPress API + detail pages | 527 posts < 600 cap; detail only for newest 30 | none parsed beyond | whole `terry_howe_auction` block | FIXED (RAW_KEEP) |
 | counties_sc.greenville_mie_adverts | 324 | sitemap + advert pages | NO: 773 sitemap URLs vs a 400 cap | plaintiff attorney/firm contact, judgment PDF link, deposit %, bid-stays-open, mortgage book/page | none | remaining |
-| law_firms.kania (+ national.nc_upset_bids) | 177 (+29) | table behind a disclosure popup (checkbox + Submit); scrapers call the data endpoint directly | n/a | all 11 columns captured | none | COMPLIANCE QUESTION (see 4) |
-| law_firms.zacchaeus | 43 | browser clicks "I AGREE" | n/a | Notice of Sale button | none | COMPLIANCE QUESTION (see 4) |
+| law_firms.kania (+ national.nc_upset_bids) | 177 (+29) | table behind a disclosure popup (checkbox + Submit); scrapers call the data endpoint directly | n/a | all 11 columns captured | none | complete; disclosure popup is a click-through with no credentials: ALLOWED (owner decision 2026-10-07) |
+| law_firms.zacchaeus | 43 | browser clicks "I AGREE" | n/a | Notice of Sale button | none | 'I AGREE' click-through with no credentials: ALLOWED (owner decision 2026-10-07) |
 | law_firms.shapiro_ingle_powerbi, brock_scott, hutchens | 77 / 45 / 43 | Power BI / paged table / grid | yes | firm file number and SC deficiency only in description | none | complete |
 | counties_sc.anderson_master_in_equity / pickens_master_in_equity | 28 / 20 | PDFs | only newest list; a results PDF and a deficiency-sale PDF not matched | hammer prices; real sale date/time | none | remaining |
 | counties_nc.henderson_foreclosure_parcels | 14 | ArcGIS roster | yes | | whole `tax_foreclosure` block | FIXED (RAW_KEEP) |
@@ -107,13 +107,13 @@ updated where they pinned an exact shape that grew. The touched files run 433 pa
 
 | source | what is still dropped | why not fixed in this pass |
 |---|---|---|
-| counties_sc.qpaybill_delinquent_roll | detail page for ~19k rows; 4 unparsed detail labels; per-year amounts; prefix enumeration limits | needs a run decision: a detail pass for every row is ~19k requests (8+ hours at 1.6 s); parsing 4 labels only helps the 42% already detailed |
-| counties_nc.lincoln_vacant | parcel_id is the short PARCELID (nulled), PIN unused as identity | `board_persist` restores this source's prior identity from PARCELID and refuses two ids from one source: switching to PIN would duplicate every row on the next merge. Needs a coordinated identity migration (`_SOURCE_PARCEL_FIELDS` + the merge) |
+| counties_sc.qpaybill_delinquent_roll | FIXED (follow-up 6): staged detail pass; 4 unparsed detail labels and per-year amounts remain; 4 unparsed detail labels; per-year amounts; prefix enumeration limits | needs a run decision: a detail pass for every row is ~19k requests (8+ hours at 1.6 s); parsing 4 labels only helps the 42% already detailed |
+| counties_nc.lincoln_vacant | FIXED (follow-up 7): PIN is parcel_id, with the alias merge | `board_persist` restores this source's prior identity from PARCELID and refuses two ids from one source: switching to PIN would duplicate every row on the next merge. Needs a coordinated identity migration (`_SOURCE_PARCEL_FIELDS` + the merge) |
 | counties_nc.nc_heir_estate_parcels | ~9.6k matching parcels never fetched (cap 80/county); NULL-unsafe `NOT LIKE`; value/acreage/centroid/sale/deed/link columns unmapped | the cap is the source's existing cap (rule: keep caps); the mapping needs per-county field names for 19 layers; a null-safe SQL where drew a 403 from one county host, so the filter must move into Python |
 | nc_ecourts lis pendens / divorce | "Multiple" cause rows (~14% of hits) dropped; page cap headroom 11% | the cause is unknown without the case page (Smart Search is CAPTCHA-walled); admitting them blindly adds non-foreclosure cases. Raising MAX_PAGES is a cap change |
-| counties_nc.nc_county_pdf_delinquent_tax | wrong owner on ~1,716 McDowell rows; 42 Catawba bills; 16 unparsed lines | correctness fix to the PDF parser, next pass |
+| counties_nc.nc_county_pdf_delinquent_tax | McDowell owner and spaced parcels FIXED (follow-up 3); 42 Catawba bills (first-wins de-dupe) remain | correctness fix to the PDF parser, next pass |
 | counties_nc.albemarle_observer_tax_lists | one county's 2026 list (~1,820 rows) | needs a new dot-leader text parser |
-| counties.column_legal_notices | text past 800 chars; personal-representative address/attorney; Guilford window cut at 250 | the PR's address is a private individual's address, a new category for the public dashboard: owner decision; paging needs a query split |
+| counties.column_legal_notices | full text and PR mailing FIXED (follow-up 4); attorney block parsing and the 250-row window cut (one county) remain | the PR's address is a private individual's address, a new category for the public dashboard: owner decision; paging needs a query split |
 | counties_sc.greenville_mie_adverts | 373 oldest sitemap URLs; attorney contact, judgment PDF, deposit, mortgage book/page | cap is the source's existing cap; parsing is next pass |
 | counties_sc.sc_ust_registry | detail page (tanks, releases, inspection) | detail carries owner/operator phones (module policy: never stored) and is ~18.4k requests; a capped subset (estate-owned rows) is possible |
 | counties_sc.berkeley_paystar_tax | invoices not grouped by parcel (years) | structural change to one row per parcel, next pass |
@@ -123,7 +123,7 @@ updated where they pinned an exact shape that grew. The touched files run 433 pa
 | epa_frs.sems / acres | 83 rows dropped on county name variants; coordinates, NPL status | next pass; per-facility detail host rate-limits (429) |
 | counties_sc.charleston_delinquent_tax | re-emits last year's list; parser reads ~834 of ~2,416 RP rows | the current list is the xlsx lane (complete); retire or date-gate this lane: owner call |
 | counties_sc.sc_dew_lien_registry | 8,288 stale rows without the registry block | disabled by design (cross-reference only); purge/refresh is a board action |
-| counties_nc.rutherford_tax | 2,622 six-digit parcel ids nulled; file 8 months old | identity change (same risk as Lincoln) |
+| counties_nc.rutherford_tax | ids FIXED (follow-up 7: PIN); the county file is still dated 1/31/2026 | identity change (same risk as Lincoln) |
 | state_contamination | open/closed incident fields can mix when two incidents share an address and merge | dedupe-merge behavior, outside the scraper |
 | city_websites.charlotte_open_data | closed cases stay on the board | retirement logic, not extraction |
 | counties_sc.florence_delinquent_tax, sc_public_notices | owner_name not first-class | small, next pass |
@@ -131,15 +131,38 @@ updated where they pinned an exact shape that grew. The touched files run 433 pa
 | WALLED, not touched | liensnc (login, terms), sc_public_index x2 (F5 + terms), rutherford_wildfire_tax (CloudFront 403 today), spartanburg_delinquent_tax PDF (Cloudflare today), ncnotices Details.aspx and SC notice details (reCAPTCHA), crexi (Cloudflare), Georgetown Catalis (CDN 403) | walls |
 | not individually audited | the rest of `docs/SOURCE_EXTRACTION_AUDIT.md`'s TODO table | below the top-30 volume line; covered by the 2026-10-03/04 batch audit |
 
-## 4. Decisions for the owner
+## 4. Owner decisions (2026-10-07) and the follow-up fixes
 
-1. Kania (`law_firms.kania`, ~177 rows, and most of `national.nc_upset_bids`): the listings page
-   opens a disclosure popup (checkbox + Submit) in front of the table; both scrapers read the
-   site's data endpoint directly. Zacchaeus (`law_firms.zacchaeus`, 43 rows) clicks "I AGREE" in a
-   browser, and its code says aldridge_pite uses the same consent pattern. Under the 2026-09-20
-   rule a click-through is a wall. Not disabled here (instruction); flagged for the wall audit.
-2. Pickens: the 2025 posting layers are still marked current beside the new 2026 layer, so
-   `pre_sale` is true for parcels on either cycle. Say when the 2025 cycle should stop counting.
-3. qpaybill detail pass for every row (~19k polite requests) or keep it opt-in.
-4. Lincoln (and Rutherford) parcel identity: approve a coordinated PIN migration.
-5. Column notices: whether a personal representative's mailing address may be published.
+1. Kania (`law_firms.kania`, `national.nc_upset_bids`) and Zacchaeus (`law_firms.zacchaeus`): a
+   disclosure popup or an "I AGREE" click with no credentials is a CLICK-THROUGH, allowed, not a
+   wall. Both stay enabled; nothing changed.
+2. Pickens: the 2026 list is current. Commit ad56ce7e: the 2025 posting layers are the prior
+   cycle; a parcel on the 2025 list and absent from the 2026 list carries
+   `raw['pickens_prior_cycle_only']=True` and earns no tax credit (distress_score
+   `tax_prior_cycle_only`, same treatment as the not-yet-late rule), kept as context. Live run:
+   2,560 rows, pre_sale 1,032 -> 777, 255 prior-cycle-only rows (0 with a tax credit), 150 rows
+   on both lists (all keep their credit). Caveat: the 2026 layer is publication week 1; later
+   weeks must be added as current layers.
+3. McDowell wrong owner. Commit 9b875d6d: the owner is the line BEFORE its parcel line. Live PDF:
+   rows 2,264 -> 2,283 (18 spaced parcels read), rows whose owner is the name printed with their
+   parcel 547 -> 2,278.
+4. Column legal notices. Commit 719cef5d: full text kept to 8,000 characters
+   (`raw.column.text`, `text_len`, `text_truncated`; the phone payload carries no column block);
+   the personal representative's printed mailing address is captured
+   (`raw.probate.pr_mailing`, or `pr_mailing_care_of` via counsel), never as the property address.
+   Live sample of 84 estate notices: characters kept 65,540 -> 98,912; pr_mailing 0 -> 35.
+5. Heir/estate parcels. Commit b287eb79: per-county cap 80 -> 400 (HEIR_ESTATE_PER_COUNTY_CAP),
+   highest-value parcels first (the layer's numeric total-value column, DESC, offset paging),
+   cap and counts in `run_stats` and a job_events note, value and rank on each row, NULL-safe
+   exclusions. Live (3 counties): leads 234 -> 1,077; rows with a value 0 -> 692.
+6. qPayBill detail pages. Commit e95dd10e: ON by default, staged, at most 2,000 parcels per run
+   (QPAYBILL_ROLL_DETAIL_MAX), HOT then WARM then COLD, largest balance first, skipping parcels
+   already detailed on the board, one request at a time per county host 1.6 s apart. Board today:
+   18,579 parcels without detail (3,687 WARM, 14,892 COLD, 0 HOT): about 10 runs to finish.
+   Live proof (one county, cap 8): 8 of 8 parsed, 22.4 detail fields per row.
+7. Lincoln and Rutherford identity. Commit 38748f73: both publish the 10-digit PIN;
+   `parcel_alias.py` maps the old short ids to it in `dedupe()` and `merge_prior_board()` and
+   records every aliased prior row's old key as folded. Replay on the 21,177 real published rows
+   of both sources: rows with a parcel after validation Rutherford 6,709 -> 9,310 of 9,328,
+   Lincoln 0 -> 3,000 of 3,000 (first 3 pages); duplicate parcel keys unchanged (13,
+   pre-existing); snapshot rows the GRANDFATHER step would restore 433 -> 12.
