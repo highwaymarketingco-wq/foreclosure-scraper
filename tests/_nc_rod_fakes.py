@@ -126,6 +126,12 @@ class FakePWPage:
     def content(self) -> str:
         return self.html
 
+    def evaluate(self, js, arg=None):
+        """RenderPage.input_beside: the scripted label -> input id map (`beside`), when the label is
+        on the page."""
+        beside = getattr(self, "beside", {})
+        return beside.get(arg) if arg in beside and arg in self.html else None
+
     def query_selector(self, sel: str):
         if sel in self.present:
             return object() if self.present[sel] in self.html else None
@@ -140,6 +146,10 @@ class FakePWPage:
         if ":not([disabled])" in sel and re.search(r"\sdisabled[\s>=/]", tag.group(0)):
             return None
         return object()
+
+    def fill(self, sel, text):
+        self.log.append(("fill", sel))
+        self.typed[sel] = text
 
     def wait_for_selector(self, sel, timeout=None):
         if self.query_selector(sel) is None:

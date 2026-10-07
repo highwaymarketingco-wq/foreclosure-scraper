@@ -88,6 +88,34 @@ class RenderPage:
         """A click that only changes the page (a radio button, a tab): no server request."""
         self.page.click(selector)
 
+    _BESIDE_JS = """(label) => {
+      const spans = [...document.querySelectorAll('span, label')].filter(s => s.offsetParent !== null
+        && s.children.length === 0 && (s.innerText || '').trim().startsWith(label));
+      if (!spans.length) return null;
+      const lr = spans[0].getBoundingClientRect(); const cy = lr.y + lr.height / 2;
+      let best = null, bd = 1e9;
+      for (const i of document.querySelectorAll('input[type=text]')) {
+        if (i.offsetParent === null || !i.id) continue;
+        const r = i.getBoundingClientRect(); const d = Math.abs(r.y + r.height / 2 - cy);
+        if (r.x > lr.x + lr.width - 5 && d < 12 && d < bd) { best = i.id; bd = d; }
+      }
+      return best; }"""
+
+    def input_beside(self, label: str) -> Optional[str]:
+        """'#id' of the visible text box on the same row as, and right of, the visible label that
+        starts with `label` (for apps whose inputs carry generated ids and no <label for=>)."""
+        iid = self.page.evaluate(self._BESIDE_JS, label)
+        return f"#{iid}" if iid else None
+
+    def fill(self, selector: str, text: str) -> None:
+        """Set a box's value in one step (for masked inputs that garble typed keys), then the
+        caller presses Tab so the page commits it."""
+        self.page.fill(selector, text)
+
+    def press(self, key: str) -> None:
+        """A key press on the focused control (e.g. Tab, so a script-drawn box commits its value)."""
+        self.page.keyboard.press(key)
+
     def has(self, selector: str) -> bool:
         return self.page.query_selector(selector) is not None
 

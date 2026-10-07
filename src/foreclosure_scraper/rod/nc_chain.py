@@ -75,6 +75,8 @@ def classify_kind(label: Optional[str], category: Optional[str] = None) -> str:
     foreclosure_notice | other, from the index's own type label (full words or a vendor short code) and, when the county
     publishes one, the code's category."""
     s = re.sub(r"\s+", " ", (label or "").upper().replace("’", "'")).strip()
+    if " " not in s and len(s) <= 8:
+        s = re.sub(r"(?<=\w)-(?=\w)", "/", s)   # a short vendor code: Logan Remote Access writes D-T, P-A
     cat = (category or "").upper().strip()
     if s and classify_instrument(s) in LOSS_CLASSES:
         return DEED                     # a trustee's / commissioner's / sheriff's / tax deed conveys

@@ -157,6 +157,19 @@ RENDER_ROD_CONFIG = {
     ("NC", "Chatham"):       ("nc_logan_blazor", "FORECLOSURE_NC_LOGAN_BLAZOR_ROD", "0"),
     ("NC", "Sampson"):       ("nc_logan_blazor", "FORECLOSURE_NC_LOGAN_BLAZOR_ROD", "0"),
     ("NC", "Wilkes"):        ("nc_logan_blazor", "FORECLOSURE_NC_LOGAN_BLAZOR_ROD", "0"),
+    # Logan 'Remote Access' (Visual WebGui search, rod/nc_logan_remote.py); proven live: Davie,
+    # Yadkin, Vance
+    ("NC", "Davie"):         ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
+    ("NC", "Yadkin"):        ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
+    ("NC", "Vance"):         ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
+    ("NC", "Martin"):        ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
+    ("NC", "Cherokee"):      ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
+    ("NC", "Anson"):         ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
+    ("NC", "Bladen"):        ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
+    ("NC", "Ashe"):          ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
+    ("NC", "Northampton"):   ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
+    ("NC", "Warren"):        ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
+    ("NC", "Swain"):         ("nc_logan_remote", "FORECLOSURE_NC_LOGAN_REMOTE_ROD", "0"),
 }
 
 

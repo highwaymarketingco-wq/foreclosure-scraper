@@ -23,6 +23,8 @@ from tests._nc_rod_fakes import CAPTCHA_PAGE, CLOUDFLARE_403, FakeResp, install
     ("LIS PENDENS", None, LIS_PENDENS), ("LIS/P", None, LIS_PENDENS), ("LP", "OTHER", LIS_PENDENS),
     ("FORCL", None, FORECLOSURE), ("NOTICE OF FORECLOSURE SALE", None, FORECLOSURE),
     ("ASSGN", None, ASSIGNMENT), ("ASSIGNMENT", None, ASSIGNMENT),
+    ("D-T", None, DEED_OF_TRUST), ("LIS-P", None, LIS_PENDENS), ("D-REL", None, SATISFACTION), ("S-T", None, SUBSTITUTION),
+    ("TR-D", None, DEED), ("P-A", None, OTHER_KIND),
     ("MODIFICATION OF DEED OF TRUST", None, OTHER_KIND), ("P A", None, OTHER_KIND), ("EASEMENT", None, OTHER_KIND),
 ])
 def test_classify_kind(label, category, kind):
