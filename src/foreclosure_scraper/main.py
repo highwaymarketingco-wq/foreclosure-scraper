@@ -3005,6 +3005,17 @@ async def run() -> int:
         if _rs and "skipped" not in _rs:
             enrichment_stats[_rod_name] = _rs
 
+    # Register-of-deeds counties whose search only runs in a browser (Harris: Mecklenburg, Carteret;
+    # Logan Blazor and Remote Access: Catawba, Cumberland, Union, Vance, Davie, Yadkin ...). Capped per
+    # platform per run and by FORECLOSURE_NC_ROD_RENDER_BUDGET_S; every platform OFF until its env flag is 1.
+    try:
+        from .enrichment_nc_rod_render import enrich_nc_rod_render
+        _render_budget_s = float(os.environ.get("FORECLOSURE_NC_ROD_RENDER_BUDGET_S", "3600")) + 120
+        s = await _await_capped(enrich_nc_rod_render(enriched), "nc_rod_render", default_s=_render_budget_s)
+        if s and "skipped" not in s: enrichment_stats["nc_rod_render"] = s
+    except Exception:
+        log.error("nc_rod_render.failed", traceback=traceback.format_exc())
+
     # Deed chain per lead (last deed + up to 3 prior instruments, liens, substitutions of trustee) for the
     # counties whose register adapters expose chain(): the attorney's title-check input. Runs on its own
     # (one lookup at a time per county, capped); OFF unless FORECLOSURE_ROD_CHAIN=1.

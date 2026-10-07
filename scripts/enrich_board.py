@@ -859,6 +859,18 @@ async def main():
     except ImportError:
         print("  [generic_rod] SKIP - module not found")
 
+    # 3aq-ter. Browser-rendered NC registers (Harris, Logan Blazor / Remote Access) and the deed chain.
+    try:
+        from foreclosure_scraper.enrichment_nc_rod_render import enrich_nc_rod_render
+        await _run_async("nc_rod_render", enrich_nc_rod_render, 3720)
+    except ImportError:
+        print("  [nc_rod_render] SKIP - module not found")
+    try:
+        from foreclosure_scraper.enrichment_rod_chain import enrich_rod_chain
+        await _run_async("rod_chain", enrich_rod_chain, 1800)
+    except ImportError:
+        print("  [rod_chain] SKIP - module not found")
+
     # 3ar. Bankruptcy property (free PACER search)
     try:
         from foreclosure_scraper.enrichment_bankruptcy_property import enrich_bankruptcy_property
