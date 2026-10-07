@@ -256,3 +256,52 @@ def test_prior_tax_years_returns_none_on_request_failure():
             raise RuntimeError("boom")
 
     assert asyncio.run(_prior_tax_years(_RaisingClient())) is None
+
+
+# --- 2026-10-07 extraction audit: assetMetaJson keys the detail call already returns.
+# Names and values below are made up. ---
+
+def _detail_with(meta_extra: dict) -> dict:
+    d = dict(_REAL_DETAIL)
+    d["invoiceeName"] = d["assetOwner"] = "SAMPLE PAT"
+    base = json.loads(_REAL_DETAIL["assetMetaJson"])
+    base.update({"BillName": "SAMPLE PAT", **meta_extra})
+    d["assetMetaJson"] = json.dumps(base)
+    return d
+
+
+def test_bill_breakdown_homestead_and_districts_are_captured():
+    li = _detail_to_listing(_detail_with({
+        "TaxesDue": "300.00", "TaxPenalties": "45.00", "DLQPenalties": "30.00",
+        "TaxTotal": "375.00", "BillTotal": "390.00", "TaxesDuePenalty1": "309.00",
+        "Penalty1Date": "2026-01-15", "HomesteadExemption": "50000",
+        "HomesteadPercentage": "100", "HomesteadApplicationYear": "2019",
+        "DelinquentCode": "D", "TaxDistrict": "01", "FireDistrict": "F2",
+        "AccountNum": "A-1", "ReceiptNumber": "R-1", "TotalBuildingCount": "1",
+        "OTBuildingValue": "", "AgLandValue": "0"}), "h")
+    b = li.raw["berkeley_paystar_tax"]
+    assert b["taxes_due"] == 300.0 and b["tax_penalties"] == 45.0 and b["dlq_penalties"] == 30.0
+    assert b["tax_total"] == 375.0 and b["bill_total"] == 390.0
+    assert b["taxes_due_penalty1"] == 309.0 and b["penalty1_date"] == "2026-01-15"
+    assert b["homestead_exemption"] == 50000.0 and b["homestead_application_year"] == "2019"
+    assert b["delinquent_code"] == "D" and b["tax_district"] == "01"
+    assert b["account_number"] == "A-1" and b["receipt_number"] == "R-1"
+    assert b["building_count"] == 1.0
+    assert "ot_building_value" not in b and "ag_land_value" not in b   # blank / 0 -> absent
+
+
+def test_appraised_value_sums_every_assessment_class():
+    """QR alone left a non-owner-occupied (OT) parcel with no appraised value."""
+    ot = _detail_with({"QRLandValue": "", "QRBuildingValue": "",
+                       "OTLandValue": "20000", "OTBuildingValue": "60000"})
+    b = _detail_to_listing(ot, "h").raw["berkeley_paystar_tax"]
+    assert b["appraised_value"] == 80000.0
+    assert b["ot_land_value"] == 20000.0 and b["ot_building_value"] == 60000.0
+    qr = _detail_to_listing(_REAL_DETAIL, "h").raw["berkeley_paystar_tax"]
+    assert qr["appraised_value"] == 27500.0                 # QR-only: unchanged
+
+
+def test_all_zero_text_codes_are_blank_not_values():
+    b = _detail_to_listing(_detail_with({"Sub": "000", "Block": "0", "Lot": "12"}), "h"
+                           ).raw["berkeley_paystar_tax"]
+    assert "subdivision" not in b and "block" not in b and b["lot"] == "12"

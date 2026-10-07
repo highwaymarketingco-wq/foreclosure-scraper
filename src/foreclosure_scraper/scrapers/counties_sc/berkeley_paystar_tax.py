@@ -90,6 +90,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import datetime
 from typing import Any, Iterable
 
@@ -281,6 +282,55 @@ def _full_addr(line1: str | None, city: str | None, state: str | None, zip_: str
     return " ".join(bits) or None
 
 
+#: assetMetaJson keys the detail call already returns and this scraper used to drop
+#: (2026-10-07 extraction audit, live-checked on two real invoices): the bill's own
+#: breakdown (taxes, penalties, staged penalty amounts and their dates, totals),
+#: the homestead exemption (age 65+/disabled relief: an elderly signal), per-class
+#: land/building values, and the district/account/receipt identifiers.
+_BILL_MONEY = {
+    "taxes_due": "TaxesDue", "tax_penalties": "TaxPenalties", "dlq_penalties": "DLQPenalties",
+    "tax_total": "TaxTotal", "bill_total": "BillTotal",
+    "taxes_due_penalty1": "TaxesDuePenalty1", "taxes_due_penalty2": "TaxesDuePenalty2",
+    "taxes_due_penalty3": "TaxesDuePenalty3",
+    "homestead_exemption": "HomesteadExemption", "homestead_percentage": "HomesteadPercentage",
+    "qr_land_value": "QRLandValue", "qr_building_value": "QRBuildingValue",
+    "ot_land_value": "OTLandValue", "ot_building_value": "OTBuildingValue",
+    "ag_land_value": "AgLandValue", "ag_building_value": "AgBuildingValue",
+    "building_count": "TotalBuildingCount", "lot_count": "LotCount",
+}
+_BILL_TEXT = {
+    "penalty1_date": "Penalty1Date", "penalty2_date": "Penalty2Date", "penalty3_date": "Penalty3Date",
+    "homestead_application_year": "HomesteadApplicationYear", "delinquent_code": "DelinquentCode",
+    "dlq_penalty_code": "DLQPenaltyCode", "exempt_code": "ExemptCode",
+    "tax_district": "TaxDistrict", "fire_district": "FireDistrict", "jurisdiction": "Jurisdiction",
+    "account_number": "AccountNum", "receipt_number": "ReceiptNumber",
+    "rollback_code": "RollbackCode", "rollback_description": "RollbackDesc",
+    "legal": "Legal1", "subdivision": "Sub", "block": "Block", "lot": "Lot",
+}
+
+
+def _class_total(meta: dict, kind: str) -> float | None:
+    """Land + building across the QR/OT/AG classes ('Value' or 'Assessment')."""
+    tot = 0.0
+    for cls in ("QR", "OT", "Ag"):
+        for part in ("Land", "Building"):
+            tot += _num(meta.get(f"{cls}{part}{kind}")) or 0.0
+    return round(tot, 2) or None
+
+
+def _bill_detail(meta: dict) -> dict:
+    out: dict[str, Any] = {}
+    for k, src in _BILL_MONEY.items():
+        v = _num(meta.get(src))
+        if v:                                   # 0 / blank is "none", not a value
+            out[k] = v
+    for k, src in _BILL_TEXT.items():
+        v = str(meta.get(src) or "").strip()
+        if v and not re.fullmatch(r"0+(\.0+)?", v):     # '000' is this roll's blank
+            out[k] = v
+    return out
+
+
 def _num(v) -> float | None:
     try:
         f = float(str(v).replace(",", ""))
@@ -330,10 +380,15 @@ def _detail_to_listing(detail: dict, invoice_hash: str) -> Listing | None:
             "deed_page": meta.get("DeedPage") or None,
             "parent_tms": meta.get("ParentTMS") or None,
             "acres": _num(meta.get("AcresCount")),
-            "appraised_value": (_num(meta.get("QRLandValue")) or 0) + (_num(meta.get("QRBuildingValue")) or 0) or None,
+            # All three assessment classes (2026-10-07 extraction audit): QR = owner-
+            # occupied 4%, OT = other 6%, AG = agricultural. Summing QR alone left this
+            # None on every non-owner-occupied parcel (on ~84% of board rows); a QR-only
+            # parcel's value is unchanged.
+            "appraised_value": _class_total(meta, "Value"),
             "assessed_value": _num(meta.get("TotalAssessment")),
             "millage": _num(meta.get("Millage")),
             "residential_assessment_exemption": meta.get("ResidentialAssessmentExemption") or None,
+            **_bill_detail(meta),
         }
     }
     if mailing:
