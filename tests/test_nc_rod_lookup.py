@@ -208,3 +208,27 @@ def test_registry_entries_are_off_by_default():
     from foreclosure_scraper import enrichment_generic_rod as g
     for county in lk.COUNTIES:
         assert g.ROD_CONFIG[("NC", county)] == ("nc_lookup", lk.ENV_FLAG, "0")
+
+
+def test_concurrent_lookups_never_interleave_their_steps(fake):
+    """enrich_generic_rod runs several lookups per county at once; the pick list and the ticked
+    names live in the server session, so one lookup's steps must finish before the next starts."""
+    import time
+
+    site = Site()
+    fast_ajax = site.ajax
+    site.ajax = lambda *a: (time.sleep(0.02), fast_ajax(*a))[1]    # give the threads room to interleave
+    sess = fake(site.routes())
+
+    async def both():
+        return await asyncio.gather(lk.search_by_name("NC", "Avery", "TESTER ALVIN Q"),
+                                    lk.search_by_name("NC", "Avery", "SAMPLE CORA B"))
+
+    tester, sample = asyncio.run(both())
+    assert [d.book for d in tester] == ["700", "640", "610", "500"]
+    assert [d.book for d in sample] == ["350"]
+    steps = [c for c in sess.calls if "index.php" not in c[1]]
+    assert len(steps) == 8
+    for block in (steps[:4], steps[4:]):                       # pick, store, check, list: contiguous
+        assert block[0][2]["show_pick_list"] == "1"
+        assert [c[0] for c in block] == ["GET", "POST", "POST", "GET"]

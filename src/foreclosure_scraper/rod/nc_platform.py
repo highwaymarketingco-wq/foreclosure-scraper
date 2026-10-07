@@ -9,6 +9,7 @@ hooks (_open, _search), and exposes module-level search_by_name / chain bound to
 from __future__ import annotations
 
 import asyncio
+import threading
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -44,6 +45,15 @@ class NcRodPlatform:
     def __init__(self) -> None:
         self._held: dict[str, _Held] = {}
         self._cache: dict[tuple, SearchResult] = {}
+        self._locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
+
+    def _county_lock(self, name: str) -> threading.Lock:
+        with self._locks_guard:
+            lk = self._locks.get(name)
+            if lk is None:
+                lk = self._locks[name] = threading.Lock()
+            return lk
 
     # -- config ------------------------------------------------------------------------------
     def config(self, county: str) -> Optional[tuple[str, Any]]:
@@ -88,6 +98,14 @@ class NcRodPlatform:
         if hit is None:
             return SearchResult(status="error", reason=f"{county} is not a {self.platform} county")
         name, cfg = hit
+        # One lookup at a time per county: the Lookup and Online Record System flows keep the pick
+        # list and the ticked names in the server session, so two lookups interleaving their steps
+        # on one session would mix their names. (The generic enricher runs several at once.)
+        with self._county_lock(name):
+            return self._search_locked(name, cfg, who, side, date_thru)
+
+    def _search_locked(self, name: str, cfg: Any, who: OwnerName, side: str,
+                       date_thru: Optional[str]) -> SearchResult:
         url = self.source_url(cfg)
         why = nc_polite.walled_reason(self.platform, self.state, name)
         if why:

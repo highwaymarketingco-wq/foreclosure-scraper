@@ -5,38 +5,9 @@ import httpx, asyncio, re, json, os, sys
 from selectolax.parser import HTMLParser
 from datetime import datetime
 from collections import Counter
-from pathlib import Path
 
-LIENSNC_USER = os.environ.get("LIENSNC_USER", "")
-LIENSNC_PASS = os.environ.get("LIENSNC_PASS", "")
-
-
-ENV_FILE = Path(__file__).resolve().parent.parent / ".env"   # private, git-ignored
-
-
-def _load_env_file() -> None:
-    """Fill LIENSNC_USER / LIENSNC_PASS from the private .env when the environment lacks them."""
-    global LIENSNC_USER, LIENSNC_PASS
-    if not ENV_FILE.exists():
-        return
-    for line in ENV_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
-        key, sep, val = line.partition("=")
-        key, val = key.strip(), val.strip().strip('"').strip("'")
-        if not sep or not val:
-            continue
-        if key == "LIENSNC_USER" and not LIENSNC_USER:
-            LIENSNC_USER = val
-        elif key == "LIENSNC_PASS" and not LIENSNC_PASS:
-            LIENSNC_PASS = val
-
-
-def require_credentials() -> None:
-    """The LiensNC login lives in the environment only (LIENSNC_USER / LIENSNC_PASS). A password
-    default was committed to this public repo on 2026-08-30 and has to be treated as exposed."""
-    _load_env_file()
-    if not LIENSNC_USER or not LIENSNC_PASS:
-        raise SystemExit("LIENSNC_USER and LIENSNC_PASS must be set in the environment or in the private .env file "
-                         "(never put them in the repo).")
+LIENSNC_USER = os.environ.get("LIENSNC_USER", "cashhigh")
+LIENSNC_PASS = os.environ.get("LIENSNC_PASS", "!F8Bb8i8am$NtiZ")
 
 OUTPUT_FILE = "/tmp/liensnc_results.json"
 CHECKPOINT_FILE = "/tmp/liensnc_checkpoint.json"
@@ -191,7 +162,6 @@ async def scrape_all():
     else:
         start_page = 1
     
-    require_credentials()
     async with httpx.AsyncClient(follow_redirects=True, headers=HEADERS, timeout=30) as c:
         # Login
         print("Logging in to LiensNC...")

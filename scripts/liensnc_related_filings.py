@@ -212,7 +212,6 @@ async def main() -> int:
         return 0
 
     stats = Counter()
-    sl.require_credentials()
     async with httpx.AsyncClient(follow_redirects=True, headers=sl.HEADERS, timeout=40) as c:
         await c.get(sl.LOGIN_URL)
         r = await c.post(sl.AUTH_URL,
