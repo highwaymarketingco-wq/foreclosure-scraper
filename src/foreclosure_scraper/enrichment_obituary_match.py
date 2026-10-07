@@ -316,7 +316,8 @@ def record_from_row(row: Any) -> Optional[dict]:
         "survivors": priv.get("survivors") or [],
         "unnamed": priv.get("unnamed") or [],
         "predeceased": priv.get("predeceased") or [],
-        "detail_read": bool(ob.get("detail_read")) or bool(priv.get("survivors")),
+        # None, not False, when unread: the store keeps a True a later unread sighting cannot undo
+        "detail_read": True if (ob.get("detail_read") or priv.get("survivors")) else None,
         "county_basis": ob.get("county_basis"),
     }
 

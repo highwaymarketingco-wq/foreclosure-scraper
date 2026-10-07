@@ -117,12 +117,11 @@ def _county(city: Optional[str], state: str) -> Optional[str]:
 
 
 def _known() -> tuple[set[str], set[str]]:
-    """(urls whose obituary page was already read, urls stored with survivors)."""
+    """(urls already in the private store, urls whose obituary page was already read)."""
     try:
         from ...heirs_store import ObituaryStore
         recs = ObituaryStore().load().records
-        return ({u for u, r in recs.items() if r.get("detail_read") or r.get("survivors")},
-                {u for u, r in recs.items() if r.get("survivors")})
+        return set(recs), {u for u, r in recs.items() if r.get("detail_read") or r.get("survivors")}
     except Exception:  # noqa: BLE001
         return set(), set()
 
@@ -137,7 +136,7 @@ class EchovitaObituaries(BaseScraper):
     async def fetch(self) -> Iterable:
         if os.environ.get("FORECLOSURE_ECHOVITA", "1") == "0":
             return []
-        stored, with_surv = _known()
+        stored, read = _known()
         cards: list[dict] = []
         stats = {"pages": 0, "cards": 0, "detail": 0, "with_survivors": 0}
         async with PoliteFetcher() as pf:
@@ -158,7 +157,7 @@ class EchovitaObituaries(BaseScraper):
                         break
                     cards += got
                     if stored and all(c["url"] in stored for c in got):
-                        break                      # caught up: every card's page was read before
+                        break                      # caught up with what a previous run listed
                 if "walled" in stats:
                     break
             stats["cards"] = len(cards)
@@ -170,7 +169,7 @@ class EchovitaObituaries(BaseScraper):
                 if len(details) >= MAX_DETAIL or "walled" in stats:
                     break
                 c = cards[i]
-                if c["url"] in stored or c["url"] in with_surv:
+                if c["url"] in read:
                     continue
                 try:
                     details[c["url"]] = parse_obituary_page(await pf.get(c["url"], content_rx=CONTENT_RX))
