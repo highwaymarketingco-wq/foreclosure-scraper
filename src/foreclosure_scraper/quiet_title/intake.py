@@ -315,6 +315,9 @@ def _wall(res: IntakeResult, what: str, w: Walled) -> None:
 
 def run_intake(adapter: CountyAdapter, pin: str, today: date, *, max_chain: int = MAX_CHAIN) -> IntakeResult:
     res = adapter.result
+    res.register_fetched = adapter.register_fetched
+    if not adapter.register_fetched:
+        res.register_link = adapter.register_link()
     try:
         _run(adapter, res, pin, today, max_chain)
     except Walled as w:
@@ -360,6 +363,15 @@ def _run(adapter: CountyAdapter, res: IntakeResult, pin: str, today: date, max_c
         for mk in roll_markers(b.owner):
             if mk not in res.roll_markers:
                 res.roll_markers.append(mk)
+
+    if not adapter.register_fetched:
+        # a county whose register this tool does not search: no deed, chain, name or deaths search;
+        # the sheet gives the register link (the where-to-look block) and says so in each section
+        register_not_fetched(res, p)
+        res.owner_people = owner_people(p.owner, [], [])
+        people = [d["person"] for d in res.owner_people if d["person"] is not None][:MAX_PEOPLE]
+        res.obituary = adapter.obituary(people)
+        return
 
     # the deed the county cites
     if p.deed_book and p.deed_page:
@@ -425,6 +437,23 @@ def _run(adapter: CountyAdapter, res: IntakeResult, pin: str, today: date, max_c
             res.death_searches.append(ds)
 
     res.obituary = adapter.obituary(people)
+
+
+NOT_FETCHED = "Not fetched by the tool: use the link above"
+
+
+def register_not_fetched(res: IntakeResult, p) -> None:
+    """The deed and chain notes for a county whose register the tool does not search."""
+    link = res.register_link or "the county register of deeds (see where to look)"
+    src = p.layer_label or "the county record"
+    if p.deed_book:
+        when = f", dated {p.deed_date_text}" if p.deed_date_text else ", with no date given"
+        res.vesting_note = (f"{src[0].upper() + src[1:]} cites book {p.deed_book} page {p.deed_page or '(no page given)'}"
+                            f"{when}. The register's index was not searched. {NOT_FETCHED} ({link}).")
+    else:
+        res.vesting_note = (f"{src[0].upper() + src[1:]} cites no deed book and page for this parcel. "
+                            f"{NOT_FETCHED} ({link}).")
+    res.chain_note = f"{NOT_FETCHED} ({link})."
 
 
 def _filter_names(ns: NameSearch, person: PersonName) -> None:
@@ -505,10 +534,29 @@ def records_table(res: IntakeResult, adapter: CountyAdapter) -> list[RecordCheck
     out: list[RecordCheck] = []
     p = res.parcel
     if p is not None:
-        out.append(RecordCheck("County parcel record (tax parcel layer)", "checked",
+        out.append(RecordCheck(adapter.parcel_record_label, "checked",
                                f"Query by PIN {res.pin} (Exhibit {p.exhibit}).",
-                               "Parcel found." if p.found else "No parcel returned for this PIN."))
+                               ("Parcel found. " + str(p.extra.get("join_note") or "")).strip() if p.found else
+                               ("No parcel returned for this PIN. " + str(p.extra.get("join_note") or "")).strip()))
     ts = res.tax
+    if not res.register_fetched:
+        if ts is not None and not ts.fetched:
+            out.append(RecordCheck("Tax records (county tax bills)", "not run",
+                                   "Not fetched by the tool for this county.", ts.note or ""))
+        link = res.register_link or "see where to look"
+        out.append(RecordCheck("Register of Deeds index: the deed cited, the chain before it, the owner's name",
+                               "not run", "Not fetched by the tool for this county.",
+                               f"A person searches the register: {link}."))
+        out.append(RecordCheck("Register of Deeds deaths index", "not run",
+                               "Not fetched by the tool for this county.",
+                               "A person searches the register's deaths (vital records) index where the county "
+                               "offers one online, or asks the register's office."))
+        ob = res.obituary or {}
+        if ob:
+            out.append(RecordCheck("Obituaries", "checked" if ob.get("run") else "not run",
+                                   "; ".join(ob.get("searches") or []) or "none", ob.get("reason") or ""))
+        out.extend(adapter.static_records())
+        return out
     if ts is not None:
         if ts.walled:
             out.append(RecordCheck("Tax records (county tax bills)", "walled", "Parcel tax page", ts.wall_reason or ""))

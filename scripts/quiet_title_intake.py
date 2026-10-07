@@ -2,6 +2,10 @@
 
   uv run python scripts/quiet_title_intake.py --pin <PIN> [--county Buncombe] [--out DIR]
 
+Buncombe NC has its own adapter (county layer, tax bills, register search). Any other NC county
+reads the parcel record from the NC OneMap statewide parcel layer and gives the register, tax and
+probate sites as links for a person (docs/county_records/county_records_matrix.json).
+
 Default output: ~/Desktop/Lawyer_Review/intake/<PIN>/ (private; never in this repo). The folder
 gets the sheet (QuietTitle_Intake_<County>_<PIN>.html and .pdf), a facts JSON, the fetch log and
 exhibits/ (the saved copy of every page read, and a picture of each).
@@ -30,8 +34,9 @@ DEFAULT_ROOT = Path.home() / "Desktop" / "Lawyer_Review" / "intake"
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--pin", required=True, help="the county's parcel number (Buncombe: the 15-digit pinnum)")
-    ap.add_argument("--county", default="Buncombe")
+    ap.add_argument("--pin", required=True, help="the county's parcel number (Buncombe: the 15-digit pinnum; elsewhere the "
+                    "PIN as the board or the county writes it, separators optional)")
+    ap.add_argument("--county", default="Buncombe", help="county name (any NC county)")
     ap.add_argument("--state", default="NC")
     ap.add_argument("--out", help="output folder (default ~/Desktop/Lawyer_Review/intake/<PIN>/)")
     ap.add_argument("--max-chain", type=int, default=3, help="earlier deeds to follow (default 3)")

@@ -17,7 +17,10 @@ LAYOUT
   names.py      pure name logic: owner-of-record markers (HEIRS / ESTATE), "LAST, FIRST MIDDLE"
                 parsing, the full-name fit rule for death-index entries
   taxyears.py   pure: which levy years are complete (NC: interest begins January 6)
-  adapters/     one class per county (adapters/base.py is the contract; Buncombe NC first)
+  adapters/     one class per county (adapters/base.py is the contract; Buncombe NC first);
+                adapters/nc_onemap.py serves any other NC county from the statewide parcel layer
+  county_records.py  the per-county 'where to look' facts, read from
+                docs/county_records/county_records_matrix.json (no network)
   intake.py     the county-independent steps: deed chain, heirs analysis, records table
   render.py     the HTML sheet, exhibit screenshots (headless Chrome, no network) and the PDF
   layups.py     ranking rules for 'layup' candidates read from the board + ledgers

@@ -23,6 +23,11 @@ from ..names import PersonName
 class CountyAdapter(ABC):
     state: str = ""
     county: str = ""
+    #: False for a county whose register this tool does not search: intake.py then runs no deed,
+    #: chain, name or deaths search and the sheet says 'not fetched by the tool: use the link above'
+    register_fetched: bool = True
+    #: the records-table name of the parcel record
+    parcel_record_label: str = "County parcel record (tax parcel layer)"
 
     def __init__(self, fetcher: PoliteFetcher, result: IntakeResult, stamp: str) -> None:
         self.f = fetcher
@@ -101,3 +106,7 @@ class CountyAdapter(ABC):
 
     def not_established(self) -> list[str]:
         return []
+
+    def register_link(self) -> Optional[str]:
+        """The register-of-deeds address a person opens (used when register_fetched is False)."""
+        return None

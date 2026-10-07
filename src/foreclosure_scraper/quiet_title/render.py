@@ -21,7 +21,7 @@ from typing import Optional
 
 from bs4 import BeautifulSoup
 
-from .intake import later_summary, tax_rows
+from .intake import NOT_FETCHED, later_summary, tax_rows
 from .model import EASTERN, Exhibit, IntakeResult, fmt_both
 
 CHROME = os.environ.get("CHROME_BIN") or "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -332,6 +332,49 @@ def _heirs_conclusion(res: IntakeResult) -> str:
             f"({counts}).")
 
 
+def _legal(res: IntakeResult, p) -> tuple[str, str]:
+    """(the at-a-glance words, the section-2 box) for the legal description, by where it came from."""
+    bp = f"book {p.deed_book or '?'} page {p.deed_page or '?'}"
+    link = (res.deed_link if res.register_fetched else res.register_link) or ""
+    if p.legal_kind == "assessor_short" and p.legal_description:
+        glance = (f"Short assessor legal (not the deed's full legal description): \"{p.legal_description}\" "
+                  f"({p.layer_label or 'the layer'}, field {p.legal_field}). The full legal description is on the "
+                  f"deed image, {bp}, at the register of deeds: {link or 'see where to look'}.")
+        box = (f"<div class='box'><b>Short assessor legal (not the deed's full legal description).</b> "
+               f"{e(p.legal_description)}<br>This is the assessor's one-line note on the tax roll as "
+               f"{e(p.layer_label or 'the layer')} publishes it (field {e(p.legal_field or '')}, Exhibit {_x(p.exhibit)}). "
+               f"It identifies the parcel; it is not the deed's legal description and is not used as one. The full "
+               f"text of the legal description is on the deed image, {e(bp)}, at the register of deeds: "
+               f"<span class='url'>{e(link or 'see where to look')}</span></div>")
+        return glance, box
+    if p.legal_description:
+        return (f"From the county layer's {p.legal_field} field: {p.legal_description}",
+                f"<div class='box'><b>Legal description (county layer field {e(p.legal_field or '')}).</b> "
+                f"{e(p.legal_description)}</div>")
+    if p.layer_label:
+        why = ("holds the deed reference for this county, not a legal description"
+               if p.extra.get("legdecfull_holds_deed_ref") else "is blank for this parcel")
+        glance = (f"Not on {p.layer_label}: its short assessor legal field (legdecfull) {why}. Needs the deed image: "
+                  f"{bp}, at the register of deeds: {link or 'see where to look'}.")
+        box = (f"<div class='box'><b>Legal description: needs the deed image.</b> The short assessor legal field "
+               f"(legdecfull) on {e(p.layer_label)} {e(why)} (Exhibit {_x(p.exhibit)}). The legal description is on "
+               f"the deed itself, {e(bp)}, at the register of deeds: <span class='url'>{e(link or 'see where to look')}"
+               f"</span></div>")
+        return glance, box
+    glance = (f"Not on the county layer (no legal-description field among its {len(p.field_names)} fields). "
+              f"Needs the deed image: {bp} (link in section 2).")
+    box = (f"<div class='box'><b>Legal description: needs the deed image.</b> The county's free parcel layer "
+           f"returned {len(p.field_names)} fields for this parcel and none is a legal description (the field "
+           f"list is in the saved response, Exhibit {_x(p.exhibit)}). The legal description is on the deed "
+           f"itself, book {e(p.deed_book or '?')} page {e(p.deed_page or '?')}. Open it here (the register's "
+           f"book/page search; it opens as a guest): <span class='url'>{e(res.deed_link or '')}</span>"
+           + (f"<br>Document Details page reached in this run: <span class='url'>{e(res.vesting_detail_url)}</span> "
+              f"(it may need the register's guest session; the book/page link always works)." if res.vesting_detail_url else "")
+           + "<br>The register's index description below is the index clerk's short note, marked by the register "
+             "as not warranted. It is not the legal description and is not used as one.</div>")
+    return glance, box
+
+
 def render_html(res: IntakeResult) -> str:
     p = res.parcel
     gen = fmt_both(res.finished or res.started)
@@ -349,36 +392,44 @@ def render_html(res: IntakeResult) -> str:
         H.append("<div class='warn'>No parcel record was found for this PIN; nothing else was searched.</div>")
         return _wrap(title, H, res)
 
-    tr = tax_rows(res.tax, (res.finished or res.started).astimezone(EASTERN).date(), res.state) if res.tax and not res.tax.walled else None
+    tr = (tax_rows(res.tax, (res.finished or res.started).astimezone(EASTERN).date(), res.state)
+          if res.tax and not res.tax.walled and res.tax.fetched else None)
+    src = p.layer_label or "the county layer"
+    legal_glance, legal_box = _legal(res, p)
 
     # ---- at a glance
     H.append("<h2>At a glance</h2>")
     glance = []
-    glance.append(("1. Tax parcel number (PIN)", f"{p.pin} (county layer updated {p.layer_updated or 'date not shown'})"))
-    if p.legal_description:
-        legal = f"From the county layer's {p.legal_field} field: {p.legal_description}"
-    else:
-        legal = (f"Not on the county layer (no legal-description field among its {len(p.field_names)} fields). "
-                 f"Needs the deed image: book {p.deed_book or '?'} page {p.deed_page or '?'} (link in section 2).")
-    glance.append(("2. Legal description", legal))
+    pin_txt = f"{p.pin} ({src}; " + (f"record revised {p.layer_updated})" if p.layer_label and p.layer_updated else
+                                     f"layer updated {p.layer_updated or 'date not shown'})")
+    if res.pin != p.pin:
+        pin_txt += f"; searched as {res.pin}"
+    glance.append(("1. Tax parcel number (PIN)", pin_txt))
+    glance.append(("2. Legal description", legal_glance))
     if res.vesting:
         v = res.vesting
         glance.append(("2. Last deed the county cites",
                        f"Book {v.book} page {v.page}, filed {v.date}, {v.kind or v.index_code}: "
                        f"{_few(v.grantors)} to {_few(v.grantees)}"))
+    elif not res.register_fetched:
+        glance.append(("2. Last deed the record cites", (f"As written on the layer: {p.deed_ref_text}. "
+                                                         if p.deed_ref_text else "") + (res.vesting_note or "")))
     else:
         glance.append(("2. Last deed the county cites",
                        f"Book {p.deed_book or '?'} page {p.deed_page or '?'}, dated {p.deed_date or '?'} on the county "
                        f"record; {res.vesting_note or ''}"))
     glance.append(("2. Earlier deeds found in the chain",
+                   res.chain_note if not res.register_fetched else
                    f"{len(res.chain)} (by register name search). {res.chain_note or ''}"))
     ls = later_summary(res)
     if ls:
         glance.append(("2. Recorded after that deed (owner-name index search)", ls))
-    glance.append(("3. Taxpayer of record (as the county shows it)",
+    glance.append((f"3. Taxpayer of record (as {'the county' if not p.layer_label else src} shows it)",
                    f"{p.owner or 'none shown'}" + (f", care of {p.care_of}" if p.care_of else "")))
     glance.append(("Property address (situs) / mailing address",
                    f"{p.situs or 'none'}{' (' + p.situs_note + ')' if p.situs_note else ''} / {p.mailing or 'none'}"))
+    if res.tax is not None and not res.tax.fetched:
+        glance.append(("3. Tax status", res.tax.note or "Not fetched by the tool for this county."))
     if tr:
         yrs = ", ".join(str(r["year"]) for r in tr["rows"])
         unpaid = tr["unpaid_years"]
@@ -392,8 +443,9 @@ def render_html(res: IntakeResult) -> str:
     marks = ", ".join(res.roll_markers) if res.roll_markers else "none"
     fits = sum(1 for d in res.death_searches for x in d.entries if x.fit == "fit")
     cands = sum(1 for d in res.death_searches for x in d.entries if x.fit == "candidate")
-    glance.append(("4. Heirs signals", f"Heirs / estate wording on the roll: {marks}. Death-index entries that fit the "
-                                       f"full name: {fits}; candidates that may not fit: {cands}."))
+    glance.append(("4. Heirs signals", f"Heirs / estate wording on the roll: {marks}. " + (
+        f"Death-index entries that fit the full name: {fits}; candidates that may not fit: {cands}."
+        if res.register_fetched else "The deaths index was not searched by the tool for this county.")))
     walled = [r.record for r in res.records if r.status in ("walled", "not run", "not checked", "not opened")]
     glance.append(("5. Records not reached", "; ".join(walled) or "none"))
     H.append("<table class='kv'><tbody>" + "".join(f"<tr><th>{e(a)}</th><td>{e(b)}</td></tr>" for a, b in glance)
@@ -401,20 +453,46 @@ def render_html(res: IntakeResult) -> str:
 
     # ---- 1 parcel
     H.append("<h2>1. Parcel record</h2>")
-    kv = [("PIN", p.pin), ("Owner of record as the county shows it", p.owner or ""),
-          ("Care of (a mailing contact on the record)", p.care_of or "none"),
-          ("Mailing address on the record", p.mailing or ""),
-          ("Situs (house number and road) on the record", (p.situs or "") + (f" ({p.situs_note})" if p.situs_note else "")),
-          ("Acreage", f"{p.acreage:.2f} acre" if p.acreage is not None else ""),
-          ("Class / improved", f"class {p.land_class or '?'}; improved: {p.improved or '?'}"),
-          ("County tax value", (f"{_money(p.tax_value)} (land {_money(p.land_value)}, buildings {_money(p.building_value)}). "
-                                f"This is the county's tax value, not a market price.") if p.tax_value is not None else ""),
-          ("Deed the county cites", f"book {p.deed_book or '?'}, page {p.deed_page or '?'}, dated {p.deed_date or '?'}, "
-                                    f"instrument code {p.deed_instrument or '?'}"),
-          ("Plat / subdivision on the record", "; ".join(x for x in [
-              f"plat book {p.plat_book} page {p.plat_page}" if p.plat_book else "no plat reference",
-              p.subdivision or "", f"township code {p.township}" if p.township else ""] if x)),
-          ("Layer updated", p.layer_updated or "")]
+    if p.layer_label:
+        H.append(f"<p class='small'>Read from {e(src)}, which publishes the county assessor's roll for all 100 NC "
+                 f"counties (information source on the record: {e(str(p.extra.get('information_source') or 'not stated'))}). "
+                 f"{e(str(p.extra.get('join_note') or ''))}</p>")
+        acre = (f"{p.acreage:.2f} acre ({p.extra.get('acreage_note')})" if p.acreage is not None
+                else f"not given ({p.extra.get('acreage_note')})")
+        value = ((f"{_money(p.tax_value)} (land {_money(p.land_value)}, improvements {_money(p.building_value)}). This is a "
+                  f"{p.value_note}.") if p.tax_value is not None else "not given")
+        deed = (f"book {p.deed_book or '?'}, page {p.deed_page or '(none given)'}, dated "
+                f"{p.deed_date_text or '(no date given)'}; as written on the layer: {p.deed_ref_text or 'blank'}")
+        kv = [("PIN", f"{p.pin} (parno); alternate number on the layer: {p.extra.get('altparno') or 'none'}"),
+              ("Owner of record (taxpayer) as the layer shows it", p.owner or ""),
+              ("Mailing address on the record", p.mailing or ""),
+              ("Situs (house number and road) on the record",
+               (p.situs or "") + (f" ({p.situs_note})" if p.situs_note else "")),
+              ("Acreage", acre),
+              ("Use / structure", f"{p.land_class or 'use not given'}; structure on the parcel: {p.improved or '?'}"),
+              ("Tax value", value),
+              ("Deed the assessor cites", deed),
+              ("Plat / subdivision on the record", "; ".join(x for x in [
+                  f"plat book {p.plat_book} page {p.plat_page or '?'}" if p.plat_book else "no plat reference",
+                  f"map reference {p.extra['mapref']}" if p.extra.get("mapref") else "",
+                  p.subdivision or ""] if x)),
+              ("Last sale date on the layer", str(p.extra.get("last_sale_date") or "not given")),
+              ("Record revised (statewide layer)", p.layer_updated or "not given")]
+    else:
+        kv = [("PIN", p.pin), ("Owner of record as the county shows it", p.owner or ""),
+              ("Care of (a mailing contact on the record)", p.care_of or "none"),
+              ("Mailing address on the record", p.mailing or ""),
+              ("Situs (house number and road) on the record", (p.situs or "") + (f" ({p.situs_note})" if p.situs_note else "")),
+              ("Acreage", f"{p.acreage:.2f} acre" if p.acreage is not None else ""),
+              ("Class / improved", f"class {p.land_class or '?'}; improved: {p.improved or '?'}"),
+              ("County tax value", (f"{_money(p.tax_value)} (land {_money(p.land_value)}, buildings {_money(p.building_value)}). "
+                                    f"This is the county's tax value, not a market price.") if p.tax_value is not None else ""),
+              ("Deed the county cites", f"book {p.deed_book or '?'}, page {p.deed_page or '?'}, dated {p.deed_date or '?'}, "
+                                        f"instrument code {p.deed_instrument or '?'}"),
+              ("Plat / subdivision on the record", "; ".join(x for x in [
+                  f"plat book {p.plat_book} page {p.plat_page}" if p.plat_book else "no plat reference",
+                  p.subdivision or "", f"township code {p.township}" if p.township else ""] if x)),
+              ("Layer updated", p.layer_updated or "")]
     H.append("<table class='kv'><tbody>" + "".join(f"<tr><th>{e(a)}</th><td>{e(str(b))}</td></tr>" for a, b in kv)
              + "</tbody></table>")
     bind = f"<b>Which parcel these facts belong to.</b> Every fact on this sheet is tied to PIN {e(p.pin)}. "
@@ -429,20 +507,10 @@ def render_html(res: IntakeResult) -> str:
 
     # ---- 2 legal description and deeds
     H.append("<h2>2. Legal description, the last deed the county cites, and the chain</h2>")
-    if p.legal_description:
-        H.append(f"<div class='box'><b>Legal description (county layer field {e(p.legal_field or '')}).</b> "
-                 f"{e(p.legal_description)}</div>")
-    else:
-        H.append(f"<div class='box'><b>Legal description: needs the deed image.</b> The county's free parcel layer "
-                 f"returned {len(p.field_names)} fields for this parcel and none is a legal description (the field "
-                 f"list is in the saved response, Exhibit {_x(p.exhibit)}). The legal description is on the deed "
-                 f"itself, book {e(p.deed_book or '?')} page {e(p.deed_page or '?')}. Open it here (the register's "
-                 f"book/page search; it opens as a guest): <span class='url'>{e(res.deed_link or '')}</span>"
-                 + (f"<br>Document Details page reached in this run: <span class='url'>{e(res.vesting_detail_url)}</span> "
-                    f"(it may need the register's guest session; the book/page link always works)." if res.vesting_detail_url else "")
-                 + "<br>The register's index description below is the index clerk's short note, marked by the register "
-                   "as not warranted. It is not the legal description and is not used as one.</div>")
-    if res.deed_rows:
+    H.append(legal_box)
+    if not res.register_fetched:
+        H.append(f"<h3>The deed the record cites</h3><p>{e(res.vesting_note or '')}</p>")
+    elif res.deed_rows:
         H.append(f"<h3>Every index entry at book {e(p.deed_book or '')} page {e(p.deed_page or '')}</h3>")
         H.append(f"<p>{e(res.vesting_note or '')} Pre-1995 deeds and deeds of trust were kept in separate book series, "
                  f"so one book and page can hold two instruments. The highlighted row is the one the county cites.</p>")
@@ -463,8 +531,11 @@ def render_html(res: IntakeResult) -> str:
         H.append("<table><thead><tr><th>Step</th><th>Filed</th><th>Book / page</th><th>Instrument</th><th>Grantor(s)</th>"
                  "<th>Grantee(s)</th><th>Index description</th><th>How it ties to the next deed</th><th>Exhibit</th>"
                  f"</tr></thead><tbody>{rows}</tbody></table>")
-    H.append(f"<p>{e(res.chain_note or '')} Each step is a lead for the abstract: the tie is the name and any shared "
-             f"index-description words, never a finding that two deeds describe the same land.</p>")
+    if not res.register_fetched:
+        H.append(f"<p>{e(res.chain_note or '')}</p>")
+    else:
+        H.append(f"<p>{e(res.chain_note or '')} Each step is a lead for the abstract: the tie is the name and any shared "
+                 f"index-description words, never a finding that two deeds describe the same land.</p>")
     if res.searches:
         H.append(_src(res, *[ns.exhibit for ns in res.searches]))
     for ns in res.after_vesting:
@@ -482,7 +553,12 @@ def render_html(res: IntakeResult) -> str:
 
     # ---- 3/4 tax
     H.append("<h2>3. Taxpayer of record and tax status</h2>")
-    if res.tax is None or res.tax.walled:
+    if res.tax is not None and not res.tax.fetched:
+        H.append(f"<p>Taxpayer of record as {e(src)} shows it: {e(p.owner or 'none shown')} (section 1, Exhibit "
+                 f"{_x(p.exhibit)}).</p>")
+        H.append(f"<div class='warn'>{e(res.tax.note or 'Tax bills are not fetched by the tool for this county.')} "
+                 f"{e(res.tax.interest_rule)}</div>")
+    elif res.tax is None or res.tax.walled:
         H.append(f"<div class='warn'>The tax pages were not read{': ' + e(res.tax.wall_reason) if res.tax and res.tax.wall_reason else ''}.</div>")
     else:
         ts = res.tax
@@ -537,8 +613,10 @@ def render_html(res: IntakeResult) -> str:
                  f"{e(', '.join(res.roll_markers))} ('{e(p.owner or '')}'). The roll does not name the heirs.</p>")
     else:
         H.append(f"<p>{_tag('No heirs wording', 'vd-na')} The county roll's owner name ('{e(p.owner or '')}') carries "
-                 f"no heirs or estate wording. Tax notices can still go to a person who has died; the deaths index "
-                 f"was searched for the owner's name below.</p>")
+                 f"no heirs or estate wording. Tax notices can still go to a person who has died; "
+                 + ("the deaths index was searched for the owner's name below.</p>" if res.register_fetched else
+                    "the register's deaths index was not searched by the tool for this county (a person searches it: "
+                    "see where to look).</p>"))
     if p.care_of:
         H.append(f"<p>The record names a care-of contact, {e(p.care_of)}. That is a mailing contact on the tax record, "
                  f"not a finding that the person is an heir.</p>")
@@ -546,7 +624,8 @@ def render_html(res: IntakeResult) -> str:
         pn = d["person"]
         H.append(f"<p class='small'>Owner name '{e(d['roll'])}': "
                  + (f"searched as {e(pn.indexed())}; " if pn else "") + f"{e(d['reading'])}.</p>")
-    H.append(f"<p>{_heirs_conclusion(res)}</p>")
+    if res.register_fetched:
+        H.append(f"<p>{_heirs_conclusion(res)}</p>")
     for ds in res.death_searches:
         H.append(f"<h3>Deaths index: {e(ds.last)}, {e(ds.first)}</h3>")
         if ds.walled:
@@ -575,7 +654,10 @@ def render_html(res: IntakeResult) -> str:
             H.append(f"<p class='small'>{len(par)} more entr{'ies' if len(par) != 1 else 'y'} name a person of this name only "
                      f"as a parent (years {', '.join(str(x.year) for x in par)}); those are other decedents.</p>")
         H.append(_src(res, ds.exhibit))
-    if not res.death_searches:
+    if not res.register_fetched:
+        H.append(f"<p>No deaths-index search was run: {e(NOT_FETCHED.lower())} "
+                 f"(<span class='url'>{e(res.register_link or 'see where to look')}</span>).</p>")
+    elif not res.death_searches:
         H.append("<p>No deaths-index search was run (no owner of record could be read as a person's name).</p>")
 
     # ---- obituaries

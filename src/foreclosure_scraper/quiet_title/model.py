@@ -81,7 +81,15 @@ class Parcel:
     field_names: list[str] = field(default_factory=list)
     legal_description: Optional[str] = None
     legal_field: Optional[str] = None
+    #: None: a legal-description field on the county's own layer. "assessor_short": the short
+    #: legal on the assessor's roll (NC OneMap legdecfull), which is NOT the deed's full legal
+    legal_kind: Optional[str] = None
     record_card_url: Optional[str] = None
+    #: where the parcel record came from, in words (None: the county's own parcel layer)
+    layer_label: Optional[str] = None
+    value_note: Optional[str] = None                    # how the layer labels its value
+    deed_ref_text: Optional[str] = None                 # the deed reference exactly as the layer writes it
+    deed_date_text: Optional[str] = None                # the deed date exactly as the layer writes it
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -178,6 +186,9 @@ class TaxStatus:
     interest_rule: str = ""
     walled: bool = False
     wall_reason: Optional[str] = None
+    #: False: the tool does not read this county's tax bills (the sheet points to the tax site)
+    fetched: bool = True
+    note: Optional[str] = None
 
 
 @dataclass
@@ -266,6 +277,9 @@ class IntakeResult:
     how_to: list[tuple[str, list[str]]] = field(default_factory=list)
     not_established: list[str] = field(default_factory=list)
     sources: list[tuple[str, str, str]] = field(default_factory=list)
+    #: False: the tool does not search this county's register; the sheet gives the register link
+    register_fetched: bool = True
+    register_link: Optional[str] = None
 
     def to_json(self) -> dict:
         def conv(o: Any) -> Any:
