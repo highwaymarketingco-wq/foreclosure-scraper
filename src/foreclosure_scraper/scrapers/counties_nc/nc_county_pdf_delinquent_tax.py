@@ -87,18 +87,50 @@ def _parse_name_id_amt(text: str, id_digits: tuple[int, int]) -> list[tuple]:
     return out
 
 
+#: A parcel the PDF text breaks with a space ("0000 000000  $1.00"); 18 McDowell rows.
+_PARCEL_AMT_SPACED_RE = re.compile(r"^([0-9A-Z][0-9A-Z ]{7,18}[0-9A-Z])\s{2,}\$([\d,]+\.\d{2})$")
+#: The list's own column-header lines, never an owner.
+_HEADER_RE = re.compile(r"^(OWNER[- ]NAME|PARCEL\s+TOTAL DUE)\b", re.I)
+
+
+def _parcel_amt(ln: str):
+    m = _PARCEL_AMT_RE.match(ln) or _PARCEL_AMT_SPACED_RE.match(ln)
+    if not m:
+        return None
+    return re.sub(r"\s+", "", m.group(1)), m.group(2)
+
+
 def _parse_parcel_amt_owner(text: str) -> list[tuple]:
-    """A "<parcel> $<amount>" line followed by the owner/description line."""
+    """"<parcel> $<amount>" lines, each paired with its owner line.
+
+    FIXED 2026-10-07 (extraction audit): the McDowell list prints the OWNER on the line
+    BEFORE its "<parcel> $<amount>" line (header "OWNER-NAME" / "PARCEL ... TOTAL DUE",
+    then owner, parcel, owner, parcel ...). Reading the NEXT line gave every row the
+    following parcel's owner: right only where two neighbours share an owner (544 of
+    2,260 live rows). The orientation is read from the document itself: when the first
+    parcel line follows the header directly, the owner comes after (the older layout this
+    parser was written for); otherwise the owner is the text between the previous parcel
+    line and this one (a wrapped name is joined)."""
     lines = [l.strip() for l in text.splitlines() if l.strip()]
+    hits = [(i, _parcel_amt(ln)) for i, ln in enumerate(lines)]
+    hits = [(i, h) for i, h in hits if h]
+    if not hits:
+        return []
+    first = hits[0][0]
+    owner_after = first == 0 or bool(_HEADER_RE.match(lines[first - 1]))
     out = []
-    for i, ln in enumerate(lines[:-1]):
-        m = _PARCEL_AMT_RE.match(ln)
-        if not m:
-            continue
-        amt = _money(m.group(2))
-        owner = _clean_owner(lines[i + 1])
+    prev = -1
+    for n, (i, (parcel, amt_s)) in enumerate(hits):
+        amt = _money(amt_s)
+        if owner_after:
+            nxt = hits[n + 1][0] if n + 1 < len(hits) else len(lines)
+            block = lines[i + 1:nxt]
+        else:
+            block = lines[prev + 1:i]
+        prev = i
+        owner = _clean_owner(" ".join(b for b in block if not _HEADER_RE.match(b)))
         if amt:
-            out.append((owner, m.group(1), amt))
+            out.append((owner, parcel, amt))
     return out
 
 

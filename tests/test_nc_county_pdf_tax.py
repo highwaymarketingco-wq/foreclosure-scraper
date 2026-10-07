@@ -49,3 +49,37 @@ def test_money_and_owner():
     assert m._money("0") is None
     assert m._clean_owner("  SMITH,  JOHN ;") == "SMITH, JOHN"
     assert m._clean_owner("") is None
+
+
+# --- 2026-10-07 extraction audit: the live McDowell list prints the owner BEFORE its
+# parcel line, so reading the next line gave every row its neighbour's owner. ---
+
+_OWNER_FIRST = (
+    "OWNER-NAME\n"
+    "PARCEL                          TOTAL DUE\n"
+    "SAMPLE HOLDINGS LLC\n"
+    "079700000001              $1,234.56\n"
+    "DOE JANE Q\n"
+    "079700000002               $99.10\n"
+    "EXAMPLE PAT AND A VERY LONG NAME THAT\n"
+    "WRAPS ONTO A SECOND LINE\n"
+    "0797 00000003                $10.00\n"
+)
+
+
+def test_owner_before_parcel_layout_pairs_each_parcel_with_its_own_owner():
+    by = {r[1]: r for r in m._parse_parcel_amt_owner(_OWNER_FIRST)}
+    assert by["079700000001"][0] == "SAMPLE HOLDINGS LLC"
+    assert by["079700000001"][2] == 1234.56
+    assert by["079700000002"][0] == "DOE JANE Q"
+
+
+def test_a_wrapped_owner_is_joined_and_a_spaced_parcel_is_read():
+    by = {r[1]: r for r in m._parse_parcel_amt_owner(_OWNER_FIRST)}
+    assert by["079700000003"][0] == "EXAMPLE PAT AND A VERY LONG NAME THAT WRAPS ONTO A SECOND LINE"
+    assert by["079700000003"][2] == 10.0
+
+
+def test_header_lines_are_never_an_owner():
+    rows = m._parse_parcel_amt_owner(_OWNER_FIRST)
+    assert not any("OWNER-NAME" in (r[0] or "") or "TOTAL DUE" in (r[0] or "") for r in rows)
