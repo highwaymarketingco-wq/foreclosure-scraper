@@ -2216,6 +2216,14 @@ RAW_KEEP = {
     # BEFORE enrichment_hoa_plaintiff_signal.py's first run, same lesson as
     # heir_naming_publication / landlocked / lexington_assessment above.
     "hoa_plaintiff_signal": "*",
+    # 2026-10-07 heir candidates (enrichment_heir_candidates.py). PRIVACY CHOICE: the candidate
+    # list itself (raw['heir_candidates']: survivors, representatives, co-owners -- private
+    # people's names) and raw['obituary_match'] (which carries the survivor list) are deliberately
+    # NOT registered here, so they never reach this public board; their names go to the gitignored
+    # data/heirs/heir_candidates.jsonl.gz instead. Only this summary publishes, and it holds counts
+    # and flags alone: {count, by_source_kind, deceased_signals, obituary_match: attached|ambiguous,
+    # label}. Never add a name field to it.
+    "heir_candidates_summary": ("count", "by_source_kind", "deceased_signals", "obituary_match", "label"),
     "sc_probate_notice": "*",
     "life_event": "*",                  # death / divorce marker the resolver keys off
     "estimated_monthly_rent_acs": "*",  # ACS $/sqft rent estimate — the rental-exit number
@@ -2632,6 +2640,18 @@ RAW_KEEP = {
     # the property's HUD contract -- direct contactability (HERMES sec 9 priority #1) --
     # and section8 is the contract_expiration/expiring_soon motivated-seller signal.
     # Both were being computed and then thrown away at every publish.
+    "condemned_signal": "*",
+    # ^ counties_sc.spartanburg_condemned: the assessor condition code/label/tier
+    # (condemned vs very_poor) behind the row's condemned flag. Written on every row
+    # since the scraper was built and never registered, so it was dropped at every
+    # publish (2026-10-07 extraction audit).
+    "tax_foreclosure": "*",
+    # ^ counties_nc.henderson_foreclosure_parcels: the county roster block (program,
+    # roster, land class, deed/plat book-page, deed/plat URLs, legal). Built with the
+    # annotated `raw: dict[str, Any] = {...}` form the RAW_KEEP scan could not see.
+    "terry_howe_auction": "*",
+    # ^ counties_sc.terry_howe_auctions: auction id/title, catalog URL, bidding start/end,
+    # item number, buyer's premium, earnest money. Same: written, never registered.
     "str_permit_lapsed": "*",
     # ^ counties_nc.asheville_str_permits: status/business_name/license_number/reason
     # behind a lapsed short-term-rental permit. Already scored (distress_score.py FINANCIAL,

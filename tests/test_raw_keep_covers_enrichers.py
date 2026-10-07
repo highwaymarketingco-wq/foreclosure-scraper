@@ -48,6 +48,13 @@ INTENTIONALLY_INTERNAL = {
     # condition assessment. The diagnostic stays in-process via the
     # vision.listing_ungraded log line.
     "vision_unscored",
+    # PRIVACY, 2026-10-07 (enrichment_heir_candidates / enrichment_obituary_match): both hold
+    # private people's names (obituary survivors, personal representatives, co-owners). The board
+    # is a public repo, so they are kept off it on purpose; the published form is
+    # raw['heir_candidates_summary'] (counts and flags, in RAW_KEEP) and the names go to the
+    # gitignored data/heirs/heir_candidates.jsonl.gz (heirs_store.py).
+    "heir_candidates",
+    "obituary_match",
 }
 
 
@@ -135,9 +142,21 @@ _SCRAPER_DIR = _Path(__file__).resolve().parent.parent / "src" / "foreclosure_sc
 #: Add here only with a reason -- an entry without one is how a real signal gets
 #: quietly reclassified as noise.
 SCRAPER_KEYS_INTENTIONALLY_INTERNAL = {
+    # 2026-10-07: surfaced when the scan learned the annotated `raw: dict = {...}` form.
+    # Each is a bare True provenance flag beside the published raw['rod'] block; the
+    # row's own source (sc_rod_acclaim / sc_rod_cott / nc_rod_logan) already names the
+    # vendor, so no data is lost.
+    "acclaim_rod": "provenance flag (True) beside the published raw['rod'] block",
+    "cott_rod": "provenance flag (True) beside the published raw['rod'] block",
+    "logan_rod": "provenance flag (True) beside the published raw['rod'] block",
     "source_url": "duplicates the Listing.source_url column; a raw copy shadowing a "
                   "real field invites the two disagreeing",
     "documents": "generic bag already carried by the document_links / doc_ocr keys",
+    "obituary_private": "PRIVACY (2026-10-07): the parsed survivor list of an obituary -- private "
+                        "people's names -- carried from the obituary scrapers to "
+                        "enrichment_obituary_match in-process only; the public board gets the "
+                        "decedent block (raw['obituary']) and counts, the names go to the gitignored "
+                        "data/heirs/ store",
     # 2026-10-04: surfaced by extending the scraper scan to walk raw={...} dict-literal
     # ASTs directly (see _scraper_raw_dict_literal_keys) instead of a regex that could
     # only ever see a literal's first key. Each of these, verified against its own
@@ -210,6 +229,13 @@ def _scraper_raw_dict_literal_keys(path: _Path) -> set[str]:
             for kw in node.keywords:
                 if kw.arg == "raw" and isinstance(kw.value, ast.Dict):
                     _collect(kw.value)
+        elif (isinstance(node, ast.AnnAssign) and isinstance(node.value, ast.Dict)
+              and isinstance(node.target, ast.Name) and node.target.id in ("raw", "_raw")):
+            # `raw: dict = {...}` / `raw: dict[str, Any] = {...}` -- the annotated form
+            # was invisible to this scan, which is how spartanburg_condemned's
+            # condemned_signal and henderson_foreclosure_parcels' tax_foreclosure went
+            # unregistered (found by the 2026-10-07 extraction audit).
+            _collect(node.value)
         elif isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
             for tgt in node.targets:
                 is_raw = (
