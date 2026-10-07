@@ -15,7 +15,8 @@ from tests._nc_rod_fakes import CAPTCHA_PAGE, CLOUDFLARE_403, FakeResp, install
 @pytest.mark.parametrize("label,category,kind", [
     ("DEED", None, DEED), ("WARRANTY DEED", None, DEED), ("D", None, DEED), ("QD", "DEED", DEED),
     ("TR/D", None, DEED), ("SUBSTITUTE TRUSTEES DEED", None, DEED),
-    ("D/T", None, DEED_OF_TRUST), ("DT", None, DEED_OF_TRUST), ("DEED OF TRUST", None, DEED_OF_TRUST),
+    ("D/T", None, DEED_OF_TRUST), ("DT", None, DEED_OF_TRUST), ("D T", None, DEED_OF_TRUST),
+    ("DEED OF TRUST", None, DEED_OF_TRUST), ("CAN D T", None, SATISFACTION),
     ("SAT D/T", None, SATISFACTION), ("CAN D/T", None, SATISFACTION), ("SATISFACTION", None, SATISFACTION),
     ("SF", "CANCELLATION", SATISFACTION),
     ("S/T", None, SUBSTITUTION), ("SUBSTITUTION OF TRUSTEE", None, SUBSTITUTION), ("SUB TR", None, SUBSTITUTION),

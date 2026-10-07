@@ -55,7 +55,7 @@ _RX_LIS = re.compile(r"LIS\s*/?\s*P|\bL\s*/\s*P\b|\bLP\b|PENDENS")
 _RX_SUB = re.compile(r"SUBST|\bS\s*/\s*T\b|\bSUB\s*/?\s*TR|\bSUB\s+TRUSTEE|\bS\s*/\s*TR\b|APPT?\.?\s*(OF\s*)?(SUB|SUCC)\w*\s*TR")
 _RX_SAT = re.compile(r"SATIS|\bSAT\b|CANCEL|\bCAN\b|\bCANC\b|RELEASE|\bREL\b|CERT\s*/\s*SAT")
 _RX_ASSIGN = re.compile(r"ASSIGN|\bASGM?T?\b|\bASSGN\b|\bASN\b|\bASG\b")
-_RX_DOT = re.compile(r"DEED OF TRUST|\bD\s*/\s*T\b|\bDT\b|\bDOT\b|\bD OF T\b|MORTGAGE|\bMTG\b|\bMORT\b|SECURITY DEED|DOFTR")
+_RX_DOT = re.compile(r"DEED OF TRUST|\bD\s*/?\s*T\b|\bDT\b|\bDOT\b|\bD OF T\b|MORTGAGE|\bMTG\b|\bMORT\b|SECURITY DEED|DOFTR")
 _RX_FCL = re.compile(r"FORECLOS|\bFORCL\b|\bFCL\b|NOTICE OF (?:FORECLOSURE )?SALE|\bNOS\b|NOTICE OF HEARING|"
                      r"NOTICE OF DEFAULT")
 _RX_NOT_NEW_DOT = re.compile(r"MODIF|SUBORD|AMEND|EXTEN|CORRECT|ADDEN")

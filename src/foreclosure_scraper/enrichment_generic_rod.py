@@ -146,6 +146,14 @@ RENDER_ROD_CONFIG = {
     # Harris 'ROD Web Access' (rod/nc_harris.py); Moore runs it too but answered with HTTP 403
     ("NC", "Mecklenburg"):   ("nc_harris", "FORECLOSURE_NC_HARRIS_ROD", "0"),
     ("NC", "Carteret"):      ("nc_harris", "FORECLOSURE_NC_HARRIS_ROD", "0"),
+    # Logan 'Public Records' Blazor (rod/nc_logan_blazor.py); proven live: Catawba, Cumberland, Union
+    ("NC", "Catawba"):       ("nc_logan_blazor", "FORECLOSURE_NC_LOGAN_BLAZOR_ROD", "0"),
+    ("NC", "Cumberland"):    ("nc_logan_blazor", "FORECLOSURE_NC_LOGAN_BLAZOR_ROD", "0"),
+    ("NC", "Union"):         ("nc_logan_blazor", "FORECLOSURE_NC_LOGAN_BLAZOR_ROD", "0"),
+    ("NC", "Cabarrus"):      ("nc_logan_blazor", "FORECLOSURE_NC_LOGAN_BLAZOR_ROD", "0"),
+    ("NC", "Chatham"):       ("nc_logan_blazor", "FORECLOSURE_NC_LOGAN_BLAZOR_ROD", "0"),
+    ("NC", "Sampson"):       ("nc_logan_blazor", "FORECLOSURE_NC_LOGAN_BLAZOR_ROD", "0"),
+    ("NC", "Wilkes"):        ("nc_logan_blazor", "FORECLOSURE_NC_LOGAN_BLAZOR_ROD", "0"),
 }
 
 

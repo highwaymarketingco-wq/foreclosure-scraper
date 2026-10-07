@@ -99,8 +99,10 @@ class FakePWPage:
     click is local. A selector 'exists' when its id / text is in the current html. Every action is
     recorded in `log`; typed text per selector in `typed`."""
 
-    def __init__(self, pages: dict, clicks: Optional[dict] = None, start_url: str = "about:blank"):
+    def __init__(self, pages: dict, clicks: Optional[dict] = None, start_url: str = "about:blank",
+                 present: Optional[dict] = None):
         self.pages, self.clicks = pages, dict(clicks or {})
+        self.present = dict(present or {})          # selector -> text that must be on the page
         self.url, self.html = start_url, ""
         self.log: list[tuple[str, str]] = []
         self.typed: dict[str, str] = {}
@@ -125,6 +127,8 @@ class FakePWPage:
         return self.html
 
     def query_selector(self, sel: str):
+        if sel in self.present:
+            return object() if self.present[sel] in self.html else None
         if sel.startswith("text="):
             return object() if sel[5:] in self.html else None
         m = re.match(r"#([\w\-]+)", sel)
