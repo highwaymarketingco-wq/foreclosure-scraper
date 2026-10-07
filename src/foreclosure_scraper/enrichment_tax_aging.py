@@ -67,7 +67,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Iterable, Optional
 
-from .enrichment_tax_owed import tax_not_yet_late, tax_year_status
+from .enrichment_tax_owed import tax_big_old, tax_not_yet_late, tax_year_status
 from .models import Listing
 from .verification.verifiers._tax_common import other_lien_listing
 
@@ -87,7 +87,7 @@ def enrich_tax_aging(listings: Iterable[Listing], today: Optional[date] = None) 
     derived raw['tax_aging_high'] flag) for every listing where a real tax
     source already states it. Returns run stats; never raises."""
     today = today or date.today()
-    stats = {"surfaced": 0, "high_2yr_plus": 0, "not_yet_late": 0, "not_yet_late_only": 0,
+    stats = {"surfaced": 0, "high_2yr_plus": 0, "not_yet_late": 0, "not_yet_late_only": 0, "big_old": 0,
              "by_source": {"nc_ptscloud": 0, "tax_owed": 0}}
 
     for li in listings:
@@ -102,6 +102,13 @@ def enrich_tax_aging(listings: Iterable[Listing], today: Optional[date] = None) 
             stats["not_yet_late_only"] += 1
         else:
             raw.pop("tax_not_yet_late", None)
+        # raw['tax_big_old']: a property-tax balance of BIG_TAX_BALANCE (,000) or more, the part
+        # already late, that is 2+ levy years late. A dashboard filter; it scores nothing.
+        if not other_lien_listing(li) and tax_big_old(raw, li.state, li.county, li.source, today):
+            raw["tax_big_old"] = True
+            stats["big_old"] += 1
+        else:
+            raw.pop("tax_big_old", None)
         pts = raw.get("nc_ptscloud_delinquent_tax")
         to = raw.get("tax_owed")
         pts_year = _year(pts.get("tax_year")) if isinstance(pts, dict) else None

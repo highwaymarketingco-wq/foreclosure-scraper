@@ -526,6 +526,33 @@ def tax_not_yet_late(raw: dict, state: Optional[str], county: Optional[str],
     return st["basis"] != "single_year" or bool(st.get("year_from_roll"))
 
 
+#: A property-tax balance this big that is also 2+ years late is the owner's "big tax-delinquent"
+#: lead (2026-10-07): raw['tax_big_old'].
+BIG_TAX_BALANCE = 7000.0
+
+
+def past_due_tax_balance(raw: dict, source: Optional[str], status: Optional[dict]) -> Optional[float]:
+    """The property-tax balance minus the part that is not late yet, when the source states that
+    part (tax_year_status's not_yet_late_amount); the whole balance otherwise."""
+    bal = property_tax_balance(raw, source)
+    if bal is None:
+        return None
+    nyl = (status or {}).get("not_yet_late_amount") or 0.0
+    return round(max(0.0, bal - nyl), 2)
+
+
+def tax_big_old(raw: dict, state: Optional[str], county: Optional[str],
+                source: Optional[str] = None, today: Optional[date] = None,
+                status: Optional[dict] = None) -> bool:
+    """A property-tax balance of BIG_TAX_BALANCE or more (the part already late) that is 2 or more
+    levy years late (tax_calendar)."""
+    st = status if status is not None else tax_year_status(raw, state, county, today)
+    if not st or st["years_delinquent"] < 2:
+        return False
+    past = past_due_tax_balance(raw, source, st)
+    return past is not None and past >= BIG_TAX_BALANCE
+
+
 def _years_fields(status: Optional[dict]) -> dict:
     """The year fields raw['tax_owed'] carries. Only from a source that lists the years or states a
     count; a single stated year is left to enrichment_tax_aging, as before (never invented here)."""

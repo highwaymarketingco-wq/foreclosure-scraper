@@ -509,7 +509,7 @@ const _LEAN_RAW_KEYS = Object.keys(_LEAN_RAW);
 const _LEAN_RAW_SCALARS = [
   "intent_score", "intent_band", "multifamily_class",
   "stale_case", "geo_imprecise", "sold_confirmed", "kw_vacant", "acres",
-  "child_support",
+  "child_support", "tax_big_old",
 ];
 const _ACRE_KEYS = ["acreage", "acres", "calculatedAcres", "deededAcres"];
 
@@ -2736,6 +2736,9 @@ function applyFilters() {
       // filter on mobile.
       if (contact === "estate_elderly" && !_lifeEventCount(r.life_events)) return false;
       if (contact === "hide_stale" && presumedWithdrawn(l)) return false;
+      // raw.tax_big_old (enrichment_tax_owed.tax_big_old): property tax of $7,000+ already late,
+      // 2+ levy years late. A current bill that is not late yet counts toward neither.
+      if (contact === "tax_big_old" && !r.tax_big_old) return false;
     }
     if (win && l.sale_date) {
       const d = Date.parse(l.sale_date);

@@ -2314,6 +2314,9 @@ RAW_KEEP = {
     # 2026-10-07: the row's only unpaid property-tax bill is not late yet (tax_calendar); the row
     # stays on the board as context and earns no tax credit. Written by enrich_tax_aging.
     "tax_not_yet_late": "*",
+    # 2026-10-07: property-tax balance >= $7,000 (the part already late) and 2+ levy years late
+    # (enrichment_tax_owed.tax_big_old). A dashboard filter; also in _SLIM_RAW_SCALARS for phones.
+    "tax_big_old": "*",
 
     # ------------------------------------------------------------------
     # 2026-09-10 SCRAPER-KEY AUDIT. Measured, not suspected: of 191 distinct raw
@@ -2978,7 +2981,7 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
 _SLIM_RAW_SCALARS = (
     "intent_score", "intent_band", "multifamily_class",
     "stale_case", "geo_imprecise", "sold_confirmed", "kw_vacant", "acres",
-    "child_support",
+    "child_support", "tax_big_old",
 )
 
 # Mirrors _ACRE_KEYS. The client probes three containers x four names = the

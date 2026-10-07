@@ -137,3 +137,46 @@ def test_ptscloud_tax_year_label_is_not_the_levy_year():
 def test_other_liens_are_not_property_tax_bills():
     li = _row([2026], source="counties_sc.sc_dew_lien_registry")
     assert not ds.tax_not_yet_late(li, TODAY)
+
+
+# ---- raw['tax_big_old']: $7,000+ of property tax already late, 2+ levy years late ----------------
+
+def _big(years, owed, per_year=None, **kw):
+    extra = {"multi_year_delinquent_tax": {"years": years, "total_due": owed,
+                                           "per_year": per_year or {}}}
+    return _row([], extra=extra, owed=owed, **kw)
+
+
+def test_big_old_needs_two_late_years_and_the_late_part_over_the_line():
+    from foreclosure_scraper.enrichment_tax_owed import BIG_TAX_BALANCE
+    assert BIG_TAX_BALANCE == 7000.0
+    assert _big([2023, 2024], 7000.0).raw.get("tax_big_old") is True
+    assert "tax_big_old" not in _big([2023, 2024], 6999.99).raw
+    assert "tax_big_old" not in _big([2025], 50000.0).raw                  # one late year
+    # unpaid 2024 + 2025 + the current 2026 bill: 2 late years, but only $6,000 of it is late
+    li = _big([2024, 2025, 2026], 9000.0, {"2024": 3000.0, "2025": 3000.0, "2026": 3000.0})
+    assert li.raw["tax_owed"]["years_delinquent"] == 2
+    assert "tax_big_old" not in li.raw
+    li = _big([2024, 2025, 2026], 12000.0, {"2024": 4000.0, "2025": 4000.0, "2026": 4000.0})
+    assert li.raw["tax_big_old"] is True
+
+
+def test_big_old_is_cleared_and_never_on_another_lien():
+    li = _big([2023, 2024], 8000.0)
+    assert li.raw["tax_big_old"] is True
+    li.raw["multi_year_delinquent_tax"]["years"] = [2024]
+    enrich_tax_owed([li], today=TODAY)
+    enrich_tax_aging([li], today=TODAY)
+    assert "tax_big_old" not in li.raw
+    assert "tax_big_old" not in _big([2023, 2024], 8000.0,
+                                     source="counties_sc.sc_dew_lien_registry").raw
+
+
+def test_big_old_ships_to_phones_and_the_dashboard_filter_reads_it():
+    from pathlib import Path
+    from foreclosure_scraper.web_artifact import RAW_KEEP, _SLIM_RAW_SCALARS
+    assert RAW_KEEP.get("tax_big_old") == "*" and RAW_KEEP.get("tax_not_yet_late") == "*"
+    assert "tax_big_old" in _SLIM_RAW_SCALARS
+    root = Path(__file__).resolve().parents[1] / "docs"
+    assert 'contact === "tax_big_old" && !r.tax_big_old' in (root / "dashboard.js").read_text()
+    assert '<option value="tax_big_old">' in (root / "index.html").read_text()
