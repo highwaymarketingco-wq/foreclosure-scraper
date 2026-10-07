@@ -359,3 +359,29 @@ Investigated, found real and reachable, and deliberately NOT turned into leads. 
 - `docs/manual_playbook_and_limits.md` — what stays manual and the exact operator steps for each manual lane.
 - `docs/net_new_source_register.md` — deep per-county URL register. **WARNING: physically truncated** — it begins mid-table-row and its sections 1.1 through 1.14 (all 11 NC counties) do not exist anywhere.
 
+
+## 2026-10-07 additions (second-round source builds)
+
+| slug | what it reads | access | notes |
+|---|---|---|---|
+| `national.bankruptcy_rss_relief_from_stay` | Bankruptcy-court CM/ECF public RSS (SC and two NC districts): lender motions for relief from the automatic stay | open RSS | debtor name + district only (no address or lender in the feed); dateless |
+| `public_notices.echovita_obituaries` | Echovita obituaries, NC and SC statewide, with survivor lists | open | feeds heir candidates; a site challenge can appear on heavy lookups |
+| `public_notices.obituary_feeds` | Open newspaper and funeral-home obituary feeds (Western NC + Upstate SC first) | open | feeds heir candidates |
+| `public_notices.publicnoticesc_estates` | SC estate notices statewide from scpublicnotices.com (SC Press Association) | open | the two estate searches publicnoticesc.py never ran |
+| `counties_sc.charleston_energov_history` | Charleston County building code cases and demolition permits (county open data) | open | no case status: a code case is open 365 days from its date |
+| `counties_sc.horry_probate` | Horry County Probate Court estate cases (public portal, JSON) | open | about 4,000 estates a year |
+| `counties_sc.york_tax_sale_parcels` | York County delinquent-tax SALE list read from the county's ArcGIS layer | open map layer | the county tax site itself is Cloudflare-walled; this layer is the open route |
+| `counties_nc.cumberland_delinquent_tax` | Cumberland County advertisement of unpaid real-estate taxes (NCGS 105-369) | open | the June ad: some bills may be paid since |
+| `counties_nc.guilford_tax_foreclosures` | Guilford County tax-foreclosure pipeline (ForeclosuresPublic ArcGIS layer) | open map layer | owner and mailing address on the layer |
+| `counties_nc.iredell_delinquent_tax` | Iredell County parcels with delinquent taxes owed (county map layer) | open map layer | no amount on the layer |
+| `counties_nc.kinston_proposed_demolition` | City of Kinston NC 2026 proposed demolition list | open | includes city-recorded utility cut-offs |
+| `counties_nc.mecklenburg_delinquent_tax` | Mecklenburg County advertisement of unpaid tax liens (NCGS 105-369), XLSX | open | default OFF (FORECLOSURE_MECKLENBURG_DELINQUENT=1); no parcel numbers, matched through the parcel cache |
+| `counties_nc.mecklenburg_tax_foreclosures` | Mecklenburg County tax-foreclosure pipeline (TaxForeclosures ArcGIS layer) | open map layer | no owner names on the layer |
+| `counties_nc.nc_metro_demolition_permits` | Demolition permits: Mecklenburg (Charlotte), Durham, Greensboro, Cary | open | expired kept; cancelled and withdrawn dropped |
+| `counties_nc.nc_tax_lien_ads` | NC annual tax-lien advertisements (NCGS 105-369) posted as PDFs by Hoke, Lee, Davidson, Randolph | open PDFs | about 12,900 rows; Davidson parcel numbers lose a leading zero (restored) |
+| `counties_nc.rocky_mount_blight_survey` | Rocky Mount 2025 parcel condition survey (dilapidated, deteriorated, boarded) | open map layer | Nash and Edgecombe |
+| `counties_nc.rowan_delinquent_tax` | Rowan County delinquent real-estate tax list (county spreadsheet) | open | real estate only |
+| `counties_nc.wake_code_cases` | Wake County code cases opened in the last 90 days (county open data) | open | case description text is never stored |
+| `newspapers.columbia_star` | The Columbia Star: weekly Master-in-Equity sale notices for Richland County | open RSS | the REST API is limited to approved addresses; the public RSS is read |
+| `newspapers.mecklenburg_times` | The Mecklenburg Times: real-estate legal notices (Mecklenburg, Union, Iredell) via RSS | open RSS | site returns 403 after about 12 requests in two minutes: run once a day |
+| `city_websites.raleigh_structure_fires` | City of Raleigh structure fires (city open data) | open | first fire-damage source |

@@ -15,7 +15,24 @@ layout quirks that produced wrong data on the first pass:
 """
 from datetime import datetime
 
+import pytest
+
 from foreclosure_scraper.models import ListingType, PropertyKind
+from foreclosure_scraper.scrapers.national import williams_auctions as _wa
+
+
+class _FrozenDatetime(datetime):
+    """The courthouse line says 'Oct 5 at 1:00 PM' with no year: the parser picks the next such date, so
+    the expected 2026 date silently became 2027 once the real clock passed Oct 5 2026. Pin the clock."""
+
+    @classmethod
+    def utcnow(cls):
+        return cls(2026, 9, 28, 12, 0, 0)
+
+
+@pytest.fixture(autouse=True)
+def _pin_the_clock(monkeypatch):
+    monkeypatch.setattr(_wa, "datetime", _FrozenDatetime)
 from foreclosure_scraper.scrapers.national.williams_auctions import (
     _DETAIL_HREF_RE,
     _PDF_LINK_RE,

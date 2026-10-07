@@ -303,7 +303,7 @@ def test_pickens_all_layers_alive_emits_every_parcel(monkeypatch):
 
 
 def test_pickens_one_retired_service_fails_the_run_instead_of_shrinking_it(monkeypatch):
-    """THE REGRESSION: this used to return 7/8 of the parcels and report OK.
+    """THE REGRESSION: this used to return all but one of the layers' parcels and report OK.
 
     The retired service answers HTTP 200 with an error body (saved fixture), so
     there is no status code anywhere to notice — only the guard catches it.
@@ -323,7 +323,7 @@ def test_pickens_one_retired_service_fails_the_run_instead_of_shrinking_it(monke
     assert len(s.last_reason) <= 200
     assert "partial harvest" in s.last_reason
     assert "dqnt_2024" in s.last_reason
-    assert "7/8 declared layers alive" in s.last_reason
+    assert f"{len(pk.LAYERS) - 1}/{len(pk.LAYERS)} declared layers alive" in s.last_reason
 
 
 def _helene_listing(parcel: str) -> Listing:
