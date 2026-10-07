@@ -46,7 +46,11 @@ _SUFFIX = {"JR", "SR", "II", "III", "IV", "V", "ETAL", "ET", "AL", "ETUX", "UX",
 _TAG = re.compile(r"<[^>]+>")
 _ENTITY_RX = re.compile(r"\bL\.?\s?L\.?\s?[CP]\b|\bINC\b|\bCORP|\bLTD\b|\bCOMPANY\b|\bBANK\b|\bTRUST\b|"
                         r"\bHOLDINGS?\b|\bPROPERTIES\b|\bHOMES\b|\bASSOC|\bCHURCH\b|\bPARTNERS|\bFUND\b|"
-                        r"\bCREDIT UNION\b|\bMORTGAGE\b|\bCOUNTY\b|\bCITY OF\b|\bSTATE OF\b|\bAUTHORITY\b", re.I)
+                        r"\bCREDIT UNION\b|\bMORTGAGE\b|\bCOUNTY\b|\bCITY OF\b|\bSTATE OF\b|\bAUTHORITY\b|"
+                        r"\bAPARTMENTS?\b|\bASSOCIATES\b|\bVENTURES?\b|\bENTERPRISES?\b|\bINVESTMENTS?\b|"
+                        r"\bREALTY\b|\bRENTALS?\b|\bDEVELOPMENT\b|\bGROUP\b|\bMINISTRIES\b|\bPARTNERSHIP\b|"
+                        r"\bCAPITAL\b|\bMANAGEMENT\b|\bCONSTRUCTION\b|\bBUILDERS\b|\bSERVICES\b|\bHOUSING\b|"
+                        r"\bINDUSTRIES\b|\bPROPERTY\b", re.I)
 
 
 def looks_entity(name: str) -> bool:

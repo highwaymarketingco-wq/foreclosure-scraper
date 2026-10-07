@@ -131,6 +131,9 @@ SC_ROD_CONFIG = {
     # ACPASS by name, 7/1/1974-2/20/2026 (rod/anderson_acpass_rod.py). Later deeds are in a
     # bot-checked system a script may not read; every chain result says so (after_index).
     ("SC", "Anderson"):      ("anderson_acpass_rod", "FORECLOSURE_SC_ACPASS_ROD", "0"),
+    # the county's own document search (rod/greenwood_docsearch.py); 2 of 6 real board owners gave a
+    # chain and a third the owner's liens, about 5 s a lookup (2026-10-07)
+    ("SC", "Greenwood"):     ("greenwood_docsearch", "FORECLOSURE_SC_GREENWOOD_ROD", "1"),
 }
 SC_CHAIN_ONLY_CONFIG = {
     ("SC", "Oconee"):        ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "1"),

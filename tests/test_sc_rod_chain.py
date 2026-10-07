@@ -288,3 +288,9 @@ def test_owner_query_estate_of_and_care_of():
     assert (q.last, q.first, q.middle) == ("QUILLFEATHER", "ROSALIND", "M") and not q.entity
     q = owner_query("The Estate of Otis Bramblewood")
     assert (q.last, q.first) == ("BRAMBLEWOOD", "OTIS")
+
+
+def test_business_words_make_an_entity():
+    q = owner_query("WILLOWMERE APARTMENTS")
+    assert q.entity and name_fit(q, "WILLOWMERE APARTMENTS LP") == "full"
+    assert owner_query("QUILLFEATHER ROSALIND M").entity is False
