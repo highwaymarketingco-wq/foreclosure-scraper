@@ -52,6 +52,20 @@ ROD_CONFIG = {
     ("NC", "Nash"):          ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
     ("NC", "Pamlico"):       ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
     ("NC", "Wayne"):         ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
+    # 'The Lookup' (Logan / BIS) name index (rod/nc_lookup.py). Clay, Haywood, Yancey are also read
+    # by enrichment_rod_lookup (raw['rod_lookup']) and Transylvania, McDowell, Mitchell by the
+    # rod/logan.py NOD sweep; neither writes raw['rod'], so these entries add, not replace.
+    ("NC", "Avery"):         ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    ("NC", "Bertie"):        ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    ("NC", "Columbus"):      ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    ("NC", "Macon"):         ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    ("NC", "Robeson"):       ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    ("NC", "Clay"):          ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    ("NC", "Haywood"):       ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    ("NC", "Yancey"):        ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    ("NC", "Transylvania"):  ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    ("NC", "McDowell"):      ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    ("NC", "Mitchell"):      ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
 }
 
 #: chain()-only registrations: counties whose lien existence another enricher already writes
