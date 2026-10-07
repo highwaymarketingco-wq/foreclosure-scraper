@@ -2288,6 +2288,7 @@ RAW_KEEP = {
     "land_distress": "*",             # land-specific distress flag
     "flood_zone": "*",                # FEMA flood-zone tag (alternate key name)
     "courtlistener_adversary": "*",  # bankruptcy adversary proceeding
+    "bankruptcy_relief_from_stay": "*",  # CM/ECF RSS relief-from-stay motion/order: court, case, chapter, events
     "geocoded_by_name": "*",          # name-based geocoding provenance
     "gis_attrs_full": "*",            # full GIS attribute snapshot
     "situs_address_source": "*",      # situs address provenance
