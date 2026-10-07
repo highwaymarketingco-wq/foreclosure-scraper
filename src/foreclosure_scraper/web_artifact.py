@@ -2693,6 +2693,15 @@ RAW_KEEP = {
     "utility_cutoff": "*",       # ^ city-recorded power/sewer/gas cut-off on a condemned building
     "heir_property": "*",        # ^ city's HEIR_PROPERTY flag
     "richland_parcel": "*",      # enrichment_richland_parcel: TMS, attempted date, opted_out, owner_agrees
+    # 2026-10-07 round 2 (same doc): each written by the scraper named, registered in the same change.
+    "charleston_energov": "*",   # counties_sc.charleston_energov_history: code cases + demolition permits
+    "demolition_permit": "*",    # ^ and counties_nc.nc_metro_demolition_permits: feed, count, permits
+    "rowan_delinquent_tax": "*", # counties_nc.rowan_delinquent_tax: bill, balance, years_unpaid, owner type
+    "heirs_or_estate_owner": "*",  # ^ Rowan type_of_id HRS / ETA
+    "cumberland_delinquent_tax": "*",  # counties_nc.cumberland_delinquent_tax: PIN, amount, years_unpaid
+    "iredell_delinquent_tax": "*",  # counties_nc.iredell_delinquent_tax: as-of date, years_unpaid
+    "wake_code_case": "*",       # counties_nc.wake_code_cases: case, type, status, categories (no free text)
+    "nc_tax_lien_ad": "*",       # counties_nc.nc_tax_lien_ads: county, tax year, amount, parcel
 
 }
 
