@@ -1,0 +1,3037 @@
+{
+ "schema": "owner-walls-register-v1",
+ "about": "Hand-maintained source of docs/OWNER_MANUAL_LANES.md. Edit this file, then run: uv run python scripts/build_owner_manual.py. Card text is plain words; <b>..</b> marks bold. Built-versus-manual, county access, adapters and dormant scrapers are computed by the generator, not typed here.",
+ "what_changed": [
+  "The manual is now generated (scripts/build_owner_manual.py) from structured data: the county matrix, the register-platform cluster docs, every new_sources JSON, the gap matrix, the live run status, the registered deed adapters and this register. 'python scripts/build_owner_manual.py --check' says when it is stale.",
+  "County access and the 'built' list are computed: a county whose deed search has a registered reader shows the reader and its on/off switch; a plain 'I agree', disclosure popup or credential-free guest button is always allowed, never a wall.",
+  "Every walled record in the source-hunt files appears in a generated table, with the card that covers it or 'no card yet'."
+ ],
+ "kind_def": {
+  "A": "<b>A: a person passes it in a normal browser.</b> A CAPTCHA (click pictures or tick 'I'm not a robot'), a Cloudflare or similar bot check ('Just a moment...', 'Verify you are human', 'Access Denied'), or a real login (an account with a user name and password, even a free one you make yourself).",
+  "B": "<b>B: paid or attorney-only.</b> A per-page fee, a subscription, a license (MLS), or an agency-only sign-in.",
+  "C": "<b>C: allowed (not a wall).</b> Terms of use, a robots.txt line, or a plain click with no credentials: 'I agree', a disclaimer, a disclosure popup, or a 'Sign in as a Guest' button. These are built or buildable and listed in appendix C."
+ },
+ "decisions": [
+  [
+   "Click-throughs are allowed.",
+   "A plain 'I agree', disclaimer, disclosure popup or 'Sign in as a Guest' button that asks for no credentials is not a wall (Kania, Zacchaeus, Aldridge Pite, and the ten Cott guest-button deed counties: Alamance, Edgecombe, Halifax, Lenoir, Onslow, Pitt, Rowan, Rutherford, Scotland, Wilson)."
+  ],
+  [
+   "Cleared by the attorney.",
+   "Terms-only restrictions; the SC Judicial Branch Public Index terms (Rule 610 and the administrative order); SC Code 30-2-50 for our SC mailings; AI cold calls. The Public Index automation was then stopped by a technical bot check (HTTP 406 at the site's edge, plus a script challenge), so those lists stay a hand-save card; Charleston's own copy of the Index is open and buildable."
+  ],
+  [
+   "robots.txt is not a wall.",
+   "Owner's rule of 2026-09-20."
+  ],
+  [
+   "LiensNC.",
+   "The LiensNC login lives in the LiensNC scripts by the owner's choice, so pulls stay repeatable. The full run never re-scraped LiensNC (national.liensnc is disabled); the roughly 45,000 rows on the board came from the two manual scripts (scripts/scrape_liensnc.py, then scripts/ingest_all.py). A repeatable incremental LiensNC refresh through the Mac hand-off is being built."
+  ],
+  [
+   "What still stays manual.",
+   "CAPTCHAs, Cloudflare and other bot checks, real logins, and paid or attorney-only subscriptions. Those are the cards below."
+  ]
+ ],
+ "built_static": [
+  {
+   "title": "Quiet-title intake sheets.",
+   "text": "scripts/quiet_title_intake.py writes a private per-parcel sheet for the attorney: every NC county through the NC OneMap statewide parcel layer, plus live register reads for Buncombe and Polk, and a 'where to look' block from the county matrix.",
+   "evidence": [
+    {
+     "path": "scripts/quiet_title_intake.py"
+    }
+   ]
+  },
+  {
+   "title": "Extraction fixes.",
+   "text": "12 fixes from docs/extraction_audit_2026-10-07.md (state contamination layers, Gaston and Lincoln vacant, PTS Cloud every delinquent year, Spartanburg vacant and condemned, Buncombe elderly, Berkeley PayStar, Greenville and New Hanover layers, Horry workbooks, Pickens 2026 cycle).",
+   "evidence": [
+    {
+     "path": "docs/extraction_audit_2026-10-07.md",
+     "regex": "the 12 fixed"
+    }
+   ]
+  },
+  {
+   "title": "Privacy filter.",
+   "text": "Social Security, driver's licence and birth-date columns are dropped whenever a county layer is read (commit 65c68d5d).",
+   "evidence": [
+    {
+     "path": "src/foreclosure_scraper/sensitive_fields.py",
+     "regex": "def drop_sensitive"
+    }
+   ]
+  },
+  {
+   "title": "Verifier fixes.",
+   "text": "Tax-lien PTS Cloud v4, tax-lien qPayBill v4 (sold at tax sale is its own state), probate heirs v3 (a death entry counts only when the full names match).",
+   "evidence": [
+    {
+     "path": "src/foreclosure_scraper/verification/verifiers/tax_lien_ptscloud.py",
+     "regex": "VERSION = \"v4\""
+    },
+    {
+     "path": "src/foreclosure_scraper/verification/verifiers/tax_lien_qpaybill.py",
+     "regex": "VERSION = \"v4\""
+    },
+    {
+     "path": "src/foreclosure_scraper/verification/verifiers/probate_heir_buncombe.py",
+     "regex": "VERSION = \"v3\""
+    }
+   ]
+  },
+  {
+   "title": "New county scrapers (2026-10-07 source hunt).",
+   "text": "Mecklenburg unpaid-tax advertisement (43,355 rows), Guilford tax foreclosures (930), Mecklenburg tax foreclosures (618).",
+   "evidence": [
+    {
+     "path": "src/foreclosure_scraper/scrapers/counties_nc/mecklenburg_delinquent_tax.py"
+    },
+    {
+     "path": "src/foreclosure_scraper/scrapers/counties_nc/guilford_tax_foreclosures.py"
+    },
+    {
+     "path": "src/foreclosure_scraper/scrapers/counties_nc/mecklenburg_tax_foreclosures.py"
+    }
+   ]
+  },
+  {
+   "title": "Obituary readers.",
+   "text": "Open newspaper and funeral-home feeds plus Echovita and Find a Grave lookups by name, with survivors kept private (commits 3bc56410, 2f0d038b).",
+   "evidence": [
+    {
+     "path": "src/foreclosure_scraper/scrapers/public_notices/_obit_common.py"
+    }
+   ]
+  },
+  {
+   "title": "Being built now.",
+   "text": "The incremental LiensNC refresh through the Mac hand-off.",
+   "evidence": []
+  }
+ ],
+ "manual_intro": "Only four things keep a source manual: a CAPTCHA, a Cloudflare or other bot check, a real login (an account with a password), or a payment or attorney-only subscription. Each card below is one such source, sorted inside its group by value for your time: the start page, the clicks (including how a person gets past the check in a normal browser), what to pull, how to save it and where to put it, how it gets loaded, time and how often, what we gain, and who else could do it.",
+ "appendix_c_intro": "No technical barrier: terms of use, robots.txt, or a plain click with no credentials. The attorney has cleared terms-only limits, and robots.txt is not a wall by the owner's rule. If a CAPTCHA, a real login or a bot check ever appears on one of these, it moves to type A and the reader stops.",
+ "cards": [
+  {
+   "id": "nc_sp",
+   "group": "nc",
+   "place": "North Carolina, every county (start with the 11 core counties)",
+   "name": "NC court foreclosure cases (special proceedings) on the NC eCourts portal",
+   "kind": "A",
+   "wall": "Picture CAPTCHA (\"Let's confirm you are human\") in front of every search. Scripts get an HTTP 405 'Human Verification' page.",
+   "url": "https://portal-nc.tylertech.cloud/Portal/",
+   "what": "Every power-of-sale foreclosure in NC is a court 'special proceeding' (case numbers like 26SP000500-100). The law-firm sale calendars and newspaper notices we already read cover many of them, but not all, and not the case status (hearing held, sale held, upset bid filed). Without this we miss foreclosures no law firm posts, and we cannot tell which sales are still open.",
+   "steps": [
+    "Open Chrome (a normal window) and go to <b>https://portal-nc.tylertech.cloud/Portal/</b>. Use that exact address; the bare site name shows an error page. Do not sign in. The public search needs no account.",
+    "Click <b>Smart Search</b>.",
+    "In the search box type <b>26SP*</b> (all 2026 special proceedings). Use <b>25SP*</b> for last year if you are backfilling.",
+    "Click <b>Advanced Filtering Options</b>. Set <b>Location</b> to the county (for example 'Buncombe County'). Set the <b>File Date</b> range: first time, the last 6 months; after that, from your last pull to today. (Labels can differ slightly; pick the closest match.)",
+    "Click <b>Submit</b>. A box that says <b>\"Let's confirm you are human\"</b> with a grid of pictures may appear. Click the pictures it asks for, then press <b>Confirm</b>. It can ask two or three times in a row; that is normal. Do not use any add-on or service that solves it for you.",
+    "At the bottom of the results, set <b>items per page</b> to the largest number offered (200). If the list looks short (about 23 rows), the site is sampling: narrow the dates and search again.",
+    "Press <b>Cmd + S</b>. Set <b>Format</b> to <b>Web Page, HTML Only</b> (not Complete, not PDF).",
+    "Name the file <b>&lt;county&gt;_nc_sp_&lt;date&gt;.html</b>, for example <b>buncombe_nc_sp_2026-10-07.html</b> (two-word counties: <b>new_hanover_nc_sp_2026-10-07.html</b>). Save it into the Desktop folder <b>Court Pages (drop here)</b>.",
+    "Repeat for the next county. The CAPTCHA usually does not come back for a few minutes.",
+    "When all counties are saved, double-click <b>Ingest Saved Court Pages</b> on the Desktop. A notice tells you how many NC court records it found.",
+    "Optional, for earlier warning: the portal's hearing search (same CAPTCHA) lists power-of-sale hearings before the notice of sale. Search hearings by county and date range with case type Special Proceedings and save the results the same way (name <b>&lt;county&gt;_nc_hearings_&lt;date&gt;.html</b>)."
+   ],
+   "pull": "Only rows whose case type reads <b>Foreclosure (Special Proceeding)</b>. Keep the columns the grid shows: case number, case style (the parties, which names the owner), file date, location, status. One results page per county per pull. Weekly: the 11 core counties (Buncombe, Henderson, Cleveland, Gaston, Rutherford, Polk, Transylvania, McDowell, Lincoln, Mitchell, Burke). Monthly: the next 14 by lead count (Mecklenburg, Wake, Forsyth, Guilford, Catawba, New Hanover, Brunswick, Durham, Pitt, Orange, Johnston, Union, Onslow, Harnett). Check: the number after the dash in each case number is the county code (Buncombe ends in -100).",
+   "save": "Web Page, HTML Only. Filename must contain <b>_nc_</b> (the loader reads the county from the text before it). Folder: <b>~/Desktop/Court Pages (drop here)/</b>. Then run the Desktop app <b>Ingest Saved Court Pages</b>.",
+   "lane": "Existing. The app runs the saved-page reader for NC court pages, which is tested on this exact results grid (verified 2026-08-13), turns each row into a lead, and tries to match the owner name to a parcel. The app refuses to run while the weekly engine run is writing, and never makes duplicates. For the engineer: scripts/ingest_saved.sh, scripts/parse_nc_ecourts_export.py, scripts/ingest_fresh_court_leads.py.",
+   "time": "About 2 to 3 minutes per county once past the CAPTCHA: 30 minutes for the 11 core counties, 35 more for the monthly 14.",
+   "often": "Weekly (core 11); monthly (next 14).",
+   "gain": "New NC foreclosure cases the law firms do not post, with the owner's name and case number; earlier warning on cases still in the hearing stage. Our estimate (not measured): 15 to 40 new cases a week across the 11 core counties. Name-to-parcel matching runs about 30% automatically, so expect roughly a third to land on a property without your help.",
+   "others": "The Clerk of Superior Court's public terminal in each courthouse (free, in person). A title abstractor or a title company's foreclosure report (an O&amp;E report runs about $85 to $95 per property, per our notes). The attorney's own research subscription (Westlaw or Lexis docket search, if his plan includes NC dockets; price not on file).",
+   "minutes_month": 160,
+   "leads": "15 to 40 cases a week (estimate)",
+   "signal_columns": [
+    "lt_foreclosure_sale"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Buncombe"
+    ],
+    [
+     "NC",
+     "Henderson"
+    ],
+    [
+     "NC",
+     "Cleveland"
+    ],
+    [
+     "NC",
+     "Gaston"
+    ],
+    [
+     "NC",
+     "Rutherford"
+    ],
+    [
+     "NC",
+     "Polk"
+    ],
+    [
+     "NC",
+     "Transylvania"
+    ],
+    [
+     "NC",
+     "McDowell"
+    ],
+    [
+     "NC",
+     "Lincoln"
+    ],
+    [
+     "NC",
+     "Mitchell"
+    ],
+    [
+     "NC",
+     "Burke"
+    ],
+    [
+     "NC",
+     "Mecklenburg"
+    ],
+    [
+     "NC",
+     "Wake"
+    ],
+    [
+     "NC",
+     "Forsyth"
+    ],
+    [
+     "NC",
+     "Guilford"
+    ],
+    [
+     "NC",
+     "Catawba"
+    ],
+    [
+     "NC",
+     "New Hanover"
+    ],
+    [
+     "NC",
+     "Brunswick"
+    ],
+    [
+     "NC",
+     "Durham"
+    ],
+    [
+     "NC",
+     "Pitt"
+    ],
+    [
+     "NC",
+     "Orange"
+    ],
+    [
+     "NC",
+     "Johnston"
+    ],
+    [
+     "NC",
+     "Union"
+    ],
+    [
+     "NC",
+     "Onslow"
+    ],
+    [
+     "NC",
+     "Harnett"
+    ]
+   ],
+   "short": "NC foreclosure lists",
+   "loads": "yes",
+   "wall_class": "captcha",
+   "covers": [
+    "NC-ECOURTS-HEARINGS"
+   ]
+  },
+  {
+   "id": "nc_est",
+   "group": "nc",
+   "place": "North Carolina, every county (start with the 11 core counties)",
+   "name": "NC estate files (probate) on the NC eCourts portal",
+   "kind": "A",
+   "wall": "The same picture CAPTCHA as above.",
+   "url": "https://portal-nc.tylertech.cloud/Portal/",
+   "what": "Every NC estate is opened with the Clerk of Superior Court and indexed on eCourts (case numbers like 26E000123-100). Newspaper notices to creditors reach us for many estates, but only after the executor publishes, and only the ones that publish where we read. The estate index shows the decedent and the date the estate opened, weeks earlier.",
+   "steps": [
+    "Open Chrome (a normal window) and go to <b>https://portal-nc.tylertech.cloud/Portal/</b>. Use that exact address; the bare site name shows an error page. Do not sign in. The public search needs no account.",
+    "Click <b>Smart Search</b>.",
+    "In the search box type <b>26E*</b> (all 2026 estate files).",
+    "Click <b>Advanced Filtering Options</b>. Set <b>Location</b> to the county and the <b>File Date</b> range (first time: last 6 months; after that: since your last pull). If a <b>Case Category</b> or <b>Case Type</b> filter is offered, pick <b>Estate</b>.",
+    "Click <b>Submit</b>. A box that says <b>\"Let's confirm you are human\"</b> with a grid of pictures may appear. Click the pictures it asks for, then press <b>Confirm</b>. It can ask two or three times in a row; that is normal. Do not use any add-on or service that solves it for you.",
+    "At the bottom of the results, set <b>items per page</b> to the largest number offered (200). If the list looks short (about 23 rows), the site is sampling: narrow the dates and search again.",
+    "Press <b>Cmd + S</b>. Set <b>Format</b> to <b>Web Page, HTML Only</b> (not Complete, not PDF).",
+    "Name the file <b>&lt;county&gt;_nc_estates_&lt;date&gt;.html</b>, for example <b>henderson_nc_estates_2026-10-07.html</b>. Save it into <b>Court Pages (drop here)</b> on the Desktop.",
+    "Repeat per county, then double-click <b>Ingest Saved Court Pages</b>."
+   ],
+   "pull": "All estate rows (decedent estates). Skip guardianship, incompetency, minor and other rows that describe a living person's health or capacity; they are not property leads and should not be saved. Columns: case number, case name (the decedent), file date, location, status. Same county plan as the foreclosure search: core 11 weekly, next 14 monthly.",
+   "save": "Web Page, HTML Only, filename with <b>_nc_</b>, into <b>Court Pages (drop here)</b>, then the Desktop app.",
+   "lane": "Existing (same app and reader as the foreclosure search). The reader recognizes estate captions ('Estate of ...', 'In re ...') and scores these rows as estate leads. First time you do this, ask Claude to check that the decedent names came through correctly.",
+   "time": "About 2 minutes per county: 25 minutes for the core 11.",
+   "often": "Weekly (core 11); monthly (next 14).",
+   "gain": "The decedent's name and the estate's opening date, weeks before any newspaper notice. Your sheet shows estate and probate signals at zero or under 1% in most NC counties. Our estimate (not measured): 50 to 100 new estates a week across the core 11; many will not own land.",
+   "others": "The Clerk's Estates Division (public terminal or a phone call, free). The attorney's research subscription if it covers NC estate dockets (price not on file). Paid court-data vendors (UniCourt, Trellis; price not on file).",
+   "minutes_month": 130,
+   "leads": "50 to 100 estates a week (estimate)",
+   "signal_columns": [
+    "lt_probate_notice",
+    "lt_estate_lead",
+    "probate",
+    "heir_estate"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Buncombe"
+    ],
+    [
+     "NC",
+     "Henderson"
+    ],
+    [
+     "NC",
+     "Cleveland"
+    ],
+    [
+     "NC",
+     "Gaston"
+    ],
+    [
+     "NC",
+     "Rutherford"
+    ],
+    [
+     "NC",
+     "Polk"
+    ],
+    [
+     "NC",
+     "Transylvania"
+    ],
+    [
+     "NC",
+     "McDowell"
+    ],
+    [
+     "NC",
+     "Lincoln"
+    ],
+    [
+     "NC",
+     "Mitchell"
+    ],
+    [
+     "NC",
+     "Burke"
+    ],
+    [
+     "NC",
+     "Mecklenburg"
+    ],
+    [
+     "NC",
+     "Wake"
+    ],
+    [
+     "NC",
+     "Forsyth"
+    ],
+    [
+     "NC",
+     "Guilford"
+    ],
+    [
+     "NC",
+     "Catawba"
+    ],
+    [
+     "NC",
+     "New Hanover"
+    ],
+    [
+     "NC",
+     "Brunswick"
+    ],
+    [
+     "NC",
+     "Durham"
+    ],
+    [
+     "NC",
+     "Pitt"
+    ],
+    [
+     "NC",
+     "Orange"
+    ],
+    [
+     "NC",
+     "Johnston"
+    ],
+    [
+     "NC",
+     "Union"
+    ],
+    [
+     "NC",
+     "Onslow"
+    ],
+    [
+     "NC",
+     "Harnett"
+    ]
+   ],
+   "short": "NC estate lists",
+   "loads": "yes",
+   "wall_class": "captcha",
+   "covers": [
+    "NC eCourts estates"
+   ]
+  },
+  {
+   "id": "nc_verify",
+   "group": "nc",
+   "place": "North Carolina, one lead at a time",
+   "name": "Check one NC lead's court case (status, parties, heirs) with the human-assisted checker",
+   "kind": "A",
+   "wall": "The same picture CAPTCHA, plus the NC Secretary of State's bot check when the owner is a company.",
+   "url": "https://portal-nc.tylertech.cloud/Portal/",
+   "what": "For a HOT lead (lis pendens, foreclosure, divorce or estate), the one fact that decides whether to call is on the case page: is the case still open, who are the parties, are there heirs we do not know about. We have a tool that sets this up and reads the saved page.",
+   "steps": [
+    "Tell Claude: <b>\"verify lead &lt;parcel number&gt; in &lt;county&gt;\"</b> (or give the case number). The tool prints which search to run and opens the eCourts page in your browser. If the owner is a company, a second tab opens on the NC Secretary of State business search.",
+    "On eCourts: pass the picture CAPTCHA yourself, search the case number (best) or the name it printed, and click into the matching case so the full case page shows (parties, events, hearings).",
+    "Press <b>Cmd + S</b>, Web Page, HTML Only, and save it as <b>&lt;parcel&gt;_case.html</b> in your Downloads folder.",
+    "If the company tab opened: search the company name, open its profile page, save it the same way as <b>&lt;parcel&gt;_sos.html</b>.",
+    "Tell Claude the file names. The tool reads them and reports confirmed, refuted or unconfirmed. For an estate, any new name on the page is checked against the free NC voter list to see if that person is alive and where they vote."
+   ],
+   "pull": "One case page per lead: the parties list, the events list (hearing, order of sale, upset bid, dismissal) and the status line. Do HOT leads only, 5 per sitting.",
+   "save": "HTML Only, in ~/Downloads, filename with the parcel number. Do not put these in the court drop folder (they are single cases, not lists).",
+   "lane": "Existing, run by Claude in the terminal: the tool queues the check, opens the page, and parses what you saved into a verdict. It does not write back to the dashboard yet; the verdict is a report. For the engineer: scripts/verify_lead_human_assisted.py, src/foreclosure_scraper/verification_human_lane.py.",
+   "time": "About 5 to 6 minutes per lead.",
+   "often": "Weekly, HOT leads only.",
+   "gain": "A checked yes or no on the lead's case, and the heirs list on estate leads. This adds no new cells to your sheet; it makes the leads you call right.",
+   "others": "The attorney (his eCourts access is the same public search; his staff can run it). A title abstractor for heirs on a specific property.",
+   "minutes_month": 130,
+   "leads": "5 leads a week checked",
+   "signal_columns": [],
+   "scope": [],
+   "short": "NC lead checker",
+   "loads": "yes",
+   "wall_class": "captcha"
+  },
+  {
+   "id": "nc_notice_body",
+   "group": "nc",
+   "place": "North Carolina, newspaper legal notices (statewide site)",
+   "name": "Full text of NC estate and foreclosure notices on ncnotices.com",
+   "kind": "A",
+   "wall": "Each notice's full text sits behind an 'I Agree, View Notice' click (allowed) and, on the notices our reader checked, a Google checkbox CAPTCHA ('I'm not a robot'), which is what keeps it manual.",
+   "url": "https://www.ncnotices.com/",
+   "what": "We already read the notice list (name, county, date). The full text holds the executor's name and mailing address, the attorney, and sometimes the date of death. That is the best free contact path for an estate.",
+   "steps": [
+    "Open <b>https://www.ncnotices.com/</b> in Chrome.",
+    "Search the decedent's name from the lead (or browse 'Notice to Creditors' for the county).",
+    "Click the notice. Tick the box <b>I'm not a robot</b>, pass any picture check, and click <b>I Agree, View Notice</b>.",
+    "Copy the executor (personal representative) name and mailing address, the attorney's name, and the date of death if shown.",
+    "Paste them into the lead's notes in your CRM. If you prefer, save the notice page (Cmd + S, HTML Only) into ~/Downloads as <b>&lt;parcel&gt;_notice.html</b>, but no reader picks these up yet."
+   ],
+   "pull": "For estate leads you will actually mail or call: executor name, executor mailing address, attorney, date of death. 10 per sitting.",
+   "save": "Type into the CRM. Saved pages are not loaded by anything yet.",
+   "lane": "None. A small reader would be needed: the notice-body reader we already have for the ungated notices could read a saved page. About an hour for the engineer.",
+   "time": "About 2 minutes per notice.",
+   "often": "Weekly, top estate leads only.",
+   "gain": "A named, mailable executor for the estate (the person who can sign). Your sheet shows 'heir naming publication' at zero in every NC county.",
+   "others": "The executor's attorney is named in the notice; the attorney's office is a legitimate contact route.",
+   "minutes_month": 85,
+   "leads": "10 executors a week",
+   "signal_columns": [
+    "heir_naming_publication"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Buncombe"
+    ],
+    [
+     "NC",
+     "Henderson"
+    ],
+    [
+     "NC",
+     "Cleveland"
+    ],
+    [
+     "NC",
+     "Gaston"
+    ],
+    [
+     "NC",
+     "Rutherford"
+    ],
+    [
+     "NC",
+     "Polk"
+    ],
+    [
+     "NC",
+     "Transylvania"
+    ],
+    [
+     "NC",
+     "McDowell"
+    ],
+    [
+     "NC",
+     "Lincoln"
+    ],
+    [
+     "NC",
+     "Mitchell"
+    ],
+    [
+     "NC",
+     "Burke"
+    ],
+    [
+     "NC",
+     "Mecklenburg"
+    ],
+    [
+     "NC",
+     "Wake"
+    ],
+    [
+     "NC",
+     "Forsyth"
+    ],
+    [
+     "NC",
+     "Guilford"
+    ],
+    [
+     "NC",
+     "Catawba"
+    ],
+    [
+     "NC",
+     "New Hanover"
+    ],
+    [
+     "NC",
+     "Brunswick"
+    ],
+    [
+     "NC",
+     "Durham"
+    ],
+    [
+     "NC",
+     "Pitt"
+    ],
+    [
+     "NC",
+     "Orange"
+    ],
+    [
+     "NC",
+     "Johnston"
+    ],
+    [
+     "NC",
+     "Union"
+    ],
+    [
+     "NC",
+     "Onslow"
+    ],
+    [
+     "NC",
+     "Harnett"
+    ]
+   ],
+   "short": "NC notice text",
+   "loads": "small",
+   "wall_class": "captcha",
+   "covers": [
+    "ncnotices.com Details.aspx"
+   ]
+  },
+  {
+   "id": "nc_sos_liens",
+   "group": "nc",
+   "place": "North Carolina, Secretary of State",
+   "name": "NC Secretary of State: federal tax lien and UCC lien searches",
+   "kind": "A",
+   "wall": "Cloudflare check ('Just a moment...' or a 'Verify you are human' box) that our stealth browser could not pass. The federal tax lien page also says scripted searches are not permitted and bulk access is a paid data subscription (price not on file).",
+   "url": "https://www.sosnc.gov/online_services/search/by_title/_Federal_Tax_Lien",
+   "what": "IRS liens and UCC filings against companies (LLCs, builders) that own our leads. A narrow signal: it only covers company owners.",
+   "steps": [
+    "Open the page in Chrome. If the Cloudflare box shows, tick it.",
+    "Type the company name exactly as the county shows the owner (for example 'ABC HOLDINGS LLC'). Search.",
+    "Open each hit and note: filing date, lien amount if shown, the IRS office, and whether it is released.",
+    "For UCC filings use <b>https://www.sosnc.gov/online_services/search/by_title/_uniform_commercial_code</b> the same way."
+   ],
+   "pull": "Company-owned HOT leads only. Filing date, amount, status (open or released). 10 names per sitting.",
+   "save": "Type into the CRM. No reader exists.",
+   "lane": "None. A two-column file (owner name, lien note) could be loaded later if this proves useful.",
+   "time": "About 2 minutes per name.",
+   "often": "Monthly, company-owned HOT leads.",
+   "gain": "Proof of tax trouble for company owners. Your sheet's 'liens' column is zero in every NC county, but this source fills only the company-owned slice.",
+   "others": "The NC SoS paid data subscription for bulk (price not on file). The attorney's lien search vendor.",
+   "minutes_month": 20,
+   "leads": "a few liens a month",
+   "signal_columns": [
+    "liens"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Buncombe"
+    ],
+    [
+     "NC",
+     "Henderson"
+    ],
+    [
+     "NC",
+     "Cleveland"
+    ],
+    [
+     "NC",
+     "Gaston"
+    ],
+    [
+     "NC",
+     "Rutherford"
+    ],
+    [
+     "NC",
+     "Polk"
+    ],
+    [
+     "NC",
+     "Transylvania"
+    ],
+    [
+     "NC",
+     "McDowell"
+    ],
+    [
+     "NC",
+     "Lincoln"
+    ],
+    [
+     "NC",
+     "Mitchell"
+    ],
+    [
+     "NC",
+     "Burke"
+    ]
+   ],
+   "short": "NC SoS liens",
+   "loads": "crm",
+   "wall_class": "bot"
+  },
+  {
+   "id": "sc_probate_net",
+   "group": "sc",
+   "place": "South Carolina: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York",
+   "name": "SC probate court estate index on southcarolinaprobate.net",
+   "kind": "A",
+   "wall": "The site refuses scripts with a 403 'Forbidden' page from its load balancer (checked 2026-10-07, also with a normal browser identity). A person in a normal browser should get the search page. If you also get 403 in your own browser, the site is down; call the probate court.",
+   "url": "https://www.southcarolinaprobate.net/search/",
+   "what": "17 SC probate courts post their estate index here. Each estate row shows the decedent, the filing date, the case status, the creditor-claim deadline and, in a sub-table, the personal representative's full name and mailing address. Our reader for this site works only when the site answers it, and today it does not.",
+   "steps": [
+    "Open <b>https://www.southcarolinaprobate.net/search/</b> in Chrome. (Charleston also has <b>/charlestonprobatesearch/</b>.)",
+    "Pick the county in the <b>County</b> drop-down. Wait for the page to refresh.",
+    "Type a last name in the name box and press <b>Search</b>. The site searches by name only, not by date. Use the surnames of your SC obituary, estate and tax-delinquent leads in that county.",
+    "Click the plus sign on each matching case to open the parties list (the personal representative's name and address) and the docket list.",
+    "Press <b>Cmd + S</b>, Web Page, HTML Only. Name: <b>&lt;county&gt;_sc_probate_&lt;surname&gt;_&lt;date&gt;.html</b>."
+   ],
+   "pull": "Estate cases only (skip marriage records). Case number, decedent, filing date, status, creditor-claim date, personal representative name and mailing address. 15 surnames per sitting, biggest counties first (Charleston, Sumter, Oconee, Cherokee, Florence, Colleton).",
+   "save": "HTML Only into ~/Downloads (not the court drop folder, which would move the files without reading them).",
+   "lane": "None for saved pages yet. The live reader already parses this exact page (it is how the 373 Charleston rows on the board were built), so pointing it at saved files is a small job, about an hour. Until then, ask Claude to load them by hand. For the engineer: src/foreclosure_scraper/scrapers/counties_sc/sc_probate_net.py.",
+   "time": "About 1 minute per surname search plus 1 minute per case opened.",
+   "often": "Weekly.",
+   "gain": "SC estates with a named personal representative and a mailing address, which is the person who can sell. Your sheet shows SC probate and estate signals at zero or under 1% in about 35 to 45 of 46 SC counties.",
+   "others": "The probate court clerk by phone (free). The attorney's probate subscription where a county sells document access (Greenville). An SC abstractor.",
+   "minutes_month": 85,
+   "leads": "10 to 30 estates a week (estimate)",
+   "signal_columns": [
+    "lt_probate_notice",
+    "lt_estate_lead",
+    "probate",
+    "heir_estate"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Aiken"
+    ],
+    [
+     "SC",
+     "Bamberg"
+    ],
+    [
+     "SC",
+     "Barnwell"
+    ],
+    [
+     "SC",
+     "Charleston"
+    ],
+    [
+     "SC",
+     "Cherokee"
+    ],
+    [
+     "SC",
+     "Chester"
+    ],
+    [
+     "SC",
+     "Colleton"
+    ],
+    [
+     "SC",
+     "Dorchester"
+    ],
+    [
+     "SC",
+     "Florence"
+    ],
+    [
+     "SC",
+     "Georgetown"
+    ],
+    [
+     "SC",
+     "Kershaw"
+    ],
+    [
+     "SC",
+     "Lancaster"
+    ],
+    [
+     "SC",
+     "Marlboro"
+    ],
+    [
+     "SC",
+     "Oconee"
+    ],
+    [
+     "SC",
+     "Orangeburg"
+    ],
+    [
+     "SC",
+     "Sumter"
+    ],
+    [
+     "SC",
+     "York"
+    ]
+   ],
+   "short": "SC probate site",
+   "loads": "small",
+   "wall_class": "bot",
+   "covers": [
+    "SC probate index (southcarolinaprobate.net)"
+   ]
+  },
+  {
+   "id": "sc_sos",
+   "group": "sc",
+   "place": "South Carolina, Secretary of State",
+   "name": "SC Secretary of State business entity search (company owners)",
+   "kind": "A",
+   "wall": "Google checkbox CAPTCHA ('I'm not a robot') on every search (re-checked 2026-10-04).",
+   "url": "https://businessfilings.sc.gov/BusinessFiling/Entity/Search",
+   "what": "When an SC lead is owned by an LLC or corporation, the entity record shows whether it is in good standing or dissolved, the registered agent's name and address, and sometimes the principal office. NC company owners we already look up for free; SC we cannot.",
+   "steps": [
+    "Open the page in Chrome.",
+    "Type the company name as the county shows it. Tick <b>I'm not a robot</b> and pass any picture check. Press <b>Search</b>.",
+    "Open the matching entity. Note: status (Good Standing, Forfeited, Dissolved), date of status, registered agent name and address.",
+    "Type these into the lead's notes in the CRM."
+   ],
+   "pull": "SC HOT and WARM leads whose owner name contains LLC, INC, CORP, TRUST or LP. Status, status date, registered agent name and address. 10 per sitting.",
+   "save": "Type into the CRM. No reader exists (an older instruction to save 'sc_sos_&lt;entity&gt;.html' files led nowhere: nothing reads them).",
+   "lane": "None. A small reader for a saved entity page, or a simple CSV (owner name, status, agent, agent address), would be needed.",
+   "time": "About 2 minutes per company.",
+   "often": "Monthly.",
+   "gain": "A contact route (the registered agent) and a distress flag (forfeited or dissolved company still holding land). Your sheet's 'SoS dissolution' column is zero in all 46 SC counties.",
+   "others": "The SC UCC search (ucconline.sc.gov) for liens against company owners: the 2026-10-07 source hunt found it open; an older note said $5 a search. The attorney's corporate search vendor.",
+   "minutes_month": 30,
+   "leads": "10 company owners a month",
+   "signal_columns": [
+    "sos_dissolution"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Spartanburg"
+    ],
+    [
+     "SC",
+     "Anderson"
+    ],
+    [
+     "SC",
+     "Pickens"
+    ],
+    [
+     "SC",
+     "Oconee"
+    ],
+    [
+     "SC",
+     "Cherokee"
+    ],
+    [
+     "SC",
+     "Union"
+    ],
+    [
+     "SC",
+     "Laurens"
+    ],
+    [
+     "SC",
+     "Charleston"
+    ],
+    [
+     "SC",
+     "Horry"
+    ],
+    [
+     "SC",
+     "Greenville"
+    ],
+    [
+     "SC",
+     "Sumter"
+    ],
+    [
+     "SC",
+     "Darlington"
+    ],
+    [
+     "SC",
+     "Berkeley"
+    ],
+    [
+     "SC",
+     "Lexington"
+    ]
+   ],
+   "short": "SC SoS companies",
+   "loads": "small",
+   "wall_class": "captcha",
+   "covers": [
+    "SC Secretary of State business filings search"
+   ]
+  },
+  {
+   "id": "sc_notice_body",
+   "group": "sc",
+   "place": "South Carolina, newspaper legal notices",
+   "name": "Full text of SC notices to creditors and foreclosure notices (scpublicnotices.com, publicnoticesc.com)",
+   "kind": "A",
+   "wall": "scpublicnotices.com: the notice page ('Details') shows a Cloudflare 'Verify you are human' box and a Google CAPTCHA. publicnoticesc.com: Cloudflare check on every page.",
+   "url": "https://www.scpublicnotices.com/",
+   "what": "We read the notice list and the short preview. The full notice holds the personal representative's name and address, or for a foreclosure the sale date, the property and the plaintiff.",
+   "steps": [
+    "Open <b>https://www.scpublicnotices.com/</b> in Chrome.",
+    "Search the decedent's or owner's last name, or filter by county and category (Notice to Creditors, Foreclosure).",
+    "Click the notice. Pass the 'Verify you are human' box and the picture check if shown.",
+    "Copy the personal representative's name and address (estates) or sale date, address and plaintiff (foreclosures) into the CRM.",
+    "Same steps on <b>https://www.publicnoticesc.com/</b> for notices that only appear there."
+   ],
+   "pull": "Top SC estate and foreclosure leads only: representative name, mailing address, attorney; or sale date and address. 10 per sitting.",
+   "save": "Type into the CRM. Nothing reads saved notice pages yet.",
+   "lane": "None. Same small reader job as the NC notice bodies.",
+   "time": "About 2 minutes per notice.",
+   "often": "Weekly, top leads.",
+   "gain": "Named contacts on SC estates. Your sheet's 'heir naming publication' column is zero in 45 of 46 SC counties.",
+   "others": "The attorney named in the notice.",
+   "minutes_month": 40,
+   "leads": "10 contacts a week",
+   "signal_columns": [
+    "heir_naming_publication"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Spartanburg"
+    ],
+    [
+     "SC",
+     "Anderson"
+    ],
+    [
+     "SC",
+     "Pickens"
+    ],
+    [
+     "SC",
+     "Oconee"
+    ],
+    [
+     "SC",
+     "Cherokee"
+    ],
+    [
+     "SC",
+     "Union"
+    ],
+    [
+     "SC",
+     "Laurens"
+    ],
+    [
+     "SC",
+     "Charleston"
+    ],
+    [
+     "SC",
+     "Horry"
+    ],
+    [
+     "SC",
+     "Greenville"
+    ]
+   ],
+   "short": "SC notice text",
+   "loads": "small",
+   "wall_class": "captcha",
+   "covers": [
+    "SC Press Association Details.aspx"
+   ]
+  },
+  {
+   "id": "sc_qpublic",
+   "group": "sc",
+   "place": "South Carolina, county property cards on qPublic: Allendale, Bamberg, Barnwell, Cherokee, Chester, Clarendon, Colleton, Darlington, Edgefield, Fairfield, Florence, Georgetown, Hampton, Jasper, Kershaw, Lancaster, Laurens, Lee, Marlboro, Newberry, Oconee, Orangeburg, Pickens, Spartanburg, Union, York",
+   "name": "SC assessor property cards (heated square feet, beds, baths, sales) on qPublic",
+   "kind": "A",
+   "wall": "Cloudflare 'Verify you are human' check on searches (a terms click also shows; that part is allowed).",
+   "url": "https://qpublic.schneidercorp.com/Application.aspx?App=CherokeeCountySC&Layer=Parcels&PageType=Search",
+   "what": "Free SC map layers leave heated square feet and sale price blank. The county property card on qPublic has them as plain text. Without them our value estimates for SC lean on guesses.",
+   "steps": [
+    "Open the qPublic link for the county (replace <b>Cherokee</b> in the address with the county name, for example <b>App=PickensCountySC</b>).",
+    "Click through the terms box. If a Cloudflare 'Verify you are human' box shows, tick it.",
+    "Search by <b>Parcel ID</b> (the lead's TMS number) or by owner name.",
+    "On the card, find <b>Heated Sq Ft</b> (or Living Area), <b>Bedrooms</b>, <b>Full Baths</b>, <b>Year Built</b>, <b>Acres</b>, and the <b>Sales</b> table (date, price, deed book and page).",
+    "Type these into the CRM, or into a simple sheet with columns: parcel_id, heated_sqft, beds, baths, year_built, last_sale_date, last_sale_price."
+   ],
+   "pull": "SC HOT leads with no square footage on the dashboard. The 7 fields above. 10 parcels per sitting.",
+   "save": "A CSV with the columns above, saved as <b>sc_cards_&lt;date&gt;.csv</b> in ~/Downloads, then ask Claude to load it. Saved card pages are not read by anything.",
+   "lane": "None for a hand-made CSV. A small loader (parcel_id plus the 7 fields) is about an hour of work. Note for the engineer: the code that renders these cards automatically has a setting that ticks the Cloudflare box unless FORECLOSURE_NO_CF_SOLVE=1 is set, and no run script sets it. That should be checked against the owner's rule.",
+   "time": "About 2 minutes per parcel.",
+   "often": "Weekly, HOT SC leads.",
+   "gain": "Real square footage and sale history, which make the value estimate and the offer price trustworthy. Your sheet shows square feet zero in 26 SC counties and beds and baths zero in 31.",
+   "others": "The county assessor's office (call with the TMS number). Paid property data: ATTOM (entry about $95 to $500 a month; bulk backfill $1,500 to $5,000 one time), Realie ($50 to $350 a month), PropStream Pro ($199 a month). Prices from our 2026-07 notes; confirm before buying.",
+   "minutes_month": 85,
+   "leads": "10 parcels a week",
+   "signal_columns": [
+    "sqft",
+    "beds_baths",
+    "lot_size",
+    "assessed_value"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Allendale"
+    ],
+    [
+     "SC",
+     "Bamberg"
+    ],
+    [
+     "SC",
+     "Barnwell"
+    ],
+    [
+     "SC",
+     "Cherokee"
+    ],
+    [
+     "SC",
+     "Chester"
+    ],
+    [
+     "SC",
+     "Clarendon"
+    ],
+    [
+     "SC",
+     "Colleton"
+    ],
+    [
+     "SC",
+     "Darlington"
+    ],
+    [
+     "SC",
+     "Edgefield"
+    ],
+    [
+     "SC",
+     "Fairfield"
+    ],
+    [
+     "SC",
+     "Florence"
+    ],
+    [
+     "SC",
+     "Georgetown"
+    ],
+    [
+     "SC",
+     "Hampton"
+    ],
+    [
+     "SC",
+     "Jasper"
+    ],
+    [
+     "SC",
+     "Kershaw"
+    ],
+    [
+     "SC",
+     "Lancaster"
+    ],
+    [
+     "SC",
+     "Laurens"
+    ],
+    [
+     "SC",
+     "Lee"
+    ],
+    [
+     "SC",
+     "Marlboro"
+    ],
+    [
+     "SC",
+     "Newberry"
+    ],
+    [
+     "SC",
+     "Oconee"
+    ],
+    [
+     "SC",
+     "Orangeburg"
+    ],
+    [
+     "SC",
+     "Pickens"
+    ],
+    [
+     "SC",
+     "Spartanburg"
+    ],
+    [
+     "SC",
+     "Union"
+    ],
+    [
+     "SC",
+     "York"
+    ]
+   ],
+   "short": "SC property cards",
+   "loads": "small",
+   "wall_class": "bot",
+   "covers": [
+    "qPublic / Beacon county property sites (Schneider)",
+    "Cherokee County SC parcels"
+   ]
+  },
+  {
+   "id": "sc_publicindex",
+   "group": "sc",
+   "place": "South Carolina, 45 county courts on publicindex.sccourts.org (Charleston has its own open copy)",
+   "name": "SC Judicial Public Index case lists (foreclosure, partition, quiet title, lis pendens, judgments)",
+   "kind": "A",
+   "wall": "A bot check, not the terms: the terms (Rule 610 and the administrative order) are cleared by the attorney, but on 2026-10-07 the site's edge refused an ordinary request with HTTP 406 on every path, and earlier checks found an F5 'Client Challenge' script on the search page. A person's desktop browser passes both without seeing anything. So the automatic lanes were not built, and these lists are hand-saved (docs/new_sources_2026-10-07_sc_public_index.md).",
+   "url": "https://publicindex.sccourts.org/Spartanburg/PublicIndex/",
+   "what": "SC foreclosure, partition, quiet-title, lis pendens and judgment case lists for 45 counties. SC foreclosure is judicial, so this is where an SC foreclosure starts. Your sheet shows SC foreclosure-sale signals at zero in 39 of 46 counties.",
+   "steps": [
+    "Open <b>https://publicindex.sccourts.org/&lt;County&gt;/PublicIndex/</b> in Chrome (for example Spartanburg). Click <b>Accept</b> on the disclaimer.",
+    "Leave <b>Last Name</b> blank. Set <b>Date Type</b> to <b>Case Filed</b>, the begin date to your last pull (first time: 6 months back), the end date to today.",
+    "Run each lane and save each results page: <b>Foreclosure</b> (Circuit Court, Common Pleas, sub-type Foreclosure 420); <b>Partition</b> (sub-type Partition 440); <b>Quiet title</b> (the quiet-title sub-type in the Common Pleas list); <b>Lis Pendens</b> (Index Search radio, Lis Pendens); <b>Judgments</b> (Index Search radio, Judgments). Skip Possession/eviction (it names the tenant, not the owner).",
+    "If it says 'maximum records exceeded', shorten the date range to about 2 months.",
+    "Press Cmd + S, HTML Only, name <b>&lt;county&gt;_sc_&lt;lane&gt;_&lt;date&gt;.html</b> (for example <b>spartanburg_sc_foreclosure_2026-10-07.html</b>), save into <b>Court Pages (drop here)</b>, then run the Desktop app <b>Ingest Saved Court Pages</b>."
+   ],
+   "pull": "Foreclosure and partition first, then quiet title, lis pendens and judgments. Case number, caption, filed date, status. Monthly: the 7 core SC counties (Spartanburg, Anderson, Pickens, Oconee, Cherokee, Union, Laurens), then Greenville, Horry, York, Lexington, Richland, Berkeley, Sumter as time allows. For Master in Equity sale rosters (York, Aiken, Lexington, Richland and others), open Court Rosters on the same site and save the month's roster page.",
+   "save": "HTML Only into <b>Court Pages (drop here)</b>, then <b>Ingest Saved Court Pages</b>.",
+   "lane": "Existing: the app runs the SC Public Index reader automatically on any saved Public Index page. The list page has no judgment dollar column (an older bug that read the case-number year as a '$2026' judgment was fixed on 2026-09-29). Charleston's own copy (jcmsweb.charlestoncounty.org/PublicIndex/) answered normally and is buildable. For the engineer: scripts/ingest_publicindex_files.py; src/foreclosure_scraper/ingest_sc_publicindex_export.py.",
+   "time": "About 3 minutes per county per lane: about 40 minutes a month for foreclosure and partition in the 7 core counties.",
+   "often": "Monthly.",
+   "gain": "SC foreclosure and partition filings, the first public sign of an SC foreclosure, plus quiet-title and judgment filings.",
+   "others": "The Clerk of Court (records request). Paid court data (UniCourt, Trellis; prices not on file).",
+   "minutes_month": 40,
+   "leads": "tens of filings a month",
+   "signal_columns": [
+    "lt_foreclosure_sale"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Spartanburg"
+    ],
+    [
+     "SC",
+     "Anderson"
+    ],
+    [
+     "SC",
+     "Pickens"
+    ],
+    [
+     "SC",
+     "Oconee"
+    ],
+    [
+     "SC",
+     "Cherokee"
+    ],
+    [
+     "SC",
+     "Union"
+    ],
+    [
+     "SC",
+     "Laurens"
+    ]
+   ],
+   "short": "SC court lists",
+   "loads": "yes",
+   "wall_class": "bot",
+   "covers": [
+    "SC-ROSTERS-MORE"
+   ]
+  },
+  {
+   "id": "pacer",
+   "group": "national",
+   "place": "Nationwide (federal bankruptcy courts for Western, Middle and Eastern NC and for SC)",
+   "name": "PACER bankruptcy petitions: fix the bankruptcy rows that have no county",
+   "kind": "B",
+   "wall": "PACER needs your own free PACER account and charges $0.10 a page, capped at $3.00 per document. Fees are waived if you stay under $30 a quarter (from 1 Jan 2027: $0.12 a page and a $40 waiver). CourtListener's RECAP archive is free and has many of the same documents.",
+   "url": "https://pacer.uscourts.gov/",
+   "what": "Bankruptcy rows come from the free CourtListener feed with the debtor's name and case number but often no address. Your coverage sheet counts about 5,000 such rows under 'UNKNOWN' county (about 3,060 in NC and 1,950 in SC); today's dashboard file shows 737. Page 1 of the bankruptcy petition lists the debtor's street address and county.",
+   "steps": [
+    "First ask Claude to pull every petition that is already free in CourtListener's RECAP archive. That needs no person and no money, and may fix many rows at once.",
+    "For the rest: go to <b>https://www.courtlistener.com/</b>, search the case number, open the docket. If document 1 (the Voluntary Petition) shows 'Download PDF' (free), open it.",
+    "If it shows 'Buy on PACER': log in to PACER with your own account, open the case in that court (Western District of NC: <b>https://ecf.ncwb.uscourts.gov</b>; Middle NC: <b>https://ecf.ncmb.uscourts.gov</b>; Eastern NC: <b>https://ecf.nceb.uscourts.gov</b>; SC: <b>https://ecf.scb.uscourts.gov</b>), and view document 1, page 1 only (10 cents).",
+    "On page 1, Part 1, item 5 ('Where you live'), copy the street address, city, county, state and ZIP.",
+    "Add a row to a sheet with columns: <b>case_number, court, street, city, county, state, zip</b>. Save it as <b>bankruptcy_addresses_&lt;date&gt;.csv</b> in ~/Downloads and ask Claude to load it."
+   ],
+   "pull": "Page 1 of the petition only. Address, city, county, ZIP. Chapter 13 cases first (people trying to keep a house), then Chapter 7. 20 cases per sitting.",
+   "save": "One CSV per sitting, columns above, into ~/Downloads.",
+   "lane": "None yet. A small loader is needed (match on case number, write address and county). About an hour for the engineer, and the free RECAP pull should be done first.",
+   "time": "About 3 minutes per case. 20 cases is an hour and about $2 to $6, which stays inside the free quarterly waiver.",
+   "often": "Twice a month until the backlog is small.",
+   "gain": "Turns UNKNOWN-county bankruptcy rows into mailable, county-sorted leads and lets the bankruptcy-stay check match them to foreclosures.",
+   "others": "CourtListener (free; RECAP has many petitions). The attorney's PACER account (same price). Paid court-data services (price not on file).",
+   "minutes_month": 120,
+   "leads": "40 rows fixed a month",
+   "signal_columns": [],
+   "scope": [],
+   "short": "PACER",
+   "loads": "small",
+   "wall_class": "paid",
+   "covers": [
+    "FED-PACER"
+   ]
+  },
+  {
+   "id": "people_search",
+   "group": "national",
+   "place": "Nationwide people-search sites (most useful for SC, where we have no free phone source)",
+   "name": "Phone numbers for HOT leads from people-search sites (TruePeopleSearch, FastPeopleSearch and similar)",
+   "kind": "A",
+   "wall": "Cloudflare checks (and some CAPTCHAs) stop scripts, so a person looks up each lead. Full numbers on some sites are behind a paywall.",
+   "url": "https://www.truepeoplesearch.com/",
+   "what": "SC has no free phone source: the SC voter list is paid, purpose-limited and has no phone column. In NC our free voter-file match only finds owners who live in the house. A person can look up a few top leads by hand.",
+   "steps": [
+    "Open <b>https://www.truepeoplesearch.com/</b> (or <b>https://www.fastpeoplesearch.com/</b>) in Chrome. Pass the Cloudflare check if shown.",
+    "Search the owner's full name and the city and state of the <b>mailing</b> address on the lead (not the property, if the owner is absentee).",
+    "Open the result whose current or past address matches the mailing address or the property. Check the age if the lead has one.",
+    "Copy up to three phone numbers (wireless first) and any email address.",
+    "Add a row to a sheet with columns: <b>parcel_id, property_address, owner_name, phone1, phone2, phone3, email</b>. Save as <b>contacts_people_search_&lt;date&gt;.csv</b> in ~/Downloads.",
+    "Ask Claude to load it. The loader tags every phone 'needs Do Not Call scrub', as it does for all phones."
+   ],
+   "pull": "SC HOT and WARM leads first, then NC absentee owners. Phone numbers, email, the matched address. 20 leads per sitting. Never guess between two people with the same name: skip the lead.",
+   "save": "CSV into ~/Downloads (not the court drop folder).",
+   "lane": "Existing, terminal step by Claude: the contact loader matches each row by parcel number (best) or property address and attaches the phones with the Do Not Call flag. For the engineer: scripts/ingest_contacts.py, src/foreclosure_scraper/contact_ingest.py.",
+   "time": "About 2 to 3 minutes per lead.",
+   "often": "Weekly.",
+   "gain": "Callable SC leads. Your sheet shows phone at zero in 36 of 46 SC counties and email at zero in 39.",
+   "others": "Paid skip tracing on a CSV upload: Tracerfy about $0.02 a record, DataZapp $0.02 to $0.03 ($125 minimum), BatchData $0.07 to $0.18, REISkip $0.15 to $0.22 per hit. A full-board run of 30,000 leads was estimated at $600 to $900. Prices from our 2026-07 notes; confirm before buying.",
+   "minutes_month": 170,
+   "leads": "20 leads a week with phones",
+   "signal_columns": [
+    "phone",
+    "email"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Spartanburg"
+    ],
+    [
+     "SC",
+     "Charleston"
+    ],
+    [
+     "SC",
+     "Horry"
+    ],
+    [
+     "SC",
+     "Pickens"
+    ],
+    [
+     "SC",
+     "Greenville"
+    ],
+    [
+     "SC",
+     "Oconee"
+    ],
+    [
+     "SC",
+     "Sumter"
+    ],
+    [
+     "SC",
+     "Laurens"
+    ],
+    [
+     "SC",
+     "Cherokee"
+    ],
+    [
+     "SC",
+     "Anderson"
+    ],
+    [
+     "SC",
+     "Darlington"
+    ],
+    [
+     "SC",
+     "Berkeley"
+    ],
+    [
+     "SC",
+     "Williamsburg"
+    ],
+    [
+     "SC",
+     "Lexington"
+    ],
+    [
+     "SC",
+     "Kershaw"
+    ],
+    [
+     "SC",
+     "Florence"
+    ],
+    [
+     "SC",
+     "Colleton"
+    ],
+    [
+     "SC",
+     "Union"
+    ],
+    [
+     "SC",
+     "Clarendon"
+    ],
+    [
+     "SC",
+     "Marlboro"
+    ]
+   ],
+   "short": "Phone lookups",
+   "loads": "yes",
+   "wall_class": "bot",
+   "covers": [
+    "TruePeopleSearch",
+    "CyberBackgroundChecks",
+    "Intelius",
+    "PeopleFinders",
+    "ZabaSearch"
+   ]
+  },
+  {
+   "id": "obits",
+   "group": "national",
+   "place": "Obituary sites and newspapers: Legacy.com, Tribute Archive, Everloved, Gannett papers (Asheville, Hendersonville, Gastonia, Shelby, Spartanburg, Greenville, Anderson), TownNews papers, Transylvania Times, Frazer funeral-home pages",
+   "name": "Obituaries behind a bot check or a paper's paywall (survivors = likely heirs)",
+   "kind": "A",
+   "wall": "Cloudflare checks (Legacy.com, Tribute Archive, Everloved, Transylvania Times, Frazer funeral-home obituary pages); HTTP 402 'Access Restricted' on Gannett and some TownNews obituary pages; HTTP 429 or 403 from several small papers (checked 2026-10-07). Our new obituary readers use the open feeds and Echovita and stop at these.",
+   "url": "https://www.legacy.com/",
+   "what": "The obituary names the survivors, who are usually the heirs and the people who will sell. Our open readers cover part of this; these sites hold the rest.",
+   "steps": [
+    "For an estate or probate lead, open <b>https://www.legacy.com/</b> in Chrome (pass the check) and search the decedent's first and last name with the state.",
+    "If not found, try the local paper's obituary page (for example citizen-times.com/obituaries for Buncombe) and the funeral home's site named in the death notice.",
+    "Open the obituary. Copy: date of death, the city, the survivors (spouse, children, siblings) with their cities, and the funeral home.",
+    "Type these into the lead's notes in the CRM. Keep survivor names private (they never go on the public dashboard)."
+   ],
+   "pull": "Estate and probate leads you will work: date of death, survivors and their cities, funeral home. 10 per sitting.",
+   "save": "CRM notes.",
+   "lane": "None by design: survivor names are kept private. The heir-candidate store built today could take a private CSV later if wanted.",
+   "time": "About 3 minutes per decedent.",
+   "often": "Weekly, top estate leads.",
+   "gain": "Named likely heirs with their towns, to find and mail the person who can sell.",
+   "others": "The funeral home; the estate's attorney (named in the notice to creditors).",
+   "minutes_month": 40,
+   "leads": "10 heir sets a week",
+   "signal_columns": [],
+   "scope": [],
+   "short": "Obituary sites",
+   "loads": "crm",
+   "wall_class": "bot",
+   "covers": [
+    "Legacy.com",
+    "Tribute Archive",
+    "Everloved",
+    "Transylvania Times obituaries",
+    "Frazer funeral-home obituary pages"
+   ]
+  },
+  {
+   "id": "propwire",
+   "group": "national",
+   "place": "Nationwide (PropWire)",
+   "name": "PropWire export from your own free account",
+   "kind": "A",
+   "wall": "DataDome bot shield on every page (scripts get a 403 and a CAPTCHA), plus account login. Its skip-trace tier is paid.",
+   "url": "https://propwire.com/",
+   "what": "PropWire lists pre-foreclosures and owner data and lets a logged-in user export a CSV. Our loader attaches what it can to leads we already have (by parcel or address). It does not create new leads.",
+   "steps": [
+    "Log in at <b>https://propwire.com/</b> with your own account.",
+    "Search a core county. Filter to pre-foreclosure / foreclosure (and absentee owner if offered).",
+    "Use <b>Export</b> to CSV (data tier only; do not buy the skip-trace tier unless you decide to).",
+    "Save as <b>propwire_&lt;county&gt;_&lt;date&gt;.csv</b> in ~/Downloads and ask Claude to load it as a PropWire export."
+   ],
+   "pull": "Parcel number, property address, owner name, owner mailing address, and phone or email only if your plan includes them.",
+   "save": "CSV into ~/Downloads.",
+   "lane": "Existing (contact loader, same as the people-search CSV). It only attaches to leads already on the dashboard.",
+   "time": "About 10 minutes a month.",
+   "often": "Monthly.",
+   "gain": "Mailing addresses and, if paid, phones on leads we already have. Low new value without the paid tier.",
+   "others": "PropStream ($99 to $699 a month; Pro $199), PropertyRadar ($99 to $119 a month solo). Prices from our 2026-07 notes.",
+   "minutes_month": 10,
+   "leads": "contacts on existing leads",
+   "signal_columns": [],
+   "scope": [],
+   "short": "PropWire",
+   "loads": "yes",
+   "wall_class": "login"
+  },
+  {
+   "id": "mls",
+   "group": "national",
+   "place": "NC and SC multiple listing services (Canopy, Upstate SC boards)",
+   "name": "MLS data: closed sale prices, expired and withdrawn listings",
+   "kind": "B",
+   "wall": "License wall. Only a licensed agent or broker who belongs to the board can get MLS data. Feed access (CoreLogic Trestle) runs about $100 to $250 a month plus per-MLS license fees; a broker feed about $30 a month (2026-07 notes, unverified).",
+   "url": "(no public page: only through a licensed agent)",
+   "what": "The best comparable sales, and the expired or withdrawn listings that signal a seller who tried and failed. Not published anywhere else.",
+   "steps": [
+    "There is no way to do this yourself without a license.",
+    "Ask a licensed agent you work with to run, monthly, for your core counties: closed sales in the last 6 months near your HOT leads, and expired or withdrawn residential listings in the last 90 days.",
+    "Ask for the export as CSV with address, parcel number if available, list price, sale price, sale date, square feet, beds and baths.",
+    "Save as <b>mls_&lt;county&gt;_&lt;date&gt;.csv</b> in ~/Downloads and ask Claude what can be loaded (no loader exists yet)."
+   ],
+   "pull": "Closed sales near HOT leads; expired and withdrawn listings.",
+   "save": "CSV into ~/Downloads.",
+   "lane": "None. A comps loader would be needed.",
+   "time": "Your time: a monthly email to the agent.",
+   "often": "Monthly, if you have an agent partner.",
+   "gain": "Tighter comparable sales. Your sheet shows 'comps' at zero in 84 NC and 36 SC counties.",
+   "others": "A licensed agent partner; PropStream or ATTOM for closed sales (see the paid table).",
+   "minutes_month": 10,
+   "leads": "better values, not new leads",
+   "signal_columns": [
+    "comps",
+    "comps_tight"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Buncombe"
+    ],
+    [
+     "NC",
+     "Henderson"
+    ],
+    [
+     "NC",
+     "Cleveland"
+    ],
+    [
+     "NC",
+     "Gaston"
+    ],
+    [
+     "NC",
+     "Rutherford"
+    ],
+    [
+     "NC",
+     "Polk"
+    ],
+    [
+     "NC",
+     "Transylvania"
+    ],
+    [
+     "NC",
+     "McDowell"
+    ],
+    [
+     "NC",
+     "Lincoln"
+    ],
+    [
+     "NC",
+     "Mitchell"
+    ],
+    [
+     "NC",
+     "Burke"
+    ],
+    [
+     "SC",
+     "Spartanburg"
+    ],
+    [
+     "SC",
+     "Anderson"
+    ],
+    [
+     "SC",
+     "Pickens"
+    ],
+    [
+     "SC",
+     "Oconee"
+    ],
+    [
+     "SC",
+     "Cherokee"
+    ],
+    [
+     "SC",
+     "Union"
+    ],
+    [
+     "SC",
+     "Laurens"
+    ]
+   ],
+   "short": "MLS",
+   "loads": "crm",
+   "wall_class": "paid"
+  },
+  {
+   "id": "unclaimed",
+   "group": "national",
+   "place": "NC, SC, missingmoney.com, the U.S. Courts unclaimed funds locator, MERS ServicerID",
+   "name": "Unclaimed property, federal court unclaimed funds and MERS servicer lookups",
+   "kind": "A",
+   "wall": "Cloudflare Turnstile 'Verify you are human' box on the three unclaimed-property sites (same vendor software); a CAPTCHA on the U.S. Courts locator and on MERS ServicerID.",
+   "url": "https://unclaimed.nccash.gov/",
+   "what": "Money the state holds for a person can be an opening line with heirs. Low value for finding leads; it does not add property signals.",
+   "steps": [
+    "Open <b>https://unclaimed.nccash.gov/</b> (NC), <b>https://southcarolina.findyourunclaimedproperty.com/</b> (SC) or <b>https://www.missingmoney.com/</b>.",
+    "Type the decedent's last name (first name optional). Tick 'Verify you are human'.",
+    "Note any match with the same name and a matching city: holder, amount range, property type.",
+    "For money held by a federal court (often a bankruptcy dividend never claimed), search the name at <b>https://www.uscourts.gov/services-forms/unclaimed-funds</b> (the locator; pass its CAPTCHA).",
+    "To find who services a loan, search the property address at <b>https://www.mers-servicerid.org/sis/</b> (pass the CAPTCHA). It shows the servicer's name, never a balance."
+   ],
+   "pull": "Decedent names on top estate leads; the servicer for foreclosure leads you will call.",
+   "save": "Type into the CRM.",
+   "lane": "None (not needed).",
+   "time": "About 1 minute per name.",
+   "often": "Only when working a specific estate.",
+   "gain": "A conversation opener with heirs. No sheet cells.",
+   "others": "None.",
+   "minutes_month": 5,
+   "leads": "",
+   "signal_columns": [],
+   "scope": [],
+   "short": "Unclaimed property",
+   "loads": "crm",
+   "wall_class": "captcha",
+   "covers": [
+    "FED-UCF",
+    "VER-MERS",
+    "VER-NCCASH"
+   ]
+  },
+  {
+   "id": "gaston_rod",
+   "group": "county",
+   "place": "Gaston County, NC",
+   "name": "Gaston register of deeds index and deed images",
+   "kind": "A",
+   "wall": "Cloudflare 'Just a moment...' check in front of the deed search (a 403 to scripts on 2026-10-07). Deed images are a paid order.",
+   "url": "https://gastonnc.courthousecomputersystems.com/",
+   "what": "Deeds, deeds of trust, lis pendens and satisfactions for a Gaston owner. Gaston is our third-biggest NC county (about 9,300 rows on your sheet), and our free reader for this index now meets the check.",
+   "steps": [
+    "Open the address in Chrome. Wait for 'Just a moment...' to finish or tick the box.",
+    "Accept the disclaimer. Choose the name search.",
+    "Type the owner's last name and first name. Search grantor and grantee.",
+    "Note each instrument: date, kind (deed, deed of trust, satisfaction, lis pendens), book and page, the other party.",
+    "Type the list into the lead's notes, or save the results page (HTML Only) as <b>gaston_rod_&lt;parcel&gt;.html</b> in ~/Downloads for the quiet-title sheet."
+   ],
+   "pull": "For HOT Gaston leads: the last deed into the owner, every deed of trust and its satisfaction, any lis pendens. 5 leads per sitting.",
+   "save": "Notes in the CRM, or HTML into ~/Downloads (no loader reads it).",
+   "lane": "None for saved pages. The quiet-title sheet prints this site as 'a person needed'.",
+   "time": "About 5 minutes per lead.",
+   "often": "Per HOT lead.",
+   "gain": "Whether there is equity (open loans without satisfactions) and a clean chain. On your sheet Gaston's deed-break, quiet-title and lien cells are zero.",
+   "others": "The attorney's own title search account, a title abstractor, or an O&amp;E report (about $85 to $95). The public terminals in the Gaston register of deeds office (free).",
+   "minutes_month": 25,
+   "leads": "5 leads checked a week",
+   "state": "NC",
+   "county": "Gaston",
+   "signal_columns": [
+    "deed_chain_has_history",
+    "deed_chain_break",
+    "deed_chain_distress_transfer",
+    "quiet_title",
+    "liens",
+    "lien_priority"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Gaston"
+    ]
+   ],
+   "short": "Gaston deeds",
+   "loads": "crm",
+   "wall_class": "bot"
+  },
+  {
+   "id": "polk_tax",
+   "group": "county",
+   "place": "Polk County, NC",
+   "name": "Polk tax bill search",
+   "kind": "A",
+   "wall": "Cloudflare 'you have been blocked' page to scripts (2026-10-07). Our Polk tax reader has returned nothing for 5 runs in a row.",
+   "url": "https://www.polknc.gov/tax_search/",
+   "what": "Whether a Polk parcel's taxes are paid, and for which years. Note: the Polk map layer's 'tax owed' field is the yearly bill, not a delinquent balance.",
+   "steps": [
+    "Open the address in Chrome (a normal window). If 'you have been blocked' shows in your browser too, try your phone on cellular data.",
+    "Search by owner name or parcel number.",
+    "Open the bill list. Note each unpaid year and the amount due."
+   ],
+   "pull": "HOT and WARM Polk leads: unpaid years and amount due. 10 per sitting.",
+   "save": "Notes in the CRM, or a CSV with parcel_id, unpaid_years, amount_due in ~/Downloads (no loader yet).",
+   "lane": "None.",
+   "time": "About 1 minute per parcel.",
+   "often": "Monthly.",
+   "gain": "Real delinquent-tax status for Polk leads.",
+   "others": "Polk County tax office by phone.",
+   "minutes_month": 10,
+   "leads": "10 parcels a month",
+   "state": "NC",
+   "county": "Polk",
+   "signal_columns": [
+    "two_year_delinquent",
+    "multi_year_delinquent_tax",
+    "tax_aging_surfaced"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Polk"
+    ]
+   ],
+   "short": "Polk tax",
+   "loads": "small",
+   "wall_class": "bot",
+   "watch_sources": [
+    "counties_nc.polk_tax"
+   ]
+  },
+  {
+   "id": "avalon_tax",
+   "group": "county",
+   "place": "Cleveland and Caldwell Counties, NC",
+   "name": "Cleveland and Caldwell tax bill sites (Avalon)",
+   "kind": "A",
+   "wall": "Google CAPTCHA loaded by the tax site (the search sits behind it).",
+   "url": "https://www.clevelandcountytaxes.com/taxes.html",
+   "what": "Taxpayer and bill status per parcel. Cleveland's current deed book and page is also not in any free map layer, so it comes from the deed index or this site.",
+   "steps": [
+    "Open <b>https://www.clevelandcountytaxes.com/taxes.html</b> (Caldwell: <b>https://www.caldwellcountynctax.com/taxes.html</b>).",
+    "Pass the CAPTCHA if shown. Search by owner name or parcel number.",
+    "Note unpaid years and amount due for each lead."
+   ],
+   "pull": "HOT and WARM leads: unpaid years, amount due, taxpayer name. 10 per sitting.",
+   "save": "Notes in the CRM, or a CSV (parcel_id, unpaid_years, amount_due) in ~/Downloads.",
+   "lane": "None.",
+   "time": "About 1 minute per parcel.",
+   "often": "Monthly.",
+   "gain": "Delinquent-tax status where the county does not publish a list we read.",
+   "others": "County tax office by phone.",
+   "minutes_month": 10,
+   "leads": "10 parcels a month",
+   "state": "NC",
+   "county": "Cleveland",
+   "signal_columns": [
+    "two_year_delinquent",
+    "multi_year_delinquent_tax",
+    "tax_aging_surfaced"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Cleveland"
+    ],
+    [
+     "NC",
+     "Caldwell"
+    ]
+   ],
+   "short": "Cleveland/Caldwell tax",
+   "loads": "small",
+   "wall_class": "captcha"
+  },
+  {
+   "id": "nc_rod_captcha",
+   "group": "county",
+   "place": "Wake, Brunswick, Iredell, Craven, Greene, Harnett, Randolph and Stokes Counties, NC (and the Durham marriage index)",
+   "name": "NC deed searches behind a CAPTCHA or a math question",
+   "kind": "A",
+   "wall": "Wake: Google CAPTCHA on the entry disclaimer (Durham's marriage index has the same gate). Brunswick: a math question on the public sign-in. Iredell, Craven, Greene, Harnett, Randolph, Stokes: a CAPTCHA on the deed search.",
+   "url": "https://rodrecords.wake.gov/web",
+   "what": "Deed chains and deeds of trust for leads in these counties, plus Wake and Durham marriage licenses for divorce leads. Wake (about 7,100 rows) is big on your sheet.",
+   "steps": [
+    "Open the county's deed search: Wake <b>https://rodrecords.wake.gov/web</b>; Durham <b>https://rodweb.dconc.gov/web</b>; others from the county table below.",
+    "Tick the CAPTCHA (or answer the math question in Brunswick) and accept the disclaimer.",
+    "Search the owner's name as grantor and grantee. Note date, instrument type, book and page, other party.",
+    "In Wake and Durham, for a divorce lead, search the marriage license index for the couple's names if needed."
+   ],
+   "pull": "HOT leads in these counties only. 5 per sitting.",
+   "save": "Notes in the CRM.",
+   "lane": "None.",
+   "time": "About 4 to 5 minutes per lead.",
+   "often": "Per HOT lead.",
+   "gain": "Equity and chain checks; marriage records for divorce leads. Deed-chain and marriage cells are zero or thin for most of these counties (Wake and Durham are zero across the board).",
+   "others": "The county register of deeds office; an abstractor; O&amp;E report about $85 to $95; the attorney's title account.",
+   "minutes_month": 20,
+   "leads": "per lead",
+   "state": "NC",
+   "county": "(several)",
+   "signal_columns": [
+    "deed_chain_has_history",
+    "deed_chain_break",
+    "deed_chain_distress_transfer",
+    "quiet_title",
+    "liens",
+    "lien_priority",
+    "marriage_license"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Wake"
+    ],
+    [
+     "NC",
+     "Brunswick"
+    ],
+    [
+     "NC",
+     "Iredell"
+    ],
+    [
+     "NC",
+     "Craven"
+    ],
+    [
+     "NC",
+     "Greene"
+    ],
+    [
+     "NC",
+     "Harnett"
+    ],
+    [
+     "NC",
+     "Randolph"
+    ],
+    [
+     "NC",
+     "Stokes"
+    ]
+   ],
+   "short": "Deeds behind CAPTCHA",
+   "loads": "crm",
+   "wall_class": "captcha"
+  },
+  {
+   "id": "nc_cchs_cf",
+   "group": "county",
+   "place": "Caldwell, Camden, Caswell, Chowan, Currituck, Dare, Duplin, Franklin, Gates, Hertford, Hyde, Montgomery (vendor servers us3/us4/us5) and Alleghany, Pasquotank, Pender, Perquimans, Person, Richmond, Rockingham, Tyrrell, Washington (hosted search), NC",
+   "name": "NC deed searches hosted by Courthouse Computer Systems behind a Cloudflare check",
+   "kind": "A",
+   "wall": "Cloudflare check that scripts do not pass (live 2026-10-07 on Caldwell, Franklin, Hertford and Gates). A person opening the same site in a normal browser normally passes it. Our older reader still reads Burke, Cleveland, Henderson, Lincoln and Madison on the same vendor servers.",
+   "url": "https://alleghanync.courthousecomputersystems.com/",
+   "what": "Deed index and images for 21 counties our new deed-chain readers cannot open.",
+   "steps": [
+    "Open the county's site (the county table below has each address). Wait for the check or tick the box.",
+    "Accept the disclaimer, search the owner's name, note instruments as above."
+   ],
+   "pull": "HOT leads only.",
+   "save": "Notes in the CRM.",
+   "lane": "None.",
+   "time": "About 4 minutes per lead.",
+   "often": "Per HOT lead.",
+   "gain": "Deed-chain checks in counties we cannot read at all today.",
+   "others": "County office; abstractor; O&amp;E report about $85 to $95.",
+   "minutes_month": 10,
+   "leads": "per lead",
+   "state": "NC",
+   "county": "(several)",
+   "signal_columns": [
+    "deed_chain_has_history",
+    "deed_chain_break",
+    "deed_chain_distress_transfer",
+    "quiet_title",
+    "liens",
+    "lien_priority"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Caldwell"
+    ],
+    [
+     "NC",
+     "Camden"
+    ],
+    [
+     "NC",
+     "Caswell"
+    ],
+    [
+     "NC",
+     "Chowan"
+    ],
+    [
+     "NC",
+     "Currituck"
+    ],
+    [
+     "NC",
+     "Dare"
+    ],
+    [
+     "NC",
+     "Duplin"
+    ],
+    [
+     "NC",
+     "Franklin"
+    ],
+    [
+     "NC",
+     "Gates"
+    ],
+    [
+     "NC",
+     "Hertford"
+    ],
+    [
+     "NC",
+     "Hyde"
+    ],
+    [
+     "NC",
+     "Montgomery"
+    ],
+    [
+     "NC",
+     "Alleghany"
+    ],
+    [
+     "NC",
+     "Pasquotank"
+    ],
+    [
+     "NC",
+     "Pender"
+    ],
+    [
+     "NC",
+     "Perquimans"
+    ],
+    [
+     "NC",
+     "Person"
+    ],
+    [
+     "NC",
+     "Richmond"
+    ],
+    [
+     "NC",
+     "Rockingham"
+    ],
+    [
+     "NC",
+     "Tyrrell"
+    ],
+    [
+     "NC",
+     "Washington"
+    ]
+   ],
+   "short": "Deeds behind Cloudflare",
+   "loads": "crm",
+   "wall_class": "bot"
+  },
+  {
+   "id": "nc_tax_walled",
+   "group": "county",
+   "place": "Ashe, Cherokee (NC), Halifax and Union (NC) Counties",
+   "name": "NC tax lookups behind a check or a login",
+   "kind": "A",
+   "wall": "Ashe and Halifax: Cloudflare check on qPublic. Cherokee NC: tax statements behind an account login with a registration ID. Union NC: county tax pages answered 'Access Denied' to scripts.",
+   "url": "https://qpublic.schneidercorp.com/Application.aspx?App=AsheCountyNC&Layer=Parcels&PageType=Search",
+   "what": "Tax-bill status for leads in these counties.",
+   "steps": [
+    "Open the county's tax site (county table below). Pass the check.",
+    "Search the parcel. Note unpaid years and amount due. For Cherokee NC, call the tax office if the site wants a registration ID you do not have."
+   ],
+   "pull": "HOT leads only.",
+   "save": "Notes in the CRM.",
+   "lane": "None.",
+   "time": "About 1 to 2 minutes per parcel.",
+   "often": "Monthly.",
+   "gain": "Delinquency status where we have none.",
+   "others": "County tax office by phone.",
+   "minutes_month": 5,
+   "leads": "per lead",
+   "state": "NC",
+   "county": "(several)",
+   "signal_columns": [
+    "two_year_delinquent",
+    "multi_year_delinquent_tax",
+    "tax_aging_surfaced"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Ashe"
+    ],
+    [
+     "NC",
+     "Cherokee"
+    ],
+    [
+     "NC",
+     "Halifax"
+    ],
+    [
+     "NC",
+     "Union"
+    ]
+   ],
+   "short": "NC tax lookups",
+   "loads": "small",
+   "wall_class": "bot"
+  },
+  {
+   "id": "nc_paid_images",
+   "group": "county",
+   "place": "Buncombe, Polk, Gaston, Mecklenburg, Davidson and others, NC",
+   "name": "NC deed images that cost money (the index is free)",
+   "kind": "B",
+   "wall": "Pay per page or a subscription for the scanned deed. Buncombe: pay-per-view images on the register's site. Mecklenburg: deeds after Feb 1990 are paid copies. Davidson: pre-1984 records on a paid portal (davidsonportal.com). Polk and Gaston: images through a paid cart. Exact prices are not in our notes.",
+   "url": "https://registerofdeeds.buncombenc.gov/External/LandRecords/protected/v4/SrchName.aspx",
+   "what": "The full legal description and the loan amount on a deed of trust are only on the image, not in the index.",
+   "steps": [
+    "Find the instrument in the free index (book and page).",
+    "Either buy that one image through the site's cart, or read it free on the public terminal in the register of deeds office, or ask the attorney to pull it on his title account.",
+    "Note the loan amount ('principal sum of $...') and the legal description."
+   ],
+   "pull": "Only the deed of trust and the vesting deed for leads you are about to offer on.",
+   "save": "Save the PDF as <b>&lt;parcel&gt;_dot.pdf</b> in ~/Downloads; tell Claude, who can read the loan amount from it.",
+   "lane": "None as a drop folder; the document reader can read a single PDF on request.",
+   "time": "About 5 minutes per document.",
+   "often": "Per offer.",
+   "gain": "A real loan amount for the equity estimate. Spartanburg SC images are free and already read this way.",
+   "others": "The attorney's title account; abstractor; O&amp;E about $85 to $95.",
+   "minutes_month": 10,
+   "leads": "per offer",
+   "state": "NC",
+   "county": "(several)",
+   "signal_columns": [],
+   "scope": [],
+   "short": "Paid deed images",
+   "loads": "crm",
+   "wall_class": "paid"
+  },
+  {
+   "id": "spartanburg_site",
+   "group": "county",
+   "place": "Spartanburg County, SC",
+   "name": "Spartanburg County website documents: Master in Equity sale roster, forfeited land list, tax sale list, deficiency and sale results",
+   "kind": "A",
+   "wall": "Cloudflare 'Attention Required!' block page to scripts (2026-10-07). Four of our readers got 403 in today's run. If your own browser on the same network shows the same page, the block is on your internet address: use your phone on cellular data or wait a day.",
+   "url": "https://www.spartanburgcounty.gov/DocumentCenter/View/3392",
+   "what": "Spartanburg is our biggest county (about 18,000 rows). The monthly Master in Equity roster lists every foreclosure set for sale (25 to 30 a month, with case number, lender, owner and address). The forfeited land list and the yearly tax sale list (about 2,170 parcels) come from the same site. Your sheet shows Spartanburg's foreclosure-sale signal at 0.6%.",
+   "steps": [
+    "Open each address in Chrome: Master in Equity roster <b>https://www.spartanburgcounty.gov/DocumentCenter/View/3392</b>; deficiency sales <b>https://www.spartanburgcounty.gov/DocumentCenter/View/11824</b>; forfeited land list <b>https://www.spartanburgcounty.gov/DocumentCenter/View/104130</b>; tax sale list <b>https://www.spartanburgcounty.gov/DocumentCenter/View/11161</b>.",
+    "Each opens a PDF. Use <b>File, Save</b> (or the download arrow).",
+    "Name them <b>spartanburg_sc_mie_&lt;date&gt;.pdf</b>, <b>spartanburg_sc_deficiency_&lt;date&gt;.pdf</b>, <b>spartanburg_sc_flc_&lt;date&gt;.pdf</b>, <b>spartanburg_sc_taxsale_&lt;date&gt;.pdf</b>.",
+    "Put them in ~/Downloads and tell Claude 'load the Spartanburg PDFs'."
+   ],
+   "pull": "The whole PDF each time. The Master in Equity roster monthly; the forfeited land list monthly; the tax sale list once a year when it is posted (autumn).",
+   "save": "PDF into ~/Downloads. Do not put PDFs in the court drop folder (the app ignores PDFs).",
+   "lane": "None as a drop folder. The readers that fetch these PDFs today can read the same PDF from disk with a small change (about an hour). For the engineer: counties_sc/spartanburg_master_in_equity.py, spartanburg_flc.py, spartanburg_delinquent_tax.py.",
+   "time": "About 5 minutes a month.",
+   "often": "Monthly (tax sale list yearly).",
+   "gain": "Every Spartanburg foreclosure set for sale, with owner and address, plus forfeited land.",
+   "others": "Spartanburg Master in Equity's office or Clerk of Court (records request).",
+   "minutes_month": 5,
+   "leads": "25 to 30 sales a month",
+   "state": "SC",
+   "county": "Spartanburg",
+   "signal_columns": [
+    "lt_foreclosure_sale",
+    "lt_auction",
+    "lt_tax_sale_overage"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Spartanburg"
+    ]
+   ],
+   "short": "Spartanburg PDFs",
+   "loads": "small",
+   "wall_class": "bot",
+   "watch_sources": [
+    "counties_sc.spartanburg_master_in_equity",
+    "counties_sc.spartanburg_flc"
+   ]
+  },
+  {
+   "id": "york_site",
+   "group": "county",
+   "place": "York County, SC",
+   "name": "York County tax collection pages and overage list",
+   "kind": "A",
+   "wall": "Cloudflare 'Attention Required!' block page to scripts (2026-10-07); our York delinquent-tax reader got 403.",
+   "url": "https://www.yorkcountysc.gov/216/Tax-Collection",
+   "what": "York's delinquent-tax list and tax-sale overage claims (owners owed surplus money after a tax sale).",
+   "steps": [
+    "Open <b>https://www.yorkcountysc.gov/216/Tax-Collection</b> in Chrome.",
+    "Click the current delinquent or tax sale list link and save the file (PDF or spreadsheet).",
+    "Open <b>https://www.yorkcountysc.gov/DocumentCenter/View/2828/OVERAGE-CLAIM-LIST</b> and save the PDF.",
+    "Name them <b>york_sc_delinquent_&lt;date&gt;.pdf</b> and <b>york_sc_overage_&lt;date&gt;.pdf</b>, put them in ~/Downloads, and tell Claude."
+   ],
+   "pull": "The whole list each time.",
+   "save": "PDF into ~/Downloads.",
+   "lane": "None as a drop folder; the existing York readers can read a saved copy with a small change.",
+   "time": "About 5 minutes.",
+   "often": "Monthly.",
+   "gain": "York delinquent-tax and overage leads.",
+   "others": "York County treasurer's office.",
+   "minutes_month": 5,
+   "leads": "a list a month",
+   "state": "SC",
+   "county": "York",
+   "signal_columns": [
+    "two_year_delinquent",
+    "multi_year_delinquent_tax",
+    "tax_aging_surfaced",
+    "lt_tax_sale_overage"
+   ],
+   "scope": [
+    [
+     "SC",
+     "York"
+    ]
+   ],
+   "short": "York PDFs",
+   "loads": "small",
+   "wall_class": "bot",
+   "covers": [
+    "SC-YORK-TAXSALE"
+   ],
+   "watch_sources": [
+    "counties_sc.york_delinquent_tax"
+   ]
+  },
+  {
+   "id": "anderson_probate",
+   "group": "county",
+   "place": "Anderson County, SC",
+   "name": "Anderson probate index on ACPASS (free account login)",
+   "kind": "A",
+   "wall": "A free account login (Register Here). Scripts must not log in, so a person does it.",
+   "url": "https://acpass.andersoncountysc.org/courts.htm",
+   "what": "Anderson estate filings (decedent, filing date, representative). Anderson has no probate signal on your sheet. Anderson's tax search on the same site is open (no login, despite what older notes say) and is listed as buildable.",
+   "steps": [
+    "Open the address. Click <b>Register Here</b> once and make a free account with your own email.",
+    "Log in. Open the probate or estate search.",
+    "Search by filing date if offered, otherwise by the surnames of your Anderson leads.",
+    "Save the results page (Cmd + S, HTML Only) as <b>anderson_sc_probate_&lt;date&gt;.html</b> in ~/Downloads, or type the estates into the CRM."
+   ],
+   "pull": "Estates opened in the last 30 days (or matches for your Anderson lead surnames): case number, decedent, date, representative.",
+   "save": "HTML into ~/Downloads.",
+   "lane": "None; a small reader would be needed once you send one saved page.",
+   "time": "About 10 minutes.",
+   "often": "Monthly.",
+   "gain": "Anderson probate leads where there are none today.",
+   "others": "Anderson probate court by phone; abstractor.",
+   "minutes_month": 10,
+   "leads": "a few estates a month",
+   "state": "SC",
+   "county": "Anderson",
+   "signal_columns": [
+    "lt_probate_notice",
+    "lt_estate_lead",
+    "probate",
+    "heir_estate"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Anderson"
+    ]
+   ],
+   "short": "Anderson probate",
+   "loads": "small",
+   "wall_class": "login"
+  },
+  {
+   "id": "nc_county_lists",
+   "group": "county",
+   "place": "Mecklenburg, Durham and Union Counties, NC",
+   "name": "Sheriff execution sales (Mecklenburg, Durham) and the Union County NC tax-foreclosure list",
+   "kind": "A",
+   "wall": "Bot checks to scripts (probed 2026-10-07): Mecklenburg Sheriff, Cloudflare 'Attention Required' (403); Durham Sheriff notice PDFs, 'Access Denied' (403); Union NC tax-foreclosure page, a 403 block page.",
+   "url": "https://www.mecksheriff.com/publicauctions/",
+   "what": "An execution sale is a court judgment being enforced against the owner's real estate: a forced sale. Union County NC's tax-foreclosure auction list is the county's own pipeline. Your sheet shows 'sheriff sale' at zero in 99 of 100 NC counties.",
+   "steps": [
+    "Open <b>https://www.mecksheriff.com/publicauctions/</b> in Chrome; pass the check if it shows. Open each real-property sale notice (PDF) and save it.",
+    "Durham: open the Durham County Sheriff's civil process / sales page from the sheriff's site and save each notice of execution sale PDF.",
+    "Union NC: open the county's property tax foreclosure auction page (Tax Administration on unioncountync.gov) and save the list PDFs. If it will not open, email taxforeclosures@unioncountync.gov and ask for the current list.",
+    "Name the files <b>mecklenburg_nc_sheriff_&lt;date&gt;.pdf</b>, <b>durham_nc_sheriff_&lt;date&gt;.pdf</b>, <b>union_nc_taxforeclosure_&lt;date&gt;.pdf</b>, put them in ~/Downloads and tell Claude."
+   ],
+   "pull": "Every real-property notice: case number, owner (defendant), address or parcel, sale date, minimum bid.",
+   "save": "PDF into ~/Downloads.",
+   "lane": "None yet; a small PDF reader per list is needed.",
+   "time": "About 10 minutes for all three.",
+   "often": "Monthly.",
+   "gain": "Forced-sale leads that no other free list carries.",
+   "others": "The Clerk of Superior Court (execution docket); the county tax office (Union).",
+   "minutes_month": 10,
+   "leads": "a few forced sales a month",
+   "state": "NC",
+   "county": "(several)",
+   "signal_columns": [
+    "lt_sheriff_sale",
+    "lt_tax_sale",
+    "lt_auction"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Mecklenburg"
+    ],
+    [
+     "NC",
+     "Durham"
+    ],
+    [
+     "NC",
+     "Union"
+    ]
+   ],
+   "short": "Sheriff sales / Union NC list",
+   "loads": "small",
+   "wall_class": "bot",
+   "covers": [
+    "NC-MECK-SHERIFF",
+    "NC-DURHAM-SHERIFF",
+    "NC-UNION-TFC"
+   ]
+  },
+  {
+   "id": "lexington_probate",
+   "group": "county",
+   "place": "Lexington County, SC",
+   "name": "Lexington County probate estate search",
+   "kind": "A",
+   "wall": "The search answers only with a token issued after a Google reCAPTCHA (invisible version 3), so scripts are refused (HTTP 401). A person in a normal browser searches freely.",
+   "url": "https://www.lex-co.com/ProbateSearch/estates",
+   "what": "Lexington estates (decedent, case, filing date). Lexington has about 2,200 rows on your sheet and no probate signal.",
+   "steps": [
+    "Open the address in Chrome and click through the disclaimer.",
+    "Search the surnames of your Lexington leads (and recent obituary names).",
+    "Note case number, decedent, filing date and personal representative for matches, or save the results page (HTML Only) as <b>lexington_sc_probate_&lt;date&gt;.html</b> in ~/Downloads."
+   ],
+   "pull": "Matches for your Lexington lead surnames, 15 per sitting.",
+   "save": "HTML into ~/Downloads, or notes in the CRM.",
+   "lane": "None; a small reader would be needed.",
+   "time": "About 10 minutes.",
+   "often": "Monthly.",
+   "gain": "Lexington estate leads.",
+   "others": "Lexington probate court by phone.",
+   "minutes_month": 10,
+   "leads": "a few estates a month",
+   "state": "SC",
+   "county": "Lexington",
+   "signal_columns": [
+    "lt_probate_notice",
+    "lt_estate_lead",
+    "probate",
+    "heir_estate"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Lexington"
+    ]
+   ],
+   "short": "Lexington probate",
+   "loads": "small",
+   "wall_class": "captcha",
+   "covers": [
+    "SC-LEX-PROBATE"
+   ]
+  },
+  {
+   "id": "richland_taxsale",
+   "group": "county",
+   "place": "Richland County, SC",
+   "name": "Richland County delinquent tax sale list",
+   "kind": "A",
+   "wall": "403 block page to scripts (probed 2026-10-07). The list is posted for the autumn sale.",
+   "url": "https://www.richlandcountysc.gov/",
+   "what": "The full Richland (Columbia) delinquent tax sale list; we read only the 3-row forfeited land list today.",
+   "steps": [
+    "In October to November, open the Richland County Treasurer's delinquent tax sale page from richlandcountysc.gov in Chrome.",
+    "Save the sale list (PDF or spreadsheet) as <b>richland_sc_taxsale_&lt;date&gt;.pdf</b> in ~/Downloads and tell Claude."
+   ],
+   "pull": "The whole list.",
+   "save": "File into ~/Downloads.",
+   "lane": "None yet; small reader needed.",
+   "time": "About 5 minutes.",
+   "often": "Once a year (autumn).",
+   "gain": "Richland tax-sale leads.",
+   "others": "Richland County Treasurer's office.",
+   "minutes_month": 1,
+   "leads": "one list a year",
+   "state": "SC",
+   "county": "Richland",
+   "signal_columns": [
+    "two_year_delinquent",
+    "multi_year_delinquent_tax",
+    "tax_aging_surfaced",
+    "lt_tax_sale"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Richland"
+    ]
+   ],
+   "short": "Richland tax sale",
+   "loads": "small",
+   "wall_class": "bot",
+   "covers": [
+    "SC-RICHLAND-TAXSALE"
+   ]
+  },
+  {
+   "id": "sc_rod_walled",
+   "group": "county",
+   "place": "Beaufort, Aiken, Jasper, Clarendon, Kershaw, Hampton, Lexington and Orangeburg Counties, SC",
+   "name": "SC deed searches behind a CAPTCHA, a Cloudflare check or a free account",
+   "kind": "A",
+   "wall": "Beaufort: CAPTCHA on every search. Aiken: Cloudflare check on the county site. Jasper: CAPTCHA on the deed search. Clarendon: blocks automated reads (a person searches free). Kershaw and Hampton: free Neumo account login. Lexington: free CountyFusion guest account. Orangeburg: free county ROD account.",
+   "url": "https://rod.beaufortcountysc.gov/searchng/",
+   "what": "Deed chains and mortgages for SC leads in these counties.",
+   "steps": [
+    "Open the county's deed search (addresses in the county table below).",
+    "Pass the CAPTCHA or Cloudflare box, or sign in with a free account you create yourself.",
+    "Search the owner as grantor and grantee; note date, instrument, book and page, other party."
+   ],
+   "pull": "HOT leads only, 5 per sitting.",
+   "save": "Notes in the CRM.",
+   "lane": "None.",
+   "time": "About 4 to 5 minutes per lead.",
+   "often": "Per HOT lead.",
+   "gain": "Deed-chain checks where we have none.",
+   "others": "SC abstractor (the attorney's usual abstractor); county ROD office.",
+   "minutes_month": 10,
+   "leads": "per lead",
+   "state": "SC",
+   "county": "(several)",
+   "signal_columns": [
+    "deed_chain_has_history",
+    "deed_chain_break",
+    "deed_chain_distress_transfer",
+    "quiet_title",
+    "liens",
+    "lien_priority"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Beaufort"
+    ],
+    [
+     "SC",
+     "Aiken"
+    ],
+    [
+     "SC",
+     "Jasper"
+    ],
+    [
+     "SC",
+     "Clarendon"
+    ],
+    [
+     "SC",
+     "Kershaw"
+    ],
+    [
+     "SC",
+     "Hampton"
+    ],
+    [
+     "SC",
+     "Lexington"
+    ],
+    [
+     "SC",
+     "Orangeburg"
+    ]
+   ],
+   "short": "SC deeds behind a check",
+   "loads": "crm",
+   "wall_class": "captcha"
+  },
+  {
+   "id": "sc_rod_paid",
+   "group": "county",
+   "place": "Lee, Newberry, Williamsburg, Calhoun, Richland, Darlington Counties, SC",
+   "name": "SC deed records that cost money",
+   "kind": "B",
+   "wall": "Lee: Neumo subscription, $5 a day. Newberry: free index, deed images $5 a day. Williamsburg: free registration, every image $1 a page. Calhoun: deeds only on paid TitleSearcher or at the Clerk. Richland: paid county subscription for deeds and probate documents. Darlington: Cott RECORDhub account or subscription.",
+   "url": "https://www.titlesearcher.com/index.php",
+   "what": "Deed chains for leads in these counties. Williamsburg (about 2,300 rows) and Darlington (about 2,500) are the largest.",
+   "steps": [
+    "For a single HOT lead: buy one day ($5) in Lee or Newberry, or the needed pages in Williamsburg ($1 each), and search the owner name.",
+    "Or ask the attorney's abstractor, who already has these subscriptions."
+   ],
+   "pull": "Only leads you are about to offer on.",
+   "save": "Notes in the CRM; PDFs into ~/Downloads.",
+   "lane": "None.",
+   "time": "About 10 minutes per lead.",
+   "often": "Per offer.",
+   "gain": "Title checks in paid counties.",
+   "others": "The attorney's abstractor (price not on file).",
+   "minutes_month": 10,
+   "leads": "per offer",
+   "state": "SC",
+   "county": "(several)",
+   "signal_columns": [
+    "deed_chain_has_history",
+    "deed_chain_break",
+    "deed_chain_distress_transfer",
+    "quiet_title",
+    "liens",
+    "lien_priority"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Lee"
+    ],
+    [
+     "SC",
+     "Newberry"
+    ],
+    [
+     "SC",
+     "Williamsburg"
+    ],
+    [
+     "SC",
+     "Calhoun"
+    ],
+    [
+     "SC",
+     "Richland"
+    ],
+    [
+     "SC",
+     "Darlington"
+    ]
+   ],
+   "short": "SC paid deeds",
+   "loads": "crm",
+   "wall_class": "paid"
+  },
+  {
+   "id": "avenu",
+   "group": "county",
+   "place": "Bamberg, Cherokee, Chester, Chesterfield, Dillon, Edgefield and Fairfield Counties, SC",
+   "name": "SC deed search on Neumo (formerly Avenu) GRIDS: account login",
+   "kind": "A",
+   "wall": "The public search redirects to an account login page with a password form (all 7 counties checked 2026-10-07). Cherokee's terms also bar robots (terms only, allowed); the login is what keeps it manual.",
+   "url": "https://cherokeesc.avenuinsights.com/",
+   "what": "Deed index and, from about 2002, free images for these counties. Cherokee SC (about 2,800 rows on your sheet) is the largest.",
+   "steps": [
+    "From the county's register of deeds page, open its Neumo (Avenu) deed search in Chrome.",
+    "Sign in with your own account (create a free one if the site offers it).",
+    "Search the owner as grantor and grantee and note date, instrument, book and page, other party."
+   ],
+   "pull": "HOT leads only.",
+   "save": "Notes in the CRM.",
+   "lane": "None.",
+   "time": "About 4 minutes per lead.",
+   "often": "Per HOT lead.",
+   "gain": "Deed checks in seven SC counties no script can read.",
+   "others": "County ROD office; abstractor.",
+   "minutes_month": 5,
+   "leads": "per lead",
+   "state": "SC",
+   "county": "(several)",
+   "signal_columns": [
+    "deed_chain_has_history",
+    "deed_chain_break",
+    "deed_chain_distress_transfer",
+    "quiet_title",
+    "liens",
+    "lien_priority"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Bamberg"
+    ],
+    [
+     "SC",
+     "Cherokee"
+    ],
+    [
+     "SC",
+     "Chester"
+    ],
+    [
+     "SC",
+     "Chesterfield"
+    ],
+    [
+     "SC",
+     "Dillon"
+    ],
+    [
+     "SC",
+     "Edgefield"
+    ],
+    [
+     "SC",
+     "Fairfield"
+    ]
+   ],
+   "short": "Avenu deed portal",
+   "loads": "crm",
+   "wall_class": "login"
+  },
+  {
+   "id": "morganton",
+   "group": "city",
+   "place": "City of Morganton (Burke County), NC",
+   "name": "Morganton city website (code enforcement, condemned and vacant structures)",
+   "kind": "A",
+   "wall": "The whole city website sits behind a Cloudflare Turnstile check (403, 'Just a moment...') on every page (2026-09-30).",
+   "url": "https://www.morgantonnc.gov/",
+   "what": "Burke's largest city. If the city posts code-enforcement or condemned-structure lists, they would be the only code signal in Burke (Burke has none today).",
+   "steps": [
+    "Open <b>https://www.morgantonnc.gov/</b> in Chrome and pass the check.",
+    "Look under Development and Design Services or Code Enforcement for a list of condemned, unsafe or vacant structures, or minimum housing cases.",
+    "If a list exists, save it (PDF or HTML Only) as <b>morganton_nc_code_&lt;date&gt;.pdf</b> in ~/Downloads and tell Claude. If none exists, tell Claude so the note is closed."
+   ],
+   "pull": "Any list of condemned, unsafe, minimum-housing or vacant structures with addresses.",
+   "save": "File into ~/Downloads.",
+   "lane": "None; a reader would be built only if a list exists.",
+   "time": "About 10 minutes, once.",
+   "often": "Once, then quarterly if a list exists.",
+   "gain": "Code-enforcement signal for Burke, which is zero today.",
+   "others": "Call the city's code enforcement office and ask for the list (public record).",
+   "minutes_month": 3,
+   "leads": "unknown",
+   "state": "NC",
+   "county": "Burke",
+   "signal_columns": [
+    "code_enforcement",
+    "condemned"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Burke"
+    ]
+   ],
+   "short": "Morganton city",
+   "loads": "small",
+   "wall_class": "bot"
+  },
+  {
+   "id": "city_union",
+   "group": "city",
+   "place": "City of Union (Union County), SC",
+   "name": "City of Union website",
+   "kind": "A",
+   "wall": "A JavaScript 'Client Challenge' page on every address (2026-09-30), a bot shield.",
+   "url": "https://www.cityofunion.net/",
+   "what": "The one possible code-enforcement source for Union County SC (the county site has narrative only).",
+   "steps": [
+    "Open the site in Chrome; the challenge clears on its own in a normal browser.",
+    "Look for code enforcement, condemned or unsafe structure lists.",
+    "Save any list into ~/Downloads as <b>union_sc_code_&lt;date&gt;.pdf</b> and tell Claude, or tell Claude there is none."
+   ],
+   "pull": "Any list of code cases or condemned structures.",
+   "save": "File into ~/Downloads.",
+   "lane": "None.",
+   "time": "About 10 minutes, once.",
+   "often": "Once.",
+   "gain": "Possibly the first Union SC code signal.",
+   "others": "Call the city.",
+   "minutes_month": 3,
+   "leads": "unknown",
+   "state": "SC",
+   "county": "Union",
+   "signal_columns": [
+    "code_enforcement",
+    "condemned"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Union"
+    ]
+   ],
+   "short": "City of Union",
+   "loads": "small",
+   "wall_class": "bot"
+  }
+ ],
+ "foia": {
+  "id": "foia",
+  "name": "Records requests (FOIA) for data that is not online anywhere",
+  "minutes": "15 minutes a month, then wait 1 to 4 weeks",
+  "text": "Send the batch of written requests in docs/foia_court_records.md: NC Clerks of Superior Court (foreclosure special proceedings and civil judgments with the judgment amount), SC Clerks of Court copying the Master in Equity (foreclosures, sale rosters, judgment amounts), SC Chief Magistrates (ejectment and eviction filings, the only case-level eviction route). Ask for CSV or Excel by email. When files come back, put them in ~/Downloads and tell Claude; no automatic reader exists for them yet. This is not a wall: the data is simply not published online."
+ },
+ "top15": [
+  {
+   "cards": [
+    "nc_est"
+   ],
+   "task": "Save NC estate lists (search 26E*) for the 11 core counties",
+   "minutes": 25,
+   "often": "weekly"
+  },
+  {
+   "cards": [
+    "sc_probate_net"
+   ],
+   "task": "Search the SC probate site for 15 lead surnames, save the estate pages",
+   "minutes": 20,
+   "often": "weekly"
+  },
+  {
+   "cards": [
+    "spartanburg_site",
+    "york_site",
+    "nc_county_lists",
+    "richland_taxsale"
+   ],
+   "task": "Download the county lists our readers are blocked from: Spartanburg and York PDFs, Mecklenburg and Durham sheriff sales, Union NC tax foreclosures (Richland SC in the autumn)",
+   "minutes": 20,
+   "often": "monthly",
+   "brings": "Every Spartanburg foreclosure set for sale (25 to 30 a month), forfeited land, York tax lists, and forced sales in Mecklenburg, Durham and Union NC"
+  },
+  {
+   "cards": [
+    "sc_publicindex"
+   ],
+   "task": "Save SC Public Index foreclosure and partition lists for the 7 core SC counties",
+   "minutes": 40,
+   "often": "monthly",
+   "brings": "SC foreclosure and partition filings, the first public sign of an SC foreclosure; tens a month"
+  },
+  {
+   "cards": [
+    "people_search"
+   ],
+   "task": "Look up phones for 20 SC HOT leads on a people-search site, save a CSV",
+   "minutes": 45,
+   "often": "weekly"
+  },
+  {
+   "cards": [
+    "nc_sp"
+   ],
+   "task": "Save NC foreclosure lists (search 26SP*) for the 11 core counties",
+   "minutes": 30,
+   "often": "weekly"
+  },
+  {
+   "cards": [
+    "sc_qpublic"
+   ],
+   "task": "Read 10 SC property cards on qPublic, save a CSV",
+   "minutes": 20,
+   "often": "weekly"
+  },
+  {
+   "cards": [
+    "nc_notice_body",
+    "sc_notice_body"
+   ],
+   "task": "Open 10 estate notices (NC and SC), copy the executor's name and address",
+   "minutes": 20,
+   "often": "weekly",
+   "brings": "10 named executors with mailing addresses a week"
+  },
+  {
+   "cards": [
+    "sc_sos"
+   ],
+   "task": "Look up 10 SC company owners on the SC Secretary of State site",
+   "minutes": 20,
+   "often": "monthly"
+  },
+  {
+   "cards": [
+    "nc_tax_walled",
+    "avalon_tax",
+    "polk_tax"
+   ],
+   "task": "Tax status for HOT leads in Polk, Cleveland, Caldwell, Ashe, Cherokee NC, Halifax, Union NC",
+   "minutes": 15,
+   "often": "monthly",
+   "brings": "Unpaid years and amount due where no list reaches us; about 10 parcels a month"
+  },
+  {
+   "cards": [
+    "anderson_probate",
+    "lexington_probate"
+   ],
+   "task": "Anderson probate (free ACPASS account) and Lexington probate (CAPTCHA): pull new estates",
+   "minutes": 20,
+   "often": "monthly",
+   "brings": "A few estates a month in two counties with no probate signal today"
+  },
+  {
+   "cards": [
+    "pacer"
+   ],
+   "task": "Fix 20 bankruptcy rows with no county (free CourtListener first, then PACER page 1)",
+   "minutes": 60,
+   "often": "twice a month"
+  },
+  {
+   "cards": [
+    "foia"
+   ],
+   "task": "Send the monthly records requests (judgment amounts, SC evictions)",
+   "minutes": 15,
+   "often": "monthly"
+  },
+  {
+   "cards": [
+    "nc_verify"
+   ],
+   "task": "Check 5 NC HOT leads' court cases with the lead checker",
+   "minutes": 30,
+   "often": "weekly"
+  },
+  {
+   "cards": [
+    "gaston_rod",
+    "nc_rod_captcha",
+    "nc_cchs_cf",
+    "sc_rod_walled"
+   ],
+   "task": "Deed and loan check for 5 HOT leads in counties whose deed search needs a person (Gaston, Wake, the CCHS Cloudflare counties, Beaufort SC and others)",
+   "minutes": 25,
+   "often": "weekly",
+   "brings": "Equity and title checked before you offer: open loans without a satisfaction, a clean chain"
+  },
+  {
+   "cards": [
+    "morganton",
+    "city_union"
+   ],
+   "task": "Check the Morganton and Union SC city sites once for code-enforcement lists",
+   "minutes": 20,
+   "often": "once",
+   "brings": "Either the first code-enforcement list in Burke and Union SC, or a closed question"
+  }
+ ],
+ "appendix_c": [
+  [
+   "Charleston County's own copy of the SC Public Index (jcmsweb.charlestoncounty.org/PublicIndex/)",
+   "The court's terms (Rule 610 and the administrative order) only, cleared by the attorney. Answered an ordinary request normally on 2026-10-07.",
+   "Buildable: Charleston foreclosure, partition, quiet-title, lis pendens and judgment lists. (The other 45 counties' Index has a bot check: see the SC Public Index card.)"
+  ],
+  [
+   "SC Family Court portal (portal.fccms.sccourts.org)",
+   "Terms only (cleared); the portal answered normally on 2026-10-07.",
+   "Name search buildable; our test found 0% real divorce hits, so low value."
+  ],
+  [
+   "Click-through consent pages: Kania's disclosure popup (checkbox and Submit), Zacchaeus and Aldridge Pite 'I AGREE'",
+   "A plain consent click; no credentials.",
+   "Allowed and built (Kania, Zacchaeus, Aldridge Pite readers run)."
+  ],
+  [
+   "Cott eSearch 'Sign in as a Guest' button: Alamance, Edgecombe, Halifax, Lenoir, Onslow, Pitt, Rowan, Rutherford, Scotland, Wilson (NC deeds)",
+   "A guest button on the vendor's sign-in page; no user name or password.",
+   "Allowed. An engineer is adding the guest click to the Cott deed reader now."
+  ],
+  [
+   "'I accept' disclaimers on register of deeds, tax and court sites (most of the 145 counties)",
+   "An 'I accept' click with accuracy-only text.",
+   "Allowed; built or buildable (see the county table)."
+  ],
+  [
+   "Anderson SC tax search (ACPASS)",
+   "robots.txt says Disallow; pages print the state notice on commercial use (cleared). Not behind the login (re-checked 2026-09-10).",
+   "Buildable: owner, mailing address, balance due by year."
+  ],
+  [
+   "Anderson SC deeds since 21 Feb 2026 (Ingenuity system)",
+   "Terms forbid automation (terms only, cleared).",
+   "Buildable after the new system is mapped; older deeds are on ACPASS."
+  ],
+  [
+   "Oconee SC deeds (Kofile / GovOS PublicSearch)",
+   "robots.txt Disallow only.",
+   "Built: the SC PublicSearch deed-chain reader (Greenville and Oconee)."
+  ],
+  [
+   "qPublic and Spatialest / Schneider property cards",
+   "Terms prohibit robots (terms only, cleared).",
+   "Allowed where no bot check stands in front; the qPublic Cloudflare check on searches keeps the qPublic card manual."
+  ],
+  [
+   "Horry and Greenwood SC probate (Spartan public portals)",
+   "None found: the 2026-10-07 source hunt read Horry's portal as open JSON (2,968 estates in 2026).",
+   "Buildable (the county matrix had recorded Horry as a login; the newer check supersedes it)."
+  ],
+  [
+   "ncnotices.com and scpublicnotices.com title-clearing lanes (partition, quiet title, unknown heirs, heirs at law, claim of lien)",
+   "Terms click-through on the detail page (allowed); the list grid is open.",
+   "Buildable on the readers we already run. If a detail page shows a CAPTCHA, the notice-text card applies."
+  ],
+  [
+   "Zillow, Redfin, Realtor.com, Trulia, Xome, Hubzu",
+   "Terms ban scraping (cleared). Zillow shows a 'press and hold' bot check on some runs; Hubzu and Xome are JavaScript apps our browser renders.",
+   "Built where they run (Zillow 88, Hubzu 17, Trulia 9, Xome 9 rows on the board). Redfin Data Center ZIP statistics: buildable. Low value: they list the same bank-owned and auction homes we get elsewhere."
+  ],
+  [
+   "LoopNet, LandWatch, Land and Farm, Lands of America",
+   "Akamai bot shield; terms.",
+   "LandWatch and Land and Farm run (551 and 426 rows). LoopNet is a hard block and matters only for multifamily; Crexi is the free multifamily source."
+  ],
+  [
+   "Auction.com",
+   "Imperva bot shield on listing pages; terms.",
+   "Buildable through the site's public sitemap (2026-09-10 recheck); 21 rows on the board today."
+  ],
+  [
+   "JavaScript-only search apps with no wall: Logan Remote Access (11 NC counties), Logan Public Records (7 NC counties), Durham NC delinquent-tax list (Spatialest)",
+   "No check; the search runs in the page's own script.",
+   "Buildable with a headless browser (next round of the deed readers)."
+  ],
+  [
+   "Sites whose robots.txt names AI crawlers (SeeClickFix, Transylvania Times)",
+   "robots.txt only.",
+   "Allowed by the owner's rule (2026-09-20). SeeClickFix runs but fell 97% in today's run (an engineering issue)."
+  ],
+  [
+   "CourtListener / RECAP (federal courts)",
+   "None for search; docket alerts need a free account.",
+   "Built (bankruptcy feed). Optional by hand: free docket alerts on HOT bankruptcy-stayed foreclosures."
+  ]
+ ],
+ "paid": [
+  [
+   "PACER (federal court documents)",
+   "$0.10 a page, max $3.00 a document; waived under $30 a quarter. 2027: $0.12 and $40.",
+   "Bankruptcy petitions for UNKNOWN-county rows; any federal docket.",
+   "CourtListener RECAP (free) first."
+  ],
+  [
+   "SC Secretary of State UCC search",
+   "$5 a search per an August note; the 2026-10-07 source hunt found ucconline.sc.gov open (check before paying)",
+   "UCC liens against SC companies",
+   "Low value"
+  ],
+  [
+   "NC Secretary of State Master Files data subscription",
+   "$750 setup plus $2,000 a year (seen 2026-10-07)",
+   "Bulk business registration, federal tax lien and UCC data",
+   "Per-name lookups (the site's 'no scripted searches' note is terms only, cleared)"
+  ],
+  [
+   "Neumo (Lee SC)",
+   "$5 a day",
+   "Deed index and images",
+   "Abstractor"
+  ],
+  [
+   "Neumo images (Newberry SC)",
+   "$5 a day",
+   "Deed images 2003 on",
+   "Free index"
+  ],
+  [
+   "Neumo images (Williamsburg SC)",
+   "$1 a page",
+   "Deed images",
+   "Free registration for the index"
+  ],
+  [
+   "TitleSearcher (Calhoun SC)",
+   "Not on file",
+   "Deeds",
+   "Clerk of Court office"
+  ],
+  [
+   "Richland SC online data",
+   "Not on file",
+   "Deeds and probate documents",
+   "Attorney's or abstractor's subscription"
+  ],
+  [
+   "Cott RECORDhub (Darlington SC)",
+   "Not on file",
+   "Deed index",
+   "Abstractor"
+  ],
+  [
+   "Deed images: Buncombe, Polk, Gaston, Mecklenburg (post-1990), Davidson (pre-1984)",
+   "Not on file",
+   "Full legal description, loan amount",
+   "Public terminal in the office (free); attorney's title account"
+  ],
+  [
+   "Oconee SC deed copies (Kofile)",
+   "$2 to $4 a document",
+   "Clean deed copies",
+   "Free index"
+  ],
+  [
+   "Title O&amp;E report (any county)",
+   "About $85 to $95 a property",
+   "Owner, liens, loans of record",
+   "Abstractor"
+  ],
+  [
+   "MLS feed (license required)",
+   "Trestle about $100 to $250 a month plus per-MLS fees; broker feed about $30 a month",
+   "Closed sales, expired and withdrawn listings",
+   "A licensed agent partner"
+  ],
+  [
+   "Skip tracing",
+   "Tracerfy ~$0.02/record; DataZapp $0.02 to $0.03 ($125 min); BatchData $0.07 to $0.18; REISkip $0.15 to $0.22/hit; BatchData Growth $1,000/mo",
+   "Owner phones and emails",
+   "Hand lookups (above)"
+  ],
+  [
+   "Property data platforms",
+   "PropStream $99 to $699/mo (Pro $199); PropertyRadar $99 to $119/mo solo; ATTOM ~$95 to $500/mo, bulk backfill $1,500 to $5,000; Realie $50 to $350/mo; RentCast $199 or $449/mo; HouseCanary ~$5 a valuation report",
+   "Square feet, sales, liens, comps",
+   "qPublic cards by hand; county layers"
+  ],
+  [
+   "Lien data",
+   "CoreLogic involuntary lien API $11.50 a call; ATTOM ~$500/mo",
+   "Open liens (never the live payoff)",
+   "Deed-of-trust images"
+  ],
+  [
+   "Court data vendors (UniCourt, Trellis, Docket Alarm; PacerMonitor beyond its free tier needs an account)",
+   "Not on file",
+   "Court dockets, SC Family Court",
+   "Records requests; CourtListener"
+  ],
+  [
+   "Tax-sale list resellers (Tax Sale Resources, Goliath Data)",
+   "Not on file (subscription)",
+   "SC and NC tax-sale and delinquent lists",
+   "The county files and readers in this document"
+  ],
+  [
+   "NCOALink (USPS change of address)",
+   "$15,000+ a year",
+   "Forwarding addresses",
+   "None"
+  ],
+  [
+   "Westlaw or Lexis (the attorney's subscription)",
+   "Not on file",
+   "Court dockets where his plan covers NC or SC state courts",
+   "The public portals by hand"
+  ],
+  [
+   "SCDOT statewide SC parcel layer",
+   "No price: agency sign-in; a data-sharing request may be granted (not tried)",
+   "SC owner mailing for the weakest SC counties (up to about 9,700 rows, a guess)",
+   "County map layers (in use for 8 of 11 core SC counties)"
+  ],
+  [
+   "Regrid parcel data; county assessor roll exports by records request",
+   "Regrid price not verified; county copy fees vary",
+   "SC owner mailing and values where county sites are walled",
+   "qPublic cards by hand"
+  ],
+  [
+   "USPS vacancy data (via HUD)",
+   "Not for sale to us: government and nonprofit licensees only",
+   "Vacancy flags",
+   "Land-use vacancy proxy (built)"
+  ]
+ ],
+ "does_not_exist": [
+  [
+   "Live mortgage payoff balance",
+   "Only the loan servicer has it, and releases it only to the borrower or someone the borrower authorizes in writing."
+  ],
+  [
+   "SC sale price on foreclosure, deed-in-lieu and other exempt deeds",
+   "SC Code 12-24-70: exempt deeds state no value."
+  ],
+  [
+   "Debt amount in an NC foreclosure notice of sale",
+   "NC law requires only sale terms, deposit and upset-bid rules. The number is in the clerk's paper file (records request) or an O&amp;E report."
+  ],
+  [
+   "SC magistrate eviction list in bulk",
+   "No online roster exists. Records request to the Chief Magistrate, or the Legal Services Corporation data program (civilcourtdata@lsc.gov)."
+  ],
+  [
+   "A structured investor buy-box feed",
+   "Does not exist; the curated buyer list is the answer (built)."
+  ],
+  [
+   "Owner email addresses in public records",
+   "Not in any public record. Paid only."
+  ],
+  [
+   "SC voter phone numbers",
+   "The SC voter file has no phone column, and its use is restricted."
+  ],
+  [
+   "Utility shutoff lists (NC)",
+   "NC G.S. 132-1.1 removes utility billing records from the public-records law."
+  ]
+ ],
+ "stop": [
+  [
+   "NC eCourts divorce saves",
+   "The open NC judgment search already gives granted divorces statewide, with no CAPTCHA (5,777 rows on the board)."
+  ],
+  [
+   "NC eCourts lis pendens saves",
+   "Same open judgment search (10,761 rows)."
+  ],
+  [
+   "SC Public Index state tax lien saves",
+   "State tax liens come from the state registry already."
+  ],
+  [
+   "SC Public Index eviction (Possession 450) saves",
+   "The case names the tenant, not the owner. Every saved row adds a wrong name."
+  ],
+  [
+   "Saving Anderson or Pickens tax pages, SC company pages, SC contractor roster pages, SC case detail pages",
+   "Nothing reads those files. Read the number and type it into the CRM instead."
+  ]
+ ],
+ "gaps": [
+  "Anderson SC tax: the county matrix (2026-10-07) says the tax page redirects to a login; the 2026-09-10 recheck found the tax search itself open (the redirect page still carries the content). This document follows the recheck (allowed, buildable).",
+  "Horry SC probate: the county matrix records a login; the 2026-10-07 source hunt read it as open JSON. This document follows the newer check (allowed, buildable).",
+  "Lexington SC probate: the county matrix records a plain disclaimer; the source hunt found the search needs a reCAPTCHA token (type A). This document follows the source hunt.",
+  "The 12 Courthouse Computer Systems counties on the vendor's us3/us4/us5 servers (Caldwell, Camden, Caswell, Chowan, Currituck, Dare, Duplin, Franklin, Gates, Hertford, Hyde, Montgomery) are 'disclaimer' or 'open' in the matrix, but the 2026-10-07 platform check found a Cloudflare challenge to scripts on the search page. Counted here as needing a person. Our older reader still reads Burke, Cleveland, Henderson, Lincoln and Madison on the same servers.",
+  "The old master list's 'CCHS decommissioned' line for Burke, Lincoln, Cleveland and Henderson is stale; those sites are live.",
+  "NC eCourts search labels ('Advanced Filtering Options', 'File Date', 'Location') are from our notes, not re-read today. If a label differs, pick the closest match. Whether a saved NC estate list keeps the executor's name is not yet confirmed on a real save.",
+  "southcarolinaprobate.net refused our plain request with a 403 today, even with a normal browser identity; we did not open it in a real browser. If your browser also gets 403, the site is down for everyone.",
+  "Spartanburg and York county websites answered our single polite request with Cloudflare 'Attention Required!' today. This may be a block on this Mac's internet address after our readers' runs, in which case your own browser on the same network could see it too.",
+  "Rutherford, Edgecombe and Avery county websites gave our readers 403 in the morning run but answered a single polite request normally later; treated as temporary, no card.",
+  "The ncnotices.com detail page: the source hunt calls it a terms click only; our reader saw a Google CAPTCHA on it in July. The card covers both.",
+  "SC UCC search: an August note says $5 a search; the source hunt found ucconline.sc.gov open. Not checked further.",
+  "SC Public Index: the lanes already on the board (the frozen lis pendens lane and the earlier sweeps, about 7,900 rows) were read through a stealth browser before today's probe found the 406 refusal. Whether those lanes keep running is for the engineer and the owner; this document treats the Index as hand-saved.",
+  "NC Secretary of State: its business search page now says scripted searches are not permitted (terms only, cleared) and offers a paid Master Files subscription; our NC company lookups also pass a Cloudflare JavaScript check with a stealth browser.",
+  "The 'UNKNOWN' counts: your coverage sheet (2026-10-01) has 7,103 rows; today's board and the gap matrix (2026-10-07) have 2,648. The steps are the same.",
+  "The gap matrix (docs/gap_matrix/README.md) counts 1,031 'walled' county-column cells, mostly the attorney title-check columns in counties whose deed, estate or tax site needs a person; the deed, estate and tax cards here are how a person fills them. Its 'SC Public Index terms' cells are walled after all, by the bot check found today (not the terms); its 'SC family-court terms' cells are allowed; its 'SC voter list is sold' and 'HUD vacancy login' cells are in the paid table.",
+  "Several readers are written to tick a Cloudflare box when one appears (always for the NC SoS UCC search and the old eCourts case-status reader; unless FORECLOSURE_NO_CF_SOLVE=1 is set for the qPublic, Cherokee SC and Buncombe card readers and two law-firm readers). An engineer should confirm this fits the rule that a bot check is never passed by code.",
+  "Lead estimates marked 'estimate' are ours, not measured. Name-to-parcel matching was measured at about 29% automatic (2026-07).",
+  "Prices for deed images in Buncombe, Polk, Gaston, Mecklenburg, Davidson, and for TitleSearcher, Richland, Cott RECORDhub, Docket Alarm, Tax Sale Resources and Goliath are not in our notes.",
+  "No sc_rod_platform_clusters.md existed when this was built; the SC county counts come from the county matrix."
+ ],
+ "sources_static": [
+  "docs/MASTER_GAPS_WALLS_AND_MANUAL_LANES.md, docs/walls_register.md, docs/blocked_sources_forensic.md, docs/manual_source_inventory.md, docs/manual_playbook_and_limits.md, docs/honest_operator_manual.md, docs/operator_manual_manual_steps_and_paywalls_2026-10-04.md",
+  "docs/source_reverification_2026-09-10.md, docs/source_unblock_plan.md, docs/COUNTY_SYSTEMS_REGISTRY.md, docs/ROD_PORTAL_ACCESS.md, docs/foia_court_records.md, docs/operator_playbook_liensnc_and_bankruptcy.md, docs/gather_steps.md, docs/HANDOFF.md",
+  "docs/county_records/README.md and county_records_matrix.json (145 counties, 2026-10-07)",
+  "Live run_meta.json on the dashboard (run of 2026-10-07 17:09 UTC): source status, alarms and dormant reasons",
+  "Scraper and enricher docstrings under src/foreclosure_scraper that describe a CAPTCHA, Cloudflare, DataDome, Akamai, Imperva, PerimeterX, AWS-WAF, token or login wall",
+  "The manual lanes in code: scripts/ingest_saved.sh, scripts/parse_nc_ecourts_export.py, scripts/ingest_publicindex_files.py, scripts/ingest_contacts.py, scripts/ingest_liensnc.py, scripts/verify_lead_human_assisted.py",
+  "The owner's coverage sheet county_signal_coverage_FINAL.csv (73 signals x 146 counties, plus 2 UNKNOWN rows), and docs/gap_matrix/README.md (2026-10-07) for the walled-cell cross-check",
+  "docs/county_records/nc_rod_platform_clusters.md (NC deed platforms, readers built, where a person is needed), docs/extraction_audit_2026-10-07.md (12 fixes), docs/new_sources_2026-10-07_liens_courts.md (75 records; its walled list is folded in here)",
+  "Repo commits of 2026-10-07 for the built items: deed-chain readers (a237f78b, dbd53293, 471f33c6, b05be4a2, cf447ca4), quiet-title intake (f48a9f86 and follow-ups), privacy filter (65c68d5d), verifiers (0b533d76, 0210de27, c70abdd9), LiensNC owner decision (580cc002)",
+  "One polite request (ordinary browser identity, 2 seconds apart) on 2026-10-07 to each of: southcarolinaprobate.net, spartanburgcounty.gov, rutherfordcountync.gov, yorkcountysc.gov, edgecombecountync.gov, averycountync.gov, foreclosure.com, publicnoticesc.com, redfin.com, xome.com, hubzu.com, auction.com. No wall was passed."
+ ],
+ "saving_md": [
+  "There is one ready-made lane, for court result lists:",
+  "",
+  "1. Save the results page with **Cmd + S**, Format **Web Page, HTML Only**.",
+  "2. Name it `<county>_nc_<what>_<date>.html` for NC (the `_nc_` part is required; the loader reads the county from the text before it) or `<county>_sc_<what>_<date>.html` for SC.",
+  "3. Put it in the Desktop folder **Court Pages (drop here)**.",
+  "4. Double-click **Ingest Saved Court Pages** on the Desktop. It loads NC eCourts and SC Public Index lists, matches owner names to parcels, never makes duplicates, refuses to run while the weekly engine run is writing, and then moves the files into a dated 'Ingested' subfolder.",
+  "",
+  "Watch out: that app moves **every** .html, .htm and .csv file out of the drop folder, whether or not it could read it. So save anything that is not a court list (contact sheets, probate pages, LiensNC pages, PDFs) into **~/Downloads** instead and tell Claude what you saved.",
+  "",
+  "Other lanes that exist but run from the terminal (ask Claude):",
+  "",
+  "- **Contact sheets** (phones and emails from people-search sites, PropWire exports): a CSV with columns such as parcel_id, property_address, owner_name, phone1, phone2, email. Matched by parcel number, else property address. Every phone is flagged for a Do Not Call scrub.",
+  "- **Lead checker** for one NC court case: Claude starts it, you pass the CAPTCHA and save the case page, Claude reads it.",
+  "- **LiensNC loader** for saved LiensNC result pages or CSV files.",
+  "",
+  "Everything else (saved probate pages, notice pages, property-card sheets, county PDFs, bankruptcy address sheets, records-request replies) has **no loader yet**. Each card says what small loader would be needed; most are about an hour of engineering because the reader for the live page already exists."
+ ],
+ "saving_html": [
+  "<p><b>One ready-made lane, for court result lists:</b></p><ol class='steps'>",
+  "<li>Save the results page with <b>Cmd + S</b>, Format <b>Web Page, HTML Only</b>.</li>",
+  "<li>Name it <b>&lt;county&gt;_nc_&lt;what&gt;_&lt;date&gt;.html</b> for NC (the <b>_nc_</b> part is required; the loader reads the county from the text before it) or <b>&lt;county&gt;_sc_&lt;what&gt;_&lt;date&gt;.html</b> for SC.</li>",
+  "<li>Put it in the Desktop folder <b>Court Pages (drop here)</b>.</li>",
+  "<li>Double-click <b>Ingest Saved Court Pages</b> on the Desktop. It loads NC eCourts and SC Public Index lists, matches owner names to parcels, never makes duplicates, refuses to run while the weekly engine run is writing, then moves the files into a dated 'Ingested' subfolder.</li></ol>",
+  "<div class='box'><b>Watch out:</b> that app moves <b>every</b> .html, .htm and .csv file out of the drop folder, whether or not it could read it. Save anything that is not a court list (contact sheets, probate pages, LiensNC pages, PDFs) into <b>~/Downloads</b> instead and tell Claude what you saved.</div>",
+  "<p><b>Other lanes that exist but run from the terminal (ask Claude):</b></p><ul><li><b>Contact sheets</b> (phones and emails from people-search sites, PropWire exports): a CSV with columns such as parcel_id, property_address, owner_name, phone1, phone2, email. Matched by parcel number, else property address. Every phone is flagged for a Do Not Call scrub.</li><li><b>Lead checker</b> for one NC court case: Claude starts it, you pass the CAPTCHA and save the case page, Claude reads it.</li><li><b>LiensNC loader</b> for saved LiensNC result pages or CSV files.</li></ul>",
+  "<p>Everything else (saved probate pages, notice pages, property-card sheets, county PDFs, bankruptcy address sheets, records-request replies) has <b>no loader yet</b>. Each card says what small loader would be needed; most are about an hour of engineering because the reader for the live page already exists.</p>"
+ ],
+ "unknown_bullets": [
+  "<b>Bankruptcy rows: a manual step fixes them.</b> Page 1 of the bankruptcy petition gives the debtor's street address and county. Ask Claude to pull the free copies from CourtListener first; then do the rest by hand, 20 per sitting, with the PACER card. Save a CSV (case_number, court, street, city, county, state, zip) to ~/Downloads. A small loader is needed.",
+  "<b>LiensNC rows: no manual step.</b> The county can be read from the project address and ZIP already on the row (engineering); the incremental LiensNC refresh being built is the natural place for it.",
+  "<b>SC brownfield rows: no manual step.</b> These are state environmental sites; the county comes from the site address (engineering)."
+ ],
+ "access_overrides": {
+  "SC|anderson|tax": [
+   "allowed",
+   "Free, open (the 2026-09-10 recheck: the tax search is not behind the login)"
+  ],
+  "SC|horry|probate": [
+   "allowed",
+   "Free, open (the 2026-10-07 source hunt read the Spartan portal as open JSON)"
+  ],
+  "SC|lexington|probate": [
+   "captcha",
+   "The probate search needs a reCAPTCHA token (2026-10-07 source hunt)"
+  ]
+ },
+ "manual_lane_fixes": [
+  [
+   "(Cloudflare-gated tax site, qPublic terms bar automation)",
+   "(Cloudflare-gated tax site and qPublic check)"
+  ],
+  [
+   "Sign in as guest for the index;",
+   "The index opens with a 'Sign in as a Guest' click (allowed);"
+  ],
+  [
+   "Free by guest sign-in;",
+   "Free after a 'Sign in as a Guest' click (allowed);"
+  ],
+  [
+   "must be looked up by a person in the new Ingenuity system (its terms forbid automation)",
+   "are in the new Ingenuity system, which has a bot check, so a person looks them up"
+  ],
+  [
+   "tax bills and probate need a free ACPASS login a person can use, or a call to the offices",
+   "the tax search is open (buildable); probate needs a free ACPASS login a person can use, or a call to the office"
+  ],
+  [
+   "which we leave to a person in a browser (or the abstractor) because the same vendor's terms forbid automation",
+   "which needs an account login, so a person (or the abstractor) searches it"
+  ],
+  [
+   "are on the Avenu portal, whose terms forbid automation, so a person searches it in a browser",
+   "are on the Neumo (Avenu) portal, which needs an account login, so a person searches it"
+  ],
+  [
+   "(account/subscription, no automation allowed)",
+   "(account or subscription)"
+  ],
+  [
+   "and probate needs a free portal account (person) or a call to the court",
+   "and probate is on Horry's open Spartan portal (buildable)"
+  ],
+  [
+   "A person (not a script: the site's terms forbid robots) logs in",
+   "A person logs in"
+  ],
+  [
+   "and the terms forbid robots, so a person",
+   "so a person"
+  ],
+  [
+   "but terms forbid robots and every deed image costs $1/page",
+   "and every deed image costs $1/page"
+  ],
+  [
+   "(a person, or a script if terms allow once read)",
+   "(allowed; buildable)"
+  ]
+ ]
+}
