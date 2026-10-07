@@ -88,9 +88,20 @@ def _classify(docs) -> dict:
     }
 
 
+#: Stamped on raw['rod'] read with rod.logan's fixed party sides (2026-10-07: 'Party 2' rows are
+#: the grantee side, and a party cell's <br>-separated names are kept apart). An older stamp put
+#: the searched owner on the grantor side of every row, so a deed INTO the owner read as a sale
+#: by the owner, and glued co-owners into one name. Those stamps are refetched first (below).
+PARTY_SIDES = "v2"
+
+
 def _rod_age_days(li, now: datetime) -> float | None:
-    """Days since this lead's ROD was last fetched (None if never)."""
+    """Days since this lead's ROD was last fetched (None if never, or if it was read before the
+    party-sides fix: such a stamp is refetched as soon as a never-fetched lead would be)."""
     rod = (li.raw or {}).get("rod") if isinstance(li.raw, dict) else None
+    if isinstance(rod, dict) and rod.get("source") == "spartanburg_rod_render" \
+            and rod.get("party_sides") != PARTY_SIDES:
+        return None
     fa = (rod or {}).get("fetched_at")
     if not fa:
         return None
@@ -165,6 +176,7 @@ async def enrich_spartanburg_rod(listings, max_lookups: int | None = None) -> di
             "adverse_types": [], "mortgage_count": 0, "satisfaction_count": 0,
             "open_mortgages_est": 0, "instruments": [], "source": "spartanburg_rod_render"}
         summ["fetched_at"] = now.isoformat()
+        summ["party_sides"] = PARTY_SIDES
         if not isinstance(li.raw, dict):
             li.raw = {}
         li.raw["rod"] = summ

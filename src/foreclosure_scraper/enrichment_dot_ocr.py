@@ -61,6 +61,7 @@ from typing import Optional
 
 import structlog
 
+from .rod.logan import grantee_side, party_names
 from .http_client import client as http_client
 from .rod import doc_images as di
 from .rod.doc_images import DOC_IMAGE_COUNTIES, LoganImageSession
@@ -106,13 +107,21 @@ def _parse_image_rows(html: str) -> list[dict]:
         keym = re.search(r"view_image\.php\?key=([0-9a-f]+)", call)
         if not keym:
             continue
+        # args 5-7 are Party Type, Searched Party, Reverse Party. 'Party 2' puts the searched party
+        # on the grantee side (rod.logan.grantee_side); a party cell can hold several names split
+        # by <br> (escaped here as &lt;br&gt;). Until 2026-10-07 the searched party was always
+        # stored as the grantor.
+        role = args[5] if len(args) > 5 else ""
+        searched = "; ".join(party_names(args[6])) if len(args) > 6 else ""
+        reverse = "; ".join(party_names(args[7])) if len(args) > 7 else ""
+        grantor, grantee = (reverse, searched) if grantee_side(role) else (searched, reverse)
         rows.append({
             "instrument_no": args[0],
             "date": args[1].strip(),
             "book_info": args[2].strip(),
             "doc_type": args[3].strip(),
-            "grantor": (args[6].strip() if len(args) > 6 else ""),
-            "grantee": (args[7].strip() if len(args) > 7 else ""),
+            "grantor": grantor,
+            "grantee": grantee,
             "key": keym.group(1),
         })
     return rows

@@ -95,6 +95,33 @@ def _clean(s: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", s or "").replace("&nbsp;", " ")).strip()
 
 
+#: The date Party 1 / Party 2 sides and <br>-split party cells were fixed (Spartanburg rows read
+#: before it carry the searched party on the grantor side whatever its role).
+PARTY_SIDES_FIX_DATE = "2026-10-07"
+_BR_SPLIT = re.compile(r"<br\s*/?>|&lt;br\s*/?&gt;", re.I)
+
+
+def party_names(cell_html: str) -> list[str]:
+    """The names in one party cell. Spartanburg's build lists several in one cell, split by
+    <br>; reading the cell as one string glued co-owners into one name."""
+    out: list[str] = []
+    for part in _BR_SPLIT.split(cell_html or ""):
+        n = _clean(part)
+        if n and n not in out:
+            out.append(n)
+    return out
+
+
+def grantee_side(role: str) -> bool:
+    """Whether a Party Type cell names the grantee side of the instrument: GRANTEE or INDIRECT
+    on most builds, 'Party 2' on Spartanburg's (where 'Party 1' is the grantor side: the
+    seller on a deed, the borrower on a mortgage). Live-checked 2026-10-07 on Spartanburg:
+    'Party 2' rows are deeds into the searched owner; its mortgages and liens list the owner as
+    'Party 1'."""
+    r = (role or "").upper()
+    return "GRANTEE" in r or "INDIRECT" in r or bool(re.search(r"\bPARTY\s*(?:2|TWO)\b", r))
+
+
 def _split_book_page(book_info: str) -> tuple[str | None, str | None]:
     r"""Split a Logan 'Book Info' cell into (book, page).
 
@@ -152,24 +179,27 @@ def _parse_records(html: str, state: str, county: str) -> list[RodDoc]:
         date_str = m.group(2)
         end = links[i + 1].start() if i + 1 < len(links) else len(html)
         window = html[m.end():end]
-        row_cells = [_clean(c) for c in _ROW_CELL_RE.findall(window)]
+        raw_cells = _ROW_CELL_RE.findall(window)
+        row_cells = [_clean(c) for c in raw_cells]
+        # pairs are (side, name) with side "grantor" | "grantee"
         if len(row_cells) >= 6:
             # Classic single-row shape: both sides of ONE transaction
-            # (Searched Party / Reverse Party) in the same row.
-            book_info, doc_type, legal, party_type, searched, reverse = row_cells[:6]
-            pairs = []
-            if searched:
-                pairs.append((party_type, searched))
-            if reverse:
-                opposite = ("GRANTOR" if "GRANTEE" in (party_type or "").upper()
-                            or "INDIRECT" in (party_type or "").upper() else "GRANTEE")
-                pairs.append((opposite, reverse))
+            # (Searched Party / Reverse Party) in the same row. A party cell can
+            # hold several names split by <br> (Spartanburg), and the role is
+            # GRANTOR/GRANTEE (DIRECT/INDIRECT) or 'Party 1'/'Party 2'.
+            book_info, doc_type, legal, party_type = row_cells[:4]
+            searched_side = "grantee" if grantee_side(party_type) else "grantor"
+            reverse_side = "grantor" if searched_side == "grantee" else "grantee"
+            pairs = [(searched_side, n) for n in party_names(raw_cells[4])]
+            pairs += [(reverse_side, n) for n in party_names(raw_cells[5])]
         else:
             # One-party-per-row shape (live-confirmed on multi-party
             # instruments): Book Info, Doc Type, Legal, Party Type, Name.
             row_cells = (row_cells + [""] * 5)[:5]
-            book_info, doc_type, legal, party_type, name = row_cells
-            pairs = [(party_type, name)] if name else []
+            raw_cells = (list(raw_cells) + [""] * 5)[:5]
+            book_info, doc_type, legal, party_type, _name = row_cells
+            side = "grantee" if grantee_side(party_type) else "grantor"
+            pairs = [(side, n) for n in party_names(raw_cells[4])]
         g = groups.setdefault(inst, {
             "date": date_str, "book_info": book_info, "doc_type": doc_type,
             "legal": legal, "grantors": [], "grantees": [],
@@ -190,12 +220,12 @@ def _parse_records(html: str, state: str, county: str) -> list[RodDoc]:
             km = _KEY_RE.search(window)
             if km:
                 g["image_key"] = km.group(1)
-        for role, name in pairs:
+        for side, name in pairs:
             name = (name or "").strip()
             if not name:
                 continue
-            is_grantee = "GRANTEE" in (role or "").upper() or "INDIRECT" in (role or "").upper()
-            bucket, seen_key = ("grantees", "_seen_grantees") if is_grantee else ("grantors", "_seen_grantors")
+            bucket, seen_key = (("grantees", "_seen_grantees") if side == "grantee"
+                                else ("grantors", "_seen_grantors"))
             key = name.upper()
             if key in g[seen_key]:
                 continue
