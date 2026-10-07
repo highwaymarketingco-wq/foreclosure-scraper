@@ -66,6 +66,12 @@ ROD_CONFIG = {
     ("NC", "Transylvania"):  ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
     ("NC", "McDowell"):      ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
     ("NC", "Mitchell"):      ("nc_lookup", "FORECLOSURE_NC_LOOKUP_ROD", "0"),
+    # BIS 'Online Record System' name index, NC side (rod/nc_ors.py; the SC counties on the same
+    # platform are read by enrichment_rod_name_index)
+    ("NC", "New Hanover"):   ("nc_ors", "FORECLOSURE_NC_ORS_ROD", "0"),
+    ("NC", "Davidson"):      ("nc_ors", "FORECLOSURE_NC_ORS_ROD", "0"),
+    ("NC", "Forsyth"):       ("nc_ors", "FORECLOSURE_NC_ORS_ROD", "0"),
+    ("NC", "Guilford"):      ("nc_ors", "FORECLOSURE_NC_ORS_ROD", "0"),
 }
 
 #: chain()-only registrations: counties whose lien existence another enricher already writes

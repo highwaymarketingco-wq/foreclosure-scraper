@@ -61,9 +61,10 @@ _RX_FCL = re.compile(r"FORECLOS|\bFORCL\b|\bFCL\b|NOTICE OF (?:FORECLOSURE )?SAL
 _RX_NOT_NEW_DOT = re.compile(r"MODIF|SUBORD|AMEND|EXTEN|CORRECT|ADDEN")
 
 #: Lookup / Online Record System category names (instType[CATEGORY][CODE]) when the county
-#: publishes its code list
-_CATEGORY_KIND = {"DEED": DEED, "DEED OF TRUST": DEED_OF_TRUST, "CANCELLATION": SATISFACTION,
-                  "SATISFACTION": SATISFACTION}
+#: publishes its code list (Avery: DEED / DEED OF TRUST / CANCELLATION; Davidson: DEEDS / MORTGAGE)
+_CATEGORY_KIND = {"DEED": DEED, "DEEDS": DEED, "DEED OF TRUST": DEED_OF_TRUST, "DEEDS OF TRUST": DEED_OF_TRUST,
+                  "MORTGAGE": DEED_OF_TRUST, "MORTGAGES": DEED_OF_TRUST, "CANCELLATION": SATISFACTION,
+                  "CANCELLATIONS": SATISFACTION, "SATISFACTION": SATISFACTION, "SATISFACTIONS": SATISFACTION}
 
 _SALE_OFFICER = re.compile(r"\bTRUSTEE|/\s*TR\b|/\s*SUB\s*TR\b|\bSUBSTITUTE\b|\bCOMMISSIONER|\bSHERIFF|\bCLERK\b|\bTAX COLLECTOR|"
                            r"\bMASTER\b|\bEXECUT|\bADMINISTRAT|\bPERSONAL REP|\bGUARDIAN|\bESTATE OF\b|\bHEIRS\b")
@@ -83,15 +84,15 @@ def classify_kind(label: Optional[str], category: Optional[str] = None) -> str:
         return LIS_PENDENS
     if _RX_FCL.search(s):
         return FORECLOSURE
+    if _RX_SAT.search(s):               # before the category: 'SAT D/T' sits in a MORTGAGE category
+        return SATISFACTION
+    if _RX_ASSIGN.search(s):
+        return ASSIGNMENT
     if cat in _CATEGORY_KIND:           # the county's own code list says what the code is
         kind = _CATEGORY_KIND[cat]
         if kind == DEED_OF_TRUST and _RX_NOT_NEW_DOT.search(s):
             return OTHER_KIND
         return kind
-    if _RX_SAT.search(s):
-        return SATISFACTION
-    if _RX_ASSIGN.search(s):
-        return ASSIGNMENT
     if _RX_DOT.search(s) and not _RX_NOT_NEW_DOT.search(s):
         return DEED_OF_TRUST
     if classify_instrument(s) != OTHER:
