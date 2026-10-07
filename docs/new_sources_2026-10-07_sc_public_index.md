@@ -141,12 +141,10 @@ plain requests and the disclaimer click-through it already performs.
     settlement, satisfaction, transfer, vacatur or cancellation. In SC a
     foreclosure is usually disposed when the judgment of foreclosure is entered
     and the Master-in-Equity sale comes weeks later, so such a case is kept and
-    marked `raw['foreclosure_judgment_entered'] = True` with
-    `raw['foreclosure_judgment_date']` (the disposition date). It is kept even
-    when filed before 2024. The same flag sits inside `raw['sc_public_index']`,
-    which the board publishes whole; the two top-level keys are published only
-    once they are added to `web_artifact.RAW_KEEP`. That edit was not made here
-    because `web_artifact.py` has another session's uncommitted changes.
+    marked `raw['foreclosure_judgment_entered'] = True` (registered in
+    `RAW_KEEP` by the coordinator, ab44ec1e), with the disposition date in
+    `raw['sc_public_index']['foreclosure_judgment_date']`. It is kept even when
+    filed before 2024.
   - Partition, quiet title, lis pendens: open only.
   - Judgment: kept unless the status says satisfied, vacated, cancelled,
     released or expired (its disposition date is the day it was entered).
@@ -154,28 +152,47 @@ plain requests and the disclaimer click-through it already performs.
   Everything not kept is counted in `not_lead_by_lane`, and the run stats carry
   a per-lane profile of distinct status / type / subtype values and filed and
   disposition years.
-- **Share of the 520 foreclosures kept: not measured yet.** It needs one more
-  run of `scripts/charleston_lane_proof.py`, which now prints
-  `foreclosure_kept_share`, the distinct status / type / subtype values and the
-  year distributions per lane. It accepts the Charleston disclaimer, so the
-  agent did not run it; the coordinator or the owner does. About 11 requests,
-  3 s apart.
-- **Filed-date window search (built, unverified live).** When the search page
-  (the one reached after the disclaimer) has a date-type dropdown with a
-  "filed" option and From / To boxes, each run sets Circuit Court and Common
-  Pleas (option values read from the page, with the dropdowns' own postbacks)
-  and searches 14-day filed-date windows from the last day read (minus 3 days of
-  overlap) to today. On the first run it looks back 120 days. A window that
-  fills the 250-row grid, or says the maximum was exceeded, is split in half. If
-  the form also offers a disposition date type, a second sweep reads the last 9
-  months of dispositions, which is where judgment-entered foreclosures show up.
-  Caps: 40 requests a run, 3 s apart, one thread; an interrupted run resumes.
-  State: `data/charleston_public_index/state.json` (git-ignored; keys
-  `filed_through`, `disposed_through`). If the page has no date filter, or the
-  first answer is not a results page, the run falls back to the letter sweep
-  and saves no state. Switch: `CHARLESTON_PI_DATE_WINDOW=0`. Whether
-  Charleston's form has these controls is not known yet: part 2 of the proof
-  script prints the form's date options and runs two windows.
+- **Coordinator's proof runs (letters B, M, W), second pass:** foreclosure 520
+  seen, only 3 kept: the letter sweep returns mostly old, closed cases. Judgments
+  158 kept, other 2,016. The first date-window attempt sent 4 requests and read 0
+  cases (windows 0, budget exhausted). The form does offer date types (Actions
+  Filed, Arrested, Case Filed, Disposed, Judgment Issued) and court and
+  case-type selects.
+- **Why the date search read nothing (diagnosed from that run, not re-run by the
+  agent):** the date type was picked by the first option containing "filed",
+  which is **Actions Filed** (any docket entry in the range), not Case Filed. An
+  all-Common-Pleas 14-day window by docket activity fills the 250-row grid, so
+  each window was split, and the 4-request budget ran out before any window
+  could be read.
+- **Fixed design:**
+  - The date type is matched in order "case filed", "date filed", "filed", and
+    the label used is printed.
+  - After the Circuit and Common Pleas postbacks, the subtype list is read from
+    the page and only the lead subtypes are searched, one at a time:
+    foreclosure, partition, quiet title, lis pendens and the judgment kinds.
+    Evictions, minors' settlements and sealed matters are never searched.
+  - Windows are 30 days per subtype (7 days when the page has no subtype list).
+  - Last name stays blank.
+  - Foreclosures are also searched by "Disposed" over 9 months (judgment
+    entered, sale ahead).
+  - Every request is traced: purpose, HTTP status, grid rows, cap, and the
+    page's own message text; no party data.
+  - If a date-only search is refused (no results page), one letter is tried
+    with the same date filter. If that answers, the run becomes letter by
+    letter WITH the Case Filed range (`letters_with_date`, first lead subtype),
+    so the answers are recent filings. Otherwise it falls back to the plain
+    letter sweep.
+  - Defaults: 60-day first lookback, 40 requests a run, 3 s apart. Each run
+    starts from the last day read minus 3 days of overlap, so an
+    interrupted run resumes. State: `data/charleston_public_index/state.json`
+    (git-ignored; keys `filed_through` and `disposed_through`). Switches:
+    `CHARLESTON_PI_DATE_WINDOW=0` (letter sweep only) and
+    `CHARLESTON_PI_DISPOSED_SWEEP=0`.
+- **Still to measure live:** the working query shape and the cases seen and kept
+  per lane for a 60-day window. `uv run python scripts/charleston_lane_proof.py`
+  (about 20 requests, 3 s apart, temporary state) prints both, plus the trace.
+  The agent did not run it: it accepts the Charleston disclaimer, and the
+  agent's rules need that yes from the owner directly.
 
 ### Cleanup of carried rows (prior correction 6, narrowed)
 

@@ -1,18 +1,19 @@
 """Bounded live proof of the Charleston Public Index reader. Counts and labels only, no names.
 
-Part 1, letter sweep (5 requests): GET the disclaimer page, POST its Accept button, then
-3 last-name-letter searches. Prints, per lane, the DISTINCT case status / type / subtype
-values with counts, the filed and disposition year distributions, and how many cases the
-per-lane lead rules keep (foreclosure: open, or judgment entered in the last 9 months).
+Default: the date-window search for the last 60 days, about 20 requests: GET the disclaimer
+page, POST its Accept button, the court and case-type postbacks, then 'Case Filed' windows of
+30 days for each lead subtype (foreclosure, partition, quiet title, lis pendens, judgments),
+a window that fills the grid split in half. Prints the query shape (labels only), a trace of
+every request (HTTP status, grid rows, cap, the page's own message), and the cases seen and
+kept per lane. State goes to a temporary file, never to data/.
 
-Part 2, filed-date window (about 6 requests): a fresh session, the search form's own date
-controls (printed), Circuit / Common Pleas, two 14-day windows ending today. Writes its state
-to a temporary file, never to data/.
+--letters: also the letter sweep (B, M, W; 5 more requests) with the per-lane profile of
+distinct status / type / subtype values and filed / disposition years.
 
 Every request 3 s apart, one at a time. NOTE: this accepts the Charleston Public Index
 disclaimer (the court's Rule 610 terms) on the operator's behalf.
 
-    cd ~/foreclosure-scraper && uv run python scripts/charleston_lane_proof.py
+    cd ~/foreclosure-scraper && uv run python scripts/charleston_lane_proof.py [--letters]
 """
 import asyncio
 import json
@@ -32,46 +33,55 @@ def _top(d, n=25):
     return dict(sorted(d.items(), key=lambda kv: -kv[1])[:n])
 
 
-async def main():
-    # Part 1: letter sweep (date window off)
-    os.environ["CHARLESTON_PI_DATE_WINDOW"] = "0"
-    mod.SEARCH_PREFIXES = ["B", "M", "W"]
-    rows = await mod._curl_search_county("charleston")
-    st = dict(mod.LAST_CHARLESTON_STATS)
-    profile = {lane: {f: _top(c) for f, c in v.items()} for lane, v in (st.get("profile") or {}).items()}
-    fc_seen = (st.get("lanes") or {}).get("foreclosure", 0)
-    fc_kept = (st.get("emitted_by_lane") or {}).get("foreclosure", 0)
-    print(json.dumps({
-        "part": "letters B, M, W",
-        "grid_headers": st.get("headers"),
-        "search_form": st.get("form"),
-        "cases_seen": st.get("cases"),
-        "by_lane": st.get("lanes"),
-        "kept_by_lane": st.get("emitted_by_lane"),
-        "not_lead_by_lane": st.get("not_lead_by_lane"),
-        "foreclosure_kept_share": f"{fc_kept}/{fc_seen}",
-        "foreclosure_judgment_entered": st.get("foreclosure_judgment_entered"),
-        "party_rows_dropped_eviction_minor_sealed": st.get("dropped_party_rows"),
-        "emitted": len(rows),
-        "profile_per_lane": profile,
-    }, indent=1))
+def _kept_share(st, lane):
+    return f"{(st.get('emitted_by_lane') or {}).get(lane, 0)}/{(st.get('lanes') or {}).get(lane, 0)}"
 
-    # Part 2: filed-date window, bounded, temporary state
+
+async def main():
+    if "--letters" in sys.argv:
+        os.environ["CHARLESTON_PI_DATE_WINDOW"] = "0"
+        mod.SEARCH_PREFIXES = ["B", "M", "W"]
+        rows = await mod._curl_search_county("charleston")
+        st = dict(mod.LAST_CHARLESTON_STATS)
+        print(json.dumps({
+            "part": "letters B, M, W",
+            "grid_headers": st.get("headers"),
+            "cases_seen": st.get("cases"), "by_lane": st.get("lanes"),
+            "kept_by_lane": st.get("emitted_by_lane"),
+            "foreclosure_kept_share": _kept_share(st, "foreclosure"),
+            "foreclosure_judgment_entered": st.get("foreclosure_judgment_entered"),
+            "emitted": len(rows),
+            "profile_per_lane": {lane: {f: _top(c) for f, c in v.items()}
+                                 for lane, v in (st.get("profile") or {}).items()},
+        }, indent=1))
+
     os.environ["CHARLESTON_PI_DATE_WINDOW"] = "1"
     mod.SEARCH_PREFIXES = []
-    mod.FILED_LOOKBACK_DAYS = 27
-    mod.WINDOW_MAX_REQUESTS = 4
+    mod.FILED_LOOKBACK_DAYS = 59          # 60 days including today
+    mod.WINDOW_DAYS = 30
+    mod.DISPOSED_SWEEP = False            # no disposition sweep in this proof
+    mod.WINDOW_MAX_REQUESTS = int(os.environ.get("PROOF_MAX_REQUESTS", "18"))
     mod.CHARLESTON_STATE_FILE = Path(tempfile.mkdtemp()) / "state.json"
     rows = await mod._curl_search_county("charleston")
     st = dict(mod.LAST_CHARLESTON_STATS)
+    search = st.get("search") or {}
     print(json.dumps({
-        "part": "filed-date window (2 x 14 days, max 4 requests after the disclaimer)",
+        "part": "Case Filed date windows, last 60 days, per lead subtype",
         "search_form": st.get("form"),
-        "search": st.get("search"),
-        "cases_seen": st.get("cases"),
-        "by_lane": st.get("lanes"),
+        "query_shape": {"court": "Circuit Court", "case_type": "Common Pleas",
+                        "date_type": (st.get("form") or {}).get("date_used", {}).get("filed"),
+                        "subtypes": search.get("subtypes"), "last_name": "blank" if search.get("mode") == "date_window"
+                        else "one letter per request", "window_days": mod.WINDOW_DAYS},
+        "mode": search.get("mode"), "fallback": search.get("fallback"),
+        "requests": search.get("requests"), "windows": search.get("windows"),
+        "split": search.get("split"), "capped_days": search.get("capped_days"),
+        "budget_exhausted": search.get("budget_exhausted"),
+        "trace": search.get("trace"),
+        "cases_seen": st.get("cases"), "by_lane": st.get("lanes"),
         "kept_by_lane": st.get("emitted_by_lane"),
+        "foreclosure_kept_share": _kept_share(st, "foreclosure"),
         "filed_years": {lane: v.get("filed_year") for lane, v in (st.get("profile") or {}).items()},
+        "status_per_lane": {lane: _top(v.get("status") or {}) for lane, v in (st.get("profile") or {}).items()},
         "emitted": len(rows),
     }, indent=1))
 

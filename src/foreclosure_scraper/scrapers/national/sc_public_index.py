@@ -667,13 +667,19 @@ CHARLESTON_SEARCH = "https://jcmsweb.charlestoncounty.org/PublicIndex/PISearch.a
 #: Incremental state of the date-window search (git-ignored data/).
 CHARLESTON_STATE_FILE = Path(__file__).resolve().parents[4] / "data" / "charleston_public_index" / "state.json"
 WINDOW_DELAY = float(os.environ.get("CHARLESTON_PI_DELAY_S", "3"))
-WINDOW_DAYS = int(os.environ.get("CHARLESTON_PI_WINDOW_DAYS", "14"))
-FILED_LOOKBACK_DAYS = int(os.environ.get("CHARLESTON_PI_LOOKBACK_DAYS", "120"))
+#: Days per window when the search is narrowed to one case subtype, and when it is not.
+WINDOW_DAYS = int(os.environ.get("CHARLESTON_PI_WINDOW_DAYS", "30"))
+WINDOW_DAYS_ALL_CP = 7
+FILED_LOOKBACK_DAYS = int(os.environ.get("CHARLESTON_PI_LOOKBACK_DAYS", "60"))
 WINDOW_MAX_REQUESTS = int(os.environ.get("CHARLESTON_PI_MAX_REQUESTS", "40"))
 WINDOW_OVERLAP_DAYS = 3
+#: The 'Disposed' sweep for judgment-entered foreclosures (CHARLESTON_PI_DISPOSED_SWEEP=0: off).
+DISPOSED_SWEEP = os.environ.get("CHARLESTON_PI_DISPOSED_SWEEP", "1") != "0"
 GRID_CAP_ROWS = 250
 _NO_RECORDS_RE = re.compile(r"no (records|cases|matches|results)|0 records|nothing found", re.I)
 _MAX_EXCEEDED_RE = re.compile(r"maximum[^<]{0,40}exceed", re.I)
+#: Letters for the fallback "letter + date filter" search (when a date-only search is refused).
+DATE_LETTERS = [chr(c) for c in range(ord("A"), ord("Z") + 1)]
 
 
 def _select_leads(results: list[dict], parse_stats: dict, window: dict,
@@ -724,7 +730,13 @@ def _select_leads(results: list[dict], parse_stats: dict, window: dict,
 
 
 def _select(tree: HTMLParser, suffix: str):
-    return tree.css_first(f'select[name$="{suffix}"]')
+    """The <select> whose name ends with `suffix`, case-insensitively (the page spells the
+    subtype list 'DropdownlistCaseSubType')."""
+    suffix = suffix.lower()
+    for sel in tree.css("select"):
+        if (sel.attributes.get("name") or "").lower().endswith(suffix):
+            return sel
+    return None
 
 
 def _options(sel) -> list[tuple[str, str]]:
@@ -732,15 +744,29 @@ def _options(sel) -> list[tuple[str, str]]:
 
 
 def _pick(options: list[tuple[str, str]], *needles: str) -> str | None:
-    for v, t in options:
-        if any(n in t.lower() or n in v.lower() for n in needles):
-            return v
+    """The first option whose text or value contains a needle, needles tried IN ORDER (so
+    'case filed' wins over a bare 'filed', which would also match 'Actions Filed')."""
+    for n in needles:
+        for v, t in options:
+            if n in t.lower() or n in v.lower():
+                return v
     return None
+
+
+def _label(options: list[tuple[str, str]], value: str | None) -> str | None:
+    return next((t for v, t in options if v == value), None)
+
+
+def _postback(sel) -> bool:
+    return bool(sel is not None and "__doPostBack" in (sel.attributes.get("onchange") or ""))
 
 
 def _date_form(html: str) -> dict | None:
     """The search form's date-filter controls, or None when it has no filed-date range.
-    Every name and option value is read from the page itself, not assumed."""
+    Every name and option value is read from the page itself, not assumed. Live 2026-10-07
+    (coordinator's proof run): date types Actions Filed, Arrested, Case Filed, Disposed,
+    Judgment Issued, plus court and case-type selects. 'Actions Filed' (any docket entry in
+    the range) must not be taken for 'Case Filed'."""
     tree = HTMLParser(html or "")
     df = _select(tree, "DropDownListDateFilter")
     f = tree.css_first('input[name$="TextBoxDateFrom"]')
@@ -748,7 +774,7 @@ def _date_form(html: str) -> dict | None:
     if not (df and f and t):
         return None
     dopts = _options(df)
-    filed = _pick(dopts, "file")
+    filed = _pick(dopts, "case filed", "date filed", "filed")
     if filed is None:
         return None
     court, case = _select(tree, "DropDownListCourtType"), _select(tree, "DropDownListCaseTypes")
@@ -758,10 +784,12 @@ def _date_form(html: str) -> dict | None:
         "from": f.attributes.get("name"), "to": t.attributes.get("name"),
         "court": court.attributes.get("name") if court else None,
         "court_value": _pick(_options(court), "circuit"),
-        "court_postback": bool(court and "__doPostBack" in (court.attributes.get("onchange") or "")),
+        "court_postback": _postback(court),
         "case": case.attributes.get("name") if case else None,
-        "case_postback": bool(case and "__doPostBack" in (case.attributes.get("onchange") or "")),
+        "case_options": _options(case),
+        "case_postback": _postback(case),
         "date_options": [t for _, t in dopts],
+        "date_labels": {"filed": _label(dopts, filed), "disposed": _label(dopts, _pick(dopts, "dispos"))},
     }
 
 
@@ -769,6 +797,7 @@ def _form_summary(form: dict | None) -> dict:
     if not form:
         return {"date_filter": False}
     return {"date_filter": True, "date_options": form.get("date_options"),
+            "date_used": form.get("date_labels"),
             "disposed_option": bool(form.get("disposed")), "court_select": bool(form.get("court")),
             "case_select": bool(form.get("case"))}
 
@@ -776,6 +805,42 @@ def _form_summary(form: dict | None) -> dict:
 def _grid_rows(html: str) -> int:
     grid = HTMLParser(html or "").css_first("table#ContentPlaceHolder1_SearchResults")
     return sum(1 for tr in grid.css("tr") if tr.css("td")) if grid else -1
+
+
+_MSG_ID_RE = re.compile(r"message|error|validat|warning|label", re.I)
+
+
+def _page_message(html: str) -> str:
+    """The page's own status / validation text (e.g. 'maximum records exceeded', 'enter a last
+    name'), for the run trace. Read from elements whose id says message / error / validator /
+    label and that are not inside the results grid; never a party row."""
+    tree = HTMLParser(html or "")
+    bits = []
+    for node in tree.css("span, div, p"):
+        nid = node.attributes.get("id") or ""
+        if not _MSG_ID_RE.search(nid) or "SearchResults" in nid:
+            continue
+        txt = node.text(strip=True)
+        if txt and len(txt) < 200:
+            bits.append(txt)
+    return " | ".join(dict.fromkeys(bits))[:240]
+
+
+def _subtype_plan(page_html: str) -> tuple[str | None, list[tuple[str, str, str]]]:
+    """(subtype select name, [(value, label, lane)]) for the lead lanes, read from the page
+    after the Common Pleas postback. Evictions, minors' settlements and sealed matters never."""
+    sel = _select(HTMLParser(page_html or ""), "DropdownlistCaseSubType")
+    if sel is None:
+        return None, []
+    plan = []
+    for v, t in _options(sel):
+        if not v.strip():
+            continue
+        lane = charleston_lane(t)
+        if lane in ("foreclosure", "partition", "quiet_title", "lis_pendens", "judgment") \
+                and not charleston_skip(t):
+            plan.append((v, t, lane))
+    return sel.attributes.get("name"), plan
 
 
 def _load_state() -> dict:
@@ -804,22 +869,34 @@ def _windows(start: date, end: date, days: int) -> list[tuple[date, date]]:
     return out
 
 
+_LAST = "ctl00$ContentPlaceHolder1$TextBoxlastName"
+_SEARCH = {"ctl00$ContentPlaceHolder1$ButtonSearch": "Search",
+           "ctl00$ContentPlaceHolder1$IndexGroup": "rbIndexGroup1"}
+
+
 async def _date_window_search(session, search_url: str, page_html: str, form: dict,
                               results: list, parse_stats: dict,
                               today: date | None = None) -> dict:
-    """Common Pleas cases by filed-date window since the last run (and, when the form offers
-    a disposition date, foreclosure judgments by disposition-date window): one request at a
-    time, WINDOW_DELAY apart, at most WINDOW_MAX_REQUESTS a run, a window that hits the grid
-    cap split in half. State (the last day fully read per date type) in CHARLESTON_STATE_FILE,
-    so an interrupted run resumes. Returns what it did; {'fallback': reason} when the site's
-    answer is not a results page (the caller then runs the letter sweep)."""
+    """Recent Common Pleas filings by 'Case Filed' date window, one lead subtype at a time
+    (foreclosure, partition, quiet title, lis pendens, the judgment kinds), from the last run's
+    day (minus WINDOW_OVERLAP_DAYS) to today; plus foreclosures by 'Disposed' date over the last
+    FORECLOSURE_JUDGMENT_DAYS (judgment entered, sale ahead). Court, case type and subtype
+    values come from the page's own dropdowns and postbacks. One request at a time,
+    WINDOW_DELAY apart, at most WINDOW_MAX_REQUESTS a run; a window that fills the 250-row grid
+    or says the maximum was exceeded is split in half. State: CHARLESTON_STATE_FILE.
+
+    If the first date search is not answered with a results page (e.g. the form wants a name),
+    one letter is tried with the same date filter; when that works, the run becomes a
+    letter-by-letter search WITH the date filter ('letters_with_date'). Otherwise it returns
+    {'fallback': ...} and the caller runs the plain letter sweep. `trace` records each request
+    (purpose, labels, dates, HTTP status, grid rows, cap, the page's own message): no names."""
     today = today or datetime.utcnow().date()
     state = _load_state()
     hidden = _get_hidden_fields(page_html)
     used = 0
-    info: dict = {"mode": "date_window", "windows": 0, "split": 0, "capped_days": 0}
+    info: dict = {"mode": "date_window", "windows": 0, "split": 0, "capped_days": 0, "trace": []}
 
-    async def post(data: dict) -> str | None:
+    async def post(data: dict, what: str) -> str | None:
         nonlocal used, hidden
         if used >= WINDOW_MAX_REQUESTS:
             return None
@@ -827,79 +904,131 @@ async def _date_window_search(session, search_url: str, page_html: str, form: di
         r = await asyncio.to_thread(session.post, search_url, data=data,
                                     impersonate="chrome", timeout=30)
         await asyncio.sleep(WINDOW_DELAY)
+        text = r.text if r.status_code == 200 else ""
+        n = _grid_rows(text)
+        if len(info["trace"]) < 60:
+            info["trace"].append({"what": what, "http": r.status_code, "grid_rows": n,
+                                  "max_exceeded": bool(_MAX_EXCEEDED_RE.search(text)),
+                                  "message": _page_message(text)})
         if r.status_code != 200:
             return ""
         hidden = _get_hidden_fields(r.text) or hidden
         return r.text
 
     base: dict = {}
-    # Cascading dropdowns: Circuit Court, then Common Pleas (option values read from the page).
+    page = page_html
+    # Cascading dropdowns: Circuit Court, then Common Pleas (values read from the page).
     if form.get("court") and form.get("court_value") is not None:
         base[form["court"]] = form["court_value"]
         if form.get("court_postback"):
-            html = await post({**hidden, **base, "__EVENTTARGET": form["court"], "__EVENTARGUMENT": ""})
-            if not html:
+            page = await post({**hidden, **base, "__EVENTTARGET": form["court"], "__EVENTARGUMENT": ""},
+                              "postback court=circuit")
+            if not page:
                 return {**info, "fallback": "court_postback_failed", "requests": used}
-            case_sel = _select(HTMLParser(html), "DropDownListCaseTypes")
-            form = {**form, "case": case_sel.attributes.get("name") if case_sel else form.get("case")}
-            form["case_options"] = _options(case_sel)
-    case_value = _pick(form.get("case_options") or _options(_select(HTMLParser(page_html), "DropDownListCaseTypes")),
-                       "common pleas")
-    if form.get("case") and case_value is not None:
-        base[form["case"]] = case_value
-        if form.get("case_postback"):
-            html = await post({**hidden, **base, "__EVENTTARGET": form["case"], "__EVENTARGUMENT": ""})
-            if not html:
+    case_sel = _select(HTMLParser(page), "DropDownListCaseTypes")
+    case_name = case_sel.attributes.get("name") if case_sel is not None else form.get("case")
+    case_value = _pick(_options(case_sel) or form.get("case_options") or [], "common pleas")
+    if case_name and case_value is not None:
+        base[case_name] = case_value
+        if _postback(case_sel) or form.get("case_postback"):
+            page = await post({**hidden, **base, "__EVENTTARGET": case_name, "__EVENTARGUMENT": ""},
+                              "postback case=common pleas")
+            if not page:
                 return {**info, "fallback": "case_postback_failed", "requests": used}
+    sub_name, plan = _subtype_plan(page)
+    info["subtypes"] = [t for _, t, _ in plan]
+    subtypes = [(v, t) for v, t, _ in plan] if (sub_name and plan) else [(None, "all Common Pleas")]
+    days = WINDOW_DAYS if subtypes[0][0] is not None else WINDOW_DAYS_ALL_CP
 
-    sweeps = [("filed", form["filed"], FILED_LOOKBACK_DAYS)]
-    if form.get("disposed"):
-        sweeps.append(("disposed", form["disposed"], FORECLOSURE_JUDGMENT_DAYS))
-    for key, option, lookback in sweeps:
+    def query(option: str, a: date, b: date, sub: str | None, last: str = "") -> dict:
+        q = {**hidden, **base, form["date_filter"]: option,
+             form["from"]: a.strftime("%m/%d/%Y"), form["to"]: b.strftime("%m/%d/%Y"),
+             _LAST: last, **_SEARCH}
+        if sub is not None and sub_name:
+            q[sub_name] = sub
+        return q
+
+    def take(html: str, key: str) -> None:
+        for rec in _parse_charleston_results(html, parse_stats):
+            rec["via"] = key
+            results.append(rec)
+
+    sweeps = [("filed", form["filed"], FILED_LOOKBACK_DAYS, subtypes)]
+    fc = [(v, t) for v, t in subtypes if v is not None and charleston_lane(t) == "foreclosure"]
+    if DISPOSED_SWEEP and form.get("disposed") and fc:
+        sweeps.append(("disposed", form["disposed"], FORECLOSURE_JUDGMENT_DAYS, fc))
+    first = True
+    for key, option, lookback, subs in sweeps:
         through = _mdy_iso(state.get(f"{key}_through"))
         start = max(today - timedelta(days=lookback),
                     (through - timedelta(days=WINDOW_OVERLAP_DAYS)) if through else date.min)
-        queue = _windows(start, today, WINDOW_DAYS)
         done_through = through
-        while queue:
-            a, b = queue.pop(0)
-            html = await post({**hidden, **base,
-                               form["date_filter"]: option,
-                               form["from"]: a.strftime("%m/%d/%Y"), form["to"]: b.strftime("%m/%d/%Y"),
-                               "ctl00$ContentPlaceHolder1$TextBoxlastName": "",
-                               "ctl00$ContentPlaceHolder1$ButtonSearch": "Search",
-                               "ctl00$ContentPlaceHolder1$IndexGroup": "rbIndexGroup1"})
-            if html is None:
-                info["budget_exhausted"] = True
+        for a0, b0 in _windows(start, today, days):
+            window_ok = True
+            for sub, label in subs:
+                queue = [(a0, b0)]
+                while queue:
+                    a, b = queue.pop(0)
+                    what = f"{key} {label} {a.isoformat()}..{b.isoformat()}"
+                    html = await post(query(option, a, b, sub), what)
+                    if html is None:
+                        info["budget_exhausted"] = True
+                        window_ok = False
+                        break
+                    n = _grid_rows(html)
+                    if n < 0 and not _NO_RECORDS_RE.search(html):
+                        if first:
+                            # Not a results page: does a name fragment unlock it?
+                            probe = await post(query(option, a, b, sub, last="A"), what + " letter A")
+                            if probe and _grid_rows(probe) >= 0:
+                                return {**info, **await _letters_with_date(
+                                    post, query, option, a0, today, sub, take, info), "requests": used}
+                            return {**info, "fallback": "not_a_results_page", "requests": used}
+                        info["unreadable_windows"] = info.get("unreadable_windows", 0) + 1
+                        window_ok = False
+                        break
+                    first = False
+                    capped = n >= GRID_CAP_ROWS or bool(_MAX_EXCEEDED_RE.search(html))
+                    if capped and b > a:
+                        mid = a + timedelta(days=(b - a).days // 2)
+                        queue[:0] = [(a, mid), (mid + timedelta(days=1), b)]
+                        info["split"] += 1
+                        continue
+                    if capped:
+                        info["capped_days"] += 1
+                    info["windows"] += 1
+                    if n > 0:
+                        take(html, key)
+                if not window_ok:
+                    break
+            if not window_ok:
                 break
-            n = _grid_rows(html)
-            if n < 0 and not _NO_RECORDS_RE.search(html):
-                if not info["windows"]:
-                    return {**info, "fallback": "not_a_results_page", "requests": used}
-                info["unreadable_windows"] = info.get("unreadable_windows", 0) + 1
-                break
-            capped = n >= GRID_CAP_ROWS or bool(_MAX_EXCEEDED_RE.search(html))
-            if capped and b > a:
-                mid = a + timedelta(days=(b - a).days // 2)
-                queue[:0] = [(a, mid), (mid + timedelta(days=1), b)]
-                info["split"] += 1
-                continue
-            if capped:
-                info["capped_days"] += 1
-            info["windows"] += 1
-            for rec in _parse_charleston_results(html, parse_stats) if n > 0 else []:
-                rec["via"] = key
-                results.append(rec)
-            done_through = b
+            done_through = b0
         if done_through:
             state[f"{key}_through"] = done_through.isoformat()
-        if info.get("budget_exhausted"):
+        if info.get("budget_exhausted") or info.get("unreadable_windows"):
             break
     info["requests"] = used
     state["updated_at"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     _save_state(state)
     info["state"] = {k: v for k, v in state.items() if k.endswith("_through")}
     return info
+
+
+async def _letters_with_date(post, query, option: str, start: date, end: date, sub: str | None,
+                             take, info: dict) -> dict:
+    """Fallback when a date-only search is refused: every letter, each with the same
+    'Case Filed' range (and subtype when there is one), so the answers are recent filings."""
+    out = {"mode": "letters_with_date", "letters_done": 0}
+    for letter in DATE_LETTERS:
+        html = await post(query(option, start, end, sub, last=letter), f"letter {letter} + date")
+        if html is None:
+            out["budget_exhausted"] = True
+            break
+        if _grid_rows(html) > 0:
+            take(html, "filed")
+        out["letters_done"] += 1
+    return out
 
 
 def _mdy_iso(s: Any) -> date | None:
@@ -1077,10 +1206,10 @@ class SCPublicIndexScraper(BaseScraper):
             extra_raw: dict = {}
             if case.get("foreclosure_judgment_entered"):
                 # The judgment of foreclosure is entered and the Master's sale is probably
-                # still ahead. Also kept inside the sc_public_index block, which the board
-                # publishes whole; the top-level key needs a RAW_KEEP entry to be published.
+                # still ahead (top-level key registered in RAW_KEEP); its date is the case's
+                # disposition date, kept in the sc_public_index block.
                 extra_raw["foreclosure_judgment_entered"] = True
-                extra_raw["foreclosure_judgment_date"] = case.get("date_disposed") or None
+                block["foreclosure_judgment_date"] = case.get("date_disposed") or None
 
             li = Listing(
                 source=JUDGMENT_LIEN_SOURCE if judgment else self.slug,

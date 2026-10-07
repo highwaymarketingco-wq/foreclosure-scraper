@@ -279,7 +279,7 @@ def test_charleston_pass_keeps_live_cases_and_marks_judgment_entered(monkeypatch
     lis = {li.case_number: li for li in mod.SCPublicIndexScraper()._to_listings(rows)}
     fj = lis["2023CP1000201"]
     assert fj.raw["foreclosure_judgment_entered"] is True
-    assert fj.raw["foreclosure_judgment_date"] == _RECENT
+    assert fj.raw["sc_public_index"]["foreclosure_judgment_date"] == _RECENT
     assert fj.raw["sc_public_index"]["foreclosure_judgment_entered"] is True
     assert "foreclosure_judgment_entered" not in lis["2026CP1000203"].raw
 
@@ -288,20 +288,39 @@ def test_charleston_pass_keeps_live_cases_and_marks_judgment_entered(monkeypatch
 # Filed-date window search (made-up form markup in the shape of the state form).
 # --------------------------------------------------------------------------- #
 
-FORM = """<html><body>
+_PB = "javascript:setTimeout('__doPostBack(\\'{n}\\',\\'\\')', 0)"
+_COURT = "ctl00$ContentPlaceHolder1$DropDownListCourtType"
+_CASE = "ctl00$ContentPlaceHolder1$DropDownListCaseTypes"
+_SUB = "ctl00$ContentPlaceHolder1$DropdownlistCaseSubType"
+_DATE = "ctl00$ContentPlaceHolder1$DropDownListDateFilter"
+_FROM, _TO = "ctl00$ContentPlaceHolder1$TextBoxDateFrom", "ctl00$ContentPlaceHolder1$TextBoxDateTo"
+
+
+def _form(with_subtypes: bool) -> str:
+    sub = (f'<select name="{_SUB}"><option value=" ">All</option>'
+           '<option value="210">Auto 210</option><option value="420">Foreclosure 420</option>'
+           '<option value="440">Partition 440</option><option value="450">Possession 450</option>'
+           '<option value="530">Minor Settlement 530</option>'
+           '<option value="540">Transcript Judgment 540</option></select>') if with_subtypes else ""
+    # the date types in the live page's order (2026-10-07); option values made up
+    return f"""<html><body>
 <input type="hidden" name="__VIEWSTATE" value="v0" />
-<select name="ctl00$ContentPlaceHolder1$DropDownListCourtType"
-        onchange="javascript:setTimeout('__doPostBack(\'ctl00$ContentPlaceHolder1$DropDownListCourtType\',\'\')', 0)">
+<select name="{_COURT}" onchange="{_PB.format(n=_COURT)}">
   <option value=" ">All</option><option value="G">Circuit Court</option><option value="L">Summary Court</option>
 </select>
-<select name="ctl00$ContentPlaceHolder1$DropDownListCaseTypes">
+<select name="{_CASE}" onchange="{_PB.format(n=_CASE)}">
   <option value=" ">All</option><option value="CP  ">Common Pleas</option><option value="GS  ">General Sessions</option>
 </select>
-<select name="ctl00$ContentPlaceHolder1$DropDownListDateFilter">
-  <option value="">Select</option><option value="Filed">Case Filed</option><option value="Disposed">Case Disposed</option>
+{sub}
+<select name="{_DATE}">
+  <option value="">Select</option><option value="AF">Actions Filed</option><option value="AR">Arrested</option>
+  <option value="CF">Case Filed</option><option value="DI">Disposed</option><option value="JI">Judgment Issued</option>
 </select>
-<input name="ctl00$ContentPlaceHolder1$TextBoxDateFrom" /><input name="ctl00$ContentPlaceHolder1$TextBoxDateTo" />
+<input name="{_FROM}" /><input name="{_TO}" />
 </body></html>"""
+
+
+FORM = _form(False)
 
 
 def _grid_page(n_cases, subtype="Foreclosure 420", start=1):
@@ -311,9 +330,13 @@ def _grid_page(n_cases, subtype="Foreclosure 420", start=1):
             '<table id="ContentPlaceHolder1_SearchResults">' + _HEAD + rows + "</table></body></html>")
 
 
+_SUB_LABEL = {"420": "Foreclosure 420", "440": "Partition 440", "540": "Transcript Judgment 540"}
+
+
 class _WindowSession(_FakeCurlSession):
-    """Accept -> FORM; court postback -> FORM; a search answers by window length: a window
-    longer than 7 days is 'capped' (250 rows), shorter ones answer 2 cases."""
+    """Accept -> form; court postback -> form; case postback -> form with the subtype list.
+    A search window longer than 7 days is 'capped' (250 rows); shorter ones answer 2 cases of
+    the subtype asked."""
     def __init__(self, *a, **k):
         super().__init__()
         self.searches = []
@@ -321,29 +344,38 @@ class _WindowSession(_FakeCurlSession):
     def post(self, url, data=None, **k):
         if not url.endswith("PISearch.aspx"):
             return _Resp(FORM)
+        if data.get("__EVENTTARGET") == _CASE:
+            return _Resp(_form(True))
         if data.get("__EVENTTARGET"):
             return _Resp(FORM)
-        f = data["ctl00$ContentPlaceHolder1$TextBoxDateFrom"]
-        t = data["ctl00$ContentPlaceHolder1$TextBoxDateTo"]
-        self.searches.append((data["ctl00$ContentPlaceHolder1$DropDownListDateFilter"], f, t,
-                              data.get("ctl00$ContentPlaceHolder1$DropDownListCourtType"),
-                              data.get("ctl00$ContentPlaceHolder1$DropDownListCaseTypes")))
-        from datetime import datetime as _dt
-        days = (_dt.strptime(t, "%m/%d/%Y") - _dt.strptime(f, "%m/%d/%Y")).days + 1
+        f, t = data[_FROM], data[_TO]
+        self.searches.append({"date": data[_DATE], "from": f, "to": t, "court": data.get(_COURT),
+                              "case": data.get(_CASE), "sub": data.get(_SUB),
+                              "last": data.get("ctl00$ContentPlaceHolder1$TextBoxlastName")})
+        days = (_dt_parse(t) - _dt_parse(f)).days + 1
         if days > 7:
             return _Resp(_grid_page(250))
-        return _Resp(_grid_page(2, start=len(self.searches) * 10))
+        return _Resp(_grid_page(2, subtype=_SUB_LABEL.get(data.get(_SUB), "Foreclosure 420"),
+                                start=len(self.searches) * 10))
 
 
 def test_date_form_is_read_from_the_page():
     form = mod._date_form(FORM)
-    assert form["filed"] == "Filed" and form["disposed"] == "Disposed"
+    assert form["filed"] == "CF"            # 'Case Filed', not 'Actions Filed'
+    assert form["disposed"] == "DI"
     assert form["court_value"] == "G" and form["court_postback"] is True
-    assert form["case_postback"] is False
+    assert form["case_postback"] is True
     assert mod._date_form("<html><body>no date filter</body></html>") is None
 
 
-def test_date_window_search_is_incremental_and_splits_capped_windows(monkeypatch, tmp_path):
+def test_subtype_plan_keeps_lead_subtypes_only():
+    name, plan = mod._subtype_plan(_form(True))
+    assert name == _SUB
+    assert [(v, lane) for v, _, lane in plan] == [("420", "foreclosure"), ("440", "partition"),
+                                                  ("540", "judgment")]
+
+
+def test_date_window_search_is_incremental_by_subtype_and_splits_capped_windows(monkeypatch, tmp_path):
     import asyncio
 
     import curl_cffi.requests as cf
@@ -357,29 +389,66 @@ def test_date_window_search_is_incremental_and_splits_capped_windows(monkeypatch
     monkeypatch.setattr(cf, "Session", _make)
     monkeypatch.setattr(mod, "REQUEST_DELAY", 0)
     monkeypatch.setattr(mod, "WINDOW_DELAY", 0)
-    monkeypatch.setattr(mod, "WINDOW_DAYS", 14)
+    monkeypatch.setattr(mod, "WINDOW_DAYS", 30)
     monkeypatch.setattr(mod, "FILED_LOOKBACK_DAYS", 20)
     monkeypatch.setattr(mod, "FORECLOSURE_JUDGMENT_DAYS", 5)
-    monkeypatch.setattr(mod, "WINDOW_MAX_REQUESTS", 40)
+    monkeypatch.setattr(mod, "WINDOW_MAX_REQUESTS", 60)
     monkeypatch.setattr(mod, "CHARLESTON_STATE_FILE", tmp_path / "state.json")
     rows = asyncio.run(mod._curl_search_county("charleston"))
     st = mod.LAST_CHARLESTON_STATS["search"]
     assert st["mode"] == "date_window" and st["split"] >= 1 and "fallback" not in st
+    assert st["subtypes"] == ["Foreclosure 420", "Partition 440", "Transcript Judgment 540"]
     searches = sess["s"].searches
-    assert all(c == "G" and k == "CP  " for _, _, _, c, k in searches)   # Circuit, Common Pleas
-    assert {d for d, *_ in searches} == {"Filed", "Disposed"}
-    assert rows and all(r["lane"] == "foreclosure" for r in rows)
+    assert all(q["court"] == "G" and q["case"] == "CP  " and q["last"] == "" for q in searches)
+    assert {q["date"] for q in searches} == {"CF", "DI"}
+    assert {q["sub"] for q in searches if q["date"] == "CF"} == {"420", "440", "540"}
+    assert {q["sub"] for q in searches if q["date"] == "DI"} == {"420"}   # judgment-entered foreclosures
+    assert {r["lane"] for r in rows} == {"foreclosure", "partition", "judgment"}
+    assert st["trace"] and all("message" in t for t in st["trace"])
     import json as _json
     state = _json.loads((tmp_path / "state.json").read_text())
     today = date.today().isoformat()
     assert state["filed_through"] == today and state["disposed_through"] == today
     # next run: starts from the saved day minus the overlap, not the lookback
-    n_before = len(searches)
     asyncio.run(mod._curl_search_county("charleston"))
     second = sess["s"].searches
-    assert len(second) < n_before
-    first_from = min(_dt_parse(f) for d, f, *_ in second if d == "Filed")
+    first_from = min(_dt_parse(q["from"]) for q in second if q["date"] == "CF")
     assert (date.today() - first_from).days == mod.WINDOW_OVERLAP_DAYS
+
+
+def test_name_required_becomes_letters_with_the_date_filter(monkeypatch, tmp_path):
+    import asyncio
+
+    import curl_cffi.requests as cf
+
+    sess = {}
+
+    class _NeedsName(_WindowSession):
+        def post(self, url, data=None, **k):
+            if url.endswith("PISearch.aspx") and not data.get("__EVENTTARGET") and not data.get(
+                    "ctl00$ContentPlaceHolder1$TextBoxlastName"):
+                self.searches.append({"last": "", "date": data.get(_DATE)})
+                return _Resp('<html><body><span id="ContentPlaceHolder1_LabelMessage">'
+                             "Last name is required</span></body></html>")
+            return super().post(url, data, **k)
+
+    def _make(*a, **k):
+        sess["s"] = _NeedsName()
+        return sess["s"]
+
+    monkeypatch.setattr(cf, "Session", _make)
+    monkeypatch.setattr(mod, "REQUEST_DELAY", 0)
+    monkeypatch.setattr(mod, "WINDOW_DELAY", 0)
+    monkeypatch.setattr(mod, "FILED_LOOKBACK_DAYS", 6)
+    monkeypatch.setattr(mod, "WINDOW_MAX_REQUESTS", 40)
+    monkeypatch.setattr(mod, "CHARLESTON_STATE_FILE", tmp_path / "state.json")
+    asyncio.run(mod._curl_search_county("charleston"))
+    st = mod.LAST_CHARLESTON_STATS["search"]
+    assert st["mode"] == "letters_with_date" and "fallback" not in st
+    assert st["trace"][2]["message"] == "Last name is required"
+    letters = [q for q in sess["s"].searches if q.get("last")]
+    assert {q["last"] for q in letters} >= set("ABCXYZ")
+    assert all(q["date"] == "CF" and q["sub"] == "420" for q in letters)
 
 
 def _dt_parse(s):
