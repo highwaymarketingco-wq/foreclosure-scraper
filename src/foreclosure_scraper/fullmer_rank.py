@@ -249,7 +249,11 @@ def years_delinquent(li: Listing) -> tuple[Optional[float], bool]:
     yrs = _num(surf.get("years_delinquent"))
     if str(surf.get("source") or "") == "default":
         yrs = None          # placeholder, not a measurement
-    two_plus = bool(tad.get("is_two_year_plus")) or bool(yrs and yrs >= DELINQ_RIPE_YEARS)
+    # A scraper's two_year_delinquent flag is len(unpaid years) >= 2, and its unpaid years can
+    # include the current bill that is not late yet (2026-10-07). When tax_aging_surfaced counted
+    # the LATE years from that same year list (basis year_list), its count decides.
+    tad_two = bool(tad.get("is_two_year_plus")) and not (yrs is not None and surf.get("basis") == "year_list")
+    two_plus = tad_two or bool(yrs and yrs >= DELINQ_RIPE_YEARS)
     return yrs, two_plus
 
 

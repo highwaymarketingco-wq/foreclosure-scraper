@@ -121,6 +121,7 @@ import structlog
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
+from ...tax_calendar import completed_delinquent_years
 
 log = structlog.get_logger()
 
@@ -469,11 +470,15 @@ def aggregate_bills(county: str, recs: list[dict]) -> list[Listing]:
         total = round(sum(x["total_due"] or 0 for x in per_bill), 2) or None
         c["bills"] = per_bill
         c["years"] = years
-        c["years_delinquent"] = len(years)
+        # LATE unpaid levy years (tax_calendar, 2026-10-07): an Unpaid bill of the current levy is
+        # not late yet. unpaid_bill_years is the raw count of unpaid bills' years.
+        late = completed_delinquent_years(years, "SC", county)
+        c["years_delinquent"] = len(late)
+        c["unpaid_bill_years"] = len(years)
         c["oldest_year"] = years[0] if years else None
-        c["is_two_year_plus"] = len(years) >= 2
+        c["is_two_year_plus"] = len(late) >= 2
         # The shared, published key fullmer_rank reads for delinquency ripeness.
-        li.raw["two_year_delinquent"] = {"is_two_year_plus": len(years) >= 2, "years": len(years),
+        li.raw["two_year_delinquent"] = {"is_two_year_plus": len(late) >= 2, "years": len(late),
                                          "oldest_year": years[0] if years else None, "source": SLUG}
         c["total_due"] = total
         if total:

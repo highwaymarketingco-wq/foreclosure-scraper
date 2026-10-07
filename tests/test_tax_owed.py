@@ -1,7 +1,7 @@
 """Tax-owed normalizer: per-source amounts -> raw['tax_owed'] + parcel cross-ref."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 from foreclosure_scraper.enrichment_tax_owed import enrich_tax_owed
@@ -132,11 +132,19 @@ def test_years_delinquent_promoted_from_multi_year_sibling_block():
     # Depth audit 2026-10-02: raw['multi_year_delinquent_tax'] already carries
     # years_delinquent (and the full per-year breakdown) but it never reached the
     # unified raw['tax_owed'] every downstream reader actually consults.
+    # 2026-10-07: years_delinquent counts only the LATE years (tax_calendar). In October 2026 the
+    # 2026 bill is not late yet, so "unpaid 2025 + 2026" is one year delinquent; the raw count of
+    # unpaid bills is kept apart.
     li = _li("counties_nc.buncombe_delinquent_tax", parcel="9608-10-8745",
              raw={"buncombe_delinquent_tax": {"principal_tax_due": 1920.86, "tax_year": 2026},
                   "multi_year_delinquent_tax": {"years": [2025, 2026], "years_delinquent": 2,
                                                 "total_due": 1920.86}})
-    enrich_tax_owed([li])
+    enrich_tax_owed([li], today=date(2026, 10, 7))
+    to = li.raw["tax_owed"]
+    assert to["years_delinquent"] == 1
+    assert to["unpaid_bill_years"] == 2
+    assert to["not_yet_late_years"] == [2026]
+    enrich_tax_owed([li], today=date(2027, 1, 6))     # the 2026 bill is late from January 6
     assert li.raw["tax_owed"]["years_delinquent"] == 2
 
 

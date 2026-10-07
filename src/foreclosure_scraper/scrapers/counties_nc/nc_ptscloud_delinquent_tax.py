@@ -40,6 +40,7 @@ from ...base_scraper import BaseScraper
 from ...layer_guard import LayerHarvest
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+from ...tax_calendar import completed_delinquent_years
 
 log = structlog.get_logger()
 
@@ -287,7 +288,10 @@ def _year_summary(by_year: list[dict], bill_due_amt: float) -> dict:
     years = sorted({b["tax_year"] for b in by_year if b.get("tax_year")})
     return {
         "years_unpaid": years or None,
-        "years_delinquent": len(years) or None,
+        # LATE unpaid levy years (tax_calendar, 2026-10-07: an unpaid current-year bill is not
+        # late until January 6); unpaid_bill_years is the raw count of the roll's years
+        "years_delinquent": (len(completed_delinquent_years(years, "NC")) if years else None),
+        "unpaid_bill_years": len(years) or None,
         "oldest_year": years[0] if years else None,
         # BILL_DUE_AMT summed: the unpaid tax itself, without the interest that
         # TOTAL_DUE_AMOUNT (principal_tax_due above) folds in.

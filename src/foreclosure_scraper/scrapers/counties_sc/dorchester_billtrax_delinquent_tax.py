@@ -172,6 +172,7 @@ import structlog
 
 from ...base_scraper import BaseScraper, OUTCOME_OK, OUTCOME_BLOCKED, OUTCOME_PARTIAL, OUTCOME_ZERO
 from ...models import Listing, ListingType, PropertyKind
+from ...tax_calendar import completed_delinquent_years
 
 log = structlog.get_logger()
 
@@ -470,8 +471,10 @@ def _aggregate(bills: Iterable[dict]) -> list[Listing]:
                 "property_location": situs,
                 "bills": per_bill,
                 "years": years,
-                "years_delinquent": len(years),
-                "is_two_year_plus": len(years) >= 2,
+                # LATE unpaid levy years (tax_calendar, 2026-10-07); the raw count apart
+                "years_delinquent": len(completed_delinquent_years(years, "SC", "Dorchester")),
+                "unpaid_bill_years": len(years),
+                "is_two_year_plus": len(completed_delinquent_years(years, "SC", "Dorchester")) >= 2,
                 "total_due": total_due,
                 "property_id": latest.get("_PropertyId"),
                 # Deliberately NOT a top-level raw["document_url"]/etc key --

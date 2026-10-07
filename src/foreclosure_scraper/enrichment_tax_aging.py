@@ -43,6 +43,18 @@ per-parcel vendor read) over tax_owed (broader, pipeline-normalized, but its
 year can come from a generic text scan) -- the same priority
 scripts/surface_tax_aging.py already used.
 
+YEARS DELINQUENT = LATE YEARS (2026-10-07, owner + attorney rule). years_delinquent counts the
+unpaid levy years whose delinquent date has passed (tax_calendar: NC January 6, SC January 16 of
+the next year); a current bill that is not late yet is not counted. One reader for every source,
+enrichment_tax_owed.tax_year_status(): a source block that lists the unpaid years wins, then a
+stated count (less the newest year when that year is not late yet), then a single year (the
+delinquency since that year, tax_calendar.years_since_levy; the old `current_year - year`, which
+also counted a bill still inside its January grace window). Measured on the 10/7 board: the
+Buncombe multi-year engine lists the current 2026 levy among its years, so "unpaid 2025 + 2026"
+read as 2 years delinquent when it is 1. tax_aging_surfaced also carries `basis`,
+`unpaid_bill_years` (the raw count) and `not_yet_late_years`, and `status` is "not_yet_late"
+when nothing is late yet.
+
 Idempotent and NOT missing-only: recomputed every run from whatever
 raw['tax_owed']/raw['nc_ptscloud_delinquent_tax'] currently say, so a later
 correction to either source is reflected immediately instead of freezing a
@@ -55,93 +67,59 @@ from __future__ import annotations
 from datetime import date
 from typing import Iterable, Optional
 
+from .enrichment_tax_owed import tax_year_status
 from .models import Listing
 
 _MIN_YEAR = 1990
 
 
-def _current_year() -> int:
-    return date.today().year
-
-
-def _from_ptscloud(raw: dict, current_year: int) -> Optional[tuple[int, int]]:
-    """(tax_year, years_delinquent) from raw['nc_ptscloud_delinquent_tax'], or None."""
-    pts = raw.get("nc_ptscloud_delinquent_tax")
-    if not isinstance(pts, dict):
-        return None
-    ty = pts.get("tax_year")
+def _year(v) -> Optional[int]:
     try:
-        ty = int(ty)
+        y = int(str(v).strip()[:4])
     except (TypeError, ValueError):
         return None
-    if not (_MIN_YEAR <= ty <= current_year):
-        return None
-    return ty, current_year - ty
+    return y if _MIN_YEAR <= y <= date.today().year + 1 else None
 
 
-def _from_tax_owed(raw: dict, current_year: int) -> Optional[tuple[Optional[int], int]]:
-    """(tax_year or None, years_delinquent) from raw['tax_owed'], or None.
-
-    `years_delinquent` is preferred when the source already states a count
-    directly (promoted by enrich_tax_owed from a sibling multi-year block) --
-    more authoritative than subtracting the earliest delinquent year, and
-    available even when `year` itself is absent. Falls back to computing from
-    `year` otherwise.
-    """
-    to = raw.get("tax_owed")
-    if not isinstance(to, dict):
-        return None
-    yr = to.get("year")
-    try:
-        yr = int(yr)
-        if not (_MIN_YEAR <= yr <= current_year):
-            yr = None
-    except (TypeError, ValueError):
-        yr = None
-
-    yrs = to.get("years_delinquent")
-    if isinstance(yrs, (int, float)) and yrs > 0:
-        return yr, int(yrs)
-    if yr is not None:
-        return yr, current_year - yr
-    return None
-
-
-def enrich_tax_aging(listings: Iterable[Listing]) -> dict:
+def enrich_tax_aging(listings: Iterable[Listing], today: Optional[date] = None) -> dict:
     """Surface years-delinquent onto raw['tax_aging_surfaced'] (and the
     derived raw['tax_aging_high'] flag) for every listing where a real tax
     source already states it. Returns run stats; never raises."""
-    current_year = _current_year()
-    stats = {"surfaced": 0, "high_2yr_plus": 0, "by_source": {"nc_ptscloud": 0, "tax_owed": 0}}
+    today = today or date.today()
+    stats = {"surfaced": 0, "high_2yr_plus": 0, "not_yet_late": 0,
+             "by_source": {"nc_ptscloud": 0, "tax_owed": 0}}
 
     for li in listings:
         raw = li.raw if isinstance(li.raw, dict) else None
         if raw is None:
             continue
-
-        tax_year: Optional[int] = None
-        years_delinquent: Optional[int] = None
-        source: Optional[str] = None
-
-        hit = _from_ptscloud(raw, current_year)
-        if hit is not None:
-            tax_year, years_delinquent = hit
-            source = "nc_ptscloud"
+        pts = raw.get("nc_ptscloud_delinquent_tax")
+        to = raw.get("tax_owed")
+        pts_year = _year(pts.get("tax_year")) if isinstance(pts, dict) else None
+        to_year = _year(to.get("year")) if isinstance(to, dict) else None
+        if pts_year is not None:
+            source, tax_year = "nc_ptscloud", pts_year
+        elif isinstance(to, dict) and (to_year is not None or to.get("years_delinquent")):
+            source, tax_year = "tax_owed", to_year
         else:
-            hit = _from_tax_owed(raw, current_year)
-            if hit is not None:
-                tax_year, years_delinquent = hit
-                source = "tax_owed"
-
-        if source is None:
             continue  # no real measurement this run -- leave whatever's there alone
 
-        raw["tax_aging_surfaced"] = {
+        status = tax_year_status(raw, li.state, li.county, today)
+        if status is None:
+            continue
+        years_delinquent = status["years_delinquent"]
+        surf = {
             "tax_year": tax_year,
             "years_delinquent": years_delinquent,
-            "status": "delinquent",
+            "status": "delinquent" if years_delinquent >= 1 else "not_yet_late",
             "source": source,
+            "basis": status["basis"],
         }
+        if status.get("unpaid_bill_years") is not None:
+            surf["unpaid_bill_years"] = status["unpaid_bill_years"]
+        if status["not_yet_late_years"]:
+            surf["not_yet_late_years"] = status["not_yet_late_years"]
+        raw["tax_aging_surfaced"] = surf
         is_high = years_delinquent >= 2
         raw["tax_aging_high"] = is_high
 
@@ -149,5 +127,7 @@ def enrich_tax_aging(listings: Iterable[Listing]) -> dict:
         stats["by_source"][source] += 1
         if is_high:
             stats["high_2yr_plus"] += 1
+        if not years_delinquent:
+            stats["not_yet_late"] += 1
 
     return stats

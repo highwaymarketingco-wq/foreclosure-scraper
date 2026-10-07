@@ -107,6 +107,7 @@ import structlog
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+from ...tax_calendar import completed_delinquent_years
 
 log = structlog.get_logger()
 
@@ -894,7 +895,10 @@ def build_listing(state: str, county: str, parcel_key: str, obs: list[_Obs],
     raw_block = {
         "years": years,
         "per_year": {str(y): per_year.get(y) for y in years},
-        "years_delinquent": len(years),
+        # LATE unpaid levy years (tax_calendar, 2026-10-07): the current levy that is not late
+        # yet is not one. unpaid_bill_years is the raw count, the current bill included.
+        "years_delinquent": len(completed_delinquent_years(years, state, county)),
+        "unpaid_bill_years": len(years),
         "matured_years": matured,
         "matured_years_delinquent": len(matured),
         "consecutive_years": _longest_run(years),

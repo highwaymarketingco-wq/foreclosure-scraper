@@ -159,6 +159,7 @@ from html import unescape as html_unescape
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
+from ...tax_calendar import levy_year_is_delinquent
 from ...enrichment_qpaybill_tax import _UA, _hidden, _url
 
 log = structlog.get_logger()
@@ -1044,17 +1045,16 @@ def _delinquent_years(years: list[str], today: date | None = None) -> list[str]:
     board for not having paid a bill that was not yet due, and made Colleton one of
     the largest "distressed" counties in the dataset.
 
-    Rule: a tax year counts only once the calendar has passed it. In February 2026 a
-    2025 bill IS delinquent (it was due 15 January); in September 2026 a 2026 bill is
-    not. Conservative at the 1 Jan - 15 Jan boundary, which is the right direction to
-    err: a missed real delinquency costs a lead, a fabricated one costs a phone call
-    to someone who owes nothing.
+    Rule: a tax year counts only once its bill is late (tax_calendar: the day after
+    15 January of the next year, a weekend deadline moved to Monday). In February 2026
+    a 2025 bill IS delinquent; in September 2026 a 2026 bill is not, and neither is it
+    on 10 January 2027 (the old calendar-year cutoff called it late from 1 January).
     """
-    cutoff = (today or date.today()).year
+    today = today or date.today()
     out = []
     for y in years:
         try:
-            if int(y) < cutoff:
+            if levy_year_is_delinquent(int(y), "SC", None, today):
                 out.append(y)
         except (TypeError, ValueError):
             continue          # unparseable year — cannot prove it is past due
