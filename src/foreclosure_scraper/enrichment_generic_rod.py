@@ -106,9 +106,13 @@ CHAIN_ONLY_CONFIG = {
 # entry shape and the same chain() result shape as the NC ones, so enrich_generic_rod (raw['rod'])
 # and enrichment_rod_chain (raw['rod_chain']) read them unchanged. Per-run cap
 # SC_ROD_MAX_LOOKUPS_PER_COUNTY (default 30) is enforced inside the adapters (rod/sc_polite.py).
+# Defaults from a yield check on 4 real board owners per platform (2026-10-07, counts only):
+# PublicSearch Greenville 4/4 chains (about 15 s a lookup) and AcclaimWeb Horry 4/4 owners found
+# (2 with a deed) are ON; Online Record System (Laurens 2/4, one lookup 200 s) and ACPASS
+# (Anderson 1/4) are OFF until the owner turns them on.
 SC_ROD_CONFIG = {
     # GovOS (Kofile) PublicSearch (rod/publicsearch.py); Oconee's raw['rod'] stays on rod/kofile.py
-    ("SC", "Greenville"):    ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "0"),
+    ("SC", "Greenville"):    ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "1"),
     # 'Online Record System' (rod/sc_online_record_system.py). The first eight are also read by
     # enrichment_rod_name_index (raw['rod_name_index'], no chain); none of them had raw['rod'].
     ("SC", "Abbeville"):     ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
@@ -122,14 +126,14 @@ SC_ROD_CONFIG = {
     ("SC", "Laurens"):       ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
     ("SC", "Lancaster"):     ("sc_online_record_system", "FORECLOSURE_SC_ORS_ROD", "0"),
     # Harris AcclaimWeb by name (rod/acclaim_names.py); rod/acclaim.py's Pickens date sweep is separate
-    ("SC", "Horry"):         ("acclaim_names", "FORECLOSURE_SC_ACCLAIM_ROD", "0"),
-    ("SC", "Pickens"):       ("acclaim_names", "FORECLOSURE_SC_ACCLAIM_ROD", "0"),
+    ("SC", "Horry"):         ("acclaim_names", "FORECLOSURE_SC_ACCLAIM_ROD", "1"),
+    ("SC", "Pickens"):       ("acclaim_names", "FORECLOSURE_SC_ACCLAIM_ROD", "1"),
     # ACPASS by name, 7/1/1974-2/20/2026 (rod/anderson_acpass_rod.py). Later deeds are in a
     # bot-checked system a script may not read; every chain result says so (after_index).
     ("SC", "Anderson"):      ("anderson_acpass_rod", "FORECLOSURE_SC_ACPASS_ROD", "0"),
 }
 SC_CHAIN_ONLY_CONFIG = {
-    ("SC", "Oconee"):        ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "0"),
+    ("SC", "Oconee"):        ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "1"),
 }
 ROD_CONFIG.update({k: v for k, v in SC_ROD_CONFIG.items() if k not in ROD_CONFIG})
 CHAIN_ONLY_CONFIG.update({k: v for k, v in SC_CHAIN_ONLY_CONFIG.items() if k not in CHAIN_ONLY_CONFIG})

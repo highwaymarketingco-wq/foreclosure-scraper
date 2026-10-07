@@ -88,9 +88,21 @@ def index_parts(name: str) -> Optional[tuple[str, str, str]]:
     return last, toks[0], (toks[1][0] if len(toks) > 1 else "")
 
 
+_ESTATE_OF = re.compile(r"^(?:THE\s+)?(?:ESTATE|EST|HEIRS?)\s+OF\s+(?:THE\s+LATE\s+)?(.+)$", re.I)
+
+
 def owner_query(owner: str) -> Optional[NameQuery]:
     """A query for a board owner name (Title Case FIRST LAST or ALL-CAPS SURNAME FIRST)."""
     first_party = re.split(r";|<br\s*/?>", owner or "", maxsplit=1)[0]
+    first_party = re.split(r"\s+(?:C/O|%|ATTN:?)\s+", first_party, maxsplit=1, flags=re.I)[0]
+    m = _ESTATE_OF.match(first_party.strip())
+    if m:                                   # 'ESTATE OF JOHN A SMITH': the name is in natural order
+        toks = [t for t in normalize_name(m.group(1)).split() if t not in _SUFFIX]
+        if len(toks) >= 2:
+            last, first = toks[-1], toks[0]
+            mid = toks[1][0] if len(toks) > 2 else ""
+            return NameQuery(display=_clean(first_party), term=f"{last} {first}", last=last, first=first,
+                             middle=mid)
     if looks_entity(first_party):
         return entity_query(first_party)
     raw = re.split(r" & | AND | \+ ", first_party, maxsplit=1, flags=re.I)[0]

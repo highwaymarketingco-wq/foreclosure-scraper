@@ -281,3 +281,10 @@ def test_failed_chain_step_keeps_the_last_deed():
     res = build_chain(reg, state="SC", county="Testcounty", owner_name=OWNER, platform="test")
     assert res.status == "ok" and res.last_deed.book == "2100" and res.prior == []
     assert "did not answer" in res.chain_stopped
+
+
+def test_owner_query_estate_of_and_care_of():
+    q = owner_query("ESTATE OF ROSALIND M QUILLFEATHER C/O OTIS BRAMBLEWOOD")
+    assert (q.last, q.first, q.middle) == ("QUILLFEATHER", "ROSALIND", "M") and not q.entity
+    q = owner_query("The Estate of Otis Bramblewood")
+    assert (q.last, q.first) == ("BRAMBLEWOOD", "OTIS")
