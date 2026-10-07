@@ -42,7 +42,8 @@ the roll block's PARCEL_NUM (parcel_raw, parcel), the land-records REID (raw.lrc
 
 VERDICTS (a levy-year Y bill is delinquent once unpaid on January 6 of Y+1, G.S. 105-360; the
 bill's own interestBeginDate decides "paid late"):
-  confirmed    a Real Property bill of a delinquent-eligible year with an amount due today.
+  confirmed    a Real Property bill of a delinquent-eligible year with an amount due today, on the
+               row's own parcel, with the owner agreeing (CONFIRMED BINDS ..., v4, below).
   stale        nothing delinquent today, the parcel carries the row's address (v2), and the claimed
                year (else the latest delinquent-eligible year) was PAID on or after its
                interest-begin date. Interest paid alone is not lateness (v2).
@@ -82,6 +83,37 @@ stale: a claimed year, the latest year, or a bill that was already delinquent wh
 saw the row (first_seen) was paid late; refuted: those were paid on time.
 A row typed tax_lien by another lien's source that is covered through its own claim (a mixed row)
 gets its verdict as is: the qualified GOVERNS (_tax_common) never ends that lien's listing type.
+
+CONFIRMED BINDS TO THE ROW'S OWN PARCEL AND OWNER (v4, 2026-10-07). Until v3 the address binding and
+the owner category only guarded stale / refuted: a `confirmed` answer was whatever the first parcel
+searched owed, and 15 of the 54 confirmed verdicts carried a bill owner different from the row's
+owner and 4 only a partial one (live re-check for the lawyer package: the roll block of a
+neighbouring parcel had been merged into four unrelated Henderson rows, 20 L M Morgan Rd, 38
+Macedonia Rd and others; 1718 Sugarloaf Mountain Rd read another parcel's $1,233; 38 Macedonia Rd is
+only the MAILING address of a parcel whose own situs is 2014 Pace Mountain Rd). Now `confirmed` needs:
+  1. a parcel that is the row's. Its number is one the ROW carries (row_parcel_ids: the board
+     parcel_id, the land-records REID, or, on the roll's own row, the roll's parcel number) and that
+     matches EXACTLY (not a number a resolver attached: raw parcel_from_geo / parcel_from_address is a
+     guess), or the parcel's CURRENT situs address equals the row's (_bind: the bills, else the
+     address search, else account_choice / address_not_found, as for stale / refuted). A roll block
+     merged into another source's row is a claim about ITS parcel, not the row's: with no address
+     match it is unconfirmed (roll_block_unbound) or followed to the parcel that carries the row's
+     address. An exact number binds `confirmed` even when the county printed another address (the
+     PTS property-address field is often the owner's mailing address: Guilford, Pitt, old Madison
+     bills); the relation is recorded (address_binding parcel_number), never a veto. The harmful
+     answers (stale / refuted) still need the address.
+  2. CURRENT addresses only (_addresses / _candidates). A parcel carries an address only through its
+     newest tax year's bills: parcel 9935114's 2024-2026 bills say 2014 PACE MOUNTAIN RD while its
+     older bills say 38 MACEDONIA RD (the owner's mailing address). A mailing address binds nothing.
+  3. the owner on the bills (the delinquent bills' and the latest bill's, surname-first or natural
+     order, any case, suffixes and ET AL ignored: tc.owner_category) agrees with the row's owner. A
+     differing or partial owner is unconfirmed (bill_owner_differs, bill_owner_partial) unless the
+     parcel number matches EXACTLY (owner_corroborated_by pin_exact). A missing owner on either
+     side contradicts nothing. The owner on an old unpaid bill counts: a parcel sold since still
+     names the old owner on its old bill (9 of the 19 flagged rows, 4 Forsyth and 5 Madison, were that:
+     the roll's owner is the owner of the unpaid bill, the latest bill names a later owner).
+Unconfirmed never suppresses (the registry only ends a claim on stale / refuted).
+
 Evidence (public ledger: a whitelist, no names, no mailing addresses): API and page URLs, tenant,
 the tax parcel searched and where it came from, the board parcel, per-year delinquent amounts,
 total, years, the not-yet-delinquent current levy, deferred amounts, the county's bill flags
@@ -104,7 +136,11 @@ from ..core import VerificationResult, result
 from . import _tax_common as tc
 
 SIGNAL = "tax_lien"
-VERSION = "v3"         # v3 (2026-10-06): two claims judged apart (current vs chronic, bill history of
+VERSION = "v4"         # v4 (2026-10-07): `confirmed` binds to the row's own parcel (the same
+                       # address binding as stale / refuted, a merged roll block is not the row's
+                       # parcel) and to the row's owner (bill_owner_differs / bill_owner_partial
+                       # unless the parcel number matches exactly).
+                       # v3 (2026-10-06): two claims judged apart (current vs chronic, bill history of
                        # levy 2019 on, per-record governs), stale for a claimed year / a bill
                        # delinquent at first_seen paid late, the address is followed only with
                        # proof (ambiguous_account / address_not_found), address-scoped ledger.
@@ -131,6 +167,7 @@ LRC_REID_TENANTS = frozenset({"Henderson", "Madison", "Hyde"})
 ROLL_SLUG = "counties_nc.nc_ptscloud_delinquent_tax"
 ROLL_KEY = "nc_ptscloud_delinquent_tax"
 MAX_SEARCHES = 2
+MAX_ADDRESS_CANDIDATES = 4   # parcels with a bill at the row's address whose current address is read
 MAX_BILL_CHECKS = 2
 TENANT_MAX_FAILURES = 2
 TIMEOUT_S = 30.0
@@ -187,6 +224,44 @@ def parcel_candidates(row: Any, tenant: str, blk: Optional[dict]) -> list[tuple[
         seen.add(k)
         keep.append((p, src))
     return keep
+
+
+def _key(p: Any) -> str:
+    """alnum identifier of a parcel number, '' for a placeholder (empty, all zeros)."""
+    k = tc.alnum(p)
+    return "" if not k or set(k) <= {"0"} else k
+
+
+def row_parcel_ids(row: Any, tenant: str, blk: Optional[dict]) -> tuple[frozenset, frozenset]:
+    """(own, exact): the billing-parcel numbers that are the ROW'S OWN, and those among them that
+    corroborate a differing owner (module doc, CONFIRMED BINDS TO THE ROW'S OWN PARCEL AND OWNER).
+    own: the board parcel_id, the land-records REID (Henderson / Madison / Hyde, the row's own
+    county), and, on the roll's OWN row (source nc_ptscloud_delinquent_tax), the roll block's
+    parcel numbers. A roll block merged into another source's row is a claim about its own parcel,
+    not a number the row carries. exact: own, minus the numbers a resolver attached (raw
+    parcel_from_geo / parcel_from_address: a guess, not corroboration) and minus the block of a
+    roll row a geocoder moved to another county (claim_county_differs)."""
+    own: set[str] = set()
+    exact: set[str] = set()
+    resolved = tc.parcel_resolved(row)
+
+    def add(num: Any, *, exact_ok: bool) -> None:
+        k = _key(num)
+        if k:
+            own.add(k)
+            if exact_ok:
+                exact.add(k)
+
+    add(tc.g(row, "parcel_id"), exact_ok=not resolved)
+    lrc = tc.raw_of(row).get("lrcpwa")
+    if tenant in LRC_REID_TENANTS and isinstance(lrc, dict) and \
+            str(tc.g(row, "county") or "").strip().lower() == tenant.lower():
+        add(lrc.get("reid"), exact_ok=not resolved)
+    if blk is not None and tc.g(row, "source") == ROLL_SLUG:
+        moved = tenant.lower() != str(tc.g(row, "county") or "").strip().lower()
+        for k in ("parcel_raw", "parcel"):
+            add(blk.get(k), exact_ok=not moved)
+    return frozenset(own), frozenset(exact)
 
 
 def claimed_years(row: Any, blk: Optional[dict]) -> list[int]:
@@ -334,7 +409,7 @@ _KEYS = ("reason", "url", "page_url", "tenant", "claim_county_differs", "tax_par
          "address_binding", "address_matches", "address_pins", "followed_from_parcel",
          "followed_because", "address_owner_match", "history_from_levy", "history_bills_read",
          "history_complete", "late_levy_years", "late_payment_dates", "chronic_claim",
-         "current_claim_basis")
+         "current_claim_basis", "tax_parcel_row_own", "owner_corroborated_by")
 
 
 def public_evidence(ev: dict) -> dict:
@@ -389,7 +464,9 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
                                         url=SEARCH_URL.format(q=quote(cands[0][0], safe=""),
                                                               tenant=quote(tenant))))
 
-    return await _decide(row, client, tenant, slug, bills, claimed, today, ev, can_follow=True)
+    own, exact = row_parcel_ids(row, tenant, blk)
+    return await _decide(row, client, tenant, slug, bills, claimed, today, ev, can_follow=True,
+                         own=own, exact=exact)
 
 
 def _set_binding(ev: dict, how: str) -> None:
@@ -399,15 +476,43 @@ def _set_binding(ev: dict, how: str) -> None:
 
 
 def _addresses(bills: list[dict]) -> list[str]:
-    return list(dict.fromkeys(b["address"] for b in bills if b.get("address")))
+    """The parcel's CURRENT property address(es): those on its newest tax year's bills (v4). An
+    older bill of the same parcel can carry the owner's MAILING address in the property-address
+    field (Henderson 9935114: its 2024-2026 bills read 2014 PACE MOUNTAIN RD, its older ones
+    38 MACEDONIA RD and others): that is not an address the parcel has today, and binding a row
+    to it was how 38 Macedonia Rd got the neighbouring parcel's balance."""
+    if not bills:
+        return []
+    top = max(b["year"] for b in bills)
+    return list(dict.fromkeys(b["address"] for b in bills if b.get("address") and b["year"] == top))
+
+
+def _candidates(payload: dict, addr: Any) -> dict[str, str]:
+    """{parcelId: property address} of the parcels in an ADDRESS search answer that have a bill at
+    the row's address (address_relation 'match'), any year. Only candidates: the answer holds just
+    the bills whose text matched the query, so a parcel whose older bills carried the address (as
+    the owner's mailing address) shows up here though its current address is another one. _bind
+    reads each candidate's own bills to see its CURRENT address (_addresses)."""
+    out: dict[str, str] = {}
+    for r in payload.get("results") or []:
+        if not isinstance(r, dict) or not r.get("parcelId"):
+            continue
+        if tc.address_relation(addr, r.get("propertyAddress1") or r.get("propertyAddress")) == "match":
+            out.setdefault(str(r["parcelId"]), r.get("propertyAddress1") or "")
+    return out
 
 
 async def _bind(row: dict, client, tenant: str, parcel: str, bills: list[dict], ev: dict,
-                *, can_follow: bool) -> tuple[str, Any]:
+                *, can_follow: bool, own: bool = True) -> tuple[str, Any]:
     """Does the parcel checked carry the row's address? ("ok", None), ("follow", parcel) or
-    ("unconfirmed", reason); see ADDRESS BINDING in the module docstring."""
+    ("unconfirmed", reason); see ADDRESS BINDING in the module docstring. `own`: the parcel's
+    number is one the row itself carries (row_parcel_ids). A parcel that is not the row's own
+    (a roll block merged in from another parcel) is bound only by an address match: with nothing
+    to compare, or nothing found, it is `roll_block_unbound` (v4)."""
     query = tc.address_query(row.get("street_address"))
     if query is None:
+        if not own:
+            return "unconfirmed", "roll_block_unbound"
         _set_binding(ev, "no_row_address")
         return "ok", None
     addr = row.get("street_address")
@@ -427,15 +532,29 @@ async def _bind(row: dict, client, tenant: str, parcel: str, bills: list[dict], 
         return "unconfirmed", "address_search_failed"
     if not isinstance(payload, dict) or not isinstance(payload.get("results"), list):
         return "unconfirmed", "address_search_unreadable"
-    carry: dict[str, str] = {}
-    for r in payload["results"]:
-        if isinstance(r, dict) and r.get("parcelId") and \
-                tc.address_relation(addr, r.get("propertyAddress1") or r.get("propertyAddress")) == "match":
-            carry.setdefault(str(r["parcelId"]), r.get("propertyAddress1") or "")
-    ev["address_matches"] = len(carry)
-    if any(tc.alnum(p) == tc.alnum(parcel) for p in carry):
+    cands = _candidates(payload, addr)
+    if rel == "unknown" and any(tc.alnum(c) == tc.alnum(parcel) for c in cands):
+        # the parcel's current address cannot be read (no usable number) and an older bill of it
+        # carries the row's: nothing contradicts, the older bill is the only address it ever had
+        ev["address_matches"] = len(cands)
         _set_binding(ev, "address_search")
         return "ok", None
+    # a candidate carries the address only TODAY: read its own bills (cached for the run)
+    carry: dict[str, str] = {}
+    for pid in [c for c in cands if tc.alnum(c) != tc.alnum(parcel)][:MAX_ADDRESS_CANDIDATES]:
+        purl = SEARCH_URL.format(q=quote(pid, safe=""), tenant=quote(tenant))
+        try:
+            ppay = await _get_json(client, purl, tenant)
+        except TenantDown:
+            return "unconfirmed", "tenant_unhealthy"
+        except Exception as exc:  # noqa: BLE001
+            ev["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+            return "unconfirmed", "address_search_failed"
+        pbills = bills_of(ppay, pid) if isinstance(ppay, dict) else []
+        now = _addresses(pbills)
+        if any(tc.address_relation(addr, a) == "match" for a in now):
+            carry[pid] = cands[pid]
+    ev["address_matches"] = len(carry)
     if carry:
         if can_follow and len(carry) == 1:
             return "follow", next(iter(carry))      # _decide: account_choice() says if it decides
@@ -443,19 +562,36 @@ async def _bind(row: dict, client, tenant: str, parcel: str, bills: list[dict], 
         return "unconfirmed", "address_parcel_mismatch"
     if rel == "conflict":                           # the county names another address and no
         return "unconfirmed", "address_not_found"   # parcel carries the row's (v3: own reason)
+    if not own:                           # a merged block, nothing ties it to the row (v4)
+        return "unconfirmed", "roll_block_unbound"
     _set_binding(ev, "unverified")        # the county's address has no usable number
     return "ok", None
 
 
+def owner_gate(ev: dict, parcel: str, exact: frozenset) -> Optional[str]:
+    """None when the bills' owner may stand behind `confirmed`; else the unconfirmed reason. The
+    owner CATEGORY (ev["owner_match"]: tc.owner_category over the delinquent bills' and the latest
+    bill's owners) 'same' or unknown passes. 'different' / 'partial' pass only with an EXACT parcel
+    number (module doc; row_parcel_ids), recorded as owner_corroborated_by pin_exact."""
+    cat = ev.get("owner_match")
+    if cat in (None, "same"):
+        return None
+    if _key(parcel) in exact:
+        ev["owner_corroborated_by"] = "pin_exact"
+        return None
+    return "bill_owner_differs" if cat == "different" else "bill_owner_partial"
+
+
 async def _decide(row: dict, client, tenant: str, slug: str, bills: list[dict], claimed: list[int],
-                  today: date, ev: dict, *, can_follow: bool) -> VerificationResult:
+                  today: date, ev: dict, *, can_follow: bool, own: frozenset = frozenset(),
+                  exact: frozenset = frozenset()) -> VerificationResult:
     latest = bills[0]
-    ev["owner_match"] = tc.owner_category(row.get("owner_name"), latest["owners"])
     ev["latest_levy_year"] = latest["year"]
     delinquent: dict[int, float] = {}
     current: dict[int, float] = {}
     deferred: dict[int, float] = {}
     flags: set[str] = set()
+    owed_owners: list[Any] = []
     for b in bills:
         if b["due"] <= 0:
             continue
@@ -464,8 +600,12 @@ async def _decide(row: dict, client, tenant: str, slug: str, bills: list[dict], 
         elif b["status"] == "UNPAID" and is_eligible(b["year"], today):
             delinquent[b["year"]] = round(delinquent.get(b["year"], 0.0) + b["due"], 2)
             flags.update(b["flags"])
+            owed_owners += b["owners"]
         elif b["status"] == "UNPAID":
             current[b["year"]] = round(current.get(b["year"], 0.0) + b["due"], 2)
+    # the owner the bills name: the unpaid (delinquent) bills' owners as well as the latest bill's
+    # (a parcel sold since still has the old owner on the old unpaid bill)
+    ev["owner_match"] = tc.owner_category(row.get("owner_name"), [*latest["owners"], *owed_owners])
     ev["delinquent_by_year"] = {str(y): a for y, a in sorted(delinquent.items(), reverse=True)}
     ev["total_delinquent"] = tc.money_total(delinquent)
     ev["years_delinquent"] = len(delinquent)
@@ -474,18 +614,26 @@ async def _decide(row: dict, client, tenant: str, slug: str, bills: list[dict], 
         ev["deferred_by_year"] = {str(y): a for y, a in sorted(deferred.items(), reverse=True)}
     if flags:
         ev["flags"] = sorted(flags)
-    if delinquent:
-        ev["under_500"] = ev["total_delinquent"] < 500
-        ev["de_minimis"] = ev["total_delinquent"] < tc.DE_MINIMIS
-        rels = {tc.address_relation(row.get("street_address"), a) for a in _addresses(bills)}
+
+    # Is this the parcel the row is about? (v4: before ANY verdict, confirmed included.)
+    parcel = ev.get("tax_parcel") or ""
+    ev["tax_parcel_row_own"] = _key(parcel) in own
+    if delinquent and _key(parcel) in exact:
+        # The row's own parcel NUMBER matches exactly (the roll's own row, the land-records REID,
+        # the board parcel_id): the bills are the row's whatever address the county printed on
+        # them. The PTS property-address field is often the owner's mailing address (Guilford,
+        # Pitt, old Madison bills), so for `confirmed` it is recorded, never a veto. The harmful
+        # answers (stale / refuted) still need the address (below).
+        a_now = _addresses(bills)
         if tc.address_query(row.get("street_address")):
+            rels = {tc.address_relation(row.get("street_address"), a) for a in a_now}
             ev["address_relation"] = ("match" if "match" in rels else "conflict"
                                       if "conflict" in rels else "unknown")
-        return _res("confirmed", ev)
-
-    # nothing owed today. Before stale / refuted: is this the parcel that carries the row's address?
-    parcel = ev.get("tax_parcel") or ""
-    action, what = await _bind(row, client, tenant, parcel, bills, ev, can_follow=can_follow)
+        _set_binding(ev, "parcel_number")
+        action, what = "ok", None
+    else:
+        action, what = await _bind(row, client, tenant, parcel, bills, ev, can_follow=can_follow,
+                                   own=ev["tax_parcel_row_own"])
     if action == "follow":
         url = SEARCH_URL.format(q=quote(what, safe=""), tenant=quote(tenant))
         try:
@@ -503,9 +651,12 @@ async def _decide(row: dict, client, tenant: str, slug: str, bills: list[dict], 
         if not tc.needs_proof(row.get("street_address"), _addresses(bills)):
             choice, why = "follow", "parcel_names_no_usable_address"
         else:
+            # a resolver attached the board parcel, or the roll block merged in through it (v4:
+            # the merged block is not a number the row carries, so it is as much a guess)
+            from_guess = (ev.get("tax_parcel_from") == "board_parcel"
+                          or (ev.get("tax_parcel_from") == "roll_block" and not ev["tax_parcel_row_own"]))
             choice, why = tc.account_choice(
-                own_retired=False,
-                resolved=tc.parcel_resolved(row) and ev.get("tax_parcel_from") == "board_parcel",
+                own_retired=False, resolved=tc.parcel_resolved(row) and from_guess,
                 own_owner=ev.get("owner_match"), address_owner=owner_addr)
         if choice == "ambiguous":
             return _res("unconfirmed", dict(ev, reason=why, address_pins=[what],
@@ -516,9 +667,19 @@ async def _decide(row: dict, client, tenant: str, slug: str, bills: list[dict], 
                    followed_from_parcel=parcel, address_binding="followed",
                    followed_because=why, results_total=payload.get("totalCount"))
         return await _decide(row, client, tenant, slug, bills2, claimed, today, ev2,
-                             can_follow=False)
+                             can_follow=False, own=own, exact=exact)
     if action == "unconfirmed":
         return _res("unconfirmed", dict(ev, reason=what))
+
+    if delinquent:
+        ev["under_500"] = ev["total_delinquent"] < 500
+        ev["de_minimis"] = ev["total_delinquent"] < tc.DE_MINIMIS
+        why_not = owner_gate(ev, parcel, exact)
+        if why_not:
+            return _res("unconfirmed", dict(ev, reason=why_not))
+        return _res("confirmed", ev)
+
+    # nothing owed today and the parcel is the row's: stale / refuted / unconfirmed from its history
 
     last_ok = latest_eligible(today)
     if latest["year"] < last_ok:

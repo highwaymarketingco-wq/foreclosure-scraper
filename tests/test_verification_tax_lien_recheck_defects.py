@@ -400,7 +400,8 @@ def test_a_payment_release_is_not_a_payment():
 
 
 def test_version_bumped_so_every_old_entry_is_due_again():
-    assert (tb.VERSION, tp.VERSION, tq.VERSION) == ("v5", "v3", "v3")
+    # tp v4: 2026-10-07 (confirmed binds to the row's parcel and owner)
+    assert (tb.VERSION, tp.VERSION, tq.VERSION) == ("v5", "v4", "v3")
 
 
 # ===========================================================================
