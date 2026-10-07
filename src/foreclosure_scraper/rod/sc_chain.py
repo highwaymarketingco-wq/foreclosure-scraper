@@ -27,7 +27,7 @@ Name fit: surname equal, given name equal or an initial of it, middle initials n
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Callable, Optional
 
