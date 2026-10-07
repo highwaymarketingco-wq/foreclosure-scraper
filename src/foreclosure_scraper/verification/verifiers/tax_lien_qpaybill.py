@@ -34,7 +34,8 @@ delinquency flag, or the roll's own qpaybill_roll block for this county). NC row
 touched (tax_lien_buncombe / tax_lien_ptscloud).
 
 WHICH PARCEL. The claim's own identification number (the roll block's identification_no) and the
-board's parcel_id (Cherokee's 13-digit numeric form re-dashed as enrichment_qpaybill_tax does).
+board's parcel_id (Cherokee's 13-digit numeric form re-dashed as enrichment_qpaybill_tax does; v4 also
+re-dashes its 16-digit numeric SUB-ACCOUNTS, NNN-NN-NN-NNN.NNN.NNN, which that normalizer leaves as digits).
 They differ on 3,995 of the roll's own rows (a resolver gave the row another parcel, often by a
 road name), so when they differ BOTH are searched:
     both delinquent -> confirmed; neither -> stale/refuted read on the claim's parcel
@@ -90,6 +91,25 @@ refuted or stale for `tax_lien` and keeps `tax_lien_chronic`. stale: a claimed y
 year, or a bill that was already delinquent when the board first saw the row (first_seen) was paid
 late; refuted: those were paid on time.
 
+SOLD AT TAX SALE (v4, 2026-10-07; observed live on Cherokee's portal, 3 requests: the land parcel of
+229 Euphra Dr, map 052-00-00-013.010, shows Status "Sold at Tax Sale", Payment Date 11/04/24, for
+tax years 2023 and 2024 with amounts $253.93 and $116.93, its 2025 bill "Paid" 03/25/26, while its
+manufactured-home account .010.001 shows "Unpaid" for 2023-2025; the only statuses on that page are
+Paid, Unpaid and Sold at Tax Sale; no Redeemed / Forfeited status was observed, so none is invented).
+A sold row is its own state, not a payment: its Payment Date is the SALE date, not a payment, and
+the sale is unresolved on the portal (the 12-month redemption period ended 11/04/25 and the portal
+does not say whether the owner redeemed or the purchaser took the deed). So:
+  * a Sold row of one of the last RECENT_SALE_YEARS eligible levies counts as the delinquent balance
+    it is (as in v3) and the verdict carries reason sold_at_tax_sale beside the amounts, the years
+    (sold_at_tax_sale_years) and the sale dates (sold_at_tax_sale_on);
+  * a year with a Sold row is never judged paid or late (the 2025 bill that was paid late in March
+    2026 on that same land parcel is not a reason for `stale`), and a recent Sold row stops stale and
+    refuted altogether: with nothing else owed the answer is unconfirmed, reason sold_at_tax_sale,
+    so the claim keeps scoring (a sold account whose row has no amount is the same);
+  * a manufactured-home sub-account (ident NNN-NN-NN-NNN.NNN.NNN, the portal's STARTS-WITH search
+    returns the land account's rows beside it) is read together with its land account:
+    related_account in the evidence, and a recent sale of the land is the same machine reason.
+
 VERDICTS (SC real-property tax is due January 15 of the next year, S.C. Code 12-45-70; unpaid
 after it, penalties attach, so a levy-year Y bill is delinquent from January 16 of Y+1; a
 deadline on a weekend rolls to Monday):
@@ -125,7 +145,11 @@ from ..core import VerificationResult, result
 from . import _tax_common as tc
 
 SIGNAL = "tax_lien"
-VERSION = "v3"         # v3 (2026-10-06): two claims judged apart (current vs chronic, the grid's
+VERSION = "v4"         # v4 (2026-10-07): "Sold at Tax Sale" is its own state (never paid, late,
+                       # stale or refuted; reason sold_at_tax_sale), the land account behind a
+                       # sub-account (Cherokee .001) is read too, Cherokee's 16-digit sub-account
+                       # parcels are re-dashed.
+                       # v3 (2026-10-06): two claims judged apart (current vs chronic, the grid's
                        # whole payment history, per-record governs), stale for a claimed year / a
                        # bill delinquent at first_seen paid late, the address account decides only
                        # with proof (ambiguous_account / address_not_found), address-scoped
@@ -198,6 +222,11 @@ def board_parcel(row: Any, county: str) -> Optional[str]:
         pid = _norm_pid("SC", county, pid)
     except Exception:  # noqa: BLE001
         pass
+    digits = re.sub(r"[^0-9]", "", pid or "")
+    if county.strip().lower() == "cherokee" and len(digits) == 16 and digits == pid:
+        # a numeric SUB-ACCOUNT (the manufactured home on a land parcel): NNN-NN-NN-NNN.NNN.NNN;
+        # _norm_pid leaves a 16-digit id as it is, and a search for it finds nothing (v4)
+        pid = f"{digits[0:3]}-{digits[3:5]}-{digits[5:7]}-{digits[7:10]}.{digits[10:13]}.{digits[13:16]}"
     return pid or None
 
 
@@ -350,6 +379,8 @@ def assess(mine: list[dict], today: date) -> dict:
     delinquent: dict[int, float] = {}
     current: dict[int, float] = {}
     sold: list[int] = []
+    sold_on: list[str] = []
+    recent_unpriced: list[int] = []
     for r in mine:
         k, y, amt = _kind(r["status"]), r["year"], r["amount"] or 0.0
         if k == "owed" and amt > 0:
@@ -358,15 +389,26 @@ def assess(mine: list[dict], today: date) -> dict:
             else:
                 current[y] = round(current.get(y, 0.0) + amt, 2)
         elif k == "sold":
+            # "Sold at Tax Sale": its Payment Date is the SALE date, not a payment (v4)
             sold.append(y)
-            if y > last_ok - RECENT_SALE_YEARS and amt > 0:
-                delinquent[y] = round(delinquent.get(y, 0.0) + amt, 2)
+            if r.get("paid_on"):
+                sold_on.append(r["paid_on"].isoformat())
+            if y > last_ok - RECENT_SALE_YEARS:
+                if amt > 0:
+                    delinquent[y] = round(delinquent.get(y, 0.0) + amt, 2)
+                else:
+                    recent_unpriced.append(y)
     out.update(latest_levy_year=max(r["year"] for r in mine),
                delinquent_by_year={str(y): a for y, a in sorted(delinquent.items(), reverse=True)},
                not_yet_delinquent_due={str(y): a for y, a in sorted(current.items(), reverse=True)},
                owners=[r["owner"] for r in sorted(mine, key=lambda r: -r["year"])[:2]])
     if sold:
         out["sold_at_tax_sale_years"] = sorted(set(sold), reverse=True)
+        out["sold_at_tax_sale_on"] = sorted(set(sold_on))[-4:]
+        out["sold_recent"] = any(y > last_ok - RECENT_SALE_YEARS for y in sold)
+        out["_sold_years"] = set(sold)
+    if recent_unpriced:
+        out["sold_unpriced"] = sorted(set(recent_unpriced), reverse=True)
     by_year: dict[int, list[dict]] = {}
     rb_by_year: dict[int, list[dict]] = {}
     for r in mine:
@@ -520,13 +562,19 @@ _KEYS = ("reason", "url", "tenant", "county", "searched", "decided_on", "delinqu
          "claim_ident", "address_relation", "address_binding", "address_matches",
          "rollback_bills_checked", "board_parcel", "latest_levy_year", "latest_delinquent_eligible_levy",
          "delinquent_by_year", "total_delinquent", "years_delinquent", "under_500", "de_minimis",
-         "not_yet_delinquent_due", "sold_at_tax_sale_years", "claimed_years", "bills_checked",
+         "not_yet_delinquent_due", "sold_at_tax_sale_years", "sold_at_tax_sale_on", "related_account",
+         "claimed_years", "bills_checked",
          "owner_match", "note", "error", "tenant_health", "followed_because",
          "address_owner_match", "history_from_levy", "history_years_read", "history_complete",
          "late_levy_years", "late_payment_dates", "chronic_claim", "current_claim_basis")
 _SEARCHED_KEYS = ("map_number", "receipt", "role", "found", "rows", "latest_levy_year",
                   "delinquent_by_year", "not_yet_delinquent_due", "sold_at_tax_sale_years",
                   "page_capped")
+_RELATED_KEYS = ("map_number", "rows", "latest_levy_year", "delinquent_by_year",
+                 "sold_at_tax_sale_years", "sold_at_tax_sale_on")
+#: a manufactured-home sub-account of a land parcel: NNN-NN-NN-NNN.NNN.NNN (Cherokee); its land
+#: account is the same number without the last segment
+_SUBACCOUNT = re.compile(r"^(.+\.\d{3})\.\d{3}$")
 MAX_RECEIPTS = 2
 
 
@@ -534,6 +582,8 @@ def public_evidence(ev: dict) -> dict:
     out = tc.pick(ev, _KEYS)
     if isinstance(out.get("searched"), list):
         out["searched"] = [tc.pick(s, _SEARCHED_KEYS) for s in out["searched"]]
+    if isinstance(out.get("related_account"), dict):
+        out["related_account"] = tc.pick(out["related_account"], _RELATED_KEYS)
     return out
 
 
@@ -560,6 +610,7 @@ def _decide_paid(a: dict, claimed: list[int], today: date, first_seen: Optional[
     holds every year, so reading it costs no request): {late_levy_years, late_payment_dates,
     years_read, readable} over the regular bills of levy HISTORY_FROM_LEVY on."""
     by_year = a.get("_by_year") or {}
+    sold_years = a.get("_sold_years") or set()
     # the claimed years, then the two latest delinquent-eligible ones
     order = [y for y in claimed if is_eligible(y, today) and y in by_year]
     for y in sorted((y for y in by_year if is_eligible(y, today)), reverse=True)[:2]:
@@ -568,6 +619,9 @@ def _decide_paid(a: dict, claimed: list[int], today: date, first_seen: Optional[
     checks = []
     verdict = "none"
     for y in order[:4]:
+        if y in sold_years:                  # v4: a year sold at tax sale is neither paid nor late
+            checks.append({"year": y, "status": "Sold at Tax Sale", "paid_late": None})
+            continue
         c = paid_check(by_year, y)
         if c is None:
             kinds = sorted({r["status"] for r in by_year.get(y, [])})
@@ -580,14 +634,16 @@ def _decide_paid(a: dict, claimed: list[int], today: date, first_seen: Optional[
     if verdict == "none" and any(c.get("paid_late") is False for c in checks):
         verdict = "refuted"
     # the payment history, every delinquent-eligible regular year from HISTORY_FROM_LEVY on
-    window = sorted(y for y in by_year if is_eligible(y, today)
+    window = sorted(y for y in by_year if is_eligible(y, today) and y not in sold_years
                     and (y >= tc.HISTORY_FROM_LEVY or y in claimed))
     hist_checks = {y: paid_check(by_year, y) for y in window}
     late = {y: late_payments(by_year, y) for y, c in hist_checks.items() if c and c["paid_late"]}
     hist = {"late_levy_years": sorted(late),
             "late_payment_dates": {str(y): late[y][:4] for y in sorted(late)},
             "years_read": sum(1 for c in hist_checks.values() if c),
-            "readable": all(c is not None for c in hist_checks.values())}
+            "readable": all(c is not None for c in hist_checks.values())
+            and not any(y in sold_years and y >= tc.HISTORY_FROM_LEVY and is_eligible(y, today)
+                        for y in by_year)}
     seen = [y for y, dates in late.items() if tc.paid_after_seen(
         first_seen, deadline(y) + timedelta(days=1), dates[-1])]
     if seen and verdict in ("refuted", "none"):
@@ -623,6 +679,32 @@ async def _lookup(client: Any, county: str, sub: str, value: str, role: str, tod
     else:
         a["receipt"] = value
     return a
+
+
+def parent_ident(ident: Any) -> Optional[str]:
+    """The land account behind a sub-account number ('052-00-00-013.010.001' -> '052-00-00-013.010'),
+    else None."""
+    m = _SUBACCOUNT.match(str(ident or "").strip())
+    return m.group(1) if m else None
+
+
+async def _related_account(client: Any, county: str, sub: str, a: dict, today: date) -> Optional[dict]:
+    """The assessment of the land account behind the sub-account `a` was read for (one search, the
+    portal's STARTS-WITH search also returns the sub-account's rows), or None. Evidence only: a
+    failure here never changes a verdict."""
+    parent = parent_ident(a.get("map_number"))
+    if not parent:
+        return None
+    try:
+        g = await search(client, county, sub, parent)
+    except Exception:  # noqa: BLE001
+        return None
+    mine = select_rows(g["rows"], parent)
+    if not mine:
+        return None
+    ra = assess(mine, today)
+    ra["map_number"] = parent
+    return ra
 
 
 async def verify(row: dict, client, *, today: Optional[date] = None) -> VerificationResult:
@@ -693,17 +775,25 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         # cannot be told from here, so nothing is decided (and nothing suppressed)
         return _res("unconfirmed", dict(ev, reason="identity_conflict",
                                         delinquent_parcel="claim" if dl_claim else "board"))
+    # v4: the land account behind a manufactured-home sub-account (evidence, and a sale of the land
+    # is the same machine reason as a sale of the account itself)
+    related = await _related_account(client, county, sub, claim or board or primary, today)
+    if related is not None:
+        ev["related_account"] = related
     if dl_claim or dl_board:
         a = claim if dl_claim else board
         ev.update(decided_on=claim_via if dl_claim else "board_parcel",
                   latest_levy_year=a["latest_levy_year"],
                   delinquent_by_year=a["delinquent_by_year"],
                   not_yet_delinquent_due=a["not_yet_delinquent_due"],
-                  sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"))
+                  sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"),
+                  sold_at_tax_sale_on=a.get("sold_at_tax_sale_on"))
         ev["total_delinquent"] = tc.money_total(a["delinquent_by_year"])
         ev["years_delinquent"] = len(a["delinquent_by_year"])
         ev["under_500"] = ev["total_delinquent"] < 500
         ev["de_minimis"] = ev["total_delinquent"] < tc.DE_MINIMIS
+        if a.get("sold_recent") or (related or {}).get("sold_recent"):
+            ev["reason"] = "sold_at_tax_sale"
         return _res("confirmed", ev)
 
     a = primary
@@ -711,6 +801,7 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
               latest_levy_year=a["latest_levy_year"],
               not_yet_delinquent_due=a["not_yet_delinquent_due"],
               sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"),
+              sold_at_tax_sale_on=a.get("sold_at_tax_sale_on"),
               delinquent_by_year={}, total_delinquent=0.0, years_delinquent=0)
     if any(s.get("page_capped") for s in searched if s.get("found")):
         return _res("unconfirmed", dict(ev, reason="page_capped"))
@@ -728,17 +819,26 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         return _res("unconfirmed", dict(ev, reason=what))
     if action == "follow":
         a = what                                   # the address's own rows decide (v2)
+        related = None                             # the sub-account's land is not this account's
+        ev.pop("related_account", None)
         ev.update(decided_on="address_search", address_binding="followed",
                   latest_levy_year=a["latest_levy_year"],
                   not_yet_delinquent_due=a["not_yet_delinquent_due"],
-                  sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"))
+                  sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"),
+                  sold_at_tax_sale_on=a.get("sold_at_tax_sale_on"))
         if a["delinquent_by_year"]:
             ev.update(delinquent_by_year=a["delinquent_by_year"],
                       total_delinquent=tc.money_total(a["delinquent_by_year"]),
                       years_delinquent=len(a["delinquent_by_year"]))
             ev["under_500"] = ev["total_delinquent"] < 500
             ev["de_minimis"] = ev["total_delinquent"] < tc.DE_MINIMIS
+            if a.get("sold_recent"):
+                ev["reason"] = "sold_at_tax_sale"
             return _res("confirmed", ev)
+    # v4: an account (or its land) sold at tax sale is neither paid nor stale: with nothing else
+    # owed the answer is unconfirmed and says why, so the claim keeps scoring
+    if a.get("sold_recent") or a.get("sold_unpriced") or (related or {}).get("sold_recent"):
+        return _res("unconfirmed", dict(ev, reason="sold_at_tax_sale"))
     last_ok = latest_eligible(today)
     if not a.get("via_receipts") and a["latest_levy_year"] < last_ok:
         # a receipt answers only the claimed bills, so this history test needs the Map search
