@@ -3,8 +3,8 @@
 Runs national.sc_public_index's Charleston path: GET the disclaimer page, POST its
 Accept button, then 3 last-name-letter searches, 2 s apart (5 requests). Prints the
 results grid's column labels (to confirm the header names the parser reads) and how
-many Common Pleas cases fell in each lane, including the 'other' cases that are
-counted but no longer emitted as leads.
+many Common Pleas cases fell in each lane, including the 'other' and closed cases
+that are counted but no longer emitted as leads ("emitted" = open leads).
 
 NOTE: this accepts the Charleston Public Index disclaimer (the court's Rule 610
 terms) on the operator's behalf.
@@ -30,6 +30,7 @@ async def main():
         "cases_seen": st.get("cases"),
         "by_lane": st.get("lanes"),
         "other_not_emitted": st.get("other_not_emitted"),
+        "closed_not_emitted": st.get("closed_not_emitted"),
         "party_rows_dropped_eviction_minor_sealed": st.get("dropped_party_rows"),
         "emitted": len(rows),
         "emitted_with_judgment_number": sum(1 for r in rows if r.get("judgment_number")),

@@ -21,10 +21,12 @@ _HEAD = """
 """
 
 
-def _row(name, role, case, title, subtype, judg="", ctype="Common Pleas", cls="standardRow"):
+def _row(name, role, case, title, subtype, judg="", ctype="Common Pleas", cls="standardRow",
+         status="Pending", disposed=""):
     return (f'<tr class="{cls}"><td>{name}</td><td>{role}</td>'
-            f'<td title="{title}"><a>{case}</a></td><td>05/01/2026</td><td>Pending</td><td></td>'
-            f"<td>{ctype}</td><td>{subtype}</td><td>{judg}</td><td>Common Pleas</td></tr>")
+            f'<td title="{title}"><a>{case}</a></td><td>05/01/2026</td><td>{status}</td>'
+            f"<td>{disposed}</td><td>{ctype}</td><td>{subtype}</td><td>{judg}</td>"
+            f"<td>Common Pleas</td></tr>")
 
 
 GRID = (
@@ -178,17 +180,68 @@ def test_charleston_pass_counts_other_and_does_not_emit_it(monkeypatch):
     rows = asyncio.run(mod._curl_search_county("charleston"))
     assert sorted(r["lane"] for r in rows) == ["foreclosure", "judgment", "partition", "quiet_title"]
     st = mod.LAST_CHARLESTON_STATS
-    assert st["cases"] == 5 and st["other_not_emitted"] == 1
+    assert st["cases"] == 5 and st["other_not_emitted"] == 1 and st["emitted"] == 4
+    assert st["closed_not_emitted"] == {}
     assert st["lanes"] == {"foreclosure": 1, "partition": 1, "quiet_title": 1,
                            "judgment": 1, "other": 1}
     assert st["dropped_party_rows"] == 2  # the eviction and the minor's settlement
     assert "subtype" in st["headers"] and "judgment #" in st["headers"]
 
 
-def test_header_variants_are_read():
-    html = GRID.replace("<th>Case Number</th>", "<th>Case #</th>").replace(
-        "<th>Subtype</th>", "<th>Case Sub-Type</th>").replace("<th>Judgment #</th>",
-                                                             "<th>Judgment Number</th>")
-    by = _by_case(mod._parse_charleston_results(html))
-    assert by["2026CP1000102"]["lane"] == "partition"
-    assert by["2026CP1000104"]["judgment_number"] == "2026JG1000001"
+def test_headers_match_the_ten_live_labels_exactly():
+    st: dict = {}
+    mod._parse_charleston_results(GRID, st)
+    assert tuple(st["headers"]) == mod.CHARLESTON_HEADERS
+    # a variant label is not guessed at: "Case #" means an unknown layout -> the
+    # positional fallback, rows without a lane (today's behaviour)
+    html = GRID.replace("<th>Case Number</th>", "<th>Case #</th>")
+    assert all("lane" not in r for r in mod._parse_charleston_results(html))
+    # a missing Subtype label leaves the case unlabeled rather than reading another column
+    html = GRID.replace("<th>Subtype</th>", "<th>Sub Type</th>")
+    assert {r["lane"] for r in mod._parse_charleston_results(html)} == {""}
+
+
+CLOSED_GRID = (
+    '<html><body><table id="ContentPlaceHolder1_SearchResults">' + _HEAD
+    + _row("Owner November", "Defendant", "2026CP1000201", "SAMPLE BANK VS Owner November",
+           "Foreclosure 420", status="Disposed", disposed="08/01/2026")
+    + _row("Owner Oscar", "Defendant", "2026CP1000202", "SAMPLE BANK VS Owner Oscar",
+           "Foreclosure 420", status="Dismissed")
+    + _row("Owner Papa", "Defendant", "2026CP1000203", "SAMPLE BANK VS Owner Papa",
+           "Foreclosure 420")
+    + _row("Debtor Quebec", "Defendant", "2026CP1000204", "SAMPLE CREDIT VS Debtor Quebec",
+           "Transcript Judgment 540", status="Judgment Entered", disposed="06/01/2026")
+    + _row("Debtor Romeo", "Defendant", "2026CP1000205", "SAMPLE CREDIT VS Debtor Romeo",
+           "Confession of Judgment 570", status="Satisfied", disposed="06/02/2026")
+    + _row("Heir Sierra", "Defendant", "2026CP1000206", "Heir Tango VS Heir Sierra",
+           "Partition 440", status="Closed")
+    + "</table></body></html>"
+)
+
+
+def test_only_open_cases_are_leads():
+    rows = {r["case_number"]: r for r in mod._parse_charleston_results(CLOSED_GRID)}
+    assert {cn for cn, r in rows.items() if mod.case_is_open(r)} == {
+        "2026CP1000203",   # pending foreclosure
+        "2026CP1000204",   # entered judgment: a disposition date does not close a judgment
+    }
+
+
+def test_charleston_pass_does_not_emit_closed_cases(monkeypatch):
+    import asyncio
+
+    import curl_cffi.requests as cf
+
+    class _Closed(_FakeCurlSession):
+        def post(self, url, data=None, **k):
+            if url.endswith("PISearch.aspx"):
+                return _Resp(CLOSED_GRID.replace("<html><body>", "<html><body>" + self.HIDDEN))
+            return super().post(url, data, **k)
+
+    monkeypatch.setattr(cf, "Session", _Closed)
+    monkeypatch.setattr(mod, "REQUEST_DELAY", 0)
+    monkeypatch.setattr(mod, "SEARCH_PREFIXES", ["A"])
+    rows = asyncio.run(mod._curl_search_county("charleston"))
+    assert sorted(r["case_number"] for r in rows) == ["2026CP1000203", "2026CP1000204"]
+    assert mod.LAST_CHARLESTON_STATS["closed_not_emitted"] == {
+        "foreclosure": 2, "judgment": 1, "partition": 1}

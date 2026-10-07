@@ -123,22 +123,62 @@ plain requests and the disclaimer click-through it already performs.
   back to the old positional one and rows carry no lane.
 - **Wiring:** none. The rows pass `_in_scope` and `_active_only` as they are
   (tested; `DATELESS_OK_SOURCES` matches the judgment sub-slug by prefix).
-- **Tests:** `tests/test_sc_public_index_charleston_lanes.py` (8, made-up
-  names and case numbers, including a full pass against a fake session).
-- **Live proof: still not run by the agent.** It POSTs the Charleston
-  disclaimer's Accept button, and the agent's own rules require the owner's yes
-  given directly, not relayed by another agent. The owner can run it in one
-  line: `uv run python scripts/charleston_lane_proof.py` (5 requests, 2 s apart).
-  It prints the grid's real column labels and the counts per lane, including
-  `other`. Until then the header names are the state grid's, with common
-  variants (`Case #`, `Case Sub-Type`, `Judgment Number` ...). If Charleston
-  uses none of them, the parser falls back and today's rows go out unchanged.
-- **How many of today's 1,549 Charleston rows are `other`: unknown.** One board
-  pass on 2026-10-07: all 1,549 come from `national.sc_public_index`, all typed
-  `lis_pendens`, and `raw['sc_public_index']` keeps only name, role, case
-  number, dates, status, court and source: no case-type label. Counting them
-  needs a sample from the live site, behind the same disclaimer click. The
-  proof script's `by_lane` gives the share for 3 letters of the alphabet.
+- **Tests:** `tests/test_sc_public_index_charleston_lanes.py` (11, made-up
+  names and case numbers, including full passes against a fake session).
+- **Live proof (run by the coordinator with the owner's clearance, 2026-10-07,
+  letters B, M, W).** Grid headers: name, party type, case number, filed date,
+  case status, disposition date, type, subtype, judgment #, court agency. The
+  parser now matches exactly these ten labels (`CHARLESTON_HEADERS`); any other
+  layout falls back to the positional parser and rows go out unlabeled. Cases
+  seen 2,700: other 2,016 (75%), foreclosure 520, judgment 158, partition 5,
+  lis pendens 1; 422 eviction / minor / sealed party rows dropped; 684 emitted,
+  only 14 of them filed 2024 or later.
+- **Only open cases are leads** (coordinator, same day): a case with a
+  disposition date or a closed status (closed, disposed, dismissed, satisfied,
+  settled, withdrawn, vacated, cancelled) is counted in
+  `closed_not_emitted`, not emitted. A judgment's disposition date is the day it
+  was entered, so a judgment stays a lead unless its status says satisfied,
+  vacated, cancelled, released or expired (`case_is_open`). How many of the 684
+  survive needs one more run of the proof script (its `emitted` line now counts
+  open leads only). On the board, 557 of the 1,549 carried Charleston rows are
+  open by the same rule (next section).
+- **Two things the proof shows, for a decision:**
+  - The letter sweep reaches mostly old cases (14 of 684 filed 2024 or later),
+    and the scraper keeps only 2024+, so it yields few new leads. A
+    filed-date-window search, like the state form's date filter, would reach
+    recent filings directly. That needs one more live look at Charleston's
+    search form.
+  - In SC a foreclosure is usually disposed when the judgment of foreclosure is
+    entered, before the Master's sale, so "no disposition date" also drops
+    foreclosures whose sale is still ahead. The sale stage comes from the
+    Master-in-Equity sources (`charleston_mie`), not from this lane.
+
+### One-time cleanup of the carried rows (prior correction 6)
+
+`enrichment_prior_correction.withdraw_charleston_case_type()` runs in the
+existing `correct_prior_rows()` pass (after the prior board is merged in, before
+any enricher). A Charleston row of `national.sc_public_index` (or its
+`judgment_lien` sub-slug) is withdrawn when its lane is not foreclosure,
+partition, quiet title, lis pendens or judgment, or when the case is closed.
+Withdrawn means listing type `unknown` (no type signal; the row stays on the
+board), with `raw['withdrawn_case_type_other']` = {reason, at, listing_type,
+lane, status, date_disposed}. Reasons: `case_type_other`,
+`case_type_unrecoverable` (no label came back: this run's pass did not re-emit
+the case), `case_closed`. It is reversible: a later run that re-emits the case
+open and labeled restores it (fresh type wins the merge; the audit key is
+dropped), and `restore_case_type_withdrawal()` puts the old type back by hand.
+Run stats: `charleston_case_type_withdrawn`, `charleston_case_type_detail`.
+Tests: `tests/test_prior_correction_charleston_case_type.py` (6).
+
+**What it would withdraw on today's board** (one read-only pass, counts only):
+all 1,549 carried Charleston rows. 992 are closed (status Settled 570, Dismissed
+252, Judgment 88, Disposed 30, Transferred 20, Satisfied 8, Closed 6, and 6
+"Pending" with a disposition date). The other 557 are open but carry no case-type
+label (Pending 354, Pending/ADR 172, Referred To Master 14, Appeal 5, ...); they
+are restored only if the next run's Charleston pass re-emits them labeled as a
+lead type. Given the 75% `other` share and the sweep's reach, expect most of
+them to stay withdrawn. If the Charleston pass fails in a run, every unlabeled
+row is withdrawn that run and comes back on the next good run.
 
 ## Divorce is not in the Public Index
 
@@ -297,9 +337,9 @@ Magistrate civil rows with the generic "Summons & Complaint" sub-type (for
 example an HOA collection suit against the owner) still load. Tests:
 `tests/test_publicindex_export.py` (3 new, 2 updated).
 
-Test fixture names (2026-10-07): `tests/test_publicindex_export.py` carried
-party names and case numbers copied from a live Spartanburg export; they are
-now made up, with the test logic unchanged. Still to clean, outside this task:
+Test fixture names (2026-10-07): `tests/test_publicindex_export.py`,
 `tests/test_sc_divorce_search.py` and
-`tests/test_sc_divorce_party_role_and_middle_match.py` use real-looking owner
-names and divorce captions ("real board shapes").
+`tests/test_sc_divorce_party_role_and_middle_match.py` carried party names,
+owner names and captions copied from live pages and the board; they are now
+made up (same name shapes: ALL-CAPS surname-first, Title Case first-last,
+comma, suffix, "&", "et al.", "AND"), with the test logic unchanged.

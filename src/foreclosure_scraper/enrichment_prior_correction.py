@@ -156,6 +156,20 @@ merges on a withdrawn parcel or address. Every change keeps the old values under
    scorer's senior_exemption (the tax_relief path and the life_events tag path) is gone from every
    withdrawn row and nothing else on its stack changes.
 
+6. CHARLESTON PUBLIC INDEX CASES THAT ARE NOT LEADS (2026-10-07). national.sc_public_index's
+   Charleston pass used to emit every Common Pleas case as lis_pendens; the live grid showed 75% of
+   them are other case types (auto, contracts, torts) and many are closed. The pass now labels each
+   case (raw['sc_public_index']['lane']) and emits only open foreclosure / partition / quiet-title /
+   lis pendens / judgment cases. The carried rows have no label. A Charleston row of that source
+   (or its judgment_lien sub-slug) is WITHDRAWN when its lane is not one of those five (reason
+   'case_type_other', or 'case_type_unrecoverable' when no label came back: this run's pass did
+   not re-emit the case), or when the case is closed (reason 'case_closed': a disposition date or
+   a closed status; a judgment only when satisfied, vacated, cancelled, released or expired; the
+   scraper's case_is_open). Withdrawn = listing_type 'unknown' (no type signal, the row stays on the
+   board), with the old type, lane and status in raw['withdrawn_case_type_other']. Reversible: a
+   later run that re-emits the case open and labeled restores it (its fresh type wins the merge and
+   the audit key is dropped here), and restore_case_type_withdrawal() puts the old type back.
+
 MEMORY. Three light passes and one correcting pass over the in-memory list (correction 5 adds one
 light pass over the claim rows and one index of the elderly scraper's rows); the lookup tables
 are the recorded resolver points (2,331 on the 10/6 board), their row counts, the parcel points
@@ -187,6 +201,11 @@ MAILING_KEY = "address_was_owner_mailing"
 SUPERSEDED_KEY = "superseded_mailing_copies"
 NAME_COUNTY_KEY = "county_was_name_derived"
 EXEMPT_KEY = "exempt_claim_withdrawn"
+CASE_TYPE_KEY = "withdrawn_case_type_other"
+
+#: Correction 6: the Charleston Public Index sources, and the case lanes that stay leads.
+CHARLESTON_PI_SOURCES = frozenset({"national.sc_public_index", "national.sc_public_index.judgment_lien"})
+LEAD_CASE_LANES = frozenset({"foreclosure", "partition", "quiet_title", "lis_pendens", "judgment"})
 
 #: raw['parcel_from_geo']['source'] values that record an id swap or an address match, not a point.
 NON_POINT_STAMPS = frozenset({"ptscloud_pts_to_pin", "burke_cache_situs_address"})
@@ -1670,6 +1689,67 @@ async def place_parcel_points(c: Any, rows: list, budget_s: Optional[float] = No
 
 
 # ------------------------------------------------------------------------------- the step
+def _lt_value(li: Any) -> str:
+    lt = getattr(li, "listing_type", None)
+    return getattr(lt, "value", lt) or ""
+
+
+def withdraw_charleston_case_type(li: Listing, today: Optional[datetime] = None) -> Optional[dict]:
+    """Correction 6 on one row. Returns {'action': 'withdrawn', 'reason': ...},
+    {'action': 'restored'} (a withdrawn row the fresh pass re-emitted open and labeled),
+    {'action': 'already'} (withdrawn before, still not a lead) or None (not concerned / a lead)."""
+    if str(getattr(li, "source", "") or "") not in CHARLESTON_PI_SOURCES:
+        return None
+    if county_name(li.county) != "Charleston" or str(li.state or "").upper() != "SC":
+        return None
+    from .scrapers.national.sc_public_index import case_is_open
+
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    spi = raw.get("sc_public_index") if isinstance(raw.get("sc_public_index"), dict) else {}
+    lane = (spi.get("lane") or "").strip()
+    is_open = case_is_open(spi)
+    if lane in LEAD_CASE_LANES and is_open:
+        if CASE_TYPE_KEY in raw:
+            raw.pop(CASE_TYPE_KEY, None)
+            return {"action": "restored"}
+        return None
+    if CASE_TYPE_KEY in raw:
+        return {"action": "already"}
+    if not is_open:
+        reason = "case_closed"
+    elif lane == "other":
+        reason = "case_type_other"
+    else:
+        reason = "case_type_unrecoverable"
+    raw[CASE_TYPE_KEY] = {
+        "reason": reason,
+        "at": (today or datetime.utcnow()).date().isoformat(),
+        "listing_type": _lt_value(li),
+        "lane": lane or None,
+        "status": spi.get("status") or None,
+        "date_disposed": spi.get("date_disposed") or None,
+    }
+    li.raw = raw
+    from .models import ListingType
+    li.listing_type = ListingType.UNKNOWN
+    return {"action": "withdrawn", "reason": reason}
+
+
+def restore_case_type_withdrawal(li: Listing) -> bool:
+    """Undo correction 6 on one row: the recorded listing type comes back, the audit key goes."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    rec = raw.pop(CASE_TYPE_KEY, None)
+    if not isinstance(rec, dict):
+        return False
+    from .models import ListingType
+    try:
+        li.listing_type = ListingType(rec.get("listing_type") or "lis_pendens")
+    except ValueError:
+        li.listing_type = ListingType.LIS_PENDENS
+    li.raw = raw
+    return True
+
+
 def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = None,
                        min_rows: Optional[int] = None, sample: int = 6,
                        min_exempt_rows: Optional[int] = None) -> dict:
@@ -1690,6 +1770,7 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
     c4: Counter = Counter()
     c4_by: Counter = Counter()
     c4_fields: Counter = Counter()
+    c6: Counter = Counter()
     samples: dict = defaultdict(list)
     errors = 0
     keys = candidate_points(listings)
@@ -1729,6 +1810,9 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
                             c4["parcel_withdrawn_here"] += 1
                         for f in a4.get("cleared", ()):
                             c4_fields[f] += 1
+                a6 = withdraw_charleston_case_type(li)
+                if a6 is not None:
+                    c6[a6.get("reason") or a6["action"]] += 1
                 a2 = restore_situs(li, cache, points)
                 if a2 is not None:
                     if "skip" in a2:
@@ -1787,6 +1871,8 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
         "exempt_claim_by_source": c5["by_source"],
         "exempt_list_rows": c5["registry_rows"],
         "exempt_claim_row_errors": c5["errors"],
+        "charleston_case_type_withdrawn": sum(v for k, v in c6.items() if k.startswith("case_")),
+        "charleston_case_type_detail": dict(c6),
         "parcel_points_indexed": len(points),
         "superseded_dropped": len(dropped),
         "superseded_by_source_county": {f"{s}|{c}": n for (s, c), n in c3_by.most_common(10)},

@@ -10,10 +10,10 @@ confirmed bugs, both fixed here:
    construction, always contains the searched last/first name -- it is
    literally who matched the query -- so for a non-party row (Attorney,
    Mediator, Guardian Ad Litem, ...) the trim was a no-op. Live-verified
-   2026-10-02: searching the common surname "DAVIS" returns
-   "Davis, Davis, Joy C C" / ParticipantRole="Attorney" for ~30 unrelated
+   2026-10-02: searching the common surname "DAWSON" returns
+   "Dawson, Dawson, Jolie C C" / ParticipantRole="Attorney" for ~30 unrelated
    divorce cases (a real SC family-law attorney with many clients), none of
-   whose captions mention "Davis" at all -- the OLD code matched every one.
+   whose captions mention "Dawson" at all -- the OLD code matched every one.
    `_is_party_role` now rejects any row whose role is not a real party
    (Plaintiff/Defendant/Petitioner/Respondent) before it ever reaches
    `_owner_in_case` or raw['divorce']['cases'].
@@ -66,7 +66,7 @@ class _FakeSession:
         return self.script(json)
 
 
-def _lead(owner="BYRD SANDRA D"):
+def _lead(owner="BRAMBLE SELMA D"):
     li = Listing(source="x", source_url="u1", listing_type=ListingType.TAX_LIEN,
                  state="SC", county="Spartanburg", owner_name=owner, parcel_id="P1")
     li.raw = {"distress_stack": {"categories": []}}   # so a category-append is observable
@@ -100,12 +100,12 @@ def _row(case_id, description, role, person_name="", filed="2026-06-01T00:00:00"
 # ---- role bug: an attorney echo must never become a divorce hit -----------------
 
 def test_attorney_role_echo_is_rejected_even_though_personname_matches(monkeypatch):
-    """The exact live incident: owner is BYRD; the only "hit" is an attorney
-    named Byrd who represents two unrelated people. CaseDescription never
-    mentions Byrd at all -- the old PersonName-inclusive blob let this through."""
-    li = _lead("BYRD SANDRA D")
+    """The exact live incident: owner is BRAMBLE; the only "hit" is an attorney
+    named Bramble who represents two unrelated people. CaseDescription never
+    mentions Bramble at all -- the old PersonName-inclusive blob let this through."""
+    li = _lead("BRAMBLE SELMA D")
     row = _row("2022DR4200999", "JOHN SMITH vs. MARY SMITH", role="Attorney",
-               person_name="Byrd, Byrd, Sandra D D")
+               person_name="Bramble, Bramble, Selma D D")
     stats = _run(monkeypatch, li, [row])
     assert stats["with_divorce"] == 0
     assert li.raw["divorce"]["case_count"] == 0
@@ -114,17 +114,17 @@ def test_attorney_role_echo_is_rejected_even_though_personname_matches(monkeypat
 
 
 def test_guardian_ad_litem_role_is_also_rejected(monkeypatch):
-    li = _lead("BYRD SANDRA D")
+    li = _lead("BRAMBLE SELMA D")
     row = _row("2022DR4200998", "SOMEONE ELSE vs. ANOTHER PERSON", role="Guardian Ad Litem",
-               person_name="Byrd, Byrd, Sandra D D")
+               person_name="Bramble, Bramble, Selma D D")
     stats = _run(monkeypatch, li, [row])
     assert stats["with_divorce"] == 0
     assert li.raw["divorce"]["cases"] == []
 
 
 def test_a_real_party_row_is_kept_by_the_role_filter(monkeypatch):
-    li = _lead("BYRD SANDRA D")
-    row = _row("2022DR4200001", "SANDRA D BYRD vs. ROBERT BYRD", role="Defendant")
+    li = _lead("BRAMBLE SELMA D")
+    row = _row("2022DR4200001", "SELMA D BRAMBLE vs. ROLAND BRAMBLE", role="Defendant")
     stats = _run(monkeypatch, li, [row])
     assert stats["with_divorce"] == 1
     assert li.raw["divorce"]["case_count"] == 1
@@ -135,8 +135,8 @@ def test_a_missing_role_is_conservatively_kept(monkeypatch):
     """The portal does not always populate ParticipantRole; an unpopulated
     role is not evidence the row is NOT a party (same policy
     distress_score._divorce_signal already used for its own role check)."""
-    li = _lead("BYRD SANDRA D")
-    row = _row("2022DR4200002", "SANDRA D BYRD vs. ROBERT BYRD", role=None)
+    li = _lead("BRAMBLE SELMA D")
+    row = _row("2022DR4200002", "SELMA D BRAMBLE vs. ROLAND BRAMBLE", role=None)
     stats = _run(monkeypatch, li, [row])
     assert stats["with_divorce"] == 1
 
@@ -148,8 +148,8 @@ def test_common_name_with_no_middle_corroboration_is_not_categorized(monkeypatch
     owner carries no middle initial at all -- 'unverified', the dominant
     bucket (46% of all hits) that used to pass straight through. The hit is
     still recorded (never silent) but must not reach distress_stack."""
-    li = _lead("BYRD SANDRA")                                    # no middle at all
-    row = _row("2022DR4200003", "SANDRA LEE BYRD vs. ROBERT BYRD", role="Plaintiff")
+    li = _lead("BRAMBLE SELMA")                                    # no middle at all
+    row = _row("2022DR4200003", "SELMA LEE BRAMBLE vs. ROLAND BRAMBLE", role="Plaintiff")
     stats = _run(monkeypatch, li, [row])
     assert stats["with_divorce"] == 1                            # recorded...
     assert li.raw["divorce"]["case_count"] == 1
@@ -160,8 +160,8 @@ def test_common_name_with_no_middle_corroboration_is_not_categorized(monkeypatch
 def test_conflicting_middle_initial_is_not_categorized(monkeypatch):
     """Same first+last name, a DIFFERENT real middle name on the matched
     party -- a different person (41% of comparable hits, audit 2026-09-21)."""
-    li = _lead("BYRD SANDRA D")
-    row = _row("2022DR4200004", "SANDRA LEE BYRD vs. ROBERT BYRD", role="Plaintiff")
+    li = _lead("BRAMBLE SELMA D")
+    row = _row("2022DR4200004", "SELMA LEE BRAMBLE vs. ROLAND BRAMBLE", role="Plaintiff")
     stats = _run(monkeypatch, li, [row])
     assert li.raw["divorce"]["match"] == "conflict"
     assert "divorce" not in li.raw["distress_stack"]["categories"]
@@ -169,8 +169,8 @@ def test_conflicting_middle_initial_is_not_categorized(monkeypatch):
 
 def test_agreeing_middle_initial_is_categorized(monkeypatch):
     """The real corroborating match: same first+last+middle initial."""
-    li = _lead("BYRD SANDRA D")
-    row = _row("2022DR4200005", "SANDRA D BYRD vs. ROBERT BYRD", role="Defendant")
+    li = _lead("BRAMBLE SELMA D")
+    row = _row("2022DR4200005", "SELMA D BRAMBLE vs. ROLAND BRAMBLE", role="Defendant")
     stats = _run(monkeypatch, li, [row])
     assert li.raw["divorce"]["match"] == "agrees"
     assert "divorce" in li.raw["distress_stack"]["categories"]

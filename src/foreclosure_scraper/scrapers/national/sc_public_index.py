@@ -247,6 +247,27 @@ def charleston_skip(subtype: str, case_type: str = "") -> bool:
     return bool(_CHARLESTON_SKIP_RE.search(f"{subtype or ''} {case_type or ''}"))
 
 
+#: The ten column labels of Charleston's SearchResults grid, lower-cased, as the live
+#: page showed them on 2026-10-07 (coordinator's run of scripts/charleston_lane_proof.py).
+CHARLESTON_HEADERS = ("name", "party type", "case number", "filed date", "case status",
+                      "disposition date", "type", "subtype", "judgment #", "court agency")
+
+#: A case is a lead only while it is open (2026-10-07). Non-judgment lanes: no
+#: disposition date and none of these words in the status. Judgments: the
+#: disposition date is the day the judgment was entered, so only a status saying the
+#: lien is gone (satisfied, vacated, cancelled, released, expired) closes one.
+_CLOSED_STATUS_RE = re.compile(r"clos|dispos|dismiss|satisf|settled|withdr|vacat|cancel", re.I)
+_JUDGMENT_GONE_RE = re.compile(r"satisf|vacat|cancel|releas|expir", re.I)
+
+
+def case_is_open(rec: dict) -> bool:
+    """Is this Charleston case still a lead? See _CLOSED_STATUS_RE / _JUDGMENT_GONE_RE."""
+    status = rec.get("status") or ""
+    if rec.get("lane") == "judgment":
+        return not _JUDGMENT_GONE_RE.search(status)
+    return not (rec.get("date_disposed") or "").strip() and not _CLOSED_STATUS_RE.search(status)
+
+
 _VS_RES = (re.compile(r"^\s*(.*?)\s+VS\.?\s+(.*?)\s*$", re.I),
            re.compile(r"^\s*(.*?)\s+V\.?\s+(.*?)\s*$", re.I))
 _ROLE_TAIL_RE = re.compile(r",\s*(defendant|plaintiff)(\s*,\s*et\s*al\.?)?\s*$", re.I)
@@ -258,34 +279,25 @@ def _parse_charleston_results(html: str, stats: dict | None = None) -> list[dict
     "Case Number" header is missing, so a layout change degrades to today's rows.
 
     `stats` (optional) collects the header labels seen and how many party rows were
-    dropped (eviction / minor / sealed). Header names below are the state grid's,
-    with common variants, until a live Charleston page confirms its own labels.
+    dropped (eviction / minor / sealed). Columns are matched EXACTLY to the ten
+    labels the live Charleston grid showed on 2026-10-07 (CHARLESTON_HEADERS).
     """
     tree = HTMLParser(html)
     grid = tree.css_first("table#ContentPlaceHolder1_SearchResults")
     headers = [th.text(strip=True).lower() for th in grid.css("th")] if grid else []
 
-    def col(*names: str, exact: bool = False) -> int | None:
-        for n in names:
-            for i, h in enumerate(headers):
-                if (h == n) if exact else (n in h):
-                    return i
-        return None
+    def col(label: str) -> int | None:
+        return headers.index(label) if label in headers else None
 
-    case_i = col("case number", "case #", "case no")
+    case_i = col("case number")
     if stats is not None:
         stats["headers"] = headers
     if grid is None or case_i is None:
         return _parse_search_results(html)
-    name_i = col("name", "party name", exact=True)
-    role_i = col("party type", "role")
-    filed_i = col("filed date", "date filed", "filing date")
-    status_i = col("case status", "status")
-    disp_i = col("disposition date", "disposed")
-    type_i = col("type", "case type", exact=True)
-    sub_i = col("subtype", "sub-type", "sub type")
-    judg_i = col("judgment #", "judgment number", "judgment no")
-    agency_i = col("court agency", "agency")
+    name_i, role_i = col("name"), col("party type")
+    filed_i, status_i = col("filed date"), col("case status")
+    disp_i, type_i = col("disposition date"), col("type")
+    sub_i, judg_i, agency_i = col("subtype"), col("judgment #"), col("court agency")
 
     def cell(cells, i) -> str:
         return cells[i].text(strip=True) if i is not None and i < len(cells) else ""
@@ -314,7 +326,8 @@ def _parse_charleston_results(html: str, stats: dict | None = None) -> list[dict
             "subtype": subtype,
             "judgment_number": cell(cells, judg_i),
             "court_agency": cell(cells, agency_i),
-            "lane": charleston_lane(subtype, case_type) or "",
+            # no Subtype column: unlabeled (emitted as before), never guessed from Type alone
+            "lane": (charleston_lane(subtype, case_type) or "") if sub_i is not None else "",
         }
         title = cells[case_i].attributes.get("title") or ""
         m = _VS_RES[0].match(title) or _VS_RES[1].match(title)
@@ -597,22 +610,33 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
     # One record per case; the defendant's party row wins (2026-10-07).
     cases = _dedupe_prefer_defendant(results)
     # Charleston 'other' cases (auto, contracts, torts...) are not property
-    # suits: counted in the run stats, never emitted as leads (2026-10-07).
-    # Unlabeled cases (the grid had no Subtype column) still go out as before.
+    # suits, and a closed case (disposed, dismissed, satisfied...) is not a lead:
+    # both are counted in the run stats, never emitted (2026-10-07). Unlabeled
+    # cases (the grid had no Subtype column) still go out as before.
     lanes: dict[str, int] = {}
+    closed: dict[str, int] = {}
+    out = []
     for c in cases:
         k = c.get("lane") or "unlabeled"
         lanes[k] = lanes.get(k, 0) + 1
+        if k == "other":
+            continue
+        if c.get("lane") and not case_is_open(c):
+            closed[k] = closed.get(k, 0) + 1
+            continue
+        out.append(c)
     LAST_CHARLESTON_STATS.clear()
     LAST_CHARLESTON_STATS.update({
         "cases": len(cases), "lanes": lanes,
         "other_not_emitted": lanes.get("other", 0),
+        "closed_not_emitted": closed,
+        "emitted": len(out),
         "dropped_party_rows": parse_stats.get("dropped_party_rows", 0),
         "headers": parse_stats.get("headers", []),
     })
     log.info("sc_public_index.charleston_lanes", **{k: v for k, v in LAST_CHARLESTON_STATS.items()
                                                      if k != "headers"})
-    return [c for c in cases if c.get("lane") != "other"]
+    return out
 
 
 class SCPublicIndexScraper(BaseScraper):

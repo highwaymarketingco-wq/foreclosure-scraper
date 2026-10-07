@@ -198,19 +198,19 @@ import pytest as _pytest
 
 @_pytest.mark.parametrize("owner,expected", [
     # county-GIS / tax roll: ALL-CAPS surname-first (unchanged behavior)
-    ("BYRD SANDRA D", ("BYRD", "SANDRA")),
-    ("SMITH JOHN C & MELINDA P", ("SMITH", "JOHN")),
-    ("LOPEZ, JOSE G. SANCHEZ & SULLY L. SANCHEZ", ("LOPEZ", "JOSE")),
-    ("ABBAD MIRIAM ALALI SAMI", ("ABBAD", "MIRIAM")),
+    ("BRAMBLE SELMA D", ("BRAMBLE", "SELMA")),
+    ("SMITH JOHN C & MARIGOLD P", ("SMITH", "JOHN")),
+    ("LOMAX, JOEL G. SANDOVAL & SUNNY L. SANDOVAL", ("LOMAX", "JOEL")),
+    ("ABBOTT MIRA ALDEN SAMSON", ("ABBOTT", "MIRA")),
     # court-party / probate notices: Title Case FIRST [MIDDLE] LAST (the bug)
-    ("Krystal  Henderson", ("HENDERSON", "KRYSTAL")),
-    ("Joshua D Smith", ("SMITH", "JOSHUA")),
-    ("Susan Lee Meaders", ("MEADERS", "SUSAN")),
-    ("Rhonda J. Hester Cassell", ("CASSELL", "RHONDA")),
-    ("Rex Allen Chappell Jr", ("CHAPPELL", "REX")),
-    ("Tina Lopez & John Lopez", ("LOPEZ", "TINA")),
+    ("Kestrel  Hollis", ("HOLLIS", "KESTREL")),
+    ("Jonah D Smithers", ("SMITHERS", "JONAH")),
+    ("Sela Lee Marrow", ("MARROW", "SELA")),
+    ("Rowan J. Hestia Carvell", ("CARVELL", "ROWAN")),
+    ("Rory Alden Chapman Jr", ("CHAPMAN", "RORY")),
+    ("Tilda Lomax & Jon Lomax", ("LOMAX", "TILDA")),
     # a comma always means LAST, FIRST even in mixed case
-    ("Roper, John A., Jr.", ("ROPER", "JOHN")),
+    ("Ropper, Jon A., Jr.", ("ROPPER", "JON")),
     # degenerate input
     ("Madonna", ("MADONNA", "")),
     ("", ("", "")),
@@ -234,13 +234,13 @@ def test_reset_targets_only_wrong_order_stamps():
         li.raw = {"divorce": {"fetched_at": "2026-09-01T00:00:00+00:00", "case_count": 0}}
         return li
 
-    assert needs_reset(stamped("Joshua D Smith")) is True          # was searched as JOSHUA/D
-    assert needs_reset(stamped("BYRD SANDRA D")) is False           # GIS order: unchanged
-    assert needs_reset(stamped("Roper, John A., Jr.")) is False     # comma: unchanged
+    assert needs_reset(stamped("Jonah D Smithers")) is True        # was searched as JONAH/D
+    assert needs_reset(stamped("BRAMBLE SELMA D")) is False         # GIS order: unchanged
+    assert needs_reset(stamped("Ropper, Jon A., Jr.")) is False     # comma: unchanged
     assert needs_reset(stamped("Madonna")) is False                 # single token: unchanged
     assert needs_reset(stamped("Acme Holdings LLC")) is False       # entity: stamp stands
-    assert needs_reset(stamped("Joshua D Smith", county="Wake", state="NC")) is False   # out of scope
-    unstamped = _lead(2, owner="Joshua D Smith")
+    assert needs_reset(stamped("Jonah D Smithers", county="Wake", state="NC")) is False   # out of scope
+    unstamped = _lead(2, owner="Jonah D Smithers")
     assert needs_reset(unstamped) is False                          # never searched: nothing to clear
 
 
@@ -263,19 +263,19 @@ def test_error_kinds_absent_when_nothing_failed(monkeypatch):
 @pytest.mark.parametrize("case_description,last,first,expect_plaintiff,expect_defendant,expect_extra", [
     # Plain two-party caption (the common shape: 14,741/14,741 live rows use
     # 'vs.'/'vs').
-    ("JIMMIE LEE GLENN vs. JAMES L GLENN", "GLENN", "JAMES",
-     "JIMMIE LEE GLENN", "JAMES L GLENN", False),
+    ("JASPER LEE GLENDON vs. JARVIS L GLENDON", "GLENDON", "JARVIS",
+     "JASPER LEE GLENDON", "JARVIS L GLENDON", False),
     # Title Case also appears live (not every SC row is ALL-CAPS).
-    ("Irina Popov vs. Zhenia Popov", "POPOV", "ZHENIA",
-     "Irina Popov", "Zhenia Popov", False),
+    ("Ilsa Pavlo vs. Zeno Pavlo", "PAVLO", "ZENO",
+     "Ilsa Pavlo", "Zeno Pavlo", False),
     # "et al." on one side -- the named person is kept, flagged as incomplete.
-    ("TERESA COLLINS STILWELL, et al. vs. WILLIAM PATRICK STILWELL, et al.",
-     "STILWELL", "WILLIAM",
-     "TERESA COLLINS STILWELL", "WILLIAM PATRICK STILWELL", True),
+    ("TAMSIN CORLISS STILLWATER, et al. vs. WARREN PEMBROKE STILLWATER, et al.",
+     "STILLWATER", "WARREN",
+     "TAMSIN CORLISS STILLWATER", "WARREN PEMBROKE STILLWATER", True),
     # A bare "AND" folding a second defendant onto one side with no further
     # delimiter -- kept whole, flagged.
-    ("WALTER L NIX vs. PEARL T AND ROGER NIX", "NIX", "ROGER",
-     "WALTER L NIX", "PEARL T AND ROGER NIX", True),
+    ("WALDO L NOX vs. PERRIN T AND ROLAND NOX", "NOX", "ROLAND",
+     "WALDO L NOX", "PERRIN T AND ROLAND NOX", True),
 ])
 def test_parse_rows_splits_caption_into_plaintiff_defendant(
     case_description, last, first, expect_plaintiff, expect_defendant, expect_extra,
