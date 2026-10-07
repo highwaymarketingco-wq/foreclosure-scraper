@@ -52,8 +52,18 @@ def test_a_refuted_or_stale_tax_lien_drops_out_of_scoring(verdict):
 
 
 def test_a_judgment_debt_survives_a_refuted_tax_lien():
-    names = _names(_lead([_vrec("refuted")], amount_source="judgment"))
+    # A REAL judgment: a court-published lis pendens carrying the indebtedness. (A `judgment` label on
+    # a standing county tax_lien ROLL row is the roll balance a tax scraper promoted to
+    # judgment_amount, not a judgment: it follows the tax verdict, see test_tax_roll_amount_kind.)
+    li = _lead([_vrec("refuted")], amount_source="judgment").model_copy(update={
+        "listing_type": ListingType.LIS_PENDENS, "source": "counties_nc.nc_ecourts_lis_pendens"})
+    names = _names(li)
     assert "tax_lien" not in names and "recorded_debt" in names
+
+
+def test_a_judgment_labelled_roll_balance_follows_a_refuted_tax_lien():
+    names = _names(_lead([_vrec("refuted")], amount_source="judgment"))
+    assert "tax_lien" not in names and "recorded_debt" not in names
 
 
 @pytest.mark.parametrize("verdict", ["confirmed", "unconfirmed", "wall"])
@@ -89,7 +99,12 @@ def test_lead_signal_facets_follow_the_same_rule():
     after = _facet_signals(sc, TODAY)
     assert "tax_lien" not in after and "recorded_debt" not in after
     sc.raw["amount_owed"]["source"] = "judgment"
-    assert "recorded_debt" in _facet_signals(sc, TODAY)
+    # a `judgment` label on a standing county tax_lien ROLL row is the roll balance (it follows the
+    # tax verdict); only a real judgment survives: the same row typed as a court lis pendens
+    assert "recorded_debt" not in _facet_signals(sc, TODAY)
+    court = sc.model_copy(update={"listing_type": ListingType.LIS_PENDENS,
+                                  "source": "counties_nc.nc_ecourts_lis_pendens"})
+    assert "recorded_debt" in _facet_signals(court, TODAY)
     sc.raw["verification"] = [_vrec("confirmed")]
     assert _facet_signals(sc, TODAY) == base
 

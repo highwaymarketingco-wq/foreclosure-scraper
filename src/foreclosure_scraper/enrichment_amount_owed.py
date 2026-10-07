@@ -14,16 +14,21 @@ it came from + a confidence, so the dashboard can show the provenance:
 
     raw["amount_owed"] = {
         "value": 187425.0,
-        "source": "judgment" | "opening_bid" | "assessed_value",
+        "source": "judgment" | "opening_bid" | "assessed_value" | "tax_owed",
         "label": "Judgment / indebtedness"      # human-facing
                  | "Opening bid (≈ debt owed)"
-                 | "Tax-assessed value (not debt)",
+                 | "Tax-assessed value (not debt)"
+                 | "Delinquent property tax owed",
         "confidence": "high" | "medium" | "low",
         "is_actual_debt": True | False,
     }
 
 Waterfall (highest-fidelity first):
-  1. judgment_amount  — explicit indebtedness parsed from notice text. HIGH.
+  1. judgment_amount  — explicit indebtedness parsed from notice text. HIGH. Except on a standing
+                        county tax-roll row (`is_standing_tax_roll_row`): its scraper promotes the
+                        roll BALANCE to judgment_amount, which is a tax bill and is labelled
+                        `tax_owed` (2026-10-07: labelled `judgment`, it made equity "evidenced" and
+                        put 1,458 tax-roll rows in HOT).
   2. opening_bid      — foreclosure auction opening; lender opens at the
                         debt. MEDIUM. is_actual_debt=False (it's a proxy).
   3. assessed_value / tax_value — NOT debt; only used as a last-resort
@@ -39,6 +44,7 @@ from typing import Optional
 import structlog
 
 from .models import Listing, ListingType
+from .verification.verifiers._tax_common import g as _g, ltype as _ltype, other_lien_listing
 
 log = structlog.get_logger()
 
@@ -47,6 +53,25 @@ log = structlog.get_logger()
 #: be displaced by a delinquent-TAX balance discovered later. Everything else -- missing, or a
 #: non-debt proxy (assessed_value / tax_value / any one-off script's estimate) -- is fair game.
 _NEVER_OVERWRITE_SOURCES = frozenset({"judgment", "opening_bid"})
+
+
+def is_standing_tax_roll_row(row) -> bool:
+    """The row is a standing county property-tax delinquent ROLL entry: typed `tax_lien` by a county
+    property-tax source, so its `judgment_amount` is the roll's balance (the scrapers promote the
+    amount to that field, "same convention as counties_sc.horry_flc"), never a court judgment.
+
+    A tax_lien row from a federal/state/lien-agent/court source is NOT one (the verification
+    registry's own list, `_tax_common.other_lien_listing`: an SC DEW or DOR lien, an NCDOR or
+    eCourts judgment, a LiensNC filing): those amounts are recorded liens and judgments and keep
+    the `judgment` label. A `tax_sale` row is not one either: it is a scheduled sale or county-owned
+    inventory whose amount is an opening bid, which this module labels separately. Takes a Listing
+    or a board row dict.
+
+    Measured on the 2026-10-07 pre_publish checkpoint (350,013 rows): 10,752 standing tax_lien roll
+    rows carried the `judgment` label beside their own tax balance, and 1,458 of the 1,504 HOT rows
+    were such rows: the label made their equity "evidenced" (a judgment is a fact about the debt,
+    a tax bill is not), which opened the HOT gate for a $6.65 balance."""
+    return _ltype(row) == "tax_lien" and not other_lien_listing(row)
 
 
 def _set(li: Listing, value: float, source: str, label: str,
@@ -65,7 +90,7 @@ def _set(li: Listing, value: float, source: str, label: str,
 def enrich_amount_owed(listings: list[Listing]) -> dict[str, int]:
     """Populate raw.amount_owed from the best available signal. Returns
     per-source counts for the run summary."""
-    counts = {"judgment": 0, "opening_bid": 0, "assessed_value": 0, "none": 0}
+    counts = {"judgment": 0, "opening_bid": 0, "assessed_value": 0, "none": 0, "tax_owed": 0}
 
     for li in listings:
         # Only meaningful for distressed/foreclosure listings — a plain REO
@@ -76,9 +101,18 @@ def enrich_amount_owed(listings: list[Listing]) -> dict[str, int]:
         )
 
         if li.judgment_amount and li.judgment_amount > 0:
-            _set(li, li.judgment_amount, "judgment",
-                 "Judgment / indebtedness", "high", True)
-            counts["judgment"] += 1
+            if is_standing_tax_roll_row(li):
+                # A tax-roll scraper puts the roll balance in judgment_amount. Label it for what it
+                # is, so equity does not read a tax bill as an evidenced mortgage payoff and the
+                # recorded_debt:tax verification rule can remove the credit (same label the second
+                # pass, promote_tax_owed_amount_owed, gives every other tax balance).
+                _set(li, li.judgment_amount, "tax_owed",
+                     "Delinquent property tax owed", "high", True)
+                counts["tax_owed"] += 1
+            else:
+                _set(li, li.judgment_amount, "judgment",
+                     "Judgment / indebtedness", "high", True)
+                counts["judgment"] += 1
         elif is_foreclosure and li.opening_bid and li.opening_bid > 0:
             _set(li, li.opening_bid, "opening_bid",
                  "Opening bid (≈ debt owed)", "medium", False)
@@ -98,13 +132,20 @@ def enrich_amount_owed(listings: list[Listing]) -> dict[str, int]:
     return counts
 
 
-def _tax_owed_promotion(raw: dict) -> Optional[dict]:
+def _tax_owed_promotion(raw: dict, row=None) -> Optional[dict]:
     """The promoted amount_owed dict for `raw`, or None if no promotion applies.
 
     Pure dict logic (no Listing needed) so it can run both over real Listing objects
     (promote_tax_owed_amount_owed, below) and directly over raw board-row dicts in a
     streaming backfill that never pays Listing.model_validate() for untouched rows --
     see scripts/backfill_tax_owed_amount_owed.py.
+
+    `row` (optional, a Listing or a board row dict): lets the rule see the listing type and source.
+    With it, a `judgment`-labelled amount on a standing county tax-roll row
+    (`is_standing_tax_roll_row`) whose own record carries the tax balance is a tax balance that an
+    earlier pass (an older enrich_amount_owed, or a checkpoint written before this rule) labelled
+    as a court judgment: it is promoted like any other tax balance, so the equity engine and the
+    scorer read its true kind. Without `row` the old rule holds (a judgment is never overwritten).
     """
     if not isinstance(raw, dict):
         return None
@@ -120,7 +161,11 @@ def _tax_owed_promotion(raw: dict) -> Optional[dict]:
     ao = raw.get("amount_owed")
     ao_src = ao.get("source") if isinstance(ao, dict) else None
     if ao_src in _NEVER_OVERWRITE_SOURCES:
-        return None
+        mislabelled_tax_roll = (ao_src == "judgment" and row is not None
+                                and to.get("basis") == "own_record"
+                                and is_standing_tax_roll_row(row))
+        if not mislabelled_tax_roll:
+            return None
     # Idempotent: a row already correctly promoted (source == "tax_owed", same value) would
     # produce the identical dict again, so re-running this pass is always safe.
     confidence = "high" if to.get("basis") == "own_record" else "medium"
@@ -164,15 +209,18 @@ def promote_tax_owed_amount_owed(listings: list[Listing]) -> dict[str, int]:
     and 'medium' when it arrived by 'parcel_cross_ref' (inherited from a different
     lead the resolver pinned to the same parcel).
     """
-    counts = {"promoted": 0, "unchanged": 0}
+    counts = {"promoted": 0, "unchanged": 0, "relabelled_judgment": 0}
     for li in listings:
         if not isinstance(li.raw, dict):
             counts["unchanged"] += 1
             continue
-        new_ao = _tax_owed_promotion(li.raw)
+        new_ao = _tax_owed_promotion(li.raw, li)
         if new_ao is None:
             counts["unchanged"] += 1
             continue
+        old_ao = li.raw.get("amount_owed")
+        if isinstance(old_ao, dict) and old_ao.get("source") == "judgment":
+            counts["relabelled_judgment"] += 1      # a tax-roll balance that carried the judgment label
         li.raw["amount_owed"] = new_ao
         counts["promoted"] += 1
 

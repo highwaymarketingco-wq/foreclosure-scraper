@@ -66,7 +66,8 @@ from .signal_freshness import (
 )
 from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 from .verification.core import block_suppressed, qualifiers, suppressed_scorer_signals
-from .verification.verifiers._tax_common import PROPERTY_TAX, other_lien_listing
+from .enrichment_amount_owed import is_standing_tax_roll_row
+from .verification.verifiers._tax_common import DE_MINIMIS, PROPERTY_TAX, other_lien_listing
 
 log = structlog.get_logger()
 
@@ -493,6 +494,59 @@ def _is_liensnc(li: Listing) -> bool:
     return "liensnc" in _slugs(li)
 
 
+#: A delinquent county property-tax balance under this is a payment shortfall or an interest-only
+#: residue, not financial pressure on the owner, so a standing tax-roll row (`is_standing_tax_roll_row`)
+#: earns no financial credit for it. The floor is the verification registry's own de minimis
+#: (`_tax_common.DE_MINIMIS`, "a confirmed balance under this is real but trivial (a payment
+#: shortfall)"), not a new number. Measured on the 2026-10-07 pre_publish checkpoint (56,905
+#: standing tax_lien roll rows with a known amount, by the largest amount the row carries): 1,478
+#: under $10, 3,617 under $25, 6,253 under $50, 10,365 under $100, 18,120 under $250; Rutherford's
+#: two rolls hold 444 of the 3,617 under $25 and 1,690 of the 10,365 under $100 (its roll is full of
+#: small balances, e.g. $6.65 and $59.34). The 3,617 under $25 were 87 HOT, 775 WARM, 2,755 COLD.
+#: The row stays on the board as context; only the credit goes. 2,742 roll rows carry no amount at
+#: all and are not touched.
+TRIVIAL_TAX_BALANCE = DE_MINIMIS
+
+
+def _tax_roll_amount(li: Listing, r: dict) -> Optional[float]:
+    """The largest tax amount a row carries: its tax_owed balance, an amount_owed that is the tax
+    balance (labelled tax_owed, or `judgment` on a roll row), or its judgment_amount (a roll
+    scraper's promoted amount). The largest, so a principal-only balance beside a total that
+    includes interest is never read as trivial. None when the row carries none."""
+    vals = []
+    to = r.get("tax_owed")
+    if isinstance(to, dict):
+        vals.append(to.get("balance"))
+    ao = r.get("amount_owed")
+    if isinstance(ao, dict) and ao.get("source") in ("tax_owed", "judgment"):
+        vals.append(ao.get("value"))
+    vals.append(getattr(li, "judgment_amount", None))
+    nums = [float(v) for v in vals if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0]
+    return max(nums) if nums else None
+
+
+def trivial_tax_roll(li: Listing) -> bool:
+    """A standing county tax-roll row whose whole balance is under TRIVIAL_TAX_BALANCE. A row with
+    no known amount is not trivial (nothing to measure), and neither is a lien or judgment from
+    another source (`is_standing_tax_roll_row`), a scheduled tax sale, or a row whose credit
+    rests on something else."""
+    if not is_standing_tax_roll_row(li):
+        return False
+    amt = _tax_roll_amount(li, li.raw if isinstance(li.raw, dict) else {})
+    return amt is not None and amt < TRIVIAL_TAX_BALANCE
+
+
+def amount_is_tax_balance(li: Listing, amount_owed) -> bool:
+    """raw['amount_owed'] is the county's tax balance: labelled `tax_owed`, or still labelled
+    `judgment` on a standing tax-roll row (an older enrich_amount_owed, or a checkpoint from before
+    the relabel, called a roll balance a court judgment). A real judgment (a foreclosure, a lis
+    pendens, a court or lien source) is not."""
+    if not isinstance(amount_owed, dict):
+        return False
+    src = amount_owed.get("source")
+    return src == "tax_owed" or (src == "judgment" and is_standing_tax_roll_row(li))
+
+
 def tax_listing_drop(li: Listing, drop: set[str]) -> set[str]:
     """`drop` with "tax_lien" / "tax_sale" added where a "<name>:property_tax" verdict ends them
     on THIS row: a refuted/stale county property-tax verdict (the tax_lien verifiers' GOVERNS)
@@ -722,6 +776,8 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
         if name is not None:
             if not live:
                 c.stale.append(why)
+            elif name == "tax_lien" and trivial_tax_roll(li):
+                pass        # an interest-only residue on a standing roll is not distress (TRIVIAL_TAX_BALANCE)
             else:
                 sig.append((name, cat, w, ev))
                 if days is not None and days >= 0 and name in _LANE_KINDS and days <= _LANE_WINDOW_DAYS:
@@ -756,11 +812,17 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     _to = r.get("tax_owed")
     _real_tax = isinstance(_to, dict) and isinstance(_to.get("balance"), (int, float)) and _to["balance"] > 0
     _ao = r.get("amount_owed")
-    if "recorded_debt:tax" in drop:
+    # The amount's TRUE kind. A standing tax-roll row's amount is the roll balance whatever label an
+    # earlier pass gave it (`judgment` on 10,942 rows of the 2026-10-07 checkpoint), so it is
+    # governed by the tax rules below (a refuted/stale tax verdict, the trivial floor) and never
+    # credited as if it were a court judgment. A real judgment or opening bid is unchanged.
+    _ao_is_tax = amount_is_tax_balance(li, _ao)
+    if "recorded_debt:tax" in drop or trivial_tax_roll(li):
         # the county says the tax balance behind this debt is not owed (refuted) or was paid
-        # since (stale): a judgment or an opening bid still counts, the tax balance does not
+        # since (stale), or the whole balance is a trivial residue: a judgment or an opening bid
+        # still counts, the tax balance does not
         _real_tax = False
-        if isinstance(_ao, dict) and _ao.get("source") == "tax_owed":
+        if _ao_is_tax:
             _ao = None
     if is_countable_debt(_ao) or _real_tax:
         # A REAL debt only: an actual judgment / opening bid, or a real delinquent-tax balance
@@ -1103,6 +1165,11 @@ def _equity_info(li: Listing) -> tuple[Optional[str], bool]:
     pct = eqb.get("pct")
     if pct is not None:
         evidenced = eqb["evidenced"] if isinstance(eqb.get("evidenced"), bool) else equity_is_evidenced(eqb)
+        if evidenced and eqb.get("payoff_source") == "amount_owed:judgment" and is_standing_tax_roll_row(li):
+            # a roll balance an earlier pass labelled `judgment` is not a fact about a mortgage (a
+            # delinquent-tax payoff is "NON_MORTGAGE", equity_is_evidenced): the stored flag was
+            # computed from that label, so a stale checkpoint cannot open HOT on it
+            evidenced = False
         if pct >= 0.40:
             return "high", evidenced
         if pct >= 0.15:
