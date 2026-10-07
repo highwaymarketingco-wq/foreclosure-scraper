@@ -229,7 +229,7 @@ def parcel_from_onemap(pin: str, a: dict, fields: list[str]) -> Parcel:
     own, co1 = split_care_of(_s(a, "ownname"))
     own2, co2 = split_care_of(_s(a, "ownname2"))
     p.owner = (f"{own}; {own2}" if own2 and own2 not in own else own) or None
-    p.care_of = "; ".join(x for x in (co1, co2) if x) or None
+    p.care_of = "; ".join(dict.fromkeys(x for x in (co1, co2) if x)) or None
     mail = " ".join(x for x in (_s(a, "mailadd"), _s(a, "munit")) if x)
     city = " ".join(x for x in (_s(a, "mcity"), _s(a, "mstate"), _s(a, "mzip")) if x)
     p.mailing = ", ".join(x for x in (mail, city) if x) or None

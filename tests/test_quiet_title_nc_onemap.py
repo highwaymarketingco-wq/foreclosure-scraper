@@ -325,3 +325,9 @@ def test_plat_written_inside_the_short_legal():
     assert (p.plat_book, p.plat_page) == ("37", "23") and p.extra["plat_from_legal"]
     q = parcel_from_onemap("1", ATTRS, [])
     assert (q.plat_book, q.plat_page) == ("12", "34") and "plat_from_legal" not in q.extra
+
+
+def test_the_same_care_of_in_both_owner_fields_is_shown_once():
+    p = parcel_from_onemap("1", dict(ATTRS, ownname="TESTER ANNA HEIRS & C/O JOHN SAMPLE",
+                                     ownname2="C/O JOHN SAMPLE"), [])
+    assert p.care_of == "JOHN SAMPLE" and p.owner == "TESTER ANNA HEIRS"
