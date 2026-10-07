@@ -382,3 +382,111 @@ def test_partial_is_populated_for_soft_timeout_salvage(canned_statewide):
     out = asyncio.run(s.fetch())
     assert len(s.partial) >= len(out) > 0
     assert any(li.county == "Catawba" for li in s.partial)
+
+
+# --- 2026-10-07: cap raised in stages to 400, highest-value parcels first, cap in run stats,
+# NULL-safe exclusions. Names below are made up. ---
+
+class _Resp:
+    status_code = 200
+
+    def __init__(self, body):
+        self._b = body
+
+    def json(self):
+        return self._b
+
+
+class _SchemaHttp:
+    """Answers the layer schema GET; the row reads go through the patched helpers."""
+
+    def __init__(self, fields):
+        self.fields = fields
+        self.gets = 0
+
+    async def get(self, url, params=None, timeout=None):
+        self.gets += 1
+        return _Resp({"fields": self.fields})
+
+
+def _row(i, value):
+    return {"CURR_NAME1": f"SAMPLE{i} PAT HEIRS", "CURR_NAME2": None, "PIN": f"P{i}",
+            "FMV_TOTAL": value, "WHOLE_ADDRESS": f"{i} TEST ST"}
+
+
+def test_value_field_is_a_numeric_total_value_column():
+    assert m._pick_value_field({"fields": [
+        {"name": "TotalMarketValue", "type": "esriFieldTypeString"},
+        {"name": "parval", "type": "esriFieldTypeDouble"}]}) == "parval"
+    assert m._pick_value_field({"fields": [
+        {"name": "TotalMarketValue", "type": "esriFieldTypeString"}]}) is None
+
+
+def test_default_cap_is_400_and_env_adjustable():
+    assert m._PER_COUNTY_CAP == 400 or "HEIR_ESTATE_PER_COUNTY_CAP" in __import__("os").environ
+
+
+def test_exclusions_sit_on_the_first_owner_field_only():
+    """`UPPER(f2) NOT LIKE` is NULL when f2 is NULL and dropped every single-owner row."""
+    w = m._where({"owner": ["NAME1", "NAME2"]}, "Lincoln")
+    assert "UPPER(NAME1) NOT LIKE '%REAL ESTATE%'" in w
+    assert "UPPER(NAME2) NOT LIKE" not in w
+    assert "UPPER(NAME2) LIKE '%HEIR%'" in w          # matching still reads every field
+
+
+def test_an_excluded_phrase_on_a_second_field_still_drops_the_row():
+    assert m._excluded_row(["SMITH JOHN HEIRS", "LIFE ESTATE"])
+    assert not m._excluded_row(["SMITH JOHN HEIRS", None])
+
+
+def _drive(monkeypatch, rows_by_page, fields, cap=3):
+    monkeypatch.setattr(m, "_PER_COUNTY_CAP", cap)
+    monkeypatch.setattr(m, "_RANK_PAGE", 2)
+    calls = []
+
+    async def fake_page(http, url, where, out_fields="*", count=25, offset=0, order_by=""):
+        calls.append({"count": count, "offset": offset, "order_by": order_by,
+                      "out_fields": out_fields})
+        page = rows_by_page[len(calls) - 1] if len(calls) <= len(rows_by_page) else []
+        return page, len(calls) < len(rows_by_page)
+
+    unordered = []
+
+    async def fake_query(http, url, where, out_fields="*", count=80):
+        unordered.append(count)
+        return [_row(9, 1.0)]
+
+    monkeypatch.setattr(m, "_query_page", fake_page)
+    monkeypatch.setattr(m, "_query", fake_query)
+    s = m.NCHeirEstateParcels()
+    spec = m.COUNTY_GIS["NC:Gaston"]
+    out = asyncio.run(s._process_county(_SchemaHttp(fields), "NC", "Gaston", spec))
+    return s, out, calls, unordered
+
+
+def test_rows_are_read_highest_value_first_up_to_the_cap(monkeypatch):
+    fields = [{"name": "FMV_TOTAL", "type": "esriFieldTypeDouble"}]
+    pages = [[_row(1, 900.0), _row(2, 500.0)], [_row(3, 100.0), _row(4, 50.0)]]
+    s, out, calls, unordered = _drive(monkeypatch, pages, fields, cap=3)
+    assert [c["order_by"] for c in calls] == ["FMV_TOTAL DESC", "FMV_TOTAL DESC"]
+    assert [c["offset"] for c in calls] == [0, 2] and calls[1]["count"] == 1
+    assert "*" not in calls[0]["out_fields"] and "FMV_TOTAL" in calls[0]["out_fields"]
+    assert not unordered
+    assert [li.raw["heir_estate"]["value_rank"] for li in out] == [1, 2, 3]
+    assert out[0].raw["heir_estate"]["value"] == 900.0
+    assert out[0].raw["heir_estate"]["per_county_cap"] == 3
+    assert s.run_stats["per_county_cap"] == 3
+    assert s.run_stats["capped_counties"] == ["NC:Gaston"]
+    assert s.run_stats["ranked_by_value"] == 1
+
+
+def test_an_empty_ranked_read_falls_back_to_the_unordered_one(monkeypatch):
+    fields = [{"name": "FMV_TOTAL", "type": "esriFieldTypeDouble"}]
+    s, out, calls, unordered = _drive(monkeypatch, [[]], fields, cap=3)
+    assert unordered == [3] and len(out) == 1
+    assert "value_rank" not in out[0].raw["heir_estate"]
+
+
+def test_a_layer_without_a_numeric_value_column_reads_unordered(monkeypatch):
+    s, out, calls, unordered = _drive(monkeypatch, [], [{"name": "X", "type": "esriFieldTypeString"}])
+    assert not calls and unordered == [3]

@@ -59,6 +59,7 @@ on a LIVING owner, not a decedent).
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 from datetime import datetime
 from typing import Iterable
@@ -68,7 +69,8 @@ import structlog
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
-from ...enrichment_owner_mailing import COUNTY_GIS, _query
+from ... import job_events
+from ...enrichment_owner_mailing import COUNTY_GIS, _query, _query_page, _spec_out_fields
 from ...validation import NC_COUNTIES as _ALL_NC_COUNTIES
 
 log = structlog.get_logger()
@@ -101,7 +103,26 @@ _MATCH_TOKENS = ("HEIR", "ESTATE")
 # subdivision/HOA/brokerage, not a decedent; "LIFE ESTATE" is a living owner.
 _EXCLUDE = ("LIFE ESTATE", "REAL ESTATE", "ESTATES")
 
-_PER_COUNTY_CAP = 80
+#: Rows read per county per run. Was a flat 80 with no order and no offset, so every run
+#: re-read the same arbitrary first 80 of ~10.9k matching parcels across the 19 county
+#: layers (2026-10-07 audit). Raised in stages (owner decision 2026-10-07): 400 by default,
+#: env-adjustable, highest-value parcels first (see _value_field), and the cap is recorded
+#: in the run stats (NCHeirEstateParcels.run_stats, job_events note "nc_heir.run_stats").
+_PER_COUNTY_CAP = int(os.environ.get("HEIR_ESTATE_PER_COUNTY_CAP", "400"))
+#: One request's page size while ranking by value (<= every layer's maxRecordCount).
+_RANK_PAGE = 400
+
+#: Total-value column names, best first (lowercased). Only a NUMERIC column qualifies:
+#: ordering a string column ("TotalMarketValue" on Buncombe is text) sorts lexically.
+_VALUE_FIELD_PREFERENCE = (
+    "parval", "totval", "tot_val", "totalvalue", "total_value", "totalmarketvalue",
+    "totmktval", "taxmktval", "fairmktval", "fmv_total", "aprtotval", "apr_tot_val",
+    "totalappraisedvalue", "appraisedvalue", "appraised_value", "cost_total_value",
+    "marketvalue", "market_value", "assessedvalue", "assessed_value", "assessed_v",
+    "taxvalue", "tax_value",
+)
+_NUMERIC_TYPES = {"esriFieldTypeDouble", "esriFieldTypeInteger", "esriFieldTypeSmallInteger",
+                  "esriFieldTypeSingle", "esriFieldTypeBigInteger"}
 
 # Python-side belt-and-suspenders: an "ESTATE" hit is only a decedent when it is
 # NOT an entity (LLC/HOA/church/etc.). HEIR hits are accepted outright.
@@ -179,8 +200,13 @@ def _where(spec: dict, county: str) -> str:
         return ""
     pos = " OR ".join(
         f"UPPER({f}) LIKE '%{tok}%'" for f in owner_fields for tok in _MATCH_TOKENS)
+    # The exclusions go on the FIRST owner field only. `UPPER(f2) NOT LIKE ...` is NULL
+    # when the second owner field is NULL, which silently dropped every single-owner row
+    # (Lincoln 305 matched as written vs 1,162 null-safe; 2026-10-07 audit), and the
+    # null-safe `OR f2 IS NULL` form drew a 403 from one county host. The other fields
+    # are excluded in Python (_excluded_row), with the same meaning.
     neg = " AND ".join(
-        f"UPPER({f}) NOT LIKE '%{ex}%'" for f in owner_fields for ex in _EXCLUDE)
+        f"UPPER({owner_fields[0]}) NOT LIKE '%{ex}%'" for ex in _EXCLUDE)
     where = f"({pos})"
     if neg:
         where += f" AND {neg}"
@@ -189,6 +215,34 @@ def _where(spec: dict, county: str) -> str:
     if cf:
         where += f" AND UPPER({cf}) = '{county.upper()}'"
     return where
+
+
+_EXCLUDE_RE = re.compile("|".join(re.escape(x) for x in _EXCLUDE), re.I)
+
+
+def _excluded_row(owner_fields: list[str]) -> bool:
+    """Any owner field carrying LIFE ESTATE / REAL ESTATE / ESTATES: the row is out, the
+    rule the SQL used to apply to every field (see _where)."""
+    return any(_EXCLUDE_RE.search(f or "") for f in owner_fields)
+
+
+def _pick_value_field(layer_meta: dict) -> str | None:
+    """The layer's numeric total-value column, by _VALUE_FIELD_PREFERENCE, else None."""
+    numeric = {str(f.get("name") or "").lower(): f.get("name")
+               for f in (layer_meta.get("fields") or [])
+               if f.get("type") in _NUMERIC_TYPES and f.get("name")}
+    for want in _VALUE_FIELD_PREFERENCE:
+        if want in numeric:
+            return numeric[want]
+    return None
+
+
+def _num(v) -> float | None:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f > 0 else None
 
 
 def _html(s: str) -> str:
@@ -314,9 +368,56 @@ class NCHeirEstateParcels(BaseScraper):
     # per-host throttle (~0.8-1.5s/request regardless of concurrency — see
     # _STATEWIDE_CONCURRENCY's comment), so 89 more counties is roughly another 70-130s
     # on top of the ~18-county baseline.
-    timeout_s = 360.0
+    # 360 -> 600 on 2026-10-07: up to 400 value-ranked rows per county (was 80 unordered)
+    # plus one schema read per layer. Measured live: 3 counties 6 s -> 20 s.
+    timeout_s = 600.0
     requires_apify = False
     optional = True
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self._value_fields: dict[str, str | None] = {}
+        self.run_stats: dict = {"per_county_cap": _PER_COUNTY_CAP, "counties": 0,
+                                "rows_read": 0, "capped_counties": [],
+                                "ranked_by_value": 0}
+
+    async def _value_field(self, http, url: str) -> str | None:
+        """The layer's numeric total-value column (one schema GET per layer per run)."""
+        if url not in self._value_fields:
+            vf = None
+            try:
+                r = await http.get(url.rstrip("/"), params={"f": "json"}, timeout=30.0)
+                if getattr(r, "status_code", 0) == 200:
+                    vf = _pick_value_field(r.json() or {})
+            except Exception:  # noqa: BLE001 - unranked is the old behaviour, not a failure
+                vf = None
+            self._value_fields[url] = vf
+        return self._value_fields[url]
+
+    async def _ranked_rows(self, http, spec: dict, where: str, value_field: str | None):
+        """Up to _PER_COUNTY_CAP matching rows, highest value first when the layer has a
+        numeric value column. An empty ranked first page (a slow ordered query times out
+        the same way an empty one answers) falls back to the old unordered read."""
+        out_fields = _spec_out_fields(spec)
+        if value_field:
+            out_fields = ",".join(dict.fromkeys(out_fields.split(",") + [value_field]))
+            rows: list[dict] = []
+            offset = 0
+            while len(rows) < _PER_COUNTY_CAP:
+                page, more = await _query_page(
+                    http, spec["url"], where, out_fields,
+                    count=min(_RANK_PAGE, _PER_COUNTY_CAP - len(rows)), offset=offset,
+                    order_by=f"{value_field} DESC")
+                rows.extend(page)
+                offset += len(page)
+                if not page or not more:
+                    break
+            if rows:
+                self.run_stats["ranked_by_value"] += 1
+                return rows[:_PER_COUNTY_CAP], True
+        rows = await _query(http, spec["url"], where, out_fields=out_fields,
+                            count=_PER_COUNTY_CAP)
+        return rows, False
 
     async def _process_county(self, http, state: str, county: str, spec: dict) -> list[Listing]:
         """One county's worth of heir/estate parcels. Pulled out of fetch() so the
@@ -326,15 +427,19 @@ class NCHeirEstateParcels(BaseScraper):
         if not where:
             return []
         try:
-            rows = await _query(http, spec["url"], where, out_fields="*",
-                                count=_PER_COUNTY_CAP)
+            value_field = await self._value_field(http, spec["url"])
+            rows, ranked = await self._ranked_rows(http, spec, where, value_field)
         except Exception as exc:  # noqa: BLE001
             log.warning("nc_heir.county_fail", county=county, error=str(exc)[:120])
             return []
+        self.run_stats["counties"] += 1
+        self.run_stats["rows_read"] += len(rows)
+        if len(rows) >= _PER_COUNTY_CAP:
+            self.run_stats["capped_counties"].append(f"{state}:{county}")
         out: list[Listing] = []
-        for attrs in rows:
+        for rank, attrs in enumerate(rows, 1):
             owner_fields = _owner_fields(spec, attrs)
-            if not owner_fields or not _is_decedent(owner_fields):
+            if not owner_fields or not _is_decedent(owner_fields) or _excluded_row(owner_fields):
                 continue
             owner = _owner_display(owner_fields)
             if not owner:
@@ -375,6 +480,11 @@ class NCHeirEstateParcels(BaseScraper):
                         "mailing": mail,
                         "care_of": care_of,
                         "match": "heirs" if _HEIR_TOKEN.search(owner) else "estate",
+                        # 2026-10-07: the layer's own total value (the ranking key), the
+                        # row's place in its county's value-ranked read, and the cap.
+                        **({"value": _num(attrs.get(value_field)), "value_field": value_field,
+                            "value_rank": rank} if ranked and value_field else {}),
+                        "per_county_cap": _PER_COUNTY_CAP,
                     },
                     # Score as a probate/life-event distress signal.
                     "relationship_signal": {
@@ -413,7 +523,17 @@ class NCHeirEstateParcels(BaseScraper):
                 [_bounded(c) for c in NC_STATEWIDE_FALLBACK_COUNTIES]
             ):
                 out.extend(await coro)
-        log.info("nc_heir.parsed", listings=len(out))
+        log.info("nc_heir.parsed", listings=len(out), **{
+            k: (len(v) if isinstance(v, list) else v) for k, v in self.run_stats.items()})
+        try:
+            job_events.note("nc_heir.run_stats", listings=len(out),
+                            per_county_cap=self.run_stats["per_county_cap"],
+                            counties=self.run_stats["counties"],
+                            rows_read=self.run_stats["rows_read"],
+                            ranked_by_value=self.run_stats["ranked_by_value"],
+                            capped_counties=",".join(self.run_stats["capped_counties"])[:200])
+        except Exception:  # noqa: BLE001 - bookkeeping never fails the run
+            pass
         return out
 
 
