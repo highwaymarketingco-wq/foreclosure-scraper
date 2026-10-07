@@ -31,7 +31,8 @@ def test_registry_includes_chain_only_counties():
     reg = chain_registry()
     assert reg[("NC", "Nash")][0] == "nc_cott_v4"
     assert reg[("NC", "Buncombe")][0] == "nc_cott_v4" and reg[("NC", "Polk")][0] == "nc_cott_v4"
-    assert ("SC", "Oconee") not in reg                    # kofile has no chain()
+    # kofile has no chain(); Oconee's chain comes from the SC PublicSearch adapter (chain-only entry)
+    assert reg[("SC", "Oconee")][0] == "publicsearch"
 
 
 def test_off_by_default(monkeypatch):

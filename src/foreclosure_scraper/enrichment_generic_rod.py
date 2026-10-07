@@ -76,6 +76,20 @@ CHAIN_ONLY_CONFIG = {
     ("NC", "Polk"):          ("nc_cott_v4", "FORECLOSURE_NC_COTT_ROD", "0"),
 }
 
+# SC platform adapters (2026-10-07; see docs/county_records/sc_rod_platform_clusters.md). Same
+# entry shape and the same chain() result shape as the NC ones, so enrich_generic_rod (raw['rod'])
+# and enrichment_rod_chain (raw['rod_chain']) read them unchanged. Per-run cap
+# SC_ROD_MAX_LOOKUPS_PER_COUNTY (default 30) is enforced inside the adapters (rod/sc_polite.py).
+SC_ROD_CONFIG = {
+    # GovOS (Kofile) PublicSearch (rod/publicsearch.py); Oconee's raw['rod'] stays on rod/kofile.py
+    ("SC", "Greenville"):    ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "0"),
+}
+SC_CHAIN_ONLY_CONFIG = {
+    ("SC", "Oconee"):        ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "0"),
+}
+ROD_CONFIG.update({k: v for k, v in SC_ROD_CONFIG.items() if k not in ROD_CONFIG})
+CHAIN_ONLY_CONFIG.update({k: v for k, v in SC_CHAIN_ONLY_CONFIG.items() if k not in CHAIN_ONLY_CONFIG})
+
 
 def platform_enabled(entry: tuple) -> bool:
     """Whether a registry entry's platform flag is on (env var, else the entry's default)."""
