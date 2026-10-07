@@ -76,3 +76,13 @@ def test_walled_county_stops_and_leaves_leads_unstamped(monkeypatch):
     assert stats["walled_counties"] == ["Nash"] and stats["stamped"] == 0
     assert all("rod_chain" not in li.raw for li in leads)
     assert len(sess.calls) == 1
+
+
+def test_budget_stops_the_pass_before_any_lead(monkeypatch):
+    sess = install(monkeypatch, [("GET", "SrchName.aspx", FakeResp(FORM))], cott.ADAPTER)
+    monkeypatch.setenv("FORECLOSURE_ROD_CHAIN", "1")
+    monkeypatch.setenv(cott.ENV_FLAG, "1")
+    monkeypatch.setenv("FORECLOSURE_ROD_CHAIN_BUDGET_S", "-1")
+    li = _lead("Nash", "TESTER ALVIN Q")
+    stats = asyncio.run(enrich_rod_chain([li]))
+    assert stats["budget_exhausted"] and stats["targets"] == 0 and "rod_chain" not in li.raw and sess.calls == []

@@ -9,6 +9,7 @@ hooks (_open, _search), and exposes module-level search_by_name / chain bound to
 from __future__ import annotations
 
 import asyncio
+import os
 import threading
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -66,6 +67,19 @@ class NcRodPlatform:
     def source_url(self, cfg: Any) -> str:          # the page a person opens; platform overrides
         return ""
 
+    #: env var holding this platform's own per-run, per-county lookup cap (e.g. the headless-browser
+    #: platforms, in the style of FORECLOSURE_SPARTANBURG_ROD_MAX); None = NC_ROD_MAX_LOOKUPS_PER_COUNTY
+    cap_env: Optional[str] = None
+    default_cap: int = nc_polite.DEFAULT_MAX_LOOKUPS_PER_COUNTY
+
+    def max_lookups(self) -> int:
+        if self.cap_env:
+            try:
+                return max(0, int(os.environ.get(self.cap_env, self.default_cap)))
+            except ValueError:
+                return self.default_cap
+        return nc_polite.max_lookups_per_county()
+
     # -- protocol hooks ----------------------------------------------------------------------
     def _open(self, client: PoliteClient, cfg: Any) -> Any:
         """Clear the county's disclaimer / open its search; return context kept with the session."""
@@ -113,10 +127,10 @@ class NcRodPlatform:
         ck = (county_key(name), who.last, who.first, who.entity, side, date_thru or "")
         if ck in self._cache:
             return self._cache[ck]
-        if not nc_polite.take_lookup(self.platform, self.state, name):
+        cap = self.max_lookups()
+        if not nc_polite.take_lookup(self.platform, self.state, name, cap):
             return SearchResult(status="capped", url=url,
-                                reason=f"per-run cap of {nc_polite.max_lookups_per_county()} lookups for "
-                                       f"{name} reached")
+                                reason=f"per-run cap of {cap} lookups for {name} reached")
         try:
             held = self._client(name, cfg)
             res = self._search(held.client, cfg, held.ctx, who, side, date_thru)

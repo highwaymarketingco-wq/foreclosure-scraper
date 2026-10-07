@@ -12,6 +12,8 @@ SWITCHES (all OFF by default)
   FORECLOSURE_ROD_CHAIN_REFRESH_DAYS / _REFRESH_HOT_DAYS   re-read after 30 / 7 days
   NC_ROD_MAX_LOOKUPS_PER_COUNTY    the adapters' per-run cap (default 30 name searches per county;
                                    a chain spends 1 + one per link walked)
+  FORECLOSURE_ROD_CHAIN_BUDGET_S   wall-clock budget for the pass (default 1800): no new lead is
+                                   started after it; leads not reached stay unstamped for next run
 
 POLITENESS: counties run one after another, leads within a county one after another, through
 the adapters' paced client (>= 1.6 s per host, one request at a time). A county that answers with
@@ -23,12 +25,13 @@ from __future__ import annotations
 import asyncio
 import importlib
 import os
+import time
 from datetime import datetime, timezone
 from typing import Iterable
 
 import structlog
 
-from .enrichment_generic_rod import CHAIN_ONLY_CONFIG, ROD_CONFIG, platform_enabled
+from .enrichment_generic_rod import CHAIN_ONLY_CONFIG, RENDER_ROD_CONFIG, ROD_CONFIG, platform_enabled
 from .models import Listing
 from .rod.classify import imminent
 
@@ -41,7 +44,7 @@ _RETRY_LATER = ("walled", "capped", "error")
 def chain_registry() -> dict[tuple[str, str], tuple]:
     """(state, county) -> registry entry, for every entry whose module has chain()."""
     out: dict[tuple[str, str], tuple] = {}
-    for key, entry in {**ROD_CONFIG, **CHAIN_ONLY_CONFIG}.items():
+    for key, entry in {**ROD_CONFIG, **RENDER_ROD_CONFIG, **CHAIN_ONLY_CONFIG}.items():
         mod = _module(entry[0])
         if mod is not None and hasattr(mod, "chain"):
             out[key] = entry
@@ -81,6 +84,8 @@ async def enrich_rod_chain(listings: Iterable[Listing]) -> dict:
     base_days = float(os.environ.get("FORECLOSURE_ROD_CHAIN_REFRESH_DAYS", "30"))
     hot_days = float(os.environ.get("FORECLOSURE_ROD_CHAIN_REFRESH_HOT_DAYS", "7"))
     depth = int(os.environ.get("FORECLOSURE_ROD_CHAIN_DEPTH", "3"))
+    budget_s = float(os.environ.get("FORECLOSURE_ROD_CHAIN_BUDGET_S", "1800"))
+    t0 = time.monotonic()
     registry = chain_registry()
 
     by_county: dict[tuple[str, str], list[Listing]] = {}
@@ -93,7 +98,8 @@ async def enrich_rod_chain(listings: Iterable[Listing]) -> dict:
 
     stats = {"counties": 0, "targets": 0, "stamped": 0, "with_last_deed": 0, "with_prior": 0,
              "with_open_dot_est": 0, "with_lis_pendens": 0, "with_substitution": 0,
-             "walled_counties": [], "capped_counties": [], "errors": 0, "disabled_counties": 0}
+             "walled_counties": [], "capped_counties": [], "errors": 0, "disabled_counties": 0,
+             "budget_exhausted": False}
     for (state, county), targets in sorted(by_county.items()):
         entry = registry[(state, county)]
         if not platform_enabled(entry):
@@ -103,6 +109,9 @@ async def enrich_rod_chain(listings: Iterable[Listing]) -> dict:
         stats["counties"] += 1
         targets.sort(key=lambda li: not imminent(li, now))       # auctions soonest first
         for li in targets:
+            if time.monotonic() - t0 > budget_s:
+                stats["budget_exhausted"] = True
+                break
             stats["targets"] += 1
             try:
                 res = await asyncio.to_thread(mod.chain, county, li.owner_name, state=state, depth=depth)

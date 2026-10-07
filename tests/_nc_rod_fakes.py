@@ -8,7 +8,9 @@ sessions and caches.
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Union
+import re
+from contextlib import contextmanager
+from typing import Any, Callable, Optional, Union
 
 
 class FakeResp:
@@ -70,3 +72,112 @@ CAPTCHA_PAGE = FakeResp("<html><head><title>Records</title></head><body><h2>Plea
 
 SERVER_ERROR = FakeResp("<html><head><title>Runtime Error</title></head><body><h1>Server Error in '/' "
                         "Application.</h1></body></html>", 500)
+
+
+# -- a scripted stand-in for a Playwright page, driven through the real rod.nc_render.RenderPage ------
+
+class _Resp:
+    def __init__(self, status: int):
+        self.status = status
+
+
+class _Keyboard:
+    def __init__(self, page: "FakePWPage"):
+        self.page = page
+
+    def press(self, key: str) -> None:
+        if key in ("Control+A", "Delete"):
+            self.page.typed[self.page.focus] = ""
+
+    def type(self, text: str, delay: int = 0) -> None:
+        self.page.typed[self.page.focus] = self.page.typed.get(self.page.focus, "") + text
+
+
+class FakePWPage:
+    """goto(url) answers from `pages` (URL substring -> html or (status, html)); click(selector)
+    on a selector in `clicks` loads the next scripted page (a list is served in order); any other
+    click is local. A selector 'exists' when its id / text is in the current html. Every action is
+    recorded in `log`; typed text per selector in `typed`."""
+
+    def __init__(self, pages: dict, clicks: Optional[dict] = None, start_url: str = "about:blank"):
+        self.pages, self.clicks = pages, dict(clicks or {})
+        self.url, self.html = start_url, ""
+        self.log: list[tuple[str, str]] = []
+        self.typed: dict[str, str] = {}
+        self.focus = ""
+        self._pending = None
+        self._served: dict[str, int] = {}
+        self.keyboard = _Keyboard(self)
+
+    def _answer(self, ans, url):
+        status, html = ans if isinstance(ans, tuple) else (200, ans)
+        self.url, self.html = url, html
+        return _Resp(status)
+
+    def goto(self, url, wait_until=None, timeout=None):
+        self.log.append(("goto", url))
+        for sub, ans in self.pages.items():
+            if sub in url:
+                return self._answer(ans, url)
+        return self._answer((404, "<html>not found</html>"), url)
+
+    def content(self) -> str:
+        return self.html
+
+    def query_selector(self, sel: str):
+        if sel.startswith("text="):
+            return object() if sel[5:] in self.html else None
+        m = re.match(r"#([\w\-]+)", sel)
+        if not m:
+            return object() if sel in self.html else None
+        tag = re.search(r"""<[^>]*id=["']""" + re.escape(m.group(1)) + r"""["'][^>]*>""", self.html)
+        if tag is None:
+            return None
+        if ":not([disabled])" in sel and re.search(r"\sdisabled[\s>=/]", tag.group(0)):
+            return None
+        return object()
+
+    def wait_for_selector(self, sel, timeout=None):
+        if self.query_selector(sel) is None:
+            raise TimeoutError(sel)
+
+    def click(self, sel, **kw):
+        self.log.append(("click", sel))
+        self.focus = sel
+        if sel in self.clicks:
+            ans = self.clicks[sel]
+            if isinstance(ans, list):
+                n = self._served.get(sel, 0)
+                self._served[sel] = n + 1
+                ans = ans[min(n, len(ans) - 1)]
+            if callable(ans):
+                ans = ans(self)
+            self._pending = ans
+
+    def _apply(self):
+        if self._pending is not None:
+            url, html = self._pending
+            self._pending = None
+            self.url, self.html = url, html
+
+    @contextmanager
+    def expect_navigation(self, timeout=None):
+        yield
+        self._apply()
+
+    def wait_for_load_state(self, state=None):
+        self._apply()
+
+    def wait_for_timeout(self, ms):
+        self._apply()
+
+
+def install_render(monkeypatch, fake_page_factory):
+    """Point rod.nc_render.launcher at a factory returning a FakePWPage per lookup."""
+    from foreclosure_scraper.rod import nc_render
+
+    @contextmanager
+    def launcher(platform, state, county, **kw):
+        yield nc_render.RenderPage(platform, state, county, fake_page_factory())
+
+    monkeypatch.setattr(nc_render, "launcher", launcher)

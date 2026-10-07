@@ -134,6 +134,16 @@ SC_CHAIN_ONLY_CONFIG = {
 ROD_CONFIG.update({k: v for k, v in SC_ROD_CONFIG.items() if k not in ROD_CONFIG})
 CHAIN_ONLY_CONFIG.update({k: v for k, v in SC_CHAIN_ONLY_CONFIG.items() if k not in CHAIN_ONLY_CONFIG})
 
+#: NC registers searched in a headless browser (rod/nc_render.py): run by enrichment_nc_rod_render
+#: (Spartanburg-style: capped per run by each platform's *_ROD_MAX, idempotent, skips rows that
+#: already carry raw['rod']), NOT by enrich_generic_rod; enrichment_rod_chain reads them for the
+#: chain. Same entry shape, all OFF until the platform flag is 1.
+RENDER_ROD_CONFIG = {
+    # Harris 'ROD Web Access' (rod/nc_harris.py); Moore runs it too but answered with HTTP 403
+    ("NC", "Mecklenburg"):   ("nc_harris", "FORECLOSURE_NC_HARRIS_ROD", "0"),
+    ("NC", "Carteret"):      ("nc_harris", "FORECLOSURE_NC_HARRIS_ROD", "0"),
+}
+
 
 def platform_enabled(entry: tuple) -> bool:
     """Whether a registry entry's platform flag is on (env var, else the entry's default)."""

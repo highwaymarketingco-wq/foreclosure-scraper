@@ -103,12 +103,14 @@ def _key(platform: str, state: str, county: str) -> tuple[str, str, str]:
     return (platform, (state or "").upper(), (county or "").strip().lower())
 
 
-def take_lookup(platform: str, state: str, county: str) -> bool:
-    """Spend one lookup from the county's per-run budget. False when the budget is used up."""
+def take_lookup(platform: str, state: str, county: str, cap: Optional[int] = None) -> bool:
+    """Spend one lookup from the county's per-run budget (`cap`, else NC_ROD_MAX_LOOKUPS_PER_COUNTY).
+    False when the budget is used up."""
     k = _key(platform, state, county)
+    limit = max_lookups_per_county() if cap is None else max(0, cap)
     with _state_lock:
         n = _lookups.get(k, 0)
-        if n >= max_lookups_per_county():
+        if n >= limit:
             return False
         _lookups[k] = n + 1
         return True
@@ -140,6 +142,22 @@ def reset_state() -> None:
         _last_request.clear()
         _lookups.clear()
         _walled.clear()
+
+
+def pace(host: str) -> None:
+    """Wait until MIN_GAP_S has passed since the last request to `host` from anywhere in the
+    process (the plain-HTTP client and the headless-browser pages share this clock)."""
+    last = _last_request.get(host)
+    if last is not None:
+        wait = MIN_GAP_S - (clock() - last)
+        if wait > 0:
+            sleep(wait)
+    _last_request[host] = clock()
+
+
+def mark_done(host: str) -> None:
+    """The gap runs from the END of a slow answer too."""
+    _last_request[host] = clock()
 
 
 # ------------------------------------------------------------------------------------------------
@@ -176,12 +194,7 @@ class PoliteClient:
         self.opened = clock()
 
     def _pace(self, host: str) -> None:
-        last = _last_request.get(host)
-        if last is not None:
-            wait = MIN_GAP_S - (clock() - last)
-            if wait > 0:
-                sleep(wait)
-        _last_request[host] = clock()
+        pace(host)
 
     def request(self, method: str, url: str, *, params: Any = None, data: Any = None,
                 headers: Optional[dict] = None,
