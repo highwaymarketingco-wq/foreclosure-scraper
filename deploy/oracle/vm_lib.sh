@@ -77,6 +77,25 @@ vm_load_env() {
   # already overrides for. Override per-host here, not by raising the shared
   # default and risking the Mac.
   export BOARD_PRIOR_MERGE_ALLOW_LARGE="${BOARD_PRIOR_MERGE_ALLOW_LARGE:-1}"
+
+  # 2026-10-07 register-of-deeds readers and deed chain (HANDOFF item 82). The plain-HTTP platforms were
+  # proven live on real board owners, so they run on the VM; the per-platform caps keep one run polite
+  # (30 name searches per county per run, coverage grows across runs). The BROWSER-rendered platforms
+  # (Harris, Logan Blazor, Logan Remote Access) stay OFF for the run that measures peak memory and time;
+  # turn them on per platform with FORECLOSURE_NC_HARRIS_ROD=1 etc. The Mecklenburg delinquent list stays
+  # OFF (one-year balances, +29k rows): FORECLOSURE_MECKLENBURG_DELINQUENT=1 to add it.
+  export FORECLOSURE_ROD_CHAIN="${FORECLOSURE_ROD_CHAIN:-1}"
+  export FORECLOSURE_ROD_CHAIN_BUDGET_S="${FORECLOSURE_ROD_CHAIN_BUDGET_S:-1800}"
+  export FORECLOSURE_NC_COTT_ROD="${FORECLOSURE_NC_COTT_ROD:-1}"
+  export FORECLOSURE_NC_LOOKUP_ROD="${FORECLOSURE_NC_LOOKUP_ROD:-1}"
+  export FORECLOSURE_NC_ORS_ROD="${FORECLOSURE_NC_ORS_ROD:-1}"
+  export FORECLOSURE_NC_CCHS_CLASSIC_ROD="${FORECLOSURE_NC_CCHS_CLASSIC_ROD:-1}"
+  export FORECLOSURE_NC_TYLER_ROD="${FORECLOSURE_NC_TYLER_ROD:-1}"
+  export FORECLOSURE_SC_ORS_ROD="${FORECLOSURE_SC_ORS_ROD:-1}"
+  export FORECLOSURE_SC_ACPASS_ROD="${FORECLOSURE_SC_ACPASS_ROD:-1}"
+  export FORECLOSURE_NC_HARRIS_ROD="${FORECLOSURE_NC_HARRIS_ROD:-0}"
+  export FORECLOSURE_NC_LOGAN_BLAZOR_ROD="${FORECLOSURE_NC_LOGAN_BLAZOR_ROD:-0}"
+  export FORECLOSURE_NC_LOGAN_REMOTE_ROD="${FORECLOSURE_NC_LOGAN_REMOTE_ROD:-0}"
 }
 
 # vm_publish_board <log> <commit message>: stage the dashboard payload, commit, pull --rebase,
