@@ -504,7 +504,9 @@ def render_html(res: IntakeResult) -> str:
               ("Tax value", value),
               ("Deed the assessor cites", deed),
               ("Plat / subdivision on the record", "; ".join(x for x in [
-                  f"plat book {p.plat_book} page {p.plat_page or '?'}" if p.plat_book else "no plat reference",
+                  (f"plat book {p.plat_book} page {p.plat_page or '?'}"
+                   + (" (read from the short legal)" if p.extra.get("plat_from_legal") else ""))
+                  if p.plat_book else "no plat reference",
                   f"map reference {p.extra['mapref']}" if p.extra.get("mapref") else "",
                   p.subdivision or ""] if x)),
               ("Last sale date on the layer", str(p.extra.get("last_sale_date") or "not given")),

@@ -318,3 +318,10 @@ def test_acreage_prefers_the_recorded_area_and_ignores_a_unit_error():
     assert p.acreage == 0.71 and "unit error" in p.extra["acreage_note"]
     q = parcel_from_onemap("1", dict(ATTRS, gisacres=0.68, recareano=0.0, recareatx=""), [])
     assert q.acreage == 0.68
+
+
+def test_plat_written_inside_the_short_legal():
+    p = parcel_from_onemap("1", dict(ATTRS, mapref="", legdecfull="EXAMPLE HEIGHTS LO:19 PL:0037-0023"), [])
+    assert (p.plat_book, p.plat_page) == ("37", "23") and p.extra["plat_from_legal"]
+    q = parcel_from_onemap("1", ATTRS, [])
+    assert (q.plat_book, q.plat_page) == ("12", "34") and "plat_from_legal" not in q.extra

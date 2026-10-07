@@ -294,6 +294,11 @@ def parcel_from_onemap(pin: str, a: dict, fields: list[str]) -> Parcel:
         p.plat_book, p.plat_page = pb, pp
     elif _s(a, "mapref"):
         p.extra["mapref"] = _s(a, "mapref")
+    pl = re.search(r"\bPL\s*:\s*([A-Z]?\d+)\s*-\s*(\d+[A-Z]?)\b", p.legal_description or "")
+    if not p.plat_book and pl and _z(pl.group(1)):
+        # Cumberland writes the plat inside the short legal ('... LO:19 PL:0037-0023') and leaves mapref blank
+        p.plat_book, p.plat_page = _z(pl.group(1)), _z(pl.group(2))
+        p.extra["plat_from_legal"] = True
     p.subdivision = _s(a, "subdivisio") or None
     p.layer_updated = layer_date(_s(a, "revdatetx"))
     p.extra.update({"parno": _s(a, "parno"), "altparno": _s(a, "altparno"), "nparno": _s(a, "nparno"),
