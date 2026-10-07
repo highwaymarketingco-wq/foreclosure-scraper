@@ -123,7 +123,7 @@ def _row(**kw) -> dict:
 
 def test_registered_with_governs_ttl():
     v = {x.name: x for x in discover()}["elderly_disabled"]
-    assert v.signal == "elderly_disabled" and v.version == "v4"
+    assert v.signal == "elderly_disabled" and v.version == "v5"
     assert v.governs == ("elderly_disabled", "senior_exemption")
     assert v.ttl_days == 60 and v.retry_days == 7 and not v.wall
 
@@ -349,7 +349,11 @@ def _cases():
 #: what v3 changed on the live cases (the fixture's `expected` is what v2 answered): the one
 #: stale that the county's own bill contradicted
 V3_CHANGED = {"stale_billed_this_year": {"verdict": "confirmed", "basis": "exemption_on_latest_bill",
-                                         "reason": None, "voter_status": "not_found"}}
+                                         "reason": None, "voter_status": "not_found"},
+              # v5 (owner decision 2026-10-06): the exclusion gone from the newest bill with the SAME
+              # owner keeps scoring: unconfirmed, not stale (11 Cardinal Cove Rd)
+              "stale_relief_removed": {"verdict": "unconfirmed", "basis": None,
+                                       "reason": "relief_removed_same_owner", "voter_status": "not_found"}}
 
 
 #: 82 Black Bear Trl: its parcel page lists 2026 and 2025 bills in legal collection ("See Legal",
@@ -370,7 +374,7 @@ def test_live_verdicts_reproduce(name):
     assert res.evidence.get("basis") == exp["basis"]
     assert res.evidence.get("reason") in SHARED_PARSER_REASONS.get(name, {exp["reason"]})
     assert (res.evidence.get("voter") or {}).get("status") == exp["voter_status"]
-    assert res.verifier == "elderly_disabled" and res.verifier_version == "v4"
+    assert res.verifier == "elderly_disabled" and res.verifier_version == "v5"
 
 
 @pytest.mark.parametrize("name", _cases())
@@ -458,12 +462,13 @@ def _with_bill_exempt(c: dict, year: int, exempt: str) -> Replay:
     return with_address(c, resp)
 
 
-def test_a_newest_bill_without_the_exclusion_is_still_stale_for_the_same_owner():
+def test_a_newest_bill_without_the_exclusion_keeps_scoring_for_the_same_owner():
     """The 1406 pages with the 2026 bill's exclusion removed: the newest bill is what says the
-    relief is gone, and an unchanged owner does not change that (v2 behaviour kept)."""
+    relief is gone; with the owner unchanged the person may still be elderly, so v5 answers
+    unconfirmed (the signal keeps scoring), not stale."""
     c = case("stale_billed_this_year")
     res = run(c["row"], _with_bill_exempt(c, 2026, "$0.00"))
-    assert res.verdict == "stale" and res.evidence["basis"] == "relief_removed"
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "relief_removed_same_owner"
     assert res.evidence["exempt_value_by_year"] == {"2026": 0.0, "2025": 101800.0}
 
 
@@ -518,15 +523,15 @@ def test_stale_relief_removed_from_the_2026_bill():
     assert ev["bills_checked"][0]["exempt_value"] == 0.0 and ev["bills_checked"][1]["exempt_value"] > 0
 
 
-def test_a_same_owner_removal_stays_stale_and_shows_what_decides_it():
+def test_a_same_owner_removal_keeps_scoring_and_shows_what_decides_it():
     """11 Cardinal Cove Rd (parcel situs 7): 118,350 excluded on the 2025 bill, 0 on 2026, the
-    same life-estate owner on every bill since 2021 and no deed since 2010. Whether a same-owner
-    removal should suppress the signal is the owner's scoring decision, so the verdict is NOT
-    changed; the evidence now carries what that decision needs."""
+    same life-estate owner on every bill since 2021 and no deed since 2010. The owner decided
+    (2026-10-06) that such a lead keeps scoring: unconfirmed (relief_removed_same_owner), not
+    stale; the evidence carries what the decision rests on."""
     c = case("stale_relief_removed")
     res = run(c["row"], replay(c))
     ev = res.evidence
-    assert res.verdict == "stale" and ev["basis"] == "relief_removed"
+    assert res.verdict == "unconfirmed" and ev["reason"] == "relief_removed_same_owner"
     assert ev["exempt_value_by_year"] == {"2026": 0.0, "2025": 118350.0}
     assert ev["owner_unchanged_since"] == 2021 and ev["owner_match"] == "same"
     assert "transferred_since" not in ev and "deed_date" not in ev       # no deed since the board saw it
@@ -930,27 +935,28 @@ def _ravenwood(relief: dict | None = None, owner_by_year=None) -> tuple[dict, Sc
     return row, Scripted(resp, addr)
 
 
-def test_a_relief_that_ended_after_2024_is_stale_not_refuted():
+def test_a_relief_that_ended_after_2024_is_not_refuted_and_keeps_scoring():
     """v3 read the two newest bills (2026, 2025: no exclusion) and said refuted; the 2022 to 2024
     bills excluded half the value under the same owner. The neighbour at the row's address having
-    ELD under someone else neither confirms nor hides that."""
+    ELD under someone else neither confirms nor hides that. v5: the relief was this owner's, so
+    the answer is unconfirmed (relief_removed_same_owner), which keeps the signal scoring."""
     row, f = _ravenwood()
     res = run_at(row, f)
     ev = res.evidence
-    assert res.verdict == "stale" and ev["basis"] == "relief_removed"
+    assert res.verdict == "unconfirmed" and ev["reason"] == "relief_removed_same_owner"
     assert ev["relief_years"] == [2024, 2023, 2022] and ev["owner_unchanged_since"] == 2022
     assert ev["exempt_value_by_year"] == {"2026": 0.0, "2025": 0.0, "2024": 90050.0,
                                           "2023": 90050.0, "2022": 90050.0}
     assert ev["pinnum"] == RAV_BOARD and ev["address_pin"] == RAV_ADDR and ev["board_pin"] == RAV_BOARD
     roles = {p["role"]: p for p in ev["parcels"]}
-    assert roles["address"]["status"] == "neutral" and roles["board"]["status"] == "stale"
+    assert roles["address"]["status"] == "neutral" and roles["board"]["status"] == "unconfirmed"
     assert roles["address"]["reason"] == "address_parcel_other_owner" and roles["address"]["county_code"] == "ELD"
     assert "TESTOR" not in json.dumps(ev).upper() and "FENWICK" not in json.dumps(ev).upper()
 
 
 def test_the_window_starts_in_2022_and_a_relief_before_it_is_not_looked_for():
     row, f = _ravenwood(relief={2022: 90050.0})
-    assert run_at(row, f).verdict == "stale"                       # the edge of the window
+    assert run_at(row, f).verdict == "unconfirmed"                 # the edge of the window (same owner)
     row, f = _ravenwood(relief={})
     f.responses.update(_tax_pages(RAV_BOARD, "3 EASTCREST DR", "0000667232",
                                   {y: ("FENWICK DORIAN", 180100.0, 90050.0 if y == 2021 else 0.0)
@@ -1106,7 +1112,7 @@ def test_the_address_and_lien_queries_are_retried_too():
                                    _years("FENWICK DORIAN", {})))
     f = FlakyLayer(f0.responses, fail=2, address=f0.address)
     res = run_at(row, f)
-    assert res.verdict == "stale" and f.calls[lien_url] == 3
+    assert res.verdict == "unconfirmed" and f.calls[lien_url] == 3
     assert "lien_bill" in {p["role"] for p in res.evidence["parcels"]}
 
 

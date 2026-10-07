@@ -154,7 +154,9 @@ from .tax_lien_buncombe import (BILL_URL, PARCEL_URL, SEARCH_URL, money, owner_m
                                 parse_parcel_page, parse_search_results, pin_of)
 
 SIGNAL = "elderly_disabled"
-VERSION = "v4"         # v4 (2026-10-06): the check is bound to the parcel that carries the row's
+VERSION = "v5"         # v5 (2026-10-06): relief gone from the newest bill with the SAME owner is
+                       # unconfirmed (relief_removed_same_owner), not stale: the signal keeps scoring
+                       # (owner decision). v4 (2026-10-06): the check is bound to the parcel that carries the row's
                        # ADDRESS as well as the board and lien-bill parcels (a confirmed there is
                        # `exemption_on_address_parcel`), and the "never" is read from every levy
                        # bill since 2022, not the latest two (an earlier relief is stale)
@@ -685,9 +687,14 @@ def _decide_bills(*, own: dict, bills: list[dict], latest: Optional[int], since:
         mine = [y for y in relief_years if since is None or y >= since]
         if relief_years and not mine and not from_layer:
             info.update(basis="owner_changed", relief_under_earlier_owner=True)
-        else:
-            info["basis"] = "relief_removed"
-        return "stale", info
+            return "stale", info
+        # The relief was this owner's and is gone from the newest bill, and the owner has not changed
+        # (no deed): the exclusion may have lapsed over income or paperwork while the person is
+        # still elderly or disabled. The owner decided on 2026-10-06 to keep such a lead scoring
+        # (11 Cardinal Cove Rd, 29 Ravenwood Dr), so this is unconfirmed (scores as before), not
+        # stale (which would remove the signal).
+        info["reason"] = "relief_removed_same_owner"
+        return "unconfirmed", info
     if claimed_before and not newest_ok:
         # the bills cannot say the relief is gone when the newest one was not read, and the
         # layer's flag alone is not proof (it can go blank over a bill that still excludes)

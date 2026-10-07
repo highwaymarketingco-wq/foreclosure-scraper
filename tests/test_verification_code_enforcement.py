@@ -28,6 +28,7 @@ import gzip
 import json
 import re
 from datetime import date, datetime, timedelta, timezone
+
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -44,6 +45,13 @@ from foreclosure_scraper.verification.registry import discover
 from foreclosure_scraper.verification.verifiers import _arcgis_layer as agl
 from foreclosure_scraper.verification.verifiers import code_enforcement_henderson as ovt
 from foreclosure_scraper.verification.verifiers import vacant_structure_hendersonville as vsr
+
+
+def _utc_today():
+    """The verifier counts days in UTC (core.utc_now); after 8 pm Eastern the local date is a day
+    behind the UTC one, so a test that builds 'N days ago' must use the same clock."""
+    return datetime.now(timezone.utc).date()
+
 
 FIX = Path(__file__).parent / "fixtures" / "verification"
 TODAY = date(2026, 10, 6)
@@ -356,13 +364,13 @@ def _reg_resp(*, edited: str | None = None, dates: dict | None = None, edit: dic
 def test_register_marked_occupied_still_ends_the_claim_when_the_register_is_fresh():
     """The rule is about AGE: a layer edited within a year, or an occupied row dated within the
     last 180 days, still decides (stale, marked_occupied)."""
-    res = _check_reg(_reg_row("902 SYLVAN BLVD"), _reg_resp(edited=date.today().isoformat()))
+    res = _check_reg(_reg_row("902 SYLVAN BLVD"), _reg_resp(edited=_utc_today().isoformat()))
     assert res.verdict == "stale" and res.evidence["reason"] == "marked_occupied"
-    recent = (date.today() - timedelta(days=60)).isoformat()
+    recent = (_utc_today() - timedelta(days=60)).isoformat()
     res = _check_reg(_reg_row("902 SYLVAN BLVD"), _reg_resp(dates={48: recent}))
     assert res.verdict == "stale" and res.evidence["reason"] == "marked_occupied"
     assert res.evidence["register_row_age_days"] == 60
-    old_row = (date.today() - timedelta(days=200)).isoformat()      # layer old, row older than 180 d
+    old_row = (_utc_today() - timedelta(days=200)).isoformat()      # layer old, row older than 180 d
     res = _check_reg(_reg_row("902 SYLVAN BLVD"), _reg_resp(dates={48: old_row}))
     assert res.verdict == "unconfirmed" and res.evidence["reason"] == "register_occupancy_too_old"
 
