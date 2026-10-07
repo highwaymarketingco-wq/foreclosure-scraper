@@ -129,3 +129,64 @@ def test_government_owner_still_excluded(monkeypatch):
 def test_scraper_registered():
     from foreclosure_scraper.scrapers._registry import all_scrapers
     assert "counties_sc.spartanburg_vacant" in {s.slug for s in all_scrapers()}
+
+
+# --- 2026-10-07 extraction audit: columns on the layer the scraper never requested.
+# Names and values below are made up. ---
+
+def _run_one(monkeypatch, **attrs):
+    base = dict(TAXPIN="700000000001", OwnerName="SAMPLE OWNER LLC", TaxpayerNa=None,
+                StreetAddr="1 MAIL ST", City="SAMPLETOWN", State="SC", Zip="29999",
+                PropertyLo="10 TEST AVE", SaleDate=None, SaleAmount=None)
+    base.update(attrs)
+    page = {"features": [_feature(**base)]}
+    calls = {"n": 0}
+
+    def fake_client(**kw):
+        class _C:
+            async def get(self, url, params=None):
+                calls["n"] += 1
+                return _FakeResponse(page if calls["n"] == 1 else _PAGE_EMPTY)
+
+        class _CM:
+            async def __aenter__(self):
+                return _C()
+
+            async def __aexit__(self, *a):
+                return False
+        return _CM()
+
+    monkeypatch.setattr(mod, "client", fake_client)
+    return list(asyncio.run(mod.SpartanburgVacant().fetch()))[0]
+
+
+def test_new_columns_are_requested():
+    for col in ("StreetZip", "LegalDescr", "Acreage", "PreviousAp", "PreviousTa",
+                "PreviousAs", "DeedBook", "DeedPage", "PreviousOw", "CDUC"):
+        assert col in mod._OUT_FIELDS.split(","), col
+
+
+def test_situs_zip_legal_and_acreage_reach_the_listing(monkeypatch):
+    li = _run_one(monkeypatch, StreetZip="29301-1234", LegalDescr="LOT 9 TEST SUBDIV",
+                  Acreage=0.31)
+    assert li.zip_code == "29301"            # situs zip, not the mailing Zip
+    assert li.legal_description == "LOT 9 TEST SUBDIV"
+    assert li.acreage == 0.31
+
+
+def test_deed_values_and_previous_owner_land_in_cama_specs(monkeypatch):
+    li = _run_one(monkeypatch, PreviousAp=42000, PreviousTa=42000, PreviousAs=2520,
+                  DeedBook="123", DeedPage="45", Instrument="2020-1", PreviousOw="EXAMPLE PAT",
+                  CDUC="FAIR", Assessment="6", Topo="LEVEL", DEEDACREAG=1.2)
+    c = li.raw["cama_specs"]
+    assert c["prior_appraised_value"] == 42000 and c["prior_assessed_value"] == 2520
+    assert c["deed_book"] == "123" and c["deed_page"] == "45" and c["instrument"] == "2020-1"
+    assert c["previous_owner"] == "EXAMPLE PAT" and c["cduc"] == "FAIR"
+    assert c["assessment"] == "6" and c["topography"] == "LEVEL"
+    assert li.acreage == 1.2                 # DEEDACREAG when Acreage is empty
+
+
+def test_blank_and_bad_situs_zip_stay_none(monkeypatch):
+    assert _run_one(monkeypatch, StreetZip=" ").zip_code is None
+    assert _run_one(monkeypatch, StreetZip="N/A").zip_code is None
+    assert "deed_book" not in _run_one(monkeypatch, DeedBook=" ").raw["cama_specs"]

@@ -71,6 +71,17 @@ _OUT_FIELDS = ",".join([
     "TAXPIN", "OwnerName", "TaxpayerNa", "StreetAddr", "City", "State", "Zip",
     "PropertyLo", "SaleDate", "SaleAmount", "YearBuilt", "ConditionF",
     "LivingArea", "BedRooms", "FullBaths", "HalfBaths", "LandUse", "PropertyTy",
+    # 2026-10-07 extraction audit: on the layer, never requested (fill on a live
+    # 2,000-row sample in parens). StreetZip is the SITUS zip (61%; the board had a
+    # zip on 788 of 4,438 rows); LegalDescr (100%; legal_description was empty on
+    # every row); Acreage/DEEDACREAG (~21%); the Previous* appraised/taxable/assessed
+    # values (85% -- the Current* columns are empty on this layer); DeedBook/DeedPage/
+    # Instrument (93-100%); PreviousOw (95%); CDUC (98%); Assessment (100%);
+    # ReviewDate; AccountNum; LandSizeDe; StreetComm; Utility1/RoadType/Topo (97%).
+    "StreetZip", "StreetComm", "LegalDescr", "Acreage", "DEEDACREAG",
+    "PreviousAp", "PreviousTa", "PreviousAs", "DeedBook", "DeedPage", "Instrument",
+    "PreviousOw", "CDUC", "Assessment", "ReviewDate", "AccountNum", "LandSizeDe",
+    "Utility1", "RoadType", "Topo",
 ])
 
 _PAGE = 1000   # halved once geometry rides along: ~365 KB/page at precision 6
@@ -131,6 +142,12 @@ def _owner_mailing(a: dict) -> Any:
     if name:
         return {"name": name, "mailing": mail} if mail else {"name": name}
     return mail
+
+
+def _situs_zip(a: dict) -> str | None:
+    """The parcel's own (situs) ZIP. `Zip` on this layer is the OWNER's mailing zip."""
+    m = re.match(r"^\s*(\d{5})", str(a.get("StreetZip") or ""))
+    return m.group(1) if m else None
 
 
 def _is_absentee(a: dict) -> bool:
@@ -280,9 +297,12 @@ class SpartanburgVacant(BaseScraper):
                         county="Spartanburg",
                         city="Spartanburg",
                         street_address=situs,
+                        zip_code=_situs_zip(a),
                         parcel_id=parcel,
                         owner_name=owner,
                         defendant=owner,
+                        legal_description=_clean(a.get("LegalDescr")),
+                        acreage=_num(a.get("Acreage")) or _num(a.get("DEEDACREAG")),
                         sale_date=None,
                         living_sqft=living_sqft,
                         year_built=year_built,
@@ -309,7 +329,19 @@ class SpartanburgVacant(BaseScraper):
                                     ("condition", "ConditionF"), ("land_use", "LandUse"),
                                     ("property_type", "PropertyTy"),
                                     ("last_sale_date", "SaleDate"), ("last_sale_amount", "SaleAmount"),
-                                ) if a.get(v) not in (None, "", 0, "0")
+                                    # 2026-10-07 extraction audit (see _OUT_FIELDS)
+                                    ("prior_appraised_value", "PreviousAp"),
+                                    ("prior_taxable_value", "PreviousTa"),
+                                    ("prior_assessed_value", "PreviousAs"),
+                                    ("deed_book", "DeedBook"), ("deed_page", "DeedPage"),
+                                    ("instrument", "Instrument"),
+                                    ("previous_owner", "PreviousOw"), ("cduc", "CDUC"),
+                                    ("assessment", "Assessment"), ("review_date", "ReviewDate"),
+                                    ("account_number", "AccountNum"),
+                                    ("land_size", "LandSizeDe"), ("situs_community", "StreetComm"),
+                                    ("utility", "Utility1"), ("road_type", "RoadType"),
+                                    ("topography", "Topo"),
+                                ) if a.get(v) not in (None, "", 0, "0") and str(a.get(v)).strip()
                             },
                         },
                     )
