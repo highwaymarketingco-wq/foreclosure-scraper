@@ -783,6 +783,23 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
             stats["filled_landuse"] += flags["land_use"]
             stats["filled_address"] = stats.get("filled_address", 0) + flags["street_address"]
 
+    # FREE LOCAL PARCEL-CACHE JOIN FIRST, over EVERY listing (2026-10-07). The per-lead
+    # block above reads the same cache, but only after the two idempotency gates written
+    # for the expensive live query (raw["gis"]["queried"], "core attrs complete") and only
+    # for the batches the RESOLVER_PHASE_MAX_SECONDS cap lets run, so 36,469 board rows
+    # with a parcel id sat without the owner mailing their county cache already held.
+    # A local lookup costs microseconds; it must not wait behind the network budget.
+    # Fill-only, same guards as scripts/join_parcel_cache_to_board.py (one shared copy in
+    # parcel_cache_join). FORECLOSURE_CACHE_JOIN=0 turns it off.
+    if os.environ.get("FORECLOSURE_CACHE_JOIN") != "0":
+        try:
+            from .parcel_cache_join import join_listings
+            jc = join_listings(listings)
+            stats["cache_join"] = dict(jc)
+            log.info("enrichment.gis_attrs.cache_join", counts=dict(jc))
+        except Exception:  # noqa: BLE001 - the live loop below still runs
+            log.error("enrichment.gis_attrs.cache_join_failed", exc_info=True)
+
     _load_cache()
     # Batch processing to avoid OOM on 8GB machines — process in chunks of 2500
     # instead of creating 53k+ coroutines via asyncio.gather all at once.

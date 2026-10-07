@@ -742,6 +742,60 @@ SC_DUAL_LAYERS: dict[str, dict] = {
     },
 }
 
+#: DORCHESTER SC, added 2026-10-07 on the owner's decision (licence/terms restrictions cleared
+#: by the owner's attorney). LICENCE WORDING, kept here on purpose: the service iteminfo
+#: (.../Parcels_Public/MapServer/info/iteminfo) reads "Basic Public data - not to be added to any
+#: pay for use locations without prior written approval of Dorchester County Assessor or GIS
+#: Director." The board is free and public; if it is ever put behind a paywall, this entry needs
+#: that written approval first. Open, no token, 80,111 parcels, maxRecordCount 90,000.
+#: FULL_TMS ("003-00-00-037.000") normalises to the board's 14-digit TMS; all 17 Dorchester rows
+#: of the 249 big-old tax rows with no mailing matched on it (2026-10-07). No value field exists
+#: on this layer. Config as written up in docs/county_breadth_research_2026-09-21.md section 3c.
+PARCEL_LAYERS["Dorchester"] = {
+    "state": "SC",
+    "url": ("https://gisportal.dorchestercounty.net/hosting/rest/services/General_Data/"
+            "Parcels_Public/MapServer/0/query"),
+    "id_fields": ["FULL_TMS", "TMS", "PARCELNO"],
+    "page_delay_s": 1.7,
+    "map": {"owner": "OWNER", "address": "PROPERTY_LOCATION",
+            "owner_mailing": ["MAILING_ADDRESS", "CITY_STATE_ZIP"],
+            "acreage": "TAXED_ACRES", "sale_price": "SALE_PRICE", "sale_date": "SALE_DATE"},
+}
+
+#: 2026-10-07: property facts the already-downloaded county layers publish and the cache used to
+#: drop (field names verified on each layer's ?f=json that day). Merged into each config's map
+#: with setdefault, so an existing mapping is never replaced. {"baths": [full, half]} counts a
+#: half bath as 0.5. The NC OneMap fallback (nc_onemap_cfg) maps structyear -> year_built for
+#: every NC county it serves.
+FACT_MAPS: dict[str, dict] = {
+    "Gaston": {"year_built": "YEARBLT", "bedrooms": "XBEDRM",
+               "bathrooms": {"baths": ["XBATHS", "XHBATHS"]},
+               "sale_price": "SALESAMT", "sale_date": "SALEDATE"},
+    "McDowell": {"year_built": "structyear", "sale_date": "saledatetx"},
+    "Spartanburg": {"year_built": "YearBuilt", "bedrooms": "BedRooms",
+                    "bathrooms": {"baths": ["FullBaths", "HalfBaths"]},
+                    "stories": "StoryHeight", "sale_date": "SaleDate"},
+    "Darlington": {"year_built": "YEAR_BUILT", "bedrooms": "BED"},
+    "Greenville": {"bedrooms": "BEDROOMS", "bathrooms": {"baths": ["BATHRMS", "HALFBATH"]}},
+    "York": {"year_built": "YearBuilt"},
+    "Lexington": {"year_built": "YearBuilt", "bedrooms": "Nbr_Bedroom",
+                  "bathrooms": {"baths": ["Nbr_FullBath", "Nbr_HalfBath"]}, "stories": "Stories"},
+    "Greenwood": {"year_built": "YearBuilt", "bedrooms": "Bedrooms",
+                  "bathrooms": {"baths": ["Bathrooms", "HalfBaths"]}},
+    "Barnwell": {"year_built": "Year_Built", "bedrooms": "F__Bedrms", "bathrooms": "F__Baths",
+                 "stories": "F__Stories"},
+    "Saluda": {"year_built": "SDE.DBO.AssessorData.Year_Built",
+               "bedrooms": "SDE.DBO.AssessorData.F__Bedrms",
+               "bathrooms": "SDE.DBO.AssessorData.F__Baths",
+               "stories": "SDE.DBO.AssessorData.F__Stories"},
+    "Chester": {"bedrooms": "Bedrooms", "stories": "Stories"},
+}
+for _county, _facts in FACT_MAPS.items():
+    for _cfg in (PARCEL_LAYERS.get(_county), SC_DUAL_LAYERS.get(_county)):
+        if _cfg:
+            for _col, _spec in _facts.items():
+                _cfg["map"].setdefault(_col, _spec)
+
 # schema columns of the local `parcels` table, in insert order
 # OWNER_MAILING IS THE POINT OF THE 2026-09-10 ADDITION. Measured that day: 10 of the 14
 # cached county layers publish an owner MAILING address, and this schema had no column for
@@ -750,9 +804,22 @@ SC_DUAL_LAYERS: dict[str, dict] = {
 # constraint in every SC county -- while the mailing address sat in a layer already being
 # downloaded. sale_price/sale_date are added for the same reason: 9 layers carry them and
 # the sold-comp pool has no SC half.
+#
+# 2026-10-07: year_built / bedrooms / bathrooms / stories. Eleven already-downloaded county
+# layers (and the NC OneMap statewide layer, `structyear`) publish them and the refresh threw
+# them away for lack of a column (docs/new_sources_2026-10-07_contact_and_facts.md). Old cache
+# files without these columns stay readable: lookup_with_tier selects only the columns a file
+# has (migration on read), and ensure_columns() adds them in place when a writer needs them.
 _COLS = ("owner", "address", "owner_mailing", "market_value", "tax_value", "acreage",
-         "living_sqft", "land_use", "sale_price", "sale_date")
-_NUMERIC = {"market_value", "tax_value", "acreage", "living_sqft"}
+         "living_sqft", "land_use", "sale_price", "sale_date",
+         "year_built", "bedrooms", "bathrooms", "stories")
+_NUMERIC = {"market_value", "tax_value", "acreage", "living_sqft",
+            "year_built", "bedrooms", "bathrooms", "stories"}
+#: SQLite type of each schema column (sale_price has always been REAL).
+_COL_TYPES = {c: ("REAL" if c in _NUMERIC or c == "sale_price" else "TEXT") for c in _COLS}
+#: The table DDL, built from _COLS so a new column cannot be added to one and not the other.
+PARCELS_DDL = ("CREATE TABLE parcels(id TEXT, "
+               + ", ".join(f"{c} {_COL_TYPES[c]}" for c in _COLS) + ")")
 
 
 _US_STATE_CODES = frozenset(
@@ -819,6 +886,15 @@ def _map_val(rec: dict, col: str, spec):
     if isinstance(spec, dict):
         if col not in _NUMERIC:
             return None                # a sum is only meaningful for a number column
+        if "baths" in spec:
+            # {"baths": [full, half]}: full baths + 0.5 per half bath (Gaston XBATHS/XHBATHS,
+            # Spartanburg FullBaths/HalfBaths, ...). None when the full count is missing or 0.
+            flds = list(spec.get("baths") or ())
+            full = _num(rec.get(flds[0])) if flds else None
+            if not full or full <= 0:
+                return None
+            half = _num(rec.get(flds[1])) if len(flds) > 1 else None
+            return full + 0.5 * (half if half and half > 0 else 0.0)
         total = None
         for f in spec.get("sum") or ():
             n = _num(rec.get(f))
@@ -1169,7 +1245,8 @@ def nc_onemap_cfg(county: str) -> dict:
                 "owner_mailing": ["mailadd", "munit", "mcity", "mstate", "mzip"],
                 "market_value": "parval", "tax_value": "landval",
                 "acreage": "gisacres", "land_use": "parusedesc",
-                "sale_price": None, "sale_date": "saledatetx"},
+                "sale_price": None, "sale_date": "saledatetx",
+                "year_built": "structyear"},
     }
 
 
@@ -1231,6 +1308,7 @@ def _src_fields(id_fields, spec_map) -> str:
     for spec in spec_map.values():
         if isinstance(spec, dict):
             src.update(spec.get("sum") or ())
+            src.update(spec.get("baths") or ())
         elif isinstance(spec, list):
             src.update(spec)
         elif spec:
@@ -1394,9 +1472,7 @@ async def refresh_county(county: str, state: str | None = None) -> dict:
     if tmp.exists():
         tmp.unlink()
     con = sqlite3.connect(tmp)
-    con.execute("CREATE TABLE parcels(id TEXT, owner TEXT, address TEXT, "
-                "owner_mailing TEXT, market_value REAL, tax_value REAL, acreage REAL, "
-                "living_sqft REAL, land_use TEXT, sale_price REAL, sale_date TEXT)")
+    con.execute(PARCELS_DDL)
     m = cfg["map"]
     recs = []
     addr_i = _COLS.index("address")
@@ -1456,13 +1532,102 @@ def _zero_prefix_candidates(v) -> list[tuple[str, str]]:
 #: specifically need a freshness bound and owner/address/sqft/acreage don't.
 _STALE_DROPPED_COLS = ("market_value", "tax_value")
 
+#: County assessor/auditor roll files obtained by public-records request
+#: (scripts/ingest_county_roll.py) live in a SIDECAR file beside the layer cache,
+#: <stem>.roll.sqlite, so the weekly layer refresh (which rebuilds <stem>.sqlite from
+#: the county layer) can never wipe them. lookup_with_tier reads the layer cache first
+#: and lets the roll fill only what the layer lacks; a county with no layer at all is
+#: served by its roll alone. Rows carry prov ('county_roll_request') and prov_date (the
+#: roll file's own date).
+ROLL_PROVENANCE = "county_roll_request"
+ROLL_PROV_COLS = ("prov", "prov_date")
+#: A roll is an annual official file; its VALUE columns are handed out for this long after
+#: its prov_date (one assessment year plus slack), owner/mailing/facts without a limit.
+ROLL_VALUE_MAX_AGE_DAYS = 400.0
 
-def _row_to_dict(row: tuple, *, drop_value: bool) -> dict:
-    cols = _COLS
+
+def roll_db_path(county: str, state: str | None = None) -> Path:
+    """The roll sidecar for a county: data/parcel_cache/<stem>.roll.sqlite."""
+    p = _db_path(county, state)
+    return p.with_name(p.name[: -len(".sqlite")] + ".roll.sqlite")
+
+
+def ensure_columns(con: sqlite3.Connection, extra: tuple[str, ...] = ()) -> list[str]:
+    """Schema migration in place: add any _COLS (and `extra`) column a `parcels` table lacks.
+    Existing rows read NULL in the new columns. Returns the columns added."""
+    have = {r[1] for r in con.execute("PRAGMA table_info(parcels)")}
+    added = []
+    for c in list(_COLS) + list(extra):
+        if c not in have:
+            con.execute(f"ALTER TABLE parcels ADD COLUMN {c} {_COL_TYPES.get(c, 'TEXT')}")
+            added.append(c)
+    return added
+
+
+_CONN_COLS: dict = {}
+
+
+def _conn_and_cols(p: Path) -> tuple[sqlite3.Connection, tuple[str, ...]]:
+    """A cached read-only connection plus the schema columns this FILE actually has, so a
+    cache written before a column existed stays readable (migration on read)."""
+    ckey = p.name     # same key enrichment_prior_correction pre-opens connections under
+    con = _CONN.get(ckey)
+    cols = _CONN_COLS.get(ckey)
+    if con is None:
+        con = _CONN[ckey] = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+        cols = None   # a new connection (or a different file under the same name): re-read
+    if cols is None or _CONN_COLS.get("__con__" + ckey) is not con:
+        try:
+            have = {r[1] for r in con.execute("PRAGMA table_info(parcels)")}
+        except sqlite3.DatabaseError:
+            have = set()
+        cols = _CONN_COLS[ckey] = tuple(c for c in list(_COLS) + list(ROLL_PROV_COLS) if c in have)
+        _CONN_COLS["__con__" + ckey] = con     # the connection these columns were read from
+    return con, cols
+
+
+def _row_to_dict(row: tuple, *, drop_value: bool, cols: tuple[str, ...] = _COLS) -> dict:
     if drop_value:
         return {c: v for c, v in zip(cols, row)
                 if v not in (None, "") and c not in _STALE_DROPPED_COLS}
     return {c: v for c, v in zip(cols, row) if v not in (None, "")}
+
+
+def _query_file(p: Path, county: str, parcel_id: str,
+                drop_value: bool) -> tuple[Optional[dict], Optional[str]]:
+    con, cols = _conn_and_cols(p)
+    if not cols:
+        return None, None
+    sel = "SELECT " + ",".join(cols) + " FROM parcels WHERE id=?"
+    pad_rows: list[dict] = []
+    cands = _lookup_candidates(parcel_id)
+    if str(county).strip().lower() == "florence":
+        cands = cands + _zero_prefix_candidates(parcel_id)
+    for k, tier in cands:
+        try:
+            row = con.execute(sel, (k,)).fetchone()
+        except sqlite3.OperationalError:
+            return None, None   # unreadable / foreign schema: the weekly refresh rebuilds it
+        if not row:
+            continue
+        d = _row_to_dict(row, drop_value=drop_value, cols=cols)
+        if tier == "zero_pad":
+            pad_rows.append(d)     # never take the first: prove there is only one parcel
+            continue
+        return d, tier
+    if pad_rows:
+        ident = {(d.get("owner"), d.get("address"), d.get("owner_mailing")) for d in pad_rows}
+        if len(ident) == 1:
+            return pad_rows[0], "zero_pad"
+    return None, None
+
+
+def _roll_value_stale(prov_date) -> bool:
+    try:
+        d = datetime.fromisoformat(str(prov_date)[:10]).replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return True
+    return (datetime.now(timezone.utc) - d).days > ROLL_VALUE_MAX_AGE_DAYS
 
 
 def lookup_with_tier(county: str, parcel_id: str,
@@ -1478,36 +1643,39 @@ def lookup_with_tier(county: str, parcel_id: str,
     own live-query path instead, the same as a cache MISS already does. Every
     current caller already treats these keys as optional (`pc.get("market_value")`),
     so an absent key is a safe, backward-compatible no-op for them.
+
+    2026-10-07: columns are read per file (a cache built before year_built/bedrooms/
+    bathrooms/stories existed still answers), and a county roll sidecar (roll_db_path)
+    fills whatever the layer row lacks, or answers alone when there is no layer cache.
+    A field taken from the roll is named in the result's "roll_fields" list, with
+    "roll_prov"/"roll_date" beside it.
     """
     try:
         p = _db_path(county, state)
     except ValueError:
         return None, None   # dual-state name, caller had no state — refuse to guess
-    if not p.exists() or not (parcel_id or "").strip():
+    if not (parcel_id or "").strip():
         return None, None
-    drop_value = cache_is_stale(county, state)
-    ckey = p.name
-    con = _CONN.get(ckey)
-    if con is None:
-        con = _CONN[ckey] = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
-    sel = "SELECT " + ",".join(_COLS) + " FROM parcels WHERE id=?"
-    pad_rows: list[tuple] = []
-    cands = _lookup_candidates(parcel_id)
-    if str(county).strip().lower() == "florence":
-        cands = cands + _zero_prefix_candidates(parcel_id)
-    for k, tier in cands:
-        try:
-            row = con.execute(sel, (k,)).fetchone()
-        except sqlite3.OperationalError:
-            return None, None   # stale-schema cache (pre-land_use column) — weekly refresh rebuilds it
-        if not row:
-            continue
-        if tier == "zero_pad":
-            pad_rows.append(row)     # never take the first: prove there is only one parcel
-            continue
-        return _row_to_dict(row, drop_value=drop_value), tier
-    if pad_rows:
-        ident = {(r[0], r[1], r[2]) for r in pad_rows}   # owner, address, owner_mailing
-        if len(ident) == 1:
-            return _row_to_dict(pad_rows[0], drop_value=drop_value), "zero_pad"
-    return None, None
+    r = roll_db_path(county, state)
+    main_hit, tier = (None, None)
+    if p.exists():
+        main_hit, tier = _query_file(p, county, parcel_id, cache_is_stale(county, state))
+    roll_hit, roll_tier = (None, None)
+    if r.exists():
+        roll_hit, roll_tier = _query_file(r, county, parcel_id, False)
+    if roll_hit:
+        prov = roll_hit.pop("prov", None) or ROLL_PROVENANCE
+        pdate = roll_hit.pop("prov_date", None)
+        if _roll_value_stale(pdate):
+            for c in _STALE_DROPPED_COLS:
+                roll_hit.pop(c, None)
+        base = dict(main_hit or {})
+        filled = [k for k, v in roll_hit.items() if k not in base and v not in (None, "")]
+        for k in filled:
+            base[k] = roll_hit[k]
+        if filled:
+            base["roll_fields"] = filled
+            base["roll_prov"] = prov
+            base["roll_date"] = pdate
+        return (base or None), (tier or (f"roll_{roll_tier}" if roll_tier else None))
+    return main_hit, tier

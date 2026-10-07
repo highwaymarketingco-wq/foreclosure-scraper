@@ -1845,7 +1845,7 @@ def load_board(docs_dir: Path | str = "docs", *,
 
 # Whitelist of `raw` sub-keys to keep in the output (keep file small + privacy-OK)
 RAW_KEEP = {
-    "gis": ("owner", "mailing", "last_sale"),
+    "gis": ("owner", "mailing", "last_sale", "stories"),   # stories: parcel_cache_join, 2026-10-07
     "zillow": ("zpid", "homeType", "zestimate", "yearBuilt", "bedrooms", "bathrooms",
                "livingArea", "lotSize", "taxAssessedValue", "description", "photo", "photos"),
     "flags": "*",
