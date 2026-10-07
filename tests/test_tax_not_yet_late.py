@@ -180,3 +180,80 @@ def test_big_old_ships_to_phones_and_the_dashboard_filter_reads_it():
     root = Path(__file__).resolve().parents[1] / "docs"
     assert 'contact === "tax_big_old" && !r.tax_big_old' in (root / "dashboard.js").read_text()
     assert '<option value="tax_big_old">' in (root / "index.html").read_text()
+
+
+# ---- BIG_OLD_TAX_WARM_FLOOR: big + old + a mailing address or phone on file -> at least WARM ------
+
+def _floor_row(years=(2023, 2024), owed=9000.0, *, mail=False, phone=False, years_list=None):
+    li = _big(list(years_list or years), owed)
+    li.raw.pop("owner_mailing", None)
+    li.raw["owner_mailing"] = {"mailing": "1 TEST LN ANYTOWN SC", "absentee": False} if mail else {}
+    if phone:
+        li.raw["skip_trace"] = {"phone_numbers": ["555-0100"]}
+    return li
+
+
+def _tier(li):
+    ds.score_board([li], previous_path=None, today=TODAY)
+    return li.raw["distress_stack"]
+
+
+def test_floor_with_a_mailing_address():
+    st = _tier(_floor_row(mail=True))
+    assert ds.BIG_OLD_TAX_WARM_FLOOR == "WARM"
+    assert st["tier"] == "WARM" and st["tier_floor"] == "tax_big_old"
+    assert st["tax_big_old"] == "contact"
+
+
+def test_floor_with_a_phone():
+    st = _tier(_floor_row(phone=True))
+    assert st["tier"] == "WARM" and st["tier_floor"] == "tax_big_old"
+
+
+def test_no_floor_without_contact():
+    st = _tier(_floor_row())
+    assert st["tier"] == "COLD" and "tier_floor" not in st
+    assert st["tax_big_old"] == "no_contact"
+
+
+def test_floor_never_demotes_and_never_opens_hot():
+    # a tier already WARM or HOT is left as it is and carries no floor marker
+    for tier in ("WARM", "HOT"):
+        d = {"tax_big_old": "contact"}
+        assert ds._tier_floor(d, tier) == tier and "tier_floor" not in d
+    # the floor gives WARM, not HOT, and an ended event / senior lien / scope cap holds COLD
+    assert ds._tier_floor({"tax_big_old": "contact"}, "COLD") == "WARM"
+    for cap in ({"stale_reason": "sale passed"}, {"surviving_senior_debt_risk": True},
+                {"scope_capped": "flip_outside_footprint"}):
+        assert ds._tier_floor({"tax_big_old": "contact", **cap}, "COLD") == "COLD"
+    # a row the base rule already makes WARM keeps WARM without the marker
+    li = _floor_row(mail=True)
+    li.raw["owner_mailing"]["absentee"] = True      # the absentee route to WARM
+    li.raw["code_enforcement"] = {"status": "open"}
+    st = _tier(li)
+    assert st["tier"] in ("WARM", "HOT")
+
+
+def test_not_yet_late_or_small_rows_never_qualify():
+    st = _tier(_floor_row(years_list=[2026], owed=9000.0, mail=True))   # only the current bill
+    assert st["tier"] == "COLD" and "tax_big_old" not in st
+    st = _tier(_floor_row(years_list=[2025, 2026], owed=50000.0, mail=True))   # one late year
+    assert "tax_big_old" not in st
+    st = _tier(_floor_row(owed=6999.0, mail=True))
+    assert st["tier"] == "COLD" and "tax_big_old" not in st
+
+
+def test_a_refuted_tax_verdict_takes_the_floor_away(monkeypatch):
+    li = _floor_row(mail=True)
+    monkeypatch.setattr(ds, "suppressed_scorer_signals", lambda raw, today=None: {"recorded_debt:tax"})
+    st = _tier(li)
+    assert st["tier"] == "COLD" and "tax_big_old" not in st
+
+
+def test_retraction_keeps_the_floor():
+    li = _floor_row(mail=True)
+    st = _tier(li)
+    st["equity_band"] = "high"
+    assert ds.retract_equity_rank(li)
+    assert li.raw["distress_stack"]["tier"] == "WARM"
+    assert li.raw["distress_stack"]["tier_floor"] == "tax_big_old"

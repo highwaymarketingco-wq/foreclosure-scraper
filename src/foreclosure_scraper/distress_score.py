@@ -68,6 +68,8 @@ from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 from .verification.core import block_suppressed, qualifiers, suppressed_scorer_signals
 from .enrichment_amount_owed import is_standing_tax_roll_row
 from .enrichment_tax_owed import tax_not_yet_late as _tax_not_yet_late_raw
+from .enrichment_tax_owed import tax_big_old as _tax_big_old_raw
+from .enrichment_sc_phone import is_owner_phone_usable
 from .verification.verifiers._tax_common import DE_MINIMIS, PROPERTY_TAX, other_lien_listing
 
 log = structlog.get_logger()
@@ -732,13 +734,14 @@ def _resolved_by_name(r: dict) -> bool:
 
 class _Collected:
     """Everything one listing contributes to its parcel group."""
-    __slots__ = ("signals", "stale", "events", "stay")
+    __slots__ = ("signals", "stale", "events", "stay", "big_old")
 
     def __init__(self) -> None:
         self.signals: list[tuple[str, str, int, str]] = []    # (name, category, weight, evidence)
         self.stale: list[str] = []                             # reasons an ended sale was dropped
         self.events: list[tuple[str, int, bool]] = []          # (kind, days_to_event, in_foreclosure_lane)
         self.stay: Optional[dict] = None                       # a bankruptcy stay in force
+        self.big_old: bool = False                             # big_old_tax, not ended by a verdict
 
 
 def _stay_block(r: dict, today: date) -> Optional[dict]:
@@ -994,6 +997,9 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
         # stacks normally with absentee/tax signals (the LAND_WHOLESALE lane this enricher
         # feeds), the same as every other PROPERTY signal here.
         sig.append(("vacant_lot", "PROPERTY", 10, REC))
+    # BIG_OLD_TAX_WARM_FLOOR: a big, 2+-year-late property-tax balance that no refuted/stale tax
+    # verdict has ended (the same drop the tax signals above obey)
+    c.big_old = not ({"recorded_debt:tax", "tax_lien", "tax_sale"} & set(drop)) and big_old_tax(li, today)
     if drop:
         c.signals = [x for x in c.signals if x[0] not in drop]
         c.events = [e for e in c.events if e[0] not in drop]
@@ -1084,10 +1090,10 @@ def _tier(stack: int, score: float, eq_ok: bool, mailable: bool,
     return "COLD"
 
 
-def _derive_tier(ds: dict, eq_ok: bool, eq_evidenced: Optional[bool]) -> str:
-    """The FULL tier of a published `distress_stack`: the base rule plus the lane, the caps
-    and the bidder title gates. `score_board` and `retract_equity_rank` both come through
-    here, so a retraction cannot disagree with the scorer it retracts. Reads only fields the
+def _derive_base_tier(ds: dict, eq_ok: bool, eq_evidenced: Optional[bool]) -> str:
+    """The tier of a published `distress_stack` before the floors (_derive_tier): the base rule
+    plus the lane, the caps and the bidder title gates. `score_board` and `retract_equity_rank`
+    both come through here, so a retraction cannot disagree with the scorer it retracts. Reads only fields the
     stack itself carries; an older stack that lacks the newer fields gets the older behaviour."""
     if ds.get("scope_capped"):
         return "COLD"                              # a flip outside the 18 footprint counties
@@ -1115,6 +1121,57 @@ def _derive_tier(ds: dict, eq_ok: bool, eq_evidenced: Optional[bool]) -> str:
     if stayed and tier == "HOT":
         tier = "WARM"                              # F3: a stayed foreclosure will not be sold on schedule
     return tier
+
+
+#: Owner decision 2026-10-07: a big, old property-tax delinquency (enrichment_tax_owed.tax_big_old:
+#: $7,000+ already late, 2+ levy years late) whose owner can be reached (a mailing address or a
+#: phone on file, owner_contact_on_file) is at least WARM. A floor only: it raises COLD to WARM,
+#: never lowers a tier, never opens HOT (the HOT gate is unchanged), and does not lift a row an
+#: ended event (F2), a surviving senior lien (F18) or the footprint cap holds at COLD. Rows with no
+#: contact keep their tier (the dashboard's 'Big old tax' filter and the unlock list still show
+#: them). The stack records it: ds['tax_big_old'] = 'contact' | 'no_contact', and
+#: ds['tier_floor'] = 'tax_big_old' when the floor raised the tier.
+BIG_OLD_TAX_WARM_FLOOR = "WARM"
+
+
+def big_old_tax(li: Listing, today: Optional[date] = None) -> bool:
+    """The row's property-tax balance is big and old (enrichment_tax_owed.tax_big_old). Never for
+    another lien's row (an SC DEW / DOR lien, a LiensNC filing, an eCourts judgment)."""
+    if other_lien_listing(li):
+        return False
+    return _tax_big_old_raw(li.raw if isinstance(li.raw, dict) else {}, li.state, li.county,
+                            li.source, today)
+
+
+def owner_contact_on_file(active: list[Listing]) -> bool:
+    """A mailing address or a phone for the owner on any listing of the group, counted the way the
+    board already counts them: the scorer's own `contactable` (raw['owner_mailing'] read through
+    mailing_dict) and analytics_dashboard._has_mailing / _has_phone (skip-trace mailing, a usable
+    owner_phone by enrichment_sc_phone.is_owner_phone_usable, the gate the dashboard's
+    ownerPhoneBlock mirrors, or skip-trace phone numbers)."""
+    for li in active:
+        r = li.raw if isinstance(li.raw, dict) else {}
+        st = r.get("skip_trace") if isinstance(r.get("skip_trace"), dict) else {}
+        if (mailing_dict(r.get("owner_mailing")).get("mailing") or st.get("owner_mailing_address")
+                or is_owner_phone_usable(r.get("owner_phone")) or st.get("phone_numbers")):
+            return True
+    return False
+
+
+def _tier_floor(ds: dict, tier: str) -> str:
+    """BIG_OLD_TAX_WARM_FLOOR on a derived tier; records ds['tier_floor'] when it applies."""
+    ds.pop("tier_floor", None)
+    if (tier == "COLD" and ds.get("tax_big_old") == "contact" and not ds.get("stale_reason")
+            and not ds.get("scope_capped") and not ds.get("surviving_senior_debt_risk")):
+        ds["tier_floor"] = "tax_big_old"
+        return BIG_OLD_TAX_WARM_FLOOR
+    return tier
+
+
+def _derive_tier(ds: dict, eq_ok: bool, eq_evidenced: Optional[bool]) -> str:
+    """The FULL tier of a published `distress_stack`: _derive_base_tier, then the floors
+    (_tier_floor). `score_board` and `retract_equity_rank` both come through here."""
+    return _tier_floor(ds, _derive_base_tier(ds, eq_ok, eq_evidenced))
 
 
 def retract_equity_rank(li: Listing) -> bool:
@@ -1383,6 +1440,7 @@ def _score_group(active: list[Listing], prior_prices: dict, today: date) -> dict
     stale: list[str] = []
     events: list[tuple[str, int, bool]] = []
     stay: Optional[dict] = None
+    big_old = False
     for li in active:
         prior_price = prior_prices.get(li.dedupe_key()) if prior_prices else None
         col = _collect(li, prior_price, today)
@@ -1390,6 +1448,7 @@ def _score_group(active: list[Listing], prior_prices: dict, today: date) -> dict
         stale.extend(col.stale)
         events.extend(col.events)
         stay = stay or col.stay
+        big_old = big_old or col.big_old
 
     names = {n for n, _c, _w, _e in sigs}
     # F5: an REO or auction listing on a parcel that also has an enforcement record is the
@@ -1532,6 +1591,8 @@ def _score_group(active: list[Listing], prior_prices: dict, today: date) -> dict
         ds["stale_reason"] = stale_reason
     if stay:
         ds["stay"] = stay
+    if big_old:
+        ds["tax_big_old"] = "contact" if owner_contact_on_file(active) else "no_contact"
     ds["tier"] = _derive_tier(ds, eq in ("high", "med"), bool(eq_evidenced) if eq else None)
     return ds
 
@@ -1568,7 +1629,8 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None,
     prior_prices = _prior_price_index(previous_path) if any(_mls_fields(li) for li in listings) else {}
 
     hist = {"HOT": 0, "WARM": 0, "COLD": 0}
-    counts = {"lane_foreclosure": 0, "stale_capped": 0, "stay_capped": 0, "scope_capped": 0, "errors": 0}
+    counts = {"lane_foreclosure": 0, "stale_capped": 0, "stay_capped": 0, "scope_capped": 0, "errors": 0,
+              "tier_floor_tax_big_old": 0}
     failures: list[tuple[str, str]] = []
     for key, group in groups.items():
         # exclude sold/closed properties from active scoring
@@ -1617,6 +1679,7 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None,
         counts["lane_foreclosure"] += ds.get("lane") == "foreclosure"
         counts["stale_capped"] += bool(ds.get("stale_reason"))
         counts["stay_capped"] += bool(ds.get("stay"))
+        counts["tier_floor_tax_big_old"] += ds.get("tier_floor") == "tax_big_old"
     LAST_STATS.update(counts)
     LAST_STATS["tiers"] = dict(hist)
     log.info("distress_score.done", **hist, **counts)

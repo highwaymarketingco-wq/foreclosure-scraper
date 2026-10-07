@@ -53,7 +53,7 @@ also counted a bill still inside its January grace window). Measured on the 10/7
 Buncombe multi-year engine lists the current 2026 levy among its years, so "unpaid 2025 + 2026"
 read as 2 years delinquent when it is 1. tax_aging_surfaced also carries `basis`,
 `unpaid_bill_years` (the raw count) and `not_yet_late_years`, and `status` is "not_yet_late"
-when nothing is late yet.
+where the evidence shows the only unpaid bill is not late yet (tax_not_yet_late).
 
 Idempotent and NOT missing-only: recomputed every run from whatever
 raw['tax_owed']/raw['nc_ptscloud_delinquent_tax'] currently say, so a later
@@ -97,7 +97,8 @@ def enrich_tax_aging(listings: Iterable[Listing], today: Optional[date] = None) 
         # raw['tax_not_yet_late']: the row's only unpaid property-tax bill is not late yet. Context
         # for the board (the scorer, lead_signals, fullmer_rank and the amount_owed promotion each
         # apply the same rule themselves); cleared once it no longer holds (the bill went late).
-        if not other_lien_listing(li) and tax_not_yet_late(raw, li.state, li.county, li.source, today):
+        not_late = not other_lien_listing(li) and tax_not_yet_late(raw, li.state, li.county, li.source, today)
+        if not_late:
             raw["tax_not_yet_late"] = True
             stats["not_yet_late_only"] += 1
         else:
@@ -127,7 +128,9 @@ def enrich_tax_aging(listings: Iterable[Listing], today: Optional[date] = None) 
         surf = {
             "tax_year": tax_year,
             "years_delinquent": years_delinquent,
-            "status": "delinquent" if years_delinquent >= 1 else "not_yet_late",
+            # "not_yet_late" only where the evidence holds (tax_not_yet_late); a row whose only
+            # year is a bare "2026" on tax_owed keeps "delinquent", as before (2026-10-07)
+            "status": "not_yet_late" if not_late else "delinquent",
             "source": source,
             "basis": status["basis"],
         }
