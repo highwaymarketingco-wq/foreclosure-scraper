@@ -2584,7 +2584,13 @@ RAW_KEEP = {
     # fire on a full run only. Pickens keeps just what the scorer and the card need (the
     # `publications` list is the bulky part); the vacancy block is four small keys.
     "pickens_delinquent": ("chronic", "repeat_delinquent", "cycle_count", "pre_sale",
-                           "first_cycle", "latest_cycle"),
+                           "first_cycle", "latest_cycle",
+                           # 2026-10-07 extraction audit: the rest of what the scraper reads
+                           # off the county's own rolls, dropped at every publish. publications
+                           # is one small {service, cycle, amount, current} entry per roll the
+                           # parcel appears on (at most nine): the per-cycle amount history.
+                           "cycles", "publications", "tax_year", "acres", "buildings",
+                           "improved_vacant", "account_no", "pin_ext"),
     "vacancy": "*",
 
     # docs/extraction_gaps.md verification pass (2026-09-28): these scrapers were fixed

@@ -36,7 +36,12 @@ def _payloads() -> dict:
 
 def _routes(payloads: dict | None = None) -> dict:
     p = payloads if payloads is not None else _payloads()
-    return {f"/services/{svc}/FeatureServer": body for svc, body in p.items()}
+    # A layer the recorded fixture predates (the 2026 cycle, wired 2026-10-07) answers
+    # cleanly empty, the same stand-in _only() uses.
+    out = {f"/services/{L.service}/FeatureServer": {"objectIdFieldName": "FID", "features": []}
+           for L in mod.LAYERS}
+    out.update({f"/services/{svc}/FeatureServer": body for svc, body in p.items()})
+    return out
 
 
 class _ctx:
@@ -89,6 +94,7 @@ def test_every_delinquent_layer_on_the_org_is_wired():
     assert [L.service for L in mod.LAYERS] == [
         "delinquent_2020", "del_2021", "dqnt_2022", "dqnt_2023", "dqnt_2024",
         "DelParces_October2025NewsAd", "DelqParcels_Ad_paperlisting2", "Posting3",
+        "DELQ_TAX_WEEK1_2026",
     ]
     assert not any(L.service.startswith("FLC") for L in mod.LAYERS)
 
@@ -99,10 +105,11 @@ def test_layers_are_ordered_oldest_to_newest():
     assert cycles == sorted(cycles)
 
 
-def test_only_the_2025_posting_layers_are_the_current_cycle():
+def test_only_the_2025_and_2026_posting_layers_are_the_current_cycle():
     assert {L.service for L in mod.LAYERS if L.current} == {
-        "DelParces_October2025NewsAd", "DelqParcels_Ad_paperlisting2", "Posting3"}
-    assert all(L.cycle == 2025 for L in mod.LAYERS if L.current)
+        "DelParces_October2025NewsAd", "DelqParcels_Ad_paperlisting2", "Posting3",
+        "DELQ_TAX_WEEK1_2026"}
+    assert all(L.cycle in (2025, 2026) for L in mod.LAYERS if L.current)
 
 
 def test_out_fields_are_enumerated_never_star():
@@ -432,7 +439,7 @@ def test_one_dead_layer_fails_the_run_instead_of_shrinking_it():
     with pytest.raises(PartialHarvest) as ei:
         _run(FakeHttp(_routes(p)))
     assert "dqnt_2024" in str(ei.value)
-    assert "7/8 declared layers alive" in str(ei.value)
+    assert f"{len(mod.LAYERS) - 1}/{len(mod.LAYERS)} declared layers alive" in str(ei.value)
 
 
 def test_safe_run_reports_a_partial_harvest_as_an_error_not_a_zero():
@@ -521,3 +528,26 @@ def test_live():
           f"repeat={sum(1 for x in d if x['repeat_delinquent'])} "
           f"chronic={sum(1 for x in d if x['chronic'])} "
           f"situs={sum(1 for li in rows if li.street_address)}")
+
+
+
+# --- 2026-10-07 extraction audit. Values below are made up. ---
+
+def test_the_2026_cycle_layer_reads_pin_owner_and_amount():
+    lay = next(L for L in mod.LAYERS if L.service == "DELQ_TAX_WEEK1_2026")
+    assert lay.current and lay.cycle == 2026
+    assert (lay.pin, lay.owner, lay.amount) == ("GISADMIN_P", "T_WEEK_1_1", "T_WEEK_1_2")
+    assert lay.out_fields.split(",") == ["FID", "GISADMIN_P", "T_WEEK_1_1", "T_WEEK_1_2"]
+
+
+def test_the_pickens_block_keeps_cycle_history_through_the_publish_slim():
+    from foreclosure_scraper.web_artifact import _slim_raw
+    blk = {"chronic": True, "cycle_count": 3, "cycles": [2022, 2024, 2026],
+           "publications": [{"service": "x", "cycle": 2026, "amount": 10.0, "current": True}],
+           "tax_year": "2025", "acres": 1.0, "buildings": 1, "improved_vacant": "V",
+           "account_no": "1", "pin_ext": "000", "parcel_id": "4000-00-00-0000"}
+    out = _slim_raw({"pickens_delinquent": blk})["pickens_delinquent"]
+    for k in ("cycles", "publications", "tax_year", "acres", "buildings",
+              "improved_vacant", "account_no", "pin_ext"):
+        assert k in out, k
+    assert "parcel_id" not in out          # a duplicate of the row's own parcel_id

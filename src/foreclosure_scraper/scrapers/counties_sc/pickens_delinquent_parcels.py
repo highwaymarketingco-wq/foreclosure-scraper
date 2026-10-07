@@ -229,6 +229,14 @@ LAYERS: tuple[Layer, ...] = (
           owner="DelqParc_4", amount="DelqParc_5", acres="DelqParc_1"),
     Layer("Posting3", 2025, True, pin="PIN", owner="OWNER__NOW",
           amount="AMOUNT_DUE", acres="CALCACRE", pin_ext="PIN_SUF"),
+    # 2026 cycle, first publication week (2026-10-07 extraction audit: a new service on
+    # the same org, 801 parcels, not wired). Column aliases checked live on a 200-row
+    # sample: GISADMIN_P is aliased "PIN" (dashed Pickens PIN on every row), T_WEEK_1_1 is
+    # the owner name, T_WEEK_1_2 is aliased "AMOUNT DUE"; T_WEEK_1__ repeats the PIN.
+    # The 2025 posting layers stay current too: whether that cycle has closed is the
+    # owner's call (see docs/extraction_audit_2026-10-07.md), not something to guess here.
+    Layer("DELQ_TAX_WEEK1_2026", 2026, True, pin="GISADMIN_P", owner="T_WEEK_1_1",
+          amount="T_WEEK_1_2"),
 )
 
 #: Government / institutional owners are not sellers.
