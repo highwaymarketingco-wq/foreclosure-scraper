@@ -134,6 +134,9 @@ SC_ROD_CONFIG = {
 }
 SC_CHAIN_ONLY_CONFIG = {
     ("SC", "Oconee"):        ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "1"),
+    # 'The Lookup' over plain HTTP (rod/sc_lookup.py); raw['rod'] stays on enrichment_spartanburg_rod.
+    # Proven 4/4 chains on real board owners 2026-10-07 (one to four minutes a chain).
+    ("SC", "Spartanburg"):   ("sc_lookup", "FORECLOSURE_SC_LOOKUP_ROD", "1"),
 }
 ROD_CONFIG.update({k: v for k, v in SC_ROD_CONFIG.items() if k not in ROD_CONFIG})
 CHAIN_ONLY_CONFIG.update({k: v for k, v in SC_CHAIN_ONLY_CONFIG.items() if k not in CHAIN_ONLY_CONFIG})
