@@ -6,12 +6,12 @@ Public repo: no owner names, phone numbers or private addresses appear here. Fie
 
 ## 1. Totals
 
-- Source records: **350**. New (not ingested by any module and not in an earlier doc): **253**.
+- Source records: **350**. New (not ingested by any module and not in an earlier doc): **240**.
 - By access class, all records: open 242, bot-check 33, absent 25, JS-app 21, public-records-request 12, login 7, terms-only 4, disclaimer-click 4, CAPTCHA 1, paid 1.
-- By access class, new records: open 168, bot-check 28, absent 22, JS-app 16, public-records-request 10, login 4, terms-only 2, disclaimer-click 2, paid 1.
+- By access class, new records: open 155, bot-check 28, absent 22, JS-app 16, public-records-request 10, login 4, terms-only 2, disclaimer-click 2, paid 1.
 - By category: code_enforcement 74, tax_sale 63, delinquent_tax 40, county_surplus 38, condemned_demolition_unsafe 33, building_permits 31, auction 12, vacant_registry 10, sheriff_or_mie_sale 8, str_registration 7, eviction 7, fire_incident 6, flood_storm_damage 4, municipal_tax_or_fee_lien 4, utility_shutoff 4, absentee_owner 2, other 2, land_bank 2, probate 1, usps_vacancy 1, hoa 1.
 
-Coverage grid (section 5): agol_none 978, none_found 663, not_checked 651, built 344, open 326, walled 257, absent 24 cells over 146 counties and 213 municipalities.
+Coverage grid (section 5): agol_none 978, none_found 663, not_checked 651, built 358, open 312, walled 257, absent 24 cells over 146 counties and 213 municipalities.
 
 How the search ran:
 - ArcGIS Online item search over the NC/SC extent for 45 distress terms (5,584 items, 949 inside NC/SC, 556 distress-titled), then ?f=json + returnCountOnly probes on 100 candidate layers
@@ -19,7 +19,7 @@ How the search ran:
 - statewide lanes checked by the lead agent (evictions, fire, flood, USPS, utilities, HOA, sheriff, auctions)
 - polite: >= 1.6 s between requests to one host, ordinary browser UA, <= 4 requests per source; no CAPTCHA, login, paywall, WAF or bot check touched
 
-## 2. Built today (four scrapers, tests, bounded live proof)
+## 2. Built today (eleven scrapers in two rounds, tests, bounded live proof)
 
 | Module | Source | Rows on the live run (counts only) | Signal written | Why it ranked |
 |---|---|---|---|---|
@@ -27,8 +27,15 @@ How the search ran:
 | `counties_nc.rocky_mount_blight_survey` | Rocky Mount 2025 condition survey, 6 ArcGIS layers (Nash + Edgecombe) | 651 layer rows folded to 618 parcels: 216 dilapidated, 211 deteriorated, 224 vacant+boarded; 564 absentee, 137 out-of-state | DISTRESSED; raw condemned (dilapidated), distressed (deteriorated), vacancy boarded_up, owner_mailing | Physical distress + owner mailing on every row, two counties with almost no property-condition signal |
 | `city_websites.raleigh_structure_fires` | Raleigh Open Data fire incidents (daily) | 397 addresses / 411 building-fire incidents in the last 730 days | DISTRESSED, raw fire_incident + distressed; address only (resolver adds owner) | First fire-damage source in the repo; live daily feed in the largest NC city without one |
 | `counties_nc.kinston_proposed_demolition` | Kinston 2026 proposed demolition ArcGIS layer | 45 parcels, all with situs; 41 absentee, 9 out-of-state; 2 with utility cut-offs, 2 heirs property | DISTRESSED, raw condemned, utility_cutoff + vacancy (when cut), heir_property, owner_mailing | Strongest per-row signal found (city demolition list) and the only published utility cut-off flags |
+| `counties_sc.charleston_energov_history` | Charleston County EnerGov history (Building Services code cases + demolition permits) | 1,050 cases in 730 days, 929 matched to an address point within 3 m -> 467 parcels (117 with a code case, 365 with a demolition permit) | DISTRESSED; code_enforcement (open 365 days from the case date, then stale), demolition_permit | Round 2 #1: largest live code/demolition feed in SC |
+| `counties_nc.nc_metro_demolition_permits` | Mecklenburg Accela, Greensboro BI_Permits, Durham demolition layer, Cary OpenDataSoft | 1,866 properties in 730 days (Mecklenburg 1,381, Durham 207, Greensboro 144, Cary 134); 1,654 with owner mailing | DISTRESSED, demolition_permit (expired permits kept, cancelled/withdrawn dropped) | Round 2 #2 |
+| `counties_nc.rowan_delinquent_tax` | Rowan County delinquent list XLSX (newest year found on the page) | 2,699 real-estate bills (personal property and utility rows dropped), $2.36M, all with owner mailing | TAX_LIEN, tax_owed (late years only), heirs/estate owner flag | Round 2 #3 |
+| `counties_nc.cumberland_delinquent_tax` | Cumberland 2025 unpaid real-estate tax ad (PDF of 2026-06-21) | 3,755 PINs, $2.65M; 398 of 400 sampled PINs hit the parcel cache | TAX_LIEN, tax_owed | Round 2 #3 |
+| `counties_nc.iredell_delinquent_tax` | Iredell DelinquentTaxes outlines joined to NC OneMap | 2,391 outlines, 2,380 matched, 2,366 parcels (as of 2026-10-06) | TAX_LIEN, tax_owed (levy 2025, no balance on the layer) | Round 2 #3 |
+| `counties_nc.wake_code_cases` | Wake County code cases, last 90 days | 575 cases, 186 open, 74 structural (fire damage, collapse, unsafe, failed septic) | DISTRESSED, code_enforcement | Round 2 #4 |
+| `counties_nc.nc_tax_lien_ads` | Hoke, Lee, Davidson, Randolph tax-lien ads (PDF) | 12,910 rows, $10.1M: Hoke 2,831, Lee 2,739, Davidson 3,202, Randolph 4,138 (the research estimate was ~11,500) | TAX_LIEN, tax_owed | Round 2 #5 |
 
-Rows ship under `counties_sc.york_tax_sale_parcels` (dated) and the `counties_generic.arcgis_distress.` prefix (dateless; already whitelisted in `main.DATELESS_OK_SOURCES`, so `main.py` was not touched). Every attribute bag passes `sensitive_fields.drop_sensitive`; outFields are explicit. New raw keys are registered in `web_artifact.RAW_KEEP`. Tests: `tests/test_new_sources_2026_10_07.py` (27, hand-written fixtures, made-up names). The Mecklenburg and Guilford tax-foreclosure layers ranked higher but were built the same day by a parallel session (`mecklenburg_tax_foreclosures`, `guilford_tax_foreclosures`). Rowan and Cumberland delinquent lists rank above Kinston by volume but are dateless non-ArcGIS lists: their rows would be dropped by `main._active_only` until a one-line `DATELESS_OK_SOURCES` entry is added, and `main.py` was off-limits for this task. Next after the table: Mecklenburg 'Back Bills' (93,916 unpaid prior-year bills, real-estate share unmeasured), Durham's 1,479 vacant homes identified from stopped water service (probably a 2023 extract) and 546 special-assessment liens, Sumter vacant registries (3,385 + 1,168, 2020-2023), Goldsboro's 218 dilapidated structures, the STR registries (Hilton Head 4,785, Charleston 886, Greensboro 790, Columbia 446), and Kinston (built).
+Round 1 (first four rows) and round 2 (the seven after) were built the same day. Rows ship under `counties_sc.york_tax_sale_parcels` (dated) and the `counties_generic.arcgis_distress.` prefix (dateless; already whitelisted in `main.DATELESS_OK_SOURCES`, so `main.py` was not touched). Every attribute bag passes `sensitive_fields.drop_sensitive`; outFields are explicit. New raw keys are registered in `web_artifact.RAW_KEEP`. Tests: `tests/test_new_sources_2026_10_07.py` (27, hand-written fixtures, made-up names). The Mecklenburg and Guilford tax-foreclosure layers ranked higher but were built the same day by a parallel session (`mecklenburg_tax_foreclosures`, `guilford_tax_foreclosures`). Rowan and Cumberland delinquent lists rank above Kinston by volume but are dateless non-ArcGIS lists: their rows would be dropped by `main._active_only` until a one-line `DATELESS_OK_SOURCES` entry is added, and `main.py` was off-limits for this task. Next after the table: Mecklenburg 'Back Bills' (93,916 unpaid prior-year bills, real-estate share unmeasured), Durham's 1,479 vacant homes identified from stopped water service (probably a 2023 extract) and 546 special-assessment liens, Sumter vacant registries (3,385 + 1,168, 2020-2023), Goldsboro's 218 dilapidated structures, the STR registries (Hilton Head 4,785, Charleston 886, Greensboro 790, Columbia 446), and Kinston (built). Round 2: every delinquent-list scraper writes raw['tax_owed'] through _tax_kit on tax_calendar (years_delinquent counts only LATE levy years; a row whose only bill is not late yet is dropped). All eleven are dateless except York; the coordinator adds the round-2 slugs to main.DATELESS_OK_SOURCES.
 
 ## 3. Top 10 by value
 
@@ -36,15 +43,15 @@ Value = net-new distressed rows the source would put on the board, weighted by h
 
 | # | Source | Where | Rows / signals | Access | Status | Build effort | Why |
 |---|---|---|---|---|---|---|---|
-| 1 | Charleston County EnerGov history: code cases + demolition permits | Charleston County SC | 3,899 code cases (1,871 Building Services) + ~3,200 demolition permits in 386,386 rows, updated daily | open | not built | 6 h (no address field: join points to the parcel layer by location) | Largest live code/demolition feed found in SC; Charleston has 6,457 board rows and no code signal |
+| 1 | Charleston County EnerGov history: code cases + demolition permits | Charleston County SC | 3,899 code cases (1,871 Building Services) + ~3,200 demolition permits in 386,386 rows, updated daily | open | BUILT (charleston_energov_history): 467 parcels | done | Largest live code/demolition feed found in SC; Charleston has 6,457 board rows and no code signal |
 | 2 | York County SC 2026 tax sale layer | York County SC | 853 parcels, sale 2026-10-12 | open | BUILT today (york_tax_sale_parcels) | done | Dated, imminent transfer; county site is Cloudflare-walled so the layer is the only open route |
 | 3 | Rocky Mount 2025 condition survey | Nash + Edgecombe NC | 618 parcels (216 dilapidated, 224 vacant+boarded, 211 deteriorated) | open | BUILT today (rocky_mount_blight_survey) | done | Physical distress plus owner mailing on every row |
-| 4 | Big-city demolition permit feeds (Mecklenburg AccelaAllPermits, Greensboro, Durham, Cary) | Mecklenburg, Guilford, Durham, Wake NC | ~8,100 demolition permits: Mecklenburg 1,760 (222,105 permits, daily), Greensboro 3,023 whole-house demolitions with owner mailing, Durham 2,923 (newest 2026-10-01), Cary 388 | open | not built (Mecklenburg replaces the dead Charlotte endpoint in enrichment_building_permits.py) | 2-3 h each as Layer entries | A demolition permit is a house about to be torn down or rebuilt; daily feeds in the four largest metros |
-| 5 | NC annual tax-lien advertisements not yet read (Hoke, Lee, Davidson, Randolph; also Davie, Pasquotank, Martin) | 7 NC counties | about 11,500 bills (Hoke ~2,780, Lee ~2,740, Davidson ~3,000, Randolph ~3,000; estimates from file sizes/first pages) | open | not built | 2-3 h each as config in nc_county_pdf_delinquent_tax | Same shape the repo already parses; fills counties with no tax rows |
-| 6 | Cumberland County 2025 delinquent real estate list | Cumberland County NC | 3,755 bills | open | not built | 3 h (PDF) + one DATELESS_OK_SOURCES line in main.py | Fayetteville area; ptscloud tenant returns no export |
-| 7 | Rowan County delinquent taxpayer XLSX (2019-2025) | Rowan County NC | 2,699 real-estate bills in the 2025 file (6,542 total), 117 heirs + 56 estate owner types, 7 years of history | open | not built | 3 h + one DATELESS_OK_SOURCES line in main.py | Balance, parcel, owner mailing and repeat-year history in one file |
-| 8 | Wake County code cases, last 90 days (+ Wake Forest open cases) | Wake County NC | 575 cases (rolling 90 days, daily) + 186 Wake Forest open cases | open | not built | 2 h | Overturns the 2026-09-28 'Wake has nothing live' verdict; first live code feed for the state's largest county |
-| 9 | Iredell DelinquentTaxes map layer | Iredell County NC | 2,391 parcels, as-of 2026-10-06 (weekly) | open | not built | 4 h (geometry only: spatial join to parcels) | Overturns the earlier 'no Iredell delinquent feed' note |
+| 4 | Big-city demolition permit feeds (Mecklenburg AccelaAllPermits, Greensboro, Durham, Cary) | Mecklenburg, Guilford, Durham, Wake NC | ~8,100 demolition permits: Mecklenburg 1,760 (222,105 permits, daily), Greensboro 3,023 whole-house demolitions with owner mailing, Durham 2,923 (newest 2026-10-01), Cary 388 | open | BUILT (nc_metro_demolition_permits): 1,866 properties in 2 years | done | A demolition permit is a house about to be torn down or rebuilt; daily feeds in the four largest metros |
+| 5 | NC annual tax-lien advertisements not yet read (Hoke, Lee, Davidson, Randolph; also Davie, Pasquotank, Martin) | 7 NC counties | about 11,500 bills (Hoke ~2,780, Lee ~2,740, Davidson ~3,000, Randolph ~3,000; estimates from file sizes/first pages) | open | BUILT (nc_tax_lien_ads): 12,910 rows measured | done | Same shape the repo already parses; fills counties with no tax rows |
+| 6 | Cumberland County 2025 delinquent real estate list | Cumberland County NC | 3,755 bills | open | BUILT (cumberland_delinquent_tax): 3,755 | done | Fayetteville area; ptscloud tenant returns no export |
+| 7 | Rowan County delinquent taxpayer XLSX (2019-2025) | Rowan County NC | 2,699 real-estate bills in the 2025 file (6,542 total), 117 heirs + 56 estate owner types, 7 years of history | open | BUILT (rowan_delinquent_tax): 2,699 | done | Balance, parcel, owner mailing and repeat-year history in one file |
+| 8 | Wake County code cases, last 90 days (+ Wake Forest open cases) | Wake County NC | 575 cases (rolling 90 days, daily) + 186 Wake Forest open cases | open | BUILT (wake_code_cases): 74 structural of 186 open | done | Overturns the 2026-09-28 'Wake has nothing live' verdict; first live code feed for the state's largest county |
+| 9 | Iredell DelinquentTaxes map layer | Iredell County NC | 2,391 parcels, as-of 2026-10-06 (weekly) | open | BUILT (iredell_delinquent_tax): 2,366 parcels | done | Overturns the earlier 'no Iredell delinquent feed' note |
 | 10 | Raleigh structure fires | Raleigh, Wake County NC | ~200 burned buildings a year (397 addresses / 2 years) | open | BUILT today (raleigh_structure_fires) | done | First fire-damage signal in the repo, daily feed |
 
 ## 4. Walled and absent sources: what a person does by hand
@@ -198,10 +205,10 @@ Statewide lanes applied to every county: NC eviction = O (NC Judgment Search sum
 | Cumberland | B | B | W | - | O | O | n | n | O | O | n | B |
 | Currituck | N | O | N | N | N | n | n | n | n | O | n | B |
 | Dare | W | W | W | W | W | n | W | n | n | O | n | B |
-| Davidson | O | B | N | N | W | n | n | n | n | O | n | B |
+| Davidson | B | B | N | N | W | n | n | n | n | O | n | B |
 | Davie | O | B | N | N | N | - | O | n | n | O | n | B |
 | Duplin | N | O | N | N | N | n | n | n | n | O | n | B |
-| Durham | B | O | O | - | B | n | O | n | n | O | n | B |
+| Durham | B | O | O | - | B | n | B | n | n | O | n | B |
 | Edgecombe | O | B | B | - | N | B | N | n | n | O | n | B |
 | Forsyth | B | O | O | O | W | - | O | n | n | O | n | B |
 | Franklin | W | W | W | W | W | n | n | n | n | O | n | B |
@@ -210,26 +217,26 @@ Statewide lanes applied to every county: NC eviction = O (NC Judgment Search sum
 | Graham | B | - | - | - | - | n | n | n | n | O | n | B |
 | Granville | W | W | W | W | W | n | n | n | n | O | n | B |
 | Greene | N | O | O | - | - | n | n | n | n | O | n | B |
-| Guilford | B | B | O | - | B | O | O | n | n | O | O | B |
+| Guilford | B | B | O | - | B | O | B | n | n | O | O | B |
 | Halifax | N | O | W | N | N | O | n | n | n | O | n | B |
 | Harnett | N | O | N | - | O | O | - | n | n | O | n | B |
 | Haywood | N | B | N | N | N | N | N | n | n | O | n | B |
 | Henderson | B | B | N | N | B | n | n | n | B | O | n | B |
 | Hertford | B | N | O | - | - | n | n | n | n | O | n | B |
-| Hoke | O | O | O | N | N | n | n | n | n | O | n | B |
+| Hoke | B | O | O | N | N | n | n | n | n | O | n | B |
 | Hyde | B | W | W | W | W | n | n | n | n | O | n | B |
-| Iredell | O | W | O | N | O | n | n | O | n | O | n | B |
+| Iredell | B | W | O | N | O | n | n | O | n | O | n | B |
 | Jackson | N | N | N | N | N | n | n | n | n | O | n | B |
 | Johnston | N | O | N | - | O | n | W | n | n | O | n | B |
 | Jones | N | N | N | N | N | n | n | n | n | O | n | B |
-| Lee | O | N | O | - | W | n | n | n | n | O | n | B |
+| Lee | B | N | O | - | W | n | n | n | n | O | n | B |
 | Lenoir | N | N | O | N | N | B | n | n | n | O | n | B |
 | Lincoln | B | B | B | N | B | n | n | n | n | O | n | B |
 | Macon | N | N | O | N | N | n | n | n | n | O | n | B |
 | Madison | B | B | O | - | - | n | n | n | n | O | n | B |
 | Martin | O | B | N | - | N | N | N | n | n | O | n | B |
 | McDowell | B | B | N | - | W | O | n | n | n | O | n | B |
-| Mecklenburg | B | B | O | W | B | O | O | n | n | O | n | B |
+| Mecklenburg | B | B | O | W | B | O | B | n | n | O | n | B |
 | Mitchell | N | N | - | - | - | n | n | n | n | O | n | B |
 | Montgomery | N | N | N | N | N | n | n | n | n | O | n | B |
 | Moore | N | B | N | N | N | N | N | O | n | O | n | B |
@@ -249,7 +256,7 @@ Statewide lanes applied to every county: NC eviction = O (NC Judgment Search sum
 | Richmond | N | N | N | N | N | N | N | n | n | O | n | B |
 | Robeson | N | B | N | - | - | W | n | n | n | O | n | B |
 | Rockingham | W | N | W | W | W | W | n | n | n | O | n | B |
-| Rowan | O | B | - | - | O | n | n | n | n | O | n | B |
+| Rowan | B | B | - | - | O | n | n | n | n | O | n | B |
 | Rutherford | B | B | - | - | - | n | W | n | n | O | n | B |
 | Sampson | W | W | W | W | W | n | n | n | n | O | n | B |
 | Scotland | N | N | N | N | N | n | n | n | n | O | n | B |
@@ -261,7 +268,7 @@ Statewide lanes applied to every county: NC eviction = O (NC Judgment Search sum
 | Tyrrell | B | N | N | - | - | n | n | n | n | O | n | B |
 | Union | W | W | W | W | W | n | O | n | n | O | n | B |
 | Vance | N | O | O | - | N | O | - | n | n | O | n | B |
-| Wake | N | B | O | - | O | - | O | B | n | O | n | B |
+| Wake | N | B | O | - | B | - | B | B | n | O | n | B |
 | Warren | N | B | N | N | N | n | n | n | n | O | n | B |
 | Washington | B | N | O | - | - | n | n | n | n | O | n | B |
 | Watauga | N | B | B | - | - | n | n | n | n | O | n | B |
@@ -284,7 +291,7 @@ Statewide lanes applied to every county: NC eviction = O (NC Judgment Search sum
 | Beaufort | - | N | B | B | W | N | O | n | n | W | O | B |
 | Berkeley | B | W | - | W | W | W | W | n | n | W | n | B |
 | Calhoun | B | O | - | - | - | - | - | n | n | W | n | B |
-| Charleston | B | B | O | B | O | O | O | n | n | O | O | B |
+| Charleston | B | B | O | B | B | O | O | n | n | O | O | B |
 | Cherokee | B | B | B | B | N | N | - | n | n | W | n | - |
 | Chester | B | W | - | W | N | N | - | n | n | W | n | B |
 | Chesterfield | B | A | - | - | - | - | - | n | n | W | n | - |
@@ -328,11 +335,11 @@ Statewide lanes applied to every county: NC eviction = O (NC Judgment Search sum
 |---|---|---|---|---|---|---|---|
 | Charlotte | B | O | N | O | n | n | W |
 | Raleigh | O | W | N | O | B | n | O |
-| Greensboro | B | B | N | O | n | O | W |
-| Durham | B | B | O | O | n | n | O |
+| Greensboro | B | B | N | B | n | O | W |
+| Durham | B | B | O | B | n | n | O |
 | Winston-Salem | O | O | N | O | n | n | O |
 | Fayetteville | O | O | N | N | n | n | W |
-| Cary | O | N | N | O | n | n | N |
+| Cary | O | N | N | B | n | n | N |
 | Wilmington | O | W | N | B | n | n | N |
 | High Point | W | O | N | O | n | n | N |
 | Concord | N | N | N | O | n | n | - |
@@ -605,18 +612,18 @@ Short form; the JSON carries fields, cadence, evidence and notes for each row. `
 | Fayetteville Code Enforcement Spreadsheet (open + closed cases, past 12 months) | Fayetteville, Cumberland, NC | code_enforcement | bot-check |  | - |  | yes | subagent: NC cities (45 large… |
 | Fayetteville AGOL code enforcement / demolition snapshots (2015-16) | Fayetteville, Cumberland, NC | condemned_demolition_unsafe | open | 15,410 + 135; max Date 2016-06-29 | - |  | yes | lead agent: ArcGIS Online sea… |
 | Fayetteville surplus real property | Fayetteville, Cumberland, NC | county_surplus | bot-check |  | - |  | yes | subagent: NC counties (100) t… |
-| Cumberland 2025 delinquent real estate taxes grid | Cumberland, NC | delinquent_tax | open | 3,755 rows on 2026-10-07 (pager 'Item 1 to 20 of 3755') | - | 3 | yes | subagent: NC counties (100) t… |
+| Cumberland 2025 delinquent real estate taxes grid | Cumberland, NC | delinquent_tax | open | 3,755 rows on 2026-10-07 (pager 'Item 1 to 20 of 3755') / b… | counties_nc.cumberland_delinquent_tax (built… | 3 | no | subagent: NC counties (100) t… |
 | Fayetteville substantial damage determinations (Hurricane Matthew) | Fayetteville, Cumberland, NC | flood_storm_damage | open | 47 | - | 1 | yes | lead agent: ArcGIS Online sea… |
 | Currituck tax foreclosures page + execution sale notice | Currituck, NC | tax_sale | open | 0 sales ('There are NO ...') on 2026-10-07 | - | 1 | yes | subagent: NC counties (100) t… |
 | Dare County / Kill Devil Hills monthly building permit reports | Kill Devil Hills, Dare, NC | building_permits | bot-check |  | - |  | no | subagent: NC towns 5k-22k (10… |
 | Dare County website (tax foreclosure / delinquent / surplus pages) | Dare, NC | delinquent_tax | bot-check |  | - |  | yes | subagent: NC counties (100) t… |
 | City of Lexington website (code enforcement / council) | Lexington, Davidson, NC | code_enforcement | bot-check |  | - |  | yes | subagent: NC towns 5k-22k (10… |
-| Davidson 2025 tax lien advertisement list | Davidson, NC | delinquent_tax | open | 19 pages, ~3,170 amount-bearing lines on 2026-10-07 (est. ~… | - | 4 | yes | subagent: NC counties (100) t… |
+| Davidson 2025 tax lien advertisement list | Davidson, NC | delinquent_tax | open | 19 pages, ~3,170 amount-bearing lines on 2026-10-07 (est. ~… | counties_nc.nc_tax_lien_ads (built 2026-10-0… | 4 | no | subagent: NC counties (100) t… |
 | Davidson current and pending tax foreclosures PDF | Davidson, NC | tax_sale | open | 35 pages, ~55 amount lines on 2026-10-07 | nc_civicplus_tax_sale (pypdf path, 21 rows p… | 0 | no | subagent: NC counties (100) t… |
 | Davie County monthly demolition permit reports (Residential / Commercial) | Mocksville, Davie, NC | building_permits | open | Jan-2026 residential PDF: ~3 rows (RDEM-26-2, -3 ...); sear… | - | 4 | yes | subagent: NC towns 5k-22k (10… |
 | Davie tax liens listing (105-369 notice) | Davie, NC | delinquent_tax | open | 4 pages, ~475 lines x 2 entries (est. ~950 liens) on 2026-1… | - | 3 | yes | subagent: NC counties (100) t… |
 | Duplin County tax foreclosure sale list | Duplin, NC | tax_sale | open | 3 parcels on 2026-10-07 | - | 1 | yes | subagent: NC counties (100) t… |
-| Durham Demolition Permits | Durham, Durham, NC | building_permits | open | 2,923 rows (2026-10-07); latest ISSUE_DATE 2026-10-01 | - | 2 | yes | subagent: NC cities (45 large… |
+| Durham Demolition Permits | Durham, Durham, NC | building_permits | open | 2,923 rows (2026-10-07); latest ISSUE_DATE 2026-10-01 / bui… | counties_nc.nc_metro_demolition_permits (bui… | 2 | no | subagent: NC cities (45 large… |
 | Durham Open Landuse Code Violation Cases | Durham, Durham, NC | code_enforcement | open | 1,110 (module notes) | counties_generic.arcgis_distress_layers (dur… | 0 | no | subagent: NC cities (45 large… |
 | Durham GS Available and Surplus Property | Durham, Durham, NC | county_surplus | open | 85 rows in layer 0 (2026-10-07); batch sublayers 1-6 | - | 1.5 | yes | subagent: NC cities (45 large… |
 | Durham 2025 tax-lien advertisement (Spatialest delinquent list) | Durham, NC | delinquent_tax | disclaimer-click | 2,748 rows on 2026-10-07 (Count field) | - | 3 | yes | subagent: NC counties (100) t… |
@@ -647,7 +654,7 @@ Short form; the JSON carries fields, cadence, evidence and notes for each row. `
 | Creedmoor code enforcement page | Creedmoor, Granville, NC | code_enforcement | bot-check |  | - |  | yes | subagent: NC towns 5k-22k (10… |
 | Granville County website (tax foreclosure / delinquent / surplus pages) | Granville, NC | delinquent_tax | bot-check |  | - |  | yes | subagent: NC counties (100) t… |
 | Greene County foreclosed and county-owned properties | Greene, NC | tax_sale | open | 1+ parcel listed on 2026-10-07 | - | 1 | yes | subagent: NC counties (100) t… |
-| Greensboro Engineering & Inspections Building Permits (BI_Permits) | Greensboro, Guilford, NC | building_permits | open | 124,985 rows (2026-10-07); latest IssuedDate 2026-10-06 | - | 2 | yes | subagent: NC cities (45 large… |
+| Greensboro Engineering & Inspections Building Permits (BI_Permits) | Greensboro, Guilford, NC | building_permits | open | 124,985 rows (2026-10-07); latest IssuedDate 2026-10-06 / b… | counties_nc.nc_metro_demolition_permits (bui… | 2 | no | subagent: NC cities (45 large… |
 | High Point Construction Permits | High Point, Guilford, NC | building_permits | open | 47,562 rows (2026-10-07); latest Permit_Issued_Date 2026-10… | - | 3 | yes | subagent: NC cities (45 large… |
 | Greensboro Code Compliance All Cases (housing) | Greensboro, Guilford, NC | code_enforcement | open | 1,511 open / 665 open Housing (module notes) | counties_generic.arcgis_distress_layers (gre… | 0 | no | subagent: NC cities (45 large… |
 | High Point Accela Citizen Access - Code Violation module | High Point, Guilford, NC | code_enforcement | login |  | - |  | yes | subagent: NC cities (45 large… |
@@ -667,21 +674,21 @@ Short form; the JSON carries fields, cadence, evidence and notes for each row. `
 | Hendersonville vacant / condemned structures registry | Hendersonville, Henderson, NC | vacant_registry | open | 47 rows on SOURCE_REGISTER | counties_nc.hendersonville_vacant_structures | 0 | no | subagent: NC towns 5k-22k (10… |
 | Hertford County-owned foreclosure properties | Hertford, NC | county_surplus | open | 0 rows in HTML table on 2026-10-07 (list moved to StoryMap,… | - | 2 | yes | subagent: NC counties (100) t… |
 | Hoke County surplus properties for sale | Hoke, NC | county_surplus | open | ~6 rows (7 <tr>) on 2026-10-07 | - | 1 | yes | subagent: NC counties (100) t… |
-| Hoke County 2025 delinquent tax ad lists (non-transferred + transferred) | Hoke, NC | delinquent_tax | open | non-transferred: 53 pages, ~2,667 amount rows; transferred:… | - | 3 | yes | subagent: NC counties (100) t… |
+| Hoke County 2025 delinquent tax ad lists (non-transferred + transferred) | Hoke, NC | delinquent_tax | open | non-transferred: 53 pages, ~2,667 amount rows; transferred:… | counties_nc.nc_tax_lien_ads (built 2026-10-0… | 3 | no | subagent: NC counties (100) t… |
 | Hoke County upcoming tax foreclosure sales | Hoke, NC | tax_sale | open | 23 rows on 2026-10-07 | - | 2 | yes | subagent: NC counties (100) t… |
 | Hyde County website (tax foreclosure / delinquent / surplus pages) | Hyde, NC | delinquent_tax | bot-check |  | - |  | yes | subagent: NC counties (100) t… |
 | Statesville Code Enforcement by ward (AGOL snapshots) | Statesville, Iredell, NC | code_enforcement | open | Ward1 76 rows, lastEdit 2024-01-29 (wards 2-6 not counted) | - | 3 | yes | lead agent: ArcGIS Online sea… |
 | Iredell County surplus real property listings | Iredell, NC | county_surplus | open | ~13 listing rows (16 table rows incl. headers) on 2026-10-07 | - | 1 | yes | subagent: NC counties (100) t… |
 | Mooresville town surplus resolutions (news notices) | Mooresville, Iredell, NC | county_surplus | open | 2 notices in 2026 | - |  | yes | subagent: NC cities (45 large… |
 | Iredell County delinquent taxes layer | Iredell, NC | delinquent_tax | absent |  | - |  | no | lead agent: ArcGIS Online sea… |
-| Iredell DelinquentTaxes parcel layer | Iredell, NC | delinquent_tax | open | 2,391 parcels on 2026-10-07, ASOF 2026-10-06 | - | 4 | yes | subagent: NC counties (100) t… |
+| Iredell DelinquentTaxes parcel layer | Iredell, NC | delinquent_tax | open | 2,391 parcels on 2026-10-07, ASOF 2026-10-06 / built: 2,391… | counties_nc.iredell_delinquent_tax (built 20… | 4 | no | subagent: NC counties (100) t… |
 | Statesville fire call data by ward (2024, 2025) | Statesville, Iredell, NC | fire_incident | open | 1,412 (2024) + 1,543 (2025) in ward 1 alone | - | 2 | yes | lead agent: ArcGIS Online sea… |
 | Selma open code violations / blighted properties monthly lists | Selma, Johnston, NC | code_enforcement | open | 45 PDFs found via WP media API on 2026-10-07; newest blight… | - | 3 | yes | subagent: NC towns 5k-22k (10… |
 | Johnston County tax foreclosure auctions + county-owned surplus | Johnston, NC | tax_sale | open | 0 rows on 2026-10-07 ('No Sale Scheduled At This Time'); su… | - | 1 | yes | subagent: NC counties (100) t… |
 | Smithfield vacant building registry (commercial, 90-day) | Smithfield, Johnston, NC | vacant_registry | public-records-request |  | - | 1 | yes | subagent: NC towns 5k-22k (10… |
 | Sanford EnerGov Citizen Self Service | Sanford, Lee, NC | code_enforcement | JS-app |  | - | 8 | yes | subagent: NC cities (45 large… |
 | Lee County surplus property upset-bid notices | Lee, NC | county_surplus | open | 5 posts in news list on 2026-10-07 | - | 1 | yes | subagent: NC counties (100) t… |
-| Lee County 2025 delinquent real property list | Lee, NC | delinquent_tax | open | 77 pages, ~2,740 amount rows on 2026-10-07 | - | 3 | yes | subagent: NC counties (100) t… |
+| Lee County 2025 delinquent real property list | Lee, NC | delinquent_tax | open | 77 pages, ~2,740 amount rows on 2026-10-07 / built: Lee 2,7… | counties_nc.nc_tax_lien_ads (built 2026-10-0… | 3 | no | subagent: NC counties (100) t… |
 | City of Kinston 2026 proposed demolition list | Kinston, Lenoir, NC | condemned_demolition_unsafe | open | 45 (2026-10-07, last edit 2026-06-04) | counties_nc.kinston_proposed_demolition (bui… | 2 | no | lead agent: ArcGIS Online sea… |
 | Kinston condemnation list and citywide/corridor demolition project lists | Kinston, Lenoir, NC | condemned_demolition_unsafe | public-records-request | news 2026-01-02: 118 properties remain on the condemnation … | - | 4 | yes | subagent: NC towns 5k-22k (10… |
 | Kinston city-owned vacant lot sale list (annual December surplus list) | Kinston, Lenoir, NC | county_surplus | absent | news 2022-10: ~40 lots listed; city owns ~1,000 vacant parc… | - | 2 | yes | subagent: NC towns 5k-22k (10… |
@@ -695,7 +702,7 @@ Short form; the JSON carries fields, cadence, evidence and notes for each row. `
 | Marion OpenGov/ViewPoint permitting (code violation + demolition record types) | Marion, McDowell, NC | code_enforcement | JS-app |  | - |  | no | subagent: NC towns 5k-22k (10… |
 | Marion building-condition survey (xbEbU) | Marion, McDowell, NC | condemned_demolition_unsafe | open | 123 rows, 79 at condition >=4 (per r3) | - | 2 | no | subagent: NC towns 5k-22k (10… |
 | McDowell 105-369 lien advertisement PDF | McDowell, NC | delinquent_tax | open |  | nc_county_pdf_delinquent_tax | 0 | no | subagent: NC counties (100) t… |
-| Mecklenburg County Accela All Permits (county-wide incl. Charlotte, Huntersvill… | Charlotte; Huntersville; Cornelius; Matthews… | building_permits | open | 222,105 rows (2026-10-07); latest issue_date 2026-10-07; si… | - | 3 | yes | subagent: NC cities (45 large… |
+| Mecklenburg County Accela All Permits (county-wide incl. Charlotte, Huntersvill… | Charlotte; Huntersville; Cornelius; Matthews… | building_permits | open | 222,105 rows (2026-10-07); latest issue_date 2026-10-07; si… | counties_nc.nc_metro_demolition_permits (bui… | 3 | no | subagent: NC cities (45 large… |
 | Mecklenburg building permit locations | Mecklenburg, NC | building_permits | open | 482,399 | - | 3 | yes | lead agent: ArcGIS Online sea… |
 | Charlotte Code Enforcement Cases All | Charlotte, Mecklenburg, NC | code_enforcement | open | 3,341 open (module docstring); not re-counted | city_websites.charlotte_open_data | 0 | no | subagent: NC cities (45 large… |
 | Charlotte Code Enforcement Orders to Demolish | Charlotte, Mecklenburg, NC | condemned_demolition_unsafe | open | 15 rows, all CaseStatus Open; newest DateCreated 2023-11-07… | - | 1 | yes | lead agent: ArcGIS Online sea… |
@@ -733,7 +740,7 @@ Short form; the JSON carries fields, cadence, evidence and notes for each row. `
 | Person County minimum housing cases 2023 | Roxboro, Person, NC | code_enforcement | open | 222 | - | 1 | yes | lead agent: ArcGIS Online sea… |
 | Person County website (tax foreclosure / delinquent / surplus pages) | Person, NC | delinquent_tax | bot-check |  | - |  | yes | subagent: NC counties (100) t… |
 | Pitt DelinquentTaxesPOD open-data table | Pitt, NC | delinquent_tax | open | 9,170 rows per repo doc (2026-08-02); not re-fetched | nc_ptscloud_delinquent_tax (Pitt tenant) | 0 | no | subagent: NC counties (100) t… |
-| Randolph 2026 tax lien advertisement PDFs (by surname letter) | Randolph, NC | delinquent_tax | open | 'A' file alone: 5 pages, 198 amount rows, 199 PIN-like toke… | - | 4 | yes | subagent: NC counties (100) t… |
+| Randolph 2026 tax lien advertisement PDFs (by surname letter) | Randolph, NC | delinquent_tax | open | 'A' file alone: 5 pages, 198 amount rows, 199 PIN-like toke… | counties_nc.nc_tax_lien_ads (built 2026-10-0… | 4 | no | subagent: NC counties (100) t… |
 | Archdale-area geocoded liens | Archdale (inferred), Randolph, NC | municipal_tax_or_fee_lien | open | 66 | - | 1 | yes | lead agent: ArcGIS Online sea… |
 | Lumberton council demolition approvals (inspections director requests) | Lumberton, Robeson, NC | condemned_demolition_unsafe | public-records-request |  | - |  | yes | subagent: NC towns 5k-22k (10… |
 | Robeson County tax public auctions | Robeson, NC | tax_sale | open | ~4 parcels on 2026-10-07 | law_firms.zacchaeus (partial; ZLS runs Robes… | 2 | no | subagent: NC counties (100) t… |
@@ -743,7 +750,7 @@ Short form; the JSON carries fields, cadence, evidence and notes for each row. `
 | Salisbury 311 Requests (live) | Salisbury, Rowan, NC | code_enforcement | open | 2,227 rows; lastEdit 2026-10-07 | - | 2 | yes | subagent: NC cities (45 large… |
 | Salisbury chronic abatement layer | Salisbury, Rowan, NC | code_enforcement | login |  | - |  | yes | lead agent: ArcGIS Online sea… |
 | Salisbury minimum housing violations (2017) | Salisbury, Rowan, NC | code_enforcement | open | 61 | - | 1 | yes | lead agent: ArcGIS Online sea… |
-| Rowan delinquent taxpayer lists (annual XLS + PDF, 2019-2025) | Rowan, NC | delinquent_tax | open | 2025 file: 6,542 rows on 2026-10-07 (REAL 2,699 / PP 3,839 … | - | 3 | yes | subagent: NC counties (100) t… |
+| Rowan delinquent taxpayer lists (annual XLS + PDF, 2019-2025) | Rowan, NC | delinquent_tax | open | 2025 file: 6,542 rows on 2026-10-07 (REAL 2,699 / PP 3,839 … | counties_nc.rowan_delinquent_tax (built 2026… | 3 | no | subagent: NC counties (100) t… |
 | Rowan tax foreclosures page (Kania) | Rowan, NC | tax_sale | open |  | law_firms.kania | 0 | no | subagent: NC counties (100) t… |
 | Salisbury Vacant Housing Inventory (2020 survey) | Salisbury, Rowan, NC | vacant_registry | open | 303 rows; lastEdit 2020-08-28 | - | 1 | yes | subagent: NC cities (45 large… |
 | Forest City SmartGov portal | Forest City, Rutherford, NC | building_permits | login |  | - |  | no | subagent: NC towns 5k-22k (10… |
@@ -757,13 +764,13 @@ Short form; the JSON carries fields, cadence, evidence and notes for each row. `
 | Indian Trail / Leland Infovision Evolve public portals | Indian Trail; Leland, Union; Brunswick, NC | code_enforcement | JS-app |  | - |  | yes | subagent: NC cities (45 large… |
 | Henderson Code Compliance Notice of Hearing page | Henderson, Vance, NC | condemned_demolition_unsafe | open | 0 notices on 2026-10-07 (page body empty) | - | 1 | yes | subagent: NC towns 5k-22k (10… |
 | Vance County surplus properties - land (incl. parcels jointly owned with City o… | Henderson, Vance, NC | county_surplus | open | 0 parcels listed on 2026-10-07 (procedure + offer form only… | - | 1 | yes | subagent: NC towns 5k-22k (10… |
-| Cary Building Permit Applications (OpenDataSoft) | Cary, Wake, NC | building_permits | open | 87,184 rows (2026-10-07) | - | 2 | yes | subagent: NC cities (45 large… |
+| Cary Building Permit Applications (OpenDataSoft) | Cary, Wake, NC | building_permits | open | 87,184 rows (2026-10-07) / built: Cary 134 properties in 73… | counties_nc.nc_metro_demolition_permits (bui… | 2 | no | subagent: NC cities (45 large… |
 | Holly Springs CityView Portal (permit locator open; code enforcement login) | Holly Springs, Wake, NC | building_permits | open |  | - | 4 | yes | subagent: NC cities (45 large… |
 | Raleigh Building Permits (open data) | Raleigh, Wake, NC | building_permits | open | 184,461 rows (2026-10-07); latest issueddate 2026-10-06 | - | 3 | yes | lead agent: ArcGIS Online sea… |
 | Wake County building permits | Wake, NC | building_permits | open | 197,477 | - | 3 | yes | lead agent: ArcGIS Online sea… |
 | Ask Raleigh Requests (311 service requests incl. public nuisance, unsafe housin… | Raleigh, Wake, NC | code_enforcement | open | 16,897 rows (2026-10-07) | - | 3 | yes | subagent: NC cities (45 large… |
 | Cary Cases311_Public | Cary, Wake, NC | code_enforcement | open | 264,967 rows; lastEdit 2025-03-26 | - |  | yes | subagent: NC cities (45 large… |
-| Wake County Code Cases Past 90 Days (published on Raleigh open-data hub) | Wake, NC | code_enforcement | open | 575 rows (2026-10-07); status In Progress 156, Escalated 26… | - | 2 | yes | subagent: NC cities (45 large… |
+| Wake County Code Cases Past 90 Days (published on Raleigh open-data hub) | Wake, NC | code_enforcement | open | 575 rows (2026-10-07); status In Progress 156, Escalated 26… | counties_nc.wake_code_cases (built 2026-10-0… | 2 | no | subagent: NC cities (45 large… |
 | Wake Forest Code / Zoning Enforcement cases | Wake Forest, Wake, NC | code_enforcement | open | 3,382 rows; 186 open (2026-10-07); lastEdit 2026-09-30 | - | 2 | yes | subagent: NC cities (45 large… |
 | City of Raleigh owned undeveloped property | Raleigh, Wake, NC | county_surplus | open | 946 | - | 1 | yes | lead agent: ArcGIS Online sea… |
 | Raleigh Real Property for Sale (city surplus land) | Raleigh, Wake, NC | county_surplus | bot-check | search snippet showed 2 current listings (2026-10) | - |  | yes | subagent: NC cities (45 large… |
@@ -807,7 +814,7 @@ Short form; the JSON carries fields, cadence, evidence and notes for each row. `
 | Calhoun County 2026 tax sale list (to be posted on the Tax Collector page) | Calhoun, SC | tax_sale | open | not yet posted on 2026-10-07 | - | 3 | yes | subagent: SC counties (46) ta… |
 | Charleston County 2025 building permits | Charleston, SC | building_permits | open | 1,781 | - | 2 | yes | lead agent: ArcGIS Online sea… |
 | City of Charleston open-data hub (data-charleston-sc) | Charleston, Charleston, SC | building_permits | open | 147 datasets 2026-10-07; 0 code/condemned/vacant/demolition… | - | 0 | no | subagent: SC cities (66) + SC… |
-| Charleston County EnerGov history: code cases + demolition permits (ArcGIS) | Charleston, SC | code_enforcement | open | 386,386 rows on 2026-10-07. CodeManagement: Building Servic… | - | 4 | yes | subagent: SC cities (66) + SC… |
+| Charleston County EnerGov history: code cases + demolition permits (ArcGIS) | Charleston, SC | code_enforcement | open | 386,386 rows on 2026-10-07. CodeManagement: Building Servic… | counties_sc.charleston_energov_history (buil… | 4 | no | subagent: SC cities (66) + SC… |
 | Charleston Municipal Court Livability docket (upcoming / disposed PDFs) | Charleston, Charleston, SC | code_enforcement | open | docket dated 2026-09-28, 9 pages | - | 3 | yes | subagent: SC cities (66) + SC… |
 | City of Charleston Citizen Services monthly request dashboards | Charleston, Charleston, SC | code_enforcement | open | Sept 2026 service: 57 request types; 'Overgrown yard or vac… | - | 3 | yes | subagent: SC cities (66) + SC… |
 | City of Charleston Livability daily log (Survey123) | Charleston, Charleston, SC | code_enforcement | open | 14,719 rows 2021-01-20 to 2026-10-07 (Trash_removal_dumpout… | - | 2 | yes | subagent: SC cities (66) + SC… |

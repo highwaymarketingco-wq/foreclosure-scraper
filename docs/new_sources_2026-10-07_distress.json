@@ -9,7 +9,7 @@
  ],
  "counts": {
   "records": 350,
-  "new_not_ingested_not_documented": 253,
+  "new_not_ingested_not_documented": 240,
   "by_access_class": {
    "open": 242,
    "login": 7,
@@ -23,7 +23,7 @@
    "paid": 1
   },
   "new_by_access_class": {
-   "open": 168,
+   "open": 155,
    "login": 4,
    "absent": 22,
    "terms-only": 2,
@@ -60,25 +60,25 @@
  "grid_summary": {
   "all": {
    "none_found": 663,
-   "open": 326,
+   "open": 312,
    "not_checked": 651,
    "walled": 257,
    "agol_none": 978,
-   "built": 344,
+   "built": 358,
    "absent": 24
   },
   "counties": {
    "none_found": 274,
-   "open": 234,
+   "open": 223,
    "not_checked": 202,
    "walled": 147,
    "agol_none": 562,
-   "built": 316,
+   "built": 327,
    "absent": 17
   },
   "cities": {
-   "built": 28,
-   "open": 92,
+   "built": 31,
+   "open": 89,
    "none_found": 389,
    "agol_none": 416,
    "walled": 110,
@@ -2960,8 +2960,8 @@
    "access_class": "open",
    "format": "ArcGIS FeatureServer (hosted)",
    "cadence": "daily",
-   "volume": "575 rows (2026-10-07); status In Progress 156, Escalated 26, Escalated to Code Case 4, rest closed/void",
-   "already_ingested": null,
+   "volume": "575 rows (2026-10-07); status In Progress 156, Escalated 26, Escalated to Code Case 4, rest closed/void | built: 186 open -> 74 structural",
+   "already_ingested": "counties_nc.wake_code_cases (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 2,
    "value_rows": "~150-180 open cases per 90-day window; strongest subsets VIO - Building Inspections (56) and VIO - Wastewater (94, failing septic) -> est. 40-60 strong leads/quarter",
@@ -2972,7 +2972,7 @@
    "found_by": "subagent: NC cities (45 largest)",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Ask Raleigh Requests (311 service requests incl. public nuisance, unsafe housing)",
@@ -3081,8 +3081,8 @@
    "access_class": "open",
    "format": "ArcGIS FeatureServer",
    "cadence": "daily",
-   "volume": "222,105 rows (2026-10-07); latest issue_date 2026-10-07; sibling BuildingPermits_Accela 59,631",
-   "already_ingested": null,
+   "volume": "222,105 rows (2026-10-07); latest issue_date 2026-10-07; sibling BuildingPermits_Accela 59,631 | built: Mecklenburg 1,381 properties in 730 days",
+   "already_ingested": "counties_nc.nc_metro_demolition_permits (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 3,
    "value_rows": "type_of_work='Demolition' 1,760; demolition rows by tax_jurisdiction: CHARLOTTE 1,984, HUNTERSVILLE 81, MATTHEWS 53, CORNELIUS 43, MINT HILL 38, DAVIDSON 33, PINEVILLE 25 -> ~600-800 teardown signals/yr; is_not_finaled supports stalled-permit signal",
@@ -3093,7 +3093,7 @@
    "found_by": "subagent: NC cities (45 largest)",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Charlotte Code Enforcement Cases All",
@@ -3187,8 +3187,8 @@
    "access_class": "open",
    "format": "ArcGIS MapServer",
    "cadence": "daily",
-   "volume": "124,985 rows (2026-10-07); latest IssuedDate 2026-10-06",
-   "already_ingested": null,
+   "volume": "124,985 rows (2026-10-07); latest IssuedDate 2026-10-06 | built: Greensboro 144 properties in 730 days",
+   "already_ingested": "counties_nc.nc_metro_demolition_permits (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 2,
    "value_rows": "ApplicationType 'Total Demolish' 3,023 (latest 2026-09-24) + 'Interior/Exterior Demolition' 888 -> ~150-250 whole-structure demolitions/yr with owner mailing; 'Repair to Standard'/'Repair to Rehab' (620, legacy to 2013) are minimum-housing repair permits",
@@ -3199,7 +3199,7 @@
    "found_by": "subagent: NC cities (45 largest)",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "0 expected: a distress subset; would help only if one of the 34 target parcels is on it",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Greensboro Code Compliance All Cases (housing)",
@@ -3261,8 +3261,8 @@
    "access_class": "open",
    "format": "ArcGIS MapServer",
    "cadence": "daily",
-   "volume": "2,923 rows (2026-10-07); latest ISSUE_DATE 2026-10-01",
-   "already_ingested": null,
+   "volume": "2,923 rows (2026-10-07); latest ISSUE_DATE 2026-10-01 | built: Durham 207 properties in 730 days",
+   "already_ingested": "counties_nc.nc_metro_demolition_permits (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 2,
    "value_rows": "~150-250 demolitions/yr with PIN -> teardown / condemned-structure signal",
@@ -3273,7 +3273,7 @@
    "found_by": "subagent: NC cities (45 largest)",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Durham GS Available and Surplus Property",
@@ -3560,8 +3560,8 @@
    "access_class": "open",
    "format": "JSON API (OpenDataSoft v2.1)",
    "cadence": "daily",
-   "volume": "87,184 rows (2026-10-07)",
-   "already_ingested": null,
+   "volume": "87,184 rows (2026-10-07) | built: Cary 134 properties in 730 days",
+   "already_ingested": "counties_nc.nc_metro_demolition_permits (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 2,
    "value_rows": "'BLDG - DEMOLISH - SNGL FAM HOME (B645)' 388 (latest issue 2026-10-05) + non-res demolition 54 -> ~40-60 teardowns/yr",
@@ -3572,7 +3572,7 @@
    "found_by": "subagent: NC cities (45 largest)",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Cary Cases311_Public",
@@ -5997,8 +5997,8 @@
    "access_class": "open",
    "format": "ArcGIS MapServer (query enabled, points; sibling lines/polygons layers 1-2)",
    "cadence": "daily (newest APPLICATIONDATE 2026-10-07)",
-   "volume": "386,386 rows on 2026-10-07. CodeManagement: Building Services 1,871 (2010-11 to 2026-09-29), Planning and Zoning 1,028, Environmental Management 905, STR 37, Public Works 36. Demolition work class: Building (R) 1,467, Zoning Permit 1,424, Manufactured Home 200, Building (C) 121, Commercial zoning 10 (2016 to 2026-10-06)",
-   "already_ingested": null,
+   "volume": "386,386 rows on 2026-10-07. CodeManagement: Building Services 1,871 (2010-11 to 2026-09-29), Planning and Zoning 1,028, Environmental Management 905, STR 37, Public Works 36. Demolition work class: Building (R) 1,467, Zoning Permit 1,424, Manufactured Home 200, Building (C) 121, Commercial zoning 10 (2016 to 2026-10-06) | built: 1,050 cases in 730 days -> 467 parcels",
+   "already_ingested": "counties_sc.charleston_energov_history (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 4,
    "value_rows": "~1,900 building-services code cases (~100-150/yr recent) + ~3,200 demolition permits (~300/yr); no address field, so join point to the PARCELS WITH ATTRIBUTES layer (energov_css/4, already in parcel_cache) by spatial query",
@@ -6009,7 +6009,7 @@
    "found_by": "subagent: SC cities (66) + SC county code programs",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Charleston County Government Owned Parcels",
@@ -7569,8 +7569,8 @@
    "access_class": "open",
    "format": "HTML Telerik RadGrid (ASP.NET postback paging, page size editable) + annual PDF /docs/default-source/tax-documents/delinquent-taxes/delinquent_taxes__2025.pdf",
    "cadence": "annual (updates as paid)",
-   "volume": "3,755 rows on 2026-10-07 (pager 'Item 1 to 20 of 3755')",
-   "already_ingested": null,
+   "volume": "3,755 rows on 2026-10-07 (pager 'Item 1 to 20 of 3755') | built: 3,755 PINs, $2.65M",
+   "already_ingested": "counties_nc.cumberland_delinquent_tax (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 3,
    "value_rows": "~3,750 delinquent RE bills/yr; join to parcels via description/owner (no PIN column on grid - PDF may carry one)",
@@ -7581,7 +7581,7 @@
    "found_by": "subagent: NC counties (100) tax/surplus/sheriff",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Guilford ForeclosuresPublic tax-foreclosure layer",
@@ -7754,8 +7754,8 @@
    "access_class": "open",
    "format": "ArcGIS MapServer feature layer (polygons)",
    "cadence": "weekly-ish (ASOF 2026-10-06 on 2026-10-07)",
-   "volume": "2,391 parcels on 2026-10-07, ASOF 2026-10-06",
-   "already_ingested": null,
+   "volume": "2,391 parcels on 2026-10-07, ASOF 2026-10-06 | built: 2,391 outlines -> 2,366 parcels",
+   "already_ingested": "counties_nc.iredell_delinquent_tax (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 4,
    "value_rows": "~2,400 delinquent parcels; needs a point-in-polygon or centroid join to the Iredell parcel layer (or NC OneMap parcels) for PIN/owner/situs",
@@ -7766,7 +7766,7 @@
    "found_by": "subagent: NC counties (100) tax/surplus/sheriff",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Craven County property tax foreclosure list",
@@ -7867,8 +7867,8 @@
    "access_class": "open",
    "format": "XLSX (DocumentCenter/View/55256 for 2025; 49361 2024; 45600 2023; 38408 2022; 31671 2021; 25197 2020; 20334 2019) + PDF twins",
    "cadence": "annual (new file each spring; old years kept)",
-   "volume": "2025 file: 6,542 rows on 2026-10-07 (REAL 2,699 / PP 3,839 / UT 4); 71 columns",
-   "already_ingested": null,
+   "volume": "2025 file: 6,542 rows on 2026-10-07 (REAL 2,699 / PP 3,839 / UT 4); 71 columns | built: 2,699 real-estate bills, $2.36M",
+   "already_ingested": "counties_nc.rowan_delinquent_tax (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 3,
    "value_rows": "~2,700 delinquent real-estate parcels/yr with balance and owner mailing; 7 years of history allow repeat-delinquency scoring",
@@ -7879,7 +7879,7 @@
    "found_by": "subagent: NC counties (100) tax/surplus/sheriff",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Rowan tax foreclosures page (Kania)",
@@ -7925,8 +7925,8 @@
    "access_class": "open",
    "format": "PDF (text layer), 19 pages; landing page /843/2025-DELINQUENT-TAXPAYERS",
    "cadence": "annual (published 2026-03-25 in The Dispatch/Orator)",
-   "volume": "19 pages, ~3,170 amount-bearing lines on 2026-10-07 (est. ~3,000 liens)",
-   "already_ingested": null,
+   "volume": "19 pages, ~3,170 amount-bearing lines on 2026-10-07 (est. ~3,000 liens) | built: Davidson 3,202 rows",
+   "already_ingested": "counties_nc.nc_tax_lien_ads (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 4,
    "value_rows": "~3,000 delinquent RE liens/yr",
@@ -7937,7 +7937,7 @@
    "found_by": "subagent: NC counties (100) tax/surplus/sheriff",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Davidson current and pending tax foreclosures PDF",
@@ -8019,8 +8019,8 @@
    "access_class": "open",
    "format": "~14 PDFs (0-9, A, B, C, D, E-F, G, H, I-L, M-N, ...) at /DocumentCenter/View/548-557+",
    "cadence": "annual",
-   "volume": "'A' file alone: 5 pages, 198 amount rows, 199 PIN-like tokens on 2026-10-07; whole set est. 2,500-3,500",
-   "already_ingested": null,
+   "volume": "'A' file alone: 5 pages, 198 amount rows, 199 PIN-like tokens on 2026-10-07; whole set est. 2,500-3,500 | built: Randolph 4,138 rows",
+   "already_ingested": "counties_nc.nc_tax_lien_ads (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 4,
    "value_rows": "~3,000 delinquent RE liens/yr with PIN",
@@ -8031,7 +8031,7 @@
    "found_by": "subagent: NC counties (100) tax/surplus/sheriff",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Lee County 2025 delinquent real property list",
@@ -8053,8 +8053,8 @@
    "access_class": "open",
    "format": "PDF 77 pages (text layer), linked from news post 'TAX LIEN ADVERTISEMENT FOR DELINQUENT REAL PROPERTY' (news_detail_T12_R260.php, 2026-02-11)",
    "cadence": "annual (2024 and 2025 posts also present)",
-   "volume": "77 pages, ~2,740 amount rows on 2026-10-07",
-   "already_ingested": null,
+   "volume": "77 pages, ~2,740 amount rows on 2026-10-07 | built: Lee 2,739 rows",
+   "already_ingested": "counties_nc.nc_tax_lien_ads (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 3,
    "value_rows": "~2,700 delinquent RE parcels with situs and 12-digit property ID",
@@ -8065,7 +8065,7 @@
    "found_by": "subagent: NC counties (100) tax/surplus/sheriff",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Lee County surplus property upset-bid notices",
@@ -8907,8 +8907,8 @@
    "access_class": "open",
    "format": "2 PDFs (/DocumentCenter/View/4258/2025-Taxes-Ad-List-Nontransferred, /4259/...-Transferred)",
    "cadence": "annual",
-   "volume": "non-transferred: 53 pages, ~2,667 amount rows; transferred: 3 pages, ~118 rows (2026-10-07)",
-   "already_ingested": null,
+   "volume": "non-transferred: 53 pages, ~2,667 amount rows; transferred: 3 pages, ~118 rows (2026-10-07) | built: Hoke 2,831 rows",
+   "already_ingested": "counties_nc.nc_tax_lien_ads (built 2026-10-07)",
    "previously_documented": null,
    "build_effort_hours": 3,
    "value_rows": "~2,700 delinquent parcels/yr with PIN",
@@ -8919,7 +8919,7 @@
    "found_by": "subagent: NC counties (100) tax/surplus/sheriff",
    "unlock_249_big_old_targets": 0,
    "unlock_249_method": "no target rows in this county",
-   "is_new": true
+   "is_new": false
   },
   {
    "name": "Hoke County upcoming tax foreclosure sales",
@@ -11589,7 +11589,7 @@
    ]
   },
   "Davidson County, NC": {
-   "delinquent_tax": "open",
+   "delinquent_tax": "built",
    "tax_sale": "built",
    "county_surplus": "none_found",
    "sheriff_or_mie_sale": "none_found",
@@ -11662,7 +11662,7 @@
    "sheriff_or_mie_sale": "not_checked",
    "code_enforcement": "built",
    "condemned_demolition_unsafe": "agol_none",
-   "building_permits": "open",
+   "building_permits": "built",
    "fire_incident": "agol_none",
    "flood_storm_damage": "agol_none",
    "eviction": "open",
@@ -11861,7 +11861,7 @@
    "sheriff_or_mie_sale": "not_checked",
    "code_enforcement": "built",
    "condemned_demolition_unsafe": "open",
-   "building_permits": "open",
+   "building_permits": "built",
    "fire_incident": "agol_none",
    "flood_storm_damage": "agol_none",
    "eviction": "open",
@@ -11990,7 +11990,7 @@
    ]
   },
   "Hoke County, NC": {
-   "delinquent_tax": "open",
+   "delinquent_tax": "built",
    "tax_sale": "open",
    "county_surplus": "open",
    "sheriff_or_mie_sale": "none_found",
@@ -12035,7 +12035,7 @@
    ]
   },
   "Iredell County, NC": {
-   "delinquent_tax": "open",
+   "delinquent_tax": "built",
    "tax_sale": "walled",
    "county_surplus": "open",
    "sheriff_or_mie_sale": "none_found",
@@ -12121,7 +12121,7 @@
    ]
   },
   "Lee County, NC": {
-   "delinquent_tax": "open",
+   "delinquent_tax": "built",
    "tax_sale": "none_found",
    "county_surplus": "open",
    "sheriff_or_mie_sale": "not_checked",
@@ -12283,7 +12283,7 @@
    "sheriff_or_mie_sale": "walled",
    "code_enforcement": "built",
    "condemned_demolition_unsafe": "open",
-   "building_permits": "open",
+   "building_permits": "built",
    "fire_incident": "agol_none",
    "flood_storm_damage": "agol_none",
    "eviction": "open",
@@ -12713,7 +12713,7 @@
    ]
   },
   "Rowan County, NC": {
-   "delinquent_tax": "open",
+   "delinquent_tax": "built",
    "tax_sale": "built",
    "county_surplus": "not_checked",
    "sheriff_or_mie_sale": "not_checked",
@@ -12977,9 +12977,9 @@
    "tax_sale": "built",
    "county_surplus": "open",
    "sheriff_or_mie_sale": "not_checked",
-   "code_enforcement": "open",
+   "code_enforcement": "built",
    "condemned_demolition_unsafe": "not_checked",
-   "building_permits": "open",
+   "building_permits": "built",
    "fire_incident": "built",
    "flood_storm_damage": "agol_none",
    "eviction": "open",
@@ -13372,7 +13372,7 @@
    "tax_sale": "built",
    "county_surplus": "open",
    "sheriff_or_mie_sale": "built",
-   "code_enforcement": "open",
+   "code_enforcement": "built",
    "condemned_demolition_unsafe": "open",
    "building_permits": "open",
    "fire_incident": "agol_none",
@@ -14240,7 +14240,7 @@
    "code_enforcement": "built",
    "condemned_demolition_unsafe": "built",
    "vacant_registry": "none_found",
-   "building_permits": "open",
+   "building_permits": "built",
    "fire_incident": "agol_none",
    "str_registration": "open",
    "county_surplus": "walled",
@@ -14257,7 +14257,7 @@
    "code_enforcement": "built",
    "condemned_demolition_unsafe": "built",
    "vacant_registry": "open",
-   "building_permits": "open",
+   "building_permits": "built",
    "fire_incident": "agol_none",
    "str_registration": "agol_none",
    "county_surplus": "open",
@@ -14308,7 +14308,7 @@
    "code_enforcement": "open",
    "condemned_demolition_unsafe": "none_found",
    "vacant_registry": "none_found",
-   "building_permits": "open",
+   "building_permits": "built",
    "fire_incident": "agol_none",
    "str_registration": "agol_none",
    "county_surplus": "none_found",
@@ -17126,8 +17126,8 @@
    "where": "Charleston County SC",
    "rows": "3,899 code cases (1,871 Building Services) + ~3,200 demolition permits in 386,386 rows, updated daily",
    "access": "open",
-   "status": "not built",
-   "effort": "6 h (no address field: join points to the parcel layer by location)",
+   "status": "BUILT (charleston_energov_history): 467 parcels",
+   "effort": "done",
    "why": "Largest live code/demolition feed found in SC; Charleston has 6,457 board rows and no code signal"
   },
   {
@@ -17153,8 +17153,8 @@
    "where": "Mecklenburg, Guilford, Durham, Wake NC",
    "rows": "~8,100 demolition permits: Mecklenburg 1,760 (222,105 permits, daily), Greensboro 3,023 whole-house demolitions with owner mailing, Durham 2,923 (newest 2026-10-01), Cary 388",
    "access": "open",
-   "status": "not built (Mecklenburg replaces the dead Charlotte endpoint in enrichment_building_permits.py)",
-   "effort": "2-3 h each as Layer entries",
+   "status": "BUILT (nc_metro_demolition_permits): 1,866 properties in 2 years",
+   "effort": "done",
    "why": "A demolition permit is a house about to be torn down or rebuilt; daily feeds in the four largest metros"
   },
   {
@@ -17162,8 +17162,8 @@
    "where": "7 NC counties",
    "rows": "about 11,500 bills (Hoke ~2,780, Lee ~2,740, Davidson ~3,000, Randolph ~3,000; estimates from file sizes/first pages)",
    "access": "open",
-   "status": "not built",
-   "effort": "2-3 h each as config in nc_county_pdf_delinquent_tax",
+   "status": "BUILT (nc_tax_lien_ads): 12,910 rows measured",
+   "effort": "done",
    "why": "Same shape the repo already parses; fills counties with no tax rows"
   },
   {
@@ -17171,8 +17171,8 @@
    "where": "Cumberland County NC",
    "rows": "3,755 bills",
    "access": "open",
-   "status": "not built",
-   "effort": "3 h (PDF) + one DATELESS_OK_SOURCES line in main.py",
+   "status": "BUILT (cumberland_delinquent_tax): 3,755",
+   "effort": "done",
    "why": "Fayetteville area; ptscloud tenant returns no export"
   },
   {
@@ -17180,8 +17180,8 @@
    "where": "Rowan County NC",
    "rows": "2,699 real-estate bills in the 2025 file (6,542 total), 117 heirs + 56 estate owner types, 7 years of history",
    "access": "open",
-   "status": "not built",
-   "effort": "3 h + one DATELESS_OK_SOURCES line in main.py",
+   "status": "BUILT (rowan_delinquent_tax): 2,699",
+   "effort": "done",
    "why": "Balance, parcel, owner mailing and repeat-year history in one file"
   },
   {
@@ -17189,8 +17189,8 @@
    "where": "Wake County NC",
    "rows": "575 cases (rolling 90 days, daily) + 186 Wake Forest open cases",
    "access": "open",
-   "status": "not built",
-   "effort": "2 h",
+   "status": "BUILT (wake_code_cases): 74 structural of 186 open",
+   "effort": "done",
    "why": "Overturns the 2026-09-28 'Wake has nothing live' verdict; first live code feed for the state's largest county"
   },
   {
@@ -17198,8 +17198,8 @@
    "where": "Iredell County NC",
    "rows": "2,391 parcels, as-of 2026-10-06 (weekly)",
    "access": "open",
-   "status": "not built",
-   "effort": "4 h (geometry only: spatial join to parcels)",
+   "status": "BUILT (iredell_delinquent_tax): 2,366 parcels",
+   "effort": "done",
    "why": "Overturns the earlier 'no Iredell delinquent feed' note"
   },
   {
@@ -17240,6 +17240,55 @@
    "live": "45 parcels, all with situs; 41 absentee, 9 out-of-state; 2 with utility cut-offs, 2 heirs property",
    "signal": "DISTRESSED, raw condemned, utility_cutoff + vacancy (when cut), heir_property, owner_mailing",
    "why": "Strongest per-row signal found (city demolition list) and the only published utility cut-off flags"
+  },
+  {
+   "module": "counties_sc.charleston_energov_history",
+   "source": "Charleston County EnerGov history (Building Services code cases + demolition permits)",
+   "live": "1,050 cases in 730 days, 929 matched to an address point within 3 m -> 467 parcels (117 with a code case, 365 with a demolition permit)",
+   "signal": "DISTRESSED; code_enforcement (open 365 days from the case date, then stale), demolition_permit",
+   "why": "Round 2 #1: largest live code/demolition feed in SC"
+  },
+  {
+   "module": "counties_nc.nc_metro_demolition_permits",
+   "source": "Mecklenburg Accela, Greensboro BI_Permits, Durham demolition layer, Cary OpenDataSoft",
+   "live": "1,866 properties in 730 days (Mecklenburg 1,381, Durham 207, Greensboro 144, Cary 134); 1,654 with owner mailing",
+   "signal": "DISTRESSED, demolition_permit (expired permits kept, cancelled/withdrawn dropped)",
+   "why": "Round 2 #2"
+  },
+  {
+   "module": "counties_nc.rowan_delinquent_tax",
+   "source": "Rowan County delinquent list XLSX (newest year found on the page)",
+   "live": "2,699 real-estate bills (personal property and utility rows dropped), $2.36M, all with owner mailing",
+   "signal": "TAX_LIEN, tax_owed (late years only), heirs/estate owner flag",
+   "why": "Round 2 #3"
+  },
+  {
+   "module": "counties_nc.cumberland_delinquent_tax",
+   "source": "Cumberland 2025 unpaid real-estate tax ad (PDF of 2026-06-21)",
+   "live": "3,755 PINs, $2.65M; 398 of 400 sampled PINs hit the parcel cache",
+   "signal": "TAX_LIEN, tax_owed",
+   "why": "Round 2 #3"
+  },
+  {
+   "module": "counties_nc.iredell_delinquent_tax",
+   "source": "Iredell DelinquentTaxes outlines joined to NC OneMap",
+   "live": "2,391 outlines, 2,380 matched, 2,366 parcels (as of 2026-10-06)",
+   "signal": "TAX_LIEN, tax_owed (levy 2025, no balance on the layer)",
+   "why": "Round 2 #3"
+  },
+  {
+   "module": "counties_nc.wake_code_cases",
+   "source": "Wake County code cases, last 90 days",
+   "live": "575 cases, 186 open, 74 structural (fire damage, collapse, unsafe, failed septic)",
+   "signal": "DISTRESSED, code_enforcement",
+   "why": "Round 2 #4"
+  },
+  {
+   "module": "counties_nc.nc_tax_lien_ads",
+   "source": "Hoke, Lee, Davidson, Randolph tax-lien ads (PDF)",
+   "live": "12,910 rows, $10.1M: Hoke 2,831, Lee 2,739, Davidson 3,202, Randolph 4,138 (the research estimate was ~11,500)",
+   "signal": "TAX_LIEN, tax_owed",
+   "why": "Round 2 #5"
   }
  ],
  "could_not_determine": [
