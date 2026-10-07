@@ -6299,6 +6299,37 @@ function renderDetail(l, detailState) {
     $("d-contact-section").style.display = "none";
   }
 
+  // Possible heirs (2026-10-07). raw.heir_candidates is filtered when the board is built
+  // (enrichment_heir_candidates.PUBLISHABLE_HEIR_RELATIONS): name, relation, source link and date,
+  // plus a representative's address only when the public probate notice prints one. Everything
+  // is escaped; a source link is only drawn for an http(s) URL. On mobile the key arrives with
+  // the detail shard, so the section appears once renderDetail runs with it.
+  const _heirSrc = {
+    obituary_survivor: "obituary", probate_notice_personal_representative: "estate notice",
+    probate_record_personal_representative: "probate index", county_record: "county tax roll",
+  };
+  const _heirs = (l.raw && Array.isArray(l.raw.heir_candidates)) ? l.raw.heir_candidates : [];
+  const _heirEl = $("d-heirs"), _heirSec = $("d-heirs-section");
+  if (_heirEl && _heirSec && _heirs.length) {
+    const _items = _heirs.slice(0, 30).map(h => {
+      if (!h || !h.name) return "";
+      const u = String(h.source_url || "");
+      const link = /^https?:\/\//.test(u)
+        ? ` <a href="${_attr(u)}" target="_blank" rel="noopener noreferrer">${_txt(_heirSrc[h.source_kind] || "source")}</a>`
+        : (_heirSrc[h.source_kind] ? ` <span class="heir-src">${_txt(_heirSrc[h.source_kind])}</span>` : "");
+      const date = h.source_date ? ` <span class="heir-date">${_txt(String(h.source_date).slice(0, 10))}</span>` : "";
+      const addr = h.address ? `<div class="heir-addr">${_txt(h.address)}</div>` : "";
+      return `<li>${_txt(h.name)} <span class="heir-rel">(${_txt(h.relation || "")})</span>${link}${date}${addr}</li>`;
+    }).join("");
+    _heirEl.innerHTML = `<ul class="heir-list">${_items}</ul>`
+      + `<div class="heir-note">Named in public records (obituaries, estate notices, county rolls). `
+      + `Candidates only, not a finding that anyone is an heir.</div>`;
+    _heirSec.style.display = "block";
+  } else if (_heirEl && _heirSec) {
+    _heirEl.innerHTML = "";
+    _heirSec.style.display = "none";
+  }
+
   // Distress Stack — full breakdown (only the tier badge was shown before)
   const _ds = getDistress(l);
   if (_ds && (_ds.score != null || (_ds.signals || []).length)) {

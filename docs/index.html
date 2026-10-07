@@ -512,6 +512,12 @@
       <div id="d-contact"></div>
     </div>
 
+    <!-- raw.heir_candidates, filtered at build time (enrichment_heir_candidates.PUBLISHABLE_HEIR_RELATIONS). -->
+    <div class="detail-section" id="d-heirs-section" style="display:none">
+      <h3>Possible heirs (candidates, from public notices)</h3>
+      <div id="d-heirs"></div>
+    </div>
+
     <div class="detail-section" id="d-distress-section" style="display:none">
       <h3>Distress Stack</h3>
       <div id="d-distress"></div>
@@ -555,7 +561,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="dashboard.js?v=20261007a"></script>
+<script src="dashboard.js?v=20261007b"></script>
 <script>
   // Theme toggle wiring (kept separate from dashboard.js so data/render logic stays untouched)
   (function () {

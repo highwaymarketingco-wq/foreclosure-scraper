@@ -2219,14 +2219,17 @@ RAW_KEEP = {
     # BEFORE enrichment_hoa_plaintiff_signal.py's first run, same lesson as
     # heir_naming_publication / landlocked / lexington_assessment above.
     "hoa_plaintiff_signal": "*",
-    # 2026-10-07 heir candidates (enrichment_heir_candidates.py). PRIVACY CHOICE: the candidate
-    # list itself (raw['heir_candidates']: survivors, representatives, co-owners -- private
-    # people's names) and raw['obituary_match'] (which carries the survivor list) are deliberately
-    # NOT registered here, so they never reach this public board; their names go to the gitignored
-    # data/heirs/heir_candidates.jsonl.gz instead. Only this summary publishes, and it holds counts
-    # and flags alone: {count, by_source_kind, deceased_signals, obituary_match: attached|ambiguous,
-    # label}. Never add a name field to it.
-    "heir_candidates_summary": ("count", "by_source_kind", "deceased_signals", "obituary_match", "label"),
+    # 2026-10-07 heir candidates (enrichment_heir_candidates.py). OWNER DECISION 2026-10-07: the
+    # candidate NAMES publish. raw['heir_candidates'] is already the published form when it gets
+    # here: only relations in enrichment_heir_candidates.PUBLISHABLE_HEIR_RELATIONS (spouse, child,
+    # sibling, parent, the estate's representative, a roll co-owner / care-of contact), only
+    # {name, relation, source_kind, source_url, source_date, label} (+ a representative's address
+    # when the public probate notice prints one), never a minor, age, birth date, phone or e-mail.
+    # The full list stays in the gitignored data/heirs/ file. raw['obituary_match'] (whole survivor
+    # lists) is still NOT registered. The summary holds counts and flags only.
+    "heir_candidates": "*",
+    "heir_candidates_summary": ("count", "published_count", "by_source_kind", "deceased_signals",
+                                "obituary_match", "label"),
     "sc_probate_notice": "*",
     "life_event": "*",                  # death / divorce marker the resolver keys off
     "estimated_monthly_rent_acs": "*",  # ACS $/sqft rent estimate — the rental-exit number

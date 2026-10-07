@@ -19,7 +19,26 @@ board counts. It holds counts only: no owner, decedent or relative names, no pag
 | Name lookups | `src/foreclosure_scraper/obituary_lookup.py` | For dead-owner leads with no attached obituary: Echovita city search and Find a Grave county search by the owner's name, capped, never repeated within 45 days. |
 | Shared fetcher | `scrapers/public_notices/_obit_common.py` | >= 1.6 s between requests to one host, an ordinary browser User-Agent, no impersonation; a CAPTCHA / challenge / login / 401-403 / 402 / 429 stops that host for the run. |
 
-**Privacy choice (public board).** `raw['heir_candidates']`, `raw['obituary_match']` and the
+**Publishing rule (owner decision, 2026-10-07; supersedes the counts-only choice below).**
+`raw['heir_candidates']` now publishes, filtered at build time by one constant,
+`enrichment_heir_candidates.PUBLISHABLE_HEIR_RELATIONS`: spouse, son, daughter, child, brother, sister,
+sibling, parent (mother, father), the estate's executor / executrix / administrator / administratrix /
+personal representative, and a co-owner or care-of contact from the tax roll. Each published name
+carries only `{name, relation, source_kind, source_url, source_date, label: "candidate"}`, plus an
+address only for a representative whose public probate notice prints one. Never published:
+grandchildren and great-grandchildren, nieces and nephews, in-laws, companions, step-relations,
+cousins, a court notice's named heirs, collectors, anyone described as a minor or given an age under
+18, a name without a surname, and any phone, e-mail, birth date, age or note. The full list stays in
+`data/heirs/`; `raw['obituary_match']` (whole survivor lists) still does not publish. The dashboard
+detail panel shows them as "Possible heirs (candidates, from public notices)" with a source link per
+name. One-pass board count of what the next publish would carry: **3,639 leads, 3,941 names**
+(1,800 leads / 2,062 names in the footprint), of the 4,115 candidates built: personal representative
+1,272, co-owner on the tax roll 1,363, executor 530, administrator 380, care-of contact 250,
+executrix 37, administratrix 5, and from obituaries child 18, sibling 25, sister 16, spouse 9, son 9,
+parent 9, daughter 8, brother 5, mother 5; 993 representatives carry the address their notice
+printed. Nothing publishes until the next publish run, which the owner approves.
+
+**Privacy choice (public board), first version.** `raw['heir_candidates']`, `raw['obituary_match']` and the
 scrapers' `raw['obituary_private']` hold private people's names and are NOT in RAW_KEEP: they never
 reach the published board. The only new published key is `raw['heir_candidates_summary']`, a
 whitelist of `count`, `by_source_kind`, `deceased_signals`, `obituary_match`

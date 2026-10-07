@@ -48,12 +48,9 @@ INTENTIONALLY_INTERNAL = {
     # condition assessment. The diagnostic stays in-process via the
     # vision.listing_ungraded log line.
     "vision_unscored",
-    # PRIVACY, 2026-10-07 (enrichment_heir_candidates / enrichment_obituary_match): both hold
-    # private people's names (obituary survivors, personal representatives, co-owners). The board
-    # is a public repo, so they are kept off it on purpose; the published form is
-    # raw['heir_candidates_summary'] (counts and flags, in RAW_KEEP) and the names go to the
-    # gitignored data/heirs/heir_candidates.jsonl.gz (heirs_store.py).
-    "heir_candidates",
+    # PRIVACY, 2026-10-07 (enrichment_obituary_match): the whole obituary survivor list (in-laws,
+    # grandchildren, ages). Not published; the publishable subset of those names reaches the board
+    # through raw['heir_candidates'] (enrichment_heir_candidates.PUBLISHABLE_HEIR_RELATIONS).
     "obituary_match",
 }
 

@@ -27,10 +27,14 @@ the public notice prints one)]. source_kind is one of:
                                           entry, or the roll's care-of addressee.
 None of these is a finding that the person is an heir, is alive, or is anyone in particular.
 
-PRIVACY. Names are private people's names. raw['heir_candidates'] and raw['obituary_match'] are NOT
-in RAW_KEEP, so they never reach the public board; the published key is
-raw['heir_candidates_summary'] (counts and flags, no names). The names go to the private file
-data/heirs/heir_candidates.jsonl.gz (heirs_store.py; data/ is gitignored).
+PUBLISHING (owner decision 2026-10-07). raw['heir_candidates'] on the board is the PUBLISHED form:
+only relations in PUBLISHABLE_HEIR_RELATIONS (spouse, child, sibling, parent, the estate's
+representative, a roll co-owner or care-of contact), only {name, relation, source_kind, source_url,
+source_date, label} (+ address for a representative when the public probate notice prints one),
+never a minor, an age, a birth date, a phone or an e-mail. The full list (grandchildren, nieces,
+in-laws, notes, ages) stays in the private file data/heirs/heir_candidates.jsonl.gz (heirs_store.py;
+data/ is gitignored). raw['obituary_match'] (whole survivor lists) is still not published.
+raw['heir_candidates_summary'] carries counts and flags.
 
 No network. Env HEIR_CANDIDATES=0 turns it off; HEIR_CANDIDATES_PRIVATE_OUT=0 skips the private file.
 """
@@ -73,6 +77,74 @@ _REL_WORDS = {
     "nephew": "nephew", "niece": "niece", "aunt": "aunt", "uncle": "uncle", "cousin": "cousin",
     "companion": "companion", "godchild": "godchild",
 }
+
+
+# --------------------------------------------------------------------------- publishing rule
+
+#: OWNER DECISION 2026-10-07: candidate NAMES publish on the (public) dashboard, but only for
+#: relations that are plausible heirs-at-law or the estate's representatives. Change the rule
+#: here and nowhere else. Everything else (grandchildren, nieces/nephews, in-laws, companions,
+#: step-relations, a court notice's named heirs, collectors) stays in the private file only.
+PUBLISHABLE_HEIR_RELATIONS = frozenset({
+    "spouse", "son", "daughter", "child", "brother", "sister", "sibling", "parent", "mother", "father",
+    "personal representative", "executor", "executrix", "administrator", "administratrix",
+    "co-owner on the tax roll", "care-of contact on the tax roll",
+})
+#: the only fields a published candidate carries (no phone, email, birth date, age or note)
+PUBLISHED_FIELDS = ("name", "relation", "source_kind", "source_url", "source_date", "label")
+_CONTACT_LIKE = re.compile(r"\d|@|https?://|www\.", re.I)
+
+
+def _published_relation(c: dict) -> Optional[str]:
+    kind, rel = c.get("source_kind"), str(c.get("relation") or "").strip().lower()
+    if kind == "obituary_survivor":
+        return rel or None
+    if kind in ("probate_notice_personal_representative", "probate_record_personal_representative"):
+        r = re.sub(r"^co[- ]", "", rel)
+        if r in ("pr", "personal representative", "personal representatives") or "personal representative" in r:
+            return "personal representative"
+        for key in ("executrix", "executor", "administratrix", "administrator"):
+            if key in r:
+                return key
+        return None
+    if kind == "county_record":
+        if rel.startswith("care-of"):
+            return "care-of contact on the tax roll"
+        if "co-owner" in rel or "owner line" in rel:
+            return "co-owner on the tax roll"
+    return None
+
+
+def publishable(c: dict) -> Optional[dict]:
+    """The published form of one candidate, or None when the rule keeps it private: a relation
+    outside PUBLISHABLE_HEIR_RELATIONS, anyone described as a minor or given an age under 18, a name
+    without a surname or carrying digits / an address-like token, or no relation at all."""
+    rel = _published_relation(c)
+    if not rel or rel not in PUBLISHABLE_HEIR_RELATIONS:
+        return None
+    if c.get("minor") or (isinstance(c.get("age"), int) and c["age"] < 18):
+        return None
+    name = str(c.get("name") or "").strip()
+    if len(name.split()) < 2 or _CONTACT_LIKE.search(name):
+        return None
+    out = {"name": name, "relation": rel, "source_kind": c.get("source_kind"),
+           "source_url": c.get("source_url"), "source_date": c.get("source_date"), "label": "candidate"}
+    if c.get("source_kind") == "probate_notice_personal_representative" and c.get("address"):
+        out["address"] = c["address"]          # printed in the public probate notice itself
+    return out
+
+
+def published_candidates(cands: list[dict]) -> list[dict]:
+    out, seen = [], set()
+    for c in cands:
+        p = publishable(c)
+        if not p:
+            continue
+        k = (clean(p["name"]), p["relation"], p["source_url"])
+        if k not in seen:
+            seen.add(k)
+            out.append(p)
+    return out
 
 
 # --------------------------------------------------------------------------- death signals
@@ -237,7 +309,8 @@ def _obituary_candidates(row: Any) -> list[dict]:
             out.append(_cand(s["name"], word, "obituary_survivor", s.get("source_url") or src.get("url"),
                              s.get("source_date") or src.get("death_date") or src.get("published"),
                              "; ".join(b for b in bits if b) + ". A candidate, not a finding that this person is "
-                                                              "an heir."))
+                                                              "an heir.",
+                             minor=bool(s.get("minor")) or None, age=s.get("age")))
     return out
 
 
@@ -350,7 +423,8 @@ def candidates_for(row: Any) -> list[dict]:
     return _dedupe(cands)
 
 
-def summary_of(signals: list[dict], cands: list[dict], obituary_match: Optional[dict]) -> dict:
+def summary_of(signals: list[dict], cands: list[dict], obituary_match: Optional[dict],
+               published: Optional[list] = None) -> dict:
     by: dict[str, int] = {}
     for c in cands:
         by[c["source_kind"]] = by.get(c["source_kind"], 0) + 1
@@ -359,7 +433,8 @@ def summary_of(signals: list[dict], cands: list[dict], obituary_match: Optional[
         "by_source_kind": by,
         "deceased_signals": sorted({s["kind"] for s in signals}),
         "obituary_match": (obituary_match or {}).get("status") if isinstance(obituary_match, dict) else None,
-        "label": "candidates, not findings; names are kept off the public board",
+        "published_count": len(published or []),
+        "label": "candidates, not findings",
     }
 
 
@@ -390,8 +465,12 @@ def enrich_heir_candidates(listings: Iterable[Any], *, private_out: Optional[boo
         for s in {x["kind"] for x in sig}:
             stats["by_signal"][s] = stats["by_signal"].get(s, 0) + 1
         cands = candidates_for(row)
-        raw["heir_candidates"] = cands
-        raw["heir_candidates_summary"] = summary_of(sig, cands, raw.get("obituary_match"))
+        pub = published_candidates(cands)
+        raw["heir_candidates"] = pub                    # the PUBLISHED form (see publishable())
+        raw["heir_candidates_summary"] = summary_of(sig, cands, raw.get("obituary_match"), pub)
+        if pub:
+            stats["published_leads"] = stats.get("published_leads", 0) + 1
+            stats["published_names"] = stats.get("published_names", 0) + len(pub)
         if cands:
             stats["with_candidates"] += 1
             stats["candidates"] += len(cands)

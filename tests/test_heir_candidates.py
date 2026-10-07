@@ -222,7 +222,7 @@ def test_county_record_coowners_and_care_of():
     assert not any(x["name"] in ("TANDRY ORVEL",) for x in c)
 
 
-def test_enricher_summary_has_no_names_and_private_file_does(tmp_path, monkeypatch):
+def test_enricher_summary_is_counts_and_private_file_keeps_everything(tmp_path, monkeypatch):
     monkeypatch.setenv("HEIRS_PRIVATE_DIR", str(tmp_path))
     lead = _lead("TANDRY ORVEL QUIMBY HEIRS")
     match_rows([lead], [_obit()])
@@ -232,21 +232,86 @@ def test_enricher_summary_has_no_names_and_private_file_does(tmp_path, monkeypat
     blob = json.dumps(summ)
     for nm in ("Lunetta", "Corwin", "Wynnie", "Tandry"):
         assert nm not in blob
-    assert summ["count"] == 3 and summ["by_source_kind"] == {"obituary_survivor": 3}
-    assert summ["obituary_match"] == "attached"
+    assert summ["count"] == 3 and summ["published_count"] == 3
+    assert summ["by_source_kind"] == {"obituary_survivor": 3} and summ["obituary_match"] == "attached"
     priv = read_heir_candidates(tmp_path)
     assert priv and priv[0]["heir_candidates"][0]["name"] == "Lunetta Brask Tandry"
+    assert "confidence_note" in priv[0]["heir_candidates"][0]          # the private file keeps the notes
 
 
-def test_publish_keeps_summary_and_drops_names():
+def test_publish_carries_the_filtered_names_only():
     from foreclosure_scraper.web_artifact import _slim_raw
     lead = _lead("TANDRY ORVEL QUIMBY HEIRS")
     match_rows([lead], [_obit()])
     enrich_heir_candidates([lead], private_out=False)
     pub = _slim_raw(lead["raw"])
-    assert "heir_candidates" not in pub and "obituary_match" not in pub
-    assert pub["heir_candidates_summary"]["count"] == 3
-    assert "Lunetta" not in json.dumps(pub)
+    assert "obituary_match" not in pub                                  # whole survivor lists stay private
+    names = [(h["name"], h["relation"]) for h in pub["heir_candidates"]]
+    assert names == [("Lunetta Brask Tandry", "spouse"), ("Corwin Tandry", "son"), ("Wynnie Tandry Holcomb", "daughter")]
+    assert all(set(h) <= {"name", "relation", "source_kind", "source_url", "source_date", "label"}
+               for h in pub["heir_candidates"])
+    assert "Rudd" not in json.dumps(pub)                                # the in-law never publishes
+    assert pub["heir_candidates_summary"]["published_count"] == 3
+
+
+# --------------------------------------------------------------------------- the publishing rule
+
+def _c(name, relation, kind="obituary_survivor", **kw):
+    return {"name": name, "relation": relation, "source_kind": kind, "source_url": "https://p.test/o/1",
+            "source_date": "2026-09-28", "confidence_note": "note", "label": "candidate", **kw}
+
+
+def test_publish_rule_keeps_heirs_at_law_and_representatives():
+    from foreclosure_scraper.enrichment_heir_candidates import PUBLISHABLE_HEIR_RELATIONS, publishable
+    for rel in ("spouse", "son", "daughter", "child", "brother", "sister", "sibling", "mother", "father", "parent"):
+        assert publishable(_c("Ida Moss", rel))["relation"] == rel
+    assert publishable(_c("Ida Moss", "co-executor", "probate_notice_personal_representative"))["relation"] == "executor"
+    assert publishable(_c("Ida Moss", "Executrix", "probate_notice_personal_representative"))["relation"] == "executrix"
+    assert publishable(_c("Ida Moss", "pr", "probate_record_personal_representative"))["relation"] == \
+        "personal representative"
+    assert publishable(_c("IDA MOSS", "co-owner of record on the tax roll", "county_record"))["relation"] == \
+        "co-owner on the tax roll"
+    assert publishable(_c("IDA MOSS", "care-of addressee on the tax roll", "county_record"))["relation"] == \
+        "care-of contact on the tax roll"
+    assert {"spouse", "son", "daughter", "personal representative"} <= PUBLISHABLE_HEIR_RELATIONS
+
+
+def test_publish_rule_drops_the_rest():
+    from foreclosure_scraper.enrichment_heir_candidates import publishable
+    for rel in ("grandchild", "great-grandchild", "nephew", "niece", "in_law", "son_in_law", "daughter-in-law",
+                "companion", "cousin", "stepchild", "aunt", "uncle", "friend", "godchild", ""):
+        assert publishable(_c("Ida Moss", rel)) is None, rel
+    assert publishable(_c("Ida Moss", "named heir (defendant)", "court_notice_named_heir")) is None
+    assert publishable(_c("Ida Moss", "collector", "probate_notice_personal_representative")) is None
+    assert publishable(_c("Ida Moss", "son", minor=True)) is None                  # a minor
+    assert publishable(_c("Ida Moss", "son", age=12)) is None                      # under 18 by age
+    assert publishable(_c("Petra", "spouse")) is None                              # no surname printed
+    assert publishable(_c("Ida Moss 828-555-0100", "son")) is None                 # a phone in the name
+    assert publishable(_c("ida@example.test Moss", "son")) is None                 # an e-mail
+
+
+def test_published_fields_never_carry_ages_phones_or_notes():
+    from foreclosure_scraper.enrichment_heir_candidates import publishable
+    p = publishable(_c("Ida Moss", "son", age=44, nickname="Bud", phone="828-555-0100", email="x@y.test",
+                       birth_date="1982-01-01"))
+    assert set(p) == {"name", "relation", "source_kind", "source_url", "source_date", "label"}
+    rep = publishable(_c("Ida Moss", "executor", "probate_notice_personal_representative",
+                         address="9 Elm St, Shelby, NC 28150"))
+    assert rep["address"] == "9 Elm St, Shelby, NC 28150"                          # printed in the notice
+    roll = publishable(_c("IDA MOSS", "co-owner of record on the tax roll", "county_record", address="x"))
+    assert "address" not in roll                                                    # only notice addresses
+
+
+def test_minors_are_flagged_by_the_survivor_parser():
+    from foreclosure_scraper.obituary_text import parse_survivors
+    r = parse_survivors("He is survived by his wife, Opal Pike; a minor son, Rafe Pike; and a daughter, "
+                        "Ivy Pike (15).")
+    flags = {p["name"]: p.get("minor") for p in r["survivors"]}
+    assert flags == {"Opal Pike": None, "Rafe Pike": True, "Ivy Pike": True}
+    lead = _lead("PIKE ANSEL HEIRS")
+    match_rows([lead], [_obit(decedent="Ansel Pike", survivors=r["survivors"])])
+    enrich_heir_candidates([lead], private_out=False)
+    assert [h["name"] for h in lead["raw"]["heir_candidates"]] == ["Opal Pike"]
 
 
 def test_probate_index_representative_is_not_read_as_the_decedent():

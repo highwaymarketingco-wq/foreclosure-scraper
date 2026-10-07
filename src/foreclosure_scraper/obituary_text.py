@@ -96,7 +96,7 @@ _NUMBER_WORDS = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "fi
                  "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
                  "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
                  "eighteen": 18, "nineteen": 19, "twenty": 20}
-_QUANT = (r"(?:\d{1,3}|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
+_QUANT = (r"(?:\d{1,3}|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|minor|young|infant|"
           r"thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|several|many|"
           r"numerous|a\s+host\s+of|a\s+number\s+of|special|beloved|loving|devoted|dear|precious|"
           r"cherished|adoring|faithful|wonderful|his|her|their|the|our|also|best\s+friend\s+and)")
@@ -402,6 +402,7 @@ def _parse_segment(seg: str, surname_hint: Optional[str]) -> tuple[list[dict], l
                 else last_multi[-2]
             names[i] = (f"{nm} {surname}", {**notes, "surname_from_list": True})
     paired = len(rels) > 1 and len(rels) == len(names)
+    minor = bool(re.search(r"\b(?:minor|infant)\b|\bunder\s+(?:the\s+age\s+of\s+)?18\b", head, re.I))
     for i, (nm, notes) in enumerate(names):
         rel = rels[i] if paired else rels[0]
         person = {"name": nm, "relation": rel}
@@ -413,6 +414,8 @@ def _parse_segment(seg: str, surname_hint: Optional[str]) -> tuple[list[dict], l
             person["nickname"] = notes["nickname"]
         if notes.get("age") is not None:
             person["age"] = notes["age"]
+        if minor or (notes.get("age") is not None and notes["age"] < 18):
+            person["minor"] = True
         if notes.get("parenthetical"):
             person["parenthetical"] = notes["parenthetical"]
         people.append(person)
