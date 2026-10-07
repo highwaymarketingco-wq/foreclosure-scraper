@@ -133,52 +133,70 @@ plain requests and the disclaimer click-through it already performs.
   seen 2,700: other 2,016 (75%), foreclosure 520, judgment 158, partition 5,
   lis pendens 1; 422 eviction / minor / sealed party rows dropped; 684 emitted,
   only 14 of them filed 2024 or later.
-- **Only open cases are leads** (coordinator, same day): a case with a
-  disposition date or a closed status (closed, disposed, dismissed, satisfied,
-  settled, withdrawn, vacated, cancelled) is counted in
-  `closed_not_emitted`, not emitted. A judgment's disposition date is the day it
-  was entered, so a judgment stays a lead unless its status says satisfied,
-  vacated, cancelled, released or expired (`case_is_open`). How many of the 684
-  survive needs one more run of the proof script (its `emitted` line now counts
-  open leads only). On the board, 557 of the 1,549 carried Charleston rows are
-  open by the same rule (next section).
-- **Two things the proof shows, for a decision:**
-  - The letter sweep reaches mostly old cases (14 of 684 filed 2024 or later),
-    and the scraper keeps only 2024+, so it yields few new leads. A
-    filed-date-window search, like the state form's date filter, would reach
-    recent filings directly. That needs one more live look at Charleston's
-    search form.
-  - In SC a foreclosure is usually disposed when the judgment of foreclosure is
-    entered, before the Master's sale, so "no disposition date" also drops
-    foreclosures whose sale is still ahead. The sale stage comes from the
-    Master-in-Equity sources (`charleston_mie`), not from this lane.
+- **Lead rules per lane** (`case_lead`, coordinator's second pass the same day).
+  Open = no disposition date and no closed status (closed, disposed, dismissed,
+  satisfied, settled, withdrawn, vacated, cancelled).
+  - Foreclosure: open, OR disposed in the last 9 months (274 days) with a
+    disposition that is not a dismissal, withdrawal, discontinuance,
+    settlement, satisfaction, transfer, vacatur or cancellation. In SC a
+    foreclosure is usually disposed when the judgment of foreclosure is entered
+    and the Master-in-Equity sale comes weeks later, so such a case is kept and
+    marked `raw['foreclosure_judgment_entered'] = True` with
+    `raw['foreclosure_judgment_date']` (the disposition date). It is kept even
+    when filed before 2024. The same flag sits inside `raw['sc_public_index']`,
+    which the board publishes whole; the two top-level keys are published only
+    once they are added to `web_artifact.RAW_KEEP`. That edit was not made here
+    because `web_artifact.py` has another session's uncommitted changes.
+  - Partition, quiet title, lis pendens: open only.
+  - Judgment: kept unless the status says satisfied, vacated, cancelled,
+    released or expired (its disposition date is the day it was entered).
+  - Other: never. Unlabeled (unknown layout): as before.
+  Everything not kept is counted in `not_lead_by_lane`, and the run stats carry
+  a per-lane profile of distinct status / type / subtype values and filed and
+  disposition years.
+- **Share of the 520 foreclosures kept: not measured yet.** It needs one more
+  run of `scripts/charleston_lane_proof.py`, which now prints
+  `foreclosure_kept_share`, the distinct status / type / subtype values and the
+  year distributions per lane. It accepts the Charleston disclaimer, so the
+  agent did not run it; the coordinator or the owner does. About 11 requests,
+  3 s apart.
+- **Filed-date window search (built, unverified live).** When the search page
+  (the one reached after the disclaimer) has a date-type dropdown with a
+  "filed" option and From / To boxes, each run sets Circuit Court and Common
+  Pleas (option values read from the page, with the dropdowns' own postbacks)
+  and searches 14-day filed-date windows from the last day read (minus 3 days of
+  overlap) to today. On the first run it looks back 120 days. A window that
+  fills the 250-row grid, or says the maximum was exceeded, is split in half. If
+  the form also offers a disposition date type, a second sweep reads the last 9
+  months of dispositions, which is where judgment-entered foreclosures show up.
+  Caps: 40 requests a run, 3 s apart, one thread; an interrupted run resumes.
+  State: `data/charleston_public_index/state.json` (git-ignored; keys
+  `filed_through`, `disposed_through`). If the page has no date filter, or the
+  first answer is not a results page, the run falls back to the letter sweep
+  and saves no state. Switch: `CHARLESTON_PI_DATE_WINDOW=0`. Whether
+  Charleston's form has these controls is not known yet: part 2 of the proof
+  script prints the form's date options and runs two windows.
 
-### One-time cleanup of the carried rows (prior correction 6)
+### Cleanup of carried rows (prior correction 6, narrowed)
 
-`enrichment_prior_correction.withdraw_charleston_case_type()` runs in the
-existing `correct_prior_rows()` pass (after the prior board is merged in, before
-any enricher). A Charleston row of `national.sc_public_index` (or its
-`judgment_lien` sub-slug) is withdrawn when its lane is not foreclosure,
-partition, quiet title, lis pendens or judgment, or when the case is closed.
-Withdrawn means listing type `unknown` (no type signal; the row stays on the
-board), with `raw['withdrawn_case_type_other']` = {reason, at, listing_type,
-lane, status, date_disposed}. Reasons: `case_type_other`,
-`case_type_unrecoverable` (no label came back: this run's pass did not re-emit
-the case), `case_closed`. It is reversible: a later run that re-emits the case
-open and labeled restores it (fresh type wins the merge; the audit key is
-dropped), and `restore_case_type_withdrawal()` puts the old type back by hand.
-Run stats: `charleston_case_type_withdrawn`, `charleston_case_type_detail`.
-Tests: `tests/test_prior_correction_charleston_case_type.py` (6).
+The blanket rule (withdraw every carried Charleston row without a lead label:
+all 1,549 on today's board) is removed. Rows the scraper no longer emits are
+retired by the normal carry-forward aging, and relabelled ones come back on the
+next run. What remains withdraws a carried Charleston row of
+`national.sc_public_index` (or its `judgment_lien` sub-slug) only when its stored
+lane is `other` or its stored status records a dismissal, withdrawal,
+discontinuance or satisfaction. Withdrawn means listing type `unknown` (the row
+stays on the board), with `raw['withdrawn_case_type_other']` = {reason, at,
+listing_type, lane, status, date_disposed}. It is reversible: when a later copy
+no longer meets the rule, the audit key is dropped and the recorded type comes
+back if the row is still `unknown`; `restore_case_type_withdrawal()` does it by
+hand. Tests: `tests/test_prior_correction_charleston_case_type.py` (6).
 
 **What it would withdraw on today's board** (one read-only pass, counts only):
-all 1,549 carried Charleston rows. 992 are closed (status Settled 570, Dismissed
-252, Judgment 88, Disposed 30, Transferred 20, Satisfied 8, Closed 6, and 6
-"Pending" with a disposition date). The other 557 are open but carry no case-type
-label (Pending 354, Pending/ADR 172, Referred To Master 14, Appeal 5, ...); they
-are restored only if the next run's Charleston pass re-emits them labeled as a
-lead type. Given the 75% `other` share and the sweep's reach, expect most of
-them to stay withdrawn. If the Charleston pass fails in a run, every unlabeled
-row is withdrawn that run and comes back on the next good run.
+260 of the 1,549 Charleston rows (Dismissed 252, Satisfied 8). The other 1,289
+are left alone, including the 557 open ones without a label and the 570
+Settled ones: settlement is not in the cleanup rule, and those rows age out if
+the scraper stops emitting them.
 
 ## Divorce is not in the Public Index
 

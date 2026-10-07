@@ -156,19 +156,18 @@ merges on a withdrawn parcel or address. Every change keeps the old values under
    scorer's senior_exemption (the tax_relief path and the life_events tag path) is gone from every
    withdrawn row and nothing else on its stack changes.
 
-6. CHARLESTON PUBLIC INDEX CASES THAT ARE NOT LEADS (2026-10-07). national.sc_public_index's
-   Charleston pass used to emit every Common Pleas case as lis_pendens; the live grid showed 75% of
-   them are other case types (auto, contracts, torts) and many are closed. The pass now labels each
-   case (raw['sc_public_index']['lane']) and emits only open foreclosure / partition / quiet-title /
-   lis pendens / judgment cases. The carried rows have no label. A Charleston row of that source
-   (or its judgment_lien sub-slug) is WITHDRAWN when its lane is not one of those five (reason
-   'case_type_other', or 'case_type_unrecoverable' when no label came back: this run's pass did
-   not re-emit the case), or when the case is closed (reason 'case_closed': a disposition date or
-   a closed status; a judgment only when satisfied, vacated, cancelled, released or expired; the
-   scraper's case_is_open). Withdrawn = listing_type 'unknown' (no type signal, the row stays on the
-   board), with the old type, lane and status in raw['withdrawn_case_type_other']. Reversible: a
-   later run that re-emits the case open and labeled restores it (its fresh type wins the merge and
-   the audit key is dropped here), and restore_case_type_withdrawal() puts the old type back.
+6. CHARLESTON PUBLIC INDEX CASES THAT ARE POSITIVELY NOT LEADS (2026-10-07). national.sc_public_index's
+   Charleston pass used to emit every Common Pleas case as lis_pendens; it now labels each case
+   (raw['sc_public_index']['lane']) and emits only leads. Carried rows the pass no longer emits
+   are retired by the normal carry-forward aging, and relabelled ones come back on the next run,
+   so this correction is narrow: a carried Charleston row of that source (or its judgment_lien
+   sub-slug) is WITHDRAWN only when its stored lane is 'other' (reason 'case_type_other') or its
+   stored status records a dismissal, withdrawal, discontinuance or satisfaction (reason
+   'case_dismissed_or_satisfied'). A row with no label and any other status is left alone.
+   Withdrawn = listing_type 'unknown' (no type signal, the row stays on the board), with the old
+   type, lane and status in raw['withdrawn_case_type_other']. Reversible: when a later copy no
+   longer meets the rule (re-emitted labeled and live), the audit key is dropped and, if the row
+   is still 'unknown', its recorded type comes back; restore_case_type_withdrawal() does it by hand.
 
 MEMORY. Three light passes and one correcting pass over the in-memory list (correction 5 adds one
 light pass over the claim rows and one index of the elderly scraper's rows); the lookup tables
@@ -1694,39 +1693,39 @@ def _lt_value(li: Any) -> str:
     return getattr(lt, "value", lt) or ""
 
 
+_DISMISSED_OR_SATISFIED_RE = re.compile(r"dismiss|withdr|discontinu|satisf", re.I)
+
+
 def withdraw_charleston_case_type(li: Listing, today: Optional[datetime] = None) -> Optional[dict]:
     """Correction 6 on one row. Returns {'action': 'withdrawn', 'reason': ...},
-    {'action': 'restored'} (a withdrawn row the fresh pass re-emitted open and labeled),
-    {'action': 'already'} (withdrawn before, still not a lead) or None (not concerned / a lead)."""
+    {'action': 'restored'} (withdrawn before, no longer meets the rule), {'action': 'already'}
+    (withdrawn before, still meets it) or None (not concerned / left alone)."""
     if str(getattr(li, "source", "") or "") not in CHARLESTON_PI_SOURCES:
         return None
     if county_name(li.county) != "Charleston" or str(li.state or "").upper() != "SC":
         return None
-    from .scrapers.national.sc_public_index import case_is_open
-
     raw = li.raw if isinstance(li.raw, dict) else {}
     spi = raw.get("sc_public_index") if isinstance(raw.get("sc_public_index"), dict) else {}
     lane = (spi.get("lane") or "").strip()
-    is_open = case_is_open(spi)
-    if lane in LEAD_CASE_LANES and is_open:
+    status = (spi.get("status") or "").strip()
+    reason = None
+    if lane == "other":
+        reason = "case_type_other"
+    elif _DISMISSED_OR_SATISFIED_RE.search(status):
+        reason = "case_dismissed_or_satisfied"
+    if reason is None:
         if CASE_TYPE_KEY in raw:
-            raw.pop(CASE_TYPE_KEY, None)
+            restore_case_type_withdrawal(li, only_if_unknown=True)
             return {"action": "restored"}
         return None
     if CASE_TYPE_KEY in raw:
         return {"action": "already"}
-    if not is_open:
-        reason = "case_closed"
-    elif lane == "other":
-        reason = "case_type_other"
-    else:
-        reason = "case_type_unrecoverable"
     raw[CASE_TYPE_KEY] = {
         "reason": reason,
         "at": (today or datetime.utcnow()).date().isoformat(),
         "listing_type": _lt_value(li),
         "lane": lane or None,
-        "status": spi.get("status") or None,
+        "status": status or None,
         "date_disposed": spi.get("date_disposed") or None,
     }
     li.raw = raw
@@ -1735,13 +1734,17 @@ def withdraw_charleston_case_type(li: Listing, today: Optional[datetime] = None)
     return {"action": "withdrawn", "reason": reason}
 
 
-def restore_case_type_withdrawal(li: Listing) -> bool:
-    """Undo correction 6 on one row: the recorded listing type comes back, the audit key goes."""
+def restore_case_type_withdrawal(li: Listing, only_if_unknown: bool = False) -> bool:
+    """Undo correction 6 on one row: the recorded listing type comes back, the audit key goes.
+    `only_if_unknown`: keep a type a fresher copy already set (the merge's fresh type wins)."""
     raw = li.raw if isinstance(li.raw, dict) else {}
     rec = raw.pop(CASE_TYPE_KEY, None)
     if not isinstance(rec, dict):
         return False
+    li.raw = raw
     from .models import ListingType
+    if only_if_unknown and _lt_value(li) != "unknown":
+        return True
     try:
         li.listing_type = ListingType(rec.get("listing_type") or "lis_pendens")
     except ValueError:

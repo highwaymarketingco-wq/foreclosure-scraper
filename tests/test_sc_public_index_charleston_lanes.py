@@ -181,7 +181,8 @@ def test_charleston_pass_counts_other_and_does_not_emit_it(monkeypatch):
     assert sorted(r["lane"] for r in rows) == ["foreclosure", "judgment", "partition", "quiet_title"]
     st = mod.LAST_CHARLESTON_STATS
     assert st["cases"] == 5 and st["other_not_emitted"] == 1 and st["emitted"] == 4
-    assert st["closed_not_emitted"] == {}
+    assert st["not_lead_by_lane"] == {"other": 1}
+    assert st["search"]["mode"] == "letters" and st["form"] == {"date_filter": False}
     assert st["lanes"] == {"foreclosure": 1, "partition": 1, "quiet_title": 1,
                            "judgment": 1, "other": 1}
     assert st["dropped_party_rows"] == 2  # the eviction and the minor's settlement
@@ -201,12 +202,19 @@ def test_headers_match_the_ten_live_labels_exactly():
     assert {r["lane"] for r in mod._parse_charleston_results(html)} == {""}
 
 
+from datetime import date, timedelta  # noqa: E402
+
+TODAY = date(2026, 10, 7)
+_RECENT = (date.today() - timedelta(days=60)).strftime("%m/%d/%Y")   # within 9 months of the run
+_OLD = (date.today() - timedelta(days=400)).strftime("%m/%d/%Y")     # beyond it
+
 CLOSED_GRID = (
     '<html><body><table id="ContentPlaceHolder1_SearchResults">' + _HEAD
-    + _row("Owner November", "Defendant", "2026CP1000201", "SAMPLE BANK VS Owner November",
-           "Foreclosure 420", status="Disposed", disposed="08/01/2026")
+    # foreclosure disposed recently, not dismissed: judgment entered, sale ahead -> lead
+    + _row("Owner November", "Defendant", "2023CP1000201", "SAMPLE BANK VS Owner November",
+           "Foreclosure 420", status="Disposed", disposed=_RECENT)
     + _row("Owner Oscar", "Defendant", "2026CP1000202", "SAMPLE BANK VS Owner Oscar",
-           "Foreclosure 420", status="Dismissed")
+           "Foreclosure 420", status="Dismissed", disposed=_RECENT)
     + _row("Owner Papa", "Defendant", "2026CP1000203", "SAMPLE BANK VS Owner Papa",
            "Foreclosure 420")
     + _row("Debtor Quebec", "Defendant", "2026CP1000204", "SAMPLE CREDIT VS Debtor Quebec",
@@ -215,19 +223,35 @@ CLOSED_GRID = (
            "Confession of Judgment 570", status="Satisfied", disposed="06/02/2026")
     + _row("Heir Sierra", "Defendant", "2026CP1000206", "Heir Tango VS Heir Sierra",
            "Partition 440", status="Closed")
+    + _row("Owner Victor", "Defendant", "2025CP1000207", "SAMPLE BANK VS Owner Victor",
+           "Foreclosure 420", status="Judgment", disposed=_OLD)
+    + _row("Owner Whiskey", "Defendant", "2026CP1000208", "SAMPLE BANK VS Owner Whiskey",
+           "Foreclosure 420", status="Settled", disposed=_RECENT)
     + "</table></body></html>"
 )
 
 
-def test_only_open_cases_are_leads():
-    rows = {r["case_number"]: r for r in mod._parse_charleston_results(CLOSED_GRID)}
-    assert {cn for cn, r in rows.items() if mod.case_is_open(r)} == {
-        "2026CP1000203",   # pending foreclosure
-        "2026CP1000204",   # entered judgment: a disposition date does not close a judgment
-    }
+def test_lead_rules_per_lane():
+    def lead(**kw):
+        return mod.case_lead({"status": "Pending", "date_disposed": "", **kw}, TODAY)
+    assert lead(lane="foreclosure") == (True, False)
+    assert lead(lane="foreclosure", status="Referred To Master") == (True, False)
+    assert lead(lane="foreclosure", status="Judgment", date_disposed="08/01/2026") == (True, True)
+    assert lead(lane="foreclosure", status="Disposed", date_disposed="01/15/2026") == (True, True)
+    assert lead(lane="foreclosure", status="Disposed", date_disposed="12/01/2025") == (False, False)  # > 9 months
+    for st in ("Dismissed", "Withdrawn", "Discontinued", "Settled", "Satisfied", "Transferred"):
+        assert lead(lane="foreclosure", status=st, date_disposed="08/01/2026") == (False, False), st
+    for lane in ("partition", "quiet_title", "lis_pendens"):
+        assert lead(lane=lane) == (True, False)
+        assert lead(lane=lane, status="Judgment", date_disposed="08/01/2026") == (False, False)
+    assert lead(lane="judgment", status="Judgment Entered", date_disposed="06/01/2020") == (True, False)
+    for st in ("Satisfied", "Vacated", "Cancelled", "Released", "Expired"):
+        assert lead(lane="judgment", status=st) == (False, False), st
+    assert lead(lane="other") == (False, False)
+    assert lead(lane="") == (True, False)   # unlabeled (unknown layout): as before
 
 
-def test_charleston_pass_does_not_emit_closed_cases(monkeypatch):
+def test_charleston_pass_keeps_live_cases_and_marks_judgment_entered(monkeypatch):
     import asyncio
 
     import curl_cffi.requests as cf
@@ -242,6 +266,148 @@ def test_charleston_pass_does_not_emit_closed_cases(monkeypatch):
     monkeypatch.setattr(mod, "REQUEST_DELAY", 0)
     monkeypatch.setattr(mod, "SEARCH_PREFIXES", ["A"])
     rows = asyncio.run(mod._curl_search_county("charleston"))
-    assert sorted(r["case_number"] for r in rows) == ["2026CP1000203", "2026CP1000204"]
-    assert mod.LAST_CHARLESTON_STATS["closed_not_emitted"] == {
-        "foreclosure": 2, "judgment": 1, "partition": 1}
+    by = {r["case_number"]: r for r in rows}
+    assert sorted(by) == ["2023CP1000201", "2026CP1000203", "2026CP1000204"]
+    assert by["2023CP1000201"]["foreclosure_judgment_entered"] is True
+    st = mod.LAST_CHARLESTON_STATS
+    assert st["not_lead_by_lane"] == {"foreclosure": 3, "judgment": 1, "partition": 1}
+    assert st["foreclosure_judgment_entered"] == 1
+    assert st["profile"]["foreclosure"]["status"]["Disposed"] == 1
+    # the judgment-entered foreclosure filed in 2023 survives the 2024+ filter, flagged
+    for r in rows:
+        r["_county"] = "charleston"
+    lis = {li.case_number: li for li in mod.SCPublicIndexScraper()._to_listings(rows)}
+    fj = lis["2023CP1000201"]
+    assert fj.raw["foreclosure_judgment_entered"] is True
+    assert fj.raw["foreclosure_judgment_date"] == _RECENT
+    assert fj.raw["sc_public_index"]["foreclosure_judgment_entered"] is True
+    assert "foreclosure_judgment_entered" not in lis["2026CP1000203"].raw
+
+
+# --------------------------------------------------------------------------- #
+# Filed-date window search (made-up form markup in the shape of the state form).
+# --------------------------------------------------------------------------- #
+
+FORM = """<html><body>
+<input type="hidden" name="__VIEWSTATE" value="v0" />
+<select name="ctl00$ContentPlaceHolder1$DropDownListCourtType"
+        onchange="javascript:setTimeout('__doPostBack(\'ctl00$ContentPlaceHolder1$DropDownListCourtType\',\'\')', 0)">
+  <option value=" ">All</option><option value="G">Circuit Court</option><option value="L">Summary Court</option>
+</select>
+<select name="ctl00$ContentPlaceHolder1$DropDownListCaseTypes">
+  <option value=" ">All</option><option value="CP  ">Common Pleas</option><option value="GS  ">General Sessions</option>
+</select>
+<select name="ctl00$ContentPlaceHolder1$DropDownListDateFilter">
+  <option value="">Select</option><option value="Filed">Case Filed</option><option value="Disposed">Case Disposed</option>
+</select>
+<input name="ctl00$ContentPlaceHolder1$TextBoxDateFrom" /><input name="ctl00$ContentPlaceHolder1$TextBoxDateTo" />
+</body></html>"""
+
+
+def _grid_page(n_cases, subtype="Foreclosure 420", start=1):
+    rows = "".join(_row(f"Owner {i}", "Defendant", f"2026CP10{start + i:05d}", f"SAMPLE BANK VS Owner {i}",
+                        subtype) for i in range(n_cases))
+    return ('<html><body><input type="hidden" name="__VIEWSTATE" value="v1" />'
+            '<table id="ContentPlaceHolder1_SearchResults">' + _HEAD + rows + "</table></body></html>")
+
+
+class _WindowSession(_FakeCurlSession):
+    """Accept -> FORM; court postback -> FORM; a search answers by window length: a window
+    longer than 7 days is 'capped' (250 rows), shorter ones answer 2 cases."""
+    def __init__(self, *a, **k):
+        super().__init__()
+        self.searches = []
+
+    def post(self, url, data=None, **k):
+        if not url.endswith("PISearch.aspx"):
+            return _Resp(FORM)
+        if data.get("__EVENTTARGET"):
+            return _Resp(FORM)
+        f = data["ctl00$ContentPlaceHolder1$TextBoxDateFrom"]
+        t = data["ctl00$ContentPlaceHolder1$TextBoxDateTo"]
+        self.searches.append((data["ctl00$ContentPlaceHolder1$DropDownListDateFilter"], f, t,
+                              data.get("ctl00$ContentPlaceHolder1$DropDownListCourtType"),
+                              data.get("ctl00$ContentPlaceHolder1$DropDownListCaseTypes")))
+        from datetime import datetime as _dt
+        days = (_dt.strptime(t, "%m/%d/%Y") - _dt.strptime(f, "%m/%d/%Y")).days + 1
+        if days > 7:
+            return _Resp(_grid_page(250))
+        return _Resp(_grid_page(2, start=len(self.searches) * 10))
+
+
+def test_date_form_is_read_from_the_page():
+    form = mod._date_form(FORM)
+    assert form["filed"] == "Filed" and form["disposed"] == "Disposed"
+    assert form["court_value"] == "G" and form["court_postback"] is True
+    assert form["case_postback"] is False
+    assert mod._date_form("<html><body>no date filter</body></html>") is None
+
+
+def test_date_window_search_is_incremental_and_splits_capped_windows(monkeypatch, tmp_path):
+    import asyncio
+
+    import curl_cffi.requests as cf
+
+    sess = {}
+
+    def _make(*a, **k):
+        sess["s"] = _WindowSession()
+        return sess["s"]
+
+    monkeypatch.setattr(cf, "Session", _make)
+    monkeypatch.setattr(mod, "REQUEST_DELAY", 0)
+    monkeypatch.setattr(mod, "WINDOW_DELAY", 0)
+    monkeypatch.setattr(mod, "WINDOW_DAYS", 14)
+    monkeypatch.setattr(mod, "FILED_LOOKBACK_DAYS", 20)
+    monkeypatch.setattr(mod, "FORECLOSURE_JUDGMENT_DAYS", 5)
+    monkeypatch.setattr(mod, "WINDOW_MAX_REQUESTS", 40)
+    monkeypatch.setattr(mod, "CHARLESTON_STATE_FILE", tmp_path / "state.json")
+    rows = asyncio.run(mod._curl_search_county("charleston"))
+    st = mod.LAST_CHARLESTON_STATS["search"]
+    assert st["mode"] == "date_window" and st["split"] >= 1 and "fallback" not in st
+    searches = sess["s"].searches
+    assert all(c == "G" and k == "CP  " for _, _, _, c, k in searches)   # Circuit, Common Pleas
+    assert {d for d, *_ in searches} == {"Filed", "Disposed"}
+    assert rows and all(r["lane"] == "foreclosure" for r in rows)
+    import json as _json
+    state = _json.loads((tmp_path / "state.json").read_text())
+    today = date.today().isoformat()
+    assert state["filed_through"] == today and state["disposed_through"] == today
+    # next run: starts from the saved day minus the overlap, not the lookback
+    n_before = len(searches)
+    asyncio.run(mod._curl_search_county("charleston"))
+    second = sess["s"].searches
+    assert len(second) < n_before
+    first_from = min(_dt_parse(f) for d, f, *_ in second if d == "Filed")
+    assert (date.today() - first_from).days == mod.WINDOW_OVERLAP_DAYS
+
+
+def _dt_parse(s):
+    from datetime import datetime as _dt
+    return _dt.strptime(s, "%m/%d/%Y").date()
+
+
+def test_not_a_results_page_falls_back_to_the_letter_sweep(monkeypatch, tmp_path):
+    import asyncio
+
+    import curl_cffi.requests as cf
+
+    class _Odd(_WindowSession):
+        def post(self, url, data=None, **k):
+            if url.endswith("PISearch.aspx") and not data.get("__EVENTTARGET") \
+                    and data.get("ctl00$ContentPlaceHolder1$TextBoxDateFrom"):
+                return _Resp("<html><body>Please enter a last name</body></html>")
+            if url.endswith("PISearch.aspx") and data.get("ctl00$ContentPlaceHolder1$TextBoxlastName"):
+                return _Resp(GRID.replace("<html><body>", "<html><body>" + self.HIDDEN))
+            return super().post(url, data, **k)
+
+    monkeypatch.setattr(cf, "Session", _Odd)
+    monkeypatch.setattr(mod, "REQUEST_DELAY", 0)
+    monkeypatch.setattr(mod, "WINDOW_DELAY", 0)
+    monkeypatch.setattr(mod, "SEARCH_PREFIXES", ["A"])
+    monkeypatch.setattr(mod, "CHARLESTON_STATE_FILE", tmp_path / "state.json")
+    rows = asyncio.run(mod._curl_search_county("charleston"))
+    st = mod.LAST_CHARLESTON_STATS["search"]
+    assert st["mode"] == "letters" and st["fallback"] == "not_a_results_page"
+    assert len(rows) == 4
+    assert not (tmp_path / "state.json").exists()
