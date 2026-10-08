@@ -174,7 +174,8 @@ def lawyer_rows(row: dict, blk: dict) -> list[tuple[str, str, str]]:
         "deed_chain": " ; ".join(f"{t.get('date') or '?'} {t.get('doc_type') or t.get('type') or ''} "
                                  f"{t.get('book') or ''}/{t.get('page') or ''} ({t.get('source') or ''})" for t in tr),
         "taxpayer": f"{row.get('owner_name') or ''}",
-        "heirs": f"{len(raw.get('heir_candidates') or [])} candidate(s) on the board",
+        "heirs": (f"{len(raw.get('heir_candidates') or [])} heir candidate(s) on the board"
+                  + ("; a personal representative is on the probate record" if DL.estate_contact(raw) else "")),
     }
     out = []
     for k, label in LAWYER_LABELS:
@@ -250,7 +251,8 @@ def render(row: dict, blk: dict, shared: int, meta: dict) -> str:
             h.append(f"<tr><td class='k'>{esc(a)}</td><td>{b2}</td></tr>")
         h.append("</table>")
     if blk.get("lane") in ("A", "B", "D", "E") and blk.get("tier") in ("A", "B", "C"):
-        h.append(f"<h2>Call opener</h2><div class='say'>{esc(DL.say_this(row, blk))}</div>")
+        title = "Call opener" if blk.get("tier") in ("A", "B") else "Opener (for the letter, or if they call back)"
+        h.append(f"<h2>{title}</h2><div class='say'>{esc(DL.say_this(row, blk))}</div>")
         h.append(f"<h2>Before dialing or writing</h2><div>{esc(DL.before_dialing(row, blk, shared))}</div>")
     if blk.get("unmet"):
         h.append("<h2>Not yet met</h2><ul>" + "".join(f"<li>{esc(w)}</li>" for w in CR.unmet_words(blk["unmet"])) + "</ul>")

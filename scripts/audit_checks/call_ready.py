@@ -11,7 +11,9 @@ counts; src/foreclosure_scraper/call_ready.py is the gate itself.
                                 no bankruptcy on record, an owner phone that is not blocked (agent,
                                 people-search, do-not-dial) or DNC-registered, and tier A only with a
                                 phone tied to the record; lane D needs a sale date ahead or an open
-                                upset window on as_of. max 0.
+                                upset window on as_of; a worked estate / heirs lead (lanes B and C, tiers
+                                A-C) needs a property on the row and a county roll owner who is the dead
+                                person. max 0.
   call-ready-no-dead-owner-call no lane A row (any tier) whose owner of record is an estate or carries
                                 HEIRS / ESTATE / DECEASED wording, or that carries a confirmed death
                                 check: a dead person is never the one we call. max 0.
@@ -117,11 +119,21 @@ class CallEvidence(_Check):
         from foreclosure_scraper import call_ready as CR
         from foreclosure_scraper.enrichment_sc_phone import owner_phone_block_reason
         b = _blk(row)
-        if b is None or b.get("tier") not in ("A", "B") or b.get("lane") not in ("A", "D"):
+        if b is None:
+            return
+        raw = row.get("raw") if isinstance(row.get("raw"), dict) else {}
+        if b.get("lane") in ("B", "C") and b.get("tier") in ("A", "B", "C"):
+            # an estate or heirs lead that is worked: a property, and the county roll names the dead owner
+            self.checked += 1
+            if not CR.has_property(row):
+                self.bad(row, "estate_lead_without_property")
+            elif CR.death_fact(row).get("tied") is not True:
+                self.bad(row, "decedent_not_tied")
+            return
+        if b.get("tier") not in ("A", "B") or b.get("lane") not in ("A", "D"):
             return
         self.checked += 1
         today = _as_of(b)
-        raw = row.get("raw") if isinstance(row.get("raw"), dict) else {}
         op = raw.get("owner_phone") if isinstance(raw.get("owner_phone"), dict) else {}
         if not op.get("phone") or owner_phone_block_reason(op):
             self.bad(row, "phone_blocked_or_absent")

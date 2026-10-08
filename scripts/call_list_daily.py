@@ -184,8 +184,10 @@ def before_dialing(row: dict, blk: dict, shared: int) -> str:
                      f"confirm the unpaid years still show (checked {f.get('tax_checked_on')}); skip if paid.")
     if blk.get("lane") == "B":
         steps.append("Confirm the estate is still open on the clerk's estate index before writing or calling.")
-    if blk.get("dnc") in (None, "not_scrubbed", "unverified"):
+    if blk.get("tier") in ("A", "B") and blk.get("dnc") in (None, "not_scrubbed", "unverified"):
         steps.append("Scrub the number against the National Do Not Call list first.")
+    if blk.get("tier") == "C":
+        steps.append("Mail first (no phone a closer may dial is tied to this lead); use the opener if they call back.")
     if blk.get("tier") == "B":
         steps.append("The phone matches by name only: confirm identity in the first sentence.")
     if shared:

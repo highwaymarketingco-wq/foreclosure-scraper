@@ -560,9 +560,11 @@ def mailing_sane(text: str) -> bool:
     after it; no notice text, no 'unknown' / 'returned' marker, not a paragraph."""
     from .verification.core import has_notice_text
     s = str(text or "").strip()
-    if len(s) < 8 or len(s) > 160 or has_notice_text(s) or _BAD_MAIL.search(s):
+    if len(s) < 8 or len(s) > 160 or has_notice_text(s) or _BAD_MAIL.search(s) or \
+            re.search(r"\b(99999|00000)(-?\d{4})?\s*$", s):
         return False
-    numbered = bool(re.match(r"^\s*\d+[A-Z]?\b", s.upper())) or bool(_BOX.search(s))
+    # a house number at the start, or after a care-of line ("C/O <FIRM>, 77 CENTRAL AVE ...")
+    numbered = bool(re.search(r"(^|,)\s*\d+[A-Z]?\s+\w", s.upper())) or bool(_BOX.search(s))
     tail = bool(_ZIP.search(s)) or bool(_STATE.search(s.upper()[-12:]))
     return numbered and tail
 
@@ -733,7 +735,10 @@ def lawyer_list(row: Any, tax: dict, death: dict, estate: dict) -> dict:
     deed = _latest_deed(raw)
     out["legal_description"] = "ok" if (str(_g(row, "legal_description") or "").strip() and deed) else "missing"
     dc = raw.get("deed_chain")
-    n_tr = len(dc.get("transfers") or []) if isinstance(dc, dict) and isinstance(dc.get("transfers"), list) else 0
+    # a transfer counts when it is a recorded instrument: it carries a date or a book / instrument number
+    n_tr = sum(1 for t in (dc.get("transfers") or []) if isinstance(t, dict)
+               and (to_date(t.get("date")) or t.get("book") or t.get("instrument"))) \
+        if isinstance(dc, dict) and isinstance(dc.get("transfers"), list) else 0
     ph = record(raw, "probate_heir")
     chain_done = bool(((((ph or {}).get("evidence") or {}).get("transfer") or {}).get("chain") or {}).get("complete"))
     out["deed_chain"] = "ok" if (n_tr >= 2 or chain_done) else "missing"

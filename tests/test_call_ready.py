@@ -125,6 +125,19 @@ def test_bad_mailing_keeps_a_tied_phone_out_of_tier_a():
     assert b["lane"] == "A" and b["tier"] == "D" and "mailing_malformed" in b["unmet"]
 
 
+@pytest.mark.parametrize("text, ok", [
+    ("12 TEST HOLLOW RD FAIRVIEW NC 28730", True),
+    ("PO BOX 12 FLETCHER NC 28732", True),
+    ("C/O EXAMPLE LAW FIRM, 77 MAIN ST STE H ASHEVILLE NC 28801", True),
+    ("UNKNOWN CANDLER NE 99999", False),
+    ("1 MAIN ST SOMEWHERE NC 99999", False),
+    ("1680 TEST RD HENDERSONVILLE", False),           # no state, no ZIP
+    ("Under and by virtue of the power of sale contained in a deed of trust", False),
+])
+def test_mailing_sanity(text, ok):
+    assert CR.mailing_sane(text) is ok
+
+
 # --------------------------------------------------------------------------------------------- lane E
 
 def test_entity_owner_with_a_confirmed_debt_is_mail_only():

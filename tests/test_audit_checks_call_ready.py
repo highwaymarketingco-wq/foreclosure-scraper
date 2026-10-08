@@ -68,6 +68,17 @@ def test_tier_a_with_a_name_only_phone_is_caught():
     assert not res["ok"] and "tier_a_phone_not_tied" in res["detail"]
 
 
+def test_estate_lead_without_a_property_is_caught():
+    probate = _fx.probate_row()
+    stamped(probate)
+    assert probate["raw"]["call_ready"]["tier"] == "C"
+    assert run(ac.CallEvidence(), [probate])["ok"]
+    probate["parcel_id"] = None
+    probate["street_address"] = None          # e.g. a newspaper notice that names no property
+    res = run(ac.CallEvidence(), [probate])
+    assert not res["ok"] and "estate_lead_without_property" in res["detail"]
+
+
 def test_owner_call_to_an_estate_is_caught():
     r = stamped(heirs_row())
     blk = r["raw"]["call_ready"]
