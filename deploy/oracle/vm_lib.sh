@@ -96,6 +96,27 @@ vm_load_env() {
   export FORECLOSURE_NC_HARRIS_ROD="${FORECLOSURE_NC_HARRIS_ROD:-0}"
   export FORECLOSURE_NC_LOGAN_BLAZOR_ROD="${FORECLOSURE_NC_LOGAN_BLAZOR_ROD:-0}"
   export FORECLOSURE_NC_LOGAN_REMOTE_ROD="${FORECLOSURE_NC_LOGAN_REMOTE_ROD:-0}"
+
+  # 2026-10-09 audit (additions_verify): the SC register platforms that are ON by their code default are
+  # declared here too, so a changed default can never switch one off unseen; the register passes run
+  # their counties side by side (one request at a time per county host still) under their own budgets
+  # (the 10/8 run reached 5 of ~60 register counties in the 900 s ROD group cap and the deed chain the
+  # same 6 alphabetical counties). Obituary lookups and the Mecklenburg delinquent list stay OFF on
+  # purpose (owner decisions pending), declared so the gate sees the choice.
+  export FORECLOSURE_SC_PUBLICSEARCH_ROD="${FORECLOSURE_SC_PUBLICSEARCH_ROD:-1}"
+  export FORECLOSURE_SC_ACCLAIM_ROD="${FORECLOSURE_SC_ACCLAIM_ROD:-1}"
+  export FORECLOSURE_SC_GREENWOOD_ROD="${FORECLOSURE_SC_GREENWOOD_ROD:-1}"
+  export FORECLOSURE_SC_RECORDROOM_ROD="${FORECLOSURE_SC_RECORDROOM_ROD:-1}"
+  export FORECLOSURE_SC_COTT_ESEARCH_ROD="${FORECLOSURE_SC_COTT_ESEARCH_ROD:-1}"
+  export FORECLOSURE_SC_LOOKUP_ROD="${FORECLOSURE_SC_LOOKUP_ROD:-1}"
+  export FORECLOSURE_GENERIC_ROD_BUDGET_S="${FORECLOSURE_GENERIC_ROD_BUDGET_S:-2400}"
+  export GENERIC_ROD_COUNTY_CONCURRENCY="${GENERIC_ROD_COUNTY_CONCURRENCY:-8}"
+  export ROD_CHAIN_COUNTY_CONCURRENCY="${ROD_CHAIN_COUNTY_CONCURRENCY:-8}"
+  export OBITUARY_LOOKUPS="${OBITUARY_LOOKUPS:-0}"
+  export FORECLOSURE_MECKLENBURG_DELINQUENT="${FORECLOSURE_MECKLENBURG_DELINQUENT:-0}"
+  # Richland map-viewer reader: about 4 s a row on one host; 500 fits the 2,400 s resolver cap (the 10/8
+  # run read 300 and left 1,775 Richland rows waiting).
+  export RICHLAND_PARCEL_MAX="${RICHLAND_PARCEL_MAX:-500}"
 }
 
 # vm_publish_board <log> <commit message>: stage the dashboard payload, commit, pull --rebase,
