@@ -41,7 +41,7 @@ def _board(d: Path, rows: list[dict]) -> Path:
 
 def _run(tmp: Path, base: Path, cand: Path) -> tuple[int, dict]:
     out = tmp / "cmp" / "report.json"
-    (tmp / "no_checks").mkdir(exist_ok=True)
+    (tmp / "no_checks").mkdir(parents=True, exist_ok=True)
     rc = CB.main(["--baseline", str(base), "--candidate", str(cand), "--out", str(out), "--no-ledger",
                   "--checks-dir", str(tmp / "no_checks")])
     return rc, json.loads(out.read_text())
@@ -96,3 +96,22 @@ def test_source_id_keys_are_county_qualified_and_skip_weak_ids():
     assert CB.source_id_keys({**row, "county": None}) == []
     assert CB.source_id_keys({"state": "NC", "county": "Polk", "raw": {"parcel_id_nulled": {"value": "000"}}}) == []
     assert CB.join_keys(row)[0] == "sid:NC:madison:25261" and CB.join_keys(row)[-1].startswith("fp:")
+
+
+def test_hot_warm_growth_without_the_value_is_not_a_regression_but_a_loss_on_rows_in_both_is(tmp_path):
+    def hot(i, comps=True, tier="WARM"):
+        raw = {"distress_stack": {"tier": tier, "signals": ["tax_lien"]}}
+        if comps:
+            raw["comps"] = [{"sold_price": 90000 + i, "sold_date": "2026-01-01"}]
+        return _row(i, "counties_nc.test_roll", raw=raw)
+    live = [hot(i) for i in range(300)] + [_row(1000 + i, "counties_nc.cold") for i in range(300)]
+    # 300 COLD rows promoted to WARM without comps: the all-HOT+WARM share halves, nothing is lost
+    grown = [hot(i) for i in range(300)] + [hot(1000 + i, comps=False) for i in range(300)]
+    rc, rep = _run(tmp_path / "a", _board(tmp_path / "base", live), _board(tmp_path / "cand", grown))
+    assert not any(b["name"].endswith(":comps") for b in rep["blockers"]), rep["blockers"]
+    cov = next(r for r in rep["coverage"] if r["state"] == "ALL" and r["column"] == "comps")
+    assert cov["count_hotwarm_both"] == [300, 300]
+    # 30 of the rows HOT+WARM on both boards lose their comps: a regression on that lens
+    lost = [hot(i, comps=i >= 30) for i in range(300)] + [_row(1000 + i, "counties_nc.cold") for i in range(300)]
+    rc, rep = _run(tmp_path / "b", _board(tmp_path / "base2", live), _board(tmp_path / "cand2", lost))
+    assert "ALL:comps" in {b["name"] for b in rep["blockers"]}

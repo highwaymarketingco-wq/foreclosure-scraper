@@ -38,8 +38,9 @@ WHAT IT REPORTS (each section in the JSON and in the plain-words markdown)
                scripts/gap_matrix.py's own functions, not restated here), three extra fields and
                every distress signal: ROW COUNTS first, then the share of all rows, of HOT+WARM
                rows, and of rows present in BOTH boards (the like-for-like lens). Regressions are
-               judged on the like-for-like and HOT/WARM lenses plus counts, never on the all-rows
-               share alone (a board that grows with sparse rows lowers it while the count rises).
+               judged on the like-for-like lens and on the rows HOT or WARM on BOTH boards, never
+               on the all-rows or all-HOT+WARM share alone (a board that grows with sparse rows, or
+               promotes COLD rows, lowers those while no row loses the value).
   3 fields     rows present in both that HAD a value and now have none (lost) or another one
                (changed): owner name, street address, parcel id, phone, email, mailing address,
                tax balance, tax years, tax levy year, assessed value, comps, and each signal flag;
@@ -1039,6 +1040,12 @@ class Comparison:
         # base flipped; the row is still there: attribution, not loss), and the pairs
         self.relabeled: Counter = Counter()
         self.relabeled_to: Counter = Counter()
+        # rows HOT or WARM on BOTH boards: the like-for-like HOT+WARM lens (audit 2026-10-09,
+        # regressions: on the d42058b3 run HOT+WARM grew by 13,554 new and 9,757 promoted rows and
+        # 1,744 rows left the tier while staying on the board; the share over all HOT+WARM rows read
+        # that churn as lost comps, divorce and lien checks that the rows in both still carried)
+        self.hw_base = Cov()
+        self.hw_cand = Cov()
 
     def close(self) -> None:
         if self.best_fh:
@@ -1093,6 +1100,9 @@ class Comparison:
             self.relabeled_to[(bsrc, f.src)] += 1
         self.ov_base.add(bst, bcols | {"sig:" + s for s in bsigs})
         self.ov_cand.add(bst, set(f.cols) | {"sig:" + s for s in f.sigs})
+        if btier >= 2 and f.tier >= 2:
+            self.hw_base.add(bst, bcols | {"sig:" + s for s in bsigs})
+            self.hw_cand.add(bst, set(f.cols) | {"sig:" + s for s in f.sigs})
         for i, name in enumerate(FIELDS):
             v, _g = f.fvals[i]
             hc = _h4(v) if v is not None else 0
@@ -1801,20 +1811,24 @@ def coverage_section(bs: BoardStats, cs: BoardStats, cmp: Comparison, missing_co
                  "count_both": [ovb, ovc], "share_both": [_pct(ovb, ob), _pct(ovc, oc)],
                  "left_with_rows": missing_cov.c[state][col], "came_with_new_rows": cmp.new_cov.c[state][col]}
             lfl = (r["share_both"][1] - r["share_both"][0]) if ob >= LENS_MIN_ROWS and None not in r["share_both"] else None
-            hw = (r["share_hotwarm"][1] - r["share_hotwarm"][0]) if min(hb, hc) >= LENS_MIN_ROWS and None not in r["share_hotwarm"] else None
             alls = (r["share_all"][1] - r["share_all"][0]) if None not in r["share_all"] else None
             d = c - b
             why = []
             if lfl is not None and lfl < -COVERAGE_DROP_PP:
                 why.append(f"rows in both: {r['share_both'][0]}% -> {r['share_both'][1]}% ({ovb:,} -> {ovc:,} rows)")
-            # the HOT+WARM lens counts only when the HOT+WARM rows WITH the value fell, by more than the
-            # HOT+WARM rows with it that left the board: new hot leads arriving without it lower the
-            # share (dilution) and rows leaving are the rows section's business, neither is a loss here
-            hw_left = missing_hw.c[state][col]
-            if hw is not None and hw < -COVERAGE_DROP_PP and \
-                    hwc < hwb - hw_left - max(FLAT_MIN_ROWS, FLAT_REL * hwb):
-                why.append(f"HOT+WARM rows: {r['share_hotwarm'][0]}% -> {r['share_hotwarm'][1]}% "
-                           f"({hwb:,} -> {hwc:,} rows)")
+            # the HOT+WARM lens is judged on the rows HOT or WARM on BOTH boards (like for like): new
+            # hot leads arriving without the value, rows promoted from COLD and rows leaving the tier or
+            # the board move the share over all HOT+WARM rows (dilution, the tiers and rows sections'
+            # business) without a single row losing it. Measured on the d42058b3 run: comps 40.77% ->
+            # 26.63% over all HOT+WARM rows, 39.15% -> 38.87% on the 43,201 rows HOT+WARM on both.
+            nhw = cmp.hw_base.n[state]
+            hbb, hbc = cmp.hw_base.c[state][col], cmp.hw_cand.c[state][col]
+            r["count_hotwarm_both"] = [hbb, hbc]
+            r["share_hotwarm_both"] = [_pct(hbb, nhw), _pct(hbc, nhw)]
+            if nhw >= LENS_MIN_ROWS and None not in r["share_hotwarm_both"] and \
+                    r["share_hotwarm_both"][1] - r["share_hotwarm_both"][0] < -COVERAGE_DROP_PP:
+                why.append(f"rows HOT+WARM on both boards: {r['share_hotwarm_both'][0]}% -> "
+                           f"{r['share_hotwarm_both'][1]}% ({hbb:,} -> {hbc:,} of {nhw:,} rows)")
             if why:
                 cls = "regression"
             elif abs(d) <= max(FLAT_MIN_ROWS, FLAT_REL * max(b, 1)):
