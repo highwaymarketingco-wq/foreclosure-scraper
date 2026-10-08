@@ -36,6 +36,8 @@ from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 from foreclosure_scraper.scrapers.counties_sc.zombie_properties import ZombieProperties
 
 
+_ITER = "foreclosure_scraper.scrapers.counties_sc.zombie_properties._iter_board_listings"
+
 def _li(**kw):
     base = dict(
         source="test", source_url="https://x/y", state="SC", county="Anderson",
@@ -68,7 +70,7 @@ async def test_fetch_does_not_block_the_event_loop():
             await asyncio.sleep(0.01)
             heartbeats["n"] += 1
 
-    with patch("foreclosure_scraper.web_artifact.load_board", return_value=board):
+    with patch(_ITER, side_effect=lambda: iter(board)):
         hb_task = asyncio.create_task(_heartbeat())
         scraper = ZombieProperties()
         await scraper.fetch()
@@ -106,7 +108,7 @@ async def test_fetch_still_finds_real_zombies_after_the_threading_change():
     too_recent_lp = _li(parcel_id="Z4", street_address="4 New Ln", first_seen=recent)
     board = [zombie_lp, resolved_lp, progressed_lp, progressed_sale, too_recent_lp]
 
-    with patch("foreclosure_scraper.web_artifact.load_board", return_value=board):
+    with patch(_ITER, side_effect=lambda: iter(board)):
         scraper = ZombieProperties()
         out = await scraper.fetch()
 
@@ -118,7 +120,23 @@ async def test_fetch_still_finds_real_zombies_after_the_threading_change():
 
 @pytest.mark.asyncio
 async def test_fetch_handles_board_load_failure_without_blocking():
-    with patch("foreclosure_scraper.web_artifact.load_board", side_effect=RuntimeError("boom")):
+    with patch(_ITER, side_effect=RuntimeError("boom")):
         scraper = ZombieProperties()
         out = await scraper.fetch()
     assert out == []
+
+
+@pytest.mark.asyncio
+async def test_the_board_is_streamed_never_loaded_whole():
+    """load_board() refuses a board over 1,200 MB (4.1 GB on 2026-10-08), so this source returned ZERO_RESULT
+    on every VM run. It must stream the board and never call load_board."""
+    old = datetime.utcnow() - timedelta(days=400)
+    board = [_li(parcel_id="S1", street_address="1 Slow Ln", first_seen=old),
+             _li(parcel_id="S1", street_address="1 Slow Lane Extended", first_seen=old),   # same property, longer address
+             _li(parcel_id="S2", street_address="2 Fast Ln", first_seen=datetime.utcnow())]
+    boom = RuntimeError("load_board must not be called")
+    with patch("foreclosure_scraper.web_artifact.load_board", side_effect=boom), \
+         patch(_ITER, side_effect=lambda: iter(board)) as it:
+        out = await ZombieProperties().fetch()
+    assert it.call_count == 2                       # pass 1 (facts) and pass 2 (base rows of zombie keys only)
+    assert len(out) == 1 and out[0].street_address == "1 Slow Lane Extended"

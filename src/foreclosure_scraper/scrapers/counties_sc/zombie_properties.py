@@ -11,7 +11,7 @@ lis pendens listings against sale-type listings, and yields zombie
 properties as DISTRESSED leads.
 
 Logic:
-1. Load board with load_board().
+1. Stream the published board (two passes; never load_board(), which refuses a board over 1,200 MB).
 2. Group all listings by dedupe_key.
 3. Find groups where:
    a. At least one listing has listing_type == "lis_pendens"
@@ -68,6 +68,23 @@ _SALE_TYPES = {
 ZOMBIE_AGE_MONTHS = 12
 
 
+def _iter_board_listings():
+    """Every row of the published board as a Listing, one at a time: the board never sits in memory."""
+    from pathlib import Path
+
+    from ...board_parts import iter_plain_rows
+    from ...board_stream import iter_board_rows
+
+    docs = Path(__file__).resolve().parents[4] / "docs"
+    plain = docs / "listings.json"
+    rows = iter_plain_rows(plain) if plain.exists() else iter_board_rows(docs / "listings.json.gz")
+    for rec in rows:
+        try:
+            yield Listing.model_validate(rec)
+        except Exception:  # noqa: BLE001 - one malformed row must not void the derivation
+            continue
+
+
 class ZombieProperties(BaseScraper):
     slug = "counties_sc.zombie_properties"
     name = "Zombie Properties Detector (stalled foreclosures)"
@@ -102,67 +119,71 @@ class ZombieProperties(BaseScraper):
     def _compute_zombies(self) -> list[Listing]:
         out: list[Listing] = []
 
+        # Two streaming passes over the published board (never load_board(): the whole board was 4.1 GB
+        # on 2026-10-08, over the 1,200 MB load ceiling, so this source returned ZERO_RESULT on every VM run).
+        # Pass 1 keeps four small facts per dedupe_key; pass 2 picks the base row of each zombie key only.
         try:
-            from ...web_artifact import load_board
-            board = load_board()
+            facts: dict[str, list] = {}      # key -> [has_lis_pendens, oldest_lp_first_seen, has_sale, has_terminal]
+            total = 0
+            for listing in _iter_board_listings():
+                total += 1
+                f = facts.setdefault(listing.dedupe_key(), [False, None, False, False])
+                if listing.listing_type == ListingType.LIS_PENDENS:
+                    f[0] = True
+                    if listing.first_seen and (f[1] is None or listing.first_seen < f[1]):
+                        f[1] = listing.first_seen
+                if listing.listing_type in _SALE_TYPES:
+                    f[2] = True
+                if (listing.auction_status or "").lower() in TERMINAL_AUCTION_STATUSES:
+                    f[3] = True
         except Exception as exc:
             log.warning("zombie_properties.board_load_fail", error=str(exc)[:160])
             return out
 
-        if not board:
+        if not total:
             log.info("zombie_properties.empty_board")
             return out
 
-        cutoff = datetime.utcnow() - timedelta(days=ZOMBIE_AGE_MONTHS * 30)
+        now = datetime.utcnow()
+        cutoff = now - timedelta(days=ZOMBIE_AGE_MONTHS * 30)
 
-        # Group listings by dedupe_key
-        groups: dict[str, list[Listing]] = {}
-        for listing in board:
-            key = listing.dedupe_key()
-            groups.setdefault(key, []).append(listing)
-
-        zombies_found = 0
-        for key, listings in groups.items():
-            # Find lis pendens entries in this group
-            lp_entries = [
-                l for l in listings
-                if l.listing_type == ListingType.LIS_PENDENS
-            ]
-            if not lp_entries:
+        zombie_keys: dict[str, datetime] = {}
+        for key, (has_lp, oldest, has_sale, has_terminal) in facts.items():
+            if not has_lp:
                 continue
-
-            # Check if any listing in the group has progressed to sale
-            has_sale = any(
-                l.listing_type in _SALE_TYPES for l in listings
-            )
             if has_sale:
-                continue  # This property has progressed — not a zombie
-
-            # A lis pendens with a TERMINAL disposition (dismissed/satisfied/
-            # redeemed/etc.) is RESOLVED, not stalled -- the case is over,
-            # whether or not it ever became a sale. Checking _SALE_TYPES
-            # progression alone missed this entirely; found 2026-09-15 after
-            # every single live row this scraper produced turned out to
-            # carry auction_status="dismissed" (see module docstring).
-            has_terminal_status = any(
-                (l.auction_status or "").lower() in TERMINAL_AUCTION_STATUSES
-                for l in listings
-            )
-            if has_terminal_status:
-                continue  # Resolved (e.g. dismissed) — not a zombie
-
-            # Check if the oldest lis pendens is >12 months old
-            oldest_lp = min(
-                (l.first_seen for l in lp_entries if l.first_seen),
-                default=datetime.utcnow(),
-            )
+                continue  # This property has progressed -- not a zombie
+            # A lis pendens with a TERMINAL disposition (dismissed/satisfied/redeemed/etc.) is RESOLVED, not
+            # stalled -- the case is over, whether or not it ever became a sale (found 2026-09-15: every live
+            # row this scraper produced carried auction_status="dismissed"; see the module docstring).
+            if has_terminal:
+                continue
+            oldest_lp = oldest if oldest is not None else now     # no first_seen anywhere: "now", never old enough
             if oldest_lp >= cutoff:
                 continue  # Not old enough yet
+            zombie_keys[key] = oldest_lp
+        del facts
 
-            # This is a zombie property — use the most detailed listing
-            # as the base (prefer one with an address)
-            base = max(lp_entries, key=lambda l: len(l.street_address or ""))
+        if not zombie_keys:
+            log.info("zombie_properties.done", count=0, total_board=total)
+            return out
 
+        # Pass 2: the base row of each zombie key = its lis pendens with the longest street address
+        # (the first such row on a tie, like max() over the group did).
+        bases: dict[str, Listing] = {}
+        for listing in _iter_board_listings():
+            if listing.listing_type != ListingType.LIS_PENDENS:
+                continue
+            key = listing.dedupe_key()
+            if key not in zombie_keys:
+                continue
+            best = bases.get(key)
+            if best is None or len(listing.street_address or "") > len(best.street_address or ""):
+                bases[key] = listing
+
+        zombies_found = 0
+        for key, base in bases.items():
+            oldest_lp = zombie_keys[key]
             zombie = base.model_copy(deep=True)
             zombie.listing_type = ListingType.DISTRESSED
             zombie.source = "counties_sc.zombie_properties"
@@ -188,5 +209,5 @@ class ZombieProperties(BaseScraper):
             out.append(zombie)
             zombies_found += 1
 
-        log.info("zombie_properties.done", count=zombies_found, total_board=len(board))
+        log.info("zombie_properties.done", count=zombies_found, total_board=total)
         return out
