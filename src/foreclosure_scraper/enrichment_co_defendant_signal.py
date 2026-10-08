@@ -111,14 +111,22 @@ _HOA_RE = re.compile(
 )
 
 
+def _party_key(name: str) -> str:
+    return " ".join(re.sub(r"[^0-9a-z]+", " ", str(name or "").lower()).split())
+
+
 def _co_defendants(li: Listing) -> list[str]:
+    """The case's co-defendants, minus the plaintiff itself: a party list that repeats the
+    plaintiff (2 of 135 tagged rows on the 10/8 checkpoint listed the suing bank as its own junior
+    lienholder; audit 2026-10-09 additions_verify) must not read as another lien."""
     raw = li.raw if isinstance(li.raw, dict) else {}
+    plaintiff = _party_key(getattr(li, "plaintiff", None) or "")
     for container in ("court", "sc_public_index"):
         block = raw.get(container)
         if isinstance(block, dict):
             vals = block.get("co_defendants")
             if isinstance(vals, list) and vals:
-                return [str(v) for v in vals if v]
+                return [str(v) for v in vals if v and (not plaintiff or _party_key(v) != plaintiff)]
     return []
 
 

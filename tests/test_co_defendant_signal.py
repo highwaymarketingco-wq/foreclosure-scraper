@@ -143,3 +143,15 @@ def test_enricher_is_wired_into_main_pipeline():
     src = inspect.getsource(main_module)
     assert "enrichment_co_defendant_signal import enrich_co_defendant_signal" in src
     assert "enrich_co_defendant_signal(enriched)" in src
+
+
+def test_the_plaintiff_is_never_its_own_junior_lienholder():
+    """A party list that repeats the suing lender (2 of 135 tagged rows on the 10/8 checkpoint)
+    is not a second lien; another lender beside it still is. Made-up names."""
+    alone = _row(["Example National Bank"], container="sc_public_index")
+    alone.plaintiff = "Example National Bank"
+    other = _row(["EXAMPLE NATIONAL BANK", "Sample Credit Union"], container="sc_public_index")
+    other.plaintiff = "Example National Bank"
+    enrich_co_defendant_signal([alone, other])
+    assert "co_defendant_signal" not in alone.raw
+    assert other.raw["co_defendant_signal"]["junior_lienholders"] == ["Sample Credit Union"]
