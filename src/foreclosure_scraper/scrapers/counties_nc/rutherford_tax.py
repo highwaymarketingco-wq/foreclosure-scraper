@@ -94,6 +94,7 @@ import structlog
 from selectolax.parser import HTMLParser
 
 import asyncio
+import time
 
 from ...base_scraper import BaseScraper
 from ...http_client import client, get_bytes, get_text
@@ -458,7 +459,22 @@ async def _pin_map(http) -> dict[str, str]:
         if not feats or (len(feats) < _PIN_PAGE and not body.get("exceededTransferLimit")):
             break
     log.info("rutherford_tax.pin_map", parcels=len(out))
+    if out:
+        _PIN_MEMO["at"], _PIN_MEMO["map"] = time.time(), out
     return out
+
+
+#: The last good {Parcel_Number: PIN} map in this process, so counties_nc.rutherford_wildfire_tax
+#: (same county Parcel_Number) reuses it instead of paging the layer a second time (2026-10-08).
+_PIN_MEMO: dict = {"at": 0.0, "map": {}}
+_PIN_MEMO_MAX_AGE_S = 6 * 3600
+
+
+async def pin_map_cached(http) -> dict[str, str]:
+    """_pin_map(), reused for six hours within one process when the last read was non-empty."""
+    if _PIN_MEMO["map"] and time.time() - _PIN_MEMO["at"] <= _PIN_MEMO_MAX_AGE_S:
+        return _PIN_MEMO["map"]
+    return await _pin_map(http)
 
 
 def apply_pins(rows: list[Listing], pins: dict[str, str]) -> int:
@@ -521,7 +537,7 @@ class RutherfordDelinquentTax(BaseScraper):
 
         try:
             async with client(timeout=60.0) as http:
-                pinned = apply_pins(out, await _pin_map(http))
+                pinned = apply_pins(out, await pin_map_cached(http))
         except Exception as exc:  # noqa: BLE001 - rows keep their Parcel_Number
             pinned = 0
             log.warning("rutherford_tax.pin_apply_failed", error=str(exc)[:160])

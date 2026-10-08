@@ -777,6 +777,62 @@ async def _sweep_year(c, url: str, year: int, st: dict, on_page, budget) -> bool
     return True
 
 
+def apply_county_pins(rows: list[Listing], pins: dict[str, str]) -> int:
+    """parcel_id := the county's 10-digit PIN for the roll's Parcel_Number; the Parcel_Number stays
+    in raw['rutherford_wildfire']['parcel'] (the alias parcel_alias.py matches on) and the PIN is
+    also written to raw['rutherford_wildfire']['pin'].
+
+    WHY (2026-10-08 source-completeness audit). This feed's ParcelNumber is the same 6-7 digit
+    county Parcel_Number counties_nc.rutherford_tax switched away from on 2026-10-07 (owner
+    decision, parcel_alias.py): validation.py nulled the 896 six-digit ones on the 2026-10-08 run,
+    so those rows published with no parcel, and the 7-digit ones never matched the PIN every other
+    NC source keys on. Same guard as rutherford_tax.apply_pins: a PIN the county gives to two
+    Parcel_Numbers of this roll is not one property here and is not applied."""
+    from collections import Counter
+
+    def roll_id(li: Listing) -> str:
+        blk = (li.raw or {}).get("rutherford_wildfire") or {}
+        return str(blk.get("parcel") or li.parcel_id or "").strip()
+
+    shared = {p for p, c in Counter(pins.get(roll_id(li)) for li in rows).items() if p and c > 1}
+    n = 0
+    for li in rows:
+        pin = pins.get(roll_id(li))
+        if pin and pin not in shared:
+            ((li.raw or {}).setdefault("rutherford_wildfire", {}))["pin"] = pin
+            li.parcel_id = pin
+            n += 1
+    return n
+
+
+def _pins_enabled() -> bool:
+    """PINs are published only once parcel_alias.ALIAS_SOURCES registers this slug: without that
+    entry the board merge would see a prior row's short id and the fresh row's PIN as two ids of
+    one source in one county, refuse the fold, and publish every re-keyed row twice. The alias
+    entry is a shared-file change the lead lands; until then this source behaves exactly as before.
+    RUTHERFORD_WILDFIRE_PINS=0 turns it off even then."""
+    if os.environ.get("RUTHERFORD_WILDFIRE_PINS") == "0":
+        return False
+    try:
+        from ... import parcel_alias
+    except Exception:  # noqa: BLE001
+        return False
+    return SLUG in getattr(parcel_alias, "ALIAS_SOURCES", {})
+
+
+async def _with_pins(rows: list[Listing]) -> list[Listing]:
+    if not rows or not _pins_enabled():
+        return rows
+    try:
+        from .rutherford_tax import pin_map_cached
+        async with client(timeout=60.0) as http:
+            pinned = apply_county_pins(rows, await pin_map_cached(http))
+        log.info("rutherford_wildfire.pinned", pinned=pinned, rows=len(rows))
+    except Exception as exc:  # noqa: BLE001 - rows keep their Parcel_Number
+        log.warning("rutherford_wildfire.pin_failed", error=str(exc)[:160])
+    return rows
+
+
 class RutherfordWildfireDelinquent(BaseScraper):
     slug = SLUG
     name = "Rutherford NC delinquent tax bills (Sturgis Wildfire API)"
@@ -808,7 +864,7 @@ class RutherfordWildfireDelinquent(BaseScraper):
             out = _records_to_listings(_load_bills(), f"{DEFAULT_API_HOST}/data/{DEFAULT_CLIENT_ID}"
                                        "/Wildfire/Records", self.slug)
             log.info("rutherford_wildfire.cache_hit", age_h=round(age_h, 1), listings=len(out))
-            return out
+            return await _with_pins(out)
 
         api_host, client_id = DEFAULT_API_HOST, DEFAULT_CLIENT_ID
         try:
@@ -872,6 +928,7 @@ class RutherfordWildfireDelinquent(BaseScraper):
         _save_state(st)
         out = rollup()
         self.partial = out
+        out = await _with_pins(out)
         log.info("rutherford_wildfire.done", pages=pages["n"], complete=st["complete"],
                  walled=walled, distinct_parcels=len(out), **_state_summary(st),
                  total_owed=round(sum(li.judgment_amount or 0.0 for li in out), 2))
