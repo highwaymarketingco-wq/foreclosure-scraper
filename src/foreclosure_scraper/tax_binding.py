@@ -672,12 +672,52 @@ def _year_keys(d: Any) -> list[int]:
 def confirmed_tax_record(raw: Any, now=None) -> Optional[dict]:
     """The row's tax_lien verification record when its verdict is 'confirmed' and it has not
     expired (verification.apply stamps expires_at = checked_at + the verifier's TTL)."""
+    rec = decisive_tax_record(raw, now)
+    return rec if rec is not None and rec.get("verdict") == "confirmed" else None
+
+
+def decisive_tax_record(raw: Any, now=None) -> Optional[dict]:
+    """The row's tax_lien record when its verdict is confirmed, stale or refuted and it has not
+    expired; None otherwise (unconfirmed, wall, expired, no record)."""
     from .verification.core import is_expired, records_of
     for rec in records_of(raw):
-        if rec.get("signal") == "tax_lien" and rec.get("verdict") == "confirmed" \
+        if rec.get("signal") == "tax_lien" and rec.get("verdict") in ("confirmed", "stale", "refuted") \
                 and not is_expired(rec, now):
             return rec
     return None
+
+
+def _money_text(v: float) -> str:
+    return f"${v:,.2f}"
+
+
+def county_check_note(rec: dict) -> dict:
+    """raw['tax_county_check']: the verdict, when it was checked, and one short line of what the
+    county's site showed (amounts and years only)."""
+    ev = rec.get("evidence") if isinstance(rec.get("evidence"), dict) else {}
+    verdict = rec.get("verdict")
+    total = _num(ev.get("total_delinquent")) or 0.0
+    pending = {y: _num(ev["not_yet_delinquent_due"].get(str(y))) for y in _year_keys(ev.get("not_yet_delinquent_due"))}
+    if verdict == "confirmed":
+        n = ev.get("years_delinquent")
+        detail = f"{_money_text(total)} past due" + (f" over {n} year{'s' if n != 1 else ''}" if isinstance(n, int) else "")
+    elif verdict == "stale":
+        detail = "the delinquent bill was paid; nothing past due now" if total <= 0 else f"{_money_text(total)} past due"
+    else:
+        detail = "no delinquent bill on the county site" if total <= 0 else f"{_money_text(total)} past due"
+    if pending:
+        detail += "; " + ", ".join(f"{y} bill {_money_text(a)} not late yet" for y, a in pending.items() if a)
+    return {"verdict": verdict, "checked_at": rec.get("checked_at"), "detail": detail}
+
+
+def county_check_balance(row: Any, rec: dict) -> Optional[dict]:
+    """For a stale or refuted check of the row's own parcel: the past-due balance the county's site
+    still shows (raw['tax_owed'] from the check), or {} when it shows none (the balance goes)."""
+    ev = rec.get("evidence") if isinstance(rec.get("evidence"), dict) else {}
+    total = _num(ev.get("total_delinquent")) or 0.0
+    if total <= 0:
+        return {}
+    return verified_tax_owed(row, rec)
 
 
 def verified_checks_row(row: Any, ev: dict) -> bool:
@@ -721,24 +761,55 @@ def verified_tax_owed(row: Any, rec: dict) -> Optional[dict]:
 
 
 def restore_verified_tax(listings: Iterable[Any], now=None) -> dict:
-    """Set raw['tax_owed'], the aging fields and the amount_owed promotion from each row's
-    confirmed county-site verification (verified_tax_owed), after verification.apply and before
-    the scorer. A row whose tax_owed is another lien's (a state lien, a lien-agent filing) is left
-    alone. Idempotent. Returns counts."""
+    """The county's own site decides the row's displayed tax debt, after verification.apply and
+    before the scorer. For a tax_lien check of the row's own parcel inside its TTL:
+      confirmed         raw['tax_owed'], the aging fields and the amount_owed promotion from the
+                        check's balance and late years (verified_tax_owed);
+      stale / refuted   the earlier unverified balance and what came of it are removed (the site
+                        shows nothing past due), or replaced by a past-due balance the site still
+                        shows;
+    and raw['tax_county_check'] = {verdict, checked_at, detail} records what the site said. A row
+    with no such check is not touched (an expired note is cleared). A row whose tax_owed is
+    another lien's (a state lien, a lien-agent filing) is left alone. Idempotent. Returns counts."""
     from .enrichment_amount_owed import _tax_owed_promotion
     from .enrichment_tax_owed import BIG_TAX_BALANCE
     stats = {"confirmed": 0, "restored": 0, "replaced_balance": 0, "added_balance": 0,
-             "not_own_parcel_or_no_years": 0, "other_lien_kept": 0}
+             "not_own_parcel_or_no_years": 0, "other_lien_kept": 0,
+             "stale_or_refuted": 0, "balance_removed": 0, "balance_from_check": 0, "note_only": 0,
+             "notes_cleared": 0}
     for li in listings:
         raw = _raw(li)
-        rec = confirmed_tax_record(raw, now) if raw else None
+        rec = decisive_tax_record(raw, now) if raw else None
         if rec is None:
+            if raw.pop("tax_county_check", None) is not None:   # an expired check says nothing now
+                stats["notes_cleared"] += 1
             continue
-        stats["confirmed"] += 1
         old = raw.get("tax_owed")
         if isinstance(old, dict) and _non_property_owed(li):
             stats["other_lien_kept"] += 1
             continue
+        ev = rec.get("evidence") if isinstance(rec.get("evidence"), dict) else {}
+        if rec.get("verdict") in ("stale", "refuted"):
+            # the county's site says the claim is paid (stale) or was never owed (refuted): the row
+            # never shows the earlier unverified balance; it shows what the check states
+            stats["stale_or_refuted"] += 1
+            if not verified_checks_row(li, ev):
+                stats["not_own_parcel_or_no_years"] += 1
+                continue
+            raw["tax_county_check"] = county_check_note(rec)
+            new_to = county_check_balance(li, rec)
+            if new_to:
+                rec_conf = dict(rec, verdict="confirmed")
+                _apply_verified(li, raw, new_to, rec_conf, _tax_owed_promotion, BIG_TAX_BALANCE)
+                stats["balance_from_check"] += 1
+            elif isinstance(old, dict) or any(k in raw for k in DERIVED_AGING_KEYS):
+                raw.pop("tax_owed", None)
+                drop_derived_tax(raw, drop_owed=True)
+                stats["balance_removed"] += isinstance(old, dict)
+            else:
+                stats["note_only"] += 1
+            continue
+        stats["confirmed"] += 1
         to = verified_tax_owed(li, rec)
         if to is None:
             stats["not_own_parcel_or_no_years"] += 1
@@ -748,20 +819,26 @@ def restore_verified_tax(listings: Iterable[Any], now=None) -> dict:
             stats["replaced_balance"] += _num(old.get("balance")) != to["balance"]
         else:
             stats["added_balance"] += 1
-        raw["tax_owed"] = to
-        n = to["years_delinquent"]
-        surf = {"tax_year": to["year"], "years_delinquent": n, "status": "delinquent",
-                "source": VERIFIED_SOURCE, "basis": "year_list", "unpaid_bill_years": to["unpaid_bill_years"]}
-        if to["not_yet_late_years"]:
-            surf["not_yet_late_years"] = to["not_yet_late_years"]
-        raw["tax_aging_surfaced"] = surf
-        raw["tax_aging_high"] = n >= 2
-        raw.pop("tax_not_yet_late", None)
-        if n >= 2 and to["balance"] >= BIG_TAX_BALANCE:
-            raw["tax_big_old"] = True
-        else:
-            raw.pop("tax_big_old", None)
-        ao = _tax_owed_promotion(raw, li)
-        if ao is not None:
-            raw["amount_owed"] = ao
+        raw["tax_county_check"] = county_check_note(rec)
+        _apply_verified(li, raw, to, rec, _tax_owed_promotion, BIG_TAX_BALANCE)
     return stats
+
+
+def _apply_verified(li: Any, raw: dict, to: dict, rec: dict, promote, big: float) -> None:
+    """raw['tax_owed'], the aging fields and the amount_owed promotion from a county-site balance."""
+    raw["tax_owed"] = to
+    n = to["years_delinquent"]
+    surf = {"tax_year": to["year"], "years_delinquent": n, "status": "delinquent",
+            "source": VERIFIED_SOURCE, "basis": "year_list", "unpaid_bill_years": to["unpaid_bill_years"]}
+    if to["not_yet_late_years"]:
+        surf["not_yet_late_years"] = to["not_yet_late_years"]
+    raw["tax_aging_surfaced"] = surf
+    raw["tax_aging_high"] = n >= 2
+    raw.pop("tax_not_yet_late", None)
+    if n >= 2 and to["balance"] >= big:
+        raw["tax_big_old"] = True
+    else:
+        raw.pop("tax_big_old", None)
+    ao = promote(raw, li)
+    if ao is not None:
+        raw["amount_owed"] = ao

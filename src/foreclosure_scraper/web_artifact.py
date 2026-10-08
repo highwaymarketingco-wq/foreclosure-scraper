@@ -2322,6 +2322,9 @@ RAW_KEEP = {
     # 2026-10-07: property-tax balance >= $7,000 (the part already late) and 2+ levy years late
     # (enrichment_tax_owed.tax_big_old). A dashboard filter; also in _SLIM_RAW_SCALARS for phones.
     "tax_big_old": "*",
+    # 2026-10-08: what the county's own site said about the row's tax claim when it was checked
+    # ({verdict, checked_at, detail}); tax_binding.restore_verified_tax sets the balance from it
+    "tax_county_check": "*",
 
     # ------------------------------------------------------------------
     # 2026-09-10 SCRAPER-KEY AUDIT. Measured, not suspected: of 191 distinct raw

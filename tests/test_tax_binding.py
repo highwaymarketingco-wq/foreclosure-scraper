@@ -408,6 +408,8 @@ def test_a_confirmed_county_check_sets_the_balance_and_years():
     assert li.raw["tax_aging_surfaced"]["years_delinquent"] == 3 and li.raw["tax_aging_high"] is True
     assert li.raw["amount_owed"] == {"value": 1925.12, "source": "tax_owed", "label": "Delinquent property tax owed",
                                      "confidence": "high", "is_actual_debt": True}
+    assert li.raw["tax_county_check"] == {"verdict": "confirmed", "checked_at": "2026-10-08T03:00:00Z",
+                                          "detail": "$1,925.12 past due over 3 years; 2026 bill $710.00 not late yet"}
     st = tax_year_status(li.raw, "NC", "Sample", date(2026, 10, 8))
     assert st["basis"] == "verified" and st["years_delinquent"] == 3
     # the scorer and the buy-box ranker read it
@@ -434,12 +436,90 @@ def test_the_verified_numbers_replace_a_block_balance():
     assert stats["replaced_balance"] == 1 and li.raw["tax_owed"]["balance"] == 1925.12
 
 
-def test_stale_refuted_unconfirmed_and_expired_answers_restore_nothing():
-    for rec in (_verdict("stale"), _verdict("refuted"), _verdict("unconfirmed"),
-                _verdict(expires="2026-10-01T00:00:00Z")):
+def test_unconfirmed_and_expired_answers_restore_nothing():
+    for rec in (_verdict("unconfirmed"), _verdict(expires="2026-10-01T00:00:00Z")):
         li = _verified_row(rec)
         stats = tb.restore_verified_tax([li], now=CHECK_NOW)
-        assert stats["restored"] == 0 and "tax_owed" not in li.raw, rec["verdict"]
+        assert stats["restored"] == 0 and "tax_owed" not in li.raw and "tax_county_check" not in li.raw
+
+
+# ---- a stale or refuted county check: the row never shows the refuted debt -----------------------
+
+def _paid(verdict="refuted", **ev):
+    base = {"total_delinquent": 0, "years_delinquent": 0, "delinquent_by_year": {},
+            "not_yet_delinquent_due": {}}
+    base.update(ev)
+    return _verdict(verdict, **base)
+
+
+def _unverified_debt_row(rec):
+    # the roll block and what an earlier run derived from it (1,200.56 over 21 years), plus an
+    # unrelated signal that must stay
+    return _verified_row(rec, raw={"nc_county_csv_delinquent_tax": _csv_block("R12345-001-002-003", 1200.56),
+                                   **_derived(1200.56), "tax_big_old": True,
+                                   "two_year_delinquent": {"is_two_year_plus": True, "years": 21},
+                                   "code_enforcement": {"status": "open"}})
+
+
+def test_a_refuted_check_removes_the_displayed_balance_and_keeps_a_note():
+    li = _unverified_debt_row(_paid("refuted"))
+    stats = tb.restore_verified_tax([li], now=CHECK_NOW)
+    assert stats["balance_removed"] == 1
+    for k in ("tax_owed", "tax_aging_surfaced", "tax_aging_high", "tax_big_old", "amount_owed",
+              "two_year_delinquent"):
+        assert k not in li.raw, k
+    assert li.raw["tax_county_check"] == {"verdict": "refuted", "checked_at": "2026-10-08T03:00:00Z",
+                                          "detail": "no delinquent bill on the county site"}
+    assert li.raw["code_enforcement"] == {"status": "open"}                  # other signals untouched
+    assert "nc_county_csv_delinquent_tax" in li.raw                          # the source record stays
+    assert "recorded_debt" not in {n for n, _c, _w in ds._signals_for(li, today=date(2026, 10, 8))}
+
+
+def test_a_stale_check_says_paid_and_names_the_bill_not_late_yet():
+    li = _unverified_debt_row(_paid("stale", not_yet_delinquent_due={"2026": 656.61}))
+    tb.restore_verified_tax([li], now=CHECK_NOW)
+    assert "tax_owed" not in li.raw
+    assert li.raw["tax_county_check"]["detail"] == ("the delinquent bill was paid; nothing past due now; "
+                                                    "2026 bill $656.61 not late yet")
+
+
+def test_a_stale_check_that_still_shows_a_past_due_balance_sets_that_balance():
+    li = _unverified_debt_row(_verdict("stale", total_delinquent=120.5, years_delinquent=1,
+                                       delinquent_by_year={"2025": 120.5}, not_yet_delinquent_due={}))
+    stats = tb.restore_verified_tax([li], now=CHECK_NOW)
+    assert stats["balance_from_check"] == 1
+    assert li.raw["tax_owed"]["balance"] == 120.5 and li.raw["tax_owed"]["source"] == tb.VERIFIED_SOURCE
+    assert li.raw["tax_aging_surfaced"]["years_delinquent"] == 1 and "tax_big_old" not in li.raw
+    assert li.raw["tax_county_check"]["verdict"] == "stale"
+
+
+def test_a_stale_check_of_another_parcel_changes_nothing():
+    li = _unverified_debt_row(_paid("stale", tax_parcel_row_own=None, tax_parcel="R99999-009-009-009",
+                                    address_relation="conflict"))
+    before = copy.deepcopy(li.raw)
+    tb.restore_verified_tax([li], now=CHECK_NOW)
+    assert li.raw == before
+
+
+def test_a_row_with_no_check_is_untouched_and_an_expired_note_is_cleared():
+    plain = _li(raw={"nc_county_csv_delinquent_tax": _csv_block("R11111-001-001-001"), **_derived(4100.01)})
+    before = copy.deepcopy(plain.raw)
+    tb.restore_verified_tax([plain], now=CHECK_NOW)
+    assert plain.raw == before
+    old = _unverified_debt_row(_paid("refuted", expires="2026-10-01T00:00:00Z"))
+    old.raw["tax_county_check"] = {"verdict": "refuted", "checked_at": "2026-08-01T00:00:00Z", "detail": "x"}
+    tb.restore_verified_tax([old], now=CHECK_NOW)
+    assert "tax_county_check" not in old.raw and old.raw["tax_owed"]["balance"] == 1200.56
+
+
+def test_each_run_takes_the_refuted_balance_off_again():
+    li = _unverified_debt_row(_paid("refuted"))
+    tb.restore_verified_tax([li], now=CHECK_NOW)
+    enrich_tax_owed([li], today=TODAY)              # the next run re-reads the roll block
+    assert li.raw["tax_owed"]["balance"] == 1200.56
+    stats = tb.restore_verified_tax([li], now=CHECK_NOW)
+    assert "tax_owed" not in li.raw and stats["balance_removed"] == 1
+    assert tb.restore_verified_tax([li], now=CHECK_NOW)["balance_removed"] == 0     # idempotent
 
 
 def test_a_check_of_another_parcel_restores_nothing():
