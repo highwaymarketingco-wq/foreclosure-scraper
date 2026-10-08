@@ -14,12 +14,13 @@ delinquent once it is unpaid after January 5 of Y+1 (G.S. 105-360: due September
 without interest through January 5), so today, 2026-10-05, the 2026 bill is not delinquent and
 the 2025 one is. Verdicts:
 
-  confirmed    at least one delinquent bill with an amount due today, OR any bill whose Amount Due
-               is not a number ("See Legal", "Payment Unavailable, Contact Tax Collections": the
-               bill is in legal collection; v4). Such a bill is an UNPAID balance of unknown size
-               for its year: it counts as delinquent whatever year it is and the claim holds. Its
-               remaining balance is read from its Bill Details page when that can be read
-               (tax + interest + costs - payments), as evidence only.
+  confirmed    at least one delinquent bill with an amount due today, OR a delinquent bill whose
+               Amount Due is not a number ("See Legal", "Payment Unavailable, Contact Tax
+               Collections": the bill is in legal collection; v4). Such a bill is an UNPAID balance
+               of unknown size for its year, unless its own Bill Details page shows it paid off
+               (v6, below); its remaining balance is read from that page when it can be read
+               (tax + interest + costs - payments). A See Legal bill of a levy year that is not
+               late yet is owed, not delinquent (v6): it never makes a late year by itself.
   stale        nothing delinquent today, the parcel is the row's (below), and the claim WAS true:
                a year the board claimed has a PAYMENT dated on or after the January 6 interest
                date, or a bill that was already delinquent the day the board first saw the row
@@ -67,7 +68,8 @@ among the matches binds it; exactly one other active parcel carries the address 
 verified INSTEAD (evidence followed_from_pin); anything else is unconfirmed. A row with no
 house-numbered address has nothing to bind and is judged on its PIN (but an Inactive PIN is
 never judged: pin_inactive). A confirmed answer needs no binding (an unpaid balance on the
-parcel id the row carries is true of that parcel) but records address_relation and pin_inactive.
+parcel id the row carries is true of that parcel) but records address_relation and pin_inactive,
+EXCEPT when the PIN's page names a different house number on the row's own street (v6, below).
 
 WHICH PARCEL, WHEN THE ADDRESS NAMES ANOTHER (v5). The follow step used to go to the one other
 parcel that carries the row's address whenever the row's own PIN did not (2026-10-06: 2614 Old Fort
@@ -81,6 +83,29 @@ it, the board owner matches the address parcel and not the PIN's); judge the row
 board's value equals its county value (the layer row IS that parcel's record; the address is the
 owner's mailing-style address); else `ambiguous_account`. A PIN whose own page names another
 address while no parcel carries the row's: `address_not_found`.
+
+LATE YEARS ONLY, PAID-OFF LEGAL BILLS, THE NEIGHBOR'S HOUSE NUMBER (v6, 2026-10-08 independent audit
+of 160 ledger rows against the live site). Three defects:
+  1. A See Legal bill counted as a late year whatever its levy year: every parcel in legal
+     collection also shows its CURRENT bill as See Legal, so 41 ledger rows labelled two or more
+     late years had one (8 of the 40 sampled "2+" rows were one year too high). A bill is late
+     only after January 5 of the year after its levy, See Legal or not: years_delinquent,
+     delinquent_by_year and total_delinquent count late years only, and the not-yet-late amount
+     stays in not_yet_delinquent_due. A not-yet-late See Legal bill alone is not a delinquency.
+  2. A See Legal card stays on the page after the bill is paid off in legal collection: parcel
+     9618970338 carried See Legal on its 2011-2013 bills, each brought to $0 by one 2014
+     payment, and was confirmed with 3 late years totalling $0. Each See Legal bill's own
+     Transactions table is read first (late ones first); a payment row and nothing left in any
+     column (legal_bill_paid) is a PAID bill: no late year, nothing owed
+     (see_legal_paid_years in the evidence). An unreadable page keeps the bill unpaid.
+  3. 915 Morgan Hill Rd was confirmed from the balance of its PIN, which is 909 Morgan Hill Rd's
+     parcel (it held only because 915's own parcel owed too). When the PIN's page names a
+     different house number on the row's own street (_tax_common.other_number_same_street), a
+     confirmed answer is bound like any other: the address search, account_choice() (follow,
+     own, ambiguous_account) and address_not_found. A different street or no usable number is
+     unchanged.
+balance_under_25 marks a confirmed balance under _tax_common.DE_MINIMIS (a marker, not a verdict:
+9 of the 40 sampled one-year rows owed under $25).
 
 Evidence also carries the two FINDINGS.md side checks: the county's current owner against the
 board's owner_name (Finding C), as the match CATEGORY only (same / partial / different; never a
@@ -117,7 +142,11 @@ from ..core import VerificationResult, digits, result
 from . import _tax_common as tc
 
 SIGNAL = "tax_lien"
-VERSION = "v5"         # v5 (2026-10-06): two claims judged apart (current vs chronic, from the
+VERSION = "v6"         # v6 (2026-10-08): late years only (a not-yet-late See Legal bill is not
+                       # one), a See Legal bill its own transactions show paid off is paid, a PIN
+                       # naming another house number on the row's street must bind before a
+                       # confirmed answer, balance_under_25 marker.
+                       # v5 (2026-10-06): two claims judged apart (current vs chronic, from the
                        # bill history of levy 2019 on; per-record governs), stale when a claimed
                        # year or a bill delinquent at first_seen was paid late, the address is
                        # followed only with proof (ambiguous_account / address_not_found), the
@@ -346,6 +375,22 @@ def remaining_balance(bill: dict) -> Optional[float]:
     return round(sum((t.get(k) or 0.0) for t in txs for k in ("tax", "late_fee", "interest", "cost")), 2) + 0.0
 
 
+_COLUMNS = ("tax", "late_fee", "interest", "cost")
+
+
+def legal_bill_paid(bill: dict) -> bool:
+    """v6: a parsed Bill Details page shows the bill PAID OFF: at least one payment row (PAYMENT,
+    or a PAYMENTRELEASE writing off a residual) and nothing left in any column (tax, late fee,
+    interest and cost each sum to zero or less). A See Legal card can outlive the payment: a
+    2011 bill of 141.45 tax + 30.97 interest + 2.00 cost, paid by one 2014 payment of the same
+    three amounts, still reads See Legal. A balance of zero with no payment row is not paid (the
+    size is unknown, as before)."""
+    txs = bill.get("transactions") or []
+    if not any(str(t.get("type") or "").startswith("PAY") for t in txs):
+        return False
+    return all(round(sum((t.get(k) or 0.0) for t in txs), 2) <= 0.0 for k in _COLUMNS)
+
+
 # ---------------------------------------------------------------------------
 # the rules (pure)
 # ---------------------------------------------------------------------------
@@ -505,9 +550,11 @@ def _is_delinquent_bill(b: dict, today: date) -> bool:
 
 
 async def _legal_balances(client, legal: list[dict]) -> list[dict]:
-    """[{bill, year, remaining}] for the See Legal bills: remaining is what the bill's own
-    Transactions table says is still owed (None when the page cannot be read). Evidence only: a
-    See Legal bill is unpaid whatever this says."""
+    """[{bill, year, remaining, paid?}] for the See Legal bills, in the order given (the caller
+    puts the delinquent ones first): remaining is what the bill's own Transactions table says is
+    still owed (None when the page cannot be read, or past MAX_LEGAL_BILL_FETCHES); paid=True
+    when that table shows the bill paid off (legal_bill_paid, v6). A bill not shown paid stays
+    unpaid, whatever its remaining says."""
     out = []
     for b in legal[:MAX_LEGAL_BILL_FETCHES]:
         row = {"bill": b["bill"], "year": b["year"], "remaining": None}
@@ -515,12 +562,60 @@ async def _legal_balances(client, legal: list[dict]) -> list[dict]:
             bp = parse_bill_page(await client.get_text(BILL_URL.format(bill=b["bill"])))
             if bp["readable"]:
                 row["remaining"] = remaining_balance(bp)
+                if legal_bill_paid(bp):
+                    row["paid"] = True
         except Exception:  # noqa: BLE001 - the balance is evidence; the bill stays unpaid
             pass
         out.append(row)
     out.extend({"bill": b["bill"], "year": b["year"], "remaining": None}
                for b in legal[MAX_LEGAL_BILL_FETCHES:])
     return out
+
+
+async def _follow(row: dict, client, pin: str, page: dict, what: str, claimed: list[int],
+                  today: date, ev: dict) -> Optional[VerificationResult]:
+    """The address search names exactly one other parcel (`what`) for the row's address: decide
+    which account is the row's (v5; tc.account_choice). Returns the answer (unconfirmed, or the
+    followed parcel's own verdict), or None when the row's OWN parcel decides (value identity:
+    the board's value is its county value; the evidence records the address parcel)."""
+    url = PARCEL_URL.format(pin=what)
+    try:
+        text = await client.get_text(url)
+    except Exception as exc:  # noqa: BLE001
+        ev["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+        ev["reason"] = "address_parcel_fetch_failed"
+        return _res("unconfirmed", ev)
+    page2 = parse_parcel_page(text)
+    if not page2["bills"]:
+        ev["reason"] = "address_parcel_unreadable"
+        return _res("unconfirmed", ev)
+    # v5: two parcels, the row's own and the one the address search names. When the row's
+    # own PIN names a REAL other address the address account decides only with PROOF the
+    # PIN is wrong (tc.account_choice); a PIN whose page names no usable address (a 99999
+    # placeholder) contradicts nothing, and the one parcel that carries the address decides
+    owner_addr = tc.owner_category(row.get("owner_name"), [page2.get("owner")])
+    if not tc.needs_proof(row.get("street_address"), [page.get("situs")]):
+        choice, why = "follow", "pin_names_no_usable_address"
+    else:
+        choice, why = tc.account_choice(
+            own_retired=bool(page.get("inactive")), resolved=tc.parcel_resolved(row),
+            own_owner=ev.get("owner_match"), address_owner=owner_addr,
+            own_value_identity=tc.value_identity(row, page.get("value"), page2.get("value")))
+    if choice == "ambiguous":
+        ev.update(address_pins=[what], address_owner_match=owner_addr,
+                  value_county_address_parcel=page2.get("value"), reason=why)
+        return _res("unconfirmed", ev)
+    if choice == "follow":
+        ev2: dict[str, Any] = {"url": url, "followed_from_pin": pin,
+                               "address_binding": "followed", "followed_because": why}
+        if page.get("inactive"):
+            ev2["followed_from_inactive_pin"] = True
+        return await _decide(row, client, what, page2, claimed, today, ev2, can_follow=False)
+    # "own": the row's data is its own parcel's record and the address is another property's
+    # (the board's value equals this parcel's county value, not the address parcel's)
+    ev.update(address_binding="own_parcel_value_identity", address_account_pin=what,
+              value_county_address_parcel=page2.get("value"))
+    return None
 
 
 def _set_binding(ev: dict, how: str) -> None:
@@ -584,22 +679,50 @@ async def _decide(row: dict, client, pin: str, page: dict, claimed: list[int], t
     delinquent: dict[int, float] = {}
     current: dict[int, float] = {}
     for b in bills:
-        if b["amount_due"] is not None and b["amount_due"] > 0:
+        if not b["see_legal"] and b["amount_due"] is not None and b["amount_due"] > 0:
             if _is_delinquent_bill(b, today):
                 _addr_sum(delinquent, b["year"], b["amount_due"])
             else:
                 _addr_sum(current, b["year"], b["amount_due"])
-    legal = [b for b in bills if b["see_legal"]]
+    # See Legal bills (v6): each one's own Transactions table is read first, the delinquent ones
+    # first; a bill shown paid off is paid, any other is unpaid. Only a DELINQUENT unpaid one makes
+    # a late year; a not-yet-late one is owed (not_yet_delinquent_due), whatever its card says.
+    legal = sorted((b for b in bills if b["see_legal"]),
+                   key=lambda b: not _is_delinquent_bill(b, today))
+    detail = await _legal_balances(client, legal) if legal else []
+    legal_late: set[int] = set()
+    size_unknown = False
+    for b, d in zip(legal, detail):
+        if d.get("paid"):
+            continue
+        rem = d["remaining"]
+        amt = rem if rem is not None and rem > 0 else (
+            b["amount_due"] if rem is None and (b["amount_due"] or 0) > 0 else None)
+        if _is_delinquent_bill(b, today):
+            legal_late.add(b["year"])
+            if amt is None:
+                size_unknown = True          # unpaid, size unknown: the total is a floor
+            else:
+                _addr_sum(delinquent, b["year"], amt)
+        elif amt is not None:
+            _addr_sum(current, b["year"], amt)
+    late_years = set(delinquent) | legal_late
     regular = [b for b in bills if b["regular"]] or bills
     ev.update({
         "pin": pin, "latest_levy_year": regular[0]["year"] if regular else bills[0]["year"],
         "delinquent_by_year": {str(y): a for y, a in sorted(delinquent.items(), reverse=True)},
         "total_delinquent": round(sum(delinquent.values()), 2),
-        "years_delinquent": len(set(delinquent) | {b["year"] for b in legal}),
+        "years_delinquent": len(late_years),
         "not_yet_delinquent_due": {str(y): a for y, a in sorted(current.items())},
         "claimed_years": claimed,
         **side_checks(row, page),
     })
+    if legal:
+        ev["see_legal_bills"] = detail
+        ev["see_legal_years"] = sorted({d["year"] for d in detail if not d.get("paid")}, reverse=True)
+        paid_years = sorted({d["year"] for d in detail if d.get("paid")}, reverse=True)
+        if paid_years:
+            ev["see_legal_paid_years"] = paid_years
     if page.get("inactive"):
         ev["pin_inactive"] = True
     cp = claim_pins(row)
@@ -610,21 +733,25 @@ async def _decide(row: dict, client, pin: str, page: dict, claimed: list[int], t
     if rel_row:
         ev.setdefault("address_relation", tc.address_relation(row.get("street_address"),
                                                               page.get("situs")))
-    if delinquent or legal:
+    if late_years:
         if legal:
-            detail = await _legal_balances(client, legal)
-            ev["see_legal_bills"] = detail
-            ev["see_legal_years"] = sorted({b["year"] for b in legal}, reverse=True)
-            known = [d["remaining"] for d in detail if d["remaining"] is not None]
-            due = sum(d["remaining"] for d in detail if d["remaining"] and d["remaining"] > 0
-                      and is_delinquent_year(d["year"], today))
-            ev["total_delinquent"] = round(ev["total_delinquent"] + due, 2)
-            ev["total_delinquent_is_floor"] = len(known) < len(legal) or any(x <= 0 for x in known)
-            for d in detail:           # a current levy in legal collection is owed, not yet delinquent
-                if d["remaining"] and d["remaining"] > 0 and not is_delinquent_year(d["year"], today):
-                    ev["not_yet_delinquent_due"][str(d["year"])] = round(
-                        ev["not_yet_delinquent_due"].get(str(d["year"]), 0.0) + d["remaining"], 2)
-        ev["under_500"] = ev["total_delinquent"] < 500 and not ev.get("total_delinquent_is_floor")
+            ev["total_delinquent_is_floor"] = size_unknown
+        # v6: a PIN whose page names another house number on the row's own street is a neighbor's
+        # parcel until the address search says otherwise (915 / 909 Morgan Hill Rd): bind it the
+        # way a stale / refuted answer is bound, through account_choice() and address_not_found
+        if "followed_from_pin" not in ev and tc.other_number_same_street(
+                row.get("street_address"), page.get("situs")):
+            action, what = await _bind(row, client, pin, page, ev, can_follow=can_follow)
+            if action == "follow":
+                res = await _follow(row, client, pin, page, what, claimed, today, ev)
+                if res is not None:
+                    return res
+            elif action == "unconfirmed":
+                ev["reason"] = what
+                return _res("unconfirmed", ev)
+        floor = bool(ev.get("total_delinquent_is_floor"))
+        ev["under_500"] = ev["total_delinquent"] < 500 and not floor
+        ev["balance_under_25"] = ev["total_delinquent"] < tc.DE_MINIMIS and not floor
         return _res("confirmed", ev)
     if page.get("see_legal_text"):
         # the words are on the page but no card read them: a layout change. Never decide.
@@ -634,43 +761,9 @@ async def _decide(row: dict, client, pin: str, page: dict, claimed: list[int], t
     # nothing owed today. Before stale / refuted: is this the parcel that carries the row's address?
     action, what = await _bind(row, client, pin, page, ev, can_follow=can_follow)
     if action == "follow":
-        url = PARCEL_URL.format(pin=what)
-        try:
-            text = await client.get_text(url)
-        except Exception as exc:  # noqa: BLE001
-            ev["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
-            ev["reason"] = "address_parcel_fetch_failed"
-            return _res("unconfirmed", ev)
-        page2 = parse_parcel_page(text)
-        if not page2["bills"]:
-            ev["reason"] = "address_parcel_unreadable"
-            return _res("unconfirmed", ev)
-        # v5: two parcels, the row's own and the one the address search names. When the row's
-        # own PIN names a REAL other address the address account decides only with PROOF the
-        # PIN is wrong (tc.account_choice); a PIN whose page names no usable address (a 99999
-        # placeholder) contradicts nothing, and the one parcel that carries the address decides
-        owner_addr = tc.owner_category(row.get("owner_name"), [page2.get("owner")])
-        if not tc.needs_proof(row.get("street_address"), [page.get("situs")]):
-            choice, why = "follow", "pin_names_no_usable_address"
-        else:
-            choice, why = tc.account_choice(
-                own_retired=bool(page.get("inactive")), resolved=tc.parcel_resolved(row),
-                own_owner=ev.get("owner_match"), address_owner=owner_addr,
-                own_value_identity=tc.value_identity(row, page.get("value"), page2.get("value")))
-        if choice == "ambiguous":
-            ev.update(address_pins=[what], address_owner_match=owner_addr,
-                      value_county_address_parcel=page2.get("value"), reason=why)
-            return _res("unconfirmed", ev)
-        if choice == "follow":
-            ev2: dict[str, Any] = {"url": url, "followed_from_pin": pin,
-                                   "address_binding": "followed", "followed_because": why}
-            if page.get("inactive"):
-                ev2["followed_from_inactive_pin"] = True
-            return await _decide(row, client, what, page2, claimed, today, ev2, can_follow=False)
-        # "own": the row's data is its own parcel's record and the address is another property's
-        # (the board's value equals this parcel's county value, not the address parcel's)
-        ev.update(address_binding="own_parcel_value_identity", address_account_pin=what,
-                  value_county_address_parcel=page2.get("value"))
+        res = await _follow(row, client, pin, page, what, claimed, today, ev)
+        if res is not None:
+            return res
     elif action == "unconfirmed":
         ev["reason"] = what
         return _res("unconfirmed", ev)

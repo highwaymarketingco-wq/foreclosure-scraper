@@ -141,7 +141,7 @@ def test_8792725038_is_confirmed_not_stale_and_its_balances_are_read():
     assert rem == {2026: 52.09, 2024: 364.36, 2023: 380.29, 2022: 89.41}
     assert ev["total_delinquent"] == 834.06 and ev["total_delinquent_is_floor"] is False
     assert ev["not_yet_delinquent_due"] == {"2026": 52.09}      # the current levy, owed not delinquent
-    assert ev["years_delinquent"] == 4 and ev["under_500"] is False
+    assert ev["years_delinquent"] == 3 and ev["under_500"] is False     # v6: late years only (not 2026)
     assert ev["pin_inactive"] is True and ev["address_relation"] == "conflict"
 
 
@@ -261,10 +261,12 @@ def test_an_address_that_belongs_to_two_other_parcels_or_none_is_unconfirmed():
 
 
 def test_a_confirmed_answer_needs_no_binding_but_records_it():
+    """v6: only when the PIN's page names another STREET; another house number on the row's own
+    street must bind first (tests/test_verification_tax_lien_buncombe_v6.py)."""
     r, f = brun(brow("0646441256", street_address="2614 OLD FORT RD",
                      raw={"tax_owed": {"balance": 1.0, "year": 2026}}),
                 {f"{tb.BASE}/Parcel/Details/064644125600000":
-                 parcel_html([("0000000009-2025-2025-0000-00", "$55.00")], situs="2610 OLD FORT RD")})
+                 parcel_html([("0000000009-2025-2025-0000-00", "$55.00")], situs="12 EXAMPLE LN")})
     assert r.verdict == "confirmed" and r.evidence["address_relation"] == "conflict"
     assert len(f.asked) == 1
 
@@ -401,7 +403,8 @@ def test_a_payment_release_is_not_a_payment():
 
 def test_version_bumped_so_every_old_entry_is_due_again():
     # tp v4 / tq v4: 2026-10-07 (confirmed binds to the row's parcel and owner; Sold at Tax Sale)
-    assert (tb.VERSION, tp.VERSION, tq.VERSION) == ("v5", "v4", "v4")
+    # tb v6: 2026-10-08 (late years only, paid-off See Legal bills, another house number)
+    assert (tb.VERSION, tp.VERSION, tq.VERSION) == ("v6", "v4", "v4")
 
 
 # ===========================================================================

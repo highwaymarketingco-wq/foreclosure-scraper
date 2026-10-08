@@ -263,7 +263,7 @@ def test_a_mixed_row_gets_the_county_verdict_as_it_is(pages, parcel, verdict, st
     assert genuine.verdict == r.verdict == verdict
     assert not {"property_tax_verdict", "listing_claim_source", "reason"} & set(r.evidence)
     assert r.evidence["bills_checked"] == genuine.evidence["bills_checked"]
-    assert r.verifier_version == tlb.VERSION == "v5"
+    assert r.verifier_version == tlb.VERSION == "v6"
 
 
 def test_confirmed_on_a_mixed_row():

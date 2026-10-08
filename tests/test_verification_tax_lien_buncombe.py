@@ -206,12 +206,14 @@ def test_owner_match():
 def test_a_parcel_with_see_legal_bills_is_confirmed_not_record_ended():
     """155 Tunnel Rd (PIN 965808521500000): billing LOOKED to stop at the 2024 levy (v2 called it
     parcel_record_ended: unconfirmed) because the 2025 and 2026 bills are in legal collection and
-    the old parser skipped them. They are unpaid balances, so v4 confirms."""
+    the old parser skipped them. They are unpaid balances, so v4 confirms. v6: the 2026 levy is not
+    late yet (2026-10-05), See Legal or not, so it is ONE late year, not two."""
     f = ReplayFetcher(served("Parcel/Details/965808521500000"))
     r = run(_row(parcel_id="9658-08-5215-00000", raw={"tax_owed": {"balance": 10.0, "year": 2026}}), f)
     assert r.verdict == "confirmed" and r.evidence["see_legal_years"] == [2026, 2025]
     assert r.evidence["latest_levy_year"] == 2026
-    assert t.VERSION == "v5"
+    assert r.evidence["years_delinquent"] == 1
+    assert t.VERSION == "v6"
 
 
 # ---------------------------------------------------------------------------

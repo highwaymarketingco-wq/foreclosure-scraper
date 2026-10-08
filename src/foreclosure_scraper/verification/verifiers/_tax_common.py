@@ -74,7 +74,10 @@ it, the board owner matches the address account and not the row's own); judge th
 account when the row's own data is that account's (the board's value equals its county value,
 Buncombe); otherwise the verifier cannot tell which account is right and answers `unconfirmed`,
 reason `ambiguous_account`, never refuted or stale. No account carries the address and the row's
-own account carries another one: `address_not_found`.
+own account carries another one: `address_not_found`. A confirmed answer goes through the same
+policy when the row's own account names a different house number on the row's street
+(other_number_same_street; tax_lien_buncombe v6: 915 Morgan Hill Rd was confirmed from the balance
+of 909 Morgan Hill Rd's parcel).
 """
 from __future__ import annotations
 
@@ -392,6 +395,17 @@ def same_street(a: Any, b: Any) -> bool:
     _, sa, _ = address_key(a)
     _, sb, _ = address_key(b)
     return bool(sa) and sa == sb
+
+
+def other_number_same_street(row_addr: Any, county_addr: Any) -> bool:
+    """True when the county record names a DIFFERENT house number on the row's own street (the row
+    says 915 Morgan Hill Rd, the parcel page says 909 Morgan Hill Rd): a neighbor's parcel, which
+    must not bind to the row even when it owes (tax_lien_buncombe v6 runs the address search,
+    account_choice() and address_not_found for it before a confirmed answer). A record with no
+    usable number, or a different street, is not this case."""
+    na, _, _ = address_key(row_addr)
+    nb, _, _ = address_key(county_addr)
+    return bool(na and nb and na != nb and same_street(row_addr, county_addr))
 
 
 def needs_proof(row_addr: Any, other_addrs: Iterable[Any]) -> bool:
