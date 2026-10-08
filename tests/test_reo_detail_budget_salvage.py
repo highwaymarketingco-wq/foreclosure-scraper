@@ -158,3 +158,53 @@ def test_usda_detail_pages_stop_at_the_deadline(monkeypatch):
     monkeypatch.setattr(UP, "get_text", fake_get_text)
     rows = asyncio.run(UP._fetch_county("national.usda_properties", "anderson", deadline=0.0))
     assert len(rows) == 4 and calls["detail"] == 0
+
+
+# ----------------------------------------------------------------------------- cash buyers, US Marshals
+
+def test_cash_buyer_deeds_ships_finished_counties_on_a_timeout(monkeypatch):
+    from foreclosure_scraper.models import Listing, ListingType
+    from foreclosure_scraper.scrapers.national import cash_buyer_deeds as CB
+
+    async def done(state, county, days):
+        return ["deed-1", "deed-2"]
+
+    async def hangs(state, county, days):
+        await asyncio.sleep(5.0)
+        return []
+
+    monkeypatch.setattr(CB, "VENDOR_DISPATCH", (("Burke", "NC", done), ("Polk", "NC", hangs)))
+    monkeypatch.setattr(CB, "_identify_cash_buyers", lambda docs: list(docs))
+    monkeypatch.setattr(CB, "_deed_to_listing", lambda d, url: Listing(
+        source=CB.CashBuyerDeeds.slug, source_url=url, listing_type=ListingType.UNKNOWN,
+        state="NC", county="Burke", case_number=d))
+    s = CB.CashBuyerDeeds()
+    s.timeout_s = 0.5
+    rows = asyncio.run(s.safe_run())
+    assert s.last_outcome != "TIMEOUT"
+    assert sorted(li.case_number for li in rows) == ["deed-1", "deed-2"]
+
+
+def test_usmarshals_ships_parsed_details_on_a_timeout(monkeypatch):
+    from foreclosure_scraper.models import Listing, ListingType
+    from foreclosure_scraper.scrapers.national import usmarshals_realproperty as UM
+
+    async def hits():
+        return [("/properties/1-0", "1 Pretend Rd, Conway, SC 29526"),
+                ("/properties/2-0", "2 Pretend Rd, Conway, SC 29526")]
+
+    async def fake_get_text(url, impersonate=True, timeout=30.0):
+        if url.endswith("/2-0"):
+            await asyncio.sleep(5.0)
+        return "<html></html>"
+
+    monkeypatch.setattr(UM, "_list_ids_for_state", hits)
+    monkeypatch.setattr(UM, "get_text", fake_get_text)
+    monkeypatch.setattr(UM, "_parse_detail", lambda html, href, addr: Listing(
+        source=UM.USMarshalsRealProperty.slug, source_url=href, listing_type=ListingType.REO,
+        state="SC", street_address=addr.split(",")[0]))
+    s = UM.USMarshalsRealProperty()
+    s.timeout_s = 0.5
+    rows = asyncio.run(s.safe_run())
+    assert s.last_outcome != "TIMEOUT"
+    assert [li.street_address for li in rows] == ["1 Pretend Rd"]

@@ -284,7 +284,8 @@ class USMarshalsRealProperty(BaseScraper):
             return []
 
         log.info("usmarshals.list_done", ncsc_hits=len(hits))
-        out: list[Listing] = []
+        # self.partial (2026-10-08): a soft timeout during the detail pages ships what is parsed.
+        out = self.partial
         for href, addr in hits:
             url = f"{_BASE}{href}" if href.startswith("/") else href
             try:
@@ -301,4 +302,4 @@ class USMarshalsRealProperty(BaseScraper):
                 out.append(li)
 
         log.info("usmarshals.done", count=len(out))
-        return out
+        return list(out)

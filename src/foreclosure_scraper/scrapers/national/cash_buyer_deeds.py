@@ -486,7 +486,10 @@ class CashBuyerDeeds(BaseScraper):
     timeout_s = 300.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
+        # self.partial, not a local list (2026-10-08): ten county ROD sweeps run one after another
+        # inside a 300 s soft timeout, and every timeout since 2026-09 shipped 0 rows although the
+        # counties finished before the cut-off had produced theirs.
+        out = self.partial
         for county, state, vendor_fn in VENDOR_DISPATCH:
             src_url = _source_url(state, county)
             try:
@@ -513,4 +516,4 @@ class CashBuyerDeeds(BaseScraper):
                 if li:
                     out.append(li)
 
-        return out
+        return list(out)
