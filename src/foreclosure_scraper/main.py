@@ -1497,8 +1497,10 @@ async def run() -> int:
 
     # Filter to scope (counties we care about) — applies to both partitions
     in_area = [li for li in active_raw if _safe_pred(_in_scope, li, False)]
+    from .drop_audit import removed_by_source
     log.info("orchestrator.in_scope", count=len(in_area),
-             pruned=len(active_raw) - len(in_area))
+             pruned=len(active_raw) - len(in_area),
+             removed_by_source=removed_by_source(active_raw, in_area))
     sold_pool = [li for li in sold_pool_raw if _safe_pred(_in_scope, li, False)]
     log.info("orchestrator.sold_pool_in_scope",
              count=len(sold_pool), pruned=len(sold_pool_raw) - len(sold_pool))
@@ -1506,14 +1508,16 @@ async def run() -> int:
     # Active only
     active = [li for li in in_area
               if _safe_pred(lambda x: _active_only(x, cfg.sale_horizon_days), li, False)]
-    log.info("orchestrator.active", count=len(active), pruned=len(in_area) - len(active))
+    log.info("orchestrator.active", count=len(active), pruned=len(in_area) - len(active),
+             removed_by_source=removed_by_source(in_area, active))
 
     # Flip-candidate filter — drop super-luxury SFR (>$750k without 2+ acres,
     # and anything >$1.5M outright). Multi-family + land bypass. Default keep on
     # error so a filter crash never silently drops a good lead.
     flip_able = [li for li in active if _safe_pred(_flip_candidate, li, True)]
     log.info("orchestrator.flip_filtered", count=len(flip_able),
-             pruned=len(active) - len(flip_able))
+             pruned=len(active) - len(flip_able),
+             removed_by_source=removed_by_source(active, flip_able))
     active = flip_able
 
     # Silent-drop warning: a source that scraped rows OK (N>0) but where 0
