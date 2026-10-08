@@ -300,6 +300,42 @@ def _year_summary(by_year: list[dict], bill_due_amt: float) -> dict:
     }
 
 
+#: Forsyth's export carries BILL_TYPE "SAN" rows: "Sanitation Lien on Parcel: 6910-78-2033."
+#: with PARCEL_NUM blank (2026-10-08 extract: 9,652 delinquent bills, 1,202 parcels, $5.81M due,
+#: levy years 2019-2026). A sanitation lien is a lien on the real property, billed and collected
+#: by the county tax office. The REI-only filter below dropped every one of them.
+_SAN_PIN_RE = re.compile(r"Sanitation\s+Lien\s+on\s+Parcel:\s*([0-9]{4}-[0-9]{2}-[0-9]{4})", re.I)
+
+
+def _pin_key(parcel: str | None) -> str:
+    """'6869-43-0725.000' and '6869-43-0725' -> '6869430725' (the 10-digit NC PIN)."""
+    p = re.sub(r"\.0+$", "", (parcel or "").strip())
+    return re.sub(r"[^0-9]", "", p)
+
+
+def _sanitation_liens(rows: list[dict]) -> dict[str, dict]:
+    """{pin key: {total_due, bills, years, pin}} from the export's SAN rows."""
+    out: dict[str, dict] = {}
+    for r in rows:
+        if (r.get("BILL_TYPE") or "").strip().upper() != "SAN":
+            continue
+        m = _SAN_PIN_RE.search(r.get("DESCRIPTION") or "")
+        owed = _money(r.get("TOTAL_DUE_AMOUNT"))
+        if not m or not owed:
+            continue
+        k = _pin_key(m.group(1))
+        a = out.setdefault(k, {"pin": m.group(1), "total_due": 0.0, "bills": 0, "years": set()})
+        a["total_due"] += owed
+        a["bills"] += 1
+        yr = (r.get("TAX_YEAR") or "").strip()
+        if yr:
+            a["years"].add(yr)
+    for a in out.values():
+        a["total_due"] = round(a["total_due"], 2)
+        a["years"] = sorted(a["years"])
+    return out
+
+
 def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]:
     # Some extracts carry a stray NUL byte inside a field (seen in Pitt's roll),
     # which makes csv.DictReader raise "line contains NUL" and drop the whole
@@ -345,6 +381,13 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
         if yr >= a["year"]:
             a["year"], a["row"], a["parcel_id"], a["parcel_raw"] = yr, r, parcel_id, parcel
 
+    # Sanitation liens on a parcel that is ALSO on the delinquent real-property roll are attached
+    # to that row (raw only: not added to principal_tax_due, which the tax verifier checks against
+    # the county's Real Property bills). A parcel with ONLY sanitation liens (about 600 in Forsyth,
+    # 2026-10-08) is not emitted yet: as a tax_lien row the tax_lien_ptscloud verifier would find no
+    # delinquent Real Property bill and judge it stale/refuted. Emitting them needs the verifier to
+    # skip a sanitation-only claim first (a shared-file change, audit 2026-10-09).
+    san = _sanitation_liens(rows)
     out: list[Listing] = []
     now = datetime.utcnow()
     for _identity_key, a in agg.items():
@@ -431,6 +474,8 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
                     "bill_number": (r.get("BILL_NUMBER") or "").strip() or None,
                     "flags": flags,
                     **_year_summary(a["by_year"], a["bill_due_amt"]),
+                    **({"sanitation_liens": san[_pin_key(parcel)]}
+                       if san and _pin_key(parcel) in san else {}),
                 },
                 # Same key + value nc_its_public_tax.py already publishes for
                 # the identical concept (the county's own in-rem foreclosure

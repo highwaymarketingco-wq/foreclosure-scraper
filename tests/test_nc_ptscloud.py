@@ -230,3 +230,23 @@ def test_years_reach_the_normalized_tax_block():
     li = next(l for l in m._parse_csv(_YEARS_CSV, "Madison", "NC", "Madison")
               if l.parcel_id == "7001")
     assert t._find_years_delinquent(li.raw) == 3
+
+
+def test_forsyth_sanitation_liens_attach_to_the_parcels_roll_row():
+    """Forsyth's export carries BILL_TYPE SAN rows ("Sanitation Lien on Parcel: <PIN>.", blank
+    PARCEL_NUM) that the REI-only filter dropped (2026-10-08: 9,652 bills on 1,202 parcels).
+    On a parcel that is on the real-property roll they are attached in raw, never summed into
+    principal_tax_due. Values invented."""
+    csv_text = (
+        "BILL_NUMBER,BILL_TYPE,PARCEL_NUM,TAX_YEAR,OWNER_NAME,DESCRIPTION,TOTAL_DUE_AMOUNT,BILL_DUE_AMT,FLAGS\n"
+        "1,REI,6800-11-2222.000,2025,SAMPLE PAT,LOT 1,1000.00,900.00,DLQ\n"
+        "2,SAN,,2024,SAMPLE PAT,Sanitation Lien on Parcel: 6800-11-2222.,500.00,500.00,DLQ\n"
+        "3,SAN,,2025,SAMPLE PAT,Sanitation Lien on Parcel: 6800-11-2222.,380.00,380.00,DLQ\n"
+        "4,SAN,,2025,OTHER OWNER,Sanitation Lien on Parcel: 6800-99-0000.,380.00,380.00,DLQ\n"
+    )
+    leads = m._parse_csv(csv_text, "Forsyth", "NC", "Forsyth")
+    assert len(leads) == 1
+    blk = leads[0].raw["nc_ptscloud_delinquent_tax"]
+    assert blk["principal_tax_due"] == 1000.0
+    assert blk["sanitation_liens"] == {"pin": "6800-11-2222", "total_due": 880.0, "bills": 2,
+                                       "years": ["2024", "2025"]}
