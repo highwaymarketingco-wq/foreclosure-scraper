@@ -150,11 +150,19 @@ def test_the_rest_of_the_selection_is_unchanged():
     assert tlb.applies(roll_row(source="counties_generic.arcgis_distress.buncombe_unpaid_bills",
                                 raw={}))
     # a county roll block on a row that is not typed tax_lien was never covered and still is not
-    # (495 asheville_str_permits rows carry one); nor is a tax_sale row (21, counties_nc.buncombe_tax)
+    # (495 asheville_str_permits rows carry one)
     str_permit = {"state": "NC", "county": "Buncombe", "source": "counties_nc.asheville_str_permits",
                   "listing_type": "unknown", "raw": {"buncombe_delinquent_tax": dict(ROLL_BLOCK)}}
     assert not tlb.applies(str_permit)
-    assert not tlb.applies(roll_row(source="counties_nc.buncombe_tax", listing_type="tax_sale"))
+    # 2026-10-09 (audit tax_checkers_2): the call-ready gate waits on a county check for a tax_sale
+    # row of a county source and for a row with a delinquent-tax balance of its own, so the
+    # verifier covers them (before, 159 Buncombe rows waited on a check nothing would make)
+    assert tlb.applies(roll_row(source="counties_nc.buncombe_tax", listing_type="tax_sale"))
+    no_balance = roll_row(source="counties_nc.buncombe_tax", listing_type="tax_sale")
+    no_balance["raw"].pop("tax_owed")
+    assert tlb.applies(no_balance)
+    assert tlb.applies({"state": "NC", "county": "Buncombe", "listing_type": "unknown", "source": "x",
+                        "raw": {"tax_owed": {"balance": 50.0, "kind": "delinquent_tax"}}})
     # the two derived flags still cover any row type
     assert tlb.applies({"state": "NC", "county": "Buncombe", "listing_type": "unknown",
                         "raw": {"tax_aging_surfaced": {"status": "delinquent", "years_delinquent": 1}}})

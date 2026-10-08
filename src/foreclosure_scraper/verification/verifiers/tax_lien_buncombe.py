@@ -197,7 +197,9 @@ def flagged(row: dict) -> bool:
             not tc.other_lien_listing(row)
             or any(isinstance(_raw(row).get(k), dict) for k in OWN_BLOCKS)):
         return True
-    return tc.aging_claim(row)
+    # the call-ready gate's claims (2026-10-09): a delinquent-tax balance of the row's own, or a
+    # tax_sale listing type of a county source (22 Buncombe rows had only that)
+    return tc.aging_claim(row) or tc.tax_owed_claim(row) or tc.listing_tax_claim(row)
 
 
 def applies(row: dict) -> bool:

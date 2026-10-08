@@ -15,8 +15,26 @@ CAPTCHA, no terms click-through; the search page only sets an ASP.NET session co
 
 NOT covered: Gates (bttaxpayerportal.com/ITSPublicGT, an older 1.0.1 build): every search
 (parcel, bill number, a common surname) answered zero records on 2026-10-08, so it cannot decide
-anything. Other ITSPublic counties (Catawba, Transylvania, Person, ...) are one PORTALS entry each
-once their search is checked live; none was on this run.
+anything. Other ITSPublic counties (Person, ...) are one PORTALS entry each once their search is
+checked live.
+
+ADDED 2026-10-09 (audit tax_checkers_2; same verdict rules, nothing changes for Onslow / Graham):
+    Transylvania  https://tax.transylvaniacounty.org/TaxBillSearch     board parcel = ParcelNumber
+    Catawba       https://taxbill.catawbacountync.gov/ITSPublicCT       board PIN = AlternateParcelIdentifier
+Both run a newer build that answers an EMPTY partial (and the table HTTP 500) unless the posted
+model carries every .search-value field of the form (Portal.full_model; the table post then also
+sends PostData). Transylvania prints a map reference between the parcel and the situs
+("T452 00068A 01 MS.00": Portal.map_ref), its board rows carry 8511-59-1029-000 or the 13-digit
+form (Portal.parcel_alnum) and its own roll block raw.transylvania_tax (parcel, account_number;
+"Escrow :" where a business bill has no parcel: a placeholder). Catawba has no account search,
+prints the PIN with a 0000 pad (3741171043520000 is PIN 374117104352: Portal.pin_pad), no acreage
+on bills before levy 2025 (Portal.real_without_units: a bill naming a parcel that is not
+"Personal Property"), and its advertisement PDF's id (raw.nc_county_pdf_delinquent_tax.county_id,
+4,994 of 5,245 Catawba claim rows have no parcel_id) is the REID/LRK, zero-padded to 7 digits in
+the ParcelNumber field (Roll.pad). A county roll's numbers are the row's own only on the roll's own
+row (Roll.slug). A roll row with no parcel whose account answers only Personal Property bills is
+unconfirmed, reason personal_property_only (Transylvania's roll lists business personal property
+with parcel "Escrow :" on 163 board rows: not a real-property claim).
 
 THE CALLS (read from the portal's own scripts, live-verified 2026-10-08; form-encoded posts bind
 like the page's JSON posts):
@@ -103,6 +121,37 @@ TRANSIENT_REASONS = ("fetch_failed", "portal_unhealthy", "unreadable_answer",
                      "address_search_failed", "address_parcel_fetch_failed")
 
 
+ROLL_KEY = "nc_its_public_tax"
+ROLL_SLUG = "counties_nc.nc_its_public_tax"
+
+
+@dataclass(frozen=True)
+class Roll:
+    """A county roll whose block a board row may carry (raw[key]) and how its numbers search the
+    portal. Its numbers are the row's own (exact) only on the roll's OWN row (source == slug): a
+    block merged into another source's row is a claim about the block's parcel, not the row's."""
+    key: str                                   # raw block key
+    slug: str                                  # the roll's own board source
+    parcel_keys: tuple[str, ...] = ("parcel", "alternate_id")   # block fields naming the parcel
+    search_keys: tuple[str, ...] = ("parcel",)  # those of them searched, in order
+    parcel_field: Optional[str] = None         # search field for them (None: the portal's)
+    pad: int = 0                               # zero-pad an all-digit block parcel to this width
+    account_key: Optional[str] = "account"     # block field naming the taxpayer account
+
+
+#: the ITSPublic roll scraper's own block (Onslow, Graham)
+ITS_ROLL = Roll(ROLL_KEY, ROLL_SLUG)
+#: tax_lien_itspublic v1 (2026-10-09): Transylvania's own roll scraper reads the same vendor
+TRANSYLVANIA_ROLL = Roll("transylvania_tax", "counties_nc.transylvania_delinquent_tax",
+                         parcel_keys=("parcel",), search_keys=("parcel",),
+                         account_key="account_number")
+#: Catawba's advertisement PDF: its id is the REID/LRK (the portal's ParcelNumber, 7 digits
+#: zero-padded: PDF 27012 -> 0027012, live 2026-10-09), not an account number
+CATAWBA_PDF_ROLL = Roll("nc_county_pdf_delinquent_tax", "counties_nc.nc_county_pdf_delinquent_tax",
+                        parcel_keys=("county_id",), search_keys=("county_id",),
+                        parcel_field="ParcelNumber", pad=7, account_key=None)
+
+
 @dataclass(frozen=True)
 class Portal:
     county: str
@@ -111,6 +160,24 @@ class Portal:
     address_search: bool = True    # the form offers FormattedPropertyAddress
     #: place names that end a situs line ("105 FOX LN HUBERT NC 28539"), longest first
     cities: tuple[str, ...] = ()
+    rolls: tuple[Roll, ...] = (ITS_ROLL,)
+    #: the build needs every .search-value field in the posted model, else the partial answers an
+    #: empty body and the table HTTP 500 (Transylvania, Catawba; live 2026-10-09)
+    full_model: bool = False
+    #: extra .search-value fields of that model (Catawba: AlternateParcelIdentifier)
+    model_fields: tuple[str, ...] = ()
+    account_search: bool = True    # the form offers AccountNumber
+    #: a bill whose description has no acreage is still real property when it names a parcel and
+    #: is not "Personal Property" (Catawba prints no acreage on bills before levy 2025)
+    real_without_units: bool = False
+    #: a description part that is a map reference, not the situs (Transylvania prints
+    #: "T452 00068A 01 MS.00" between the parcel and the situs)
+    map_ref: Optional[str] = None
+    #: the bill's parcel id is the board's PIN plus this zero pad (Catawba: 3741171043520000 is
+    #: PIN 374117104352): the unpadded form is added to the bill's ids
+    pin_pad: str = ""
+    #: search the board parcel as [0-9A-Z] only (Transylvania boards carry 8511-59-1029-000)
+    parcel_alnum: bool = False
 
 
 PORTALS: dict[str, Portal] = {
@@ -122,11 +189,19 @@ PORTALS: dict[str, Portal] = {
                 "POLLOCKSVILLE", "WILMINGTON", "BELGRADE", "FOLKSTONE", "VERONA", "HUBERT",
                 "COMFORT", "TAR HEEL")),
     "Graham": Portal("Graham", "https://www.bttaxpayerportal.com/ITSPublicGR2.0", "ParcelNumber"),
+    "Transylvania": Portal(
+        "Transylvania", "https://tax.transylvaniacounty.org", "ParcelNumber",
+        rolls=(ITS_ROLL, TRANSYLVANIA_ROLL), full_model=True, map_ref=r"\bMS\.\d+$",
+        parcel_alnum=True),
+    "Catawba": Portal(
+        "Catawba", "https://taxbill.catawbacountync.gov/ITSPublicCT", "AlternateParcelIdentifier",
+        cities=("SHERRILLS FORD", "LONG VIEW", "CLAREMONT", "CONOVER", "HICKORY", "MAIDEN",
+                "NEWTON", "CATAWBA", "TERRELL", "VALE"),
+        rolls=(ITS_ROLL, CATAWBA_PDF_ROLL), full_model=True,
+        model_fields=("AlternateParcelIdentifier",), account_search=False,
+        real_without_units=True, pin_pad="0000", parcel_alnum=True),
 }
 _BY_COUNTY = {k.lower(): v for k, v in PORTALS.items()}
-
-ROLL_KEY = "nc_its_public_tax"
-ROLL_SLUG = "counties_nc.nc_its_public_tax"
 #: a PTS Cloud roll row geocoded into one of these counties is tax_lien_ptscloud's (its claim is
 #: about a parcel of the PTS tenant's county)
 PTS_ROLL_SLUG = "counties_nc.nc_ptscloud_delinquent_tax"
@@ -152,13 +227,29 @@ def portal_of(row: Any) -> Optional[Portal]:
     return _BY_COUNTY.get(str(tc.g(row, "county") or "").strip().lower())
 
 
-def roll_block(row: Any) -> Optional[dict]:
-    """The ITS roll's block when it is for the row's own county."""
-    b = tc.raw_of(row).get(ROLL_KEY)
-    if not isinstance(b, dict):
-        return None
+def roll_of(row: Any) -> Optional[tuple[Roll, dict]]:
+    """(roll, block) of the first of the row's portal's rolls whose block the row carries for the
+    row's own county (a block naming no county is taken as the row's)."""
+    portal = portal_of(row)
+    raw = tc.raw_of(row)
     county = str(tc.g(row, "county") or "").strip().lower()
-    return b if str(b.get("county") or county).strip().lower() == county else None
+    for roll in (portal.rolls if portal else (ITS_ROLL,)):
+        b = raw.get(roll.key)
+        if isinstance(b, dict) and str(b.get("county") or county).strip().lower() == county:
+            return roll, b
+    return None
+
+
+def roll_block(row: Any) -> Optional[dict]:
+    """The block of the row's county roll (roll_of) when it is for the row's own county."""
+    rb = roll_of(row)
+    return rb[1] if rb else None
+
+
+def _own_roll(row: Any) -> Optional[tuple[Roll, dict]]:
+    """roll_of(row) when the row IS that roll's row (its numbers are the row's own)."""
+    rb = roll_of(row)
+    return rb if rb and tc.g(row, "source") == rb[0].slug else None
 
 
 def applies(row: dict) -> bool:
@@ -170,9 +261,21 @@ def applies(row: dict) -> bool:
 
 
 def _key(p: Any) -> str:
-    """alnum identifier of a parcel number, '' for a placeholder (empty, all zeros)."""
+    """alnum identifier of a parcel number, '' for a placeholder (empty, all zeros, no digit at
+    all: Transylvania's roll prints "Escrow :" where a business bill has no parcel)."""
     k = tc.alnum(p)
-    return "" if not k or set(k) <= {"0"} else k
+    return "" if not k or set(k) <= {"0"} or not re.search(r"\d", k) else k
+
+
+def _roll_parcels(roll: Roll, blk: dict, keys: Optional[tuple[str, ...]] = None) -> list[str]:
+    out = []
+    for f in (roll.parcel_keys if keys is None else keys):
+        v = str(blk.get(f) or "").strip()
+        if roll.pad and v.isdigit() and len(v) < roll.pad:
+            v = v.zfill(roll.pad)
+        if _key(v):
+            out.append(v)
+    return out
 
 
 def row_parcel_ids(row: Any) -> tuple[frozenset, frozenset]:
@@ -191,10 +294,10 @@ def row_parcel_ids(row: Any) -> tuple[frozenset, frozenset]:
                 exact.add(k)
 
     add(tc.g(row, "parcel_id"), not resolved)
-    blk = roll_block(row)
-    if blk is not None and tc.g(row, "source") == ROLL_SLUG:
-        add(blk.get("parcel"), True)
-        add(blk.get("alternate_id"), True)
+    rb = _own_roll(row)
+    if rb is not None:
+        for v in _roll_parcels(*rb):
+            add(v, True)
     return frozenset(own), frozenset(exact)
 
 
@@ -205,14 +308,16 @@ def searches(row: Any, portal: Portal) -> list[tuple[str, str, str]]:
     out: list[tuple[str, str, str]] = []
     pid = str(tc.g(row, "parcel_id") or "").strip()
     if _key(pid):
-        out.append((portal.parcel_field, pid, "board_parcel"))
-    blk = roll_block(row)
-    if blk is not None and tc.g(row, "source") == ROLL_SLUG:
-        p = str(blk.get("parcel") or "").strip()
-        if _key(p):
-            out.append((portal.parcel_field, p, "roll_block"))
-        acct = str(blk.get("account") or "").strip()
-        if _key(acct):
+        out.append((portal.parcel_field, tc.alnum(pid) if portal.parcel_alnum else pid,
+                    "board_parcel"))
+    rb = _own_roll(row)
+    if rb is not None:
+        roll, blk = rb
+        for p in _roll_parcels(roll, blk, roll.search_keys):
+            out.append((roll.parcel_field or portal.parcel_field,
+                        tc.alnum(p) if portal.parcel_alnum else p, "roll_block"))
+        acct = str(blk.get(roll.account_key) or "").strip() if roll.account_key else ""
+        if _key(acct) and portal.account_search:
             out.append(("AccountNumber", acct, "roll_account"))
     seen, keep = set(), []
     for f, v, src in out:
@@ -264,19 +369,34 @@ def _money(v: Any) -> Optional[float]:
         return None
 
 
-def parse_description(desc_html: Any) -> dict:
-    """{"ids": [...], "situs": str | None, "real": bool} from a description cell."""
+_PERSONAL = re.compile(r"^personal\s+property\b", re.I)
+
+
+def parse_description(desc_html: Any, portal: Optional[Portal] = None) -> dict:
+    """{"ids": [...], "situs": str | None, "real": bool} from a description cell. The portal's
+    quirks (Portal: real_without_units, map_ref, pin_pad) apply when it is given."""
     parts = [_text(p) for p in _BR.split(str(desc_html or ""))]
     parts = [p for p in parts if p]
-    real = bool(parts) and bool(_UNITS.match(parts[-1]))
-    body = parts[:-1] if real else parts
+    units = bool(parts) and bool(_UNITS.match(parts[-1]))
+    body = parts[:-1] if units else parts
+    map_ref = re.compile(portal.map_ref, re.I) if portal is not None and portal.map_ref else None
     ids: list[str] = []
     situs = None
     for p in body:
         if " " not in p and re.search(r"\d", p) and _ID.match(p.upper()) and len(p) <= 24:
             ids.append(p)
+        elif map_ref is not None and map_ref.search(p):
+            continue
         elif situs is None and re.search(r"[A-Za-z]", p):
             situs = p
+    real = units
+    if not real and portal is not None and portal.real_without_units:
+        real = bool(ids) and bool(parts) and not _PERSONAL.match(parts[0])
+    if portal is not None and portal.pin_pad:
+        n = len(portal.pin_pad)
+        for i in list(ids):
+            if i.isdigit() and len(i) >= 10 + n and i.endswith(portal.pin_pad) and i[:-n] not in ids:
+                ids.append(i[:-n])
     return {"ids": ids, "situs": situs, "real": real}
 
 
@@ -298,7 +418,7 @@ def situs_street(situs: Optional[str], cities: tuple[str, ...] = ()) -> Optional
     return s or None
 
 
-def parse_rows(payload: Any) -> list[dict]:
+def parse_rows(payload: Any, portal: Optional[Portal] = None) -> list[dict]:
     """The bills of a GetSearchTableData answer (real property only), newest first."""
     out = []
     for r in (payload.get("rows") if isinstance(payload, dict) else None) or []:
@@ -308,7 +428,7 @@ def parse_rows(payload: Any) -> list[dict]:
         year = tc.to_int(_text(cell[0]))
         if not 1900 < year < 2100:
             continue
-        d = parse_description(cell[4])
+        d = parse_description(cell[4], portal)
         if not d["real"] or not d["ids"]:
             continue
         action = _text(cell[7]) if len(cell) > 7 else ""
@@ -428,6 +548,26 @@ def _ok(client: Any, portal: Portal) -> None:
     _run(client)["portals"].setdefault(portal.county, _PortalState()).failures = 0
 
 
+def search_model(portal: Portal, field: str, value: str) -> dict:
+    """The search-input model posted to GetSearchTablePartial: the field and the paid-bills flag
+    (Onslow, Graham), or every .search-value field of the form with only `field` filled
+    (Portal.full_model: Transylvania, Catawba answer an empty body to anything less)."""
+    if not portal.full_model:
+        model = {"PageSize": "50", field: value, "UnpaidBillsOnly": "false"}
+        if field == "ParcelNumber":
+            model["ParcelSearch"] = "false"
+        return model
+    model = {"PageSize": "50", "OwnerLastName": "", "OwnerFirstName": "", "ParcelNumber": "",
+             "ParcelSearch": "false", "TaxYear": "", "BillNumber": "", "UnpaidBillsOnly": "false",
+             "FormattedPropertyAddress": "", "SortBy": "AccountName1-Asc"}
+    if portal.account_search:
+        model["AccountNumber"] = ""
+    for f in portal.model_fields:
+        model[f] = ""
+    model[field] = value
+    return model
+
+
 async def search(client: Any, portal: Portal, field: str, value: str) -> list[dict]:
     """Every real-property bill the portal returns for one search (all years), cached per run."""
     run = _run(client)
@@ -437,25 +577,28 @@ async def search(client: Any, portal: Portal, field: str, value: str) -> list[di
     try:
         s = await _session(client, portal)
         hdr = _headers(portal)
-        model = {"PageSize": "50", field: value, "UnpaidBillsOnly": "false"}
-        if field == "ParcelNumber":
-            model["ParcelSearch"] = "false"
+        model = search_model(portal, field, value)
         r = await s.post_form(f"{portal.base}/TaxBillSearch/GetSearchTablePartial/", model,
                               headers=hdr, timeout=TIMEOUT_S)
         if r.status != 200:
             raise RuntimeError(f"search HTTP {r.status}")
         table = (re.findall(r'PopulateTable\("([^"]+)"', r.text) or ["PayTaxBills"])[0]
         bills: list[dict] = []
+        other = 0
         for page in range(1, MAX_PAGES + 1):
-            d = await s.post_form(f"{portal.base}/TaxBillSearch/GetSearchTableData",
-                                  {"Page": str(page), "NumRows": str(NUM_ROWS), "Table": table},
+            form = {"Page": str(page), "NumRows": str(NUM_ROWS), "Table": table}
+            if portal.full_model:
+                form["PostData"] = ""
+            d = await s.post_form(f"{portal.base}/TaxBillSearch/GetSearchTableData", form,
                                   headers=hdr, timeout=TIMEOUT_S)
             if d.status != 200:
                 raise RuntimeError(f"table HTTP {d.status}")
             payload = json.loads(d.text)
             if not isinstance(payload, dict) or not isinstance(payload.get("rows"), list):
                 raise ValueError("not a result table")
-            bills += parse_rows(payload)
+            got = parse_rows(payload, portal)
+            other += len(payload["rows"]) - len(got)
+            bills += got
             if page >= tc.to_int(payload.get("total")) or not payload["rows"]:
                 break
     except PortalDown:
@@ -465,7 +608,14 @@ async def search(client: Any, portal: Portal, field: str, value: str) -> list[di
         raise
     _ok(client, portal)
     run["cache"][ck] = bills
+    run["cache"][("other",) + ck] = other
     return bills
+
+
+def other_bills(client: Any, portal: Portal, field: str, value: str) -> int:
+    """How many bills a cached search answered that are not real property (personal property,
+    supplemental bills): 0 when the search was not made."""
+    return int(_run(client)["cache"].get(("other", "search", portal.county, field, value)) or 0)
 
 
 async def view(client: Any, portal: Portal, year: int, bill: str) -> dict:
@@ -576,6 +726,10 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
             break
     ev["searched"] = searched
     if not bills:
+        if not own and any(other_bills(client, portal, f, v) for f, v, _ in plan[:MAX_SEARCHES]):
+            # the roll row names no parcel and its account holds only personal-property bills
+            # (Transylvania's roll lists business personal property with parcel "Escrow :")
+            return _res("unconfirmed", dict(ev, reason="personal_property_only"))
         return _res("unconfirmed", dict(ev, reason="parcel_not_found"))
     return await _decide(row, client, portal, bills, claimed, today, ev, can_follow=True,
                          own=own, exact=exact)

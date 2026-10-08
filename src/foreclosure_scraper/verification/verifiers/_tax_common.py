@@ -315,8 +315,25 @@ def aging_claim(row: Any) -> bool:
                     and to_int(ta.get("years_delinquent")) > 0))
 
 
+def tax_owed_claim(row: Any) -> bool:
+    """The row carries a county delinquent-tax balance of its own (raw.tax_owed, kind
+    delinquent_tax, balance > 0) and is not another lien's listing: the call-ready gate's own
+    test (call_ready.property_tax_claim). Added 2026-10-09 (audit tax_checkers_2): on the
+    2026-10-07 board 382 rows in counties WITH a checker (Buncombe 137, Spartanburg 122, Horry 55,
+    Pickens 19, ...) carried a balance the gate waited on but no aging flag or listing type, so no
+    verifier took them and the gate kept them at tax_check_missing for good."""
+    to = raw_of(row).get("tax_owed")
+    if not isinstance(to, dict) or str(to.get("kind") or "delinquent_tax") != "delinquent_tax":
+        return False
+    try:
+        bal = float(to.get("balance") or 0)
+    except (TypeError, ValueError):
+        return False
+    return bal > 0 and not other_lien_listing(row)
+
+
 def claims_property_tax(row: Any, own_block: bool) -> bool:
-    return listing_tax_claim(row) or aging_claim(row) or bool(own_block)
+    return listing_tax_claim(row) or aging_claim(row) or tax_owed_claim(row) or bool(own_block)
 
 
 #: the dashboard's "tax delinquent 2+ years and $500 or more" rows, checked first within a tier

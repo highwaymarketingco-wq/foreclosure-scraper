@@ -318,3 +318,205 @@ def test_the_public_evidence_names_nobody():
     r = run(onslow_roll_row(), FakePortal(ONSLOW, onslow_bills()))
     blob = json.dumps(r.to_dict())
     assert "TESTOWNER" not in blob and "900000001" not in blob     # no owner, no account number
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-09: Transylvania and Catawba (newer build: the full search model)
+# ---------------------------------------------------------------------------
+
+TRANSY = p.PORTALS["Transylvania"].base
+CATAWBA = p.PORTALS["Catawba"].base
+_FULL = ("OwnerLastName", "OwnerFirstName", "ParcelNumber", "ParcelSearch", "TaxYear", "BillNumber",
+         "UnpaidBillsOnly", "FormattedPropertyAddress", "SortBy")
+
+
+class FullModelPortal(FakePortal):
+    """The newer build: a partial posted without every .search-value field answers an empty body
+    and the table then fails (HTTP 500), as Transylvania did on 2026-10-09."""
+
+    def __init__(self, base, bills, *, required=_FULL, map_ref=None, pin_pad=""):
+        super().__init__(base, bills)
+        self.required, self.map_ref, self.pin_pad = required, map_ref, pin_pad
+
+    async def post_form(self, url, data, **kw):
+        if url.endswith("/GetSearchTablePartial/") and not all(f in data for f in self.required):
+            self.asked.append(("POST", url, dict(data)))
+            self.model = None
+            return FormResponse(200, url, "")
+        if url.endswith("/GetSearchTableData") and self.model is None:
+            return FormResponse(500, url, "<title>Object reference not set to an instance</title>")
+        return await super().post_form(url, data, **kw)
+
+    def _match(self):
+        m = self.model or {}
+        if self.pin_pad and m.get("AlternateParcelIdentifier"):
+            v = tc.alnum(m["AlternateParcelIdentifier"])
+            return [b for b in self.bills if len(b["ids"]) > 1 and tc.alnum(b["ids"][1]) == v + self.pin_pad]
+        return super()._match()
+
+    def _row(self, b):
+        r = FakePortal._row(b)
+        if self.map_ref:      # Transylvania: parcel, map reference, situs, acreage
+            r["cell"][4] = "<br/>".join([*b["ids"], self.map_ref, b["situs"], b["acres"]])
+        if b.get("no_units"):  # Catawba before levy 2025: no acreage part
+            r["cell"][4] = "<br/>".join([*b["ids"], b["situs"], ""])
+        return r
+
+
+def transy_bills(**over):
+    situs = "12 TEST BAYNARD RD"
+    pid = "8500000001000"
+    return [bill(2026, 26001, [pid], situs, balance=400.0),
+            bill(2025, 15001, [pid], situs, balance=over.get("b2025", 436.06), paid_on=over.get("p2025")),
+            bill(2024, 14001, [pid], situs, paid_on=over.get("p2024", date(2024, 9, 1))),
+            bill(2023, 13001, [pid], situs, paid_on=date(2023, 9, 1)),
+            bill(2022, 12001, [pid], situs, paid_on=date(2022, 9, 1)),
+            bill(2021, 11001, [pid], situs, paid_on=date(2021, 9, 1)),
+            bill(2020, 10001, [pid], situs, paid_on=date(2020, 9, 1)),
+            bill(2019, 9001, [pid], situs, paid_on=date(2019, 9, 1))]
+
+
+def transy_roll_row(**kw):
+    r = {"state": "NC", "county": "Transylvania", "listing_type": "tax_lien",
+         "source": "counties_nc.transylvania_delinquent_tax", "parcel_id": "Escrow :",
+         "street_address": "12 TEST BAYNARD RD", "owner_name": "TESTOWNER ALPHA",
+         "first_seen": "2026-10-04T12:00:00",
+         "raw": {"transylvania_tax": {"tax_year": "2025", "bill_number": "15001",
+                                      "account_number": "900000001", "parcel": "8500000001000",
+                                      "balance_owed": 436.06},
+                 "tax_owed": {"balance": 436.06, "year": 2025, "kind": "delinquent_tax"}}}
+    r.update(kw)
+    return r
+
+
+def test_transylvania_posts_the_full_model_and_reads_the_situs_past_the_map_reference():
+    portal = FullModelPortal(TRANSY, transy_bills(), map_ref="T999 00001   01 MS.07")
+    r = run(transy_roll_row(), portal)
+    assert r.verdict == "confirmed", r.evidence
+    ev = r.evidence
+    assert ev["delinquent_by_year"] == {"2025": 436.06}
+    assert ev["searched"][0] == {"by": "ParcelNumber", "from": "roll_block", "bills": 8}
+    assert ev["tax_parcel"] == "8500000001000"
+    partial = [a for a in portal.asked if a[0] == "POST" and a[1].endswith("GetSearchTablePartial/")]
+    assert all(f in partial[0][2] for f in _FULL) and partial[0][2]["ParcelNumber"] == "8500000001000"
+    tables = [a for a in portal.asked if a[0] == "POST" and a[1].endswith("GetSearchTableData")]
+    assert tables[0][2].get("PostData") == ""
+    d = p.parse_description("8500000001000<br/>T999 00001   01 MS.07<br />12 TEST BAYNARD RD<br />4.420 AC",
+                            p.PORTALS["Transylvania"])
+    assert d["situs"] == "12 TEST BAYNARD RD" and d["ids"] == ["8500000001000"] and d["real"]
+
+
+def test_transylvania_escrow_placeholder_is_no_parcel_and_a_dashed_pin_is_searched_bare():
+    row = transy_roll_row(parcel_id="Escrow :")
+    assert p.searches(row, p.PORTALS["Transylvania"])[0] == ("ParcelNumber", "8500000001000", "roll_block")
+    row = transy_roll_row(parcel_id="8500-00-0001-000", source="counties_generic.x", raw={
+        "tax_owed": {"balance": 436.06, "year": 2025, "kind": "delinquent_tax"}})
+    assert p.applies(row)                                        # the gate's claim: a tax_owed balance
+    assert p.searches(row, p.PORTALS["Transylvania"]) == [("ParcelNumber", "8500000001000", "board_parcel")]
+    r = run(row, FullModelPortal(TRANSY, transy_bills(), map_ref="T999 00001   01 MS.07"))
+    assert r.verdict == "confirmed" and r.evidence["address_binding"] == "parcel_number"
+
+
+def test_transylvania_stale_when_the_claimed_year_was_paid_late():
+    bills = transy_bills(b2025=0.0, p2025=date(2026, 9, 30))
+    r = run(transy_roll_row(), FullModelPortal(TRANSY, bills, map_ref="T999 00001   01 MS.07"))
+    assert r.verdict == "stale", r.evidence
+    assert r.evidence["late_levy_years"] == [2025] and r.evidence["address_binding"] == "bill_address"
+
+
+def test_the_old_minimal_model_fails_on_the_newer_build():
+    """What the verifier would get without Portal.full_model: unconfirmed, never a verdict."""
+    old = p.Portal("Transylvania", TRANSY, "ParcelNumber", rolls=p.PORTALS["Transylvania"].rolls)
+    assert set(p.search_model(old, "ParcelNumber", "1")) == {"PageSize", "ParcelNumber", "UnpaidBillsOnly",
+                                                             "ParcelSearch"}
+    assert set(p.search_model(p.PORTALS["Transylvania"], "ParcelNumber", "1")) >= set(_FULL) | {"AccountNumber"}
+    cat = p.search_model(p.PORTALS["Catawba"], "AlternateParcelIdentifier", "374100000001")
+    assert "AccountNumber" not in cat and cat["AlternateParcelIdentifier"] == "374100000001"
+
+
+def catawba_bills(**over):
+    ids = ["0027012", "3741000000010000"]
+    situs = "20 TEST 19TH ST NEWTON NC 28658"
+    out = [bill(2026, 27012, ids, situs, balance=0.0, paid_on=date(2026, 9, 1)),
+           bill(2025, 27012, ids, situs, balance=over.get("b2025", 0.0), paid_on=over.get("p2025", date(2026, 3, 2)))]
+    for y in range(2024, 2018, -1):
+        b = bill(y, 1600000 + y, ids, "20 TEST 19TH ST", paid_on=date(y, 11, 20))
+        b["no_units"] = True
+        out.append(b)
+    pp = bill(2024, 1810313, ["Personal Property"], "20 TEST 19TH ST", balance=99.0)
+    out.append(pp)
+    return out
+
+
+def catawba_pdf_row(**kw):
+    r = {"state": "NC", "county": "Catawba", "listing_type": "tax_lien",
+         "source": "counties_nc.nc_county_pdf_delinquent_tax", "parcel_id": "",
+         "street_address": None, "owner_name": "TESTOWNER ALPHA", "first_seen": "2026-08-01T12:00:00",
+         "raw": {"nc_county_pdf_delinquent_tax": {"county": "Catawba", "county_id": "27012",
+                                                  "id_is_parcel": False, "principal_tax_due": 4000.0,
+                                                  "tax_year": 2025},
+                 "tax_owed": {"balance": 4000.0, "year": 2025, "kind": "delinquent_tax"}}}
+    r.update(kw)
+    return r
+
+
+def test_catawba_pdf_id_is_the_reid_and_older_bills_without_acreage_are_read():
+    portal = FullModelPortal(CATAWBA, catawba_bills(), required=_FULL + ("AlternateParcelIdentifier",),
+                             pin_pad="0000")
+    r = run(catawba_pdf_row(), portal)
+    assert r.verdict == "stale", r.evidence            # claimed 2025, paid 2026-03-02 (after Jan 6)
+    ev = r.evidence
+    assert ev["searched"][0] == {"by": "ParcelNumber", "from": "roll_block", "bills": 8}
+    assert ev["tax_parcel"] == "0027012" and ev["address_binding"] == "no_row_address"
+    assert ev["late_levy_years"] == [2025] and ev["history_complete"] is True
+    assert ev["chronic_claim"] == "not_confirmed"
+    d = p.parse_description("Personal Property<br />20 TEST 19TH ST<br />", p.PORTALS["Catawba"])
+    assert not d["real"]
+
+
+def test_catawba_board_pin_finds_the_padded_pin_and_confirms():
+    portal = FullModelPortal(CATAWBA, catawba_bills(b2025=1500.0, p2025=None),
+                             required=_FULL + ("AlternateParcelIdentifier",), pin_pad="0000")
+    row = {"state": "NC", "county": "Catawba", "listing_type": "code_violation", "source": "counties_generic.x",
+           "parcel_id": "374100000001", "street_address": "20 TEST 19TH ST", "owner_name": "TESTOWNER ALPHA",
+           "raw": {"tax_owed": {"balance": 1500.0, "year": 2025, "kind": "delinquent_tax"}}}
+    r = run(row, portal)
+    assert r.verdict == "confirmed", r.evidence
+    assert r.evidence["searched"][0]["by"] == "AlternateParcelIdentifier"
+    assert r.evidence["delinquent_by_year"] == {"2025": 1500.0}
+    assert r.evidence["tax_parcel"] == "374100000001"
+
+
+def test_a_merged_pdf_block_is_not_the_rows_own_number():
+    """A Catawba row of another source carrying the advertisement block of some parcel: the block's
+    REID is never searched or treated as exact (it is a claim about the block's parcel)."""
+    row = catawba_pdf_row(source="counties_generic.state_contamination.nc_ust_incidents",
+                          parcel_id="374100000001")
+    assert p.applies(row)
+    assert p.searches(row, p.PORTALS["Catawba"]) == [("AlternateParcelIdentifier", "374100000001", "board_parcel")]
+    own, exact = p.row_parcel_ids(row)
+    assert "0027012" not in own and "374100000001" in exact
+
+
+def test_a_tax_owed_balance_of_another_lien_is_not_a_property_tax_claim():
+    row = {"state": "NC", "county": "Catawba", "listing_type": "tax_lien", "source": "liensnc",
+           "parcel_id": "374100000001", "raw": {"tax_owed": {"balance": 900.0, "kind": "delinquent_tax"}}}
+    assert not tc.tax_owed_claim(row)
+    row2 = dict(row, listing_type="foreclosure", source="x")
+    assert tc.tax_owed_claim(row2)
+    row3 = dict(row2, raw={"tax_owed": {"balance": 0, "kind": "delinquent_tax"}})
+    assert not tc.tax_owed_claim(row3)
+    row4 = dict(row2, raw={"tax_owed": {"balance": 50.0, "kind": "judgment"}})
+    assert not tc.tax_owed_claim(row4)
+
+
+def test_a_roll_row_whose_account_holds_only_personal_property_says_so():
+    """Transylvania's roll lists business personal-property bills with parcel "Escrow :": the
+    account search answers only Personal Property bills, never a parcel to judge."""
+    pp = bill(2025, 100416, ["Personal Property"], "", account="202510041600", balance=50.0)
+    portal = FullModelPortal(TRANSY, [pp], map_ref="T999 00001   01 MS.07")
+    row = transy_roll_row(raw={"transylvania_tax": {"tax_year": "2025", "bill_number": "100416",
+                                                    "account_number": "202510041600", "parcel": "Escrow :"},
+                               "tax_owed": {"balance": 50.0, "year": 2025, "kind": "delinquent_tax"}})
+    r = run(row, portal)
+    assert (r.verdict, r.evidence["reason"]) == ("unconfirmed", "personal_property_only"), r.evidence
