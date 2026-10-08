@@ -3710,6 +3710,15 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("vacant_landuse.failed", traceback=traceback.format_exc())
 
+    # Call-ready gate (call_ready.py, docs/call_ready.md): lane, tier, reason and unmet conditions per
+    # row, read off the checks verification.apply attached, restore_verified_tax and the block_binding
+    # scrub above. Pure, no network, never drops a row.
+    try:
+        from .call_ready import stamp_board as _call_ready_stamp
+        enrichment_stats["call_ready"] = _call_ready_stamp(enriched)
+    except Exception:
+        log.error("call_ready.failed", traceback=traceback.format_exc())
+
     # Stacked-distress score (HOT/WARM/COLD operator board) — runs last so it
     # can stack every signal + equity + contactability gathered above.
     def _score_failed(kind: str, detail: str, hist: dict | None = None,
@@ -3929,6 +3938,14 @@ async def run_enrich_tail(st: TailState) -> dict:
         log.info("orchestrator.fullmer_ranked", **enrichment_stats["fullmer_rank"]["buckets"])
     except Exception:
         log.error("fullmer_rank.failed", traceback=traceback.format_exc())
+
+    # Heir candidates and the Fullmer rank are current only after score_board: stamp the gate again
+    # (idempotent) so lane B / C's heir item and the rank are this run's.
+    try:
+        from .call_ready import stamp_board as _call_ready_stamp
+        enrichment_stats["call_ready_final"] = _call_ready_stamp(enriched)
+    except Exception:
+        log.error("call_ready_final.failed", traceback=traceback.format_exc())
 
     # Derivation flags — free_and_clear (no mortgage in ROD), tired_landlord
     # (absentee + 10yr ownership), divorce (from nc_ecourts_divorce scraper).
