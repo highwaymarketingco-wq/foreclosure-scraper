@@ -194,3 +194,29 @@ def test_new_hanover_reads_only_live_whole_structure_demolitions():
     for dead in ("Void", "Withdrawn", "Revoked"):
         assert f"'{dead}'" in w
     assert "PERMIT_STATUS IS NULL" in w                              # NOT IN alone drops NULL statuses
+
+
+# ----------------------------------------------------------------------------- EPA FRS county text
+
+def test_epa_frs_reads_the_county_from_suffixes_cities_and_one_close_spelling():
+    from foreclosure_scraper.scrapers.counties_generic import epa_frs_sites as E
+
+    def row(county, city, addr="1 PRETEND INDUSTRIAL RD"):
+        return {"county_name": county, "city_name": city, "location_address": addr,
+                "primary_name": "MADE UP MILL", "pgm_sys_id": "X1", "registry_id": "110000000001"}
+
+    cases = [
+        (row("ROBESON COUNTY", "LUMBERTON"), "NC", "Robeson", "county_name"),
+        (row("WILSON COOUNTY", "WILSON"), "NC", "Wilson", "county_name"),
+        (row(" NOT DEFINED ", "SALISBURY"), "NC", "Rowan", "city"),
+        (row("GREENVILLE", "GREENVILLE"), "NC", "Pitt", "city"),        # an NC city, not the SC county
+        (row(None, "WENDELL"), "NC", "Wake", "city"),
+        (row("ALLLENDALE", "NOWHERE TOWN"), "SC", "Allendale", "close_spelling"),
+        (row("GREENVILLE", "GREER"), "SC", "Greenville", "county_name"),
+    ]
+    for r, st, county, how in cases:
+        li = E._to_listing(r, st, "ACRES")
+        assert li is not None, r
+        assert (li.county, li.raw["epa_frs"]["county_from"]) == (county, how), r
+    assert E._to_listing(row(" NOT DEFINED ", "NOWHERE TOWN"), "SC", "SEMS") is None
+    assert E._to_listing(row("CUMBERLAND", "FAYETTEVILLE", addr="UNKNOWN"), "NC", "ACRES") is None

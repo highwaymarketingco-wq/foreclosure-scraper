@@ -34,10 +34,15 @@ def test_real_nc_sc_counties_outside_the_old_footprint_are_kept():
 
 def test_garbage_county_values_still_drop():
     """FRS's county_name occasionally carries a data-entry typo (verified live
-    2026-10-03: 'BURTCOMBE', 'ALLLENDALE') that matches no real county name --
-    those rows still correctly drop, same as before the widen."""
-    assert E._to_listing(_row(county="BURTCOMBE"), "NC", "ACRES") is None
-    assert E._to_listing(_row(county="NOT A REAL COUNTY"), "NC", "ACRES") is None
+    2026-10-03: 'BURTCOMBE', 'ALLLENDALE') that matches no real county name.
+    Since 2026-10-08 the row's city is read through the NC/SC gazetteers first
+    (a Buncombe city resolves the typo); a typo with no known city and no single
+    close spelling still drops."""
+    li = E._to_listing(_row(county="BURTCOMBE"), "NC", "ACRES")
+    assert li is not None and li.county == "Buncombe"
+    assert li.raw["epa_frs"]["county_from"] == "city"
+    nowhere = {**_row(county="NOT A REAL COUNTY"), "city_name": "NOWHERE TOWN"}
+    assert E._to_listing(nowhere, "NC", "ACRES") is None
 
 
 def test_county_case_is_normalised_to_canonical_spelling():

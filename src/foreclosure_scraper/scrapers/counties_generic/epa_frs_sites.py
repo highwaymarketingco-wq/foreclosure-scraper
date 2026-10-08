@@ -37,12 +37,17 @@ MEASURED STATEWIDE (widened 2026-10-03, was MEASURED IN-FOOTPRINT)
 """
 from __future__ import annotations
 
+import difflib
 import os
+import re
 from datetime import datetime
 from typing import Iterable, Optional
 
 import structlog
 
+from ..._bankruptcy_city_to_county import bankruptcy_county_for
+from ..._coastal_city_to_county import coastal_county_for
+from ..._upstate_city_to_county import upstate_county_for
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...layer_guard import LayerHarvest
@@ -74,10 +79,40 @@ def _clean(v) -> Optional[str]:
     return s
 
 
+_COUNTY_SUFFIX = re.compile(r"\s+CO+UNTY$")
+
+
+def resolve_county(row: dict, state: str) -> tuple[Optional[str], Optional[str]]:
+    """(canonical county, how it was found) for one FRS row, or (None, None).
+
+    county_name is free text. Measured 2026-10-08 over the four statewide pulls (3,815 rows): 101
+    rows dropped, 19 for having no street address and the rest on the county text: SEMS writes
+    ' NOT DEFINED ' (64 rows) and ACRES carries 'ROBESON COUNTY', 'WILSON COOUNTY', 'ALLLENDALE',
+    a city ('GREENVILLE' for Pitt, 'MONROE' for Rock Hill) or nothing. In order: the exact name;
+    the name without a 'COUNTY' suffix; the row's city through the NC/SC city gazetteers (the
+    county text is then not trusted); one close spelling of a county of that state."""
+    names = FOOTPRINT[state]
+    raw = " ".join((row.get("county_name") or "").upper().split())
+    if raw in names:
+        return names[raw], "county_name"
+    bare = _COUNTY_SUFFIX.sub("", raw)
+    if bare in names:
+        return names[bare], "county_name"
+    city = row.get("city_name")
+    for lookup in (bankruptcy_county_for, upstate_county_for, coastal_county_for):
+        hit = lookup(city, state)
+        if hit and hit.upper() in names:
+            return names[hit.upper()], "city"
+    close = difflib.get_close_matches(bare, list(names), n=2, cutoff=0.85) if bare else []
+    if len(close) == 1:
+        return names[close[0]], "close_spelling"
+    return None, None
+
+
 def _to_listing(row: dict, state: str, program: str) -> Optional[Listing]:
-    county = FOOTPRINT[state].get((row.get("county_name") or "").upper().strip())
+    county, county_from = resolve_county(row, state)
     if not county:
-        return None                       # outside the footprint
+        return None                       # no NC/SC county could be read for the row
     addr = _clean(row.get("location_address"))
     if not addr:
         return None                       # no address, no lead
@@ -120,6 +155,7 @@ def _to_listing(row: dict, state: str, program: str) -> Optional[Listing]:
             "registry_id": registry_id,
             "site_name": name,
             "county_name": _clean(row.get("county_name")),
+            "county_from": county_from,
             "location_description": _clean(row.get("location_description")),
             "last_reported_date": _clean(row.get("last_reported_date")),
             # EXTRACTION-COMPLETENESS AUDIT 2026-10-03: live field-population
