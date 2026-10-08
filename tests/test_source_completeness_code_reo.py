@@ -184,3 +184,13 @@ def test_transylvania_legal_location_is_not_a_street_address(monkeypatch):
     assert rows["TR K OFF FROZEN CREEK RD"].street_address is None
     assert rows["LAUREL CREEK DR L-5A     1.67"].street_address is None
     assert rows["123 MADEUP RD"].street_address == "123 MADEUP RD"
+
+
+# ----------------------------------------------------------------------------- New Hanover demolitions
+
+def test_new_hanover_reads_only_live_whole_structure_demolitions():
+    w = next(l for l in AD.LAYERS if l.slug == "new_hanover_demolition_permits").where
+    assert "WORK_CLASS = 'Demolition'" in w and "LIKE" not in w     # 'Interior Demolition' is a renovation
+    for dead in ("Void", "Withdrawn", "Revoked"):
+        assert f"'{dead}'" in w
+    assert "PERMIT_STATUS IS NULL" in w                              # NOT IN alone drops NULL statuses

@@ -359,7 +359,13 @@ LAYERS: tuple[Layer, ...] = (
                 "DESCRIPTION", "PERMIT_TYPE", "ISSUE_DATE", "FINALED_DATE",
                 "EXPIRATION_DATE", "LAST_INSPECTION_DATE", "UNIT", "MAIN_ZONE",
                 "Lat", "Lon"),
-        where="WORK_CLASS LIKE '%Demolition%'",
+        # 2026-10-08: whole-structure demolitions that are still live. 'Interior Demolition' is
+        # a renovation (160 rows), and Void/Withdrawn/Revoked permits are dead (161 rows): live
+        # 2026-10-08, 1,746 -> 1,438. Same rule as nc_metro_demolition_permits (dead permits
+        # dropped, an EXPIRED permit kept as a stalled teardown; Greensboro's interior class not
+        # read).
+        where=("WORK_CLASS = 'Demolition' AND (PERMIT_STATUS IS NULL OR "
+               "PERMIT_STATUS NOT IN ('Void','Withdrawn','Revoked'))"),
         parcel="PID", lat_field="Lat", lon_field="Lon",
         situs_parts=("NUMBER", "DIR", "STREET", "TYPE"),
         city="CITY", zip_="ZIPCODE",
