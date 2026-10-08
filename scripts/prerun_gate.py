@@ -17,9 +17,14 @@ THE CHECKS (each PASS / WARN / FAIL / SKIP, one line why)
                  was pushed); ahead/behind reported. Never fetches.
     tests        data/test_results/latest.json (scripts/run_test_suite.py) is a FULL run, green,
                  and no code path changed between its commit and HEAD
+    ci           GitHub's Tests workflow (suite on a fresh checkout + repo size) is green on the pin
+                 (gh CLI; a failed run fails, no gh / no run / still running warns)
     ledgers      docs/handoff/verification committed within ledgers.max_age_h, no ledger modified
                  in the working tree, no verification sweep running
     handoff      the Mac's stealth hand-off committed within handoff.max_age_h (warning only)
+    repo-size    scripts/repo_size_check.py on HEAD: no tracked file over 90 MiB (the commit gate
+                 refuses 95 MiB, GitHub 100 MiB) and the Pages site (tracked docs/ minus the
+                 _config.yml excludes) under 900 MB (pages.yml stops at 950, Pages refuses 1 GB)
     manual       scripts/build_owner_manual.py --check (walls register + owner manual current)
     memory       projected peak = max measured MB-per-row x prior board rows x growth_factor, under
                  the watchdog kill line (deploy/oracle/run_profile.json "memory"); warning above
@@ -166,6 +171,48 @@ def _sweep_running() -> bool:
         return False
 
 
+def _gh(repo: Path, args: list[str]) -> tuple[int, str]:
+    try:
+        r = subprocess.run(["gh", *args], cwd=repo, capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return 1, str(exc)
+    return r.returncode, ((r.stdout or "") if r.returncode == 0 else (r.stderr or r.stdout or "")).strip()
+
+
+def check_ci(repo: Path, pin: str | None,
+             gh: Callable[[Path, list[str]], tuple[int, str]] = _gh) -> tuple[str, str]:
+    """GitHub's Tests workflow (.github/workflows/tests.yml: the suite on a fresh checkout, and the
+    repo size limits) on the pinned commit. The 'tests' check runs the suite on THIS machine, which
+    holds gitignored data a fresh checkout lacks (data/sc_parcel_mailing.db): CI failed on every push
+    from 2026-10-07 to 10-09 on a test that read that roll, while every local run was green. A
+    failed workflow on the pin is refused; no gh, no network, no run yet or a run in progress is a
+    warning."""
+    if not pin:
+        return WARN, "no pin: GitHub CI not checked"
+    rc, sha = _git(repo, "rev-parse", "--verify", "--quiet", f"{pin}^{{commit}}")
+    if rc or not sha:
+        return WARN, f"pin {pin} is not a commit in this checkout: GitHub CI not checked"
+    rc, out = gh(repo, ["run", "list", "--workflow", "Tests", "--commit", sha, "--limit", "10",
+                        "--json", "databaseId,status,conclusion,createdAt"])
+    if rc != 0:
+        return WARN, f"could not read GitHub CI for {sha[:10]} (gh): {out[:160]}"
+    try:
+        runs = sorted(json.loads(out or "[]"), key=lambda r: r.get("createdAt") or "", reverse=True)
+    except ValueError:
+        return WARN, "could not parse gh run list output"
+    if not runs:
+        return WARN, f"no Tests workflow run on GitHub for {sha[:10]} yet (pushed?)"
+    done = [r for r in runs if r.get("status") == "completed"
+            and r.get("conclusion") not in ("cancelled", "skipped")]
+    if not done:
+        return WARN, f"the Tests workflow on {sha[:10]} has not finished (run {runs[0].get('databaseId')})"
+    last = done[0]
+    if last.get("conclusion") == "success":
+        return PASS, f"Tests workflow green on {sha[:10]} (run {last.get('databaseId')})"
+    return FAIL, (f"Tests workflow {last.get('conclusion')} on {sha[:10]} (run {last.get('databaseId')}): "
+                  f"gh run view {last.get('databaseId')} --log-failed")
+
+
 def check_ledgers(repo: Path, profile: dict, sweep_running: Callable[[], bool] = _sweep_running) -> tuple[str, str]:
     cfg = profile.get("ledgers") or {}
     d = cfg.get("dir", "docs/handoff/verification")
@@ -195,14 +242,36 @@ def check_ledgers(repo: Path, profile: dict, sweep_running: Callable[[], bool] =
 
 
 def check_handoff(repo: Path, profile: dict) -> tuple[str, str]:
+    """Age of the newest commit that touched the hand-off: the sharded directory (since
+    2026-10-09, stealth_handoff_store) or the legacy single file, whichever is newer."""
     cfg = profile.get("handoff") or {}
-    f = cfg.get("file", "docs/handoff/stealth_leads.json")
-    a = _commit_age_h(repo, f)
-    if a is None:
-        return WARN, f"no committed {f}"
+    paths = [cfg.get("dir", "docs/handoff/stealth_leads"),
+             cfg.get("file", "docs/handoff/stealth_leads.json")]
+    ages = [a for a in (_commit_age_h(repo, p) for p in paths) if a is not None]
+    if not ages:
+        return WARN, f"no committed {' or '.join(paths)}"
+    a = min(ages)
     if a > float(cfg.get("max_age_h", 36)):
         return WARN, f"the Mac's stealth hand-off is {a:.0f} h old: the run ingests stale stealth leads"
     return PASS, f"stealth hand-off {a:.1f} h old"
+
+
+def check_repo_size(repo: Path, profile: dict) -> tuple[str, str]:
+    """scripts/repo_size_check.py on HEAD: no tracked file over max_file_mib (the pre-commit gate
+    refuses 95 MiB, GitHub 100 MiB) and the Pages site under max_pages_mb (pages.yml stops a
+    deploy at 950 MB, Pages refuses 1 GB). Limits from run_profile.json "repo_size"."""
+    import repo_size_check as rsc
+    cfg = profile.get("repo_size") or {}
+    r = rsc.measure(repo, "HEAD",
+                    max_file_mib=float(cfg.get("max_file_mib", rsc.MAX_FILE_MIB)),
+                    warn_file_mib=float(cfg.get("warn_file_mib", rsc.WARN_FILE_MIB)),
+                    max_pages_mb=float(cfg.get("max_pages_mb", rsc.MAX_PAGES_MB)),
+                    warn_pages_mb=float(cfg.get("warn_pages_mb", rsc.WARN_PAGES_MB)))
+    if not r["ok"]:
+        return FAIL, rsc.summary(r)
+    if r["warnings"]:
+        return WARN, rsc.summary(r) + "; " + "; ".join(r["warnings"][:3])
+    return PASS, rsc.summary(r)
 
 
 def check_manual(repo: Path, offline: bool = False) -> tuple[str, str]:
@@ -409,8 +478,8 @@ def check_suite(repo: Path, checkpoint: Path | None) -> tuple[str, str]:
 
 
 # --------------------------------------------------------------------------------------- driver
-CHECK_ORDER = ("git", "pin", "pushed", "tests", "ledgers", "handoff", "manual", "memory",
-               "board-loads", "unwired", "frozen-keys", "flags", "registry", "suite")
+CHECK_ORDER = ("git", "pin", "pushed", "tests", "ci", "ledgers", "handoff", "repo-size", "manual",
+               "memory", "board-loads", "unwired", "frozen-keys", "flags", "registry", "suite")
 
 
 def run_gate(repo: Path, profile: dict, *, pin: str | None, skip: set[str], checkpoint: Path | None,
@@ -420,8 +489,10 @@ def run_gate(repo: Path, profile: dict, *, pin: str | None, skip: set[str], chec
         "pin": lambda: check_pin(repo, pin),
         "pushed": lambda: check_pushed(repo),
         "tests": lambda: check_tests(repo, profile),
+        "ci": lambda: check_ci(repo, pin),
         "ledgers": lambda: check_ledgers(repo, profile),
         "handoff": lambda: check_handoff(repo, profile),
+        "repo-size": lambda: check_repo_size(repo, profile),
         "manual": lambda: check_manual(repo, offline),
         "memory": lambda: check_memory(repo, profile),
         "board-loads": lambda: check_board_loads(repo, profile),

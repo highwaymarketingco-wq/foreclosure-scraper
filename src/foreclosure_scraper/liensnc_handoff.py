@@ -26,7 +26,7 @@ ONE CYCLE (run_cycle):
      frontier (see the INCREMENTAL block in scripts/scrape_liensnc.py);
   4. every pending filing (new this cycle, or sent before and not on the board yet) becomes
      a Listing shaped like the rows already on the board, which scripts/run_stealth_sources.py
-     writes to docs/handoff/stealth_leads.json. The VM's national.stealth_handoff ingests it
+     writes to docs/handoff/stealth_leads/. The VM's national.stealth_handoff ingests it
      like any other Mac-scraped lead: same slug, same dedupe keys, same scoring.
 
 ROW SHAPE (to_listing) = scripts/ingest_all.ingest_liensnc() + the fixes applied to the board

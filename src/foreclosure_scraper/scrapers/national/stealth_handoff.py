@@ -2,9 +2,14 @@
 
 In the cloud split (see foreclosure_scraper.source_split), the residential-IP
 stealth scrapers run on the Mac, which writes their leads to
-``docs/handoff/stealth_leads.json`` and pushes it. The datacenter VM's normal
-run picks that file up HERE, as an ordinary source, so those leads flow through
-the same enrichment + merge + publish path as everything else.
+``docs/handoff/stealth_leads/`` (manifest.json + one JSON Lines shard per source,
+see foreclosure_scraper.stealth_handoff_store) and pushes it. The datacenter VM's
+normal run picks that up HERE, as an ordinary source, so those leads flow through
+the same enrichment + merge + publish path as everything else. The legacy single
+file ``docs/handoff/stealth_leads.json`` is still read when no manifest exists (or
+it is the newer of the two), so a checkout from before the 2026-10-09 switch to
+shards still ingests: the single file had reached 93.8 MiB, 1.2 MiB under the
+repo's 95 MiB commit gate.
 
 Each lead keeps its ORIGINAL source (sc_public_index, nc_sos_ucc, ...) — the
 orchestrator only fills ``source`` when it is blank — so board provenance stays
@@ -54,6 +59,7 @@ from typing import Iterable
 
 import structlog
 
+from ... import stealth_handoff_store as store
 from ...base_scraper import BaseScraper, OUTCOME_PARTIAL
 from ...models import Listing
 
@@ -68,7 +74,10 @@ log = structlog.get_logger()
 # existed) and silently returned [] on every run -- found 2026-09-15 via live
 # zero-row audit; the real file at docs/handoff/stealth_leads.json (7,270
 # leads from the Mac's residential-IP stealth scrapers) was never read.
-_HANDOFF = Path(__file__).resolve().parents[4] / "docs" / "handoff" / "stealth_leads.json"
+_HANDOFF_ROOT = Path(__file__).resolve().parents[4] / "docs" / "handoff"
+# The legacy single file (read as a fallback) and the sharded hand-off (preferred).
+_HANDOFF = store.legacy_file(_HANDOFF_ROOT)
+_HANDOFF_DIR = store.shard_dir(_HANDOFF_ROOT)
 # Past this age we still ingest (stale stealth leads beat none) but warn loudly.
 _STALE_HOURS = float(os.environ.get("HANDOFF_STALE_HOURS", "72"))
 # FOUND 2026-10-04 (batch 18, see module docstring): a plain log.warning at
@@ -89,7 +98,79 @@ class StealthHandoffScraper(BaseScraper):
     timeout_s = 120.0
 
     async def fetch(self) -> Iterable[Listing]:
-        path = Path(os.environ.get("HANDOFF_FILE", _HANDOFF))
+        # HANDOFF_FILE overrides the location: a legacy single file, a manifest.json, or the
+        # shard directory.
+        override = os.environ.get("HANDOFF_FILE")
+        if override:
+            p = Path(override)
+            if p.is_dir() or p.name == store.MANIFEST:
+                return self._read_sharded(p if p.is_dir() else p.parent)
+            return self._read_legacy(p)
+
+        manifest_path = _HANDOFF_DIR / store.MANIFEST
+        if manifest_path.exists():
+            m = store.read_manifest(manifest_path)
+            if m is not None:
+                if _HANDOFF.exists() and _is_newer(store.peek_generated_at(_HANDOFF),
+                                                   m.get("generated_at")):
+                    # Only an old writer can produce this (the new one deletes the legacy
+                    # file): read whichever hand-off is the newer one.
+                    log.warning("stealth_handoff.legacy_newer_than_shards",
+                                legacy=str(_HANDOFF), shards=str(_HANDOFF_DIR))
+                    return self._read_legacy(_HANDOFF)
+                return self._read_sharded(_HANDOFF_DIR, m)
+            log.warning("stealth_handoff.manifest_unreadable", path=str(manifest_path))
+            if not _HANDOFF.exists():
+                self._partial(f"hand-off manifest {manifest_path} is unreadable and no legacy "
+                              f"file exists; no stealth leads ingested")
+                return []
+            self._partial(f"hand-off manifest {manifest_path} is unreadable; ingested the "
+                          f"legacy file {_HANDOFF.name} instead (older data)")
+        return self._read_legacy(_HANDOFF)
+
+    # ------------------------------------------------------------------ helpers
+    def _partial(self, reason: str) -> None:
+        self.last_outcome = OUTCOME_PARTIAL
+        self.last_reason = (f"{self.last_reason}; {reason}"
+                            if getattr(self, "last_reason", "") else reason)
+
+    def _note_freshness(self, gen: object) -> None:
+        """Freshness is advisory only: a stale hand-off is still ingested."""
+        if not gen:
+            return
+        try:
+            age_h = (datetime.now(timezone.utc)
+                     - datetime.fromisoformat(str(gen))).total_seconds() / 3600
+            (log.warning if age_h > _STALE_HOURS else log.info)(
+                "stealth_handoff.age", hours=round(age_h, 1), stale_after=_STALE_HOURS)
+            if age_h > _SEVERE_STALE_HOURS:
+                # FOUND 2026-10-04 (batch 18): surface this distinctly
+                # from routine staleness -- see module docstring.
+                self.last_outcome = OUTCOME_PARTIAL
+                self.last_reason = (
+                    f"hand-off file is severely stale ({age_h / 24:.1f} days old, "
+                    f"generated_at={gen}) -- the Mac-side scheduled job "
+                    f"(scripts/run_stealth_sources.py) does not appear to be "
+                    f"running; ingesting the stale data anyway"
+                )
+                log.warning("stealth_handoff.severely_stale", days=round(age_h / 24, 1),
+                            generated_at=gen)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _validate(self, rows: Iterable[object]) -> list[Listing]:
+        out: list[Listing] = []
+        bad = 0
+        for d in rows:
+            try:
+                out.append(Listing.model_validate(d))
+            except Exception:  # noqa: BLE001 - skip a malformed row, keep the rest
+                bad += 1
+        if bad:
+            log.warning("stealth_handoff.some_invalid", dropped=bad, kept=len(out))
+        return out
+
+    def _read_legacy(self, path: Path) -> list[Listing]:
         if not path.exists():
             log.info("stealth_handoff.absent", path=str(path),
                      note="Mac has not pushed a hand-off yet (or single-host run)")
@@ -105,38 +186,38 @@ class StealthHandoffScraper(BaseScraper):
             log.warning("stealth_handoff.bad_shape", type=type(rows).__name__)
             return []
 
-        # Freshness — advisory only; we still ingest a stale file.
-        gen = payload.get("generated_at") if isinstance(payload, dict) else None
-        if gen:
-            try:
-                age_h = (datetime.now(timezone.utc)
-                         - datetime.fromisoformat(gen)).total_seconds() / 3600
-                (log.warning if age_h > _STALE_HOURS else log.info)(
-                    "stealth_handoff.age", hours=round(age_h, 1), stale_after=_STALE_HOURS)
-                if age_h > _SEVERE_STALE_HOURS:
-                    # FOUND 2026-10-04 (batch 18): surface this distinctly
-                    # from routine staleness -- see module docstring.
-                    self.last_outcome = OUTCOME_PARTIAL
-                    self.last_reason = (
-                        f"hand-off file is severely stale ({age_h / 24:.1f} days old, "
-                        f"generated_at={gen}) -- the Mac-side scheduled job "
-                        f"(scripts/run_stealth_sources.py) does not appear to be "
-                        f"running; ingesting the stale data anyway"
-                    )
-                    log.warning("stealth_handoff.severely_stale", days=round(age_h / 24, 1),
-                                generated_at=gen)
-            except Exception:  # noqa: BLE001
-                pass
-
-        out: list[Listing] = []
-        bad = 0
-        for d in rows:
-            try:
-                out.append(Listing.model_validate(d))
-            except Exception:  # noqa: BLE001 - skip a malformed row, keep the rest
-                bad += 1
-        if bad:
-            log.warning("stealth_handoff.some_invalid", dropped=bad, kept=len(out))
-        log.info("stealth_handoff.ingested", leads=len(out),
+        self._note_freshness(payload.get("generated_at") if isinstance(payload, dict) else None)
+        out = self._validate(rows)
+        log.info("stealth_handoff.ingested", leads=len(out), layout="legacy_file",
                  sources=len({(li.source or "?") for li in out}))
         return out
+
+    def _read_sharded(self, directory: Path, manifest: dict | None = None) -> list[Listing]:
+        m = manifest if manifest is not None else store.read_manifest(directory)
+        if m is None:
+            log.warning("stealth_handoff.manifest_unreadable", path=str(directory))
+            self._partial(f"hand-off manifest in {directory} is absent or unreadable; "
+                          f"no stealth leads ingested")
+            return []
+        self._note_freshness(m.get("generated_at"))
+        stats: dict[str, int] = {}
+        out = self._validate(store.iter_shard_rows(directory, m, stats))
+        lost = stats.get("shards_missing", 0) + stats.get("shards_corrupt", 0)
+        if lost or stats.get("count_mismatch") or stats.get("lines_bad"):
+            log.warning("stealth_handoff.shard_problems", **stats)
+        if lost:
+            self._partial(f"{lost} of {len(m.get('shards') or [])} hand-off shards missing or "
+                          f"corrupt ({stats.get('shards_missing', 0)} missing, "
+                          f"{stats.get('shards_corrupt', 0)} corrupt); ingested the rest")
+        log.info("stealth_handoff.ingested", leads=len(out), layout="shards",
+                 shards=stats.get("shards_read", 0), manifest_count=m.get("lead_count"),
+                 sources=len({(li.source or "?") for li in out}))
+        return out
+
+
+def _is_newer(a: object, b: object) -> bool:
+    """True when ISO timestamp a is strictly later than b (False when either is unparseable)."""
+    try:
+        return datetime.fromisoformat(str(a)) > datetime.fromisoformat(str(b))
+    except (TypeError, ValueError):
+        return False

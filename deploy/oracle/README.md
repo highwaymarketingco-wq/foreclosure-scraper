@@ -10,9 +10,9 @@ IP.
   │  scripts/run_stealth_sources.py                            │
   │   • runs the 39 stealth-browser sources ONLY               │
   │   • no board load, no enrichment  → stays under 8 GB       │
-  │   • writes docs/handoff/stealth_leads.json → git push      │
+  │   • writes docs/handoff/stealth_leads/ → git push          │
   └───────────────────────────┬────────────────────────────────┘
-                              │  (GitHub, one small file)
+                              │  (GitHub, manifest + shards)
   ┌───────────────────────────▼──── Oracle VM (24 GB, always-on) ┐
   │  deploy/oracle/vm_run.sh   (FORECLOSURE_ROLE=vm)             │
   │   • runs the other 178 datacenter-safe sources              │
@@ -124,8 +124,11 @@ cd ~/foreclosure-scraper && uv run python scripts/run_stealth_sources.py
 ## Operating notes
 
 - **Single writer of the board:** only the VM writes `docs/listings.json*`. The
-  Mac writes only `docs/handoff/stealth_leads.json`. Different files → the two
-  hosts pushing to `main` just rebase past each other, no board conflict.
+  Mac writes only `docs/handoff/stealth_leads/` (manifest.json + one JSON Lines
+  shard per source, each under 20 MiB; until 2026-10-09 it was the single file
+  `docs/handoff/stealth_leads.json`, which reached 93.8 MiB, and the VM still
+  reads that file when no manifest exists). Different files → the two hosts
+  pushing to `main` just rebase past each other, no board conflict.
 - **Ordering:** run the Mac stealth job a bit BEFORE the VM run so the hand-off
   is fresh. If the Mac hasn't pushed, the VM ingests the last hand-off (warns if
   >72 h old) — the board never goes blank.

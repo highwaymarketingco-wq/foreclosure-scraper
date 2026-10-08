@@ -78,3 +78,25 @@ jobs:
           echo "Full suite (network/live-browser tests skip by default — set" \
                "RUN_NETWORK_TESTS=1 / RUN_LIVE=1 locally to include them)." \
                >> "$GITHUB_STEP_SUMMARY"
+
+  # SIZE WALLS, checked on every push while there is still time to act. A tracked file over
+  # 90 MiB fails (the pre-commit gate refuses 95 MiB, GitHub refuses 100 MiB: the Mac's stealth
+  # hand-off reached 93.8 MiB on 2026-10-08), and so does a Pages site over 900 MB (pages.yml stops
+  # a deploy at 950 MB; the site was 972 MB on 2026-10-08 and every deploy failed until
+  # docs/handoff/ was excluded). Its own job, so a size failure never hides the test result and a
+  # test failure never hides the size result. Stdlib only and reads the committed tree with
+  # `git ls-tree`, so it needs no uv sync and runs in seconds.
+  repo-size:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tracked file and Pages size limits
+        run: |
+          set +e
+          python3 scripts/repo_size_check.py > repo_size.txt
+          rc=$?
+          cat repo_size.txt
+          { echo "### Repo size"; echo '```'; cat repo_size.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"

@@ -7,7 +7,7 @@ each cycle fetches only the filings the board does not hold yet and hands them o
 
 HOW IT RUNS. `mac_only = True` puts it with the residential sources (source_split), so
 scripts/run_stealth_sources.py (launchd com.highway.foreclosure.stealth-handoff, 06:00) runs
-it on the Mac and writes its rows into docs/handoff/stealth_leads.json, and the VM run
+it on the Mac and writes its rows into docs/handoff/stealth_leads/, and the VM run
 (FORECLOSURE_ROLE=vm) skips it and ingests those rows through national.stealth_handoff. The
 work is foreclosure_scraper.liensnc_handoff.run_cycle(): one read-only board pass, the
 date-bounded newest-first search, the ledger of rows sent but not on the board yet.

@@ -160,8 +160,17 @@
   "max_age_h": 36
  },
  "handoff": {
+  "dir": "docs/handoff/stealth_leads",
   "file": "docs/handoff/stealth_leads.json",
+  "_doc": "dir is the sharded hand-off (manifest.json + one JSON Lines shard per source) since 2026-10-09; file is the legacy single file, read as a fallback. The age is the newer of the two.",
   "max_age_h": 36
+ },
+ "repo_size": {
+  "max_file_mib": 90,
+  "warn_file_mib": 40,
+  "max_pages_mb": 900,
+  "warn_pages_mb": 800,
+  "_doc": "scripts/repo_size_check.py limits (prerun_gate repo-size, CI tests.yml job repo-size). The pre-commit gate refuses 95 MiB and GitHub 100 MiB per file; pages.yml stops a deploy at 950 MB and Pages refuses 1 GB."
  },
  "test_results": "data/test_results/latest.json",
  "code_paths": [

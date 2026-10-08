@@ -73,7 +73,7 @@ SOURCE_SUBSTRINGS = ("polk", "mitchell", "union", "greenwood")
 CODE_PATHS = ("src", "scripts", "deploy", "pyproject.toml", "uv.lock", ".python-version")
 DOCS_EXCLUDE = ("docs/listings_part_*", "docs/listings_detail*", "docs/listings_slim*",
                 "docs/listings.json*", "docs/board.manifest.json", "docs/parcel_photos",
-                "docs/handoff/stealth_leads.json")
+                "docs/handoff/stealth_leads.json", "docs/handoff/stealth_leads")
 DATA_PRIVATE = ("checkpoint", "checkpoint_archive", "heirs", "canary", "prerun_gate", "test_results")
 KEY_SHARE = 0.25
 #: a strip key must come back on at least this share of its baseline (an enricher that ran but

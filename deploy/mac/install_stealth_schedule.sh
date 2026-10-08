@@ -2,7 +2,7 @@
 # Mac side of the cloud split — schedule the stealth-source hand-off (launchd).
 #
 # Runs scripts/run_stealth_sources.py daily at 06:00 LOCAL: it runs only the 39
-# residential-IP stealth scrapers and pushes docs/handoff/stealth_leads.json for
+# residential-IP stealth scrapers and pushes docs/handoff/stealth_leads/ for
 # the Oracle VM to ingest. Lightweight (no board load) — safe on 8 GB. If the
 # Mac is asleep at 06:00, launchd fires the missed run once at next wake.
 #

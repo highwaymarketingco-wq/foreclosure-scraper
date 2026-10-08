@@ -257,12 +257,15 @@ vm_checkout() {
 }
 
 # vm_handoff_note <log>: which stealth hand-off the run will ingest, and whether origin has a newer one.
+# The hand-off is the sharded directory docs/handoff/stealth_leads/ since 2026-10-09 (the legacy
+# single file docs/handoff/stealth_leads.json is read as a fallback): the newest commit touching
+# either one is the hand-off this checkout carries.
 vm_handoff_note() {
-  local LOG="$1" F="docs/handoff/stealth_leads.json" HERE THERE
-  HERE=$(git log -1 --format='%ct %h %ci' -- "$F" 2>/dev/null)
-  THERE=$(git log -1 --format='%ct %h %ci' origin/main -- "$F" 2>/dev/null)
+  local LOG="$1" F="docs/handoff/stealth_leads" L="docs/handoff/stealth_leads.json" HERE THERE
+  HERE=$(git log -1 --format='%ct %h %ci' -- "$F" "$L" 2>/dev/null)
+  THERE=$(git log -1 --format='%ct %h %ci' origin/main -- "$F" "$L" 2>/dev/null)
   if [[ -z "$HERE" ]]; then
-    echo "==> ⚠️  no stealth hand-off ($F) in this checkout" | tee -a "$LOG"; return 0
+    echo "==> ⚠️  no stealth hand-off ($F/ or $L) in this checkout" | tee -a "$LOG"; return 0
   fi
   echo "==> stealth hand-off: ${HERE#* } ($(( ($(date +%s) - ${HERE%% *}) / 3600 ))h old)" | tee -a "$LOG"
   if [[ -n "$THERE" && "${THERE%% *}" -gt "${HERE%% *}" ]]; then
