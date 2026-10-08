@@ -333,6 +333,10 @@ class FlorenceDelinquentTax(BaseScraper):
                     county="Florence",
                     parcel_id=r["tms"],
                     defendant=r.get("current_owner") or r["taxpayer"],
+                    # owner_name is the field enrichers read (resolver, skip-trace,
+                    # GIS backfill); it was left None on every row (10/7 extraction
+                    # audit, section 3). The CURRENT OWNER line wins over the taxpayer.
+                    owner_name=r.get("current_owner") or r["taxpayer"],
                     street_address=addr,
                     sale_date=sale_date,
                     description=" | ".join(

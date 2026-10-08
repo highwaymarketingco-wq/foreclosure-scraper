@@ -315,3 +315,33 @@ def test_fetch_mobile_list_stays_mobile_regardless_of_bldgs():
     assert len(rows) == 1
     assert rows[0].property_kind == PropertyKind.MOBILE
     assert rows[0].raw["florence_delinquent_tax"]["buildings"] == 1.0
+
+
+def test_fetch_sets_owner_name_not_just_defendant():
+    """10/7 extraction audit section 3: owner_name was None on every Florence row."""
+    import asyncio
+    from unittest.mock import patch
+
+    from foreclosure_scraper.scrapers.counties_sc.florence_delinquent_tax import (
+        FlorenceDelinquentTax,
+    )
+
+    html = ('<!-- padding so this page clears fetch()\'s len(html) < 200 guard, '
+            'same as a real page\'s surrounding nav/layout would -->'
+            '<a href="DelinquentTax/2026/2026 Tax Sale List Real 9-01-26.pdf">'
+            'Tax Sale List</a>')
+    pdf_bytes = _make_courier_pdf([_HEADER, _ROW_LOTS_ONLY, _ROW_ACRES_AND_BLDGS])
+
+    async def fake_get_text(*a, **k):
+        return html
+
+    async def fake_get_bytes(*a, **k):
+        return pdf_bytes
+
+    with patch("foreclosure_scraper.scrapers.counties_sc.florence_delinquent_tax.get_text",
+               fake_get_text), \
+         patch("foreclosure_scraper.scrapers.counties_sc.florence_delinquent_tax.get_bytes",
+               fake_get_bytes):
+        rows = list(asyncio.run(FlorenceDelinquentTax().fetch()))
+
+    assert rows and all(r.owner_name and r.owner_name == r.defendant for r in rows)
