@@ -105,13 +105,16 @@ def test_chain_binding_check():
 
 def test_window_lane_aging_is_caught():
     c = _by_name()["additions-window-lanes-not-aging"]
-    aging = {"source": "national.sc_public_index", "county": "Charleston",
-             "raw": {"pulled_sale": {"presumed_withdrawn": True, "consecutive_misses": 1}}}
-    fresh = {"source": "national.sc_public_index", "county": "Charleston", "raw": {}}
-    elsewhere = {"source": "national.sc_public_index", "county": "Hampton",
-                 "raw": {"pulled_sale": {"presumed_withdrawn": True}}}
-    out = _feed(c, [aging] * 5 + [fresh] * 5 + [elsewhere])
-    assert out["checked"] == 10 and out["violations"] == 5 and not out["ok"]
+    spi = {"case_number": "2026CP1000001", "date_filed": "09/01/2026", "status": "Pending", "date_disposed": ""}
+    aging = {"source": "national.sc_public_index", "state": "SC", "county": "Charleston",
+             "raw": {"sc_public_index": dict(spi), "pulled_sale": {"presumed_withdrawn": True}}}
+    held = {"source": "national.sc_public_index", "state": "SC", "county": "Charleston",
+            "raw": {"sc_public_index": dict(spi)}}
+    disposed = {"source": "national.sc_public_index", "state": "SC", "county": "Charleston",
+                "raw": {"sc_public_index": dict(spi, date_disposed="09/15/2026"),
+                        "pulled_sale": {"presumed_withdrawn": True}}}
+    out = _feed(c, [aging, held, disposed])
+    assert out["checked"] == 3 and out["violations"] == 1 and not out["ok"]
 
 
 def test_rod_binding_and_near_beach_and_richland():

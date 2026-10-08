@@ -43,10 +43,10 @@ Checks (make_checks):
                                    (30 sampled 10/8 chains: 14 right, 16 another parcel or stale).
   additions-alias-is-pin           raw.parcel_id_alias mapping a short id to anything but a 10-digit
                                    NC PIN (53 Rutherford rows got another property's id on 10/8). 0.
-  additions-window-lanes-not-aging court rows of a filed-date-window lane (Charleston Public Index,
-                                   judgment_lien sub-lanes) marked presumed withdrawn by the carry-
-                                   forward aging because the window no longer reaches them. At most
-                                   10% (would flag the 1,549 Charleston rows on the run after 10/8).
+  additions-window-lanes-not-aging an OPEN case of a filed-date-window court lane (Charleston Public
+                                   Index; board_persist.open_case_hold) marked presumed withdrawn by
+                                   the carry-forward aging. 0 allowed (owner decision 2026-10-09:
+                                   open cases stay until disposed or idle 12 months).
 
 Memory: counters, a few date counters per addition, at most SAMPLE examples (source slugs, county
 names, parcel ids; never a person's name).
@@ -744,44 +744,44 @@ class SosAgentGovernment:
                            + f"; {self.kept} other unbound legacy profiles (owner policy, item 57)")}
 
 
-#: Court lanes fed by a filed-date WINDOW (only new filings arrive): a carried row the window no
-#: longer reaches is aged by board_persist like a pulled listing (presumed_withdrawn after one run,
-#: dropped after FULLRUN_PERSIST_MAX_MISSES). The Charleston Public Index pass moved to a 60-day
-#: window on 10/7 (CHARLESTON_PI_LOOKBACK_DAYS): the 1,549 Charleston rows the 10/7 letter search
-#: delivered are not re-read by it.
-WINDOW_LANE_SOURCES = ("national.sc_public_index", "national.sc_public_index.judgment_lien",
-                       "counties_nc.nc_ecourts_lis_pendens.judgment_lien")
-WINDOW_AGING_MAX_SHARE = 0.10
-
-
+#: Court lanes fed by a filed-date WINDOW (only new filings arrive). Owner decision 2026-10-09: a
+#: known OPEN case stays until it is disposed (a judgment-entered foreclosure for its window) or idle
+#: 12 months; board_persist.open_case_hold() holds it out of the carry-forward aging. A row the rule
+#: says is open but that carries the presumed-withdrawn tag is a violation (the 1,549 Charleston rows
+#: of the 10/7 hand-off would have been tagged on the next run without the hold).
 class WindowLanesNotAging:
     name = "additions-window-lanes-not-aging"
 
     def __init__(self) -> None:
+        from datetime import datetime as _dt
+        from foreclosure_scraper.board_persist import OPEN_CASE_SOURCES, open_case_hold
+        self._hold = open_case_hold
+        self._sources = OPEN_CASE_SOURCES
+        self._now = _dt.utcnow()
         self.checked = 0
-        self.aging = 0
-        self.by: Counter = Counter()
+        self.open_ = 0
+        self.bad = 0
+        self.examples: list[str] = []
 
     def feed(self, row: dict) -> None:
-        src = str(row.get("source") or "")
-        if src not in WINDOW_LANE_SOURCES:
-            return
-        if src.startswith("national.sc_public_index") and str(row.get("county") or "") != "Charleston":
+        if str(row.get("source") or "") not in self._sources:
             return
         self.checked += 1
+        if not self._hold(row, self._now):
+            return
+        self.open_ += 1
         ps = _raw(row).get("pulled_sale")
         if (isinstance(ps, dict) and ps.get("presumed_withdrawn")) or row.get("auction_status") == "presumed_withdrawn":
-            self.aging += 1
-            self.by[src] += 1
+            self.bad += 1
+            if len(self.examples) < SAMPLE:
+                self.examples.append(f"{row.get('county')}|{(_raw(row).get('sc_public_index') or {}).get('case_number')}")
 
     def finish(self) -> dict:
-        cap = int(self.checked * WINDOW_AGING_MAX_SHARE)
-        return {"name": self.name, "checked": self.checked, "violations": self.aging,
-                "max_violations": cap, "ok": self.aging <= cap,
-                "detail": (f"{self.aging} of {self.checked} window-fed court rows are aging out "
-                           f"(presumed withdrawn): " + ", ".join(f"{k} {v}" for k, v in self.by.most_common())
-                           + "; widen the Mac lane's look-back or re-read open cases")
-                if self.aging else f"{self.checked} window-fed court rows, none aging"}
+        return {"name": self.name, "checked": self.checked, "violations": self.bad,
+                "max_violations": 0, "ok": self.bad == 0,
+                "detail": (f"{self.bad} of {self.open_} open window-lane cases are aging out: "
+                           + "; ".join(self.examples)) if self.bad
+                else f"{self.open_} open window-lane cases held of {self.checked} rows"}
 
 
 class AliasIsPin:

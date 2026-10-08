@@ -129,10 +129,11 @@ web_artifact.py, which this module imports directly) and the existing
 from __future__ import annotations
 
 import os
+import re
 import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 
@@ -186,6 +187,62 @@ PRIOR_MERGE_MAX_DROP_RATE = float(
 #: Sources whose rows are recorded FILINGS fed by an incremental hand-off (only new filings arrive each
 #: cycle): a prior row that is absent from a run is not "pulled", so these never age toward the miss limit.
 AGE_EXEMPT_SOURCES = frozenset({"liensnc"})
+
+#: Court lanes searched by a FILED-DATE WINDOW (owner decision 2026-10-09): the window limits how far
+#: back each run searches, not how long a known open case stays. A prior row of these sources in these
+#: counties is held (no miss counted, no presumed-withdrawn tag) while open_case_hold() says the case is
+#: open: not disposed (a foreclosure disposed by judgment stays for the foreclosure_judgment_entered
+#: window, CHARLESTON_PI_JUDGMENT_DAYS, the scraper's own rule), not dismissed, withdrawn or satisfied,
+#: not a non-lead 'other' lane, and with activity (filed / last docket event / first seen) within
+#: OPEN_CASE_MAX_IDLE_DAYS. Anything else ages as before. The 10/7 Charleston pass moved to a 60-day
+#: window; without this the 1,549 Charleston rows of the 10/7 hand-off were tagged presumed withdrawn on
+#: the next run and dropped after the miss limit (audit 2026-10-09 additions_verify).
+OPEN_CASE_SOURCES = frozenset({"national.sc_public_index", "national.sc_public_index.judgment_lien"})
+OPEN_CASE_COUNTIES = frozenset({("SC", "charleston")})
+OPEN_CASE_MAX_IDLE_DAYS = int(os.environ.get("OPEN_CASE_MAX_IDLE_DAYS", "365"))
+_OPEN_CASE_CLOSED_RE = re.compile(r"dismiss|withdr|discontinu|satisf", re.I)
+
+
+def _case_day(v: Any) -> Optional[datetime]:
+    s = str(v or "").strip()
+    for fmt, n in (("%m/%d/%Y", 10), ("%Y-%m-%d", 10), ("%Y%m%d", 8)):
+        try:
+            return datetime.strptime(s[:n], fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def open_case_hold(rec: dict, now: datetime) -> bool:
+    """Whether a prior-only row is a still-open case of a window-searched court lane (see
+    OPEN_CASE_SOURCES). Pure: reads the row dict only."""
+    if str(rec.get("source") or "") not in OPEN_CASE_SOURCES:
+        return False
+    cty = (str(rec.get("state") or "").upper(),
+           str(rec.get("county") or "").replace(" County", "").strip().lower())
+    if cty not in OPEN_CASE_COUNTIES:
+        return False
+    raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
+    spi = raw.get("sc_public_index") if isinstance(raw.get("sc_public_index"), dict) else {}
+    if str(spi.get("lane") or "").strip() == "other":
+        return False
+    if _OPEN_CASE_CLOSED_RE.search(str(spi.get("status") or "")):
+        return False
+    now = _naive(now) or now
+    disposed = _case_day(spi.get("date_disposed"))
+    if disposed is not None or str(spi.get("date_disposed") or "").strip():
+        if raw.get("foreclosure_judgment_entered") is True and disposed is not None:
+            days = int(os.environ.get("CHARLESTON_PI_JUDGMENT_DAYS", "274"))
+            return (now - disposed).days <= days
+        return False
+    seen = [d for d in (_case_day(spi.get("date_filed")), _case_day(raw.get("docket_last_event_date")))
+            if d is not None]
+    if not seen:           # no case date on the row: how long the board has known it stands in
+        first = _case_day(str(rec.get("first_seen") or "")[:10])
+        seen = [first] if first is not None else []
+    if not seen:
+        return True
+    return (now - max(seen)).days <= OPEN_CASE_MAX_IDLE_DAYS
 
 
 def _naive(dt: Optional[datetime]) -> Optional[datetime]:
@@ -561,6 +618,7 @@ def merge_prior_board(
         "fresh_only": 0,
         "prior_only_kept": 0,
         "prior_only_kept_age_exempt": 0,
+        "prior_only_kept_open_case": 0,
         "aged_out_terminal": 0,
         "aged_out_misses": 0,
         "carried_vision": 0,
@@ -654,6 +712,21 @@ def merge_prior_board(
                 return
             stats["prior_only_kept"] += 1
             stats["prior_only_kept_age_exempt"] += 1
+            return
+        if open_case_hold(rec, now):
+            # a known open case the run's filed-date window no longer reaches: held, not aged
+            raw.pop("pulled_sale", None)
+            rec["raw"] = raw
+            if rec.get("auction_status") == "presumed_withdrawn":
+                rec["auction_status"] = None
+            try:
+                kept.append(Listing.model_validate(share_row(rec, key_cache)))
+            except Exception as exc:  # noqa: BLE001
+                drop_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
+                stats["prior_drop_errors"] += 1
+                return
+            stats["prior_only_kept"] += 1
+            stats["prior_only_kept_open_case"] += 1
             return
         prev_pulled = raw.get("pulled_sale") or {}
         consecutive = prev_pulled.get("consecutive_misses", 0) + 1
