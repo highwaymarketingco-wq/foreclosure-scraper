@@ -94,6 +94,13 @@ exclude:
   # here with no `include` counterpart: the prefix-trap rule is about `.json`
   # entries whose `.gz` twin the dashboard fetches, and nothing fetches this.
   - OPERATIONS.md
+  # docs/handoff/ is the Mac <-> VM hand-off data (verification ledgers, stealth leads, SoS agent
+  # results). Only scripts and the VM read it; nothing on the dashboard fetches it. It grew to
+  # ~120 MB (stealth_leads.json 98 MB, tax_lien.json 13 MB) and pushed the deployed site over the
+  # 950 MB limit on 2026-10-08, which stopped every Pages deploy. The trailing slash keeps this a
+  # directory prefix: it does not match handoff_scorer_to_others_2026-09-21.md. No `include`
+  # counterpart is needed: nothing under handoff/ is a .json twin the dashboard fetches.
+  - handoff/
 include:
   # The board is listings_part_NNN.json.gz (audit O1: the single listings.json.gz was days
   # from GitHub's 100 MiB file limit). No `exclude` entry above is a prefix of `listings_part_`
