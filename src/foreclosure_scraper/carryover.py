@@ -8,8 +8,12 @@ fetch failed. Without a backstop, the dashboard goes blank for that
 source and downstream systems lose continuity.
 
 Strategy:
-  1. Before scraping, load the prior week's docs/listings.json.
-  2. Index it by `source` slug.
+  1. Stream the prior run's docs/listings.json one row at a time, counting rows per `source` slug and
+     keeping ONLY the rows of sources that could need carryover (a registered scraper that produced 0
+     rows this run). It is NEVER loaded whole: the plain file was 4.1 GB / 350,013 rows on 2026-10-08, and
+     json.loads(read_text()) of it took the VM from 4 GB to over 25 GB in 70 seconds: two gated full runs were
+     killed by the memory watchdog exactly there (the same class of bug new_listings.py fixed on 2026-10-05).
+  2. Index the kept rows by `source` slug.
   3. After scraping, identify sources where:
        prior_run had >= MIN_PRIOR listings AND this run has 0
   4. Replay the prior listings into the current pipeline, marked
@@ -39,6 +43,7 @@ from typing import Iterable
 
 import structlog
 
+from .board_parts import iter_plain_rows
 from .models import Listing
 
 log = structlog.get_logger()
@@ -59,47 +64,37 @@ def _docs_dir() -> Path:
     return Path(__file__).resolve().parent.parent.parent / "docs"
 
 
-def load_prior_listings(docs_dir: Path | None = None) -> tuple[list[dict], datetime | None]:
-    """Read the previous week's docs/listings.json + run_meta.json.
-
-    Returns ([], None) if either is missing or malformed — carryover
-    is best-effort, never blocks a run.
-    """
-    docs = docs_dir or _docs_dir()
-    listings_path = docs / "listings.json"
+def _prior_run_ts(docs: Path) -> datetime | None:
+    """run_time of the previous run from docs/run_meta.json (None if missing or unreadable)."""
     meta_path = docs / "run_meta.json"
-    if not listings_path.exists():
-        return [], None
+    if not meta_path.exists():
+        return None
     try:
-        prior = json.loads(listings_path.read_text(encoding="utf-8"))
-        if not isinstance(prior, list):
-            return [], None
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        ts = meta.get("run_time")
+        if ts:
+            # run_time is ISO-formatted with trailing Z
+            return datetime.fromisoformat(ts.replace("Z", "+00:00"))
     except Exception as exc:  # noqa: BLE001
-        log.warning("carryover.prior_listings_read_failed", error=str(exc))
-        return [], None
-
-    prior_run_ts: datetime | None = None
-    if meta_path.exists():
-        try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            ts = meta.get("run_time")
-            if ts:
-                # run_time is ISO-formatted with trailing Z
-                prior_run_ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-        except Exception as exc:  # noqa: BLE001
-            log.warning("carryover.prior_meta_read_failed", error=str(exc))
-
-    return prior, prior_run_ts
+        log.warning("carryover.prior_meta_read_failed", error=str(exc))
+    return None
 
 
-def _index_by_source(prior: list[dict]) -> dict[str, list[dict]]:
-    out: dict[str, list[dict]] = {}
-    for d in prior:
+def _stream_prior(listings_path: Path, wanted) -> tuple[dict[str, int], dict[str, list[dict]]]:
+    """(rows per source slug in the prior board, the rows of the slugs `wanted(slug)` accepts), read one
+    row at a time. Raises on an unreadable file: the caller treats that as 'no prior' (best-effort)."""
+    counts: dict[str, int] = {}
+    kept: dict[str, list[dict]] = {}
+    for d in iter_plain_rows(listings_path):
+        if not isinstance(d, dict):
+            continue
         slug = (d.get("source") or "").strip()
         if not slug:
             continue
-        out.setdefault(slug, []).append(d)
-    return out
+        counts[slug] = counts.get(slug, 0) + 1
+        if wanted(slug):
+            kept.setdefault(slug, []).append(d)
+    return counts, kept
 
 
 def _too_old(prior_run_ts: datetime | None) -> bool:
@@ -155,35 +150,43 @@ def carryover_for_zeroed_sources(
       (carryover_listings, stats_by_source)
         stats_by_source = {slug: count_carried_over}
     """
-    prior, prior_run_ts = load_prior_listings(docs_dir)
-    if not prior:
+    docs = docs_dir or _docs_dir()
+    listings_path = docs / "listings.json"
+    if not listings_path.exists():
         log.info("carryover.no_prior_run")
         return [], {}
 
+    prior_run_ts = _prior_run_ts(docs)
     if _too_old(prior_run_ts):
         log.info("carryover.prior_too_old", prior_run=str(prior_run_ts))
         return [], {}
 
     prior_run_iso = prior_run_ts.isoformat() if prior_run_ts else "unknown"
-    by_source_prior = _index_by_source(prior)
     skip = set(skip_slugs)
+
+    def _could_need_carryover(slug: str) -> bool:
+        # the same three gates the loop below applies to a slug, evaluated BEFORE its rows are kept
+        return (slug not in skip
+                and expected_min.get(slug, 0) > 0     # a source not expected to produce: its zero is normal
+                and by_source_now.get(slug, 0) <= 0)  # fresh data this run: nothing to replace
+
+    try:
+        prior_counts, kept_rows = _stream_prior(listings_path, _could_need_carryover)
+    except Exception as exc:  # noqa: BLE001 - carryover is best-effort, never blocks a run
+        log.warning("carryover.prior_listings_read_failed", error=str(exc))
+        return [], {}
+    if not prior_counts:
+        log.info("carryover.no_prior_run")
+        return [], {}
 
     carried: list[Listing] = []
     stats: dict[str, int] = {}
 
-    for slug, prior_listings in by_source_prior.items():
-        if slug in skip:
-            continue
-        if expected_min.get(slug, 0) <= 0:
-            # Source isn't expected to produce — its zero is normal,
-            # not a regression. Don't carry forward.
-            continue
-        if by_source_now.get(slug, 0) > 0:
-            continue  # source produced fresh data, no carryover needed
-        if len(prior_listings) < MIN_PRIOR_FOR_CARRYOVER:
+    for slug, prior_listings in kept_rows.items():
+        if prior_counts.get(slug, 0) < MIN_PRIOR_FOR_CARRYOVER:
             continue  # too sparse last week to be confident
 
-        reason = f"source produced 0 this run; prior run had {len(prior_listings)}"
+        reason = f"source produced 0 this run; prior run had {prior_counts[slug]}"
         added = 0
         for d in prior_listings:
             li = _to_listing(d, prior_run_iso=prior_run_iso, reason=reason)

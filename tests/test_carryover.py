@@ -225,3 +225,38 @@ def test_carryover_severity_is_attention_grabbing():
     assert _severity("REGRESSED (expected ≥ 3)") == 3
     assert _severity("PAYWALL-BLOCKED") == 1
     assert _severity("OK (12)") == 0
+
+
+# ---- streaming (2026-10-08): the prior board is never loaded whole ----------------------------------
+
+def test_the_prior_board_is_streamed_and_only_candidate_rows_are_kept(tmp_path, monkeypatch):
+    """Two gated full runs were killed by the memory watchdog inside json.loads(read_text()) of the 4.1 GB
+    board. Rows of sources that cannot need carryover must never be retained."""
+    import foreclosure_scraper.carryover as co
+
+    prior = ([_mk("counties_nc.zeroed", source_url=f"https://x/z{i}") for i in range(4)]
+             + [_mk("counties_nc.fresh", source_url=f"https://x/f{i}") for i in range(400)]
+             + [_mk("counties_nc.not_expected", source_url=f"https://x/n{i}") for i in range(50)])
+    docs = _write_prior(tmp_path, prior)
+
+    kept_slugs: list[str] = []
+    real = co._stream_prior
+
+    def _spy(path, wanted):
+        counts, kept = real(path, wanted)
+        kept_slugs.extend(kept)
+        return counts, kept
+
+    monkeypatch.setattr(co, "_stream_prior", _spy)
+    carried, stats = carryover_for_zeroed_sources(
+        by_source_now={"counties_nc.zeroed": 0, "counties_nc.fresh": 400},
+        expected_min={"counties_nc.zeroed": 1, "counties_nc.fresh": 1, "counties_nc.not_expected": 0},
+        skip_slugs=set(), docs_dir=docs)
+    assert kept_slugs == ["counties_nc.zeroed"]               # nothing else was held in memory
+    assert len(carried) == 4 and stats == {"counties_nc.zeroed": 4}
+
+
+def test_the_module_never_decodes_the_whole_board():
+    src = Path(__import__("foreclosure_scraper.carryover", fromlist=["x"]).__file__).read_text()
+    assert "json.loads(listings_path" not in src and "load_prior_listings" not in src
+    assert "iter_plain_rows" in src
