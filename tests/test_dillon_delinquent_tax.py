@@ -344,3 +344,11 @@ def test_no_new_owner_flag_false_when_blank():
     raw = rows[0].raw["dillon_delinquent_tax"]
     assert raw["ownership_transferred"] is False
     assert raw["new_owner_name"] is None
+
+
+def test_scraper_timeout_covers_both_requests_and_a_fallback():
+    """10/8 VM run: a ConnectTimeout on the treasurer page plus the curl fallback outlasted
+    the old 60 s scraper timeout (shorter than the two requests' own 40 s + 60 s), so the
+    run read nothing; the run an hour earlier read all 343 rows in 39 s."""
+    from foreclosure_scraper.scrapers.counties_sc import dillon_delinquent_tax as mod
+    assert mod.DillonDelinquentTax.timeout_s >= mod._PAGE_TIMEOUT_S + mod._FILE_TIMEOUT_S + 60

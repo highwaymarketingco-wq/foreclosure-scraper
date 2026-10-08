@@ -188,18 +188,26 @@ def parse_xlsx_rows(data: bytes) -> list[dict]:
     return out
 
 
+#: The two requests' own timeouts. The scraper timeout must cover both plus the shared
+#: client's curl fallback: 60 s did not (10/8 01:40 VM run: a ConnectTimeout on the
+#: treasurer page, then the curl fallback, and the 60 s cutoff fired with nothing read;
+#: the run an hour earlier took 39 s and read all 343 rows).
+_PAGE_TIMEOUT_S = 40.0
+_FILE_TIMEOUT_S = 60.0
+
+
 class DillonDelinquentTax(BaseScraper):
     slug = "counties_sc.dillon_delinquent_tax"
     name = "Dillon County SC Delinquent Tax Sale List"
     category = "county_tax"
-    timeout_s = 60.0
+    timeout_s = 180.0
     expected_min_count = 100
     optional = True
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         try:
-            html = await get_text(PAGE_URL, impersonate=True, timeout=40.0)
+            html = await get_text(PAGE_URL, impersonate=True, timeout=_PAGE_TIMEOUT_S)
         except Exception as exc:
             log.warning("dillon_tax.fetch_fail", error=str(exc)[:160])
             return out
@@ -218,7 +226,7 @@ class DillonDelinquentTax(BaseScraper):
             doc_url = "https://www.dilloncountysc.org/" + doc_url.lstrip("/")
 
         try:
-            data = await get_bytes(doc_url, timeout=60.0)
+            data = await get_bytes(doc_url, timeout=_FILE_TIMEOUT_S)
         except Exception as exc:
             log.warning("dillon_tax.download_fail", url=doc_url, error=str(exc)[:160])
             return out
