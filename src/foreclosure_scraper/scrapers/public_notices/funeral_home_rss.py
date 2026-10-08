@@ -395,6 +395,27 @@ def _iter_entries(text: str, kind: str):
         yield name, link, pub, summary, _date_from_title(raw_title), {}
 
 
+
+def _residence_place(obituary: dict, county: str, state: str) -> tuple[str, str]:
+    """(county, state) for the row: the decedent's own city from the feed (obits:deceased_city /
+    deceased_state) when it names exactly one NC or SC county, else the funeral home's. A live
+    check of 30 rows (audit 2026-10-09 additions_verify) found the funeral home's county on rows
+    whose feed said the decedent lived in another county or state."""
+    city = (obituary.get("deceased_city") or "").strip()
+    st = (obituary.get("deceased_state") or state or "").strip().upper()
+    st = {"NORTH CAROLINA": "NC", "SOUTH CAROLINA": "SC"}.get(st, st)
+    if city and obituary.get("deceased_state") and st not in ("NC", "SC"):
+        obituary["residence_out_of_area"] = True
+    if city and st in ("NC", "SC"):
+        try:
+            from ...enrichment_obituary_match import counties_for_city
+            cs = counties_for_city(city, st)
+        except Exception:  # noqa: BLE001 - the funeral home's county stays
+            cs = set()
+        if len(cs) == 1:
+            return next(iter(cs)), st
+    return county, state
+
 class FuneralHomeRss(BaseScraper):
     slug = "public_notices.funeral_home_rss"
     name = "Funeral-Home RSS Obituaries (W-NC + Upstate-SC — pre-probate heir leads)"
@@ -487,15 +508,18 @@ class FuneralHomeRss(BaseScraper):
             # exact age wins over the free-text regex guess above on any
             # host that happens to carry both.
             obituary.update(extra)
+            row_county, row_state = _residence_place(obituary, county, state)
+            if (row_county, row_state) != (county, state):
+                obituary["funeral_home_county"] = county
             out.append(Listing(
                 source=self.slug,
                 source_url=link,
                 listing_type=ListingType.PROBATE_NOTICE,
                 property_kind=PropertyKind.UNKNOWN,
-                state=state, county=county,
+                state=row_state, county=row_county,
                 defendant=name,  # decedent -> resolver pins parcel by owner-name
                 owner_name=name,  # the resolver reads owner_name first, then defendant
-                description=f"Obituary (death) — {name}, {county} County {state} "
+                description=f"Obituary (death) — {name}, {row_county} County {row_state} "
                             f"— pre-probate heir/estate signal (funeral-home feed)",
                 first_seen=now, last_seen=now,
                 raw={

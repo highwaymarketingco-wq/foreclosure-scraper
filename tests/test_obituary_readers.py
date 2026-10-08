@@ -184,3 +184,16 @@ def test_echovita_stops_on_a_wall(monkeypatch, tmp_path):
     s = ev.EchovitaObituaries()
     assert asyncio.run(s.fetch()) == []
     assert s.last_stats["walled"] == "challenge page" and len(fake.calls) == 1
+
+
+
+def test_feed_title_town_suffix_and_cross_state_residence():
+    """Audit 2026-10-09: 'Name-Town' titles (Edgefield) kept the town in the decedent's name, and a
+    residence across the state line kept the paper's county. Made-up names."""
+    from foreclosure_scraper.scrapers.public_notices import obituary_feeds as OF
+    assert OF.strip_town_suffix("Jane Q Sample-Edgefield", "SC") == "Jane Q Sample"
+    assert OF.strip_town_suffix("Mary Sample-Exampleton", "SC") == "Mary Sample-Exampleton"
+    assert OF.strip_town_suffix(None, "SC") is None
+    feed = OF.Feed("x.example", "https://x.example/feed", "Polk", "NC", "wp", "X", False)
+    assert OF._place_for(feed, "Landrum") == ("Spartanburg", "SC")
+    assert OF._place_for(feed, None) == ("Polk", "NC")

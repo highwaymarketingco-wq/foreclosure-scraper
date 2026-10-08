@@ -108,6 +108,22 @@ def article_text(html: str) -> str:
     return ""
 
 
+def strip_town_suffix(name: Optional[str], state: Optional[str]) -> Optional[str]:
+    """'Jane Q Sample-Edgefield' -> 'Jane Q Sample': some papers title an obituary 'Name-Town'
+    (the Edgefield Advertiser: 7 of 9 sampled rows carried the town in the decedent's name; audit
+    2026-10-09 additions_verify). The suffix is cut only when it is a known town of the feed's
+    state, so a hyphenated surname stays."""
+    if not name or "-" not in name:
+        return name
+    head, _, tail = name.rpartition("-")
+    tail = tail.strip()
+    if head.strip() and tail and " " not in head.strip()[-1:]:
+        from ...enrichment_obituary_match import counties_for_city
+        if counties_for_city(tail, state):
+            return head.strip(" -")
+    return name
+
+
 def feed_items(text: str) -> list[dict]:
     """[{title, link, published, content}] from an RSS/Atom feed."""
     out: list[dict] = []
@@ -135,12 +151,20 @@ def feed_items(text: str) -> list[dict]:
 
 
 def _county_for(feed: Feed, residence: Optional[str]) -> str:
+    return _place_for(feed, residence)[0]
+
+
+def _place_for(feed: Feed, residence: Optional[str]) -> tuple[str, str]:
+    """(county, state) of the decedent's residence when it names one county in the feed's state,
+    else in the other Carolina (a Tryon NC paper prints Landrum SC deaths: audit 2026-10-09, the
+    county was the paper's on rows whose decedent lived across the line), else the feed's own."""
     if residence:
         from ...enrichment_obituary_match import counties_for_city
-        cs = counties_for_city(residence, feed.state)
-        if len(cs) == 1:
-            return next(iter(cs))
-    return feed.county
+        for st in (feed.state, "SC" if feed.state == "NC" else "NC"):
+            cs = counties_for_city(residence, st)
+            if len(cs) == 1:
+                return next(iter(cs)), st
+    return feed.county, feed.state
 
 
 def _known_with_survivors() -> set[str]:
@@ -179,7 +203,7 @@ class ObituaryFeeds(BaseScraper):
                 details = 0
                 for it in feed_items(text):
                     st["items"] += 1
-                    dec = decedent_from_title(it["title"])
+                    dec = strip_town_suffix(decedent_from_title(it["title"]), feed.state)
                     link = it["link"]
                     if not dec or not link or link in seen:
                         continue
@@ -201,9 +225,10 @@ class ObituaryFeeds(BaseScraper):
                         continue
                     from ...obituary_text import clean_text, parse_obituary_lede
                     lede = parse_obituary_lede(clean_text(body)) if body else {}
+                    place_county, place_state = _place_for(feed, lede.get("residence"))
                     li = obituary_listing(
-                        source=self.slug, url=link, decedent=dec, state=feed.state,
-                        county=_county_for(feed, lede.get("residence")), publisher=feed.publisher,
+                        source=self.slug, url=link, decedent=dec, state=place_state,
+                        county=place_county, publisher=feed.publisher,
                         text=body if feed.kind != "townnews" else "", published=it["published"] or None,
                         extra_public={"feed_host": feed.host, "feed_kind": feed.kind})
                     out.append(li)

@@ -140,3 +140,17 @@ def test_precise_obits_age_overrides_the_free_text_regex_guess():
     merged.update(M._summary_fields(summary))
     merged.update(extra)
     assert merged["age"] == 80
+
+
+def test_row_county_follows_the_decedents_own_city():
+    """Audit 2026-10-09: the funeral home's county stood on rows whose feed said the decedent lived
+    elsewhere. One NC/SC county for the city -> that county; a split town stays with the funeral
+    home; another state stays too and is flagged."""
+    ob = {"deceased_city": "Wilmington", "deceased_state": "NC"}
+    assert M._residence_place(ob, "Edgecombe", "NC") == ("New Hanover", "NC")
+    split = {"deceased_city": "Rocky Mount", "deceased_state": "NC"}
+    assert M._residence_place(split, "Edgecombe", "NC") == ("Edgecombe", "NC")
+    away = {"deceased_city": "Brooklyn", "deceased_state": "NY"}
+    assert M._residence_place(away, "Buncombe", "NC") == ("Buncombe", "NC")
+    assert away["residence_out_of_area"] is True
+    assert M._residence_place({}, "Buncombe", "NC") == ("Buncombe", "NC")
