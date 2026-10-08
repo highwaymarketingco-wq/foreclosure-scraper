@@ -356,32 +356,48 @@ async def _fetch_page(client: httpx.AsyncClient, template: dict, page: int,
     return bills, total
 
 
-#: Floor window size for _fetch_range_with_recovery's bisection. Live-diagnosed
-#: 2026-09-29: a full PAGE_SIZE=2000 page failed with a server-side MongoDB
-#: "not a valid 24 digit hex string" error (a malformed ObjectId on ONE record in
-#: BillTrax's own data, not anything this scraper sends), and bisecting at
-#: PageSize=200 isolated it to a single 200-record window (offset 17,200 of
-#: 22,386) while every window on either side of it succeeded cleanly. Bisecting
-#: down to this floor bounds the worst-case data loss from one such bad record to
-#: (at most, two adjacent) _MIN_WINDOW-sized windows instead of an entire
-#: PAGE_SIZE page (2,000) or the whole rest of the roll.
+#: Floor window size for _fetch_range_with_recovery's split. Live-diagnosed 2026-09-29: a
+#: full PAGE_SIZE=2000 page failed with a server-side MongoDB "not a valid 24 digit hex
+#: string" error (a malformed ObjectId on ONE record in BillTrax's own data, not anything
+#: this scraper sends). The first version bisected 2000 -> 1000 -> 500 -> 250 and stopped
+#: there, because 250 = 2 x 125 cannot be HALVED again into equal integer windows, so the
+#: whole 250-record window around the one bad record was skipped on every run (the
+#: 2026-10-08 VM run: offset 17,000, 250 of 22,394 raw bills).
 #:
-#: Kept at a clean power-of-two fraction of the default PAGE_SIZE (2000 -> 1000 ->
-#: 500 -> 250) rather than halved further: PAGE_SIZE's remaining odd factor (125)
-#: cannot be split into two EQUAL integer halves, and an uneven split would risk
-#: silently skipping or double-counting the boundary record. 250 already bounds
-#: the loss far below one full page, so recursion deliberately stops before that
-#: parity problem could occur.
-_MIN_WINDOW = 250
+#: A window does not have to be halved. The API pages by (PageNumberToFetch, PageSize),
+#: so any child size that divides the parent size keeps every child offset a multiple of
+#: its own size: 250 -> 2 x 125 -> 5 x 25 -> 5 x 5 -> 5 x 1. The split now uses the
+#: window's smallest prime factor and goes down to ONE record, so a single bad record
+#: costs that record only.
+_MIN_WINDOW = 1
+
+
+def _smallest_factor(n: int) -> int:
+    """The smallest prime factor of n (n itself when prime); the split arity for a window."""
+    f = 2
+    while f * f <= n:
+        if n % f == 0:
+            return f
+        f += 1
+    return n
+
+
+def _is_record_data_error(exc: Exception) -> bool:
+    """The API's own deterministic data error (a malformed id in one of the window's
+    records). Re-sending the same window gets the same answer, so it is split at once
+    instead of retried after a backoff."""
+    msg = str(exc)
+    return isinstance(exc, ValueError) and "HasErrors" in msg and "hex string" in msg
 
 
 async def _fetch_range_with_recovery(
     client: httpx.AsyncClient, template: dict, offset: int, size: int,
 ) -> tuple[list[dict], int | None, list[tuple[int, int]]]:
-    """Fetch bills in [offset, offset+size). On failure, retries once, then bisects
-    down to _MIN_WINDOW to isolate a bad record to the smallest possible window
-    instead of losing the whole range. Returns (bills, TotalRecords-or-None,
-    skipped [(offset, size), ...] windows that still failed at the floor)."""
+    """Fetch bills in [offset, offset+size). On failure, retries once (not for the API's
+    deterministic record-data error), then splits the window into k equal children (k =
+    its smallest prime factor) down to single records, so a bad record loses only itself.
+    Returns (bills, TotalRecords-or-None, skipped [(offset, size), ...] windows that still
+    failed at one record)."""
     assert size > 0 and offset % size == 0, f"offset {offset} must be a multiple of size {size}"
     page = offset // size
     try:
@@ -390,26 +406,31 @@ async def _fetch_range_with_recovery(
     except Exception as exc:  # noqa: BLE001
         log.warning("dorchester_billtrax.window_error", offset=offset, size=size,
                     error=str(exc)[:160])
-    await asyncio.sleep(_BACKOFF_S)
-    try:
-        bills, total = await _fetch_page(client, template, page, page_size=size)
-        return bills, total, []
-    except Exception as exc:  # noqa: BLE001
-        log.warning("dorchester_billtrax.window_error_retry_failed", offset=offset,
-                    size=size, error=str(exc)[:160])
-    if size <= _MIN_WINDOW or size % 2 != 0:
-        # size % 2 != 0 guards a non-default PAGE_SIZE (env override) that hits an odd
-        # number before reaching _MIN_WINDOW -- halving an odd size unevenly risks
-        # silently skipping or double-fetching the boundary record, so this is treated
-        # as the floor instead of bisecting further.
+        data_error = _is_record_data_error(exc)
+    if not data_error:
+        await asyncio.sleep(_BACKOFF_S)
+        try:
+            bills, total = await _fetch_page(client, template, page, page_size=size)
+            return bills, total, []
+        except Exception as exc:  # noqa: BLE001
+            log.warning("dorchester_billtrax.window_error_retry_failed", offset=offset,
+                        size=size, error=str(exc)[:160])
+    if size <= _MIN_WINDOW:
         log.warning("dorchester_billtrax.window_skipped", offset=offset, size=size,
-                    note="bounded gap: this window failed at the floor granularity "
-                         "and is being skipped rather than blocking the rest of the roll")
+                    note="bounded gap: this record failed on its own and is skipped "
+                         "rather than blocking the rest of the roll")
         return [], None, [(offset, size)]
-    half = size // 2
-    b1, t1, s1 = await _fetch_range_with_recovery(client, template, offset, half)
-    b2, t2, s2 = await _fetch_range_with_recovery(client, template, offset + half, half)
-    return b1 + b2, t1 or t2, s1 + s2
+    k = _smallest_factor(size)
+    child = size // k
+    bills: list[dict] = []
+    total = None
+    skipped: list[tuple[int, int]] = []
+    for i in range(k):
+        b, t, s = await _fetch_range_with_recovery(client, template, offset + i * child, child)
+        bills.extend(b)
+        total = total or t
+        skipped.extend(s)
+    return bills, total, skipped
 
 
 def _aggregate(bills: Iterable[dict]) -> list[Listing]:
@@ -517,7 +538,9 @@ class DorchesterBillTraxDelinquentTax(BaseScraper):
     slug = SLUG
     name = "Dorchester SC Delinquent Tax (BillTrax)"
     category = "county_tax"
-    timeout_s = 300.0
+    # 2026-10-08 VM run: 281.6 s with the old 250-record skip. Splitting the bad window
+    # down to its one record adds about 20 small requests (no backoff on the data error).
+    timeout_s = 480.0
     expected_min_count = 200
     optional = True
 
