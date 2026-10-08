@@ -56,8 +56,8 @@ party is the row's owner of record, on a row that names a property.
 | D2 | an ended judgment still scored | 762 rows (43 WARM): 760 from the legacy `nc_ecourts_judgments` lane (it kept every status), 2 from the scraper | no reader of the row's own status | `distress_score.court_record_ended` (eCourts rows only) ends the type signal; `nc_ecourts_case` answers stale | `test_court_signals_scoring.py` | `court-ended-record-not-scored` |
 | D3 | a bankruptcy filing with no property scored | 755 bankruptcy filing rows scored with no parcel and no numbered address, 751 of them with '<debtor name> — <case>' as street_address | F11 tested the truthiness of street_address | `distress_score.has_property_address` | `test_court_signals_scoring.py` | `court-bankruptcy-has-property` |
 | D4 | HOT court leads with no property | 14 HOT (13 are D1) | D1 | D1 | | `court-hot-has-property` |
-| D5 | NC "lis_pendens" is mostly liens | of 8,795 NC lis_pendens rows with an eCourts block: claim of lien 6,229, transcript of judgment 1,435, lis pendens 763, lien 273, condemnation 78, possession (evictions, legacy lane) 16 | the scraper maps every lien cause to LIS_PENDENS (weight 28) | NOT changed: a scoring and dashboard decision (owner) | | (verifier evidence carries the cause) |
-| D6 | an estate notice put on someone else's parcel | 36 of 111 rows (NC 21, SC 15) | the name-to-property resolver | NOT fixed here (resolver / block_binding area) | | `court-probate-decedent-binds` |
+| D5 | NC "lis_pendens" is mostly liens | of 8,795 NC lis_pendens rows with an eCourts block: claim of lien 6,229, transcript of judgment 1,435, lis pendens 763, lien 273, condemnation 78, possession (evictions, legacy lane) 16 | the scraper mapped every lien cause to LIS_PENDENS (weight 28) | coordinator decision (section 10): claims of lien are ListingType `lien_claim` (signal lien_claim, weight 10, name-only evidence: never record-linked, never completes a HOT stack), transcripts are judgment liens; scraper + the tail retypes carried rows; dashboard label, Type filter, lane | `test_court_signals_scoring.py`, `test_court_signals_binding.py` | `court-lis-pendens-is-lis-pendens` |
+| D6 | an estate notice put on someone else's parcel | 36 of 111 rows (NC 21, SC 15) by token overlap; 80 by the name rule now applied | many were the personal representative's own house (the address the notice prints for the representative) | coordinator decision (section 10): the tail binds a notice to a parcel only by name, else keeps it as an unbound county-level lead | `test_court_signals_binding.py` | `court-probate-decedent-binds` |
 | D7 | court leads with no property at all | WARM court rows with no parcel and no numbered address: 2,241 (HOT 14); in the sample 28/30 NC lis pendens, 29/30 NC divorce, 46/60 bankruptcy, 50/60 NC probate notices | name-only court records that never resolved | D1/D3 remove most WARM ones; the rest is the call-ready gate's (wave 2 F) | | `court-hot-has-property` |
 | D8 | two cases fused on one row | 203 rows whose case_number differs from their own eCourts block's (153 legacy lane) | merges | `nc_ecourts_case` answers unconfirmed `case_number_conflict` (never verifies the wrong case) | `test_verification_nc_ecourts_case.py` | (block_binding area) |
 
@@ -149,8 +149,8 @@ on the rows so the wall shows where the lead is read.
 
 ## 8. Open items
 
-* D5 (claims of lien scored as lis pendens, weight 28): owner decision on the label and weight.
-* D6 (estate notices on another person's parcel): resolver / block_binding fix, not started.
+* D5 and D6: done (section 10).
+* The 16 'CV - Possession' rows of the legacy lane (evictions) are still typed lis_pendens.
 * SC lis pendens in Charleston (1,330 rows, 7 WARM): the county's own index copy is open; a
   verifier is buildable (about half a day) and was not built.
 * NC estate status, NC SP sale status, SC Public Index, notice bodies: walls (section 6).
@@ -167,3 +167,44 @@ on the rows so the wall shows where the lead is read.
 * `law_firms.hutchens` keeps 42 of 252 NC rows (footprint `keep()`), so most of the firm's NC sales never reach the board.
 * `law_firms.rogers_townsend` NC page answers 404.
 * The tax_lien ledger has entries for 3 of 30 sampled SC tax_sale rows.
+
+## 10. Coordinator decisions (2026-10-09), applied
+
+All three live in `enrichment_court_owner_verify.enrich_court_owner_verify` (the existing court tail
+step: `run_enrich_tail` before verification and scoring, and `scripts/reconcile_board.py` as a local
+step), so no main.py line is needed. Counts below are from the 2026-10-08 pre_publish checkpoint:
+the affected rows and every row sharing their parcel group (8,195 rows) scored before and after the
+change with the same code otherwise.
+
+1. **Claims of lien are not lis pendens.** `ListingType.LIEN_CLAIM` ('CV - Claim of Lien', 'CV -
+   Lien'): signal lien_claim, FINANCIAL, weight 10, name-only evidence (never record-linked, never
+   completes a HOT stack; not a lane kind). 'CV - Transcript of Judgment' becomes a judgment lien
+   (distressed + nc_ecourts.signal judgment_lien, weight 12, the docketed money-judgment
+   convention). 'CV - Lis Pendens' and 'CV - Condemnation' stay lis_pendens. The scraper types new
+   hits; the tail retypes carried rows (raw.retyped records it; rows are kept); the scorer maps a
+   carried row the retype has not reached. Dashboard: its own type pill and Type filter option,
+   SIGNAL_CATEGORY, and the stage lane is 'outbound', never 'prefore'. **Moved: 7,947 rows**
+   (6,511 lien claims, 1,436 transcripts); none scores lis_pendens after; 5,763 score lien_claim
+   (748 do not: their own block says the judgment ended). **Tier changes: WARM to COLD 109, COLD to
+   WARM 2, HOT none.**
+2. **Estate notices bind by name.** A row whose estate notice names a property keeps it only when
+   the decedent agrees with an owner of record (surname and first name, middle initials not in
+   conflict; '<decedent> HEIRS' agrees; the row's owner_name counts only when it is not the
+   notice's own decedent or representative copied), or the representative does on a property that
+   is not the representative's printed address. Otherwise: a notice row loses its parcel, address,
+   values and property-signal blocks (kept under raw.unbound_property_blocks; raw.estate_unbound
+   says why) and stays a county-level estate lead; a notice merged onto another source's row moves
+   to raw.probate_unbound. **Unbound: 80** (75 notice rows, 5 merged notices; reasons: decedent not
+   the owner 52, no owner of record 29 on the first pass). **Tier changes: WARM to COLD 10.**
+3. **Bankruptcy filings bind by name.** The same agreement between a debtor of the case and an owner
+   of record (a county-roll owner, or owner_name when it is not the case name copied). **Unbound:
+   165 filing rows** (all 'debtor not the owner of record'). **Tier changes: WARM to COLD 52.** The
+   rule unbinds all 8 links the CourtListener re-check refuted on the sample and keeps the confirmed
+   ones.
+
+Group mates (other rows on the same parcels): WARM to COLD 2. Invariants added or changed:
+`court-lis-pendens-is-lis-pendens`, `court-bankruptcy-filing-binds`, `court-probate-decedent-binds`
+(now the tail's own rule). Tests: `test_court_signals_binding.py` (13), `test_court_signals_scoring.py`
+(+4), `test_audit_checks_court_signals.py` (+2), `test_verification_nc_ecourts_case.py` (+1;
+nc_ecourts_case v2 governs lien_claim). Not verified: the dashboard in a browser (the JS file
+parses; `tests/js/phone_gate.test.mjs` fails on a phone-gate assertion unrelated to these lines).

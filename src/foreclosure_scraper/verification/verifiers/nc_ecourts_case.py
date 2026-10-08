@@ -54,7 +54,9 @@ owner of record to compare), 'no_property' (the row has no parcel and no numbere
 claim names a person only and nothing about a property can be called).
 
 GOVERNS (per record, governs_for): a divorce judgment governs ("divorce_notice", "divorce"); a
-docketed money judgment ("judgment_lien",); every other cause ("lis_pendens", "upset_bid"). The
+docketed money judgment or a transcript of judgment ("judgment_lien",); a claim of lien
+("lien_claim", "upset_bid"; v2, after claims of lien became their own type, 2026-10-09); a lis
+pendens or a condemnation ("lis_pendens", "upset_bid"). The
 'upset_bid' is the scraper's own stamp: it treated a judgment's order date as a foreclosure sale
 date and opened a 14-day upset-bid window on 1,146 rows of the 2026-10-08 checkpoint (claims of
 lien, transcripts of judgment, tax liens; NC power-of-sale sales are special proceedings, which
@@ -75,11 +77,11 @@ from typing import Any, Optional
 from ..core import VerificationResult, case_id, result
 
 SIGNAL = "nc_ecourts_case"
-VERSION = "v1"
+VERSION = "v2"         # v2 (2026-10-09): claims of lien are their own claim kind (lien_claim)
 TTL_DAYS = 14          # a lien is cancelled or satisfied, a judgment vacated, within weeks
 RETRY_DAYS = 3
 SOURCE = "portal-nc.tylertech.cloud (NC Judgment Search, open JSON)"
-GOVERNS = ("lis_pendens", "upset_bid", "judgment_lien", "divorce_notice", "divorce")
+GOVERNS = ("lis_pendens", "lien_claim", "upset_bid", "judgment_lien", "divorce_notice", "divorce")
 ROW_SUMMARY_EXCLUDE = ("owner_name",)
 IDENTITY = "case"
 TRANSIENT_REASONS = ("fetch_failed", "service_unhealthy", "unreadable_answer")
@@ -91,7 +93,7 @@ CLAIM_SOURCES = frozenset({
     "counties_nc.nc_ecourts_divorce",
     "nc_ecourts_judgments",
 })
-CLAIM_TYPES = frozenset({"lis_pendens", "divorce_notice"})
+CLAIM_TYPES = frozenset({"lis_pendens", "divorce_notice", "lien_claim"})
 PAGE_SIZE = 200
 MAX_PAGES = 5                 # 1,000 hits in a three-day county window (Mecklenburg ~ 300)
 WINDOW_BEFORE_DAYS = 1
@@ -165,13 +167,17 @@ def claim(row: Any) -> Optional[dict]:
 
 
 def claim_kind(c: dict, row: Any = None) -> str:
-    """'divorce' | 'judgment_lien' | 'lien_or_lis_pendens'."""
+    """'divorce' | 'judgment_lien' | 'lien_claim' | 'lien_or_lis_pendens' (a lis pendens or a
+    condemnation; the name is kept so stored records stay readable)."""
     cause = (c or {}).get("cause") or ""
     if cause.startswith("FAM - Divorce"):
         return "divorce"
     src = str(_get(row, "source") or "") if row is not None else ""
-    if (c or {}).get("signal") == "judgment_lien" or src.endswith(".judgment_lien"):
+    sig = (c or {}).get("signal")
+    if sig == "judgment_lien" or src.endswith(".judgment_lien") or cause == "CV - Transcript of Judgment":
         return "judgment_lien"
+    if sig == "lien_claim" or cause in ("CV - Claim of Lien", "CV - Lien"):
+        return "lien_claim"
     return "lien_or_lis_pendens"
 
 
@@ -412,6 +418,8 @@ def governs_for(record: dict) -> tuple[str, ...]:
         return ("divorce_notice", "divorce")
     if kind == "judgment_lien":
         return ("judgment_lien",)
+    if kind == "lien_claim":
+        return ("lien_claim", "upset_bid")
     if kind == "lien_or_lis_pendens":
         return ("lis_pendens", "upset_bid")
     return GOVERNS

@@ -92,6 +92,14 @@ def test_cancelled_judgment_is_stale():
     row = _row()
     r = _run(row, _fetcher(row, [_hit(status="Canceled")]))
     assert r.verdict == "stale" and r.evidence["reason"] == "judgment_no_longer_in_force"
+    assert V.governs_for(r.to_dict()) == ("lien_claim", "upset_bid")      # a claim of lien
+
+
+def test_a_real_lis_pendens_governs_lis_pendens():
+    row = _row(raw={"nc_ecourts": {"cause": "CV - Lis Pendens", "civilJudgmentStatus": "Active",
+                                   "judgmentId": 222, "orderedDate": "2026-09-30T23:00:00-05:00"}})
+    r = _run(row, _fetcher(row, [_hit(cause="CV - Lis Pendens", status="Satisfied")]))
+    assert r.verdict == "stale" and r.evidence["claim_kind"] == "lien_or_lis_pendens"
     assert V.governs_for(r.to_dict()) == ("lis_pendens", "upset_bid")
 
 

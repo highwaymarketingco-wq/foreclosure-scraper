@@ -23,11 +23,19 @@ docs/audit_2026-10-09/court_signals.md has the measurements (2026-10-08 pre_publ
                                   verifier's record (any verdict, not expired): "rechecked at its
                                   primary source before it is called". The detail gives the WARM
                                   share too (not counted as violations).
-  court-probate-decedent-binds    a row scoring probate / probate_notice / probate_deed from an
-                                  estate notice (raw.probate.decedent) on a property whose owner of
-                                  record is known names that decedent: at least one name word
-                                  shared with the owner of record (death words and initials
-                                  ignored). Caught: 36 of 117 such rows (NC 21 of 78, SC 15 of 39).
+  court-probate-decedent-binds    a row whose estate notice (raw.probate.decedent) names a property
+                                  binds to it by name: the decedent agrees with an owner of record
+                                  (surname + first name, middles not in conflict), or the personal
+                                  representative does on a property that is not the representative's
+                                  own printed address (enrichment_court_owner_verify.estate_binding,
+                                  the rule the tail applies). Caught (old token-overlap reading): 36
+                                  of 111 rows (NC 21, SC 15).
+  court-bankruptcy-filing-binds   a bankruptcy filing row that names a property binds to it by name:
+                                  a debtor agrees with an owner of record not copied from the case
+                                  name (enrichment_court_owner_verify.bankruptcy_binding).
+  court-lis-pendens-is-lis-pendens  no row scores lis_pendens (or is typed lis_pendens) on an NC
+                                  Judgment Search claim of lien or transcript of judgment: those are
+                                  lien_claim and judgment_lien. Caught: 7,937 of 8,795 NC rows.
 
 No names or addresses leave the process: samples are county:parcel or county:case.
 """
@@ -45,11 +53,12 @@ if str(_REPO / "src") not in sys.path:
 SAMPLE = 8
 COURT = frozenset({"lis_pendens", "foreclosure_sale", "sheriff_sale", "court_sale", "upset_bid",
                    "hoa_sale", "divorce", "divorce_notice", "probate", "probate_notice",
-                   "estate_lead", "probate_deed", "bankruptcy", "judgment_lien", "partition"})
+                   "estate_lead", "probate_deed", "bankruptcy", "judgment_lien", "partition",
+                   "lien_claim"})
 _ENDED = re.compile(r"cancel|satisf|dismiss|vacat|withdr|expire|releas|terminat", re.I)
 _NUMBERED = re.compile(r"^\s*\d*[1-9]\d*[A-Za-z]?\s+\S")
 _DEATH = re.compile(r"\bHEIRS?\b|\bESTATE\b|\bEST\b|\bDECEASED\b", re.I)
-_JUDGMENT_TYPES = frozenset({"lis_pendens", "divorce_notice", "tax_lien", "distressed"})
+_JUDGMENT_TYPES = frozenset({"lis_pendens", "divorce_notice", "tax_lien", "distressed", "lien_claim"})
 
 
 def _raw(row: dict) -> dict:
@@ -135,7 +144,8 @@ class EndedRecordNotScored(_Check):
         if not _ENDED.search(status):
             return
         sigs, tier = _stack(row)
-        scored = sigs & {"lis_pendens", "divorce_notice", "tax_lien", "judgment_lien", "upset_bid"}
+        scored = sigs & {"lis_pendens", "divorce_notice", "tax_lien", "judgment_lien", "upset_bid",
+                         "lien_claim"}
         if scored and str(row.get("listing_type") or "") in _JUDGMENT_TYPES:
             self._bad(row, f"{tier}:{row.get('source')}")
 
@@ -217,30 +227,47 @@ class HotVerified(_Check):
 
 class ProbateDecedentBinds(_Check):
     name = "court-probate-decedent-binds"
-    describe = "an estate-notice probate claim on a property names the property's owner of record"
+    describe = "an estate notice on a property binds to it by name (decedent, or representative on title)"
 
     def feed(self, row: dict) -> None:
-        sigs, tier = _stack(row)
-        if not (sigs & {"probate", "probate_notice", "probate_deed"}) or not _has_property(row):
-            return
-        raw = _raw(row)
-        pr = raw.get("probate")
-        dec = pr.get("decedent") if isinstance(pr, dict) else None
-        if not dec:
-            return
-        from foreclosure_scraper.name_normalize import core_tokens
-        g = raw.get("gis") if isinstance(raw.get("gis"), dict) else {}
-        owners = set()
-        for o in (row.get("owner_name"), g.get("owner")):
-            owners |= {t for t in core_tokens(_DEATH.sub(" ", str(o or ""))) if len(t) >= 3}
-        if not owners:
+        from foreclosure_scraper.enrichment_court_owner_verify import estate_binding
+        b = estate_binding(row)
+        if b is None:
             return
         self.checked += 1
-        dw = {t for t in core_tokens(str(dec)) if len(t) >= 3}
-        if dw and not (dw & owners):
-            self._bad(row, f"{row.get('state')}:{tier}")
+        if b[0] != "bound":
+            self._bad(row, f"{row.get('state')}:{b[1]}")
+
+
+class BankruptcyFilingBinds(_Check):
+    name = "court-bankruptcy-filing-binds"
+    describe = "a bankruptcy filing on a property binds to it by name (a debtor is an owner of record)"
+
+    def feed(self, row: dict) -> None:
+        from foreclosure_scraper.enrichment_court_owner_verify import bankruptcy_binding
+        b = bankruptcy_binding(row)
+        if b is None:
+            return
+        self.checked += 1
+        if b[0] != "bound":
+            self._bad(row, b[1])
+
+
+class LisPendensIsLisPendens(_Check):
+    name = "court-lis-pendens-is-lis-pendens"
+    describe = "no NC claim of lien or transcript of judgment is typed or scored as a lis pendens"
+
+    def feed(self, row: dict) -> None:
+        from foreclosure_scraper.enrichment_court_owner_verify import court_lien_kind
+        kind = court_lien_kind(row)
+        if kind is None:
+            return
+        self.checked += 1
+        sigs, tier = _stack(row)
+        if row.get("listing_type") == "lis_pendens" or "lis_pendens" in sigs:
+            self._bad(row, f"{kind}:{tier}")
 
 
 def make_checks() -> list:
     return [UpsetBidNeedsSale(), EndedRecordNotScored(), BankruptcyHasProperty(), HotHasProperty(),
-            HotVerified(), ProbateDecedentBinds()]
+            HotVerified(), ProbateDecedentBinds(), BankruptcyFilingBinds(), LisPendensIsLisPendens()]

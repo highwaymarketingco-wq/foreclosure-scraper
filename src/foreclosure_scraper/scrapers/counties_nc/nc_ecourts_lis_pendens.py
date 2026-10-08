@@ -190,6 +190,11 @@ DIVORCE_CAUSES = {
     "FAM - Divorce",
 }
 
+#: claims of lien: their own listing type lien_claim, not lis_pendens (court_signals 2026-10-09)
+LIEN_CLAIM_CAUSES = {"CV - Claim of Lien", "CV - Lien"}
+#: a transcript of judgment is a judgment lien (NCGS 1-234): distressed + signal judgment_lien
+TRANSCRIPT_CAUSES = {"CV - Transcript of Judgment"}
+
 # Hard safety exclusion mirroring enrichment_nc_divorce.py's _DV50B_RE: a 50B
 # domestic-violence protective order is a safety matter, never a lead, and
 # must never surface even if it somehow carried a divorce-adjacent cause or
@@ -395,8 +400,21 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
     # published clerk/county feeds (national.nc_upset_bids).
 
     # Pick listing type based on the cause.
+    # court_signals audit 2026-10-09: a claim of lien (contractor, supplier, HOA) is not a lis
+    # pendens: its own type and signal lien_claim (lower weight, never the HOT gate); a transcript
+    # of judgment is a judgment lien on the debtor's property (NCGS 1-234), scored like the docketed
+    # money judgments (nc_ecourts.signal judgment_lien). Only 'CV - Lis Pendens' (and condemnation,
+    # an action about the property) stay lis_pendens. Measured on the 2026-10-08 checkpoint: of
+    # 8,795 NC lis_pendens rows from this index 6,502 were liens and 1,435 transcripts.
+    lien_signal = None
     if is_divorce:
         listing_type = ListingType.DIVORCE_NOTICE
+    elif cause in LIEN_CLAIM_CAUSES:
+        listing_type = ListingType.LIEN_CLAIM
+        lien_signal = "lien_claim"
+    elif cause in TRANSCRIPT_CAUSES:
+        listing_type = ListingType.DISTRESSED
+        lien_signal = "judgment_lien"
     elif "Lis Pendens" in cause:
         listing_type = ListingType.LIS_PENDENS
     elif "Tax" in cause or "Tax Liability" in cause:
@@ -466,6 +484,7 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
                 "orderedDate": od,
                 "ordered_date_iso": ordered_date.isoformat() if ordered_date else None,
                 "location": location,
+                **({"signal": lien_signal} if lien_signal else {}),
                 **({"defendant_aliases": defendant_aliases} if defendant_aliases else {}),
                 **({"plaintiff_aliases": plaintiff_aliases} if plaintiff_aliases else {}),
             },

@@ -70,6 +70,7 @@ from .enrichment_amount_owed import is_standing_tax_roll_row
 from .enrichment_tax_owed import tax_not_yet_late as _tax_not_yet_late_raw
 from .enrichment_tax_owed import tax_big_old as _tax_big_old_raw
 from .enrichment_sc_phone import is_owner_phone_usable
+from .enrichment_court_owner_verify import court_lien_kind
 from .verification.verifiers._tax_common import DE_MINIMIS, PROPERTY_TAX, other_lien_listing
 
 log = structlog.get_logger()
@@ -312,10 +313,16 @@ _LISTING_TYPE_SIGNAL = {
     "bankruptcy": ("LEGAL", 18),              # only once the filing is tied to a property
     "elderly_disabled": ("LIFE_EVENT", 8),    # an attribute, weighted like senior_exemption
     "tax_sale_overage": ("FINANCIAL", 15),    # money owed to the former owner, a lower bar
+    # court_signals audit 2026-10-09: a claim of lien (contractor, supplier, HOA) docketed with the
+    # clerk. Not a lis pendens (28): a claim against the owner with no action pending about the
+    # property. Weighted under recorded_debt; name-only evidence (_type_evidence), so it never
+    # completes a stack or makes a row record-linked for the HOT gate.
+    "lien_claim": ("FINANCIAL", 10),
 }
 _TAX_SALE_STANDING_ROLL_WEIGHT = 20   # a delinquent roll with no upcoming sale date = tax_lien (F10)
 #: listing types an NC Judgment Search hit becomes (court_record_ended governs their type signal)
-_COURT_JUDGMENT_TYPES = frozenset({"lis_pendens", "divorce_notice", "tax_lien", "distressed"})
+_COURT_JUDGMENT_TYPES = frozenset({"lis_pendens", "divorce_notice", "tax_lien", "distressed",
+                                   "lien_claim"})
 
 def evidence_of(ds: dict, signal: str) -> str:
     """Evidence class of one signal on a published `distress_stack`. `record` is the default and
@@ -332,7 +339,7 @@ SIGNAL_CATEGORY = {
     "hoa_sale": "FINANCIAL", "tax_sale_overage": "FINANCIAL", "court_sale": "FINANCIAL",
     "upset_bid": "FINANCIAL", "recorded_debt": "FINANCIAL", "str_permit_lapsed": "FINANCIAL",
     "deferral_rollback": "FINANCIAL", "lien": "FINANCIAL", "builder_distress": "FINANCIAL",
-    "judgment_lien": "FINANCIAL",
+    "judgment_lien": "FINANCIAL", "lien_claim": "FINANCIAL",
     "auction": "SALES", "reo": "SALES", "mls_withdrawn_expired": "SALES",
     "stale_on_market": "SALES", "price_cut": "SALES", "partition": "SALES",
     "distressed": "PROPERTY", "code_enforcement": "PROPERTY", "distressed_condition": "PROPERTY",
@@ -803,6 +810,13 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     sig = c.signals
     r = li.raw if isinstance(li.raw, dict) else {}
     lt = _ltype(li)
+    # court_signals 2026-10-09: an NC Judgment Search claim of lien or transcript of judgment still
+    # typed lis_pendens (a row the tail's retype has not reached) scores as what it is
+    lien_kind = court_lien_kind(li) if lt in ("lis_pendens", "distressed") else None
+    if lt == "lis_pendens" and lien_kind == "lien_claim":
+        lt = "lien_claim"
+    elif lt == "lis_pendens" and lien_kind == "judgment_lien":
+        lt = "distressed"
     slugs = _slugs(li)
     by_name = _resolved_by_name(r)
     # Per-listing verification (verification/, docs/HANDOFF.md item 66): a non-expired refuted
@@ -814,6 +828,8 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
     override = None
     if lt == "distressed":
         override = next((_SOURCE_OVERRIDE[s] for s in slugs if s in _SOURCE_OVERRIDE), None)
+        if override is None and lien_kind == "judgment_lien":
+            override = _SOURCE_OVERRIDE["judgment_lien"]
     skip_type = (
         lt not in _LISTING_TYPE_SIGNAL
         or _is_liensnc(li)                                            # A8: context-only
@@ -1058,6 +1074,8 @@ def _type_evidence(lt: str, slugs: list[str], by_name: bool, *, helene: bool = F
         if helene:
             return REC
         return INF if any(s in _KEYWORD_DISTRESSED_SLUGS for s in slugs) else REC
+    if lt == "lien_claim":
+        return NO      # a party's claim matched to a property by name: never a record for HOT
     if lt in ("estate_lead", "divorce_notice", "bankruptcy"):
         return NJ      # a party record (obituary, summons, filing) matched to a property by name
     return REC

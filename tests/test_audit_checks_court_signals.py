@@ -83,6 +83,28 @@ def test_hot_rows_a_verifier_covers_carry_its_record():
 
 def test_probate_decedent_binds_to_the_owner():
     bad = _row(["probate"], parcel_id="1", owner_name="ROE RICHARD", raw={"probate": {"decedent": "Jane Doe"}})
-    good = _row(["probate"], parcel_id="2", owner_name="DOE JANE HEIRS", raw={"probate": {"decedent": "Jane Doe"}})
+    good = _row(["probate"], parcel_id="2", owner_name="DOE JANE HEIRS",
+                raw={"probate": {"decedent": "Jane Doe"}, "gis": {"owner": "DOE JANE HEIRS"}})
     d = _run(C.ProbateDecedentBinds(), [bad, good])
+    assert d["checked"] == 2 and d["violations"] == 1
+
+
+def test_bankruptcy_filing_binds_by_name():
+    base = {"listing_type": "bankruptcy", "parcel_id": "1"}
+    bad = _row(["bankruptcy"], **base, defendant="Mary Doe",
+               raw={"courtlistener": {"case_name": "Mary Doe"}, "gis": {"owner": "DOE ALPHA"}})
+    good = _row(["bankruptcy"], **base, defendant="Jane Doe",
+                raw={"courtlistener": {"case_name": "Jane Doe"}, "gis": {"owner": "DOE JANE"}})
+    d = _run(C.BankruptcyFilingBinds(), [bad, good])
+    assert d["checked"] == 2 and d["violations"] == 1
+
+
+def test_lis_pendens_is_lis_pendens():
+    lien = _row(["lis_pendens"], source="counties_nc.nc_ecourts_lis_pendens",
+                raw={"nc_ecourts": {"cause": "CV - Claim of Lien"}})
+    retyped = _row(["lien_claim"], source="counties_nc.nc_ecourts_lis_pendens", listing_type="lien_claim",
+                   raw={"nc_ecourts": {"cause": "CV - Claim of Lien", "signal": "lien_claim"}})
+    real = _row(["lis_pendens"], source="counties_nc.nc_ecourts_lis_pendens",
+                raw={"nc_ecourts": {"cause": "CV - Lis Pendens"}})
+    d = _run(C.LisPendensIsLisPendens(), [lien, retyped, real])
     assert d["checked"] == 2 and d["violations"] == 1

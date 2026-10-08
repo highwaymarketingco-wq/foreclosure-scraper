@@ -237,6 +237,11 @@ class ListingType(str, Enum):
     # financially motivated, and a warm entry point regardless of what they do
     # with the claim. First source: York County SC, $296-$35,286 per claim.
     TAX_SALE_OVERAGE = "tax_sale_overage"
+    # LIEN_CLAIM = a claim of lien docketed with the clerk (a contractor's, supplier's or HOA's
+    # claim against the owner: NC 'CV - Claim of Lien' / 'CV - Lien'). Not a lis pendens (no
+    # pending action about the property), so it never feeds a lis_pendens column, lane or the HOT
+    # gate; its own, lower-weight signal lien_claim (court_signals audit 2026-10-09).
+    LIEN_CLAIM = "lien_claim"
     UNKNOWN = "unknown"
 
 

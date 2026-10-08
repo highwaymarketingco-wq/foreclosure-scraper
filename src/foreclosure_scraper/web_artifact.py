@@ -2260,6 +2260,10 @@ RAW_KEEP = {
     # tests/test_raw_keep_covers_enrichers.py.
     "builder_distress": "*",          # LiensNC cluster/related-filings = over-leveraged flipper
     "owner_mismatch": "*",            # court lead whose geo-snapped property was stripped (name-only, unverified)
+    # court_signals audit 2026-10-09 (enrichment_court_owner_verify): a court/notice record kept as
+    # an unbound lead, why, and what it carried; an NC claim of lien / transcript retyped
+    "estate_unbound": "*", "probate_unbound": "*", "relationship_signal_unbound": "*",
+    "bankruptcy_unbound_property": "*", "unbound_property_blocks": "*", "retyped": "*",
     "resolved_from_name": "*",        # name->property resolver provenance {county, strategy, confidence}
     "_resolved_deep_enriched": "*",   # marker: resolved lead already got the same-run comps/Vision catch-up
     "tax_owed": "*",                  # normalized delinquent-tax balance {balance, kind, source, year, basis}

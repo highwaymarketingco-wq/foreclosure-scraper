@@ -1595,6 +1595,7 @@ const NAME_ONLY_SIGNALS = ["incarceration", "bankruptcy"];
 const SIGNAL_CATEGORY = {
   foreclosure_sale: "FINANCIAL", lis_pendens: "FINANCIAL", tax_sale: "FINANCIAL",
   tax_lien: "FINANCIAL", court_sale: "FINANCIAL", upset_bid: "FINANCIAL",
+  lien_claim: "FINANCIAL", judgment_lien: "FINANCIAL",
   recorded_debt: "FINANCIAL", str_permit_lapsed: "FINANCIAL", deferral_rollback: "FINANCIAL",
   sheriff_sale: "SALES", auction: "SALES", reo: "SALES", mls_withdrawn_expired: "SALES",
   stale_on_market: "SALES", price_cut: "SALES", partition: "SALES",
@@ -2250,6 +2251,10 @@ function stageOf(l) {
   // so "is there a block" is not "is the window open". Open means in_window is
   // exactly true AND its deadline has not passed, decided from the dates today.
   const ub = l.raw && l.raw.upset_bid;
+  // court_signals 2026-10-09: an NC claim of lien (lien_claim) or transcript of judgment
+  // (nc_ecourts.signal judgment_lien) is not a pre-foreclosure, whatever its source slug says
+  const ecs = l.raw && l.raw.nc_ecourts && l.raw.nc_ecourts.signal;
+  if (t === "lien_claim" || ecs === "lien_claim" || ecs === "judgment_lien") return "outbound";
   if (hasSale || t === "foreclosure_sale" || (ub && upsetBidState(l, Date.now()).open)) return "foreclosure";
   if (t === "lis_pendens" || t === "bankruptcy" || STAGE_PREFORE.test(src)) return "prefore";
   return "outbound"; // probate/obituary/elderly/divorce/tax-delinquent/vacant/distressed
