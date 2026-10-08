@@ -123,3 +123,32 @@ def test_asheville_str_rows_carry_the_permit_point(monkeypatch):
     by_id = {li.case_number: li for li in rows}
     assert (by_id["HS-1"].latitude, by_id["HS-1"].longitude) == (35.4967, -82.5148)
     assert by_id["HS-2"].latitude is None                     # a 0/0 point is no point
+
+
+# ----------------------------------------------------------------------------- SeeClickFix
+
+def test_seeclickfix_never_keeps_the_complainant(monkeypatch):
+    from foreclosure_scraper.scrapers.national import seeclickfix as SCF
+
+    class _Resp:
+        status_code = 200
+
+        def json(self):
+            return {"issues": [{"id": 1, "summary": "Abandoned property", "description": "vacant house",
+                                "address": "1 Pretend St, Spartanburg, SC 29301", "status": "Open",
+                                "reporter": {"id": 7, "name": "Made Up Resident", "role": "Registered User"},
+                                "html_url": "https://seeclickfix.com/issues/1"}]}
+
+    class _C:
+        async def get(self, url, params=None):
+            return _Resp()
+
+    @asynccontextmanager
+    async def fake_client(**kw):
+        yield _C()
+
+    monkeypatch.setattr(SCF, "client", fake_client)
+    city = next(c for c in SCF._CITIES if c["city"] == "Spartanburg")
+    rows = asyncio.run(SCF.SeeClickFixScraper()._fetch_city(city))
+    assert rows and "reporter" not in rows[0].raw["seeclickfix"]
+    assert "Made Up Resident" not in repr(rows[0].raw)

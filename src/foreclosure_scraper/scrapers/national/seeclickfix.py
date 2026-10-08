@@ -201,7 +201,9 @@ class SeeClickFixScraper(BaseScraper):
                                 "lng": lng,
                                 "created_at": iss.get("created_at"),
                                 "updated_at": iss.get("updated_at"),
-                                "reporter": iss.get("reporter"),
+                                # No "reporter" (2026-10-08): SeeClickFix's reporter block is the
+                                # private resident who filed the complaint (name, avatar), not the
+                                # property owner; the public board never carries a complainant.
                                 "url": issue_url,
                                 "place_url": c["place_url"],
                             },
