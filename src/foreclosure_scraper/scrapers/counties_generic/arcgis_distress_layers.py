@@ -328,8 +328,15 @@ LAYERS: tuple[Layer, ...] = (
         url=("https://services3.arcgis.com/axQ4OCSpcxALIQsV/arcgis/rest/services/"
              "NCEM_Damage_Assessment_BC/FeatureServer/119"),
         listing_type=ListingType.DISTRESSED,
-        fields=("REID", "dmg_loc", "damage_cat_cal", "program_type", "county"),
-        parcel="REID", situs="dmg_loc",
+        fields=("REID", "dmg_loc", "damage_cat_cal", "program_type", "county",
+                # 2026-10-08 source-completeness audit: on the layer, never requested. The
+                # assessor's own point (latitude/longitude, 456 of 456 rows) places the row for
+                # the geo parcel enricher: REID is Burke's 5-digit real-estate id, which
+                # validation nulls (415 rows on the 2026-10-08 run), and Burke's parcel cache
+                # keys on the 10-digit PIN. Damage_Val / BLDG_Val are NCEM's estimated damage
+                # and building value, damage the short class, start_time the assessment time.
+                "latitude", "longitude", "damage", "Damage_Val", "BLDG_Val", "start_time"),
+        parcel="REID", situs="dmg_loc", lat_field="latitude", lon_field="longitude",
         detail="damage_cat_cal", process="storm_damage",
         source_page="https://www.burkenc.org/",
     ),

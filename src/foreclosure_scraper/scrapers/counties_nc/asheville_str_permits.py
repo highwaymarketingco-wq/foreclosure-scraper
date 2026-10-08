@@ -68,6 +68,19 @@ def _epoch_ms_to_iso(v) -> str | None:
         return None
 
 
+def _point(geom) -> tuple[float | None, float | None]:
+    """(lat, lon) of a WGS84 point geometry, or (None, None)."""
+    if not isinstance(geom, dict):
+        return None, None
+    try:
+        lon, lat = float(geom.get("x")), float(geom.get("y"))
+    except (TypeError, ValueError):
+        return None, None
+    if not (33.0 < lat < 37.5 and -85.0 < lon < -75.0):   # NC; drops 0/0 and NaN-like nulls
+        return None, None
+    return lat, lon
+
+
 def _split_addr(full: str) -> tuple[str | None, str | None]:
     """'85 MILLS GAP RD, ASHEVILLE, NC 28803' -> ('85 MILLS GAP RD', 'ASHEVILLE')."""
     if not full:
@@ -97,7 +110,13 @@ class AshevilleSTRPermits(BaseScraper):
                              "record_status_date,business_name,record_type,"
                              "record_id,license_number,balance_due,date_opened,"
                              "record_comments",
-                "returnGeometry": "false", "resultRecordCount": "1500", "f": "json",
+                # The permit's own point: `apn`/`parcel_number` on this layer is the city's
+                # 4-6 digit permit-system parcel key, not Buncombe's PIN (it matches neither
+                # pin, pinnum nor AccountNumber on the county parcel layer; checked 2026-10-08),
+                # and validation nulls it (620 rows on the 2026-10-08 run). The point is what
+                # lets the geo parcel enricher find the PIN, owner and value.
+                "returnGeometry": "true", "outSR": "4326",
+                "resultRecordCount": "1500", "f": "json",
             }
             try:
                 r = await c.get(LAYER, params=params)
@@ -126,9 +145,11 @@ class AshevilleSTRPermits(BaseScraper):
                 balance_due = a.get("balance_due")
                 record_id = (a.get("record_id") or "").strip() or None
                 license_number = (str(a.get("license_number") or "").strip() or None)
+                lat, lon = _point(f.get("geometry"))
                 li = Listing(
                     source=self.slug,
                     source_url="https://gis.ashevillenc.gov/server/rest/services/Permits/HomestayPermitsView/MapServer/5",
+                    latitude=lat, longitude=lon,
                     listing_type=ListingType.UNKNOWN,
                     property_kind=PropertyKind.SINGLE_FAMILY,
                     state="NC",

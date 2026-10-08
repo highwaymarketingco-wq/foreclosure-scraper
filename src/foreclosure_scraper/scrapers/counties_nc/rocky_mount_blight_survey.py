@@ -91,8 +91,25 @@ FIELDS = (
 _ORDER = ("dilapidated", "vacant_boarded", "deteriorated")
 
 
+#: validation._validate_parcel_id nulls a parcel id shorter than this.
+_MIN_PID_LEN = 7
+
+
+def parcel_of(a: dict) -> Optional[str]:
+    """The row's parcel id. Edgecombe's PARNO is its dashed PIN ('3759-86-6196'); Nash's PARNO is
+    the county's 6-digit account number ('027989'), which validation nulls as too short, while
+    its ALTPARNO carries the 12-digit Nash PIN ('385018315565'), a key NC OneMap and the parcel
+    cache also index (parno/altparno). So a PARNO under 7 characters yields to a long ALTPARNO
+    (229 of the 618 rows on the 2026-10-08 run had their PARNO nulled); both stay in the
+    raw["arcgis_distress"] block."""
+    parno, alt = clean(a.get("PARNO")), clean(a.get("ALTPARNO"))
+    if parno and len(parno) < _MIN_PID_LEN and alt and len(alt) >= _MIN_PID_LEN:
+        return alt
+    return parno or alt
+
+
 def _key(county: str, a: dict) -> Optional[tuple[str, str]]:
-    pid = clean(a.get("PARNO")) or clean(a.get("ALTPARNO"))
+    pid = parcel_of(a)
     if pid:
         return county, "p:" + pid
     site = clean(a.get("SITEADD"))
@@ -119,7 +136,7 @@ def to_listing(slot: dict, *, now: Optional[datetime] = None) -> Optional[Listin
     a = slot["attrs"]
     county = slot["county"]
     classes: list[str] = slot["classes"]
-    pid = clean(a.get("PARNO")) or clean(a.get("ALTPARNO"))
+    pid = parcel_of(a)
     situs = clean(a.get("SITEADD"))
     if not (pid or situs):
         return None

@@ -87,9 +87,13 @@ FEEDS: tuple[Feed, ...] = (
     Feed("durham", "Durham", "Durham",
          "https://webgis2.durhamnc.gov/server/rest/services/PublicServices/Inspections/MapServer/10",
          "https://www.durhamnc.gov/1303/Custom-Maps-and-Data-Layers",
-         ("PermitNum", "PID", "ISSUE_DATE", "CO_SIGNOFF_DATE", "PROJECT_TYPE", "TYPE", "PmtStatus"),
+         ("PermitNum", "PID", "PIN15", "ISSUE_DATE", "CO_SIGNOFF_DATE", "PROJECT_TYPE", "TYPE",
+          "PmtStatus"),
+         # PID is Durham's 6-digit parcel id, which validation nulls as too short (206 rows on the
+         # 2026-10-08 run); PIN15 on the same row is the 10-digit PIN, NC OneMap's `parno` for
+         # Durham (PID is its `altparno`), so it is the parcel id and PID stays in the raw block.
          {"permit": "PermitNum", "status": "PmtStatus", "date": "ISSUE_DATE", "parcel": "PID",
-          "type": "TYPE"}),
+          "parcel_long": "PIN15", "type": "TYPE"}),
     Feed("cary", "Wake", "Cary",
          "https://data.townofcary.org/api/explore/v2.1/catalog/datasets/permit-applications/records",
          "https://data.townofcary.org/explore/dataset/permit-applications/",
@@ -138,6 +142,19 @@ def _get(a: dict, feed: Feed, role: str):
     return clean(a.get(f)) if isinstance(f, str) else None
 
 
+#: validation._validate_parcel_id nulls a parcel id shorter than this.
+_MIN_PID_LEN = 7
+
+
+def parcel_of(a: dict, feed: Feed) -> Optional[str]:
+    """The feed's parcel id, or its long form (`parcel_long`) when the short one would be nulled."""
+    short = _get(a, feed, "parcel")
+    long_ = _get(a, feed, "parcel_long")
+    if long_ and len(long_) >= _MIN_PID_LEN and (not short or len(short) < _MIN_PID_LEN):
+        return long_
+    return short or long_
+
+
 def group_permits(feed: Feed, rows: Iterable[dict]) -> list[dict]:
     """One group per property (parcel, else address) for one feed; dead permits dropped."""
     groups: dict[str, dict] = {}
@@ -145,7 +162,7 @@ def group_permits(feed: Feed, rows: Iterable[dict]) -> list[dict]:
         a = drop_sensitive(a)
         if _DEAD.search(_get(a, feed, "status") or ""):
             continue
-        parcel, addr = _get(a, feed, "parcel"), _get(a, feed, "address")
+        parcel, addr = parcel_of(a, feed), _get(a, feed, "address")
         key = f"p:{parcel}" if parcel else (f"a:{addr.lower()}" if addr else None)
         if not key:
             continue
@@ -162,7 +179,7 @@ def to_listing(g: dict, *, now: Optional[datetime] = None) -> Listing:
     feed: Feed = g["feed"]
     a = g["attrs"]
     permits = g["permits"]
-    parcel, addr = _get(a, feed, "parcel"), _get(a, feed, "address")
+    parcel, addr = parcel_of(a, feed), _get(a, feed, "address")
     owner = _get(a, feed, "owner")
     latest = permits[0]["date"].date().isoformat() if permits and permits[0]["date"] else None
     raw: dict[str, Any] = {"demolition_permit": {
@@ -170,6 +187,9 @@ def to_listing(g: dict, *, now: Optional[datetime] = None) -> Listing:
         "permits": [{**p, "date": p["date"].date().isoformat() if p["date"] else None} for p in permits[:10]],
         "source": SLUG,
     }}
+    short = _get(a, feed, "parcel")
+    if short and short != parcel:
+        raw["demolition_permit"]["county_parcel_id"] = short
     if "mail" in feed.m:
         mail = owner_mailing(owner, [a.get(f) for f in feed.m["mail"]],
                              a.get(feed.m.get("mail_state") or ""), addr, parcel, "NC",
