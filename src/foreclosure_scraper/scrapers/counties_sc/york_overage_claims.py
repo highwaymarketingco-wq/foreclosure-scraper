@@ -49,6 +49,14 @@ from ...parcel_cache import lookup as _parcel_lookup
 
 log = structlog.get_logger()
 
+#: An ordinary, complete browser User-Agent. The bare "Mozilla/5.0" this module sent
+#: until 2026-10-08 is now answered 403 by the county site's Cloudflare front (measured
+#: 2026-10-08 on yorkcountysc.gov and orangeburgcounty.org DocumentCenter files: bare
+#: UA 403, full UA 200, same host, same minute, no challenge page either way).
+_HEADERS = {"User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                           "AppleWebKit/537.36 (KHTML, like Gecko) "
+                           "Chrome/126.0.0.0 Safari/537.36")}
+
 PDF_URL = "https://www.yorkcountysc.gov/DocumentCenter/View/2828/OVERAGE-CLAIM-LIST"
 
 MAP_RE = re.compile(r"^\d{3}-\d{2}-\d{2}-\d{3}$")
@@ -150,7 +158,7 @@ class YorkOverageClaims(BaseScraper):
         out: list[Listing] = []
         try:
             async with httpx.AsyncClient(timeout=self.timeout_s, follow_redirects=True) as c:
-                resp = await c.get(PDF_URL, headers={"User-Agent": "Mozilla/5.0"})
+                resp = await c.get(PDF_URL, headers=_HEADERS)
                 resp.raise_for_status()
                 pdf_bytes = resp.content
         except Exception as exc:

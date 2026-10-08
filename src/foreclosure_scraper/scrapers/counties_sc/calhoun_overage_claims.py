@@ -70,6 +70,14 @@ from ...parcel_cache import lookup as _parcel_lookup
 
 log = structlog.get_logger()
 
+#: An ordinary, complete browser User-Agent. The bare "Mozilla/5.0" this module sent
+#: until 2026-10-08 is now answered 403 by the county site's Cloudflare front (measured
+#: 2026-10-08 on yorkcountysc.gov and orangeburgcounty.org DocumentCenter files: bare
+#: UA 403, full UA 200, same host, same minute, no challenge page either way).
+_HEADERS = {"User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                           "AppleWebKit/537.36 (KHTML, like Gecko) "
+                           "Chrome/126.0.0.0 Safari/537.36")}
+
 HUB_URL = "https://calhouncounty.sc.gov/departments/tax-collector"
 
 #: Direct document URLs, live-verified 2026-10-04. Hub-page discovery below
@@ -151,7 +159,7 @@ async def _discover_new_docs(c: httpx.AsyncClient, have: set[str]) -> list[tuple
     written, without a code change."""
     found: list[tuple[str, str]] = []
     try:
-        resp = await c.get(HUB_URL, headers={"User-Agent": "Mozilla/5.0"})
+        resp = await c.get(HUB_URL, headers=_HEADERS)
         resp.raise_for_status()
     except Exception as exc:  # noqa: BLE001
         log.warning("calhoun_overage.hub_fetch_fail", error=str(exc)[:160])
@@ -194,7 +202,7 @@ class CalhounOverageClaims(BaseScraper):
 
             for url, year in docs:
                 try:
-                    resp = await c.get(url, headers={"User-Agent": "Mozilla/5.0"})
+                    resp = await c.get(url, headers=_HEADERS)
                     resp.raise_for_status()
                     data = resp.content
                 except Exception as exc:  # noqa: BLE001

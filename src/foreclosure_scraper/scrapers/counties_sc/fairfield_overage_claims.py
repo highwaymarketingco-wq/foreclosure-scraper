@@ -63,6 +63,14 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
+#: An ordinary, complete browser User-Agent. The bare "Mozilla/5.0" this module sent
+#: until 2026-10-08 is now answered 403 by the county site's Cloudflare front (measured
+#: 2026-10-08 on yorkcountysc.gov and orangeburgcounty.org DocumentCenter files: bare
+#: UA 403, full UA 200, same host, same minute, no challenge page either way).
+_HEADERS = {"User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                           "AppleWebKit/537.36 (KHTML, like Gecko) "
+                           "Chrome/126.0.0.0 Safari/537.36")}
+
 HUB_URL = "https://www.fairfieldsc.com/departments/tax-collector"
 #: Direct fallback, live-verified 2026-10-04, used only if hub-page discovery
 #: (which reads the real <a> off the live page) fails outright.
@@ -122,7 +130,7 @@ async def _discover_doc_url(c: httpx.AsyncClient) -> str:
     form, not a roster). Falls back to FALLBACK_DOC_URL if the page is
     unreachable or no longer carries a matching link."""
     try:
-        resp = await c.get(HUB_URL, headers={"User-Agent": "Mozilla/5.0"})
+        resp = await c.get(HUB_URL, headers=_HEADERS)
         resp.raise_for_status()
     except Exception as exc:  # noqa: BLE001
         log.warning("fairfield_overage.hub_fetch_fail", error=str(exc)[:160])
@@ -156,7 +164,7 @@ class FairfieldOverageClaims(BaseScraper):
         async with httpx.AsyncClient(timeout=self.timeout_s, follow_redirects=True) as c:
             doc_url = await _discover_doc_url(c)
             try:
-                resp = await c.get(doc_url, headers={"User-Agent": "Mozilla/5.0"})
+                resp = await c.get(doc_url, headers=_HEADERS)
                 resp.raise_for_status()
                 data = resp.content
             except Exception as exc:  # noqa: BLE001
