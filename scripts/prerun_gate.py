@@ -377,11 +377,20 @@ def check_suite(repo: Path, checkpoint: Path | None) -> tuple[str, str]:
     ck = checkpoint if checkpoint is not None else repo / "data" / "checkpoint"
     out = repo / "data" / "prerun_gate" / "suite_result.json"
     cmd = [sys.executable, str(repo / "scripts" / "audit_suite.py"), "--out", str(out)]
-    if (Path(ck) / "board.json.gz").exists():
+    board_man = repo / "docs" / "board.manifest.json"
+    ck_board = Path(ck) / "board.json.gz"
+    stale_ck = (checkpoint is None and ck_board.exists() and board_man.exists()
+                and ck_board.stat().st_mtime < board_man.stat().st_mtime)
+    if ck_board.exists() and not stale_ck:
         cmd += ["--checkpoint", str(ck)]
-        what = f"checkpoint {ck}"
+        try:
+            m = json.loads((Path(ck) / "manifest.json").read_text())
+            what = f"checkpoint {ck} (phase {m.get('phase')}, saved {m.get('saved_at')})"
+        except (OSError, ValueError):
+            what = f"checkpoint {ck}"
     else:
-        what = "the published board (no checkpoint here)"
+        what = ("the published board (the checkpoint here is older than it)" if stale_ck
+                else "the published board (no checkpoint here)")
     try:
         r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=7200)
     except subprocess.TimeoutExpired:

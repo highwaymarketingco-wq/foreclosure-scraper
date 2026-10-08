@@ -1,0 +1,439 @@
+{
+ "generated_at": "2026-10-08T21:35:45+00:00",
+ "source": "board:/Users/cashhigh/foreclosure-scraper/docs",
+ "rows": 350013,
+ "seconds": 125.6,
+ "peak_rss_mb": 256.0,
+ "ok": false,
+ "not_ok": [
+  "block-binding-family-gis",
+  "block-binding-family-owner-contact",
+  "block-binding-family-deed-sale",
+  "block-binding-family-photo",
+  "block-binding-family-court-lien",
+  "block-binding-family-person-match",
+  "block-binding-family-code-site",
+  "block-binding-family-resolution",
+  "block-binding-family-other",
+  "block-binding-a-shared-copy",
+  "block-binding-b-foreign-county",
+  "block-binding-c-other-parcel",
+  "block-binding-d-other-person",
+  "block-binding-fallback-point",
+  "block-binding-e-fused-rows",
+  "docs-per-lead-doc-outcome",
+  "docs-roster-rows-read",
+  "docs-dot-county-attempted",
+  "images-hot-warm-graded",
+  "images-relative-photo-present",
+  "drops-short-parcel-county-native",
+  "pipeline-grade-equity-current",
+  "pipeline-combo-matches-tax",
+  "pipeline-run-health-counts",
+  "source-county-refreshed"
+ ],
+ "checks": [
+  {
+   "name": "block-binding-family-gis",
+   "module": "block_binding",
+   "checked": 154733,
+   "violations": 8212,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-family-owner-contact",
+   "module": "block_binding",
+   "checked": 207632,
+   "violations": 22317,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-family-deed-sale",
+   "module": "block_binding",
+   "checked": 90708,
+   "violations": 5288,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-family-photo",
+   "module": "block_binding",
+   "checked": 88957,
+   "violations": 3726,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-family-court-lien",
+   "module": "block_binding",
+   "checked": 105246,
+   "violations": 367,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-family-person-match",
+   "module": "block_binding",
+   "checked": 17844,
+   "violations": 3146,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-family-code-site",
+   "module": "block_binding",
+   "checked": 93371,
+   "violations": 313,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-family-resolution",
+   "module": "block_binding",
+   "checked": 46503,
+   "violations": 461,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-family-other",
+   "module": "block_binding",
+   "checked": 29257,
+   "violations": 19,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-a-shared-copy",
+   "module": "block_binding",
+   "checked": 254601,
+   "violations": 21673,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-b-foreign-county",
+   "module": "block_binding",
+   "checked": 318590,
+   "violations": 109,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-c-other-parcel",
+   "module": "block_binding",
+   "checked": 318590,
+   "violations": 10222,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-d-other-person",
+   "module": "block_binding",
+   "checked": 318590,
+   "violations": 21034,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-fallback-point",
+   "module": "block_binding",
+   "checked": 318590,
+   "violations": 9016,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "block-binding-e-fused-rows",
+   "module": "block_binding",
+   "checked": 350013,
+   "violations": 2964,
+   "max_violations": 2000,
+   "ok": false
+  },
+  {
+   "name": "block-binding-e-parcel-two-counties",
+   "module": "block_binding",
+   "checked": 169286,
+   "violations": 341,
+   "max_violations": 400,
+   "ok": true
+  },
+  {
+   "name": "block-binding-e-row-county-vs-source",
+   "module": "block_binding",
+   "checked": 101828,
+   "violations": 18,
+   "max_violations": 20,
+   "ok": true
+  },
+  {
+   "name": "docs-processed-has-ledger-entry",
+   "module": "documents_images",
+   "checked": 21396,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "docs-per-lead-doc-outcome",
+   "module": "documents_images",
+   "checked": 207,
+   "violations": 169,
+   "max_violations": 4,
+   "ok": false
+  },
+  {
+   "name": "docs-roster-rows-read",
+   "module": "documents_images",
+   "checked": 6522,
+   "violations": 5083,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "docs-dot-county-attempted",
+   "module": "documents_images",
+   "checked": 11,
+   "violations": 9,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "images-hot-warm-graded",
+   "module": "documents_images",
+   "checked": 12069,
+   "violations": 2659,
+   "max_violations": 603,
+   "ok": false
+  },
+  {
+   "name": "images-relative-photo-present",
+   "module": "documents_images",
+   "checked": 5291,
+   "violations": 817,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "docs-ocr-no-shared-stamp",
+   "module": "documents_images",
+   "checked": 34,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "docs-ocr-tax-not-judgment",
+   "module": "documents_images",
+   "checked": 0,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "docs-inventory",
+   "module": "documents_images",
+   "checked": 350013,
+   "violations": 0,
+   "max_violations": 1000000000,
+   "ok": true
+  },
+  {
+   "name": "drops-short-parcel-county-native",
+   "module": "drops_lineage",
+   "checked": 33806,
+   "violations": 1443,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "drops-situs-road-nulled",
+   "module": "drops_lineage",
+   "checked": 0,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "drops-dateless-filtered-source",
+   "module": "drops_lineage",
+   "checked": 296424,
+   "violations": 1,
+   "max_violations": 25,
+   "ok": true
+  },
+  {
+   "name": "drops-age-out-imminent",
+   "module": "drops_lineage",
+   "checked": 350013,
+   "violations": 467,
+   "max_violations": 2500,
+   "ok": true
+  },
+  {
+   "name": "drops-county-blank-source",
+   "module": "drops_lineage",
+   "checked": 350013,
+   "violations": 0,
+   "max_violations": 25,
+   "ok": true
+  },
+  {
+   "name": "drops-marker-bounds",
+   "module": "drops_lineage",
+   "checked": 350013,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "drops-low-value-parcel",
+   "module": "drops_lineage",
+   "checked": 0,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "lineage-gis-subkeys",
+   "module": "drops_lineage",
+   "checked": 143932,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "lineage-scorer-gated-columns",
+   "module": "drops_lineage",
+   "checked": 350013,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "pipeline-row-scored",
+   "module": "pipeline",
+   "checked": 350011,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "pipeline-row-valued",
+   "module": "pipeline",
+   "checked": 350013,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "pipeline-equity-tax-inputs",
+   "module": "pipeline",
+   "checked": 84580,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "pipeline-grade-equity-current",
+   "module": "pipeline",
+   "checked": 350013,
+   "violations": 70861,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "pipeline-combo-matches-tax",
+   "module": "pipeline",
+   "checked": 414,
+   "violations": 25,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "pipeline-tax-check-binding",
+   "module": "pipeline",
+   "checked": 0,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "pipeline-countyless-national",
+   "module": "pipeline",
+   "checked": 7289,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "pipeline-raw-keep",
+   "module": "pipeline",
+   "checked": 350013,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "pipeline-seen-order",
+   "module": "pipeline",
+   "checked": 350013,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "pipeline-run-health-counts",
+   "module": "pipeline",
+   "checked": 120,
+   "violations": 120,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "source-county-refreshed",
+   "module": "source_completeness",
+   "checked": 301932,
+   "violations": 53,
+   "max_violations": 0,
+   "ok": false
+  },
+  {
+   "name": "source-county-floor",
+   "module": "source_completeness",
+   "checked": 222174,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "source-cap-not-hit",
+   "module": "source_completeness",
+   "checked": 4761,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "version-heir-publishing-rule",
+   "module": "version_compare",
+   "checked": 350013,
+   "violations": 0,
+   "max_violations": 0,
+   "ok": true
+  },
+  {
+   "name": "version-join-identity",
+   "module": "version_compare",
+   "checked": 350013,
+   "violations": 47460,
+   "max_violations": 63002,
+   "ok": true
+  }
+ ],
+ "limited": null,
+ "invalid_checkpoint_rows": 0
+}
