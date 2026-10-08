@@ -1,9 +1,9 @@
 {
- "generated": "2026-10-07 17:51 EDT",
- "commit": "9edff1f3",
+ "generated": "2026-10-08 17:50 EDT",
+ "commit": "82860c43",
  "fingerprint": {
   "inputs": {
-   "docs/walls_register.json": "2b79619275454706",
+   "docs/walls_register.json": "327452fb256478b7",
    "docs/county_records/county_records_matrix.json": "3ff143d0ce5ff97b",
    "docs/county_records/nc_rod_platform_clusters.md": "aa876f9499cade01",
    "docs/county_records/sc_rod_platform_clusters.md": "a1031bf224f1ac1c",
@@ -131,8 +131,8 @@
  "inputs": [
   {
    "path": "docs/walls_register.json",
-   "sha": "2b79619275454706",
-   "date": "2026-10-07"
+   "sha": "327452fb256478b7",
+   "date": "2026-10-08 17:50 (file time)"
   },
   {
    "path": "docs/county_records/county_records_matrix.json",
