@@ -447,5 +447,20 @@ def test_funeral_rows_are_scoped_in_but_die_in_active_only_without_the_whitelist
 
 
 def test_funeral_rows_are_name_resolver_targets(monkeypatch):
+    """Anderson SC is served from the bulk assessor roll (data/sc_parcel_mailing.db), which is
+    gitignored and exists only on the operator's machine. Without pinning it this test passed on
+    the Mac and failed in CI on every push from 2026-10-07 (the roll is absent on the runner), so
+    the roll's presence is a fixture here, and the no-roll case is asserted separately below."""
+    from foreclosure_scraper import sc_parcel_mailing as pm
     from foreclosure_scraper.enrichment_resolve_name_to_property import _is_target
+    monkeypatch.setattr(pm, "covered_counties", lambda: {("SC", "Anderson")})
     assert all(_is_target(li) for li in _funeral_rows(monkeypatch))
+
+
+def test_funeral_rows_are_not_targets_when_the_anderson_roll_is_absent(monkeypatch):
+    """Without the roll on disk Anderson is a wall again (no free owner-name search), so the rows
+    must not be targeted: the resolver would only burn budget on a guaranteed miss."""
+    from foreclosure_scraper import sc_parcel_mailing as pm
+    from foreclosure_scraper.enrichment_resolve_name_to_property import _is_target
+    monkeypatch.setattr(pm, "covered_counties", lambda: set())
+    assert not any(_is_target(li) for li in _funeral_rows(monkeypatch))
