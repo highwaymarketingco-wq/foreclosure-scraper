@@ -1914,10 +1914,11 @@
    "place": "Spartanburg County, SC",
    "name": "Spartanburg County website documents: Master in Equity sale roster, forfeited land list, tax sale list, deficiency and sale results",
    "kind": "A",
-   "wall": "Cloudflare 'Attention Required!' block page to scripts (2026-10-07). Four of our readers got 403 in today's run. If your own browser on the same network shows the same page, the block is on your internet address: use your phone on cellular data or wait a day.",
+   "wall": "Cloudflare 'Attention Required!' block page. Measured 2026-10-08 (audit 2026-10-09): the block is on the cloud server's datacenter address (403 on every run); a plain request from the office Mac returns the files (2,171-row tax sale list, 5-row forfeited land list). If your own browser shows the same page, use your phone on cellular data or wait a day.",
    "url": "https://www.spartanburgcounty.gov/DocumentCenter/View/3392",
    "what": "Spartanburg is our biggest county (about 18,000 rows). The monthly Master in Equity roster lists every foreclosure set for sale (25 to 30 a month, with case number, lender, owner and address). The forfeited land list and the yearly tax sale list (about 2,170 parcels) come from the same site. Your sheet shows Spartanburg's foreclosure-sale signal at 0.6%.",
    "steps": [
+    "<b>One decision first.</b> Tell Claude whether the Spartanburg readers (tax sale list, forfeited land, Master in Equity roster) may run from the office Mac's nightly lane; they make the same plain request your browser makes. If yes, nothing below is needed for those lists.",
     "Open each address in Chrome: Master in Equity roster <b>https://www.spartanburgcounty.gov/DocumentCenter/View/3392</b>; deficiency sales <b>https://www.spartanburgcounty.gov/DocumentCenter/View/11824</b>; forfeited land list <b>https://www.spartanburgcounty.gov/DocumentCenter/View/104130</b>; tax sale list <b>https://www.spartanburgcounty.gov/DocumentCenter/View/11161</b>.",
     "Each opens a PDF. Use <b>File, Save</b> (or the download arrow).",
     "Name them <b>spartanburg_sc_mie_&lt;date&gt;.pdf</b>, <b>spartanburg_sc_deficiency_&lt;date&gt;.pdf</b>, <b>spartanburg_sc_flc_&lt;date&gt;.pdf</b>, <b>spartanburg_sc_taxsale_&lt;date&gt;.pdf</b>.",
@@ -1950,7 +1951,9 @@
    "wall_class": "bot",
    "watch_sources": [
     "counties_sc.spartanburg_master_in_equity",
-    "counties_sc.spartanburg_flc"
+    "counties_sc.spartanburg_flc",
+    "counties_sc.spartanburg_delinquent_tax",
+    "counties_sc.sc_flc"
    ]
   },
   {
@@ -1999,6 +2002,68 @@
    ],
    "watch_sources": [
     "counties_sc.york_delinquent_tax"
+   ]
+  },
+  {
+   "id": "dc_ip_block",
+   "group": "county",
+   "place": "Rutherford, Edgecombe, Lee and Avery Counties, NC",
+   "name": "County websites that refuse the cloud server but open from a home connection",
+   "kind": "A",
+   "wall": "HTTP 403 to the cloud server's datacenter internet address on every run since 2026-10-07 (the county sites' hosting edge). The same plain request from the office Mac, with no challenge, no login and nothing solved, returns the page (measured 2026-10-08, audit 2026-10-09).",
+   "url": "https://www.rutherfordcountync.gov/departments/revenue_department_tax_administrator/index.php",
+   "what": "Rutherford's delinquent tax roll (about 9,300 parcels a run until 10/6; the board now holds 5,109 carried-over rows that age out after four missed runs), Rutherford's tax-foreclosure and upset-bid pages, Edgecombe's tax-foreclosure list (18 parcels), Lee County's delinquent real property list (about 2,700 leads) and Avery's property-for-sale page.",
+   "steps": [
+    "<b>One decision first.</b> Tell Claude whether these readers may run from the office Mac's nightly lane (the lane that already runs the court readers). They make the same plain request your browser makes; nothing is bypassed. If yes, Claude switches them (one line per reader) and nothing below is needed.",
+    "If no, once a month open each address in Chrome: Rutherford <b>https://www.rutherfordcountync.gov/departments/revenue_department_tax_administrator/index.php</b> and click 'Delinquent Tax Bills' (a spreadsheet); Edgecombe <b>https://www.edgecombecountync.gov/businesses/tax_collector/tax_foreclosure_list.php</b>; Lee <b>https://leecountync.gov/2025%20Delinquent%20Real%20Property%2001.22.2026.pdf</b> (or the newest delinquent list on Lee's tax page); Avery <b>https://www.averycountync.gov/departments/tax_assessors_office.php</b>, 'Property For Sale', only when a sale is announced.",
+    "Save each file (File, Save, or the download arrow; for the Edgecombe page use Save Page As, 'Web Page, HTML Only').",
+    "Name them <b>rutherford_nc_delinquent_&lt;date&gt;.xlsx</b>, <b>edgecombe_nc_taxforeclosure_&lt;date&gt;.html</b>, <b>lee_nc_delinquent_&lt;date&gt;.pdf</b>, put them in ~/Downloads and tell Claude."
+   ],
+   "pull": "The whole list each time.",
+   "save": "Files into ~/Downloads.",
+   "lane": "None as a drop folder; the existing readers parse the same files (Rutherford's reader reads the spreadsheet unchanged).",
+   "time": "About 5 minutes for all four.",
+   "often": "Monthly (Rutherford's roll is reposted rarely; Edgecombe and Avery when a sale is set).",
+   "gain": "Rutherford's whole delinquent roll stays on the board; Lee's 2,700 delinquent parcels reach it for the first time.",
+   "others": "County tax offices by phone or email for the current list.",
+   "minutes_month": 5,
+   "leads": "about 12,000 parcels across the four lists",
+   "state": "NC",
+   "county": "Rutherford",
+   "signal_columns": [
+    "two_year_delinquent",
+    "multi_year_delinquent_tax",
+    "tax_aging_surfaced",
+    "lt_tax_sale",
+    "lt_foreclosure_sale"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Rutherford"
+    ],
+    [
+     "NC",
+     "Edgecombe"
+    ],
+    [
+     "NC",
+     "Lee"
+    ],
+    [
+     "NC",
+     "Avery"
+    ]
+   ],
+   "short": "NC county sites (cloud block)",
+   "loads": "small",
+   "wall_class": "bot",
+   "watch_sources": [
+    "counties_nc.rutherford_tax",
+    "counties_nc.rutherford_foreclosure",
+    "counties_nc.edgecombe_tax_foreclosure",
+    "counties_nc.nc_tax_lien_ads",
+    "counties_nc.wnc_tax_foreclosures"
    ]
   },
   {
@@ -2908,8 +2973,8 @@
   "The old master list's 'CCHS decommissioned' line for Burke, Lincoln, Cleveland and Henderson is stale; those sites are live.",
   "NC eCourts search labels ('Advanced Filtering Options', 'File Date', 'Location') are from our notes, not re-read today. If a label differs, pick the closest match. Whether a saved NC estate list keeps the executor's name is not yet confirmed on a real save.",
   "southcarolinaprobate.net refused our plain request with a 403 today, even with a normal browser identity; we did not open it in a real browser. If your browser also gets 403, the site is down for everyone.",
-  "Spartanburg and York county websites answered our single polite request with Cloudflare 'Attention Required!' today. This may be a block on this Mac's internet address after our readers' runs, in which case your own browser on the same network could see it too.",
-  "Rutherford, Edgecombe and Avery county websites gave our readers 403 in the morning run but answered a single polite request normally later; treated as temporary, no card.",
+  "Spartanburg and York county websites: re-measured 2026-10-08, the block is on the cloud server's address; the office Mac's plain request with a complete browser identity gets the files. York and Orangeburg (same Cloudflare front) also refuse a bare 'Mozilla/5.0' identity from any address; our overage readers now send a complete one.",
+  "Rutherford, Edgecombe, Avery and Lee (NC) county websites: re-measured 2026-10-08 (audit 2026-10-09), the 403 is on the cloud server's datacenter address on every run, not temporary; the office Mac's plain request gets the pages. Card 'County websites that refuse the cloud server'.",
   "The ncnotices.com detail page: the source hunt calls it a terms click only; our reader saw a Google CAPTCHA on it in July. The card covers both.",
   "SC UCC search: an August note says $5 a search; the source hunt found ucconline.sc.gov open. Not checked further.",
   "SC Public Index: the lanes already on the board (the frozen lis pendens lane and the earlier sweeps, about 7,900 rows) were read through a stealth browser before today's probe found the 406 refusal. Whether those lanes keep running is for the engineer and the owner; this document treats the Index as hand-saved.",
@@ -2919,7 +2984,14 @@
   "Several readers are written to tick a Cloudflare box when one appears (always for the NC SoS UCC search and the old eCourts case-status reader; unless FORECLOSURE_NO_CF_SOLVE=1 is set for the qPublic, Cherokee SC and Buncombe card readers and two law-firm readers). An engineer should confirm this fits the rule that a bot check is never passed by code.",
   "Lead estimates marked 'estimate' are ours, not measured. Name-to-parcel matching was measured at about 29% automatic (2026-07).",
   "Prices for deed images in Buncombe, Polk, Gaston, Mecklenburg, Davidson, and for TitleSearcher, Richland, Cott RECORDhub, Docket Alarm, Tax Sale Resources and Goliath are not in our notes.",
-  "No sc_rod_platform_clusters.md existed when this was built; the SC county counts come from the county matrix."
+  "No sc_rod_platform_clusters.md existed when this was built; the SC county counts come from the county matrix.",
+  "NC eCourts judgment index (open search, no CAPTCHA): 13.8% of the 90-day hits carry the cause 'Multiple' and are left out, because the real causes are only on the case page behind the eCourts CAPTCHA (card 'NC court foreclosure cases' steps apply, for a short list only). The page caps do not bind (80,061 of 90,000 lis pendens hits, 104,580 of 120,000 divorce hits on 2026-10-08).",
+  "foreclosure.com refuses every page with an AWS 'VPN or proxy' 403, from the cloud server and from the office Mac (2026-10-08); its free view masks street numbers, so a manual pass adds only city and ZIP level leads. Not carded.",
+  "TownNews papers (Post and Courier family: Journal Scene, Berkeley Independent, Aiken Standard; Index-Journal; Carolina Coast): the platform answers 429 'Too Many Requests' when several of its papers are read in the same minute. Our readers now stop at the first 429 instead of retrying; spreading them across the run is a run-order change.",
+  "Catalis/Avalon SC tax sites (Pickens, Chester, Hampton, Fairfield, Aiken): the shared CDN rate-limits (429 then 403 in September); at the safe pace a run reads about 75 bills, Pickens only, and the other four counties are never reached. A separate long lane is a run decision.",
+  "NC DEQ land-use restriction layer (state contamination): needs an ArcGIS Online sign-in token since 2026-10; a person can browse the DEQ Land Use Restrictions search by hand. The public Brownfields point layer on the same server is an unwired partial substitute.",
+  "McCormick SC forfeited land: the list is printed only in the McCormick Messenger; the treasurer page carries none (2026-10-08).",
+  "Greenwood SC tax portal (corebtpay): off season it lists only PAID bills; the reader now stops after a short check and resumes when unpaid bills return (after January 15)."
  ],
  "sources_static": [
   "docs/MASTER_GAPS_WALLS_AND_MANUAL_LANES.md, docs/walls_register.md, docs/blocked_sources_forensic.md, docs/manual_source_inventory.md, docs/manual_playbook_and_limits.md, docs/honest_operator_manual.md, docs/operator_manual_manual_steps_and_paywalls_2026-10-04.md",
