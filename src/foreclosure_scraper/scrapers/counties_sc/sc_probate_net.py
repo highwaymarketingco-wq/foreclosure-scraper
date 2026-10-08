@@ -84,6 +84,7 @@ flip, so both are admissible per config.in_scope_distressed regardless.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 from datetime import datetime
 from typing import Iterable
@@ -536,9 +537,79 @@ async def _search_county(
     r2 = await client.post(BASE_URL, data=form)
     r2.raise_for_status()
 
-    if marriage:
-        return _parse_marriage(r2.text, county, state)
-    return _parse_probate(r2.text, county, state)
+    parse = _parse_marriage if marriage else _parse_probate
+    out = parse(r2.text, county, state)
+
+    # 2026-10-08 (source-completeness audit): the results grid pages at 20 rows
+    # (GridView pager, __doPostBack('<grid>', 'Page$N')) and only page 1 was ever
+    # read. Live 2026-10-08, Charleston Probate "Smith": pager Page$2..Page$5, and
+    # page 2 held 20 more estates, none on page 1. Follow the pager while the
+    # current page links to the next one.
+    grid = PRE + ("cgvMarriage" if marriage else "cgvCases")
+    html = r2.text
+    page = 1
+    while page < MAX_GRID_PAGES and f"Page${page + 1}" in _pager_pages(html, grid):
+        page += 1
+        await asyncio.sleep(GRID_PAGE_PAUSE_S)
+        pform = _hidden_fields(html)
+        pform["__EVENTTARGET"] = grid
+        pform["__EVENTARGUMENT"] = f"Page${page}"
+        pform[PRE + "ddlCounties"] = dropdown_value
+        pform[PRE + "tbLastName"] = surname
+        pform[PRE + "tbFirstName"] = ""
+        pform[PRE + "tbMiddleName"] = ""
+        pform[PRE + "tbCaseNumber"] = ""
+        pform[PRE + "rblPartyType"] = "0"
+        rp = await client.post(BASE_URL, data=pform)
+        rp.raise_for_status()
+        html = rp.text
+        out.extend(parse(html, county, state))
+    else:
+        if page >= MAX_GRID_PAGES and f"Page${page + 1}" in _pager_pages(html, grid):
+            log.warning("sc_probate_net.grid_page_cap", county=county, surname=surname,
+                        pages=page)
+    return out
+
+
+#: Pages of 20 read per (county, surname) search; a bound, not an expected size.
+MAX_GRID_PAGES = 25
+#: A CLOSED estate (or a marriage license) older than this is history, not a lead.
+#: Reading every grid page (above) reaches decades back: live 2026-10-08 Charleston
+#: "Smith" returned 98 estates filed 1987-2026, and 18 of the 20 on page 1 were
+#: Closed. An estate that is not closed is kept whatever its age. 0 turns it off.
+MAX_AGE_DAYS = int(os.environ.get("SC_PROBATE_NET_MAX_AGE_DAYS", "730"))
+
+
+def _parse_us_date(v: str | None) -> datetime | None:
+    try:
+        return datetime.strptime((v or "").strip(), "%m/%d/%Y")
+    except ValueError:
+        return None
+
+
+def is_current(li: Listing, now: datetime | None = None) -> bool:
+    """Keep an estate that is not closed, or any record dated inside MAX_AGE_DAYS."""
+    if MAX_AGE_DAYS <= 0:
+        return True
+    now = now or datetime.utcnow()
+    b = (li.raw or {}).get("sc_probate_net") or {}
+    if b.get("record_kind") == "probate":
+        if not (b.get("status") or "").strip().lower().startswith("closed"):
+            return True
+        dates = [b.get("filing_date"), b.get("appointment_date")]
+    else:
+        dates = [b.get("application_date"), b.get("marriage_date")]
+    parsed = [d for d in (_parse_us_date(x) for x in dates) if d]
+    if not parsed:
+        return b.get("record_kind") != "probate"   # an undated license is kept; an undated closed estate is not
+    return (now - max(parsed)).days <= MAX_AGE_DAYS
+GRID_PAGE_PAUSE_S = 1.0
+_PAGER_RE = re.compile(r"__doPostBack\((?:&#39;|')([^&']+)(?:&#39;|'),(?:&#39;|')(Page\$\d+)(?:&#39;|')\)")
+
+
+def _pager_pages(html: str, grid: str) -> set[str]:
+    """The 'Page$N' arguments the grid's pager links to on this page."""
+    return {arg for tgt, arg in _PAGER_RE.findall(html or "") if tgt == grid}
 
 
 class SCProbateNet(BaseScraper):
@@ -549,11 +620,13 @@ class SCProbateNet(BaseScraper):
     category = "probate"
     expected_min_count = 0  # Charleston/Dorchester/York post here today; the rest legit-empty
     requires_apify = False
-    timeout_s = 600.0
+    # 600 -> 900 with the grid pager (2026-10-08); rows are banked in
+    # self.partial so a timeout ships what was read instead of nothing.
+    timeout_s = 900.0
 
     async def fetch(self) -> Iterable[Listing]:
         cfg = RuntimeConfig.from_env()
-        out: list[Listing] = []
+        out: list[Listing] = self.partial
         # Dedupe across surname sweeps + counties on (county, kind, case#).
         seen: set[tuple] = set()
 
@@ -565,6 +638,7 @@ class SCProbateNet(BaseScraper):
             # Sequential per (county, surname) — compliant, one request at a time.
             for dropdown_value, county, state, marriage in COUNTIES:
                 county_hits = 0
+                county_stale = 0
                 for surname in SURNAMES:
                     try:
                         listings = await _search_county(
@@ -583,6 +657,9 @@ class SCProbateNet(BaseScraper):
                         if li.case_number and key in seen:
                             continue
                         seen.add(key)
+                        if not is_current(li):
+                            county_stale += 1
+                            continue
                         out.append(li)
                         county_hits += 1
                     # Be polite to the shared county server between searches.
@@ -590,5 +667,6 @@ class SCProbateNet(BaseScraper):
                 log.info(
                     "sc_probate_net.county_done",
                     county=county, marriage=marriage, count=county_hits,
+                    stale_closed_or_old=county_stale, max_age_days=MAX_AGE_DAYS,
                 )
         return out
