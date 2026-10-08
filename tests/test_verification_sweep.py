@@ -158,3 +158,27 @@ def test_source_filter(board):
     plan, _ = sw.select(board / "listings.json.gz", [_fake_verifier([])], {"tax_lien": L.Ledger("tax_lien")},
                         county=None, cap=10, now=NOW, sources={"s"})
     assert len(plan["tax_lien"]) == 6
+
+
+def test_a_verifiers_priority_orders_rows_within_a_tier(tmp_path):
+    """registry priority(row): the tax verifiers check the "2+ years and $500" rows first inside
+    a tier (_tax_common.flag_priority); the tier still comes first."""
+    from foreclosure_scraper.verification.verifiers import _tax_common as tc
+    flag = {"two_year_delinquent": {"is_two_year_plus": True}, "tax_owed": {"balance": 812.4}}
+    rows = [dict(_row("2000000001", "COLD")), dict(_row("2000000002", "COLD")),
+            dict(_row("2000000003", "WARM"))]
+    rows[1]["raw"] = {**rows[1]["raw"], **flag}
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "listings.json.gz").write_bytes(gzip.compress(json.dumps(rows).encode()))
+    sw = _load_script()
+    base = _fake_verifier([])
+    v = Verifier(name="fake_tax", signal="tax_lien", version="v1", ttl_days=30, applies=base.applies,
+                 verify=base.verify, priority_fn=tc.flag_priority)
+    plan, _ = sw.select(docs / "listings.json.gz", [v], {"tax_lien": L.Ledger("tax_lien")},
+                        county=None, cap=10, now=NOW)
+    assert [r["parcel_id"] for _p, _k, r, _v in plan["tax_lien"]] == \
+        ["2000000003", "2000000002", "2000000001"]
+    assert tc.two_years_and_500(rows[1]) and not tc.two_years_and_500(rows[0])
+    assert not tc.two_years_and_500({"raw": {"tax_aging_high": True, "tax_owed": {"balance": 499}}})
+    assert v.priority_of(rows[1]) == 0 and v.priority_of({"raw": "junk"}) == 1

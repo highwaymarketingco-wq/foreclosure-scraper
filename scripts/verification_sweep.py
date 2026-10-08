@@ -8,7 +8,8 @@ src/foreclosure_scraper/verification/verifiers/ (auto-discovered), WITHOUT writi
      ledger entry (found by the verifier's ledger_keys(): the property, or case id + property
      for a case-scoped verifier) is missing, past the verifier's TTL_DAYS (RETRY_DAYS for an unconfirmed
      answer), or was checked by another verifier VERSION. Candidates are ranked HOT -> WARM ->
-     COLD, then never-checked first, then oldest check, and only the top --max-rows per
+     COLD, then the verifier's own priority(row) (the tax verifiers: the "2+ years and $500"
+     flag first), then never-checked first, then oldest check, and only the top --max-rows per
      signal are kept (a bounded heap: memory does not grow with the backlog).
   2. Each candidate goes through its verifier's verify(row, Fetcher): http_client's per-host
      throttle plus VERIFY_HOST_MIN_INTERVAL_S (2.0 s) spacing per host (one slot for all
@@ -122,9 +123,12 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
                 continue
             lt = parse_ts(((entry or {}).get("latest") or {}).get("checked_at"))
             order += 1
-            # best first: HOT -> WARM -> COLD, never checked, oldest check, board order.
+            # best first: HOT -> WARM -> COLD, the verifier's own priority (the tax verifiers:
+            # the "2+ years and $500" flag first), never checked, oldest check, board order.
             # heapq is a min-heap: store the negated priority so h[0] is the WORST kept row.
-            prio = (tier_rank(rec), 0 if lt is None else 1, lt.timestamp() if lt else 0.0, order)
+            pri = v.priority_of(rec) if hasattr(v, "priority_of") else 0
+            prio = (tier_rank(rec), pri, 0 if lt is None else 1, lt.timestamp() if lt else 0.0,
+                    order)
             item = (tuple(-x for x in prio), keys[0], rec, v.name)
             h, seen = heaps[v.signal], inheap[v.signal]
             slots = seen.setdefault(keys[0], {})        # address identity -> queued item

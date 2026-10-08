@@ -319,6 +319,41 @@ def claims_property_tax(row: Any, own_block: bool) -> bool:
     return listing_tax_claim(row) or aging_claim(row) or bool(own_block)
 
 
+#: the dashboard's "tax delinquent 2+ years and $500 or more" rows, checked first within a tier
+FLAG_MIN_AMOUNT = 500.0
+
+
+def _num(v: Any) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def two_years_and_500(row: Any) -> bool:
+    """The row carries the "2+ late years and $500 or more" tax flag: a 2+ year delinquency
+    (raw tax_aging_high, a scraper's two_year_delinquent, or a measured tax_aging_surfaced count)
+    and a tax balance (tax_owed.balance or amount_owed.value) of FLAG_MIN_AMOUNT or more. A
+    sweep-order hint only (flag_priority), never a verdict."""
+    raw = raw_of(row)
+    ty, ta = raw.get("two_year_delinquent"), raw.get("tax_aging_surfaced")
+    two = (raw.get("tax_aging_high") is True
+           or (isinstance(ty, dict) and bool(ty.get("is_two_year_plus")))
+           or (isinstance(ta, dict) and ta.get("source") != "default"
+               and _num(ta.get("years_delinquent")) >= 2))
+    if not two:
+        return False
+    to, ao = raw.get("tax_owed"), raw.get("amount_owed")
+    amount = max(_num(to.get("balance")) if isinstance(to, dict) else 0.0,
+                 _num(ao.get("value")) if isinstance(ao, dict) else 0.0)
+    return amount >= FLAG_MIN_AMOUNT
+
+
+def flag_priority(row: Any) -> int:
+    """A tax verifier's priority(row) (registry.py): 0 for a two_years_and_500 row, else 1."""
+    return 0 if two_years_and_500(row) else 1
+
+
 def claimed_years_common(row: Any) -> set[int]:
     """Levy years the board's derived blocks say were delinquent."""
     raw = raw_of(row)

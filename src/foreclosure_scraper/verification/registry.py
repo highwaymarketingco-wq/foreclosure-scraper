@@ -34,6 +34,13 @@ Optional:
                                "verifier_error" (a crash or a per-row timeout) is always one
                                (ledger.SWEEP_TRANSIENT_REASONS).
     TRANSIENT_RETRY_DAYS: float  default 0.25 (6 hours)
+    priority(row) -> int       pure, no I/O: within a tier, rows with a lower number are checked
+                               first (default 0 for every row). The tax verifiers put the
+                               dashboard's "tax delinquent 2+ years and $500 or more" rows first
+                               (_tax_common.flag_priority): on 2026-10-08 a 6,000-row sweep filled
+                               its cap HOT -> WARM -> COLD in board order and never reached the
+                               COLD flagged rows of Kershaw, Lexington, Williamsburg and a dozen
+                               more counties.
     WALL: bool                True for a ToS/CAPTCHA-walled signal whose verify() never
                                touches the network and always returns "wall"
     ROW_SUMMARY_EXCLUDE: tuple core.row_summary() fields the sweep leaves out of this signal's
@@ -116,6 +123,17 @@ class Verifier:
     governs_fn: Optional[Callable[[dict], Any]] = None   # per-record governs (module governs_for)
     transient_reasons: tuple[str, ...] = ()   # TRANSIENT_REASONS (source health, not the row)
     transient_retry_days: float = DEFAULT_TRANSIENT_RETRY_DAYS
+    priority_fn: Optional[Callable[[Any], Any]] = None    # module priority(row)
+
+    def priority_of(self, row: Any) -> int:
+        """The row's priority within its tier (lower first; module priority(row), else 0). Never
+        raises."""
+        if self.priority_fn is None:
+            return 0
+        try:
+            return int(self.priority_fn(row))
+        except Exception:  # noqa: BLE001 - an odd row keeps the default place
+            return 0
 
     def is_transient(self, record: Any) -> bool:
         """True for an `unconfirmed` answer whose reason is about the source's health at check
@@ -215,6 +233,9 @@ def from_module(mod: Any, name: Optional[str] = None) -> Verifier:
     trd = getattr(mod, "TRANSIENT_RETRY_DAYS", DEFAULT_TRANSIENT_RETRY_DAYS)
     if not isinstance(trd, (int, float)) or trd < 0:
         problems.append("TRANSIENT_RETRY_DAYS must be a number >= 0")
+    pr = getattr(mod, "priority", None)
+    if pr is not None and not callable(pr):
+        problems.append("priority must be a function of the row")
     if problems:
         raise ContractError(f"{name}: " + "; ".join(problems))
     return Verifier(name=name, signal=sig, version=ver, ttl_days=float(ttl), applies=ap,
@@ -223,7 +244,7 @@ def from_module(mod: Any, name: Optional[str] = None) -> Verifier:
                     wall=bool(getattr(mod, "WALL", False)), module=mod, identity=ident,
                     case_identity=cid if ident == "case" else None, detail_keys=tuple(dk),
                     governs_fn=gf, transient_reasons=tuple(sorted(tr)),
-                    transient_retry_days=float(trd))
+                    transient_retry_days=float(trd), priority_fn=pr)
 
 
 def discover(package: str = PACKAGE) -> list[Verifier]:
