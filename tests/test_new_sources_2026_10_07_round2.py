@@ -307,3 +307,24 @@ def test_env_gates(monkeypatch):
                      (IR, IR.IredellDelinquentTax), (WK, WK.WakeCodeCases), (ADS, ADS.NCTaxLienAds)):
         monkeypatch.setenv(mod.ENV_OFF, "0")
         assert asyncio.run(cls().fetch()) == []
+
+
+
+def test_cumberland_placeholder_situs_never_stays_in_the_owner():
+    """The ad prints a parcel with no situs as '0 ? DR UNINCORPORATED' or '0 N/A DR' (audit
+    2026-10-09: 5 of 30 sampled rows carried it in owner_name). Made-up names."""
+    assert CU.split_owner_situs("DOE JANE Q 0 ? DR UNINCORPORATED") == ("DOE JANE Q", None)
+    assert CU.split_owner_situs("SAMPLE CORA B 0 N/A DR") == ("SAMPLE CORA B", None)
+    assert CU.split_owner_situs("SAMPLE CORA B 12 EXAMPLE RD FAYETTEVILLE NC 28301") == \
+        ("SAMPLE CORA B", "12 EXAMPLE RD")
+
+
+
+def test_wake_boilerplate_and_department_names_are_not_damage():
+    """Audit 2026-10-09: a referral's 'code violations or life safety issues' boilerplate is not an
+    unsafe structure, and a 'fire services report' / fire-marshal referral is not fire damage."""
+    assert WK.classify("VIO - Zoning", "Site visit for solid waste; check for code violations or "
+                       "life safety issues") is None
+    assert WK.classify("VIO - Zoning", "Tree fell on shed, see fire services report") is None
+    assert WK.classify("VIO - Zoning", "Fire marshal referral: unpermitted renovation") is None
+    assert WK.classify("VIO - Zoning", "House fire, roof burned, unsafe to enter") == ["fire_damage", "unsafe"]

@@ -104,10 +104,18 @@ def split_address(addr: Optional[str]) -> tuple[Optional[str], Optional[str], Op
 
 
 def _epoch_ms(v: Any) -> Optional[datetime]:
+    """The layer stores dispatch times in UTC (dateFieldsTimeReference UTC); the fire happened on
+    the LOCAL (Eastern) date: an evening dispatch read as UTC landed on the next day (2 of 30
+    sampled rows on 10/8; audit 2026-10-09 additions_verify)."""
     try:
-        return datetime.fromtimestamp(int(v) / 1000, tz=timezone.utc).replace(tzinfo=None)
+        utc = datetime.fromtimestamp(int(v) / 1000, tz=timezone.utc)
     except (TypeError, ValueError, OverflowError, OSError):
         return None
+    try:
+        from zoneinfo import ZoneInfo
+        return utc.astimezone(ZoneInfo("America/New_York")).replace(tzinfo=None)
+    except Exception:  # noqa: BLE001 - no tz database: keep UTC rather than lose the date
+        return utc.replace(tzinfo=None)
 
 
 def _type_label(a: dict) -> Optional[str]:

@@ -85,9 +85,19 @@ def parse_text(text: str) -> list[dict]:
     return out
 
 
+#: The ad prints a parcel with no situs as "0 ? DR UNINCORPORATED" or "0 N/A DR": the placeholder
+#: is not an address and must not stay in the owner (5 of 30 sampled rows on 10/8; audit
+#: 2026-10-09 additions_verify).
+_PLACEHOLDER_SITUS = re.compile(r"\s+0+\s+(?:\?+|N\s*/\s*A|UNKNOWN)(?:\s+[A-Z]{2,5})?(?:\s+UNINCORPORATED)?"
+                                r"(?:\s+NC)?(?:\s+\d{5}(?:-\d{4})?)?\s*$", re.I)
+
+
 def split_owner_situs(body: str) -> tuple[Optional[str], Optional[str]]:
     body = re.sub(r"\s+", " ", body or "").strip()
     core = _TAIL.sub("", body).strip()
+    ph = _PLACEHOLDER_SITUS.search(core)
+    if ph:
+        return (core[: ph.start()].strip(" ,") or None), None
     hits = list(_STREET.finditer(core))
     if not hits:
         return (core or None), None

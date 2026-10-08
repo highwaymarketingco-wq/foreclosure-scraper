@@ -300,3 +300,10 @@ def test_kinston_reads_only_the_demolition_layer(monkeypatch):
     out = asyncio.run(KD.KinstonProposedDemolition().fetch())
     assert len(out) == 1 and calls[0][0].endswith("FeatureServer/0")
     assert "*" not in KD.FIELDS
+
+
+
+def test_raleigh_dispatch_date_is_the_local_date():
+    """2026-01-01 01:30 UTC is the evening of 2025-12-31 in Raleigh (audit 2026-10-09)."""
+    d = RF._epoch_ms(1767231000000)
+    assert d is not None and d.date().isoformat() == "2025-12-31" and d.hour == 20

@@ -49,6 +49,14 @@ FIELDS = ("CASE_NUMBER", "OPENED_DATE", "DISTRICT", "CASE_STATUS", "CASE_TYPE", 
 OPEN_STATUSES = ("In Progress", "Escalated", "Escalated to Code Case")
 ALWAYS = ("VIO - Building Inspections", "VIO - Wastewater")
 
+#: Wording that names a department, a report or a form, not the property's condition: 4 of 30
+#: sampled rows on 10/8 were tagged unsafe from the boilerplate "code violations or life safety
+#: issues" of a site-visit referral, or fire_damage from "fire services report" / a fire-marshal
+#: referral (audit 2026-10-09 additions_verify).
+_BOILERPLATE = re.compile(r"code violations? or life safety issues?|"
+                          r"\bfire\s+(?:services?|marshal'?s?|department|dept\.?|inspector|prevention|"
+                          r"code|referral|report)\b", re.I)
+
 _STRUCT = {
     "fire_damage": re.compile(r"\bfire\b|burn", re.I),
     "collapse": re.compile(r"collap", re.I),
@@ -66,7 +74,8 @@ WHERE = "CASE_STATUS IN ({})".format(",".join(f"'{s}'" for s in OPEN_STATUSES))
 
 def classify(case_type: Optional[str], description: Optional[str]) -> Optional[list[str]]:
     """The structural categories a case belongs to, or None when it is not distress."""
-    tags = [k for k, rx in _STRUCT.items() if rx.search(description or "")]
+    text = _BOILERPLATE.sub(" ", description or "")
+    tags = [k for k, rx in _STRUCT.items() if rx.search(text)]
     if _REQUEST.search(description or "") and not set(tags) & _SEVERE:
         return None      # an owner's / contractor's own repair-inspection request, not a violation
     if (case_type or "") in ALWAYS:
