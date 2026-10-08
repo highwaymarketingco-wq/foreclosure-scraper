@@ -15,7 +15,7 @@ or a 403 / 429 stops the reader for the run (see _obit_common.wall_reason). An o
 today it is open. robots.txt disallows only PDF, checkout and add-obituary paths.
 
 WHAT A RUN DOES. Walk the NC and SC listing pages newest first (ECHOVITA_MAX_PAGES a state, default
-12, about three days of deaths), stopping early once a whole page is already in the private store.
+40, about a week of postings), stopping early once a whole page is already in the private store.
 Every card becomes a row (name, residence city -> county, age, dates). Obituary pages are then
 read for the survivor list, Western NC + Upstate SC footprint counties first, then the rest, up to
 ECHOVITA_MAX_DETAIL a run (default 120); one already stored with its survivors is not re-read.
@@ -24,6 +24,15 @@ Same row shape and privacy split as the other obituary readers (_obit_common.py)
 ride in raw['obituary_private'] and never reach the public board.
 
 Gate off with FORECLOSURE_ECHOVITA=0.
+
+SOURCE-COMPLETENESS AUDIT (2026-10-08). The VM's first run returned 576 rows = 2 states x 12 pages
+x 24 cards: the page cap bound exactly, while the listing runs far deeper (page 40 of the NC listing
+was live that day, its cards dated about 8 days back). A binding cap is worse than a short run: after
+a gap between runs longer than 12 pages of postings, the pages past the cap are never read, and the
+next run stops at the first page already in the store, so that band of deaths is skipped for good.
+The caught-up stop already ends a normal run early, so the default cap is now 40 pages a state
+(about a week of postings); a run that is caught up costs what it did, a run after a gap reads at most
+56 more pages (about 2 s each).
 """
 from __future__ import annotations
 
@@ -44,7 +53,7 @@ log = structlog.get_logger()
 
 BASE = "https://www.echovita.com"
 STATES = {"nc": "NC", "sc": "SC"}
-MAX_PAGES = int(os.environ.get("ECHOVITA_MAX_PAGES", "12"))
+MAX_PAGES = int(os.environ.get("ECHOVITA_MAX_PAGES", "40"))
 MAX_DETAIL = int(os.environ.get("ECHOVITA_MAX_DETAIL", "120"))
 CORE = {("NC", c.name) for c in NC_COUNTIES} | {("SC", c.name) for c in SC_COUNTIES}
 
