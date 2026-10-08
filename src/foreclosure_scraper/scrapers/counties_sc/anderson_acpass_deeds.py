@@ -57,6 +57,7 @@ legal-record events, not scheduled auctions — so the slug is whitelisted in
 """
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime, timedelta
 from typing import Iterable
@@ -78,12 +79,22 @@ _DETAIL_CGI = f"{_BASE}/deddetail1.cgi"
 #: code -> human label. The live TYPE column already spells these out, but
 #: this drives which codes get queried and is stamped into raw[] for a code
 #: fetched with 0 rows (where the live label is never observed).
-CODES: dict[str, str] = {"020": "POA", "195": "COURT ORDER"}
+#: COURT ORDER runs FIRST: it is small and carries the heir orders.
+CODES: dict[str, str] = {"195": "COURT ORDER", "020": "POA"}
 
 # Matches the 24-month probe window in docs/enumeration_r4/r4_deed_mining.md
-# (020 is paged/high-volume there; 195 was "finite", 17 rows in 24 months as
-# of 2026-08-03).
+# (195 was "finite", 17 rows in 24 months as of 2026-08-03, 17 again on 2026-10-08).
 _LOOKBACK_DAYS = 730
+# 020 POA is high volume and the search lists it OLDEST first: on 2026-10-08 the
+# first 25-row page of the 730-day window covered only 3 days (about 8 a day, so
+# several thousand rows). With one detail GET per row that sweep could not finish
+# inside the timeout (TIMEOUT with 0 rows on 10/7 and 10/8), and the page cap would
+# have kept the oldest rows. POA reads a recent window instead (about 170 rows
+# and 180 requests at 30 days).
+_LOOKBACK_DAYS_BY_CODE: dict[str, int] = {
+    "195": _LOOKBACK_DAYS,
+    "020": int(os.environ.get("ANDERSON_ACPASS_POA_DAYS", "30")),
+}
 # Hard safety cap on pagination per code: 25 rows/page, so this bounds a
 # single code's sweep to 1,000 rows even if the real total has grown well
 # past the research snapshot.
@@ -308,20 +319,23 @@ class AndersonAcpassDeeds(BaseScraper):
     slug = "counties_sc.anderson_acpass_deeds"
     name = "Anderson County (SC) ACPASS deed search (POA + Court Order)"
     category = "county_rod"
-    timeout_s = 240.0
+    # About 200 requests at the shared client's 0.8-1.5 s per-host spacing.
+    timeout_s = 480.0
     # 195 COURT ORDER alone was a thin 17 rows / 24 months as of 2026-08-03 —
     # too thin to set a nonzero floor without false-flagging a quiet month.
     expected_min_count = 0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
+        # Rows go into self.partial as they are built, so a soft timeout ships them.
+        out = self.partial
         today = datetime.utcnow()
-        from_str = (today - timedelta(days=_LOOKBACK_DAYS)).strftime("%m/%d/%Y")
         to_str = today.strftime("%m/%d/%Y")
         detail_budget = _MAX_DETAIL_FETCHES
 
         async with client(timeout=30.0, headers={"User-Agent": _UA}) as c:
             for code, label in CODES.items():
+                days = _LOOKBACK_DAYS_BY_CODE.get(code, _LOOKBACK_DAYS)
+                from_str = (today - timedelta(days=days)).strftime("%m/%d/%Y")
                 try:
                     rows = await _fetch_type_code(c, code, from_str, to_str)
                 except Exception:
@@ -339,7 +353,6 @@ class AndersonAcpassDeeds(BaseScraper):
                         except Exception:
                             pass
                     out.append(_build_listing(self.slug, code, label, row, detail))
-                self.partial = list(out)
 
         log.info("anderson_acpass.done", total=len(out))
-        return out
+        return list(out)
