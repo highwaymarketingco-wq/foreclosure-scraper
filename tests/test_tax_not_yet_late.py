@@ -23,7 +23,8 @@ _NOW = datetime(2026, 10, 7)
 
 def _row(years, *, source="counties_sc.qpaybill_delinquent_roll", lt=ListingType.TAX_LIEN,
          state="SC", county="Oconee", owed=2400.0, extra=None):
-    raw = {"qpaybill_roll": {"balance_owed": owed, "years_unpaid": [str(y) for y in years],
+    raw = {"qpaybill_roll": {"identification_no": "000-00-00-001", "balance_owed": owed,
+                             "years_unpaid": [str(y) for y in years],
                              "all_unpaid_years": [str(y) for y in years]},
            "owner_mailing": {"mailing": "1 TEST LN ANYTOWN SC", "absentee": True},
            **(extra or {})}
@@ -92,7 +93,9 @@ def test_no_amount_owed_promotion_and_no_fullmer_credit():
 def test_a_judgment_labelled_copy_of_the_balance_is_dropped_too():
     # a non-roll row that merged a roll's balance: tax_owed beside a judgment-labelled copy of it
     li = _row([2026], lt=ListingType.ELDERLY_DISABLED, source="counties_x.some_exemption_list",
-              extra={"county_tax_list": {"tax_year": 2026, "total_due": 2400.0}})
+              extra={"county_tax_list": {"tax_year": 2026, "total_due": 2400.0},
+                     # merged in by dedupe, which records the source it came from
+                     "also_seen_in": [{"source": "counties_x.county_tax_list", "url": "https://x.invalid/2"}]})
     assert li.raw["tax_owed"]["balance"] == 2400.0
     li.raw["amount_owed"] = {"value": 2400.0, "source": "judgment", "is_actual_debt": True}
     assert "recorded_debt" not in _names(li)
@@ -142,7 +145,9 @@ def test_other_liens_are_not_property_tax_bills():
 # ---- raw['tax_big_old']: $7,000+ of property tax already late, 2+ levy years late ----------------
 
 def _big(years, owed, per_year=None, **kw):
-    extra = {"multi_year_delinquent_tax": {"years": years, "total_due": owed,
+    # parcel_key: the multi-year engine keys its block by the row's parcel (tax_binding: a block
+    # on a row of another source binds only by that parcel)
+    extra = {"multi_year_delinquent_tax": {"years": years, "total_due": owed, "parcel_key": "0000000001",
                                            "per_year": per_year or {}}}
     return _row([], extra=extra, owed=owed, **kw)
 

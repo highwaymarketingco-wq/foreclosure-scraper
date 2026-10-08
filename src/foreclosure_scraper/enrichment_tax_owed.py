@@ -22,6 +22,18 @@ Two passes, both free + pure-Python + idempotent:
      the resolver just pinned to a parcel that is ALSO on a delinquent-tax list
      inherits the owed balance — a strong, free motivated-seller signal.
 
+Only the row's OWN record counts (2026-10-08, tax_binding.py). Before pass 1,
+tax_binding.scrub_unbound_tax() removes every county property-tax block that is
+another property's record (another county, another parcel id, another address,
+or one block found on rows of two different properties) and the tax_owed /
+tax-aging fields derived from it: one roll entry had been copied onto 1,198 New
+Hanover rows and was stamped here, every run, as each row's own debt. Pass 2
+indexes only a balance read from a block, under a parcel key of at least
+MIN_CROSS_REF_KEY_LEN characters that one balance names (an id two different
+balances claim is left out), and never re-reads an old cross reference as the
+row's own (it is rebuilt or dropped). Gate the scrub off with
+FORECLOSURE_TAX_BINDING=0.
+
 Gate off with FORECLOSURE_TAX_OWED=0.
 """
 from __future__ import annotations
@@ -35,6 +47,7 @@ import structlog
 
 from . import tax_calendar as _cal
 from .models import Listing
+from .tax_binding import drop_derived_tax, scrub_unbound_tax, usable_id
 from .verification.verifiers._tax_common import NON_PROPERTY_TAX_SOURCES
 
 log = structlog.get_logger()
@@ -145,6 +158,32 @@ def _coerce_year(val) -> Optional[int]:
 
 def _extract(li: Listing) -> tuple[Optional[float], Optional[str], object]:
     """(balance, kind, year) from a lead's OWN source record, else (None, None, None)."""
+    bal, kind, year, _via = _extract_via(li)
+    return bal, kind, year
+
+
+def _extract_via(li: Listing) -> tuple[Optional[float], Optional[str], object, Optional[str]]:
+    """_extract() plus where the balance came from: 'block' (a source block on the row, passes A
+    and B) or 'carried' (an older tax_owed with no block left, pass C)."""
+    bal, kind, year = _extract_passes(li)
+    if bal is None:
+        return None, None, None, None
+    return bal, kind, year, ("carried" if _carried_only(li, bal) else "block")
+
+
+def _carried_only(li: Listing, bal: float) -> bool:
+    """No source block on the row states `bal`: the balance is an older tax_owed's (pass C)."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    for name, blk in raw.items():
+        if name == "tax_owed" or not isinstance(blk, dict):
+            continue
+        for k in set(_GENERIC_KEYS) | {v[1] for v in _SOURCES.values()}:
+            if _money(blk.get(k)) == bal:
+                return False
+    return True
+
+
+def _extract_passes(li: Listing) -> tuple[Optional[float], Optional[str], object]:
     raw = li.raw if isinstance(li.raw, dict) else {}
     src = li.source or ""
 
@@ -574,11 +613,25 @@ def enrich_tax_owed(listings: Iterable[Listing], today: Optional[date] = None) -
     listings = list(listings)
     stamped = 0
     index: dict[tuple, dict] = {}
+    ambiguous: set[tuple] = set()
     today = today or date.today()
+
+    # Pass 0 — a tax block that is another property's record leaves the row, with what came of it.
+    unbound: dict = {}
+    if os.environ.get("FORECLOSURE_TAX_BINDING", "1") != "0":
+        unbound = scrub_unbound_tax(listings)
+    # An old cross reference is never re-read as the row's own record (pass C would): pass 2
+    # rebuilds it from this run's rows, or the row has no balance any more.
+    old_xref: set[int] = set()
+    for li in listings:
+        to = li.raw.get("tax_owed") if isinstance(li.raw, dict) else None
+        if isinstance(to, dict) and to.get("basis") == "parcel_cross_ref":
+            li.raw.pop("tax_owed", None)
+            old_xref.add(id(li))
 
     # Pass 1 — normalize each tax lead's own amount.
     for li in listings:
-        bal, kind, year = _extract(li)
+        bal, kind, year, via = _extract_via(li)
         if bal is None:
             continue
         # Preserve existing year if _extract couldn't find one (source sub-dict stripped on re-run)
@@ -596,12 +649,18 @@ def enrich_tax_owed(listings: Iterable[Listing], today: Optional[date] = None) -
         years = _years_fields(status)
         li.raw["tax_owed"] = {
             "balance": bal, "kind": kind, "source": li.source,
-            "year": year, "basis": "own_record", **years,
+            "year": year, "basis": "own_record", "parcel": li.parcel_id, **years,
         }
         stamped += 1
-        if (li.parcel_id or "").strip():
+        key = _county_county_key(li)
+        if via == "block" and _cross_ref_key_ok(key[2]):
             entry = {"balance": bal, "kind": kind, "source": li.source, "year": year, **years}
-            index.setdefault(_county_county_key(li), entry)
+            if key not in index:
+                index[key] = entry
+            elif index[key]["balance"] != bal:
+                ambiguous.add(key)     # two different balances under one id: no cross reference
+    for key in ambiguous:
+        index.pop(key, None)
 
     # Pass 2 — cross-reference onto same-parcel leads from other sources.
     xref = 0
@@ -612,9 +671,31 @@ def enrich_tax_owed(listings: Iterable[Listing], today: Optional[date] = None) -
             continue
         hit = index.get(_county_county_key(li))
         if hit:
-            li.raw["tax_owed"] = {**hit, "basis": "parcel_cross_ref"}
+            li.raw["tax_owed"] = {**hit, "basis": "parcel_cross_ref", "parcel": li.parcel_id}
             xref += 1
+    # an old cross reference that was not rebuilt: what was derived from it goes too
+    xref_dropped = 0
+    for li in listings:
+        if id(li) in old_xref and isinstance(li.raw, dict) and not li.raw.get("tax_owed"):
+            drop_derived_tax(li.raw, drop_owed=True)
+            xref_dropped += 1
 
-    log.info("tax_owed.done", stamped=stamped, cross_referenced=xref,
-             parcels_indexed=len(index))
-    return {"stamped": stamped, "cross_referenced": xref, "parcels_indexed": len(index)}
+    out = {"stamped": stamped, "cross_referenced": xref, "parcels_indexed": len(index),
+           "cross_ref_keys_ambiguous": len(ambiguous), "cross_ref_dropped": xref_dropped}
+    if unbound:
+        out["unbound"] = {k: (dict(list(v.items())[:15]) if isinstance(v, dict) else v)
+                          for k, v in unbound.items()}
+    log.info("tax_owed.done", **{k: v for k, v in out.items() if k != "unbound"},
+             unbound_rows=unbound.get("rows_scrubbed", 0),
+             unbound_blocks=unbound.get("blocks_removed", 0))
+    return out
+
+
+#: Shortest parcel key pass 2 cross-references under: placeholder_twins.MIN_PARCEL_LEN, the length
+#: validation.py trusts a parcel id to be unique at. A 3 to 6 character roll account ('123', a PTS
+#: Cloud account) names different parcels in different numbering systems of one county.
+MIN_CROSS_REF_KEY_LEN = 7
+
+
+def _cross_ref_key_ok(key: str) -> bool:
+    return len(key) >= MIN_CROSS_REF_KEY_LEN and usable_id(key)

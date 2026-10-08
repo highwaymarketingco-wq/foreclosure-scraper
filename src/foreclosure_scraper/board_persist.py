@@ -136,7 +136,7 @@ from typing import Optional
 
 import structlog
 
-from . import condo_units, parcel_alias
+from . import condo_units, parcel_alias, tax_binding
 from .enrichment_pulled_sales import PULLED_RETENTION_WEEKS
 from .models import Listing
 from .row_keys import share_row
@@ -496,6 +496,19 @@ def drop_folded_prior(rows: list[Listing], stats: dict) -> list[Listing]:
     return out
 
 
+def _keep_fresh_tax(fresh: Listing, merged: Listing, stats: dict) -> None:
+    """Listing.merge() lets the PRIOR row's raw leaves win, so a prior copy of ANOTHER parcel's
+    county tax block (docs/HANDOFF.md, the 2026-10-08 tax-binding finding: one New Hanover roll
+    entry on 1,198 rows) overwrote this run's own scraped block every run. Put the fresh block back
+    where the merged one names a different parcel or county (tax_binding.keep_fresh_tax_blocks)."""
+    try:
+        n = tax_binding.keep_fresh_tax_blocks(fresh, merged)
+    except Exception:  # noqa: BLE001 - a merge is never lost to this check
+        return
+    if n:
+        stats["tax_block_fresh_kept"] = stats.get("tax_block_fresh_kept", 0) + n
+
+
 def merge_prior_board(
     fresh_deduped: list[Listing],
     docs_dir: Path | str | None = None,
@@ -742,6 +755,7 @@ def merge_prior_board(
             merged = fresh_deduped[match_idx].merge(prior_li)
             if keep_mailing_off_address(fresh_deduped[match_idx], prior_li, merged):
                 stats["mailing_address_not_inherited"] = stats.get("mailing_address_not_inherited", 0) + 1
+            _keep_fresh_tax(fresh_deduped[match_idx], merged, stats)
             fresh_deduped[match_idx] = merged
             fresh_matched[match_idx] = True
             continue
@@ -792,6 +806,7 @@ def merge_prior_board(
             merged = fresh_li.merge(prior_li)
             if keep_mailing_off_address(fresh_li, prior_li, merged):
                 stats["mailing_address_not_inherited"] = stats.get("mailing_address_not_inherited", 0) + 1
+            _keep_fresh_tax(fresh_li, merged, stats)
             if len(condo_samples) < 5:
                 condo_samples.append((prior_li.parcel_id, fresh_li.parcel_id))
             fresh_deduped[ti] = merged
@@ -835,7 +850,9 @@ def merge_prior_board(
                                      fresh_deduped[i].street_address, prior_li.street_address))
             # fold(): Listing.merge() with fresh first (fresh wins, prior backfills), keeping the
             # prior's numbered situs over the fresh row's no-number sentinel.
-            fresh_deduped[i] = fold(fresh_deduped[i], prior_li)
+            folded = fold(fresh_deduped[i], prior_li)
+            _keep_fresh_tax(fresh_deduped[i], folded, stats)
+            fresh_deduped[i] = folded
             fresh_matched[i] = True
             stats["matched_placeholder_twin"] += 1
     deferred.clear()

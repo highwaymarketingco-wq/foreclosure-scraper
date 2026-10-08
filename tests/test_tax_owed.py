@@ -73,7 +73,7 @@ def test_tax_block_merged_into_a_non_taxish_source_is_still_found():
     li = _li("counties_sc.greenville_mie_adverts", parcel="0646050100800",
              county="Greenville", state="SC",
              raw={"greenville_mie": {"case_number": "2023-CP-23-01209"},
-                  "greenville_delinquent_tax": {"total_due": 6108.13}})
+                  "greenville_delinquent_tax": {"total_due": 6108.13, "map_number": "0646050100800"}})
     stats = enrich_tax_owed([li])
     assert stats["stamped"] == 1
     assert li.raw["tax_owed"]["balance"] == 6108.13
@@ -138,6 +138,7 @@ def test_years_delinquent_promoted_from_multi_year_sibling_block():
     li = _li("counties_nc.buncombe_delinquent_tax", parcel="9608-10-8745",
              raw={"buncombe_delinquent_tax": {"principal_tax_due": 1920.86, "tax_year": 2026},
                   "multi_year_delinquent_tax": {"years": [2025, 2026], "years_delinquent": 2,
+                                                "parcel_key": "9608108745",
                                                 "total_due": 1920.86}})
     enrich_tax_owed([li], today=date(2026, 10, 7))
     to = li.raw["tax_owed"]

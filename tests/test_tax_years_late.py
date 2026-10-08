@@ -26,7 +26,7 @@ def _myd(years, per_year):
     """A multi_year_delinquent_tax block the way the scraper writes it (years incl. the current
     levy, years_delinquent = len(years) on boards scraped before the fix)."""
     return {"years": years, "years_delinquent": len(years), "per_year": per_year,
-            "total_due": sum(per_year.values()), "year": years[-1]}
+            "total_due": sum(per_year.values()), "year": years[-1], "parcel_key": "1234567890"}
 
 
 def test_current_levy_is_not_counted():
