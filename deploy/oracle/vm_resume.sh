@@ -59,6 +59,7 @@ vm_run_watched "$LOG" "$MEMLOG" RESUME uv run python scripts/resume_from_checkpo
 RC=$VM_RC
 echo "==> exit=$RC  elapsed=$(( ($(date +%s)-START)/60 ))m  $(date)" | tee -a "$LOG"
 
+vm_report_swallowed "$LOG"
 if grep -q "count_drop_alert" "$LOG"; then
   echo "==> ⚠️  COUNT-DROP ALERT — see log." | tee -a "$LOG"; RC=2
 fi

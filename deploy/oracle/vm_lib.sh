@@ -273,7 +273,17 @@ vm_handoff_note() {
 
 # ---- one board job at a time ----------------------------------------------------------------------
 vm_board_job_active() {
-  pgrep -f -- "${VM_BOARD_JOB_PATTERN:--m foreclosure_scraper|resume_from_checkpoint\.py}" >/dev/null 2>&1
+  pgrep -f -- "${VM_BOARD_JOB_PATTERN:--m foreclosure_scraper|resume_from_checkpoint\.py|reconcile_board\.py}" >/dev/null 2>&1
+}
+
+# ---- what the run swallowed -----------------------------------------------------------------------
+# vm_report_swallowed <log>: every step that logged <step>.failed (with a traceback) or hit its time
+# cap, counted, at the end of the run log (deploy/oracle/run_failures.py). main.py carries on past
+# each, and neither the summary, run_health, the digest email nor the exit code says so. Report
+# only: never changes the exit code. (audit 2026-10-09, pipeline_gate)
+vm_report_swallowed() {
+  local LOG="$1"
+  python3 "$ROOT/deploy/oracle/run_failures.py" "$LOG" 2>/dev/null | tee -a "$LOG" || true
 }
 
 # ---- the memory watchdog --------------------------------------------------------------------------

@@ -104,6 +104,7 @@ vm_run_watched "$LOG" "$MEMLOG" RUN uv run python -m foreclosure_scraper
 RC=$VM_RC
 echo "==> exit=$RC  elapsed=$(( ($(date +%s)-START)/60 ))m  $(date)" | tee -a "$LOG"
 
+vm_report_swallowed "$LOG"
 # Fail-loud signals surfaced at the tail (mirror run_local.sh).
 if grep -q "count_drop_alert" "$LOG"; then
   echo "==> ⚠️  COUNT-DROP ALERT — a source may be broken. See log." | tee -a "$LOG"; RC=2
