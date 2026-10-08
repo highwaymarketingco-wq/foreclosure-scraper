@@ -178,12 +178,6 @@ def test_reconcile_end_to_end_keeps_publish_inputs(tmp_path, monkeypatch, quiet_
     assert not any("_resolved_deep_enriched" in r["raw"] for r in rows)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "main.run_enrich_tail grades (valuation_calc.compute + valuation_grading.grade) BEFORE "
-    "enrich_equity, and both read raw['equity']: a second pass re-grades off the first pass's "
-    "equity (a tax-sale row gains 'high real equity' and +6 risk points). Passes once the lead "
-    "wires the re-grade after enrich_equity (docs/audit_2026-10-09/pipeline_gate.md, wiring W2); "
-    "then drop this marker."))
 def test_a_second_tail_pass_changes_nothing(tmp_path, monkeypatch, quiet_board):
     ck = tmp_path / "checkpoint"
     _write_pre_publish(ck, _rows(), monkeypatch)

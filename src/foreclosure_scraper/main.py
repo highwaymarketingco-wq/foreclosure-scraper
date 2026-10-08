@@ -83,11 +83,16 @@ async def _await_capped(coro, name: str, default_s: int = 900):
     mid-run wifi drop hitting a non-hardened HTTP session) can't stall the whole run before
     the board write. On timeout/error, log and return None — the phase's partial in-place
     fills persist. Env ENRICH_PHASE_MAX_SECONDS overrides the per-phase default."""
+    _budget = float(default_s)
     try:
-        return await asyncio.wait_for(
-            coro, timeout=float(os.environ.get("ENRICH_PHASE_MAX_SECONDS", str(default_s))))
+        # an explicit per-phase budget (default_s other than the 900 s default) wins over the
+        # global ENRICH_PHASE_MAX_SECONDS override: dot_ocr, rod_chain and nc_rod_render size their
+        # own budgets (audit 2026-10-09 W5)
+        _env = os.environ.get("ENRICH_PHASE_MAX_SECONDS")
+        _budget = float(default_s) if (default_s != 900 or not _env) else float(_env)
+        return await asyncio.wait_for(coro, timeout=_budget)
     except asyncio.TimeoutError:
-        log.warning("enrich.time_capped", phase=name, budget_s=default_s)
+        log.warning("enrich.time_capped", phase=name, budget_s=_budget)
     except Exception:
         log.error(f"{name}.failed", traceback=traceback.format_exc())
     return None
@@ -1607,11 +1612,14 @@ async def run() -> int:
             import json as _gj
             _pp = Path(__file__).resolve().parents[2] / "docs" / "listings.json"
             _praw = _gj.loads(_pp.read_text()) if _pp.exists() else []
+            _gf_malformed = 0
             for _r in (_praw if isinstance(_praw, list) else []):
                 try:
                     _grandfather.append(Listing.model_validate(_r))
                 except Exception:  # noqa: BLE001 - skip a malformed prior row
-                    pass
+                    _gf_malformed += 1
+            if _gf_malformed:
+                log.warning("grandfather.malformed_prior_rows", count=_gf_malformed)
             # Leave out the prior rows merge_prior_board folded into a row of ANOTHER key (a
             # condominium's bare-pin row into its unit's row): each is on the board under the new
             # key already, and restoring it would publish it twice.
@@ -2623,17 +2631,17 @@ async def run() -> int:
                 from .validation import validate as _vl
                 _vl(sold_pool)
             except Exception:
-                pass
+                log.error("sold_pool.validate_failed", traceback=traceback.format_exc())
             try:
                 from .enrichment_county_pin import enforce_case_pinned_county
                 enforce_case_pinned_county(sold_pool)
             except Exception:
-                pass
+                log.error("sold_pool.county_pin_failed", traceback=traceback.format_exc())
             try:
                 from .enrichment_property_kind import enrich_property_kind
                 enrich_property_kind(sold_pool)
             except Exception:
-                pass
+                log.error("sold_pool.property_kind_failed", traceback=traceback.format_exc())
             log.info("sold_pool.enrich_done", count=len(sold_pool))
         except Exception:
             log.error("sold_pool.enrich_outer_failed",
@@ -3354,16 +3362,6 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("bankruptcy_tax_combo.failed", traceback=traceback.format_exc())
 
-    # Owner tenure — long-held property = high-equity proxy (the "held 7+ years"
-    # filter). Local, from the GIS/CAMA sale year. Feeds grade + outbound segmentation.
-    try:
-        from .enrichment_tenure import enrich_tenure
-        s = enrich_tenure(enriched)
-        if s:
-            enrichment_stats["tenure"] = s
-    except Exception:
-        log.error("tenure.failed", traceback=traceback.format_exc())
-
     # Tax relief — senior/disabled homestead exclusion (owner-occupant) + present-
     # use deferral rollback lien. Parcel-keyed, reads the county exemption layer.
     try:
@@ -3453,6 +3451,16 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("footprint_sqft.failed", traceback=traceback.format_exc())
 
+    # Owner tenure — long-held property = high-equity proxy (the "held 7+ years"
+    # filter). Local, from the GIS/CAMA sale year. Feeds grade + outbound segmentation.
+    try:
+        from .enrichment_tenure import enrich_tenure
+        s = enrich_tenure(enriched)
+        if s:
+            enrichment_stats["tenure"] = s
+    except Exception:
+        log.error("tenure.failed", traceback=traceback.format_exc())
+
     # Case# -> court record bid/upset-status. For foreclosure leads with a case
     # number but no posted bid, a PER-CASE public lookup (Rule-610-safe) fills the
     # recorded sale/upset STATUS (SC Public Index publishes status, not the bid $;
@@ -3515,6 +3523,35 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("entity_type.failed", traceback=traceback.format_exc())
 
+    # Per-listing verification verdicts (docs/HANDOFF.md item 66). The Mac's
+    # scripts/verification_sweep.py checks claims live and pushes the per-signal ledgers
+    # docs/handoff/verification/<signal>.json; this attaches raw['verification'] from them, no
+    # network, BEFORE score_board so a refuted/stale verdict drops the signal it governs on
+    # this same run (nightly and the enrich-only resume both pass through here). Never fails
+    # the run; VERIFICATION_APPLY=0 turns it off.
+    try:
+        from .verification.apply import apply_verification
+        s = apply_verification(enriched)
+        if s:
+            enrichment_stats["verification"] = s
+    except Exception:
+        log.error("verification_apply.failed", traceback=traceback.format_exc())
+
+    # A tax debt the county's own site CONFIRMED for this row's parcel/address becomes the row's
+    # balance (county_site_verified), so scrubbing a copied block never costs a verified lead its
+    # amount. After apply_verification (it reads raw['verification']), before score_board.
+    try:
+        from .tax_binding import restore_verified_tax
+        enrichment_stats["tax_verified_restore"] = restore_verified_tax(enriched)
+    except Exception:
+        log.error("tax_verified_restore.failed", traceback=traceback.format_exc())
+
+    try:
+        from .enrichment_bankruptcy_tax_combo import enrich_bankruptcy_tax_combo
+        enrichment_stats["bankruptcy_tax_combo_after_restore"] = enrich_bankruptcy_tax_combo(enriched)
+    except Exception:
+        log.error("bankruptcy_tax_combo_after_restore.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     valuation_failures = 0
     for li in enriched:
@@ -3553,7 +3590,8 @@ async def run_enrich_tail(st: TailState) -> dict:
                     li.raw["calc"] = valuation_calc.to_dict(c)
                     li.raw["grade"] = valuation_grading.to_dict(g)
                 except Exception:
-                    pass
+                    log.warning("assessor_card.regrade_failed", source_url=li.source_url,
+                                traceback=traceback.format_exc())
             log.info("orchestrator.assessor_card", regraded=len(touched), stats=s)
     except Exception:
         log.error("assessor_card.failed", traceback=traceback.format_exc())
@@ -3568,6 +3606,20 @@ async def run_enrich_tail(st: TailState) -> dict:
             enrichment_stats["equity"] = s
     except Exception:
         log.error("equity.failed", traceback=traceback.format_exc())
+
+    # calc (max bid payoff) and grade (equity notes, risk points) read raw['equity'], which only now
+    # exists for this run: re-grade once (audit 2026-10-09; ~40 s for 350K rows).
+    _regraded = 0
+    for li in enriched:
+        try:
+            c = valuation_calc.compute(li)
+            g = valuation_grading.grade(li, c)
+            li.raw["calc"] = valuation_calc.to_dict(c)
+            li.raw["grade"] = valuation_grading.to_dict(g)
+            _regraded += 1
+        except Exception:
+            log.warning("valuation.regrade_failed", source_url=li.source_url, traceback=traceback.format_exc())
+    enrichment_stats["valuation_regraded_after_equity"] = {"count": _regraded}
 
     # Deed chain — chronological ownership timeline synthesised from data other
     # enrichers already gathered (assessor_card.sales, county_sales,
@@ -3627,29 +3679,6 @@ async def run_enrich_tail(st: TailState) -> dict:
             enrichment_stats["vacant_landuse"] = s
     except Exception:
         log.error("vacant_landuse.failed", traceback=traceback.format_exc())
-
-    # Per-listing verification verdicts (docs/HANDOFF.md item 66). The Mac's
-    # scripts/verification_sweep.py checks claims live and pushes the per-signal ledgers
-    # docs/handoff/verification/<signal>.json; this attaches raw['verification'] from them, no
-    # network, BEFORE score_board so a refuted/stale verdict drops the signal it governs on
-    # this same run (nightly and the enrich-only resume both pass through here). Never fails
-    # the run; VERIFICATION_APPLY=0 turns it off.
-    try:
-        from .verification.apply import apply_verification
-        s = apply_verification(enriched)
-        if s:
-            enrichment_stats["verification"] = s
-    except Exception:
-        log.error("verification_apply.failed", traceback=traceback.format_exc())
-
-    # A tax debt the county's own site CONFIRMED for this row's parcel/address becomes the row's
-    # balance (county_site_verified), so scrubbing a copied block never costs a verified lead its
-    # amount. After apply_verification (it reads raw['verification']), before score_board.
-    try:
-        from .tax_binding import restore_verified_tax
-        enrichment_stats["tax_verified_restore"] = restore_verified_tax(enriched)
-    except Exception:
-        log.error("tax_verified_restore.failed", traceback=traceback.format_exc())
 
     # Stacked-distress score (HOT/WARM/COLD operator board) — runs last so it
     # can stack every signal + equity + contactability gathered above.
