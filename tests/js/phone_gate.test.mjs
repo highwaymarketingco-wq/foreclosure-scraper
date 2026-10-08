@@ -94,7 +94,9 @@ test("dashboard.js uses the gate in the filters, the detail card and the CSV", (
   // CSV: owner_phone blank when blocked, and the reason column appended last
   assert.match(JS, /owner_phone: ownerPhoneBlock\(op\) \? "" : \(op\.phone \|\| ""\)/);
   const cols = JS.slice(JS.indexOf("const cols = ["), JS.indexOf("const rows = [cols.join"));
-  assert.match(cols, /"clock_status",\s*(\/\/[^\n]*\n\s*)*"phone_block_reason",\s*\]/);
+  // the phone gate's reason column is appended right after clock_status; later audits append their
+  // own call_* columns after it (2026-10-09 call_ready), never before it
+  assert.match(cols, /"clock_status",\s*(\/\/[^\n]*\n\s*)*"phone_block_reason",\s*(\/\/[^\n]*\n\s*)*("call_[a-z_]+",\s*)*\]/);
   assert.match(JS, /phone_block_reason: \(\(\) =>/);
 });
 
