@@ -36,6 +36,7 @@ import httpx
 import structlog
 from tenacity import (
     AsyncRetrying,
+    retry_if_exception,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential_jitter,
@@ -427,6 +428,24 @@ async def _curl_fallback_text(
     return ""
 
 
+#: Status codes get_text retries: a server or gateway error can clear on the next try.
+_RETRY_STATUS = frozenset({500, 502, 503, 504})
+
+
+def _retryable_get_error(exc: BaseException) -> bool:
+    """get_text's retry predicate: a transport error, a timeout or a 5xx, never a 4xx.
+
+    Audit 2026-10-09 (source_completeness): every HTTPStatusError used to be retried, so a 403
+    block, a 404 and above all a 429 'Too Many Requests' were asked three times with backoff (six
+    with the impersonation tier). On the 10/8 gated run five TownNews papers read in the same
+    minute all ended BLOCKED that way. A 4xx answers the same on the next try; a 429 asks us to
+    stop. The 4xx still raises (and still escalates to impersonation where the caller allows it)."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code if exc.response is not None else None
+        return code in _RETRY_STATUS
+    return isinstance(exc, (httpx.TransportError, httpx.TimeoutException))
+
+
 async def get_text(
     url: str,
     *,
@@ -462,9 +481,7 @@ async def get_text(
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(3),
             wait=wait_exponential_jitter(initial=1, max=10),
-            retry=retry_if_exception_type(
-                (httpx.TransportError, httpx.HTTPStatusError, httpx.TimeoutException)
-            ),
+            retry=retry_if_exception(_retryable_get_error),
             reraise=True,
         ):
             with attempt:
