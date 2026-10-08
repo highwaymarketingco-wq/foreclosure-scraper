@@ -103,6 +103,7 @@ NETWORK_STUBS: dict[tuple[str, str], str] = {
 #: ledgers in docs/handoff/verification, local reference data, or the published board's keys).
 LOCAL_STEPS: frozenset[tuple[str, str]] = frozenset({
     ("tax_binding", "scrub_unbound_tax"), ("tax_binding", "restore_verified_tax"),
+    ("block_binding", "scrub_unbound_blocks"),
     ("enrichment_assessor_comps", "enrich_assessor_comps"),
     ("enrichment_tax_owed", "enrich_tax_owed"), ("enrichment_amount_owed", "promote_tax_owed_amount_owed"),
     ("enrichment_tax_aging", "enrich_tax_aging"), ("enrichment_bankruptcy_tax_combo", "enrich_bankruptcy_tax_combo"),
