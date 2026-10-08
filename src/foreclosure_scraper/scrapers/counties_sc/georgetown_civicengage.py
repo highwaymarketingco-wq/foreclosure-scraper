@@ -480,23 +480,29 @@ class GeorgetownCivicEngage(BaseScraper):
         out: list[Listing] = []
         async with client(timeout=60.0) as c:
             # --- (a) FLC list ---------------------------------------------
-            try:
-                r = await c.get(FLC_PAGE)
-                if r.status_code == 200:
-                    for url, label in _discover_docs(r.text, FLC_PAGE):
-                        low = (label + " " + url).lower()
-                        if "procedure" in low or "bid-app" in low or "bid app" in low:
-                            continue
-                        if "flc" not in low and "forfeit" not in low:
-                            continue
-                        data = await self._get_pdf(c, url)
-                        if data:
-                            rows = parse_flc(_pdf_text(data), url)
-                            out.extend(rows)
-                            log.info("georgetown.flc_ok", url=url, count=len(rows))
-                            break  # one FLC list doc
-            except Exception as exc:  # noqa: BLE001
-                log.warning("georgetown.flc_fail", error=str(exc)[:160])
+            # Two tries: the 10/8 VM run lost the whole FLC list (55 rows) to one failed
+            # page read ("georgetown.flc_fail" with an empty message, a timeout) while the
+            # tax-sale and MIE pages on the same host read fine moments later.
+            for attempt in range(2):
+                try:
+                    r = await c.get(FLC_PAGE)
+                    if r.status_code == 200:
+                        for url, label in _discover_docs(r.text, FLC_PAGE):
+                            low = (label + " " + url).lower()
+                            if "procedure" in low or "bid-app" in low or "bid app" in low:
+                                continue
+                            if "flc" not in low and "forfeit" not in low:
+                                continue
+                            data = await self._get_pdf(c, url)
+                            if data:
+                                rows = parse_flc(_pdf_text(data), url)
+                                out.extend(rows)
+                                log.info("georgetown.flc_ok", url=url, count=len(rows))
+                                break  # one FLC list doc
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("georgetown.flc_fail", attempt=attempt + 1,
+                                error=f"{type(exc).__name__}: {str(exc)[:140]}")
 
             # --- (b) Tax-Sale list ----------------------------------------
             try:
