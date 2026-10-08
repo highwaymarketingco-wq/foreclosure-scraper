@@ -34,8 +34,9 @@ def test_greenwood_layer_is_registered_with_the_expected_shape():
     lay = _lay("greenwood_cama_condemned")
     assert lay.state == "SC"
     assert lay.county == "Greenwood"
-    assert lay.condemned is True
-    assert lay.process == "condemned"
+    # a condition rating, not a condemnation (audit 2026-10-09)
+    assert lay.condemned is False and lay.condition_rating is True
+    assert lay.process == "poor_condition"
     # never a code_enforcement layer -- this is an appraiser rating, not a case
     assert lay.process != "code_enforcement"
     assert "ConditionText" in lay.where
@@ -44,23 +45,25 @@ def test_greenwood_layer_is_registered_with_the_expected_shape():
     assert lay.value == "TaxValue_Total"
 
 
-def test_greenwood_worn_out_row_stamps_condemned_not_code_enforcement():
+def test_greenwood_worn_out_row_is_a_poor_condition_not_a_condemnation():
     lay = _lay("greenwood_cama_condemned")
     li = M._to_listing({
-        "PIN": "6913-876-159", "Owner": "LAUNCH PAD MOBILE LLC",
-        "SiteAddress": "117 MADDOX RD", "ConditionText": "Badly Worn",
+        "PIN": "6999-999-001", "Owner": "EXAMPLE HOLDINGS LLC",
+        "SiteAddress": "117 SAMPLE RD", "ConditionText": "Badly Worn",
         "YearBuilt": 0, "TaxValue_Total": 5000,
-        "MailAddress": "720 MONTAGUE AVE STE 122",
+        "MailAddress": "720 EXAMPLE AVE STE 122",
         "MailCityState": "GREENWOOD, SC 29649-0000",
     }, lay)
     assert li is not None
-    assert li.raw["condemned"] is True
-    assert "code_enforcement" not in li.raw
-    assert li.parcel_id == "6913-876-159"
-    assert li.owner_name == "LAUNCH PAD MOBILE LLC"
-    assert li.street_address == "117 MADDOX RD"
+    assert "condemned" not in li.raw and "code_enforcement" not in li.raw
+    assert li.raw["distressed"] is True
+    assert li.raw["condition_cama"] == {"source": "greenwood_cama_condemned", "condition": "Badly Worn",
+                                        "condition_code": "Badly Worn", "distressed": True}
+    assert li.parcel_id == "6999-999-001"
+    assert li.owner_name == "EXAMPLE HOLDINGS LLC"
+    assert li.street_address == "117 SAMPLE RD"
     assert li.tax_value == 5000
-    assert li.foreclosure_process == "condemned"
+    assert li.foreclosure_process == "poor_condition"
     assert li.raw["arcgis_distress"]["layer"] == "greenwood_cama_condemned"
 
 
@@ -110,6 +113,6 @@ def test_new_hanover_demolition_permits_still_excluded():
     assert "condemned" not in li.raw
 
 
-def test_only_two_layers_opt_into_condemned():
+def test_only_rock_hill_opts_into_condemned():
     flagged = sorted(lay.slug for lay in M.LAYERS if lay.condemned)
-    assert flagged == ["greenwood_cama_condemned", "rockhill_code_demolition"]
+    assert flagged == ["rockhill_code_demolition"]

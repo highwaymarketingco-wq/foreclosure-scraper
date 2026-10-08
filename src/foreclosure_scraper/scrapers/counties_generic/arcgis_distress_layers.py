@@ -156,6 +156,10 @@ class Layer(NamedTuple):
     #: Hanover's demolition_permits -- a homeowner's own voluntary teardown
     #: application, not a condemnation) is never swept in by accident.
     condemned: bool = False
+    #: The layer is an assessor's condition rating (detail = the rating text): rows get
+    #: raw['distressed'] and raw['condition_cama'] {source, condition, condition_code,
+    #: distressed}, the shape enrichment_cama_condition writes, never raw['condemned'].
+    condition_rating: bool = False
 
 
 LAYERS: tuple[Layer, ...] = (
@@ -712,11 +716,10 @@ LAYERS: tuple[Layer, ...] = (
     # genuine middle value on this scale, not a severe one, and forcing it in
     # would repeat the exact "field LOOKED right but was degenerate/ambiguous"
     # mistake this recon was explicitly told to avoid. Sample real rows (not just
-    # the field name): "117 MADDOX RD" (owner LAUNCH PAD MOBILE LLC, tax value
-    # $5,000), "16 EDGEWOOD DR" (owner BUTLER E BRYAN, built 1948, tax value
-    # $17,300) -- genuine low-value, LLC- and individual-owned structures, the
-    # motivated-seller profile this engine targets, not a degenerate always-same
-    # value.
+    # the field name; owners and addresses not kept here, public repo): an LLC-owned
+    # structure at a $5,000 tax value and an individual-owned 1948 house at
+    # $17,300 -- genuine low-value structures, the motivated-seller profile this
+    # engine targets, not a degenerate always-same value.
     #   Greenwood currently carries only 6 leads on the whole board (0 with a
     # parcel_id), so wiring this purely as a PIN-join enrichment the way Carteret
     # is wired would enrich zero existing rows today. Wired instead as its own
@@ -726,7 +729,13 @@ LAYERS: tuple[Layer, ...] = (
     # architecture spartanburg_condemned.py and rockhill_code_demolition already
     # use, so these 719 parcels become real new leads with their own owner/
     # situs/mailing/value rather than silently waiting for a parcel_id that may
-    # never arrive. In scope per `in_scope_distressed()` ("if its a distressed
+    # never arrive. LABEL (audit 2026-10-09, additions_verify): the rows are an
+    # ASSESSOR'S DEPRECIATION RATING, not a condemnation; a live check of 30 rows
+    # found the facts right and the 'condemned' label wrong, and raw['condemned']
+    # scored them as a code-enforcement case (14 points). They now carry
+    # raw['distressed'] + raw['condition_cama'] (the assessor's condition, the
+    # distressed_condition signal) and process 'poor_condition'; the slug keeps its
+    # old name so carried rows still merge. In scope per `in_scope_distressed()` ("if its a distressed
     # property its anywhere in nc and sc," config.py/validation.py, 2026-09-15)
     # even though Greenwood sits outside the older 18-county FLIP footprint
     # HERMES.md/MASTER_GAPS_WALLS_AND_MANUAL_LANES.md still document as denied —
@@ -744,7 +753,7 @@ LAYERS: tuple[Layer, ...] = (
         value="TaxValue_Total", detail="ConditionText",
         mailing_parts=("MailAddress", "MailCityState"),
         mailing_source="greenwood_cama_condemned",
-        condemned=True, process="condemned",
+        condition_rating=True, process="poor_condition",
         source_page="https://www.greenwoodsc.gov/departments/assessor",
     ),
     # ------------------------------------------------------------------
@@ -929,12 +938,16 @@ def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
         # shape, for a layer whose rows are a condition rating or a city-
         # ordered demolition case rather than an actual case-tracked
         # code-enforcement complaint. rockhill_code_demolition (15 real open
-        # cases, live-verified 2026-10-02) and greenwood_cama_condemned (719
-        # real "Badly Worn"/"Worn Out" CAMA parcels, live-verified 2026-10-03)
-        # both opt in explicitly; New Hanover's demolition_permits layer
+        # cases, live-verified 2026-10-02) opts in explicitly (greenwood_cama_
+        # condemned did until 2026-10-09: a condition rating, see condition_rating);
+        # New Hanover's demolition_permits layer
         # (a homeowner's own voluntary teardown application, not a
         # condemnation) deliberately does not.
         raw["condemned"] = True
+    if lay.condition_rating:
+        raw["distressed"] = True
+        raw["condition_cama"] = {"source": lay.slug, "condition": detail, "condition_code": detail,
+                                 "distressed": True}
     if lay.mailing_parts:
         mail_bits = [_clean(a.get(p)) for p in lay.mailing_parts]
         mailing = " ".join(b for b in mail_bits if b) or None
