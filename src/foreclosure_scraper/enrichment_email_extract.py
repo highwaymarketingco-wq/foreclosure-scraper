@@ -29,6 +29,68 @@ from .models import Listing
 
 log = structlog.get_logger()
 
+
+_OWNER_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+
+
+def liensnc_owner_email(raw: dict | None) -> str | None:
+    """The OWNER's e-mail a LiensNC filing lists: raw['liensnc_related']['owner_contact']['email'],
+    else the first address inside raw['liensnc']['owner_text'] (the filing's owner block). The
+    filing's other e-mails (filed_by, each notice's claimant) are the contractor's or the lien
+    agent's, never the owner's. Measured on the 10/8 checkpoint: 46,953 rows carried an e-mail the
+    raw scan classified 'other'; in a 20,000-row sample the addresses sat in liensnc.owner_text
+    (19,915 rows), liensnc_related.owner_contact (5,335), notices' claimant (5,254), filed_by (2,263)."""
+    if not isinstance(raw, dict):
+        return None
+    rel = raw.get("liensnc_related")
+    oc = rel.get("owner_contact") if isinstance(rel, dict) else None
+    if isinstance(oc, dict) and isinstance(oc.get("email"), str) and "@" in oc["email"]:
+        return oc["email"].strip().lower()
+    ln = raw.get("liensnc")
+    txt = ln.get("owner_text") if isinstance(ln, dict) else None
+    if isinstance(txt, str):
+        m = _OWNER_EMAIL_RE.search(txt)
+        if m:
+            return m.group().strip(".").lower()
+    return None
+
+
+def owner_email_of(raw: dict | None) -> str | None:
+    """The OWNER's e-mail on a row, or None: the one accessor for every raw shape that carries one
+    (audit 2026-10-09, drops_lineage).
+
+      * raw['owner_email'] from this enricher / enrichment_surface_contacts / enrichment_ocr:
+        `best_email` is the best of the row's emails, which is an attorney's, agent's or broker's
+        when no owner e-mail was found; only best_classification == 'owner' is the owner's.
+      * raw['owner_email'] from liensnc_handoff: {'email', 'source': 'liensnc_filing'}, the owner
+        contact the lien-agent filing lists (no best_email: the coverage count never saw it).
+      * a LiensNC filing's owner block (liensnc_owner_email): enrichment_surface_contacts scans the
+        whole raw and classifies what it finds 'other', so the owner's address and the
+        contractor's look alike in raw['owner_email'].
+      * raw['skip_trace']['email_addresses'] (enrichment_skip_trace): campaign_export read a
+        'owner_email' key there that no provider writes, so its e-mail column was always blank.
+    """
+    if not isinstance(raw, dict):
+        return None
+    lien_owner = liensnc_owner_email(raw)
+    oe = raw.get("owner_email")
+    if isinstance(oe, dict):
+        if oe.get("best_email") and oe.get("best_classification") == "owner":
+            return str(oe["best_email"])
+        for e in oe.get("emails") or []:
+            if isinstance(e, dict) and e.get("classification") == "owner" and e.get("email"):
+                return str(e["email"])
+        if oe.get("email") and oe.get("source") == "liensnc_filing":
+            return str(oe["email"])
+    if lien_owner:
+        return lien_owner
+    st = raw.get("skip_trace")
+    if isinstance(st, dict):
+        for e in st.get("email_addresses") or []:
+            if e:
+                return str(e)
+    return None
+
 # Email regex — standard RFC 5322 simplified
 _EMAIL_RE = re.compile(
     r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",

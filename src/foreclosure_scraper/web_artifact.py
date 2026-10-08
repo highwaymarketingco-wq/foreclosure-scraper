@@ -1845,7 +1845,14 @@ def load_board(docs_dir: Path | str = "docs", *,
 
 # Whitelist of `raw` sub-keys to keep in the output (keep file small + privacy-OK)
 RAW_KEEP = {
-    "gis": ("owner", "mailing", "last_sale", "stories"),   # stories: parcel_cache_join, 2026-10-07
+    "gis": ("owner", "mailing", "last_sale", "stories",    # stories: parcel_cache_join, 2026-10-07
+            # 2026-10-09 audit (drops_lineage): county facts the gis block carried and the publish
+            # dropped, counted on the 10/8 dot_ocr checkpoint: absentee 15,377 rows and vacant
+            # 14,912 (nc_lincoln_bulk, enrichment_arcgis), owner_occupied 1,838 and deed_age 55
+            # (enrichment_gis_derived), owner_changed 18; source / owner_match_strategy say which
+            # layer and which match filled the block. All small scalars or 2-key dicts.
+            "absentee", "vacant", "owner_occupied", "deed_age", "owner_changed", "source",
+            "owner_match_strategy"),
     "zillow": ("zpid", "homeType", "zestimate", "yearBuilt", "bedrooms", "bathrooms",
                "livingArea", "lotSize", "taxAssessedValue", "description", "photo", "photos"),
     "flags": "*",
@@ -2706,6 +2713,65 @@ RAW_KEEP = {
     "wake_code_case": "*",       # counties_nc.wake_code_cases: case, type, status, categories (no free text)
     "nc_tax_lien_ad": "*",       # counties_nc.nc_tax_lien_ads: county, tax year, amount, parcel
 
+    # ------------------------------------------------------------------
+    # 2026-10-09 AUDIT (docs/audit_2026-10-09/drops_lineage.md). Measured on the 2026-10-08 gated
+    # run's dot_ocr checkpoint (383,373 rows, full raw, one pass): keys computed and then dropped
+    # here, plus keys a post-checkpoint step or a wired script writes. tests/test_raw_keep_covers_
+    # enrichers.py now scans every module (not only enrich*.py) and the raw_update / setdefault /
+    # update / conditional-literal forms that hid these.
+    #
+    # Read back by the pipeline on a reloaded board (a tail run, the verification sweep):
+    "parcel_id_alias": "*",      # {short, long}: parcel_alias.apply's record of the short county id a
+                                 # row was re-keyed from (680 rows); tax_binding.row_ids reads it to
+                                 # decide which tax debts are the row's own parcel's
+    "burke_spine": "*",          # {pin, reid, township, land_class, vacant_land, deed_book/page/date}:
+                                 # nc_burke_spine (533 rows); enrichment_lrcpwa_parcel reads it
+    "withdrawn_case_type_other": "*",  # enrichment_prior_correction correction 6 (260 Charleston
+                                 # Public Index rows): the withdrawn type/lane/status; the reversal
+                                 # restores the type from it, so without it the withdrawal is one-way
+    "_land_buildability_checked": "*",  # enrichment_land_buildability's "already checked" stamp. Its
+                                 # targets are the first LAND_BUILDABILITY_CAP (300) unstamped land
+                                 # rows in board order; with the stamp dropped here every run
+                                 # re-checked the same ~300 rows and never reached the rest (292
+                                 # stamped on 10/8, none ever published)
+    # Why a coastal row is in scope (main._in_scope / _coastal_county_source; main.py: "Listings keep
+    # tag raw.oceanfront=True so the dashboard can sort/filter them"): 6,207 / 356 / 356 / 296 / 58
+    # rows on 10/8, none ever published.
+    "coastal_county": "*", "oceanfront": "*", "oceanfront_signals": "*",
+    "downtown_charleston": "*", "near_beach_drive": "*",
+    # Audit trails of a value the pipeline removed (the removal stays; the reason now publishes):
+    "situs_nulled": "*",         # main.run SITUS SANITY: the street_address it withheld (8,606 rows
+                                 # on 10/8: title placeholders, entity names; situs_sanity.py)
+    "situs_quality": "*",        # 'low' beside situs_nulled
+    "mailing_address_not_inherited": "*",  # board_persist.keep_mailing_off_address (683 rows)
+    "auction_status_reported": "*",  # enrichment_board_quality: the source's own status wording
+                                 # before normalising ("provenance is never destroyed" said its
+                                 # comment; it was, here)
+    # Provenance of a fill:
+    "lincoln_bulk": "*",         # {parcel_id, akpar, source}: nc_lincoln_bulk filled this row's gis
+                                 # block from the county bulk file (14,893 rows)
+    "sqft_source": "*",          # 'comp_backfill': enrichment_comps estimated living_sqft
+    "derived_from": "*",         # enrichment_relationship_deeds: the source row a derived lead came from
+    "sp_case": "*",              # law_firms.mcmichael_taylor_gray: the special-proceeding case number
+                                 # beside mtg_file (a conditional `raw={...} if ... else None` the
+                                 # scraper scan could not see)
+    # Written by enrichers that only scripts/enrich_board.py runs (it cannot load today's board, so
+    # nothing reaches these now); registered so a run that wires them keeps what they fetch. Each
+    # marker (census_geocoder, envirofacts, ncpts_lrc) is the enricher's "already checked" stamp:
+    # without it every run re-queries every row.
+    "census_geocoder": "*", "census_tract": "*", "block_group": "*", "county_fips": "*",
+    "state_fips": "*", "standardized_address": "*",
+    "envirofacts": "*", "nearby_facilities": "*",
+    "crime_stats": "*", "nc_doj": "*", "nc_onemap": "*", "nc_sos_entity": "*",
+    "ncpts_lrc": "*", "land_value_assessed": "*", "building_value_assessed": "*",
+    "mailing_address": "*", "deed": "*", "tax_bill_url": "*",
+    "economic": "*", "wetlands": "*", "housing_market": "*", "market_stats": "*",
+    "addr_owner_v2": "*",        # enrichment_address_owner_v2: matched owner of an owner-search fill
+    "deficiency_amount": "*",    # enrichment_ocr: the deficiency figure read off a notice
+    "bankruptcy_petition": "*",  # petition_address (scripts/bankruptcy_petition_sweep.py)
+    "rentcast": "*",             # valuation.rentcast (main.run, only with RENTCAST_API_KEY)
+    # workflow_engine (operator workflow state, like crm): lost at every publish otherwise
+    "workflow_status": "*", "workflow_status_at": "*", "workflow_tags": "*", "campaign_queue": "*",
 }
 
 

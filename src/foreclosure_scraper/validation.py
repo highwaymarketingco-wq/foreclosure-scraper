@@ -135,6 +135,41 @@ _PARCEL_BAD_PATTERNS = (
 )
 
 
+#: Counties whose OWN parcel numbers are shorter than the 7-character floor below, by the shapes
+#: measured to be that county's parcel number (audit 2026-10-09, drops_lineage). The 2026-10-08
+#: run nulled 20,030 short ids; every nulled id on its dot_ocr checkpoint (21,248 rows carrying
+#: raw['parcel_id_nulled']) was looked up in the county's parcel cache (NC OneMap parno / altparno /
+#: nparno, data/parcel_cache) and the cache's situs house number compared with the row's:
+#:   Cleveland 4-5 digits   648 rows, 100% in the county layer, 544 same house / 27 another
+#:   Onslow 6 digits and map-block forms ('312-96', '43E-34', '28-9.1')  752 rows, 99.3% in the
+#:                          layer, 646 same house / 8 another
+#:   Nash 6 digits          237 rows, 100%, 235 same house / 1 another
+#:   Rowan 6 digits          67 rows, 100%, 67 same house
+#: 1,704 rows in all (LiensNC 662, nc_its_public_tax 355, Rocky Mount survey 229, NC UST 167, ...).
+#: These ids ARE the parcel: nulling them published the row with no parcel id. NOT here, measured:
+#: Catawba (the county list's tax ACCOUNT number, 0 of 5,376 in the layer), Guilford / Beaufort /
+#: Madison PTS Cloud ids (0% in the layer), Buncombe STR permit ids and Burke storm-layer ids (0%);
+#: Pitt and Hyde PTS ids (Pitt 5-digit 95% in the layer but 4-digit 0%, Hyde 64-94%; the rows carry
+#: no house number to confirm, and the 13 Pitt rows that do all disagree); Polk map forms (97% in the
+#: layer, 11% another house);
+#: Durham 6 digits (86%); Lincoln and Rutherford, where the owner chose the 10-digit PIN with the
+#: short id kept as an alias (parcel_alias.py, 2026-10-07).
+COUNTY_NATIVE_SHORT_PARCEL = {
+    ("NC", "Cleveland"): re.compile(r"^\d{4,5}$"),
+    ("NC", "Onslow"): re.compile(r"^(?:\d{6}|\d{1,4}[A-Z]?-\d{1,3}(?:\.[0-9A-Z]{1,2})?)$", re.I),
+    ("NC", "Nash"): re.compile(r"^\d{6}$"),
+    ("NC", "Rowan"): re.compile(r"^\d{6}$"),
+}
+
+
+def county_native_short_parcel(state: Optional[str], county: Optional[str], pid: Optional[str]) -> bool:
+    """True when `pid`, shorter than 7 characters, has the shape of the county's own parcel number
+    (COUNTY_NATIVE_SHORT_PARCEL), so it must be kept rather than nulled as too short. Pure."""
+    pat = COUNTY_NATIVE_SHORT_PARCEL.get(((state or "").strip().upper(), _normalize_county(county or "")))
+    p = (pid or "").strip()
+    return bool(pat and p and pat.match(p))
+
+
 def _record_nulled_parcel(li: Listing, pid: str, reason: str) -> None:
     """Keep the id the source gave in raw['parcel_id_nulled'] when it is nulled here. It is
     still that source's identifier for the row (Catawba's tax account '65771'), and the next
@@ -145,9 +180,33 @@ def _record_nulled_parcel(li: Listing, pid: str, reason: str) -> None:
     li.raw["parcel_id_nulled"] = {"value": pid, "reason": reason}
 
 
+def _normalize_parcel_text(v) -> str:
+    return re.sub(r"[^0-9a-z]", "", str(v or "").lower())
+
+
+def _nulled_record(li: Listing) -> Optional[dict]:
+    n = li.raw.get("parcel_id_nulled") if isinstance(li.raw, dict) else None
+    return n if isinstance(n, dict) else None
+
+
 def _validate_parcel_id(li: Listing, stats: dict) -> None:
     pid = (li.parcel_id or "").strip()
+    nulled = _nulled_record(li)
     if not pid:
+        # A county-native id an earlier run nulled (a carried row the re-scrape did not refresh):
+        # put it back, the row has no other parcel id (audit 2026-10-09).
+        val = str((nulled or {}).get("value") or "").strip()
+        if (nulled and nulled.get("reason") == "too_short"
+                and county_native_short_parcel(li.state, li.county, val)):
+            li.parcel_id = val
+            li.raw.pop("parcel_id_nulled", None)
+            stats["parcel_restored_county_native"] += 1
+        return
+    if len(pid) < 7 and county_native_short_parcel(li.state, li.county, pid):
+        stats["parcel_kept_county_native"] += 1
+        # a merged-in prior copy's record of nulling this same id is stale now
+        if nulled and _normalize_parcel_text(nulled.get("value")) == _normalize_parcel_text(pid):
+            li.raw.pop("parcel_id_nulled", None)
         return
     if len(pid) < 7:
         stats["parcel_nulled_too_short"] += 1
@@ -326,6 +385,8 @@ def validate(listings: list[Listing]) -> dict:
         "county_nulled_cross_state": 0,
         "parcel_nulled_too_short": 0,
         "parcel_nulled_bad_pattern": 0,
+        "parcel_kept_county_native": 0,
+        "parcel_restored_county_native": 0,
         "opening_bid_zeroed": 0,
         "opening_bid_too_large": 0,
         "tax_value_too_low": 0,

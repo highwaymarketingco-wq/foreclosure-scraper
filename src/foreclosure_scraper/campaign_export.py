@@ -22,6 +22,7 @@ from typing import Sequence
 
 import structlog
 
+from .enrichment_email_extract import owner_email_of
 from .enrichment_sc_phone import is_owner_phone_usable
 from .models import Listing
 from .outreach import letter_text, email_text, sms_text, _first_name, _owner, _money
@@ -157,7 +158,9 @@ def _export_email(
         if not owner:
             continue
 
-        email = st.get("owner_email") or ""
+        # owner_email_of: skip_trace writes 'email_addresses' (never 'owner_email'), and the
+        # owner_email block's best_email may be an attorney's (audit 2026-10-09)
+        email = owner_email_of(raw) or ""
         email_body = email_text(li)
         # Split subject from body (email_text starts with "Subject: ...")
         subject = ""

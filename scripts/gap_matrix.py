@@ -254,7 +254,9 @@ def deed_ref_present(raw: dict) -> bool:
             return True
     for k in ("rod", "nc_rod"):
         b = raw.get(k)
-        if isinstance(b, dict) and ((b.get("book") and b.get("page")) or b.get("instrument_no")):
+        # the register scrapers (nc_rod_logan, sc_rod_cott, sc_rod_acclaim) write 'instrument'
+        if isinstance(b, dict) and ((b.get("book") and b.get("page")) or b.get("instrument_no")
+                                    or b.get("instrument")):
             return True
     rd = raw.get("rod_docs")
     if isinstance(rd, list) and any(isinstance(x, dict) and x.get("book") and x.get("page") for x in rd):
@@ -274,17 +276,27 @@ def taxpayer_of_record_present(rec: dict) -> bool:
     if isinstance(g, dict) and g.get("owner"):
         return True
     om = raw.get("owner_mailing")
-    if isinstance(om, dict) and (om.get("owner") or om.get("addressee")):
+    # 2026-10-09: not a LiensNC filing's owner block (liensnc_handoff, source 'liensnc_filing': what the
+    # contractor wrote, not the roll), and not `addressee` (sc_probate_notices writes the personal
+    # representative there)
+    if isinstance(om, dict) and om.get("owner") and om.get("source") != "liensnc_filing":
         return True
     for k, f in (("qpaybill_roll", "owner"), ("lrcpwa", "owner"), ("heir_estate", "owner_of_record"),
                  ("mcdowell_probate", "ownname")):
         b = raw.get(k)
         if isinstance(b, dict) and b.get(f):
             return True
-    return bool(rec.get("owner_name")) and rec.get("listing_type") in ("tax_lien", "tax_sale")
+    # a tax roll row's owner is the roll's; a LiensNC lien-agent filing typed tax_lien is not a roll
+    return (bool(rec.get("owner_name")) and rec.get("listing_type") in ("tax_lien", "tax_sale")
+            and not _is_liensnc_row(rec))
 
 
 def heir_candidates_present(raw: dict) -> bool:
+    # 2026-10-09: raw['heir_candidates'] (enrichment_heir_candidates, the published candidate list the
+    # dashboard renders) was not read here, so a row with candidates counted as having none
+    hc = raw.get("heir_candidates")
+    if isinstance(hc, list) and any(isinstance(h, dict) and h.get("name") for h in hc):
+        return True
     he = raw.get("heir_estate")
     if isinstance(he, dict) and he.get("heir_names"):
         return True
@@ -302,7 +314,10 @@ def heir_candidates_present(raw: dict) -> bool:
 def probate_case_present(rec: dict) -> bool:
     raw = rec.get("raw") or {}
     pr = raw.get("probate")
-    if isinstance(pr, dict) and (pr.get("es_case_number") or pr.get("nc_estate_file_no")):
+    # 2026-10-09: + case_number (enrichment_probate_search, horry_probate, greenville_hard_distress
+    # write it; signal_freshness.has_real_probate already reads it)
+    if isinstance(pr, dict) and (pr.get("es_case_number") or pr.get("nc_estate_file_no")
+                                 or str(pr.get("case_number") or "").strip()):
         return True
     sn = raw.get("sc_probate_notice")
     if isinstance(sn, dict) and sn.get("case_number"):
@@ -315,6 +330,13 @@ def probate_case_present(rec: dict) -> bool:
 
 def obituary_present(raw: dict) -> bool:
     return isinstance(raw.get("obituary"), dict) or raw.get("life_event") == "death"
+
+
+def obituary_matched(raw: dict) -> bool:
+    """atty_obituary_match: an obituary block. life_event == 'death' alone is not one: the SC probate
+    notice readers stamp it too (sc_probate_notices, publicnoticesc_estates), so a probate notice
+    counted as an obituary match (audit 2026-10-09)."""
+    return isinstance(raw.get("obituary"), dict) and bool(raw.get("obituary"))
 
 
 def rod_checked(raw: dict) -> bool:
@@ -705,11 +727,147 @@ assert set(SPECS) == set(ALL_COLUMNS), set(ALL_COLUMNS) ^ set(SPECS)
 assert len(OWNER_COLUMNS) == 73
 
 
-def positive_columns(rec: dict, owner: set[str], verdicts: dict[str, Optional[str]]) -> set[str]:
-    """The second view's hits: the 10/1 hits with marriage_license's no-match wrapper removed,
-    plus the attorney columns. Pure."""
+# ---------------------------------------------------------------------------------------------
+# Scorer-consistent hits (audit 2026-10-09, drops_lineage). The 10/1 definitions count a raw key's
+# PRESENCE; for these columns the writer also stores negative results, ended states or weak matches,
+# and the scorer (distress_score / signal_freshness / the phone gate) counts a hit only when its own
+# predicate says so. The second view now asks the scorer's own predicate (one source of truth), so
+# a column means what the scorer acts on. owner_columns() keeps the 10/1 rule for comparability.
+# Each gate: column -> (raw key that, when present, still means "checked", predicate).
+# ---------------------------------------------------------------------------------------------
+
+def _gate_stay(rec: dict, raw: dict, today: date) -> bool:
+    from foreclosure_scraper.distress_score import _stay_block
+    return _stay_block(raw, today) is not None              # {'status': 'lapsed'} or an old stay: no
+
+
+def _gate_code(rec: dict, raw: dict, today: date) -> bool:
+    from foreclosure_scraper.signal_freshness import code_enforcement_open
+    ce = raw.get("code_enforcement")
+    return ce not in _EMPTY and code_enforcement_open(ce, today)   # TTL, vacancy_adjacent, lists
+
+
+def _gate_divorce(rec: dict, raw: dict, today: date) -> bool:
+    from foreclosure_scraper.distress_score import _divorce_signal
+    return _divorce_signal(raw, today, rec.get("owner_name")) is not None
+
+
+def _gate_storm(rec: dict, raw: dict, today: date) -> bool:
+    from foreclosure_scraper.distress_score import _storm_signal
+    return _storm_signal(raw.get("storm_damage")) is not None      # moderate or worse
+
+
+def _gate_vacancy(rec: dict, raw: dict, today: date) -> bool:
+    v = raw.get("vacancy")                                          # distress_score._vacant_structure
+    return isinstance(v, dict) and (v.get("vacant") is True or v.get("boarded_up") is True)
+
+
+def _gate_title(rec: dict, raw: dict, today: date) -> bool:
+    trs = raw.get("title_risk")
+    trs = trs if isinstance(trs, list) else [trs]
+    return any(isinstance(t, dict) and t.get("surviving_senior_debt_risk") for t in trs)
+
+
+def _gate_incarceration(rec: dict, raw: dict, today: date) -> bool:
+    from foreclosure_scraper.signal_freshness import incarceration_active
+    return incarceration_active(raw.get("incarceration"), raw.get("jail_booking"), today)
+
+
+def _gate_jail(rec: dict, raw: dict, today: date) -> bool:
+    from foreclosure_scraper.signal_freshness import custody_ended
+    jb = raw.get("jail_booking")
+    return isinstance(jb, dict) and bool(jb) and not custody_ended(jb, today)
+
+
+def _gate_bop(rec: dict, raw: dict, today: date) -> bool:
+    b = raw.get("bop_federal")
+    return isinstance(b, dict) and b.get("in_custody") is True
+
+
+def _gate_usps(rec: dict, raw: dict, today: date) -> bool:
+    u = raw.get("usps_vacancy")
+    return isinstance(u, dict) and str(u.get("vacancy_level") or "").lower() in ("high", "moderate")
+
+
+def _gate_lien_priority(rec: dict, raw: dict, today: date) -> bool:
+    lp = raw.get("lien_priority")
+    return isinstance(lp, dict) and any(lp.get(k) for k in ("senior_liens", "junior_liens",
+                                                            "super_priority_warnings"))
+
+
+def _gate_phone(rec: dict, raw: dict, today: date) -> bool:
+    from foreclosure_scraper.enrichment_sc_phone import is_owner_phone_usable
+    op = raw.get("owner_phone")
+    return isinstance(op, dict) and bool(op.get("phone")) and is_owner_phone_usable(op)
+
+
+def _gate_email(rec: dict, raw: dict, today: date) -> bool:
+    # not a scorer predicate: the outreach one. best_email can be an attorney's or agent's, and the
+    # LiensNC owner e-mail has no best_email (enrichment_email_extract.owner_email_of)
+    from foreclosure_scraper.enrichment_email_extract import owner_email_of
+    return bool(owner_email_of(raw))
+
+
+def _gate_probate(rec: dict, raw: dict, today: date) -> bool:
+    from foreclosure_scraper.signal_freshness import has_real_probate
+    return has_real_probate(raw.get("probate"))
+
+
+def _is_liensnc_row(rec: dict) -> bool:
+    return "liensnc" in [p for p in str(rec.get("source") or "").split(".") if p]   # ds._is_liensnc
+
+
+def _gate_lt_tax_lien(rec: dict, raw: dict, today: date) -> bool:
+    # 46,989 LiensNC lien-agent filings are typed tax_lien; the scorer treats them as context only
+    return rec.get("listing_type") == "tax_lien" and not _is_liensnc_row(rec)
+
+
+SCORER_GATES: dict[str, tuple[str, Any]] = {
+    "bankruptcy_stay": ("bankruptcy_stay", _gate_stay),
+    "code_enforcement": ("code_enforcement", _gate_code),
+    "divorce": ("divorce", _gate_divorce),
+    "storm_damage": ("storm_damage", _gate_storm),
+    "vacancy": ("vacancy", _gate_vacancy),
+    "title_risk": ("title_risk", _gate_title),
+    "incarceration": ("incarceration", _gate_incarceration),
+    "jail_booking": ("jail_booking", _gate_jail),
+    "bop_federal": ("bop_federal", _gate_bop),
+    "usps_vacancy": ("usps_vacancy", _gate_usps),
+    "lien_priority": ("lien_priority", _gate_lien_priority),
+    "phone": ("owner_phone", _gate_phone),
+    "email": ("owner_email", _gate_email),
+    "probate": ("probate", _gate_probate),
+    "lt_tax_lien": ("", _gate_lt_tax_lien),
+}
+
+
+def scorer_consistent_hits(rec: dict, owner: set[str], today: Optional[date] = None) -> set[str]:
+    """`owner` (the 10/1 hits) with every SCORER_GATES column set to the scorer's own verdict:
+    removed where the scorer would not count it, added where the 10/1 rule could not see it (a
+    list-shaped code_enforcement block). Pure, given `today`."""
     raw = rec.get("raw") or {}
-    pos = set(owner)
+    if not isinstance(raw, dict):
+        raw = {}
+    today = today or date.today()
+    out = set(owner)
+    for col, (_key, gate) in SCORER_GATES.items():
+        try:
+            hit = bool(gate(rec, raw, today))
+        except Exception:  # noqa: BLE001 - an odd block is not a hit
+            hit = False
+        if hit:
+            out.add(col)
+        else:
+            out.discard(col)
+    return out
+
+
+def positive_columns(rec: dict, owner: set[str], verdicts: dict[str, Optional[str]],
+                     today: Optional[date] = None) -> set[str]:
+    """The second view's hits: the 10/1 hits with marriage_license's no-match wrapper removed and
+    the SCORER_GATES columns set to the scorer's own verdict, plus the attorney columns. Pure."""
+    raw = rec.get("raw") or {}
+    pos = scorer_consistent_hits(rec, owner, today)
     ml = raw.get("marriage_license")
     if "marriage_license" in pos and not (isinstance(ml, dict) and (ml.get("spouse_name") or ml.get("license_date"))
                                           and ml.get("status") != "no_match"):
@@ -722,7 +880,7 @@ def positive_columns(rec: dict, owner: set[str], verdicts: dict[str, Optional[st
         pos.add("atty_taxpayer_of_record")
     if heir_candidates_present(raw):
         pos.add("atty_heir_candidates")
-    if obituary_present(raw):
+    if obituary_matched(raw):
         pos.add("atty_obituary_match")
     if rod_checked(raw):
         pos.add("atty_rod_lien_checked")
@@ -741,6 +899,8 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
     hit here; the county roll-up decides the rest. Pure."""
     raw = rec.get("raw") or {}
     out = set(pos)
+    # a scorer-gated column whose block is on the row was checked, hit or not (scorer_consistent_hits)
+    out |= {c for c, (k, _g) in SCORER_GATES.items() if k and raw.get(k) not in _EMPTY}
     tax = tax_status_known(raw)
     if tax:
         out |= {"multi_year_delinquent_tax", "repeat_tax_loss", "two_year_delinquent", "tax_aging_surfaced",

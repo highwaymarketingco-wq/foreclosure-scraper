@@ -114,6 +114,14 @@ def _surface_emails_from_raw(raw: dict) -> list[dict]:
     emails: list[dict] = []
     seen: set[str] = set()
     
+    # 0. the owner's own e-mail on a LiensNC filing (audit 2026-10-09): the raw scan below found it
+    #    and classified it 'other', beside the contractor's and the lien agent's
+    from .enrichment_email_extract import liensnc_owner_email
+    oe = liensnc_owner_email(raw)
+    if oe:
+        seen.add(oe)
+        emails.append({"email": oe, "source": "liensnc.owner", "classification": "owner"})
+
     # 1. distressed.agent_email
     d = raw.get("distressed")
     if isinstance(d, dict):

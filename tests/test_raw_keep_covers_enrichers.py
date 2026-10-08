@@ -339,3 +339,169 @@ def test_the_new_qpaybill_roll_key_is_published():
     assert "qpaybill_roll" in RAW_KEEP
     kept = _slim_raw({"qpaybill_roll": {"balance_owed": 130.55, "is_two_year_plus": True}})
     assert kept["qpaybill_roll"]["balance_owed"] == 130.55
+
+
+# ===========================================================================
+# EVERY MODULE (audit 2026-10-09, drops_lineage). The two scans above read enrich*.py and
+# scrapers/ only, and only `raw["k"] = ...` / `raw={...}`. Measured on the 2026-10-08 gated run's
+# dot_ocr checkpoint (383,373 rows, full raw): keys written by main.py (situs_nulled 8,606 rows,
+# coastal_county 6,207, oceanfront ...), board_persist.py (mailing_address_not_inherited 683),
+# parcel_alias.py (parcel_id_alias 680, read back by tax_binding), nc_lincoln_bulk.py (14,893),
+# nc_burke_spine.py (533, read back by enrichment_lrcpwa_parcel), enrichment_prior_correction
+# (withdrawn_case_type_other 260) were all dropped at publish, along with enrichers that build a
+# `raw_update` dict and merge it (`li.raw = {**li.raw, **raw_update}`), `setdefault`/`update`
+# writes, and a conditional `raw={...} if ... else None` literal (law_firms.mcmichael_taylor_gray's
+# sp_case). This scan covers all of them, in every module.
+# ===========================================================================
+
+#: Keys some module writes into Listing.raw that are deliberately NOT published, each with its reason.
+MODULE_KEYS_INTENTIONALLY_INTERNAL = {
+    "_equity_amortization": "enrichment_equity's in-run scratch detail, popped by its own caller "
+                            "before the row is stored",
+    "detail_page": "PRIVACY: enrichment_judgment_detail keeps up to 5,000 characters of a court "
+                   "page's text (parties' names, notice wording); the repo and board are public",
+    "downtown_charleston_pending": "main._in_scope's provisional tag, resolved in the same run by "
+                                   "_resolve_coastal_pending (kept rows get downtown_charleston)",
+    "oceanfront_pending": "main._in_scope's provisional tag, resolved in the same run by "
+                          "_resolve_coastal_pending (kept rows get oceanfront)",
+    "latitude": "enrichment_census_geocoder copies its point into raw as well as the top-level "
+                "Listing.latitude field, which is what publishes",
+    "longitude": "enrichment_census_geocoder copies its point into raw as well as the top-level "
+                 "Listing.longitude field, which is what publishes",
+    "opening_bid": "enrichment_ocr's raw.setdefault copy of an OCR'd bid shadows the top-level "
+                   "Listing.opening_bid field; a raw twin of a real field invites disagreement",
+}
+_RAW_NAMES = {"raw", "_raw", "raw_update", "new_raw"}
+
+
+def _is_raw_target(node) -> bool:
+    return ((isinstance(node, ast.Attribute) and node.attr == "raw")
+            or (isinstance(node, ast.Name) and node.id in _RAW_NAMES))
+
+
+def _literal_keys(node) -> list[str]:
+    """String keys of a dict literal, or of either branch of `{...} if c else {...}/None`."""
+    if isinstance(node, ast.Dict):
+        return [k.value for k in node.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)]
+    if isinstance(node, ast.IfExp):
+        return _literal_keys(node.body) + _literal_keys(node.orelse)
+    return []
+
+
+def _call_name(fn) -> str:
+    return fn.id if isinstance(fn, ast.Name) else (fn.attr if isinstance(fn, ast.Attribute) else "")
+
+
+def _module_raw_keys(path: Path) -> set[str]:
+    """Every literal key a module writes into a listing's raw: `X.raw[k] = / += / : T =`, the same
+    on a local named raw / _raw / raw_update / new_raw, `.setdefault(k, ...)`, `.update({...})` /
+    `.update(k=...)`, a dict literal (or conditional literal) assigned to one of those, and
+    `Listing(..., raw={...})`. A key given by a module-level string constant counts too."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (SyntaxError, UnicodeDecodeError):
+        return set()
+    consts = {t.id: n.value.value for n in tree.body
+              if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)
+              and isinstance(n.value.value, str) for t in n.targets if isinstance(t, ast.Name)}
+
+    def key(sl):
+        if isinstance(sl, ast.Constant) and isinstance(sl.value, str):
+            return sl.value
+        return consts.get(sl.id) if isinstance(sl, ast.Name) else None
+
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in targets:
+                if isinstance(t, ast.Subscript) and _is_raw_target(t.value):
+                    k = key(t.slice)
+                    if k:
+                        found.add(k)
+                if _is_raw_target(t) and getattr(node, "value", None) is not None:
+                    found.update(_literal_keys(node.value))
+        elif isinstance(node, ast.Call):
+            if _call_name(node.func).endswith("Listing"):
+                for kw in node.keywords:
+                    if kw.arg == "raw":
+                        found.update(_literal_keys(kw.value))
+            fn = node.func
+            if isinstance(fn, ast.Attribute) and _is_raw_target(fn.value):
+                if fn.attr == "setdefault" and node.args:
+                    k = key(node.args[0])
+                    if k:
+                        found.add(k)
+                elif fn.attr == "update":
+                    for a in node.args:
+                        found.update(_literal_keys(a))
+                    found.update(kw.arg for kw in node.keywords if kw.arg)
+    return found
+
+
+#: rod/ register readers build RodDoc records whose own `.raw` (one recorded instrument) is not a
+#: listing's raw; only these rod/ modules write into Listing.raw.
+_ROD_LISTING_WRITERS = {"rod/enrich.py"}
+
+
+def _all_module_raw_keys() -> dict[str, set[str]]:
+    out: dict[str, set[str]] = {}
+    for f in sorted(SRC.rglob("*.py")):
+        rel = str(f.relative_to(SRC))
+        if rel.startswith("rod/") and rel not in _ROD_LISTING_WRITERS:
+            continue
+        for k in _module_raw_keys(f):
+            out.setdefault(k, set()).add(str(f.relative_to(SRC)))
+    return out
+
+
+def test_the_module_scan_finds_the_forms_that_hid_keys(tmp_path):
+    """Guards the guard: each write form the 2026-10-09 audit found keys hiding behind."""
+    f = tmp_path / "shapes.py"
+    f.write_text(
+        "KEY = 'const_key'\n"
+        "def a(li, listing):\n"
+        "    raw_update = {'marker': True}\n"
+        "    raw_update['later'] = 1\n"
+        "    listing.raw = {**listing.raw, **raw_update}\n"
+        "    li.raw.setdefault('set_default', {})\n"
+        "    li.raw.update({'upd_lit': 1}, upd_kw=2)\n"
+        "    li.raw[KEY] = 3\n"
+        "    return Listing(raw={'cond_a': 1} if li else None)\n"
+        "def b(doc):\n"
+        "    return RodDoc(raw={'not_a_listing': 1})\n")
+    assert _module_raw_keys(f) == {"marker", "later", "set_default", "upd_lit", "upd_kw",
+                                   "const_key", "cond_a"}
+
+
+def test_every_module_raw_key_survives_publish():
+    """THE all-module test: a key any module writes into Listing.raw is in RAW_KEEP, or listed
+    as internal (here, or in the two lists above) with a reason."""
+    internal = (set(MODULE_KEYS_INTENTIONALLY_INTERNAL) | set(SCRAPER_KEYS_INTENTIONALLY_INTERNAL)
+                | INTENTIONALLY_INTERNAL)
+    keys = _all_module_raw_keys()
+    assert len(keys) > 400, f"only {len(keys)} keys found; the scan broke"
+    missing = {k: sorted(v) for k, v in sorted(keys.items()) if k not in RAW_KEEP and k not in internal}
+    assert not missing, (
+        f"{len(missing)} raw key(s) are dropped at publish with no error:\n"
+        + "\n".join(f"    {k!r:<34} written by {', '.join(v[:3])}" for k, v in list(missing.items())[:30])
+        + "\n\nAdd each to RAW_KEEP in web_artifact.py, or to MODULE_KEYS_INTENTIONALLY_INTERNAL "
+          "above WITH A REASON.")
+
+
+def test_module_internal_reasons_are_real():
+    for key, reason in MODULE_KEYS_INTENTIONALLY_INTERNAL.items():
+        assert reason and len(reason) > 20, key
+        assert key not in RAW_KEEP, f"{key!r} is both published and listed as internal"
+
+
+def test_the_keys_the_pipeline_reads_back_are_published():
+    """Pins the keys a later step or the next run reads off a reloaded board."""
+    from foreclosure_scraper.web_artifact import _slim_raw
+    for k in ("parcel_id_alias", "burke_spine", "withdrawn_case_type_other",
+              "_land_buildability_checked", "situs_nulled", "lincoln_bulk"):
+        assert k in RAW_KEEP, k
+    kept = _slim_raw({"gis": {"owner": "X", "absentee": True, "vacant": False, "queried": 1},
+                      "parcel_id_alias": {"short": "12345", "long": "1234567890"}})
+    assert kept["gis"] == {"owner": "X", "absentee": True, "vacant": False}
+    assert kept["parcel_id_alias"]["short"] == "12345"
