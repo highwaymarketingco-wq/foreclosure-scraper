@@ -15,10 +15,21 @@ SWITCHES (all OFF by default)
   FORECLOSURE_ROD_CHAIN_BUDGET_S   wall-clock budget for the pass (default 1800): no new lead is
                                    started after it; leads not reached stay unstamped for next run
 
-POLITENESS: counties run one after another, leads within a county one after another, through
-the adapters' paced client (>= 1.6 s per host, one request at a time). A county that answers with
-a wall, or reaches the cap, is left for the rest of the run; its leads stay unstamped and are
-retried on a later run.
+  ROD_CHAIN_COUNTY_CONCURRENCY     counties read at the same time (default 8; each county is its
+                                   own register host, so this never puts two requests on one host)
+
+POLITENESS: leads within a county run one after another, through the adapters' paced client
+(>= 1.6 s per host, one request at a time, per-host lock shared by every caller in the process).
+Counties are different hosts, so up to ROD_CHAIN_COUNTY_CONCURRENCY of them run side by side. A
+county that answers with a wall, or reaches the cap, is left for the rest of the run; its leads stay
+unstamped and are retried on a later run.
+
+ORDER (audit 2026-10-09, additions_verify): counties holding the most imminent leads (HOT or an
+auction within 30 days) go first, then the counties with the most leads. The 10/8 run read the
+counties one after another in ALPHABETICAL order: the 1,800 s budget ended inside the sixth county
+(Alamance, Alexander, Avery, Bertie, Buncombe, Clay) and 52 enabled counties got nothing, every run
+the same six. If the phase is cancelled by the caller's cap, the counts so far are logged
+(rod_chain.cancelled) instead of being lost.
 """
 from __future__ import annotations
 
@@ -100,47 +111,71 @@ async def enrich_rod_chain(listings: Iterable[Listing]) -> dict:
              "with_open_dot_est": 0, "with_lis_pendens": 0, "with_substitution": 0,
              "walled_counties": [], "capped_counties": [], "errors": 0, "disabled_counties": 0,
              "budget_exhausted": False}
-    for (state, county), targets in sorted(by_county.items()):
+    try:
+        county_conc = max(1, int(os.environ.get("ROD_CHAIN_COUNTY_CONCURRENCY", "8")))
+    except ValueError:
+        county_conc = 8
+    sem = asyncio.Semaphore(county_conc)
+
+    def _out_of_time() -> bool:
+        if time.monotonic() - t0 > budget_s:
+            stats["budget_exhausted"] = True
+            return True
+        return False
+
+    async def one_county(state: str, county: str, targets: list[Listing]) -> None:
         entry = registry[(state, county)]
         if not platform_enabled(entry):
             stats["disabled_counties"] += 1
-            continue
-        mod = _module(entry[0])
-        stats["counties"] += 1
-        targets.sort(key=lambda li: not imminent(li, now))       # auctions soonest first
-        for li in targets:
-            if time.monotonic() - t0 > budget_s:
-                stats["budget_exhausted"] = True
-                break
-            stats["targets"] += 1
-            try:
-                # the lead's parcel id, for adapters whose chain() takes one (Anderson SC: flags a
-                # vesting deed newer than its online index from the county parcel layer)
-                _code = getattr(mod.chain, "__code__", None)
-                _kw = {"parcel_id": li.parcel_id} if _code is not None and "parcel_id" in _code.co_varnames else {}
-                res = await asyncio.to_thread(mod.chain, county, li.owner_name, state=state, depth=depth, **_kw)
-            except Exception as exc:  # noqa: BLE001 - one lead never kills the pass
-                log.warning("rod_chain.failed", county=county, error=f"{type(exc).__name__}: {str(exc)[:120]}")
-                stats["errors"] += 1
-                continue
-            status = res.get("status")
-            if status in _RETRY_LATER:
-                if status == "error":
-                    stats["errors"] += 1
-                if status in _STOP_COUNTY:
-                    stats[f"{status}_counties"].append(county)
+            return
+        async with sem:
+            if _out_of_time():
+                return
+            mod = _module(entry[0])
+            stats["counties"] += 1
+            targets.sort(key=lambda li: not imminent(li, now))       # auctions soonest first
+            for li in targets:
+                if _out_of_time():
                     break
-                continue
-            if not isinstance(li.raw, dict):
-                li.raw = {}
-            li.raw["rod_chain"] = res
-            stats["stamped"] += 1
-            liens = res.get("liens") or {}
-            stats["with_last_deed"] += bool(res.get("last_deed"))
-            stats["with_prior"] += bool(res.get("prior_instruments"))
-            stats["with_open_dot_est"] += bool(liens.get("open_deeds_of_trust_est"))
-            stats["with_lis_pendens"] += bool(liens.get("lis_pendens"))
-            stats["with_substitution"] += bool(liens.get("substitutions_of_trustee"))
+                stats["targets"] += 1
+                try:
+                    # the lead's parcel id, for adapters whose chain() takes one (Anderson SC: flags a
+                    # vesting deed newer than its online index from the county parcel layer)
+                    _code = getattr(mod.chain, "__code__", None)
+                    _kw = {"parcel_id": li.parcel_id} if _code is not None and "parcel_id" in _code.co_varnames else {}
+                    res = await asyncio.to_thread(mod.chain, county, li.owner_name, state=state, depth=depth, **_kw)
+                except Exception as exc:  # noqa: BLE001 - one lead never kills the pass
+                    log.warning("rod_chain.failed", county=county, error=f"{type(exc).__name__}: {str(exc)[:120]}")
+                    stats["errors"] += 1
+                    continue
+                status = res.get("status")
+                if status in _RETRY_LATER:
+                    if status == "error":
+                        stats["errors"] += 1
+                    if status in _STOP_COUNTY:
+                        stats[f"{status}_counties"].append(county)
+                        break
+                    continue
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                li.raw["rod_chain"] = res
+                stats["stamped"] += 1
+                liens = res.get("liens") or {}
+                stats["with_last_deed"] += bool(res.get("last_deed"))
+                stats["with_prior"] += bool(res.get("prior_instruments"))
+                stats["with_open_dot_est"] += bool(liens.get("open_deeds_of_trust_est"))
+                stats["with_lis_pendens"] += bool(liens.get("lis_pendens"))
+                stats["with_substitution"] += bool(liens.get("substitutions_of_trustee"))
+
+    # counties holding the most imminent leads first, then the most leads (not alphabetical)
+    order = sorted(by_county.items(),
+                   key=lambda kv: (-sum(1 for li in kv[1] if imminent(li, now)), -len(kv[1]), kv[0]))
+    try:
+        await asyncio.gather(*(one_county(s, c, t) for (s, c), t in order))
+    except asyncio.CancelledError:
+        log.warning("rod_chain.cancelled", **{k: v for k, v in stats.items() if not isinstance(v, list)},
+                    walled=stats["walled_counties"], capped=stats["capped_counties"])
+        raise
     log.info("rod_chain.done", **{k: v for k, v in stats.items() if not isinstance(v, list)},
              walled=stats["walled_counties"], capped=stats["capped_counties"])
     return stats

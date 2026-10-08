@@ -19,13 +19,14 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
 
 from .models import Listing
-from .rod.classify import classify_rod_docs, is_stale, refresh_windows
+from .rod.classify import classify_rod_docs, imminent, is_stale, refresh_windows
 from .name_normalize import first_last_parts
 
 log = structlog.get_logger()
@@ -200,6 +201,35 @@ _EMPTY = {
 _CONCURRENCY = int(os.environ.get("GENERIC_ROD_CONCURRENCY", "3"))
 _MAX_PER_COUNTY = int(os.environ.get("GENERIC_ROD_MAX_PER_COUNTY", "150"))
 
+# RUN SHAPE (audit 2026-10-09, additions_verify). The 10/8 run read the enabled counties one after
+# another in board order inside the ROD group's 900 s cap: 5 counties started (Rutherford,
+# Greenville, Edgecombe, Anderson, Laurens) of about 60 enabled, 114 leads stamped, and the cap
+# cancelled the phase so not even its counts reached the run's stats. Now:
+#   * counties run side by side, GENERIC_ROD_COUNTY_CONCURRENCY at a time (default 8). Each county
+#     is its own register host and the adapters' paced client holds a per-host lock, so this never
+#     puts two requests on one host;
+#   * the counties holding the most imminent leads (HOT or an auction within 30 days) go first;
+#     inside a county imminent leads first, then leads never read before;
+#   * FORECLOSURE_GENERIC_ROD_BUDGET_S (default 840 s, under the 900 s group cap) ends the pass with
+#     its counts returned; no lookup starts after it;
+#   * in a county whose adapter also gives the deed chain (enrichment_rod_chain, when
+#     FORECLOSURE_ROD_CHAIN=1), this pass takes at most GENERIC_ROD_MAX_PER_CHAIN_COUNTY leads
+#     (default 10): the adapters cap lookups per county per run (NC_ROD_MAX_LOOKUPS_PER_COUNTY /
+#     SC_ROD_MAX_LOOKUPS_PER_COUNTY, 30) and the cap is shared by both callers, so a 150-lead pass
+#     here would leave the deed chain nothing in every such county.
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
 
 def _name_parts(owner: str):
     fl = first_last_parts(owner)   # Title Case FIRST-LAST court/probate names
@@ -253,72 +283,113 @@ async def enrich_generic_rod(listings: list[Listing]) -> dict:
         targets_by_county.setdefault(key, []).append(li)
 
     stats = {"counties": 0, "targets": 0, "searched": 0,
-             "with_instruments": 0, "with_mortgage": 0, "with_adverse": 0}
+             "with_instruments": 0, "with_mortgage": 0, "with_adverse": 0,
+             "disabled_counties": 0, "budget_exhausted": False, "chain_share_capped": 0}
+    budget_s = _env_float("FORECLOSURE_GENERIC_ROD_BUDGET_S", 840.0)
+    county_conc = max(1, _env_int("GENERIC_ROD_COUNTY_CONCURRENCY", 8))
+    chain_share = max(0, _env_int("GENERIC_ROD_MAX_PER_CHAIN_COUNTY", 10))
+    chain_counties: set = set()
+    if os.environ.get("FORECLOSURE_ROD_CHAIN", "0") == "1":
+        try:
+            from .enrichment_rod_chain import chain_registry
+            chain_counties = set(chain_registry())
+        except Exception:  # noqa: BLE001 - the share is an optimisation, never a reason to stop
+            log.warning("generic_rod.chain_registry_failed", exc_info=True)
+    t0 = time.monotonic()
+    county_sem = asyncio.Semaphore(county_conc)
 
-    for (state, county), targets in targets_by_county.items():
+    def _out_of_time() -> bool:
+        if time.monotonic() - t0 > budget_s:
+            stats["budget_exhausted"] = True
+            return True
+        return False
+
+    async def one_county(state: str, county: str, targets: list[Listing]) -> None:
         entry = ROD_CONFIG[(state, county)]
         module_name, env_flag = entry[0], entry[1]
         if not platform_enabled(entry):
+            stats["disabled_counties"] += 1
             log.info("generic_rod.skipped", county=county, reason=f"disabled ({env_flag}=0 or default off)")
-            continue
+            return
 
         mod = _get_module(module_name)
         if mod is None:
             log.warning("generic_rod.no_module", county=county, module=module_name)
-            continue
+            return
 
         if not hasattr(mod, "search_by_name"):
             log.warning("generic_rod.no_search_by_name", county=county, module=module_name)
-            continue
+            return
         search_fn = mod.search_by_name
 
-        # Cap per county
-        if len(targets) > _MAX_PER_COUNTY:
-            targets = targets[:_MAX_PER_COUNTY]
+        # imminent leads first, then leads never read before, then the rest (board order kept)
+        targets = sorted(targets, key=lambda li: (not imminent(li, now),
+                                                  isinstance(li.raw, dict) and bool(li.raw.get("rod"))))
+        cap = _MAX_PER_COUNTY
+        if (state, county) in chain_counties and chain_share < cap:
+            cap = chain_share
+            if len(targets) > cap:
+                stats["chain_share_capped"] += 1
+        if len(targets) > cap:
+            targets = targets[:cap]
 
-        stats["counties"] += 1
-        stats["targets"] += len(targets)
-        log.info("generic_rod.county_start", county=county, module=module_name,
-                 targets=len(targets))
-
-        sem = asyncio.Semaphore(_CONCURRENCY)
-
-        async def one(li: Listing) -> None:
-            owner = li.owner_name or ""
-            last, first = _name_parts(owner)
-            if not last:
+        async with county_sem:
+            if _out_of_time() or not targets:
                 return
-            async with sem:
-                try:
-                    docs = await search_fn(state, county, owner, max_docs=80)
-                except Exception as exc:
-                    log.debug("generic_rod.search_fail", county=county,
-                              owner=li.owner_name[:40], error=str(exc)[:80])
-                    docs = []
-                stats["searched"] += 1
+            stats["counties"] += 1
+            stats["targets"] += len(targets)
+            log.info("generic_rod.county_start", county=county, module=module_name,
+                     targets=len(targets))
 
-            if not docs:
-                return  # fetch failed -> leave unstamped, retry next run
+            sem = asyncio.Semaphore(_CONCURRENCY)
 
-            mine = [d for d in docs if _owner_doc(d, last, first)]
-            if not mine:
-                return
+            async def one(li: Listing) -> None:
+                owner = li.owner_name or ""
+                last, first = _name_parts(owner)
+                if not last:
+                    return
+                async with sem:
+                    if _out_of_time():
+                        return
+                    try:
+                        docs = await search_fn(state, county, owner, max_docs=80)
+                    except Exception as exc:
+                        log.debug("generic_rod.search_fail", county=county,
+                                  owner=li.owner_name[:40], error=str(exc)[:80])
+                        docs = []
+                    stats["searched"] += 1
 
-            summ = classify_rod_docs(mine, "generic_rod") if mine else dict(_EMPTY)
-            summ["fetched_at"] = now.isoformat()
-            if not isinstance(li.raw, dict):
-                li.raw = {}
-            li.raw["rod"] = summ
+                if not docs:
+                    return  # fetch failed -> leave unstamped, retry next run
 
-            stats["with_instruments"] += 1
-            if summ.get("has_mortgage"):
-                stats["with_mortgage"] += 1
-            if summ.get("has_adverse_lien"):
-                stats["with_adverse"] += 1
+                mine = [d for d in docs if _owner_doc(d, last, first)]
+                if not mine:
+                    return
 
-            await asyncio.sleep(0.3)
+                summ = classify_rod_docs(mine, "generic_rod") if mine else dict(_EMPTY)
+                summ["fetched_at"] = now.isoformat()
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                li.raw["rod"] = summ
 
-        await asyncio.gather(*(one(li) for li in targets))
+                stats["with_instruments"] += 1
+                if summ.get("has_mortgage"):
+                    stats["with_mortgage"] += 1
+                if summ.get("has_adverse_lien"):
+                    stats["with_adverse"] += 1
+
+                await asyncio.sleep(0.3)
+
+            await asyncio.gather(*(one(li) for li in targets))
+
+    # the counties holding the most imminent leads first, then the most leads
+    order = sorted(targets_by_county.items(),
+                   key=lambda kv: (-sum(1 for li in kv[1] if imminent(li, now)), -len(kv[1]), kv[0]))
+    try:
+        await asyncio.gather(*(one_county(s, c, t) for (s, c), t in order))
+    except asyncio.CancelledError:
+        log.warning("generic_rod.cancelled", **stats)
+        raise
 
     log.info("generic_rod.done", **stats)
     return stats
