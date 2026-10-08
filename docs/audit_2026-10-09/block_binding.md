@@ -152,7 +152,7 @@ removal (up to 3 rounds). It must be wired into `main.py` (the lead's change).
    except Exception:
        log.error("blocks_unbound_late.failed", traceback=traceback.format_exc())
    ```
-Cost: one in-memory pass each (verdicts plus a fingerprint index of about 0.5 M entries, about
+Cost (estimated, not measured in a run): one in-memory pass each (verdicts plus a fingerprint index of about 0.5 M entries, roughly
 100 MB while it runs; the streamed replay of the whole board took about 3 minutes per pass).
 
 ## 3. Open items
