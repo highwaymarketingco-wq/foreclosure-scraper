@@ -118,6 +118,10 @@ ARV_FLAGS_CONTRADICTED = frozenset({
     # nothing. Listed so the set is complete and stays correct if that changes.
     "arv_above_anchor_extreme",
     "ppsf_ceiling",
+    # calc.ARV_FLAG_UNEXPLAINED_OUTLIER (audit 2026-10-09): an ARV over $1M, 8x the county
+    # value or 5x the highest cited comp with no county value or comp to support it; calc
+    # withholds it like the two above.
+    "arv_unexplained_outlier",
     # calc.ARV_FLAG_PROXY_CEILING. A proxy tier (bid x2.4, bid x1.5, tax x1.25,
     # market-value-as-Zestimate, sale-to-assessed) produced a number above
     # calc.MAX_PROXY_ARV and calc REFUSED it, so no ARV is published — same

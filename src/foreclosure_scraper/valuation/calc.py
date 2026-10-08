@@ -599,6 +599,29 @@ ARV_FLAG_ABOVE_ASK = "arv_above_list_price"
 ARV_FLAG_LAND_SQFT = "arv_land_sqft_mismatch"
 
 
+# ---- An outlier ARV must name its evidence or be withheld (audit 2026-10-09) ----
+# Three tests mark an ARV as an outlier: over $1,000,000 (these counties' distressed
+# inventory), over 8x the parcel's largest 100%-basis county value, or over 5x the
+# highest sale price among the comps cited on the row. Measured on the 2026-10-08 gated
+# checkpoint (383,378 rows) re-priced by this code: 4,508 ARVs crossed one of them; 3,705
+# had a basis (the county's own value within 2.5x, 6x for land, a cited comp within 2x,
+# or the seller's ask) and 803 had none (581 already CONTRADICTED, 222 publishing a max
+# bid): small-house comps times a 7,000-sqft subject, one FHFA rescale stamped on several
+# rows, a sale floor from a deed several times the county value (a $1.4M deed on a
+# 0.2-acre lot the county values at $274K), house $/sqft times a lot. Every outlier now
+# carries `arv_basis_check` (what crossed, what supports it); an outlier with no basis
+# is withheld (arv_withheld keeps the number, flag ARV_FLAG_UNEXPLAINED_OUTLIER).
+# The parcel's own recorded sale is NOT a basis here: when it is what raised the ARV,
+# it is the thing in question (a deed's amount can cover several parcels).
+ARV_OUTLIER_ABS = 1_000_000
+ARV_OUTLIER_COUNTY_MULT = 8.0
+ARV_OUTLIER_COMP_MULT = 5.0
+ARV_SUPPORT_COUNTY_MULT_IMPROVED = 2.5   # = ARV_ANCHOR_SOFT_MULT_IMPROVED
+ARV_SUPPORT_COUNTY_MULT_LAND = 6.0       # = ARV_ANCHOR_SOFT_MULT_LAND
+ARV_SUPPORT_COMP_FRACTION = 0.5          # a cited comp sold for at least half the ARV
+ARV_FLAG_UNEXPLAINED_OUTLIER = "arv_unexplained_outlier"
+
+
 @dataclass
 class Calc:
     arv_low: float | None = None
@@ -639,6 +662,9 @@ class Calc:
     # board's shape is unchanged for the ~87% of ARVs that trip nothing.
     arv_flags: list[str] | None = None
     arv_withheld: float | None = None
+    # Set only on an outlier ARV (see ARV_OUTLIER_ABS): {"triggers": [...], "basis": [...],
+    # "verdict": "explained" | "withheld"}. None (omitted by to_dict) on every other row.
+    arv_basis_check: dict | None = None
     notes: list[str] | None = None
     # Flip framing — what's the deal status at the listed/asking price?
     deal_status: str | None = None         # GREAT / OK / NEGOTIATE / PASS
@@ -1790,6 +1816,10 @@ def _arv_sanity(li: Listing, out: "Calc", arv_conf: str, arv_flags: list[str],
             f"of them."
         )
 
+    # --- HARD 3: an outlier ARV must name its evidence ----------------------
+    if not hard and _outlier_unexplained(li, out, is_land, anchor_is_weak_evidence):
+        hard.append(ARV_FLAG_UNEXPLAINED_OUTLIER)
+
     if hard:
         out.arv_withheld = out.arv_expected
         out.arv_expected = out.arv_low = out.arv_high = None
@@ -1800,6 +1830,71 @@ def _arv_sanity(li: Listing, out: "Calc", arv_conf: str, arv_flags: list[str],
     if arv_flags:
         out.arv_flags = sorted(set(arv_flags))
     return arv_conf
+
+
+def _cited_comp_prices(li: Listing) -> list[float]:
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    out = []
+    for c in raw.get("comps") or []:
+        if not isinstance(c, dict):
+            continue
+        try:
+            p = float(c.get("sold_price") or 0)
+        except (TypeError, ValueError):
+            continue
+        if p > 0:
+            out.append(p)
+    return out
+
+
+def outlier_triggers(arv: float, county_max: float | None, comp_max: float | None) -> list[str]:
+    """Which outlier tests an ARV crosses (shared with scripts/audit_checks/valuation.py)."""
+    t = []
+    if arv > ARV_OUTLIER_ABS:
+        t.append(f"over ${ARV_OUTLIER_ABS:,.0f}")
+    if county_max and arv > ARV_OUTLIER_COUNTY_MULT * county_max:
+        t.append(f"over {ARV_OUTLIER_COUNTY_MULT:.0f}x the county value")
+    if comp_max and arv > ARV_OUTLIER_COMP_MULT * comp_max:
+        t.append(f"over {ARV_OUTLIER_COMP_MULT:.0f}x the highest cited comp")
+    return t
+
+
+def _outlier_unexplained(li: Listing, out: "Calc", is_land: bool,
+                         arv_is_seller_ask: bool) -> bool:
+    """Record `arv_basis_check` on an outlier ARV; True when nothing supports it (withhold)."""
+    arv = out.arv_expected
+    if not arv:
+        return False
+    cvals = [v for v, _ in _county_values(li)]
+    county_max = max(cvals) if cvals else None
+    comps = _cited_comp_prices(li)
+    comp_max = max(comps) if comps else None
+    triggers = outlier_triggers(arv, county_max, comp_max)
+    if not triggers:
+        return False
+    basis = []
+    mult = ARV_SUPPORT_COUNTY_MULT_LAND if is_land else ARV_SUPPORT_COUNTY_MULT_IMPROVED
+    if county_max and arv <= mult * county_max:
+        basis.append(f"county value ${county_max:,.0f} ({arv / county_max:.1f}x)")
+    if comp_max and comp_max >= ARV_SUPPORT_COMP_FRACTION * arv:
+        basis.append(f"cited comp sold for ${comp_max:,.0f}")
+    if arv_is_seller_ask and li.opening_bid:
+        basis.append(f"the seller's public asking price ${float(li.opening_bid):,.0f}")
+    verdict = "explained" if basis else "withheld"
+    out.arv_basis_check = {"triggers": triggers, "basis": basis, "verdict": verdict}
+    if basis:
+        out.notes.append(f"ARV ${arv:,.0f} is {' and '.join(triggers)}; supported by "
+                         f"{'; '.join(basis)}.")
+        return False
+    out.notes.append(
+        f"ARV WITHHELD: ${arv:,.0f} is {' and '.join(triggers)}, and nothing on the record "
+        f"supports it: "
+        + (f"the county values the parcel at ${county_max:,.0f}" if county_max
+           else "no county value") + ", "
+        + (f"the highest cited comp sold for ${comp_max:,.0f}" if comp_max else "no cited comp")
+        + ". A recorded deed of that size can cover several parcels; verify before using any "
+          "figure.")
+    return True
 
 
 ARV_FLAG_LOW_VALUE_PARCEL = "low_value_parcel"

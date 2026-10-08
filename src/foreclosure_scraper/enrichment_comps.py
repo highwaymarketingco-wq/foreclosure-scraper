@@ -22,7 +22,8 @@ from __future__ import annotations
 import asyncio
 import re
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
+from datetime import date
+from typing import Iterable, Optional
 
 import structlog
 
@@ -421,11 +422,16 @@ def _filter_by_kind(pool: list[dict], target_kind: str) -> list[dict]:
     return out
 
 
-def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
+def _pick_3_comps(target: Listing, sold_pool: list[dict],
+                  kind_cache: dict | None = None) -> list[dict]:
     """Strict like-for-like comp matcher. Refuses to mix kinds.
 
     Returns up to 3 dicts. If pool can't produce a like-for-like match, returns
     fewer (or zero) — better to show "not enough comps" than misleading comps.
+
+    `kind_cache` (enrich_with_comps passes one per run) keeps each county pool's
+    same-kind subset, so the text classifier runs once per pool row instead of once
+    per pool row PER LISTING (a 6,000-sale pool times 19,000 county leads).
     """
     target_kind = _classify_kind(target)
     target_zip = (target.zip_code or "").strip()
@@ -443,7 +449,13 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
     )
 
     # Stage 1: same kind only
-    kind_pool = _filter_by_kind(sold_pool, target_kind)
+    if kind_cache is not None:
+        ck = (id(sold_pool), target_kind)
+        kind_pool = kind_cache.get(ck)
+        if kind_pool is None:
+            kind_pool = kind_cache[ck] = _filter_by_kind(sold_pool, target_kind)
+    else:
+        kind_pool = _filter_by_kind(sold_pool, target_kind)
     if not kind_pool:
         return []
     match_quality = "kind"
@@ -960,7 +972,13 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
     gis_ctx = client(timeout=20.0) if gis_needed else None
     gis_http = await gis_ctx.__aenter__() if gis_ctx is not None else None
 
-    for li in listings:
+    # The phase runs under a wall-clock cap (main.py, COMPS_PHASE_MAX_SECONDS) that the
+    # 2026-10-08 gated run hit after 24 minutes of this loop. Rows nobody reached kept only
+    # what they already had, so the order decides who goes without: rows with no comps first,
+    # then HOT/WARM, then the rows whose comps are oldest (age_comps() prunes those later).
+    today = date.today().isoformat()
+    kind_cache: dict = {}
+    for li in sorted(listings, key=_comps_priority):
         pool_key = ((li.state or "").strip().upper(), normalize_county(li.county)) if (li.county and li.state) else None
         sold_pool = sold_pools.get(pool_key) if pool_key else None
         rent_pool = rent_pools.get(pool_key) if pool_key else None
@@ -987,7 +1005,7 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
 
         # Sold comps (strict like-for-like; may return fewer than 3 or zero)
         if sold_pool:
-            comps = _pick_3_comps(li, sold_pool)
+            comps = _pick_3_comps(li, sold_pool, kind_cache)
             if comps and gis_http is not None and pool_key in gis_crosscheck.SUPPORTED:
                 await _apply_gis_crosscheck(gis_http, comps, pool_key, gis_cache)
             if comps:
@@ -1003,23 +1021,16 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
                         "comps are county-wide (no same-zip/city/nearby match) — "
                         "ARV from these is low confidence"
                     )
-                # Prefer the line-item ADJUSTED $/sqft (comp adjusted toward the
-                # subject); fall back to raw $/sqft where no grid was computed.
-                ppsf = [(c.get("adjusted_ppsf") or c.get("price_per_sqft"))
-                        for c in comps
-                        if (c.get("adjusted_ppsf") or c.get("price_per_sqft"))]
-                if ppsf and anchored:
-                    ppsf.sort()
-                    # Arms-length / distressed filter: drop comps whose $/sqft is
-                    # far below the median — typically as-is/distressed sales that
-                    # understate ARV for a renovated subject. Tightened to 0.70x
-                    # and fires at 3+ comps (was 0.50x / 4+).
-                    if len(ppsf) >= 3:
-                        median = ppsf[len(ppsf) // 2]
-                        clean_ppsf = [p for p in ppsf if p >= median * 0.70]
-                        if len(clean_ppsf) >= 3:
-                            ppsf = clean_ppsf
-                    li.raw["comp_median_ppsf"] = ppsf[len(ppsf) // 2]
+                # The median $/sqft comes only from anchored comps (_median_ppsf);
+                # a median left by LAST run's comps must not sit beside unanchored
+                # new ones (calc would price off it).
+                med = _median_ppsf(comps)
+                if med is not None:
+                    li.raw["comp_median_ppsf"] = med
+                else:
+                    li.raw.pop("comp_median_ppsf", None)
+                for c in comps:
+                    c["picked_on"] = today
                 matched_sold += 1
             else:
                 li.raw["comps_note"] = (
@@ -1050,3 +1061,254 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
     log.info("comps.done", listings=len(listings),
              sold_matched=matched_sold, rent_matched=matched_rent,
              backfilled=backfilled, conditions=cond_counts)
+
+
+# ---- Comp age and carry-forward (audit 2026-10-09) --------------------------------------
+#
+# WHY. The 2026-10-08 gated run lost the comps of 1,599 rows the 10/7 board had priced
+# (2.3% of the 69,706 rows in both that carried comps). 410 of them were right to go: the
+# subject is now land (or the comps were sfr on a lot) and validation._validate_comps drops a
+# comp of another kind. 1,160 were not: their identity changed between runs (Lincoln's
+# 10-digit PIN on a row that had none, a PTS Cloud roll row re-keyed), so merge_prior_board
+# never folded last run's row onto them and nothing carried its comps, and this phase hit its
+# wall-clock cap (main.py COMPS_PHASE_MAX_SECONDS) before the loop reached them. Comps that a
+# row already carried had no age either: nothing said how old a kept comp was or dropped it.
+#
+# THE RULES. A comp is evidence for COMPS_CARRY_MAX_AGE_DAYS after its sale (appraisal
+# practice: comparable sales within 12 months; the sold pool itself is 180 days). Every comp
+# the matcher picks is stamped `picked_on`. After the phase (whether or not it was capped),
+# age_comps() keeps a row's not-refreshed comps only while they are inside the window, marks
+# each `carried` with its `age_days`, and drops the rest. carry_forward_from_prior() gives a
+# row that still has none the comps the previous board held for the same property (same
+# parcel, numbered address or as-scraped fingerprint, same county), when they fit the
+# subject's kind and are inside the window, marked `carried_from` with that board's date.
+
+COMPS_CARRY_MAX_AGE_DAYS = 365
+
+
+def _median_ppsf(comps: list[dict]) -> float | None:
+    """The comp median $/sqft calc prices from: geographically anchored comps only (county-wide
+    'kind only' comps stay visible but never drive the ARV), adjusted $/sqft where a grid was
+    computed, and at 3+ comps the as-is/distressed sales under 0.70x the median dropped."""
+    if not comps or not comps[0].get("geo_anchored"):
+        return None
+    ppsf = sorted(p for p in ((c.get("adjusted_ppsf") or c.get("price_per_sqft")) for c in comps
+                              if isinstance(c, dict)) if p)
+    if not ppsf:
+        return None
+    if len(ppsf) >= 3:
+        median = ppsf[len(ppsf) // 2]
+        clean = [p for p in ppsf if p >= median * 0.70]
+        if len(clean) >= 3:
+            ppsf = clean
+    return ppsf[len(ppsf) // 2]
+
+
+def _comp_sale_date(c: dict) -> date | None:
+    s = str(c.get("sold_date") or c.get("sale_date") or "").strip()
+    if len(s) >= 8 and s[:8].isdigit():          # 20260518
+        s = f"{s[:4]}-{s[4:6]}-{s[6:8]}"
+    try:
+        return date.fromisoformat(s[:10])
+    except ValueError:
+        return None
+
+
+def comp_age_days(c: dict, today: date | None = None) -> int | None:
+    d = _comp_sale_date(c) if isinstance(c, dict) else None
+    return ((today or date.today()) - d).days if d else None
+
+
+_TIER_RANK = {"HOT": 0, "WARM": 1}
+
+
+def _comps_priority(li: Listing) -> tuple:
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    comps = raw.get("comps") if isinstance(raw.get("comps"), list) else []
+    ds = raw.get("distress_stack") if isinstance(raw.get("distress_stack"), dict) else {}
+    picked = min((str(c.get("picked_on") or "") for c in comps if isinstance(c, dict)), default="")
+    return (1 if comps else 0, _TIER_RANK.get(str(ds.get("tier") or ""), 2), picked)
+
+
+def _kind_fits(subject: Listing, comp_kind) -> bool:
+    """validation._validate_comps' rule: a comp of a different known kind does not fit
+    (townhouse and single-family trade in one pool)."""
+    from .validation import _canonical_kind
+    pk = subject.property_kind
+    subj = _canonical_kind(pk.value if hasattr(pk, "value") else str(pk or ""))
+    ck = _canonical_kind(comp_kind)
+    if not ck or not subj or subj in ("unknown",) or ck == subj:
+        return True
+    return (subj, ck) in {("single_family", "townhouse"), ("townhouse", "single_family")}
+
+
+def _set_median(li: Listing) -> None:
+    med = _median_ppsf(li.raw.get("comps") or [])
+    if med is not None:
+        li.raw["comp_median_ppsf"] = med
+    else:
+        li.raw.pop("comp_median_ppsf", None)
+
+
+def age_comps(listings: list[Listing], today: date | None = None) -> dict:
+    """Run after the comps phase, capped or not. Fresh comps (picked today) get their age;
+    every other comp list is a carry: kept while each comp is inside COMPS_CARRY_MAX_AGE_DAYS
+    of its sale (an undated comp cannot show that and is dropped), marked carried with its
+    age, and the median recomputed from what is left."""
+    today = today or date.today()
+    iso = today.isoformat()
+    stats = {"fresh": 0, "carried": 0, "aged_out_rows": 0, "aged_out_comps": 0}
+    for li in listings:
+        raw = li.raw if isinstance(li.raw, dict) else None
+        comps = raw.get("comps") if raw else None
+        if not isinstance(comps, list) or not comps:
+            continue
+        if all(isinstance(c, dict) and c.get("picked_on") == iso for c in comps):
+            for c in comps:
+                c["age_days"] = comp_age_days(c, today)
+            stats["fresh"] += 1
+            continue
+        keep = []
+        for c in comps:
+            if not isinstance(c, dict):
+                continue
+            age = comp_age_days(c, today)
+            if age is None or age > COMPS_CARRY_MAX_AGE_DAYS:
+                stats["aged_out_comps"] += 1
+                continue
+            c["age_days"] = age
+            c["carried"] = True
+            keep.append(c)
+        if len(keep) != len(comps):
+            raw["comps"] = keep
+            _set_median(li)
+        if keep:
+            stats["carried"] += 1
+        else:
+            stats["aged_out_rows"] += 1
+            raw["comps_note"] = (f"no comps this run; the last ones sold over "
+                                 f"{COMPS_CARRY_MAX_AGE_DAYS} days ago and were dropped")
+    return stats
+
+
+def _identity_keys(row) -> list[str]:
+    """parcel / numbered-address keys (verification.core.row_keys, state+county qualified),
+    then the as-scraped fingerprint: the keys compare_boards joins two boards on."""
+    from .verification.core import _IDENTITY_FIELDS, _fingerprint, row_keys
+    keys = [k for k in row_keys(row) if k.startswith(("parcel:", "addr:"))]
+    if isinstance(row, Listing):
+        row = row.model_dump(mode="json", include=set(_IDENTITY_FIELDS))
+    keys.append("fp:" + _fingerprint(row))
+    return keys
+
+
+def carry_forward_from_prior(listings: list[Listing], prior_rows: Iterable[dict],
+                             prior_as_of: str | None = None,
+                             today: date | None = None) -> dict:
+    """Rows that end the comps phase with no comps (or no recorded-sales basket) get the
+    previous board's for the same property (see the block comment above). `prior_rows` is one
+    streaming pass over the previous board with its 'comps' detail merged
+    (board_stream.iter_board_rows_with_detail); only prior rows carrying comps or a basket are
+    looked at, so memory is bounded by the rows needing them. A carried basket is
+    raw['recorded_comps'] (enrichment_recorded_comps: county recorded sales around the same
+    parcel, no per-sale dates) with its median, stamped `carried_from`."""
+    today = today or date.today()
+    stats = {"needing": 0, "carried": 0, "carried_recorded": 0, "ambiguous_keys": 0,
+             "kind_mismatch": 0, "aged_out": 0}
+    need: dict[str, int] = {}
+    dup: set[str] = set()
+    for i, li in enumerate(listings):
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        if raw.get("comps") and raw.get("recorded_comps"):
+            continue
+        stats["needing"] += 1
+        for k in _identity_keys(li):
+            if k in need and need[k] != i:
+                dup.add(k)
+            need[k] = i
+    for k in dup:
+        need.pop(k, None)
+    stats["ambiguous_keys"] = len(dup)
+    if not need:
+        return stats
+
+    # best[i] = [key rank, prior street address, comps, basket, conflicted]: two prior rows of
+    # different addresses reaching the row on equally strong keys leave it without a carry.
+    best: dict[int, list] = {}
+    for row in prior_rows:
+        raw = row.get("raw") if isinstance(row.get("raw"), dict) else {}
+        comps = raw.get("comps") if isinstance(raw.get("comps"), list) else None
+        basket = raw.get("recorded_comps") if isinstance(raw.get("recorded_comps"), dict) else None
+        if not comps and not (basket and raw.get("comp_median_ppsf_recorded")):
+            continue
+        try:
+            keys = _identity_keys(row)
+        except Exception:  # noqa: BLE001 - an odd prior row is skipped
+            continue
+        addr = str(row.get("street_address") or "").strip().lower()
+        for rank, k in enumerate(keys):
+            i = need.get(k)
+            if i is None:
+                continue
+            prev = best.get(i)
+            if prev is None or rank < prev[0]:
+                best[i] = [rank, addr, comps,
+                           (basket, raw.get("comp_median_ppsf_recorded")) if basket else None, False]
+            elif rank == prev[0] and addr != prev[1]:
+                prev[4] = True
+            break
+    for i, (_rank, _addr, comps, basket, conflicted) in best.items():
+        if conflicted:
+            stats["ambiguous_keys"] += 1
+            continue
+        li = listings[i]
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        if basket and not li.raw.get("recorded_comps") and basket[1]:
+            li.raw["recorded_comps"] = {**basket[0], "carried_from": prior_as_of or "previous board"}
+            li.raw["comp_median_ppsf_recorded"] = basket[1]
+            stats["carried_recorded"] += 1
+        if li.raw.get("comps") or not comps:
+            continue
+        keep = []
+        for c in comps:
+            if not isinstance(c, dict):
+                continue
+            if not _kind_fits(li, c.get("kind")):
+                stats["kind_mismatch"] += 1
+                continue
+            age = comp_age_days(c, today)
+            if age is None or age > COMPS_CARRY_MAX_AGE_DAYS:
+                stats["aged_out"] += 1
+                continue
+            keep.append({**c, "carried": True, "age_days": age,
+                         "carried_from": prior_as_of or "previous board"})
+        if not keep:
+            continue
+        li.raw["comps"] = keep
+        _set_median(li)
+        ages = [c["age_days"] for c in keep]
+        li.raw["comps_note"] = (
+            f"no fresh comps this run; showing {len(keep)} carried from the "
+            f"{prior_as_of or 'previous'} board (sold {min(ages)}-{max(ages)} days ago)")
+        stats["carried"] += 1
+    return stats
+
+
+def carry_forward_from_board(listings: list[Listing], docs_dir=None) -> dict:
+    """carry_forward_from_prior() over the published board in `docs_dir` (default the repo's
+    docs/, the board this run will replace), streamed once with its 'comps' detail merged."""
+    import json
+    from pathlib import Path
+
+    from .board_stream import iter_board_rows_with_detail
+    docs = Path(docs_dir) if docs_dir else Path(__file__).resolve().parents[2] / "docs"
+    board = docs / "listings.json.gz"
+    if not board.exists():
+        return {"needing": 0, "carried": 0, "note": "no previous board"}
+    try:
+        as_of = str(json.loads((docs / "run_meta.json").read_text()).get("run_time") or "")[:10]
+    except (OSError, ValueError):
+        as_of = ""
+    return carry_forward_from_prior(listings, iter_board_rows_with_detail(board, keys=("comps",)),
+                                    prior_as_of=as_of or None)
