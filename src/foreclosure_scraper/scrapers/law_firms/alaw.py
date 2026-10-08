@@ -33,9 +33,19 @@ Firm coverage is STATEWIDE NC ("from the mountains to the coast"). Rows outside
 the Western-NC / Upstate-SC footprint are dropped downstream. ALAW also publishes a sibling SC workbook at
 ``/foreclosure-sales/south-carolina/`` (SC Upstate is core footprint); both pages
 flow through the same state-aware parser.
+
+SOURCE-COMPLETENESS AUDIT, 2026-10-08: TIMEOUT on the gated VM run (0 rows for 3 runs; 26 per
+run before). Both WP pages and the anonymous SharePoint embed answered a plain GET the same day
+(200, embed URL unchanged), so the failure is in the VM render, which the audit could not run
+(no browser launches). Two code faults made it worse: the goto timeout and the bootstrap poll
+each had their own 60 s, so one page could hold the render for ~2 minutes and a 2-page run
+outlived the 180 s soft timeout; and the rows of a page that DID parse were thrown away by that
+timeout. Now each page's render shares one budget (goto + poll), and parsed rows are kept as
+the scraper's partial so a hang on the second page still ships the first page's rows.
 """
 from __future__ import annotations
 
+import asyncio
 import html as htmllib
 import os
 import re
@@ -271,17 +281,21 @@ async def _render_capture(embed_url: str) -> str:
                         captured.append(body)
 
             pg.on("response", _on_response)
+            # One budget for goto + poll: the poll used to get its own full timeout after
+            # a slow goto, so one page could hold the render for twice the budget.
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + _RENDER_TIMEOUT_MS / 1000.0
             try:
                 await pg.goto(embed_url, wait_until="domcontentloaded",
                               timeout=_RENDER_TIMEOUT_MS)
             except Exception as exc:  # noqa: BLE001
                 log.warning("alaw.goto_failed", error=str(exc)[:200])
-            # Poll for the bootstrap frame to arrive.
-            waited = 0
+            # Poll for the bootstrap frame to arrive, within what is left of the budget.
             step = 1000
-            while not captured and waited < _RENDER_TIMEOUT_MS:
+            while not captured and loop.time() < deadline:
                 await pg.wait_for_timeout(step)
-                waited += step
+            if not captured:
+                log.warning("alaw.no_bootstrap_frame", waited_s=_RENDER_TIMEOUT_MS / 1000.0)
             if captured:
                 await pg.wait_for_timeout(_CAPTURE_WAIT_MS)  # let all cells stream in
             await browser.close()
@@ -323,6 +337,7 @@ class Alaw(BaseScraper):
                 rows = parse_wac_cells(wac, url)
                 log.info("alaw.parsed", page=url, count=len(rows))
                 out.extend(rows)
+                self.partial = list(out)  # a hang on the next page must not throw these away
             except Exception as exc:  # noqa: BLE001
                 log.warning("alaw.page_failed", page=url, error=str(exc)[:200])
         return out
