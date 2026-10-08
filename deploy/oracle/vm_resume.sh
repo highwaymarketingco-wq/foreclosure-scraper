@@ -12,7 +12,9 @@
 #
 # Run DETACHED so an SSH drop cannot kill it:
 #   setsid nohup bash deploy/oracle/vm_resume.sh --run >/dev/null 2>&1 < /dev/null &
-# Modes (passed through): --run (default) | --enrich-only | --publish-only
+# Modes (passed through): --run (default) | --enrich-only | --publish-only | --reconcile
+#   --reconcile: scripts/reconcile_board.py on the pre_publish checkpoint (local late-binding steps
+#   only, minutes not hours; publishes nothing; publish the result with --publish-only)
 # RESUME_PIN_COMMIT=<sha>: run exactly that commit instead of pulling origin/main (see below).
 # Logs: logs/vm-resume-<stamp>.log (run) and logs/vm-resume-<stamp>.mem.log (watchdog).
 set -uo pipefail
@@ -55,7 +57,15 @@ vm_checkout "$LOG" "$PIN" || exit 1
 uv sync --frozen >>"$LOG" 2>&1 || uv sync >>"$LOG" 2>&1
 
 START=$(date +%s)
-vm_run_watched "$LOG" "$MEMLOG" RESUME uv run python scripts/resume_from_checkpoint.py "$MODE"
+if [[ "$MODE" == "--reconcile" ]]; then
+  # The local late-binding steps only (scripts/reconcile_board.py: verification apply, tax binding,
+  # scoring and every local post-score step; network stubbed and blocked) on the pre_publish
+  # checkpoint; saves a new pre_publish checkpoint and publishes nothing. Extra arguments after the
+  # mode go to the script (e.g. --prior-correction).
+  vm_run_watched "$LOG" "$MEMLOG" RESUME uv run python scripts/reconcile_board.py "${@:2}"
+else
+  vm_run_watched "$LOG" "$MEMLOG" RESUME uv run python scripts/resume_from_checkpoint.py "$MODE"
+fi
 RC=$VM_RC
 echo "==> exit=$RC  elapsed=$(( ($(date +%s)-START)/60 ))m  $(date)" | tee -a "$LOG"
 
@@ -66,7 +76,7 @@ fi
 TOTAL=$(grep '"event": "web_artifact.written"' "$LOG" | grep -oE '"listings": [0-9]+' | tail -1 | grep -oE '[0-9]+' || echo "")
 [[ -n "$TOTAL" ]] && echo "==> total listings this run: $TOTAL" | tee -a "$LOG"
 
-if [[ "$RC" -eq 0 && "$MODE" != "--enrich-only" && -n "$TOTAL" ]]; then
+if [[ "$RC" -eq 0 && "$MODE" != "--enrich-only" && "$MODE" != "--reconcile" && -n "$TOTAL" ]]; then
   HOW="resumed from the run's checkpoint"
   [[ "$MODE" == "--publish-only" ]] && HOW="published from the run's pre_publish checkpoint"
   VM_PUBLISH_VERIFY=1 vm_publish_board "$LOG" "vm run: refresh dashboard data ($(date +%Y-%m-%d), $HOW)"

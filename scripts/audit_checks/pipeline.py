@@ -12,6 +12,11 @@ Each check would have caught a defect class this pipeline has had:
                                  tax_aging_high / amount_owed AFTER enrich_equity ran, so the
                                  assessed-value payoff (0.70 vs 0.60 of assessed) or the
                                  amount_owed-based payoff describe the pre-verification row.
+  pipeline-grade-equity-current  the grade's equity note (and its risk points) disagrees with the
+                                 published raw['equity']: the valuation loop runs before
+                                 enrich_equity, so grades read the previous run's equity.
+  pipeline-combo-matches-tax     a bankruptcy+tax combo that restates a tax balance the row no longer
+                                 has (the combo enricher only ever set it, never cleared it).
   pipeline-tax-check-binding     a county-site tax check on the row that the displayed balance
                                  contradicts: confirmed but the balance is not the checked one, or
                                  stale/refuted while an unverified balance is still shown (a step
@@ -169,6 +174,65 @@ class EquityTaxInputs(_Check):
                 self._bad(row, "amount_owed value changed after equity")
 
 
+class GradeEquityCurrent(_Check):
+    """valuation.grading.grade() reads raw['equity'] (the "high real equity (n%)" / "underwater"
+    notes and their risk-score points) and valuation.calc reads its payoff for the max bid, but
+    main.run_enrich_tail runs the valuation loop BEFORE enrich_equity: every run grades off the
+    PREVIOUS run's equity (or none for a new row). A grade whose equity note disagrees with the
+    published equity block is that lag."""
+    name = "pipeline-grade-equity-current"
+    describe = "the grade's equity note matches the published raw.equity (graded after equity)"
+
+    def feed(self, row: dict) -> None:
+        raw = _raw(row)
+        g = raw.get("grade")
+        if not isinstance(g, dict) or not isinstance(g.get("rationale"), list):
+            return
+        # grade() joins notes into its rationale items with "; " (to_dict), so split them back
+        notes = [part.strip() for n in g["rationale"] for part in str(n).split("; ")]
+        has_note = [n for n in notes if "real equity" in n]
+        eq = raw.get("equity") if isinstance(raw.get("equity"), dict) else {}
+        pct = None if eq.get("withheld") else _num(eq.get("pct"))
+        self.checked += 1
+        if pct is None:
+            if has_note:
+                self._bad(row, "equity note, no published equity")
+            return
+        if eq.get("is_underwater"):
+            want = f"underwater — real equity {pct * 100:.0f}%"
+        elif pct >= 0.40:
+            want = f"high real equity ({pct * 100:.0f}%)"
+        else:
+            want = None
+        if want is None:
+            if has_note:
+                self._bad(row, "equity note for an equity under 40%")
+        elif not any(n.startswith(want) for n in has_note):
+            self._bad(row, "no note for the published equity" if not has_note else "note for another equity")
+
+
+class ComboMatchesTax(_Check):
+    """raw['bankruptcy_tax_combo'] restates the row's tax balance. enrich_bankruptcy_tax_combo only
+    ever SET it, so a combo carried from an earlier run stayed after the tax block it restated was
+    scrubbed (tax_binding) or ended by a county check (restore_verified_tax)."""
+    name = "pipeline-combo-matches-tax"
+    describe = "a bankruptcy+tax combo restates the row's current tax balance"
+
+    def feed(self, row: dict) -> None:
+        raw = _raw(row)
+        combo = raw.get("bankruptcy_tax_combo")
+        if not isinstance(combo, dict):
+            return
+        self.checked += 1
+        to = raw.get("tax_owed")
+        if not isinstance(to, dict):
+            self._bad(row, "combo without a tax balance")
+            return
+        a, b = _num(combo.get("tax_owed_balance")), _num(to.get("balance"))
+        if a is None or b is None or abs(round(b, 2) - a) > 0.01:
+            self._bad(row, "combo balance is not the row's")
+
+
 class TaxCheckBinding(_Check):
     name = "pipeline-tax-check-binding"
     describe = ("a county-site tax check decides the displayed balance (confirmed: the checked "
@@ -320,5 +384,5 @@ class RunHealthCounts(_Check):
 
 
 def make_checks() -> list:
-    return [RowScored(), RowValued(), EquityTaxInputs(), TaxCheckBinding(), CountylessNational(),
-            RawKeep(), SeenOrder(), RunHealthCounts()]
+    return [RowScored(), RowValued(), EquityTaxInputs(), GradeEquityCurrent(), ComboMatchesTax(), TaxCheckBinding(),
+            CountylessNational(), RawKeep(), SeenOrder(), RunHealthCounts()]

@@ -162,3 +162,28 @@ def test_run_health_counts_beside_a_checkpoint(tmp_path):
 def test_run_health_counts_without_a_source_is_quiet():
     res = P.RunHealthCounts().finish()
     assert res["ok"] and "nothing to judge" in res["detail"]
+
+
+def test_combo_matches_tax():
+    rows = [{"raw": {"bankruptcy_tax_combo": {"tax_owed_balance": 900.0}, "tax_owed": {"balance": 900}}},
+            {"raw": {"bankruptcy_tax_combo": {"tax_owed_balance": 900.0}}},
+            {"raw": {"bankruptcy_tax_combo": {"tax_owed_balance": 900.0}, "tax_owed": {"balance": 450}}},
+            {"raw": {"tax_owed": {"balance": 1}}}]
+    res = _run(P.ComboMatchesTax(), rows)
+    assert (res["checked"], res["violations"]) == (3, 2)
+
+
+def test_grade_equity_current():
+    def row(pct, notes, under=False, withheld=False):
+        eq = {"pct": pct, "is_underwater": under}
+        if withheld:
+            eq = {"withheld": True}
+        return {"raw": {"equity": eq, "grade": {"rationale": notes}}}
+    rows = [row(0.98, ["tax sale — buyer takes subject to other liens; high real equity (98%)"]),
+            row(0.992, ["tax sale; high real equity (100%)"]),          # graded off another equity
+            row(0.995, ["tax sale — buyer takes subject to other liens"]),  # graded before equity
+            row(-0.2, ["underwater — real equity -20% (after payoff + liens)"], under=True),
+            row(0.2, ["fine"]),
+            row(None, ["high real equity (50%)"], withheld=True)]       # note, no published equity
+    res = _run(P.GradeEquityCurrent(), rows)
+    assert (res["checked"], res["violations"]) == (6, 3)

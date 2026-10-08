@@ -92,3 +92,28 @@ def test_combo_skips_listing_with_no_raw():
     li = Listing(source="x", source_url="u", listing_type=ListingType.TAX_LIEN)
     stats = enrich_bankruptcy_tax_combo([li])
     assert stats["combo"] == 0
+
+
+def test_a_carried_combo_is_cleared_when_its_tax_block_is_gone():
+    """The combo used to be set-only: one carried from an earlier run outlived the tax block it
+    restated once tax_binding scrubbed it or a county check ended it (audit 2026-10-09)."""
+    old = {"tax_owed_balance": 900.0, "bankruptcy_chapter": "13"}
+    bk = {"chapter": "13", "date_filed": "2026-07-10"}
+    scrubbed = _li({"bankruptcy": bk, "bankruptcy_tax_combo": dict(old)})
+    paid = _li({"bankruptcy": bk, "tax_owed": {"balance": 0}, "bankruptcy_tax_combo": dict(old)})
+    no_bk = _li({"tax_owed": {"balance": 900.0}, "bankruptcy_tax_combo": dict(old)})
+    moved = _li({"bankruptcy": bk, "tax_owed": {"balance": 450.0}, "bankruptcy_tax_combo": dict(old)})
+    stats = enrich_bankruptcy_tax_combo([scrubbed, paid, no_bk, moved])
+    assert stats["cleared"] == 3 and stats["combo"] == 1
+    for li in (scrubbed, paid, no_bk):
+        assert "bankruptcy_tax_combo" not in li.raw
+    assert moved.raw["bankruptcy_tax_combo"]["tax_owed_balance"] == 450.0
+
+
+def test_combo_is_idempotent():
+    li = _li({"bankruptcy": {"chapter": "7", "date_filed": "2026-01-01"},
+              "tax_owed": {"balance": 1234.5, "kind": "delinquent_tax"}})
+    enrich_bankruptcy_tax_combo([li])
+    first = dict(li.raw["bankruptcy_tax_combo"])
+    enrich_bankruptcy_tax_combo([li])
+    assert li.raw["bankruptcy_tax_combo"] == first

@@ -45,22 +45,24 @@ def enrich_bankruptcy_tax_combo(listings: Iterable[Listing]) -> dict:
     """Tag raw['bankruptcy_tax_combo'] on every listing carrying both a
     bankruptcy match and a real delinquent-tax balance. Returns run stats.
     """
-    stats = {"combo": 0, "combo_large": 0, "combo_long_open": 0}
+    stats = {"combo": 0, "combo_large": 0, "combo_long_open": 0, "cleared": 0}
     for li in listings:
         raw = li.raw if isinstance(li.raw, dict) else None
         if not raw:
             continue
         bk = raw.get("bankruptcy")
         to = raw.get("tax_owed")
-        if not isinstance(bk, dict) or not isinstance(to, dict):
-            continue
-        if not bk.get("date_filed"):
-            continue
         try:
-            balance = float(to.get("balance") or 0)
+            balance = float(to.get("balance") or 0) if isinstance(to, dict) else 0.0
         except (TypeError, ValueError):
-            continue
-        if balance <= 0:
+            balance = 0.0
+        if not isinstance(bk, dict) or not bk.get("date_filed") or balance <= 0:
+            # A combo carried from an earlier run whose tax block was since scrubbed
+            # (tax_binding) or ended by a county check (restore_verified_tax), or whose
+            # bankruptcy match is gone, no longer describes the row (audit 2026-10-09:
+            # 25 of 414 combos on the 10/7 board restated another balance).
+            if raw.pop("bankruptcy_tax_combo", None) is not None:
+                stats["cleared"] += 1
             continue
 
         is_large = balance >= LARGE_TAX_BALANCE_THRESHOLD
