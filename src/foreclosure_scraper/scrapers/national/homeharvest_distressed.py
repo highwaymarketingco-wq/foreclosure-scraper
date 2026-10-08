@@ -47,6 +47,7 @@ call each, ~1-15s depending on county size — Mecklenburg's 5,231-row pull took
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -85,6 +86,21 @@ def _num(v):
         return float(v)
     except (TypeError, ValueError):
         return None
+
+
+def _str(v):
+    """A text value (pandas NaN / blank -> None)."""
+    v = _clean(v)
+    return str(v).strip() or None if v is not None else None
+
+
+def _date_str(v):
+    """YYYY-MM-DD of a date / Timestamp / ISO string (pandas NaT / NaN / blank -> None)."""
+    v = _clean(v)
+    if v is None:
+        return None
+    s = str(v).strip()
+    return None if not s or s.lower() in ("nat", "nan", "none") else s[:10]
 
 
 def _clean(v):
@@ -201,6 +217,21 @@ def _to_listing(row: dict, county: str, matches: list[str]) -> Listing | None:
                 "office_email": _clean(row.get("office_email")),
                 "half_baths": _num(row.get("half_baths")),
                 "tax": _num(row.get("tax")),  # annual property-tax $ (Realtor.com tax_history latest)
+                # 2026-10-08 source-completeness audit: on the same HomeHarvest row, never kept.
+                # Prior sale (price/date: equity and how long held), the unit (two units of one
+                # building share a street line), the MLS ids, the pending and last status
+                # change dates (a price cut or a fallen-through contract), HOA fee, stories.
+                "unit": _str(row.get("unit")),
+                "mls": _str(row.get("mls")),
+                "mls_id": _str(row.get("mls_id")),
+                "last_sold_date": _date_str(row.get("last_sold_date")),
+                "last_sold_price": _num(row.get("last_sold_price")),
+                "pending_date": _date_str(row.get("pending_date")),
+                "last_status_change_date": _date_str(row.get("last_status_change_date")),
+                "hoa_fee": _num(row.get("hoa_fee")),
+                "stories": _num(row.get("stories")),
+                "new_construction": (bool(row.get("new_construction"))
+                                     if row.get("new_construction") in (True, False) else None),
             },
             "zillow": {
                 "photo": photos[0] if photos else None,
@@ -231,6 +262,14 @@ def _distress_location(county: str, state: str) -> str:
     return f"{county} County, {state}"
 
 
+#: Optional list-date window in days (FORECLOSURE_DISTRESSED_PAST_DAYS); 0 / unset = every active
+#: for-sale listing.
+try:
+    PAST_DAYS = int(os.environ.get("FORECLOSURE_DISTRESSED_PAST_DAYS") or 0)
+except ValueError:
+    PAST_DAYS = 0
+
+
 def _scrape_county(state: str, county: str) -> list[Listing]:
     """Sync HomeHarvest pull → distress-match. Run in thread pool."""
     try:
@@ -239,10 +278,15 @@ def _scrape_county(state: str, county: str) -> list[Listing]:
         return []
     out: list[Listing] = []
     try:
+        # No past_days (2026-10-08): with past_days=120 HomeHarvest returns only listings put on
+        # the market in the last 120 days, so a listing that has sat unsold longer (the most
+        # motivated seller) was never read. Live, Polk County NC: 240 rows / 15 distress matches
+        # with the window, 534 / 22 without; 3.8 s -> 7.1 s.
+        kw = {"past_days": PAST_DAYS} if PAST_DAYS else {}
         df = scrape_property(
             location=_distress_location(county, state),
             listing_type="for_sale",
-            past_days=120,
+            **kw,
         )
         if df is None or len(df) == 0:
             return out
@@ -275,22 +319,23 @@ class DistressedListings(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         loop = asyncio.get_event_loop()
-        out: list[Listing] = []
+        # Deduped by URL into self.partial as each county finishes (2026-10-08), so a soft
+        # timeout ships every finished county instead of nothing.
+        deduped = self.partial
+        seen: set[str] = set()
         with ThreadPoolExecutor(max_workers=4) as pool:
             futures = [
                 loop.run_in_executor(pool, _scrape_county, state, county)
                 for state, county in COUNTY_UNIVERSE
             ]
-            results = await asyncio.gather(*futures, return_exceptions=True)
-            for r in results:
-                if isinstance(r, list):
-                    out.extend(r)
-        # Dedupe by URL
-        seen: set[str] = set()
-        deduped: list[Listing] = []
-        for li in out:
-            if li.source_url in seen:
-                continue
-            seen.add(li.source_url)
-            deduped.append(li)
-        return deduped
+            for fut in asyncio.as_completed(futures):
+                try:
+                    r = await fut
+                except Exception:  # noqa: BLE001 - one county never sinks the rest
+                    continue
+                for li in r or []:
+                    if li.source_url in seen:
+                        continue
+                    seen.add(li.source_url)
+                    deduped.append(li)
+        return list(deduped)

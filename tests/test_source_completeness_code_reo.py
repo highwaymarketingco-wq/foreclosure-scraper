@@ -220,3 +220,72 @@ def test_epa_frs_reads_the_county_from_suffixes_cities_and_one_close_spelling():
         assert (li.county, li.raw["epa_frs"]["county_from"]) == (county, how), r
     assert E._to_listing(row(" NOT DEFINED ", "NOWHERE TOWN"), "SC", "SEMS") is None
     assert E._to_listing(row("CUMBERLAND", "FAYETTEVILLE", addr="UNKNOWN"), "NC", "ACRES") is None
+
+
+# ----------------------------------------------------------------------------- national.distressed
+
+def test_distressed_reads_every_active_listing_not_a_120_day_window(monkeypatch):
+    import sys
+    import types
+
+    from foreclosure_scraper.scrapers.national import homeharvest_distressed as HD
+
+    seen_kw: dict = {}
+
+    class _DF:
+        def __len__(self):
+            return 0
+
+    fake = types.ModuleType("homeharvest")
+
+    def scrape_property(**kw):
+        seen_kw.update(kw)
+        return _DF()
+
+    fake.scrape_property = scrape_property
+    monkeypatch.setitem(sys.modules, "homeharvest", fake)
+    monkeypatch.setattr(HD, "PAST_DAYS", 0)
+    HD._scrape_county("NC", "Polk")
+    assert seen_kw.get("listing_type") == "for_sale" and "past_days" not in seen_kw
+
+
+def test_distressed_keeps_prior_sale_unit_mls_and_status_dates():
+    import datetime as dt
+
+    from foreclosure_scraper.scrapers.national import homeharvest_distressed as HD
+
+    row = {"property_url": "https://example.invalid/p/1", "street": "1 Pretend Ln", "unit": "Apt 2",
+           "city": "Tryon", "state": "NC", "zip_code": "28782", "list_price": 150000,
+           "text": "Sold as-is, motivated seller", "mls": "CMLS", "mls_id": "4100001",
+           "last_sold_date": dt.date(2019, 5, 1), "last_sold_price": 90000.0,
+           "pending_date": float("nan"), "last_status_change_date": "2026-09-30T12:00:00",
+           "hoa_fee": 35.0, "stories": 2.0, "new_construction": False}
+    li = HD._to_listing(row, "Polk", ["as-is"])
+    d = li.raw["distressed"]
+    assert d["unit"] == "Apt 2" and d["mls_id"] == "4100001" and d["mls"] == "CMLS"
+    assert d["last_sold_date"] == "2019-05-01" and d["last_sold_price"] == 90000.0
+    assert d["pending_date"] is None and d["last_status_change_date"] == "2026-09-30"
+    assert d["hoa_fee"] == 35.0 and d["new_construction"] is False
+    import json
+    json.dumps(li.raw)                                       # publishable as JSON
+
+
+def test_distressed_salvages_finished_counties_on_a_timeout(monkeypatch):
+    import time
+
+    from foreclosure_scraper.models import Listing, ListingType
+    from foreclosure_scraper.scrapers.national import homeharvest_distressed as HD
+
+    def fake_scrape(state, county):
+        if county == "Polk":
+            return [Listing(source="national.distressed", source_url="https://example.invalid/p/9",
+                            listing_type=ListingType.DISTRESSED, state=state, county=county)]
+        time.sleep(1.5)
+        return []
+
+    monkeypatch.setattr(HD, "COUNTY_UNIVERSE", (("NC", "Polk"), ("NC", "Wake")))
+    monkeypatch.setattr(HD, "_scrape_county", fake_scrape)
+    s = HD.DistressedListings()
+    s.timeout_s = 0.5
+    rows = asyncio.run(s.safe_run())
+    assert [li.county for li in rows] == ["Polk"]
