@@ -92,7 +92,13 @@ PAGE_SIZE = 200
 MAX_PAGES_PER_COURT = 10
 # Hard wall-clock budget for the whole pass, well under timeout_s. Results are
 # ordered newest-first, so running out of budget drops the OLDEST filings.
-FETCH_BUDGET_S = float(os.environ.get("BANKRUPTCY_BUDGET_S", "600"))
+# 2026-10-08 (source-completeness audit): 600 -> 780 and shared fairly between
+# the courts (see fetch()). Measured live 2026-10-08: the 90-day corpus is
+# ncwb 811 + ncmb 670 + nceb 1,498 + scb 1,600 = 4,579 dockets (229 pages at
+# 20/page, ~2.0-2.4 s per page from this host), and the gated run of
+# 2026-10-08 stopped at exactly 600 s with 3,386 rows: the budget bound, and
+# because the courts ran in order the whole cut fell on scb (SC), the last one.
+FETCH_BUDGET_S = float(os.environ.get("BANKRUPTCY_BUDGET_S", "780"))
 # Attempts per search page before abandoning the court.
 _PAGE_RETRIES = 3
 
@@ -446,7 +452,7 @@ class CourtListenerBankruptcy(BaseScraper):
     # /search/ carries the chapter inline, so the pass is pure pagination
     # (~330s for all three courts). FETCH_BUDGET_S cuts it off well before this
     # ceiling; the ceiling only exists so a slow network can't trip the alarm.
-    timeout_s = 900.0
+    timeout_s = 1020.0
 
     async def fetch(self) -> Iterable[Listing]:
         # Token is optional: /search/ answers anonymously. When present it only
@@ -477,8 +483,14 @@ class CourtListenerBankruptcy(BaseScraper):
         adversary_skipped = 0
 
         async with client(timeout=45.0) as c:
-            for court in COURTS:
-                dockets = await _fetch_court(c, court, token, deadline)
+            for court_idx, court in enumerate(COURTS):
+                # Fair share of what is left of the budget: a court that finishes
+                # early hands its unused time to the next one, and no court can
+                # starve the ones after it (before 2026-10-08 the last court, scb,
+                # took the whole cut whenever the budget bound).
+                now = time.monotonic()
+                court_deadline = now + max(0.0, deadline - now) / (len(COURTS) - court_idx)
+                dockets = await _fetch_court(c, court, token, court_deadline)
                 state_default = COURT_STATE.get(court, "NC")
 
                 for d in dockets:
