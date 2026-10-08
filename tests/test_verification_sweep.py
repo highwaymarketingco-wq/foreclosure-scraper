@@ -113,10 +113,15 @@ def test_a_crashing_verifier_is_an_unconfirmed_answer(board, tmp_path, monkeypat
     monkeypatch.setattr(sw, "RUN_LOCK", tmp_path / "sweep.lock")
     monkeypatch.setenv("HANDOFF_PUSH", "0")
     ldir = tmp_path / "ledger"
-    assert sw.main(["--docs", str(board), "--ledger-dir", str(ldir)]) == 0
+    assert sw.main(["--docs", str(board), "--ledger-dir", str(ldir), "--defer-wait-s", "0"]) == 0
     e = next(iter(L.Ledger.load("tax_lien", ldir).rows.values()))
     assert e["latest"]["verdict"] == "unconfirmed"
     assert e["latest"]["evidence"]["reason"] == "verifier_error"
+    # a crash is about the run, not the row: re-checked once at the end of the run, and due
+    # again after the transient retry (6 hours), not RETRY_DAYS
+    assert e["checks"] == 1 and L.SWEEP_TRANSIENT_REASONS == {"verifier_error"}
+    assert L.is_due(e, v, L.parse_ts(e["latest"]["checked_at"]) + timedelta(hours=7)) == \
+        (True, "retry_transient")
 
 
 def test_the_sweep_holds_no_board_write_path():

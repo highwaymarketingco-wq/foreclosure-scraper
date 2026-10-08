@@ -11,8 +11,10 @@ src/foreclosure_scraper/verification/verifiers/ (auto-discovered), WITHOUT writi
      COLD, then never-checked first, then oldest check, and only the top --max-rows per
      signal are kept (a bounded heap: memory does not grow with the backlog).
   2. Each candidate goes through its verifier's verify(row, Fetcher): http_client's per-host
-     throttle plus VERIFY_HOST_MIN_INTERVAL_S (1.5 s) spacing per host, one row at a time,
-     a per-row timeout, a global time budget (--budget-s).
+     throttle plus VERIFY_HOST_MIN_INTERVAL_S (2.0 s) spacing per host (one slot for all
+     qPayBill tenants: fetch.SHARED_BACKENDS), one row at a time, a per-row timeout, a global
+     time budget (--budget-s). An answer about source health (a verifier's TRANSIENT_REASONS)
+     is re-checked once at the end of the run after --defer-wait-s (run_checks: DEFERRAL).
   3. Every answer is merged into the cumulative ledger docs/handoff/verification/<signal>.json
      (verification/ledger.py), saved every --save-every rows and at the end, merged with the
      file on disk first so nothing is lost.
@@ -164,29 +166,46 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
     return out, why
 
 
+async def _verify(v, row, fetcher, row_timeout_s: float):
+    try:
+        res = await asyncio.wait_for(v.verify(row, fetcher), timeout=row_timeout_s)
+    except Exception as exc:  # noqa: BLE001 - a verifier crash is an unconfirmed answer
+        res = result(v.signal, "unconfirmed",
+                     {"reason": "verifier_error",
+                      "error": f"{type(exc).__name__}: {str(exc)[:200]}"},
+                     source=v.source, version=v.version, verifier=v.name)
+    if not res.verifier:
+        res.verifier = v.name
+    if not res.verifier_version:
+        res.verifier_version = v.version
+    return res
+
+
+def _transient(v, res) -> bool:
+    fn = getattr(v, "is_transient", None)
+    return bool(callable(fn) and fn(res.to_dict()))
+
+
 async def run_checks(plan: dict, ledgers: dict, fetcher, *, budget_s: float, save_every: int,
-                     row_timeout_s: float, host: str) -> dict:
+                     row_timeout_s: float, host: str, defer_wait_s: float = 120.0) -> dict:
+    """Check every planned row, best first, and merge each answer into its ledger.
+
+    DEFERRAL (2026-10-08). An answer about the SOURCE's health (the verifier's TRANSIENT_REASONS,
+    e.g. qPayBill tenant_unhealthy while its circuit is open, or a verifier_error) is not
+    recorded at once: the row goes to the back of the run and is checked once more after the main
+    pass, after a pause of up to `defer_wait_s` (inside the time budget) so a short outage can
+    end. Its second answer is recorded, whatever it is; a row the budget never reaches again gets
+    its first answer. Before this, one minute of vendor 503s answered about 1,000 qPayBill rows
+    tenant_unhealthy in 20 seconds and ended the run."""
     t0 = time.monotonic()
     tallies: dict[str, Counter] = {}
     for sig, items in plan.items():
         led = ledgers[sig]
         tally = tallies.setdefault(sig, Counter())
         since_save = 0
-        for prio, key, row, v in items:
-            if time.monotonic() - t0 > budget_s:
-                tally["budget_stop"] += 1
-                break
-            try:
-                res = await asyncio.wait_for(v.verify(row, fetcher), timeout=row_timeout_s)
-            except Exception as exc:  # noqa: BLE001 - a verifier crash is an unconfirmed answer
-                res = result(v.signal, "unconfirmed",
-                             {"reason": "verifier_error",
-                              "error": f"{type(exc).__name__}: {str(exc)[:200]}"},
-                             source=v.source, version=v.version, verifier=v.name)
-            if not res.verifier:
-                res.verifier = v.name
-            if not res.verifier_version:
-                res.verifier_version = v.version
+
+        def record(prio, key, row, v, res, note: str = "") -> None:
+            nonlocal since_save
             entry = led.record(row, res, ttl_days=v.ttl_days, governs=v.governs_of(res.to_dict()),
                                keys=v.ledger_keys(row))
             for f in getattr(v.module, "ROW_SUMMARY_EXCLUDE", ()) or ():
@@ -194,12 +213,38 @@ async def run_checks(plan: dict, ledgers: dict, fetcher, *, budget_s: float, sav
             tally[res.verdict] += 1
             tally["checked"] += 1
             print(f"  {sig} {res.verdict:11} {key}  {row.get('street_address') or ''} "
-                  f"[{('HOT', 'WARM', 'COLD', '-')[int(prio[0])]}] "
+                  f"[{('HOT', 'WARM', 'COLD', '-')[int(prio[0])]}] {note}"
                   f"{_brief(res.evidence)}", flush=True)
             since_save += 1
             if since_save >= save_every:
                 _save(led, host)
                 since_save = 0
+
+        deferred: list = []
+        for prio, key, row, v in items:
+            if time.monotonic() - t0 > budget_s:
+                tally["budget_stop"] += 1
+                break
+            res = await _verify(v, row, fetcher, row_timeout_s)
+            if _transient(v, res):
+                deferred.append((prio, key, row, v, res))
+                tally["deferred"] += 1
+                continue
+            record(prio, key, row, v, res)
+        if deferred:
+            left = budget_s - (time.monotonic() - t0)
+            pause = max(0.0, min(defer_wait_s, left - 1.0))
+            print(f"  {sig}: {len(deferred)} answer(s) about source health deferred; "
+                  f"re-checking after {pause:.0f}s", flush=True)
+            if pause > 0:
+                await asyncio.sleep(pause)
+            for prio, key, row, v, first in deferred:
+                if time.monotonic() - t0 > budget_s:
+                    record(prio, key, row, v, first, note="(not re-checked: budget) ")
+                    continue
+                tally["rechecked_after_deferral"] += 1
+                record(prio, key, row, v, await _verify(v, row, fetcher, row_timeout_s),
+                       note="(re-check) ")
         _save(led, host)
     return {s: dict(c) for s, c in tallies.items()}
 
@@ -239,6 +284,10 @@ def main(argv=None) -> int:
                     default=float(os.environ.get("VERIFY_MAX_SECONDS", "2700")),
                     help="global time budget for the live checks (default 2700 s)")
     ap.add_argument("--row-timeout-s", type=float, default=120.0)
+    ap.add_argument("--defer-wait-s", type=float,
+                    default=float(os.environ.get("VERIFY_DEFER_WAIT_S", "120")),
+                    help="pause before re-checking rows whose answer was about source health "
+                         "(default 120 s, inside --budget-s)")
     ap.add_argument("--save-every", type=int, default=10)
     ap.add_argument("--capture-dir", default=None,
                     help="save every fetched response body here (fixtures, audits)")
@@ -317,7 +366,8 @@ def run(args) -> int:
     t1 = time.monotonic()
     tallies = asyncio.run(run_checks(plan, ledgers, fetcher, budget_s=args.budget_s,
                                      save_every=max(1, args.save_every),
-                                     row_timeout_s=args.row_timeout_s, host=host))
+                                     row_timeout_s=args.row_timeout_s, host=host,
+                                     defer_wait_s=max(0.0, args.defer_wait_s)))
     secs = round(time.monotonic() - t1)
     paths = []
     for sig, led in ledgers.items():
@@ -336,7 +386,7 @@ def run(args) -> int:
 
     checked = sum(t.get("checked", 0) for t in tallies.values())
     msg = ("verification hand-off: " + "; ".join(
-        f"{sig} +{t.get('checked', 0)} ({', '.join(f'{k} {n}' for k, n in sorted(t.items()) if k not in ('checked', 'budget_stop'))})"
+        f"{sig} +{t.get('checked', 0)} ({', '.join(f'{k} {n}' for k, n in sorted(t.items()) if k not in ('checked', 'budget_stop', 'deferred', 'rechecked_after_deferral'))})"
         for sig, t in tallies.items()) + f" [{now.date().isoformat()}]")
     if not checked:
         print("nothing checked; no commit", flush=True)

@@ -2,9 +2,15 @@
 
 Fetcher       live: http_client.get_text (its per-host throttle, retries, curl fallback and
               optional Chrome-TLS impersonation) plus an extra per-host minimum spacing for a
-              long background sweep (VERIFY_HOST_MIN_INTERVAL_S, default 1.5 s), request
+              long background sweep (VERIFY_HOST_MIN_INTERVAL_S, default 2.0 s), request
               counts per host, and optional capture of every response body to a directory
               (the sweep's --capture-dir; that is how test fixtures are recorded).
+
+PACING GROUPS (2026-10-08). Hosts of one vendor that are one backend share ONE spacing slot
+(SHARED_BACKENDS): every <tenant>.qpaybill.com county portal is the same PUBLIQ / Springbrook
+service, and on 2026-10-08 at 18:34-18:35 UTC all of them answered 503 or the generic error page
+in the same minute (Clarendon on its FIRST request of the run), so the vendor is paced as one
+host: at most one request every min_interval_s across all its tenants, one at a time.
 ReplayFetcher tests: answers from a {url: body | Exception} map and records what was asked,
               so a verifier is tested against real captured responses with no network.
 
@@ -27,7 +33,7 @@ import os
 import re
 import time
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlencode, urlsplit
@@ -37,11 +43,30 @@ def _host(url: str) -> str:
     return (urlsplit(url).hostname or "").lower()
 
 
+#: vendor domains whose tenant hosts are one backend: paced as ONE host (module doc, PACING GROUPS)
+SHARED_BACKENDS = ("qpaybill.com",)
+DEFAULT_MIN_INTERVAL_S = 2.0
+
+
+def pace_key(host: str) -> str:
+    """The pacing slot of a host: its vendor domain for a SHARED_BACKENDS tenant, else itself."""
+    h = (host or "").lower()
+    for dom in SHARED_BACKENDS:
+        if h == dom or h.endswith("." + dom):
+            return dom
+    return h
+
+
+#: response headers a form-session caller may need (a 503 / 429 names when to come back)
+_KEEP_HEADERS = ("retry-after",)
+
+
 @dataclass
 class FormResponse:
     status: int
     url: str            # the final URL after redirects
     text: str
+    headers: dict = field(default_factory=dict)   # only _KEEP_HEADERS, lowercased names
 
 
 def form_key(url: str, data: dict) -> str:
@@ -80,7 +105,12 @@ class _LiveFormSession:
         except Exception:
             self._f.errors[host] += 1
             raise
-        resp = FormResponse(status=int(r.status_code), url=str(r.url), text=r.text or "")
+        try:
+            hdrs = {k: str(r.headers.get(k)) for k in _KEEP_HEADERS if r.headers.get(k)}
+        except Exception:  # noqa: BLE001 - headers are evidence only
+            hdrs = {}
+        resp = FormResponse(status=int(r.status_code), url=str(r.url), text=r.text or "",
+                            headers=hdrs)
         if resp.status >= 400:
             self._f.errors[host] += 1
         self._f._capture(key, resp.text, meta={"status": resp.status, "url": resp.url})
@@ -120,7 +150,9 @@ class _ReplayFormSession:
             raise v
         if isinstance(v, dict):
             return FormResponse(status=int(v.get("status", 200)), url=str(v.get("url") or url),
-                                text=str(v.get("text") or ""))
+                                text=str(v.get("text") or ""),
+                                headers={str(k).lower(): str(x)
+                                         for k, x in (v.get("headers") or {}).items()})
         return FormResponse(status=200, url=url, text=str(v))
 
     async def get(self, url: str, **_: Any) -> FormResponse:
@@ -133,7 +165,8 @@ class _ReplayFormSession:
 class Fetcher:
     def __init__(self, *, min_interval_s: Optional[float] = None, timeout: float = 25.0,
                  capture_dir: Optional[Path | str] = None) -> None:
-        self.min_interval_s = float(os.environ.get("VERIFY_HOST_MIN_INTERVAL_S", "1.5")
+        self.min_interval_s = float(os.environ.get("VERIFY_HOST_MIN_INTERVAL_S",
+                                                   str(DEFAULT_MIN_INTERVAL_S))
                                     if min_interval_s is None else min_interval_s)
         self.timeout = timeout
         self.capture_dir = Path(capture_dir) if capture_dir else None
@@ -143,12 +176,15 @@ class Fetcher:
         self._locks: dict[str, asyncio.Lock] = {}
 
     async def _pace(self, host: str) -> None:
-        lock = self._locks.setdefault(host, asyncio.Lock())
+        """Wait until min_interval_s has passed since the last request to this host's pacing slot
+        (pace_key: one slot per SHARED_BACKENDS vendor), one caller at a time per slot."""
+        key = pace_key(host)
+        lock = self._locks.setdefault(key, asyncio.Lock())
         async with lock:
-            wait = self.min_interval_s - (time.monotonic() - self._last.get(host, 0.0))
+            wait = self.min_interval_s - (time.monotonic() - self._last.get(key, 0.0))
             if wait > 0:
                 await asyncio.sleep(wait)
-            self._last[host] = time.monotonic()
+            self._last[key] = time.monotonic()
 
     async def get_text(self, url: str, *, timeout: Optional[float] = None,
                        impersonate: bool = False, headers: Optional[dict] = None) -> str:

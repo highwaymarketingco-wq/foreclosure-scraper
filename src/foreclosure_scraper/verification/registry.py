@@ -26,7 +26,15 @@ Optional:
     GOVERNS: tuple[str, ...]   scorer signal names a refuted/stale verdict removes (default ())
     SOURCE: str                default `source` for the ledger summary
     RETRY_DAYS: float          when an `unconfirmed` answer is retried (default 7)
-    WALL: bool                 True for a ToS/CAPTCHA-walled signal whose verify() never
+    TRANSIENT_REASONS: tuple   `unconfirmed` reasons that are about the SOURCE's health at check
+                               time (an HTTP 503, an error page, a timeout), not about the row:
+                               such an answer is retried after TRANSIENT_RETRY_DAYS instead of
+                               RETRY_DAYS, and the sweep re-queues it once at the end of its run
+                               (ledger.is_due, scripts/verification_sweep.py). The sweep's own
+                               "verifier_error" (a crash or a per-row timeout) is always one
+                               (ledger.SWEEP_TRANSIENT_REASONS).
+    TRANSIENT_RETRY_DAYS: float  default 0.25 (6 hours)
+    WALL: bool                True for a ToS/CAPTCHA-walled signal whose verify() never
                                touches the network and always returns "wall"
     ROW_SUMMARY_EXCLUDE: tuple core.row_summary() fields the sweep leaves out of this signal's
                                ledger entries (the ledger is pushed to a PUBLIC repo; e.g.
@@ -86,6 +94,7 @@ log = structlog.get_logger()
 
 PACKAGE = "foreclosure_scraper.verification.verifiers"
 DEFAULT_RETRY_DAYS = 7.0
+DEFAULT_TRANSIENT_RETRY_DAYS = 0.25
 
 
 @dataclass(frozen=True)
@@ -105,6 +114,19 @@ class Verifier:
     case_identity: Optional[Callable[[Any], Optional[str]]] = None
     detail_keys: tuple[str, ...] = ()   # lazy-detail raw keys it reads (DETAIL_KEYS)
     governs_fn: Optional[Callable[[dict], Any]] = None   # per-record governs (module governs_for)
+    transient_reasons: tuple[str, ...] = ()   # TRANSIENT_REASONS (source health, not the row)
+    transient_retry_days: float = DEFAULT_TRANSIENT_RETRY_DAYS
+
+    def is_transient(self, record: Any) -> bool:
+        """True for an `unconfirmed` answer whose reason is about the source's health at check
+        time: this verifier's TRANSIENT_REASONS, or the sweep's own verifier_error."""
+        from .ledger import SWEEP_TRANSIENT_REASONS    # lazy: ledger imports nothing from here
+        if not isinstance(record, dict) or record.get("verdict") != "unconfirmed":
+            return False
+        ev = record.get("evidence")
+        reason = ev.get("reason") if isinstance(ev, dict) else None
+        return bool(reason) and (reason in self.transient_reasons
+                                 or reason in SWEEP_TRANSIENT_REASONS)
 
     def governs_of(self, record: Any) -> tuple[str, ...]:
         """The scorer signals this record's refuted/stale verdict removes: the module's
@@ -187,6 +209,12 @@ def from_module(mod: Any, name: Optional[str] = None) -> Verifier:
     gf = getattr(mod, "governs_for", None)
     if gf is not None and not callable(gf):
         problems.append("governs_for must be a function of the stored record")
+    tr = getattr(mod, "TRANSIENT_REASONS", ())
+    if not isinstance(tr, (tuple, list, frozenset, set)) or not all(isinstance(x, str) and x for x in tr):
+        problems.append("TRANSIENT_REASONS must be a tuple of reason strings")
+    trd = getattr(mod, "TRANSIENT_RETRY_DAYS", DEFAULT_TRANSIENT_RETRY_DAYS)
+    if not isinstance(trd, (int, float)) or trd < 0:
+        problems.append("TRANSIENT_RETRY_DAYS must be a number >= 0")
     if problems:
         raise ContractError(f"{name}: " + "; ".join(problems))
     return Verifier(name=name, signal=sig, version=ver, ttl_days=float(ttl), applies=ap,
@@ -194,7 +222,8 @@ def from_module(mod: Any, name: Optional[str] = None) -> Verifier:
                     retry_days=float(getattr(mod, "RETRY_DAYS", DEFAULT_RETRY_DAYS)),
                     wall=bool(getattr(mod, "WALL", False)), module=mod, identity=ident,
                     case_identity=cid if ident == "case" else None, detail_keys=tuple(dk),
-                    governs_fn=gf)
+                    governs_fn=gf, transient_reasons=tuple(sorted(tr)),
+                    transient_retry_days=float(trd))
 
 
 def discover(package: str = PACKAGE) -> list[Verifier]:

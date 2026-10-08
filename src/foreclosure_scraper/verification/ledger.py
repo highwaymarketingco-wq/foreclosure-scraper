@@ -507,9 +507,20 @@ def _dedupe_hist(hist: list[dict]) -> list[dict]:
     return out
 
 
+#: the sweep's own unconfirmed reason for a verifier that crashed or ran past the per-row timeout:
+#: about the run, never about the row (registry: TRANSIENT_REASONS)
+SWEEP_TRANSIENT_REASONS = frozenset({"verifier_error"})
+
+
 def is_due(entry: Optional[dict], verifier: Any, now: Optional[datetime] = None
            ) -> tuple[bool, str]:
-    """(due, why) for a row this verifier applies to. `verifier` is a registry.Verifier."""
+    """(due, why) for a row this verifier applies to. `verifier` is a registry.Verifier.
+
+    An unconfirmed answer whose reason is about the SOURCE's health (the verifier's
+    TRANSIENT_REASONS, e.g. tenant_unhealthy; the sweep's verifier_error) is due again after
+    TRANSIENT_RETRY_DAYS, not RETRY_DAYS: on 2026-10-08 a one-minute qPayBill outage answered
+    about 1,000 rows tenant_unhealthy, and with the 7-day retry none of them could be re-checked
+    for a week (why "retry_transient")."""
     if not entry or not entry.get("latest"):
         return True, "new"
     now = now or utc_now()
@@ -520,6 +531,9 @@ def is_due(entry: Optional[dict], verifier: Any, now: Optional[datetime] = None
     if age is None:
         return True, "undated"
     if lat.get("verdict") == "unconfirmed":
+        transient = getattr(verifier, "is_transient", None)
+        if callable(transient) and transient(lat):
+            return (age >= float(getattr(verifier, "transient_retry_days", 0.25))), "retry_transient"
         return (age >= verifier.retry_days), "retry"
     return (age >= verifier.ttl_days), "ttl"
 
