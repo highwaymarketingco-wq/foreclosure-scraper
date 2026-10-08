@@ -58,7 +58,10 @@ _PREV_BOARD = Path(__file__).resolve().parent.parent.parent / "docs" / "listings
 
 # Complete-inventory snapshot feeds with stable per-property URLs. Absence from a
 # fresh pull == the property sold / was withdrawn. Keep this list TIGHT.
-SNAPSHOT_REO_SOURCES: tuple[str, ...] = ("national.fannie_homepath",)
+# national.homepath_json (audit 2026-10-09): the same HomePath inventory and the same
+# /property/{uuid} URLs; since aef7c291 it asks for Fannie Mae REO only, so its retail
+# (ListHub) rows still on the board drop out of the fresh pull and are pruned here.
+SNAPSHOT_REO_SOURCES: tuple[str, ...] = ("national.fannie_homepath", "national.homepath_json")
 
 
 def _addr_id(li: Listing) -> tuple[str, str, str] | None:
