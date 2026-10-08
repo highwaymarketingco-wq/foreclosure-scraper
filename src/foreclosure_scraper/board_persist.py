@@ -136,7 +136,7 @@ from typing import Optional
 
 import structlog
 
-from . import condo_units, parcel_alias, tax_binding
+from . import block_binding, condo_units, parcel_alias, tax_binding
 from .enrichment_pulled_sales import PULLED_RETENTION_WEEKS
 from .models import Listing
 from .row_keys import share_row
@@ -511,6 +511,23 @@ def _keep_fresh_tax(fresh: Listing, merged: Listing, stats: dict) -> None:
         stats["tax_block_fresh_kept"] = stats.get("tax_block_fresh_kept", 0) + n
 
 
+def _keep_fresh_blocks(fresh: Listing, merged: Listing, stats: dict) -> None:
+    """Listing.merge() deep-merges raw with the PRIOR row's leaves winning (models._deep_merge_dict),
+    so every block the fresh scrape re-read (a new balance, a new status, a moved upset bid, another
+    parcel's record that dedupe had fused onto the prior row) lost to last run's copy, leaf by leaf.
+    merge_prior_board runs before any enricher, so every raw key the fresh row carries is its
+    scraper's own record: put it back (block_binding.keep_fresh_blocks: the fresh leaves win, the
+    prior only fills keys the fresh block lacks, and a prior block of a DIFFERENT record is dropped).
+    Enrichment the fresh row does not carry (vision, comps, gis) is still carried from the prior."""
+    try:
+        res = block_binding.keep_fresh_blocks(fresh, merged)
+    except Exception:  # noqa: BLE001 - a merge is never lost to this check
+        return
+    for k, v in res.items():
+        if v:
+            stats[k] = stats.get(k, 0) + v
+
+
 def merge_prior_board(
     fresh_deduped: list[Listing],
     docs_dir: Path | str | None = None,
@@ -758,6 +775,7 @@ def merge_prior_board(
             if keep_mailing_off_address(fresh_deduped[match_idx], prior_li, merged):
                 stats["mailing_address_not_inherited"] = stats.get("mailing_address_not_inherited", 0) + 1
             _keep_fresh_tax(fresh_deduped[match_idx], merged, stats)
+            _keep_fresh_blocks(fresh_deduped[match_idx], merged, stats)
             fresh_deduped[match_idx] = merged
             fresh_matched[match_idx] = True
             continue
@@ -809,6 +827,7 @@ def merge_prior_board(
             if keep_mailing_off_address(fresh_li, prior_li, merged):
                 stats["mailing_address_not_inherited"] = stats.get("mailing_address_not_inherited", 0) + 1
             _keep_fresh_tax(fresh_li, merged, stats)
+            _keep_fresh_blocks(fresh_li, merged, stats)
             if len(condo_samples) < 5:
                 condo_samples.append((prior_li.parcel_id, fresh_li.parcel_id))
             fresh_deduped[ti] = merged
@@ -854,6 +873,7 @@ def merge_prior_board(
             # prior's numbered situs over the fresh row's no-number sentinel.
             folded = fold(fresh_deduped[i], prior_li)
             _keep_fresh_tax(fresh_deduped[i], folded, stats)
+            _keep_fresh_blocks(fresh_deduped[i], folded, stats)
             fresh_deduped[i] = folded
             fresh_matched[i] = True
             stats["matched_placeholder_twin"] += 1
