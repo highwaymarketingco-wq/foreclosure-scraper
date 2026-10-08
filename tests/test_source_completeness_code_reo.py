@@ -20,8 +20,8 @@ NOW = datetime(2026, 10, 8, 12, 0)
 
 
 def _survives_validation(li) -> bool:
-    stats: dict = {"parcel_nulled_too_short": 0, "parcel_nulled_bad_pattern": 0}
-    _validate_parcel_id(li, stats)
+    from collections import Counter
+    _validate_parcel_id(li, Counter())
     return bool(li.parcel_id)
 
 
@@ -32,23 +32,19 @@ def _survey_row(parno, altparno, site):
             "SITEADD": site, "SCITY": "ROCKY MOUNT", "PARVAL": 41000}
 
 
-def test_rocky_mount_nash_short_account_yields_to_the_12_digit_pin():
+def test_rocky_mount_keeps_each_county_native_parcel_number():
+    # Nash's PARNO is its own 6-digit parcel number, kept by validation since 2026-10-08
+    # (COUNTY_NATIVE_SHORT_PARCEL) and the id other Nash sources publish; the 12-digit ALTPARNO
+    # stays in the raw block. Edgecombe's PARNO is its dashed PIN.
     nash = next(lay for lay in RM.LAYERS if lay.name == "nash_dilapidated")
     edge = next(lay for lay in RM.LAYERS if lay.name == "edgecombe_dilapidated")
     slots = RM.fold([(nash, _survey_row("027989", "385018315565", "1 MADEUP ST")),
                      (edge, _survey_row("3759-86-6196", "3759866196", "2 MADEUP ST"))])
     by_county = {s["county"]: RM.to_listing(s, now=NOW) for s in slots.values()}
-    assert by_county["Nash"].parcel_id == "385018315565"
-    assert by_county["Nash"].raw["arcgis_distress"]["PARNO"] == "027989"   # the account stays
-    assert by_county["Edgecombe"].parcel_id == "3759-86-6196"              # a long PARNO is kept
+    assert by_county["Nash"].parcel_id == "027989"
+    assert by_county["Nash"].raw["arcgis_distress"]["ALTPARNO"] == "385018315565"
+    assert by_county["Edgecombe"].parcel_id == "3759-86-6196"
     assert all(_survives_validation(li) for li in by_county.values())
-
-
-def test_rocky_mount_short_parno_without_a_long_alt_is_unchanged():
-    nash = next(lay for lay in RM.LAYERS if lay.name == "nash_deteriorated")
-    li = RM.to_listing(next(iter(RM.fold([(nash, _survey_row("012345", None, "3 MADEUP ST"))]).values())),
-                       now=NOW)
-    assert li.parcel_id == "012345"
 
 
 # ----------------------------------------------------------------------------- Durham demolitions

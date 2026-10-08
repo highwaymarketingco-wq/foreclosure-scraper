@@ -91,21 +91,13 @@ FIELDS = (
 _ORDER = ("dilapidated", "vacant_boarded", "deteriorated")
 
 
-#: validation._validate_parcel_id nulls a parcel id shorter than this.
-_MIN_PID_LEN = 7
-
-
 def parcel_of(a: dict) -> Optional[str]:
-    """The row's parcel id. Edgecombe's PARNO is its dashed PIN ('3759-86-6196'); Nash's PARNO is
-    the county's 6-digit account number ('027989'), which validation nulls as too short, while
-    its ALTPARNO carries the 12-digit Nash PIN ('385018315565'), a key NC OneMap and the parcel
-    cache also index (parno/altparno). So a PARNO under 7 characters yields to a long ALTPARNO
-    (229 of the 618 rows on the 2026-10-08 run had their PARNO nulled); both stay in the
-    raw["arcgis_distress"] block."""
-    parno, alt = clean(a.get("PARNO")), clean(a.get("ALTPARNO"))
-    if parno and len(parno) < _MIN_PID_LEN and alt and len(alt) >= _MIN_PID_LEN:
-        return alt
-    return parno or alt
+    """The row's parcel id: PARNO, the county's own parcel number (Edgecombe's dashed PIN
+    '3759-86-6196'; Nash's 6-digit number '027989', which validation keeps as Nash's native
+    parcel id since 2026-10-08, validation.COUNTY_NATIVE_SHORT_PARCEL, and which LiensNC and the
+    ITS tax rolls publish for the same parcels). ALTPARNO (Nash's 12-digit PIN) stays in
+    raw["arcgis_distress"]."""
+    return clean(a.get("PARNO")) or clean(a.get("ALTPARNO"))
 
 
 def _key(county: str, a: dict) -> Optional[tuple[str, str]]:
