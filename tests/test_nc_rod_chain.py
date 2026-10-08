@@ -216,3 +216,17 @@ def test_chain_without_a_deed_into_the_owner_is_partial():
                       search=FakeIndex({"TESTER": recs}))
     assert out["status"] == "partial" and out["last_deed"] is None
     assert out["liens"]["lis_pendens"]
+
+
+def test_chain_reports_deeds_out_of_the_owner_after_the_last_deed():
+    """A chain found by name stops at the owner's vesting deed; a later deed in which the owner is
+    the grantor (the owner sold this parcel or another) is reported, an earlier one is not (audit
+    2026-10-09). Made-up names."""
+    sold = _deed("2026-08-07", ["TESTER, ALVIN Q", "TESTER, BERTHA"], ["EXAMPLE HOLDINGS LLC"], "693", "308")
+    idx = FakeIndex({"TESTER": OWNER_RECS + [sold], "SAMPLE": SAMPLE_RECS, "DOE": DOE_RECS})
+    out = build_chain(platform="p", state="NC", county="Testco", owner_name="TESTER ALVIN Q", search=idx, depth=1)
+    assert out["last_deed"]["book"] == "500"
+    assert [d["book"] for d in out["conveyed_out_since"]] == ["693"]       # not the 1999 sale
+    plain = build_chain(platform="p", state="NC", county="Testco", owner_name="TESTER ALVIN Q",
+                        search=FakeIndex({"TESTER": OWNER_RECS, "SAMPLE": SAMPLE_RECS, "DOE": DOE_RECS}), depth=1)
+    assert plain["conveyed_out_since"] == []

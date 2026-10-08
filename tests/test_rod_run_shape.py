@@ -167,3 +167,49 @@ def test_chain_budget_counts_only_counties_started(chain_counties, monkeypatch):
     stats = asyncio.run(C.enrich_rod_chain([_lead("Alphaville", "TESTER ALVIN"),
                                             _lead("Zetaburg", "EXAMPLE DORA")]))
     assert stats["budget_exhausted"] and stats["counties"] == 0 and stats["targets"] == 0
+
+
+# ------------------------------------------------------------------------------- chain binding
+def _chain(recorded, **extra):
+    return {"status": "ok", "last_deed": {"recorded": recorded, "book": "1", "page": "2"}, **extra}
+
+
+def _row_sold(date_str):
+    li = _lead("Alphaville", "TESTER ALVIN")
+    li.raw = {"gis": {"last_sale": {"date": date_str}}}
+    return li
+
+
+NOW = datetime(2026, 10, 8, tzinfo=timezone.utc)
+
+
+def test_binding_confirms_a_deed_on_the_parcel_sale_date():
+    assert C.bind_chain(_row_sold("2020-06-19"), _chain("2020-06-19"), NOW)["status"] == "sale_date"
+    assert C.bind_chain(_row_sold("20040101"), _chain("2004-05-18"), NOW)["status"] == "sale_date"
+
+
+def test_binding_refuses_another_parcels_newer_deed_and_a_parcel_sold_since():
+    other = C.bind_chain(_row_sold("2004-01-01"), _chain("2020-04-29"), NOW)
+    assert other["status"] == "contradicted" and other["reason"] == "deed_newer_than_parcel_sale"
+    sold = C.bind_chain(_row_sold("2024-03-01"), _chain("2015-02-02"), NOW)
+    assert sold["status"] == "contradicted" and sold["reason"] == "parcel_sold_after_chain_deed"
+    # a deed newer than the parcel record (the county roll lags) is not judged
+    assert C.bind_chain(_row_sold("2016-07-06"), _chain("2026-08-12"), NOW)["status"] == "name_only"
+
+
+def test_binding_without_a_parcel_sale_or_with_an_outgoing_deed_is_name_only():
+    li = _lead("Alphaville", "TESTER ALVIN")
+    assert C.bind_chain(li, _chain("2018-03-01"), NOW)["status"] == "name_only"
+    b = C.bind_chain(_row_sold("2012-08-01"), _chain("2012-08-01",
+                     conveyed_out_since=[{"recorded": "2026-08-11"}]), NOW)
+    assert b["status"] == "name_only" and b["reason"] == "owner_conveyed_since_last_deed"
+
+
+def test_a_contradicted_chain_is_stamped_unbound(chain_counties, monkeypatch):
+    li = _row_sold("2004-01-01")
+    li.county = "Alphaville"
+    li.raw["gis"]["last_sale"]["date"] = "1989-01-01"
+    stats = asyncio.run(C.enrich_rod_chain([li]))
+    # the fake chain's last deed is today's date: newer than 180 days is not judged
+    assert li.raw["rod_chain"]["binding"]["status"] in ("name_only", "contradicted")
+    assert stats["stamped"] == 1 and stats["unbound"] + stats["name_only"] + stats["bound_sale_date"] == 1

@@ -24,6 +24,23 @@ Counties are different hosts, so up to ROD_CHAIN_COUNTY_CONCURRENCY of them run 
 county that answers with a wall, or reaches the cap, is left for the rest of the run; its leads stay
 unstamped and are retried on a later run.
 
+BINDING (audit 2026-10-09, additions_verify). A chain is found by the OWNER'S NAME, so its newest
+deed can be that owner's deed for another parcel, and it misses a later deed in which the owner
+sold. Checked against county and NC OneMap parcel records on 30 sampled 10/8 chains: 14 right, 10
+another parcel's deed, 6 missing a later deed. Each result now carries raw['rod_chain']['binding']
+from the lead's OWN parcel record (raw['gis']['last_sale'] date, the county's last sale):
+  sale_date       the chain's last deed was recorded within 31 days (the same year when the county
+                  gives a year only) of the parcel's last sale: the chain is this parcel's;
+  contradicted    the parcel's last sale is more than 31 days AFTER the chain's last deed (the
+                  chain missed a later deed), or the chain's last deed is more than 31 days after
+                  the parcel's last sale and older than 180 days (another parcel's deed; a deed
+                  newer than 180 days can postdate the parcel record and is not judged): the
+                  status becomes 'unbound', so nothing that reads status 'ok' takes it as the
+                  lead's chain;
+  name_only       no parcel sale date to judge by, or the owner conveyed a deed after the chain's
+                  last deed (rod/nc_chain.py conveyed_out_since: this parcel or another one was
+                  sold): a candidate found by name, not confirmed.
+
 ORDER (audit 2026-10-09, additions_verify): counties holding the most imminent leads (HOT or an
 auction within 30 days) go first, then the counties with the most leads. The 10/8 run read the
 counties one after another in ALPHABETICAL order: the 1,800 s budget ended inside the sixth county
@@ -37,7 +54,7 @@ import asyncio
 import importlib
 import os
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Iterable
 
 import structlog
@@ -88,6 +105,58 @@ def _due(li: Listing, now: datetime, hot_days: float, base_days: float) -> bool:
     return age is None or age >= (hot_days if imminent(li, now) else base_days)
 
 
+def _iso_day(v) -> tuple[date | None, bool]:
+    """(date, year_only) from 'YYYY-MM-DD', 'YYYYMMDD' or an ISO datetime; Jan 1 reads as a year."""
+    s = str(v or "").strip()
+    d = None
+    for fmt, n in (("%Y-%m-%d", 10), ("%Y%m%d", 8)):
+        try:
+            d = datetime.strptime(s[:n], fmt).date()
+            break
+        except ValueError:
+            continue
+    if d is None:
+        return None, False
+    return d, (d.month == 1 and d.day == 1)
+
+
+def bind_chain(li: Listing, res: dict, now: datetime | None = None) -> dict:
+    """How the chain's last deed ties to the lead's own parcel record (see BINDING above)."""
+    now = now or datetime.now(timezone.utc)
+    ld = res.get("last_deed") if isinstance(res.get("last_deed"), dict) else {}
+    rec, _ = _iso_day(ld.get("recorded"))
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    gis = raw.get("gis") if isinstance(raw.get("gis"), dict) else {}
+    ls = gis.get("last_sale") if isinstance(gis.get("last_sale"), dict) else {}
+    sale, year_only = _iso_day(ls.get("date"))
+    sold_since = [d.get("recorded") for d in (res.get("conveyed_out_since") or []) if isinstance(d, dict)]
+    if rec is None or sale is None:
+        b = {"status": "name_only", "parcel_last_sale": ls.get("date") or None}
+        if sold_since:
+            b["reason"] = "owner_conveyed_since_last_deed"
+            b["conveyed_out_since"] = sold_since
+        return b
+    out = {"parcel_last_sale": sale.isoformat(), "deed_recorded": rec.isoformat()}
+    if sold_since:
+        # the parcel record may predate the outgoing deed: not confirmed, and say why
+        out["conveyed_out_since"] = sold_since
+        if year_only and rec.year == sale.year or (not year_only and abs((rec - sale).days) <= 31):
+            return {"status": "name_only", "reason": "owner_conveyed_since_last_deed", **out}
+    if year_only:
+        if rec.year == sale.year:
+            return {"status": "sale_date", "precision": "year", **out}
+        gap = (rec.year - sale.year) * 365
+    else:
+        gap = (rec - sale).days
+        if abs(gap) <= 31:
+            return {"status": "sale_date", "precision": "day", **out}
+    if gap < 0:
+        return {"status": "contradicted", "reason": "parcel_sold_after_chain_deed", **out}
+    if (now.date() - rec).days <= 180:
+        return {"status": "name_only", "reason": "deed_newer_than_parcel_record", **out}
+    return {"status": "contradicted", "reason": "deed_newer_than_parcel_sale", **out}
+
+
 async def enrich_rod_chain(listings: Iterable[Listing]) -> dict:
     if os.environ.get("FORECLOSURE_ROD_CHAIN", "0") != "1":
         return {"skipped": "disabled (set FORECLOSURE_ROD_CHAIN=1)"}
@@ -110,7 +179,7 @@ async def enrich_rod_chain(listings: Iterable[Listing]) -> dict:
     stats = {"counties": 0, "targets": 0, "stamped": 0, "with_last_deed": 0, "with_prior": 0,
              "with_open_dot_est": 0, "with_lis_pendens": 0, "with_substitution": 0,
              "walled_counties": [], "capped_counties": [], "errors": 0, "disabled_counties": 0,
-             "budget_exhausted": False}
+             "budget_exhausted": False, "bound_sale_date": 0, "name_only": 0, "unbound": 0}
     try:
         county_conc = max(1, int(os.environ.get("ROD_CHAIN_COUNTY_CONCURRENCY", "8")))
     except ValueError:
@@ -158,6 +227,16 @@ async def enrich_rod_chain(listings: Iterable[Listing]) -> dict:
                     continue
                 if not isinstance(li.raw, dict):
                     li.raw = {}
+                if status == "ok":
+                    b = bind_chain(li, res, now)
+                    res["binding"] = b
+                    if b["status"] == "contradicted":
+                        res["status"] = "unbound"
+                        stats["unbound"] += 1
+                    elif b["status"] == "sale_date":
+                        stats["bound_sale_date"] += 1
+                    else:
+                        stats["name_only"] += 1
                 li.raw["rod_chain"] = res
                 stats["stamped"] += 1
                 liens = res.get("liens") or {}

@@ -14,6 +14,9 @@ WHAT chain() RETURNS (the attorney's quiet-title list)
       "liens": {"deeds_of_trust": [...], "satisfactions": [...], "lis_pendens": [...],
                 "substitutions_of_trustee": [...], "foreclosure_notices": [...], "open_deeds_of_trust_est": int,
                 "since": ISO date of the last deed the counts are measured from, or None},
+      "conveyed_out_since": up to 3 deeds in which the owner is a grantor (and not a grantee),
+                            recorded after last_deed, newest first: the owner sold this parcel or
+                            another one after it vested; enrichment_rod_chain's binding reads it,
       "owner_instruments": how many index entries name the owner, "searches": lookups spent,
       "truncated": True when a search answered with more rows than it showed,
       "source_url": the search page a person opens to check it,
@@ -400,6 +403,13 @@ def build_chain(*, platform: str, state: str, county: str, owner_name: Optional[
                            "or indexed under another name)"))
         return out
     out["last_deed"] = last.to_dict()
+    # deeds OUT of the owner recorded after the last deed in: the owner sold (this parcel or
+    # another one; a name index cannot tell). The 10/8 sample had chains that stopped at the
+    # vesting deed of a parcel the owner had since sold (audit 2026-10-09, additions_verify).
+    out["conveyed_out_since"] = [
+        r.to_dict() for r in sorted(mine, key=_sort_key, reverse=True)
+        if r.kind == DEED and names_owner(owner, r.grantors) and not names_owner(owner, r.grantees)
+        and r.recorded and last.recorded and r.recorded > last.recorded][:3]
 
     cur = last
     seen = {last.key()}
