@@ -380,6 +380,11 @@ class SpartanWeeklyLegals(BaseScraper):
             listings: list[Listing] = [
                 await self._row_to_listing(row, c, enrich=False) for row in rows
             ]
+            # Source-completeness audit 2026-10-08: these rows lived only in a local list
+            # until the end, so a soft timeout during enrichment (the VM's 10/8 run took
+            # 184 s of the 240 s) would have shipped none of them. Keep self.partial in
+            # step with `listings` so a timeout ships every notice in its latest form.
+            self.partial = [li for li in listings if li]
 
             # 2) Best-effort, TIME-BOXED detail enrichment — PROBATE FIRST (those need
             #    the decedent/PR/address from the body; foreclosure rows already carry
@@ -404,9 +409,11 @@ class SpartanWeeklyLegals(BaseScraper):
                         # `None` here would mean "enrichment didn't run",
                         # which must NOT un-drop a row already banked.
                         listings[j] = None
+                        self.partial = [li for li in listings if li]
                     elif full:
                         listings[j] = full
                         enriched_n += 1
+                        self.partial = [li for li in listings if li]
                 log.info("spartan_weekly.enriched", enriched=enriched_n, of=len(rows))
         listings = [li for li in listings if li]
         log.info("spartan_weekly.done", notices=len(rows), leads=len(listings))
