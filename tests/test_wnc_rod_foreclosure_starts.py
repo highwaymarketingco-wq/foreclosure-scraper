@@ -145,3 +145,36 @@ def test_institution_only_instrument_is_dropped():
     groups = _dedupe(rows)
     key, parties = next(iter(groups.items()))
     assert _to_listing("counties_nc.wnc_rod_foreclosure_starts", "haywood", "NC", key, parties) is None
+
+
+# --------------------------------------------------------------------------- timeout salvage
+# 2026-10-08 gated run: Clay and Haywood finished (Haywood had substitutions of trustee), then
+# Yancey ran past the 900 s soft timeout. The leads lived only in _fetch_sync's local list, so
+# safe_run had nothing to salvage and the run published 0. Each county's leads are now banked
+# in self.partial as soon as that county finishes.
+
+@pytest.mark.asyncio
+async def test_a_timeout_in_a_later_county_still_ships_the_finished_counties(monkeypatch):
+    import threading
+    release = threading.Event()
+
+    def _bulk(county, state, a, b):
+        if county == "haywood":
+            return [
+                _party("10/01/2026", "RB 9 9", "S/T", "GRANTOR", "DOE JOHN", "substitution_of_trustee"),
+                _party("10/01/2026", "RB 9 9", "S/T", "GRANTEE", "ACME BANK NA", "substitution_of_trustee"),
+            ]
+        if county == "yancey":
+            release.wait(5)      # the slow county: still running when the timeout fires
+        return []
+
+    s = WNCRodForeclosureStarts()
+    monkeypatch.setattr(s, "timeout_s", 0.5)
+    with patch(
+        "foreclosure_scraper.scrapers.counties_nc.wnc_rod_foreclosure_starts.bulk_by_date",
+        side_effect=_bulk,
+    ):
+        out = await s.safe_run()
+        release.set()
+    assert [li.defendant for li in out] == ["DOE JOHN"]
+    assert s.last_outcome != "TIMEOUT"

@@ -186,13 +186,21 @@ class WNCRodForeclosureStarts(BaseScraper):
         start = end - timedelta(days=LOOKBACK_DAYS)
         a, b = start.strftime("%m/%d/%Y"), end.strftime("%m/%d/%Y")
 
-        out: list[Listing] = []
+        # Bank each county's leads as soon as that county finishes. The 2026-10-08 gated run
+        # read Clay (0 starts) and Haywood (substitutions of trustee found in all three of its
+        # split windows) by 02:13, then spent 21 minutes in Yancey; the 900 s soft timeout
+        # fired at 02:17 and, because the rows only existed in this function's local list,
+        # base_scraper had nothing to salvage: Haywood's foreclosure starts were thrown away
+        # and the run read 0. self.partial is what safe_run ships on a timeout.
+        out = self.partial
         for county, state in COUNTIES:
             rows = bulk_by_date(county, state, a, b)
             if not rows:
                 continue
+            got = []
             for key, parties in _dedupe(rows).items():
                 li = _to_listing(self.slug, county, state, key, parties)
                 if li is not None:
-                    out.append(li)
-        return out
+                    got.append(li)
+            out.extend(got)
+        return list(out)
