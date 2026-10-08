@@ -3064,12 +3064,20 @@ async def run() -> int:
     # 2026-10-07: the platform adapters for the other NC/SC counties whose register of deeds a plain
     # script can read (rod/nc_cott_v4, nc_lookup, nc_ors, nc_cchs_classic ...): each platform is OFF
     # until its FORECLOSURE_NC_*_ROD env flag is 1 (enrichment_generic_rod's platform registry).
+    # generic_rod sizes its own wall-clock budget (it walks counties side by side), so it runs beside
+    # the per-county phases under its own cap instead of sharing their 900 s (audit 2026-10-09).
+    _generic_rod_coro = None
     try:
         from .enrichment_generic_rod import enrich_generic_rod
-        _rod_phases["generic_rod"] = enrich_generic_rod(enriched)
+        _generic_rod_coro = _await_capped(
+            enrich_generic_rod(enriched), "generic_rod",
+            default_s=int(float(os.environ.get("FORECLOSURE_GENERIC_ROD_BUDGET_S", "840")) + 120))
     except Exception:
         log.error("generic_rod.failed", traceback=traceback.format_exc())
-    _rod_results = await _gather_phases(_rod_phases)
+    _rod_results, _generic_rod_stats = await asyncio.gather(
+        _gather_phases(_rod_phases),
+        _generic_rod_coro if _generic_rod_coro is not None else asyncio.sleep(0))
+    _rod_results["generic_rod"] = _generic_rod_stats
     for _rod_name in ("gaston_rod", "cchs_rod", "aumentum_rod", "spartanburg_rod", "generic_rod"):
         _rs = _rod_results.get(_rod_name)
         if _rs and "skipped" not in _rs:
