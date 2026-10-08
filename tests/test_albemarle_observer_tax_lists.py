@@ -376,3 +376,56 @@ def test_rows_with_no_parcel_and_no_address_keep_distinct_dedupe_keys():
     road = [l for l in m.to_listings(tg, m.parse_gates(GATES), post=_post("Gates County Delinquent"), content="")
             if not l.street_address]
     assert road and len({l.dedupe_key() for l in road}) == len(road)
+
+
+# --------------------------------------------------------------------------- Pasquotank (2026-10-08)
+# The live post is three <li> blocks, each one long dot-leader run: OWNER……PARCEL……$AMOUNT, the
+# leader printed as &#8230; and/or '.' runs, names printed without their spaces. Shapes below
+# are hand-built from that layout; every name, parcel and amount is invented.
+PASQUOTANK = (
+    "<p>ELIZABETH CITY - Published below is the delinquent property tax list.</p>"
+    "<ul><li>ACMEHOLDINGSLLC&#8230;&#8230;&#8230;&#8230;&#8230;..12-C-345&#8230;&#8230;&#8230;.$1,976.36 "
+    "DOE,JANEQ&amp;JOHN&#8230;&#8230;&#8230;&#8230;&#8230;P47-70&#8230;&#8230;&#8230;&#8230;$54.13 "
+    "DOE,JANEQ&amp;JOHN&#8230;&#8230;&#8230;&#8230;P47-70&#8230;&#8230;..$10.00 "
+    "ROE,RICHARD,JR&#8230;&#8230;&#8230;&#8230;&#8230;.12-C-34&amp;35&#8230;&#8230;&#8230;.$211.76</li>"
+    "<li>ZED,ZOE&#8230;&#8230;&#8230;&#8230;&#8230;1234-56-7890#01&#8230;&#8230;&#8230;&#8230;$99.99</li></ul>"
+)
+
+
+def test_pasquotank_dot_leader_rows_are_all_read():
+    b = m.parse_pasquotank(PASQUOTANK)
+    assert [(x["owner"], x["parcel"], x["amount"]) for x in b] == [
+        ("ACMEHOLDINGSLLC", "12-C-345", 1976.36),
+        ("DOE,JANEQ&JOHN", "P47-70", 54.13),
+        ("DOE,JANEQ&JOHN", "P47-70", 10.00),
+        ("ROE,RICHARD,JR", "12-C-34&35", 211.76),
+        ("ZED,ZOE", "1234-56-7890#01", 99.99),
+    ]
+
+
+def test_pasquotank_post_is_picked_and_grouped_by_parcel():
+    index = INDEX + [
+        {"id": 12, "date": "2026-06-11T09:39:43", "link": "u12",
+         "title": {"rendered": "Pasquotank County Delinquent Tax List &#8212; Have You Paid Your Taxes?"}},
+        {"id": 13, "date": "2026-04-25T10:00:00", "link": "u13",
+         "title": {"rendered": "Several local officials, candidates appear on Pasquotank delinquent tax list"}},
+    ]
+    t = next(t for t in m.TARGETS if t.county == "Pasquotank")
+    post = m.pick_post(index, t, today=TODAY)
+    assert post["id"] == 12                     # the list itself, never the news story about it
+    leads = m.to_listings(t, m.parse_pasquotank(PASQUOTANK), post=post, content="")
+    assert len(leads) == 4
+    doe = next(l for l in leads if l.parcel_id == "P47-70")
+    assert doe.raw["tax_owed"]["balance"] == 64.13 and doe.county == "Pasquotank"
+    assert all(l.listing_type is ListingType.TAX_LIEN for l in leads)
+
+
+def test_the_scraper_fetches_the_pasquotank_post(monkeypatch):
+    seen: list = []
+    index = INDEX + [{"id": 12, "date": "2026-06-11T09:39:43", "link": "u12",
+                      "title": {"rendered": "Pasquotank County Delinquent Tax List — Have You Paid Your Taxes?"}}]
+    posts = dict(_ALL_POSTS)
+    posts[12] = PASQUOTANK
+    _patch(monkeypatch, _transport(posts, seen, index=index))
+    out = asyncio.run(m.AlbemarleObserverTaxLists().fetch())
+    assert len([l for l in out if l.county == "Pasquotank"]) == 4

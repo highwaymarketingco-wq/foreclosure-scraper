@@ -285,6 +285,37 @@ def parse_perquimans(content: str) -> list[dict]:
     return out
 
 
+# Pasquotank (added 2026-10-08, source-completeness audit): the scraper's own index call has
+# returned "Pasquotank County Delinquent Tax List — Have You Paid Your Taxes?" (2026-06-11)
+# every run with no Target and no parser, so the county's whole 2025 list (1,859 rows read
+# live that day, $1.63M principal) was fetched-and-dropped at the index. The post is a DOT-
+# LEADER layout: three <li> blocks, each one long run of
+#   "OWNER……………………..PARCEL……….$AMOUNT OWNER……….PARCEL……$AMOUNT ..."
+# with the leader printed as "…" (&#8230;) and/or "." runs. The source prints names with
+# their spaces removed ("SMITH,JOHNQ,JR"); they are kept as printed. A parcel cell can name
+# two or more parcels ("12-B-34&35", "P47-7,8", "1234-56-7890#01"): kept whole, one lead.
+# Parcel ids are the county's map references ("P47-70", "33-B-440"), the same id NC OneMap
+# carries in `mapref`, not the 10-digit PIN (OneMap `parno`).
+_PASQ_ROW = re.compile(
+    r"(?P<owner>[^…$]+?)\s*[….]{2,}\s*"
+    r"(?P<pid>[A-Za-z0-9][A-Za-z0-9\-&,#/ ]*?)\s*[….]{2,}\s*"
+    rf"{_AMT}"
+)
+
+
+def parse_pasquotank(content: str) -> list[dict]:
+    """Pasquotank's dot-leader list: every OWNER……PARCEL……$AMOUNT run in the post's <li>
+    blocks (several hundred rows per block, no separators but the leaders)."""
+    out = []
+    for li in re.findall(r"<li[^>]*>(.*?)</li>", content, flags=re.S):
+        for m in _PASQ_ROW.finditer(_text(li)):
+            owner = m["owner"].strip(" ,.")
+            pid = m["pid"].strip(" ,")
+            if owner and pid:
+                out.append({"owner": owner, "parcel": pid, "amount": _money(m["amt"])})
+    return out
+
+
 @dataclass(frozen=True)
 class Target:
     county: str
@@ -305,6 +336,8 @@ TARGETS: tuple[Target, ...] = (
     Target("Chowan", re.compile(r"^Chowan County Delinquent", re.I), parse_chowan, "parcel"),
     Target("Hyde", re.compile(r"^Hyde County Delinquent", re.I), parse_hyde, "owner_property"),
     Target("Perquimans", re.compile(r"^Perquimans Co.*Taxes", re.I), parse_perquimans, "parcel"),
+    Target("Pasquotank", re.compile(r"^Pasquotank County Delinquent (?:Property )?Tax", re.I),
+           parse_pasquotank, "parcel"),
 )
 
 
