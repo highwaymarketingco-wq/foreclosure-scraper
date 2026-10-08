@@ -76,18 +76,68 @@ def _load_previous(path: Path) -> list[Listing]:
     to compare against."""
     if not path.exists():
         return []
-    try:
-        data = json.loads(path.read_text())
-    except (ValueError, json.JSONDecodeError):
-        return []
-    if not isinstance(data, list):
-        return []
+    # Streamed one row at a time (audit 2026-10-09, pipeline_gate): json.loads(path.read_text())
+    # held the file's whole decoded text AND its parsed list of dicts at once -- on the VM that
+    # file is the 4.1 GB plain board, the same pattern that had the watchdog kill two full runs in
+    # carryover on 2026-10-07/08. main.run() reaches this whenever merge_prior_board did not run
+    # (FULLRUN_PERSIST=0, or no prior board found). Same contract: a corrupt or non-array file
+    # gives [] (nothing to compare against), never a partial list.
     out: list[Listing] = []
-    for d in data:
-        li = _hydrate_listing(d)
-        if li:
-            out.append(li)
+    try:
+        for d in _iter_array_strict(path):
+            if not isinstance(d, dict):
+                continue
+            li = _hydrate_listing(d)
+            if li:
+                out.append(li)
+    except (ValueError, UnicodeDecodeError, OSError):
+        return []
     return out
+
+
+_CHUNK = 1 << 20
+_MAX_ELEMENT = 256 << 20
+
+
+def _iter_array_strict(path: Path):
+    """The elements of one plain JSON array file, one at a time, holding one 1 MB chunk plus one
+    element. Unlike board_parts._iter_array (which stops quietly at undecodable text), anything
+    that is not a complete JSON array raises ValueError, so the caller can keep its
+    all-or-nothing contract."""
+    dec = json.JSONDecoder()
+    with open(path, "rt", encoding="utf-8") as fh:
+        buf = fh.read(_CHUNK).lstrip()
+        if not buf.startswith("["):
+            raise ValueError("not a JSON array")
+        i, closed = 1, False
+        while True:
+            while True:
+                while i < len(buf) and buf[i] in " \n\r\t,":
+                    i += 1
+                if i < len(buf) and buf[i] == "]":
+                    closed = True
+                    i += 1
+                    break
+                if i >= len(buf):
+                    break
+                try:
+                    obj, j = dec.raw_decode(buf, i)
+                except ValueError:
+                    break                      # the element continues in the next chunk
+                yield obj
+                i = j
+            buf = buf[i:]
+            i = 0
+            chunk = fh.read(_CHUNK)
+            if closed:
+                if (buf + chunk).strip():
+                    raise ValueError("text after the closing bracket")
+                return
+            if not chunk:
+                raise ValueError("JSON array is truncated or malformed")
+            if len(buf) > _MAX_ELEMENT:
+                raise ValueError("an element larger than any board row: malformed")
+            buf += chunk
 
 
 def enrich_with_pulled_sales(

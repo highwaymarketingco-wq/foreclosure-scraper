@@ -207,3 +207,41 @@ def test_corrupt_previous_file_handled(tmp_path):
     out, stats = enrich_with_pulled_sales(current, previous_path=path)
     assert len(out) == 1
     assert stats["previous_count"] == 0
+
+
+# ---- streamed read of the prior board (audit 2026-10-09, pipeline_gate) ----
+
+def test_previous_board_is_streamed_not_read_whole(tmp_path, monkeypatch):
+    """The prior board is the 4.1 GB plain file on the VM: never read_text() it whole."""
+    prev = [_li(street_address=f"{i} Oak St", zip_code="28801") for i in range(5)]
+    path = _write_previous(tmp_path, prev)
+
+    def _no_whole_read(self, *a, **k):
+        raise AssertionError("read the whole prior board")
+    monkeypatch.setattr(Path, "read_text", _no_whole_read)
+    monkeypatch.setattr("foreclosure_scraper.enrichment_pulled_sales._CHUNK", 64)   # many chunks
+    out, stats = enrich_with_pulled_sales([prev[0]], previous_path=path)
+    assert stats["previous_count"] == 5
+    assert stats["tagged_new_misses"] == 4 and len(out) == 5
+
+
+@pytest.mark.parametrize("text", [
+    '[{"source": "law_firms.brock_scott", "source_url": "https://x/1"}, {"source": "law_',  # truncated
+    '[{"source": "law_firms.brock_scott", "source_url": "https://x/1"}] trailing',           # junk after
+    '{"source": "law_firms.brock_scott"}',                                                   # not an array
+    '[{"source": "law_firms.brock_scott", "source_url": "https://x/1"}, {oops}]',            # malformed
+])
+def test_damaged_previous_file_is_all_or_nothing(tmp_path, text):
+    path = tmp_path / "listings.json"
+    path.write_text(text)
+    out, stats = enrich_with_pulled_sales([_li(street_address="1 A", zip_code="28801")],
+                                          previous_path=path)
+    assert stats["previous_count"] == 0 and len(out) == 1
+
+
+def test_pretty_printed_previous_file_reads(tmp_path):
+    prev = [_li(street_address="9 Elm St", zip_code="28801")]
+    path = tmp_path / "listings.json"
+    path.write_text("\n  " + json.dumps([li.model_dump(mode="json") for li in prev], indent=2) + "\n")
+    out, stats = enrich_with_pulled_sales([], previous_path=path)
+    assert stats["previous_count"] == 1 and stats["tagged_new_misses"] == 1
