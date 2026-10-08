@@ -195,8 +195,9 @@ January), Anderson and Dillon sheriff sales, Asheville code layer (frozen since 
 **Rate limit:** Catalis/Avalon SC tax (`sc_catalis_delinquent_roll`: at the safe 8 s pace a run
 reaches part of Pickens only; Chester, Hampton, Fairfield and Aiken never), TownNews papers (429
 when read in the same minute), two obituary hosts.
-**Owner decisions:** route the datacenter-blocked readers through the Mac lane (`mac_only = True`)
-or save files by hand; retire or date-gate `charleston_delinquent_tax` (it ships last year's list);
+**Decided (2026-10-08):** the datacenter-blocked readers are NOT moved to the Mac lane: a firewall
+block on the server's address is a wall, so they stay a person's lane (cards `dc_ip_block`,
+`spartanburg_site`). **Owner decisions:** retire or date-gate `charleston_delinquent_tax` (it ships last year's list);
 `FORECLOSURE_MECKLENBURG_DELINQUENT=1` (about 29,000 parcel-matched rows); HUD Section 8 scope (250
 of 1,312 NC/SC properties emitted); whether state-only bankruptcy rows belong on the board (the RSS
 lane ships them, the CourtListener lane drops them: 3,767 countyless national rows dropped on
@@ -209,11 +210,12 @@ while older unpaid years exist (Onslow 2022: 3,512 records; `ITS_TAX_YEARS_BACK=
 change, yield unmeasured); Buncombe delinquent and elderly, McDowell probate, Transylvania
 delinquent, Iredell, Cleveland, nod_discovery, nc_rod_substitute_trustee, Charleston EnerGov (works
 from the Mac, connection dropped on the VM), Williams, `publicnoticesc_estates` live after-run.
-**Shared-file changes for the lead** (wiring list in the reply to the lead): main's
-`source_all_filtered` warning by emitted labels; `bk_property` phase cap; `DATELESS_OK_SOURCES` for
-`usmarshals_realproperty`, `tranzon`, `daily_courier`; `SNAPSHOT_REO_SOURCES` for `homepath_json`;
-the Rutherford PIN alias; `http_client.get_text` not retrying 4xx/429; bankruptcy property
-enricher for `courtlistener_adversary`.
+**Shared-file changes.** Applied after the coordinator's go: `SNAPSHOT_REO_SOURCES` gains
+`homepath_json` (1ec2638b); the Rutherford wildfire PIN alias in `parcel_alias` and `board_persist`
+(d3ce856e); `http_client.get_text` retries only transport errors, timeouts and 5xx (82860c43). The
+coordinator wires main's `source_all_filtered` labels, the `bk_property` cap and
+`DATELESS_OK_SOURCES`. Still open: `daily_courier` probate branch, the bankruptcy property enricher
+for `courtlistener_adversary`.
 
 ## 4. Outside this area (one line each)
 - board_persist marks every prior-only row 'presumed_withdrawn', including standing tax rolls (25,314 qPayBill rows on 10/7).
