@@ -127,6 +127,34 @@ The scrub (`block_binding.scrub_unbound_blocks`) is in place, idempotent, never 
 row, counts only (`test_scrub_is_idempotent_and_tolerates_odd_rows`), and re-judges a row after a
 removal (up to 3 rounds). It must be wired into `main.py` (the lead's change).
 
+### Wiring (main.py, the lead's change)
+
+1. `run()`, right after the `tax_unbound.failed` handler (the tax scrub after the prior merge and
+   prior correction, before any enricher):
+   ```python
+   try:
+       from .block_binding import scrub_unbound_blocks
+       log.info("orchestrator.blocks_unbound", **scrub_unbound_blocks(deduped))
+       if _grandfather:
+           log.info("orchestrator.blocks_unbound_grandfather", **scrub_unbound_blocks(_grandfather))
+   except Exception:  # noqa: BLE001
+       log.error("blocks_unbound.failed", traceback=traceback.format_exc())
+   ```
+2. `run_enrich_tail()`, inside `if _grandfather:` after its `scrub_unbound_tax(_grandfather)` line:
+   `log.info("orchestrator.blocks_unbound_grandfather", **scrub_unbound_blocks(_grandfather))`
+   (import `scrub_unbound_blocks` beside `scrub_unbound_tax`).
+3. `run_enrich_tail()`, right after the `tax_verified_restore.failed` handler (before the
+   stacked-distress score):
+   ```python
+   try:
+       from .block_binding import scrub_unbound_blocks
+       enrichment_stats["blocks_unbound_late"] = scrub_unbound_blocks(enriched)
+   except Exception:
+       log.error("blocks_unbound_late.failed", traceback=traceback.format_exc())
+   ```
+Cost: one in-memory pass each (verdicts plus a fingerprint index of about 0.5 M entries, about
+100 MB while it runs; the streamed replay of the whole board took about 3 minutes per pass).
+
 ## 3. Open items
 
 * **Not wired yet** (main.py is the lead's): the scrub after the prior merge (beside the tax
