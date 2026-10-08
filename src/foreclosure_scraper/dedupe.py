@@ -191,6 +191,23 @@ def _provably_different_property(a: Listing, b: Listing) -> bool:
 # and do not conflict; neither does an id a resolver attached, an over-shared one, one repeated
 # character, a recorded-document pattern, or one under MIN_SOURCE_PARCEL_LEN characters. A group
 # remembers every (parcel, source) it has taken in, like its valid parcel.
+#
+# ---------------------------------------------------------------- roll URL keys (2026-10-09, 4)
+# THE DEFECT (audit 2026-10-09, regressions; the gated d42058b3 run against the 10/7 board): a row
+# with no parcel id, no address and no case number is keyed by its source URL (Listing.dedupe_key's
+# last branch), and a county roll's URL is the source_url of every row of the roll. The rule above
+# never fired on such rows: their short id had been nulled by validation (a published row, replayed
+# by carryover.py or aged by merge_prior_board, carries parcel_id None and the id only in
+# raw['parcel_id_nulled'] or the source's own raw block), and URL evidence merges two unnumbered rows
+# with no parcel. Rutherford's TR-452 roll was blocked (403) from the VM, carryover replayed its
+# 5,109 published rows, and dedupe() fused the 580 that had no situs into ONE row (580 taxpayers,
+# 580 parcels); the 10/7 board's aged PTS Cloud rows of Madison, Beaufort, Guilford, Pitt and Hyde
+# share 'https://bcpwa.ncptscloud.com/' and fused across counties in the second dedupe (109 gone).
+# THE RULE: identity_of() reads the id the row's source published even when validation nulled it
+# (nulled_source_parcel(); the same lookup board_persist._prior_identity applies to prior rows), so
+# two different ids of one source stay two rows; and on URL evidence alone two rows merge only when
+# they name the same county and the same owner (url_key_conflict()): a shared URL is the same RECORD
+# only when nothing on the two rows says otherwise.
 
 #: A parcel id on this many different numbered streets is not one property's id. Of the published
 #: board's parcels (2026-10-06) 111,543 carry one numbered street, 819 two (a duplex, a corner
@@ -319,15 +336,112 @@ def source_parcel(state, county, parcel_id, raw, source,
     return frozenset({(ref, str(source))})
 
 
+def nulled_source_parcel(parcel_id, raw, source) -> Optional[str]:
+    """The id a row's SOURCE published as parcel_id when validation nulled it as too short: raw
+    ['parcel_id_nulled'] (validation.py, 2026-10-06), else the source's own raw block for a row
+    published before that field (board_persist._SOURCE_PARCEL_FIELDS, the one table of where each
+    such source keeps it). None when the row carries a parcel id or no id was nulled."""
+    if parcel_id not in (None, ""):
+        return None
+    raw = raw if isinstance(raw, dict) else {}
+    pid = None
+    nulled = raw.get("parcel_id_nulled")
+    if isinstance(nulled, dict) and nulled.get("reason") == "too_short":
+        pid = nulled.get("value")
+    if not pid:
+        spec = _source_parcel_fields().get(str(source or ""))
+        blk = raw.get(spec[0]) if spec else None
+        if isinstance(blk, dict):
+            pid = blk.get(spec[1])
+    return str(pid or "").strip() or None
+
+
+_SPF: Optional[dict] = None
+
+
+def _source_parcel_fields() -> dict:
+    """board_persist._SOURCE_PARCEL_FIELDS, read on first use (board_persist imports this module)."""
+    global _SPF
+    if _SPF is None:
+        try:
+            from .board_persist import _SOURCE_PARCEL_FIELDS
+            _SPF = dict(_SOURCE_PARCEL_FIELDS)
+        except Exception:  # noqa: BLE001 - without the table only raw['parcel_id_nulled'] is read
+            _SPF = {}
+    return _SPF
+
+
+def _get(row, name):
+    return row.get(name) if isinstance(row, dict) else getattr(row, name, None)
+
+
+def _owner_key(v) -> str:
+    return "".join(ch for ch in str(v or "").casefold() if ch.isalnum())
+
+
+def url_key_conflict(a, b) -> Optional[str]:
+    """Why two rows that share only their source URL (Listing.dedupe_key's url branch) are two
+    records, or None. A Listing or a board row dict on either side. 'url_county': two different
+    counties; 'url_owner': two different owner names. A county roll's URL is the source_url of every
+    row of the roll, so URL evidence is the same record only when nothing on the rows says otherwise
+    (see 'roll URL keys' above). Different ids of one source are identity_conflict()'s, not this."""
+    ca = str(_get(a, "county") or "").strip().lower()
+    cb = str(_get(b, "county") or "").strip().lower()
+    if ca and cb and not _same_county(ca, cb):
+        return "url_county"
+    oa, ob = _owner_key(_get(a, "owner_name")), _owner_key(_get(b, "owner_name"))
+    if oa and ob and oa != ob:
+        return "url_owner"
+    return None
+
+
+#: The as-scraped fields that tell two records of one URL apart (with the owner, the source id and
+#: the point): the same record scraped twice agrees on all of them. verification.core._fingerprint
+#: reads the same fields (less the URL, which is the key here).
+_URL_RECORD_FIELDS = ("source", "listing_type", "city", "state", "zip_code", "county", "plaintiff",
+                      "defendant", "trustee", "sale_date", "sale_time", "sale_location",
+                      "opening_bid", "judgment_amount", "legal_description")
+
+
+def url_bucket_key(key: str, li) -> str:
+    """dedupe()'s pass-1 bucket for a row keyed by its URL alone: the URL key plus everything else
+    the row says about which record it is (_URL_RECORD_FIELDS, the owner, the source id: its parcel
+    id, else the id validation nulled; and its point to 4 decimals). Only the same record scraped
+    twice shares a bucket: on the 10/7 board 25,578 rows had nothing but a URL, 10,010 of them one
+    PTS Cloud URL, and city / ZIP / owner / point are all that tell those apart (2,127 UST incidents
+    share one DEQ URL, many under one chain's owner name; 76 Spartanburg cleanup cases share the
+    county home page with no owner). key_evidence() of the result is still URL."""
+    pid = _get(li, "parcel_id") or nulled_source_parcel(None, _get(li, "raw"), _get(li, "source")) or ""
+    owner = _owner_key(_get(li, "owner_name"))
+    if not owner and not pid:
+        # nothing names the record (76 such cleanup cases, 12 at one fallback point): alone,
+        # like the 'nokey' rows above, never merged on a URL
+        return f"{key}\x01nokey\x01{id(li)}"
+    parts = [key, owner, _owner_key(pid)]
+    for f in _URL_RECORD_FIELDS:
+        v = _get(li, f)
+        v = getattr(v, "value", v)
+        parts.append(str(v if v is not None else "").strip().lower())
+    for f in ("latitude", "longitude"):
+        v = _get(li, f)
+        parts.append(f"{v:.4f}" if isinstance(v, (int, float)) and not isinstance(v, bool) else "")
+    return "\x01".join(parts)
+
+
 def identity_of(state, county, parcel_id, street_address, raw,
                 overshared: frozenset = frozenset(), source=None) -> Identity:
     """Validity is placeholder_twins.parcel_key()'s (which also needs a known county). An address
-    written from a parcel that is no match key (no_key_parcel()) gives no house number."""
+    written from a parcel that is no match key (no_key_parcel()) gives no house number. A row whose
+    short id validation nulled still names it for the source-parcel rule (nulled_source_parcel())."""
     pt = _pt()
     hn = pt.real_house_no(street_address)
     if hn and pt.situs_from_parcel(raw) and no_key_parcel(state, county, parcel_id, raw, overshared):
         hn = ""
     sp = source_parcel(state, county, parcel_id, raw, source, overshared)
+    if not sp:
+        npid = nulled_source_parcel(parcel_id, raw, source)
+        if npid:
+            sp = source_parcel(state, county, npid, raw, source, overshared)
     if pt.resolver_parcel(raw):
         return Identity(hn)
     k = pt.parcel_key(state, county, parcel_id, overshared)
@@ -573,6 +687,11 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
             if k.startswith("url:"):
                 k = f"nokey:{len(buckets)}:{id(li)}"
             rekeyed += 1
+        if k.startswith("url:"):
+            # One bucket per (county, owner, source id) under a shared URL: rows that
+            # url_key_conflict() or the source-parcel rule would refuse never meet, so a roll of
+            # 10,010 address-less rows (PTS Cloud on the 10/7 board) does not walk a bucket chain.
+            k = url_bucket_key(k, li)
         if k not in buckets:
             buckets[k] = li
             continue
@@ -586,6 +705,10 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
         while kk in buckets:
             b_id = bucket_ids.get(kk) or ident(buckets[kk])
             why = identity_conflict(b_id, li_id, ev)
+            if why is None and ev == URL:
+                # a roll URL is shared by every row of the roll: same county and owner, or two
+                # records (see 'roll URL keys' above)
+                why = url_key_conflict(buckets[kk], li)
             if why is None:
                 buckets[kk] = _merge(buckets[kk], li)
                 bucket_ids[kk] = _union(b_id, li_id)
