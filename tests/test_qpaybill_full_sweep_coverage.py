@@ -195,3 +195,21 @@ def test_freshness_is_the_median_so_a_few_merged_rows_do_not_hide_a_stale_county
     assert fr == {"kershaw": "2026-09-14", "dillon": "2026-10-06", "mccormick": "2026-09-10"}
     assert len(plan) == 14
     assert mod.county_order(["Dillon", "Kershaw", "McCormick", "Lee"], fr) == ["Lee", "McCormick", "Kershaw", "Dillon"]
+
+
+class _Resp:
+    def __init__(self, url: str, status: int = 200):
+        self.url = url
+        self.status_code = status
+        self.content = b"x" * 100
+        self.text = "<html>General Info #1. Please try again.</html>"
+
+
+def test_a_redirect_to_the_vendor_info_page_is_an_outage_not_an_empty_county():
+    import pytest
+    with pytest.raises(mod.QPayBillUnavailable):
+        mod._require_ok(_Resp("https://sampletreasurer.qpaybill.com/Info.aspx"), "sampletreasurer", "S")
+    with pytest.raises(mod.QPayBillUnavailable):
+        mod._require_ok(_Resp("https://sampletreasurer.qpaybill.com/GenericErrorPage.aspx?aspxerrorpath=/x"),
+                        "sampletreasurer", "S")
+    mod._require_ok(_Resp("https://sampletreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx"), "sampletreasurer", "S")

@@ -654,6 +654,19 @@ def _require_ok(resp, sub: str, prefix: str) -> None:
         raise QPayBillUnavailable(
             f"{sub} returned HTTP {resp.status_code} for prefix {prefix!r} "
             f"({len(resp.content):,} bytes) — portal unavailable, NOT an empty result")
+    # A 200 that REDIRECTED to the vendor's info/error page is an outage too. Measured on the
+    # gated VM run of 2026-10-08 (audit 2026-10-09): Abbeville's tenant sent every request to
+    # Info.aspx ("General Info #1. Please try again."), 36 clean queries, parcels=0, errors=0;
+    # the 10/6 run had read 542 parcels there.
+    final = str(getattr(resp, "url", "") or "").split("?", 1)[0].rstrip("/").lower()
+    if final.endswith(_VENDOR_ERROR_PAGES):
+        raise QPayBillUnavailable(
+            f"{sub} redirected prefix {prefix!r} to {final.rsplit('/', 1)[-1]} "
+            f"— portal unavailable, NOT an empty result")
+
+
+#: Pages the qPayBill vendor redirects to instead of the search grid when a tenant is down.
+_VENDOR_ERROR_PAGES = ("/info.aspx", "/genericerrorpage.aspx", "/error.aspx")
 
 
 async def _fresh_vs(client: httpx.AsyncClient, sub: str) -> dict:
