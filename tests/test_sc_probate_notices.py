@@ -1,8 +1,9 @@
 """Parser tests for SC Notice-to-Creditors probate notices.
 
-Every fixture below is trimmed from a page that was actually fetched on
-2026-08-06, including the field-layout differences between the three papers and
-the two junk values that sit exactly where a representative's name sits.
+Every fixture below keeps the LAYOUT of a page fetched on 2026-08-06 (the
+field-layout differences between the three papers and the two junk values that
+sit exactly where a representative's name sits); the names and street lines were
+replaced with invented ones on 2026-10-08 (the repo is public).
 """
 import asyncio
 
@@ -20,32 +21,32 @@ HEADER = (
 )
 
 PICKENS = HEADER + (
-    "Estate: Angela Lyn Allen\n"
+    "Estate: Testa Lyn Sampleton\n"
     "Date of Death: 5/30/2026\n"
     "Case Number: 2026ES3900446\n"
     "Personal Representative:\n"
-    "Frances E. Allen\n"
-    "Address: 117 Roslyn Dr., \n"
+    "Rowan E. Sampleton\n"
+    "Address: 117 Example Dr., \n"
     "Clemson, SC 29631\n"
     "July 22, 29, Aug. 5\n"
 )
 
 CHEROKEE = HEADER + (
-    "Estate: Linda Fowler Harris\n"
+    "Estate: Dana Fowlerton Testcase\n"
     "Death: 06/19/2026\n"
     "Case# 2026ES1100303\n"
-    "PR: Nicole Easler\n"
-    "115 Riveredge Dr.\n"
+    "PR: Jordan Placeholder\n"
+    "115 Sampleriver Dr.\n"
     "Moore, SC 29369\n"
     "Published: July 29, August 5 & 12, 2026\n"
 )
 
 LAURENS = HEADER + (
-    "ESTATE OF: Lee Edward Brouillette Jr. \n"
+    "ESTATE OF: Lee Edward Exampleman Jr. \n"
     "Date of Death: May 10, 2026\n"
     "Case Number: 2026ES3000274\n"
-    "Personal Representative: Teresa Fulmer Brouillette\n"
-    "Address: 192 Burton Road, Laurens, SC 29360\n"
+    "Personal Representative: Casey Fulton Exampleman\n"
+    "Address: 192 Sample Road, Laurens, SC 29360\n"
     "July22,29Aug5\n"
 )
 
@@ -58,31 +59,31 @@ def _one(text):
 
 def test_pickens_dialect_name_on_following_line():
     r = _one(PICKENS)
-    assert r["estate"] == "Angela Lyn Allen"
+    assert r["estate"] == "Testa Lyn Sampleton"
     assert r["case_number"] == "2026ES3900446"
     assert r["county"] == "Pickens"
     assert r["date_of_death"] == "5/30/2026"
-    assert r["personal_representative"] == "Frances E. Allen"
+    assert r["personal_representative"] == "Rowan E. Sampleton"
     # The city line lives BELOW the "Address:" line and must be joined onto it.
-    assert r["pr_address"] == "117 Roslyn Dr., Clemson, SC 29631"
+    assert r["pr_address"] == "117 Example Dr., Clemson, SC 29631"
 
 
 def test_cherokee_dialect_short_labels_and_unlabelled_address():
     r = _one(CHEROKEE)
-    assert r["estate"] == "Linda Fowler Harris"
+    assert r["estate"] == "Dana Fowlerton Testcase"
     assert r["county"] == "Cherokee"
     assert r["date_of_death"] == "06/19/2026"
-    assert r["personal_representative"] == "Nicole Easler"
+    assert r["personal_representative"] == "Jordan Placeholder"
     # No "Address:" label at all on this paper.
-    assert r["pr_address"] == "115 Riveredge Dr., Moore, SC 29369"
+    assert r["pr_address"] == "115 Sampleriver Dr., Moore, SC 29369"
 
 
 def test_laurens_dialect_estate_of_and_spelled_out_date():
     r = _one(LAURENS)
-    assert r["estate"] == "Lee Edward Brouillette Jr."
+    assert r["estate"] == "Lee Edward Exampleman Jr."
     assert r["county"] == "Laurens"
     assert r["date_of_death"] == "May 10, 2026"
-    assert r["personal_representative"] == "Teresa Fulmer Brouillette"
+    assert r["personal_representative"] == "Casey Fulton Exampleman"
 
 
 def test_county_comes_from_the_case_number_not_the_paper():
@@ -116,27 +117,27 @@ def test_missing_case_number_yields_nothing():
 
 
 def test_case_number_tail_echoed_in_the_name_is_trimmed():
-    """'Estate: Ethel J. Hamrick 276' beside case ...100276 — real published text."""
-    r = _one(CHEROKEE.replace("Estate: Linda Fowler Harris",
-                              "Estate: Ethel J. Hamrick 276")
+    """'Estate: Edna J. Mockley 276' beside case ...100276 — real published text."""
+    r = _one(CHEROKEE.replace("Estate: Dana Fowlerton Testcase",
+                              "Estate: Edna J. Mockley 276")
                      .replace("2026ES1100303", "2026ES1100276"))
-    assert r["estate"] == "Ethel J. Hamrick"
+    assert r["estate"] == "Edna J. Mockley"
 
 
 def test_a_number_that_is_not_the_case_tail_is_kept():
-    r = _one(CHEROKEE.replace("Estate: Linda Fowler Harris",
-                              "Estate: Linda Fowler Harris 2nd"))
-    assert r["estate"] == "Linda Fowler Harris 2nd"
+    r = _one(CHEROKEE.replace("Estate: Dana Fowlerton Testcase",
+                              "Estate: Dana Fowlerton Testcase 2nd"))
+    assert r["estate"] == "Dana Fowlerton Testcase 2nd"
 
 
 def test_publication_date_run_is_not_read_as_a_representative():
-    r = _one(LAURENS.replace("Personal Representative: Teresa Fulmer Brouillette",
+    r = _one(LAURENS.replace("Personal Representative: Casey Fulton Exampleman",
                              "Personal Representative:\nFeb11,18,25"))
     assert r["personal_representative"] is None
 
 
 def test_po_box_is_an_address_not_a_representative_name():
-    r = _one(PICKENS.replace("Frances E. Allen\nAddress: 117 Roslyn Dr., \n"
+    r = _one(PICKENS.replace("Rowan E. Sampleton\nAddress: 117 Example Dr., \n"
                              "Clemson, SC 29631\n",
                              "Post Office Box 219\nPickens, SC 29671\n"))
     assert r["personal_representative"] is None

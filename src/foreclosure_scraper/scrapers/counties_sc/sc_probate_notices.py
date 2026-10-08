@@ -156,7 +156,7 @@ _PUBRUN = re.compile(r"^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]
                      re.I)
 _CITY = re.compile(r"^[A-Za-z .'\-]+,\s*[A-Z]{2}\.?\s*\d{5}")
 #: A stray copy of the case-number tail sometimes rides along on the estate line
-#: ("Estate: Ethel J. Hamrick 276" beside case 2026ES1100276). That is in the
+#: ("Estate: Edna J. Mockley 276" beside case 2026ES1100276). That is in the
 #: published text, not a parsing fault, so it is trimmed rather than tolerated.
 _TAIL_NUM = re.compile(r"\s+\d{2,6}$")
 _LABELS = re.compile(r"\b(?:Date\s+of\s+Death|Death|Case|Address|Published)\b", re.I)
@@ -164,7 +164,7 @@ _LABELS = re.compile(r"\b(?:Date\s+of\s+Death|Death|Case|Address|Published)\b", 
 
 def _clean_name(s: str, case: str) -> Optional[str]:
     # Strip trailing separators but NOT a trailing period: it belongs to the
-    # name in "Brouillette Jr." and in initials, and dropping it silently
+    # name in "Exampleman Jr." and in initials, and dropping it silently
     # rewrites the very string the name->property resolver matches on.
     name = re.sub(r"\s+", " ", s).strip(" ,:;-")
     m = _TAIL_NUM.search(name)
