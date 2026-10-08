@@ -47,7 +47,7 @@ import structlog
 
 from . import tax_calendar as _cal
 from .models import Listing
-from .tax_binding import drop_derived_tax, scrub_unbound_tax, usable_id
+from .tax_binding import VERIFIED_SOURCE, drop_derived_tax, scrub_unbound_tax, usable_id
 from .verification.verifiers._tax_common import NON_PROPERTY_TAX_SOURCES
 
 log = structlog.get_logger()
@@ -455,6 +455,16 @@ def tax_year_status(raw: dict, state: Optional[str], county: Optional[str],
         return _cal.levy_year_is_delinquent(y, state, county, today)
 
     to = raw.get("tax_owed") if isinstance(raw.get("tax_owed"), dict) else {}
+    if to.get("basis") == VERIFIED_SOURCE:
+        # the county's own site, read by a confirmed verification (tax_binding.restore_verified_tax):
+        # its late years stand; a bill it saw as not late yet is not counted late later (unknown)
+        late_years = [y for y in (_cal.levy_year(v) for v in to.get("delinquent_years") or []) if y]
+        n = to.get("years_delinquent")
+        n = int(n) if isinstance(n, int) and not isinstance(n, bool) and n > 0 else len(late_years)
+        pending = [y for y in (_cal.levy_year(v) for v in to.get("not_yet_late_years") or [])
+                   if y is not None and not late(y)]
+        return {"basis": "verified", "unpaid_bill_years": n + len(pending), "years_delinquent": n,
+                "delinquent_years": late_years, "not_yet_late_years": pending}
     years = unpaid_levy_years(raw)
     if years:
         done = [y for y in years if late(y)]
@@ -622,10 +632,13 @@ def enrich_tax_owed(listings: Iterable[Listing], today: Optional[date] = None) -
         unbound = scrub_unbound_tax(listings)
     # An old cross reference is never re-read as the row's own record (pass C would): pass 2
     # rebuilds it from this run's rows, or the row has no balance any more.
+    # The same for a balance an earlier run read from a confirmed county-site verification: it is
+    # set again after this run's verification apply (tax_binding.restore_verified_tax) while the
+    # verdict holds, and never becomes the row's 'own_record' (pass C would relabel it).
     old_xref: set[int] = set()
     for li in listings:
         to = li.raw.get("tax_owed") if isinstance(li.raw, dict) else None
-        if isinstance(to, dict) and to.get("basis") == "parcel_cross_ref":
+        if isinstance(to, dict) and to.get("basis") in ("parcel_cross_ref", VERIFIED_SOURCE):
             li.raw.pop("tax_owed", None)
             old_xref.add(id(li))
 

@@ -369,3 +369,120 @@ def test_cleanup_after_merge_takes_old_attachments_off_carried_rows(tmp_path):
     assert "tax_owed" not in by_pid["R88888-008-008-008"].raw
     assert "tax_aging_surfaced" not in by_pid["R88888-008-008-008"].raw
     assert by_pid["R11111-001-001-001"].raw["tax_owed"]["balance"] == 4100.01
+
+
+# ---- the county's own site is the authority: restore_verified_tax --------------------------------
+
+from datetime import timezone  # noqa: E402
+
+from foreclosure_scraper import distress_score as ds  # noqa: E402
+from foreclosure_scraper import fullmer_rank as fr  # noqa: E402
+from foreclosure_scraper.enrichment_tax_owed import tax_year_status  # noqa: E402
+
+CHECK_NOW = datetime(2026, 10, 8, 12, tzinfo=timezone.utc)
+
+
+def _verdict(verdict="confirmed", expires="2026-11-07T00:00:00Z", **ev):
+    evidence = {"total_delinquent": 1925.12, "years_delinquent": 3,
+                "delinquent_by_year": {"2022": 600.0, "2023": 625.12, "2025": 700.0},
+                "not_yet_delinquent_due": {"2026": 710.0}, "latest_levy_year": 2026,
+                "tax_parcel": "R12345-001-002-003", "tax_parcel_row_own": True}
+    evidence.update(ev)
+    return {"signal": "tax_lien", "verdict": verdict, "verifier": "tax_lien_sample", "source": "tax.sample.invalid",
+            "checked_at": "2026-10-08T03:00:00Z", "expires_at": expires, "governs": ["tax_lien"],
+            "evidence": evidence}
+
+
+def _verified_row(rec, parcel="R12345-001-002-003", raw=None, street="12 Sample Creek Rd", source=CSV):
+    return _li(source=source, parcel=parcel, street=street, raw={**(raw or {}), "verification": [rec]})
+
+
+def test_a_confirmed_county_check_sets_the_balance_and_years():
+    li = _verified_row(_verdict())
+    stats = tb.restore_verified_tax([li], now=CHECK_NOW)
+    to = li.raw["tax_owed"]
+    assert stats["restored"] == 1 and stats["added_balance"] == 1
+    assert to["balance"] == 1925.12 and to["source"] == tb.VERIFIED_SOURCE and to["basis"] == tb.VERIFIED_SOURCE
+    assert to["years_delinquent"] == 3 and to["delinquent_years"] == [2022, 2023, 2025]
+    assert to["not_yet_late_years"] == [2026] and to["year"] == 2022
+    assert li.raw["tax_aging_surfaced"]["years_delinquent"] == 3 and li.raw["tax_aging_high"] is True
+    assert li.raw["amount_owed"] == {"value": 1925.12, "source": "tax_owed", "label": "Delinquent property tax owed",
+                                     "confidence": "high", "is_actual_debt": True}
+    st = tax_year_status(li.raw, "NC", "Sample", date(2026, 10, 8))
+    assert st["basis"] == "verified" and st["years_delinquent"] == 3
+    # the scorer and the buy-box ranker read it
+    assert "recorded_debt" in {n for n, _c, _w in ds._signals_for(li, today=date(2026, 10, 8))}
+    assert fr.years_delinquent(li) == (3, True)
+    assert fr.tax_arrears(li) == (1925.12, True)
+
+
+def test_a_scrubbed_copy_never_comes_back_only_the_verified_numbers_do():
+    li = _li(parcel="R12345-001-002-003", street="12 Sample Creek Rd",
+             raw={"nc_county_csv_delinquent_tax": _csv_block("R11111-001-001-001"), **_derived(4100.01)})
+    tb.scrub_unbound_tax([li])
+    assert "tax_owed" not in li.raw
+    li.raw["verification"] = [_verdict()]
+    tb.restore_verified_tax([li], now=CHECK_NOW)
+    assert "nc_county_csv_delinquent_tax" not in li.raw
+    assert li.raw["tax_owed"]["balance"] == 1925.12
+
+
+def test_the_verified_numbers_replace_a_block_balance():
+    li = _verified_row(_verdict(), raw={"nc_county_csv_delinquent_tax": _csv_block("R12345-001-002-003", 900.0),
+                                        **_derived(900.0)})
+    stats = tb.restore_verified_tax([li], now=CHECK_NOW)
+    assert stats["replaced_balance"] == 1 and li.raw["tax_owed"]["balance"] == 1925.12
+
+
+def test_stale_refuted_unconfirmed_and_expired_answers_restore_nothing():
+    for rec in (_verdict("stale"), _verdict("refuted"), _verdict("unconfirmed"),
+                _verdict(expires="2026-10-01T00:00:00Z")):
+        li = _verified_row(rec)
+        stats = tb.restore_verified_tax([li], now=CHECK_NOW)
+        assert stats["restored"] == 0 and "tax_owed" not in li.raw, rec["verdict"]
+
+
+def test_a_check_of_another_parcel_restores_nothing():
+    cases = [
+        _verdict(tax_parcel_row_own=False),                                   # the verifier says so
+        _verdict(tax_parcel_row_own=None, tax_parcel="R99999-009-009-009",
+                 address_relation="conflict"),                                # another parcel, another address
+        _verdict(tax_parcel_row_own=None, claim_county_differs=True, address_relation="match"),
+    ]
+    for rec in cases:
+        li = _verified_row(rec)
+        stats = tb.restore_verified_tax([li], now=CHECK_NOW)
+        assert stats["not_own_parcel_or_no_years"] == 1 and "tax_owed" not in li.raw
+
+
+def test_a_check_bound_by_the_address_counts():
+    # a 5-digit roll account cannot be compared with the row's 10-digit PIN; the checked bill's
+    # situs is the row's address
+    rec = _verdict(tax_parcel_row_own=None, tax_parcel="70011", address_relation="match")
+    li = _verified_row(rec, parcel="9000000357")
+    assert tb.restore_verified_tax([li], now=CHECK_NOW)["restored"] == 1
+
+
+def test_evidence_without_the_late_years_restores_nothing():
+    rec = _verdict(years_delinquent=None, delinquent_by_year=None)
+    li = _verified_row(rec)
+    assert tb.restore_verified_tax([li], now=CHECK_NOW)["restored"] == 0
+
+
+def test_another_liens_balance_is_left_alone():
+    lien = {"balance": 7000.11, "kind": "state_tax_lien", "source": "counties_sc.sc_dew_lien_registry",
+            "basis": "own_record"}
+    li = _verified_row(_verdict(), raw={"tax_owed": lien}, source="counties_sc.sc_dew_lien_registry")
+    stats = tb.restore_verified_tax([li], now=CHECK_NOW)
+    assert stats["other_lien_kept"] == 1 and li.raw["tax_owed"] == lien
+
+
+def test_next_runs_enrich_never_relabels_a_verified_balance_as_the_rows_own():
+    li = _verified_row(_verdict())
+    tb.restore_verified_tax([li], now=CHECK_NOW)
+    enrich_tax_owed([li], today=TODAY)          # the next run, before its verification apply
+    assert "tax_owed" not in li.raw and "tax_aging_surfaced" not in li.raw
+    tb.restore_verified_tax([li], now=CHECK_NOW)   # after it: set again from the verdict
+    assert li.raw["tax_owed"]["source"] == tb.VERIFIED_SOURCE
+    again = tb.restore_verified_tax([li], now=CHECK_NOW)
+    assert again["replaced_balance"] == 0          # idempotent

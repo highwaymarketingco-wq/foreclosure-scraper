@@ -175,7 +175,9 @@ def _tax_owed_promotion(raw: dict, row=None) -> Optional[dict]:
             return None
     # Idempotent: a row already correctly promoted (source == "tax_owed", same value) would
     # produce the identical dict again, so re-running this pass is always safe.
-    confidence = "high" if to.get("basis") == "own_record" else "medium"
+    # own_record: the county's record for THIS parcel; county_site_verified: the county's own site,
+    # read for this parcel by a confirmed verification (tax_binding.restore_verified_tax)
+    confidence = "high" if to.get("basis") in ("own_record", "county_site_verified") else "medium"
     return {
         "value": round(balance, 2),
         "source": "tax_owed",
