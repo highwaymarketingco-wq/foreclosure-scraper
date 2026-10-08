@@ -22,6 +22,18 @@ May-7-2026-Deficiency-Sale-1.pdf's own body names its reopen date as APRIL
 date because that convention was never seen to drift; this one does drift,
 so `sale_date` here is parsed from the body's "REOPEN ON ... @ ..." line,
 never assumed from the filename.
+
+SOURCE-COMPLETENESS AUDIT, 2026-10-08 (the 10/7 extraction audit's open item "results/
+deficiency PDFs, real sale time"), live page read the same day:
+  * The August 4, 2026 results were posted as "August-4-2026-Sale-List-Results.pdf". Neither the
+    results selector (href containing "Sale-Results") nor RESULTS_HREF_RE admitted the
+    "Sale-List-Results" spelling, so its 9 priced rows never reached the sold-comps pool.
+  * Results PDFs were capped at the newest 6 although the 180-day window held 9 on the page;
+    the cap is now 12 (one sale list and one deficiency sale a month over the window), so the
+    date window is what bounds it. Cost: up to 6 more PDF GETs per run.
+  * Every Sale-List and results PDF states the sale hour in its header ("SALES ARE HELD AT
+    THE ANDERSON COUNTY COURTHOUSE ... 11:00 AM"); sale_date used to be midnight of the
+    filename date. The header's time is now applied (the filename date is unchanged).
 """
 from __future__ import annotations
 
@@ -47,9 +59,33 @@ PDF_HREF_RE = re.compile(
 # with hammer prices — these feed the foreclosure_sold_comps pool.
 RESULTS_HREF_RE = re.compile(
     r"/wp-content/uploads/(\d{4})/(\d{2})/"
-    r"([A-Za-z]+)-(\d+)-(\d{4})-(?:Deficiency-Sale-Results|Sale-Results)(?:-\d+)?\.pdf",
+    r"([A-Za-z]+)-(\d+)-(\d{4})-(?:Deficiency-Sale-Results|Sale-List-Results|Sale-Results)(?:-\d+)?\.pdf",
     re.I,
 )
+# Newest results PDFs read per run. The 180-day lookback holds about one sale list and one
+# deficiency sale a month (~12); the old cap of 6 dropped the older half of that window.
+RESULTS_PDF_CAP = 12
+# Header line on every Sale-List / results PDF: "SALES ARE HELD AT THE ANDERSON COUNTY
+# COURTHOUSE, THIRD FLOOR, COURTROOM #2, 11:00 AM."
+_SALE_TIME_RE = re.compile(
+    r"SALES\s+ARE\s+HELD\b[^.]{0,200}?\b(\d{1,2}):(\d{2})\s*([AP])\.?\s?M\b",
+    re.I,
+)
+
+
+def _at_sale_time(sale_date: datetime | None, text: str) -> datetime | None:
+    """`sale_date` at the hour the PDF's own header states; unchanged when none is stated."""
+    if sale_date is None:
+        return None
+    m = _SALE_TIME_RE.search(text or "")
+    if not m:
+        return sale_date
+    hour, minute = int(m.group(1)) % 12, int(m.group(2))
+    if m.group(3).upper() == "P":
+        hour += 12
+    if minute > 59:
+        return sale_date
+    return sale_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
 # Sold-price patterns observed in Anderson results PDFs.
 # Examples:
 #   "To Third Party $228,500.00"
@@ -430,8 +466,9 @@ class AndersonMasterInEquity(BaseScraper):
                     if r2.status_code == 200:
                         upcoming_text = _extract_pdf_text(r2.content)
                         listings = _parse_pdf(upcoming_text, best_pdf_url, self.slug)
+                        sale_at = _at_sale_time(best_sale_date, upcoming_text)
                         for li in listings:
-                            li.sale_date = best_sale_date
+                            li.sale_date = sale_at
                         out.extend(listings)
                 except Exception:
                     pass
@@ -439,7 +476,9 @@ class AndersonMasterInEquity(BaseScraper):
             # ---- Sale-Results / Deficiency-Sale-Results PDFs (past sales
             # with hammer prices — feed the foreclosure_sold_comps pool) ----
             results_pdfs: list[tuple[str, datetime]] = []
-            for a in tree.css("a[href*='Sale-Results'], a[href*='Deficiency-Sale-Results']"):
+            # "-Results" admits every spelling seen: Sale-Results, Deficiency-Sale-Results and
+            # Sale-List-Results (August 2026); RESULTS_HREF_RE decides.
+            for a in tree.css("a[href*='-Results']"):
                 href = a.attributes.get("href", "")
                 m = RESULTS_HREF_RE.search(href)
                 if not m:
@@ -462,10 +501,10 @@ class AndersonMasterInEquity(BaseScraper):
                 )
                 results_pdfs.append((full_url, sale_date))
 
-            # Cap at the most-recent 6 results PDFs (covers ~3 months
-            # of monthly sale + deficiency PDFs)
-            results_pdfs.sort(key=lambda x: x[1], reverse=True)
-            for url, sale_date in results_pdfs[:6]:
+            # Newest first; the 180-day window above is the real bound, RESULTS_PDF_CAP only
+            # guards against a page that suddenly lists far more. A PDF linked twice is read once.
+            results_pdfs = sorted(dict(results_pdfs).items(), key=lambda x: x[1], reverse=True)
+            for url, sale_date in results_pdfs[:RESULTS_PDF_CAP]:
                 try:
                     r3 = await c.get(url)
                     if r3.status_code != 200:
@@ -473,7 +512,8 @@ class AndersonMasterInEquity(BaseScraper):
                     text = _extract_pdf_text(r3.content)
                     if not text:
                         continue
-                    out.extend(_parse_results_pdf(text, url, self.slug, sale_date))
+                    out.extend(_parse_results_pdf(text, url, self.slug,
+                                                  _at_sale_time(sale_date, text)))
                 except Exception:
                     continue
 
