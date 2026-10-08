@@ -2406,6 +2406,15 @@ async def run() -> int:
     except Exception:
         log.error("comps.failed", traceback=traceback.format_exc())
 
+    # Comps the fresh lookup did not reach (phase cap, changed parcel id) come forward from the
+    # prior board inside a 365-day window, with their age shown (audit 2026-10-09, valuation).
+    try:
+        from .enrichment_comps import age_comps, carry_forward_from_board
+        enrichment_stats["comps_age"] = age_comps(enriched)
+        enrichment_stats["comps_carry_forward"] = carry_forward_from_board(enriched)
+    except Exception:
+        log.error("comps_carry.failed", traceback=traceback.format_exc())
+
     # FREE COMP SPINE from county sales rolls (Buncombe 388k, Cleveland). These publish a
     # recorded price but no sqft, so they gap-fill only: land $/acre into raw['comps'], and
     # sale-to-assessed ratio into raw['recorded_ratio_comps'] (Tier 1b in valuation/calc.py).
