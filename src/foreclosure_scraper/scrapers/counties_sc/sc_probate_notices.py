@@ -34,10 +34,14 @@ THREE PAPERS, THREE FIELD DIALECTS — all of them real, none of them documented
 WHY THE HOSTS DIFFER IN ACCESS PATH
     Pickens and Laurens publish notices as ordinary WordPress posts, so the
     posts endpoint returns the body directly. The Gaffney Ledger files them
-    under a custom post type whose REST route 404s and whose oht_article route
-    returns 403. We do not go around that. We read the ordinary public article
-    page instead, which is the same page a reader opens, and discover which
-    pages to read through the site's own public search endpoint.
+    under a custom post type (gd_classified, the GeoDirectory plugin) whose
+    wp/v2 route is not registered (404) and whose oht_article route returns 403.
+    We do not go around that 403. Since 2026-10-08 the notices are read from the
+    plugin's own public, unauthenticated listing route
+    (/wp-json/geodir/v2/classifieds, the same JSON the site's directory pages
+    use), 50 notices with their full text per request; the old path (the site's
+    public search endpoint, then one ordinary article page per hit) stays as the
+    fallback when that route fails.
 
 WP SEARCH IS FUZZY, so the phrase match is what actually filters
     /wp-json/wp/v2/search scores loose OR matches: searching "personal
@@ -72,6 +76,7 @@ from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...layer_guard import LayerHarvest
 from ...models import Listing, ListingType, PropertyKind
+from ...sc_case_county import SC_COUNTY_BY_CODE
 
 log = structlog.get_logger()
 
@@ -90,17 +95,25 @@ def body_text(raw: str) -> str:
     t = re.sub(r"[ \t\xa0]+", " ", t)
     return re.sub(r"\n\s*\n+", "\n", t)
 
-#: Two-digit SC county codes as they appear inside an ES case number. Only the
-#: footprint is listed; anything else is out of scope and dropped.
-SC_COUNTY_CODE = {
-    "04": "Anderson", "11": "Cherokee", "30": "Laurens",
-    "37": "Oconee", "39": "Pickens", "42": "Spartanburg", "44": "Union",
-}
+#: Two-digit SC county codes as they appear inside an ES case number (01-46,
+#: alphabetical). 2026-10-08: all 46, not only the 7-county footprint. A probate
+#: notice is a DISTRESSED lead, which the owner's rule of 2026-09-15 admits
+#: anywhere in NC/SC (main._county_in_scope -> config.in_scope_distressed); the
+#: footprint-only map predated that rule and dropped e.g. Greenville and York
+#: estates printed in these papers.
+SC_COUNTY_CODE = dict(SC_COUNTY_BY_CODE)
 
 #: How far back to read. Estates older than this are closed or cold.
 LOOKBACK_DAYS = int(os.environ.get("FORECLOSURE_SC_PROBATE_LOOKBACK_DAYS", "550"))
-#: Bound on article pages fetched per paper, so one paper cannot run away.
+#: Bound on article pages fetched per paper, so one paper cannot run away. Applies
+#: ONLY to the article-page fallback (one request per page). Before 2026-10-08 it
+#: was also applied to the inline-body lanes, BEFORE de-duplication: Pickens'
+#: two search terms return 90 + 117 posts in the lookback (measured 2026-10-08)
+#: and only the first 120 entries of the combined list were read.
 MAX_DOCS = int(os.environ.get("FORECLOSURE_SC_PROBATE_MAX_DOCS", "120"))
+#: Pages of 50 per search term for the JSON lanes (each page carries the bodies).
+#: Pickens' "estate notice" needs 3; the old fixed (1, 2) loop left 17 posts unread.
+MAX_JSON_PAGES = int(os.environ.get("FORECLOSURE_SC_PROBATE_MAX_PAGES", "12"))
 
 SEARCH_TERMS = ("notice+to+creditors", "estate+notice")
 
@@ -114,7 +127,11 @@ class Paper(NamedTuple):
 PAPERS: tuple[Paper, ...] = (
     Paper("Pickens", "www.yourpickenscounty.com", "posts"),
     Paper("Laurens", "www.laurenscountyadvertiser.net", "posts"),
-    Paper("Cherokee", "www.gaffneyledger.com", "search_html"),
+    # "geodir": GeoDirectory's public listing route; falls back to "search_html".
+    # Measured 2026-10-08: the site search reports 557 hits for "notice to
+    # creditors" and the article-page lane read 120 of them (~223 s); the
+    # geodir route returns the same notices with their text, 50 per request.
+    Paper("Cherokee", "www.gaffneyledger.com", "geodir"),
 )
 
 _PHRASE = re.compile(r"notice\s+to\s+creditors", re.I)
@@ -273,14 +290,58 @@ async def _json(c, url: str):
         raise RuntimeError(f"non-JSON response from {url}") from exc
 
 
+async def _geodir_docs(c, paper: Paper, after_iso: str) -> list[tuple[str, str]] | None:
+    """Notices from GeoDirectory's public listing route, newest first, with their text.
+
+    Returns None when the route itself fails on the first page (the caller then falls
+    back to the article-page lane); an empty list when it answers with nothing."""
+    out: list[tuple[str, str]] = []
+    cutoff = after_iso[:10]
+    for term in SEARCH_TERMS:
+        for page in range(1, MAX_JSON_PAGES + 1):
+            url = (f"https://{paper.host}/wp-json/geodir/v2/classifieds?search={term}"
+                   f"&per_page=50&page={page}")
+            try:
+                rows = await _json(c, url)
+            except RuntimeError:
+                if page == 1 and term == SEARCH_TERMS[0]:
+                    return None
+                break
+            if not isinstance(rows, list) or not rows:
+                break
+            for p in rows:
+                d = str(p.get("date") or "")[:10]
+                if d and d < cutoff:
+                    continue               # older than the lookback
+                content = p.get("content")
+                html_body = content.get("rendered", "") if isinstance(content, dict) else str(content or "")
+                out.append((p.get("link") or paper.host, body_text(html_body)))
+            last = str(rows[-1].get("date") or "")[:10]
+            if len(rows) < 50 or (last and last < cutoff):
+                break                      # last page, or past the lookback (newest first)
+        else:
+            log.warning("sc_probate.page_cap_reached", host=paper.host, term=term,
+                        max_pages=MAX_JSON_PAGES)
+    return out
+
+
 async def _fetch_paper(c, paper: Paper) -> list[Listing]:
     after = (datetime.utcnow() - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%dT00:00:00")
     slug = f"counties_sc.sc_probate_notices.{paper.host.replace('www.', '').split('.')[0]}"
     docs: list[tuple[str, str]] = []       # (url, body text)
 
-    if paper.mode == "posts":
+    mode = paper.mode
+    if mode == "geodir":
+        got = await _geodir_docs(c, paper, after)
+        if got is None:
+            log.warning("sc_probate.geodir_unavailable", host=paper.host,
+                        note="falling back to search + article pages")
+            mode = "search_html"
+        else:
+            docs.extend(got)
+    if mode == "posts":
         for term in SEARCH_TERMS:
-            for page in (1, 2):
+            for page in range(1, MAX_JSON_PAGES + 1):
                 url = (f"https://{paper.host}/wp-json/wp/v2/posts?search={term}"
                        f"&after={after}&per_page=50&page={page}"
                        f"&_fields=link,date,content")
@@ -295,7 +356,10 @@ async def _fetch_paper(c, paper: Paper) -> list[Listing]:
                                  body_text((p.get("content") or {}).get("rendered", ""))))
                 if len(rows) < 50:
                     break
-    else:
+            else:
+                log.warning("sc_probate.page_cap_reached", host=paper.host, term=term,
+                            max_pages=MAX_JSON_PAGES)
+    elif mode == "search_html":
         urls: list[str] = []
         for term in SEARCH_TERMS:
             for page in (1, 2):
@@ -322,7 +386,14 @@ async def _fetch_paper(c, paper: Paper) -> list[Listing]:
     out: list[Listing] = []
     seen: set[str] = set()
     hits = 0
-    for url, body in docs[:MAX_DOCS]:
+    # One body per URL (the two search terms return many of the same posts). No count
+    # cap here: the bodies are already in hand, and MAX_DOCS bounds only the requests
+    # of the article-page lane above.
+    uniq: dict[str, str] = {}
+    for url, body in docs:
+        uniq.setdefault(url, body)
+    docs = list(uniq.items())
+    for url, body in docs:
         estates = parse_estates(body)
         if estates:
             hits += 1

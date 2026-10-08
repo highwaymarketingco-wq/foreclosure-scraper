@@ -91,9 +91,17 @@ def test_county_comes_from_the_case_number_not_the_paper():
     assert r["county"] == "Spartanburg"
 
 
-def test_out_of_footprint_case_number_is_dropped():
-    # 23 = Greenville, adjacent but outside the 18-county footprint.
-    assert parse_estates(CHEROKEE.replace("2026ES1100303", "2026ES2300999")) == []
+def test_out_of_footprint_case_number_is_kept_under_its_own_county():
+    # 23 = Greenville, outside the 18-county FLIP footprint. A probate notice is a
+    # distressed lead, admitted anywhere in NC/SC (owner rule 2026-09-15), so since
+    # 2026-10-08 it is kept and filed under the county its case number names.
+    r = _one(CHEROKEE.replace("2026ES1100303", "2026ES2300999"))
+    assert r["county"] == "Greenville"
+
+
+def test_unknown_county_code_is_dropped():
+    # SC codes stop at 46 (York); 47+ is not a county.
+    assert parse_estates(CHEROKEE.replace("2026ES1100303", "2026ES4700999")) == []
 
 
 def test_body_without_the_literal_phrase_yields_nothing():
@@ -196,10 +204,12 @@ def test_fetch_salvages_fast_papers_when_a_slow_one_is_still_running(monkeypatch
     }
 
 
-def test_footprint_codes_only():
-    """Codes must map to real SC counties in the 18-county footprint."""
+def test_county_codes_are_the_46_sc_counties():
+    """Codes map to the 46 SC counties (01-46 alphabetical), not only the footprint."""
     assert SC_COUNTY_CODE["11"] == "Cherokee"
     assert SC_COUNTY_CODE["39"] == "Pickens"
-    assert set(SC_COUNTY_CODE.values()) == {
-        "Anderson", "Cherokee", "Laurens", "Oconee",
-        "Pickens", "Spartanburg", "Union"}
+    assert SC_COUNTY_CODE["23"] == "Greenville"
+    assert SC_COUNTY_CODE["46"] == "York"
+    assert len(SC_COUNTY_CODE) == 46
+    assert {"Anderson", "Cherokee", "Laurens", "Oconee",
+            "Pickens", "Spartanburg", "Union"} <= set(SC_COUNTY_CODE.values())
