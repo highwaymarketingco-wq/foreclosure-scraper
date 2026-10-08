@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import html as html_lib
 import re
+import time
 from datetime import datetime
 from typing import Iterable
 
@@ -290,7 +291,17 @@ def _apply_detail(li: Listing, detail: dict) -> None:
             usda_ns[k] = detail[k]
 
 
-async def _fetch_county(slug_scraper: str, county_slug: str) -> list[Listing]:
+#: Share of timeout_s the per-card detail pages may use, split evenly across the counties. The
+#: county's card rows are kept whether or not their detail page was reached in time.
+DETAIL_BUDGET_SHARE = 0.75
+
+
+async def _fetch_county(slug_scraper: str, county_slug: str,
+                        deadline: float | None = None, keep=None) -> list[Listing]:
+    """One county page's cards. Detail pages (at most DETAIL_FETCH_CAP) stop once
+    time.monotonic() passes `deadline`; the remaining cards are kept without one. `keep(li)`, when
+    given, is called on each parsed card BEFORE its detail page: it records the row (the scraper's
+    partial list) and returns False for a duplicate, which is then skipped."""
     url = f"{BASE}/property/sc/county/{county_slug}/"
     try:
         html = await get_text(url, impersonate=True, timeout=30.0)
@@ -310,7 +321,9 @@ async def _fetch_county(slug_scraper: str, county_slug: str) -> list[Listing]:
             continue
         if li is None:
             continue
-        if detail_fetches < DETAIL_FETCH_CAP:
+        if keep is not None and not keep(li):
+            continue
+        if detail_fetches < DETAIL_FETCH_CAP and (deadline is None or time.monotonic() < deadline):
             detail_fetches += 1
             try:
                 detail = await _fetch_detail(li.source_url)
@@ -330,23 +343,34 @@ class USDAProperties(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     requires_render = False
-    timeout_s = 120.0
+    # 120 s until 2026-10-08. Seven county pages plus up to DETAIL_FETCH_CAP detail pages each (up
+    # to 112 requests to one host, spaced by the shared client) ran past it on alternate runs since
+    # the detail pages were added 2026-10-04, and a timeout shipped 0 rows (336 on the runs that
+    # finished). The detail budget below stops in time, and every finished county's rows are in
+    # self.partial, so a cut-off ships them.
+    timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
+        out = self.partial
         seen: set[str] = set()
-        for county_slug in SC_COUNTY_SLUGS:
+
+        def keep(li: Listing) -> bool:
+            pid = li.raw.get("usda_property_id")
+            if pid and pid in seen:
+                return False
+            if pid:
+                seen.add(pid)
+            out.append(li)          # before its detail page: a cut-off still ships the card
+            return True
+
+        start, budget = time.monotonic(), self.timeout_s * DETAIL_BUDGET_SHARE
+        n = len(SC_COUNTY_SLUGS)
+        for i, county_slug in enumerate(SC_COUNTY_SLUGS):
             try:
-                rows = await _fetch_county(self.slug, county_slug)
+                await _fetch_county(self.slug, county_slug,
+                                    deadline=start + budget * (i + 1) / n, keep=keep)
             except Exception as exc:  # noqa: BLE001
                 log.warning("usda_properties.county_failed", county=county_slug, error=str(exc)[:200])
                 continue
-            for li in rows:
-                pid = li.raw.get("usda_property_id")
-                if pid and pid in seen:
-                    continue
-                if pid:
-                    seen.add(pid)
-                out.append(li)
         log.info("usda_properties.done", total=len(out))
-        return out
+        return list(out)

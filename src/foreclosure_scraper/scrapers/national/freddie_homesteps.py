@@ -37,6 +37,7 @@ never does — live-confirmed against a current NC listing (small volume:
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime
 from typing import Iterable
 
@@ -328,7 +329,17 @@ def _parse_detail_page(html: str) -> dict:
     return out
 
 
-async def _fetch_state(state: str, url: str) -> list[Listing]:
+#: Share of timeout_s the per-listing detail pages may use, split evenly across the states. The
+#: list-page rows are handed to the scraper's partial list before any detail page, so a cut-off
+#: ships them.
+DETAIL_BUDGET_SHARE = 0.8
+
+
+async def _fetch_state(state: str, url: str, sink: list | None = None,
+                       deadline: float | None = None) -> list[Listing]:
+    """One state's listings. `sink` (the scraper's self.partial) receives the list-page rows
+    before the detail pages are fetched; detail pages stop once time.monotonic() passes
+    `deadline`."""
     async with client(timeout=30.0) as c:
         try:
             r = await c.get(url, headers=HEADERS, follow_redirects=True)
@@ -353,12 +364,18 @@ async def _fetch_state(state: str, url: str) -> list[Listing]:
                 continue
             if li is not None:
                 out.append(li)
+        if sink is not None:
+            sink.extend(out)
 
         # Per-listing detail-page enrichment (county / full gallery /
         # lat-lng / agent contact — see module docstring). Small volume
         # (13 NC + 14 SC live 2026-10-04), one extra request each, same
         # client/connection reused.
-        for li in out:
+        for n, li in enumerate(out):
+            if deadline is not None and time.monotonic() > deadline:
+                log.info("freddie.detail_budget_spent", state=state, fetched=n,
+                         skipped=len(out) - n)
+                break
             if not li.source_url or not li.source_url.startswith(
                 "https://www.homesteps.com/listingdetails/"
             ):
@@ -406,13 +423,18 @@ class FreddieHomeSteps(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     requires_render = False
-    timeout_s = 60.0
+    # 60 s until 2026-10-08: the detail page added 2026-10-04 is one request per listing (~27),
+    # spaced by the shared client, and the source timed out with 0 rows on every run since.
+    timeout_s = 150.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        for state, url in URLS:
+        start, budget = time.monotonic(), self.timeout_s * DETAIL_BUDGET_SHARE
+        for i, (state, url) in enumerate(URLS):
             try:
-                listings = await _fetch_state(state, url)
+                listings = await _fetch_state(
+                    state, url, sink=self.partial,
+                    deadline=start + budget * (i + 1) / len(URLS))
                 out.extend(listings)
                 log.info("freddie.state_done", state=state, count=len(listings))
             except Exception as exc:

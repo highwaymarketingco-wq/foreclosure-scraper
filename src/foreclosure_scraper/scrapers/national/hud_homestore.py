@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from datetime import datetime
 from typing import Iterable
 
@@ -261,7 +262,16 @@ def _to_listing(p: dict, state: str) -> Listing | None:
     )
 
 
-async def _fetch_state(state: str) -> list[Listing]:
+#: Share of timeout_s the per-listing broker pages may use, split evenly across the states (NC's
+#: broker pages stop at half of it so SC's search always runs). The search rows themselves are
+#: handed to the scraper's partial list before any broker page, so a cut-off ships them.
+DETAIL_BUDGET_SHARE = 0.8
+
+
+async def _fetch_state(state: str, sink: list | None = None,
+                       deadline: float | None = None) -> list[Listing]:
+    """One state's listings. `sink` (the scraper's self.partial) receives the search rows before
+    the broker pages are fetched; broker pages stop once time.monotonic() passes `deadline`."""
     async with client(timeout=30.0) as c:
         # Step 1: GET /searchresult to receive the anti-CSRF cookie + token
         try:
@@ -309,13 +319,18 @@ async def _fetch_state(state: str) -> list[Listing]:
             if li.case_number:
                 seen.add(li.case_number)
             out.append(li)
+        if sink is not None:
+            sink.extend(out)
 
         # Step 3: per-listing Listing Broker contact (name/phone/email) --
         # a real, auth-free per-case detail page (see module docstring),
         # fetched on the SAME client so the connection is reused. One extra
         # request per listing; the state's whole result set is small
         # (17 NC / 10 SC live 2026-10-04), so this stays cheap.
-        for li in out:
+        for n, li in enumerate(out):
+            if deadline is not None and time.monotonic() > deadline:
+                log.info("hud.broker_budget_spent", state=state, fetched=n, skipped=len(out) - n)
+                break
             if not li.case_number:
                 continue
             try:
@@ -343,13 +358,21 @@ class HudHomeStore(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     requires_render = False
-    timeout_s = 60.0
+    # 60 s until 2026-10-08. The search is 2 requests a state, but the broker page added 2026-10-04
+    # is one request per listing (32 on 2026-10-08: 20 NC + 12 SC), spaced by the shared client,
+    # and the source timed out with 0 rows on every run since. 150 s fits the broker pages; the
+    # budget below stops them in time and the search rows ship either way.
+    timeout_s = 150.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        for state in ("NC", "SC"):
+        states = ("NC", "SC")
+        start, budget = time.monotonic(), self.timeout_s * DETAIL_BUDGET_SHARE
+        for i, state in enumerate(states):
             try:
-                listings = await _fetch_state(state)
+                listings = await _fetch_state(
+                    state, sink=self.partial,
+                    deadline=start + budget * (i + 1) / len(states))
                 out.extend(listings)
                 log.info("hud.state_done", state=state, count=len(listings))
             except Exception as exc:
