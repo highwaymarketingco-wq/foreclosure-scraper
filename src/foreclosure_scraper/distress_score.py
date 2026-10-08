@@ -883,6 +883,24 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
                 elif days is not None and days >= 0:
                     c.events.append((name, days, False))
 
+    # ---- life-event records folded in under another record (audit 2026-10-09, regressions) ----
+    # A merged row's listing_type is its BASE record's, and which record is the base depends on the
+    # order rows arrive in (the scrapers finish in a different order every run). An estate or divorce
+    # record folded under a tax-roll or vacant-land row is still that record: the gated d42058b3 run
+    # dropped estate_lead on 125 rows the 10/7 board scored with it, and raised others to HOT only
+    # because the base flipped the other way. Listing.merge keeps each absorbed record's type in
+    # raw['also_seen_in']; the life-event types count here as they would as the base.
+    have = {s[0] for s in sig}
+    for t, srcs in absorbed_life_types(r, lt):
+        if t in have:
+            continue
+        if t in _COURT_JUDGMENT_TYPES and any("ecourts" in s for s in srcs) and court_record_ended(r):
+            continue
+        cat, w = _LISTING_TYPE_SIGNAL[t]
+        ev = _type_evidence(t, srcs, by_name)
+        sig.append((t, cat, w, NJ if by_name and ev == REC else ev))
+        have.add(t)
+
     # ---- market symptoms (price_cut only when MLS fields exist, see _mls_signals) -----
     sig.extend(_mls_signals(li, prior_price=prior_price))
 
@@ -1066,6 +1084,32 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
         c.signals = [x for x in c.signals if x[0] not in drop]
         c.events = [e for e in c.events if e[0] not in drop]
     return c
+
+
+#: Listing types of a record folded into a row under another record that still score (see the
+#: 'life-event records folded in' block of _collect): facts about the owner, with no sale date or
+#: sale lifecycle of their own on the merged row.
+ABSORBED_LIFE_TYPES = frozenset({"estate_lead", "probate_notice", "divorce_notice"})
+
+
+def absorbed_life_types(raw: dict, primary: str) -> list[tuple[str, list[str]]]:
+    """[(listing type, the slugs of the sources that carried it)] of the life-event records a merged
+    row absorbed (raw['also_seen_in'] entries with a listing_type in ABSORBED_LIFE_TYPES, written by
+    Listing.merge), other than the row's own type. A filing-date source (liensnc) is context only, as
+    it is when it is the base (A8)."""
+    out: dict[str, list[str]] = {}
+    asi = raw.get("also_seen_in") if isinstance(raw, dict) else None
+    for d in asi if isinstance(asi, list) else ():
+        if not isinstance(d, dict):
+            continue
+        t = d.get("listing_type")
+        if t not in ABSORBED_LIFE_TYPES or t == primary:
+            continue
+        parts = [p for p in str(d.get("source") or "").split(".") if p]
+        if any(p in FILING_DATE_SOURCES for p in parts):
+            continue
+        out.setdefault(t, []).extend(parts)
+    return sorted(out.items())
 
 
 def _type_evidence(lt: str, slugs: list[str], by_name: bool, *, helene: bool = False) -> str:

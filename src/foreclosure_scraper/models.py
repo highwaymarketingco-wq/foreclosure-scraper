@@ -479,23 +479,43 @@ class Listing(BaseModel):
         # attribution. A group merged one row at a time (dedupe, merge_prior_board) lost its
         # earlier members' sources and links as soon as it took in a row that carried its own
         # list, and with them the only trace of those rows (2026-10-05 VM run audit).
+        #
+        # 2026-10-09 (audit regressions): an entry is one (source, url) pair, not one url. Two
+        # sources that publish the same page (multi_year_delinquent_tax and pickens_delinquent_
+        # parcels both cite the county's delinquent-tax page) used to keep one entry, so the other
+        # source vanished from the row (149 rows of the gated d42058b3 run) and every per-source
+        # count read it as lost. Each entry also keeps the absorbed record's listing_type: which
+        # record becomes the merge base depends on the order rows arrive in, and the base's type
+        # is the row's listing_type, so an estate lead folded under a tax-roll row lost its
+        # estate_lead signal (125 rows); distress_score credits the absorbed life-event types.
         seen: list[dict] = []
 
-        def _add(src, url):
-            if not url or url == out.source_url:
-                return  # primary link already lives on source_url
-            if not any(d.get("url") == url for d in seen):
-                seen.append({"source": src, "url": url})
+        def _lt(v):
+            v = getattr(v, "value", v)
+            return str(v) if v not in (None, "", "unknown") else None
+
+        def _add(src, url, lt=None):
+            if not url or (url == out.source_url and src == out.source):
+                return  # the primary record already lives on source / source_url
+            for d in seen:
+                if d.get("url") == url and d.get("source") == src:
+                    if lt and not d.get("listing_type"):
+                        d["listing_type"] = lt
+                    return
+            e = {"source": src, "url": url}
+            if lt:
+                e["listing_type"] = lt
+            seen.append(e)
 
         for d in ((self.raw or {}).get("also_seen_in") or []):
             # self's own entries are kept as they are (as before, when other had no list)
-            if isinstance(d, dict) and not (d.get("url")
-                                            and any(e.get("url") == d.get("url") for e in seen)):
-                seen.append(d)
-        _add(other.source, other.source_url)
+            if isinstance(d, dict) and not (d.get("url") and any(
+                    e.get("url") == d.get("url") and e.get("source") == d.get("source") for e in seen)):
+                seen.append(dict(d))
+        _add(other.source, other.source_url, _lt(other.listing_type))
         for d in (other.raw.get("also_seen_in") or []):
             if isinstance(d, dict):
-                _add(d.get("source"), d.get("url"))
+                _add(d.get("source"), d.get("url"), _lt(d.get("listing_type")))
         if seen:
             out.raw["also_seen_in"] = seen
         return out
