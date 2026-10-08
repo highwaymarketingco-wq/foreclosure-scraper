@@ -183,7 +183,7 @@ def load(max_age_h: Optional[float] = None) -> Optional[list[Listing]]:
     # alive until the last Listing was built -- the decoded board and the validated
     # board at the same time. Now each row is validated and its dict dropped.
     from .board_parts import iter_gz_rows
-    from .row_keys import share_keys
+    from .row_keys import share_row
     out: list[Listing] = []
     key_cache: dict = {}    # one str per distinct key across rows (row_keys.py)
     seen = 0
@@ -191,7 +191,7 @@ def load(max_age_h: Optional[float] = None) -> Optional[list[Listing]]:
         for rec in iter_gz_rows(p):
             seen += 1
             try:
-                out.append(Listing.model_validate(share_keys(rec, key_cache)))
+                out.append(Listing.model_validate(share_row(rec, key_cache)))
             except Exception:  # noqa: BLE001 - one bad row must not void the resume
                 continue
     except Exception as exc:  # noqa: BLE001

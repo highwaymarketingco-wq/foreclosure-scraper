@@ -21,6 +21,7 @@ from foreclosure_scraper import board_persist as bp
 from foreclosure_scraper import checkpoint as C
 from foreclosure_scraper.models import Listing
 from foreclosure_scraper.row_keys import share_keys
+from foreclosure_scraper.row_keys import share_row as _real_share_row
 
 FIXTURE = Path(__file__).parent / "fixtures" / "placeholder_twins_10_5_groups.json.gz"
 NOW = datetime(2026, 10, 6, 12, 0, 0)
@@ -122,9 +123,9 @@ def _merge(tmp_path, monkeypatch, share: bool):
     _board(docs, prior)
     monkeypatch.setenv("BOARD_PRIOR_MERGE_ALLOW_LARGE", "1")
     if not share:
-        monkeypatch.setattr(bp, "share_keys", _no_share)
+        monkeypatch.setattr(bp, "share_row", _no_share)
     merged, stats = bp.merge_prior_board(fresh, docs_dir=docs, now=NOW)
-    monkeypatch.setattr(bp, "share_keys", share_keys)
+    monkeypatch.setattr(bp, "share_row", _real_share_row)
     return merged, stats
 
 
@@ -147,3 +148,66 @@ def test_merge_prior_board_kept_prior_rows_share_keys(tmp_path, monkeypatch):
     by0 = {k: k for k in k0}
     common = [k for k in k1 if k in by0]
     assert common and all(by0[k] is k for k in common)
+
+
+# ---- value sharing (2026-10-07): raw['fema_disaster'] is one block on every row of a county ----------
+import json as _json
+
+from foreclosure_scraper.models import Listing as _Listing
+from foreclosure_scraper.row_keys import SHARED_VALUE_KEYS, share_row
+
+
+def _row(n, block):
+    return {"source": "s", "source_url": "http://x", "state": "NC", "county": "Buncombe", "street_address": f"{n} Test St",
+            "raw": {"fema_disaster": _json.loads(_json.dumps(block)), "calc": {"n": n}}}
+
+
+def test_equal_blocks_on_different_rows_become_one_object():
+    block = {"declarations": [{"n": 4827, "county": "Buncombe"}], "ia": 12}
+    cache: dict = {}
+    a = share_row(_row(1, block), cache)
+    b = share_row(_row(2, block), cache)
+    assert a["raw"]["fema_disaster"] is b["raw"]["fema_disaster"]
+    assert a["raw"]["calc"] is not b["raw"]["calc"]             # row-specific values stay private
+
+
+def test_different_blocks_stay_distinct():
+    cache: dict = {}
+    a = share_row(_row(1, {"declarations": [1]}), cache)
+    b = share_row(_row(2, {"declarations": [2]}), cache)
+    c = share_row(_row(3, {"declarations": [1]}), cache)
+    assert a["raw"]["fema_disaster"] is not b["raw"]["fema_disaster"]
+    assert a["raw"]["fema_disaster"] is c["raw"]["fema_disaster"]
+
+
+def test_the_serialised_row_is_unchanged():
+    block = {"declarations": [{"n": 1}], "ia": None}
+    row = _row(1, block)
+    before = _json.dumps(row, sort_keys=False)
+    assert _json.dumps(share_row(row, {}), sort_keys=False) == before
+
+
+def test_rows_without_the_block_or_with_an_odd_value_are_untouched():
+    cache: dict = {}
+    plain = {"raw": {"calc": {"x": 1}}}
+    odd = {"raw": {"fema_disaster": "not a dict"}}
+    none_raw = {"street_address": "no raw at all"}
+    assert share_row(plain, cache) == plain
+    assert share_row(odd, cache) == odd
+    assert share_row(none_raw, cache) == none_raw
+
+
+def test_sharing_survives_listing_validation():
+    block = {"declarations": [{"n": 4827}], "ia": 3}
+    cache: dict = {}
+    la = _Listing.model_validate(share_row(_row(1, block), cache))
+    lb = _Listing.model_validate(share_row(_row(2, block), cache))
+    assert la.raw["fema_disaster"] is lb.raw["fema_disaster"]
+
+
+def test_the_shared_keys_are_replaced_not_mutated_by_the_enricher():
+    # the rule the docstring states: the FEMA enricher REPLACES raw['fema_disaster'] (dict(info)), so a shared
+    # block is never changed in place for the other rows.
+    src = __import__("pathlib").Path(__import__("foreclosure_scraper.enrichment_fema_disaster", fromlist=["x"]).__file__).read_text()
+    assert 'li.raw["fema_disaster"] = dict(info)' in src
+    assert SHARED_VALUE_KEYS == ("fema_disaster",)
