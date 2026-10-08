@@ -211,15 +211,35 @@ class NCCountyPdfDelinquentTax(BaseScraper):
                 rows = _parse_name_id_amt(text, cfg["id_digits"])
             else:
                 rows = _parse_parcel_amt_owner(text)
-            # dedupe by id within county (Catawba repeats a parcel per bill)
-            seen: set[str] = set()
-            leads: list[Listing] = []
-            for owner, ident, amt in rows:
-                if ident in seen:
-                    continue
-                seen.add(ident)
-                leads.append(_to_listing(owner, ident, amt, county, cfg))
-            log.info("nc_pdf_tax.county_done", county=county, leads=len(leads))
+            leads = _aggregate(rows, county, cfg)
+            log.info("nc_pdf_tax.county_done", county=county, leads=len(leads),
+                     lines=len(rows))
             return leads
 
         return _one
+
+
+def _aggregate(rows: list[tuple], county: str, cfg: dict) -> list[Listing]:
+    """One lead per id, with EVERY advertised line under it summed.
+
+    FIXED 2026-10-08 (source-completeness audit; extraction audit 2026-10-07 section 3): this
+    used to keep the FIRST line of an id and drop the rest. Catawba's id is the taxpayer's
+    ACCOUNT number, and an account that owns several parcels is advertised once per parcel
+    (account 12391 had three liens: $56.94, $504.82, $56.45), so 42 advertised liens on 28
+    accounts never reached principal_tax_due (live list 2026-10-08: 5,298 lines, 5,256
+    accounts). McDowell repeats 4 parcels the same way. Each line is its own lien in a
+    105-369 advertisement, so the lines are summed and kept in raw['...']['lines']."""
+    groups: dict[str, list[tuple]] = {}
+    for owner, ident, amt in rows:
+        groups.setdefault(ident, []).append((owner, ident, amt))
+    out: list[Listing] = []
+    for ident, grp in groups.items():
+        owner = next((o for o, _, _ in grp if o), None)
+        total = round(sum(a for _, _, a in grp), 2)
+        li = _to_listing(owner, ident, total, county, cfg)
+        if len(grp) > 1:
+            blk = li.raw["nc_county_pdf_delinquent_tax"]
+            blk["lines"] = [{"owner": o, "amount": round(a, 2)} for o, _, a in grp]
+            blk["line_count"] = len(grp)
+        out.append(li)
+    return out

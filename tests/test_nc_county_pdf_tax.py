@@ -83,3 +83,24 @@ def test_a_wrapped_owner_is_joined_and_a_spaced_parcel_is_read():
 def test_header_lines_are_never_an_owner():
     rows = m._parse_parcel_amt_owner(_OWNER_FIRST)
     assert not any("OWNER-NAME" in (r[0] or "") or "TOTAL DUE" in (r[0] or "") for r in rows)
+
+
+def test_every_advertised_line_of_one_account_is_summed_not_first_wins():
+    """Catawba's id is the taxpayer's ACCOUNT number; an account owning several parcels is
+    advertised once per parcel. The old first-wins de-dupe kept $56.94 of $618.21 here."""
+    text = "\n".join([
+        "DOE JOHN Q 12391 56.94",
+        "DOE JOHN Q 12391 504.82",
+        "ROE RICHARD 4455 10.00",
+        "DOE JOHN Q 12391 56.45",
+    ])
+    cfg = m.COUNTIES["Catawba"]
+    leads = m._aggregate(m._parse_name_id_amt(text, cfg["id_digits"]), "Catawba", cfg)
+    assert len(leads) == 2
+    doe = next(li for li in leads if li.parcel_id == "12391")
+    blk = doe.raw["nc_county_pdf_delinquent_tax"]
+    assert blk["principal_tax_due"] == 618.21
+    assert blk["line_count"] == 3 and [x["amount"] for x in blk["lines"]] == [56.94, 504.82, 56.45]
+    roe = next(li for li in leads if li.parcel_id == "4455")
+    assert roe.raw["nc_county_pdf_delinquent_tax"]["principal_tax_due"] == 10.0
+    assert "lines" not in roe.raw["nc_county_pdf_delinquent_tax"]
