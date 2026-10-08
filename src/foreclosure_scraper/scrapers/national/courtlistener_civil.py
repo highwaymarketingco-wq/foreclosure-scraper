@@ -39,9 +39,11 @@ than duplicating a second broken pull.
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from datetime import datetime, timedelta
 from typing import Iterable
+from urllib.parse import quote
 
 import structlog
 
@@ -71,6 +73,21 @@ log = structlog.get_logger()
 # generous headroom (50 pages x 20/page = 1,000 rows/court/90-day window).
 MAX_SEARCH_PAGES_PER_COURT_CIVIL = 50
 
+# 2026-10-08 (source-completeness audit): the pass used to page through EVERY
+# civil docket filed in the window and keep the real-property ones client-side.
+# Measured live 2026-10-08 (90 days): the unfiltered corpus is ncwd 780, nced
+# 1,379, scd 2,101 (+ ncmd) -- ~240 pages at 20/page -- against a 50-page/court
+# cap and a 288 s budget; the gated run of 2026-10-08 read 30 nced pages, found
+# nothing, and ran out of budget before ncmd/ncwd/scd (0 rows for 8 straight
+# runs). The same window filtered SERVER-side with this query returns the whole
+# real-property population in one page per court: nced 1, ncmd 0, ncwd 0,
+# scd 7 (8 cases). The client-side `_is_real_property_case` stays as a second
+# check. `cause` is searched too, for cases whose suitNature is blank.
+CIVIL_REAL_PROPERTY_QUERY = (
+    'suitNature:("Real Property" OR "Real Prop") OR '
+    'cause:(foreclosure OR "quiet title" OR ejectment OR "lis pendens")'
+)
+
 
 # Federal District Courts covering NC + SC
 CIVIL_COURTS = ("nced", "ncmd", "ncwd", "scd")
@@ -98,7 +115,17 @@ def _is_real_property_case(docket: dict) -> bool:
     if nos:
         if nos in REAL_PROPERTY_NOS:
             return True
+        # /search/ writes the suit nature as "<code> Real Property: <label>"
+        # ("290 Real Property: Other", "220 Real Property: Foreclosure") or
+        # "Real Property: Foreclosure" -- neither equals a bare code or contains
+        # the long label ("All Other Real Property"), so 5 of the 7 live scd
+        # cases of 2026-10-08 were rejected here.
+        lead = re.match(r"\s*(\d{3})\b", nos)
+        if lead and lead.group(1) in REAL_PROPERTY_NOS:
+            return True
         nos_lower = nos.lower()
+        if "real prop" in nos_lower:
+            return True
         if any(label.lower() in nos_lower for label in REAL_PROPERTY_NOS.values()):
             return True
     # Cause-of-action text fallback (common in older dockets / civil rights cases)
@@ -126,6 +153,7 @@ async def _fetch_court_civil(
     next_url: str | None = (
         f"{API_BASE}/search/?type=r&court={court}&filed_after={cutoff}"
         f"&page_size={SEARCH_PAGE_SIZE}&order_by=dateFiled%20desc"
+        f"&q={quote(CIVIL_REAL_PROPERTY_QUERY)}"
     )
     headers = _auth_headers(token)
     page = 0
