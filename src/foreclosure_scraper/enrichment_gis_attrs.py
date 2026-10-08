@@ -51,6 +51,8 @@ from .enrichment_arcgis import NC_GIS, SCDOT_BASE, SC_LAYER, SC_GIS, host_walled
 from .http_client import client
 from .sensitive_fields import drop_sensitive
 from . import owner_freshness
+from . import block_binding as _bb
+from . import tax_binding as _tb
 
 # ---------------------------------------------------------------------------
 # Persistent parcel/point -> GIS-attrs cache (Phase-2 hang/volume fix)
@@ -604,10 +606,26 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
 
 # ---- Public API ----------------------------------------------------------------
 
+def _bag_binds(li, attrs: dict) -> bool:
+    """The attribute bag is this lead's parcel's, as far as its ids tell: it names no parcel id of
+    the lead's numbering system other than the lead's own (block_binding / tax_binding id rules).
+    A lead with no parcel id, or a bag with no comparable id, binds."""
+    try:
+        ids = _bb.probe("gis_attrs_full", attrs)["ids"]
+        own = _tb.row_ids(li)
+        return not (ids and own and _tb.id_relation(ids, own) == "different")
+    except Exception:  # noqa: BLE001 - an unreadable bag is not evidence either way
+        return True
+
+
 async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dict:
     """Backfill GIS attributes for every lead with lat/lng (or parcel_id) in a
     supported SC/NC county. Returns a stats dict for the orchestrator log."""
     _force = bool(os.environ.get("FORECLOSURE_GIS_FORCE"))
+    try:
+        shared_pts = _bb.shared_points(listings)
+    except Exception:  # noqa: BLE001 - no shared points is the lenient side
+        shared_pts = set()
     sem = asyncio.Semaphore(concurrency)
     stats = {"queried": 0, "matched": 0, "skipped_done": 0, "filled_market": 0, "filled_assessed": 0,
              "filled_owner": 0, "filled_sqft": 0, "filled_year": 0,
@@ -729,22 +747,36 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
         base = _resolve_layer(li)
         if not base:
             return
+        # A point that is a geocoder FALLBACK (a county seat or town centroid, a point many leads
+        # share) is not this property's location: the parcel under it is someone else's (audit
+        # 2026-10-09, block_binding: one Cherokee SC parcel's attributes on 407 rows at one
+        # centroid, one Pickens parcel on 362). Such a lead is looked up by its parcel id only.
+        fallback = _bb.imprecise_point(li, shared_pts)
+        if fallback and not (li.parcel_id or "").strip():
+            stats["skipped_fallback_point"] = stats.get("skipped_fallback_point", 0) + 1
+            return
         # Cache hit — reuse a prior run's resolved attrs for this parcel/point; NO network.
         key = _cache_key(li)
         if not _force and key and key in _ATTR_CACHE:
             cached = _ATTR_CACHE[key]
-            stats["cache_hit"] = stats.get("cache_hit", 0) + 1
-            if not isinstance(li.raw, dict):
-                li.raw = {}
-            li.raw.setdefault("gis", {})["queried"] = True
-            if cached:
-                stats["matched"] += 1
-                apply_gis_attrs(li, cached)
-            return
+            if cached and not _bag_binds(li, cached):
+                # a bag cached under this parcel by an older point query that hit the parcel next
+                # door: drop it and look the parcel up again
+                stats["cache_other_parcel"] = stats.get("cache_other_parcel", 0) + 1
+                _ATTR_CACHE.pop(key, None)
+            else:
+                stats["cache_hit"] = stats.get("cache_hit", 0) + 1
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                li.raw.setdefault("gis", {})["queried"] = True
+                if cached:
+                    stats["matched"] += 1
+                    apply_gis_attrs(li, cached)
+                return
         async with sem:
             attrs = None
             net_ok = True
-            if li.latitude and li.longitude:
+            if li.latitude and li.longitude and not fallback:
                 try:
                     attrs = await _query_point(c, base, float(li.latitude), float(li.longitude),
                                                raise_on_net_error=True)
@@ -752,11 +784,19 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
                     net_ok = False
                 except (ValueError, TypeError):
                     attrs = None
+                if attrs and not _bag_binds(li, attrs):
+                    # the point fell in another parcel (a geocode on the street or the next lot):
+                    # its owner, situs and values are not this lead's; ask by parcel id instead
+                    stats["point_other_parcel"] = stats.get("point_other_parcel", 0) + 1
+                    attrs = None
             if attrs is None and net_ok and li.parcel_id:
                 try:
                     attrs = await _query_parcel(c, base, li.parcel_id, raise_on_net_error=True)
                 except _GISNetworkError:
                     net_ok = False
+                if attrs and not _bag_binds(li, attrs):
+                    stats["parcel_query_other_parcel"] = stats.get("parcel_query_other_parcel", 0) + 1
+                    attrs = None
             stats["queried"] += 1
             # Mark attempted ONLY when we actually reached the GIS endpoint. A transient
             # network error leaves net_ok False -> lead stays unmarked -> retried next run

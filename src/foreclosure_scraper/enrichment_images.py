@@ -75,13 +75,21 @@ def _is_county_seat_point(lat: float, lon: float) -> bool:
     return (round(lat, 3), round(lon, 3)) in _COUNTY_SEAT_ROUNDED
 
 
-def _has_precise_point(li: Listing) -> bool:
+def _has_precise_point(li: Listing, shared_points: "set | None" = None) -> bool:
     """A lat/lng precise enough to frame the actual parcel: it came from a real
     address, a parcel-polygon centroid, or a name/city geocode — and is NOT a
-    shared county-seat centroid."""
+    shared fallback: a county-seat centroid, a point flagged imprecise
+    (raw['geo_imprecise'], enrichment_geocode.imprecise_point_flag) or one that
+    FALLBACK_POINT_MIN_ROWS or more of the leads share (block_binding.shared_points).
+    Measured on the 10/7 board (audit 2026-10-09, block_binding): one aerial tile on
+    243 Rutherford rows and 244 Georgetown rows at a town centroid, graded by vision
+    as each lead's condition."""
     if li.latitude is None or li.longitude is None:
         return False
     if _is_county_seat_point(li.latitude, li.longitude):
+        return False
+    from .block_binding import imprecise_point
+    if imprecise_point(li, shared_points):
         return False
     if (li.street_address or "").strip():
         return True
@@ -240,6 +248,11 @@ async def enrich_with_images(
         return
 
     real_count = aerial_count = street_count = named_geocoded = approx_count = 0
+    from .block_binding import shared_points as _shared_points
+    try:
+        shared = _shared_points(listings)
+    except Exception:  # noqa: BLE001 - no shared points is the lenient side
+        shared = set()
 
     sem = asyncio.Semaphore(8)
 
@@ -251,7 +264,7 @@ async def enrich_with_images(
         if geocode_named:
             named_targets = [
                 li for li in listings
-                if not _has_precise_point(li)
+                if not _has_precise_point(li, shared)
                 and (li.city and li.state)
                 and (_name_for(li) is not None)
             ]
@@ -289,7 +302,7 @@ async def enrich_with_images(
             attach_aerial = False
             approx = False
             if li.latitude is not None and li.longitude is not None:
-                if _has_precise_point(li):
+                if _has_precise_point(li, shared):
                     attach_aerial = True
                 elif geo_named:
                     # name-geocoded; may be a city centroid (approx) but still

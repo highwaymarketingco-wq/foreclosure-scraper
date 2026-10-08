@@ -256,11 +256,17 @@ def _process_pdf(pdf_path: str, max_pages: int = 10) -> dict | None:
     return result
 
 
-def _find_pdf_for_listing(li: Listing) -> str | None:
-    """Find the legal notice PDF path for a listing."""
+#: A document more than this many listings share is a LIST (a delinquent-tax roster, a bulk
+#: notice page), not one lead's notice: its phones, case numbers, dates and amounts are not any one
+#: row's (enrichment_doc_ocr.DOC_OCR_MAX_SHARE, the same bound). Measured on the 10/7 board (audit
+#: 2026-10-09, block_binding): one roster's extraction on 1,161 rows and another on 941, its county
+#: office phone stamped as each row's owner_phone (which then blocked the voter/county phone lookups).
+OCR_MAX_SHARE = int(os.environ.get("DOC_OCR_MAX_SHARE", "3"))
+
+
+def _notice_url_for_listing(li: Listing) -> str | None:
+    """The notice document a listing points at (no download), or None."""
     raw = li.raw if isinstance(li.raw, dict) else {}
-    
-    # Check various raw fields for PDF path/URL
     notice_url = (
         raw.get("notice_url")
         or raw.get("legal_notice_url")
@@ -269,12 +275,29 @@ def _find_pdf_for_listing(li: Listing) -> str | None:
         or (raw.get("distressed", {}).get("url") if isinstance(raw.get("distressed"), dict) else None)
         or (raw.get("notice_contact", {}).get("pdf_url") if isinstance(raw.get("notice_contact"), dict) else None)
     )
-    
     if not notice_url or not isinstance(notice_url, str):
         return None
-    
-    # Only process if it looks like a PDF or cloudinary notice
     if not any(x in notice_url for x in ('cloudinary', 'notice_export', '.pdf', 'legal_notice')):
+        return None
+    return notice_url
+
+
+def shared_documents(listings: Sequence[Listing]) -> set[str]:
+    """Notice documents (normalized URL) that more than OCR_MAX_SHARE listings point at."""
+    from collections import Counter
+    from .doc_inventory import normalize_url
+    n: Counter = Counter()
+    for li in listings:
+        u = _notice_url_for_listing(li)
+        if u:
+            n[normalize_url(u) if u.startswith("http") else u] += 1
+    return {u for u, c in n.items() if c > OCR_MAX_SHARE}
+
+
+def _find_pdf_for_listing(li: Listing) -> str | None:
+    """Find the legal notice PDF path for a listing."""
+    notice_url = _notice_url_for_listing(li)
+    if not notice_url:
         return None
     
     # If it's a URL, download to local cache
@@ -335,6 +358,11 @@ def enrich_ocr_extraction(listings: Sequence[Listing]) -> dict:
     }
 
     seen_pdfs: set[str] = set()
+    try:
+        shared_docs = shared_documents(listings)
+    except Exception:  # noqa: BLE001 - no shared set is the old behavior
+        shared_docs = set()
+    stats["shared_document_rows"] = 0
 
     for li in listings:
         stats["total_listings"] += 1
@@ -344,6 +372,15 @@ def enrich_ocr_extraction(listings: Sequence[Listing]) -> dict:
         if raw.get("ocr_extraction"):
             stats["already_processed"] += 1
             continue
+
+        # A list document many rows share is not this row's notice: nothing extracted from it is
+        # this row's (enrichment_doc_ocr reads such a roster line by line for the row's own entry).
+        nu = _notice_url_for_listing(li)
+        if nu and shared_docs:
+            from .doc_inventory import normalize_url
+            if (normalize_url(nu) if nu.startswith("http") else nu) in shared_docs:
+                stats["shared_document_rows"] += 1
+                continue
         
         pdf_path = _find_pdf_for_listing(li)
         if not pdf_path:
