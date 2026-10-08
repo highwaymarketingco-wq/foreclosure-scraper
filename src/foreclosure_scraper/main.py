@@ -572,6 +572,8 @@ def _coastal_county_source(li: Listing) -> bool:
 # inventory, not historical events. For everything else (court rosters, law-firm
 # trustee calendars, tax-sale lists, public notices) we require a parseable date.
 DATELESS_OK_SOURCES = {
+    "national.usmarshals_realproperty",   # audit 2026-10-09: federal sale lists carry no filing date
+    "national.tranzon",
     # 2026-10-07 new sources: standing tax balances, tax-foreclosure parcels and obituary/estate lists carry
     # no sale date, so they must be whitelisted or _active_only drops every row.
     "counties_nc.mecklenburg_delinquent_tax",
@@ -1879,7 +1881,7 @@ async def run() -> int:
     # nothing flows downstream (no photos, no comps, no ARV).
     try:
         from .enrichment_bankruptcy_property import enrich_bankruptcy_property
-        await _await_capped(enrich_bankruptcy_property(enriched), "bk_property")
+        await _await_capped(enrich_bankruptcy_property(enriched), "bk_property", default_s=1800)
     except Exception:
         log.error("bk_property.failed", traceback=traceback.format_exc())
 
