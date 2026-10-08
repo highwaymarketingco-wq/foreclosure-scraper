@@ -228,16 +228,27 @@ async def run_checks(plan: dict, ledgers: dict, fetcher, *, budget_s: float, sav
                 since_save = 0
 
         deferred: list = []
-        for prio, key, row, v in items:
-            if time.monotonic() - t0 > budget_s:
-                tally["budget_stop"] += 1
-                break
-            res = await _verify(v, row, fetcher, row_timeout_s)
-            if _transient(v, res):
-                deferred.append((prio, key, row, v, res))
-                tally["deferred"] += 1
-                continue
-            record(prio, key, row, v, res)
+
+        async def work(part: list) -> None:
+            for prio, key, row, v in part:
+                if time.monotonic() - t0 > budget_s:
+                    tally["budget_stop"] += 1
+                    break
+                res = await _verify(v, row, fetcher, row_timeout_s)
+                if _transient(v, res):
+                    deferred.append((prio, key, row, v, res))
+                    tally["deferred"] += 1
+                    continue
+                record(prio, key, row, v, res)
+
+        # One worker per verifier (= per county-site vendor), each walking its rows best-first.
+        # The fetcher spaces requests per host and the qPayBill tenants share one slot, so the
+        # workers never hit one host faster than the single-file sweep did; different vendors
+        # overlap instead of waiting behind each other (a 29-hour sweep became a few hours).
+        parts: dict[str, list] = {}
+        for it in items:
+            parts.setdefault(it[3].name, []).append(it)
+        await asyncio.gather(*(work(p) for p in parts.values()))
         if deferred:
             left = budget_s - (time.monotonic() - t0)
             pause = max(0.0, min(defer_wait_s, left - 1.0))
