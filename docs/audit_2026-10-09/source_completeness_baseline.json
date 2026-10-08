@@ -1,0 +1,1226 @@
+{
+ "about": "Per-source and per-(source, county) row counts of high-value lead classes on the last accepted published board; scripts/audit_checks/source_completeness.py (source-county-floor) compares a board against it. Rewrite after an accepted publish: uv run python scripts/audit_checks/source_completeness.py --write-baseline",
+ "board_newest_last_seen": "2026-10-07T16:22",
+ "board_rows": 350013,
+ "min_cell": 20,
+ "schema": "source-completeness-baseline-v1",
+ "sources": {
+  "counties.column_legal_notices": {
+   "class": "probate",
+   "counties": {
+    "Anson|NC": 21,
+    "Bladen|NC": 50,
+    "Burke|NC": 35,
+    "Cabarrus|NC": 157,
+    "Catawba|NC": 43,
+    "Columbus|NC": 44,
+    "Forsyth|NC": 112,
+    "Guilford|NC": 155,
+    "Iredell|NC": 64,
+    "Johnston|NC": 147,
+    "Marion|SC": 51,
+    "Marlboro|SC": 45,
+    "McDowell|NC": 71,
+    "Richmond|NC": 52,
+    "Robeson|NC": 140,
+    "Rockingham|NC": 123,
+    "Sampson|NC": 51,
+    "Scotland|NC": 55
+   },
+   "rows": 1564
+  },
+  "counties.multi_year_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Buncombe|NC": 76,
+    "Oconee|SC": 298,
+    "Pickens|SC": 741
+   },
+   "rows": 1115
+  },
+  "counties.nod_discovery": {
+   "class": "lis_pendens",
+   "counties": {
+    "Buncombe|NC": 44
+   },
+   "rows": 53
+  },
+  "counties.sitemap_walker": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 4
+  },
+  "counties_generic.arcgis_distress.buncombe_hmgp_buyout": {
+   "class": "code",
+   "counties": {
+    "Buncombe|NC": 239
+   },
+   "rows": 239
+  },
+  "counties_generic.arcgis_distress.buncombe_landslide_damage": {
+   "class": "code",
+   "counties": {
+    "Buncombe|NC": 396
+   },
+   "rows": 396
+  },
+  "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+   "class": "tax",
+   "counties": {
+    "Buncombe|NC": 579
+   },
+   "rows": 579
+  },
+  "counties_generic.arcgis_distress.buncombe_unpaid_bills_2024": {
+   "class": "tax",
+   "counties": {
+    "Buncombe|NC": 78
+   },
+   "rows": 78
+  },
+  "counties_generic.arcgis_distress.burke_storm_damage": {
+   "class": "code",
+   "counties": {
+    "Burke|NC": 439
+   },
+   "rows": 439
+  },
+  "counties_generic.arcgis_distress.columbia_code_vacant_boarded": {
+   "class": "code",
+   "counties": {
+    "Richland|SC": 972
+   },
+   "rows": 972
+  },
+  "counties_generic.arcgis_distress.durham_open_code_violations": {
+   "class": "code",
+   "counties": {
+    "Durham|NC": 988
+   },
+   "rows": 988
+  },
+  "counties_generic.arcgis_distress.greensboro_code_housing": {
+   "class": "code",
+   "counties": {
+    "Guilford|NC": 629
+   },
+   "rows": 629
+  },
+  "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels": {
+   "class": "tax",
+   "counties": {
+    "Greenville|SC": 2722
+   },
+   "rows": 2722
+  },
+  "counties_generic.arcgis_distress.greenwood_cama_condemned": {
+   "class": "code",
+   "counties": {
+    "Greenwood|SC": 719
+   },
+   "rows": 719
+  },
+  "counties_generic.arcgis_distress.hendersonville_flood_zone_structures": {
+   "class": "code",
+   "counties": {
+    "Henderson|NC": 101
+   },
+   "rows": 101
+  },
+  "counties_generic.arcgis_distress.lincoln_code_violations": {
+   "class": "code",
+   "counties": {
+    "Lincoln|NC": 62
+   },
+   "rows": 68
+  },
+  "counties_generic.arcgis_distress.new_hanover_demolition_permits": {
+   "class": "code",
+   "counties": {
+    "New Hanover|NC": 1378
+   },
+   "rows": 1378
+  },
+  "counties_generic.arcgis_distress.pickens_flood_damage": {
+   "class": "code",
+   "counties": {
+    "Pickens|SC": 371
+   },
+   "rows": 371
+  },
+  "counties_generic.arcgis_distress.rockhill_code_demolition": {
+   "class": "code",
+   "counties": {},
+   "rows": 13
+  },
+  "counties_generic.arcgis_distress.rockhill_code_exterior_major": {
+   "class": "code",
+   "counties": {},
+   "rows": 13
+  },
+  "counties_generic.arcgis_distress.rockhill_code_housing": {
+   "class": "code",
+   "counties": {},
+   "rows": 18
+  },
+  "counties_generic.arcgis_distress.spartanburg_city_tax_sale": {
+   "class": "tax",
+   "counties": {
+    "Spartanburg|SC": 163
+   },
+   "rows": 163
+  },
+  "counties_generic.arcgis_distress.spartanburg_property_cleanup": {
+   "class": "code",
+   "counties": {
+    "Spartanburg|SC": 2213
+   },
+   "rows": 2213
+  },
+  "counties_generic.arcgis_distress.transylvania_damage_assessment": {
+   "class": "code",
+   "counties": {
+    "Transylvania|NC": 121
+   },
+   "rows": 121
+  },
+  "counties_nc.albemarle_observer_tax_lists": {
+   "class": "tax",
+   "counties": {
+    "Bertie|NC": 1535,
+    "Chowan|NC": 869,
+    "Gates|NC": 603,
+    "Hyde|NC": 1007,
+    "Perquimans|NC": 1493,
+    "Tyrrell|NC": 391,
+    "Washington|NC": 1613
+   },
+   "rows": 7511
+  },
+  "counties_nc.asheville_helene": {
+   "class": "code",
+   "counties": {
+    "Buncombe|NC": 735
+   },
+   "rows": 735
+  },
+  "counties_nc.brunswick_legal_notices": {
+   "class": "tax",
+   "counties": {},
+   "rows": 5
+  },
+  "counties_nc.buncombe_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Buncombe|NC": 1182
+   },
+   "rows": 1182
+  },
+  "counties_nc.buncombe_elderly": {
+   "class": "elderly",
+   "counties": {
+    "Buncombe|NC": 4322
+   },
+   "rows": 4322
+  },
+  "counties_nc.buncombe_tax": {
+   "class": "tax",
+   "counties": {
+    "Buncombe|NC": 24
+   },
+   "rows": 24
+  },
+  "counties_nc.cleveland_tax": {
+   "class": "lis_pendens",
+   "counties": {},
+   "rows": 9
+  },
+  "counties_nc.cumberland_tax_foreclosure": {
+   "class": "tax",
+   "counties": {},
+   "rows": 4
+  },
+  "counties_nc.edgecombe_tax_foreclosure": {
+   "class": "tax",
+   "counties": {},
+   "rows": 14
+  },
+  "counties_nc.gaston_vacant": {
+   "class": "code",
+   "counties": {
+    "Gaston|NC": 21797
+   },
+   "rows": 21797
+  },
+  "counties_nc.gastonia_code_enforcement": {
+   "class": "code",
+   "counties": {
+    "Gaston|NC": 1176
+   },
+   "rows": 1176
+  },
+  "counties_nc.haywood_tax_foreclosures": {
+   "class": "tax",
+   "counties": {},
+   "rows": 1
+  },
+  "counties_nc.henderson_code_violations": {
+   "class": "code",
+   "counties": {
+    "Henderson|NC": 193
+   },
+   "rows": 193
+  },
+  "counties_nc.henderson_foreclosure_parcels": {
+   "class": "tax",
+   "counties": {},
+   "rows": 14
+  },
+  "counties_nc.hendersonville_vacant_structures": {
+   "class": "code",
+   "counties": {
+    "Henderson|NC": 48
+   },
+   "rows": 48
+  },
+  "counties_nc.lincoln_code_violations": {
+   "class": "code",
+   "counties": {},
+   "rows": 6
+  },
+  "counties_nc.lincoln_vacant": {
+   "class": "code",
+   "counties": {
+    "Lincoln|NC": 16057
+   },
+   "rows": 16068
+  },
+  "counties_nc.mcdowell_probate": {
+   "class": "probate",
+   "counties": {
+    "McDowell|NC": 391
+   },
+   "rows": 391
+  },
+  "counties_nc.nc_county_csv_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "New Hanover|NC": 1398
+   },
+   "rows": 1398
+  },
+  "counties_nc.nc_county_pdf_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Catawba|NC": 5227,
+    "Lincoln|NC": 1172,
+    "McDowell|NC": 2178
+   },
+   "rows": 8582
+  },
+  "counties_nc.nc_county_tax_foreclosure": {
+   "class": "tax",
+   "counties": {},
+   "rows": 3
+  },
+  "counties_nc.nc_ecourts_divorce": {
+   "class": "divorce",
+   "counties": {
+    "Alamance|NC": 109,
+    "Alexander|NC": 35,
+    "Beaufort|NC": 26,
+    "Bladen|NC": 45,
+    "Brunswick|NC": 93,
+    "Buncombe|NC": 136,
+    "Burke|NC": 60,
+    "Cabarrus|NC": 48,
+    "Caldwell|NC": 46,
+    "Catawba|NC": 128,
+    "Chatham|NC": 46,
+    "Cleveland|NC": 59,
+    "Craven|NC": 53,
+    "Cumberland|NC": 446,
+    "Currituck|NC": 20,
+    "Dare|NC": 30,
+    "Davidson|NC": 129,
+    "Duplin|NC": 28,
+    "Durham|NC": 133,
+    "Forsyth|NC": 158,
+    "Gaston|NC": 149,
+    "Granville|NC": 25,
+    "Guilford|NC": 137,
+    "Halifax|NC": 28,
+    "Harnett|NC": 103,
+    "Henderson|NC": 80,
+    "Hoke|NC": 39,
+    "Iredell|NC": 168,
+    "Jackson|NC": 25,
+    "Johnston|NC": 159,
+    "Jones|NC": 129,
+    "Lee|NC": 61,
+    "Lenoir|NC": 38,
+    "Macon|NC": 28,
+    "Mecklenburg|NC": 856,
+    "Moore|NC": 57,
+    "New Hanover|NC": 180,
+    "Onslow|NC": 40,
+    "Orange|NC": 81,
+    "Pender|NC": 39,
+    "Pitt|NC": 97,
+    "Randolph|NC": 81,
+    "Robeson|NC": 63,
+    "Rockingham|NC": 321,
+    "Rowan|NC": 22,
+    "Rutherford|NC": 22,
+    "Sampson|NC": 37,
+    "Scotland|NC": 29,
+    "Stanly|NC": 44,
+    "Stokes|NC": 72,
+    "Transylvania|NC": 22,
+    "Union|NC": 142,
+    "Wake|NC": 24,
+    "Warren|NC": 43,
+    "Wayne|NC": 116,
+    "Wilkes|NC": 40,
+    "Wilson|NC": 45,
+    "Yadkin|NC": 27
+   },
+   "rows": 5777
+  },
+  "counties_nc.nc_ecourts_lis_pendens": {
+   "class": "lis_pendens",
+   "counties": {
+    "Alamance|NC": 115,
+    "Avery|NC": 34,
+    "Beaufort|NC": 84,
+    "Brunswick|NC": 260,
+    "Buncombe|NC": 71,
+    "Burke|NC": 56,
+    "Cabarrus|NC": 265,
+    "Caldwell|NC": 34,
+    "Carteret|NC": 24,
+    "Caswell|NC": 25,
+    "Catawba|NC": 80,
+    "Chatham|NC": 56,
+    "Cherokee|NC": 37,
+    "Cleveland|NC": 129,
+    "Columbus|NC": 51,
+    "Craven|NC": 73,
+    "Cumberland|NC": 166,
+    "Currituck|NC": 41,
+    "Dare|NC": 37,
+    "Davidson|NC": 110,
+    "Duplin|NC": 45,
+    "Durham|NC": 321,
+    "Edgecombe|NC": 40,
+    "Forsyth|NC": 410,
+    "Franklin|NC": 101,
+    "Gaston|NC": 153,
+    "Granville|NC": 27,
+    "Guilford|NC": 804,
+    "Halifax|NC": 33,
+    "Harnett|NC": 147,
+    "Haywood|NC": 399,
+    "Henderson|NC": 108,
+    "Hoke|NC": 23,
+    "Iredell|NC": 242,
+    "Jackson|NC": 50,
+    "Johnston|NC": 233,
+    "Lee|NC": 37,
+    "Lenoir|NC": 28,
+    "Lincoln|NC": 67,
+    "McDowell|NC": 24,
+    "Mecklenburg|NC": 1595,
+    "Moore|NC": 41,
+    "Nash|NC": 113,
+    "New Hanover|NC": 301,
+    "Onslow|NC": 261,
+    "Orange|NC": 86,
+    "Pender|NC": 62,
+    "Person|NC": 27,
+    "Pitt|NC": 211,
+    "Polk|NC": 35,
+    "Randolph|NC": 98,
+    "Robeson|NC": 81,
+    "Rockingham|NC": 50,
+    "Rowan|NC": 114,
+    "Rutherford|NC": 67,
+    "Sampson|NC": 28,
+    "Stanly|NC": 54,
+    "Stokes|NC": 28,
+    "Surry|NC": 43,
+    "Transylvania|NC": 42,
+    "Union|NC": 200,
+    "Vance|NC": 49,
+    "Wake|NC": 1635,
+    "Warren|NC": 23,
+    "Watauga|NC": 22,
+    "Wayne|NC": 60,
+    "Wilkes|NC": 32,
+    "Wilson|NC": 51,
+    "Yadkin|NC": 24
+   },
+   "rows": 10761
+  },
+  "counties_nc.nc_govdeals_real_property": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 1
+  },
+  "counties_nc.nc_heir_estate_parcels": {
+   "class": "probate",
+   "counties": {
+    "Alamance|NC": 80,
+    "Anson|NC": 80,
+    "Avery|NC": 58,
+    "Beaufort|NC": 75,
+    "Bertie|NC": 67,
+    "Bladen|NC": 44,
+    "Brunswick|NC": 77,
+    "Buncombe|NC": 48,
+    "Burke|NC": 56,
+    "Caldwell|NC": 60,
+    "Carteret|NC": 61,
+    "Caswell|NC": 80,
+    "Catawba|NC": 79,
+    "Charleston|SC": 71,
+    "Chatham|NC": 78,
+    "Cherokee|NC": 20,
+    "Chowan|NC": 33,
+    "Clay|NC": 62,
+    "Cleveland|NC": 75,
+    "Craven|NC": 75,
+    "Cumberland|NC": 75,
+    "Currituck|NC": 77,
+    "Davie|NC": 67,
+    "Durham|NC": 72,
+    "Edgecombe|NC": 67,
+    "Forsyth|NC": 72,
+    "Franklin|NC": 73,
+    "Gaston|NC": 30,
+    "Gates|NC": 69,
+    "Granville|NC": 63,
+    "Greene|NC": 69,
+    "Guilford|NC": 61,
+    "Halifax|NC": 40,
+    "Harnett|NC": 62,
+    "Haywood|NC": 66,
+    "Henderson|NC": 69,
+    "Hertford|NC": 67,
+    "Iredell|NC": 66,
+    "Jackson|NC": 66,
+    "Johnston|NC": 37,
+    "Jones|NC": 50,
+    "Laurens|SC": 81,
+    "Lincoln|NC": 70,
+    "McDowell|NC": 53,
+    "Mecklenburg|NC": 48,
+    "Mitchell|NC": 77,
+    "Northampton|NC": 76,
+    "Oconee|SC": 49,
+    "Pasquotank|NC": 60,
+    "Pender|NC": 68,
+    "Perquimans|NC": 78,
+    "Person|NC": 68,
+    "Pickens|SC": 22,
+    "Pitt|NC": 77,
+    "Polk|NC": 155,
+    "Randolph|NC": 80,
+    "Richmond|NC": 70,
+    "Robeson|NC": 67,
+    "Rockingham|NC": 64,
+    "Rowan|NC": 57,
+    "Rutherford|NC": 197,
+    "Sampson|NC": 63,
+    "Scotland|NC": 75,
+    "Spartanburg|SC": 49,
+    "Stanly|NC": 69,
+    "Transylvania|NC": 31,
+    "York|SC": 31
+   },
+   "rows": 4437
+  },
+  "counties_nc.nc_its_public_tax": {
+   "class": "tax",
+   "counties": {
+    "Graham|NC": 740,
+    "Onslow|NC": 1459
+   },
+   "rows": 2199
+  },
+  "counties_nc.nc_ptscloud_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Beaufort|NC": 2880,
+    "Forsyth|NC": 5314,
+    "Guilford|NC": 3280,
+    "Henderson|NC": 1828,
+    "Hyde|NC": 1586,
+    "Madison|NC": 1716,
+    "Orange|NC": 1358,
+    "Pitt|NC": 1580
+   },
+   "rows": 19548
+  },
+  "counties_nc.nc_rod_logan": {
+   "class": "lis_pendens",
+   "counties": {},
+   "rows": 31
+  },
+  "counties_nc.nc_rod_substitute_trustee": {
+   "class": "lis_pendens",
+   "counties": {
+    "Buncombe|NC": 45
+   },
+   "rows": 51
+  },
+  "counties_nc.rutherford_tax": {
+   "class": "tax",
+   "counties": {
+    "Rutherford|NC": 5109
+   },
+   "rows": 5109
+  },
+  "counties_nc.rutherford_wildfire_tax": {
+   "class": "tax",
+   "counties": {
+    "Rutherford|NC": 3435
+   },
+   "rows": 3435
+  },
+  "counties_nc.stokes_delinquent_tax": {
+   "class": "tax",
+   "counties": {},
+   "rows": 1
+  },
+  "counties_nc.swain_tax_foreclosures": {
+   "class": "tax",
+   "counties": {},
+   "rows": 1
+  },
+  "counties_nc.transylvania_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Transylvania|NC": 401
+   },
+   "rows": 402
+  },
+  "counties_nc.transylvania_vacant": {
+   "class": "code",
+   "counties": {
+    "Transylvania|NC": 10972
+   },
+   "rows": 10972
+  },
+  "counties_nc.wake_tax_foreclosure": {
+   "class": "tax",
+   "counties": {},
+   "rows": 3
+  },
+  "counties_sc.anderson_master_in_equity": {
+   "class": "foreclosure",
+   "counties": {
+    "Anderson|SC": 28
+   },
+   "rows": 28
+  },
+  "counties_sc.beaufort_flc": {
+   "class": "tax",
+   "counties": {
+    "Beaufort|SC": 22
+   },
+   "rows": 22
+  },
+  "counties_sc.berkeley_paystar_tax": {
+   "class": "tax",
+   "counties": {
+    "Berkeley|SC": 2364
+   },
+   "rows": 2364
+  },
+  "counties_sc.calhoun_overage_claims": {
+   "class": "tax",
+   "counties": {
+    "Calhoun|SC": 67
+   },
+   "rows": 67
+  },
+  "counties_sc.charleston_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Charleston|SC": 1760
+   },
+   "rows": 1760
+  },
+  "counties_sc.charleston_mie": {
+   "class": "lis_pendens",
+   "counties": {
+    "Charleston|SC": 27
+   },
+   "rows": 27
+  },
+  "counties_sc.charleston_tax_sale_xlsx": {
+   "class": "tax",
+   "counties": {
+    "Charleston|SC": 2402
+   },
+   "rows": 2402
+  },
+  "counties_sc.cherokee_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Cherokee|SC": 325
+   },
+   "rows": 325
+  },
+  "counties_sc.dillon_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Dillon|SC": 843
+   },
+   "rows": 843
+  },
+  "counties_sc.dorchester_billtrax_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Dorchester|SC": 1306
+   },
+   "rows": 1306
+  },
+  "counties_sc.fairfield_overage_claims": {
+   "class": "tax",
+   "counties": {
+    "Fairfield|SC": 60
+   },
+   "rows": 60
+  },
+  "counties_sc.florence_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Florence|SC": 1829
+   },
+   "rows": 1829
+  },
+  "counties_sc.georgetown_civicengage": {
+   "class": "tax",
+   "counties": {
+    "Georgetown|SC": 354
+   },
+   "rows": 354
+  },
+  "counties_sc.greenville_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Greenville|SC": 688
+   },
+   "rows": 688
+  },
+  "counties_sc.greenville_mie_adverts": {
+   "class": "lis_pendens",
+   "counties": {
+    "Greenville|SC": 324
+   },
+   "rows": 324
+  },
+  "counties_sc.horry_delinquent_xlsx": {
+   "class": "tax",
+   "counties": {
+    "Horry|SC": 3009
+   },
+   "rows": 3009
+  },
+  "counties_sc.horry_flc": {
+   "class": "tax",
+   "counties": {
+    "Horry|SC": 23
+   },
+   "rows": 23
+  },
+  "counties_sc.oconee_flc_assignment": {
+   "class": "tax",
+   "counties": {
+    "Oconee|SC": 585
+   },
+   "rows": 585
+  },
+  "counties_sc.oconee_forfeited_land": {
+   "class": "tax",
+   "counties": {
+    "Oconee|SC": 257
+   },
+   "rows": 257
+  },
+  "counties_sc.pickens_delinquent_parcels": {
+   "class": "tax",
+   "counties": {
+    "Pickens|SC": 1403
+   },
+   "rows": 1403
+  },
+  "counties_sc.pickens_master_in_equity": {
+   "class": "foreclosure",
+   "counties": {
+    "Pickens|SC": 20
+   },
+   "rows": 20
+  },
+  "counties_sc.qpaybill_delinquent_roll": {
+   "class": "tax",
+   "counties": {
+    "Abbeville|SC": 741,
+    "Allendale|SC": 574,
+    "Bamberg|SC": 576,
+    "Barnwell|SC": 1101,
+    "Calhoun|SC": 578,
+    "Cherokee|SC": 1316,
+    "Chesterfield|SC": 725,
+    "Clarendon|SC": 1422,
+    "Colleton|SC": 1364,
+    "Darlington|SC": 2505,
+    "Dillon|SC": 484,
+    "Edgefield|SC": 750,
+    "Horry|SC": 882,
+    "Jasper|SC": 823,
+    "Kershaw|SC": 1695,
+    "Lancaster|SC": 890,
+    "Laurens|SC": 1108,
+    "Lee|SC": 458,
+    "Lexington|SC": 2194,
+    "Marlboro|SC": 1024,
+    "McCormick|SC": 277,
+    "Newberry|SC": 712,
+    "Oconee|SC": 1271,
+    "Orangeburg|SC": 93,
+    "Saluda|SC": 416,
+    "Spartanburg|SC": 3256,
+    "Sumter|SC": 3066,
+    "Union|SC": 630,
+    "Williamsburg|SC": 2249
+   },
+   "rows": 33180
+  },
+  "counties_sc.richland_flc": {
+   "class": "tax",
+   "counties": {},
+   "rows": 3
+  },
+  "counties_sc.sc_catalis_delinquent_roll": {
+   "class": "tax",
+   "counties": {
+    "Pickens|SC": 63
+   },
+   "rows": 63
+  },
+  "counties_sc.sc_county_rosters": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 8
+  },
+  "counties_sc.sc_dew_lien_registry": {
+   "class": "tax",
+   "counties": {
+    "Anderson|SC": 406,
+    "Beaufort|SC": 844,
+    "Charleston|SC": 3244,
+    "Cherokee|SC": 95,
+    "Colleton|SC": 85,
+    "Georgetown|SC": 198,
+    "Horry|SC": 1629,
+    "Laurens|SC": 148,
+    "Oconee|SC": 192,
+    "Pickens|SC": 300,
+    "Spartanburg|SC": 1107,
+    "Union|SC": 40
+   },
+   "rows": 8288
+  },
+  "counties_sc.sc_flc": {
+   "class": "tax",
+   "counties": {
+    "Anderson|SC": 73
+   },
+   "rows": 73
+  },
+  "counties_sc.sc_probate_net": {
+   "class": "probate",
+   "counties": {
+    "Charleston|SC": 253,
+    "Dorchester|SC": 101
+   },
+   "rows": 373
+  },
+  "counties_sc.sc_probate_notices.gaffneyledger": {
+   "class": "probate",
+   "counties": {
+    "Cherokee|SC": 237
+   },
+   "rows": 237
+  },
+  "counties_sc.sc_probate_notices.laurenscountyadvertiser": {
+   "class": "probate",
+   "counties": {
+    "Laurens|SC": 142
+   },
+   "rows": 142
+  },
+  "counties_sc.sc_probate_notices.yourpickenscounty": {
+   "class": "probate",
+   "counties": {
+    "Pickens|SC": 530
+   },
+   "rows": 530
+  },
+  "counties_sc.sc_public_index": {
+   "class": "lis_pendens",
+   "counties": {
+    "Anderson|SC": 1064,
+    "Cherokee|SC": 766,
+    "Laurens|SC": 864,
+    "Oconee|SC": 437,
+    "Pickens|SC": 923,
+    "Spartanburg|SC": 1098,
+    "Union|SC": 388
+   },
+   "rows": 5540
+  },
+  "counties_sc.sc_public_index_lis_pendens": {
+   "class": "lis_pendens",
+   "counties": {
+    "Anderson|SC": 125,
+    "Cherokee|SC": 33,
+    "Laurens|SC": 28,
+    "Oconee|SC": 24,
+    "Pickens|SC": 36,
+    "Spartanburg|SC": 107
+   },
+   "rows": 362
+  },
+  "counties_sc.sc_public_notices": {
+   "class": "probate",
+   "counties": {
+    "Anderson|SC": 50,
+    "Beaufort|SC": 33,
+    "Charleston|SC": 155,
+    "Cherokee|SC": 49,
+    "Colleton|SC": 127,
+    "Georgetown|SC": 21,
+    "Laurens|SC": 83,
+    "Oconee|SC": 56,
+    "Pickens|SC": 107,
+    "Spartanburg|SC": 50
+   },
+   "rows": 768
+  },
+  "counties_sc.sc_rod_acclaim": {
+   "class": "probate",
+   "counties": {
+    "Pickens|SC": 210
+   },
+   "rows": 210
+  },
+  "counties_sc.sc_rod_cott": {
+   "class": "probate",
+   "counties": {},
+   "rows": 2
+  },
+  "counties_sc.sc_state_tax_lien": {
+   "class": "tax",
+   "counties": {
+    "Berkeley|SC": 28,
+    "Charleston|SC": 41,
+    "Greenville|SC": 31,
+    "Horry|SC": 43,
+    "Lexington|SC": 20,
+    "Richland|SC": 29
+   },
+   "rows": 319
+  },
+  "counties_sc.spartan_weekly_legals": {
+   "class": "probate",
+   "counties": {
+    "Spartanburg|SC": 128
+   },
+   "rows": 128
+  },
+  "counties_sc.spartanburg_city_condemned": {
+   "class": "code",
+   "counties": {
+    "Spartanburg|SC": 84
+   },
+   "rows": 84
+  },
+  "counties_sc.spartanburg_condemned": {
+   "class": "code",
+   "counties": {
+    "Spartanburg|SC": 1754
+   },
+   "rows": 1754
+  },
+  "counties_sc.spartanburg_delinquent_tax": {
+   "class": "tax",
+   "counties": {
+    "Spartanburg|SC": 1770
+   },
+   "rows": 1770
+  },
+  "counties_sc.spartanburg_flc": {
+   "class": "tax",
+   "counties": {},
+   "rows": 5
+  },
+  "counties_sc.spartanburg_vacant": {
+   "class": "code",
+   "counties": {
+    "Spartanburg|SC": 4438
+   },
+   "rows": 4438
+  },
+  "counties_sc.terry_howe_auctions": {
+   "class": "foreclosure",
+   "counties": {
+    "Anderson|SC": 51,
+    "Laurens|SC": 124,
+    "Spartanburg|SC": 141
+   },
+   "rows": 351
+  },
+  "counties_sc.terry_howe_flc": {
+   "class": "tax",
+   "counties": {
+    "Chester|SC": 25
+   },
+   "rows": 54
+  },
+  "counties_sc.york_overage_claims": {
+   "class": "tax",
+   "counties": {
+    "York|SC": 107
+   },
+   "rows": 107
+  },
+  "law_firms.bell_carrington": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 9
+  },
+  "law_firms.brock_scott": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 45
+  },
+  "law_firms.hutchens": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 43
+  },
+  "law_firms.kania": {
+   "class": "tax",
+   "counties": {
+    "Caldwell|NC": 26
+   },
+   "rows": 177
+  },
+  "law_firms.mcmichael_taylor_gray": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 6
+  },
+  "law_firms.rogers_townsend": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 12
+  },
+  "law_firms.shapiro_ingle_powerbi": {
+   "class": "foreclosure",
+   "counties": {
+    "Gaston|NC": 24
+   },
+   "rows": 77
+  },
+  "law_firms.zacchaeus": {
+   "class": "tax",
+   "counties": {},
+   "rows": 43
+  },
+  "national.auction_dot_com": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 21
+  },
+  "national.bid4assets": {
+   "class": "tax",
+   "counties": {},
+   "rows": 19
+  },
+  "national.courtlistener_adversary": {
+   "class": "lis_pendens",
+   "counties": {},
+   "rows": 3
+  },
+  "national.courtlistener_bankruptcy": {
+   "class": "bankruptcy",
+   "counties": {
+    "Buncombe|NC": 64,
+    "Cleveland|NC": 23,
+    "Henderson|NC": 49,
+    "Mecklenburg|NC": 38,
+    "Polk|NC": 31,
+    "Transylvania|NC": 22
+   },
+   "rows": 314
+  },
+  "national.estate_sales": {
+   "class": "probate",
+   "counties": {},
+   "rows": 74
+  },
+  "national.foreclosure_dot_com": {
+   "class": "foreclosure",
+   "counties": {
+    "Anderson|SC": 56,
+    "Spartanburg|SC": 33
+   },
+   "rows": 139
+  },
+  "national.hibid_real_estate": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 5
+  },
+  "national.homeharvest": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 41
+  },
+  "national.hubzu": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 17
+  },
+  "national.jail_bookings": {
+   "class": "jail",
+   "counties": {},
+   "rows": 11
+  },
+  "national.nc_upset_bids": {
+   "class": "tax",
+   "counties": {},
+   "rows": 29
+  },
+  "national.realtor_foreclosures": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 6
+  },
+  "national.sc_public_index": {
+   "class": "lis_pendens",
+   "counties": {
+    "Beaufort|SC": 360,
+    "Charleston|SC": 1549,
+    "Edgefield|SC": 48,
+    "Saluda|SC": 42
+   },
+   "rows": 1999
+  },
+  "national.servicelink_auction": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 14
+  },
+  "national.xome": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 9
+  },
+  "national.zillow_foreclosures": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 88
+  },
+  "newspapers.aiken_standard": {
+   "class": "lis_pendens",
+   "counties": {
+    "Aiken|SC": 55
+   },
+   "rows": 55
+  },
+  "newspapers.berkeley_independent": {
+   "class": "lis_pendens",
+   "counties": {
+    "Berkeley|SC": 40
+   },
+   "rows": 40
+  },
+  "newspapers.index_journal": {
+   "class": "lis_pendens",
+   "counties": {},
+   "rows": 1
+  },
+  "newspapers.journal_scene": {
+   "class": "lis_pendens",
+   "counties": {},
+   "rows": 14
+  },
+  "newspapers.post_and_courier": {
+   "class": "lis_pendens",
+   "counties": {},
+   "rows": 4
+  },
+  "public_notices.funeral_home_rss": {
+   "class": "probate",
+   "counties": {
+    "Anderson|SC": 22,
+    "Cabarrus|NC": 20,
+    "Edgecombe|NC": 20,
+    "Johnston|NC": 20,
+    "Orangeburg|SC": 20,
+    "Williamsburg|SC": 20,
+    "Wilson|NC": 20
+   },
+   "rows": 170
+  },
+  "public_notices.gannett_obituaries": {
+   "class": "probate",
+   "counties": {
+    "Anderson|SC": 34,
+    "Buncombe|NC": 41,
+    "Cleveland|NC": 23,
+    "Gaston|NC": 20,
+    "Rutherford|NC": 50,
+    "Spartanburg|SC": 26
+   },
+   "rows": 212
+  },
+  "public_notices.nc_notices_counties": {
+   "class": "probate",
+   "counties": {
+    "Brunswick|NC": 82,
+    "Buncombe|NC": 195,
+    "Burke|NC": 31,
+    "Carteret|NC": 37,
+    "Cleveland|NC": 21,
+    "Gaston|NC": 81,
+    "Haywood|NC": 22,
+    "Henderson|NC": 33,
+    "McDowell|NC": 27,
+    "New Hanover|NC": 58,
+    "Onslow|NC": 60,
+    "Polk|NC": 49,
+    "Rutherford|NC": 49
+   },
+   "rows": 786
+  },
+  "public_notices.ncnotices": {
+   "class": "probate",
+   "counties": {
+    "Buncombe|NC": 24
+   },
+   "rows": 38
+  },
+  "public_notices.publicnoticesc": {
+   "class": "foreclosure",
+   "counties": {},
+   "rows": 1
+  }
+ }
+}
