@@ -89,9 +89,12 @@ def test_sale_list_rows_carry_the_stated_hour(monkeypatch):
     upcoming = [li for li in out if "anderson_mie" in (li.raw or {})]
     assert len(upcoming) == 2
     assert all(li.sale_date.hour == 11 and li.sale_date.minute == 0 for li in upcoming)
+    assert all(li.sale_time == "11:00" for li in out)
 
 
 def test_at_sale_time_keeps_date_when_no_hour_stated():
     d = datetime(2026, 11, 2)
     assert A._at_sale_time(d, "no header here") == d
     assert A._at_sale_time(d, "SALES ARE HELD AT THE COURTHOUSE, 2:30 PM.").hour == 14
+    assert A._sale_clock("SALES ARE HELD AT THE COURTHOUSE, 2:30 PM.") == "14:30"
+    assert A._sale_clock("no header here") is None

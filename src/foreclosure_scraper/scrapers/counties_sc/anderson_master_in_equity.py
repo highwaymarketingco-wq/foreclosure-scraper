@@ -73,6 +73,12 @@ _SALE_TIME_RE = re.compile(
 )
 
 
+def _sale_clock(text: str) -> str | None:
+    """The header's sale hour as Listing.sale_time ("HH:MM", 24-hour), or None."""
+    at = _at_sale_time(datetime(2000, 1, 1), text)
+    return f"{at.hour:02d}:{at.minute:02d}" if at and (at.hour or at.minute) else None
+
+
 def _at_sale_time(sale_date: datetime | None, text: str) -> datetime | None:
     """`sale_date` at the hour the PDF's own header states; unchanged when none is stated."""
     if sale_date is None:
@@ -467,8 +473,10 @@ class AndersonMasterInEquity(BaseScraper):
                         upcoming_text = _extract_pdf_text(r2.content)
                         listings = _parse_pdf(upcoming_text, best_pdf_url, self.slug)
                         sale_at = _at_sale_time(best_sale_date, upcoming_text)
+                        clock = _sale_clock(upcoming_text)
                         for li in listings:
                             li.sale_date = sale_at
+                            li.sale_time = li.sale_time or clock
                         out.extend(listings)
                 except Exception:
                     pass
@@ -512,8 +520,11 @@ class AndersonMasterInEquity(BaseScraper):
                     text = _extract_pdf_text(r3.content)
                     if not text:
                         continue
-                    out.extend(_parse_results_pdf(text, url, self.slug,
-                                                  _at_sale_time(sale_date, text)))
+                    clock = _sale_clock(text)
+                    for li in _parse_results_pdf(text, url, self.slug,
+                                                 _at_sale_time(sale_date, text)):
+                        li.sale_time = li.sale_time or clock
+                        out.append(li)
                 except Exception:
                     continue
 
