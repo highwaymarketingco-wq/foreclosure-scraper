@@ -106,6 +106,24 @@ COUNTIES: dict[str, str] = {
     "Madison": "https://www.madisoncountync.gov/",
 }
 
+#: A county's own tax-foreclosure page, read directly every run (2026-10-08 source-completeness
+#: audit). Madison's homepage carries no foreclosure link: its first three "tax" links are a
+#: room-occupancy PDF, the ArcGIS tax map and "Property Tax Search" = lrcpwa.ncptscloud.com/Madison
+#: (a JavaScript app with no HTML table, which also timed out on the VM: wnc_tax.fetch_timeout_or_fail
+#: on 2026-10-08). The real page is Tax Administration -> "Tax Foreclosure Sales" (live 2026-10-08:
+#: process text only, no sale list posted, a genuine 0; the county says sales are advertised in
+#: the newspaper and "may be posted to the County's website").
+COUNTY_TAX_PAGES: dict[str, list[str]] = {
+    "Madison": ["https://www.madisoncountync.gov/tax-foreclosure-sale.html"],
+}
+
+#: Link targets that never hold an HTML sale table: vendor tax apps (JavaScript SPAs), payment
+#: portals, map viewers. Following one costs a fetch (lrcpwa: a 20 s timeout) and yields nothing.
+#: PDFs are skipped too: PDF-following was removed on purpose (see the note in fetch()).
+_SKIP_LINK_RE = re.compile(
+    r"ncptscloud\.com|govpayments\.com|experience\.arcgis\.com|arcgis\.com/apps|\.pdf(?:$|[?#])",
+    re.I)
+
 
 class WNCTaxForeclosures(BaseScraper):
     slug = "counties_nc.wnc_tax_foreclosures"
@@ -119,9 +137,10 @@ class WNCTaxForeclosures(BaseScraper):
         out: list[Listing] = []
 
         for county, base_url in COUNTIES.items():
+            direct = [(u, "county tax-foreclosure page") for u in COUNTY_TAX_PAGES.get(county, [])]
             html = await _bounded_text(base_url, impersonate=True, timeout=40.0)
             if not html or len(html) < 200:
-                continue
+                html = ""
 
             # Find tax/foreclosure/sale related links
             links = re.findall(r'<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>', html, re.I | re.S)
@@ -130,9 +149,14 @@ class WNCTaxForeclosures(BaseScraper):
                 low = (href + " " + re.sub(r"<[^>]+>", "", text)).lower()
                 if any(kw in low for kw in ("tax", "foreclos", "delinquent", "sale", "auction", "sheriff", "bid", "treasurer", "collector")):
                     tax_links.append((urljoin(base_url, href), re.sub(r"<[^>]+>", "", text).strip()))
+            # The same first three links as before, minus the ones that can never hold a table
+            # (never a different, later link: a tax-rates table would parse as sale rows).
+            known = {u for u, _ in direct}
+            tax_links = direct + [t for t in tax_links[:3]
+                                  if t[0] not in known and not _SKIP_LINK_RE.search(t[0])]
 
             # Follow tax-related links and parse
-            for tax_url, link_text in tax_links[:3]:
+            for tax_url, link_text in tax_links:
                 if tax_url == base_url:
                     continue
                 sub_html = await _bounded_text(tax_url, impersonate=True, timeout=40.0)
@@ -151,7 +175,9 @@ class WNCTaxForeclosures(BaseScraper):
 
                     parcel = None
                     for c in clean:
-                        m = re.search(r"\b(\d{4,}[-\s]?[\d.]+)\b", c)
+                        # A dashed NC PIN ("9700-12-3456[-000]") first: the general pattern
+                        # stopped at its second group ("9700-12").
+                        m = re.search(r"\b(\d{4}-\d{2}-\d{4}(?:-\d{1,6})?|\d{4,}[-\s]?[\d.]+)\b", c)
                         if m:
                             parcel = m.group(1)
                             break
@@ -171,6 +197,12 @@ class WNCTaxForeclosures(BaseScraper):
                                 amount = float(m.group().replace("$", "").replace(",", ""))
                             except ValueError:
                                 pass
+
+                    # A row with neither a parcel-shaped id nor a dollar amount is page layout,
+                    # not a property (Madison's Weebly pages lay their footer nav out as a
+                    # one-row <table> of "Home | Departments | ..."), 2026-10-08.
+                    if not parcel and amount is None:
+                        continue
 
                     out.append(Listing(
                         source="counties_nc.wnc_tax_foreclosures",
