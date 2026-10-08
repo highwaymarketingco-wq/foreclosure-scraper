@@ -53,6 +53,7 @@ from ...document_links import stamp_documents
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 from .courtlistener_bankruptcy import (
+    _PAGE_RETRIES,
     API_BASE,
     COURTS,
     COURT_STATE,
@@ -222,21 +223,33 @@ async def _search(c, token: str, court: str, phrase: str) -> list[dict]:
     url: str | None = f"{API_BASE}/search/"
     page = 0
     while url and page < MAX_PAGES_PER_QUERY:
-        try:
-            r = await c.get(
-                url,
-                params=params if page == 0 else None,
-                headers=headers,
-            )
-            if r.status_code != 200:
-                if page == 0:
-                    log.warning("courtlistener_adv.search_error",
-                                court=court, phrase=phrase, status=r.status_code)
+        # 2026-10-08 (source-completeness audit): one failed page used to end the
+        # (court, phrase) search -- 9 of the 20 searches of the 2026-10-08 gated
+        # run did so ("search_exc"), with an empty error string (a bare timeout).
+        # Retry the page like courtlistener_bankruptcy._fetch_court does and
+        # record the exception TYPE so the cause is never blank.
+        data = None
+        for attempt in range(_PAGE_RETRIES):
+            try:
+                r = await c.get(
+                    url,
+                    params=params if page == 0 else None,
+                    headers=headers,
+                )
+                if r.status_code != 200:
+                    if page == 0:
+                        log.warning("courtlistener_adv.search_error",
+                                    court=court, phrase=phrase, status=r.status_code)
+                    break
+                data = r.json()
                 break
-            data = r.json()
-        except Exception as exc:  # noqa: BLE001
-            log.warning("courtlistener_adv.search_exc",
-                        court=court, phrase=phrase, error=str(exc)[:120])
+            except Exception as exc:  # noqa: BLE001
+                log.warning("courtlistener_adv.search_exc",
+                            court=court, phrase=phrase, page=page, attempt=attempt + 1,
+                            error=f"{type(exc).__name__}: {str(exc)[:120]}")
+                if attempt + 1 < _PAGE_RETRIES:
+                    await asyncio.sleep(2.0 * (attempt + 1))
+        if data is None:
             break
         results.extend(data.get("results") or [])
         url = data.get("next")  # absolute URL with all params baked in
@@ -254,7 +267,9 @@ class CourtListenerAdversary(BaseScraper):
     category = "federal_court"
     expected_min_count = 0
     requires_apify = False
-    timeout_s = 120.0
+    # 120 -> 240 s with the page retry: the 2026-10-08 pass took 93 s for 40
+    # page requests through the shared courtlistener.com throttle.
+    timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:
         token = _load_token()
