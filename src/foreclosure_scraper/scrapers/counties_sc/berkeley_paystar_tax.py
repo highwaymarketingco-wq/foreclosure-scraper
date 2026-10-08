@@ -100,6 +100,7 @@ import structlog
 from ...base_scraper import BaseScraper
 from ...enrichment_owner_mailing import _is_absentee
 from ...models import Listing, ListingType, PropertyKind
+from ...tax_calendar import completed_delinquent_years
 
 log = structlog.get_logger()
 
@@ -426,6 +427,60 @@ def _detail_to_listing(detail: dict, invoice_hash: str) -> Listing | None:
     )
 
 
+def _parcel_key(li: Listing) -> str:
+    """The parcel an invoice bills (normalised TMS), else the invoice itself."""
+    p = re.sub(r"[^0-9A-Za-z]", "", li.parcel_id or "").upper()
+    return f"parcel:{p}" if p else f"invoice:{li.case_number or li.source_url}"
+
+
+def _merge_invoices(invoices: list[Listing]) -> Listing:
+    """One lead per parcel from its unpaid prior-year invoices (2026-10-09 source audit).
+
+    The portal bills each tax year as its own invoice, and this scraper used to emit one
+    Listing per invoice. dedupe() then merged a parcel's invoices on the parcel key and kept
+    ONE invoice's block: the other years' balances and the fact that the parcel owes several
+    years were lost (live 2026-10-08: 3,017 prior-year invoices, 1,555 distinct billed names).
+    Now the newest invoice is the row (its owner, mailing, situs and bill breakdown are the
+    current ones) and the block carries every year: `bills` (one entry per invoice, the shape
+    enrichment_tax_owed._amounts_by_year reads), `years_unpaid`, `oldest_year`,
+    `years_delinquent` (late levy years, tax_calendar) and `total_due` summed over the
+    invoices; `latest_invoice_total_due` keeps the newest invoice's own amount.
+    """
+    def year(li: Listing) -> int:
+        y = li.raw["berkeley_paystar_tax"].get("tax_year")
+        return y if isinstance(y, int) else 0
+
+    ordered = sorted(invoices, key=lambda li: (year(li), str(li.case_number or "")), reverse=True)
+    base = ordered[0]
+    blocks = [li.raw["berkeley_paystar_tax"] for li in ordered]
+    bills = sorted(({"tax_year": b.get("tax_year"), "total_due": b.get("total_due"),
+                     "invoice_number": b.get("invoice_number"),
+                     "delinquent": b.get("delinquent")} for b in blocks),
+                   key=lambda b: (b["tax_year"] if isinstance(b["tax_year"], int) else 0,
+                                  str(b["invoice_number"] or "")))
+    years = sorted({b["tax_year"] for b in bills if isinstance(b["tax_year"], int)})
+    total = round(sum(b["total_due"] or 0.0 for b in bills), 2)
+    blk = dict(base.raw["berkeley_paystar_tax"])
+    blk.update({
+        "latest_invoice_total_due": blk.get("total_due"),
+        "total_due": total,
+        "bills": bills,
+        "invoice_count": len(bills),
+        "years_unpaid": [str(y) for y in years],
+        "oldest_year": years[0] if years else None,
+        "unpaid_bill_years": len(years),
+        "years_delinquent": len(completed_delinquent_years(years, "SC", "Berkeley")),
+    })
+    raw = dict(base.raw)
+    raw["berkeley_paystar_tax"] = blk
+    owner = base.owner_name
+    span = (f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])) if years else "?"
+    desc = (f"Delinquent {span} property tax of ${total:,.2f} owed by {owner}"
+            + (f" ({len(bills)} unpaid invoices)" if len(bills) > 1 else "")
+            + (f" (parcel {base.parcel_id})" if base.parcel_id else ""))
+    return base.model_copy(update={"raw": raw, "description": desc})
+
+
 class BerkeleyPaystarTax(BaseScraper):
     slug = "counties_sc.berkeley_paystar_tax"
     name = "Berkeley County SC Delinquent Real Property Tax (paystar.io)"
@@ -445,7 +500,11 @@ class BerkeleyPaystarTax(BaseScraper):
     # that would cancel every scraper together). Paired with the self.partial salvage below
     # so that even if the vendor degrades further and 600s still isn't enough, the run
     # ships whatever it collected instead of repeating the 0-row TIMEOUT.
-    timeout_s = 600.0
+    # 2026-10-08 gated VM run: 600 s salvaged 2,379 rows of a 3,036-invoice roll (about
+    # 4 detail requests/s from the datacenter host, half the Mac's pace), so the cutoff
+    # dropped about a fifth of the roll every run. 900 s covers the measured roll with
+    # margin and stays at this directory's ceiling (greenville_hard_distress.py).
+    timeout_s = 900.0
     expected_min_count = 500
     optional = True
 
@@ -483,23 +542,59 @@ class BerkeleyPaystarTax(BaseScraper):
             # this run still ships whatever it managed instead of the old all-or-nothing
             # behavior that turned a merely-slow run into a silent 0-row TIMEOUT (see class
             # docstring above and tests/test_berkeley_paystar_tax_timeout.py).
+            # One row per PARCEL (see _merge_invoices): a later invoice of a parcel already
+            # shipped REPLACES that parcel's row in place, in both `out` and self.partial, so a
+            # soft-timeout salvage ships grouped rows too.
+            by_key: dict[str, list[Listing]] = {}
+            slot: dict[str, int] = {}
+            failed: list[str] = []
+
+            def _take(invoice_hash: str, detail: dict | None) -> None:
+                nonlocal skipped
+                if not detail:
+                    failed.append(invoice_hash)
+                    return
+                li = _detail_to_listing(detail, invoice_hash)
+                if li is None:
+                    skipped += 1
+                    return
+                key = _parcel_key(li)
+                by_key.setdefault(key, []).append(li)
+                merged = _merge_invoices(by_key[key])
+                if key in slot:
+                    out[slot[key]] = merged
+                    self.partial[slot[key]] = merged
+                else:
+                    slot[key] = len(out)
+                    out.append(merged)
+                    self.partial.append(merged)
+
             tasks = [asyncio.ensure_future(_fetch_detail(client, sem, h)) for h in hashes]
             try:
                 for coro in asyncio.as_completed(tasks):
                     invoice_hash, detail = await coro
-                    if not detail:
-                        skipped += 1
-                        continue
-                    li = _detail_to_listing(detail, invoice_hash)
-                    if li is None:
-                        skipped += 1
-                        continue
-                    out.append(li)
-                    self.partial.append(li)
+                    _take(invoice_hash, detail)
             finally:
                 for t in tasks:
                     if not t.done():
                         t.cancel()
 
-        log.info("berkeley_paystar.done", listed=len(rows), skipped=skipped, total=len(out))
+            # One more try for the details that failed (2026-10-08 VM run: 12 empty-message
+            # failures, read timeouts on a slow vendor). Each was an invoice the roll lists.
+            retry, failed = failed, []
+            if retry:
+                tasks = [asyncio.ensure_future(_fetch_detail(client, sem, h)) for h in retry]
+                try:
+                    for coro in asyncio.as_completed(tasks):
+                        invoice_hash, detail = await coro
+                        _take(invoice_hash, detail)
+                finally:
+                    for t in tasks:
+                        if not t.done():
+                            t.cancel()
+            skipped += len(failed)
+
+        log.info("berkeley_paystar.done", listed=len(rows), skipped=skipped,
+                 detail_retried=len(retry), detail_failed=len(failed), parcels=len(out),
+                 invoices=sum(len(v) for v in by_key.values()))
         return out
