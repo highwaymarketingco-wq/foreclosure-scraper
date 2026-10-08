@@ -1,0 +1,2319 @@
+{
+ "schema": "board-version-v1",
+ "generated_at": "2026-10-08T21:55:22+00:00",
+ "label": "gated_d42058b3",
+ "baseline": {
+  "kind": "board",
+  "dir": "docs",
+  "rows": 350013,
+  "run_time": "2026-10-07T17:09:03"
+ },
+ "candidate": {
+  "kind": "checkpoint",
+  "dir": "checkpoint",
+  "rows": 383378,
+  "run_time": "2026-10-08T21:03:49"
+ },
+ "verdict": "HOLD",
+ "blockers": [
+  {
+   "section": "rows",
+   "name": "source:counties_nc.rutherford_tax",
+   "detail": "5,109 -> 4,468 rows (87%); missing rows by reason: {'folded_into_another_row': 1, 'unexplained': 581}"
+  },
+  {
+   "section": "rows",
+   "name": "source:counties_nc.buncombe_delinquent_tax",
+   "detail": "1,182 -> 827 rows (70%); missing rows by reason: {'folded_into_another_row': 1}"
+  },
+  {
+   "section": "rows",
+   "name": "source:counties.multi_year_delinquent_tax",
+   "detail": "1,115 -> 436 rows (39%); missing rows by reason: {}"
+  },
+  {
+   "section": "rows",
+   "name": "source:law_firms.kania",
+   "detail": "177 -> 150 rows (85%); missing rows by reason: {}"
+  },
+  {
+   "section": "rows",
+   "name": "source:counties_sc.sc_catalis_delinquent_roll",
+   "detail": "63 -> 53 rows (84%); missing rows by reason: {}"
+  },
+  {
+   "section": "coverage",
+   "name": "ALL:comps",
+   "detail": "HOT+WARM rows: 40.77% -> 26.63% (18,560 -> 17,710 rows)"
+  },
+  {
+   "section": "coverage",
+   "name": "ALL:multi_year_delinquent_tax",
+   "detail": "HOT+WARM rows: 5.85% -> 3.08% (2,662 -> 2,048 rows)"
+  },
+  {
+   "section": "coverage",
+   "name": "ALL:divorce",
+   "detail": "HOT+WARM rows: 4.6% -> 3.07% (2,094 -> 2,043 rows)"
+  },
+  {
+   "section": "coverage",
+   "name": "ALL:atty_rod_lien_checked",
+   "detail": "HOT+WARM rows: 4.8% -> 2.71% (2,185 -> 1,805 rows)"
+  },
+  {
+   "section": "coverage",
+   "name": "NC:comps",
+   "detail": "HOT+WARM rows: 42.01% -> 21.33% (9,442 -> 8,875 rows)"
+  },
+  {
+   "section": "coverage",
+   "name": "NC:multi_year_delinquent_tax",
+   "detail": "HOT+WARM rows: 5.6% -> 2.18% (1,259 -> 908 rows)"
+  },
+  {
+   "section": "coverage",
+   "name": "NC:storm_damage",
+   "detail": "HOT+WARM rows: 2.23% -> 1.17% (501 -> 485 rows)"
+  },
+  {
+   "section": "coverage",
+   "name": "NC:atty_rod_lien_checked",
+   "detail": "HOT+WARM rows: 8.54% -> 3.58% (1,919 -> 1,491 rows)"
+  },
+  {
+   "section": "coverage",
+   "name": "SC:comps",
+   "detail": "HOT+WARM rows: 39.57% -> 35.48% (9,118 -> 8,835 rows)"
+  },
+  {
+   "section": "coverage",
+   "name": "SC:multi_year_delinquent_tax",
+   "detail": "HOT+WARM rows: 6.09% -> 4.58% (1,403 -> 1,140 rows)"
+  },
+  {
+   "section": "coverage",
+   "name": "SC:divorce",
+   "detail": "HOT+WARM rows: 9.09% -> 8.2% (2,094 -> 2,043 rows)"
+  },
+  {
+   "section": "fields",
+   "name": "lost:tax_levy_year",
+   "detail": "712 of 63,186 rows in both lost their tax_levy_year (1.13%)"
+  },
+  {
+   "section": "fields",
+   "name": "lost:comps",
+   "detail": "1,599 of 69,706 rows in both lost their comps (2.29%)"
+  },
+  {
+   "section": "invariants",
+   "name": "audit:drops-situs-road-nulled",
+   "detail": "0 -> 82 violations (newly not ok)"
+  },
+  {
+   "section": "invariants",
+   "name": "audit:pipeline-row-valued",
+   "detail": "0 -> 5 violations (newly not ok)"
+  },
+  {
+   "section": "invariants",
+   "name": "audit:pipeline-countyless-national",
+   "detail": "0 -> 18 violations (newly not ok)"
+  },
+  {
+   "section": "invariants",
+   "name": "audit:source-county-floor",
+   "detail": "0 -> 5 violations (newly not ok)"
+  },
+  {
+   "section": "publish_safety",
+   "name": "artifact",
+   "detail": "Pages site would be about 969 MB (>= 950 MB: the build fails)"
+  }
+ ],
+ "notes": 35,
+ "rows": {
+  "baseline_total": 350013,
+  "candidate_total": 383378,
+  "matched": 346149,
+  "missing_from_candidate": 3864,
+  "new_in_candidate": 37229,
+  "missing_by_reason": {
+   "unexplained": 1877,
+   "folded_into_another_row": 1696,
+   "aged_out_miss_limit": 279,
+   "aged_out_terminal": 11,
+   "filter_active_only_sale_window": 1
+  }
+ },
+ "tiers": {
+  "baseline": {
+   "HOT": 46,
+   "WARM": 45476,
+   "COLD": 304489,
+   "none": 2
+  },
+  "candidate": {
+   "HOT": 67,
+   "WARM": 66445,
+   "COLD": 316864,
+   "none": 2
+  }
+ },
+ "fields": {
+  "owner_name": {
+   "overlap_rows_with_value": 320224,
+   "lost": 11,
+   "changed": 2395,
+   "gained": 1228
+  },
+  "street_address": {
+   "overlap_rows_with_value": 254133,
+   "lost": 53,
+   "changed": 434,
+   "gained": 456
+  },
+  "parcel_id": {
+   "overlap_rows_with_value": 185809,
+   "lost": 145,
+   "changed": 99,
+   "gained": 15475
+  },
+  "phone": {
+   "overlap_rows_with_value": 80200,
+   "lost": 61,
+   "changed": 31,
+   "gained": 6313
+  },
+  "email": {
+   "overlap_rows_with_value": 46958,
+   "lost": 6,
+   "changed": 0,
+   "gained": 12
+  },
+  "mailing_address": {
+   "overlap_rows_with_value": 139846,
+   "lost": 51,
+   "changed": 198,
+   "gained": 50377
+  },
+  "tax_balance": {
+   "overlap_rows_with_value": 114112,
+   "lost": 715,
+   "changed": 2039,
+   "gained": 2606
+  },
+  "tax_years": {
+   "overlap_rows_with_value": 51162,
+   "lost": 6,
+   "changed": 2417,
+   "gained": 20452
+  },
+  "tax_levy_year": {
+   "overlap_rows_with_value": 63186,
+   "lost": 712,
+   "changed": 1653,
+   "gained": 2388
+  },
+  "assessed_value": {
+   "overlap_rows_with_value": 172051,
+   "lost": 74,
+   "changed": 1568,
+   "gained": 1078
+  },
+  "comps": {
+   "overlap_rows_with_value": 69706,
+   "lost": 1599,
+   "changed": 2260,
+   "gained": 2600
+  }
+ },
+ "coverage": {
+  "address": {
+   "count": [
+    256310,
+    271297
+   ],
+   "share_all": [
+    73.23,
+    70.76
+   ],
+   "share_hotwarm": [
+    84.28,
+    75.82
+   ],
+   "share_both": [
+    73.42,
+    73.53
+   ],
+   "class": "dilution"
+  },
+  "parcel_id": {
+   "count": [
+    186166,
+    228279
+   ],
+   "share_all": [
+    53.19,
+    59.54
+   ],
+   "share_hotwarm": [
+    87.88,
+    90.02
+   ],
+   "share_both": [
+    53.68,
+    58.11
+   ],
+   "class": "improved"
+  },
+  "owner_name": {
+   "count": [
+    323941,
+    356803
+   ],
+   "share_all": [
+    92.55,
+    93.07
+   ],
+   "share_hotwarm": [
+    96.95,
+    97.87
+   ],
+   "share_both": [
+    92.51,
+    92.86
+   ],
+   "class": "improved"
+  },
+  "phone": {
+   "count": [
+    81294,
+    87512
+   ],
+   "share_all": [
+    23.23,
+    22.83
+   ],
+   "share_hotwarm": [
+    15.76,
+    13.22
+   ],
+   "share_both": [
+    23.17,
+    24.98
+   ],
+   "class": "improved"
+  },
+  "email": {
+   "count": [
+    46987,
+    46978
+   ],
+   "share_all": [
+    13.42,
+    12.25
+   ],
+   "share_hotwarm": [
+    1.28,
+    0.93
+   ],
+   "share_both": [
+    13.57,
+    13.57
+   ],
+   "class": "flat"
+  },
+  "sqft": {
+   "count": [
+    97379,
+    100221
+   ],
+   "share_all": [
+    27.82,
+    26.14
+   ],
+   "share_hotwarm": [
+    52.08,
+    38.88
+   ],
+   "share_both": [
+    27.86,
+    28.04
+   ],
+   "class": "dilution"
+  },
+  "beds_baths": {
+   "count": [
+    14327,
+    15503
+   ],
+   "share_all": [
+    4.09,
+    4.04
+   ],
+   "share_hotwarm": [
+    7.61,
+    6.26
+   ],
+   "share_both": [
+    4.05,
+    4.13
+   ],
+   "class": "improved"
+  },
+  "lot_size": {
+   "count": [
+    163884,
+    190018
+   ],
+   "share_all": [
+    46.82,
+    49.56
+   ],
+   "share_hotwarm": [
+    74.98,
+    81.38
+   ],
+   "share_both": [
+    46.45,
+    48.22
+   ],
+   "class": "improved"
+  },
+  "assessed_value": {
+   "count": [
+    175266,
+    185703
+   ],
+   "share_all": [
+    50.07,
+    48.44
+   ],
+   "share_hotwarm": [
+    87.26,
+    75.89
+   ],
+   "share_both": [
+    49.7,
+    49.99
+   ],
+   "class": "dilution"
+  },
+  "comps": {
+   "count": [
+    70529,
+    71098
+   ],
+   "share_all": [
+    20.15,
+    18.55
+   ],
+   "share_hotwarm": [
+    40.77,
+    26.63
+   ],
+   "share_both": [
+    20.14,
+    20.43
+   ],
+   "class": "regression"
+  },
+  "comps_tight": {
+   "count": [
+    3804,
+    3952
+   ],
+   "share_all": [
+    1.09,
+    1.03
+   ],
+   "share_hotwarm": [
+    2.94,
+    2.01
+   ],
+   "share_both": [
+    1.06,
+    1.11
+   ],
+   "class": "improved"
+  },
+  "lt_foreclosure_sale": {
+   "count": [
+    825,
+    797
+   ],
+   "share_all": [
+    0.24,
+    0.21
+   ],
+   "share_hotwarm": [
+    0.68,
+    0.45
+   ],
+   "share_both": [
+    0.23,
+    0.22
+   ],
+   "class": "rows_left"
+  },
+  "lt_lis_pendens": {
+   "count": [
+    14827,
+    15001
+   ],
+   "share_all": [
+    4.24,
+    3.91
+   ],
+   "share_hotwarm": [
+    5.24,
+    3.65
+   ],
+   "share_both": [
+    4.25,
+    4.17
+   ],
+   "class": "improved"
+  },
+  "lt_tax_lien": {
+   "count": [
+    116203,
+    137786
+   ],
+   "share_all": [
+    33.2,
+    35.94
+   ],
+   "share_hotwarm": [
+    43.5,
+    50.88
+   ],
+   "share_both": [
+    33.11,
+    33.07
+   ],
+   "class": "improved"
+  },
+  "lt_tax_sale": {
+   "count": [
+    47117,
+    48123
+   ],
+   "share_all": [
+    13.46,
+    12.55
+   ],
+   "share_hotwarm": [
+    32.85,
+    25.19
+   ],
+   "share_both": [
+    13.61,
+    13.6
+   ],
+   "class": "dilution"
+  },
+  "lt_auction": {
+   "count": [
+    389,
+    415
+   ],
+   "share_all": [
+    0.11,
+    0.11
+   ],
+   "share_hotwarm": [
+    0.2,
+    0.14
+   ],
+   "share_both": [
+    0.11,
+    0.11
+   ],
+   "class": "improved"
+  },
+  "lt_reo": {
+   "count": [
+    1078,
+    1405
+   ],
+   "share_all": [
+    0.31,
+    0.37
+   ],
+   "share_hotwarm": [
+    0.56,
+    0.42
+   ],
+   "share_both": [
+    0.31,
+    0.32
+   ],
+   "class": "improved"
+  },
+  "lt_distressed": {
+   "count": [
+    108243,
+    112892
+   ],
+   "share_all": [
+    30.93,
+    29.45
+   ],
+   "share_hotwarm": [
+    8.46,
+    7.42
+   ],
+   "share_both": [
+    31.24,
+    31.28
+   ],
+   "class": "dilution"
+  },
+  "lt_divorce_notice": {
+   "count": [
+    7228,
+    7255
+   ],
+   "share_all": [
+    2.07,
+    1.89
+   ],
+   "share_hotwarm": [
+    0.01,
+    0.01
+   ],
+   "share_both": [
+    2.07,
+    2.07
+   ],
+   "class": "flat"
+  },
+  "lt_probate_notice": {
+   "count": [
+    4431,
+    9102
+   ],
+   "share_all": [
+    1.27,
+    2.37
+   ],
+   "share_hotwarm": [
+    0.31,
+    0.22
+   ],
+   "share_both": [
+    1.26,
+    1.26
+   ],
+   "class": "improved"
+  },
+  "lt_estate_lead": {
+   "count": [
+    4902,
+    6734
+   ],
+   "share_all": [
+    1.4,
+    1.76
+   ],
+   "share_hotwarm": [
+    2.05,
+    6.7
+   ],
+   "share_both": [
+    1.41,
+    1.42
+   ],
+   "class": "improved"
+  },
+  "lt_elderly_disabled": {
+   "count": [
+    4322,
+    4261
+   ],
+   "share_all": [
+    1.23,
+    1.11
+   ],
+   "share_hotwarm": [
+    0.34,
+    0.2
+   ],
+   "share_both": [
+    1.25,
+    1.23
+   ],
+   "class": "rows_left"
+  },
+  "lt_tax_sale_overage": {
+   "count": [
+    234,
+    227
+   ],
+   "share_all": [
+    0.07,
+    0.06
+   ],
+   "share_hotwarm": [
+    0.15,
+    0.09
+   ],
+   "share_both": [
+    0.07,
+    0.07
+   ],
+   "class": "flat"
+  },
+  "lt_bankruptcy": {
+   "count": [
+    1051,
+    1134
+   ],
+   "share_all": [
+    0.3,
+    0.3
+   ],
+   "share_hotwarm": [
+    0.09,
+    0.11
+   ],
+   "share_both": [
+    0.3,
+    0.3
+   ],
+   "class": "improved"
+  },
+  "multi_year_delinquent_tax": {
+   "count": [
+    4363,
+    4361
+   ],
+   "share_all": [
+    1.25,
+    1.14
+   ],
+   "share_hotwarm": [
+    5.85,
+    3.08
+   ],
+   "share_both": [
+    1.26,
+    1.26
+   ],
+   "class": "regression"
+  },
+  "heir_estate": {
+   "count": [
+    4649,
+    6797
+   ],
+   "share_all": [
+    1.33,
+    1.77
+   ],
+   "share_hotwarm": [
+    1.82,
+    6.86
+   ],
+   "share_both": [
+    1.34,
+    1.43
+   ],
+   "class": "improved"
+  },
+  "heir_naming_publication": {
+   "count": [
+    1,
+    1
+   ],
+   "share_all": [
+    0.0,
+    0.0
+   ],
+   "share_hotwarm": [
+    0.0,
+    0.0
+   ],
+   "share_both": [
+    0.0,
+    0.0
+   ],
+   "class": "flat"
+  },
+  "owner_cluster": {
+   "count": [
+    65705,
+    76268
+   ],
+   "share_all": [
+    18.77,
+    19.89
+   ],
+   "share_hotwarm": [
+    26.01,
+    26.4
+   ],
+   "share_both": [
+    18.49,
+    19.51
+   ],
+   "class": "improved"
+  },
+  "divorce_no_subsequent_deed": {
+   "count": [
+    1,
+    1
+   ],
+   "share_all": [
+    0.0,
+    0.0
+   ],
+   "share_hotwarm": [
+    0.0,
+    0.0
+   ],
+   "share_both": [
+    0.0,
+    0.0
+   ],
+   "class": "flat"
+  },
+  "marriage_license": {
+   "count": [
+    27,
+    27
+   ],
+   "share_all": [
+    0.01,
+    0.01
+   ],
+   "share_hotwarm": [
+    0.03,
+    0.02
+   ],
+   "share_both": [
+    0.01,
+    0.01
+   ],
+   "class": "flat"
+  },
+  "bankruptcy_stay": {
+   "count": [
+    78,
+    78
+   ],
+   "share_all": [
+    0.02,
+    0.02
+   ],
+   "share_hotwarm": [
+    0.07,
+    0.05
+   ],
+   "share_both": [
+    0.02,
+    0.02
+   ],
+   "class": "flat"
+  },
+  "bankruptcy_tax_combo": {
+   "count": [
+    414,
+    444
+   ],
+   "share_all": [
+    0.12,
+    0.12
+   ],
+   "share_hotwarm": [
+    0.42,
+    0.31
+   ],
+   "share_both": [
+    0.12,
+    0.12
+   ],
+   "class": "improved"
+  },
+  "condemned": {
+   "count": [
+    1681,
+    1944
+   ],
+   "share_all": [
+    0.48,
+    0.51
+   ],
+   "share_hotwarm": [
+    1.55,
+    1.43
+   ],
+   "share_both": [
+    0.49,
+    0.49
+   ],
+   "class": "improved"
+  },
+  "vacant_lot": {
+   "count": [
+    7210,
+    7623
+   ],
+   "share_all": [
+    2.06,
+    1.99
+   ],
+   "share_hotwarm": [
+    7.8,
+    5.92
+   ],
+   "share_both": [
+    2.07,
+    2.07
+   ],
+   "class": "improved"
+  },
+  "vacant": {
+   "count": [
+    4660,
+    4661
+   ],
+   "share_all": [
+    1.33,
+    1.22
+   ],
+   "share_hotwarm": [
+    0.32,
+    0.22
+   ],
+   "share_both": [
+    1.35,
+    1.35
+   ],
+   "class": "flat"
+  },
+  "storm_damage": {
+   "count": [
+    1250,
+    1247
+   ],
+   "share_all": [
+    0.36,
+    0.33
+   ],
+   "share_hotwarm": [
+    1.27,
+    0.85
+   ],
+   "share_both": [
+    0.36,
+    0.36
+   ],
+   "class": "flat"
+  },
+  "liens": {
+   "count": [
+    22,
+    23
+   ],
+   "share_all": [
+    0.01,
+    0.01
+   ],
+   "share_hotwarm": [
+    0.02,
+    0.02
+   ],
+   "share_both": [
+    0.01,
+    0.01
+   ],
+   "class": "flat"
+  },
+  "sc_state_tax_lien": {
+   "count": [
+    9168,
+    9188
+   ],
+   "share_all": [
+    2.62,
+    2.4
+   ],
+   "share_hotwarm": [
+    2.17,
+    1.49
+   ],
+   "share_both": [
+    2.65,
+    2.65
+   ],
+   "class": "flat"
+  },
+  "rollback_exposure": {
+   "count": [
+    101,
+    105
+   ],
+   "share_all": [
+    0.03,
+    0.03
+   ],
+   "share_hotwarm": [
+    0.06,
+    0.04
+   ],
+   "share_both": [
+    0.03,
+    0.03
+   ],
+   "class": "flat"
+  },
+  "jail_booking": {
+   "count": [
+    396,
+    409
+   ],
+   "share_all": [
+    0.11,
+    0.11
+   ],
+   "share_hotwarm": [
+    0.05,
+    0.03
+   ],
+   "share_both": [
+    0.11,
+    0.11
+   ],
+   "class": "improved"
+  },
+  "jail_booking_new": {
+   "count": [
+    3,
+    7
+   ],
+   "share_all": [
+    0.0,
+    0.0
+   ],
+   "share_hotwarm": [
+    0.0,
+    0.0
+   ],
+   "share_both": [
+    0.0,
+    0.0
+   ],
+   "class": "flat"
+  },
+  "incarceration": {
+   "count": [
+    459,
+    476
+   ],
+   "share_all": [
+    0.13,
+    0.12
+   ],
+   "share_hotwarm": [
+    0.09,
+    0.05
+   ],
+   "share_both": [
+    0.13,
+    0.13
+   ],
+   "class": "improved"
+  },
+  "bop_federal": {
+   "count": [
+    34,
+    47
+   ],
+   "share_all": [
+    0.01,
+    0.01
+   ],
+   "share_hotwarm": [
+    0.04,
+    0.04
+   ],
+   "share_both": [
+    0.01,
+    0.01
+   ],
+   "class": "improved"
+  },
+  "builder_distress": {
+   "count": [
+    20297,
+    20297
+   ],
+   "share_all": [
+    5.8,
+    5.29
+   ],
+   "share_hotwarm": [
+    0.65,
+    0.46
+   ],
+   "share_both": [
+    5.86,
+    5.86
+   ],
+   "class": "flat"
+  },
+  "liensnc_related": {
+   "count": [
+    16000,
+    16000
+   ],
+   "share_all": [
+    4.57,
+    4.17
+   ],
+   "share_hotwarm": [
+    0.38,
+    0.27
+   ],
+   "share_both": [
+    4.62,
+    4.62
+   ],
+   "class": "flat"
+  },
+  "liensnc_posthumous_filing": {
+   "count": [
+    112,
+    113
+   ],
+   "share_all": [
+    0.03,
+    0.03
+   ],
+   "share_hotwarm": [
+    0.04,
+    0.03
+   ],
+   "share_both": [
+    0.03,
+    0.03
+   ],
+   "class": "flat"
+  },
+  "title_risk": {
+   "count": [
+    8219,
+    8379
+   ],
+   "share_all": [
+    2.35,
+    2.19
+   ],
+   "share_hotwarm": [
+    3.22,
+    2.24
+   ],
+   "share_both": [
+    2.35,
+    2.35
+   ],
+   "class": "improved"
+  },
+  "owner_mismatch": {
+   "count": [
+    568,
+    722
+   ],
+   "share_all": [
+    0.16,
+    0.19
+   ],
+   "share_hotwarm": [
+    0.19,
+    0.14
+   ],
+   "share_both": [
+    0.16,
+    0.16
+   ],
+   "class": "improved"
+  },
+  "notice_service_defect": {
+   "count": [
+    6,
+    6
+   ],
+   "share_all": [
+    0.0,
+    0.0
+   ],
+   "share_hotwarm": [
+    0.0,
+    0.0
+   ],
+   "share_both": [
+    0.0,
+    0.0
+   ],
+   "class": "flat"
+  },
+  "name_estate_of": {
+   "count": [
+    418,
+    492
+   ],
+   "share_all": [
+    0.12,
+    0.13
+   ],
+   "share_hotwarm": [
+    0.21,
+    0.23
+   ],
+   "share_both": [
+    0.12,
+    0.13
+   ],
+   "class": "improved"
+  },
+  "name_deceased": {
+   "count": [
+    629,
+    627
+   ],
+   "share_all": [
+    0.18,
+    0.16
+   ],
+   "share_hotwarm": [
+    0.94,
+    0.69
+   ],
+   "share_both": [
+    0.18,
+    0.18
+   ],
+   "class": "flat"
+  },
+  "name_life_estate": {
+   "count": [
+    1339,
+    1489
+   ],
+   "share_all": [
+    0.38,
+    0.39
+   ],
+   "share_hotwarm": [
+    1.08,
+    1.01
+   ],
+   "share_both": [
+    0.37,
+    0.38
+   ],
+   "class": "improved"
+  },
+  "name_heirs": {
+   "count": [
+    8135,
+    11487
+   ],
+   "share_all": [
+    2.32,
+    3.0
+   ],
+   "share_hotwarm": [
+    3.48,
+    8.74
+   ],
+   "share_both": [
+    2.32,
+    2.49
+   ],
+   "class": "improved"
+  },
+  "name_et_al": {
+   "count": [
+    4268,
+    4871
+   ],
+   "share_all": [
+    1.22,
+    1.27
+   ],
+   "share_hotwarm": [
+    2.72,
+    2.5
+   ],
+   "share_both": [
+    1.23,
+    1.24
+   ],
+   "class": "improved"
+  },
+  "name_trust": {
+   "count": [
+    5045,
+    5367
+   ],
+   "share_all": [
+    1.44,
+    1.4
+   ],
+   "share_hotwarm": [
+    1.9,
+    1.9
+   ],
+   "share_both": [
+    1.44,
+    1.44
+   ],
+   "class": "improved"
+  },
+  "name_care_of": {
+   "count": [
+    768,
+    829
+   ],
+   "share_all": [
+    0.22,
+    0.22
+   ],
+   "share_hotwarm": [
+    0.32,
+    0.59
+   ],
+   "share_both": [
+    0.22,
+    0.23
+   ],
+   "class": "improved"
+  },
+  "two_year_delinquent": {
+   "count": [
+    1288,
+    1292
+   ],
+   "share_all": [
+    0.37,
+    0.34
+   ],
+   "share_hotwarm": [
+    0.58,
+    1.16
+   ],
+   "share_both": [
+    0.37,
+    0.37
+   ],
+   "class": "flat"
+  },
+  "tax_aging_surfaced": {
+   "count": [
+    99585,
+    118373
+   ],
+   "share_all": [
+    28.45,
+    30.88
+   ],
+   "share_hotwarm": [
+    68.58,
+    66.46
+   ],
+   "share_both": [
+    28.18,
+    28.21
+   ],
+   "class": "improved"
+  },
+  "divorce": {
+   "count": [
+    5105,
+    5116
+   ],
+   "share_all": [
+    1.46,
+    1.33
+   ],
+   "share_hotwarm": [
+    4.6,
+    3.07
+   ],
+   "share_both": [
+    1.47,
+    1.48
+   ],
+   "class": "regression"
+  },
+  "probate": {
+   "count": [
+    1216,
+    5329
+   ],
+   "share_all": [
+    0.35,
+    1.39
+   ],
+   "share_hotwarm": [
+    0.14,
+    0.1
+   ],
+   "share_both": [
+    0.35,
+    0.35
+   ],
+   "class": "improved"
+  },
+  "vacancy": {
+   "count": [
+    39,
+    265
+   ],
+   "share_all": [
+    0.01,
+    0.07
+   ],
+   "share_hotwarm": [
+    0.07,
+    0.37
+   ],
+   "share_both": [
+    0.01,
+    0.01
+   ],
+   "class": "improved"
+  },
+  "code_enforcement": {
+   "count": [
+    7807,
+    8099
+   ],
+   "share_all": [
+    2.23,
+    2.11
+   ],
+   "share_hotwarm": [
+    4.32,
+    4.58
+   ],
+   "share_both": [
+    2.25,
+    2.25
+   ],
+   "class": "improved"
+  },
+  "deed_chain_has_history": {
+   "count": [
+    79852,
+    117416
+   ],
+   "share_all": [
+    22.81,
+    30.63
+   ],
+   "share_hotwarm": [
+    39.03,
+    51.35
+   ],
+   "share_both": [
+    22.36,
+    27.7
+   ],
+   "class": "improved"
+  },
+  "deed_chain_break": {
+   "count": [
+    2104,
+    2593
+   ],
+   "share_all": [
+    0.6,
+    0.68
+   ],
+   "share_hotwarm": [
+    2.32,
+    2.05
+   ],
+   "share_both": [
+    0.61,
+    0.67
+   ],
+   "class": "improved"
+  },
+  "deed_chain_distress_transfer": {
+   "count": [
+    2105,
+    2594
+   ],
+   "share_all": [
+    0.6,
+    0.68
+   ],
+   "share_hotwarm": [
+    2.32,
+    2.05
+   ],
+   "share_both": [
+    0.61,
+    0.67
+   ],
+   "class": "improved"
+  },
+  "quiet_title": {
+   "count": [
+    1,
+    1
+   ],
+   "share_all": [
+    0.0,
+    0.0
+   ],
+   "share_hotwarm": [
+    0.0,
+    0.0
+   ],
+   "share_both": [
+    0.0,
+    0.0
+   ],
+   "class": "flat"
+  },
+  "atty_legal_description": {
+   "count": [
+    86106,
+    98208
+   ],
+   "share_all": [
+    24.6,
+    25.62
+   ],
+   "share_hotwarm": [
+    37.2,
+    34.73
+   ],
+   "share_both": [
+    24.43,
+    26.47
+   ],
+   "class": "improved"
+  },
+  "atty_deed_ref": {
+   "count": [
+    34960,
+    35194
+   ],
+   "share_all": [
+    9.99,
+    9.18
+   ],
+   "share_hotwarm": [
+    17.64,
+    12.3
+   ],
+   "share_both": [
+    9.45,
+    9.95
+   ],
+   "class": "flat"
+  },
+  "atty_taxpayer_of_record": {
+   "count": [
+    157273,
+    205281
+   ],
+   "share_all": [
+    44.93,
+    53.55
+   ],
+   "share_hotwarm": [
+    88.67,
+    90.92
+   ],
+   "share_both": [
+    44.41,
+    51.06
+   ],
+   "class": "improved"
+  },
+  "atty_heir_candidates": {
+   "count": [
+    6883,
+    10187
+   ],
+   "share_all": [
+    1.97,
+    2.66
+   ],
+   "share_hotwarm": [
+    1.67,
+    7.74
+   ],
+   "share_both": [
+    1.98,
+    2.29
+   ],
+   "class": "improved"
+  },
+  "atty_obituary_match": {
+   "count": [
+    334,
+    831
+   ],
+   "share_all": [
+    0.1,
+    0.22
+   ],
+   "share_hotwarm": [
+    0.01,
+    0.01
+   ],
+   "share_both": [
+    0.09,
+    0.09
+   ],
+   "class": "improved"
+  },
+  "atty_rod_lien_checked": {
+   "count": [
+    7299,
+    7286
+   ],
+   "share_all": [
+    2.09,
+    1.9
+   ],
+   "share_hotwarm": [
+    4.8,
+    2.71
+   ],
+   "share_both": [
+    2.03,
+    2.1
+   ],
+   "class": "regression"
+  },
+  "atty_deed_chain_fetched": {
+   "count": [
+    79852,
+    117416
+   ],
+   "share_all": [
+    22.81,
+    30.63
+   ],
+   "share_hotwarm": [
+    39.03,
+    51.35
+   ],
+   "share_both": [
+    22.36,
+    27.7
+   ],
+   "class": "improved"
+  },
+  "atty_probate_case": {
+   "count": [
+    2593,
+    6721
+   ],
+   "share_all": [
+    0.74,
+    1.75
+   ],
+   "share_hotwarm": [
+    0.34,
+    0.25
+   ],
+   "share_both": [
+    0.74,
+    0.75
+   ],
+   "class": "improved"
+  },
+  "atty_tax_verified_confirmed": {
+   "count": [
+    210,
+    1113
+   ],
+   "share_all": [
+    0.06,
+    0.29
+   ],
+   "share_hotwarm": [
+    0.31,
+    1.09
+   ],
+   "share_both": [
+    0.06,
+    0.32
+   ],
+   "class": "improved"
+  },
+  "x_mailing_address": {
+   "count": [
+    140751,
+    215029
+   ],
+   "share_all": [
+    40.21,
+    56.09
+   ],
+   "share_hotwarm": [
+    88.22,
+    95.58
+   ],
+   "share_both": [
+    40.41,
+    54.95
+   ],
+   "class": "improved"
+  },
+  "x_tax_balance": {
+   "count": [
+    116213,
+    136599
+   ],
+   "share_all": [
+    33.2,
+    35.63
+   ],
+   "share_hotwarm": [
+    78.21,
+    74.06
+   ],
+   "share_both": [
+    32.97,
+    33.51
+   ],
+   "class": "improved"
+  },
+  "x_tax_years_late": {
+   "count": [
+    51374,
+    91592
+   ],
+   "share_all": [
+    14.68,
+    23.89
+   ],
+   "share_hotwarm": [
+    33.44,
+    47.17
+   ],
+   "share_both": [
+    14.78,
+    20.68
+   ],
+   "class": "improved"
+  },
+  "sig:auction": {
+   "count": [
+    373,
+    403
+   ],
+   "share_all": [
+    0.11,
+    0.11
+   ],
+   "share_hotwarm": [
+    0.2,
+    0.14
+   ],
+   "share_both": [
+    0.11,
+    0.11
+   ],
+   "class": "improved"
+  },
+  "sig:bankruptcy": {
+   "count": [
+    958,
+    1059
+   ],
+   "share_all": [
+    0.27,
+    0.28
+   ],
+   "share_hotwarm": [
+    0.16,
+    0.18
+   ],
+   "share_both": [
+    0.28,
+    0.28
+   ],
+   "class": "improved"
+  },
+  "sig:code_enforcement": {
+   "count": [
+    6908,
+    7424
+   ],
+   "share_all": [
+    1.97,
+    1.94
+   ],
+   "share_hotwarm": [
+    5.45,
+    5.73
+   ],
+   "share_both": [
+    1.99,
+    2.0
+   ],
+   "class": "improved"
+  },
+  "sig:deferral_rollback": {
+   "count": [
+    1,
+    1
+   ],
+   "share_all": [
+    0.0,
+    0.0
+   ],
+   "share_hotwarm": [
+    0.0,
+    0.0
+   ],
+   "share_both": [
+    0.0,
+    0.0
+   ],
+   "class": "flat"
+  },
+  "sig:distressed": {
+   "count": [
+    36839,
+    39985
+   ],
+   "share_all": [
+    10.53,
+    10.43
+   ],
+   "share_hotwarm": [
+    5.69,
+    5.51
+   ],
+   "share_both": [
+    10.63,
+    10.69
+   ],
+   "class": "improved"
+  },
+  "sig:distressed_condition": {
+   "count": [
+    14237,
+    15090
+   ],
+   "share_all": [
+    4.07,
+    3.94
+   ],
+   "share_hotwarm": [
+    6.5,
+    6.03
+   ],
+   "share_both": [
+    4.11,
+    4.04
+   ],
+   "class": "improved"
+  },
+  "sig:divorce": {
+   "count": [
+    6127,
+    6144
+   ],
+   "share_all": [
+    1.75,
+    1.6
+   ],
+   "share_hotwarm": [
+    0.39,
+    0.26
+   ],
+   "share_both": [
+    1.75,
+    1.76
+   ],
+   "class": "flat"
+  },
+  "sig:divorce_notice": {
+   "count": [
+    7228,
+    7255
+   ],
+   "share_all": [
+    2.07,
+    1.89
+   ],
+   "share_hotwarm": [
+    0.01,
+    0.01
+   ],
+   "share_both": [
+    2.07,
+    2.07
+   ],
+   "class": "flat"
+  },
+  "sig:elderly_disabled": {
+   "count": [
+    4325,
+    4264
+   ],
+   "share_all": [
+    1.24,
+    1.11
+   ],
+   "share_hotwarm": [
+    0.35,
+    0.2
+   ],
+   "share_both": [
+    1.25,
+    1.23
+   ],
+   "class": "rows_left"
+  },
+  "sig:estate_lead": {
+   "count": [
+    4917,
+    6757
+   ],
+   "share_all": [
+    1.4,
+    1.76
+   ],
+   "share_hotwarm": [
+    2.08,
+    6.74
+   ],
+   "share_both": [
+    1.42,
+    1.42
+   ],
+   "class": "improved"
+  },
+  "sig:foreclosure_sale": {
+   "count": [
+    672,
+    678
+   ],
+   "share_all": [
+    0.19,
+    0.18
+   ],
+   "share_hotwarm": [
+    0.67,
+    0.45
+   ],
+   "share_both": [
+    0.19,
+    0.19
+   ],
+   "class": "flat"
+  },
+  "sig:helene_restricted": {
+   "count": [
+    490,
+    488
+   ],
+   "share_all": [
+    0.14,
+    0.13
+   ],
+   "share_hotwarm": [
+    0.06,
+    0.04
+   ],
+   "share_both": [
+    0.14,
+    0.14
+   ],
+   "class": "flat"
+  },
+  "sig:helene_unsafe": {
+   "count": [
+    246,
+    245
+   ],
+   "share_all": [
+    0.07,
+    0.06
+   ],
+   "share_hotwarm": [
+    0.04,
+    0.02
+   ],
+   "share_both": [
+    0.07,
+    0.07
+   ],
+   "class": "flat"
+  },
+  "sig:incarceration": {
+   "count": [
+    391,
+    400
+   ],
+   "share_all": [
+    0.11,
+    0.1
+   ],
+   "share_hotwarm": [
+    0.08,
+    0.05
+   ],
+   "share_both": [
+    0.11,
+    0.11
+   ],
+   "class": "flat"
+  },
+  "sig:life_estate": {
+   "count": [
+    1430,
+    1602
+   ],
+   "share_all": [
+    0.41,
+    0.42
+   ],
+   "share_hotwarm": [
+    1.24,
+    1.14
+   ],
+   "share_both": [
+    0.4,
+    0.41
+   ],
+   "class": "improved"
+  },
+  "sig:lis_pendens": {
+   "count": [
+    14509,
+    14561
+   ],
+   "share_all": [
+    4.15,
+    3.8
+   ],
+   "share_hotwarm": [
+    5.25,
+    3.65
+   ],
+   "share_both": [
+    4.16,
+    4.08
+   ],
+   "class": "flat"
+  },
+  "sig:price_cut": {
+   "count": [
+    21,
+    20
+   ],
+   "share_all": [
+    0.01,
+    0.01
+   ],
+   "share_hotwarm": [
+    0.04,
+    0.03
+   ],
+   "share_both": [
+    0.01,
+    0.01
+   ],
+   "class": "flat"
+  },
+  "sig:probate": {
+   "count": [
+    1217,
+    5330
+   ],
+   "share_all": [
+    0.35,
+    1.39
+   ],
+   "share_hotwarm": [
+    0.14,
+    0.1
+   ],
+   "share_both": [
+    0.35,
+    0.35
+   ],
+   "class": "improved"
+  },
+  "sig:probate_deed": {
+   "count": [
+    9804,
+    16601
+   ],
+   "share_all": [
+    2.8,
+    4.33
+   ],
+   "share_hotwarm": [
+    4.0,
+    8.41
+   ],
+   "share_both": [
+    2.81,
+    2.87
+   ],
+   "class": "improved"
+  },
+  "sig:probate_notice": {
+   "count": [
+    4434,
+    9103
+   ],
+   "share_all": [
+    1.27,
+    2.37
+   ],
+   "share_hotwarm": [
+    0.31,
+    0.22
+   ],
+   "share_both": [
+    1.26,
+    1.26
+   ],
+   "class": "improved"
+  },
+  "sig:recorded_debt": {
+   "count": [
+    113121,
+    131853
+   ],
+   "share_all": [
+    32.32,
+    34.39
+   ],
+   "share_hotwarm": [
+    78.49,
+    74.21
+   ],
+   "share_both": [
+    32.09,
+    32.31
+   ],
+   "class": "improved"
+  },
+  "sig:reo": {
+   "count": [
+    1081,
+    1406
+   ],
+   "share_all": [
+    0.31,
+    0.37
+   ],
+   "share_hotwarm": [
+    0.56,
+    0.42
+   ],
+   "share_both": [
+    0.31,
+    0.32
+   ],
+   "class": "improved"
+  },
+  "sig:storm_damage": {
+   "count": [
+    755,
+    753
+   ],
+   "share_all": [
+    0.22,
+    0.2
+   ],
+   "share_hotwarm": [
+    1.12,
+    0.76
+   ],
+   "share_both": [
+    0.22,
+    0.22
+   ],
+   "class": "flat"
+  },
+  "sig:str_permit_lapsed": {
+   "count": [
+    634,
+    634
+   ],
+   "share_all": [
+    0.18,
+    0.17
+   ],
+   "share_hotwarm": [
+    0.5,
+    0.34
+   ],
+   "share_both": [
+    0.18,
+    0.18
+   ],
+   "class": "flat"
+  },
+  "sig:tax_lien": {
+   "count": [
+    67500,
+    87725
+   ],
+   "share_all": [
+    19.28,
+    22.88
+   ],
+   "share_hotwarm": [
+    43.17,
+    50.61
+   ],
+   "share_both": [
+    19.07,
+    18.81
+   ],
+   "class": "improved"
+  },
+  "sig:tax_lien_chronic": {
+   "count": [
+    321,
+    239
+   ],
+   "share_all": [
+    0.09,
+    0.06
+   ],
+   "share_hotwarm": [
+    0.69,
+    0.21
+   ],
+   "share_both": [
+    0.09,
+    0.07
+   ],
+   "class": "rows_left"
+  },
+  "sig:tax_sale": {
+   "count": [
+    46095,
+    47060
+   ],
+   "share_all": [
+    13.17,
+    12.28
+   ],
+   "share_hotwarm": [
+    31.58,
+    24.34
+   ],
+   "share_both": [
+    13.32,
+    13.3
+   ],
+   "class": "dilution"
+  },
+  "sig:tax_sale_overage": {
+   "count": [
+    234,
+    227
+   ],
+   "share_all": [
+    0.07,
+    0.06
+   ],
+   "share_hotwarm": [
+    0.15,
+    0.09
+   ],
+   "share_both": [
+    0.07,
+    0.07
+   ],
+   "class": "flat"
+  },
+  "sig:upset_bid": {
+   "count": [
+    1240,
+    1257
+   ],
+   "share_all": [
+    0.35,
+    0.33
+   ],
+   "share_hotwarm": [
+    2.66,
+    1.84
+   ],
+   "share_both": [
+    0.36,
+    0.32
+   ],
+   "class": "improved"
+  },
+  "sig:vacant_lot": {
+   "count": [
+    7211,
+    7623
+   ],
+   "share_all": [
+    2.06,
+    1.99
+   ],
+   "share_hotwarm": [
+    7.81,
+    5.92
+   ],
+   "share_both": [
+    2.07,
+    2.07
+   ],
+   "class": "improved"
+  },
+  "sig:vacant_structure": {
+   "count": [
+    30,
+    256
+   ],
+   "share_all": [
+    0.01,
+    0.07
+   ],
+   "share_hotwarm": [
+    0.05,
+    0.35
+   ],
+   "share_both": [
+    0.01,
+    0.01
+   ],
+   "class": "improved"
+  }
+ },
+ "process_flags": {
+  "baseline": [
+   "2 rows carry no HOT/WARM/COLD tier (a path bypassed the scorer)",
+   "board_selfcheck breaches: no duplicate identifiable properties",
+   "audit checks not ok: drops-short-parcel-county-native, pipeline-grade-equity-current, pipeline-combo-matches-tax, source-county-refreshed"
+  ],
+  "candidate": [
+   "2 rows carry no HOT/WARM/COLD tier (a path bypassed the scorer)",
+   "34 phase(s) hit their time cap: address_backfill.time_capped, assessor_photo, aumentum_rod, bk_property, building_permits, burke_parcel_history, cchs_rod, code_enforcement, comps.time_capped, court_bid",
+   "board_selfcheck breaches: no duplicate identifiable properties",
+   "audit checks not ok: drops-short-parcel-county-native, drops-situs-road-nulled, pipeline-row-valued, pipeline-grade-equity-current, pipeline-combo-matches-tax, pipeline-countyless-national, source-county-refreshed, source-county-floor"
+  ]
+ },
+ "best_of_both_total": 3405
+}
