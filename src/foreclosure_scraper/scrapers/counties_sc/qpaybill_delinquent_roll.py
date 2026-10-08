@@ -452,6 +452,70 @@ def _county_sem() -> "asyncio.Semaphore":
 #: one finishes rather than only after every county has finished).
 COUNTY_TIMEOUT_S = float(os.getenv("QPAYBILL_ROLL_COUNTY_TIMEOUT", "480"))
 
+#: Wall clock the staged detail pass may use (it runs after every county's sweep).
+DETAIL_BUDGET_S = float(os.getenv("QPAYBILL_ROLL_DETAIL_BUDGET_S", "900"))
+
+
+def full_sweep_timeout_s(n_counties: int, per_county_s: float = None,
+                         concurrent: int = None, detail_s: float = None) -> float:
+    """Seconds the whole scraper needs so EVERY county gets its turn: one per-county bound per
+    wave of MAX_CONCURRENT_COUNTIES counties, plus the detail pass, plus a two-minute margin."""
+    per = COUNTY_TIMEOUT_S if per_county_s is None else per_county_s
+    conc = max(1, MAX_CONCURRENT_COUNTIES if concurrent is None else concurrent)
+    det = DETAIL_BUDGET_S if detail_s is None else detail_s
+    waves = -(-max(0, n_counties) // conc)
+    return float(per * waves + det + 120.0)
+
+
+#: The scraper's own soft timeout (base_scraper.safe_run), sized to a FULL sweep.
+#:
+#: Audit 2026-10-09 (source_completeness), measured on the gated VM run of 2026-10-08: the old
+#: fixed 900 s let the first 11 of 29 counties finish (they start in name order, 4 at a time:
+#: Abbeville through Dillon, 7,028 parcels), then cancelled fetch(). The other 18 counties' sweeps
+#: were never awaited again, kept requesting from their hosts until 55 minutes after the start,
+#: and every row they read was thrown away. The same cut happened every run (8,027 / 7,118 /
+#: 7,028 parcels), so on the 10/7 board 25,314 of this source's 33,180 rows had not been re-read
+#: since 2026-09-10..15 (two consecutive misses; board_persist drops a row after four) and the
+#: staged detail pass, which runs after the sweep, never ran at all.
+#: QPAYBILL_ROLL_TIMEOUT_S overrides (900 restores the old cut; staleness-first county order
+#: then still rotates which counties are refreshed). Cost: the sweep itself (~55 min on 10/8)
+#: plus at most DETAIL_BUDGET_S, inside SCRAPE_PHASE_MAX_SECONDS (3 h); no extra requests to
+#: the sweep, which ran that long anyway, unowned.
+SCRAPER_TIMEOUT_S = float(os.getenv("QPAYBILL_ROLL_TIMEOUT_S")
+                          or full_sweep_timeout_s(len(QPAYBILL_SUBS)))
+
+#: Start the counties whose board rows are oldest first (QPAYBILL_ROLL_STALE_FIRST=0: name order).
+STALE_FIRST = os.getenv("QPAYBILL_ROLL_STALE_FIRST", "1") not in ("0", "false", "False")
+
+
+def county_order(counties, freshness: dict) -> list[str]:
+    """Counties in sweep order: never on the board first, then the county whose board rows were
+    read longest ago, then by name. `freshness` is {county (any case): 'YYYY-MM-DD'}."""
+    fr = {str(k).lower(): v for k, v in (freshness or {}).items()}
+    return sorted(counties, key=lambda c: (fr.get(str(c).lower()) or "", c))
+
+
+def _median_date(counts: dict) -> str:
+    """The median of {'YYYY-MM-DD': n} (lower median)."""
+    total = sum(counts.values())
+    acc = 0
+    for d in sorted(counts):
+        acc += counts[d]
+        if acc * 2 >= total:
+            return d
+    return ""
+
+
+def frontier_order(day: date | None = None) -> list[str]:
+    """The depth-1 name prefixes in walk order, rotated by the calendar day.
+
+    A county that hits COUNTY_TIMEOUT_S keeps only the prefixes it had walked; with a fixed A..9
+    order the same late letters were cut on every run and those owners' rows only aged on the
+    board. Rotating the start spreads the cut across runs (deterministic for a given day)."""
+    d = day or date.today()
+    k = (d.toordinal() * 11) % len(_ALPHABET)
+    return list(_ALPHABET[k:] + _ALPHABET[:k])
+
 
 def _global_sem() -> "asyncio.Semaphore":
     global _GLOBAL_SEM
@@ -780,7 +844,7 @@ async def sweep_county(client: httpx.AsyncClient, county: str, sub: str,
                                                    sink, stats)
                 return prefix, deeper, chars
 
-    frontier = list(_ALPHABET)
+    frontier = frontier_order()
     depth = 1
     while frontier and depth <= MAX_PREFIX_DEPTH:
         results = await asyncio.gather(*(guarded(p) for p in frontier))
@@ -1007,9 +1071,19 @@ def board_detail_plan(path: str = None) -> dict:
     """{(county, identification_no): {"tier": str|None, "has_detail": bool}} for this source's
     rows on the published board, read with board_stream.iter_board_rows (constant memory, read
     only). {} when the board cannot be read: the pass then simply ranks by balance."""
+    return board_plan_and_freshness(path)[0]
+
+
+def board_plan_and_freshness(path: str = None) -> tuple[dict, dict]:
+    """(board_detail_plan, {county (lower case): MEDIAN last_seen 'YYYY-MM-DD' of its rows}) from
+    ONE streamed board pass. The second map orders the sweep (county_order). The median, not the
+    newest date: on the 10/7 board a handful of a stale county's rows carried a fresh last_seen
+    through merges (Kershaw: 7 of 1,708). ({}, {}) when the board cannot be read."""
     try:
+        from collections import Counter
         from ...board_stream import iter_board_rows
         plan: dict = {}
+        seen_by_county: dict = {}
         for row in iter_board_rows(path or DETAIL_BOARD):
             if row.get("source") != "counties_sc.qpaybill_delinquent_roll":
                 continue
@@ -1017,6 +1091,9 @@ def board_detail_plan(path: str = None) -> dict:
             qr = raw.get("qpaybill_roll") or {}
             ident = qr.get("identification_no")
             county = qr.get("county") or row.get("county")
+            seen = str(row.get("last_seen") or "")[:10]
+            if county and seen:
+                seen_by_county.setdefault(str(county).lower(), Counter())[seen] += 1
             if not ident or not county:
                 continue
             tier = (raw.get("distress_stack") or {}).get("tier")
@@ -1025,10 +1102,10 @@ def board_detail_plan(path: str = None) -> dict:
             best = tier if not prev else min((tier, prev["tier"]),
                                               key=lambda t: _TIER_RANK.get(t or "", 3))
             plan[(county, ident)] = {"tier": best, "has_detail": has}
-        return plan
+        return plan, {c: _median_date(cnt) for c, cnt in seen_by_county.items()}
     except Exception as exc:  # noqa: BLE001 - a missing board only loses the tier ordering
         log.warning("qpaybill_roll.detail_plan_unavailable", error=str(exc)[:160])
-        return {}
+        return {}, {}
 
 
 def stage_detail_targets(rows_by_county: dict, kept: dict, plan: dict, cap: int) -> dict:
@@ -1066,10 +1143,13 @@ def ordered_detail_targets(rows_by_county: dict, kept: dict, plan: dict, cap: in
 
 
 async def fetch_details_paced(client: httpx.AsyncClient, sub: str, hrefs: list[str],
-                              stats: dict, pace_s: float = None) -> dict[str, dict]:
-    """fetch_details, politely: ONE request at a time to this county host, DETAIL_PACE_S apart."""
+                              stats: dict, pace_s: float = None,
+                              got: dict | None = None) -> dict[str, dict]:
+    """fetch_details, politely: ONE request at a time to this county host, DETAIL_PACE_S apart.
+    `got` (optional) is filled in place, so a caller that cancels the pass at its deadline keeps
+    every detail already parsed."""
     pace = DETAIL_PACE_S if pace_s is None else pace_s
-    got: dict[str, dict] = {}
+    got = {} if got is None else got
     for n, href in enumerate(hrefs):
         if n:
             await asyncio.sleep(pace)
@@ -1285,9 +1365,35 @@ class QPayBillDelinquentRoll(BaseScraper):
     slug = "counties_sc.qpaybill_delinquent_roll"
     name = "SC qPayBill Delinquent Real-Property Roll (19 counties)"
     category = "county_tax"
-    timeout_s = 900.0
+    timeout_s = SCRAPER_TIMEOUT_S
     expected_min_count = 0
     optional = True
+
+    def _salvage_unfinished(self, tasks, inflight: dict, consumed: set) -> dict[str, int]:
+        """On a scraper-level cancel: put every not-yet-shipped county's rows on self.partial.
+        A county whose sweep already returned ships its result; one still sweeping ships what
+        its sink holds (the same per-county salvage run_county does on its own timeout).
+        Returns {county: parcels shipped}."""
+        shipped: dict[str, int] = {}
+        done_counties: set[str] = set()
+        for t in tasks:
+            if t.done() and not t.cancelled() and t.exception() is None:
+                county, rows, _stats = t.result()
+                done_counties.add(county)
+                if county in consumed:
+                    continue
+                lis = _to_listings(county, rows)
+                self.partial.extend(lis)
+                consumed.add(county)
+                shipped[county] = len(lis)
+        for county, sink in list(inflight.items()):
+            if county in consumed or county in done_counties or not sink:
+                continue
+            lis = _to_listings(county, list(sink.values()))
+            self.partial.extend(lis)
+            consumed.add(county)
+            shipped[county] = len(lis)
+        return shipped
 
     async def fetch(self) -> Iterable[Listing]:
         only = {c.strip().title() for c in
@@ -1295,6 +1401,14 @@ class QPayBillDelinquentRoll(BaseScraper):
         targets = {k: v for k, v in QPAYBILL_SUBS.items() if not only or k in only}
         budgets = {c: _Budget(REQUEST_BUDGET_PER_COUNTY) for c in targets}
         t0 = time.monotonic()
+        # ONE board pass serves both the sweep order (stalest county first) and the detail plan.
+        plan, freshness = ({}, {})
+        if DETAIL_ENABLED or STALE_FIRST:
+            plan, freshness = board_plan_and_freshness()
+        order = county_order(targets, freshness) if STALE_FIRST else sorted(targets)
+        log.info("qpaybill_roll.order", stale_first=STALE_FIRST, first=order[:8],
+                 freshness={c: freshness.get(c) for c in order[:8]},
+                 scraper_timeout_s=self.timeout_s)
         log.info("qpaybill_roll.start", counties=len(targets),
                  budget_per_county=REQUEST_BUDGET_PER_COUNTY,
                  max_pages=MAX_PAGES_PER_PREFIX, max_depth=MAX_PREFIX_DEPTH,
@@ -1306,6 +1420,8 @@ class QPayBillDelinquentRoll(BaseScraper):
         per_county: dict[str, int] = {}
         detail_rows: dict[str, list[dict]] = {}
         kept_idents: dict[str, set] = {}
+        inflight: dict[str, dict] = {}   # county -> its live sink while its sweep runs
+        consumed: set[str] = set()       # counties whose result fetch() has already shipped
 
         def _fresh_stats() -> dict:
             return {"queries": 0, "errors": 0, "page_capped_prefixes": 0,
@@ -1371,6 +1487,9 @@ class QPayBillDelinquentRoll(BaseScraper):
             sink: dict = {}
             stats: dict = _fresh_stats()
             async with _county_sem():
+                # Registered so fetch() can still ship what this county has read if the
+                # SCRAPER-level timeout cancels fetch() while this sweep is running.
+                inflight[county] = sink
                 try:
                     rows, stats = await asyncio.wait_for(
                         sweep_county(client, county, sub, budgets[county],
@@ -1397,8 +1516,8 @@ class QPayBillDelinquentRoll(BaseScraper):
 
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                      headers={"User-Agent": _UA}) as client:
-            tasks = [asyncio.ensure_future(run_county(client, county, sub))
-                     for county, sub in sorted(targets.items())]
+            tasks = [asyncio.ensure_future(run_county(client, county, targets[county]))
+                     for county in order]
             # SALVAGE AS EACH COUNTY COMPLETES, not only after every county has.
             #
             # The old shape was `results = await asyncio.gather(*(sweep_county(...) for
@@ -1414,29 +1533,47 @@ class QPayBillDelinquentRoll(BaseScraper):
             # by processing each county's result the moment it is ready; appending to
             # self.partial here fixes the second half, so even if a pathological case
             # still runs past timeout_s, whatever finished by then is not lost.
-            for finished in asyncio.as_completed(tasks):
-                county, rows, stats = await finished
-                detail_rows[county] = rows
-                listings = _to_listings(county, rows)
-                per_county[county] = len(listings)
-                out.extend(listings)
-                self.partial.extend(listings)
-                # Idents that SURVIVED _to_listings. The detail pass below must not spend
-                # its budget on rows this county already discarded — see the note there.
-                kept_idents[county] = {
-                    (li.raw.get("qpaybill_roll") or {}).get("identification_no")
-                    for li in listings
-                    if isinstance(li.raw, dict)
-                } - {None}
-                lost = stats.pop("lost_prefixes", [])
-                log.info("qpaybill_roll.county_done", county=county,
-                         parcels=len(listings), rows=len(rows),
-                         lost_prefixes=len(lost), **stats)
-                if lost:
-                    log.warning("qpaybill_roll.county_incomplete", county=county,
-                                prefixes=sorted(lost),
-                                note="owners whose name starts with these were never "
-                                     "read; this county's roll is INCOMPLETE")
+            try:
+                for finished in asyncio.as_completed(tasks):
+                    county, rows, stats = await finished
+                    consumed.add(county)
+                    inflight.pop(county, None)
+                    detail_rows[county] = rows
+                    listings = _to_listings(county, rows)
+                    per_county[county] = len(listings)
+                    out.extend(listings)
+                    self.partial.extend(listings)
+                    # Idents that SURVIVED _to_listings. The detail pass below must not spend
+                    # its budget on rows this county already discarded — see the note there.
+                    kept_idents[county] = {
+                        (li.raw.get("qpaybill_roll") or {}).get("identification_no")
+                        for li in listings
+                        if isinstance(li.raw, dict)
+                    } - {None}
+                    lost = stats.pop("lost_prefixes", [])
+                    log.info("qpaybill_roll.county_done", county=county,
+                             parcels=len(listings), rows=len(rows),
+                             lost_prefixes=len(lost), **stats)
+                    if lost:
+                        log.warning("qpaybill_roll.county_incomplete", county=county,
+                                    prefixes=sorted(lost),
+                                    note="owners whose name starts with these were never "
+                                         "read; this county's roll is INCOMPLETE")
+            except asyncio.CancelledError:
+                # The SCRAPER-level soft timeout fired (safe_run cancels fetch()). Ship what
+                # every unfinished county has already read, then stop their sweeps: before
+                # 2026-10-09 those rows were dropped and the sweeps ran on unowned.
+                shipped = self._salvage_unfinished(tasks, inflight, consumed)
+                log.warning("qpaybill_roll.scraper_timeout_salvage",
+                            counties=sorted(shipped), parcels=sum(shipped.values()),
+                            not_started=sorted(c for c in targets
+                                               if c not in consumed and c not in shipped),
+                            timeout_s=self.timeout_s)
+                raise
+            finally:
+                for t in tasks:
+                    if not t.done():
+                        t.cancel()
 
         # STAGED DETAIL PASS (2026-10-07, owner decision; see DETAIL_ENABLED). One request per
         # parcel, so it is bounded per run and spends that bound where it matters: HOT, then
@@ -1445,31 +1582,49 @@ class QPayBillDelinquentRoll(BaseScraper):
         # it details only parcels that survived the delinquency filter (Colleton 2026-09-13:
         # 18,285 raw idents -> 1,494 real delinquents), and one row per parcel (the grid has
         # a row per unpaid year; the detail is a property attribute).
-        if DETAIL_ENABLED and detail_rows:
-            plan = board_detail_plan()
+        # The pass gets at most DETAIL_BUDGET_S and never the scraper's last minute, so it can
+        # not push fetch() past timeout_s; every detail parsed before its deadline is kept.
+        detail_left = min(DETAIL_BUDGET_S, self.timeout_s - (time.monotonic() - t0) - 60.0)
+        if DETAIL_ENABLED and detail_rows and detail_left <= 0:
+            log.warning("qpaybill_roll.detail_skipped", reason="no time left before timeout_s",
+                        seconds_left=round(detail_left, 1))
+        if DETAIL_ENABLED and detail_rows and detail_left > 0:
             targets = stage_detail_targets(detail_rows, kept_idents, plan, DETAIL_MAX)
             undetailed = sum(1 for k, v in plan.items() if not v.get("has_detail"))
             log.info("qpaybill_roll.detail_stage", cap=DETAIL_MAX,
                      targets=sum(len(v) for v in targets.values()),
                      board_rows_known=len(plan), board_rows_without_detail=undetailed,
+                     budget_s=round(detail_left, 1),
                      runs_to_finish_at_cap=(-(-undetailed // DETAIL_MAX) if DETAIL_MAX else None))
             sem = asyncio.Semaphore(max(1, DETAIL_COUNTY_CONCURRENCY))
+            got_by_county: dict[str, dict] = {c: {} for c in targets}
+            dstats_by_county: dict[str, dict] = {c: {} for c in targets}
             async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                          headers={"User-Agent": _UA}) as dclient:
 
                 async def detail_county(county: str, picked: list[dict]) -> None:
                     async with sem:
-                        dstats: dict = {}
-                        got = await fetch_details_paced(dclient, QPAYBILL_SUBS[county],
-                                                        [r["detail_href"] for r in picked], dstats)
-                        for r in detail_rows.get(county, []):
-                            rec = re.search(r"receiptNo=([^&]+)", r.get("detail_href") or "")
-                            if rec and rec.group(1) in got:
-                                r["detail"] = got[rec.group(1)]
-                        log.info("qpaybill_roll.detail_done", county=county,
-                                 requested=len(picked), parsed=len(got), **dstats)
+                        await fetch_details_paced(dclient, QPAYBILL_SUBS[county],
+                                                  [r["detail_href"] for r in picked],
+                                                  dstats_by_county[county],
+                                                  got=got_by_county[county])
 
-                await asyncio.gather(*(detail_county(c, p) for c, p in targets.items()))
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*(detail_county(c, p) for c, p in targets.items())),
+                        timeout=detail_left)
+                except asyncio.TimeoutError:
+                    log.warning("qpaybill_roll.detail_deadline", budget_s=round(detail_left, 1),
+                                parsed=sum(len(g) for g in got_by_county.values()),
+                                targets=sum(len(v) for v in targets.values()))
+            for county, picked in targets.items():
+                got = got_by_county[county]
+                for r in detail_rows.get(county, []):
+                    rec = re.search(r"receiptNo=([^&]+)", r.get("detail_href") or "")
+                    if rec and rec.group(1) in got:
+                        r["detail"] = got[rec.group(1)]
+                log.info("qpaybill_roll.detail_done", county=county,
+                         requested=len(picked), parsed=len(got), **dstats_by_county[county])
             out = []
             for county, rows in sorted(detail_rows.items()):
                 got = _to_listings(county, rows)
