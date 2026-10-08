@@ -86,6 +86,8 @@ _STATE_BBOX: dict[str, tuple[float, float, float, float]] = {
     "SC": (32.00, -83.40, 35.25, -78.50),
 }
 PAGE_SIZE = 100
+#: HomePath's listingTypes value for Fannie Mae REO (the same filter fannie_homepath sends).
+REO_LISTING_TYPES = "5"
 # Hard cap on pages per state. HomePath nationwide has ~27k listings; NC+SC
 # combined are ~500-800, so 20 pages (2000 listings) is a generous ceiling.
 PAGES_CAP = 20
@@ -256,6 +258,13 @@ async def _fetch_state(
                 "bounds": bounds,
                 "page": str(page),
                 "pageSize": str(PAGE_SIZE),
+                # Fannie Mae's own REO inventory only. Without listingTypes the endpoint also
+                # returns ListHub MLS retail listings from other sellers, and every one of them was
+                # published here as ListingType.REO: 2,098 rows on the 2026-10-08 run, 279 on the
+                # board. Measured live 2026-10-08, page 1 of each state bbox: NC 68,618 results
+                # without the filter vs 57 with it, SC 29,426 vs 22 (62 unique, 44 in NC/SC, the
+                # same inventory fannie_homepath reads since c33369b5).
+                "listingTypes": REO_LISTING_TYPES,
             }
             try:
                 r = await c.get(
