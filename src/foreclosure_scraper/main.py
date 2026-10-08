@@ -1634,6 +1634,18 @@ async def run() -> int:
         except Exception:  # noqa: BLE001 - a correction pass must never cost the run
             log.error("prior_correction.failed", traceback=traceback.format_exc())
 
+    # A county tax debt stays on a row only when it is that row's own parcel's record (tax_binding):
+    # copies from the 9/9 checkpoint recovery and old cross-county merges ride the prior board
+    # otherwise. enrich_tax_owed repeats this for the enriched rows; this covers the rows the
+    # enrich tail never touches (the grandfathered snapshot). Never costs the run.
+    try:
+        from .tax_binding import scrub_unbound_tax
+        log.info("orchestrator.tax_unbound", **scrub_unbound_tax(deduped))
+        if _grandfather:
+            log.info("orchestrator.tax_unbound_grandfather", **scrub_unbound_tax(_grandfather))
+    except Exception:  # noqa: BLE001
+        log.error("tax_unbound.failed", traceback=traceback.format_exc())
+
     # Pulled-sale detection (dad's #6): listings that existed last week
     # but didn't show up this run get tagged raw['pulled_sale'] with
     # presumed_withdrawn=True and kept on the dashboard for up to 4
@@ -3131,6 +3143,13 @@ async def run_enrich_tail(st: TailState) -> dict:
     _grandfather = st.grandfather
     _off_footprint_removed = st.off_footprint_removed
     _scoring_failed: str | None = None
+    if _grandfather:
+        # a checkpoint written before tax_binding existed carries the snapshot's copied tax debts
+        try:
+            from .tax_binding import scrub_unbound_tax
+            log.info("orchestrator.tax_unbound_grandfather", **scrub_unbound_tax(_grandfather))
+        except Exception:  # noqa: BLE001
+            log.error("tax_unbound.failed", traceback=traceback.format_exc())
 
     # ---- County-jail stamps, re-read (2026-10-06) ----
     # enrich_jail_bookings also runs BEFORE the dot_ocr checkpoint, and a resume from that checkpoint
