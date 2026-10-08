@@ -77,6 +77,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import socket
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -85,8 +86,8 @@ from typing import Any, Iterable, Optional
 import structlog
 
 from .enrichment_sos_agent import (
-    _entity_of, clean_contact, entity_key, is_active_status, names_match, propagate_profiles,
-    sos_core_key,
+    _clean_entity, _entity_of, clean_contact, entity_key, is_active_status, names_match,
+    propagate_profiles, sos_core_key,
 )
 
 log = structlog.get_logger()
@@ -596,6 +597,42 @@ def next_cap(cap_used: int, outcome: dict, targets: int,
 # VM side: apply the hand-off during the pipeline run (no network)
 # ---------------------------------------------------------------------------
 
+def profile_bound_to_row(prof: Any, li: Any) -> bool:
+    """Whether a row's raw['sos_agent'] profile is about one of the row's own entities: its legal
+    name matches (names_match) the owner, the defendant or the county GIS owner (each reduced by
+    _clean_entity), or the entity it was stamped for (resolved_for_entity) is one of them. A
+    profile with no legal name has nothing to judge and is kept."""
+    if not isinstance(prof, dict):
+        return True
+    legal = prof.get("legal_name")
+    if not legal:
+        return True
+    raw = li.raw if isinstance(getattr(li, "raw", None), dict) else {}
+    gis = raw.get("gis") if isinstance(raw.get("gis"), dict) else {}
+    ents = [e for e in (_clean_entity(str(n or "")) for n in
+                        (getattr(li, "owner_name", None), getattr(li, "defendant", None), gis.get("owner")))
+            if e]
+    if any(names_match(e, legal) for e in ents):
+        return True
+    rfe = prof.get("resolved_for_entity")
+    return bool(rfe) and any(sos_core_key(rfe) == sos_core_key(e) for e in ents)
+
+
+_GOVERNMENT_RE = re.compile(
+    r"\b(COUNTY|CITY OF|TOWN OF|VILLAGE OF|STATE OF|BOARD OF EDUCATION|BOARD OF COMMISSIONERS|"
+    r"ABC BOARD|HOUSING AUTHORITY|REDEVELOPMENT|UNITED STATES|USA|DEPARTMENT OF|DEPT OF|"
+    r"SCHOOL DISTRICT|PUBLIC SCHOOLS|NORTH CAROLINA|SOUTH CAROLINA)\b", re.I)
+
+
+def government_owned(li: Any) -> bool:
+    """The row's owner of record (owner_name, else the county GIS owner) reads as a government
+    body and no part of it is a registrable business."""
+    raw = li.raw if isinstance(getattr(li, "raw", None), dict) else {}
+    gis = raw.get("gis") if isinstance(raw.get("gis"), dict) else {}
+    owner = getattr(li, "owner_name", None) or gis.get("owner") or ""
+    return bool(owner) and bool(_GOVERNMENT_RE.search(str(owner))) and _clean_entity(str(owner)) is None
+
+
 def apply_sos_agent_handoff(listings: Iterable, path: Optional[Path] = None,
                             now: Optional[datetime] = None) -> dict:
     """Attach raw['sos_agent'] from the Mac's ledger to every NC row owned by a resolved
@@ -611,12 +648,22 @@ def apply_sos_agent_handoff(listings: Iterable, path: Optional[Path] = None,
                 church's profile on a Buncombe "COVENANT PRESBYTERIAN CHURCH" row) is removed,
                 so the row can take the entity's confirmed profile below, or none;
       cleaned   clean_contact() on the profile left in place ("Not Listed" contact dropped,
-                a commercial agent service flagged and never the best contact).
+                a commercial agent service flagged and never the best contact);
+      unbound   (audit 2026-10-09, additions_verify) a profile on a GOVERNMENT-owned row (the
+                owner of record is a county, city, town, state, school board, housing authority
+                ...) whose legal name is none of the row's own entities is removed: a carried
+                pre-hand-off block published one LLC's officers as the contact on 120 Lincoln
+                county-owned parcels (the 10/3-fixed 'Linc-oln' substring bug made the county
+                look like a business). A government parcel never has an LLC's registered agent as
+                its contact. Other unbound legacy profiles (199 of 809 rows on the 10/8
+                checkpoint, mostly a person owner after an LLC sold) are counted as
+                unbound_kept and left: HANDOFF item 57 made stale owner-change profiles the
+                owner's outreach-policy call.
     Only ledger-confirmed profiles are attached (resolved_profiles())."""
     p = Path(path) if path is not None else handoff_path()
     counts: dict[str, Any] = {"file": str(p), "status": "ok", "entities": 0,
                               "resolved_entities": 0, "attached": 0, "cleared": 0,
-                              "cleaned": 0}
+                              "unbound_cleared": 0, "unbound_kept": 0, "cleaned": 0}
     try:
         if os.environ.get("SOS_AGENT_HANDOFF_APPLY") == "0":
             counts["status"] = "disabled"
@@ -665,6 +712,14 @@ def apply_sos_agent_handoff(listings: Iterable, path: Optional[Path] = None,
             if row_profile_rejected(prof, _entity_of(li), rejected):
                 del raw["sos_agent"]
                 counts["cleared"] += 1
+            elif not profile_bound_to_row(prof, li):
+                if government_owned(li):
+                    del raw["sos_agent"]
+                    counts["unbound_cleared"] += 1
+                else:
+                    counts["unbound_kept"] += 1
+                    if clean_contact(prof):
+                        counts["cleaned"] += 1
             elif clean_contact(prof):
                 counts["cleaned"] += 1
         counts["attached"] = propagate_profiles(listings, profiles)

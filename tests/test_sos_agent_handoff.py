@@ -609,3 +609,49 @@ def test_the_mac_pass_holds_no_board_write_path():
     sh = (REPO / "scripts" / "sos_agent_refresh.sh").read_text()
     assert "board_lock_acquire" not in sh and "publish_commit" not in sh
     assert 'SOS_AGENT_MAX_CHECK:-150' in sh and "SOS_TIMEOUT:-${SOS_MAX_RUNTIME:-4200}" in sh
+
+
+# ---------------------------------------------------------------------------
+# unbound carried profiles (audit 2026-10-09, additions_verify)
+# ---------------------------------------------------------------------------
+
+def test_apply_removes_a_carried_profile_of_another_entity(tmp_path):
+    """A pre-hand-off block naming some other LLC (no resolved_for_entity) on a county-owned row is
+    not that row's contact: it goes. Made-up names."""
+    prof = sa.stamp_profile(_prof(), "ACME HOLDINGS LLC")
+    ents: dict = {}
+    ho.record_result(ents, "ACME HOLDINGS LLC", "resolved", prof)
+    p = tmp_path / "h.json"
+    _write_handoff(p, ents)
+    other = _prof(sosid="77", legal_name="Unrelated Ventures LLC")
+    rows = [
+        _li("SAMPLE COUNTY", i=0, raw={"sos_agent": dict(other)}),              # government owner
+        _li("Jane Q. Person", i=1, raw={"sos_agent": dict(other)}),             # person owner
+        _li("ACME HOLDINGS LLC", i=2, raw={"sos_agent": dict(other)}),          # other LLC: kept (item 57)
+        _li("Unrelated Ventures, LLC", i=3, raw={"sos_agent": dict(other)}),  # its own: kept
+        _li("Jane Q. Person", i=4, raw={"sos_agent": dict(other),
+                                        "gis": {"owner": "UNRELATED VENTURES LLC"}}),  # GIS owner: kept
+        _li("ACME HOLDINGS LLC", i=5, raw={"sos_agent": {"sosid": "9"}}),       # nothing to judge: kept
+    ]
+    out = ho.apply_sos_agent_handoff(rows, path=p)
+    # only the government-owned row loses the foreign profile; the person-owned and the other-LLC
+    # rows keep theirs (HANDOFF item 57: a stale owner-change profile is the owner's policy call)
+    assert out["unbound_cleared"] == 1 and out["unbound_kept"] == 2
+    assert "sos_agent" not in rows[0].raw
+    assert rows[1].raw["sos_agent"]["sosid"] == "77" and rows[2].raw["sos_agent"]["sosid"] == "77"
+    assert rows[3].raw["sos_agent"]["sosid"] == "77" and rows[4].raw["sos_agent"]["sosid"] == "77"
+    assert rows[5].raw["sos_agent"] == {"sosid": "9"}
+
+
+def test_government_owned_reads_the_owner_of_record():
+    assert ho.government_owned(_li("SAMPLE COUNTY"))
+    assert ho.government_owned(_li("CITY OF EXAMPLEVILLE"))
+    assert ho.government_owned(_li("SAMPLE COUNTY ABC BOARD AKA"))
+    assert not ho.government_owned(_li("COUNTY LINE HOLDINGS LLC"))
+    assert not ho.government_owned(_li("Jane Q. Person"))
+
+
+def test_profile_bound_to_row_reads_the_stamped_entity():
+    prof = _prof(legal_name="Acme Holdings Group, LLC", resolved_for_entity="ACME HOLDINGS LLC")
+    assert ho.profile_bound_to_row(prof, _li("Acme Holdings LLC"))
+    assert not ho.profile_bound_to_row(prof, _li("Other Things LLC"))
