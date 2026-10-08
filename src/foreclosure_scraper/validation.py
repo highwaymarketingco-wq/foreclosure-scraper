@@ -170,6 +170,12 @@ def county_native_short_parcel(state: Optional[str], county: Optional[str], pid:
     return bool(pat and p and pat.match(p))
 
 
+#: A non-land row whose county value is under this is land, a trailer site or a sliver, not a house.
+LOW_VALUE_PARCEL_MAX = 5_000
+#: raw flag valuation.calc reads to withhold a single-family ARV (see _validate_numeric_bounds).
+LOW_VALUE_FLAG = "low_value_parcel"
+
+
 def _record_nulled_parcel(li: Listing, pid: str, reason: str) -> None:
     """Keep the id the source gave in raw['parcel_id_nulled'] when it is nulled here. It is
     still that source's identifier for the row (Catawba's tax account '65771'), and the next
@@ -242,13 +248,31 @@ def _validate_numeric_bounds(li: Listing, stats: dict) -> None:
 
     # tax_value: < $5k for non-land is suspect (just $300 in one case).
     # Land can legitimately have low tax_value (raw acreage in rural counties).
+    #
+    # 2026-10-09 (audit drops_lineage, owner decision): the figure is the COUNTY'S OWN value
+    # (Greenville TAXMKTVAL median $500, qPayBill appraised median $810, Rutherford roll about
+    # $3,300 on the 10/8 run's 1,791 rows); what is wrong is the row's kind, which says a house.
+    # Keep the figure in raw['tax_value_low'] and flag raw['low_value_parcel'] (land, a trailer
+    # site or a sliver: not a single-family value); Listing.tax_value stays empty as before so no
+    # ARV / equity / bid engine reads it, and valuation.calc withholds the ARV on a flagged row.
     if (li.tax_value is not None and li.tax_value > 0
-            and li.tax_value < 5_000
+            and li.tax_value < LOW_VALUE_PARCEL_MAX
             and li.property_kind != PropertyKind.LAND):
         stats["tax_value_too_low"] += 1
         log.warning("validation.tax_value_too_low",
                     source=li.source, tax_value=li.tax_value, kind=li.property_kind)
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["tax_value_low"] = {"value": li.tax_value, "county": li.county, "source": li.source,
+                                   "reason": "kind_unverified"}
+        li.raw[LOW_VALUE_FLAG] = True
         li.tax_value = None
+    elif isinstance(li.raw, dict) and li.raw.get(LOW_VALUE_FLAG) and (
+            li.property_kind == PropertyKind.LAND
+            or (li.tax_value is not None and li.tax_value >= LOW_VALUE_PARCEL_MAX)):
+        # a carried flag the row no longer earns (now land, or the county value is a house's)
+        li.raw.pop(LOW_VALUE_FLAG, None)
+        li.raw.pop("tax_value_low", None)
 
     # tax_value > $50M — overflow / units problem.
     if li.tax_value is not None and li.tax_value > 50_000_000:

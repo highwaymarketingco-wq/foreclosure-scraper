@@ -186,19 +186,29 @@ fire; `quiet_title` equals `heir_naming_publication` by construction.
 
 ## 3. Open items
 
-1. tax_value_too_low (1,791 rows): the nulled values are the counties' own figures (Greenville
-   TAXMKTVAL median $500, qPayBill appraised median $810, Rutherford median about $3,300). The value
-   is right and the row's kind (single_family) is probably wrong. Owner decision: keep the value and
-   flag the kind, or keep nulling.
+1. DONE (decision 2026-10-09) tax_value_too_low (1,791 rows): the values are the counties' own
+   figures (Greenville TAXMKTVAL median $500, qPayBill appraised median $810, Rutherford about
+   $3,300); the row's kind is what is wrong. validation now keeps the figure in
+   `raw.tax_value_low` {value, county, source, reason: kind_unverified} and sets
+   `raw.low_value_parcel`; Listing.tax_value stays empty; `valuation.calc` withholds the
+   single-family ARV on a flagged non-land row (flag `low_value_parcel`, arv_trust 'withheld', so
+   no equity, bid or ROI is built on it); a carried flag clears when the row becomes land or shows a
+   house-sized county value; property_kind is not changed (no clear rule). Tests: 3 in
+   `tests/test_drops_lineage.py`. Invariant: `drops-low-value-parcel` (max 0).
 2. Lincoln and Rutherford short ids (2,017 rows) are genuine but stay nulled under the 10/7 owner
    decision (PIN + alias). Pitt / Hyde PTS, Polk and Durham need a house-number check per row first.
-3. The retired DEW registry's 8,288 rows age out over the next three full runs: owner decision.
-4. ZIP to county for countyless national rows: 511 of the 906 hand-off rows still have no county
-   after the gazetteer; a ZIP table (scripts/backfill_missing_county.py builds one from the caches)
-   is not in main.run. Not enough time.
-5. Not measured: in_scope / active / flip removals row by row (fresh rows are not persisted;
-   suggest logging per-source counts with `drop_audit.count_by_source`), comps dropped for kind,
-   sqft out of range, the 961 rows at the miss limit.
+3. DONE (decision 2026-10-09) the retired DEW registry's 8,288 rows age out as designed. Before
+   they go, every row was exported privately (`~/Desktop/Audit_2026-10-09/dew_registry_rows.csv`):
+   8,288 rows in 12 SC counties (Charleston 3,244, Horry 1,629, Spartanburg 1,107, Beaufort 844,
+   Anderson 406, Pickens 300, ...), all with an address, 2,459 with a parcel id.
+4. DONE ZIP to county: `scripts/build_zip_county_table.py` builds `_zip_to_county.py` offline from
+   the parcel caches and the board with backfill_missing_county.py's rules (543 one-county ZIPs: NC
+   364, SC 179; a ZIP that spans counties is left out). `fill_county_from_city` uses the city first,
+   then the ZIP, and leaves a row whose two disagree. On the 906 countyless hand-off rows: 605
+   placed (city 156, ZIP 213, both agreeing 236), 3 conflicts left, 298 still without a county.
+5. Not measured: in_scope / active / flip removals row by row (fresh rows are not persisted; the
+   wiring below logs them per source from the next run), comps dropped for kind, sqft out of range,
+   the 961 rows at the miss limit.
 6. `dedupe.parcel_key` treats ids under 7 characters as untrusted, so the kept county-native ids do
    not act as identity evidence in dedupe (same as today in-run). Left for the dedupe area.
 7. The pre-run gate runs the suite on the LAST checkpoint, which predates these fixes:
@@ -243,3 +253,11 @@ fire; `quiet_title` equals `heir_naming_publication` by construction.
    `_natl_by_src = count_by_source(enriched, is_countyless_national)`, and add
    `by_source=dict(list(_natl_by_src.items())[:15])` to the `orchestrator.drop_countyless_national`
    log call.
+5. (2026-10-09, after the decisions) per-source counts for the three ingest filters. In the block
+   under `# Filter to scope`, add `from .drop_audit import removed_by_source`, then add a keyword to
+   each log call:
+   * `orchestrator.in_scope`: `removed_by_source=removed_by_source(active_raw, in_area),`
+   * `orchestrator.active`: `removed_by_source=removed_by_source(in_area, active),`
+   * `orchestrator.flip_filtered`: `removed_by_source=removed_by_source(active, flip_able),`
+     (before `active = flip_able`).
+

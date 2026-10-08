@@ -25,6 +25,10 @@ must count what the scorer acts on. docs/audit_2026-10-09/drops_lineage.md has t
   drops-marker-bounds               each drop/withdraw marker's row count stays under its bound
                                     (parcel_id_nulled, situs_nulled, exempt_claim_withdrawn, ...): a
                                     rule that starts removing far more than it did is a rule that broke.
+  drops-low-value-parcel            a county value under $5,000 on a non-land row is kept in
+                                    raw['tax_value_low'] with raw['low_value_parcel'] (owner decision
+                                    2026-10-09), Listing.tax_value stays empty and no single-family
+                                    ARV is published on it (1,791 such rows on 10/8).
   lineage-gis-subkeys               raw.gis carries only the sub-keys web_artifact.RAW_KEEP['gis'] keeps
                                     (a writer that bypassed the publish slim).
   lineage-scorer-gated-columns      scripts/gap_matrix.py's second view counts a scorer-gated column
@@ -239,6 +243,30 @@ class MarkerBounds(_Check):
         return super().finish()
 
 
+class LowValueParcel(_Check):
+    name = "drops-low-value-parcel"
+    describe = ("a low county value is kept beside the low_value_parcel flag, never as tax_value, "
+                "and carries no ARV")
+
+    def feed(self, row: dict) -> None:
+        raw = _raw(row)
+        tvl, flag = raw.get("tax_value_low"), raw.get("low_value_parcel")
+        if tvl in (None, {}) and not flag:
+            return
+        self.checked += 1
+        ident = str(row.get("parcel_id") or row.get("source") or "?")[:40]
+        if not isinstance(tvl, dict) or not isinstance(tvl.get("value"), (int, float)):
+            self._bad("flag without its kept value", ident)
+        elif flag is not True:
+            self._bad("kept value without the flag", ident)
+        elif row.get("tax_value"):
+            self._bad("tax_value still set", ident)
+        elif str(row.get("property_kind") or "") != "land":
+            calc = raw.get("calc")
+            if isinstance(calc, dict) and calc.get("arv_expected") is not None:
+                self._bad("single-family ARV published", ident)
+
+
 class GisSubkeys(_Check):
     name = "lineage-gis-subkeys"
     describe = "raw.gis holds only the sub-keys RAW_KEEP['gis'] publishes"
@@ -312,4 +340,4 @@ class ScorerGatedColumns(_Check):
 
 def make_checks() -> list:
     return [ShortParcelCountyNative(), SitusRoadNulled(), DatelessFilteredSource(), AgeOutImminent(),
-            CountyBlankSource(), MarkerBounds(), GisSubkeys(), ScorerGatedColumns()]
+            CountyBlankSource(), MarkerBounds(), LowValueParcel(), GisSubkeys(), ScorerGatedColumns()]

@@ -346,7 +346,7 @@ def _run(rows):
 
 def test_the_checks_follow_the_interface_and_pass_a_clean_row():
     res = _run([_row(parcel_id="1234567890", raw={"gis": {"owner": "X", "absentee": True}})])
-    assert len(res) == 8
+    assert len(res) == 9
     for r in res.values():
         assert set(r) == {"name", "checked", "violations", "max_violations", "ok", "detail"}
         assert r["ok"], r
@@ -376,3 +376,86 @@ def test_the_age_out_and_marker_bounds_count():
     for _ in range(dl.MARKER_BOUNDS["county_was_name_derived"] + 1):
         mb.feed({"raw": {"county_was_name_derived": {"county": "X"}}})
     assert mb.finish()["violations"] == 1
+
+
+# --------------------------------------------------------------------------- low-value parcels
+def test_a_low_county_value_is_kept_flagged_and_never_a_house_value():
+    from foreclosure_scraper.models import PropertyKind
+    from foreclosure_scraper.valuation import calc, grading
+    li = _li(county="Greenville", state="SC", source="counties_generic.arcgis_distress.example_layer",
+             property_kind=PropertyKind.SINGLE_FAMILY, tax_value=500.0, market_value=500.0)
+    stats = validate([li])
+    assert stats["tax_value_too_low"] == 1
+    assert li.tax_value is None
+    assert li.raw["tax_value_low"] == {"value": 500.0, "county": "Greenville",
+                                       "source": "counties_generic.arcgis_distress.example_layer",
+                                       "reason": "kind_unverified"}
+    assert li.raw["low_value_parcel"] is True
+    li.opening_bid = 40_000.0       # a bid would otherwise carry a bid-proxy ARV
+    c = calc.compute(li)
+    assert c.arv_expected is None
+    assert "low_value_parcel" in (c.arv_flags or [])
+    assert grading.arv_trust(c.arv_flags, c.arv_expected, c.arv_withheld) in grading.ARV_TRUST_BLOCKS_DERIVED
+
+
+def test_land_and_real_values_are_not_flagged_and_a_stale_flag_clears():
+    from foreclosure_scraper.models import PropertyKind
+    land = _li(property_kind=PropertyKind.LAND, tax_value=800.0)
+    validate([land])
+    assert land.tax_value == 800.0 and "low_value_parcel" not in land.raw
+    carried = _li(property_kind=PropertyKind.SINGLE_FAMILY, tax_value=150_000.0,
+                  raw={"low_value_parcel": True, "tax_value_low": {"value": 900.0}})
+    validate([carried])
+    assert "low_value_parcel" not in carried.raw and "tax_value_low" not in carried.raw
+    kept = _li(property_kind=PropertyKind.SINGLE_FAMILY, tax_value=None,
+               raw={"low_value_parcel": True, "tax_value_low": {"value": 900.0}})
+    validate([kept])
+    assert kept.raw["low_value_parcel"] is True       # nothing new to contradict it
+
+
+def test_the_low_value_check():
+    ok = _row(raw={"tax_value_low": {"value": 500.0}, "low_value_parcel": True, "calc": {"arv_expected": None}})
+    bad = _row(raw={"tax_value_low": {"value": 500.0}, "low_value_parcel": True,
+                    "calc": {"arv_expected": 120000}})
+    flag_only = _row(raw={"low_value_parcel": True})
+    res = _run([ok, bad, flag_only])["drops-low-value-parcel"]
+    assert res["checked"] == 3 and res["violations"] == 2
+
+
+def test_removed_by_source_counts_what_a_filter_took():
+    from foreclosure_scraper.drop_audit import removed_by_source
+    a, b, c, d = _Row("s1"), _Row("s1"), _Row("s2"), _Row("s3")
+    assert removed_by_source([a, b, c, d], [b]) == {"s1": 1, "s2": 1, "s3": 1}
+    assert removed_by_source([a, b, c, d], [b], top=1) in ({"s1": 1}, {"s2": 1}, {"s3": 1})
+    assert removed_by_source([a, a, c], [c]) == {"s1": 2}
+
+
+def test_countyless_rows_are_placed_by_zip_and_a_conflict_is_left():
+    from foreclosure_scraper._zip_to_county import ZIP_COUNTY, county_for_zip
+    from foreclosure_scraper.drop_audit import fill_county_from_city
+    (st, z), cty = next(iter(sorted(ZIP_COUNTY.items())))
+    assert county_for_zip(z + "-1234", st.lower()) == cty and county_for_zip("1234", st) is None
+    by_zip = Listing(source="national.landandfarm", source_url="https://example.invalid/5",
+                     listing_type=ListingType.UNKNOWN, state=st, city="Nowhere Example", zip_code=z)
+    other = next(c for c in ("Cleveland", "Wake") if c != cty)
+    city = "Shelby" if other == "Cleveland" else "Raleigh"
+    clash = Listing(source="national.xome", source_url="https://example.invalid/6",
+                    listing_type=ListingType.REO, state=st, city=city, zip_code=z)
+    st_ = fill_county_from_city([by_zip, clash])
+    assert by_zip.county == cty and by_zip.raw["county_backfill"]["evidence"] == "zip"
+    assert clash.county is None and st_["conflicts"] == (1 if st == "NC" else 0)
+
+
+def test_the_zip_table_module_renders_and_imports(tmp_path):
+    spec = _ilu.spec_from_file_location(
+        "build_zip_county_table", _P(__file__).resolve().parents[1] / "scripts" / "build_zip_county_table.py")
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    from collections import Counter
+    text = mod.render({("NC", "28150"): "Cleveland"}, Counter({"cache+board": 1}))
+    f = tmp_path / "zt.py"
+    f.write_text(text)
+    zs = _ilu.spec_from_file_location("zt", f)
+    zt = _ilu.module_from_spec(zs)
+    zs.loader.exec_module(zt)
+    assert zt.county_for_zip("28150", "NC") == "Cleveland" and zt.county_for_zip("28150", "SC") is None

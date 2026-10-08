@@ -1802,6 +1802,15 @@ def _arv_sanity(li: Listing, out: "Calc", arv_conf: str, arv_flags: list[str],
     return arv_conf
 
 
+ARV_FLAG_LOW_VALUE_PARCEL = "low_value_parcel"
+
+
+def _low_value_parcel(li: Listing) -> bool:
+    """validation flagged this non-land row's county value as too low for a house."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    return raw.get("low_value_parcel") is True and li.property_kind != PropertyKind.LAND
+
+
 def compute(li: Listing) -> Calc:
     """Compute investor financials for a listing. Mutates nothing."""
     out = Calc(notes=[])
@@ -1827,6 +1836,22 @@ def compute(li: Listing) -> Calc:
             ]
     out.arv_low, out.arv_expected, out.arv_high = low, expected, high
     out.notes.extend(arv_notes)
+    # LOW-VALUE PARCEL (2026-10-09, audit drops_lineage, owner decision). validation flags a non-land
+    # row whose county value is under $5,000 (raw['low_value_parcel'], the figure kept in
+    # raw['tax_value_low']): land, a trailer site or a sliver mis-typed as a house. A single-family
+    # ARV is not a value for it, so none is published and nothing is built on it (arv_trust reads
+    # 'withheld'); the refused number goes to arv_withheld. Land rows never carry the flag.
+    if _low_value_parcel(li):
+        if out.arv_expected is not None:
+            out.arv_withheld = out.arv_expected
+        out.arv_low = out.arv_expected = out.arv_high = None
+        _refusals.append((ARV_FLAG_LOW_VALUE_PARCEL, out.arv_withheld))
+        _lv = (li.raw.get("tax_value_low") or {}).get("value") if isinstance(li.raw, dict) else None
+        out.notes.append(
+            "ARV withheld: the county values this parcel at "
+            + (f"${float(_lv):,.0f}" if isinstance(_lv, (int, float)) else "under $5,000")
+            + ", which is land, a trailer site or a sliver, not a single-family value; "
+              "confirm what stands on the parcel before using any house figure.")
 
     # ---- Vision-based ARV adjustment ------------------------------------
     # Subject's photo-derived condition tier is what the rehab will need to

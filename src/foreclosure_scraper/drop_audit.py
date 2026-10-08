@@ -66,8 +66,9 @@ def all_filtered_sources(results: Iterable[tuple[str, list]], by_source: Mapping
 # Measured on the Mac stealth hand-off of 2026-10-08 (51,730 rows): 906 national rows had no
 # county; every one carried a city and 898 an NC/SC ZIP (landandfarm 645, zillow_foreclosures
 # 199, xome 27, trulia 13, ...). The 146-county city gazetteer (_bankruptcy_city_to_county, the
-# table fdic_failed_banks and the obituary matcher already use) places 395 of them; the rest need a
-# ZIP table (not built here; scripts/backfill_missing_county.py builds one from the parcel caches).
+# table fdic_failed_banks and the obituary matcher already use) and the ZIP table built offline
+# from the parcel caches (_zip_to_county, scripts/build_zip_county_table.py, 543 one-county ZIPs)
+# place 605 of them (city 156, ZIP 213, both agreeing 236; the 3 where they disagree are left).
 # ---------------------------------------------------------------------------------------------
 
 def is_countyless_national(li) -> bool:
@@ -78,27 +79,42 @@ def is_countyless_national(li) -> bool:
 
 
 def fill_county_from_city(listings) -> dict:
-    """Give every countyless national / REO row whose (city, state) the NC/SC gazetteer knows its
-    county, stamped raw['county_backfill'] = {county, evidence: 'city', basis}. Must run BEFORE the
-    post-enrichment scope re-pass, so a flip placed this way is still judged against the footprint.
-    Never overwrites a county. Returns {'filled': n, 'by_source': {...}, 'left': n}."""
+    """Give every countyless national / REO row the county its (city, state) names in the NC/SC
+    gazetteer, or failing that the one county its ZIP lies in (_zip_to_county, built offline from
+    the parcel caches by scripts/build_zip_county_table.py), stamped raw['county_backfill'] =
+    {county, evidence: 'city' | 'zip' | 'city+zip', basis}. When city and ZIP name different
+    counties the row is left alone. Must run BEFORE the post-enrichment scope re-pass, so a flip
+    placed this way is still judged against the footprint. Never overwrites a county.
+    Returns {'filled': n, 'by_source': {...}, 'by_evidence': {...}, 'conflicts': n, 'left': n}."""
     from ._bankruptcy_city_to_county import bankruptcy_county_for
+    from ._zip_to_county import county_for_zip
     filled: dict[str, int] = {}
-    left = 0
+    by_ev: dict[str, int] = {}
+    left = conflicts = 0
     for li in listings:
         if not is_countyless_national(li):
             continue
-        cty = bankruptcy_county_for(getattr(li, "city", None), getattr(li, "state", None))
+        st = getattr(li, "state", None)
+        by_city = bankruptcy_county_for(getattr(li, "city", None), st)
+        by_zip = county_for_zip(getattr(li, "zip_code", None), st)
+        if by_city and by_zip and by_city != by_zip:
+            conflicts += 1
+            continue
+        cty = by_city or by_zip
         if not cty:
             left += 1
             continue
+        ev = "city+zip" if (by_city and by_zip) else ("city" if by_city else "zip")
         li.county = cty
         if not isinstance(li.raw, dict):
             li.raw = {}
-        li.raw.setdefault("county_backfill", {"county": cty, "evidence": "city",
-                                              "basis": "_bankruptcy_city_to_county gazetteer"})
+        li.raw.setdefault("county_backfill", {
+            "county": cty, "evidence": ev,
+            "basis": "_bankruptcy_city_to_county gazetteer / _zip_to_county (parcel caches)"})
         filled[li.source] = filled.get(li.source, 0) + 1
-    return {"filled": sum(filled.values()), "by_source": filled, "left": left}
+        by_ev[ev] = by_ev.get(ev, 0) + 1
+    return {"filled": sum(filled.values()), "by_source": filled, "by_evidence": by_ev,
+            "conflicts": conflicts, "left": left}
 
 
 def count_by_source(listings, pred) -> dict[str, int]:
@@ -112,3 +128,17 @@ def count_by_source(listings, pred) -> dict[str, int]:
         except Exception:  # noqa: BLE001 - a row the predicate chokes on is not counted
             continue
     return dict(sorted(out.items(), key=lambda kv: -kv[1]))
+
+
+def removed_by_source(before, after, top: int = 15) -> dict[str, int]:
+    """{source: rows} of the rows in `before` that are not in `after` (by object identity), biggest
+    first, at most `top` sources: what one filter removed, per source, without re-running its
+    predicate. For the in_scope / active / flip log lines of main.run (fresh rows are not persisted,
+    so these counts are the only record of what each filter took)."""
+    kept = {id(li) for li in after}
+    out: dict[str, int] = {}
+    for li in before:
+        if id(li) not in kept:
+            s = str(getattr(li, "source", "") or "?")
+            out[s] = out.get(s, 0) + 1
+    return dict(sorted(out.items(), key=lambda kv: -kv[1])[:top])

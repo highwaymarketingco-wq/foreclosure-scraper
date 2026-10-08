@@ -2744,6 +2744,11 @@ RAW_KEEP = {
                                  # on 10/8: title placeholders, entity names; situs_sanity.py)
     "situs_quality": "*",        # 'low' beside situs_nulled
     "mailing_address_not_inherited": "*",  # board_persist.keep_mailing_off_address (683 rows)
+    "tax_value_low": "*",        # {value, county, source, reason}: a county value under $5,000 on a
+                                 # non-land row, kept here instead of being nulled away (1,791 rows
+                                 # on 10/8); Listing.tax_value stays empty
+    "low_value_parcel": "*",     # True beside it: land / trailer site / sliver; valuation.calc
+                                 # withholds the single-family ARV
     "auction_status_reported": "*",  # enrichment_board_quality: the source's own status wording
                                  # before normalising ("provenance is never destroyed" said its
                                  # comment; it was, here)
