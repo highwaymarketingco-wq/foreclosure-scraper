@@ -28,6 +28,8 @@ THE CHECKS (each PASS / WARN / FAIL / SKIP, one line why)
                  reviewed in run_profile.json board_load_allowlist (the carryover kill)
     unwired      no enrichment / scraper module that no run path reaches, unless listed with a
                  reason in run_profile.json unwired_allowlist (listed ones print as a warning)
+    frozen-keys  no published raw key whose only writers are unwired modules, unless listed in
+                 run_profile.json frozen_keys_known (a warning: values frozen since a script ran)
     flags        deploy/oracle/vm_lib.sh exports exactly the run_profile.json flags; none of
                  must_not_set is exported by vm_lib.sh or set in this environment (prints the
                  profile)
@@ -302,6 +304,24 @@ def check_unwired(repo: Path, profile: dict) -> tuple[str, str]:
     return (WARN if rows or stale else PASS), msg
 
 
+def check_frozen_keys(repo: Path, profile: dict) -> tuple[str, str]:
+    """Published raw keys whose only writers are modules no run path reaches: their values on the
+    board are whatever a script last wrote, never refreshed. A warning (each needs a wire-or-retire
+    decision), a failure only for a key not listed in run_profile.json frozen_keys_known."""
+    import pipeline_wiring as W
+    sys.path.insert(0, str(repo / "src"))
+    from foreclosure_scraper.web_artifact import RAW_KEEP
+    prod = W.raw_key_producers(sorted(RAW_KEEP), repo)
+    frozen = sorted(k for k, v in prod.items() if v["writers"] and not v["in_run"])
+    known = set(profile.get("frozen_keys_known") or [])
+    new = [k for k in frozen if k not in known]
+    if new:
+        return FAIL, (f"{len(new)} published key(s) only an unwired module writes (frozen on the board): "
+                      + ", ".join(f"{k} <- {'/'.join(prod[k]['writers'][:2])}" for k in new[:8]))
+    return (WARN if frozen else PASS), (f"{len(frozen)} published keys are frozen (written only by "
+                                        f"script-only modules), all recorded in the profile")
+
+
 def check_flags(repo: Path, profile: dict, env: dict | None = None) -> tuple[str, str]:
     import pipeline_wiring as W
     env = os.environ if env is None else env
@@ -381,7 +401,7 @@ def check_suite(repo: Path, checkpoint: Path | None) -> tuple[str, str]:
 
 # --------------------------------------------------------------------------------------- driver
 CHECK_ORDER = ("git", "pin", "pushed", "tests", "ledgers", "handoff", "manual", "memory",
-               "board-loads", "unwired", "flags", "registry", "suite")
+               "board-loads", "unwired", "frozen-keys", "flags", "registry", "suite")
 
 
 def run_gate(repo: Path, profile: dict, *, pin: str | None, skip: set[str], checkpoint: Path | None,
@@ -397,6 +417,7 @@ def run_gate(repo: Path, profile: dict, *, pin: str | None, skip: set[str], chec
         "memory": lambda: check_memory(repo, profile),
         "board-loads": lambda: check_board_loads(repo, profile),
         "unwired": lambda: check_unwired(repo, profile),
+        "frozen-keys": lambda: check_frozen_keys(repo, profile),
         "flags": lambda: check_flags(repo, profile),
         "registry": lambda: check_registry(repo),
         "suite": lambda: check_suite(repo, checkpoint),

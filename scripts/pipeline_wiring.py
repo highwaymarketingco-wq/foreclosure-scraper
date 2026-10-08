@@ -317,6 +317,28 @@ def whole_file_json_loads(repo: Path = REPO, roots: set[str] | None = None) -> l
     return out
 
 
+# ------------------------------------------------------------------------------ raw key producers
+def raw_key_producers(keys, repo: Path = REPO) -> dict[str, dict]:
+    """{key: {"writers": [module], "in_run": [module]}}: the modules that assign raw[<key>] (a
+    `["key"] =` or `.setdefault("key"` in the source; heuristic), and those the run reaches. A
+    published key with writers but none in the run is a FROZEN column: its values on the board
+    were written by a script some time ago and no run refreshes them."""
+    src = repo / "src"
+    graph = import_graph(src)
+    reach = reachable(graph, run_roots(src))
+    pat = re.compile(r"""\[["']([A-Za-z0-9_]+)["']\]\s*=(?!=)|setdefault\(["']([A-Za-z0-9_]+)["']""")
+    written: dict[str, set[str]] = defaultdict(set)
+    for m, p in iter_modules(src):
+        for a, b in pat.findall(p.read_text(encoding="utf-8", errors="replace")):
+            written[a or b].add(m)
+    out = {}
+    for k in keys:
+        writers = sorted(written.get(k, ()))
+        out[k] = {"writers": [w[len(PKG) + 1:] for w in writers],
+                  "in_run": [w[len(PKG) + 1:] for w in writers if w in reach]}
+    return out
+
+
 # ------------------------------------------------------------------------------------- env flags
 def _const_str(n) -> str | None:
     return n.value if isinstance(n, ast.Constant) and isinstance(n.value, str) else None

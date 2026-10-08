@@ -265,3 +265,23 @@ def test_a_crashing_check_is_a_failed_check(repo, monkeypatch):
                      skip=set(G.CHECK_ORDER) - {"handoff"})
     st = {r["check"]: r["status"] for r in res}
     assert st["handoff"] == G.FAIL and G.exit_code(res) == 1
+
+
+def test_frozen_keys_known_in_the_real_profile():
+    prof = G.load_profile()
+    assert G.check_frozen_keys(REPO, prof)[0] in (G.PASS, G.WARN)
+    st, why = G.check_frozen_keys(REPO, {**prof, "frozen_keys_known": []})
+    assert st == G.FAIL and f"{len(prof['frozen_keys_known'])} published key(s)" in why
+    st, why = G.check_frozen_keys(REPO, {**prof, "frozen_keys_known": [k for k in prof["frozen_keys_known"]
+                                                                       if k != "flood_zone"]})
+    assert st == G.FAIL and "flood_zone <- enrichment_flood_zone" in why
+
+
+def test_raw_key_producers_sees_wired_and_unwired_writers(repo):
+    _tree(repo, {"main.py": "from .enrichment_a import enrich_a\n",
+                 "enrichment_a.py": "def enrich_a(li):\n    li.raw['alpha'] = 1\n",
+                 "enrichment_b.py": "def enrich_b(li):\n    li.raw.setdefault('beta', {})\n    li.raw['alpha'] == 2\n"})
+    prod = W.raw_key_producers(["alpha", "beta", "gamma"], repo)
+    assert prod["alpha"] == {"writers": ["enrichment_a"], "in_run": ["enrichment_a"]}   # == is not a write
+    assert prod["beta"] == {"writers": ["enrichment_b"], "in_run": []}
+    assert prod["gamma"] == {"writers": [], "in_run": []}

@@ -35,13 +35,50 @@
   "FORECLOSURE_NC_HARRIS_ROD": "browser-rendered register platforms stay OFF until a run has measured their memory and time (HANDOFF item 82)"
  },
  "must_not_set": {
-  "GRANDFATHER_CARRIED": {"values": ["1"], "why": "main.run json.loads the whole prior plain board (4.1 GB at 350K rows) and keeps a second 350K-Listing snapshot: certain watchdog kill; restored rows also skip verification and scoring"},
-  "FULLRUN_PERSIST": {"values": ["0"], "why": "a fresh-only board replaces the cumulative one; pulled_sales then reads the whole prior board"},
-  "FULLRUN_PRIOR_CORRECTION": {"values": ["0"], "why": "turns off correct_prior_rows (fallback-point parcels, name-derived counties, exemption-claim withdrawal)"},
-  "SCORE_BOARD_FAIL_SOFT": {"values": ["1", "true", "yes"], "why": "publishes stale HOT/WARM/COLD tiers when scoring fails"},
-  "VERIFICATION_APPLY": {"values": ["0"], "why": "refuted and stale verdicts would not remove their signals"},
-  "FORECLOSURE_CHECKPOINT": {"values": ["0"], "why": "no checkpoint: a crash costs the whole run and the gated publish has nothing to publish"},
-  "ENRICH_PHASE_MAX_SECONDS": {"values": ["*"], "why": "overrides every _await_capped / _gather_phases cap, including dot_ocr, rod_chain and nc_rod_render whose own budgets main.py passes as default_s (the 2026-09-23 dot_ocr zero-visibility bug)"}
+  "GRANDFATHER_CARRIED": {
+   "values": [
+    "1"
+   ],
+   "why": "main.run json.loads the whole prior plain board (4.1 GB at 350K rows) and keeps a second 350K-Listing snapshot: certain watchdog kill; restored rows also skip verification and scoring"
+  },
+  "FULLRUN_PERSIST": {
+   "values": [
+    "0"
+   ],
+   "why": "a fresh-only board replaces the cumulative one; pulled_sales then reads the whole prior board"
+  },
+  "FULLRUN_PRIOR_CORRECTION": {
+   "values": [
+    "0"
+   ],
+   "why": "turns off correct_prior_rows (fallback-point parcels, name-derived counties, exemption-claim withdrawal)"
+  },
+  "SCORE_BOARD_FAIL_SOFT": {
+   "values": [
+    "1",
+    "true",
+    "yes"
+   ],
+   "why": "publishes stale HOT/WARM/COLD tiers when scoring fails"
+  },
+  "VERIFICATION_APPLY": {
+   "values": [
+    "0"
+   ],
+   "why": "refuted and stale verdicts would not remove their signals"
+  },
+  "FORECLOSURE_CHECKPOINT": {
+   "values": [
+    "0"
+   ],
+   "why": "no checkpoint: a crash costs the whole run and the gated publish has nothing to publish"
+  },
+  "ENRICH_PHASE_MAX_SECONDS": {
+   "values": [
+    "*"
+   ],
+   "why": "overrides every _await_capped / _gather_phases cap, including dot_ocr, rod_chain and nc_rod_render whose own budgets main.py passes as default_s (the 2026-09-23 dot_ocr zero-visibility bug)"
+  }
  },
  "unwired_allowlist": {
   "enrichment_charlotte_code": "do not wire: a 403-bypass variant (audit BRIEF: never extend bypass handling); kept per policy, run by scripts only",
@@ -94,14 +131,80 @@
   "growth_factor": 1.15,
   "_growth_doc": "next run's rows = prior board rows x growth_factor. The 10/6 run grew 223,832 -> 350,013 (x1.56) when the 10/7 sources landed; 1.15 assumes no new source of that size. Raise it when adding sources.",
   "calibration": [
-   {"run": "vm-run-20261006T175148", "kind": "full", "pin": "7d5b7ae1", "prior_rows": 223832, "rows_out": 350013, "peak_mb": 19731, "note": "gated full run, exit 0, no swap used"},
-   {"run": "vm-resume-20261007T165654", "kind": "publish_only", "rows_out": 350013, "peak_mb": 17021},
-   {"run": "vm-resume-20261007T125242", "kind": "enrich_only", "rows_out": 350013, "peak_mb": 12508}
+   {
+    "run": "vm-run-20261006T175148",
+    "kind": "full",
+    "pin": "7d5b7ae1",
+    "prior_rows": 223832,
+    "rows_out": 350013,
+    "peak_mb": 19731,
+    "note": "gated full run, exit 0, no swap used"
+   },
+   {
+    "run": "vm-resume-20261007T165654",
+    "kind": "publish_only",
+    "rows_out": 350013,
+    "peak_mb": 17021
+   },
+   {
+    "run": "vm-resume-20261007T125242",
+    "kind": "enrich_only",
+    "rows_out": 350013,
+    "peak_mb": 12508
+   }
   ],
   "_killed_doc": "vm-run-20261007T233726 and vm-run-20261008T003844 were stopped by the watchdog at 25,629 / 25,606 MB 36 minutes in, in carryover (json.loads of the 4.1 GB prior board); fixed by d42058b3. Not calibration points: a defect, not a per-row cost."
  },
- "ledgers": {"dir": "docs/handoff/verification", "max_age_h": 36},
- "handoff": {"file": "docs/handoff/stealth_leads.json", "max_age_h": 36},
+ "ledgers": {
+  "dir": "docs/handoff/verification",
+  "max_age_h": 36
+ },
+ "handoff": {
+  "file": "docs/handoff/stealth_leads.json",
+  "max_age_h": 36
+ },
  "test_results": "data/test_results/latest.json",
- "code_paths": ["src", "scripts", "deploy", "tests", "pyproject.toml", "uv.lock"]
+ "code_paths": [
+  "src",
+  "scripts",
+  "deploy",
+  "tests",
+  "pyproject.toml",
+  "uv.lock"
+ ],
+ "frozen_keys_known": [
+  "bankruptcy_petition",
+  "block_group",
+  "bt_appraisal_card",
+  "building_value_assessed",
+  "campaign_queue",
+  "census_tract",
+  "contact",
+  "crime_stats",
+  "deed",
+  "deficiency_amount",
+  "dnc_scrub",
+  "economic",
+  "flood_zone",
+  "housing_market",
+  "hud_fmr",
+  "land_distress",
+  "land_value_assessed",
+  "lexington_assessment",
+  "market_stats",
+  "marriage_license",
+  "nearby_facilities",
+  "ocr_extraction",
+  "property_category",
+  "rod_name_index",
+  "septic",
+  "standardized_address",
+  "state_fips",
+  "tax_bill_url",
+  "wetlands",
+  "workflow_status",
+  "workflow_status_at",
+  "workflow_tags"
+ ],
+ "_frozen_doc": "RAW_KEEP keys whose only writers are modules the run never imports (scripts/pipeline_wiring.raw_key_producers, 2026-10-09): their values on the board are whatever a script last wrote. Each needs a wire-or-retire decision; the gate fails on a NEW one."
 }
