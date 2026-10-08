@@ -85,6 +85,8 @@ _MIN_LOAN = float(os.environ.get("FORECLOSURE_DOT_OCR_MIN_LOAN", "1000"))
 # Ceiling guard: an OCR misread of a parcel id / book+page concatenation would
 # otherwise become a billion-dollar "principal" and drive equity to nonsense.
 _MAX_LOAN = float(os.environ.get("FORECLOSURE_DOT_OCR_MAX_LOAN", "20000000"))
+#: the processed-documents ledger (lane dot_ocr) re-searches an owner read by an older version
+DOT_OCR_VERSION = "dot_ocr-v2"
 
 
 def _name_parts(owner: str) -> tuple[str, str]:
@@ -442,13 +444,37 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
         age = _dot_age_days(li, now)
         return age is None or age >= refresh_days
 
+    from . import doc_inventory as _inv
+    from . import doc_ledger as _dl
+    led = _dl.get_ledger("dot_ocr") if _dl.enabled() else None
+
+    def _lkey(li) -> str:
+        return _inv.owner_search_key(li.state or "", li.county or "", li.owner_name or "")
+
     targets = [li for li in listings if _eligible(li)]
-    # Never-fetched first, then stalest — a budget-trimmed run still progresses.
+    pending_all = len(targets)
+    # The processed-documents ledger (lane dot_ocr): an owner search that found no deed of
+    # trust, or whose documents were not notes, waits for its retry time instead of being
+    # searched again first on every run (the 2026-10-07 run searched the same 393 Lincoln and
+    # Burke owners every run had searched, found 0 images, and left no mark).
+    ledger_skipped = 0
+    if led is not None and not force:
+        kept = []
+        for li in targets:
+            if led.is_due(_lkey(li), DOT_OCR_VERSION):
+                kept.append(li)
+            else:
+                ledger_skipped += 1
+        targets = kept
+    # Never-fetched first, then stalest, then the lead's value (HOT, WARM, score): a
+    # budget-trimmed run still progresses, best leads first.
     targets.sort(key=lambda li: (_dot_age_days(li, now) is not None,
-                                 -(_dot_age_days(li, now) or 1e9)))
+                                 -(_dot_age_days(li, now) or 1e9),
+                                 _inv.lead_value_key(li)))
     total_pending = len(targets)
 
-    stats = {"pending": total_pending, "targets": 0, "searched": 0, "image_ok": 0,
+    stats = {"pending": total_pending, "pending_before_ledger": pending_all,
+             "ledger_not_due": ledger_skipped, "targets": 0, "searched": 0, "image_ok": 0,
              "loan_found": 0, "rejected_not_note": 0, "budget_exhausted": False,
              "gemini_quota_exhausted": False, "fallback_ocr": 0,
              "counties": {}, "walled_counties": sorted(
@@ -462,6 +488,16 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
     by_county: dict[tuple[str, str], list] = {}
     for li in targets:
         by_county.setdefault(((li.state or "").strip(), (li.county or "").strip()), []).append(li)
+    # FAIR SHARE. The counties used to run in the order their first lead appeared, each taking
+    # up to county_cap (200) of the run's cap (400): the first two counties took the whole run
+    # every time (2026-10-07: Lincoln 200 + Burke 200; the other 9 configured counties never
+    # searched). Now every county gets an equal share of the cap (at most county_cap), counties
+    # holding the most valuable lead go first, and a share a county does not use is NOT carried
+    # (keeps the per-county index sweep cost bounded as before).
+    share = max(1, min(county_cap, -(-cap // max(1, len(by_county)))))
+    by_county = dict(sorted(by_county.items(),
+                            key=lambda kv: _inv.lead_value_key(kv[1][0])))
+    stats["county_share"] = share
 
     from . import enrichment_doc_ocr as ocr
 
@@ -484,6 +520,11 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
         """
         parsed = None
         quota_out = 0
+        # Bound before the Gemini loop: the NVIDIA / Mistral / Anthropic fallbacks below read
+        # `blocks`, which used to be assigned only inside the all-keys-quota-out branch, so a
+        # Gemini that answered without a usable result (not a quota) raised UnboundLocalError
+        # there and _all_counties dropped the rest of that county.
+        blocks = None
         for k in gemini_keys:
             try:
                 parsed = await ocr._gemini_call(k, [(data, mime)], is_text=False)
@@ -494,15 +535,14 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
                 parsed = None
             if parsed:
                 break
-        if not parsed and quota_out == len(gemini_keys) and (gh_token or groq_token):
-            stats["gemini_quota_exhausted"] = True
-            blocks = None
+        if not parsed:
             if mime == "application/pdf":
                 png = di.rasterize_pdf_page1(data)
-                if png:
-                    blocks = [png]
+                blocks = [png] if png else None
             else:
                 blocks = [(data, mime)]
+        if not parsed and quota_out == len(gemini_keys) and (gh_token or groq_token):
+            stats["gemini_quota_exhausted"] = True
             for name, url, key, model in (
                     ("github", ocr.GITHUB_MODELS_URL, gh_token, ocr.GITHUB_MODELS_MODEL),
                     ("groq", ocr.GROQ_URL, groq_token, ocr.GROQ_MODEL)):
@@ -557,7 +597,8 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
         # Anthropic Claude — LAST resort, costs money
         if not parsed:
             claude_key = os.environ.get("ANTHROPIC_API_KEY")
-            if claude_key and blocks:
+            # paid: only with DOC_OCR_ALLOW_PAID=1 (free tiers by default since 2026-10-09)
+            if claude_key and blocks and ocr._paid_allowed():
                 try:
                     async with http_client(timeout=90.0) as hc:
                         parsed = await ocr._anthropic_call(hc, claude_key, blocks)
@@ -578,8 +619,18 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
             return loan, parsed
         return None, parsed
 
+    def _rec(li, outcome: str, **kw) -> None:
+        if led is None:
+            return
+        try:
+            led.record(_lkey(li), outcome=outcome, version=DOT_OCR_VERSION, category="dot_image",
+                       source=getattr(li, "source", None),
+                       county=f"{li.state or '?'}:{li.county or '?'}", **kw)
+        except Exception:  # noqa: BLE001
+            pass
+
     async def _run_county(state: str, county: str, leads: list) -> None:
-        leads = leads[:county_cap]
+        leads = leads[:share]
         stats["targets"] += len(leads)
         vendor = DOC_IMAGE_COUNTIES.get((state, county))
         cstat = {"leads": len(leads), "image_ok": 0, "loan_found": 0}
@@ -612,18 +663,41 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
                 except Exception:  # noqa: BLE001
                     cands = []
                 if not cands:
+                    _rec(li, "no_document", reason=f"vendor:{vendor or '?'}")
                     continue
                 stats["image_ok"] += 1
                 cstat["image_ok"] += 1
+                found = False
+                any_parsed = False
+                not_note = 0
                 for data, mime, doc in cands:
                     loan, parsed = await _ocr_amount(data, mime)
+                    any_parsed = any_parsed or bool(parsed)
                     if loan:
-                        _apply(li, loan, _row_from_doc(doc), parsed or {})
+                        row = _row_from_doc(doc)
+                        _apply(li, loan, row, parsed or {})
                         stats["loan_found"] += 1
                         cstat["loan_found"] += 1
+                        rec = row.get("recorded_date")
+                        _rec(li, "loan_found", provider=(parsed or {}).get("_provider"),
+                             fields=["loan_amount"], landed=["loan_amount", "rod_docs"],
+                             values={"loan_amount": loan, "doc_type": row.get("doc_type"),
+                                     "recorded_date": rec.date().isoformat() if hasattr(rec, "date") else rec,
+                                     "book": row.get("book"), "page": row.get("page"),
+                                     "instrument_no": row.get("instrument_no")},
+                             content_sha256=_dl.content_hash(data), nbytes=len(data))
+                        found = True
                         break
                     if parsed and not di.ocr_is_note(parsed):
                         stats["rejected_not_note"] += 1
+                        not_note += 1
+                if not found:
+                    if not_note and not_note == len(cands):
+                        _rec(li, "not_note", reason=f"{not_note}_candidates_not_notes")
+                    elif any_parsed:
+                        _rec(li, "no_fields", reason="no_principal_in_range")
+                    else:
+                        _rec(li, "provider_failed", reason="ocr_returned_nothing")
         finally:
             if sess is not None:
                 await sess.__aexit__(None, None, None)
@@ -637,6 +711,10 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
                 await _run_county(state, county, leads)
             except Exception:  # noqa: BLE001 - one county must never kill the run
                 log.warning("dot_ocr.county_failed", state=state, county=county)
+        # pending leads the cap / the county share left for a later run
+        stats["left_for_next_run"] = max(0, total_pending - stats["searched"])
+        if stats["left_for_next_run"]:
+            stats["budget_exhausted"] = True
 
     # HARD wall-clock backstop around the whole enricher.
     #
@@ -660,5 +738,12 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
         log.warning("dot_ocr.hard_timeout", elapsed_s=round(time.monotonic() - t0),
                     budget_s=budget_s, searched=stats["searched"])
 
+    if led is not None:
+        led.last_run = {"at": _dl._iso(_dl._utc_now()),
+                        "stats": {k: v for k, v in stats.items() if isinstance(v, (int, float, bool))}}
+        try:
+            led.save()
+        except Exception:  # noqa: BLE001
+            log.warning("dot_ocr.ledger_save_failed")
     log.info("dot_ocr.done", **stats)
     return stats

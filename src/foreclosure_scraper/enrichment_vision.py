@@ -33,6 +33,7 @@ from typing import Callable, Optional
 
 import httpx
 import structlog
+from pathlib import Path
 
 from .models import Listing
 
@@ -343,14 +344,60 @@ def _user_prompt(li: Listing) -> str:
     return "\n".join(parts)
 
 
+#: the dashboard's own copies of county photos are stored as paths RELATIVE to docs/
+#: ("parcel_photos/<county>_<parcel>.jpg", enrichment_lrcpwa_photo / enrichment_assessor_photo /
+#: the street-view cache), which the static site serves beside index.html. They are not URLs:
+#: before 2026-10-09 every one failed to "download", 2,908 rows of the 10/7 board had ONLY such
+#: images, and 1,399 of them sat in queue places 300-2,500 -- so the fetch-failing breaker
+#: (VISION_FETCH_STOP_AFTER=100 in a row) stopped the pass after 1 to 3 minutes on the 10/7 full
+#: run (39 scored of 2,500) and on the Mac daily pass three days running (3, 1, 60 scored).
+_DOCS_DIR = Path(__file__).resolve().parents[2] / "docs"
+_PAGES_BASE = os.environ.get("VISION_RELATIVE_IMAGE_BASE",
+                             "https://highwaymarketingco-wq.github.io/foreclosure-scraper/")
+
+
+def _local_image(url: str) -> Optional[Path]:
+    """The file under docs/ a relative image path names, if it exists on this machine."""
+    rel = url.split("?", 1)[0].lstrip("/")
+    if not rel or ".." in rel.split("/"):
+        return None
+    p = _DOCS_DIR / rel
+    return p if p.is_file() else None
+
+
 async def _fetch_image_bytes(c: httpx.AsyncClient, url: str) -> Optional[tuple[bytes, str]]:
-    """Download image; return (bytes, media_type). Returns None on failure."""
+    """Download image; return (bytes, media_type). Returns None on failure.
+
+    A relative path (the dashboard's hosted copy) is read from docs/ on this machine, else
+    fetched from the published site."""
     try:
+        if not url.startswith(("http://", "https://")):
+            lp = _local_image(url)
+            if lp is not None:
+                data = lp.read_bytes()[:3 * 1024 * 1024]
+                ext = lp.suffix.lower()
+                media = "image/png" if ext == ".png" else ("image/webp" if ext == ".webp" else "image/jpeg")
+                if media == "image/webp":
+                    try:
+                        import io as _io
+                        from PIL import Image as _Image
+                        im = _Image.open(_io.BytesIO(data)).convert("RGB")
+                        out = _io.BytesIO()
+                        im.save(out, "JPEG", quality=85)
+                        data, media = out.getvalue(), "image/jpeg"
+                    except Exception:
+                        pass
+                return data, media
+            if not _PAGES_BASE:
+                return None
+            url = _PAGES_BASE.rstrip("/") + "/" + url.lstrip("/")
         r = await c.get(url, timeout=15.0, follow_redirects=True)
         if r.status_code != 200:
             return None
         media_type = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
         if not media_type.startswith("image/"):
+            if media_type.startswith("text/"):
+                return None     # an HTML error page (a 200 'not found' shell) is not a photo
             media_type = "image/jpeg"
         # Cap at ~3 MB (Anthropic limit)
         data = r.content[:3 * 1024 * 1024]
@@ -1745,6 +1792,8 @@ def _needs_vision(li: Listing) -> bool:
     raw = li.raw if isinstance(li.raw, dict) else {}
     if raw.get("vision"):
         return False
+    if id(li) in _LEDGER_SKIP:
+        return False
     return not _fetch_recently_failed(raw, urls)
 
 
@@ -1864,7 +1913,140 @@ class _YieldMonitor:
 _LAST_RUN: dict = {}
 
 
+#: ids of listings the processed-documents ledger says not to send this run (an image set every
+#: lane already refused to grade, still inside its retry window). Set by enrich_with_vision
+#: around one pass; read by _needs_vision.
+_LEDGER_SKIP: set[int] = set()
+#: bumps when the prompt or the grading rules change what a read produces
+VISION_LEDGER_VERSION = "vision-v1"
+
+
+def _ledger_values(v: dict) -> dict:
+    return {"condition_tier": _canonical_tier(v), "confidence": v.get("confidence"),
+            "rehab_psf_low": v.get("rehab_psf_low"), "rehab_psf_high": v.get("rehab_psf_high"),
+            "n_photos": v.get("_n_photos")}
+
+
+def _reapply_grade(li: Listing, entry: dict) -> bool:
+    """Put an earlier grade of this exact image set back on a lead that lost it (a re-scraped
+    row the prior-board merge did not match), without sending the images again. Only the
+    grade and its confidence/rehab range are kept in the ledger, so the re-applied report says
+    so (_from_ledger)."""
+    vals = entry.get("values") or {}
+    ct = vals.get("condition_tier")
+    if not ct:
+        return False
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    li.raw["vision"] = {"condition_tier": ct, "confidence": vals.get("confidence"),
+                        "rehab_psf_low": vals.get("rehab_psf_low"),
+                        "rehab_psf_high": vals.get("rehab_psf_high"),
+                        "_provider": entry.get("provider"), "_n_photos": vals.get("n_photos"),
+                        "_from_ledger": True, "_graded_at": entry.get("processed_at")}
+    conf = str(vals.get("confidence") or "").upper()
+    if conf in ("HIGH", "MEDIUM"):
+        li.raw["condition_tier"] = ct
+        li.raw["condition_source"] = f"vision-{conf}"
+    return True
+
+
 async def enrich_with_vision(listings: list[Listing], max_listings: int | None = None) -> None:
+    """The vision pass (_enrich_with_vision_impl) with the processed-documents ledger around it
+    (doc_ledger, lane vision, keyed by the image set: doc_inventory.image_set_key of
+    _select_image_urls).
+
+    Before the pass: a lead whose image set the ledger graded (this version) gets that grade
+    back without a call; a lead whose image set every lane refused to grade ('ungraded') is not
+    sent again until its retry time. After the pass (also when the caller's wall clock cancels
+    it): every lead the pass touched gets its outcome recorded: graded, ungraded or
+    fetch_failed. The pass itself, its order and its breakers are unchanged."""
+    global _LEDGER_SKIP
+    try:
+        from . import doc_inventory as _inv
+        from . import doc_ledger as _dl
+        led = _dl.get_ledger("vision") if _dl.enabled() else None
+    except Exception:  # noqa: BLE001
+        led = None
+    if led is None:
+        await _enrich_with_vision_impl(listings, max_listings=max_listings)
+        return
+    regrade = os.environ.get("VISION_REGRADE_SCORED", "0") == "1"
+    pre: dict[int, tuple] = {}
+    keys: dict[int, str] = {}
+    skip: set[int] = set()
+    reapplied = 0
+    for li in listings:
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        urls = _select_image_urls(li)
+        if not urls:
+            continue
+        k = _inv.image_set_key(urls)
+        keys[id(li)] = k
+        ff = raw.get("vision_fetch_failed")
+        pre[id(li)] = (bool(raw.get("vision")), bool(raw.get("vision_unscored")),
+                       (ff or {}).get("at") if isinstance(ff, dict) else None)
+        if raw.get("vision") or regrade:
+            continue
+        e = led.get(k)
+        if not e or led.is_due(k, VISION_LEDGER_VERSION):
+            continue
+        if e.get("outcome") == "graded":
+            if _reapply_grade(li, e):
+                reapplied += 1
+                pre[id(li)] = (True, pre[id(li)][1], pre[id(li)][2])
+        else:
+            skip.add(id(li))
+    if reapplied or skip:
+        log.info("vision.ledger", reapplied=reapplied, not_due=len(skip))
+    _LEDGER_SKIP = skip
+    try:
+        await _enrich_with_vision_impl(listings, max_listings=max_listings)
+    finally:
+        _LEDGER_SKIP = set()
+        recorded = 0
+        for li in listings:
+            k = keys.get(id(li))
+            if k is None:
+                continue
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            had_v, had_u, had_ff = pre.get(id(li), (False, False, None))
+            src = getattr(li, "source", None)
+            county = f"{getattr(li, 'state', None) or '?'}:{getattr(li, 'county', None) or '?'}"
+            v = raw.get("vision")
+            try:
+                if isinstance(v, dict) and not had_v and not v.get("_from_ledger"):
+                    led.record(k, outcome="graded", version=VISION_LEDGER_VERSION,
+                               source=src, county=county,
+                               provider=v.get("_provider"),
+                               landed=(["condition_tier"] if str(raw.get("condition_source") or "")
+                                       .startswith("vision") else []),
+                               values=_ledger_values(v))
+                    recorded += 1
+                elif isinstance(raw.get("vision_unscored"), dict) and not had_u and not v:
+                    led.record(k, outcome="ungraded", version=VISION_LEDGER_VERSION,
+                               source=src, county=county,
+                               reason="every_lane_returned_no_tier")
+                    recorded += 1
+                else:
+                    ff = raw.get("vision_fetch_failed")
+                    if isinstance(ff, dict) and ff.get("at") != had_ff and not v:
+                        led.record(k, outcome="fetch_failed", version=VISION_LEDGER_VERSION,
+                                   source=src, county=county,
+                                   reason=f"attempts={ff.get('attempts')}")
+                        recorded += 1
+            except Exception:  # noqa: BLE001
+                continue
+        led.last_run = {"at": _dl._iso(_dl._utc_now()), "recorded": recorded,
+                        "reapplied": reapplied, "not_due": len(skip),
+                        "summary": {k2: v2 for k2, v2 in (_LAST_RUN or {}).items()
+                                    if isinstance(v2, (int, float, str)) and k2 != "backends"}}
+        try:
+            led.save()
+        except Exception:  # noqa: BLE001
+            log.warning("vision.ledger_save_failed")
+
+
+async def _enrich_with_vision_impl(listings: list[Listing], max_listings: int | None = None) -> None:
     """Run vision condition assessment on listings with usable imagery.
     Overrides condition_tier with the photo-derived value when confidence
     is HIGH or MEDIUM.

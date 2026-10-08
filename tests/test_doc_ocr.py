@@ -36,6 +36,9 @@ def test_apply_ocr_fills_blanks():
         "owner_name": "JOHN Q SMITH", "property_address": "123 Oak St",
         "city": "Asheville", "state": "NC", "zip": "28801",
         "amount": "$154,300.00", "case_number": "24 SP 123",
+        # since 2026-10-09 only a judgment / lien figure fills judgment_amount
+        # (tests/test_doc_ledger_and_reads.py has the untyped and tax cases)
+        "doc_type": "judgment_lien",
     })
     assert li.defendant == "JOHN Q SMITH"
     assert li.street_address == "123 Oak St"

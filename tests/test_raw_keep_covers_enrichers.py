@@ -52,6 +52,11 @@ INTENTIONALLY_INTERNAL = {
     # grandchildren, ages). Not published; the publishable subset of those names reaches the board
     # through raw['heir_candidates'] (enrichment_heir_candidates.PUBLISHABLE_HEIR_RELATIONS).
     "obituary_match",
+    # 2026-10-09 (documents_images audit): an earlier document read set aside because it
+    # contradicts the row's own case / house number (a sale list read as its first entry). The
+    # processed-documents ledger (docs/handoff/documents/doc_ocr.json) keeps the outcome and the
+    # reason; the published row simply carries no read.
+    "doc_ocr_rejected",
 }
 
 
