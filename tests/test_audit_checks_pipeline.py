@@ -187,3 +187,15 @@ def test_grade_equity_current():
             row(None, ["high real equity (50%)"], withheld=True)]       # note, no published equity
     res = _run(P.GradeEquityCurrent(), rows)
     assert (res["checked"], res["violations"]) == (6, 3)
+
+
+def test_tenure_from_sale():
+    c = P.TenureFromSale()
+    now = c.now
+    rows = [{"raw": {"cama": {"last_sale_date": f"{now - 10}-05-01"}, "tenure": {"years_held": 10}}},
+            {"raw": {"cama": {"last_sale_date": f"{now - 10}-05-01"}}},                  # sc_cama after tenure
+            {"raw": {"gis": {"last_sale": {"date": f"{now - 3}-01-01"}}, "tenure": {"years_held": 12}}},
+            {"raw": {}}]
+    res = _run(c, rows)
+    assert (res["checked"], res["violations"]) == (3, 2)
+    assert P.TenureFromSale.DETAIL_KEYS == ("cama",)

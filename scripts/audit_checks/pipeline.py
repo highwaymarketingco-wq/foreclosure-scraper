@@ -17,6 +17,8 @@ Each check would have caught a defect class this pipeline has had:
                                  enrich_equity, so grades read the previous run's equity.
   pipeline-combo-matches-tax     a bankruptcy+tax combo that restates a tax balance the row no longer
                                  has (the combo enricher only ever set it, never cleared it).
+  pipeline-tenure-from-sale      a row whose last-sale year is known without the tenure it gives:
+                                 enrich_tenure runs before enrich_sc_cama writes the SC sale dates.
   pipeline-tax-check-binding     a county-site tax check on the row that the displayed balance
                                  contradicts: confirmed but the balance is not the checked one, or
                                  stale/refuted while an unverified balance is still shown (a step
@@ -233,6 +235,47 @@ class ComboMatchesTax(_Check):
             self._bad(row, "combo balance is not the row's")
 
 
+class TenureFromSale(_Check):
+    """raw['tenure'] is the years since the row's last sale (enrichment_tenure._last_sale_year:
+    gis.last_sale, gis.last_sale_date, cama.last_sale_date / sale_date, last_sale_date). The run
+    computes it BEFORE enrich_sc_cama writes raw['cama'] (an SC row whose only sale date is the
+    assessor CSV's gets no tenure until the next run), and the enricher never clears or rewrites a
+    tenure whose sale changed."""
+    name = "pipeline-tenure-from-sale"
+    describe = "a row with a known last-sale year carries the tenure that year gives"
+    DETAIL_KEYS = ("cama",)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.now = datetime.utcnow().year
+
+    @staticmethod
+    def _year(row: dict) -> int | None:
+        import re
+        raw = _raw(row)
+        gis = raw.get("gis") if isinstance(raw.get("gis"), dict) else {}
+        ls = gis.get("last_sale") if isinstance(gis.get("last_sale"), dict) else {}
+        cama = raw.get("cama") if isinstance(raw.get("cama"), dict) else {}
+        for v in (ls.get("date"), ls.get("year"), gis.get("last_sale_date"), cama.get("last_sale_date"),
+                  cama.get("sale_date"), row.get("last_sale_date")):
+            if v:
+                m = re.search(r"(19|20)\d{2}", str(v))
+                if m:
+                    return int(m.group(0))
+        return None
+
+    def feed(self, row: dict) -> None:
+        y = self._year(row)
+        if not y or y > self.now:
+            return
+        self.checked += 1
+        ten = _raw(row).get("tenure")
+        if not isinstance(ten, dict):
+            self._bad(row, "sale year known, no tenure")
+        elif ten.get("years_held") not in (self.now - y, self.now - 1 - y):
+            self._bad(row, "tenure from another sale")
+
+
 class TaxCheckBinding(_Check):
     name = "pipeline-tax-check-binding"
     describe = ("a county-site tax check decides the displayed balance (confirmed: the checked "
@@ -384,5 +427,5 @@ class RunHealthCounts(_Check):
 
 
 def make_checks() -> list:
-    return [RowScored(), RowValued(), EquityTaxInputs(), GradeEquityCurrent(), ComboMatchesTax(), TaxCheckBinding(),
+    return [RowScored(), RowValued(), EquityTaxInputs(), GradeEquityCurrent(), ComboMatchesTax(), TenureFromSale(), TaxCheckBinding(),
             CountylessNational(), RawKeep(), SeenOrder(), RunHealthCounts()]
