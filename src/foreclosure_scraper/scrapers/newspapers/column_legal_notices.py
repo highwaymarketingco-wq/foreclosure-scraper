@@ -1087,10 +1087,45 @@ def estate_county(text: str, tag_county: str) -> str:
 # --------------------------------------------------------------------------- #
 # API call
 # --------------------------------------------------------------------------- #
+#: Smallest window _query will split a full page into (one day).
+_MIN_SPLIT_MS = 24 * 3600 * 1000
+#: Depth limit for the window split: 2**6 = 64 slices of the 120-day window at most.
+_MAX_SPLIT_DEPTH = 6
+
+
 async def _query(
-    c, state: str, county: str, noticetype: str, from_ms: int, to_ms: int
+    c, state: str, county: str, noticetype: str, from_ms: int, to_ms: int,
+    _depth: int = 0,
 ) -> list[dict]:
-    """One POST for a (state, county, noticetype) window. Returns raw items."""
+    """All items of a (state, county, noticetype) window.
+
+    2026-10-08 (source-completeness audit): one POST returns at most PAGE_SIZE
+    (250) rows, newest first, and the response says how many there are
+    (`page.total_results`). When a window holds more, the older rows were cut
+    (the 2026-10-07 extraction audit found one county with 391). The window is
+    now halved until every slice fits, so a busy county costs a few more POSTs
+    instead of losing its oldest notices; a quiet one costs nothing extra."""
+    items, total, n_raw = await _query_once(c, state, county, noticetype, from_ms, to_ms)
+    if total is None or total <= n_raw or n_raw < PAGE_SIZE:
+        return items
+    if _depth >= _MAX_SPLIT_DEPTH or (to_ms - from_ms) <= _MIN_SPLIT_MS:
+        log.warning("column.window_still_capped", county=county, type=noticetype,
+                    total=total, kept=n_raw, window_days=round((to_ms - from_ms) / 86_400_000, 1))
+        return items
+    mid = from_ms + (to_ms - from_ms) // 2
+    log.info("column.window_split", county=county, type=noticetype, total=total,
+             page=n_raw, depth=_depth + 1)
+    newer = await _query(c, state, county, noticetype, mid + 1, to_ms, _depth + 1)
+    older = await _query(c, state, county, noticetype, from_ms, mid, _depth + 1)
+    return newer + older
+
+
+async def _query_once(
+    c, state: str, county: str, noticetype: str, from_ms: int, to_ms: int
+) -> tuple[list[dict], int | None, int]:
+    """One POST for a (state, county, noticetype) window.
+
+    Returns (items inside the window, the server's total_results or None, rows on the page)."""
     body = {
         "search": "",
         "allFilters": [
@@ -1133,24 +1168,30 @@ async def _query(
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("column.post_fail", county=county, type=noticetype, error=str(exc)[:160])
-        return []
+        return [], None, 0
     if r.status_code != 200:
         log.warning("column.bad_status", county=county, type=noticetype, code=r.status_code)
         # raise so safe_run classifies block/server-error correctly
         r.raise_for_status()
-        return []
+        return [], None, 0
     try:
         data = r.json()
     except Exception:
-        return []
+        return [], None, 0
     results = data.get("results") if isinstance(data, dict) else data
     if not isinstance(results, list):
-        return []
+        return [], None, 0
+    total = None
+    if isinstance(data, dict):
+        pg = data.get("page")
+        if isinstance(pg, dict) and isinstance(pg.get("total_results"), int):
+            total = pg["total_results"]
     # Client-side window filter (replaces the dropped server-side range filter). Results arrive
     # newest-first, so the page already favors recent notices; keep only those in [from_ms, to_ms].
-    return [it for it in results
-            if isinstance(it.get("publishedtimestamp"), (int, float))
-            and from_ms <= it["publishedtimestamp"] <= to_ms]
+    return ([it for it in results
+             if isinstance(it.get("publishedtimestamp"), (int, float))
+             and from_ms <= it["publishedtimestamp"] <= to_ms],
+            total, len(results))
 
 
 #: SC Master-in-Equity case number: 2025-CP-38-01441, also written 2025CP3801109.
