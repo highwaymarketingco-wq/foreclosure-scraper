@@ -194,6 +194,42 @@ NC_STATEWIDE_FALLBACK_COUNTIES: tuple[str, ...] = tuple(
 )
 
 
+#: Parcel facts the layer carries beside owner/situs/mailing, by layer url (2026-10-08
+#: source-completeness audit; extraction audit 2026-10-07 section 3 "value/acreage/sale/deed/link
+#: columns unmapped"). Only layers whose field names were read live from the layer's own schema
+#: that day are listed (a name the layer lacks makes ArcGIS answer 400 and the county is lost):
+#: NC OneMap (Cleveland + the 89 statewide-fallback counties) and Polk. Kept in
+#: raw['heir_estate']['parcel_facts']; acreage and the legal description also fill the Listing.
+_PARCEL_FACT_FIELDS: dict[str, tuple[str, ...]] = {
+    _NC_ONEMAP_SPEC["url"]: ("gisacres", "parval", "landval", "improvval", "saledate",
+                             "saledatetx", "legdecfull", "parusedesc", "structyear", "mapref",
+                             "altparno"),
+    COUNTY_GIS["NC:Polk"]["url"]: ("TOTAL_TAX_VALUE", "TOTAL_TAX_OWED", "DEEDED_ACRES",
+                                   "DEED_BOOK", "DEED_PAGE", "DEED_YEAR", "PropertyRecordCard"),
+}
+_ACRE_FIELDS = ("gisacres", "DEEDED_ACRES")
+_LEGAL_FIELDS = ("legdecfull",)
+
+
+def _parcel_facts(spec: dict, attrs: dict) -> dict:
+    """The _PARCEL_FACT_FIELDS this row carries (None / blank values dropped)."""
+    out = {}
+    for k in _PARCEL_FACT_FIELDS.get(spec.get("url") or "", ()):
+        v = attrs.get(k)
+        if v is None or (isinstance(v, str) and not v.strip()):
+            continue
+        out[k] = v.strip() if isinstance(v, str) else v
+    return out
+
+
+def _first_num(facts: dict, keys: tuple[str, ...]):
+    for k in keys:
+        v = facts.get(k)
+        if isinstance(v, (int, float)) and v > 0:
+            return float(v)
+    return None
+
+
 def _where(spec: dict, county: str) -> str:
     owner_fields = spec.get("owner") or []
     if not owner_fields:
@@ -399,6 +435,9 @@ class NCHeirEstateParcels(BaseScraper):
         numeric value column. An empty ranked first page (a slow ordered query times out
         the same way an empty one answers) falls back to the old unordered read."""
         out_fields = _spec_out_fields(spec)
+        extra = _PARCEL_FACT_FIELDS.get(spec.get("url") or "", ())
+        if extra:
+            out_fields = ",".join(dict.fromkeys(out_fields.split(",") + list(extra)))
         if value_field:
             out_fields = ",".join(dict.fromkeys(out_fields.split(",") + [value_field]))
             rows: list[dict] = []
@@ -456,9 +495,13 @@ class NCHeirEstateParcels(BaseScraper):
                 cv = attrs.get(care_of_field)
                 if cv and str(cv).strip():
                     care_of = re.sub(r"\s+", " ", _html(str(cv))).strip() or None
+            facts = _parcel_facts(spec, attrs)
+            legal = next((str(facts[k]) for k in _LEGAL_FIELDS if facts.get(k)), None)
             li = Listing(
                 source=self.slug,
                 source_url=spec["url"],
+                acreage=_first_num(facts, _ACRE_FIELDS),
+                legal_description=legal,
                 listing_type=ListingType.ESTATE_LEAD,
                 property_kind=PropertyKind.UNKNOWN,
                 state=state,
@@ -485,6 +528,7 @@ class NCHeirEstateParcels(BaseScraper):
                         **({"value": _num(attrs.get(value_field)), "value_field": value_field,
                             "value_rank": rank} if ranked and value_field else {}),
                         "per_county_cap": _PER_COUNTY_CAP,
+                        **({"parcel_facts": facts} if facts else {}),
                     },
                     # Score as a probate/life-event distress signal.
                     "relationship_signal": {

@@ -490,3 +490,43 @@ def test_an_empty_ranked_read_falls_back_to_the_unordered_one(monkeypatch):
 def test_a_layer_without_a_numeric_value_column_reads_unordered(monkeypatch):
     s, out, calls, unordered = _drive(monkeypatch, [], [{"name": "X", "type": "esriFieldTypeString"}])
     assert not calls and unordered == [3]
+
+
+# --- 2026-10-08: parcel facts the layer carries (value / acreage / sale / legal / deed / card
+# link) are requested and kept. Names, ids and values below are made up. ---
+
+def test_onemap_rows_request_and_keep_the_parcel_facts(monkeypatch):
+    calls = []
+
+    async def fake_page(http, url, where, out_fields="*", count=25, offset=0, order_by=""):
+        calls.append(out_fields)
+        row = {"ownname": "SAMPLE PAT HEIRS", "ownname2": None, "parno": "1234567890",
+               "siteadd": "1 TEST ST", "parval": 150000.0, "gisacres": 2.5, "saledate": None,
+               "legdecfull": "LOT 4 SAMPLE ACRES", "mapref": " ", "structyear": 1978}
+        return [row], False
+
+    monkeypatch.setattr(m, "_query_page", fake_page)
+    s = m.NCHeirEstateParcels()
+    spec = m._NC_ONEMAP_SPEC
+    out = asyncio.run(s._process_county(
+        _SchemaHttp([{"name": "parval", "type": "esriFieldTypeDouble"}]), "NC", "Ashe", spec))
+    for f in ("gisacres", "legdecfull", "saledate", "structyear", "altparno"):
+        assert f in calls[0].split(",")
+    facts = out[0].raw["heir_estate"]["parcel_facts"]
+    assert facts == {"gisacres": 2.5, "parval": 150000.0, "legdecfull": "LOT 4 SAMPLE ACRES",
+                     "structyear": 1978}
+    assert out[0].acreage == 2.5 and out[0].legal_description == "LOT 4 SAMPLE ACRES"
+
+
+def test_polk_rows_keep_tax_owed_deed_and_record_card():
+    spec = m.COUNTY_GIS["NC:Polk"]
+    facts = m._parcel_facts(spec, {"TMS": "P1-2", "TOTAL_TAX_OWED": 525.01, "DEEDED_ACRES": 3.1,
+                                   "DEED_BOOK": "88", "DEED_PAGE": "101",
+                                   "PropertyRecordCard": "http://example.invalid/P1-2.pdf"})
+    assert facts["TOTAL_TAX_OWED"] == 525.01 and facts["DEED_BOOK"] == "88"
+    assert facts["PropertyRecordCard"].endswith("P1-2.pdf")
+
+
+def test_a_layer_without_listed_facts_requests_nothing_extra():
+    spec = m.COUNTY_GIS["NC:Gaston"]
+    assert m._parcel_facts(spec, {"FMV_TOTAL": 1.0, "anything": "x"}) == {}
