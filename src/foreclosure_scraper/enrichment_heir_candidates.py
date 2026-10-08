@@ -224,6 +224,19 @@ def _tokens(name: str) -> tuple[frozenset, Optional[str]]:
     return frozenset(w for w in words if w not in _SUF and len(w) > 1), suf
 
 
+def marked_parts(owner: str, parts: Optional[list[str]] = None) -> list[str]:
+    """The owner-string parts the HEIRS / ESTATE / DECEASED wording covers. 'DOE JOHN HEIRS; DOE
+    MARY' marks only John; 'DOE JOHN & DOE MARY HEIRS' or 'DOE JOHN & MARY - ESTATE' (one '&' group,
+    the wording at its end) covers both names: a live check (audit 2026-10-09 additions_verify) found
+    the first name of such a pair published as a living heir of the second."""
+    parts = split_owners(owner) if parts is None else parts
+    marked = [p for p in parts if roll_markers(p)]
+    if (len(marked) == 1 and len(parts) > 1 and marked[0] == parts[-1] and ";" not in str(owner)
+            and re.search(r"&|\bAND\b", str(owner), re.I)):
+        return list(parts)
+    return marked
+
+
 def _decedent_tokens(row: Any) -> set[tuple[frozenset, Optional[str]]]:
     """Every reading of the decedent / owner, so a decedent never comes back as his own heir."""
     raw = _raw(row)
@@ -236,7 +249,7 @@ def _decedent_tokens(row: Any) -> set[tuple[frozenset, Optional[str]]]:
         if not owner:
             continue
         parts = split_owners(owner)
-        marked = [p for p in parts if roll_markers(p)]
+        marked = marked_parts(owner, parts)
         if marked:
             strings += marked                      # 'DOE JOHN HEIRS; DOE MARY': only John died
         elif len(parts) == 1:
@@ -374,21 +387,27 @@ def _county_candidates(row: Any, dec: set[frozenset]) -> list[dict]:
         nm = str(h["name"])
         care = bool(re.match(r"\s*C/O\b", nm, re.I))
         nm = re.sub(r"^\s*C/O\s+", "", nm, flags=re.I)
-        if is_entity(nm) or _is_decedent(nm, dec):
+        # a roll entry that itself says DECEASED / HEIRS / ESTATE is a decedent, not a contact
+        if is_entity(nm) or roll_markers(nm) or _is_decedent(nm, dec):
             continue
         out.append(_cand(nm, "care-of addressee on the tax roll" if care else "co-owner of record on the tax roll",
                          "county_record", url, None,
                          ("the county tax roll prints this name as the care-of addressee on the heirs/estate entry"
                           if care else "the county tax roll lists this name beside the heirs/estate entry")
                          + "; a family member is often named this way, but the roll does not say so."))
-    if he.get("care_of") and not is_entity(he["care_of"]) and not _is_decedent(str(he["care_of"]), dec):
+    if he.get("care_of") and not is_entity(he["care_of"]) and not roll_markers(str(he["care_of"])) \
+            and not _is_decedent(str(he["care_of"]), dec):
         out.append(_cand(str(he["care_of"]), "care-of addressee on the tax roll", "county_record", url, None,
                          "the county tax roll mails the bill in care of this name; the roll does not say why."))
     md = raw.get("mcdowell_probate")
-    if isinstance(md, dict) and md.get("ownname2") and not is_entity(md["ownname2"]) \
-            and not _is_decedent(str(md["ownname2"]), dec):
-        out.append(_cand(str(md["ownname2"]), "second owner line on the tax roll", "county_record", url, None,
-                         "McDowell's roll prints this as the second owner line of a deceased owner's parcel."))
+    if isinstance(md, dict) and md.get("ownname2") and not is_entity(md["ownname2"]):
+        # the line can hold several names (one live sample held four, the decedent among them)
+        for part in split_owners(str(md["ownname2"])):
+            if roll_markers(part) or is_entity(part) or len(part.split()) < 2 or _is_decedent(part, dec):
+                continue
+            out.append(_cand(part, "second owner line on the tax roll", "county_record", url, None,
+                             "McDowell's roll prints this on the second owner line of a deceased owner's "
+                             "parcel."))
     # other owners in the owner-of-record string itself ('DOE JOHN HEIRS; DOE MARY')
     owner = _get(row, "owner_name")
     if owner and _entity_safe_markers(owner):

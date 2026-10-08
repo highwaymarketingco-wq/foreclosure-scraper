@@ -322,3 +322,25 @@ def test_probate_index_representative_is_not_read_as_the_decedent():
     row["defendant"] = "Ulla Wick Danner"          # the scraper puts the PR in `defendant`
     c = candidates_for(row)
     assert [(x["name"], x["source_kind"]) for x in c] == [("Ulla Wick Danner", "probate_record_personal_representative")]
+
+
+def test_an_ampersand_heirs_group_is_all_decedents_and_deceased_contacts_are_not_heirs():
+    """Audit 2026-10-09 (live check of 30 published candidates): 'A & B HEIRS' published A as a
+    living co-owner, a care-of entry marked DECEASED was published, and McDowell's second owner
+    line was published as one four-name string. Made-up names."""
+    row = _lead("TANDRY ORVEL & TANDRY LUNETTA HEIRS",
+                heir_estate={"owner_of_record": "TANDRY ORVEL & TANDRY LUNETTA HEIRS",
+                             "heir_names": [{"raw": "C/O TANDRY CORWIN (DECEASED)",
+                                             "name": "C/O TANDRY CORWIN (DECEASED)", "role": "other"},
+                                            {"raw": "C/O TANDRY MAVIS", "name": "C/O TANDRY MAVIS",
+                                             "role": "other"}]})
+    got = {x["name"] for x in candidates_for(row)}
+    assert "TANDRY ORVEL" not in got and "TANDRY LUNETTA" not in got
+    assert not any("CORWIN" in n for n in got)
+    assert "TANDRY MAVIS" in got
+    semi = _lead("TANDRY ORVEL HEIRS; TANDRY LUNETTA B")
+    assert "TANDRY LUNETTA B" in {x["name"] for x in candidates_for(semi)}   # ';' still marks one name
+    mc = _lead("QUIMBY ABEL HEIRS", county="McDowell",
+               mcdowell_probate={"ownname2": "QUIMBY BETH & QUIMBY CARL"})
+    names = {x["name"] for x in candidates_for(mc)}
+    assert names >= {"QUIMBY BETH", "QUIMBY CARL"} and "QUIMBY BETH & QUIMBY CARL" not in names
