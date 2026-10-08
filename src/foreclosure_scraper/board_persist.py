@@ -357,6 +357,8 @@ _SOURCE_PARCEL_FIELDS = {
     "counties_nc.rutherford_tax": ("rutherford_tax", "parcel"),
     "counties_nc.nc_ptscloud_delinquent_tax": ("nc_ptscloud_delinquent_tax", "parcel"),
     "counties_nc.lincoln_vacant": ("lincoln_vacant", "PARCELID"),
+    # parcel_id=parcel with raw['rutherford_wildfire']['parcel'] (audit 2026-10-09; parcel_alias)
+    "counties_nc.rutherford_wildfire_tax": ("rutherford_wildfire", "parcel"),
 }
 
 

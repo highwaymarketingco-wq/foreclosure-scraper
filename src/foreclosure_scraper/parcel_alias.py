@@ -37,6 +37,10 @@ from typing import Any, Iterable, Optional
 ALIAS_SOURCES: dict[str, tuple[str, str]] = {
     "counties_nc.lincoln_vacant": ("lincoln_vacant", "PARCELID"),
     "counties_nc.rutherford_tax": ("rutherford_tax", "parcel"),
+    # 2026-10-09 (audit source_completeness): the Sturgis/Wildfire roll's 6-7 digit Parcel_Number
+    # (896 ids nulled by validation in the 10/8 run, 893 with a PIN); the scraper publishes the PIN
+    # only once this entry exists (rutherford_wildfire_tax._pins_enabled).
+    "counties_nc.rutherford_wildfire_tax": ("rutherford_wildfire", "parcel"),
 }
 
 _NON_ALNUM = re.compile(r"[^a-z0-9]")
