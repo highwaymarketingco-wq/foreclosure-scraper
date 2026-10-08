@@ -111,7 +111,15 @@ class GreenvilleDelinquentTax(BaseScraper):
         for row in rows:
             cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
             clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
-            if len(clean) != 4 or is_label_row(clean):
+            if len(clean) != 4:
+                continue
+            # A row with a numeric item number and a dollar amount is a data row whatever
+            # its name says. is_label_row() matches label words as SUBSTRINGS of the first
+            # three cells ("owner", "office", "days", ...), so an owner such as a
+            # "... HOMEOWNERS ASSOCIATION" read as page furniture: 11 of 1,148 data rows
+            # on the live table (2026-10-08) were dropped that way.
+            is_data = clean[0].isdigit() and bool(_AMOUNT_RE.match(clean[3]))
+            if not is_data and is_label_row(clean):
                 continue
 
             item_no, map_no, name, amount_str = clean

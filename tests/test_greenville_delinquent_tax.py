@@ -87,3 +87,18 @@ def test_all_rows_are_tax_sale_type():
 def test_empty_html():
     assert list(_run("")) == []
     assert list(_run("<html><body>no table here</body></html>")) == []
+
+
+def test_owner_names_holding_label_words_are_still_data_rows():
+    """2026-10-09 source audit: is_label_row() matches 'owner', 'office', 'days', ... as
+    substrings, so 11 of 1,148 live data rows (e.g. a homeowners association) were dropped
+    as page furniture. Made-up names."""
+    html = """<table>
+<tr><th>Item #</th><th>Map #</th><th>Name</th><th>Amount Due</th></tr>
+<tr><td>3001</td><td>0500000100100</td><td>SAMPLE CREEK HOMEOWNERS ASSOC INC</td><td>$412.50</td></tr>
+<tr><td>3002</td><td>0500000100200</td><td>EXAMPLE POST OFFICE HOLDINGS LLC</td><td>$1,020.00</td></tr>
+<tr><td>3003</td><td>0500000100300</td><td>HAPPY DAYS RENTALS LLC</td><td>$75.25</td></tr>
+</table>
+<table><tr><td>Monday</td><td>Tuesday</td><td>Hours</td><td>8:30 a.m.</td></tr></table>"""
+    rows = list(_run(html))
+    assert sorted(r.parcel_id for r in rows) == ["0500000100100", "0500000100200", "0500000100300"]
