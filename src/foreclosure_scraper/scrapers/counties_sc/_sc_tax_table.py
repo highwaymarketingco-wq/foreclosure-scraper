@@ -43,6 +43,8 @@ _SCHEDULE_LABELS = ("monday", "tuesday", "wednesday", "thursday", "friday",
 #: SC TMS: 3-4 / 2 / 2 / 3-4 with optional separators, or a long bare parcel number.
 _TMS_RE = re.compile(r"\b(\d{3,4}[-\s]?\d{2}[-\s]?\d{2}[-\s]?[\d.]{3,})\b")
 _BARE_RE = re.compile(r"\b(\d{8,})\b")
+#: A dollar amount cell: '$1,234.56', '1234.56'.
+_MONEY_RE = re.compile(r"\$?\s*[\d,]+\.\d{2}")
 
 
 def is_label_row(cells: list[str]) -> bool:
@@ -51,6 +53,12 @@ def is_label_row(cells: list[str]) -> bool:
     Checks the first THREE cells rather than two: several of these tables put a blank
     leading cell in front of the label, which slipped past the original two-cell test.
     """
+    # A row that carries a parcel number AND a money amount is data, whatever words its owner
+    # name holds: the label test below matches SUBSTRINGS, so an owner such as a homeowners
+    # association ('owner') or a business 'OFFICE' read as page furniture (audit 2026-10-09:
+    # 11 of 1,148 Greenville data rows were dropped that way).
+    if find_tms(cells) and any(_MONEY_RE.fullmatch((c or "").strip()) for c in cells):
+        return False
     head = [(c or "").lower() for c in cells[:3]]
     if any(lbl in c for c in head for lbl in _HEADER_LABELS):
         return True
