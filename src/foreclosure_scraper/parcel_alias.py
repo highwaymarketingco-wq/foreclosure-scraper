@@ -69,14 +69,27 @@ def short_id_of(row: Any) -> Optional[str]:
     return str(v).strip() or None if v not in (None, "") else None
 
 
+_NC_PIN = re.compile(r"^\d{10}$")
+
+
+def is_pin(pid: Any) -> bool:
+    """An NC 10-digit PIN (punctuation ignored): the only id the table may map a short id TO.
+    On the 10/8 checkpoint carried Rutherford rows whose parcel_id was ANOTHER 7-digit county
+    number entered the table as 'PINs', and 53 rows were given a different property's id
+    (audit 2026-10-09, additions_verify)."""
+    return bool(_NC_PIN.match(_norm(pid)))
+
+
 def build(rows: Iterable[Any]) -> dict[tuple[str, str, str], str]:
-    """{(state, county, normalized short id): PIN} from alias-source rows carrying both ids."""
+    """{(state, county, normalized short id): PIN} from alias-source rows carrying both ids.
+    A row whose parcel_id is not a 10-digit PIN (a carried row that still holds a short id of
+    its own) adds nothing."""
     table: dict[tuple[str, str, str], str] = {}
     bad: set[tuple[str, str, str]] = set()
     for row in rows:
         short = short_id_of(row)
         long_ = str(_get(row, "parcel_id") or "").strip()
-        if not short or not long_ or _norm(short) == _norm(long_):
+        if not short or not long_ or _norm(short) == _norm(long_) or not is_pin(long_):
             continue
         key = (str(_get(row, "state") or ""), _cty(_get(row, "county")), _norm(short))
         if key in table and _norm(table[key]) != _norm(long_):

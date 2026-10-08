@@ -146,3 +146,12 @@ def test_an_aliased_prior_row_that_does_not_match_is_still_never_restored(tmp_pa
     merged, st = merge_prior_board([fresh], docs_dir=board(tmp_path, [old]), now=NOW)
     assert st["prior_parcel_aliased"] == 1
     assert drop_folded_prior([old], st) == []
+
+
+def test_a_short_id_never_maps_to_another_short_id():
+    """A carried Rutherford row whose parcel_id is another 7-digit county number (not a PIN) must
+    not enter the alias table: on 10/8 such rows gave 53 rows a different property's id."""
+    t = pa.build([ruth("1600009", "1600001"), ruth("1600000002", "123456", pin="1600000002")])
+    assert pa.lookup(t, "NC", "Rutherford", "1600001") is None
+    assert pa.lookup(t, "NC", "Rutherford", "123456") == "1600000002"
+    assert pa.is_pin("1600-00-0002") and not pa.is_pin("1600009") and not pa.is_pin("16000000021")
