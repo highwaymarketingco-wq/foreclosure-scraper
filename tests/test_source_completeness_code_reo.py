@@ -289,3 +289,22 @@ def test_distressed_salvages_finished_counties_on_a_timeout(monkeypatch):
     s.timeout_s = 0.5
     rows = asyncio.run(s.safe_run())
     assert [li.county for li in rows] == ["Polk"]
+
+
+def test_homeharvest_foreclosures_have_no_list_date_window(monkeypatch):
+    import sys
+    import types
+
+    from foreclosure_scraper.scrapers.national import homeharvest as HH
+
+    calls: list = []
+    fake = types.ModuleType("homeharvest")
+
+    def scrape_property(**kw):
+        calls.append(kw)
+        return None
+
+    fake.scrape_property = scrape_property
+    monkeypatch.setitem(sys.modules, "homeharvest", fake)
+    HH._scrape_one_county("Spartanburg", "SC", "Spartanburg")
+    assert calls and all("past_days" not in kw for kw in calls)

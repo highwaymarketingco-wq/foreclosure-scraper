@@ -59,7 +59,7 @@ def test_scrape_one_county_searches_whole_county_not_seat_town(monkeypatch):
 
     class _FakeHomeHarvest:
         @staticmethod
-        def scrape_property(location, listing_type, foreclosure, past_days):
+        def scrape_property(location, listing_type, foreclosure, past_days=None):
             captured_locations.append(location)
             return None
 

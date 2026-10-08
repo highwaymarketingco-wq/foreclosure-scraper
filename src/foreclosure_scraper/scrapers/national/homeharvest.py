@@ -180,14 +180,15 @@ def _scrape_one_county(seat: str, state: str, county: str) -> list[Listing]:
 
     # Two passes: foreclosure-flagged for_sale (most active), then pending
     # (lis-pendens / under-contract foreclosures aren't always flagged but
-    # land here). past_days=180 catches anything still listed after the auction.
+    # land here). No past_days (2026-10-08): past_days=180 dropped a foreclosure
+    # listing put on the market more than 180 days ago that is still active (live,
+    # Spartanburg County SC for_sale: 9 rows with the window, 10 without, the same 0.8 s).
     for listing_type, foreclosure in (("for_sale", True), ("pending", True)):
         try:
             df = scrape_property(
                 location=location,
                 listing_type=listing_type,
                 foreclosure=foreclosure,
-                past_days=180,
             )
             if df is None or len(df) == 0:
                 continue
@@ -211,7 +212,10 @@ class HomeHarvestForeclosures(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         loop = asyncio.get_event_loop()
-        out: list[Listing] = []
+        # Deduped by URL into self.partial as each county finishes (2026-10-08), so a soft
+        # timeout ships every finished county instead of nothing.
+        deduped = self.partial
+        seen: set[str] = set()
         # HomeHarvest's scrape_property is sync — run each county in a thread.
         # 4 parallel threads is plenty (don't hammer Realtor's servers).
         with ThreadPoolExecutor(max_workers=4) as pool:
@@ -219,16 +223,14 @@ class HomeHarvestForeclosures(BaseScraper):
                 loop.run_in_executor(pool, _scrape_one_county, c.seat, c.state, c.name)
                 for c in ALL_COUNTIES
             ]
-            results = await asyncio.gather(*futures, return_exceptions=True)
-            for r in results:
-                if isinstance(r, list):
-                    out.extend(r)
-        # Dedupe within HomeHarvest by URL
-        seen: set[str] = set()
-        deduped = []
-        for li in out:
-            if li.source_url in seen:
-                continue
-            seen.add(li.source_url)
-            deduped.append(li)
-        return deduped
+            for fut in asyncio.as_completed(futures):
+                try:
+                    r = await fut
+                except Exception:  # noqa: BLE001 - one county never sinks the rest
+                    continue
+                for li in r or []:
+                    if li.source_url in seen:
+                        continue
+                    seen.add(li.source_url)
+                    deduped.append(li)
+        return list(deduped)
