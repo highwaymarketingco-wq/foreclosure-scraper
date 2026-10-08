@@ -962,21 +962,25 @@ DECISIVE = ("confirmed", "refuted", "stale")
 
 
 def load_ledger_index(directory: Path = LEDGER_DIR) -> tuple[dict[str, dict[str, Optional[str]]], dict]:
-    """{signal: {property key: latest verdict}} from every ledger file, and per-signal summary
-    counts by (state, county, verdict). A case-scoped key '<case>@<key>' indexes by its property
-    part."""
+    """{signal: {property key: latest verdict}} from every ledger, either layout (the single
+    <signal>.json or the <signal>/ shard directory, both merged while a ledger is in transition:
+    verification.ledger LAYOUTS), and per-signal summary counts by (state, county, verdict). A
+    case-scoped key '<case>@<key>' indexes by its property part. One ledger in memory at a time."""
+    from foreclosure_scraper.verification import ledger as VL
+
     idx: dict[str, dict[str, Optional[str]]] = {}
     by_county: dict = {}
-    for p in sorted(directory.glob("*.json")):
-        try:
-            d = json.loads(p.read_text())
-        except Exception:  # noqa: BLE001 - a half-written file: skip, say so
-            print(f"  ledger {p.name}: unreadable, skipped", file=sys.stderr)
+    for name in VL.signals_on_disk(directory):
+        led = VL.Ledger.load(name, directory, strict=False)
+        for what, why in {**led.problems, **led.warnings}.items():
+            print(f"  ledger {what}: {why} ({'skipped' if what in led.problems else 'read'})",
+                  file=sys.stderr)
+        if not led.rows:
             continue
-        sig = d.get("signal") or p.stem
+        sig = led.signal or name
         m = idx.setdefault(sig, {})
         bc = by_county.setdefault(sig, Counter())
-        for k, e in (d.get("rows") or {}).items():
+        for k, e in led.rows.items():
             if not isinstance(e, dict):
                 continue
             verdict = (e.get("latest") or {}).get("verdict")

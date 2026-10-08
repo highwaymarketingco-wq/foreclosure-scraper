@@ -135,7 +135,7 @@ def test_row_verdicts_prefers_board_then_ledger():
 
 def test_load_ledger_index_case_scoped_keys(tmp_path):
     (tmp_path / "jail_booking.json").write_text(
-        '{"signal": "jail_booking", "rows": {"jail:x@parcel:NC:cleveland:9": {"keys": ["jail:x@parcel:NC:cleveland:9"],'
+        '{"kind": "verification_ledger", "signal": "jail_booking", "rows": {"jail:x@parcel:NC:cleveland:9": {"keys": ["jail:x@parcel:NC:cleveland:9"],'
         ' "row": {"state": "NC", "county": "cleveland"}, "latest": {"verdict": "confirmed"}}}}')
     (tmp_path / "broken.json").write_text("{not json")
     idx, counts = gm.load_ledger_index(tmp_path)

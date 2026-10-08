@@ -23,7 +23,7 @@ def _wall(now=T0):
 
 def test_the_wall_placeholder_lands_in_the_signal_ledger(tmp_path):
     p = lane.record_to_ledger(ROW, _wall(), directory=tmp_path, now=T0)
-    assert p == tmp_path / "probate.json"
+    assert p == L.shard_dir("probate", tmp_path)          # a new ledger: the sharded layout
     led = L.Ledger.load("probate", tmp_path)
     key, e = led.find_row(ROW)
     assert key == core.row_key(ROW)
@@ -52,7 +52,7 @@ def test_sos_records_get_their_own_ledger(tmp_path):
     rec = lane.make_verification_record(signal="sos_entity", verdict="refuted",
                                         evidence={"status": "Dissolved"}, source="sosnc", now=T0)
     lane.record_to_ledger(ROW, rec, directory=tmp_path, now=T0)
-    assert (tmp_path / "sos_entity.json").exists()
+    assert L.ledger_exists("sos_entity", tmp_path)      # a new ledger: the sharded layout
     assert L.Ledger.load("sos_entity", tmp_path).find_row(ROW)[1]["governs"] == []
 
 

@@ -225,10 +225,13 @@ def check_ledgers(repo: Path, profile: dict, sweep_running: Callable[[], bool] =
     if sweep_running():
         return FAIL, "a verification sweep is running: wait for it to commit, then re-pin"
     ages = {}
-    for p in sorted((repo / d).glob("*.json")):
-        a = _commit_age_h(repo, str(p.relative_to(repo)))
-        if a is not None:
-            ages[p.stem] = a
+    # either layout (verification.ledger LAYOUTS): <signal>.json, or <signal>/ (manifest + shards)
+    for p in sorted([*(repo / d).glob("*.json"), *(repo / d).glob("*/manifest.json")]):
+        q = p.parent if p.name == "manifest.json" else p
+        a = _commit_age_h(repo, str(q.relative_to(repo)))
+        name = q.name if q.is_dir() else q.stem
+        if a is not None and (name not in ages or a < ages[name]):
+            ages[name] = a
     if not ages:
         return FAIL, "no committed ledgers"
     newest = min(ages.values())

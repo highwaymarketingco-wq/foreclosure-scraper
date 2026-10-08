@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from foreclosure_scraper.verification.fetch import ReplayFetcher
-from foreclosure_scraper.verification.ledger import Ledger
+from foreclosure_scraper.verification.ledger import Ledger, ledger_exists
 from foreclosure_scraper.verification.verifiers import tax_lien_buncombe as t
 
 FIX = Path(__file__).parent / "fixtures" / "verification"
@@ -253,10 +253,10 @@ def test_the_sweep_keeps_owner_name_out_of_the_row_summary(tmp_path):
 
 def test_the_committed_ledger_holds_no_owner_names():
     """docs/handoff/verification/tax_lien.json is pushed to a PUBLIC repo."""
-    path = Path(__file__).resolve().parents[1] / "docs" / "handoff" / "verification" / "tax_lien.json"
-    if not path.exists():
+    d = Path(__file__).resolve().parents[1] / "docs" / "handoff" / "verification"
+    if not ledger_exists("tax_lien", d):
         pytest.skip("no ledger in this checkout")
-    led = Ledger.load_file(path)
+    led = Ledger.load("tax_lien", d, strict=False)          # either layout (single file or shards)
     for e in led.rows.values():
         assert "owner_name" not in (e.get("row") or {})
         for rec in (e.get("latest"), e.get("superseded")):

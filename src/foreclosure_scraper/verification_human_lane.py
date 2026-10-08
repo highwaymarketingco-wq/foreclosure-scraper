@@ -659,8 +659,9 @@ async def verify_ecourts_from_saved_page(html: str, spec: ECourtsCheckSpec, row:
 # --------------------------------------------------------------------------- #
 def record_to_ledger(row: dict, record: dict, *, directory: Optional[Path] = None,
                      now: Optional[datetime] = None) -> Path:
-    """Merge one record from this lane into ``docs/handoff/verification/<signal>.json`` under
-    ``verification.core.row_key(row)``; returns the ledger path. Raises
+    """Merge one record from this lane into the signal's ledger in docs/handoff/verification/
+    (either layout: ``verification.ledger`` LAYOUTS) under ``verification.core.row_key(row)``;
+    returns the ledger path (the shard directory or the single file). Raises
     ``verification.ledger.LedgerUnreadable`` rather than overwrite a broken ledger."""
     from .verification.core import VerificationResult
     from .verification.ledger import Ledger

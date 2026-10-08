@@ -16,11 +16,14 @@ src/foreclosure_scraper/verification/verifiers/ (auto-discovered), WITHOUT writi
      qPayBill tenants: fetch.SHARED_BACKENDS), one row at a time, a per-row timeout, a global
      time budget (--budget-s). An answer about source health (a verifier's TRANSIENT_REASONS)
      is re-checked once at the end of the run after --defer-wait-s (run_checks: DEFERRAL).
-  3. Every answer is merged into the cumulative ledger docs/handoff/verification/<signal>.json
-     (verification/ledger.py), saved every --save-every rows and at the end, merged with the
-     file on disk first so nothing is lost.
-  4. Only the ledger files are committed and pushed (HANDOFF_PUSH=0 skips git; pull --rebase
-     --autostash before the push). The VM's next run attaches the verdicts before scoring
+  3. Every answer is merged into the cumulative ledger docs/handoff/verification/<signal>/
+     (manifest + hash-bucketed shards; a not yet migrated ledger is the single file
+     <signal>.json: verification/ledger.py LAYOUTS), saved every --save-every rows and at the
+     end, merged with the copy on disk first so nothing is lost. A save rewrites only the
+     shards whose entries changed.
+  4. Only the ledger files are committed and pushed, both layouts' paths, removed ones
+     included (ledger.publish_ledgers; HANDOFF_PUSH=0 skips git; pull --rebase --autostash
+     before the push). The VM's next run attaches the verdicts before scoring
      (verification/apply.py, wired in main.py's run_enrich_tail()).
 
 A run lock (logs/.verification_sweep.lock) stops two sweeps from overlapping.
@@ -281,7 +284,8 @@ def _brief(ev: dict) -> str:
 
 
 def _save(led, host: str) -> None:
-    """Merge with the file on disk (another writer, e.g. the human lane), then write."""
+    """Merge with the copy on disk, either layout (another writer, e.g. the human lane), then
+    write. led.path is the shard directory or the single file; its parent is the ledger dir."""
     try:
         disk = L.Ledger.load(led.signal, led.path.parent if led.path else None)
         led.merge_from(disk)

@@ -22,14 +22,14 @@ from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.quiet_title.layups import LayupScan, iter_candidates_text  # noqa: E402
 from foreclosure_scraper.quiet_title.model import EASTERN, utc_now  # noqa: E402
 from foreclosure_scraper.verification.core import property_part, row_keys  # noqa: E402
-from foreclosure_scraper.verification.ledger import Ledger, ledger_path  # noqa: E402
+from foreclosure_scraper.verification.ledger import Ledger, ledger_exists  # noqa: E402
 
 GIS = {"buncombe": "https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query"}
 
 
 def load(signal: str, directory: Path) -> Ledger | None:
-    p = ledger_path(signal, directory)
-    return Ledger.load_file(p) if p.exists() else None
+    """The signal's ledger, either layout (single file or shard directory), or None."""
+    return Ledger.load(signal, directory) if ledger_exists(signal, directory) else None
 
 
 def property_index(led: Ledger | None) -> dict[str, list[str]]:
