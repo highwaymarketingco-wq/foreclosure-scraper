@@ -444,7 +444,7 @@ def test_stale_refuted_unconfirmed_and_expired_answers_restore_nothing():
 
 def test_a_check_of_another_parcel_restores_nothing():
     cases = [
-        _verdict(tax_parcel_row_own=False),                                   # the verifier says so
+        _verdict(tax_parcel_row_own=False, tax_parcel="R99999-009-009-009"),  # not the row's number, no address tie
         _verdict(tax_parcel_row_own=None, tax_parcel="R99999-009-009-009",
                  address_relation="conflict"),                                # another parcel, another address
         _verdict(tax_parcel_row_own=None, claim_county_differs=True, address_relation="match"),
@@ -457,10 +457,12 @@ def test_a_check_of_another_parcel_restores_nothing():
 
 def test_a_check_bound_by_the_address_counts():
     # a 5-digit roll account cannot be compared with the row's 10-digit PIN; the checked bill's
-    # situs is the row's address
-    rec = _verdict(tax_parcel_row_own=None, tax_parcel="70011", address_relation="match")
-    li = _verified_row(rec, parcel="9000000357")
-    assert tb.restore_verified_tax([li], now=CHECK_NOW)["restored"] == 1
+    # situs is the row's address (also when the verifier found that account by the address, not
+    # by a number the row carries: tax_parcel_row_own False)
+    for own in (None, False):
+        rec = _verdict(tax_parcel_row_own=own, tax_parcel="70011", address_relation="match")
+        li = _verified_row(rec, parcel="9000000357")
+        assert tb.restore_verified_tax([li], now=CHECK_NOW)["restored"] == 1
 
 
 def test_evidence_without_the_late_years_restores_nothing():

@@ -681,11 +681,12 @@ def confirmed_tax_record(raw: Any, now=None) -> Optional[dict]:
 
 
 def verified_checks_row(row: Any, ev: dict) -> bool:
-    """The parcel the verifier checked is the row's own: the verifier says so (tax_parcel_row_own),
-    the checked id is one of the row's ids, or the checked parcel carries the row's address. A
-    check on another county's bill, or one the verifier itself says is not the row's parcel,
-    never counts."""
-    if ev.get("claim_county_differs") or ev.get("tax_parcel_row_own") is False:
+    """The parcel the verifier checked is the row's own: the verifier says its number is one of the
+    row's (tax_parcel_row_own), the checked id is one of the row's ids, or the checked bill carries
+    the row's address (address_relation 'match': a PTS Cloud account found by the row's address
+    has tax_parcel_row_own False and still is the row's). A check on another county's bill never
+    counts."""
+    if ev.get("claim_county_differs"):
         return False
     if ev.get("tax_parcel_row_own") is True:
         return True
