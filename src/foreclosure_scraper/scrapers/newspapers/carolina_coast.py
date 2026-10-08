@@ -51,6 +51,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
+import httpx
 import structlog
 
 from ...base_scraper import BaseScraper
@@ -84,6 +85,15 @@ class CarolinaCoastForeclosures(BaseScraper):
         for url in FEED_URLS:
             try:
                 xml = await get_text(url, timeout=30.0)
+            except httpx.HTTPStatusError as exc:
+                # A 403/429 from this TownNews host (it answers 429 "Too Many Requests"
+                # quickly, and get_text has already retried it): the next feed URL on the
+                # same host gets the same answer, so stop instead of asking again. Rows
+                # already read are kept. (Source-completeness audit 2026-10-08.)
+                if exc.response is not None and exc.response.status_code in (403, 429):
+                    log.warning("carolina_coast.blocked_stop", status=exc.response.status_code)
+                    break
+                continue
             except Exception:
                 continue
             if "<item>" not in xml.lower():
