@@ -162,9 +162,24 @@ findings, both fixed here:
    them. Now parsed into a precise ``age`` (computed from birth+death date,
    more reliable than any regex) plus ``birth_date``/``death_date``/
    ``deceased_city``/``deceased_state``/``fh_name`` in ``raw['obituary']``.
+
+SOURCE-COMPLETENESS AUDIT (2026-10-08): 0 rows for 3 runs (was 40-50) was a
+TIMEOUT that threw collected rows away, not dead feeds. All 11 feeds answered
+200 to one ordinary request from the Mac that day (190 items, every host under
+1.5 s). The VM's gated run of 2026-10-08 logged 8 ``funeral_rss.home`` events
+(8 hosts finished) and then ``scraper.timeout`` at 124 s: the hosts were read
+one after another, one slow host can cost about 2 minutes inside ``get_text``
+(3 plain attempts, the curl fallback, 3 impersonate attempts, 15 s each), and
+every row sat in a local list returned only at the end, so the soft timeout
+discarded the finished hosts' rows too. Now the hosts are read concurrently
+(still one request at a time per host), each host has its own wall-clock
+deadline (``host_deadline_s``) inside ``timeout_s``, and each finished host's
+rows go into ``self.partial`` at once, so a timeout still ships them. Run time
+is the slowest host (at most 45 s), not the sum.
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 from datetime import datetime
@@ -386,11 +401,35 @@ class FuneralHomeRss(BaseScraper):
     category = "motivated_seller"
     timeout_s = 120.0
     expected_min_count = 0  # feeds can drift / go empty — not a REGRESSION
+    #: Wall-clock cap on ONE host's fetch (all of get_text's retries and
+    #: fallbacks included). Hosts run concurrently, so the whole run takes
+    #: about the slowest host, bounded by this, well inside timeout_s.
+    host_deadline_s = 45.0
 
     def _feed_url(self, host: str, kind: str) -> str:
         if kind == "ltobits":
             return f"https://www.{host}/?feed=rss2&post_type=ltobits"
         return f"https://www.{host}/feed"
+
+    async def _fetch_feed(self, host: str, kind: str) -> tuple[str, str, str | None]:
+        """(host, feed url, feed text or None). Never raises."""
+        url = self._feed_url(host, kind)
+        try:
+            # impersonate=True: plain httpx first, escalating to a real
+            # Chrome TLS fingerprint only on a 403/406 block (see module
+            # docstring finding #1 -- 2 of 11 real hosts need this today).
+            text = await asyncio.wait_for(
+                get_text(url, timeout=15.0, impersonate=True),
+                timeout=self.host_deadline_s,
+            )
+            return host, url, text
+        except asyncio.TimeoutError:
+            log.warning("funeral_rss.host_deadline", host=host,
+                        deadline_s=self.host_deadline_s)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("funeral_rss.fetch_failed", host=host,
+                        error=str(exc)[:140])
+        return host, url, None
 
     async def _collect(self) -> list[Listing]:
         if os.environ.get("FORECLOSURE_FUNERAL_RSS", "1") == "0":
@@ -398,68 +437,78 @@ class FuneralHomeRss(BaseScraper):
         out: list[Listing] = []
         seen: set[tuple[str, str]] = set()  # dedupe by (name, url)
         now = datetime.utcnow()
-        for host, (county, state, kind) in HOMES.items():
-            url = self._feed_url(host, kind)
-            try:
-                # impersonate=True: plain httpx first, escalating to a real
-                # Chrome TLS fingerprint only on a 403/406 block (see module
-                # docstring finding #1 -- 2 of 11 real hosts need this today).
-                text = await get_text(url, timeout=15.0, impersonate=True)
-            except Exception as exc:  # noqa: BLE001
-                log.warning("funeral_rss.fetch_failed", host=host,
-                            error=str(exc)[:140])
-                continue
-
-            kept = 0
-            for name, link, pub, summary_html, title_date, extra in _iter_entries(
-                text, kind
-            ):
-                if len(name) < 5 or name.replace(" ", "").isdigit():
+        # One task per host (different hosts, one request each): the run costs the
+        # slowest host, not the sum, and a hung host cannot starve the others.
+        tasks = [asyncio.ensure_future(self._fetch_feed(host, kind))
+                 for host, (_county, _state, kind) in HOMES.items()]
+        try:
+            for fut in asyncio.as_completed(tasks):
+                host, url, text = await fut
+                if text is None:
                     continue
-                if " " not in name:  # need at least first + last
-                    continue
-                link = link or url
-                key = (name.lower(), link)
-                if key in seen:
-                    continue
-                seen.add(key)
-                obituary = {"decedent": name, "home": host,
-                            "county": county, "state": state,
-                            "cms": kind, "pub_date": pub or None}
-                # Keep the Frazer title date instead of discarding it.
-                if title_date:
-                    obituary["title_date"] = title_date
-                # Age / survivors / summary from the RSS body (ltobits /
-                # plain-WordPress hosts' only source of either).
-                obituary.update(_summary_fields(summary_html))
-                # Frazer's own obits: namespace (birth/death dates, precise
-                # age, decedent's own city/state) -- applied LAST so its
-                # exact age wins over the free-text regex guess above on any
-                # host that happens to carry both.
-                obituary.update(extra)
-                out.append(Listing(
-                    source=self.slug,
-                    source_url=link,
-                    listing_type=ListingType.PROBATE_NOTICE,
-                    property_kind=PropertyKind.UNKNOWN,
-                    state=state, county=county,
-                    defendant=name,  # decedent -> resolver pins parcel by owner-name
-                    owner_name=name,  # the resolver reads owner_name first, then defendant
-                    description=f"Obituary (death) — {name}, {county} County {state} "
-                                f"— pre-probate heir/estate signal (funeral-home feed)",
-                    first_seen=now, last_seen=now,
-                    raw={
-                        "obituary": obituary,
-                        "life_event": "death",
-                        "dateless": True,   # a death has no sale date; needs DATELESS_OK_SOURCES
-                        "relationship_signal": {"kind": "probate",
-                                                "keyword": "obituary"},
-                    },
-                ))
-                kept += 1
-            log.info("funeral_rss.home", host=host, county=county,
-                     cms=kind, kept=kept)
+                county, state, kind = HOMES[host]
+                got = self._parse_host(text, host, url, county, state, kind, seen, now)
+                out.extend(got)
+                self.partial.extend(got)   # a soft timeout ships every finished host
+        finally:
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
         log.info("funeral_rss.done", leads=len(out))
+        return out
+
+    def _parse_host(self, text: str, host: str, url: str, county: str, state: str,
+                    kind: str, seen: set, now: datetime) -> list[Listing]:
+        out: list[Listing] = []
+        kept = 0
+        for name, link, pub, summary_html, title_date, extra in _iter_entries(
+            text, kind
+        ):
+            if len(name) < 5 or name.replace(" ", "").isdigit():
+                continue
+            if " " not in name:  # need at least first + last
+                continue
+            link = link or url
+            key = (name.lower(), link)
+            if key in seen:
+                continue
+            seen.add(key)
+            obituary = {"decedent": name, "home": host,
+                        "county": county, "state": state,
+                        "cms": kind, "pub_date": pub or None}
+            # Keep the Frazer title date instead of discarding it.
+            if title_date:
+                obituary["title_date"] = title_date
+            # Age / survivors / summary from the RSS body (ltobits /
+            # plain-WordPress hosts' only source of either).
+            obituary.update(_summary_fields(summary_html))
+            # Frazer's own obits: namespace (birth/death dates, precise
+            # age, decedent's own city/state) -- applied LAST so its
+            # exact age wins over the free-text regex guess above on any
+            # host that happens to carry both.
+            obituary.update(extra)
+            out.append(Listing(
+                source=self.slug,
+                source_url=link,
+                listing_type=ListingType.PROBATE_NOTICE,
+                property_kind=PropertyKind.UNKNOWN,
+                state=state, county=county,
+                defendant=name,  # decedent -> resolver pins parcel by owner-name
+                owner_name=name,  # the resolver reads owner_name first, then defendant
+                description=f"Obituary (death) — {name}, {county} County {state} "
+                            f"— pre-probate heir/estate signal (funeral-home feed)",
+                first_seen=now, last_seen=now,
+                raw={
+                    "obituary": obituary,
+                    "life_event": "death",
+                    "dateless": True,   # a death has no sale date; needs DATELESS_OK_SOURCES
+                    "relationship_signal": {"kind": "probate",
+                                            "keyword": "obituary"},
+                },
+            ))
+            kept += 1
+        log.info("funeral_rss.home", host=host, county=county,
+                 cms=kind, kept=kept)
         return out
 
     async def fetch(self) -> Iterable[Listing]:
