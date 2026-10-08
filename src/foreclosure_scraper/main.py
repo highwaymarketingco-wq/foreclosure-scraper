@@ -2431,7 +2431,8 @@ async def run() -> int:
     #  Vision = 'major' / $63k rehab).
     try:
         from .enrichment_photos import enrich_with_address_photos
-        await _await_capped(enrich_with_address_photos(enriched), "with_address_photos")
+        await _await_capped(enrich_with_address_photos(enriched), "with_address_photos",
+                            default_s=int(float(os.environ.get("FORECLOSURE_PHOTO_MAX_SECONDS") or "2400") + 120))
     except Exception:
         log.error("photos.failed", traceback=traceback.format_exc())
 
@@ -2522,7 +2523,11 @@ async def run() -> int:
     # Only touches leads that carry a document URL and are missing those fields.
     try:
         from .enrichment_doc_ocr import enrich_doc_ocr
-        s = await _await_capped(enrich_doc_ocr(enriched), "doc_ocr")
+        s = await _await_capped(enrich_doc_ocr(enriched), "doc_ocr",
+                                default_s=int(float(os.environ.get("DOC_OCR_BUDGET_S", "2400")) + 300))
+        if s is None:                      # capped or failed: the phase's own counters still say what it read
+            from . import enrichment_doc_ocr as _doc_ocr_mod
+            s = getattr(_doc_ocr_mod, "LAST_STATS", None)
         if s:
             enrichment_stats["doc_ocr"] = s
             checkpoint.save(enriched, "doc_ocr")
