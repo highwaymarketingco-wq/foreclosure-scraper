@@ -238,6 +238,15 @@ LAYERS: tuple[Layer, ...] = (
     # This is the CURRENT cycle (owner decision 2026-10-07). NOTE: it is the first
     # publication WEEK; when the county posts later weeks as their own services, add
     # them here as current 2026 layers or their parcels read as prior-cycle-only.
+    # The county's re-publication of week one (2026-10-09 source audit, read live
+    # 2026-10-08): service "WeekOne2027" despite the name, data last edited 2026-09-21,
+    # AMOUNT_DUE aliased "Amount Due As of 9/17/2026", 781 parcels of which 779 are on
+    # DELQ_TAX_WEEK1_2026 (781 distinct pins over 801 features) and 2 are new. Same cycle.
+    # It is listed BEFORE week one on purpose: build_listing sorts by cycle only (a stable
+    # sort), so within one cycle the FIRST-listed layer's value wins, and the 9/17 amounts
+    # are the newer ones.
+    Layer("WeekOne2027", 2026, True, pin="MAP_PARCEL", owner="OWNER__NOW",
+          amount="AMOUNT_DUE"),
     Layer("DELQ_TAX_WEEK1_2026", 2026, True, pin="GISADMIN_P", owner="T_WEEK_1_1",
           amount="T_WEEK_1_2"),
 )

@@ -94,7 +94,7 @@ def test_every_delinquent_layer_on_the_org_is_wired():
     assert [L.service for L in mod.LAYERS] == [
         "delinquent_2020", "del_2021", "dqnt_2022", "dqnt_2023", "dqnt_2024",
         "DelParces_October2025NewsAd", "DelqParcels_Ad_paperlisting2", "Posting3",
-        "DELQ_TAX_WEEK1_2026",
+        "WeekOne2027", "DELQ_TAX_WEEK1_2026",
     ]
     assert not any(L.service.startswith("FLC") for L in mod.LAYERS)
 
@@ -107,7 +107,7 @@ def test_layers_are_ordered_oldest_to_newest():
 
 def test_only_the_2026_layer_is_the_current_cycle():
     """Owner decision 2026-10-07: the 2026 list is current; 2025 is the prior cycle."""
-    assert {L.service for L in mod.LAYERS if L.current} == {"DELQ_TAX_WEEK1_2026"}
+    assert {L.service for L in mod.LAYERS if L.current} == {"DELQ_TAX_WEEK1_2026", "WeekOne2027"}
     assert (mod.CURRENT_CYCLE, mod.PRIOR_CYCLE) == (2026, 2025)
 
 
@@ -604,3 +604,21 @@ def test_an_old_roll_only_parcel_is_not_marked_prior_cycle():
                             "AMOUNT_DUE": 50.0}}]}}
     li = _run(_only(payload))[0]
     assert "pickens_prior_cycle_only" not in li.raw
+
+
+
+def test_the_week_one_republication_adds_its_parcels_and_newer_amounts():
+    """WeekOne2027 (2026-10-09 source audit): the county's re-publication of week one with
+    amounts as of 9/17/2026; a parcel only there is a current-cycle lead, and a parcel on
+    both takes the newer amount."""
+    http = _with_2026(["4000-00-00-0001", "4000-00-00-0002"])
+    http.routes["/services/WeekOne2027/FeatureServer"] = {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "MAP_PARCEL": "4000-00-00-0002", "OWNER__NOW": "SAMPLE OWNER",
+                            "AMOUNT_DUE": 555.0}},
+            {"attributes": {"FID": 2, "MAP_PARCEL": "4000-00-00-0003", "OWNER__NOW": "SAMPLE OWNER Z",
+                            "AMOUNT_DUE": 77.0}}]}
+    rows = {li.parcel_id: li for li in _run(http)}
+    assert {"4000-00-00-0001", "4000-00-00-0002", "4000-00-00-0003"} <= set(rows)
+    assert rows["4000-00-00-0002"].raw["pickens_delinquent"]["amount_owed"] == 555.0
+    assert not rows["4000-00-00-0003"].raw.get("pickens_prior_cycle_only")
