@@ -75,6 +75,14 @@ def form_key(url: str, data: dict) -> str:
     return f"POST {url} #{hashlib.sha256(body.encode()).hexdigest()[:16]}"
 
 
+def json_key(url: str, payload: Any) -> str:
+    """The capture/replay key of a JSON POST: the URL plus a hash of the canonical JSON body
+    (sorted keys; an empty body hashes as ''). Added 2026-10-09 for the NC Judgment Search, an
+    open JSON service that answers a POST of its own search object."""
+    body = "" if payload is None else json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return f"POSTJSON {url} #{hashlib.sha256(body.encode()).hexdigest()[:16]}"
+
+
 class _LiveFormSession:
     """One curl_cffi cookie session (Chrome TLS, as rod/aumentum.py uses for the same vendor),
     paced and counted by its Fetcher."""
@@ -126,6 +134,18 @@ class _LiveFormSession:
                               headers=headers or {}, allow_redirects=True,
                               timeout=timeout or max(self._f.timeout, 60.0))
 
+    async def post_json(self, url: str, payload: Any, *, headers: Optional[dict] = None,
+                        timeout: Optional[float] = None) -> FormResponse:
+        """POST a JSON body (payload None = an empty body) and return the FormResponse; the
+        caller parses resp.text. Paced, counted and captured under json_key(url, payload)."""
+        kw: dict = {"headers": headers or {}, "allow_redirects": True,
+                    "timeout": timeout or max(self._f.timeout, 60.0)}
+        if payload is None:
+            kw["data"] = b""
+        else:
+            kw["json"] = payload
+        return await self._go("POST", url, json_key(url, payload), **kw)
+
 
 class _ReplayFormSession:
     """Serves a ReplayFetcher's recordings: GET by URL, POST by form_key(url, data). A recorded
@@ -160,6 +180,9 @@ class _ReplayFormSession:
 
     async def post_form(self, url: str, data: dict, **_: Any) -> FormResponse:
         return self._answer(form_key(url, data), url)
+
+    async def post_json(self, url: str, payload: Any, **_: Any) -> FormResponse:
+        return self._answer(json_key(url, payload), url)
 
 
 class Fetcher:
@@ -217,7 +240,7 @@ class Fetcher:
             return
         try:
             self.capture_dir.mkdir(parents=True, exist_ok=True)
-            real = url.split(" ")[1] if url.startswith("POST ") else url
+            real = url.split(" ")[1] if url.startswith(("POST ", "POSTJSON ")) else url
             slug = re.sub(r"[^A-Za-z0-9]+", "_", urlsplit(real).path).strip("_")[-80:]
             h = hashlib.sha256(url.encode()).hexdigest()[:8]
             name = f"{_host(real)}__{slug}__{h}.html"
@@ -256,5 +279,5 @@ class ReplayFetcher:
         return _ReplayFormSession(self)
 
     def stats(self) -> dict:
-        return {"requests": dict(Counter(_host(u.split(" ")[1] if u.startswith("POST ") else u)
+        return {"requests": dict(Counter(_host(u.split(" ")[1] if u.startswith(("POST ", "POSTJSON ")) else u)
                                          for u in self.asked)), "errors": {}}

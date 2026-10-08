@@ -384,21 +384,15 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
         except (ValueError, TypeError):
             ordered_date = None
 
-    # Upset-bid window detection (NCGS §45-21.27 — 10 calendar days from
-    # the date of sale). When ordered_date is recent we tag the listing
-    # so the investor can prioritize cases still actionable. Meaningless for
-    # a divorce judgment (no foreclosure sale involved), so skipped there.
-    in_upset_bid_window = False
-    if ordered_date is not None and not is_divorce:
-        # Normalize to naive UTC for comparison with utcnow()
-        od_naive = ordered_date.replace(tzinfo=None) if ordered_date.tzinfo else ordered_date
-        days_since = (datetime.utcnow() - od_naive).days
-        if 0 <= days_since <= UPSET_BID_WINDOW_DAYS:
-            in_upset_bid_window = True
-            # Compute the upset-bid deadline date for the investor.
-            # No need to handle weekends per statute — the window runs
-            # in calendar days and only the deadline-day filing time
-            # matters (handled by the clerk of court).
+    # NO upset-bid window from this index (court_signals audit 2026-10-09). The old code opened a
+    # 14-day "upset bid" window whenever orderedDate was recent, but orderedDate is the date a
+    # JUDGMENT was entered (a claim of lien, a transcript of judgment, a tax lien, a lis pendens),
+    # not a foreclosure sale: NC power-of-sale sales and their upset bids are special proceedings
+    # (SP), which this Judgment Search does not index (module docstring). Measured on the
+    # 2026-10-08 pre_publish checkpoint: 1,146 rows scored upset_bid from this stamp (1,208 of the
+    # 1,257 NC upset_bid rows are WARM), all of them liens and judgments; a live re-read of 25
+    # found 0 sales. Real upset-bid windows come from sale dates (enrichment_upset_bid) and the
+    # published clerk/county feeds (national.nc_upset_bids).
 
     # Pick listing type based on the cause.
     if is_divorce:
@@ -436,10 +430,6 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
     # is a best-effort breadcrumb.
     source_url = f"{APP_BASE}#/search?caseNumber={case_number}"
 
-    if in_upset_bid_window:
-        # Compute deadline (orderedDate + 10 days). Floor to day for clarity.
-        deadline = od_naive + timedelta(days=UPSET_BID_WINDOW_DAYS)
-
     # Critical: orderedDate is the JUDGMENT date (when the lis pendens or
     # lien was entered), NOT a future sale date. Setting it as sale_date
     # caused every NC eCourts listing to fail _active_only's 120-day-
@@ -448,8 +438,7 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
     # None (DATELESS_OK_SOURCES already handles this for nc_ecourts) and
     # store the judgment date in raw.nc_ecourts.orderedDate where the
     # dashboard / enrichment can find it without it gating the active
-    # filter. For upset-bid-window listings the actual sale happened ON
-    # orderedDate (we keep upset_bid_deadline + raw.upset_bid for that).
+    # filter. orderedDate is never a sale date, so no upset-bid window is derived from it.
     return Listing(
         source=slug,
         source_url=source_url,
@@ -462,7 +451,7 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
         plaintiff=plaintiff,
         defendant=defendant,
         sale_date=None,
-        upset_bid_deadline=(deadline if in_upset_bid_window else None),
+        upset_bid_deadline=None,
         description=description,
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
@@ -480,15 +469,6 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
                 **({"defendant_aliases": defendant_aliases} if defendant_aliases else {}),
                 **({"plaintiff_aliases": plaintiff_aliases} if plaintiff_aliases else {}),
             },
-            **({"upset_bid": {
-                "in_window": True,
-                "window_days": UPSET_BID_WINDOW_DAYS,
-                "deadline_iso": deadline.isoformat(),
-                "days_remaining": max(0, UPSET_BID_WINDOW_DAYS - (
-                    datetime.utcnow() - od_naive).days),
-                "statute": "NCGS §45-21.27",
-                "sale_occurred_on_iso": ordered_date.isoformat() if ordered_date else None,
-            }} if in_upset_bid_window else {}),
         },
     )
 

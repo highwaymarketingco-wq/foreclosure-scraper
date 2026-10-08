@@ -76,16 +76,18 @@ def test_target_counties_match_user_territory():
     )
 
 
-def test_recent_sale_flagged_in_upset_bid_window():
-    """A sale ordered 3 days ago is within the 14-day window."""
+def test_recent_judgment_is_not_an_upset_bid_window():
+    """court_signals audit 2026-10-09: orderedDate is the date a JUDGMENT was entered (a lis
+    pendens, a claim of lien, a transcript of judgment), never a foreclosure sale; NC sales and
+    their upset bids are special proceedings this index does not hold. A judgment ordered 3 days
+    ago opens NO upset-bid window (the old stamp scored upset_bid on 1,146 checkpoint rows)."""
     od = (datetime.utcnow() - timedelta(days=3)).isoformat() + "Z"
-    li = _hit_to_listing(_hit(od), "test")
-    assert li is not None
-    assert li.upset_bid_deadline is not None
-    ub = li.raw.get("upset_bid") or {}
-    assert ub["in_window"] is True
-    assert ub["days_remaining"] == 11  # 14 - 3
-    assert ub["statute"] == "NCGS §45-21.27"
+    for cause in ("CV - Lis Pendens", "CV - Claim of Lien", "CV - Transcript of Judgment",
+                  "CV - Federal Tax Lien"):
+        li = _hit_to_listing(_hit(od, causeOfActionDesc=cause), "test")
+        assert li is not None
+        assert li.upset_bid_deadline is None
+        assert "upset_bid" not in (li.raw or {})
 
 
 def test_old_sale_not_flagged():
@@ -97,13 +99,12 @@ def test_old_sale_not_flagged():
     assert "upset_bid" not in (li.raw or {})
 
 
-def test_sale_at_window_boundary():
-    """Exactly 14 days ago — still in window per the inclusive bound."""
+def test_judgment_at_old_window_boundary_is_not_flagged():
+    """Exactly 14 days ago: still no window (it never came from a sale)."""
     od = (datetime.utcnow() - timedelta(days=14)).isoformat() + "Z"
     li = _hit_to_listing(_hit(od), "test")
-    assert li.upset_bid_deadline is not None
-    ub = li.raw.get("upset_bid") or {}
-    assert ub["days_remaining"] == 0
+    assert li.upset_bid_deadline is None
+    assert "upset_bid" not in (li.raw or {})
 
 
 def test_no_ordered_date_no_flag():

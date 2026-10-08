@@ -314,6 +314,8 @@ _LISTING_TYPE_SIGNAL = {
     "tax_sale_overage": ("FINANCIAL", 15),    # money owed to the former owner, a lower bar
 }
 _TAX_SALE_STANDING_ROLL_WEIGHT = 20   # a delinquent roll with no upcoming sale date = tax_lien (F10)
+#: listing types an NC Judgment Search hit becomes (court_record_ended governs their type signal)
+_COURT_JUDGMENT_TYPES = frozenset({"lis_pendens", "divorce_notice", "tax_lien", "distressed"})
 
 def evidence_of(ds: dict, signal: str) -> str:
     """Evidence class of one signal on a published `distress_stack`. `record` is the default and
@@ -770,6 +772,31 @@ def _stay_block(r: dict, today: date) -> Optional[dict]:
             "resume_risk": st.get("resume_risk"), "case": st.get("case")}
 
 
+#: an NC Judgment Search status that ends the judgment (scrapers/counties_nc/nc_ecourts_lis_pendens
+#: skips these at scrape time; the legacy manual lane, source nc_ecourts_judgments, did not)
+_COURT_ENDED = re.compile(r"cancel|satisf|dismiss|vacat|withdr|expire|releas|terminat", re.I)
+_HOUSE_NUMBERED = re.compile(r"^\s*\d*[1-9]\d*[A-Za-z]?\s+\S")
+
+
+def court_record_ended(raw: dict) -> bool:
+    """True when the row's own NC eCourts block says its judgment is no longer in force
+    (Canceled, Satisfied, Dismissed, Vacated, Withdrawn, Expired, Released, Terminated). Measured
+    on the 2026-10-08 pre_publish checkpoint (court_signals audit 2026-10-09): 762 rows (43 WARM)
+    scored lis_pendens while their own block said so, 760 of them from the legacy
+    nc_ecourts_judgments lane."""
+    b = raw.get("nc_ecourts") if isinstance(raw, dict) else None
+    if not isinstance(b, dict):
+        return False
+    return bool(_COURT_ENDED.search(str(b.get("civilJudgmentStatus") or b.get("civil_judgment_status") or "")))
+
+
+def has_property_address(li: Listing) -> bool:
+    """A parcel, or a street address with a house number: what a lead must have to be about a
+    property. A bankruptcy filing row whose street_address is '<debtor name> — <case>' (751 rows
+    of the 2026-10-08 checkpoint) or a bare road name has none."""
+    return bool(li.parcel_id) or bool(_HOUSE_NUMBERED.match(str(li.street_address or "")))
+
+
 def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collected:
     """The signals, lifecycle facts and lane events of ONE listing."""
     c = _Collected()
@@ -791,8 +818,12 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
         lt not in _LISTING_TYPE_SIGNAL
         or _is_liensnc(li)                                            # A8: context-only
         or (lt == "distressed" and override is None and _context_only_distressed(li))
-        or (lt == "bankruptcy" and not (li.parcel_id or li.street_address))   # F11: needs a property
+        or (lt == "bankruptcy" and not has_property_address(li))   # F11: needs a property
     )
+    if (not skip_type and lt in _COURT_JUDGMENT_TYPES and "ecourts" in str(li.source or "")
+            and court_record_ended(r)):
+        skip_type = True                       # the row's own court block says it ended
+        c.stale.append("court_record_ended")
     if not skip_type:
         if override is not None:
             name, cat, w, ev = override

@@ -102,6 +102,19 @@ def _confidence_for(li: Listing) -> str:
     return "LOW"
 
 
+def is_ecourts_order_date_window(li: Any) -> bool:
+    """True for an upset-bid block the NC eCourts judgment scraper derived from a judgment's
+    order date: the row carries raw.nc_ecourts, no sale date, and the block is neither published
+    by a feed (`source` == "published") nor derived from a sale date here (`source_signal`)."""
+    raw = getattr(li, "raw", None) if not isinstance(li, dict) else li.get("raw")
+    if not isinstance(raw, dict) or not isinstance(raw.get("nc_ecourts"), dict):
+        return False
+    ub = raw.get("upset_bid")
+    sale = getattr(li, "sale_date", None) if not isinstance(li, dict) else li.get("sale_date")
+    return (isinstance(ub, dict) and sale in (None, "") and ub.get("source") != "published"
+            and ub.get("source_signal") is None)
+
+
 def enrich_upset_bid(listings: list[Listing], now: datetime | None = None) -> dict[str, Any]:
     """Tag NC listings inside the 10-day upset-bid window. Idempotent.
 
@@ -137,6 +150,16 @@ def enrich_upset_bid(listings: list[Listing], now: datetime | None = None) -> di
         sd = _naive_utc(li.sale_date)
         if sd is None:
             stats["no_sale_date"] += 1
+            # A window the NC eCourts judgment scraper opened from a judgment ORDER date (claims
+            # of lien, transcripts of judgment, tax liens: never a sale; that stamp is gone from
+            # the scraper since the court_signals audit of 2026-10-09) rides on carried rows that
+            # have no sale date, so the branch below never re-judged it. It is not published and
+            # not derived here (no `source`, no `source_signal`): removed.
+            if is_ecourts_order_date_window(li):
+                li.raw.pop("upset_bid", None)
+                li.upset_bid_deadline = None
+                stats["ecourts_order_date_window_removed"] = (
+                    stats.get("ecourts_order_date_window_removed", 0) + 1)
             continue
         if not sale_date_is_event(li):
             # A LiensNC or nc_sos_ucc `sale_date` is a lien FILING date, and only a sale-type lead

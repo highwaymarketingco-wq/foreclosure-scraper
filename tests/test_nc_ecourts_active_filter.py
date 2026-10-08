@@ -81,22 +81,17 @@ def test_nc_ecourts_ordered_date_preserved_in_raw():
     )
 
 
-def test_upset_bid_window_listings_keep_window_data():
-    """For listings within the 10-day post-sale upset-bid window, the
-    raw.upset_bid blob must still capture sale_occurred_on for downstream
-    investor display."""
-    # 5 days ago (inside the 10-day NC upset-bid window)
+def test_recent_judgment_carries_no_upset_bid_window():
+    """court_signals audit 2026-10-09: a judgment's order date is not a sale date, so a
+    judgment entered 5 days ago carries no raw.upset_bid and no upset_bid_deadline."""
     recent = (datetime.utcnow() - timedelta(days=5)).isoformat()
     li = _hit_to_listing(
         _hit("26SP012345-910", recent, cause="CV - Lis Pendens"),
         "counties_nc.nc_ecourts_lis_pendens",
     )
-    if li and (li.raw.get("upset_bid") or {}).get("in_window"):
-        ub = li.raw["upset_bid"]
-        assert ub["sale_occurred_on_iso"], (
-            "upset-bid window listings must record when the sale happened "
-            "for the investor's 10-day-deadline math"
-        )
+    assert li is not None
+    assert "upset_bid" not in li.raw
+    assert li.upset_bid_deadline is None
 
 
 def test_nc_ecourts_alias_names_surfaced_when_present():
