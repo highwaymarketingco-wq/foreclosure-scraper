@@ -1662,6 +1662,16 @@ async def run() -> int:
     except Exception:  # noqa: BLE001
         log.error("tax_unbound.failed", traceback=traceback.format_exc())
 
+    # Same rule for every other property and person block (owner contact, mailing, GIS attributes,
+    # liens, rosters, images): a block stays only when it is this row's own record (block_binding).
+    try:
+        from .block_binding import scrub_unbound_blocks
+        log.info("orchestrator.blocks_unbound", **scrub_unbound_blocks(deduped))
+        if _grandfather:
+            log.info("orchestrator.blocks_unbound_grandfather", **scrub_unbound_blocks(_grandfather))
+    except Exception:  # noqa: BLE001
+        log.error("blocks_unbound.failed", traceback=traceback.format_exc())
+
     # Pulled-sale detection (dad's #6): listings that existed last week
     # but didn't show up this run get tagged raw['pulled_sale'] with
     # presumed_withdrawn=True and kept on the dashboard for up to 4
@@ -3179,6 +3189,8 @@ async def run_enrich_tail(st: TailState) -> dict:
         try:
             from .tax_binding import scrub_unbound_tax
             log.info("orchestrator.tax_unbound_grandfather", **scrub_unbound_tax(_grandfather))
+            from .block_binding import scrub_unbound_blocks as _sub
+            log.info("orchestrator.blocks_unbound_grandfather", **_sub(_grandfather))
         except Exception:  # noqa: BLE001
             log.error("tax_unbound.failed", traceback=traceback.format_exc())
 
@@ -3547,6 +3559,13 @@ async def run_enrich_tail(st: TailState) -> dict:
         enrichment_stats["tax_verified_restore"] = restore_verified_tax(enriched)
     except Exception:
         log.error("tax_verified_restore.failed", traceback=traceback.format_exc())
+
+    # What the enrichers still without a fallback-point guard re-attached in this run.
+    try:
+        from .block_binding import scrub_unbound_blocks
+        enrichment_stats["blocks_unbound_late"] = scrub_unbound_blocks(enriched)
+    except Exception:
+        log.error("blocks_unbound_late.failed", traceback=traceback.format_exc())
 
     try:
         from .enrichment_bankruptcy_tax_combo import enrich_bankruptcy_tax_combo
