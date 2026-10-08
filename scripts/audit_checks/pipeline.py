@@ -23,6 +23,9 @@ Each check would have caught a defect class this pipeline has had:
                                  web_artifact._to_dict (the publish transform).
   pipeline-seen-order            first_seen after last_seen: a merge that kept the wrong copy's
                                  dates.
+  pipeline-run-health-counts     the run's per-source report (run_health.json beside a published
+                                 board, resume_state.json beside a checkpoint) says "OK (n)" with a
+                                 count that is not n: the 10/7 publish showed every source at 0.
 Memory: counters and at most SAMPLE parcel ids per check (parcel ids are public record).
 """
 from __future__ import annotations
@@ -253,6 +256,69 @@ class SeenOrder(_Check):
             self._bad(row, "first_seen > last_seen")
 
 
+class RunHealthCounts(_Check):
+    """Not a row check: the run's per-source report beside the rows. A published board's
+    docs/run_health.json, or a checkpoint's resume_state.json summary, must give every source whose
+    status reads "OK (n)" a count of n. The 10/7 publish (a tail re-run carried onto a full run's
+    state) showed all 204 sources at count 0 beside "OK (3058)" statuses: carry_publish_state did
+    not carry by_source."""
+    name = "pipeline-run-health-counts"
+    describe = "every 'OK (n)' source in the run's health report has count n"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.kind = self.path = None
+
+    def set_source(self, kind: str, path: Path) -> None:
+        self.kind, self.path = kind, Path(path)
+
+    def feed(self, row: dict) -> None:
+        return None
+
+    def _pairs(self):
+        """[(source, count, status)] from the side file, or None when there is none to judge."""
+        import json
+        if self.kind == "board":
+            f = self.path / "run_health.json"
+            if not f.exists():
+                return None
+            doc = json.loads(f.read_text())
+            return [(s.get("source"), s.get("count"), str(s.get("status") or ""))
+                    for s in (doc.get("sources") or []) if isinstance(s, dict)]
+        if self.kind == "checkpoint":
+            f = self.path / "resume_state.json"
+            if not f.exists():
+                return None
+            st = json.loads(f.read_text())
+            if not (st.get("publish") or {}).get("write_run_health"):
+                return None     # this checkpoint's publish writes no run_health
+            s = st.get("summary") or {}
+            by, status = s.get("by_source") or {}, s.get("source_status") or {}
+            return [(k, by.get(k, 0), str(v)) for k, v in status.items()]
+        return None
+
+    def finish(self) -> dict:
+        import re
+        try:
+            pairs = self._pairs()
+        except Exception as exc:  # noqa: BLE001
+            return {"name": self.name, "checked": 0, "violations": 1, "max_violations": 0, "ok": False,
+                    "detail": f"could not read the run's health report: {type(exc).__name__}: {exc}"}
+        for src, count, status in pairs or []:
+            m = re.match(r"OK \((\d+)\)", status)
+            if not m:
+                continue
+            self.checked += 1
+            if int(count or 0) != int(m.group(1)):
+                self.violations += 1
+                if len(self.samples) < SAMPLE:
+                    self.samples.append(f"{src}: count {count} vs {status}")
+        out = super().finish()
+        if pairs is None:
+            out["detail"] = "no run health report beside these rows (nothing to judge)"
+        return out
+
+
 def make_checks() -> list:
     return [RowScored(), RowValued(), EquityTaxInputs(), TaxCheckBinding(), CountylessNational(),
-            RawKeep(), SeenOrder()]
+            RawKeep(), SeenOrder(), RunHealthCounts()]

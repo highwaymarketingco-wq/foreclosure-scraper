@@ -135,3 +135,12 @@ def test_a_switch_off_for_the_sold_pool_copies_no_file(tmp_path):
     assert C.main(["--from", str(src), "--live", str(live)]) == 0
     assert not (live / "sold_pool.json.gz").exists()
     assert json.loads((live / "resume_state.json").read_text())["publish"]["write_sold_pool"] is False
+
+
+def test_a_resume_with_no_scrape_counts_gets_the_full_runs_by_source():
+    """A real resume's summary has by_source {} (TailState's empty Counter). Publishing that made the
+    10/7 run_health.json show all 204 sources at count 0 beside 'OK (n)' statuses (audit 2026-10-09)."""
+    rerun = json.loads(json.dumps(RERUN_STATE))
+    rerun["summary"]["by_source"] = {}
+    out = C.carry(FULL_STATE, rerun)
+    assert out["summary"]["by_source"] == FULL_SUMMARY["by_source"]

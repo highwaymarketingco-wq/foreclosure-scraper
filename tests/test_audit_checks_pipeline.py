@@ -123,3 +123,42 @@ def test_seen_order():
             {"first_seen": "junk", "last_seen": "2026-10-02"}]
     res = _run(P.SeenOrder(), rows)
     assert (res["checked"], res["violations"]) == (2, 1)
+
+
+def test_run_health_counts_beside_a_published_board(tmp_path):
+    import json
+    (tmp_path / "run_health.json").write_text(json.dumps({"sources": [
+        {"source": "a", "count": 0, "status": "OK (3058)"},          # the 10/7 defect
+        {"source": "b", "count": 12, "status": "OK (12)"},
+        {"source": "c", "count": 0, "status": "DORMANT - seasonal"}]}))
+    c = P.RunHealthCounts()
+    c.set_source("board", tmp_path)
+    res = c.finish()
+    assert (res["checked"], res["violations"], res["ok"]) == (2, 1, False)
+
+
+def test_run_health_counts_beside_a_checkpoint(tmp_path):
+    import json
+    state = {"publish": {"write_run_health": True},
+             "summary": {"by_source": {}, "source_status": {"a": "OK (5)", "b": "EMPTY (verified)"}}}
+    (tmp_path / "resume_state.json").write_text(json.dumps(state))
+    c = P.RunHealthCounts()
+    c.set_source("checkpoint", tmp_path)
+    assert c.finish()["violations"] == 1
+    state["summary"]["by_source"] = {"a": 5}
+    (tmp_path / "resume_state.json").write_text(json.dumps(state))
+    c = P.RunHealthCounts()
+    c.set_source("checkpoint", tmp_path)
+    assert c.finish()["ok"]
+    state["publish"]["write_run_health"] = False                    # a resume writes none: not judged
+    state["summary"]["by_source"] = {}
+    (tmp_path / "resume_state.json").write_text(json.dumps(state))
+    c = P.RunHealthCounts()
+    c.set_source("checkpoint", tmp_path)
+    res = c.finish()
+    assert res["checked"] == 0 and res["ok"]
+
+
+def test_run_health_counts_without_a_source_is_quiet():
+    res = P.RunHealthCounts().finish()
+    assert res["ok"] and "nothing to judge" in res["detail"]

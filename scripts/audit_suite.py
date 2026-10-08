@@ -14,6 +14,9 @@ THE CHECK INTERFACE (BRIEF.md "The invariant interface")
     a module-level ``DETAIL_KEYS = ("comps", ...)`` (or the same attribute on a check) names the
     lazy-detail keys (web_artifact.LAZY_DETAIL_KEYS) the check reads; the runner then streams the
     detail sidecar beside a published board in lockstep and merges only those keys into raw.
+    A check with ``set_source(kind, path)`` is told, before the pass, whether the rows come from a
+    published board ("board", its docs dir) or a checkpoint ("checkpoint", its dir), so it can
+    read the run's side files there (run_health.json, resume_state.json).
 
 WHAT A ROW IS
     The PUBLISHED shape: a published board row as board_stream.iter_board_rows() yields it, or a
@@ -182,8 +185,17 @@ def _normalize(res: Any, name: str) -> dict:
 
 
 def run_suite(rows: Iterable[dict], checks: list[tuple[str, Any, tuple]],
-              limit: int | None = None) -> tuple[list[dict], int]:
-    """Feed every row to every check (one pass); return ([result], rows fed)."""
+              limit: int | None = None, source: tuple[str, Path] | None = None) -> tuple[list[dict], int]:
+    """Feed every row to every check (one pass); return ([result], rows fed). `source` is
+    ("board", docs dir) or ("checkpoint", dir): a check with set_source(kind, path) is told where
+    the rows come from (to read the run's side files there: run_health.json, resume_state.json)."""
+    if source is not None:
+        for _, c, _ in checks:
+            if hasattr(c, "set_source"):
+                try:
+                    c.set_source(source[0], Path(source[1]))
+                except Exception:  # noqa: BLE001 - reported by the check's own finish()
+                    pass
     feed_errors = [0] * len(checks)
     first_error: list[str | None] = [None] * len(checks)
     n = 0
@@ -270,14 +282,16 @@ def main(argv: list[str] | None = None) -> int:
     bad: list = []
     if a.checkpoint:
         source = f"checkpoint:{a.checkpoint}"
+        src_kind = ("checkpoint", Path(a.checkpoint))
         rows = checkpoint_rows(Path(a.checkpoint), bad)
     else:
         board = a.board or str(REPO / "docs")
         source = f"board:{board}"
+        src_kind = ("board", Path(board) if Path(board).is_dir() else Path(board).parent)
         rows = published_rows(Path(board), detail_keys)
     t0 = time.monotonic()
     try:
-        results, n = run_suite(rows, checks, limit=a.limit)
+        results, n = run_suite(rows, checks, limit=a.limit, source=src_kind)
     except Exception as exc:  # noqa: BLE001 - the board itself is unreadable
         print(f"board could not be read ({source}): {type(exc).__name__}: {exc}", file=sys.stderr)
         traceback.print_exc(limit=3)

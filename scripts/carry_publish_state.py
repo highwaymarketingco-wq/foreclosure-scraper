@@ -21,6 +21,8 @@ WHAT IT DOES
         enrichment_stats       the full run's stats, overlaid by the re-run's (same key: the re-run)
         summary.source_status, source_alarms, regressions, errors, off_footprint_removed
                                the full run's (the tail cannot know them)
+        summary.by_source      the full run's per-source scrape counts, when the re-run has none
+                               (a resume never does)
         summary.notes          the re-run's note plus a sentence naming the full run it carries
     and copies ``sold_pool.json.gz`` beside the board when the switch is on. Everything the tail
     recomputes from the new board (total, by_state, by_county_top, by_source, outreach,
@@ -104,6 +106,12 @@ def carry(old_state: dict, new_state: dict, *, old_saved_at: Optional[str] = Non
     for k in SCRAPE_SUMMARY_KEYS:
         if k in old_summary:
             summary[k] = copy.deepcopy(old_summary[k])
+    # by_source is the scrape's per-source row count. A resume has no scrape, so its summary says
+    # {} (main.TailState's empty Counter); publishing that made run_health.json show every source
+    # at count 0 beside an "OK (3058)" status and mailed a digest with no per-source table (the
+    # 10/7 publish, audit 2026-10-09). Carry the full run's when the re-run has none.
+    if not summary.get("by_source") and old_summary.get("by_source"):
+        summary["by_source"] = copy.deepcopy(old_summary["by_source"])
     note = str(summary.get("notes") or "").strip()
     carried = (f"scrape-phase health, errors, the sold pool and the publish switches carried from the "
                f"full run saved {old_saved_at or 'earlier'} (scripts/carry_publish_state.py)")
