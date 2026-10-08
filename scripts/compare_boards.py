@@ -846,15 +846,77 @@ class BaselineIndex:
         self.seen = bytearray(self.n)
 
 
+def _source_id_fields() -> dict:
+    """{source slug: (raw block, key)} of the ids sources keep in their own raw block: board_persist's
+    table of nulled short ids plus parcel_alias's short-id sources (Lincoln PARCELID, Rutherford
+    Parcel_Number). Empty when the package cannot be imported."""
+    out: dict = {}
+    try:
+        from foreclosure_scraper.board_persist import _SOURCE_PARCEL_FIELDS
+        out.update(_SOURCE_PARCEL_FIELDS)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from foreclosure_scraper.parcel_alias import ALIAS_SOURCES
+        out.update(ALIAS_SOURCES)
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+_SID_FIELDS = _source_id_fields()
+_SID_BLOCKS = sorted({b for b, _ in _SID_FIELDS.values()})
+
+
+def source_id_keys(rec: dict) -> list[str]:
+    """"sid:<STATE>:<county>:<id>" for the id a source published for the row in its own raw block
+    (_SID_FIELDS) or that validation nulled (raw['parcel_id_nulled']), whatever the row's parcel_id
+    is now. Why (audit 2026-10-09, regressions): the 10/7 board published 15,932 Lincoln and Rutherford
+    rows with no parcel (their short ids were nulled) and the next run published the same rows under
+    the 10-digit PIN, so the two boards shared no parcel key; unnumbered vacant lots shared no address
+    key either, and the as-scraped fingerprint paired different lots of one owner on one road. The
+    comparison then reported 1,818 Lincoln rows missing and 1,009 rows as having lost their comps (625
+    their tax balance) that were all on the candidate under the PIN. Ids of four characters or more
+    (dedupe.MIN_SOURCE_PARCEL_LEN), county-qualified, so one county's id system never meets another's."""
+    raw = _raw(rec)
+    st = str(rec.get("state") or "").strip().upper()
+    co = str(rec.get("county") or "").strip().lower()
+    if not co:
+        return []
+    ids = []
+    nulled = raw.get("parcel_id_nulled")
+    if isinstance(nulled, dict) and nulled.get("value"):
+        ids.append(nulled["value"])
+    for blk_name in _SID_BLOCKS:
+        blk = raw.get(blk_name)
+        if isinstance(blk, dict):
+            for b, k in _SID_FIELDS.values():
+                if b == blk_name and blk.get(k):
+                    ids.append(blk[k])
+    out = []
+    for v in ids:
+        n = re.sub(r"[^0-9a-z]", "", str(v).lower())
+        if len(n) >= 4 and len(set(n)) > 1:
+            k = f"sid:{st}:{co}:{n}"
+            if k not in out:
+                out.append(k)
+    return out
+
+
 def join_keys(rec: dict) -> list[str]:
     """The row's identity keys for the join, strongest first: verification.core.row_keys (parcel,
-    numbered address, case; else the as-scraped fingerprint), then, as a last resort, that same
-    fingerprint ("fp:", which leaves the parcel id out) so a row that lost its only parcel key still
-    finds itself when its as-scraped fields did not change."""
+    numbered address, case; else the as-scraped fingerprint), the id its source published in its own
+    raw block (source_id_keys: a short id that became a PIN between two boards is still one row),
+    then, as a last resort, that same fingerprint ("fp:", which leaves the parcel id out) so a row
+    that lost its only parcel key still finds itself when its as-scraped fields did not change."""
     try:
         keys = [k for k in row_keys(rec) if not k.startswith("row:")]
     except Exception:  # noqa: BLE001 - an odd row has only its fingerprint key
         keys = []
+    try:
+        keys.extend(source_id_keys(rec))
+    except Exception:  # noqa: BLE001
+        pass
     try:
         keys.append("fp:" + _fingerprint(rec))        # row_keys' own "row:" key is this same hash
     except Exception:  # noqa: BLE001
@@ -973,6 +1035,10 @@ class Comparison:
         self.best: Counter = Counter()
         self.best_fh = open(best_out, "w") if best_out else None
         self.match_by: Counter = Counter()
+        # live source -> matched rows whose candidate row carries another PRIMARY source (the merge
+        # base flipped; the row is still there: attribution, not loss), and the pairs
+        self.relabeled: Counter = Counter()
+        self.relabeled_to: Counter = Counter()
 
     def close(self) -> None:
         if self.best_fh:
@@ -1021,6 +1087,10 @@ class Comparison:
         bsigs = b.sigs_of(rec[6 + NF])
         bst = _state(b.counties.items[cty][0])
         bref = b.refs[pick]
+        bsrc = b.sources.items[_src]
+        if bsrc != f.src:
+            self.relabeled[bsrc] += 1
+            self.relabeled_to[(bsrc, f.src)] += 1
         self.ov_base.add(bst, bcols | {"sig:" + s for s in bsigs})
         self.ov_cand.add(bst, set(f.cols) | {"sig:" + s for s in f.sigs})
         for i, name in enumerate(FIELDS):
@@ -1830,15 +1900,33 @@ def build_report(args, base_in: BoardInput, cand_in: BoardInput, bs: BoardStats,
             hot_gone[reason] += 1
             rsamples.add("hot_left_board", bidx.refs[i])
     flagged_sources = []
+    relabel_notes = []
     for src, nb in sorted(bs.by_source.items(), key=lambda kv: -kv[1]):
         nc = cs.by_source.get(src, 0)
-        if nc >= nb * SOURCE_DROP_RATIO:
+        # A live row of `src` still on the candidate under another PRIMARY source (the merge base
+        # flipped: main.run() collected scraper results from an unordered set until 2026-10-09) is
+        # attribution, not loss: judge the source on the rows it still HOLDS, i.e. its live rows
+        # minus the missing ones plus its new ones (audit 2026-10-09, regressions: buncombe_
+        # delinquent_tax 1,182 -> 827, multi_year_delinquent_tax 1,115 -> 436, kania 177 -> 150
+        # and sc_catalis 63 -> 53 were all relabels with 0 or 1 rows missing).
+        missing_n = sum(miss_by_source.get(src, {}).values())
+        held = nb - missing_n + cmp.new_by_source.get(src, 0)
+        relab = cmp.relabeled.get(src, 0)
+        if nc < nb * SOURCE_DROP_RATIO and held >= nb * SOURCE_DROP_RATIO and relab:
+            to = {t: n for (s, t), n in cmp.relabeled_to.most_common() if s == src}
+            relabel_notes.append({"section": "rows", "name": f"relabeled:{src}",
+                                  "detail": f"{nb:,} -> {nc:,} rows under this primary source, but {held:,} of its "
+                                            f"rows are on the candidate ({relab:,} under another primary source: "
+                                            f"{dict(list(to.items())[:5])}); attribution, not loss"})
+        if held >= nb * SOURCE_DROP_RATIO:
             continue
-        item = {"source": src, "baseline": nb, "candidate": nc, "ratio": round(nc / nb, 3) if nb else None,
+        item = {"source": src, "baseline": nb, "candidate": nc, "held": held, "relabeled": relab,
+                "ratio": round(held / nb, 3) if nb else None,
                 "missing_by_reason": dict(miss_by_source.get(src, {}))}
         flagged_sources.append(item)
         entry = {"section": "rows", "name": f"source:{src}",
-                 "detail": f"{nb:,} -> {nc:,} rows ({'zero' if nc == 0 else f'{100 * nc / nb:.0f}%'}); missing rows by "
+                 "detail": f"{nb:,} -> {held:,} rows held ({'zero' if held <= 0 else f'{100 * held / nb:.0f}%'}; "
+                           f"{nc:,} under this primary source, {relab:,} relabeled); missing rows by "
                            f"reason: {dict(miss_by_source.get(src, {}))}",
                  "threshold": f"under {SOURCE_DROP_RATIO:.0%} of the live count with at least "
                               f"{SOURCE_MIN_BASELINE_ROWS} live rows"}
@@ -1850,6 +1938,7 @@ def build_report(args, base_in: BoardInput, cand_in: BoardInput, bs: BoardStats,
         else:
             entry["why_not_blocking"] = f"fewer than {SOURCE_MIN_BASELINE_ROWS} live rows"
             notes.append(entry)
+    notes.extend(relabel_notes)
     if bs.n and cs.n < bs.n * TOTAL_ROWS_MIN_RATIO:
         blockers.append({"section": "rows", "name": "total_rows",
                          "detail": f"{bs.n:,} -> {cs.n:,} rows ({100 * cs.n / bs.n:.1f}%)",
@@ -2107,7 +2196,8 @@ def render_markdown(rep: dict) -> str:
     if r["sources_flagged"]:
         L.append("Sources under 90% of their live count (or gone):")
         for s in r["sources_flagged"][:25]:
-            L.append(f"- {s['source']}: {_n(s['baseline'])} -> {_n(s['candidate'])}")
+            held = f" ({_n(s['held'])} held, {_n(s.get('relabeled', 0))} relabeled)" if "held" in s else ""
+            L.append(f"- {s['source']}: {_n(s['baseline'])} -> {_n(s['candidate'])}{held}")
         L.append("")
     L += ["## 2. Coverage (row counts first)", "",
           "| column | rows (live -> candidate) | share of all rows | share of HOT+WARM | share of rows in both | class |",
