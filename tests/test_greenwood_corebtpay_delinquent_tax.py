@@ -475,3 +475,46 @@ def test_sweep_respects_request_budget(monkeypatch):
                                      max_requests=2))
     assert stats["requests"] == 2
     assert len(calls) == 2
+
+
+def _paid_table(n_rows: int, prefix: str, unpaid_first: bool = False) -> str:
+    rows = "".join(
+        _make_row_html(account=f"8{abs(hash((prefix, i))) % 10**10:010d}",
+                       name=f"OWNER FROM PREFIX {prefix} #{i}",
+                       unpaid=(unpaid_first and i == 0))
+        for i in range(n_rows))
+    return f'<table class="eGov_listContent">{rows}</table>'
+
+
+def test_sweep_stops_when_the_portal_lists_only_paid_bills(monkeypatch):
+    """2026-10-09 source audit: off-season the portal lists only Paid bills; the 10/8 VM
+    run read ~110,000 Paid rows over 69 prefixes and timed out at 1,800 s with 0 rows."""
+    monkeypatch.setattr(mod, "SEASON_PROBE_PREFIXES", 3)
+    monkeypatch.setattr(mod, "SEASON_PROBE_MIN_ROWS", 6)
+    calls = []
+
+    async def fake_post_search(cli, prefix):
+        calls.append(prefix)
+        return _paid_table(3, prefix)
+
+    monkeypatch.setattr(mod, "_post_search", fake_post_search)
+    monkeypatch.setattr(mod, "_PACE_S", 0.0)
+    rows, stats = asyncio.run(_sweep(cli=None, prefixes=["AA", "AB", "AC", "AD", "AE", "AF"],
+                                     max_requests=100))
+    assert calls == ["AA", "AB", "AC"]
+    assert stats["season_empty"] is True and stats["unpaid_seen"] == 0
+
+
+def test_sweep_keeps_going_when_an_unpaid_bill_is_seen(monkeypatch):
+    monkeypatch.setattr(mod, "SEASON_PROBE_PREFIXES", 3)
+    monkeypatch.setattr(mod, "SEASON_PROBE_MIN_ROWS", 6)
+
+    async def fake_post_search(cli, prefix):
+        return _paid_table(3, prefix, unpaid_first=(prefix == "AB"))
+
+    monkeypatch.setattr(mod, "_post_search", fake_post_search)
+    monkeypatch.setattr(mod, "_PACE_S", 0.0)
+    _rows, stats = asyncio.run(_sweep(cli=None, prefixes=["AA", "AB", "AC", "AD", "AE"],
+                                      max_requests=100))
+    assert stats["requests"] == 5 and stats["season_empty"] is False
+    assert stats["unpaid_seen"] == 1

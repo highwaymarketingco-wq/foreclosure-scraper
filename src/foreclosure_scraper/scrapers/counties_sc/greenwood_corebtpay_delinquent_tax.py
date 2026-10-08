@@ -268,6 +268,16 @@ _PACE_S = float(os.getenv("GREENWOOD_COREBTPAY_PACE_S", "3.0"))
 _DETAIL_PACE_S = float(os.getenv("GREENWOOD_COREBTPAY_DETAIL_PACE_S", "1.5"))
 
 _REQUEST_TIMEOUT = float(os.getenv("GREENWOOD_COREBTPAY_TIMEOUT_S", "60.0"))
+
+#: Off-season stop (2026-10-09 source audit). From about October to the next January the
+#: portal lists only PAID bills (module docstring, "A SEASONAL OBSERVATION"): the 10/8 VM
+#: run read 69 prefixes, about 110,000 rows, every one Paid, and then hit the 1,800 s
+#: timeout with 0 rows; a live check of two more prefixes the same day was all Paid too.
+#: Delinquency is not ordered by name, so when the first SEASON_PROBE_PREFIXES prefixes
+#: hold at least SEASON_PROBE_MIN_ROWS bills and none is unpaid, the portal carries no
+#: unpaid bills and the sweep stops (about 12 requests instead of 30 minutes).
+SEASON_PROBE_PREFIXES = int(os.getenv("GREENWOOD_COREBTPAY_SEASON_PROBE", "12"))
+SEASON_PROBE_MIN_ROWS = int(os.getenv("GREENWOOD_COREBTPAY_SEASON_MIN_ROWS", "10000"))
 _BACKOFF_S = 5.0
 
 _ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.I | re.S)
@@ -643,7 +653,7 @@ async def _sweep(cli: httpx.AsyncClient, prefixes: list[str], max_requests: int,
     incrementally (mirrors dorchester_billtrax_delinquent_tax's per-page
     `self.partial` updates)."""
     stats = {"requests": 0, "capped": 0, "depth_truncated": 0, "errors": 0,
-             "lost_prefixes": []}
+             "lost_prefixes": [], "rows_seen": 0, "unpaid_seen": 0, "season_empty": False}
     all_rows: list[dict] = []
     frontier = list(prefixes)
     depth = 2
@@ -671,6 +681,16 @@ async def _sweep(cli: httpx.AsyncClient, prefixes: list[str], max_requests: int,
                 continue
             stats["requests"] += 1
             rows = _parse_search_table(html)
+            stats["rows_seen"] += len(rows)
+            stats["unpaid_seen"] += sum(1 for r in rows if r["unpaid"])
+            if (stats["requests"] >= SEASON_PROBE_PREFIXES
+                    and stats["rows_seen"] >= SEASON_PROBE_MIN_ROWS
+                    and stats["unpaid_seen"] == 0):
+                stats["season_empty"] = True
+                log.info("greenwood_corebtpay.season_empty", requests=stats["requests"],
+                         rows_seen=stats["rows_seen"],
+                         note="every bill on the portal is Paid; stopping the sweep")
+                return all_rows, stats
             if len(rows) >= PAGE_CAP and depth < MAX_PREFIX_DEPTH:
                 # Truncated read: do NOT absorb it (coverage past the cut is
                 # unknown), deepen instead.
@@ -774,6 +794,11 @@ class GreenwoodCorebtpayDelinquentTax(BaseScraper):
                  capped_prefixes_deepened=stats["capped"], errors=stats["errors"],
                  lost_prefixes=stats["lost_prefixes"][:10], raw_bills=len(all_rows),
                  parcels=len(listings), elapsed_s=elapsed)
+        if stats.get("season_empty") and not listings:
+            self.last_outcome = OUTCOME_ZERO
+            self.last_reason = (f"portal lists only paid bills ({stats['rows_seen']} read over "
+                                f"{stats['requests']} prefixes, 0 unpaid): off-season")
+            return listings
         if stats["errors"] or detail_blocked:
             self.last_outcome = OUTCOME_PARTIAL if listings else OUTCOME_ZERO
             self.last_reason = (f"{stats['errors']} prefix error(s)"
