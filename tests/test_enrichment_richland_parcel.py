@@ -112,3 +112,16 @@ def test_enrich_runs_two_calls_per_row_and_caps_lookups():
 def test_env_gate(monkeypatch):
     monkeypatch.setenv("FORECLOSURE_RICHLAND_PARCEL", "0")
     assert asyncio.run(R.enrich_richland_parcel([L()], http=FakeHttp())) == {"skipped": "env"}
+
+
+def test_hot_and_warm_rows_go_first_under_the_cap():
+    http = FakeHttp()
+    cold = L(street="1200 SAMPLE AVE")
+    warm = L(street="1200 SAMPLE AVE")
+    warm.raw = {"distress_stack": {"tier": "WARM"}}
+    hot = L(street="1200 SAMPLE AVE")
+    hot.raw = {"distress_stack": {"tier": "HOT"}}
+    stats = asyncio.run(R.enrich_richland_parcel([cold, warm, hot], max_lookups=2, delay_s=0, http=http))
+    assert stats["candidates"] == 2
+    assert "richland_parcel" in hot.raw and "richland_parcel" in warm.raw
+    assert "richland_parcel" not in (cold.raw or {})

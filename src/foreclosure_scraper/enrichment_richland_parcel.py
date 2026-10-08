@@ -99,6 +99,12 @@ def _has_mailing(raw: dict) -> bool:
     return bool((raw.get("gis") or {}).get("mailing"))
 
 
+def _priority(li: Listing) -> int:
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    tier = (raw.get("distress_stack") or {}).get("tier") if isinstance(raw.get("distress_stack"), dict) else None
+    return {"HOT": 0, "WARM": 1}.get(tier, 2)
+
+
 def wants(li: Listing, now: datetime) -> bool:
     """A Richland SC row with a numbered street that still lacks mailing or a parcel id."""
     if (li.state or "").upper() != "SC":
@@ -231,7 +237,10 @@ async def enrich_richland_parcel(listings: list[Listing], *, max_lookups: Option
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     cap = int(max_lookups if max_lookups is not None else os.environ.get("RICHLAND_PARCEL_MAX", "300"))
     delay = float(delay_s if delay_s is not None else os.environ.get("RICHLAND_PARCEL_DELAY_S", "1.7"))
-    todo = [li for li in listings if wants(li, now)][:cap]
+    # HOT and WARM rows first (the tier the previous run gave them), then the rest in board order:
+    # the per-run cap (about 4 s a row on one host) leaves the remainder for later runs, and on the
+    # 10/8 run 1,775 Richland rows were still waiting after the first 300 (audit 2026-10-09).
+    todo = sorted((li for li in listings if wants(li, now)), key=_priority)[:cap]
     stats = {"candidates": len(todo), "asked": 0, "matched": 0, "no_point": 0, "no_parcel": 0,
              "errors": 0}
     if not todo:
