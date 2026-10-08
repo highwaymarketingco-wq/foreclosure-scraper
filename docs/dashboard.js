@@ -504,6 +504,9 @@ const _LEAN_RAW = {
   // flag. Mirrors the matching entry appended at the end of _SLIM_RAW in web_artifact.py
   // (tests/test_board_slim.py pins them equal).
   bankruptcy_tax_combo: "*",
+  // APPENDED LAST (2026-10-09 audit, call_ready): the call-ready gate (lane, tier, rank, reason,
+  // unmet codes). Mirrors the entry appended at the end of _SLIM_RAW in web_artifact.py.
+  call_ready: "*",
 };
 const _LEAN_RAW_KEYS = Object.keys(_LEAN_RAW);
 const _LEAN_RAW_SCALARS = [
@@ -2739,6 +2742,14 @@ function applyFilters() {
       // raw.tax_big_old (enrichment_tax_owed.tax_big_old): property tax of $7,000+ already late,
       // 2+ levy years late. A current bill that is not late yet counts toward neither.
       if (contact === "tax_big_old" && !r.tax_big_old) return false;
+      // raw.call_ready (call_ready.py, docs/call_ready.md): "cr_tier_A" etc. keep that tier,
+      // "cr_tier_AB" both call tiers, "cr_lane_X" one lane at any tier.
+      if (contact.startsWith("cr_")) {
+        const cr = r.call_ready || {};
+        if (contact === "cr_tier_AB") { if (cr.tier !== "A" && cr.tier !== "B") return false; }
+        else if (contact.startsWith("cr_tier_")) { if (cr.tier !== contact.slice(8) || !cr.lane) return false; }
+        else if (contact.startsWith("cr_lane_")) { if (cr.lane !== contact.slice(8)) return false; }
+      }
     }
     if (win && l.sale_date) {
       const d = Date.parse(l.sale_date);
@@ -5767,7 +5778,7 @@ function renderDetail(l, detailState) {
           <tr>
             <td>${c.url ? `<a href="${c.url}" target="_blank">${c.address || "—"}</a>` : (c.address || "—")}</td>
             <td>${c.sold_price ? `$${Number(c.sold_price).toLocaleString()}` : "—"}</td>
-            <td>${c.sold_date ? c.sold_date.slice(0,10) : "—"}</td>
+            <td>${c.sold_date ? c.sold_date.slice(0,10) : "—"}${c.age_days != null ? ` <span class="muted" title="${_attr(c.carried ? "Kept from an earlier run" + (c.carried_from ? " (" + c.carried_from + " board)" : "") + ": no fresh comps were found this run. Comps older than 365 days are dropped." : "Days since this comp sold.")}">(${Number(c.age_days)}d${c.carried ? ", carried" : ""})</span>` : ""}</td>
             ${_distTd(c)}
             <td>${c.sqft ? Number(c.sqft).toLocaleString() : "—"}</td>
             <td>${c.beds ?? "—"}/${c.baths ?? "—"}</td>
@@ -6632,6 +6643,9 @@ function exportCsv() {
     // blank when the gate blocks the number, and this says why, so a flagged number
     // is not silently lost. Blank when the phone is usable or absent.
     "phone_block_reason",
+    // APPENDED (2026-10-09 audit, call_ready): the call-ready gate. Blank when the row was
+    // published before the gate existed.
+    "call_lane", "call_tier", "call_rank", "call_reason", "call_unmet", "call_checked_on",
   ];
   const rows = [cols.join(",")];
   filtered.forEach((l) => {
@@ -6677,6 +6691,13 @@ function exportCsv() {
       days_to_auction: dta, stale_case: r.stale_case ? "yes" : "",
       clock_status: clockSummary(l, clockOf(l)),
       phone_block_reason: (() => { const b = ownerPhoneBlock(op); return b && b !== "no_phone" ? b : ""; })(),
+      call_lane: (r.call_ready && r.call_ready.lane) || "",
+      call_tier: (r.call_ready && r.call_ready.lane && r.call_ready.tier) || "",
+      call_rank: (r.call_ready && r.call_ready.rank != null) ? r.call_ready.rank : "",
+      call_reason: (r.call_ready && r.call_ready.reason) || "",
+      call_unmet: (r.call_ready && Array.isArray(r.call_ready.unmet)) ? r.call_ready.unmet.join("; ") : "",
+      call_checked_on: (r.call_ready && Array.isArray(r.call_ready.checks))
+        ? r.call_ready.checks.map((c) => `${c.check}:${c.result}@${c.on}`).join("; ") : "",
       geo_quality: r.geo_imprecise || "verified",
       truepeoplesearch_url: tps,
       address_quality: dqf.includes("synthetic_address") ? "placeholder"

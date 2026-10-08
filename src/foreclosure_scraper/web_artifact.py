@@ -2332,6 +2332,11 @@ RAW_KEEP = {
     # 2026-10-08: what the county's own site said about the row's tax claim when it was checked
     # ({verdict, checked_at, detail}); tax_binding.restore_verified_tax sets the balance from it
     "tax_county_check": "*",
+    # 2026-10-09 audit (call_ready): the call-ready gate {v, lane, tier, rank, reason, unmet, checks,
+    # phone, dnc, mail, facts, lawyer, as_of} (call_ready.py, docs/call_ready.md). Public-safe by
+    # construction: codes, counties, amounts and dates only (no names, phones or e-mails). Also whole
+    # in _SLIM_RAW (rebuilt every run: kept out of the shards, see rule 3 there).
+    "call_ready": "*",
 
     # ------------------------------------------------------------------
     # 2026-09-10 SCRAPER-KEY AUDIT. Measured, not suspected: of 191 distinct raw
@@ -3078,6 +3083,10 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     # the other combo/rank blocks above — a handful of keys, all read together. Mirrors the
     # matching entry appended at the end of _LEAN_RAW in docs/dashboard.js.
     "bankruptcy_tax_combo": "*",
+    # APPENDED LAST (2026-10-09 audit, call_ready): the call-ready lane / tier / rank / reason the
+    # dashboard filters and the export read. Whole block: rebuilt every run (rule 3: whole here keeps
+    # it out of the shards). Mirrors the entry appended at the end of _LEAN_RAW in docs/dashboard.js.
+    "call_ready": "*",
 }
 
 
