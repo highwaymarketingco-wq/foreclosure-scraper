@@ -75,7 +75,8 @@ def _ident(led, rec: dict) -> str:
 def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, cap: int,
            now: datetime, recheck_only: bool = False,
            tiers: set[str] | None = None,
-           sources: set[str] | None = None) -> tuple[dict, dict]:
+           sources: set[str] | None = None,
+           priority_first: bool = False) -> tuple[dict, dict]:
     """One streaming pass. Returns ({signal: [(prio, key, row, verifier)] best first},
     {signal: Counter of why rows were or were not due}). recheck_only: only rows that already
     have a ledger entry (TTL / VERSION re-checks), e.g. right after a VERSION bump. tiers:
@@ -127,8 +128,10 @@ def select(board_path: Path, verifiers, ledgers: dict, *, county: str | None, ca
             # the "2+ years and $500" flag first), never checked, oldest check, board order.
             # heapq is a min-heap: store the negated priority so h[0] is the WORST kept row.
             pri = v.priority_of(rec) if hasattr(v, "priority_of") else 0
-            prio = (tier_rank(rec), pri, 0 if lt is None else 1, lt.timestamp() if lt else 0.0,
-                    order)
+            # priority_first: the verifier's own priority outranks the tier, so every flagged
+            # row is checked before any unflagged row of a better tier.
+            lead = (pri, tier_rank(rec)) if priority_first else (tier_rank(rec), pri)
+            prio = (*lead, 0 if lt is None else 1, lt.timestamp() if lt else 0.0, order, tier_rank(rec))
             item = (tuple(-x for x in prio), keys[0], rec, v.name)
             h, seen = heaps[v.signal], inheap[v.signal]
             slots = seen.setdefault(keys[0], {})        # address identity -> queued item
@@ -217,7 +220,7 @@ async def run_checks(plan: dict, ledgers: dict, fetcher, *, budget_s: float, sav
             tally[res.verdict] += 1
             tally["checked"] += 1
             print(f"  {sig} {res.verdict:11} {key}  {row.get('street_address') or ''} "
-                  f"[{('HOT', 'WARM', 'COLD', '-')[int(prio[0])]}] {note}"
+                  f"[{('HOT', 'WARM', 'COLD', '-')[int(prio[-1])]}] {note}"
                   f"{_brief(res.evidence)}", flush=True)
             since_save += 1
             if since_save >= save_every:
@@ -303,6 +306,9 @@ def main(argv=None) -> int:
                     help="only rows of this tier (HOT/WARM/COLD, repeatable or comma-separated)")
     ap.add_argument("--recheck-only", action="store_true",
                     help="only rows already in the ledger (TTL/VERSION re-checks), no new rows")
+    ap.add_argument("--priority-first", action="store_true",
+                    help="order by the verifier's own priority (tax: the '2+ years and $500' "
+                         "flag) before the HOT/WARM/COLD tier")
     ap.add_argument("--dry-run", action="store_true", help="select candidates only")
     args = ap.parse_args(argv)
 
@@ -352,10 +358,11 @@ def run(args) -> int:
                        county=args.county, cap=max(0, args.max_rows), now=now,
                        recheck_only=args.recheck_only,
                        tiers={t.strip().upper() for a in (args.tier or []) for t in a.split(",") if t.strip()} or None,
-                       sources={t.strip() for a in (args.source or []) for t in a.split(",") if t.strip()} or None)
+                       sources={t.strip() for a in (args.source or []) for t in a.split(",") if t.strip()} or None,
+                       priority_first=args.priority_first)
     scan_s = time.monotonic() - t0
     for sig in plan:
-        tiers = Counter(("HOT", "WARM", "COLD", "-")[int(p[0][0])] for p in plan[sig])
+        tiers = Counter(("HOT", "WARM", "COLD", "-")[int(p[0][-1])] for p in plan[sig])
         print(f"{sig}: {dict(why[sig])} | this run {len(plan[sig])} rows {dict(tiers)} "
               f"(board scan {scan_s:.0f}s)", flush=True)
     if args.dry_run:
