@@ -67,6 +67,18 @@ def _is_absentee(mail_state: str | None, mail_street: str | None, situs: str | N
     return False
 
 
+#: A situs that starts with a house number ("123 CASHIERS RD"). LEGAL_ADDR is the parcel's LEGAL
+#: location text, and on vacant land it is almost never a street address: "OAK LAUREL RD L-71",
+#: "TR K OFF FROZEN CREEK RD", "LAUREL CREEK DR L-5A     1.67" (live sample 2026-10-08; 5 of
+#: 2,000 start with a number per the 2026-10-03 sample). Only those go to street_address; the text
+#: is kept whole in legal_description and raw either way.
+_STREET_RE = re.compile(r"^\d+[A-Z]?\s+[A-Z0-9]", re.I)
+
+
+def street_from_legal(legal: str | None) -> str | None:
+    return legal if legal and _STREET_RE.match(legal.strip()) else None
+
+
 def _f(v) -> float | None:
     try:
         f = float(str(v).replace(",", "").strip())
@@ -206,7 +218,7 @@ class TransylvaniaVacant(BaseScraper):
                         listing_type=ListingType.UNKNOWN,
                         property_kind=PropertyKind.LAND,
                         owner_name=owner,
-                        street_address=situs,
+                        street_address=street_from_legal(situs),
                         city=None,  # CITY/STATE/ZIP are owner mailing, not situs
                         state="NC",
                         county="Transylvania",

@@ -152,3 +152,35 @@ def test_seeclickfix_never_keeps_the_complainant(monkeypatch):
     rows = asyncio.run(SCF.SeeClickFixScraper()._fetch_city(city))
     assert rows and "reporter" not in rows[0].raw["seeclickfix"]
     assert "Made Up Resident" not in repr(rows[0].raw)
+
+
+# ----------------------------------------------------------------------------- Transylvania vacant
+
+def test_transylvania_legal_location_is_not_a_street_address(monkeypatch):
+    from foreclosure_scraper.scrapers.counties_nc import transylvania_vacant as TV
+
+    feats = [{"attributes": {"PIN": f"85{i:08d}", "OWNER_NAME": "PRETEND LAND LLC", "LEGAL_ADDR": legal,
+                             "STATE": "NC", "BUILDING_V": 0}}
+             for i, legal in enumerate(["OAK LAUREL RD L-71", "TR K OFF FROZEN CREEK RD",
+                                        "LAUREL CREEK DR L-5A     1.67", "123 MADEUP RD"])]
+
+    class _Resp:
+        status_code = 200
+
+        def json(self):
+            return {"features": feats}
+
+    class _C:
+        async def get(self, url, params=None):
+            return _Resp()
+
+    @asynccontextmanager
+    async def fake_client(**kw):
+        yield _C()
+
+    monkeypatch.setattr(TV, "client", fake_client)
+    rows = {li.legal_description: li for li in asyncio.run(TV.TransylvaniaVacant().fetch())}
+    assert rows["OAK LAUREL RD L-71"].street_address is None
+    assert rows["TR K OFF FROZEN CREEK RD"].street_address is None
+    assert rows["LAUREL CREEK DR L-5A     1.67"].street_address is None
+    assert rows["123 MADEUP RD"].street_address == "123 MADEUP RD"
