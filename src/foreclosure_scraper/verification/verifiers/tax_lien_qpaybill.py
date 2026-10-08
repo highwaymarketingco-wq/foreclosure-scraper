@@ -24,9 +24,34 @@ lookup, live-verified 2026-10-06:
 
 One session per tenant and search criteria per sweep run (opened on the first row that needs it,
 reused, re-opened after 15 minutes), so a parcel costs one request after two per county. Requests are one at a
-time per host, paced by the sweep's Fetcher. A tenant that answers an error page
-(GenericErrorPage.aspx, Williamsburg's known failure), an HTTP error, or fails twice in a run is
-skipped for the rest of the run: its rows answer unconfirmed (tenant_unhealthy), never refuted.
+time, paced by the sweep's Fetcher as ONE host for all tenants (fetch.SHARED_BACKENDS, 2.0 s).
+
+TENANT HEALTH (v5, 2026-10-08). v4 condemned a tenant for the whole run on ONE generic error page
+or two failures in a row, and its remaining rows answered tenant_unhealthy without a request. Two
+things tripped it on the 10/8 sweep (6,000 rows, 2.5 h, 1,870 Spartanburg requests):
+  * Horry (843 rows): the address binding posted Search By = "Address", which Horry's form does
+    not offer (its list is Notice Number, Map Number, Owner Name, PIN, Tax ID); the server answers
+    an unlisted dropdown value with GenericErrorPage.aspx, a per-request error, not an outage.
+  * every other tenant (Spartanburg 288, Oconee 512, Union 57, Laurens 38, Calhoun, Clarendon):
+    the whole vendor answered HTTP 503 or the generic error page in the same minute (18:34-18:35
+    UTC; Clarendon on its first request of the run); six minutes later all 29 forms answered 200
+    within a second. A vendor outage, not this sweep's pace on one tenant.
+So now: (1) the criteria list each tenant's form offers is read when its first session opens and a
+criteria it does not offer is never posted (CriteriaUnavailable: Horry has no address search, see
+ADDRESS BINDING); (2) a transient failure (HTTP 408/429/5xx, the generic error page, a page with no
+form, a timeout or connection error) is retried once after RETRY_BACKOFF_S (a Retry-After header is
+honoured up to RETRY_AFTER_CAP_S); (3) a circuit breaker per tenant: TENANT_MAX_FAILURES failed
+searches in a row OPEN it for COOLDOWN_BASE_S (doubling on each re-open, up to COOLDOWN_MAX_S;
+the portal's own "site is currently off line" notice, Abbeville since 2026-10-08, opens it for
+OFFLINE_COOLDOWN_S); while open, rows answer unconfirmed tenant_unhealthy without a request (a
+cooldown ending within MAX_INLINE_WAIT_S is waited out); after it, ONE half-open search is let
+through: success closes the circuit, failure re-opens it. Nothing condemns a tenant for the rest
+of the run except HTTP 401/403 (a block is a wall: never retried in the run). (4) The evidence
+names what happened: http_status, tenant_failure (http_503, generic_error_page, portal_offline,
+timeout ...), tenant_state (closed / open / blocked) and retry_in_s. tenant_unhealthy (the
+circuit is open), fetch_failed (this row's search failed twice, circuit still closed) and
+address_search_failed are TRANSIENT_REASONS: the sweep re-checks them at the end of its run and
+the ledger makes them due again after 6 hours, not 7 days.
 
 WHICH ROWS. SC rows in a qPayBill county whose tax claim the county record can answer
 (verifiers/_tax_common.py: a tax_lien/tax_sale listing type that is not a DEW / DOR lien, a
@@ -43,9 +68,13 @@ road name), so when they differ BOTH are searched:
         row really is cannot be told here, so nothing is decided and nothing suppressed)
     only one found -> decided on that one
 Some tenants' grid identification number is not their Map Number (Horry shows the PIN in the
-grid and searches the TMS; Orangeburg shows an account number): when the claim's number finds
-nothing, the claim's own bills are read by notice number instead (Search By = Receipt Number,
-the block's notice_numbers, newest 2), which answers exactly the claimed bills.
+grid and searches the TMS; Orangeburg shows an account number). v5: a tenant whose form offers a
+Search By option labelled "PIN" (Horry, Orangeburg; Lexington's "PIN" value is labelled "Decal
+Number" and is not used) has an all-digit number searched by PIN first (live 2026-10-08: an
+11-digit Horry PIN searched by PIN answers its whole bill history, 11 rows; the same number as a
+Map Number answers "No records matched"; v4 answered 123 Horry rows parcel_not_found that way). When
+neither finds the number, the claim's own bills are read by notice number instead (Search By =
+Receipt Number, the block's notice_numbers, newest 2), which answers exactly the claimed bills.
 
 ROLLBACK BILLS (v2). A rollback tax (a change of use, e.g. out of agricultural valuation) is a
 separate bill whose Description says "<year> ROLLBACK TAX..." and that is filed under the year it
@@ -67,6 +96,18 @@ ADDRESS'S rows decide instead (decided_on address_search), confirmed on an unpai
 on a late payment, refuted when paid on time; an address with no rows of its own, or a full page
 that may hide years, is unconfirmed (address_parcel_mismatch / page_capped). A row with no
 house-numbered address has nothing to bind and is judged on its parcel as before.
+v5: a tenant with no Property Address search (Horry) cannot run that search: the account's own
+rows decide (address_binding no_address_search) unless they name another address (conflict) or
+the account is a parcel a resolver attached to the row, which answer unconfirmed
+(address_search_unavailable).
+
+CONFIRMED IS BOUND TOO (v5). v4 confirmed on any delinquent balance of the parcel searched. When
+that account's bills name a DIFFERENT house number on the row's own street
+(_tax_common.other_number_same_street: a neighbor's parcel), or it is the board parcel a resolver
+attached and its bills do not carry the row's address, the confirmed answer goes through the same
+binding as stale / refuted: the address search, account_choice() (follow the address's own
+account only with proof) and address_not_found / ambiguous_account. Never confirmed on a
+neighbor's bills.
 
 WHICH ACCOUNT, WHEN THE ADDRESS NAMES ANOTHER (v3). In v2 the address's rows decided whenever the
 row's own account did not carry the address. That turned two Union SC rows from stale to refuted
@@ -137,6 +178,7 @@ import html as _html
 import re
 import time
 import weakref
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from functools import lru_cache
 from typing import Any, Optional
@@ -145,7 +187,12 @@ from ..core import VerificationResult, result
 from . import _tax_common as tc
 
 SIGNAL = "tax_lien"
-VERSION = "v4"         # v4 (2026-10-07): "Sold at Tax Sale" is its own state (never paid, late,
+VERSION = "v5"         # v5 (2026-10-08): tenant health is a circuit breaker with a half-open probe
+                       # (never dead for the run on one error page or a vendor-wide minute of
+                       # 503s), only the criteria a tenant's form offers are posted (Horry: no
+                       # address search), Horry's PIN search, a confirmed answer is bound like a
+                       # stale one when the bills name a neighbor's house number.
+                       # v4 (2026-10-07): "Sold at Tax Sale" is its own state (never paid, late,
                        # stale or refuted; reason sold_at_tax_sale), the land account behind a
                        # sub-account (Cherokee .001) is read too, Cherokee's 16-digit sub-account
                        # parcels are re-dashed.
@@ -156,16 +203,26 @@ VERSION = "v4"         # v4 (2026-10-07): "Sold at Tax Sale" is its own state (n
                        # ledger. v2: rollback bills judged apart; address binding
 TTL_DAYS = 30
 RETRY_DAYS = 7
+#: answers about the portal's health, not the row (module doc, TENANT HEALTH; registry.py)
+TRANSIENT_REASONS = ("tenant_unhealthy", "fetch_failed", "address_search_failed")
+TRANSIENT_RETRY_DAYS = 0.25
 SOURCE = "qpaybill.com"
 GOVERNS = tc.GOVERNS          # tax_lien:property_tax, tax_sale:property_tax, ... (_tax_common)
 governs_for = tc.governs_for  # per record: a confirmed chronic claim keeps tax_lien_chronic
+priority = tc.flag_priority     # the "2+ years and $500" rows first within a tier
 ROW_SUMMARY_EXCLUDE = ("owner_name",)
 
 ROLL_SLUG = "counties_sc.qpaybill_delinquent_roll"
 ROLL_KEY = "qpaybill_roll"
 PAGE_CAP = 25
 SESSION_MAX_AGE_S = 15 * 60
-TENANT_MAX_FAILURES = 2
+TENANT_MAX_FAILURES = 2        # failed searches in a row (each after its one retry) that open the circuit
+RETRY_BACKOFF_S = 15.0         # pause before the one retry of a transient failure
+RETRY_AFTER_CAP_S = 60.0       # a Retry-After header is honoured up to this
+COOLDOWN_BASE_S = 60.0         # first open period of a tenant's circuit; doubles per re-open
+COOLDOWN_MAX_S = 900.0
+OFFLINE_COOLDOWN_S = 1800.0    # the portal's own "site is currently off line" notice
+MAX_INLINE_WAIT_S = 20.0       # an open circuit about to half-open is waited out, not reported
 GET_TIMEOUT_S = 45.0
 POST_TIMEOUT_S = 60.0          # Darlington answers slowly but correctly (8028596d)
 RECENT_SALE_YEARS = 3          # Sold-at-Tax-Sale rows still inside redemption
@@ -177,11 +234,20 @@ _GRID_ID = "ctl00_MainContent_gvSearchResults"
 _NO_MATCH = "No records matched"
 
 
+#: counties whose treasurer left qPayBill: the roll scraper still lists them, this verifier does not
+#: (2026-10-08: abbevilletreasurer.qpaybill.com answers every request with Info.aspx, "Sorry the
+#: site is currently off line."; the county's treasurer page links its PayStar search instead,
+#: which tax_lien_paystar reads)
+MOVED = {"abbeville": "taxes.paystar.io (tax_lien_paystar)"}
+
+
 @lru_cache(maxsize=1)
 def tenants() -> dict[str, tuple[str, str]]:
-    """{county lowercased: (County, qpaybill subdomain)} from the roll scraper's QPAYBILL_SUBS."""
+    """{county lowercased: (County, qpaybill subdomain)} from the roll scraper's QPAYBILL_SUBS,
+    without the MOVED counties."""
     from ...scrapers.counties_sc.qpaybill_delinquent_roll import QPAYBILL_SUBS
-    return {c.strip().lower(): (c, s) for c, s in QPAYBILL_SUBS.items()}
+    return {c.strip().lower(): (c, s) for c, s in QPAYBILL_SUBS.items()
+            if c.strip().lower() not in MOVED}
 
 
 def form_url(sub: str) -> str:
@@ -443,11 +509,54 @@ def late_payments(by_year: dict, year: int) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# the tenant sessions (one per county and search criteria per sweep run)
+# the tenant sessions (one per county and search criteria per sweep run) and their health
 # ---------------------------------------------------------------------------
 
+@dataclass
+class Health:
+    """What one failed request said about the tenant (module doc, TENANT HEALTH)."""
+    kind: str                           # http_503, generic_error_page, portal_offline, timeout ...
+    http_status: Optional[int] = None   # the HTTP status the portal answered, None for no answer
+    retry_after_s: Optional[float] = None
+    transient: bool = True              # worth one retry after a pause
+    blocked: bool = False               # 401 / 403: a wall, never retried in the run
+
+    def text(self) -> str:
+        return self.kind if self.http_status in (None, 200) or self.kind.startswith("http_") \
+            else f"{self.kind} (HTTP {self.http_status})"
+
+
+class SourceFailure(RuntimeError):
+    """One search failed (after its retry) and the tenant's circuit is still closed."""
+
+    def __init__(self, health: Health) -> None:
+        super().__init__(health.text())
+        self.health = health
+
+    def evidence(self) -> dict:
+        return {"tenant_health": self.health.text(), "http_status": self.health.http_status,
+                "tenant_failure": self.health.kind, "tenant_state": "closed"}
+
+
 class TenantDown(RuntimeError):
-    pass
+    """The tenant's circuit is open (or the tenant blocked us): no request is made for the row."""
+
+    def __init__(self, health: Health, state: str = "open", retry_in_s: Optional[float] = None,
+                 failures: int = 0) -> None:
+        self.health, self.state, self.failures = health, state, failures
+        self.retry_in_s = None if retry_in_s is None else max(0, int(round(retry_in_s)))
+        when = "" if self.retry_in_s is None else f", half-open in {self.retry_in_s} s"
+        super().__init__(f"{health.text()}: circuit {state}{when}")
+
+    def evidence(self) -> dict:
+        return {"tenant_health": str(self)[:200], "http_status": self.health.http_status,
+                "tenant_failure": self.health.kind, "tenant_state": self.state,
+                "retry_in_s": self.retry_in_s}
+
+
+class CriteriaUnavailable(LookupError):
+    """The tenant's form does not offer this Search By option (Horry has no Property Address):
+    nothing was posted, the tenant is healthy."""
 
 
 class _Session:
@@ -462,13 +571,24 @@ class _Tenant:
     def __init__(self, county: str, sub: str) -> None:
         self.county, self.sub, self.url = county, sub, form_url(sub)
         self.sessions: dict[str, _Session] = {}
-        self.failures = 0
-        self.dead: Optional[str] = None
         self.lock = asyncio.Lock()
         self.cache: dict[tuple[str, str], dict] = {}
+        self.offered: Optional[dict[str, str]] = None    # Search By value -> label, from the form
+        # the circuit breaker (module doc, TENANT HEALTH)
+        self.failures = 0                    # failed searches in a row
+        self.open_until = 0.0                # monotonic; > now: open, no request
+        self.trips = 0                       # times opened since the last success
+        self.half_open = False               # the next search is the one probe
+        self.blocked: Optional[Health] = None
+        self.last: Optional[Health] = None
 
 
 _RUNS: "weakref.WeakKeyDictionary[Any, dict]" = weakref.WeakKeyDictionary()
+
+
+async def _sleep(seconds: float) -> None:
+    """Every pause of the health logic (a test replaces it to record the pauses)."""
+    await asyncio.sleep(seconds)
 
 
 def _tenant(client: Any, county: str, sub: str) -> _Tenant:
@@ -482,14 +602,64 @@ def _tenant(client: Any, county: str, sub: str) -> _Tenant:
     return t
 
 
-def _problem(resp: Any) -> Optional[str]:
-    if resp.status >= 400:
-        return f"http_{resp.status}"
-    if "genericerrorpage" in str(resp.url).lower() or "GenericErrorPage" in resp.text[:20000]:
-        return "generic_error_page"
+_OFFLINE = re.compile(r"currently\s+off\s*line|site is (?:currently )?(?:down|unavailable)", re.I)
+_RETRYABLE_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
+
+
+def _retry_after(resp: Any) -> Optional[float]:
+    v = (getattr(resp, "headers", None) or {}).get("retry-after")
+    try:
+        return max(0.0, float(str(v).strip())) if v not in (None, "") else None
+    except ValueError:
+        return None                       # an HTTP-date: fall back to our own backoff
+
+
+def _problem(resp: Any) -> Optional[Health]:
+    """What is wrong with a portal answer, or None for a usable page."""
+    st = int(resp.status)
+    if st in (401, 403):
+        return Health(f"http_{st}", st, transient=False, blocked=True)
+    if st >= 400:
+        return Health(f"http_{st}", st, retry_after_s=_retry_after(resp),
+                      transient=st in _RETRYABLE_STATUS or st >= 500)
+    url = str(resp.url).lower()
+    if "genericerrorpage" in url or "GenericErrorPage" in resp.text[:20000]:
+        return Health("generic_error_page", st)
+    if url.rstrip("/").endswith("/info.aspx") or _OFFLINE.search(resp.text[:20000]):
+        # "Sorry the site is currently off line." (Abbeville, 2026-10-08): the portal says so
+        return Health("portal_offline", st, transient=False)
     if "__VIEWSTATE" not in resp.text:
-        return "no_form_on_page"
+        return Health("no_form_on_page", st)
     return None
+
+
+def _exc_health(exc: BaseException) -> Health:
+    name = type(exc).__name__
+    if isinstance(exc, (asyncio.TimeoutError, TimeoutError)) or "timeout" in name.lower() \
+            or "timed out" in str(exc).lower():
+        return Health("timeout")
+    return Health(f"request_error:{name}"[:60])
+
+
+class _Failed(RuntimeError):
+    def __init__(self, health: Health) -> None:
+        super().__init__(health.text())
+        self.health = health
+
+
+def offered_criteria(text: str) -> dict[str, str]:
+    """{Search By value: label} of the tenant form's criteria list ({} when there is none)."""
+    m = re.search(r'name="ctl00\$MainContent\$ddlCriteriaList"[^>]*>(.*?)</select>', text, re.S)
+    if not m:
+        return {}
+    return {v: _html.unescape(lbl).strip() for v, lbl in
+            re.findall(r'<option[^>]*value="([^"]*)"[^>]*>([^<]*)</option>', m.group(1))}
+
+
+def pin_search_offered(t: _Tenant) -> bool:
+    """The tenant offers a Search By option that IS a parcel PIN (value "PIN" labelled "PIN":
+    Horry, Orangeburg; Lexington's "PIN" value is labelled "Decal Number")."""
+    return bool(t.offered) and (t.offered.get("PIN") or "").strip().upper() == "PIN"
 
 
 async def _close(s: _Session) -> None:
@@ -506,46 +676,112 @@ async def _open(t: _Tenant, s: _Session, client: Any, criteria: str) -> None:
     s.cm = client.form_session()
     s.session = await s.cm.__aenter__()
     r = await s.session.get(t.url, timeout=GET_TIMEOUT_S)
-    if (p := _problem(r)) is not None or _CRITERIA not in r.text:
-        raise TenantDown(p or "no_search_form")
+    if (p := _problem(r)) is not None:
+        raise _Failed(p)
+    if _CRITERIA not in r.text:
+        raise _Failed(Health("no_search_form", int(r.status)))
+    offered = offered_criteria(r.text)
+    if offered:
+        t.offered = offered
+    if t.offered is not None and criteria not in t.offered:
+        raise CriteriaUnavailable(criteria)
     r = await s.session.post_form(t.url, criteria_data(viewstate(r.text), criteria),
                                   timeout=POST_TIMEOUT_S)
     if (p := _problem(r)) is not None:
-        raise TenantDown(p)
+        raise _Failed(p)
     s.state = viewstate(r.text)
     s.opened = time.monotonic()
 
 
+async def _search_once(t: _Tenant, s: _Session, client: Any, criteria: str, value: str
+                       ) -> tuple[dict, Any]:
+    if s.session is None or time.monotonic() - s.opened > SESSION_MAX_AGE_S:
+        await _open(t, s, client, criteria)
+    r = await s.session.post_form(t.url, search_data(s.state, value, criteria),
+                                  timeout=POST_TIMEOUT_S)
+    if (p := _problem(r)) is not None:
+        raise _Failed(p)
+    g = parse_grid(r.text)
+    if not g["grid"] and not g["no_match"]:
+        raise _Failed(Health("search_answer_unreadable", int(r.status)))
+    return g, r
+
+
+async def _gate(t: _Tenant) -> None:
+    """Let a search through, or raise TenantDown while the tenant's circuit is open. An open
+    circuit about to half-open (within MAX_INLINE_WAIT_S) is waited out; after the cooldown the
+    next search is the one half-open probe."""
+    if t.blocked is not None:
+        raise TenantDown(t.blocked, "blocked", None, t.failures)
+    if t.open_until:
+        wait = t.open_until - time.monotonic()
+        if wait > MAX_INLINE_WAIT_S:
+            raise TenantDown(t.last or Health("unknown"), "open", wait, t.failures)
+        if wait > 0:
+            await _sleep(wait)
+        t.open_until = 0.0
+        t.half_open = True
+
+
+def _record_failure(t: _Tenant, h: Health) -> None:
+    """Count a failed search; open the circuit at TENANT_MAX_FAILURES in a row, on a failed
+    half-open probe, or on the portal's offline notice."""
+    t.last = h
+    t.failures += 1
+    if h.blocked:
+        t.blocked = h
+        return
+    if t.half_open or h.kind == "portal_offline" or t.failures >= TENANT_MAX_FAILURES:
+        t.trips += 1
+        cool = OFFLINE_COOLDOWN_S if h.kind == "portal_offline" else \
+            min(COOLDOWN_BASE_S * 2 ** (t.trips - 1), COOLDOWN_MAX_S)
+        if h.retry_after_s:
+            cool = max(cool, min(h.retry_after_s, COOLDOWN_MAX_S))
+        t.open_until = time.monotonic() + cool
+    t.half_open = False
+
+
 async def search(client: Any, county: str, sub: str, value: str, criteria: str = "Map") -> dict:
-    """The grid for one search (cached for the run). Raises TenantDown when the tenant is (or
-    just became) unhealthy, another exception for a one-off failure."""
+    """The grid for one search (cached for the run). Raises CriteriaUnavailable when the tenant's
+    form does not offer `criteria`, TenantDown when its circuit is open (or this failure opened
+    it), SourceFailure when this search failed twice and the circuit is still closed."""
     t = _tenant(client, county, sub)
     async with t.lock:
         key = (criteria, value)
         if key in t.cache:
             return t.cache[key]
-        if t.dead:
-            raise TenantDown(t.dead)
+        if t.offered is not None and criteria not in t.offered:
+            raise CriteriaUnavailable(criteria)
+        await _gate(t)
+        probe = t.half_open
         s = t.sessions.setdefault(criteria, _Session())
-        try:
-            if s.session is None or time.monotonic() - s.opened > SESSION_MAX_AGE_S:
-                await _open(t, s, client, criteria)
-            r = await s.session.post_form(t.url, search_data(s.state, value, criteria),
-                                          timeout=POST_TIMEOUT_S)
-            if (p := _problem(r)) is not None:
-                raise TenantDown(p)
-            g = parse_grid(r.text)
-            if not g["grid"] and not g["no_match"]:
-                raise TenantDown("search_answer_unreadable")
-        except Exception as exc:  # noqa: BLE001
-            t.failures += 1
-            why = f"{type(exc).__name__}: {str(exc)[:120]}"
-            if (isinstance(exc, TenantDown) and str(exc) == "generic_error_page") \
-                    or t.failures >= TENANT_MAX_FAILURES:
-                t.dead = f"{why} ({t.failures} failure(s) this run)"
-            await _close(s)                 # a fresh session next time
-            raise
-        t.failures = 0
+        retried = False
+        while True:
+            try:
+                g, r = await _search_once(t, s, client, criteria, value)
+                break
+            except CriteriaUnavailable:
+                await _close(s)
+                raise
+            except _Failed as f:
+                h = f.health
+            except Exception as exc:  # noqa: BLE001 - a timeout, a connection error, no recording
+                h = _exc_health(exc)
+            await _close(s)                 # a fresh session for the next attempt
+            if h.transient and not h.blocked and not retried and not probe:
+                retried = True
+                pause = RETRY_BACKOFF_S if h.retry_after_s is None \
+                    else min(h.retry_after_s, RETRY_AFTER_CAP_S)
+                if pause > 0:
+                    await _sleep(pause)
+                continue
+            _record_failure(t, h)
+            if t.blocked is not None:
+                raise TenantDown(h, "blocked", None, t.failures)
+            if t.open_until:
+                raise TenantDown(h, "open", t.open_until - time.monotonic(), t.failures)
+            raise SourceFailure(h)
+        t.failures, t.trips, t.open_until, t.half_open = 0, 0, 0.0, False
         new = viewstate(r.text)
         if new.get("__VIEWSTATE"):
             s.state = new
@@ -566,10 +802,13 @@ _KEYS = ("reason", "url", "tenant", "county", "searched", "decided_on", "delinqu
          "claimed_years", "bills_checked",
          "owner_match", "note", "error", "tenant_health", "followed_because",
          "address_owner_match", "history_from_levy", "history_years_read", "history_complete",
-         "late_levy_years", "late_payment_dates", "chronic_claim", "current_claim_basis")
+         "late_levy_years", "late_payment_dates", "chronic_claim", "current_claim_basis",
+         # v5: what the portal answered when it failed (module doc, TENANT HEALTH), and why a
+         # confirmed answer was bound to the row's address first
+         "http_status", "tenant_failure", "tenant_state", "retry_in_s", "bound_because")
 _SEARCHED_KEYS = ("map_number", "receipt", "role", "found", "rows", "latest_levy_year",
                   "delinquent_by_year", "not_yet_delinquent_due", "sold_at_tax_sale_years",
-                  "page_capped")
+                  "page_capped", "searched_by")
 _RELATED_KEYS = ("map_number", "rows", "latest_levy_year", "delinquent_by_year",
                  "sold_at_tax_sale_years", "sold_at_tax_sale_on")
 #: a manufactured-home sub-account of a land parcel: NNN-NN-NN-NNN.NNN.NNN (Cherokee); its land
@@ -590,6 +829,15 @@ def public_evidence(ev: dict) -> dict:
 def _res(verdict: str, ev: dict) -> VerificationResult:
     return result(SIGNAL, verdict, public_evidence(ev), source=SOURCE, version=VERSION,
                   verifier=_NAME)
+
+
+def _down(ev: dict, searched: list, exc: BaseException, reason: str) -> VerificationResult:
+    """An unconfirmed answer about the portal's health (TenantDown / SourceFailure)."""
+    extra = exc.evidence() if hasattr(exc, "evidence") else {
+        "error": f"{type(exc).__name__}: {str(exc)[:160]}"}
+    if isinstance(exc, TenantDown):
+        reason = "tenant_unhealthy"
+    return _res("unconfirmed", dict(ev, reason=reason, searched=searched, **extra))
 
 
 def claim_receipts(row: Any) -> list[str]:
@@ -666,19 +914,41 @@ def _decide_paid(a: dict, claimed: list[int], today: date, first_seen: Optional[
 async def _lookup(client: Any, county: str, sub: str, value: str, role: str, today: date,
                   *, criteria: str = "Map", notices: Optional[set] = None) -> dict:
     g = await search(client, county, sub, value, criteria)
-    ident = value if criteria == "Map" else None
-    if criteria == "Map":
+    if criteria in ("Map", "PIN"):
         mine = select_rows(g["rows"], value)
     else:                       # a receipt answers one bill; its row names the claim's ident
         mine = [r for r in g["rows"] if tc.alnum(r["notice"]) in (notices or set())]
     a = assess(mine, today)
     a["role"] = role
-    if criteria == "Map":
+    if criteria in ("Map", "PIN"):
         a["map_number"] = value
-        a["page_capped"] = page_capped(g["rows"], ident or "", g["capped"]) if mine else False
+        a["searched_by"] = criteria
+        a["page_capped"] = page_capped(g["rows"], value, g["capped"]) if mine else False
     else:
         a["receipt"] = value
     return a
+
+
+def _digits_only(value: str) -> bool:
+    return bool(re.fullmatch(r"\d{6,}", str(value or "").strip()))
+
+
+async def _find(client: Any, county: str, sub: str, value: str, role: str, today: date
+                ) -> list[dict]:
+    """The searches for one identification number, first found last: by PIN first when the
+    tenant offers a real PIN search and the number is all digits (Horry), else by Map Number and
+    then, if the form turned out to offer a PIN search, by PIN (v5)."""
+    t = _tenant(client, county, sub)
+    out: list[dict] = []
+    if _digits_only(value) and pin_search_offered(t):
+        out.append(await _lookup(client, county, sub, value, role, today, criteria="PIN"))
+        if out[-1]["found"]:
+            return out
+    out.append(await _lookup(client, county, sub, value, role, today, criteria="Map"))
+    if not out[-1]["found"] and _digits_only(value) and pin_search_offered(t) \
+            and not any(a.get("searched_by") == "PIN" for a in out):
+        out.append(await _lookup(client, county, sub, value, role, today, criteria="PIN"))
+    return out
 
 
 def parent_ident(ident: Any) -> Optional[str]:
@@ -707,6 +977,24 @@ async def _related_account(client: Any, county: str, sub: str, a: dict, today: d
     return ra
 
 
+def neighbor_risk(row: Any, a: dict) -> Optional[str]:
+    """Why a DELINQUENT account must be bound to the row's address before it confirms (v5,
+    CONFIRMED IS BOUND TOO), or None: its bills name another house number on the row's street
+    (other_number_same_street), or it is the board parcel a resolver attached and no bill carries
+    the row's address (resolver_parcel)."""
+    addr = row.get("street_address") if isinstance(row, dict) else None
+    if tc.address_query(addr) is None:
+        return None
+    addrs = [r.get("address") for r in a.get("_rows") or [] if r.get("address")]
+    if any(tc.address_relation(addr, x) == "match" for x in addrs):
+        return None
+    if any(tc.other_number_same_street(addr, x) for x in addrs):
+        return "other_number_same_street"
+    if a.get("role") == "board" and tc.parcel_resolved(row):
+        return "resolver_parcel"
+    return None
+
+
 async def verify(row: dict, client, *, today: Optional[date] = None) -> VerificationResult:
     today = today or date.today()
     ten = tenant_of(row)
@@ -727,13 +1015,13 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     searched: list[dict] = []
     try:
         for value, role in subs:
-            a = await _lookup(client, county, sub, value, role, today)
-            searched.append(a)
-            if a["found"]:
-                found[role] = a
+            tries = await _find(client, county, sub, value, role, today)
+            searched.extend(tries)
+            if tries[-1]["found"]:
+                found[role] = tries[-1]
             elif role == "claim":
-                # Some tenants' grid identification number is not their Map Number (Horry shows
-                # the PIN, searches the TMS): read the claim's own bills by notice number instead.
+                # Some tenants' grid identification number is not their Map Number (Orangeburg
+                # shows an account number): read the claim's own bills by notice number instead.
                 for rc in claim_receipts(row)[:MAX_RECEIPTS]:
                     ra = await _lookup(client, county, sub, rc, "claim_receipt", today,
                                        criteria="Receipt", notices={tc.alnum(rc)})
@@ -754,9 +1042,8 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
                             merged["latest_levy_year"] = max(prev["latest_levy_year"],
                                                              ra["latest_levy_year"])
                             found["claim"] = merged
-    except TenantDown as exc:
-        return _res("unconfirmed", dict(ev, reason="tenant_unhealthy", searched=searched,
-                                        tenant_health=str(exc)[:200]))
+    except (TenantDown, SourceFailure) as exc:
+        return _down(ev, searched, exc, "fetch_failed")
     except Exception as exc:  # noqa: BLE001
         return _res("unconfirmed", dict(ev, reason="fetch_failed", searched=searched,
                                         error=f"{type(exc).__name__}: {str(exc)[:160]}"))
@@ -775,19 +1062,54 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         # cannot be told from here, so nothing is decided (and nothing suppressed)
         return _res("unconfirmed", dict(ev, reason="identity_conflict",
                                         delinquent_parcel="claim" if dl_claim else "board"))
+    a = claim if dl_claim else board if dl_board else primary
+    decided_on = claim_via if a is claim else "board_parcel"
     # v4: the land account behind a manufactured-home sub-account (evidence, and a sale of the land
     # is the same machine reason as a sale of the account itself)
-    related = await _related_account(client, county, sub, claim or board or primary, today)
+    related = await _related_account(client, county, sub, a, today)
     if related is not None:
         ev["related_account"] = related
-    if dl_claim or dl_board:
-        a = claim if dl_claim else board
-        ev.update(decided_on=claim_via if dl_claim else "board_parcel",
-                  latest_levy_year=a["latest_levy_year"],
-                  delinquent_by_year=a["delinquent_by_year"],
-                  not_yet_delinquent_due=a["not_yet_delinquent_due"],
-                  sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"),
-                  sold_at_tax_sale_on=a.get("sold_at_tax_sale_on"))
+    ev.update(decided_on=decided_on, latest_levy_year=a["latest_levy_year"],
+              not_yet_delinquent_due=a["not_yet_delinquent_due"],
+              sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"),
+              sold_at_tax_sale_on=a.get("sold_at_tax_sale_on"))
+    delinquent = bool(a["delinquent_by_year"])
+    if not delinquent:
+        ev.update(delinquent_by_year={}, total_delinquent=0.0, years_delinquent=0)
+        if any(s.get("page_capped") for s in searched if s.get("found")):
+            return _res("unconfirmed", dict(ev, reason="page_capped"))
+
+    # Before any verdict on this account: does it carry the row's address? A stale / refuted answer
+    # always asks (v2); a confirmed one when the bills name a neighbor's house number or the parcel
+    # is a resolver's (v5)
+    why_bind = None if not delinquent else neighbor_risk(row, a)
+    if not delinquent or why_bind:
+        if why_bind:
+            ev["bound_because"] = why_bind
+        try:
+            action, what = await _bind(row, client, county, sub, a, today, ev)
+        except (TenantDown, SourceFailure) as exc:
+            return _down(ev, searched, exc, "address_search_failed")
+        except Exception as exc:  # noqa: BLE001
+            return _res("unconfirmed", dict(ev, reason="address_search_failed", searched=searched,
+                                            error=f"{type(exc).__name__}: {str(exc)[:160]}"))
+        if action == "unconfirmed":
+            return _res("unconfirmed", dict(ev, reason=what))
+        if action == "follow":
+            a = what                                   # the address's own rows decide (v2)
+            related = None                             # the sub-account's land is not this account's
+            ev.pop("related_account", None)
+            ev.update(decided_on="address_search", address_binding="followed",
+                      latest_levy_year=a["latest_levy_year"],
+                      not_yet_delinquent_due=a["not_yet_delinquent_due"],
+                      sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"),
+                      sold_at_tax_sale_on=a.get("sold_at_tax_sale_on"))
+            delinquent = bool(a["delinquent_by_year"])
+            if not delinquent:
+                ev.update(delinquent_by_year={}, total_delinquent=0.0, years_delinquent=0)
+
+    if delinquent:
+        ev["delinquent_by_year"] = a["delinquent_by_year"]
         ev["total_delinquent"] = tc.money_total(a["delinquent_by_year"])
         ev["years_delinquent"] = len(a["delinquent_by_year"])
         ev["under_500"] = ev["total_delinquent"] < 500
@@ -796,45 +1118,6 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
             ev["reason"] = "sold_at_tax_sale"
         return _res("confirmed", ev)
 
-    a = primary
-    ev.update(decided_on=claim_via if claim else "board_parcel",
-              latest_levy_year=a["latest_levy_year"],
-              not_yet_delinquent_due=a["not_yet_delinquent_due"],
-              sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"),
-              sold_at_tax_sale_on=a.get("sold_at_tax_sale_on"),
-              delinquent_by_year={}, total_delinquent=0.0, years_delinquent=0)
-    if any(s.get("page_capped") for s in searched if s.get("found")):
-        return _res("unconfirmed", dict(ev, reason="page_capped"))
-
-    # nothing owed on the parcel checked. Before stale / refuted: does it carry the row's address?
-    try:
-        action, what = await _bind(row, client, county, sub, a, today, ev)
-    except TenantDown as exc:
-        return _res("unconfirmed", dict(ev, reason="tenant_unhealthy", searched=searched,
-                                        tenant_health=str(exc)[:200]))
-    except Exception as exc:  # noqa: BLE001
-        return _res("unconfirmed", dict(ev, reason="address_search_failed", searched=searched,
-                                        error=f"{type(exc).__name__}: {str(exc)[:160]}"))
-    if action == "unconfirmed":
-        return _res("unconfirmed", dict(ev, reason=what))
-    if action == "follow":
-        a = what                                   # the address's own rows decide (v2)
-        related = None                             # the sub-account's land is not this account's
-        ev.pop("related_account", None)
-        ev.update(decided_on="address_search", address_binding="followed",
-                  latest_levy_year=a["latest_levy_year"],
-                  not_yet_delinquent_due=a["not_yet_delinquent_due"],
-                  sold_at_tax_sale_years=a.get("sold_at_tax_sale_years"),
-                  sold_at_tax_sale_on=a.get("sold_at_tax_sale_on"))
-        if a["delinquent_by_year"]:
-            ev.update(delinquent_by_year=a["delinquent_by_year"],
-                      total_delinquent=tc.money_total(a["delinquent_by_year"]),
-                      years_delinquent=len(a["delinquent_by_year"]))
-            ev["under_500"] = ev["total_delinquent"] < 500
-            ev["de_minimis"] = ev["total_delinquent"] < tc.DE_MINIMIS
-            if a.get("sold_recent"):
-                ev["reason"] = "sold_at_tax_sale"
-            return _res("confirmed", ev)
     # v4: an account (or its land) sold at tax sale is neither paid nor stale: with nothing else
     # owed the answer is unconfirmed and says why, so the claim keeps scoring
     if a.get("sold_recent") or a.get("sold_unpriced") or (related or {}).get("sold_recent"):
@@ -878,7 +1161,7 @@ async def _bind(row: dict, client, county: str, sub: str, a: dict, today: date, 
                 ) -> tuple[str, Any]:
     """Does the account checked carry the row's address? ("ok", None), ("follow", assessment of
     the address's own rows) or ("unconfirmed", reason); see ADDRESS BINDING in the module
-    docstring. Raises TenantDown / the fetch error like search()."""
+    docstring. Raises TenantDown / SourceFailure like search()."""
     addr = row.get("street_address")
     query = tc.address_query(addr)
     if query is None:
@@ -891,7 +1174,15 @@ async def _bind(row: dict, client, county: str, sub: str, a: dict, today: date, 
     if rel == "match":
         ev["address_binding"] = "bill_address"
         return "ok", None
-    g = await search(client, county, sub, query, ADDRESS_CRITERIA)
+    try:
+        g = await search(client, county, sub, query, ADDRESS_CRITERIA)
+    except CriteriaUnavailable:
+        # v5: the tenant has no Property Address search (Horry). The account's own rows decide
+        # unless they name another address, or the account is a parcel a resolver attached
+        ev["address_binding"] = "no_address_search"
+        if rel == "conflict" or (a.get("role") == "board" and tc.parcel_resolved(row)):
+            return "unconfirmed", "address_search_unavailable"
+        return "ok", None
     mine = [r for r in g["rows"] if tc.address_relation(addr, r.get("address")) == "match"]
     ev["address_matches"] = len(mine)
     if not mine:

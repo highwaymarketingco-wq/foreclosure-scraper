@@ -404,7 +404,8 @@ def test_a_payment_release_is_not_a_payment():
 def test_version_bumped_so_every_old_entry_is_due_again():
     # tp v4 / tq v4: 2026-10-07 (confirmed binds to the row's parcel and owner; Sold at Tax Sale)
     # tb v6: 2026-10-08 (late years only, paid-off See Legal bills, another house number)
-    assert (tb.VERSION, tp.VERSION, tq.VERSION) == ("v6", "v4", "v4")
+    # tq v5: 2026-10-08 (tenant health circuit breaker, offered criteria, Horry PIN, confirmed bound)
+    assert (tb.VERSION, tp.VERSION, tq.VERSION) == ("v6", "v4", "v5")
 
 
 # ===========================================================================

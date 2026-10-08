@@ -19,22 +19,43 @@ from foreclosure_scraper.verification.verifiers import tax_lien_qpaybill as q
 FIX = Path(__file__).parent / "fixtures" / "verification"
 FX = json.loads(gzip.decompress((FIX / "tax_lien_qpaybill.json.gz").read_bytes()))
 TODAY = date(2026, 10, 6)
+#: a real "No records matched" answer (Spartanburg), served for searches with no recording below
+NO_MATCH = FX["searches"]["spartanburgcountytax|Map|9-99-99-999.99"]
+
+
+@pytest.fixture(autouse=True)
+def _no_backoff(monkeypatch):
+    """v5 retries a transient failure once after RETRY_BACKOFF_S; no real sleeping in tests."""
+    monkeypatch.setattr(q, "RETRY_BACKOFF_S", 0.0)
 
 
 def served(*searches: str, extra: dict | None = None) -> ReplayFetcher:
     """A replay of each 'sub|criteria|value' search: the tenant's form, its criteria postback and
-    the search, keyed exactly as the verifier posts them."""
+    the search, keyed exactly as the verifier posts them. A criteria with no recorded postback
+    (Horry's and Orangeburg's PIN, v5) reuses the tenant's Map postback page; a search with no
+    recording answers "No records matched"."""
     resp: dict = {}
     for key in searches:
         sub, crit, value = key.split("|")
         url = q.form_url(sub)
         form = FX["forms"][sub]
-        crit_page = FX["criteria"][f"{sub}|{crit}"]
+        crit_page = FX["criteria"].get(f"{sub}|{crit}") or FX["criteria"][f"{sub}|Map"]
         resp[url] = form
         resp[form_key(url, q.criteria_data(q.viewstate(form), crit))] = crit_page
-        resp[form_key(url, q.search_data(q.viewstate(crit_page), value, crit))] = FX["searches"][key]
+        resp[form_key(url, q.search_data(q.viewstate(crit_page), value, crit))] = \
+            FX["searches"].get(key) or no_match_for(crit_page)
     resp.update(extra or {})
     return ReplayFetcher(resp)
+
+
+def no_match_for(crit_page: str) -> str:
+    """NO_MATCH carrying the tenant's own viewstate placeholders (the session posts the last
+    answer's viewstate with its next search, as the portal expects)."""
+    out = NO_MATCH
+    for name, value in q.viewstate(NO_MATCH).items():
+        if value:
+            out = out.replace(f'value="{value}"', f'value="{q.viewstate(crit_page)[name]}"')
+    return out
 
 
 def owner_of(key: str) -> str:
@@ -205,8 +226,12 @@ def test_other_lien_listing_is_never_suppressed():
 
 
 def test_receipt_fallback_horry_reads_the_claimed_bills():
-    keys = ("horrycountytreasurer|Map|99800086567", "horrycountytreasurer|Receipt|386084253",
-            "horrycountytreasurer|Receipt|384217243", "horrycountytreasurer|Map|39307010208")
+    """The claim's number is not found by Map Number nor (v5) by PIN: its bills are read by
+    notice number. Horry's form offers a PIN search, so once the form is known an all-digit
+    number is searched by PIN first (the board parcel)."""
+    keys = ("horrycountytreasurer|Map|99800086567", "horrycountytreasurer|PIN|99800086567",
+            "horrycountytreasurer|Receipt|386084253", "horrycountytreasurer|Receipt|384217243",
+            "horrycountytreasurer|PIN|39307010208", "horrycountytreasurer|Map|39307010208")
     row = roll_row("Horry", "99800086567", parcel="39307010208", years=("2024", "2025"),
                    notices=("384217243", "386084253"), source="counties_sc.horry_delinquent_xlsx",
                    listing_type="tax_lien")
@@ -214,24 +239,30 @@ def test_receipt_fallback_horry_reads_the_claimed_bills():
     res = run(row, f)
     assert res.verdict == "stale"
     assert res.evidence["decided_on"] == "claim_receipts"
-    roles = [(s["role"], s.get("map_number") or s.get("receipt"), s["found"])
+    roles = [(s["role"], s.get("searched_by"), s.get("map_number") or s.get("receipt"), s["found"])
              for s in res.evidence["searched"]]
-    assert roles == [("claim", "99800086567", False), ("claim_receipt", "386084253", True),
-                     ("claim_receipt", "384217243", True), ("board", "39307010208", False)]
+    assert roles == [("claim", "Map", "99800086567", False), ("claim", "PIN", "99800086567", False),
+                     ("claim_receipt", None, "386084253", True),
+                     ("claim_receipt", None, "384217243", True),
+                     ("board", "PIN", "39307010208", False), ("board", "Map", "39307010208", False)]
     # the claimed 2025 bill was paid on 2026-09-22, after its 2026-01-15 deadline
     assert res.evidence["bills_checked"] == [{"year": 2025, "status": "Paid", "paid_on": "2026-09-22",
                                               "deadline": "2026-01-15", "paid_late": True}]
-    # one form + one criteria postback per criteria, then one request per search
-    assert len(f.asked) == 2 + 2 + 4
+    # Horry has no Property Address search: the binding never posts one (v5)
+    assert res.evidence["address_binding"] in ("no_row_address", "no_address_search")
+    # one form + one criteria postback per criteria (Map, PIN, Receipt), then one per search
+    assert len(f.asked) == 3 * 2 + 6
 
 
 def test_receipt_fallback_orangeburg_confirmed():
-    keys = ("orangeburgtreasurer|Map|0970023", "orangeburgtreasurer|Receipt|007255255")
+    keys = ("orangeburgtreasurer|Map|0970023", "orangeburgtreasurer|PIN|0970023",
+            "orangeburgtreasurer|Receipt|007255255")
     row = roll_row("Orangeburg", "0970023", parcel=None, notices=("007255255",))
     res = run(row, served(*keys))
     assert res.verdict == "confirmed"
     assert res.evidence["decided_on"] == "claim_receipts"
     assert res.evidence["delinquent_by_year"] == {"2025": 229.68}
+    assert [s.get("searched_by") for s in res.evidence["searched"]] == ["Map", "PIN", None]
 
 
 def test_not_on_the_portal_is_unconfirmed():
@@ -272,24 +303,34 @@ def test_one_session_per_tenant_per_run():
     assert len(f.asked) == 4
 
 
-def test_generic_error_page_marks_the_tenant_unhealthy_for_the_run():
+def test_generic_error_page_is_retried_then_opens_the_circuit_not_the_whole_run():
+    """v5 (TENANT HEALTH): one error page is one failed request, retried once; two failed
+    searches in a row open the circuit for COOLDOWN_BASE_S; nothing is condemned for the run.
+    tests/test_verification_tax_lien_qpaybill_health.py covers the half-open recovery."""
     url = q.form_url("williamsburgtreasurer")
     f = ReplayFetcher({url: {"status": 200, "text": "<html><body>An error occurred.</body></html>",
                              "url": "https://williamsburgtreasurer.qpaybill.com/GenericErrorPage.aspx"}})
     res = run(roll_row("Williamsburg", "45-338-010"), f)
-    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "tenant_unhealthy"
-    assert "generic_error_page" in res.evidence["tenant_health"]
-    asked = len(f.asked)
+    assert res.verdict == "unconfirmed" and res.evidence["reason"] == "fetch_failed"
+    assert res.evidence["tenant_failure"] == "generic_error_page"
+    assert res.evidence["http_status"] == 200 and res.evidence["tenant_state"] == "closed"
+    assert f.asked.count(url) == 2                                 # the request and its one retry
     res2 = run(roll_row("Williamsburg", "45-221-070"), f)
     assert res2.verdict == "unconfirmed" and res2.evidence["reason"] == "tenant_unhealthy"
-    assert len(f.asked) == asked                                   # no request to a dead tenant
+    assert res2.evidence["tenant_state"] == "open" and 0 < res2.evidence["retry_in_s"] <= 60
+    asked = len(f.asked)
+    res3 = run(roll_row("Williamsburg", "45-221-071"), f)
+    assert res3.evidence["reason"] == "tenant_unhealthy"
+    assert len(f.asked) == asked                                   # no request while it is open
 
 
-def test_a_hanging_tenant_fails_twice_then_is_skipped():
+def test_a_hanging_tenant_opens_its_circuit_after_two_failed_searches():
     f = ReplayFetcher({})            # every request raises LookupError, like a timeout would
     r1 = run(roll_row("Darlington", "104-00-01-121"), f)
+    assert r1.evidence["reason"] == "fetch_failed"
+    assert r1.evidence["tenant_failure"].startswith("request_error")
     r2 = run(roll_row("Darlington", "104-00-01-122"), f)
-    assert r1.evidence["reason"] == r2.evidence["reason"] == "fetch_failed"
+    assert r2.evidence["reason"] == "tenant_unhealthy" and r2.evidence["tenant_state"] == "open"
     n = len(f.asked)
     r3 = run(roll_row("Darlington", "104-00-01-123"), f)
     assert r3.verdict == "unconfirmed" and r3.evidence["reason"] == "tenant_unhealthy"

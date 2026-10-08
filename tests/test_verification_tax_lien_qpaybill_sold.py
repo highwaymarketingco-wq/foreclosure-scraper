@@ -20,6 +20,11 @@ from foreclosure_scraper.verification.verifiers import tax_lien_qpaybill as q
 
 TODAY = date(2026, 10, 7)
 SUB = "cherokeecountysctax"
+
+
+@pytest.fixture(autouse=True)
+def _no_backoff(monkeypatch):
+    monkeypatch.setattr(q, "RETRY_BACKOFF_S", 0.0)
 LAND = "900-00-00-001.010"
 HOME = "900-00-00-001.010.001"
 
