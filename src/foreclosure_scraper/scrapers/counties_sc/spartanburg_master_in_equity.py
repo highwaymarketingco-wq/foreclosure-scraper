@@ -14,11 +14,24 @@ sale roster (PDF). Each row has:
 We use pdfplumber rather than pypdf because pypdf flattens multi-column tables
 and we lose row boundaries — verified locally that pdfplumber.extract_tables()
 recovers all 25-30 rows per monthly PDF.
+
+SOURCE-COMPLETENESS AUDIT, 2026-10-08: BLOCKED for 2 runs (0 rows; 19-48 per run before). Not a
+moved file: www.spartanburgcounty.gov answers both document URLs with Cloudflare's "Sorry, you
+have been blocked" page (HTTP 403, served for civicplus.io) to a plain request from the VM AND
+from the residential Mac, with a full browser User-Agent as well as the old bare "Mozilla/5.0".
+A wall: nothing here passes or works around it. The manual lane (docs walls card
+"spartanburg_site") has a person save the two PDFs in a normal browser; this module now reads
+those saved files when SPARTANBURG_MIE_PDF_DIR points at the folder holding them
+(spartanburg_sc_mie_<date>.pdf -> the 3392 roster, spartanburg_sc_deficiency_<date>.pdf -> the
+11824 deficiency list; newest file of each kind). The live fetch also sends the shared client's
+full browser User-Agent instead of overriding it with a bare "Mozilla/5.0".
 """
 from __future__ import annotations
 
 import io
+import os
 import re
+from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Iterable
 
@@ -32,6 +45,29 @@ PDF_URLS = (
     "https://www.spartanburgcounty.gov/DocumentCenter/View/3392/Sale-Results",
     "https://www.spartanburgcounty.gov/DocumentCenter/View/11824/Deficiency-Sale",
 )
+# Saved-by-hand copies (manual lane for the Cloudflare block): file-name prefix -> the URL the
+# person saved it from, so the parser applies that URL's results/deficiency handling.
+SAVED_PDF_PREFIXES = (
+    ("spartanburg_sc_mie_", PDF_URLS[0]),
+    ("spartanburg_sc_deficiency_", PDF_URLS[1]),
+)
+
+
+def _saved_pdfs(folder: str | os.PathLike | None) -> list[tuple[str, bytes]]:
+    """(source_url, bytes) for the newest saved PDF of each kind in `folder`; [] when unset."""
+    if not folder:
+        return []
+    d = Path(folder).expanduser()
+    if not d.is_dir():
+        return []
+    found: list[tuple[str, bytes]] = []
+    for prefix, url in SAVED_PDF_PREFIXES:
+        files = sorted(d.glob(f"{prefix}*.pdf"), key=lambda f: f.stat().st_mtime, reverse=True)
+        for f in files[:1]:
+            data = f.read_bytes()
+            if data[:4] == b"%PDF":
+                found.append((url, data))
+    return found
 
 CASE_RE = re.compile(r"\b\d{2,4}-\d{3,5}\b")
 ADDR_RE = re.compile(
@@ -335,13 +371,25 @@ class SpartanburgMasterInEquity(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
+        live: set[str] = set()
         async with client(timeout=45.0) as c:
             for url in PDF_URLS:
                 try:
-                    r = await c.get(url, headers={"User-Agent": "Mozilla/5.0"})
+                    r = await c.get(url)
                     if r.status_code != 200 or r.content[:4] != b"%PDF":
                         continue
                 except Exception:
                     continue
+                live.add(url)
                 out.extend(_parse_pdf_tables(r.content, url))
+        # Manual lane: a PDF the live fetch could not get, read from the folder a person saved
+        # it to (opt-in; nothing is read unless SPARTANBURG_MIE_PDF_DIR is set).
+        for url, data in _saved_pdfs(os.environ.get("SPARTANBURG_MIE_PDF_DIR")):
+            if url in live:
+                continue
+            rows = _parse_pdf_tables(data, url)
+            for li in rows:
+                if isinstance(li.raw, dict) and isinstance(li.raw.get("spartanburg_pdf"), dict):
+                    li.raw["spartanburg_pdf"]["from_saved_pdf"] = True
+            out.extend(rows)
         return out
