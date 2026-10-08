@@ -3621,6 +3621,15 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("verification_apply.failed", traceback=traceback.format_exc())
 
+    # A tax debt the county's own site CONFIRMED for this row's parcel/address becomes the row's
+    # balance (county_site_verified), so scrubbing a copied block never costs a verified lead its
+    # amount. After apply_verification (it reads raw['verification']), before score_board.
+    try:
+        from .tax_binding import restore_verified_tax
+        enrichment_stats["tax_verified_restore"] = restore_verified_tax(enriched)
+    except Exception:
+        log.error("tax_verified_restore.failed", traceback=traceback.format_exc())
+
     # Stacked-distress score (HOT/WARM/COLD operator board) — runs last so it
     # can stack every signal + equity + contactability gathered above.
     def _score_failed(kind: str, detail: str, hist: dict | None = None,
