@@ -25,9 +25,18 @@ itself is not stored (it can carry names past the decedent's).
 
 Polite: _obit_common.PoliteFetcher (>= 1.6 s between requests, ordinary UA, a wall stops the run).
 Gate off with FORECLOSURE_SC_ESTATE_NOTICES=0; PUBLICNOTICESC_ESTATE_MAX_PAGES (default 20).
+
+SOURCE-COMPLETENESS AUDIT (2026-10-08). The VM's first run (gated run, 2026-10-08) returned 0 rows
+in 35 s as ZERO_RESULT, with no warning in the log; the same code on the Mac that day read 100
+previews (page 1 of each preset) and named 9 estates. Each preset's error went only into the
+info-level stats, so the run could not say why. Now: a failing preset logs a warning and is retried
+once after a pause (a wall is never retried), page errors log a warning, and a run that ends with
+no rows because every attempt failed re-raises the last error, so safe_run reports ERROR / BLOCKED /
+TIMEOUT with the reason instead of a silent ZERO_RESULT.
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 from datetime import datetime
@@ -48,6 +57,8 @@ log = structlog.get_logger()
 PRESETS = {"30": "Notice to Creditors", "23": "Probate Notices"}
 MAX_PAGES = int(os.environ.get("PUBLICNOTICESC_ESTATE_MAX_PAGES", "20"))
 _DETAIL_URL = "https://www.scpublicnotices.com/Details.aspx?ID={}"
+#: Pause before the one retry of a preset whose search postbacks failed (not a wall).
+_RETRY_PAUSE_S = 15.0
 
 #: SC county code inside an estate case number (YYYY-ES-CC-NNNNN): the state's alphabetical order
 SC_COUNTY_CODES = {f"{i:02d}": n for i, n in enumerate((
@@ -142,24 +153,32 @@ class PublicNoticeSCEstates(BaseScraper):
         out = self.partial
         seen: set[str] = set()
         stats: dict = {}
+        errors: list[BaseException] = []
         async with PoliteFetcher() as pf:
             for preset in PRESETS:
                 st = stats.setdefault(PRESETS[preset], {"pages": 0, "notices": 0, "named": 0})
-                try:
-                    html, session_url = await pf.get_with_url(BASE_URL)
-                    form = dict(_hidden_fields(html))
-                    form.update({"__EVENTTARGET": PRE + "ddlPopularSearches", "__EVENTARGUMENT": "",
-                                 PRE + "ddlPopularSearches": preset})
-                    html = await pf.post(session_url, form)
-                    form = dict(_hidden_fields(html))
-                    form.update({"__EVENTTARGET": f"{GRID}$ctl01$ddlPerPage", "__EVENTARGUMENT": "",
-                                 f"{GRID}$ctl01$ddlPerPage": "50"})
-                    html = await pf.post(session_url, form)
-                except Walled as w:
-                    st["walled"] = w.reason
+                html = session_url = None
+                for attempt in (1, 2):
+                    try:
+                        html, session_url = await self._open_preset(pf, preset)
+                        if attempt > 1:
+                            st["recovered_from"] = st.pop("error", None)
+                        break
+                    except Walled as w:
+                        st["walled"] = w.reason
+                        errors.append(w)
+                        break
+                    except Exception as exc:  # noqa: BLE001
+                        st["error"] = str(exc)[:120]
+                        log.warning("publicnoticesc_estates.preset_failed", preset=PRESETS[preset],
+                                    attempt=attempt, error=f"{type(exc).__name__}: {str(exc)[:160]}")
+                        if attempt == 1:
+                            await asyncio.sleep(_RETRY_PAUSE_S)
+                        else:
+                            errors.append(exc)
+                if "walled" in st:
                     break
-                except Exception as exc:  # noqa: BLE001
-                    st["error"] = str(exc)[:120]
+                if html is None:
                     continue
                 labels: set[str] = set()
                 while True:
@@ -188,13 +207,36 @@ class PublicNoticeSCEstates(BaseScraper):
                         html = await pf.post(session_url, form)
                     except Walled as w:
                         st["walled"] = w.reason
+                        errors.append(w)
                         break
                     except Exception as exc:  # noqa: BLE001
                         st["error"] = str(exc)[:120]
+                        log.warning("publicnoticesc_estates.page_failed", preset=PRESETS[preset],
+                                    page=st["pages"] + 1, error=f"{type(exc).__name__}: {str(exc)[:160]}")
+                        errors.append(exc)
                         break
                     nxt = pa.current_page(html)
                     if nxt is not None and str(nxt) in labels:
                         break
         log.info("publicnoticesc_estates.done", rows=len(out), presets=stats)
         self.last_stats = stats
+        if not out and errors:
+            # Nothing read and something failed: say so (safe_run classifies the error)
+            # instead of returning an empty list that reads as "the portal had no estates".
+            raise errors[-1]
         return out
+
+    @staticmethod
+    async def _open_preset(pf, preset: str) -> tuple[str, str]:
+        """Open a fresh portal session, run one 'Popular Searches' preset and set 50 rows a page.
+        Returns (grid html, session url)."""
+        html, session_url = await pf.get_with_url(BASE_URL)
+        form = dict(_hidden_fields(html))
+        form.update({"__EVENTTARGET": PRE + "ddlPopularSearches", "__EVENTARGUMENT": "",
+                     PRE + "ddlPopularSearches": preset})
+        html = await pf.post(session_url, form)
+        form = dict(_hidden_fields(html))
+        form.update({"__EVENTTARGET": f"{GRID}$ctl01$ddlPerPage", "__EVENTARGUMENT": "",
+                     f"{GRID}$ctl01$ddlPerPage": "50"})
+        html = await pf.post(session_url, form)
+        return html, session_url
