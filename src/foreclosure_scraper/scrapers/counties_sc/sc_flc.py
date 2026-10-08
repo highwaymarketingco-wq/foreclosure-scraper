@@ -290,6 +290,19 @@ def _is_quota(msg: str) -> bool:
                                 "resource_exhausted", "exceeded"))
 
 
+#: A provider overload is as transient as a quota hit (2026-10-08 VM run: Gemini answered
+#: "503 UNAVAILABLE ... experiencing high demand ... try again" on every key for about 15 s).
+#: It used to be read as a hard error: the page came back None and the document was
+#: counted as 0 rows, a clean zero. It now rotates keys and cools like a quota hit.
+_TRANSIENT_MARKERS = ("503", "unavailable", "overloaded", "high demand", "try again",
+                      "500 internal", "internal error", "deadline")
+
+
+def _is_transient(msg: str) -> bool:
+    m = (msg or "").lower()
+    return _is_quota(msg) or any(s in m for s in _TRANSIENT_MARKERS)
+
+
 async def _ocr_page(page_pdf: bytes, keys: list[str]) -> Optional[list[dict]]:
     """OCR one page through the free Gemini pool, rotating keys past quota.
 
@@ -319,7 +332,9 @@ async def _ocr_page(page_pdf: bytes, keys: list[str]) -> Optional[list[dict]]:
                         response_mime_type="application/json"),
                 )
             except Exception as exc:  # noqa: BLE001
-                if _is_quota(str(exc)):
+                if _is_transient(str(exc)):
+                    if not _is_quota(str(exc)):
+                        log.info("sc_flc.ocr_transient", key=key[:8], error=str(exc)[:120])
                     continue          # next key
                 log.warning("sc_flc.ocr_error", error=str(exc)[:160])
                 return None
@@ -340,7 +355,7 @@ async def _ocr_page(page_pdf: bytes, keys: list[str]) -> Optional[list[dict]]:
             log.info("sc_flc.ocr_pool_cooling", sweep=sweep + 1,
                      keys=len(keys), sleep_s=_OCR_COOLDOWN_S)
             await asyncio.sleep(_OCR_COOLDOWN_S)
-    raise _OCRQuotaOut(f"all {len(keys)} Gemini keys rate-limited")
+    raise _OCRQuotaOut(f"all {len(keys)} Gemini keys rate-limited or overloaded")
 
 
 async def _ocr_document(data: bytes) -> list[dict]:

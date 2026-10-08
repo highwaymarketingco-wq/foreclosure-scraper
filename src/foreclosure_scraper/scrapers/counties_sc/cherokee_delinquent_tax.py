@@ -83,6 +83,27 @@ WP_MEDIA_URL = (
     "?search=tax%20sale&per_page=100&mime_type=application/pdf"
 )
 
+#: The county's delinquent-tax page, which links the CURRENT list. 2026-10-08: the page's
+#: "Delinquent Tax Sale" link is /wp-content/uploads/2026/10/DOC008-2.pdf, a scanner-named
+#: upload the media search for "tax sale" does not return (its title is the file name), so
+#: a list posted the same way was invisible to this scraper. Both paths are read now.
+DELINQUENT_PAGE_URL = "https://www.cherokeecountysc.gov/delinquent-tax/"
+_PAGE_PDF_LINK_RE = re.compile(r'<a[^>]+href="([^"]+\.pdf)"[^>]*>(.*?)</a>', re.I | re.S)
+_PAGE_LINK_KEEP_RE = re.compile(r"tax\s*sale|delinquent", re.I)
+_PAGE_LINK_SKIP_RE = re.compile(r"bidder|policy|privacy|third.party|legal.description", re.I)
+
+
+def _page_pdf_links(html: str) -> list[dict]:
+    """The delinquent-tax page's own PDF links whose label names a tax-sale list, shaped
+    like wp-json media items ({"source_url", "title": {"rendered"}})."""
+    out: list[dict] = []
+    for href, label in _PAGE_PDF_LINK_RE.findall(html or ""):
+        text = re.sub(r"<[^>]+>|\s+", " ", label).strip()
+        if not _PAGE_LINK_KEEP_RE.search(text) or _PAGE_LINK_SKIP_RE.search(text):
+            continue
+        out.append({"source_url": href.strip(), "title": {"rendered": text}})
+    return out
+
 # Cherokee TMS format: NNN-NN-NN-NNN.NNN (e.g. 099-01-00-022.000)
 _TMS_RE = re.compile(r"\b(\d{3}-\d{2}-\d{2}-\d{3}\.\d{3})\b")
 
@@ -184,6 +205,19 @@ _OCR_TEXT_FLOOR = 40
 # scraper's timeout_s so a bad run degrades to "OCR skipped", not a hang.
 _OCR_CALL_TIMEOUT_S = 45.0
 _OCR_TOTAL_TIMEOUT_S = 180.0
+#: Rounds over the key pool when every key failed for a TRANSIENT reason (quota, a
+#: provider overload, a call timeout). 2026-10-08 VM run: Gemini answered "503 UNAVAILABLE
+#: ... high demand" on every key for about 15 s and the scanned-PDF fallback gave up
+#: after one round, reading the PDF as empty.
+_OCR_ROUNDS = 3
+_OCR_ROUND_COOLDOWN_S = 20.0
+_OVERLOAD_MARKERS = ("503", "unavailable", "overloaded", "high demand", "try again",
+                     "500 internal", "internal error")
+
+
+def _is_overload_error(msg: str) -> bool:
+    m = (msg or "").lower()
+    return any(s in m for s in _OVERLOAD_MARKERS)
 
 
 def _is_quota_error(msg: str) -> bool:
@@ -237,22 +271,35 @@ async def _ocr_pdf_text(pdf_bytes: bytes) -> str:
         return text
 
     async def _try_all_keys() -> str:
-        for key in keys:
-            try:
-                text = await asyncio.wait_for(_one_key(key), timeout=_OCR_CALL_TIMEOUT_S)
-            except asyncio.TimeoutError:
-                log.warning("cherokee_delinquent_tax.ocr_call_timeout", key=key[:8])
-                continue
-            except Exception as exc:
-                msg = str(exc)
-                if _is_quota_error(msg):
-                    log.info("cherokee_delinquent_tax.ocr_quota_exhausted", key=key[:8])
-                else:
-                    log.warning("cherokee_delinquent_tax.ocr_error",
-                                key=key[:8], error=msg[:160])
-                continue
-            if text:
-                return text
+        for rnd in range(_OCR_ROUNDS):
+            transient = False
+            for key in keys:
+                try:
+                    text = await asyncio.wait_for(_one_key(key), timeout=_OCR_CALL_TIMEOUT_S)
+                except asyncio.TimeoutError:
+                    log.warning("cherokee_delinquent_tax.ocr_call_timeout", key=key[:8])
+                    transient = True
+                    continue
+                except Exception as exc:
+                    msg = str(exc)
+                    if _is_quota_error(msg):
+                        log.info("cherokee_delinquent_tax.ocr_quota_exhausted", key=key[:8])
+                        transient = True
+                    elif _is_overload_error(msg):
+                        log.info("cherokee_delinquent_tax.ocr_overloaded", key=key[:8],
+                                 error=msg[:120])
+                        transient = True
+                    else:
+                        log.warning("cherokee_delinquent_tax.ocr_error",
+                                    key=key[:8], error=msg[:160])
+                    continue
+                if text:
+                    return text
+            if not transient or rnd + 1 >= _OCR_ROUNDS:
+                break
+            log.info("cherokee_delinquent_tax.ocr_pool_cooling", round=rnd + 1,
+                     sleep_s=_OCR_ROUND_COOLDOWN_S)
+            await asyncio.sleep(_OCR_ROUND_COOLDOWN_S)
         return ""
 
     try:
@@ -293,14 +340,27 @@ class CherokeeDelinquentTaxScraper(BaseScraper):
             media_items = json.loads(text)
         except Exception as e:
             log.error("cherokee_delinquent_tax.media_fetch_error", error=str(e)[:120])
-            self.last_outcome = OUTCOME_ZERO
-            return
+            media_items = []        # the page path below can still find the list
+
+        # The delinquent-tax page's own links go FIRST (the page links the current list).
+        try:
+            page_html = await get_text(DELINQUENT_PAGE_URL, timeout=20)
+            page_items = _page_pdf_links(page_html)
+        except Exception as e:  # noqa: BLE001
+            log.warning("cherokee_delinquent_tax.page_fetch_error", error=str(e)[:120])
+            page_items = []
+        known = {str(it.get("source_url") or "").split("//", 1)[-1].removeprefix("www.")
+                 for it in (media_items or [])}
+        page_new = [it for it in page_items
+                    if it["source_url"].split("//", 1)[-1].removeprefix("www.") not in known]
+        media_items = page_new + list(media_items or [])
 
         if not media_items:
             self.last_outcome = OUTCOME_ZERO
             return
 
-        log.info("cherokee_delinquent_tax.media_found", count=len(media_items))
+        log.info("cherokee_delinquent_tax.media_found", count=len(media_items),
+                 page_links_not_in_media_search=len(page_new))
 
         # Step 2: Download and parse each PDF
         all_rows: list[dict] = []

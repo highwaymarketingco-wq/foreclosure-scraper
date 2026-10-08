@@ -129,6 +129,19 @@ def _is_quota(msg: str) -> bool:
     return any(s in m for s in ("quota", "rate limit", "429", "resource_exhausted", "exceeded"))
 
 
+#: A provider overload is as transient as a quota hit (2026-10-08 VM run: Gemini answered
+#: "503 UNAVAILABLE ... experiencing high demand ... try again" on every key for about 15 s).
+#: It used to be read as a hard error: the page came back None and the document was
+#: counted as 0 rows, a clean zero. It now rotates keys and cools like a quota hit.
+_TRANSIENT_MARKERS = ("503", "unavailable", "overloaded", "high demand", "try again",
+                      "500 internal", "internal error", "deadline")
+
+
+def _is_transient(msg: str) -> bool:
+    m = (msg or "").lower()
+    return _is_quota(msg) or any(s in m for s in _TRANSIENT_MARKERS)
+
+
 class _OCRQuotaOut(Exception):
     """Every key in the free pool is rate-limited right now."""
 
@@ -185,7 +198,9 @@ async def _ocr_page(page_pdf: bytes, keys: list[str]) -> Optional[dict]:
                 log.warning("laurens_overage.ocr_call_timeout", key=key[:8])
                 continue
             except Exception as exc:  # noqa: BLE001
-                if _is_quota(str(exc)):
+                if _is_transient(str(exc)):
+                    if not _is_quota(str(exc)):
+                        log.info("laurens_overage.ocr_transient", key=key[:8], error=str(exc)[:120])
                     continue
                 log.warning("laurens_overage.ocr_error", error=str(exc)[:160])
                 return None
@@ -206,10 +221,10 @@ async def _ocr_page(page_pdf: bytes, keys: list[str]) -> Optional[dict]:
             log.info("laurens_overage.ocr_pool_cooling", sweep=sweep + 1,
                      keys=len(keys), sleep_s=_OCR_COOLDOWN_S)
             await asyncio.sleep(_OCR_COOLDOWN_S)
-    raise _OCRQuotaOut(f"all {len(keys)} Gemini keys rate-limited")
+    raise _OCRQuotaOut(f"all {len(keys)} Gemini keys rate-limited or overloaded")
 
 
-async def _ocr_document(data: bytes, max_pages: int = 20) -> list[dict]:
+async def _ocr_document(data: bytes, max_pages: int = 20, on_page=None) -> list[dict]:
     """OCR the scanned overage list page by page. Each returned dict is one
     page's {"tax_sale_date", "rows": [...]}. Raises _OCRNoKey/_OCRQuotaOut
     (never returns [] for those) so an unread document is never mistaken for
@@ -240,6 +255,8 @@ async def _ocr_document(data: bytes, max_pages: int = 20) -> list[dict]:
             break
         if got.get("rows"):
             out.append(got)
+            if on_page is not None:
+                on_page(got)
     return out
 
 
@@ -296,7 +313,10 @@ class LaurensOverageClaims(BaseScraper):
     slug = "counties_sc.laurens_overage_claims"
     name = "Laurens County SC Overage Claim List"
     category = "county_tax"
-    timeout_s = 300.0   # OCR of a multi-page scan is the long pole
+    # OCR of a multi-page scan is the long pole: 4 pages, each up to _OCR_CALL_TIMEOUT_S
+    # per key plus pool cool-downs. 300 s timed out on 10/7 with nothing shipped; rows
+    # now reach self.partial page by page, and 600 s lets the 4 pages finish.
+    timeout_s = 600.0
     expected_min_count = 0
     optional = True
 
@@ -316,26 +336,14 @@ class LaurensOverageClaims(BaseScraper):
             log.warning("laurens_overage.not_pdf", url=doc_url, head=data[:8])
             return out
 
-        try:
-            pages = await _ocr_document(data)
-        except _OCRNoKey as exc:
-            raise RuntimeError(
-                "Laurens overage list is a scanned PDF unread: no OCR key is "
-                "configured. Set GEMINI_API_KEY (or GEMINI_API_KEY_1..N). "
-                "Raising rather than returning 0 so a missing key is never "
-                "mistaken for an empty source."
-            ) from exc
-        except _OCRQuotaOut as exc:
-            raise RuntimeError(
-                "Laurens overage list unread: the free Gemini key pool was "
-                "rate-limited for the whole pass. Transient quota condition, "
-                "not a dead source -- re-run, or stagger against the daily "
-                "vision pass."
-            ) from exc
-
         now = datetime.utcnow()
         seen: set[str] = set()
-        for page in pages:
+
+        def _take_page(page: dict) -> None:
+            """Turn one OCR'd page into listings as soon as it is read, into `out` and
+            self.partial, so a soft timeout on a later page still ships the pages read
+            (each page is one or two minutes of OCR; the 10/7 run timed out at 300 s with
+            nothing shipped)."""
             tax_sale_date = str(page.get("tax_sale_date") or "").strip()
             for raw_row in page.get("rows") or []:
                 rec = _normalize_row(tax_sale_date, raw_row)
@@ -353,7 +361,7 @@ class LaurensOverageClaims(BaseScraper):
                     situs = None
                 street_address = situs.get("address") if situs else None
 
-                out.append(Listing(
+                li = Listing(
                     source=self.slug,
                     source_url=doc_url,
                     listing_type=ListingType.TAX_SALE_OVERAGE,
@@ -379,7 +387,30 @@ class LaurensOverageClaims(BaseScraper):
                         "item": rec["item"],
                         "map_number": rec["map_number"],
                     }},
-                ))
+                )
+                out.append(li)
+                self.partial.append(li)
+
+        try:
+            pages = await _ocr_document(data, on_page=_take_page)
+        except _OCRNoKey as exc:
+            raise RuntimeError(
+                "Laurens overage list is a scanned PDF unread: no OCR key is "
+                "configured. Set GEMINI_API_KEY (or GEMINI_API_KEY_1..N). "
+                "Raising rather than returning 0 so a missing key is never "
+                "mistaken for an empty source."
+            ) from exc
+        except _OCRQuotaOut as exc:
+            if out:
+                log.warning("laurens_overage.ocr_partial_shipped", rows=len(out),
+                            error=str(exc)[:120])
+                return out
+            raise RuntimeError(
+                "Laurens overage list unread: the free Gemini key pool was "
+                "rate-limited or overloaded for the whole pass. Transient condition, "
+                "not a dead source -- re-run, or stagger against the daily "
+                "vision pass."
+            ) from exc
 
         log.info("laurens_overage.done", pages=len(pages), usable=len(out))
         return out
