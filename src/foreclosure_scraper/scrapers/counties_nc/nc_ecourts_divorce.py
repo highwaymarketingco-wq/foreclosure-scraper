@@ -648,6 +648,13 @@ class NCECourtsDivorce(BaseScraper):
                 total = result.get("totalHits") or 0
                 if (pg + 1) * self.JUDGMENT_PAGE_SIZE >= total:
                     break
+            else:
+                # 2026-10-08 (source-completeness audit): the page cap used to end
+                # the loop silently. Measured live 2026-10-08: 104,580 hits in the
+                # 120-day window against the 120,000-hit cap (13% headroom).
+                log.warning("nc_ecourts_divorce.page_cap_reached",
+                            max_pages=self.JUDGMENT_MAX_PAGES,
+                            reported_total=result.get("totalHits"))
 
         log.info("nc_ecourts_divorce.parsed", listings=len(listings))
         return listings
@@ -708,6 +715,12 @@ class NCECourtsDivorce(BaseScraper):
             raw={
                 "nc_ecourts": {
                     "cause": cause,
+                    # judgmentType ("Granted in Whole or Part", "Default Civil", ...)
+                    # and caseCategoryKey ("FAM") are on every hit and were dropped
+                    # here while the lis-pendens lane keeps them (2026-10-07
+                    # extraction audit, section 1).
+                    "judgmentType": hit.get("judgmentType"),
+                    "caseCategoryKey": hit.get("caseCategoryKey"),
                     "civilJudgmentStatus": hit.get("civilJudgmentStatus"),
                     "caseID": hit.get("caseID"),
                     "judgmentId": hit.get("judgmentId"),

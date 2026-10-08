@@ -623,6 +623,7 @@ class NCECourtsLisPendens(BaseScraper):
             # Step 2: paginate through all hits across the 14 target counties
             all_hits: list[dict] = []
             page_from = 0
+            total = 0
             for _ in range(self.MAX_PAGES):
                 so = _build_search_object(
                     template,
@@ -656,7 +657,13 @@ class NCECourtsLisPendens(BaseScraper):
                     break
                 page_from += len(hits)
 
-            log.info("nc_ecourts.fetched", total_hits=len(all_hits))
+            log.info("nc_ecourts.fetched", total_hits=len(all_hits), reported_total=total)
+            # 2026-10-08 (source-completeness audit): MAX_PAGES used to end the loop
+            # silently. Measured live 2026-10-08: 80,061 hits in the 90-day window
+            # against the 90,000-hit cap (11% headroom). Say so when the cap binds.
+            if total and len(all_hits) < total and len(all_hits) >= self.MAX_PAGES * self.PAGE_SIZE:
+                log.warning("nc_ecourts.page_cap_reached", fetched=len(all_hits),
+                            reported_total=total, max_pages=self.MAX_PAGES)
 
         # Docket-history sidecar (Dirty Deeds Tier B #37) -- record every
         # foreclosure-cause hit's case/status BEFORE the terminal-status
