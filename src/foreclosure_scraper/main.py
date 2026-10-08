@@ -1134,6 +1134,9 @@ def _situs_is_junk(address: str | None) -> bool:
     return bool(_SITUS_ENTITY_RE.search(first))
 
 
+from .situs_sanity import situs_is_junk as _situs_is_junk  # noqa: E402,F811 (audit 2026-10-09)
+
+
 def _active_only(li: Listing, horizon_days: int, *, now: datetime | None = None) -> bool:
     """Drop listings whose sale is too far past or > horizon_days out, and any
     auction marked withdrawn/cancelled or in a TERMINAL court status (redeemed /
@@ -1518,12 +1521,11 @@ async def run() -> int:
     # source_status would still read "OK (N)". Surface it so a misrouted source
     # (e.g. a DATELESS_OK_SOURCES omission dropping every dateless row) is
     # caught instead of looking healthy. Compares raw scrape count to survivors.
-    survived_by_source: Counter = Counter(li.source for li in active if li.source)
-    for slug, scraped_n in by_source.items():
-        if scraped_n > 0 and survived_by_source.get(slug, 0) == 0:
-            log.warning("orchestrator.source_all_filtered",
-                        source=slug, scraped=scraped_n,
-                        note="OK with rows but 0 reached the dashboard post-filter")
+    from .drop_audit import all_filtered_sources
+    for slug, scraped_n in all_filtered_sources(results, by_source, active):
+        log.warning("orchestrator.source_all_filtered",
+                    source=slug, scraped=scraped_n,
+                    note="OK with rows but 0 reached the dashboard post-filter")
 
     # Dedupe across sources — guarded so a merge-key edge case can't discard the
     # run; on failure ship the un-deduped active set (worse dupes, not a lost run).
@@ -2126,6 +2128,13 @@ async def run() -> int:
     # let it ship. The OCEANFRONT_COASTAL_COUNTIES carve-out below keeps the
     # legitimate coastal track (Brunswick / Onslow / Georgetown / Charleston ...)
     # untouched — only genuinely off-footprint counties are dropped.
+    try:
+        from .drop_audit import fill_county_from_city
+        _cf = fill_county_from_city(enriched)
+        if _cf["filled"]:
+            log.info("orchestrator.countyless_national_placed", **_cf)
+    except Exception:
+        log.error("countyless_fill.failed", traceback=traceback.format_exc())
     _pre_scope = len(enriched)
     enriched = [li for li in enriched if not _safe_pred(_denied_now, li, False)]
     if _pre_scope != len(enriched):
@@ -2142,11 +2151,14 @@ async def run() -> int:
         src = li.source or ""
         return (src.startswith("national.") or src.startswith("reo.")) \
             and not (li.county or "").strip()
+    from .drop_audit import count_by_source, is_countyless_national
+    _natl_by_src = count_by_source(enriched, is_countyless_national)
     _pre_natl = len(enriched)
     enriched = [li for li in enriched if not _safe_pred(_countyless_national, li, False)]
     if _pre_natl != len(enriched):
         _off_footprint_removed += _pre_natl - len(enriched)
-        log.info("orchestrator.drop_countyless_national", dropped=_pre_natl - len(enriched))
+        log.info("orchestrator.drop_countyless_national", dropped=_pre_natl - len(enriched),
+                 by_source=dict(list(_natl_by_src.items())[:15]))
 
     # SITUS SANITY guard — a street_address that is a business/entity name or a
     # 'Vacant parcel' placeholder is a geocoder POI artifact, not a real situs.
