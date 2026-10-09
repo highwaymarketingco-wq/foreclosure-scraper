@@ -161,6 +161,25 @@ class NcRodPlatform:
         shown = self.config(county)[0]
         return [to_rod_doc(r, self.state, shown, self.platform) for r in res.records[:max_docs]]
 
+    def search_by_name_status_sync(self, state: str, county: str, name: str,
+                                   max_docs: int = 80) -> tuple[list[RodDoc], str, bool]:
+        """search_by_name_sync plus why it may be empty: (docs, status, truncated), status ok | walled |
+        capped | error | noname. Status ok with no docs is a checked "nothing indexed under that name"."""
+        if (state or "").upper() != self.state or self.config(county) is None:
+            return [], "error", False
+        who = parse_owner(name)
+        if who is None:
+            return [], "noname", False
+        res = self.search(county, who, "both", None)
+        if res.status != "ok":
+            return [], res.status, False
+        shown = self.config(county)[0]
+        return ([to_rod_doc(r, self.state, shown, self.platform) for r in res.records[:max_docs]],
+                "ok", bool(getattr(res, "truncated", False)))
+
+    async def search_by_name_status(self, state: str, county: str, name: str, max_docs: int = 80):
+        return await asyncio.to_thread(self.search_by_name_status_sync, state, county, name, max_docs)
+
     async def search_by_name(self, state: str, county: str, name: str, max_docs: int = 80) -> list[RodDoc]:
         """The interface every rod module exposes (enrichment_generic_rod calls it). Runs the
         blocking, paced search in a worker thread; the per-host lock keeps one host serial."""

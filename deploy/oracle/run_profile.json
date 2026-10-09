@@ -26,6 +26,7 @@
   "FORECLOSURE_SC_ORS_ROD": "1",
   "FORECLOSURE_SC_ACPASS_ROD": "1",
   "FORECLOSURE_NC_HARRIS_ROD": "0",
+  "FORECLOSURE_NC_HARRIS_MARRIAGE": "0",
   "FORECLOSURE_NC_LOGAN_BLAZOR_ROD": "0",
   "FORECLOSURE_NC_LOGAN_REMOTE_ROD": "0",
   "FORECLOSURE_SC_PUBLICSEARCH_ROD": "1",
@@ -47,6 +48,8 @@
   "FORECLOSURE_NC_HARRIS_ROD": "browser-rendered register platforms stay OFF until a run has measured their memory and time (HANDOFF item 82)",
   "FORECLOSURE_GENERIC_ROD_BUDGET_S": "the generic register pass's own budget (enrichment_generic_rod); it only applies in full once main.py runs generic_rod under its own _await_capped (audit 2026-10-09 additions_verify wiring), before that the ROD group's 900 s cap still cancels it (its counts are then logged as generic_rod.cancelled)",
   "GENERIC_ROD_COUNTY_CONCURRENCY": "register counties read side by side; each county is its own host and the adapters hold a per-host lock, so never two requests on one host",
+  "FORECLOSURE_NC_HARRIS_MARRIAGE": "Mecklenburg/Carteret Marriage index in the same guest browser (rod/nc_harris.marriage_search); a second browser lookup per lead (measured 15-20 s, 540 MB peak on 2026-10-09), so OFF with the Harris flag it depends on",
+  "FORECLOSURE_SC_LIEN_SWEEP": "county-wide AcclaimWeb lien sweep (Horry, Pickens), enrichment_register_lien_sweep; plain HTTP, cached, newest month first inside FORECLOSURE_LIEN_SWEEP_BUDGET_S (needs the main.py wiring line in docs/audit_2026-10-09/top80_logan_harris.md)",
   "OBITUARY_LOOKUPS": "live obituary name lookups (Echovita / Find a Grave) per dead-owner lead: OFF until the owner decides (HANDOFF item 82)",
   "FORECLOSURE_MECKLENBURG_DELINQUENT": "Mecklenburg delinquent XLSX (one-year balances, +29k rows, +12 min geocoding): OFF by the 10/7 decision (vm_lib 9edff1f3)",
   "RICHLAND_PARCEL_MAX": "Richland map-viewer lookups per run (one host, about 4 s a row, inside RESOLVER_PHASE_MAX_SECONDS 2,400); HOT and WARM rows first"

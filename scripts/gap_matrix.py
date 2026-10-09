@@ -639,7 +639,10 @@ SPECS: dict[str, Spec] = {
                                 ("SC", "HUD USPS vacancy data needs a registered login")),
                          doc="raw.usps_vacancy present"),
     "liens": Spec(_S, "row", "rod", producers=("enrichment_dew_liens.py", "enrichment_irs_lien.py",
-                                               "enrichment_lien_stack.py"),
+                                               "enrichment_lien_stack.py",
+                                               # the register-of-deeds name readers (raw['rod'] is this
+                                               # column's check): the platform registry names the counties
+                                               "enrichment_generic_rod.py", "enrichment_rod_chain.py"),
                   doc="raw.liens present; checked = a register-of-deeds pull is on the row (raw.rod)"),
     "child_support": Spec(_S, "derived", "court", applies="court_case",
                           producers=("enrichment_case_detail.py", "enrichment_nc_case_status_tyler.py"),
@@ -1110,8 +1113,12 @@ def _access_status(block: dict, free_flag: str) -> tuple[str, str]:
     return "unknown", ""
 
 
-def source_status(spec: Spec, state: str, crec: Optional[dict]) -> tuple[str, str, str]:
-    """(status, wall, where): status free | walled | unknown. `where` names the source."""
+def source_status(spec: Spec, state: str, crec: Optional[dict], col: str = "") -> tuple[str, str, str]:
+    """(status, wall, where): status free | walled | unknown. `where` names the source.
+    `col` lets a county's register block carry a per-column verdict (rod.column_access[col]:
+    a wall kind from ACCESS_WALL, or 'none' = no free source), for the columns whose source is a
+    different system of the same office (marriage licenses: the vital-records login, the probate
+    court) than the name index the rest of the block describes."""
     sw = dict(spec.statewide).get(state)
     if sw:
         return "free", "", f"statewide: {sw}"
@@ -1144,6 +1151,11 @@ def source_status(spec: Spec, state: str, crec: Optional[dict]) -> tuple[str, st
             return "free", "", f"county GIS legal field: {_host(gis.get('url'))}"
         if str(rod.get("legal_description_in_index")) == "yes":
             st, w = _access_status(rod, "free_name_search")
+        ca = str((rod.get("column_access") or {}).get(col) or "").lower() if col else ""
+        if ca in ACCESS_WALL:
+            return "walled", ACCESS_WALL[ca], f"register: {_host(rod.get('url'))} ({col}: {ca})"
+        if ca == "none":
+            return "unknown", "", f"register: {_host(rod.get('url'))} ({col}: no free source)"
             return st, w, f"register index: {_host(rod.get('url'))}"
         if str(gis.get("legal_description_field")) == "no" and str(rod.get("legal_description_in_index")) == "no":
             return "walled", "only on the deed image", f"register: {_host(rod.get('url'))}"
@@ -1603,7 +1615,7 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set], screens: Op
                 built = "code"
             else:
                 built = "no"
-            src = source_status(spec, st, crec) if co != UNKNOWN else ("unknown", "", "county unknown")
+            src = source_status(spec, st, crec, col) if co != UNKNOWN else ("unknown", "", "county unknown")
             cells[(st, co, col)] = dict(app=app, pos=pos, chk=chk, target=target, ran=ran, built=built, src=src,
                                         screened=scr,
                                         v_any=cube.v_any[key][col], v_dec=cube.v_dec[key][col],

@@ -87,7 +87,10 @@ def parse_results(html: str) -> tuple[list[IndexRecord], Optional[int], int]:
             grantors=[g for g in grantors if g], grantees=[g for g in grantees if g],
             description=v.get("COMBINED_LEGAL") or None))
     text = _txt(s)
-    m = re.search(r"\(\s*([\d,]+)\s+records? found", text, re.I)
+    # '( 2 records found as of ...' with rows, but '; 0 records found as of ...' / 'begins with X 0 records
+    # found as of ...' (no paren) on an empty result (found 2026-10-09: the empty page was read as "could
+    # not be read", so a clean negative was an error and the lead was retried every run)
+    m = re.search(r"(?<![\d,])([\d,]+)\s+records? found", text, re.I)
     found = int(m.group(1).replace(",", "")) if m else None
     sel = s.select_one("select[aria-label='Results Page Selection']")     # the first of the two option bars
     pages = len(sel.find_all("option")) if sel is not None else (1 if out else 0)
@@ -95,7 +98,7 @@ def parse_results(html: str) -> tuple[list[IndexRecord], Optional[int], int]:
 
 
 def no_records(html: str) -> bool:
-    return bool(re.search(r"\(\s*0\s+records? found|No records found|returned no records", html or "", re.I))
+    return bool(re.search(r"(?<![\d,])0\s+records? found|No records found|returned no records", html or "", re.I))
 
 
 def party_text(who: OwnerName) -> str:
@@ -141,6 +144,95 @@ class Harris(NcRenderPlatform):
             rows += more
             read += 1
         return SearchResult(records=rows, total=found, url=url, truncated=bool(found and pages > read))
+
+
+# -- the Marriage index (same app, same guest session, no CAPTCHA, no login) ------------------------
+MARRIAGE_FLAG = "FORECLOSURE_NC_HARRIS_MARRIAGE"           # OFF by default: a second browser lookup per lead
+MARRIAGE_NAME = "#cphNoMargin_f_txtGrantor"                 # 'Name' (begins with, LAST FIRST), name type Both
+MARRIAGE_SEARCH = "#cphNoMargin_SearchButtons1_btnSearch"
+
+
+def parse_marriage_results(html: str) -> tuple[list[dict], Optional[int]]:
+    """(rows, the 'N records found' count or None). One row per licence: licence number, application
+    and marriage dates, groom and bride as 'LAST FIRST MIDDLE', their names at birth, status."""
+    s = BeautifulSoup(html or "", "lxml")
+    keys = [th.get("key") for th in s.find_all("th") if th.get("key")]
+    rows: list[dict] = []
+    for tr in s.find_all("tr", attrs={"adr": True}):
+        tds = tr.find_all("td", recursive=False)
+        if len(tds) != len(keys):
+            continue
+        v = {k: _txt(td) for k, td in zip(keys, tds)}
+        if not (v.get("GROOM") or v.get("BRIDE")):
+            continue
+        rows.append({"license_no": v.get("LICENSE_NO") or None,
+                     "applied": mdy_to_iso(v.get("DATE_OF_APP")), "married": mdy_to_iso(v.get("DATE_OF_MARRIAGE")),
+                     "groom": _name(v.get("GROOM", "")), "bride": _name(v.get("BRIDE", "")),
+                     "groom_birth_surname": v.get("GROOM_MAIDEN_NAME") or None,
+                     "bride_birth_surname": v.get("BRIDE_MAIDEN_NAME") or None,
+                     "status": v.get("LICENSE_STATUS") or None})
+    m = re.search(r"(?<![\d,])([\d,]+)\s+records? found", _txt(s), re.I)
+    return rows, (int(m.group(1).replace(",", "")) if m else (0 if no_records(html) else None))
+
+
+def marriage_license_from(rows: list[dict], who: OwnerName, county: str) -> Optional[dict]:
+    """The board's raw['marriage_license'] dict for the newest licence in which the owner is one of
+    the two spouses (the spouse is the other name), or None when no row names the owner. The name
+    index matches names, not people: match_confidence says how much of the owner's name fit."""
+    from .nc_chain import same_party
+    best = None
+    for r in rows:
+        mine_g, mine_b = same_party(who, r["groom"]), same_party(who, r["bride"])
+        if not (mine_g or mine_b):
+            continue
+        if best is None or (r["married"] or r["applied"] or "") > (best[0]["married"] or best[0]["applied"] or ""):
+            best = (r, r["bride"] if mine_g else r["groom"])
+    if best is None:
+        return None
+    r, spouse = best
+    return {"spouse_name": spouse.title(), "license_date": r["married"] or r["applied"], "county_issued": county,
+            "license_no": r["license_no"], "match_confidence": "high" if who.first else "medium",
+            "searched_name": who.label, "source": "harris_marriage_index"}
+
+
+class MarriageSearch:
+    """A marriage-index lookup result: status ok | walled | capped | error, rows (all licences under
+    the typed name), the parsed 'found' count."""
+    def __init__(self, status: str = "ok", rows: Optional[list[dict]] = None, found: Optional[int] = None,
+                 reason: str = "") -> None:
+        self.status, self.rows, self.found, self.reason = status, rows or [], found, reason
+
+
+def marriage_search(county: str, who: OwnerName) -> MarriageSearch:
+    """One marriage-index name search in a headless guest browser (the lookup budget is shared with the
+    real-estate search: the same cap env var). Person names only."""
+    from . import nc_polite
+    from .nc_render import launcher
+    hit = ADAPTER.config(county)
+    if hit is None or who.entity:
+        return MarriageSearch("error", reason="not a Harris county or an entity name")
+    name, cfg = hit
+    why = nc_polite.walled_reason(PLATFORM, "NC", name)
+    if why:
+        return MarriageSearch("walled", reason=why)
+    if not nc_polite.take_lookup(PLATFORM, "NC", name, ADAPTER.max_lookups()):
+        return MarriageSearch("capped", reason="per-run lookup cap reached")
+    try:
+        with launcher(PLATFORM, "NC", name) as rp:
+            rp.goto(cfg.root + "/")
+            if rp.has(ACCEPT_LINK):
+                rp.click_nav(ACCEPT_LINK)
+            rp.goto(cfg.root + "/Marriage/SearchEntry.aspx")
+            if not rp.has(MARRIAGE_NAME):
+                return MarriageSearch("error", reason="the marriage search form did not open")
+            rp.type_into(MARRIAGE_NAME, party_text(who))
+            html = rp.click_nav(MARRIAGE_SEARCH)
+    except Exception as exc:  # noqa: BLE001 - a lookup never kills a run
+        return MarriageSearch("error", reason=f"{type(exc).__name__}: {str(exc)[:120]}")
+    rows, found = parse_marriage_results(html)
+    if not rows and found != 0:
+        return MarriageSearch("error", reason="the marriage results page could not be read")
+    return MarriageSearch("ok", rows, found)
 
 
 ADAPTER = Harris()

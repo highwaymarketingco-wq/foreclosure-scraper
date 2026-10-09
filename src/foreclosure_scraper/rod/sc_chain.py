@@ -619,25 +619,39 @@ def run_chain(*, platform: str, state: str, county: str, owner_name: str,
     return res
 
 
+def run_search_status(*, platform: str = "", state: str, county: str, name: str,
+                      make_searcher: Callable[[], Searcher], max_docs: int = 50,
+                      budget: Optional[LookupBudget] = None) -> tuple[list[RodDoc], str, bool]:
+    """run_search that says WHY it is empty: (docs, status, truncated) with status ok | walled |
+    capped | error | noname. Only status 'ok' with no docs is a real "searched, nothing indexed
+    under that name" (a caller may stamp that as a checked negative, never when truncated)."""
+    budget = budget or BUDGET
+    if not name or not name.strip():
+        return [], "noname", False
+    if walled_reason(state, county):
+        return [], "walled", False
+    q = owner_query(name)
+    if q is None:
+        return [], "noname", False
+    searcher = _CachingSearcher(platform, state, county, make_searcher)
+    if searcher.key(q, "both", None) not in _CACHE and not budget.take(state, county):
+        return [], "capped", False
+    try:
+        raw_docs = searcher(q, "both", None)
+        docs = _dedupe(list(raw_docs))
+        truncated = bool(getattr(raw_docs, "truncated", False))
+    except RodWalled as w:
+        mark_walled(state, county, w.reason)
+        return [], "walled", False
+    except Exception:  # noqa: BLE001
+        return [], "error", False
+    docs.sort(key=lambda d: d.recorded_date or datetime.min, reverse=True)
+    return docs[:max_docs], "ok", truncated
+
+
 def run_search(*, platform: str = "", state: str, county: str, name: str,
                make_searcher: Callable[[], Searcher], max_docs: int = 50,
                budget: Optional[LookupBudget] = None) -> list[RodDoc]:
     """All instruments naming `name` on either side, newest first; [] on a wall, a cap or a failure."""
-    budget = budget or BUDGET
-    if walled_reason(state, county) or not name or not name.strip():
-        return []
-    q = owner_query(name)
-    if q is None:
-        return []
-    searcher = _CachingSearcher(platform, state, county, make_searcher)
-    if searcher.key(q, "both", None) not in _CACHE and not budget.take(state, county):
-        return []
-    try:
-        docs = _dedupe(list(searcher(q, "both", None)))
-    except RodWalled as w:
-        mark_walled(state, county, w.reason)
-        return []
-    except Exception:  # noqa: BLE001
-        return []
-    docs.sort(key=lambda d: d.recorded_date or datetime.min, reverse=True)
-    return docs[:max_docs]
+    return run_search_status(platform=platform, state=state, county=county, name=name,
+                             make_searcher=make_searcher, max_docs=max_docs, budget=budget)[0]

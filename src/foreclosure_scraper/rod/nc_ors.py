@@ -269,5 +269,10 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 80)
     return await ADAPTER.search_by_name(state, county, name, max_docs)
 
 
+async def search_by_name_status(state: str, county: str, name: str, max_docs: int = 80):
+    """(docs, status, truncated): see NcRodPlatform.search_by_name_status_sync."""
+    return await ADAPTER.search_by_name_status(state, county, name, max_docs)
+
+
 def chain(county: str, owner_name: Optional[str], *, state: str = "NC", depth: int = 3) -> dict:
     return ADAPTER.chain(county, owner_name, state=state, depth=depth)

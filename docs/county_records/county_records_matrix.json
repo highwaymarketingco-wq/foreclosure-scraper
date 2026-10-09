@@ -1303,7 +1303,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: davidsondeeds.com meta-refreshes to davidsonNameSearch.php, a 'LEGAL DISCLAIMER' page with Accept/Decline (POST form; accuracy-only text plus an 'online search notice' about ongoing quality testing; no automation language). Decline returns to co.davidson.nc.us/292/Register-of-Deeds. Index start 1984 is from the county ROD page as quoted by a site-restricted web search, not read directly. Separately, davidsonportal.com is a user/password 'Online Access Portal' with Sign Up; a web search summary describes it as a $50/month subscription with name search from July 1 1964 and images from 1784 (not verified on the page).",
-    "notes": "Two tiers: free disclaimer-gated index (from 1984) and a paid subscription portal (older index and images back to 1784 per secondary source). Did not accept the disclaimer (POST)."
+    "notes": "Two tiers: free disclaimer-gated index (from 1984) and a paid subscription portal (older index and images back to 1784 per secondary source). Did not accept the disclaimer (POST). 2026-10-09: the name index lists a MARRIAGE instrument type but 0 of 191 instruments returned for a common name were marriages; no free marriage source found.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -1533,7 +1536,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: forsyth.cc/rod/online_lookup.aspx says 'Free public online searches for land records, miscellaneous documents, and vital records indexes', 'Actual images of recorded real estate documents are available to view', names BIS as the hosting vendor, and dates computerized indexes to 1965 (county formed 1849). It links forsythdeeds.com/disclaimer.php: 'LEGAL DISCLAIMER' with an Accept form posting to forsythNameSearch.php (accuracy-only text, no automation language). Did not accept.",
-    "notes": "Free index and free image viewing per the county's own page. Online coverage start year not stated (computerized indexing began 1965; earlier books exist from 1849). The repo's enrichment_rod_name_index.py already speaks this NameSearch/NamePick/NameDisplay protocol for SC hosts."
+    "notes": "Free index and free image viewing per the county's own page. Online coverage start year not stated (computerized indexing began 1965; earlier books exist from 1849). The repo's enrichment_rod_name_index.py already speaks this NameSearch/NamePick/NameDisplay protocol for SC hosts. 2026-10-09: the 'Vital Search' button on the name-index page goes to vital/login.php, a username and password form; marriage licenses are only there (checked 2026-10-09).",
+    "column_access": {
+     "marriage_license": "login"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -1855,7 +1861,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: guilforddeeds.com redirects to guilfordcountync.gov/government/register-deeds (200, read with curl because the host refused Python's TLS settings), whose 'Search Real Estate Records' link is rdlxweb.guilfordcountync.gov/guilfordNameSearch.php; that page (200) is a legal disclaimer with Accept/Decline buttons (accuracy and liability only). A GET with ?Accept=Accept returned the disclaimer again (the accept is a POST), so the search form was not reached.",
-    "notes": "Separate Guilford slavery-deeds index at rdlxweb.guilfordcountync.gov/gsd/. Coverage years and image cost not read; county 'notices' page link is a 404."
+    "notes": "Separate Guilford slavery-deeds index at rdlxweb.guilfordcountync.gov/gsd/. Coverage years and image cost not read; county 'notices' page link is a 404. 2026-10-09: the 'Vital Search' button on the name-index page goes to vital/login.php, a username and password form; marriage licenses are only there (checked 2026-10-09).",
+    "column_access": {
+     "marriage_license": "login"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -2860,14 +2869,14 @@
     "platform": "Aumentum Recorder web access (Harris Recording Solutions) at rod.moorecountync.gov",
     "url": "https://rod.moorecountync.gov/",
     "free_name_search": "yes",
-    "access": "disclaimer_click",
+    "access": "blocked",
     "index_online_back_to_year": null,
     "images_free": "yes",
     "legal_description_in_index": "unknown",
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: GET rod.moorecountync.gov (200) welcome page: click-to-acknowledge disclaimer (accuracy only); notice that the office is back-filing index entries for 1/1/1888-6/30/1988 so older parties may be missing; notice that all recorded document images viewed or downloaded through the online search now carry a watermark and that this does not restrict public access. Optional account login exists.",
-    "notes": "Images are free to view/download with a watermark per the county's notice. Index for 1888-1988 is incomplete while back-filing; the office says to also search the index books in person."
+    "notes": "Images are free to view/download with a watermark per the county's notice. Index for 1888-1988 is incomplete while back-filing; the office says to also search the index books in person. 2026-10-09: the disclaimer postback answered HTTP 403 behind Cloudflare on 2026-10-07 (nc_rod_platform_clusters.md); a bot check, not passed by a script."
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -4615,7 +4624,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: opened search.abbevilledeeds.com (disclaimer text is accuracy/liability only, no automation clause), then NameSearch.php?Accept=Accept: 'Verified Through' today's date, start-date field defaults to 10/03/1978, instrument groups DEEDS/LIENS/MORTGAGE/PLATS/UCC, book-page and property-description (subdivision/lot/block) search. One SMITH 2024 test search: rows carry Date, Book-Page, Type, Grantor, Grantee, Description, Amount, Image, with direct view_image.php?...&type=pdf|tif links and no cart, fee or login text. Same platform's image link returned application/pdf with no login on Georgetown the same day.",
-    "notes": "1978 is the form's default start date, read as the start of the typed index (not stated in words). Description cell is a short property note, not the deed's legal; the legal is on the free PDF. Date window is ignored here per repo (returns head of index), so name lookup only."
+    "notes": "1978 is the form's default start date, read as the start of the typed index (not stated in words). Description cell is a short property note, not the deed's legal; the legal is on the free PDF. Date window is ignored here per repo (returns head of index), so name lookup only.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "Abbeville County Probate Court page lists forms and contacts only, no online case search. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
@@ -4845,7 +4857,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: opened barnwelldeeds.com (disclaimer) and NameSearch.php?Accept=Accept ('Verified Through' 10/6/2026, PLATS instrument group, property-description search; start-date field has no default so the index start year is not shown). Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07). Platform check 2026-10-07: index rows link view_image.php?...&type=pdf|tif with no cart/fee/login text (Abbeville test search); one such link on Georgetown returned application/pdf with no login.",
-    "notes": "Repo measured that Barnwell honours the date window (bulk date-range reads possible). Barnwell was dropped from the Avenu sclandrecords picker (commented out)."
+    "notes": "Repo measured that Barnwell honours the date window (bulk date-range reads possible). Barnwell was dropped from the Avenu sclandrecords picker (commented out). 2026-10-09 (top80 register group): SC marriage licenses are issued by the county probate court, not the register; this register's name search has no marriage instrument type, and the probate site (southcarolinaprobate.net) answers a plain request with HTTP 403 (checked 2026-10-09), so marriage_license is a person's lane.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "Barnwell County Probate Court; county site did not resolve/connect on 2026-10-07. Barnwell is in the southcarolinaprobate.net dropdown but returned no cases in the repo's 2026-10-02 probe. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
@@ -4937,7 +4952,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: opened search.berkeleydeeds.com (disclaimer) and NameSearch.php?Accept=Accept: 'Verified Through' today, start-date field defaults to 07/01/1983, PLATS instrument group, property-description search. Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07). Platform check 2026-10-07: index rows link view_image.php?...&type=pdf|tif with no cart/fee/login text (Abbeville test search); one such link on Georgetown returned application/pdf with no login.",
-    "notes": "1983 is the form's default start date, read as the start of the typed index. Repo: date window ignored here, name lookup only."
+    "notes": "1983 is the form's default start date, read as the start of the typed index. Repo: date window ignored here, name lookup only. 2026-10-09 (top80 register group): SC marriage licenses are issued by the county probate court, not the register; this register's name search has no marriage instrument type, and the probate site (southcarolinaprobate.net) answers a plain request with HTTP 403 (checked 2026-10-09), so marriage_license is a person's lane.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "Berkeley County Probate Court; county site (berkeleycountysc.gov) answered a Cloudflare 'Just a moment...' challenge (403) on 2026-10-07. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
@@ -5022,14 +5040,17 @@
     "platform": "Charleston County ROD document search (county-built pages on charlestoncounty.gov) plus Day Book and Archival Room",
     "url": "https://www.charlestoncounty.gov/departments/rod/rodsearch.php",
     "free_name_search": "yes",
-    "access": "disclaimer_click",
+    "access": "captcha",
     "index_online_back_to_year": 1978,
     "images_free": "yes",
     "legal_description_in_index": "unknown",
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: opened the ROD Name/Date search: checkbox 'I have read and I agree to the terms in the legal disclaimer'; table states Deed/Mortgage Index Data 1978 thru 10/06/26, image record dates 10/1994 thru 10/06/26, plat images, liens from 1999; search by name, type, book/page, tracer, Parcel ID (PID). Help & FAQs says copies can be downloaded from the web site at no cost and older records need microfilm at the office. Archive page: RMC record books 1719-1960 are being digitized and put online. County legal disclaimer has no automation clause. No search was run.",
-    "notes": "Archival Room also lists old deed, mortgage, plat and probate (heir/deceased) indexes. Images are free downloads per the county FAQ (1994/1997 onward)."
+    "notes": "Archival Room also lists old deed, mortgage, plat and probate (heir/deceased) indexes. Images are free downloads per the county FAQ (1994/1997 onward). 2026-10-09 (top80 register group): SC marriage licenses are issued by the county probate court, not the register; this register's name search has no marriage instrument type, and the probate site (southcarolinaprobate.net) answers a plain request with HTTP 403 (checked 2026-10-09), so marriage_license is a person's lane. 2026-10-09: wall recorded: the name/date search results hand off to the county's document viewer, which loads reCAPTCHA (checked 2026-10-07 in sc_rod_platform_clusters.md, the owner manual lists it as a person's lane); not passed by a script.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "Charleston Probate Court publishes estates and wills on southcarolinaprobate.net/charlestonprobatesearch (linked from the county's online-services page as 'Estates and Wills Search'). southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
@@ -5259,7 +5280,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: opened search.colletondeeds.com (disclaimer) and NameSearch.php?Accept=Accept: 'Verified Through' today, start-date field defaults to 08/01/1986, PLATS instrument group, property-description search. Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07). Platform check 2026-10-07: index rows link view_image.php?...&type=pdf|tif with no cart/fee/login text (Abbeville test search); one such link on Georgetown returned application/pdf with no login.",
-    "notes": "1986 is the form's default start date, read as the start of the typed index. Repo: date window ignored here, name lookup only."
+    "notes": "1986 is the form's default start date, read as the start of the typed index. Repo: date window ignored here, name lookup only. 2026-10-09 (top80 register group): SC marriage licenses are issued by the county probate court, not the register; this register's name search has no marriage instrument type, and the probate site (southcarolinaprobate.net) answers a plain request with HTTP 403 (checked 2026-10-09), so marriage_license is a person's lane.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "Colleton County Probate Court. Colleton is in the southcarolinaprobate.net dropdown and the repo queries it every run, but it returned no cases (court does not feed the site). southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
@@ -5397,7 +5421,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: opened search.dorchesterdeeds.com (disclaimer) and NameSearch.php?Accept=Accept ('Verified Through' today, PLATS group, property-description search; no default start date, so the index start year is not shown). Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07). Platform check 2026-10-07: index rows link view_image.php?...&type=pdf|tif with no cart/fee/login text (Abbeville test search); one such link on Georgetown returned application/pdf with no login.",
-    "notes": "Repo: date window ignored here (returns head of index), name lookup only."
+    "notes": "Repo: date window ignored here (returns head of index), name lookup only. 2026-10-09 (top80 register group): SC marriage licenses are issued by the county probate court, not the register; this register's name search has no marriage instrument type, and the probate site (southcarolinaprobate.net) answers a plain request with HTTP 403 (checked 2026-10-09), so marriage_license is a person's lane.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "Dorchester Probate publishes to southcarolinaprobate.net (repo sc_probate_net.py reads 'Dorchester Probate' and 'Dorchester Marriage'; about 20 hits for one surname in the 2026-10-02 probe). Per repo, document links there open a paid viewer. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
@@ -5535,7 +5562,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: opened search.florencedeeds.com (disclaimer) and NameSearch.php?Accept=Accept ('Verified Through' today, PLATS group, property-description search, no default start date) and oldIndexes/oldindexsearch.php: scanned index books 1889-1937, 1928-1937, 1938-1962, 1963-1973, 1974-1983 (deeds), mortgage books 1938-1983, plat index 1889-2003, viewed by book and page number. Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07). Platform check 2026-10-07: index rows link view_image.php?...&type=pdf|tif with no cart/fee/login text (Abbeville test search); one such link on Georgetown returned application/pdf with no login.",
-    "notes": "1889 is the start of the scanned index-book pages (browse by page, not a typed search); typed index start year not shown. The county Clerk of Court also runs a free 'Public Records Inquiry' by Map/Block/Parcel (web.florenceco.org/cgi-bin/coc/mbp.cgi), linked from GIS as PROPERTYHISTORY; landing opened, no parcel queried. Repo: date window ignored here."
+    "notes": "1889 is the start of the scanned index-book pages (browse by page, not a typed search); typed index start year not shown. The county Clerk of Court also runs a free 'Public Records Inquiry' by Map/Block/Parcel (web.florenceco.org/cgi-bin/coc/mbp.cgi), linked from GIS as PROPERTYHISTORY; landing opened, no parcel queried. Repo: date window ignored here.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "Florence County Probate Court FAQ says 'You can view our records online' and links southcarolinaprobate.net/search; estates before 2018 by email request. The repo's 2026-10-02 probe of 'Florence' there returned no cases for one surname. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
@@ -5581,7 +5611,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: opened georgetowndeeds.com (disclaimer) and NameSearch.php?Accept=Accept: 'Verified Through' today, start-date field defaults to 01/01/1977, PLATS group, property-description search. Ran one SMITH 2024 test search: rows give Date, Book-Page, Type, Grantor, Grantee, Description (short 'PD:' property note), Amount, Image; one view_image.php link returned application/pdf with no login. Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07).",
-    "notes": "1977 is the form's default start date. Repo: Georgetown honours the date window (bulk date-range reads possible). Removed from the Avenu sclandrecords picker (commented out)."
+    "notes": "1977 is the form's default start date. Repo: Georgetown honours the date window (bulk date-range reads possible). Removed from the Avenu sclandrecords picker (commented out). 2026-10-09 (top80 register group): SC marriage licenses are issued by the county probate court, not the register; this register's name search has no marriage instrument type, and the probate site (southcarolinaprobate.net) answers a plain request with HTTP 403 (checked 2026-10-09), so marriage_license is a person's lane.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "Georgetown County Probate Court. Georgetown is in the southcarolinaprobate.net dropdown and the repo queries it every run, but it returned no cases. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
@@ -5903,7 +5936,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: lancastercountysc.gov/403/Land-Records-Search links lancasterscdeeds.com (and the paid TitleSearcher). Landing is a disclaimer (accuracy and anti-tampering text, no automation language) whose Accept is a plain GET to NameSearch.php?Accept=Accept. That page loaded with no CAPTCHA: 'Instruments Verified Through: October 7, 2026', name search with date range, Book-Page search, and a Property Description search (subdivision/lot/block/section/map/phase/unit). Book types include DEED, MORTGAGE, PLAT, LIS PENDENS, JUDGMENTS, TAX LIENS, MECHANICS LIENS and 'INDEX BOOKS'. No search run.",
-    "notes": "The registry's CAPTCHA flag came from a reCAPTCHA elsewhere, not this search. 'INDEX BOOKS' as a book type suggests scanned old index books are online, which may reach well before the computer index; start year not stated."
+    "notes": "The registry's CAPTCHA flag came from a reCAPTCHA elsewhere, not this search. 'INDEX BOOKS' as a book type suggests scanned old index books are online, which may reach well before the computer index; start year not stated.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "southcarolinaprobate.net: the county Probate Court page's 'Public Records Search' link points there and Lancaster is in its dropdown, but the repo's 2026-10-02 probe returned 'no records' for a common surname, so the court does not appear to feed it.",
@@ -5949,7 +5985,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: laurensdeeds.com (info site; its reCAPTCHA belongs to a contact form) links search.laurensdeeds.com. Disclaimer (accuracy-only) posts to NameSearch.php?Accept=Accept; that GET loaded with no CAPTCHA, 'Instruments Verified Through: October 6, 2026', a Property Description search, and book types DEED BOOK, MORTGAGE BOOK, SMALL PLAT BOOK, LARGE PLAT CABINET, LIS PENDENS, MECHANICS LIENS, JUDGEMENTS, SC and FEDERAL LIENS. Images marked free in the repo's rod/doc_images.py audit; not re-opened today. No search run.",
-    "notes": "Name required; no name-less date sweep (per rod/logan.py). Instrument list includes DEED OF DISTRIBUTION, useful for heirs. Earliest index year not stated."
+    "notes": "Name required; no name-less date sweep (per rod/logan.py). Instrument list includes DEED OF DISTRIBUTION, useful for heirs. Earliest index year not stated.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "Laurens County Probate Court (county site). Its page offers estate information and 'Request Public Records' only; no online case index is linked. A Spartan Technology public probate app also answers at scportal.hostedbyspartan.com/LaurensPublicPortal/ (same shell as Greenwood's), found by probing the vendor host, not via a county link; contents not opened. Not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read.",
@@ -6685,7 +6724,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: search.yorkdeeds.com is a disclaimer (accuracy/anti-tampering text, no automation language); a plain GET of NameSearch.php?Accept=Accept loaded (497 KB) with no CAPTCHA, 'Instruments Verified Through: October 7, 2026', Property Description search (subdivision/lot/unit) and book codes RECORD BOOK, DEEDS, MORTGAGES, PLATS, TAX LIENS INDEX, SPECIALS, MISCELLANEOUS. 'Old Index Books' and 'Non-Indexed Plats' panels exist only as HTML comments (switched off). No search run.",
-    "notes": "Repo's enrichment_rod_name_index.py already reads this host by owner name (index rows carry an Amount column). Start year not stated; date-window behaviour undetermined per repo."
+    "notes": "Repo's enrichment_rod_name_index.py already reads this host by owner name (index rows carry an Amount column). Start year not stated; date-window behaviour undetermined per repo.",
+    "column_access": {
+     "marriage_license": "blocked"
+    }
    },
    "probate": {
     "system": "southcarolinaprobate.net participant: the repo's 2026-10-02 probe returned real York Probate hits; per-case docket rows link to a PAID document viewer (repo sc_probate_net.py).",

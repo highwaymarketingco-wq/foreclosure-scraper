@@ -284,7 +284,8 @@ async def enrich_generic_rod(listings: list[Listing]) -> dict:
 
     stats = {"counties": 0, "targets": 0, "searched": 0,
              "with_instruments": 0, "with_mortgage": 0, "with_adverse": 0,
-             "disabled_counties": 0, "budget_exhausted": False, "chain_share_capped": 0}
+             "disabled_counties": 0, "budget_exhausted": False, "chain_share_capped": 0,
+             "screened_none_found": 0}
     budget_s = _env_float("FORECLOSURE_GENERIC_ROD_BUDGET_S", 840.0)
     county_conc = max(1, _env_int("GENERIC_ROD_COUNTY_CONCURRENCY", 8))
     chain_share = max(0, _env_int("GENERIC_ROD_MAX_PER_CHAIN_COUNTY", 10))
@@ -321,6 +322,7 @@ async def enrich_generic_rod(listings: list[Listing]) -> dict:
             log.warning("generic_rod.no_search_by_name", county=county, module=module_name)
             return
         search_fn = mod.search_by_name
+        status_fn = getattr(mod, "search_by_name_status", None)
 
         # imminent leads first, then leads never read before, then the rest (board order kept)
         targets = sorted(targets, key=lambda li: (not imminent(li, now),
@@ -351,20 +353,34 @@ async def enrich_generic_rod(listings: list[Listing]) -> dict:
                 async with sem:
                     if _out_of_time():
                         return
+                    status, truncated = None, False
                     try:
-                        docs = await search_fn(state, county, owner, max_docs=80)
+                        if status_fn is not None:
+                            docs, status, truncated = await status_fn(state, county, owner, max_docs=80)
+                        else:
+                            docs = await search_fn(state, county, owner, max_docs=80)
                     except Exception as exc:
                         log.debug("generic_rod.search_fail", county=county,
                                   owner=li.owner_name[:40], error=str(exc)[:80])
-                        docs = []
+                        docs, status = [], "error"
                     stats["searched"] += 1
 
-                if not docs:
-                    return  # fetch failed -> leave unstamped, retry next run
-
-                mine = [d for d in docs if _owner_doc(d, last, first)]
+                mine = [d for d in docs if _owner_doc(d, last, first)] if docs else []
                 if not mine:
-                    return
+                    # 2026-10-09 (top80 register group): a module that reports its status lets a clean
+                    # "searched, nothing indexed under this name" be recorded as a checked negative
+                    # (raw['rod'] with instrument_count 0 and screened_none_found, the same shape as
+                    # enrichment_nc_rod_render's clean no-match). Walls, caps, errors, an unparsable
+                    # name and a truncated pick list stay unstamped and are retried next run.
+                    if status == "ok" and not truncated:
+                        summ = dict(_EMPTY)
+                        summ.update({"fetched_at": now.isoformat(), "screened_none_found": True,
+                                     "platform": module_name})
+                        if not isinstance(li.raw, dict):
+                            li.raw = {}
+                        li.raw["rod"] = summ
+                        stats["screened_none_found"] += 1
+                    return  # fetch failed (or screened and stamped above)
 
                 summ = classify_rod_docs(mine, "generic_rod") if mine else dict(_EMPTY)
                 summ["fetched_at"] = now.isoformat()

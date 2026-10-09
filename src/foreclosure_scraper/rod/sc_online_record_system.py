@@ -41,7 +41,7 @@ from typing import Optional
 from bs4 import BeautifulSoup
 
 from .models import RodDoc
-from .sc_chain import Docs, NameQuery, Searcher, name_fit, run_chain, run_search
+from .sc_chain import Docs, NameQuery, Searcher, name_fit, run_chain, run_search, run_search_status
 from .sc_polite import PoliteSession
 
 PLATFORM = "sc_online_record_system"
@@ -324,3 +324,13 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 50)
     """Every instrument naming `name` as grantor or grantee (newest first): the shared
     enrichment_generic_rod interface."""
     return await asyncio.to_thread(_search_sync, state, county, name, max_docs)
+
+
+async def search_by_name_status(state: str, county: str, name: str, max_docs: int = 50) -> tuple[list[RodDoc], str, bool]:
+    """search_by_name plus why it may be empty: (docs, status, truncated), status ok | walled | capped |
+    error | noname. Status ok with no docs is a checked "nothing indexed under that name"."""
+    if _cfg(state, county) is None:
+        return [], "error", False
+    return await asyncio.to_thread(
+        lambda: run_search_status(platform=PLATFORM, state="SC", county=county.strip().title(), name=name,
+                                  make_searcher=lambda: make_searcher(state, county), max_docs=max_docs))

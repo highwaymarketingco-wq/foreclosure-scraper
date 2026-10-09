@@ -39,7 +39,58 @@ def _empty(source: str) -> dict:
             "instruments": [], "source": source}
 
 
+async def enrich_marriage_render(listings: Iterable[Listing], *, t0: float, budget_s: float) -> dict:
+    """raw['marriage_license'] for the Harris counties (Mecklenburg, Carteret): the register's own Marriage
+    index, same guest browser session as the real-estate search (rod/nc_harris.marriage_search). OFF unless
+    FORECLOSURE_NC_HARRIS_MARRIAGE=1 AND the Harris platform flag is on. Persons only; a lead that already
+    carries raw['marriage_license'] is skipped; a clean "no licence under this name" is stamped
+    {status: no_match, checked_at}; walls, caps, errors and a result page longer than the rows read (the
+    owner may be on page 2) stay unstamped."""
+    from .rod import nc_harris
+    out = {"marriage_targets": 0, "marriage_searched": 0, "marriage_found": 0, "marriage_no_match": 0}
+    if os.environ.get(nc_harris.MARRIAGE_FLAG, "0") != "1":
+        return out
+    now = datetime.now(timezone.utc)
+    by_county: dict[str, list[Listing]] = {}
+    for li in listings:
+        key = ((li.state or "").upper(), (li.county or "").strip())
+        entry = RENDER_ROD_CONFIG.get(key)
+        if entry is None or entry[0] != "nc_harris" or not platform_enabled(entry):
+            continue
+        if isinstance(li.raw, dict) and li.raw.get("marriage_license"):
+            continue
+        who = parse_owner(li.owner_name or "")
+        if who is None or who.entity:
+            continue
+        by_county.setdefault(key[1], []).append(li)
+    for county, targets in sorted(by_county.items()):
+        targets.sort(key=lambda li: not imminent(li, now))
+        for li in targets:
+            if time.monotonic() - t0 > budget_s:
+                return out
+            who = parse_owner(li.owner_name)
+            out["marriage_targets"] += 1
+            res = await asyncio.to_thread(nc_harris.marriage_search, county, who)
+            out["marriage_searched"] += 1
+            if res.status in ("walled", "capped"):
+                break
+            if res.status != "ok":
+                continue
+            hit = nc_harris.marriage_license_from(res.rows, who, county)
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            if hit:
+                li.raw["marriage_license"] = hit
+                out["marriage_found"] += 1
+            elif res.found is not None and res.found <= len(res.rows):
+                li.raw["marriage_license"] = {"status": "no_match", "checked_at": now.isoformat(),
+                                              "source": "harris_marriage_index"}
+                out["marriage_no_match"] += 1
+    return out
+
+
 async def enrich_nc_rod_render(listings: Iterable[Listing]) -> dict:
+    listings = list(listings)
     budget_s = float(os.environ.get("FORECLOSURE_NC_ROD_RENDER_BUDGET_S", "3600"))
     t0 = time.monotonic()
     now = datetime.now(timezone.utc)
@@ -102,6 +153,7 @@ async def enrich_nc_rod_render(listings: Iterable[Listing]) -> dict:
                 stats["with_adverse"] += bool(summ.get("has_adverse_lien"))
         if stats["budget_exhausted"]:
             break
+    stats.update(await enrich_marriage_render(listings, t0=t0, budget_s=budget_s))
     log.info("nc_rod_render.done", **{k: v for k, v in stats.items() if not isinstance(v, list)},
              walled=stats["walled_counties"], capped=stats["capped_counties"])
     return stats
