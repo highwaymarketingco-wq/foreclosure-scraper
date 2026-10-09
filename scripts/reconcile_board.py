@@ -71,6 +71,8 @@ sys.path.insert(0, str(REPO / "scripts"))
 #: tests/test_reconcile_board.py fails when run_enrich_tail imports a step that is in neither this
 #: nor LOCAL_STEPS, so a new tail step must be classified before a reconcile can run it.
 NETWORK_STUBS: dict[tuple[str, str], str] = {
+    ("enrichment_onemap_sweeps", "enrich_onemap_sweeps"): "skip",     # NC OneMap statewide sweeps
+    ("enrichment_probate_spartan", "enrich_probate_spartan"): "skip",  # Spartanburg probate index
     ("enrichment_jail_bookings", "enrich_jail_bookings"): "skip",       # county jail rosters
     ("enrichment_nc_divorce", "enrich_nc_divorce"): "skip",
     ("enrichment_sc_divorce", "enrich_sc_divorce"): "skip",

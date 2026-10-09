@@ -824,6 +824,7 @@ DATELESS_OK_SOURCES = {
     # NCGS 105-369 tax-lien-ad / estate notices. Full body is CAPTCHA-gated so no
     # row carries a sale_date; without this entry _active_only drops all of them.
     "public_notices.nc_notices_counties",
+    "public_notices.nc_heir_notices",
     # Kania tax-foreclosure filings — filed, then await a scheduled sale date
     # (37 of 56 rows dateless on 2026-07-31).
     "law_firms.kania",
@@ -1933,6 +1934,15 @@ async def run() -> int:
                     note="proceeding; unenriched leads keep prior fields")
     except Exception:
         log.error("gis_attrs.failed", traceback=traceback.format_exc())
+
+    # County GIS deed book/page and legal-description fill (gis_fill; audit 2026-10-09, top-80 fill group).
+    try:
+        from .gis_fill import enrich_gis_fill
+        s = await _await_capped(enrich_gis_fill(enriched), "gis_fill",
+                                default_s=int(float(os.environ.get("FORECLOSURE_GIS_FILL_BUDGET_S", "2400")) + 180))
+        if s and "skipped" not in s: enrichment_stats["gis_fill"] = s
+    except Exception:
+        log.error("gis_fill.failed", traceback=traceback.format_exc())
 
     # Richland SC map-viewer reader (the county's parcel viewer shows owner mailing, value and sale facts
     # that no layer we read carries; its disclaimer is a click-through). Capped like every resolver phase.
@@ -3087,6 +3097,17 @@ async def run() -> int:
         if _rs and "skipped" not in _rs:
             enrichment_stats[_rod_name] = _rs
 
+    # County-wide register sweeps and name-index checks stamped as "screened, none found" (top-80 register group).
+    try:
+        from .enrichment_register_checks import enrich_register_checks
+        s = await _await_capped(
+            enrich_register_checks(enriched), "register_checks",
+            default_s=int(float(os.environ.get("FORECLOSURE_REGISTER_SWEEP_BUDGET_S", "1800"))
+                          + float(os.environ.get("FORECLOSURE_REGISTER_CHECKS_BUDGET_S", "900")) + 180))
+        if s and "skipped" not in s: enrichment_stats["register_checks"] = s
+    except Exception:
+        log.error("register_checks.failed", traceback=traceback.format_exc())
+
     # Register-of-deeds counties whose search only runs in a browser (Harris: Mecklenburg, Carteret;
     # Logan Blazor and Remote Access: Catawba, Cumberland, Union, Vance, Davie, Yadkin ...). Capped per
     # platform per run and by FORECLOSURE_NC_ROD_RENDER_BUDGET_S; every platform OFF until its env flag is 1.
@@ -3097,6 +3118,24 @@ async def run() -> int:
         if s and "skipped" not in s: enrichment_stats["nc_rod_render"] = s
     except Exception:
         log.error("nc_rod_render.failed", traceback=traceback.format_exc())
+
+    # Logan / Harris browser-register lien sweep (top-80), then the county-run CCHS / Kofile sweeps.
+    try:
+        from .enrichment_register_lien_sweep import enrich_register_lien_sweep
+        s = await _await_capped(
+            enrich_register_lien_sweep(enriched), "register_lien_sweep",
+            default_s=int(float(os.environ.get("FORECLOSURE_LIEN_SWEEP_BUDGET_S", "600")) + 180))
+        if s and "skipped" not in s: enrichment_stats["register_lien_sweep"] = s
+    except Exception:
+        log.error("register_lien_sweep.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_county_lien_sweep import enrich_county_lien_sweep
+        s = await _await_capped(
+            enrich_county_lien_sweep(enriched), "county_lien_sweep",
+            default_s=int(float(os.environ.get("FORECLOSURE_COUNTY_SWEEP_BUDGET_S", "900")) + 240))
+        if s and "skipped" not in s: enrichment_stats["county_lien_sweep"] = s
+    except Exception:
+        log.error("county_lien_sweep.failed", traceback=traceback.format_exc())
 
     # Deed chain per lead (last deed + up to 3 prior instruments, liens, substitutions of trustee) for the
     # counties whose register adapters expose chain(): the attorney's title-check input. Runs on its own
@@ -3419,6 +3458,14 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("rollback_exposure.failed", traceback=traceback.format_exc())
 
+    # NC OneMap statewide sweeps (never overwrites the tax relief / rollback dollar figures).
+    try:
+        from .enrichment_onemap_sweeps import enrich_onemap_sweeps
+        s = await _await_capped(enrich_onemap_sweeps(enriched), "onemap_sweeps", default_s=900)
+        if s and "skipped" not in s: enrichment_stats["onemap_sweeps"] = s
+    except Exception:
+        log.error("onemap_sweeps.failed", traceback=traceback.format_exc())
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from .enrichment_life_events import enrich_life_events
@@ -3426,6 +3473,16 @@ async def run_enrich_tail(st: TailState) -> dict:
         if s: enrichment_stats["life_events"] = s
     except Exception:
         log.error("life_events.failed", traceback=traceback.format_exc())
+
+    # Spartanburg probate estates (before court owner verify so death_signal_on_roll sees the wording).
+    try:
+        from .enrichment_probate_spartan import enrich_probate_spartan
+        s = await _await_capped(
+            enrich_probate_spartan(enriched), "probate_spartan",
+            default_s=int(float(os.environ.get("FORECLOSURE_PROBATE_SPARTAN_BUDGET_S", "1500")) + 180))
+        if s and "skipped" not in s: enrichment_stats["probate_spartan"] = s
+    except Exception:
+        log.error("probate_spartan.failed", traceback=traceback.format_exc())
 
     # Upset-bid window tagging (NCGS §45-21.27) — for every NC listing
     # whose sale_date is in the past 0-10 calendar days, attach
