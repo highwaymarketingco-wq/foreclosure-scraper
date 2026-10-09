@@ -211,28 +211,72 @@ def heirs_row(**raw):
 def test_lane_c_lists_the_missing_lawyer_items():
     b = CR.call_ready(heirs_row(), TODAY)
     assert b["lane"] == "C" and b["tier"] == "D"
-    assert b["lawyer"]["parcel"] == "ok" and b["lawyer"]["tax_checked"] == "2026-10-06"
-    for code in ("lawyer_legal_description", "lawyer_deed_chain", "lawyer_heirs", "lawyer_rod_checked",
-                 "lawyer_probate_checked", "lawyer_obituaries_checked"):
+    # sourced items carry the date they were read; the roll's legal description alone is not the deed's
+    assert b["lawyer"]["parcel"] == "2026-10-07" and b["lawyer"]["tax_checked"] == "2026-10-06"
+    for code in ("lawyer_legal_description", "lawyer_deed_chain", "lawyer_heirs", "lawyer_obituaries_checked"):
         assert code in b["unmet"]
+    # NC estate files sit behind a CAPTCHA: a person's item, not a script's
+    assert b["lawyer"]["probate_checked"] == "walled" and "lawyer_probate_checked_walled" in b["unmet"]
 
 
-def test_lane_c_complete_list_is_ready_to_mail_and_hand_to_the_attorney():
+def bound_chain(**kw):
+    c = {"state": "NC", "county": "Buncombe", "platform": "nc_cott_v4", "status": "ok",
+         "fetched_at": "2026-10-09T12:00:00+00:00", "source_url": "https://rod.example/search",
+         "last_deed": {"recorded": "2001-05-09", "book": "2210", "page": "301", "type": "DEED",
+                       "grantors": ["SELLER A"], "grantees": ["DOE JOHN ALLEN"],
+                       "description": "LOT 7 TEST HOLLOW SUBD"},
+         "prior_instruments": [{"recorded": "1987-03-02", "book": "1450", "page": "22", "type": "DEED"}],
+         "binding": {"status": "book_page", "parcel_last_sale": "2001-05-09"}}
+    c.update(kw)
+    return c
+
+
+def complete_heirs_row():
+    from foreclosure_scraper.lawyer_lane import stamp_deed_latest
     extra = {
-        "deed_chain": {"transfers": [{"date": "1987-03-02", "book": "1450", "page": "22", "source": "rod_docs"},
-                                     {"date": "2001-05-09", "book": "2210", "page": "301", "source": "rod_docs"}],
-                       "summary": {}},
+        "gis": {"owner": "DOE JOHN ALLEN HEIRS", "last_sale": {"date": "2001-05-09", "book": "2210", "page": "301"}},
+        "rod_chain": bound_chain(),
         "heir_candidates": [{"name": "Mary Doe", "relation": "daughter", "source_kind": "obituary_survivor",
                              "source_url": "https://news.example/obit", "source_date": "2024-02-01", "label": "candidate"}],
-        "rod_lookup": {"checked_at": "2026-10-01"},
     }
     r = heirs_row(**extra)
     r["raw"]["verification"].append({"signal": "probate_heir", "verdict": "confirmed", "checked_at": "2026-10-05T00:00:00Z",
                                      "verifier": "probate_heir_buncombe", "source": "rod.example",
                                      "evidence": {"transfer": {"chain": {"complete": True}}}})
+    # NC estate files are behind a CAPTCHA: the owner's dated search of the estate index
+    r["raw"]["probate_search"] = {"checked_at": "2026-10-06", "result": "none", "source": "owner: eCourts estates"}
+    stamp_deed_latest([r])
+    return r
+
+
+def test_lane_c_complete_list_is_ready_to_mail_and_hand_to_the_attorney():
+    r = complete_heirs_row()
+    assert r["raw"]["deed_latest"]["doc_id"] == "2210/301"
     b = CR.call_ready(r, TODAY)
     assert (b["lane"], b["tier"]) == ("C", "C"), b["unmet"]
-    assert all(v != "missing" for v in b["lawyer"].values())
+    assert all(CR.to_date(v) for v in b["lawyer"].values()), b["lawyer"]
+
+
+def test_lane_c_is_not_ready_on_an_unbound_chain_or_another_parcels_deed():
+    r = complete_heirs_row()
+    r["raw"]["rod_chain"]["binding"] = {"status": "name_only"}
+    r["raw"].pop("deed_latest")
+    from foreclosure_scraper.lawyer_lane import stamp_deed_latest
+    stamp_deed_latest([r])
+    b = CR.call_ready(r, TODAY)
+    assert "deed_latest" not in r["raw"] and b["tier"] == "D"
+    assert "lawyer_legal_description" in b["unmet"]
+    r2 = complete_heirs_row()
+    r2["raw"]["deed_latest"]["parcel_id"] = "1111-22-3333-00000"      # copied from another row
+    b2 = CR.call_ready(r2, TODAY)
+    assert b2["tier"] == "D" and "lawyer_legal_description" in b2["unmet"]
+
+
+def test_lane_c_deed_older_than_the_parcels_last_sale_is_stale():
+    r = complete_heirs_row()
+    r["raw"]["gis"]["last_sale"] = {"date": "2019-08-01"}      # the parcel sold after the chain's deed
+    b = CR.call_ready(r, TODAY)
+    assert b["tier"] == "D" and "lawyer_legal_description" in b["unmet"]
 
 
 def test_an_obituary_name_match_alone_is_never_an_owner_call():

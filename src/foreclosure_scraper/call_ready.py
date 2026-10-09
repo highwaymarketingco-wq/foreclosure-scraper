@@ -128,14 +128,19 @@ UNMET_WORDS = {
     "estate_status_unknown": "the probate notice is over a year old; check the clerk's index for the estate's status",
     "conveyed_after_death": "a deed recorded after the death suggests the estate already conveyed the property",
     "lawyer_parcel": "lawyer's list: parcel number missing",
-    "lawyer_legal_description": "lawyer's list: legal description or the latest deed's book and page missing",
-    "lawyer_deed_chain": "lawyer's list: deed chain missing (fewer than two recorded transfers)",
+    "lawyer_legal_description": "lawyer's list: the latest deed (bound to this parcel) and its legal description are not on the row",
+    "lawyer_deed_chain": "lawyer's list: no register chain with an earlier deed bound to this parcel",
     "lawyer_taxpayer": "lawyer's list: taxpayer of record not confirmed by the county roll or tax site",
     "lawyer_heirs": "lawyer's list: no heir candidate with a stated relation",
     "lawyer_rod_checked": "lawyer's list: register of deeds not checked",
     "lawyer_tax_checked": "lawyer's list: county tax site not checked",
     "lawyer_probate_checked": "lawyer's list: probate (estate files) not checked",
     "lawyer_obituaries_checked": "lawyer's list: obituaries not checked",
+    "lawyer_legal_description_walled": "lawyer's list: the latest deed's legal description is behind a wall (a person pulls the deed)",
+    "lawyer_deed_chain_walled": "lawyer's list: the deed chain is behind a wall (a person searches the register)",
+    "lawyer_rod_checked_walled": "lawyer's list: the register of deeds is not readable by a script (a person checks it)",
+    "lawyer_tax_checked_walled": "lawyer's list: the county tax site is not readable by a script (a person checks it)",
+    "lawyer_probate_checked_walled": "lawyer's list: the estate files are behind a CAPTCHA or login (a person checks them)",
     "outside_original_counties": "a foreclosure sale outside the 18 original counties (not a flip lead)",
     "sale_window_closed": "the sale date passed and no upset-bid window is open",
     "sale_date_missing": "no sale date and no upset-bid window on the row",
@@ -704,6 +709,11 @@ def other_issue_checks(raw: dict, today: date) -> list[dict]:
 # ---------------------------------------------------------------------------------------------
 
 def _latest_deed(raw: dict) -> Optional[dict]:
+    dl = raw.get("deed_latest")
+    if isinstance(dl, dict) and dl.get("recorded") and dl.get("bound"):
+        # the register's latest deed, bound to this parcel (lawyer_lane.stamp_deed_latest)
+        return {"date": _iso(to_date(dl.get("recorded"))), "book": dl.get("book"), "page": dl.get("page"),
+                "doc_id": dl.get("doc_id")}
     dc = raw.get("deed_chain")
     tr = dc.get("transfers") if isinstance(dc, dict) else None
     best = None
@@ -736,59 +746,14 @@ def conveyed_after_death(raw: dict, death: dict) -> bool:
 
 
 def lawyer_list(row: Any, tax: dict, death: dict, estate: dict) -> dict:
-    """The attorney's intake list, each item 'ok' / 'missing' / a check date / 'n/a'."""
-    from .block_binding import row_owner_strength
-    from .tax_binding import norm_id, usable_id
-    raw = _raw(row)
-    out: dict = {}
-    pid = _g(row, "parcel_id")
-    out["parcel"] = "ok" if pid and usable_id(norm_id(pid)) else "missing"
-    deed = _latest_deed(raw)
-    out["legal_description"] = "ok" if (str(_g(row, "legal_description") or "").strip() and deed) else "missing"
-    dc = raw.get("deed_chain")
-    # a transfer counts when it is a recorded instrument: it carries a date or a book / instrument number
-    n_tr = sum(1 for t in (dc.get("transfers") or []) if isinstance(t, dict)
-               and (to_date(t.get("date")) or t.get("book") or t.get("instrument"))) \
-        if isinstance(dc, dict) and isinstance(dc.get("transfers"), list) else 0
-    ph = record(raw, "probate_heir")
-    chain_done = bool(((((ph or {}).get("evidence") or {}).get("transfer") or {}).get("chain") or {}).get("complete"))
-    out["deed_chain"] = "ok" if (n_tr >= 2 or chain_done) else "missing"
-    try:
-        strength = row_owner_strength(row)
-    except Exception:  # noqa: BLE001
-        strength = "none"
-    owner_ok = strength == "roll" or (tax.get("verdict") in ("confirmed", "stale", "refuted")
-                                       and str(((record(raw, "tax_lien") or {}).get("evidence") or {}).get("owner_match") or "") == "same")
-    out["taxpayer"] = "ok" if (str(_g(row, "owner_name") or "").strip() and owner_ok) else "missing"
-    if death.get("record") or death.get("weak"):
-        out["heirs"] = "ok" if (estate.get("heirs") or estate.get("pr")) else "missing"
-    else:
+    """The attorney's intake list (lawyer_lane.items), published as {item: the ISO date it was
+    sourced | 'missing' | 'walled' | 'n/a'}. An item counts only when a record on the row supplies
+    it AND dates it (audit 2026-10-09, lawyer_lane): the latest deed's legal description comes from
+    raw['deed_latest'] (a register chain bound to this parcel), never from the roll alone."""
+    from .lawyer_lane import items, published
+    out = published(items(row))
+    if not (death.get("record") or death.get("weak")):
         out["heirs"] = "n/a"
-    rod_dates = [to_date((record(raw, s) or {}).get("checked_at")) for s in ("probate_heir", "foreclosure_rod")]
-    rl = raw.get("rod_lookup")
-    if isinstance(rl, dict):
-        rod_dates.append(to_date(rl.get("looked_up_at") or rl.get("checked_at") or rl.get("as_of")
-                                 or rl.get("fetched_at")))
-    rod_dates = [d for d in rod_dates if d]
-    out["rod_checked"] = _iso(max(rod_dates)) if rod_dates else "missing"
-    out["tax_checked"] = tax.get("checked_on") or "missing"
-    prob = []
-    if ph:
-        prob.append(to_date(ph.get("checked_at")))
-    if "probate_record" in death.get("record", []) or "sc_probate_notice" in death.get("record", []):
-        prob.append(to_date(_g(row, "first_seen")))
-    prob = [d for d in prob if d]
-    out["probate_checked"] = _iso(max(prob)) if prob else "missing"
-    obit = []
-    ob = raw.get("obituary")
-    if isinstance(ob, dict):
-        obit.append(to_date(ob.get("pub_date") or ob.get("title_date")))
-    hc = raw.get("heir_candidates")
-    if isinstance(hc, list):
-        obit += [to_date(c.get("source_date")) for c in hc
-                 if isinstance(c, dict) and c.get("source_kind") == "obituary_survivor"]
-    obit = [d for d in obit if d]
-    out["obituaries_checked"] = _iso(max(obit)) if obit else "missing"
     return out
 
 
@@ -799,7 +764,14 @@ _LAWYER_UNMET = {"parcel": "lawyer_parcel", "legal_description": "lawyer_legal_d
 
 
 def lawyer_unmet(ll: dict) -> list[str]:
-    return [_LAWYER_UNMET[k] for k, v in ll.items() if v == "missing" and k in _LAWYER_UNMET]
+    """One code per item not sourced and dated: lawyer_<item> (a script can supply it, has not)
+    or lawyer_<item>_walled (a person has to pull it)."""
+    out = []
+    for k, v in ll.items():
+        if k not in _LAWYER_UNMET or v == "n/a" or to_date(v):
+            continue
+        out.append(_LAWYER_UNMET[k] + ("_walled" if v == "walled" else ""))
+    return out
 
 
 # ---------------------------------------------------------------------------------------------

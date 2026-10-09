@@ -351,7 +351,8 @@ def run(path: Optional[Path], today: date, attach: bool, keep_rows: bool, ledger
                     if lane == "A" and hard[0] == "tax_check_missing":
                         only_by_county[f"{row.get('state')}:{row.get('county')}:{blk.get('phone')}"] += 1
             if lane == "C":
-                lawyer_combo[",".join(k for k, v in (blk.get("lawyer") or {}).items() if v == "missing") or "complete"] += 1
+                lawyer_combo[",".join(k + ("(walled)" if v == "walled" else "") for k, v in (blk.get("lawyer") or {}).items()
+                                     if v in ("missing", "walled")) or "complete"] += 1
         if keep_rows and lane in ("A", "B"):
             k = property_key(row)
             score = (TIER_ORDER.get(tier, 9), -(blk.get("rank") or 0))

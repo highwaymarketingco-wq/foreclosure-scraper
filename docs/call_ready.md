@@ -63,14 +63,22 @@ call_rank, call_reason, call_unmet, call_checked_on`. Rows published before the 
 
 ## The attorney's intake list (lanes B and C)
 
-| Item | Sourced on the board when | Gap |
+`src/foreclosure_scraper/lawyer_lane.py` (audit 2026-10-09, docs/audit_2026-10-09/lawyer_lane.md). Each item
+is published as the ISO date it was sourced, or `missing` (a script could supply it and has not), `walled`
+(a person has to pull it) or `n/a`. A lane C lead is ready only when every item is sourced AND dated.
+
+| Item | Sourced and dated when | Gap |
 |---|---|---|
-| parcel number | a usable parcel id on the row | address-only rows |
-| legal description + the latest deed | the row's legal description (county roll) and the latest deed's book / page (deed chain, the county layer's vesting deed, or the GIS last sale) | the deed's own text is read live by `scripts/quiet_title_intake.py`, not stored on the board |
-| deed chain | two or more recorded transfers in `raw.deed_chain`, or a complete chain read by the probate_heir checker | most counties: GIS last sale only |
-| taxpayer of record | the county roll owner agrees with the row's owner, or the tax site check matched the owner | |
-| possible heirs | a personal representative or an heir candidate with a publishable relation | no free heir source outside obituaries and probate notices |
-| records checked: register of deeds / tax / probate / obituaries | a dated check of each: the probate_heir or foreclosure_rod checker or an ROD lookup; the tax_lien check; the probate_heir check or a probate record; an obituary or an obituary-survivor heir candidate | NC estate files are behind a CAPTCHA (a person checks them); an obituary search that found nothing leaves no dated record |
+| parcel number | a usable parcel id on the row (dated by the row's last sighting) | address-only rows |
+| legal description off the latest deed | `raw.deed_latest`: the latest deed from a register chain BOUND to this parcel (the county parcel record cites its book/page, or it was recorded within 31 days of the parcel's last sale), with the register index's description, dated when the register was read | the full metes-and-bounds text is only on the deed image (paywalled or bot-checked; a person pulls it); a chain found by name only is never used |
+| deed chain | a bound register chain with an earlier conveyance, or the death-index/deeds check's complete chain | counties with no register adapter |
+| taxpayer of record | the tax site check matched the owner, or the county roll on the row agrees with the owner | |
+| possible heirs | a personal representative, or an heir candidate with a publishable relation and a dated source | no free heir source outside obituaries and probate notices |
+| records checked: register / tax / probate / obituaries | a dated register read (chain, name index, death-index check); the tax_lien check; a probate record or notice, or a dated estate-index search (`raw.probate_search`); an obituary, a survivor list, or a dated search that found none (`raw.obituary_search`) | NC estate files are behind a CAPTCHA (`walled`: the owner searches eCourts); per-lead obituary lookups are off by the owner's decision |
+
+`scripts/lawyer_packages.py` merges the board, the live intake sheet (`scripts/quiet_title_intake.py`) and
+what the owner pulled by hand (`~/Desktop/Call_Sheets/lawyer/owner_inputs/<PIN>/items.json`, walls register
+card `lawyer_owner_pulls`) and writes the package for every lead that is then complete.
 
 ## Ranking (Fullmer: order, never a filter)
 

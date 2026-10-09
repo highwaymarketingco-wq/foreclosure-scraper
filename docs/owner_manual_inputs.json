@@ -1,9 +1,9 @@
 {
- "generated": "2026-10-08 20:27 EDT",
- "commit": "5f99e0e3",
+ "generated": "2026-10-09 11:39 EDT",
+ "commit": "ab4eb4b5",
  "fingerprint": {
   "inputs": {
-   "docs/walls_register.json": "59b023bf9f440e24",
+   "docs/walls_register.json": "b74f0b954fb823d0",
    "docs/county_records/county_records_matrix.json": "3ff143d0ce5ff97b",
    "docs/county_records/nc_rod_platform_clusters.md": "aa876f9499cade01",
    "docs/county_records/sc_rod_platform_clusters.md": "a1031bf224f1ac1c",
@@ -11,7 +11,8 @@
    "docs/new_sources_2026-10-07_distress.json": "7572dfc70ff761f3",
    "docs/new_sources_2026-10-07_liens_courts.json": "78c80420b0cb1aa0",
    "docs/gap_matrix/gap_matrix_2026-10-07.json": "321e8b5f9780fb4d",
-   "docs/gap_matrix/county_signal_coverage_2026-10-07.csv": "827ec579e85aa18f"
+   "docs/gap_matrix/gap_matrix_2026-10-09.json": "a20f3554f4355869",
+   "docs/gap_matrix/county_signal_coverage_2026-10-09.csv": "73150d44a9efe2a4"
   },
   "adapters": [
    "NC|Alamance|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
@@ -131,8 +132,8 @@
  "inputs": [
   {
    "path": "docs/walls_register.json",
-   "sha": "59b023bf9f440e24",
-   "date": "2026-10-08"
+   "sha": "b74f0b954fb823d0",
+   "date": "2026-10-09 11:39 (file time)"
   },
   {
    "path": "docs/county_records/county_records_matrix.json",
@@ -170,13 +171,18 @@
    "date": "2026-10-07"
   },
   {
-   "path": "docs/gap_matrix/county_signal_coverage_2026-10-07.csv",
-   "sha": "827ec579e85aa18f",
-   "date": "2026-10-07"
+   "path": "docs/gap_matrix/gap_matrix_2026-10-09.json",
+   "sha": "a20f3554f4355869",
+   "date": "2026-10-09"
+  },
+  {
+   "path": "docs/gap_matrix/county_signal_coverage_2026-10-09.csv",
+   "sha": "73150d44a9efe2a4",
+   "date": "2026-10-09"
   }
  ],
  "run_meta": {
-  "source": "https://highwaymarketingco-wq.github.io/foreclosure-scraper/run_meta.json",
+  "source": "docs/run_meta.json (local copy)",
   "run_time": "2026-10-07T17:09:03.605738Z"
  }
 }

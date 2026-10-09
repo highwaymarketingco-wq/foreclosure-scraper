@@ -12,6 +12,10 @@ SWITCHES (all OFF by default)
   FORECLOSURE_ROD_CHAIN_REFRESH_DAYS / _REFRESH_HOT_DAYS   re-read after 30 / 7 days
   NC_ROD_MAX_LOOKUPS_PER_COUNTY    the adapters' per-run cap (default 30 name searches per county;
                                    a chain spends 1 + one per link walked)
+  FORECLOSURE_COUNTY_DEED_REF      (default 1) for a chain whose row has no county deed book/page,
+                                   read the parcel's deed reference from NC OneMap (SC: the
+                                   county's own parcel layer, six counties) first
+                                   (county_deed_ref.py, one request, 2 s apart) so it can be bound
   FORECLOSURE_ROD_CHAIN_BUDGET_S   wall-clock budget for the pass (default 1800): no new lead is
                                    started after it; leads not reached stay unstamped for next run
 
@@ -37,6 +41,10 @@ from the lead's OWN parcel record (raw['gis']['last_sale'] date, the county's la
                   newer than 180 days can postdate the parcel record and is not judged): the
                   status becomes 'unbound', so nothing that reads status 'ok' takes it as the
                   lead's chain;
+  book_page       (audit 2026-10-09, lawyer_lane) the county parcel record on the row cites the
+                  chain's last deed by book and page (raw['gis']['last_sale'] book/page): this
+                  parcel's deed. A different book/page recorded on the parcel's sale date is a
+                  same-day deed for another parcel: name_only, reason book_page_differs;
   name_only       no parcel sale date to judge by, or the owner conveyed a deed after the chain's
                   last deed (rod/nc_chain.py conveyed_out_since: this parcel or another one was
                   sold): a candidate found by name, not confirmed.
@@ -120,16 +128,44 @@ def _iso_day(v) -> tuple[date | None, bool]:
     return d, (d.month == 1 and d.day == 1)
 
 
+def _needs_deed_ref(li: Listing, state: str, now: datetime) -> bool:
+    """An NC lead (or an SC lead in a county_deed_ref.SC_LAYERS county) with a parcel id whose row has
+    no county deed book/page and no
+    raw['county_deed_ref'] read in the last 30 days (FORECLOSURE_COUNTY_DEED_REF=0 turns it off)."""
+    from .county_deed_ref import SC_LAYERS
+    if os.environ.get("FORECLOSURE_COUNTY_DEED_REF", "1") != "1" or not li.parcel_id \
+            or not (state == "NC" or (state == "SC" and str(li.county or "").strip().title() in SC_LAYERS)):
+        return False
+    from .lawyer_lane import county_deed_ref
+    ref = county_deed_ref(li)
+    if ref.get("book") and ref.get("page"):
+        return False
+    cdr = (li.raw or {}).get("county_deed_ref") if isinstance(li.raw, dict) else None
+    if isinstance(cdr, dict):
+        d, _ = _iso_day(cdr.get("fetched_at"))
+        if d and (now.date() - d).days < 30:
+            return False
+    return True
+
+
 def bind_chain(li: Listing, res: dict, now: datetime | None = None) -> dict:
     """How the chain's last deed ties to the lead's own parcel record (see BINDING above)."""
     now = now or datetime.now(timezone.utc)
     ld = res.get("last_deed") if isinstance(res.get("last_deed"), dict) else {}
     rec, _ = _iso_day(ld.get("recorded"))
-    raw = li.raw if isinstance(li.raw, dict) else {}
-    gis = raw.get("gis") if isinstance(raw.get("gis"), dict) else {}
-    ls = gis.get("last_sale") if isinstance(gis.get("last_sale"), dict) else {}
+    # the county record's last sale: raw['gis']['last_sale'], completed by raw['county_deed_ref']
+    # (the parcel layer's own deed reference, county_deed_ref.py) where the row lacks one
+    from .lawyer_lane import county_deed_ref, same_book_page
+    ls = county_deed_ref(li)
     sale, year_only = _iso_day(ls.get("date"))
     sold_since = [d.get("recorded") for d in (res.get("conveyed_out_since") or []) if isinstance(d, dict)]
+    # the county parcel record cites a deed book and page: the strongest tie (audit 2026-10-09,
+    # lawyer_lane). The same book/page is this parcel's deed whatever the dates say; a different
+    # one recorded on the parcel's sale date is a same-day deed for another parcel (not bound).
+    bp = same_book_page(ld.get("book"), ld.get("page"), ls.get("book"), ls.get("page"))
+    if bp is True and not sold_since:
+        return {"status": "book_page", "parcel_last_sale": ls.get("date") or None,
+                "deed_recorded": rec.isoformat() if rec else None}
     if rec is None or sale is None:
         b = {"status": "name_only", "parcel_last_sale": ls.get("date") or None}
         if sold_since:
@@ -144,11 +180,15 @@ def bind_chain(li: Listing, res: dict, now: datetime | None = None) -> dict:
             return {"status": "name_only", "reason": "owner_conveyed_since_last_deed", **out}
     if year_only:
         if rec.year == sale.year:
+            if bp is False:
+                return {"status": "name_only", "reason": "book_page_differs", **out}
             return {"status": "sale_date", "precision": "year", **out}
         gap = (rec.year - sale.year) * 365
     else:
         gap = (rec - sale).days
         if abs(gap) <= 31:
+            if bp is False:
+                return {"status": "name_only", "reason": "book_page_differs", **out}
             return {"status": "sale_date", "precision": "day", **out}
     if gap < 0:
         return {"status": "contradicted", "reason": "parcel_sold_after_chain_deed", **out}
@@ -227,17 +267,31 @@ async def enrich_rod_chain(listings: Iterable[Listing]) -> dict:
                     continue
                 if not isinstance(li.raw, dict):
                     li.raw = {}
+                if status in ("ok", "partial") and res.get("last_deed") and _needs_deed_ref(li, state, now):
+                    # the parcel layer's own deed reference, so the chain can be bound to the parcel
+                    from .county_deed_ref import fetch as fetch_deed_ref
+                    ref = await asyncio.to_thread(fetch_deed_ref, state, county, li.parcel_id)
+                    stats["county_deed_ref"] = stats.get("county_deed_ref", 0) + bool(ref)
+                    if ref:
+                        li.raw["county_deed_ref"] = ref
                 if status == "ok":
                     b = bind_chain(li, res, now)
                     res["binding"] = b
                     if b["status"] == "contradicted":
                         res["status"] = "unbound"
                         stats["unbound"] += 1
-                    elif b["status"] == "sale_date":
+                    elif b["status"] in ("sale_date", "book_page"):
                         stats["bound_sale_date"] += 1
                     else:
                         stats["name_only"] += 1
                 li.raw["rod_chain"] = res
+                # the attorney's latest deed (raw['deed_latest']) from a chain bound to the parcel;
+                # removes a stale or unbound one (lawyer_lane.stamp_deed_latest, no network)
+                try:
+                    from .lawyer_lane import stamp_deed_latest
+                    stats["deed_latest"] = stats.get("deed_latest", 0) + stamp_deed_latest([li], now)["deed_latest"]
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("rod_chain.deed_latest_failed", error=f"{type(exc).__name__}: {str(exc)[:120]}")
                 stats["stamped"] += 1
                 liens = res.get("liens") or {}
                 stats["with_last_deed"] += bool(res.get("last_deed"))

@@ -2602,6 +2602,42 @@
    "short": "City of Union",
    "loads": "small",
    "wall_class": "bot"
+  },
+  {
+   "id": "lawyer_owner_pulls",
+   "group": "county",
+   "place": "Every NC county; SC counties whose estate index is behind a login or block (lane C leads only)",
+   "name": "The attorney's quiet-title package: the estate search and the deed copy a script cannot get",
+   "kind": "A",
+   "wall": "NC estate files: the eCourts picture CAPTCHA (every county). SC estate indexes: blocked or login in most counties (Greenville and Greenwood are open; no reader is built yet). Deed images: paid carts in Buncombe, Polk, Gaston, Mecklenburg and others, bot checks elsewhere.",
+   "url": "https://portal-nc.tylertech.cloud/Portal/",
+   "what": "Stephen needs, per lead: the parcel, the legal description off the latest deed, the deed chain, the taxpayer, possible heirs and the records checked. The board fills the parcel, taxpayer, latest deed (book/page, index description, bound to the parcel) and chain where a register adapter reads the county. A lane C lead is complete only with a dated estate search (that no estate is open) and, for the full legal description, the deed copy. Those two are the owner's steps.",
+   "steps": [
+    "Open <b>~/Desktop/Call_Sheets/lawyer/&lt;date&gt;/lane_c_&lt;date&gt;.csv</b>. Start with the rows whose <b>open_items</b> is smallest; <b>who_must_act</b> says which items are yours.",
+    "Estate search (NC): open <b>https://portal-nc.tylertech.cloud/Portal/</b> in Chrome, Smart Search, type the owner's name as <b>LAST FIRST</b>, filter Location to the county and Case Type to Estate, Submit, answer the picture check yourself. Note whether an estate file exists (case number) or none.",
+    "Deed copy: in the CSV the latest deed's book/page is in the intake sheet (run the <b>intake_cmd</b> in the row if there is none). Buy or print that one deed image from the register (or read it at the register's public terminal), save it as a PDF.",
+    "Make the folder <b>~/Desktop/Call_Sheets/lawyer/owner_inputs/&lt;PIN&gt;/</b> (PIN = the parcel number, letters and digits only) and put the PDFs in it.",
+    "In the same folder save <b>items.json</b>, for example: {\"probate_checked\": {\"on\": \"2026-10-10\", \"source\": \"eCourts estate search, none found\"}, \"legal_description\": {\"on\": \"2026-10-10\", \"source\": \"deed copy\", \"file\": \"deed.pdf\"}}. Item names: parcel, legal_description, deed_chain, taxpayer, heirs, rod_checked, tax_checked, probate_checked, obituaries_checked.",
+    "Run <b>uv run python scripts/lawyer_packages.py</b> (or ask Claude). Every lead whose list is now complete gets its package (HTML and PDF) in <b>packages/</b>."
+   ],
+   "pull": "Only lane C leads you will hand to the attorney: the estate search for each, the latest deed copy when the attorney wants the full legal description.",
+   "save": "PDFs and <b>items.json</b> in <b>~/Desktop/Call_Sheets/lawyer/owner_inputs/&lt;PIN&gt;/</b> (private, never in the repository).",
+   "lane": "scripts/lawyer_packages.py reads the folder and regenerates the package; nothing goes on the public board.",
+   "time": "About 3 minutes per estate search; about 5 minutes per deed copy.",
+   "often": "Per lead handed to the attorney.",
+   "gain": "A complete, dated intake package per lead, ready for the attorney.",
+   "others": "The attorney's title account; an abstractor for records older than about 70 years.",
+   "minutes_month": 40,
+   "leads": "per lead handed to the attorney",
+   "signal_columns": [],
+   "scope": [],
+   "short": "Attorney package pulls",
+   "loads": "small",
+   "wall_class": "captcha",
+   "covers": [
+    "NC eCourts estate files (per lead)",
+    "deed images (per lead)"
+   ]
   }
  ],
  "foia": {

@@ -180,7 +180,8 @@ def lawyer_rows(row: dict, blk: dict) -> list[tuple[str, str, str]]:
     out = []
     for k, label in LAWYER_LABELS:
         v = ll.get(k, "missing")
-        status = "ok" if v == "ok" else ("n/a" if v == "n/a" else ("missing" if v == "missing" else f"checked {v}"))
+        status = {"ok": "ok", "n/a": "n/a", "missing": "missing",
+                  "walled": "walled (a person pulls it)"}.get(v, f"sourced {v}")
         out.append((label, status, detail.get(k, "")))
     return out
 
