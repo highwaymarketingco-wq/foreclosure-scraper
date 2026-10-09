@@ -93,6 +93,10 @@ ROD_CONFIG = {
     # (Johnston). Wake (Self-Service with a reCAPTCHA) is left to a person.
     ("NC", "Durham"):        ("nc_tyler", "FORECLOSURE_NC_TYLER_ROD", "0"),
     ("NC", "Johnston"):      ("nc_tyler", "FORECLOSURE_NC_TYLER_ROD", "0"),
+    # Courthouse Computer Systems 'LRSearch' (rod/nc_lrsearch.py), Beaufort: open, no login or CAPTCHA
+    # (the 10/7 "walled" was Cloudflare's passive beacon read as a challenge). The county-wide sweep
+    # (enrichment_county_lien_sweep) covers every row; this adds the per-owner instrument picture.
+    ("NC", "Beaufort"):      ("nc_lrsearch", "FORECLOSURE_NC_LRSEARCH_ROD", "1"),
 }
 
 #: chain()-only registrations: counties whose lien existence another enricher already writes
@@ -139,6 +143,9 @@ SC_ROD_CONFIG = {
     # real board owners 2026-10-07: Union 1 chain + 3 owners' liens of 6, Marlboro 2 chains of 5
     ("SC", "Union"):         ("sc_recordroom", "FORECLOSURE_SC_RECORDROOM_ROD", "1"),
     ("SC", "Marlboro"):      ("sc_cott_esearch", "FORECLOSURE_SC_COTT_ESEARCH_ROD", "1"),
+    # GovOS CountyFusion by name (rod/sc_countyfusion.py): the no-credential 'Login as Guest' button and
+    # a plain Accept click-through; live 2026-10-09. The county-wide sweep covers every row.
+    ("SC", "Sumter"):        ("sc_countyfusion", "FORECLOSURE_SC_COUNTYFUSION_ROD", "1"),
 }
 SC_CHAIN_ONLY_CONFIG = {
     ("SC", "Oconee"):        ("publicsearch", "FORECLOSURE_SC_PUBLICSEARCH_ROD", "1"),

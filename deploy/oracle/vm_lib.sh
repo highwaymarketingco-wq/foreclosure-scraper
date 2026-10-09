@@ -117,6 +117,15 @@ vm_load_env() {
   # 2026-10-09 top80 (register_other): marriage-index check on the six Cott v4 tenants that publish one
   # (Onslow, Alamance, Alexander, Pamlico, Edgecombe, Rutherford); plain HTTP, 1.6 s a host, 30 lookups a
   # county a run on its own budget; also gated by FORECLOSURE_NC_COTT_ROD.
+  # 2026-10-09 top80 (register_cchs_kofile): county-wide adverse-instrument sweeps of 22 Courthouse Computer
+  # Systems (classic ASP, LRSearch), GovOS CountyFusion and GovOS/Kofile PublicSearch counties, matched to every
+  # board owner offline, plus Beaufort's Marriages index; plain HTTP, cached in data/county_sweeps. Sumter
+  # (CountyFusion) and Beaufort (LRSearch) are also read by owner name (30 lookups a county a run).
+  export FORECLOSURE_COUNTY_LIEN_SWEEP="${FORECLOSURE_COUNTY_LIEN_SWEEP:-1}"
+  export FORECLOSURE_COUNTY_MARRIAGE_SWEEP="${FORECLOSURE_COUNTY_MARRIAGE_SWEEP:-1}"
+  export FORECLOSURE_COUNTY_SWEEP_BUDGET_S="${FORECLOSURE_COUNTY_SWEEP_BUDGET_S:-900}"
+  export FORECLOSURE_SC_COUNTYFUSION_ROD="${FORECLOSURE_SC_COUNTYFUSION_ROD:-1}"
+  export FORECLOSURE_NC_LRSEARCH_ROD="${FORECLOSURE_NC_LRSEARCH_ROD:-1}"
   export FORECLOSURE_REGISTER_CHECKS="${FORECLOSURE_REGISTER_CHECKS:-1}"
   export FORECLOSURE_REGISTER_CHECKS_BUDGET_S="${FORECLOSURE_REGISTER_CHECKS_BUDGET_S:-900}"
   export FORECLOSURE_GENERIC_ROD_BUDGET_S="${FORECLOSURE_GENERIC_ROD_BUDGET_S:-2400}"

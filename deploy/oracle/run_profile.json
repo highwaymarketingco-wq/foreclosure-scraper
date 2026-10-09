@@ -46,7 +46,12 @@
   "FORECLOSURE_GIS_FILL_BUDGET_S": "2400",
   "OBITUARY_LOOKUPS": "0",
   "FORECLOSURE_MECKLENBURG_DELINQUENT": "0",
-  "RICHLAND_PARCEL_MAX": "500"
+  "RICHLAND_PARCEL_MAX": "500",
+  "FORECLOSURE_COUNTY_LIEN_SWEEP": "1",
+  "FORECLOSURE_COUNTY_MARRIAGE_SWEEP": "1",
+  "FORECLOSURE_COUNTY_SWEEP_BUDGET_S": "900",
+  "FORECLOSURE_SC_COUNTYFUSION_ROD": "1",
+  "FORECLOSURE_NC_LRSEARCH_ROD": "1"
  },
  "flags_notes": {
   "VISION_PROVIDER": "vm_lib.sh picks gemini when a Gemini key file exists, else anthropic; the declared value is vm_lib.sh's text default",
@@ -60,7 +65,12 @@
   "GENERIC_ROD_COUNTY_CONCURRENCY": "register counties read side by side; each county is its own host and the adapters hold a per-host lock, so never two requests on one host",
   "OBITUARY_LOOKUPS": "live obituary name lookups (Echovita / Find a Grave) per dead-owner lead: OFF until the owner decides (HANDOFF item 82)",
   "FORECLOSURE_MECKLENBURG_DELINQUENT": "Mecklenburg delinquent XLSX (one-year balances, +29k rows, +12 min geocoding): OFF by the 10/7 decision (vm_lib 9edff1f3)",
-  "RICHLAND_PARCEL_MAX": "Richland map-viewer lookups per run (one host, about 4 s a row, inside RESOLVER_PHASE_MAX_SECONDS 2,400); HOT and WARM rows first"
+  "RICHLAND_PARCEL_MAX": "Richland map-viewer lookups per run (one host, about 4 s a row, inside RESOLVER_PHASE_MAX_SECONDS 2,400); HOT and WARM rows first",
+  "FORECLOSURE_COUNTY_LIEN_SWEEP": "county-wide adverse-instrument sweeps of 22 CCS classic / LRSearch, GovOS CountyFusion and GovOS-Kofile PublicSearch counties (enrichment_county_lien_sweep, rod/county_sweeps): plain HTTP and one WebSocket, cached in data/county_sweeps, 'screened, none found' only for the window read; needs the main.py wiring line in unwired_wire_pending",
+  "FORECLOSURE_COUNTY_MARRIAGE_SWEEP": "Beaufort NC Marriages index swept by date (about 275 licences a year) and matched to person owners; part of the same pass",
+  "FORECLOSURE_COUNTY_SWEEP_BUDGET_S": "each county's register reads inside the sweep pass (a cold Sumter sweep took 395 s on 2026-10-09, the others 30 to 55 s; later runs read only the new end)",
+  "FORECLOSURE_SC_COUNTYFUSION_ROD": "Sumter by owner name through GovOS CountyFusion (rod/sc_countyfusion): no-credential 'Login as Guest' and a plain Accept click-through, about 5 s a lookup once the session is held; 30 lookups a run (FORECLOSURE_SC_COUNTYFUSION_ROD_MAX)",
+  "FORECLOSURE_NC_LRSEARCH_ROD": "Beaufort by owner name through CCS LRSearch (rod/nc_lrsearch): open, no login or CAPTCHA; 30 lookups a run (FORECLOSURE_NC_LRSEARCH_ROD_MAX)"
  },
  "must_not_set": {
   "GRANDFATHER_CARRIED": {
@@ -135,7 +145,8 @@
  "unwired_wire_pending": {
   "gis_fill": "main.py, right after the enrich_gis_attrs try/except (the 'GIS attribute backfill' block, before the Richland SC map-viewer reader): try: from .gis_fill import enrich_gis_fill; s = await _await_capped(enrich_gis_fill(enriched), \"gis_fill\", default_s=float(os.environ.get(\"FORECLOSURE_GIS_FILL_BUDGET_S\", \"2400\")) + 180); if s and \"skipped\" not in s: enrichment_stats[\"gis_fill\"] = s; except Exception: log.error(\"gis_fill.failed\", traceback=traceback.format_exc()) (top80_fill)",
   "enrichment_register_checks": "main.py, in the register block right after the generic_rod stats loop (the for _rod_name in (... \"generic_rod\") loop): try: from .enrichment_register_checks import enrich_register_checks; s = await _await_capped(enrich_register_checks(enriched), \"register_checks\", default_s=float(os.environ.get(\"FORECLOSURE_REGISTER_CHECKS_BUDGET_S\", \"900\")) + 120); if s and \"skipped\" not in s: enrichment_stats[\"register_checks\"] = s; except Exception: log.error(\"register_checks.failed\", traceback=traceback.format_exc()) (top80_register_other)",
-  "enrichment_register_lien_sweep": "main.py, in the register block right after the enrich_nc_rod_render try/except: from .enrichment_register_lien_sweep import enrich_register_lien_sweep; s = await _await_capped(enrich_register_lien_sweep(enriched), \"register_lien_sweep\", default_s=float(os.environ.get(\"FORECLOSURE_LIEN_SWEEP_BUDGET_S\", \"600\")) + 180); if s and \"skipped\" not in s: enrichment_stats[\"register_lien_sweep\"] = s (top80_logan_harris)"
+  "enrichment_register_lien_sweep": "main.py, in the register block right after the enrich_nc_rod_render try/except: from .enrichment_register_lien_sweep import enrich_register_lien_sweep; s = await _await_capped(enrich_register_lien_sweep(enriched), \"register_lien_sweep\", default_s=float(os.environ.get(\"FORECLOSURE_LIEN_SWEEP_BUDGET_S\", \"600\")) + 180); if s and \"skipped\" not in s: enrichment_stats[\"register_lien_sweep\"] = s (top80_logan_harris)",
+  "enrichment_county_lien_sweep": "main.py, in the register block right after the enrich_register_lien_sweep try/except (or, if that is not in yet, right after the enrich_nc_rod_render try/except): try: from .enrichment_county_lien_sweep import enrich_county_lien_sweep; s = await _await_capped(enrich_county_lien_sweep(enriched), \"county_lien_sweep\", default_s=float(os.environ.get(\"FORECLOSURE_COUNTY_SWEEP_BUDGET_S\", \"900\")) + 240); if s and \"skipped\" not in s: enrichment_stats[\"county_lien_sweep\"] = s; except Exception: log.error(\"county_lien_sweep.failed\", traceback=traceback.format_exc()) (top80_register_cchs_kofile)"
  },
  "tail_calls_required": [
   [
