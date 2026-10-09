@@ -430,3 +430,20 @@ def test_unscreened_is_a_ratchet(monkeypatch):
     assert out2["ok"]
     sc_unlisted = {"state": "SC", "county": "Clarendon", "parcel_id": "1", "raw": {}}
     assert feed_all(T.make_checks(), [sc_unlisted])["top80-fill-unscreened"]["checked"] == 0
+
+
+def test_like_pass_errors_end_the_like_pass_not_the_exact_lane(monkeypatch):
+    rows = [li(pin=f"166220-70-{9000 + i}") for i in range(30)]
+    exact = []
+
+    def handler(url, data):
+        if "LIKE" in data["where"]:
+            return FakeResp(error={"code": 500, "message": "timed out"})
+        exact.append(data["where"])
+        return FakeResp([])                       # nothing by exact id: every pin goes to the LIKE pass
+    calls = fake_post(monkeypatch, handler)
+    # 30 distinct 10-character ids: one exact request (BATCH 40), then LIKE requests until two errors
+    st = run(rows, budget_s=60)
+    assert len(exact) == 1 and st["requests"] == 3
+    assert any(k.endswith("#like") for k in st["closed_layers"]) and G.NC_URL not in G.closed_layers()
+    assert all("gis_fill" not in r.raw for r in rows)          # unasked rows are never turned into verdicts

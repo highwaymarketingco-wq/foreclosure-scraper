@@ -501,11 +501,13 @@ def closed_layers() -> dict[str, str]:
     return dict(_closed)
 
 
-def query(url: str, form: dict) -> Optional[list[dict]]:
+def query(url: str, form: dict, key: Optional[str] = None) -> Optional[list[dict]]:
     """POST one ArcGIS query; the list of attribute bags ([] when none), or None when the layer did
-    not answer usefully (the error is counted; two in a row close the layer for the run)."""
+    not answer usefully (the error is counted under `key` (default: the url); two in a row close that key
+    for the run, so a slow LIKE query can end the LIKE pass without closing the exact-id lane)."""
     host = (urlsplit(url).hostname or "").lower()
-    if url in _closed:
+    key = key or url
+    if key in _closed:
         return None
     from .rod import nc_polite
     with _host_lock(host):
@@ -520,20 +522,20 @@ def query(url: str, form: dict) -> Optional[list[dict]]:
             r = fn(url, data=form, headers=nc_polite.HEADERS, timeout=60)
         except Exception as e:  # noqa: BLE001 - one request never stops a pass
             _last[host] = clock()
-            return _fail(url, f"{type(e).__name__}")
+            return _fail(key, f"{type(e).__name__}")
         finally:
             _last[host] = clock()
     try:
         status = int(r.status_code)
         j = r.json() if status == 200 else None
     except Exception:  # noqa: BLE001
-        return _fail(url, "unreadable answer")
+        return _fail(key, "unreadable answer")
     if status != 200 or not isinstance(j, dict):
-        return _fail(url, f"HTTP {status}")
+        return _fail(key, f"HTTP {status}")
     if "error" in j:
         msg = str((j.get("error") or {}).get("message") or (j.get("error") or {}).get("code") or "error")
-        return _fail(url, msg[:80])
-    _errors[url] = 0
+        return _fail(key, msg[:80])
+    _errors[key] = 0
     return [(f.get("attributes") or {}) for f in (j.get("features") or []) if isinstance(f, dict)]
 
 
@@ -803,6 +805,8 @@ def _plan(listings: list, now: datetime) -> dict[tuple[str, str], dict[str, list
 
 
 LIKE_BATCH = 12
+#: the closed-layer key of the LIKE pass (its errors never close the exact-id lane)
+LIKE_KEY = NC_URL + "#like"
 #: a LIKE pattern needs at least this many characters to be selective
 LIKE_MIN_KEY = 8
 
@@ -822,7 +826,7 @@ def fetch_nc_like(county: str, pins: list[str]) -> Optional[dict[str, dict]]:
     layer; a record is accepted ONLY when its parno/altparno equals the PIN letter for letter (alias keys),
     so a loose pattern can never bind another parcel."""
     feats = query(NC_URL, {"where": nc_like_where(county, pins), "outFields": NC_FIELDS,
-                           "returnGeometry": "false", "f": "json"})
+                           "returnGeometry": "false", "f": "json"}, key=LIKE_KEY)
     if feats is None:
         return None
     index: dict[str, dict] = {}
@@ -923,7 +927,7 @@ async def enrich_gis_fill(listings: list, budget_s: Optional[float] = None) -> d
             del like_q[key][:LIKE_BATCH]
             if not like_q[key]:
                 del like_q[key]
-            if NC_URL in _closed:
+            if LIKE_KEY in _closed or NC_URL in _closed:
                 like_q = {}
                 break
             got = await asyncio.to_thread(fetch_nc_like, co, pins)
@@ -935,6 +939,7 @@ async def enrich_gis_fill(listings: list, budget_s: Optional[float] = None) -> d
                 if m is not None:
                     stats["found_by_like"] += 1
                 settle(key, pin, m)
-    stats["closed_layers"] = {u.split("/rest/")[0][-40:]: w for u, w in closed_layers().items()}
+    stats["closed_layers"] = {u.split("/rest/")[0][-40:] + ("#like" if u.endswith("#like") else ""): w
+                              for u, w in closed_layers().items()}
     log.info("gis_fill.done", **{k: v for k, v in stats.items() if k != "closed_layers"})
     return stats
