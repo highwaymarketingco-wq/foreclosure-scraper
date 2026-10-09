@@ -23,9 +23,11 @@ Each check would have caught a defect this group measured or closes a cell the c
                                on nearly every parcel there (Johnston 99%, Rowan 99%, Wayne 97% on
                                2026-10-09) and the sweep's reliability rule failed to drop the county.
   top80-checks-config          repo configuration, not rows: the ITS portals and the unreadable-portal
-                               verdicts are disjoint and cover the 15 counties probed, the screen ledger
-                               knows the ITS source and the OneMap enrichment, the sweep's reliability
-                               threshold is at most 0.25, and the run profile lists the group's flags.
+                               verdicts are disjoint and cover the 15 counties probed, the tax_lien
+                               verifier (tax_lien_itspublic) holds the six parcel-bearing newer-build
+                               counties, the screen ledger knows the ITS source and the OneMap
+                               enrichment, the sweep's reliability threshold is at most 0.25, and the
+                               run profile lists the group's enrichment.
 
 Memory: a few counters and county-name samples.
 """
@@ -224,6 +226,14 @@ class _Config:
             for c in ITS_COUNTIES:
                 if c not in M.PORTALS:
                     bad.append(f"portal {c} missing")
+            from foreclosure_scraper.verification.verifiers import tax_lien_itspublic as V
+            for c in ("anson", "granville", "harnett", "yadkin", "alleghany", "scotland"):
+                pt = V._BY_COUNTY.get(c)
+                if pt is None or not pt.full_model:
+                    bad.append(f"tax_lien_itspublic has no full-model portal for {c}")
+            for c in ("caswell", "jones", "person"):
+                if c in V._BY_COUNTY:
+                    bad.append(f"tax_lien_itspublic must not bind {c} (no parcel id on its bills)")
             if S.MAX_FLAG_SHARE > 0.25:
                 bad.append("present-use reliability threshold above 0.25")
             if set(SL.ENRICHMENT_SCREENS.get("onemap_sweeps", ())) != {"heir_estate", "rollback_exposure"}:

@@ -439,6 +439,31 @@ CELLS = (0, 1, 3, 4, 5, 6, 7, None)
 #: balance, discovery year, description (parcel<br/>PIN), address ("1017 ANDOVER PL SE BOLIVIA
 #: 28422 COUNTY"); no action cell
 ITSNET_CELLS = (0, 1, 3, 7, 4, 5, None, 8)
+#: top-80 check group (2026-10-09): six of the ten counties the roll scraper now reads on the
+#: vendor's newer build. Read live that day (one search each): Anson, Granville, Harnett,
+#: Yadkin print the Onslow cell order with the parcel in the description; Alleghany and Scotland
+#: print the ITSNet order (account, owner, levy, balance, discovery year, description, address).
+#: The board parcel is the portal's ParcelNumber (same as NC OneMap's parno where the county
+#: prints one). Every one of them needs the full search model (full_model). Caswell and Jones print
+#: no parcel id on their bills (situs only), and Person's ParcelNumber search answered nothing for
+#: the three ids its own bills print (live 2026-10-09: parcel_not_found 3 of 3): a parcel verifier
+#: cannot bind a row to them, so they stay out.
+_NEWER_BUILD = {
+    "Anson": ("https://www.bttaxpayerportal.com/ITSPublicAN", CELLS),
+    "Granville": ("https://tax.granvillecounty.org/ITSPublic", CELLS),   # AlternateParcelIdentifier, no AccountNumber
+    "Harnett": ("https://cama.harnett.org/ITSPublicHT", CELLS),
+    "Yadkin": ("https://www.bttaxpayerportal.com/ITSPublicYK", CELLS),
+    "Alleghany": ("https://www.bttaxpayerportal.com/ITSPublicAL", ITSNET_CELLS),
+    "Scotland": ("https://www.bttaxpayerportal.com/ITSPublicSC", ITSNET_CELLS),
+}
+#: form fields beyond the common ones, read from each page's own .search-value inputs
+_NEWER_EXTRA = {"Granville": dict(model_fields=("AlternateParcelIdentifier",), account_search=False),
+                "Alleghany": dict(model_fields=("AlternateParcelIdentifier",))}
+for _county, (_base, _cells) in _NEWER_BUILD.items():
+    PORTALS.setdefault(_county, Portal(_county, _base, "ParcelNumber", full_model=True,
+                                       real_without_units=True, cells=_cells,
+                                       **_NEWER_EXTRA.get(_county, {})))
+_BY_COUNTY.update({k.lower(): v for k, v in PORTALS.items()})
 #: what follows the zip in an ITSNet address cell (the taxing jurisdiction): cut, the zip kept so
 #: situs_street() knows a place name precedes it
 _AFTER_ZIP = re.compile(r"(\s\d{5}(?:-\d{4})?)\b.*$")

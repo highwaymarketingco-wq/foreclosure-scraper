@@ -553,3 +553,39 @@ def test_brunswick_reads_the_itsnet_cell_order():
     assert r.evidence["address_relation"] == "match"       # "... SE TESTVILLE 28000 COUNTY" cut to the street
     rows = p.parse_rows({"rows": [ItsNetPortal._row(b) for b in bills]}, p.PORTALS["Brunswick"])
     assert [b["year"] for b in rows] == [2026, 2025, 2024] and rows[0]["situs"] == "1017 TEST ANDOVER PL SE TESTVILLE 28000"
+
+
+# ---------------------------------------------------------------------------------------------
+# top-80 check group (2026-10-09): six counties of the vendor's newer build
+# ---------------------------------------------------------------------------------------------
+
+def test_the_newer_build_counties_are_configured_with_the_full_model():
+    for c in ("anson", "granville", "harnett", "yadkin", "alleghany", "scotland"):
+        port = p._BY_COUNTY[c]
+        assert port.full_model and port.parcel_field == "ParcelNumber" and port.real_without_units
+    assert p._BY_COUNTY["alleghany"].cells == p.ITSNET_CELLS and p._BY_COUNTY["anson"].cells == p.CELLS
+    assert not p._BY_COUNTY["granville"].account_search
+    assert "AlternateParcelIdentifier" in p._BY_COUNTY["granville"].model_fields
+    for c in ("caswell", "jones", "person"):                  # no parcel id to bind a row to
+        assert c not in p._BY_COUNTY
+
+
+def test_alleghany_layout_parcel_and_alternate_in_the_description_situs_in_the_address_cell():
+    payload = {"rows": [
+        {"id": "2025/3896", "cell": ["2025", "3896", "83774", "EXAMPLE HOLDINGS LLC", "2,737.83", "86.21", "",
+                                     "3033811534<br/>", "147 SAMPLE RD"]},
+        {"id": "2025/17739", "cell": ["2025", "17739", "83903", "EXAMPLE NURSERY", "17.52", "19.06", "",
+                                      "Personal Property", "5734 SAMPLE HWY"]}]}
+    bills = p.parse_rows(payload, p._BY_COUNTY["alleghany"])
+    assert len(bills) == 1
+    assert bills[0]["ids"] == ["3033811534"] and bills[0]["situs"] == "147 SAMPLE RD" and bills[0]["balance"] == 86.21
+
+
+def test_anson_layout_a_parcel_only_description_is_real_property_without_units():
+    payload = {"rows": [
+        {"id": "2025/201268", "cell": ["2025", "201268", "7561", "EXAMPLE LLC", "742600527368<br/><br /><br />",
+                                       "392.85", "392.85", "<button>+</button>"]},
+        {"id": "2025/7604", "cell": ["2025", "7604", "7580", "EXAMPLE JOE", "Personal Property<br />1 SAMPLE RD",
+                                     "14.41", "15.67", "<button>+</button>"]}]}
+    bills = p.parse_rows(payload, p._BY_COUNTY["anson"])
+    assert [b["ids"] for b in bills] == [["742600527368"]] and bills[0]["balance"] == 392.85
