@@ -288,7 +288,15 @@ _ADDR_ALIAS = {
     "NORTH": "N", "SOUTH": "S", "EAST": "E", "WEST": "W", "NORTHEAST": "NE",
     "NORTHWEST": "NW", "SOUTHEAST": "SE", "SOUTHWEST": "SW",
     "CRESCENT": "CRES",         # "5 ALL SOULS CRES" is the county's spelling of "5 All Souls Crescent"
+    # Mecklenburg's roll abbreviations ("10 SAMPLE AV", "10 SAMPLE BV", "10 SAMPLE CR",
+    # "10 SAMPLE WY", "10 SAMPLE PY"; audit 2026-10-09 phones_lost)
+    "AV": "AVE", "BV": "BLVD", "CR": "CIR", "WY": "WAY", "PY": "PKWY", "TR": "TRL",
+    "LP": "LOOP", "HY": "HWY",
 }
+#: route prefixes: "NC 200", "HWY 64", "US HWY 117" (the number that follows is the street name)
+_ADDR_ROUTE = frozenset({"HWY", "NC", "SC", "US", "SR", "RT", "ROUTE"})
+#: a state token or a zip after the street: the start of a comma-less "CITY ST ZIP" tail
+_ADDR_TAIL_ANCHOR = re.compile(r"^(NC|SC|\d{5}(\d{4})?)$")
 _ADDR_SUFFIXES = frozenset({"CRES", "RD", "ST", "DR", "TER", "AVE", "BLVD", "LN", "CT", "CIR", "TRL",
                             "HWY", "EXT", "PL", "PKWY", "WAY", "LOOP", "PT", "CV", "RDG", "HTS",
                             "PIKE", "ALY", "SQ", "XING", "TRCE", "RUN", "PATH", "BND", "CRK"})
@@ -298,6 +306,52 @@ _ADDR_UNIT = frozenset({"APT", "UNIT", "STE", "SUITE", "LOT", "TRLR", "BLDG", "B
 #: words the counties append that are not part of the street ("242 P GIBBS RD UNINCORPORATED")
 _ADDR_NOISE = frozenset({"UNINCORPORATED", "UNINCORPORAT", "UNINC", "NC", "SC", "USA", "UNITED",
                          "STATES", "COUNTY"})
+
+
+def _drop_city_tail(toks: list[str]) -> list[str]:
+    """Street tokens (after the house number, aliases applied) without a comma-less city / state /
+    zip tail: "SAMPLE RD CHARLOTTE NC 28207" -> "SAMPLE RD". Only when a state token or a zip
+    follows the street AND a suffix (after at least one name token) comes before it; the suffix and
+    the suffix / direction tokens right after it stay ("MAIN ST EXT", "CHURCH ST NE"). Without a
+    suffix the city cannot be told from the street and nothing is dropped.
+    WHY (audit 2026-10-09, phones_lost): "10 SAMPLE RD CHARLOTTE NC 28207" kept CHARLOTTE as a
+    street word, so a LiensNC filing for "10 Sample Rd" read as another house (other_address) and
+    block_binding removed the filing with the owner's own phone (164 filings among the rows whose
+    phone the 10/9 comparison lost; 28 of those phones were the owner's)."""
+    j = next((k for k, t in enumerate(toks) if k >= 2 and _ADDR_TAIL_ANCHOR.match(t)), None)
+    if j is None:
+        return toks
+    i = next((k for k in range(1, j) if toks[k] in _ADDR_SUFFIXES
+              or (toks[k].isdigit() and toks[k - 1] in _ADDR_ROUTE)), None)
+    if i is None:
+        return toks
+    if toks[i] in _ADDR_ROUTE and i + 1 < j and toks[i + 1].isdigit():
+        i += 1                          # "US HWY 70 SAMPLE CITY NC": the route number stays
+    end = i + 1
+    while end < j and (toks[end] in _ADDR_SUFFIXES or toks[end] in _ADDR_DIRECTIONS):
+        end += 1
+    return toks[:end]
+
+
+_UNIT_TOKEN = re.compile(r"^(\d{1,5}[A-Z]?|[A-Z]\d{0,4})$")
+
+
+def _drop_unit_tail(toks: list[str]) -> list[str]:
+    """Street tokens without a unit written after the street's suffix (and direction):
+    "SAMPLE ST 14", "SAMPLE RD W C", "SAMPLE BLVD 3C", "SAMPLE PKWY M1100". Not after HWY
+    ("HWY 64" names the road) nor after "STATE RD" / "SR" ("STATE RD 1001"); a direction letter
+    (N, E, ...) is a direction, not a unit."""
+    k = len(toks)
+    if k < 3 or not _UNIT_TOKEN.match(toks[-1]) or toks[-1] in _ADDR_DIRECTIONS:
+        return toks
+    i = k - 2
+    while i > 0 and toks[i] in _ADDR_DIRECTIONS:
+        i -= 1
+    if toks[i] not in _ADDR_SUFFIXES or toks[i] == "HWY" or i == 0:
+        return toks
+    if toks[i] == "RD" and toks[i - 1] in ("STATE", "SR", "CO"):
+        return toks
+    return toks[:-1]
 
 
 def address_key(addr: Any) -> tuple[Optional[str], frozenset, frozenset]:
@@ -325,8 +379,9 @@ def address_key(addr: Any) -> tuple[Optional[str], frozenset, frozenset]:
             if digits_ and not (len(digits_) >= 4 and set(digits_) == {"9"}):
                 number = digits_ + m.group(2)
             toks = toks[1:]
-    toks = [_ADDR_ALIAS.get(t, t) for t in toks
-            if t not in _ADDR_NOISE and not re.fullmatch(r"\d{5}(\d{4})?", t)]
+    toks = _drop_city_tail([_ADDR_ALIAS.get(t, t) for t in toks])
+    toks = [t for t in toks if t not in _ADDR_NOISE and not re.fullmatch(r"\d{5}(\d{4})?", t)]
+    toks = _drop_unit_tail(toks)
     name = frozenset(t for t in toks if t not in _ADDR_SUFFIXES and t not in _ADDR_DIRECTIONS)
     tail = frozenset(t for t in toks if t in _ADDR_SUFFIXES or t in _ADDR_DIRECTIONS)
     return number, name, tail

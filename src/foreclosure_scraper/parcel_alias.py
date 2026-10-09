@@ -41,7 +41,16 @@ ALIAS_SOURCES: dict[str, tuple[str, str]] = {
     # (896 ids nulled by validation in the 10/8 run, 893 with a PIN); the scraper publishes the PIN
     # only once this entry exists (rutherford_wildfire_tax._pins_enabled).
     "counties_nc.rutherford_wildfire_tax": ("rutherford_wildfire", "parcel"),
+    # 2026-10-09 (audit phones_lost): Lincoln's delinquent-tax PDF prints the 5-6 character AKPAR
+    # account (county_id); nc_lincoln_bulk.adopt_pin gives the row the PIN after the merge, so the
+    # next scrape (short id again) must find that PIN row under the short id it also carries.
+    # Catawba and McDowell rows carry county_id == parcel_id and are never re-keyed.
+    "counties_nc.nc_county_pdf_delinquent_tax": ("nc_county_pdf_delinquent_tax", "county_id"),
 }
+#: sources whose raw id is a short alias only up to this many characters: the delinquent-tax PDF's
+#: county_id is Lincoln's AKPAR (5-6) but McDowell's and Catawba's own parcel numbers (10-12), which
+#: must not become a second id of the row (tax_binding.row_ids reads short_id_of)
+SHORT_ID_MAX_LEN: dict[str, int] = {"counties_nc.nc_county_pdf_delinquent_tax": 6}
 
 _NON_ALNUM = re.compile(r"[^a-z0-9]")
 
@@ -66,7 +75,12 @@ def short_id_of(row: Any) -> Optional[str]:
         return None
     blk = raw.get(spec[0])
     v = blk.get(spec[1]) if isinstance(blk, dict) else None
-    return str(v).strip() or None if v not in (None, "") else None
+    if v in (None, ""):
+        return None
+    mx = SHORT_ID_MAX_LEN.get(str(_get(row, "source") or ""))
+    if mx is not None and len(_norm(v)) > mx:
+        return None
+    return str(v).strip() or None
 
 
 _NC_PIN = re.compile(r"^\d{10}$")

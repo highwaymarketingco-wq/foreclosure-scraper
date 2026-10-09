@@ -415,6 +415,27 @@ def is_eligible(li: Listing) -> bool:
             and bool((li.parcel_id or "").strip()))
 
 
+def adopt_pin(li: Listing, rec: dict) -> bool:
+    """A row keyed by the county's short AKPAR account id (nc_county_pdf_delinquent_tax publishes
+    it) takes the 10-digit PIN of the same bulk record; the short id stays in
+    raw['parcel_id_alias'] {short, long}, as parcel_alias records it. Returns True when it changed.
+    WHY (audit 2026-10-09, phones_lost): validation nulls an id under 7 characters, so these rows
+    published with no parcel at all, beside the older PIN row of the same property; the next run
+    kept only the parcel-less copy and the owner's county-published phone (lincoln_taxpayer, looked
+    up by PIN) went with the PIN row (19 phones on the 10/8 run; 262 accounts on both a PIN row
+    and a parcel-less row of the 10/7 board)."""
+    pin = norm_key(rec.get("parcel_id"))
+    short = norm_key(li.parcel_id)
+    if not re.fullmatch(r"\d{10}", pin or "") or not short or short == pin \
+            or short != norm_key(rec.get("akpar")):
+        return False
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    li.raw.setdefault("parcel_id_alias", {"short": str(li.parcel_id), "long": pin})
+    li.parcel_id = pin
+    return True
+
+
 def enrich(listings: Iterable[Listing], auto_refresh: bool = True) -> dict:
     """Backfill Lincoln leads from the cached bulk roll. Never overwrites a
     value the board already has; writes owner/mailing/flags into raw['gis'] to
@@ -486,6 +507,8 @@ def enrich(listings: Iterable[Listing], auto_refresh: bool = True) -> dict:
                                   "akpar": rec.get("akpar"),
                                   "source": INDEX_PAGE}
         stats["fields_filled"] += filled
+        if adopt_pin(li, rec):
+            stats["pin_adopted"] = stats.get("pin_adopted", 0) + 1
 
     log.info("lincoln_bulk.done", **stats)
     return stats

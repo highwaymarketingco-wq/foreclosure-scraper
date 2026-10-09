@@ -546,6 +546,83 @@ def shared_points(rows: Iterable[Any], min_rows: int = FALLBACK_POINT_MIN_ROWS) 
     return {p for p, c in n.items() if c >= min_rows}
 
 
+#: contact blocks a LiensNC filing writes with no name of their own (liensnc_handoff: the filing's
+#: "Owner" section); the person they belong to is the one that section names
+FILING_CONTACT_BLOCKS = ("owner_phone", "owner_email")
+
+
+def filing_persons(row: Any, name: str, blk: Any) -> list[str]:
+    """The owner a LiensNC filing names (first line of raw['liensnc']['owner_text']) for a contact
+    block built from that filing, else []. WHY (audit 2026-10-09, phones_lost): a lien-agent
+    appointment's "Owner" section is often the BUILDER or contractor who filed it; their phone was
+    judged only by the filing's address, so it stayed on the homeowner's row (one builder's phone on
+    100+ rows) or, once the address matched, would have been restored there."""
+    if name not in FILING_CONTACT_BLOCKS or not isinstance(blk, dict) \
+            or str(blk.get("source") or "") not in _FILING_SOURCES:
+        return []
+    lien = _raw(row).get("liensnc")
+    if not isinstance(lien, dict):
+        return []
+    first = str(lien.get("owner_text") or "").strip().split("\n")[0].strip()
+    return [first] if name_tokens(first) else []
+
+
+def filing_contact_value(name: str, blk: Any) -> Optional[str]:
+    """The phone (10 digits) or e-mail (lower case) of a contact block a LiensNC filing wrote, else
+    None. WHY (audit 2026-10-09, phones_lost): a builder or pool company puts its own number in the
+    "Owner" section of every lien-agent appointment it files; on 34 rows of 6 different owners the
+    'self-filed' phone was the contractor's. The shared test now reads these by value."""
+    if name not in FILING_CONTACT_BLOCKS or not isinstance(blk, dict) \
+            or str(blk.get("source") or "") not in _FILING_SOURCES:
+        return None
+    if name == "owner_phone":
+        d = re.sub(r"\D", "", str(blk.get("phone") or ""))[-10:]
+        return d if len(d) == 10 else None
+    e = str(blk.get("email") or "").strip().lower()
+    return e or None
+
+
+#: a filing phone is the filer's line only when the filings carrying it name this many different
+#: owners (two are often one owner and their LLC)
+FILER_LINE_MIN_OWNERS = 3
+
+
+def filing_line_rows(members: list[tuple[int, frozenset]]) -> set:
+    """The filer's-line test for ONE filing phone or e-mail value. `members`: (row index, tokens of
+    the owner the row's filing names, filing_persons) of every row carrying the value.
+      * one owner named on at least half of those filings (2+ of them: a builder on its own lots,
+        an owner on their own filings) keeps it, except on the rows whose filing names someone else;
+      * else, filings naming FILER_LINE_MIN_OWNERS or more different owners: the value is the
+        filer's (a pool company, a permit service) on everybody's appointment and leaves every row;
+      * else (two names: often one owner and their company) it stays.
+    Returns the row indexes it is removed from."""
+    named = [(i, t) for i, t in members if t]
+    if len(named) < 2:
+        return set()
+    group: set = set()
+    for _i, t in named[:50]:
+        g = {j for j, u in named if u & t}
+        if len(g) > len(group):
+            group = g
+    if len(group) >= 2 and 2 * len(group) >= len(named):
+        return {i for i, _t in named if i not in group}
+    clusters: list[set] = []
+    for _i, t in named:
+        hit = next((c for c in clusters if c & t), None)
+        if hit is None:
+            clusters.append(set(t))
+        else:
+            hit |= t
+        if len(clusters) >= FILER_LINE_MIN_OWNERS:
+            return {i for i, _t in members}
+    return set()
+
+
+def _judges_person(name: str, blk: Any) -> bool:
+    return name in PERSON_NAME_FIELDS or (name in FILING_CONTACT_BLOCKS and isinstance(blk, dict)
+                                          and str(blk.get("source") or "") in _FILING_SOURCES)
+
+
 def _person_disagrees(row: Any, name: str, blk: Any, strength: Optional[str],
                       roll_only: bool = False) -> bool:
     """The person a person-matched block names shares no name with the row's owner, and (when the
@@ -555,6 +632,8 @@ def _person_disagrees(row: Any, name: str, blk: Any, strength: Optional[str],
     if not isinstance(blk, dict):
         return False
     persons = [n for n in _strs(blk.get(f) for f in PERSON_NAME_FIELDS.get(name, ())) if name_tokens(n)]
+    if not persons:
+        persons = filing_persons(row, name, blk)
     own = _get(row, "owner_name")
     if not persons or not name_tokens(own) or not all(names_disagree(own, n) for n in persons):
         return False
@@ -576,7 +655,7 @@ def block_verdict(row: Any, name: str, blk: Any, *, strength: Optional[str] = No
         # the row's own record stays, except a contact built from its LiensNC filing that names a
         # filer (a builder, a contractor) the county roll on the row says is not the owner
         filing = isinstance(blk, dict) and str(blk.get("source") or "") in _FILING_SOURCES
-        if not (filing and name in PERSON_NAME_FIELDS and _person_disagrees(row, name, blk, strength, roll_only=True)):
+        if not (filing and _judges_person(name, blk) and _person_disagrees(row, name, blk, strength, roll_only=True)):
             return "own_source", p
         return "other_person", p
     cr = county_relation(row, name, p)
@@ -587,7 +666,7 @@ def block_verdict(row: Any, name: str, blk: Any, *, strength: Optional[str] = No
         return "other_parcel", p
     if pr == "other_address":
         return "other_address", p
-    if name in PERSON_NAME_FIELDS and _person_disagrees(row, name, blk, strength):
+    if _judges_person(name, blk) and _person_disagrees(row, name, blk, strength):
         return "other_person", p
     if pr == "same":
         return "bound", p
@@ -660,7 +739,9 @@ def _dominant_owner(members: list[tuple[int, frozenset]]) -> set:
 
 def row_verdicts(row: Any, points: Optional[set] = None) -> list[tuple[str, str, Optional[int], bool]]:
     """[(block name, verdict, fingerprint or None, block names an owner)] for every block this module
-    judges on `row` (checked()). The fingerprint is set for a specific block the shared test reads."""
+    judges on `row` (checked()). The fingerprint is set for a specific block the shared test reads.
+    A LiensNC filing's phone / e-mail has none: scrub_unbound_blocks reads those by value
+    (filing_line_rows)."""
     raw = _raw(row)
     out: list[tuple[str, str, Optional[int], bool]] = []
     if not raw:
@@ -761,7 +842,7 @@ def remove_blocks(row: Any, reasons: dict[str, str], stats: Optional[dict] = Non
 
 
 #: per-row rounds: removing one block can change what the rest bind to (the row's owner strength)
-MAX_ROUNDS = 3
+MAX_ROUNDS = 4
 
 
 def scrub_row(row: Any, verdicts: list, stats: Optional[dict], record: Optional[list],
@@ -778,6 +859,13 @@ def scrub_row(row: Any, verdicts: list, stats: Optional[dict], record: Optional[
                 reasons[name] = r
         if not reasons:
             break
+        if rnd < MAX_ROUNDS - 1 and "other_person" in reasons.values() \
+                and any(r != "other_person" for r in reasons.values()):
+            # a person verdict leans on the row's owner strength, which a block leaving in this same
+            # round may have set (a roll owner read from another parcel's record): remove the other
+            # blocks first and judge the people again (audit 2026-10-09, phones_lost: the roll
+            # owner's own phone left a row because an unbound block made the row's owner look rolled)
+            reasons = {k: r for k, r in reasons.items() if r != "other_person"}
         n += remove_blocks(row, reasons, stats, record, idx)
         vs = row_verdicts(row, points)
     if n and stats is not None:
@@ -823,9 +911,29 @@ def scrub_unbound_blocks(listings: Iterable[Any], record: Optional[list] = None,
                 keys = frozenset({("r", i)})
             info.append((i, v, keys, name_tokens(_get(rows[i], "owner_name"))))
         unbound |= {(i, fp) for i in shared_unbound(info, named_fp.get(fp, False))}
+    # a LiensNC filing's phone / e-mail by value (filing_line_rows; audit 2026-10-09 phones_lost)
+    lines: dict[tuple[str, str], list] = defaultdict(list)
+    for i, row in enumerate(rows):
+        raw = _raw(row)
+        for name in FILING_CONTACT_BLOCKS:
+            try:
+                v = filing_contact_value(name, raw.get(name))
+                if v:
+                    fo = filing_persons(row, name, raw.get(name))
+                    lines[(name, v)].append((i, name_tokens(fo[0]) if fo else frozenset()))
+            except Exception:  # noqa: BLE001
+                continue
+    filer_lines: dict[int, dict[str, str]] = defaultdict(dict)
+    for (name, _v), members in lines.items():
+        if len(members) >= 2:
+            for i in filing_line_rows(members):
+                filer_lines[i][name] = "shared_copy"
     for i, row in enumerate(rows):
         try:
-            scrub_row(row, verdicts[i], stats, record, i, unbound=unbound, points=points)
+            k = remove_blocks(row, filer_lines[i], stats, record, i) if i in filer_lines else 0
+            if not scrub_row(row, verdicts[i], stats, record, i, unbound=unbound, points=points) and k:
+                stats["rows_scrubbed"] += 1
+                stats["by_county"][f"{_get(row, 'state') or ''}:{county_key(_get(row, 'county'))}"] += 1
         except Exception:  # noqa: BLE001
             continue
     stats["by_reason"] = dict(stats["by_reason"])
