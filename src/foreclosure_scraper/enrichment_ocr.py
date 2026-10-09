@@ -1,5 +1,9 @@
 """OCR enricher — extract text from legal notice PDFs and images.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 Uses EasyOCR (pure Python, no system binary needed) to extract text from:
   - Legal notice PDFs (3,388 unprocessed)
   - Notice of sale documents

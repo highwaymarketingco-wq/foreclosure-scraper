@@ -48,7 +48,22 @@ def test_every_stub_names_a_real_attribute_the_tail_uses():
     for (mod, attr) in R.NETWORK_STUBS:
         m = importlib.import_module(f"foreclosure_scraper.{mod}")
         assert hasattr(m, attr), (mod, attr)
+        if (mod, attr) in R.AWAITING_MAIN_WIRING:
+            continue
         assert (mod, attr) in used, f"stale stub: run_enrich_tail no longer uses {mod}.{attr}"
+
+
+def test_awaiting_steps_are_classified_and_real():
+    for (mod, attr) in R.AWAITING_MAIN_WIRING:
+        assert (mod, attr) in R.NETWORK_STUBS or (mod, attr) in R.LOCAL_STEPS, (mod, attr)
+        assert hasattr(importlib.import_module(f"foreclosure_scraper.{mod}"), attr), (mod, attr)
+
+
+@pytest.mark.xfail(strict=True, reason="audit 2026-10-09 unwired_enrichers: main.py wiring lines UE1-UE4 "
+                   "not added yet; once they are, empty R.AWAITING_MAIN_WIRING and drop this marker")
+def test_awaiting_steps_are_wired():
+    missing = sorted(R.AWAITING_MAIN_WIRING - _tail_imports())
+    assert not missing, f"not yet in run_enrich_tail: {missing}"
 
 
 def test_network_is_blocked_inside_and_restored_after():

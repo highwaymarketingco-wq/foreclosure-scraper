@@ -1,5 +1,9 @@
 """SC phone enrichment via NC voter file cross-reference.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 SC has no free bulk voter file with phones. But many SC property owners live in NC
 (or have NC records). This enricher cross-references SC foreclosure owner names
 against the NC voter file (NCSBE) to find phone numbers.

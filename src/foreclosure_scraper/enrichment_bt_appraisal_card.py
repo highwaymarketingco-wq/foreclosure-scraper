@@ -292,6 +292,14 @@ async def enrich_bt_appraisal_card(listings: Iterable[Listing]) -> dict:
             got = parse_card(r.content)
             if not got:
                 stats["not_a_card"] += 1
+                # The portal answered, with no card: recorded (no card_url, so doc_inventory does not
+                # count it) so the tail's 30-day recheck skips it instead of re-asking every run
+                # (enrichment_tail_extras.bt_targets). A fetch error writes nothing: retried next run.
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                if not isinstance(li.raw.get("bt_appraisal_card"), dict) or \
+                        not li.raw["bt_appraisal_card"].get("card_url"):
+                    li.raw["bt_appraisal_card"] = {"status": "no_card"}
                 return
             stats["parsed"] += 1
             if not isinstance(li.raw, dict):

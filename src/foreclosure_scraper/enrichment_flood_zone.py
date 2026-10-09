@@ -129,6 +129,35 @@ async def check_flood_zone(lat: float, lon: float) -> dict:
     return result
 
 
+def flood_zone_from_flood(fl: dict) -> Optional[dict]:
+    """raw['flood_zone'] (this module's shape) for a raw['flood'] block, or None.
+
+    The run reads the FEMA NFHL layer once, in enrichment_flood (raw['flood']); this module's own
+    fetcher (enrich_flood_zones) read the same layer a second time and only scripts ran it, so the
+    published flood_zone went stale (audit 2026-10-09, unwired_enrichers). The tail now mirrors
+    raw['flood'] into flood_zone (enrichment_tail_extras.mirror_flood_zone); enrich_flood_zones is
+    kept for the scripts and is not called by the run."""
+    if not isinstance(fl, dict):
+        return None
+    zone = str(fl.get("zone") or "").strip().upper()
+    if not zone or zone == "?":
+        return None
+    sub = str(fl.get("subtype") or "").strip()
+    in_sfha = bool(fl.get("in_sfha") or fl.get("sfha_tf"))
+    if in_sfha:
+        risk, desc = "high", sub
+    elif zone in ("X", "X500", "B", "C"):
+        moderate = zone == "X500" or "0.2 PCT" in sub.upper()
+        risk, desc = ("moderate" if moderate else "low"), "Area of moderate/low flood hazard"
+    elif zone == "D":
+        risk, desc = "unknown", "Area of undetermined flood hazard"
+    else:
+        risk, desc = "unknown", sub or zone
+    return {"in_sfha": in_sfha, "zone": zone, "zone_description": desc, "flood_risk": risk,
+            "source": "flood"}
+
+
+
 async def enrich_flood_zones(listings: list) -> dict:
     """Add flood zone data to listings that have lat/lng.
 

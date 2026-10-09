@@ -1,5 +1,9 @@
 """Lexington SC value + assessment-ratio enricher.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 WHY THIS EXISTS
     Lexington landed 2,214 leads on 2026-09-13 and every one ranked D, because the
     buy-box arithmetic needs a VALUE and the qPayBill roll does not carry one.

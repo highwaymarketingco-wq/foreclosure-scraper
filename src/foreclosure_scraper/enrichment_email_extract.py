@@ -1,5 +1,9 @@
 """Email extraction enricher — surfaces emails already present in raw data.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): the enrich_extract_emails step is not run by main.py
+(owner_email_of / liensnc_owner_email below stay the accessors every reader uses); the reason is
+in deploy/oracle/run_profile.json unwired_allowlist and docs/audit_2026-10-09/unwired_enrichers.md.
+
 Emails are scattered across multiple raw fields from different scrapers:
   - raw["distressed"]["agent_email"]    — RE agent/broker emails (HomeHarvest)
   - raw["notice_contact"]               — attorney/trustee emails (legal notices)

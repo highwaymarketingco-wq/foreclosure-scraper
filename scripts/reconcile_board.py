@@ -97,7 +97,22 @@ NETWORK_STUBS: dict[tuple[str, str], str] = {
     ("enrichment_usps_vacancy", "enrich_usps_vacancy"): "none",
     ("valuation.rentcast", "enrich_top_n"): "unmatched",
     ("outreach", "generate_outreach"): "sync_skip",                     # writes docs/crm.json
+    # audit 2026-10-09 unwired_enrichers: BT appraisal cards; septic layer refresh + NWI wetlands
+    ("enrichment_tail_extras", "enrich_network_pre_value"): "skip",
+    ("enrichment_tail_extras", "enrich_network_geo"): "skip",
 }
+
+#: NETWORK_STUBS / LOCAL_STEPS entries whose main.py wiring line the lead has not added yet (the
+#: report docs/audit_2026-10-09/unwired_enrichers.md, lines UE1-UE4). The stale-stub test skips
+#: them; tests/test_reconcile_board.py::test_awaiting_steps_are_wired is a strict xfail that starts
+#: failing once they are wired: then empty this set and drop the marker.
+AWAITING_MAIN_WIRING: frozenset[tuple[str, str]] = frozenset({
+    ("enrichment_dnc", "enrich_dnc_scrub"),
+    ("enrichment_tail_extras", "enrich_local_pre_gate"),
+    ("enrichment_tail_extras", "enrich_local_after_qa"),
+    ("enrichment_tail_extras", "enrich_network_pre_value"),
+    ("enrichment_tail_extras", "enrich_network_geo"),
+})
 
 #: Local steps run_enrich_tail imports that a reconcile RUNS (no network; they read the rows, the
 #: ledgers in docs/handoff/verification, local reference data, or the published board's keys).
@@ -136,6 +151,12 @@ LOCAL_STEPS: frozenset[tuple[str, str]] = frozenset({
     ("enrichment_source_link", "enrich_source_link"), ("web_artifact", "plain_board_row_count"),
     # imported by the tail but never called by a reconcile (TailState.update_source_health=False)
     ("source_health_tracker", "update_source_health"),
+    # audit 2026-10-09 unwired_enrichers: the DNC scrub reads data/dnc_registry.csv and
+    # data/internal_dnc.csv only; flood_zone mirror, HUD FMR and septic from local tables;
+    # source-consistency flags and property category from the rows
+    ("enrichment_dnc", "enrich_dnc_scrub"),
+    ("enrichment_tail_extras", "enrich_local_pre_gate"),
+    ("enrichment_tail_extras", "enrich_local_after_qa"),
 })
 
 #: raw marker that keeps the resolved-lead catch-up (comps / photos / vision for rows the name

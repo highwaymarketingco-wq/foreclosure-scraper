@@ -105,18 +105,21 @@ def _api_get(path: str) -> dict | list | None:
         return None
 
 
-def _load_fmr_data() -> dict[str, dict]:
-    """Load FMR data from cache or HUD API.
+def _load_fmr_data(force: bool = False) -> dict[str, dict]:
+    """Load FMR data from cache or HUD API (force=True: always the API, for
+    scripts/refresh_fmr_cache.py; an empty answer keeps the old cache).
 
     Returns dict: {county_fips: {efficiency, 1br, 2br, 3br, 4br, year, area_name}}
     """
     global _loaded, _county_rent_map, _metro_rent_map, _county_fips_map
 
-    if _loaded:
+    if _loaded and not force:
         return _county_rent_map
+    if force:
+        _county_rent_map, _metro_rent_map, _county_fips_map = {}, {}, {}
 
     # Try cache first
-    if _CACHE_FILE.exists():
+    if _CACHE_FILE.exists() and not force:
         mtime = _CACHE_FILE.stat().st_mtime
         age_days = (datetime.now().timestamp() - mtime) / 86400
         if age_days < 30:
@@ -207,7 +210,12 @@ def _load_fmr_data() -> dict[str, dict]:
         _time.sleep(1.0)  # HUD rate limit: ~1 req/sec
     log.info("hud_fmr.non_metro_done", fetched=len(_county_rent_map))
 
-    # Save cache
+    # Save cache: never an EMPTY one (audit 2026-10-09). A failed refresh used to write an empty
+    # table with a fresh date, so the next 30 days had no FMR at all; the old table is kept instead.
+    if not _county_rent_map and not _metro_rent_map:
+        log.warn("hud_fmr.refresh_empty_cache_kept", path=str(_CACHE_FILE))
+        _loaded = True
+        return _county_rent_map
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     try:
         with open(_CACHE_FILE, "w") as f:

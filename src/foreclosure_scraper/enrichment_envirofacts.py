@@ -1,5 +1,9 @@
 """EPA EnviroFacts enrichment — environmental hazard overlay for property leads.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 The EPA EnviroFacts multistream API provides free, no-auth access to multiple
 environmental databases. For a real-estate lead engine, the relevant ones are:
 

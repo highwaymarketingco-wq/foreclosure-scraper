@@ -17,6 +17,7 @@ RECOMMENDED (missing = a loud warning; present but damaged = refuse)
     data/ncvoter/ncvoter*.txt           NC voter files: the NC owner-phone match
     data/sc_parcel_mailing.db           SC bulk assessor mailing roll (table sc_parcel_mailing)
     data/sc_cama.db                     SC assessor CAMA (table sc_cama)
+    data/fmr_cache/fmr_by_county.json   HUD Fair Market Rent table (key county_rent)
 
 A SQLite file passes when it opens read-only, ``PRAGMA quick_check`` answers ok (a file cut short
 by an interrupted copy fails here), and its table exists and has a row. The manifest
@@ -59,6 +60,9 @@ RECOMMENDED: dict[str, tuple[str, str | None]] = {
     "data/ncvoter": ("dir", "ncvoter*.txt"),
     "data/sc_parcel_mailing.db": ("sqlite", "sc_parcel_mailing"),
     "data/sc_cama.db": ("sqlite", "sc_cama"),
+    # HUD Fair Market Rent table the tail applies offline (enrichment_tail_extras; refreshed on the Mac
+    # by scripts/refresh_fmr_cache.py, audit 2026-10-09 unwired_enrichers)
+    "data/fmr_cache/fmr_by_county.json": ("json", "county_rent"),
 }
 
 
@@ -107,7 +111,22 @@ def _check(root: Path, rel: str, kind: str, arg: str | None) -> str | None:
         return "missing"
     if p.stat().st_size == 0:
         return "empty file"
+    if kind == "json":
+        return _json_problem(p, arg)
     return _sqlite_problem(p, arg or "") if kind == "sqlite" else _zip_problem(p)
+
+
+def _json_problem(p: Path, key: str | None) -> str | None:
+    """A small JSON object file: it parses, and `key` (when named) holds something."""
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return f"unreadable json: {type(exc).__name__}"
+    if not isinstance(d, dict):
+        return "not a json object"
+    if key and not d.get(key):
+        return f"no {key!r} in it"
+    return None
 
 
 def _cache_files(root: Path) -> list[str]:

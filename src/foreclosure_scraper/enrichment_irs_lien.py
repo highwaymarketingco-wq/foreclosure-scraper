@@ -1,5 +1,9 @@
 """IRS / federal tax lien search via CourtListener RECAP archive.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 Federal tax liens are recorded when the IRS files a Notice of Federal Tax Lien (NFTL).
 While the lien is recorded at the county ROD, enforcement actions (collection,
 seizure, suit) appear in federal court. CourtListener's RECAP archive mirrors

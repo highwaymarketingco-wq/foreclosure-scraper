@@ -23,14 +23,43 @@ from .models import Listing
 
 log = structlog.get_logger()
 
+#: The public NWI service behind the USFWS Wetlands Mapper. The www.fws.gov/wetlandsmapserver address
+#: this module used first answers 403 "Access denied, excessive crawling" to a single request
+#: (checked 2026-10-08); this one answers (a Congaree SC point returns PFO1C, 90 acres).
 WETLANDS_URL = (
-    "https://www.fws.gov/wetlandsmapserver/services/"
-    "Wetlands_Extract/MapServer/0/query"
+    "https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/rest/services/"
+    "Wetlands/MapServer/0/query"
 )
 _SEMAPHORE = asyncio.Semaphore(3)  # be polite, 3 concurrent
 _walled = False
 _consecutive_fail = 0
 _WALL_THRESHOLD = 10  # after 10 consecutive DNS/network failures, stop trying
+
+
+async def query_point(c, lat: float, lon: float, radius_m: int = 60) -> list[dict[str, Any]] | None:
+    """The NWI wetland polygons within `radius_m` of a point, as [{type, code, acres}]; None when the
+    service did not answer usefully (retry later). A 403/429 raises PermissionError: a wall is
+    recorded and the caller stops, never retried around (audit 2026-10-09, unwired_enrichers)."""
+    r = await c.get(WETLANDS_URL, params={
+        "geometry": f"{lon},{lat}", "geometryType": "esriGeometryPoint", "inSR": "4326",
+        "spatialRel": "esriSpatialRelIntersects", "distance": str(int(radius_m)),
+        "units": "esriSRUnit_Meter", "returnGeometry": "false",
+        "outFields": "WETLAND_TYPE,ATTRIBUTE,ACRES", "f": "json"})
+    if r.status_code in (403, 429):
+        raise PermissionError(f"wetlands service answered {r.status_code}")
+    if r.status_code != 200:
+        return None
+    data = r.json()
+    if not isinstance(data, dict) or "error" in data:
+        return None
+    out: list[dict[str, Any]] = []
+    for feat in data.get("features") or []:
+        a = feat.get("attributes") or {}
+        if a.get("WETLAND_TYPE"):
+            acres = a.get("ACRES")
+            out.append({"type": a.get("WETLAND_TYPE"), "code": a.get("ATTRIBUTE"),
+                        "acres": round(float(acres), 2) if isinstance(acres, (int, float)) else None})
+    return out
 
 
 async def _query_wetlands(lat: float, lon: float) -> list[dict[str, Any]]:

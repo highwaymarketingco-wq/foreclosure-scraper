@@ -1,5 +1,9 @@
 """USDA Economic Research Service enrichment — county economic indicators.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 The USDA Economic Research Service (ERS) provides county-level economic data
 via both a public API and downloadable CSVs. The API key is optional —
 without it, requests work at a lower rate limit.

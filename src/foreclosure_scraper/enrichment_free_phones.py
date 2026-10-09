@@ -1,5 +1,9 @@
 """Multi-source free phone enrichment — covers SC + NC gaps.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 The voter_phone enricher only covers NC (NCSBE voter file, ~69% of NC owners).
 SC has no free voter phone file. This module adds free people-search sources:
 

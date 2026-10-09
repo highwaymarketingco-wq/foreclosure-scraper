@@ -1,5 +1,9 @@
 """NCPTS LRC Cloud enrichment — full CAMA data for ALL 100 NC counties.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 The LRC portal at lrcpwa.ncptscloud.com is a second NCPTS cluster (separate
 from bcpwa.ncptscloud.com which handles delinquent-tax CSV downloads).
 The LRC cluster exposes a parcel search + detail REST API:

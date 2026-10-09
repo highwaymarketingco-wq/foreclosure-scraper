@@ -1,5 +1,9 @@
 """NC Department of Justice consumer-protection enrichment (403-bypass variant).
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 The NC DOJ consumer-protection pages at https://ncdoj.gov/consumer-protection/
 return HTTP 403 to standard requests. This module tries multiple endpoint
 strategies before giving up, so listings whose defendant/owner matches a known

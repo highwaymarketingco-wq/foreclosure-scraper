@@ -1,5 +1,9 @@
 """Redfin Data Center enrichment — ZIP-level market statistics.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 The Redfin Data Center (https://www.redfin.com/news/data-center/) provides
 free TSV downloads of housing market data at the ZIP, city, county, and metro
 level. We download the ZIP-code-level market tracker once per run (cached

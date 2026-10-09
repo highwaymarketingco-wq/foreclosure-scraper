@@ -1,5 +1,9 @@
 """NC Secretary of State business-entity enrichment (403-bypass variant).
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 The NC SOS business search at https://www.sosnc.gov/online/Search returns HTTP
 403 to a plain httpx request because the site fingerprints the TLS handshake
 and blocks non-browser clients. This module tries multiple strategies before

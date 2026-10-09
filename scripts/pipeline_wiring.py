@@ -339,6 +339,26 @@ def raw_key_producers(keys, repo: Path = REPO) -> dict[str, dict]:
     return out
 
 
+# ------------------------------------------------------------------------------ tail step calls
+def tail_imports(repo: Path = REPO) -> set[tuple[str, str]]:
+    """(module, name) of every `from .module import name` inside main.run_enrich_tail: the steps the
+    tail actually calls. The import graph says a module is reached when anything imports it (a
+    helper import counts); this says the tail calls the step (scripts/reconcile_board.py classifies
+    the same set)."""
+    p = repo / "src" / PKG / "main.py"
+    try:
+        tree = ast.parse(p.read_text(encoding="utf-8", errors="replace"))
+    except (OSError, SyntaxError):
+        return set()
+    fn = next((n for n in tree.body if isinstance(n, (ast.AsyncFunctionDef, ast.FunctionDef))
+               and n.name == "run_enrich_tail"), None)
+    out: set[tuple[str, str]] = set()
+    for node in ast.walk(fn) if fn is not None else ():
+        if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module:
+            out |= {(node.module, a.name) for a in node.names}
+    return out
+
+
 # ------------------------------------------------------------------------------------- env flags
 def _const_str(n) -> str | None:
     return n.value if isinstance(n, ast.Constant) and isinstance(n.value, str) else None

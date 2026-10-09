@@ -32,9 +32,12 @@ THE CHECKS (each PASS / WARN / FAIL / SKIP, one line why)
     board-loads  no whole-file json.load of a board-scale file in the run path that is not
                  reviewed in run_profile.json board_load_allowlist (the carryover kill)
     unwired      no enrichment / scraper module that no run path reaches, unless listed with a
-                 reason in run_profile.json unwired_allowlist (listed ones print as a warning)
+                 reason in run_profile.json unwired_allowlist (retired: printed as a warning); a
+                 module listed in unwired_wire_pending (decided WIRE) that is still unreached fails
+                 as "wiring pending" and names the main.py line that wires it
     frozen-keys  no published raw key whose only writers are unwired modules, unless listed in
-                 run_profile.json frozen_keys_known (a warning: values frozen since a script ran)
+                 run_profile.json frozen_keys_known (a warning: values frozen since a script ran);
+                 a key a wire-pending module writes fails as "wiring pending"
     flags        deploy/oracle/vm_lib.sh exports exactly the run_profile.json flags; none of
                  must_not_set is exported by vm_lib.sh or set in this environment (prints the
                  profile)
@@ -364,32 +367,57 @@ def check_board_loads(repo: Path, profile: dict) -> tuple[str, str]:
 def check_unwired(repo: Path, profile: dict) -> tuple[str, str]:
     import pipeline_wiring as W
     allow = profile.get("unwired_allowlist") or {}
+    pending = profile.get("unwired_wire_pending") or {}
     rows = W.unwired(repo)
-    new = [r for r in rows if r["module"] not in allow]
-    stale = sorted(set(allow) - {r["module"] for r in rows})
+    names = {r["module"] for r in rows}
+    new = [r for r in rows if r["module"] not in allow and r["module"] not in pending]
+    waiting = sorted(m for m in names if m in pending and m not in allow)
+    stale = sorted(set(allow) - names)
+    wired = sorted(set(pending) - names)
     if new:
         return FAIL, (f"{len(new)} module(s) no run path reaches and no reason recorded: "
                       + ", ".join(f"{r['module']} ({r['status']})" for r in new[:8]))
+    if waiting:
+        lines = sorted({str(pending[m]).split(" ")[0] for m in waiting})
+        return FAIL, (f"wiring pending: {len(waiting)} module(s) decided WIRE that no run path reaches yet "
+                      f"({', '.join(waiting[:9])}); add the main.py lines {', '.join(lines)} "
+                      f"(docs/audit_2026-10-09/unwired_enrichers.md)")
+    # a module can be reached through a helper import while its step is never called: the steps
+    # the profile requires must be imported inside main.run_enrich_tail
+    req = [tuple(x) for x in profile.get("tail_calls_required") or []]
+    missing = [f"{m}.{a}" for m, a in req if (m, a) not in W.tail_imports(repo)]
+    if missing:
+        return FAIL, (f"wiring pending: main.run_enrich_tail does not call {', '.join(missing[:6])} "
+                      f"(docs/audit_2026-10-09/unwired_enrichers.md)")
     msg = f"{len(rows)} unwired module(s), each with a recorded reason"
-    if stale:
-        msg += f"; allowlist names {len(stale)} now wired or gone: {', '.join(stale[:5])} (tidy the profile)"
-    return (WARN if rows or stale else PASS), msg
+    if stale or wired:
+        msg += (f"; the profile names {len(stale) + len(wired)} module(s) now wired or gone: "
+                f"{', '.join((stale + wired)[:6])} (tidy unwired_allowlist / unwired_wire_pending)")
+    return (WARN if rows or stale or wired else PASS), msg
 
 
 def check_frozen_keys(repo: Path, profile: dict) -> tuple[str, str]:
     """Published raw keys whose only writers are modules no run path reaches: their values on the
     board are whatever a script last wrote, never refreshed. A warning (each needs a wire-or-retire
-    decision), a failure only for a key not listed in run_profile.json frozen_keys_known."""
+    decision), a failure only for a key not listed in run_profile.json frozen_keys_known ("wiring
+    pending" when a module decided WIRE writes it: the main.py line is missing)."""
     import pipeline_wiring as W
     sys.path.insert(0, str(repo / "src"))
     from foreclosure_scraper.web_artifact import RAW_KEEP
     prod = W.raw_key_producers(sorted(RAW_KEEP), repo)
     frozen = sorted(k for k, v in prod.items() if v["writers"] and not v["in_run"])
     known = set(profile.get("frozen_keys_known") or [])
+    pending = set(profile.get("unwired_wire_pending") or {})
     new = [k for k in frozen if k not in known]
-    if new:
-        return FAIL, (f"{len(new)} published key(s) only an unwired module writes (frozen on the board): "
-                      + ", ".join(f"{k} <- {'/'.join(prod[k]['writers'][:2])}" for k in new[:8]))
+    waiting = [k for k in new if set(prod[k]["writers"]) & pending]
+    other = [k for k in new if k not in waiting]
+    if other:
+        return FAIL, (f"{len(other)} published key(s) only an unwired module writes (frozen on the board): "
+                      + ", ".join(f"{k} <- {'/'.join(prod[k]['writers'][:2])}" for k in other[:8]))
+    if waiting:
+        return FAIL, (f"wiring pending: {len(waiting)} published key(s) written by modules decided WIRE that the "
+                      f"run does not reach yet: {', '.join(waiting[:10])} (main.py lines in "
+                      f"docs/audit_2026-10-09/unwired_enrichers.md)")
     return (WARN if frozen else PASS), (f"{len(frozen)} published keys are frozen (written only by "
                                         f"script-only modules), all recorded in the profile")
 

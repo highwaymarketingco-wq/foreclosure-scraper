@@ -1,5 +1,9 @@
 """Realtor.com Data Library enrichment — county-level housing market data.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 The Realtor.com Data Library (https://www.realtor.com/research/data/)
 provides free TSV/CSV downloads of housing market statistics at the
 metropolitan and county level. We download the county-level market data

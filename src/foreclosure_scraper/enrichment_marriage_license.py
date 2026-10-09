@@ -1,5 +1,9 @@
 """Marriage license signal enricher — NC Register of Deeds cross-reference.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 A distressed homeowner who recently filed for a marriage license is a life-event
 signal: possible name change, joint ownership, or spousal motivation. This
 enricher cross-references owner names against marriage license records from NC

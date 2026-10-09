@@ -250,7 +250,10 @@ def test_the_real_profile_matches_vm_lib_and_the_real_code():
     prof = G.load_profile()
     assert G.check_flags(REPO, prof, env={})[0] == G.PASS
     assert G.check_board_loads(REPO, prof)[0] == G.PASS
-    assert G.check_unwired(REPO, prof)[0] in (G.PASS, G.WARN)
+    st, why = G.check_unwired(REPO, prof)
+    # until the lead adds the unwired_enrichers wiring lines (UE1-UE4) the only failure allowed is
+    # "wiring pending"; test_the_real_profile_has_nothing_pending flips once they are in
+    assert st in (G.PASS, G.WARN) or why.startswith("wiring pending"), why
 
 
 def test_exit_codes():
@@ -269,12 +272,43 @@ def test_a_crashing_check_is_a_failed_check(repo, monkeypatch):
 
 def test_frozen_keys_known_in_the_real_profile():
     prof = G.load_profile()
-    assert G.check_frozen_keys(REPO, prof)[0] in (G.PASS, G.WARN)
+    st, why = G.check_frozen_keys(REPO, prof)
+    assert st in (G.PASS, G.WARN) or why.startswith("wiring pending"), why
     st, why = G.check_frozen_keys(REPO, {**prof, "frozen_keys_known": []})
     assert st == G.FAIL and f"{len(prof['frozen_keys_known'])} published key(s)" in why
     st, why = G.check_frozen_keys(REPO, {**prof, "frozen_keys_known": [k for k in prof["frozen_keys_known"]
-                                                                       if k != "flood_zone"]})
-    assert st == G.FAIL and "flood_zone <- enrichment_flood_zone" in why
+                                                                       if k != "lexington_assessment"]})
+    assert st == G.FAIL and "lexington_assessment <- enrichment_lexington_assessment" in why
+
+
+@pytest.mark.xfail(strict=True, reason="audit 2026-10-09 unwired_enrichers: main.py lines UE1-UE4 not added "
+                   "yet; once they are, drop this marker and tidy run_profile.json unwired_wire_pending")
+def test_the_real_profile_has_nothing_pending():
+    prof = G.load_profile()
+    assert G.check_unwired(REPO, prof)[0] in (G.PASS, G.WARN)
+    assert G.check_frozen_keys(REPO, prof)[0] in (G.PASS, G.WARN)
+
+
+def test_wire_pending_modules_fail_until_reached(repo):
+    _tree(repo, {"main.py": "from .enrichment_a import enrich_a\n",
+                 "enrichment_a.py": "def enrich_a(li):\n    li.raw['alpha'] = 1\n",
+                 "enrichment_b.py": "def enrich_b(li):\n    li.raw['beta'] = 1\n",
+                 "enrichment_c.py": "def enrich_c(li):\n    li.raw['gamma'] = 1\n"})
+    prof = {"unwired_allowlist": {"enrichment_c": "retired"}, "unwired_wire_pending": {"enrichment_b": "UE9"},
+            "frozen_keys_known": ["gamma"]}
+    st, why = G.check_unwired(repo, prof)
+    assert st == G.FAIL and why.startswith("wiring pending") and "enrichment_b" in why and "UE9" in why
+    _tree(repo, {"main.py": "from .enrichment_a import enrich_a\nfrom .enrichment_b import enrich_b\n"})
+    st, why = G.check_unwired(repo, prof)
+    assert st == G.WARN and "enrichment_b" in why and "tidy" in why
+    # reached through a helper import but its step never called inside run_enrich_tail
+    req = {**prof, "tail_calls_required": [["enrichment_b", "enrich_b"]]}
+    st, why = G.check_unwired(repo, req)
+    assert st == G.FAIL and "does not call enrichment_b.enrich_b" in why
+    _tree(repo, {"main.py": ("from .enrichment_a import enrich_a\n"
+                             "async def run_enrich_tail(st):\n    from .enrichment_b import enrich_b\n")})
+    assert W.tail_imports(repo) == {("enrichment_b", "enrich_b")}
+    assert G.check_unwired(repo, req)[0] == G.WARN
 
 
 def test_raw_key_producers_sees_wired_and_unwired_writers(repo):

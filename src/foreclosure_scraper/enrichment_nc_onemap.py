@@ -1,5 +1,9 @@
 """NC OneMap geospatial enrichment — parcel, zoning, floodplain overlay for NC.
 
+RETIRED 2026-10-09 (audit unwired_enrichers): main.py does not run this module and nothing
+should; the reason is in deploy/oracle/run_profile.json unwired_allowlist and
+docs/audit_2026-10-09/unwired_enrichers.md. Kept, not deleted, with the board keys it wrote.
+
 NC OneMap provides free ArcGIS REST services for North Carolina counties.
 For each listing's lat/lon (NC properties only), we query:
 
