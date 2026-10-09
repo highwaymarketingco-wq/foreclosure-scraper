@@ -114,15 +114,15 @@ PORTALS: dict[str, ITSPortal] = {
 }
 
 #: Counties on this vendor that cannot be read (verdicts, not gaps; read live 2026-10-09):
-#:   Clay, Swain, Surry  the old 1.0 build: a plain form post to /TaxBillSearch/Results that the
-#:                       server answers HTTP 500 (no JSON grid exists)
-#:   Warren, Gates       the portal answers, but every unpaid-bill search returns 0 records
+#:   Clay, Swain, Surry  the old 1.0 build: no JSON grid routes (404); Clay's plain form post to
+#:                       /TaxBillSearch/Results answers HTTP 500 (Swain and Surry serve the same page)
+#:   Warren, Gates       the portal answers, but every bill search (paid or unpaid, 2022-2025) returns 0 records
 UNREADABLE_PORTALS = {
-    "Clay": "old ITS 1.0 build; results form answers HTTP 500",
-    "Swain": "old ITS 1.0 build; results form answers HTTP 500",
-    "Surry": "old ITS 1.0 build; results form answers HTTP 500",
-    "Warren": "portal answers 0 unpaid bills for every year",
-    "Gates": "portal answers 0 unpaid bills for every year",
+    "Clay": "old ITS 1.0 build: no JSON routes (404); its results form answers HTTP 500",
+    "Swain": "old ITS 1.0 build: no JSON routes (404); same page as Clay, its form was not posted",
+    "Surry": "old ITS 1.0 build: no JSON routes (404); same page as Clay, its form was not posted",
+    "Warren": "portal answers 0 bills, paid or unpaid, for 2022-2025 (read live 2026-10-09)",
+    "Gates": "portal answers 0 bills, paid or unpaid, for 2022-2025 (read live 2026-10-09)",
 }
 
 

@@ -117,7 +117,7 @@ def test_cache_round_trip_and_ttl():
 # --------------------------------------------------------------------------- matching
 
 ROWS = [["1985ES2400360", "SMITHSON, LOUGENIA H"], ["2019ES2400111", "SMITHSON, LOUGENIA"],
-        ["2020ES2400222", "ROEBUCK, TIMOTHY ALAN"], ["1999ES2400333", "ZOLLER, KARL"]]
+        ["2020ES2400222", "SAMPLEMAN, TIMOTHY ALAN"], ["1999ES2400333", "ZOLLER, KARL"]]
 
 
 def row(owner, county="Greenwood", raw=None, state="SC"):
@@ -130,7 +130,7 @@ def test_full_and_initial_fits_are_found_and_a_different_middle_name_is_not():
     assert fits and fits[0]["level"] in ("full", "middle_initial") and fits[0]["case_number"].endswith("ES2400360")
     assert idx.fits(["SMITHSON LOUGENIA B"]) == [] or all(f["case_number"] != "1985ES2400360" for f in
                                                          idx.fits(["SMITHSON LOUGENIA B"]))
-    assert idx.fits(["ROEBUCK TIMOTHY ALAN"])[0]["level"] == "full"
+    assert idx.fits(["SAMPLEMAN TIMOTHY ALAN"])[0]["level"] == "full"
     assert idx.fits(["NOBODY HERE"]) == []
 
 
@@ -142,7 +142,7 @@ def test_given_surname_only_counts_for_a_recent_case():
 
 def test_a_name_match_alone_never_writes_raw_probate():
     idx = P.DecedentIndex(ROWS)
-    r = row("ROEBUCK TIMOTHY ALAN")
+    r = row("SAMPLEMAN TIMOTHY ALAN")
     st = P.match_rows([r], {"Greenwood": idx})
     assert r.raw["probate_index_match"][0]["case_number"] == "2020ES2400222"
     assert "probate" not in r.raw
@@ -151,12 +151,12 @@ def test_a_name_match_alone_never_writes_raw_probate():
 
 def test_a_death_on_the_roll_promotes_the_match_to_raw_probate_without_overwriting_a_case():
     idx = P.DecedentIndex(ROWS)
-    r = row("ESTATE OF ROEBUCK TIMOTHY ALAN")
+    r = row("ESTATE OF SAMPLEMAN TIMOTHY ALAN")
     P.match_rows([r], {"Greenwood": idx})
     pr = r.raw["probate"]
     assert pr["case_number"] == "2020ES2400222" and pr["es_case_number"] == "2020ES2400222"
     assert pr["source"] == P.SOURCE and pr["match_confidence"] in ("full", "middle_initial")
-    keep = row("ESTATE OF ROEBUCK TIMOTHY ALAN", raw={"probate": {"case_number": "X9", "decedent": "Someone"}})
+    keep = row("ESTATE OF SAMPLEMAN TIMOTHY ALAN", raw={"probate": {"case_number": "X9", "decedent": "Someone"}})
     P.match_rows([keep], {"Greenwood": idx})
     assert keep.raw["probate"]["case_number"] == "X9"
     assert keep.raw["probate_index_match"]
@@ -164,7 +164,7 @@ def test_a_death_on_the_roll_promotes_the_match_to_raw_probate_without_overwriti
 
 def test_other_states_counties_and_unindexed_counties_are_untouched():
     idx = P.DecedentIndex(ROWS)
-    a, b, c = row("ROEBUCK TIMOTHY ALAN", state="NC"), row("ROEBUCK TIMOTHY ALAN", county="Aiken"), row(None)
+    a, b, c = row("SAMPLEMAN TIMOTHY ALAN", state="NC"), row("SAMPLEMAN TIMOTHY ALAN", county="Aiken"), row(None)
     st = P.match_rows([a, b, c], {"Greenwood": idx})
     assert a.raw is None and b.raw is None and c.raw is None and st["rows_matched_against"] == 0
 
@@ -172,7 +172,7 @@ def test_other_states_counties_and_unindexed_counties_are_untouched():
 # --------------------------------------------------------------------------- the enrichment end to end
 
 def test_enrich_builds_matches_and_reports_the_screened_county(monkeypatch):
-    http = FakeHttp({0: (2, [("2020ES2400222", "ROEBUCK, TIMOTHY ALAN"), ("1999ES1", "ZOLLER, KARL")])})
+    http = FakeHttp({0: (2, [("2020ES2400222", "SAMPLEMAN, TIMOTHY ALAN"), ("1999ES1", "ZOLLER, KARL")])})
     import contextlib
 
     @contextlib.asynccontextmanager
@@ -180,7 +180,7 @@ def test_enrich_builds_matches_and_reports_the_screened_county(monkeypatch):
         yield http
 
     monkeypatch.setattr(P, "client", fake_client)
-    rows = [row("ROEBUCK TIMOTHY ALAN"), row("SOMEONE ELSE"), row("ROEBUCK TIMOTHY ALAN", county="Aiken")]
+    rows = [row("SAMPLEMAN TIMOTHY ALAN"), row("SOMEONE ELSE"), row("SAMPLEMAN TIMOTHY ALAN", county="Aiken")]
     st = asyncio.run(P.enrich_probate_spartan(rows))
     assert st["screened"] == {"probate": ["SC|Greenwood"]}
     assert st["counties"]["Greenwood"]["complete"] and st["counties"]["Greenwood"]["total"] == 2
@@ -217,13 +217,13 @@ def test_ledger_reads_the_probate_screen():
 
 
 def test_a_thin_fit_with_a_unique_name_and_no_case_year_is_kept_and_promoted_only_with_a_death_on_the_roll():
-    idx = P.DecedentIndex([["2399", "GOVAN, FRANCES"], ["1155", "WISE, BP"], ["1788", "WISE, BP"]])
-    live = row("Frances Govan", county="Calhoun")
+    idx = P.DecedentIndex([["2399", "SAMPLETON, FRANCES"], ["1155", "EXAMPLEWISE, BP"], ["1788", "EXAMPLEWISE, BP"]])
+    live = row("Frances Sampleton", county="Calhoun")
     P.match_rows([live], {"Calhoun": idx})
     assert live.raw["probate_index_match"][0]["level"] == "given_surname" and "probate" not in live.raw
-    dead = row("ESTATE OF Frances Govan", county="Calhoun")
+    dead = row("ESTATE OF Frances Sampleton", county="Calhoun")
     P.match_rows([dead], {"Calhoun": idx})
     assert dead.raw["probate"]["case_number"] == "2399"
-    twin = row("ESTATE OF Bp Wise", county="Calhoun")                  # two decedents with the name: ambiguous
+    twin = row("ESTATE OF Bp Examplewise", county="Calhoun")                  # two decedents with the name: ambiguous
     P.match_rows([twin], {"Calhoun": idx})
     assert twin.raw is None
