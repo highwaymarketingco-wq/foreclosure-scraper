@@ -2089,6 +2089,7 @@ RAW_KEEP = {
     "staleness": "*",                 # staleness_sweep verdict {state: upset_closed|sale_passed|gone_quiet, ...} for dashboard filtering
     "life_events": "*",               # elderly/probate signals: life_estate | estate_probate | multiple_heirs | trust
     "probate": "*",                   # probate court case search result: case_number, filing_date, court, decedent, status
+    "probate_index_match": "*",       # enrichment_probate_spartan: name fits to a county court's decedent index (case numbers only)
     "gis_exempt": "*",                # statutory tax-relief exemption (ELD/DIS/BLD/VET) -> hard elderly/disabled signal
     "owner_name_source": "*",         # provenance when owner_name was promoted from tax/GIS
     "owner_name_as_of": "*",          # freshness stamp (ISO date) for the CURRENT-state owner_name refresh

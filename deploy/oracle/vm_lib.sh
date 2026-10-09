@@ -128,6 +128,15 @@ vm_load_env() {
   export FORECLOSURE_NC_LRSEARCH_ROD="${FORECLOSURE_NC_LRSEARCH_ROD:-1}"
   export FORECLOSURE_REGISTER_CHECKS="${FORECLOSURE_REGISTER_CHECKS:-1}"
   export FORECLOSURE_REGISTER_CHECKS_BUDGET_S="${FORECLOSURE_REGISTER_CHECKS_BUDGET_S:-900}"
+  # ... and the county-wide Date Range sweeps of the ten Cott v4 counties (adverse kinds for liens, the MARRIAGES
+  # index for licences), cached in data/county_sweeps/; newest window first inside the per-county budget.
+  export FORECLOSURE_REGISTER_SWEEP="${FORECLOSURE_REGISTER_SWEEP:-1}"
+  export FORECLOSURE_REGISTER_SWEEP_BUDGET_S="${FORECLOSURE_REGISTER_SWEEP_BUDGET_S:-1800}"
+  export FORECLOSURE_REGISTER_SWEEP_SINCE="${FORECLOSURE_REGISTER_SWEEP_SINCE:-2020-01-01}"
+  # 2026-10-09 top80 (check group): the Spartan public probate inquiry of Greenwood, Newberry and Calhoun (plain HTTP,
+  # the whole decedent index once, about 420 requests at 2 s, cached 30 days in data/probate_index), matched offline.
+  export FORECLOSURE_PROBATE_SPARTAN="${FORECLOSURE_PROBATE_SPARTAN:-1}"
+  export FORECLOSURE_PROBATE_SPARTAN_BUDGET_S="${FORECLOSURE_PROBATE_SPARTAN_BUDGET_S:-1500}"
   export FORECLOSURE_GENERIC_ROD_BUDGET_S="${FORECLOSURE_GENERIC_ROD_BUDGET_S:-2400}"
   export GENERIC_ROD_COUNTY_CONCURRENCY="${GENERIC_ROD_COUNTY_CONCURRENCY:-8}"
   export ROD_CHAIN_COUNTY_CONCURRENCY="${ROD_CHAIN_COUNTY_CONCURRENCY:-8}"

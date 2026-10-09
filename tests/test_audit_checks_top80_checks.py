@@ -35,7 +35,8 @@ def test_the_interface_and_names():
     checks = T.make_checks()
     assert [c.name for c in checks] == [
         "top80-its-roll-shape", "top80-its-county-silent", "top80-onemap-heir-shape",
-        "top80-onemap-flag-shape", "top80-onemap-flag-share", "top80-checks-config"]
+        "top80-onemap-flag-shape", "top80-onemap-flag-share", "top80-probate-match-shape",
+        "top80-vacant-lot-shape", "top80-checks-config"]
     for c in checks:
         r = c.finish()
         assert set(r) == {"name", "checked", "violations", "max_violations", "ok", "detail"}
@@ -100,3 +101,35 @@ def test_flag_share_catches_a_county_where_the_flag_is_on_everything():
 def test_live_repo_configuration_is_consistent():
     got = by_name(T.make_checks())["top80-checks-config"].finish()
     assert got["ok"], got["detail"]
+
+
+def prow(match=None, probate=None, owner="ESTATE OF DOE JANE", state="SC", county="Greenwood", **raw_extra):
+    raw = dict(raw_extra)
+    if match is not None:
+        raw["probate_index_match"] = match
+    if probate is not None:
+        raw["probate"] = probate
+    return {"state": state, "county": county, "owner_name": owner, "raw": raw}
+
+
+GOOD = {"case_number": "2020ES2400222", "level": "full", "county": "Greenwood", "party_type": "DEC"}
+PR = {"source": "spartan_public_probate", "case_number": "2020ES2400222", "es_case_number": "2020ES2400222"}
+
+
+def test_probate_match_shape():
+    assert run("top80-probate-match-shape", [prow([GOOD], PR), prow([GOOD], owner="DOE JANE")])["ok"]
+    assert not run("top80-probate-match-shape", [prow([GOOD, GOOD, GOOD, GOOD])])["ok"]
+    assert not run("top80-probate-match-shape", [prow([{**GOOD, "level": "maybe"}])])["ok"]
+    assert not run("top80-probate-match-shape", [prow([{**GOOD, "county": "Aiken"}])])["ok"]
+    assert not run("top80-probate-match-shape", [prow([GOOD], state="NC")])["ok"]
+    assert not run("top80-probate-match-shape", [prow([GOOD], {**PR, "es_case_number": "X"})])["ok"]
+    got = run("top80-probate-match-shape", [prow([GOOD], PR, owner="DOE JANE")])
+    assert not got["ok"] and "probate_without_death_signal" in got["detail"]
+
+
+def test_vacant_lot_shape():
+    ok = {"state": "SC", "raw": {"vacant_lot": {"land_use": "Vacant Residential", "source": "parcel_cache_landuse"}}}
+    bad = {"state": "SC", "raw": {"vacant_lot": {"land_use": "R", "source": "parcel_cache_landuse"}}}
+    other = {"state": "SC", "raw": {"vacant_lot": {"land_use": "R", "source": "county"}}}
+    assert run("top80-vacant-lot-shape", [ok, other])["ok"]
+    assert not run("top80-vacant-lot-shape", [ok, bad])["ok"]

@@ -22,6 +22,15 @@ Each check would have caught a defect this group measured or closes a cell the c
                                rows stamped from the present-use flag above MAX_SHARE: the layer's flag is
                                on nearly every parcel there (Johnston 99%, Rowan 99%, Wayne 97% on
                                2026-10-09) and the sweep's reliability rule failed to drop the county.
+  top80-probate-match-shape    raw['probate_index_match'] (the Spartan decedent-index name fits of Greenwood,
+                               Newberry and Calhoun) that is malformed: more than 3 entries, an entry without
+                               a case number / a known level / one of the three counties, or a row outside
+                               SC; and a raw['probate'] with source spartan_public_probate that names no case,
+                               differs between case_number and es_case_number, or sits on a row with no
+                               death signal (a name match alone must never write raw['probate']).
+  top80-vacant-lot-shape       raw['vacant_lot'] stamped from the parcel cache whose land_use text names no
+                               vacant / undeveloped parcel (the stamp is the VACANT / UNDEVELOPED regex of
+                               enrichment_vacant_landuse; the county's class code alone is not a vacant lot).
   top80-checks-config          repo configuration, not rows: the ITS portals and the unreadable-portal
                                verdicts are disjoint and cover the 15 counties probed, the tax_lien
                                verifier (tax_lien_itspublic) holds the six parcel-bearing newer-build
@@ -207,6 +216,80 @@ class _FlagShare:
                        f"{MAX_SHARE:.0%} of them: {bad}; flagged rows {sum(self.flagged.values())}")
 
 
+_DEATH = re.compile(r"\bHEIRS?\b|\bESTATE\b|\bDECEASED\b|\bDEC'?D\b", re.I)
+_LEVELS = ("full", "middle_initial", "given_surname")
+SPARTAN_COUNTIES = ("Greenwood", "Newberry", "Calhoun")
+
+
+class _ProbateShape:
+    name = "top80-probate-match-shape"
+
+    def __init__(self) -> None:
+        self.checked = self.bad = 0
+        self.sample: list[str] = []
+
+    def _flag(self, row: dict, why: str) -> None:
+        self.bad += 1
+        if len(self.sample) < SAMPLE:
+            self.sample.append(f"{row.get('county')}:{why}")
+
+    def feed(self, row: dict) -> None:
+        raw = _raw(row)
+        m = raw.get("probate_index_match")
+        pr = raw.get("probate")
+        spartan_pr = isinstance(pr, dict) and pr.get("source") == "spartan_public_probate"
+        if m is None and not spartan_pr:
+            return
+        self.checked += 1
+        if m is not None:
+            if not isinstance(m, list) or not m or len(m) > 3:
+                self._flag(row, "match_list_shape")
+            else:
+                for e in m:
+                    if not (isinstance(e, dict) and e.get("case_number") and e.get("level") in _LEVELS
+                            and e.get("county") in SPARTAN_COUNTIES):
+                        self._flag(row, "match_entry_shape")
+                        break
+            if str(row.get("state") or "").upper() != "SC":
+                self._flag(row, "not_sc")
+        if spartan_pr:
+            if not pr.get("case_number") or pr.get("case_number") != pr.get("es_case_number"):
+                self._flag(row, "probate_case_number")
+            owners = " ".join(str(x) for x in (row.get("owner_name"), (raw.get("gis") or {}).get("owner")
+                                               if isinstance(raw.get("gis"), dict) else "") if x)
+            corroborated = (_DEATH.search(owners) or raw.get("heir_estate") or raw.get("sc_probate_notice")
+                            or raw.get("heir_naming_publication") or raw.get("sc_probate_net")
+                            or str(row.get("listing_type") or "").endswith("probate_notice"))
+            if not corroborated:
+                self._flag(row, "probate_without_death_signal")
+
+    def finish(self) -> dict:
+        return _result(self.name, self.checked, self.bad, 0,
+                       f"{self.checked} Spartan probate rows; {self.bad} malformed or uncorroborated; sample {self.sample}")
+
+
+_VACANT = re.compile(r"\b(VACANT|UNDEVELOPED)\b", re.I)
+
+
+class _VacantShape:
+    name = "top80-vacant-lot-shape"
+
+    def __init__(self) -> None:
+        self.checked = self.bad = 0
+
+    def feed(self, row: dict) -> None:
+        vl = _raw(row).get("vacant_lot")
+        if not isinstance(vl, dict) or vl.get("source") != "parcel_cache_landuse":
+            return
+        self.checked += 1
+        if not _VACANT.search(str(vl.get("land_use") or "")):
+            self.bad += 1
+
+    def finish(self) -> dict:
+        return _result(self.name, self.checked, self.bad, 0,
+                       f"{self.checked} parcel-cache vacant_lot stamps; {self.bad} whose land use is not vacant/undeveloped")
+
+
 class _Config:
     name = "top80-checks-config"
 
@@ -234,6 +317,11 @@ class _Config:
             for c in ("caswell", "jones", "person"):
                 if c in V._BY_COUNTY:
                     bad.append(f"tax_lien_itspublic must not bind {c} (no parcel id on its bills)")
+            from foreclosure_scraper import enrichment_probate_spartan as PS
+            if set(PS.PORTALS) != set(SPARTAN_COUNTIES):
+                bad.append("Spartan probate portals changed")
+            if SL.ENRICHMENT_SCREENS.get("probate_spartan") != ("probate",):
+                bad.append("screen ledger does not know the Spartan probate screen")
             if S.MAX_FLAG_SHARE > 0.25:
                 bad.append("present-use reliability threshold above 0.25")
             if set(SL.ENRICHMENT_SCREENS.get("onemap_sweeps", ())) != {"heir_estate", "rollback_exposure"}:
@@ -245,12 +333,15 @@ class _Config:
         try:
             prof = json.loads((_REPO / "deploy" / "oracle" / "run_profile.json").read_text())
             pend = (prof.get("unwired_wire_pending") or {})
-            if "enrichment_onemap_sweeps" not in pend and "enrichment_onemap_sweeps" not in json.dumps(prof):
-                bad.append("run_profile.json does not list enrichment_onemap_sweeps")
+            for mod in ("enrichment_onemap_sweeps", "enrichment_probate_spartan"):
+                if mod not in pend and mod not in json.dumps(prof):
+                    bad.append(f"run_profile.json does not list {mod}")
+            if (prof.get("flags") or {}).get("FORECLOSURE_PROBATE_SPARTAN") != "1":
+                bad.append("run_profile flag FORECLOSURE_PROBATE_SPARTAN is not 1")
         except Exception as exc:  # noqa: BLE001
             bad.append(f"run_profile unreadable: {str(exc)[:60]}")
         return _result(self.name, 1, len(bad), 0, "ok" if not bad else "; ".join(bad))
 
 
 def make_checks() -> list:
-    return [_ItsShape(), _ItsSilent(), _HeirShape(), _FlagShape(), _FlagShare(), _Config()]
+    return [_ItsShape(), _ItsSilent(), _HeirShape(), _FlagShape(), _FlagShare(), _ProbateShape(), _VacantShape(), _Config()]

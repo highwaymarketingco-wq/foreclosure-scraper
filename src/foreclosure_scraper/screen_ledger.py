@@ -173,6 +173,7 @@ DECLARED: tuple[Screen, ...] = (
 #: only when the enrichment finished its sweep of that county without a failed page.
 ENRICHMENT_SCREENS: dict[str, tuple[str, ...]] = {
     "onemap_sweeps": ("heir_estate", "rollback_exposure"),     # enrichment_onemap_sweeps (top-80 2026-10-09)
+    "probate_spartan": ("probate",),                           # enrichment_probate_spartan (top-80 2026-10-09)
 }
 
 #: Sources that never screen a county, with the reason (kept so the exclusion is visible)
