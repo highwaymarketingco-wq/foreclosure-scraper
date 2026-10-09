@@ -39,7 +39,7 @@ def roll_row(short_id, owner, *, county="Rutherford", url=ROLL, source="counties
 
 
 def test_replayed_roll_rows_with_nulled_ids_stay_apart():
-    rows = [roll_row("426770", "OWNER A"), roll_row("514474", "OWNER B"), roll_row("230682", "OWNER C")]
+    rows = [roll_row("900001", "OWNER A"), roll_row("900002", "OWNER B"), roll_row("900003", "OWNER C")]
     assert len({li.dedupe_key() for li in rows}) == 1          # one URL key for all three
     out = D.dedupe(rows)
     assert len(out) == 3
@@ -56,16 +56,16 @@ def test_nulled_id_from_parcel_id_nulled_counts_too():
 
 
 def test_aged_rows_of_two_counties_sharing_a_portal_url_stay_apart():
-    a = roll_row("25261", "OWNER A", nulled=True, source="counties_nc.nc_ptscloud_delinquent_tax",
+    a = roll_row("900007", "OWNER A", nulled=True, source="counties_nc.nc_ptscloud_delinquent_tax",
                  url=PORTAL, county="Madison", aged=True)
-    b = roll_row("25261", "OWNER A", nulled=True, source="counties_nc.nc_ptscloud_delinquent_tax",
+    b = roll_row("900007", "OWNER A", nulled=True, source="counties_nc.nc_ptscloud_delinquent_tax",
                  url=PORTAL, county="Beaufort", aged=True)
     assert len(D.dedupe([a, b])) == 2
 
 
 def test_the_same_record_twice_still_merges():
-    a = roll_row("426770", "OWNER A", city="Forest City", zip_code="28043")
-    b = roll_row("426770", "Owner  A", city="Forest City", zip_code="28043")
+    a = roll_row("900001", "OWNER A", city="Testville", zip_code="28000")
+    b = roll_row("900001", "Owner  A", city="Testville", zip_code="28000")
     out = D.dedupe([a, b])
     assert len(out) == 1
 
@@ -79,18 +79,18 @@ def test_rows_with_no_owner_and_no_id_never_merge_on_a_url():
 
 
 def test_identity_reads_the_nulled_short_id():
-    li = roll_row("426770", "OWNER A")
+    li = roll_row("900001", "OWNER A")
     ident = D.identity(li)
     assert ident.sp and next(iter(ident.sp))[1] == "counties_nc.rutherford_tax"
-    other = roll_row("514474", "OWNER B")
+    other = roll_row("900002", "OWNER B")
     assert D.different_source_parcels(ident, D.identity(other))
     # a row that carries its parcel id is unchanged: the nulled lookup is only a fallback
-    assert D.nulled_source_parcel("1624538", li.raw, li.source) is None
+    assert D.nulled_source_parcel("9000006", li.raw, li.source) is None
 
 
 def test_numbered_rows_of_one_address_with_two_nulled_ids_stay_apart():
-    a = roll_row("430941", "OWNER A", street_address="173 E MAIN ST", zip_code="28043")
-    b = roll_row("425109", "OWNER B", street_address="173 E MAIN ST", zip_code="28043")
+    a = roll_row("900004", "OWNER A", street_address="12 TEST ST", zip_code="28000")
+    b = roll_row("900005", "OWNER B", street_address="12 TEST ST", zip_code="28000")
     assert len(D.dedupe([a, b])) == 2
 
 
