@@ -3731,6 +3731,12 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("vacant_landuse.failed", traceback=traceback.format_exc())
 
+    # Latest deed of a bound chain (legal description index entry, doc refs) for the lawyer lane.
+    try:
+        from .lawyer_lane import stamp_deed_latest
+        enrichment_stats["deed_latest"] = stamp_deed_latest(enriched)
+    except Exception:
+        log.error("deed_latest.failed", traceback=traceback.format_exc())
     # DNC scrub of every phone (enrichment_dnc; audit 2026-10-09 unwired_enrichers): data/dnc_registry.csv
     # and data/internal_dnc.csv when present, 31-day re-scrub; no file = every phone 'unverified'.
     try:
