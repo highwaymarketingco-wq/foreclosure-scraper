@@ -40,7 +40,7 @@ def test_values_right_after_a_json_escape_are_seen():
     blob = "Phone:\\n" + "336-762" + "-4410\\n" + "jo.x" + "@" + "realmail.com"
     c = R.scan_text(blob)
     assert c["phones"] == 1 and c["emails"] == 1
-    assert [m.group(0) for m in R.EMAIL.finditer(blob)] == ["jo.x@realmail.com"]
+    assert [m.group(0) for m in R.EMAIL.finditer(blob)] == ["jo.x" + "@" + "realmail.com"]
 
 
 def test_board_data_paths_are_named_with_a_reason():
