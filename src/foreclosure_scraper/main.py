@@ -3590,6 +3590,14 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("tax_verified_restore.failed", traceback=traceback.format_exc())
 
+    # One row per property, true twins merged, fused rows split, owner conflicts stamped
+    # (identity.py; audit 2026-10-09). After the tax scrub, before the late block scrub.
+    try:
+        from .identity import run_identity_pass
+        enrichment_stats["identity"] = run_identity_pass(enriched)
+    except Exception:
+        log.error("identity_pass.failed", traceback=traceback.format_exc())
+
     # What the enrichers still without a fallback-point guard re-attached in this run.
     try:
         from .block_binding import scrub_unbound_blocks
