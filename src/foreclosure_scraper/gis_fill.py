@@ -13,7 +13,7 @@ own field list and a live sample 2026-10-09):
   SC   SC_FILL below  the county's own layer (the same endpoints parcel_cache.PARCEL_LAYERS uses, plus
                       the ones the 10/9 source hunt found open). A county with no open layer, a
                       token-walled layer or a layer without the field is NOT guessed at: it is
-                      listed in NOT_FILLABLE with the reason (those cells are verdicts).
+                      listed in VERDICTS (walled / no source) or LAYER_LACKS (another route exists) with the reason.
 
 WHAT IT WRITES (missing-only; a value already on the row is never overwritten):
   raw['county_deed_ref']  {source, parno, book, page, date, fetched_at}  (the key lawyer_lane reads)
@@ -142,52 +142,72 @@ SC_FILL: dict[str, dict] = {
         acres=["GisFile_Acres"]),
 }
 
-#: counties where a cube cell stays open because the county has no usable free source for the field,
-#: with the reason (the build list items that end as verdicts, not builds). county -> {column: reason}
-NOT_FILLABLE: dict[tuple[str, str], dict[str, str]] = {}
+#: VERDICTS: (state, county, column) -> (kind, reason). The cells of the build list that END as a verdict, not a
+#: build: kind 'walled' (a person gets past a bot check; walls_register card sc_qpublic has the steps) or
+#: 'no source' (no free source exists today). scripts/gap_matrix.py reads it (class 'walled (...)' /
+#: 'no source known' for a cell that would otherwise read built-but-low-yield).
+VERDICTS: dict[tuple[str, str, str], tuple[str, str]] = {}
+#: LAYER_LACKS: facts about a county's open layer that explain a gap but do not close a cell (another route
+#: exists: the register index for a deed reference, a second source for a value). (state, county) -> {column: why}
+LAYER_LACKS: dict[tuple[str, str], dict[str, str]] = {}
 
 
-def _nf(state: str, counties: Iterable[str], cols: Iterable[str], reason: str) -> None:
+def _verdict(kind: str, counties: Iterable[str], cols: Iterable[str], reason: str, state: str = "SC") -> None:
     for c in counties:
-        NOT_FILLABLE.setdefault((state, c), {}).update({col: reason for col in cols})
+        for col in cols:
+            VERDICTS[(state, c, col)] = (kind, reason)
 
 
-_QPUBLIC = ("the county's only parcel viewer is Schneider qPublic/Beacon, which answers scripts with a "
-            "Cloudflare 'Just a moment' check (2026-10-07 county records matrix; walls_register card "
-            "sc_qpublic has the owner's steps)")
-_nf("SC", ("Clarendon", "Edgefield", "Fairfield", "Lee"), ("assessed_value", "lot_size"), _QPUBLIC)
-_nf("SC", ("Chesterfield", "Marion", "Williamsburg"), ("assessed_value", "lot_size"),
-    "the county's only viewer is a WTH 'tgis' map shell with no open ArcGIS parcel REST layer "
-    "(parcel_cache.py research note, 2026-09-21; re-read in the 2026-10-07 county records matrix)")
-_nf("SC", ("Jasper",), ("assessed_value", "lot_size"),
-    "the layer parcel_cache reads now answers 'Token Required' (2026-10-09); the public June-17 copy of "
-    "the same service has market value and acres and is read here (SC_FILL_EXTRA), for the 2 in 8 sampled "
-    "board parcels it holds")
-_nf("SC", ("Dorchester", "Lancaster", "Colleton"), ("assessed_value",),
-    "the county's open parcel layer carries no value field (fields read 2026-10-09)")
-_nf("SC", ("Florence",), ("assessed_value",),
-    "the county's open layer publishes TOTBDGVAL, the BUILDING value only (no land value), which is not "
-    "an assessed or market value (parcel_cache.py note; fields read 2026-10-09)")
-_nf("SC", ("Florence", "Colleton"), ("atty_deed_ref", "atty_legal_description"),
-    "the county's open parcel layer carries no deed or legal field (fields read 2026-10-09)")
-_nf("SC", ("Dorchester", "Lancaster", "Hampton"), ("atty_legal_description",),
-    "the county's open parcel layer carries no legal-description field (fields read 2026-10-09)")
-_nf("SC", ("Orangeburg",), ("assessed_value", "atty_deed_ref", "atty_legal_description"),
-    "the county's open Tax Parcel layer (Main_Public_Tax_Parcel_Map_WFL1) carries parcel number, owner "
-    "and acres only (fields read 2026-10-09); the value is on the qPublic card (walls_register sc_qpublic)")
-_nf("SC", ("Newberry",), ("assessed_value", "lot_size"),
-    "the county's own parcel service (map.newberrycounty.net PropertyParcel/MapServer) answers 'Service "
-    "not started' (HTTP 500, 2026-10-09); no other open layer exists (matrix 2026-10-07)")
-_PID_NAME_ONLY = ("the rows carry a name only (probate / newspaper notices, HUD REAC property names, "
-                  "state tax-lien registry): no street address, no precise point, and an owner-name match to "
-                  "the county layer found 0 unique parcels of the {n} names that could be matched "
-                  "(Aiken 31, Orangeburg 31, 2026-10-09 checkpoint; most are ambiguous)")
-_nf("SC", ("Aiken",), ("parcel_id",), _PID_NAME_ONLY.format(n=31))
-_nf("SC", ("Hampton", "Marion"), ("parcel_id",), "the rows carry a name only (state tax-lien registry, bankruptcy "
-    "filing, probate notice): no address, no precise point; Marion has no open parcel layer to match against")
-_nf("SC", ("Orangeburg",), ("parcel_id",), _PID_NAME_ONLY.format(n=31) +
-    "; the 93 qPayBill roll rows are the exception: their account number joins the county layer exactly "
-    "(enrich_account_parcels, 78 of 93 resolved on 2026-10-09)")
+def _lacks(counties: Iterable[str], cols: Iterable[str], reason: str, state: str = "SC") -> None:
+    for c in counties:
+        LAYER_LACKS.setdefault((state, c), {}).update({col: reason for col in cols})
+
+
+_QPUBLIC = ("the county's property card is on Schneider qPublic / Beacon, which answers scripts with a Cloudflare "
+            "'Just a moment' check (2026-10-07 county records matrix); a person opens it in a browser: "
+            "walls_register card sc_qpublic")
+_verdict("walled", ("Clarendon", "Edgefield", "Fairfield", "Lee"), ("assessed_value", "lot_size"), _QPUBLIC)
+_verdict("walled", ("Colleton", "Florence", "Lancaster", "Orangeburg"), ("assessed_value",),
+         "the county's open parcel layer carries no usable value field (Florence: the building value only; "
+         "fields read 2026-10-09); the value is on the county's qPublic card behind the Cloudflare check: "
+         "walls_register card sc_qpublic")
+_verdict("walled", ("Newberry",), ("assessed_value", "lot_size"),
+         "the county's own parcel service (map.newberrycounty.net PropertyParcel/MapServer) answers 'Service not "
+         "started' (HTTP 500, 2026-10-09); the property card is on qPublic behind the Cloudflare check: "
+         "walls_register card sc_qpublic")
+_verdict("no source", ("Chesterfield", "Marion", "Williamsburg"), ("assessed_value", "lot_size"),
+         "the county's only viewer is a WTH 'tgis' map shell with no open ArcGIS parcel REST layer "
+         "(parcel_cache.py research note 2026-09-21; county records matrix 2026-10-07)")
+_verdict("no source", ("Dorchester",), ("assessed_value",),
+         "the county's open parcel layer carries no value field (fields read 2026-10-09) and the county has no "
+         "qPublic card")
+_NAME_ONLY = ("the rows carry a name only (probate / newspaper notices, HUD REAC property names, state tax-lien "
+              "registry, bankruptcy filings): no street address and no precise point, and an owner-name match to "
+              "the county layer found no unique parcel ({n})")
+_verdict("no source", ("Aiken",), ("parcel_id",), _NAME_ONLY.format(n="0 of 31 matchable names unique, 2026-10-09"))
+_verdict("no source", ("Hampton", "Marion"), ("parcel_id",),
+         _NAME_ONLY.format(n="Hampton has 3 rows; Marion has no open parcel layer to match against"))
+
+_lacks(("Florence", "Colleton"), ("atty_deed_ref", "atty_legal_description"),
+       "the county's open parcel layer carries no deed or legal field (fields read 2026-10-09); the register "
+       "index is the other route")
+_lacks(("Dorchester", "Lancaster", "Hampton"), ("atty_legal_description",),
+       "the county's open parcel layer carries no legal-description field (fields read 2026-10-09)")
+_lacks(("Orangeburg",), ("atty_deed_ref", "atty_legal_description"),
+       "the county's open Tax Parcel layer carries parcel number, owner and acres only (fields read 2026-10-09)")
+_lacks(("Jasper",), ("assessed_value", "lot_size"),
+       "the layer parcel_cache reads now answers 'Token Required' (2026-10-09); the public June-17 copy of the same "
+       "service has market value and acres and is read here (SC_FILL_EXTRA), for the parcels it holds (2 of 8 "
+       "sampled board parcels, 11 of 25 on the second sample)")
+_lacks(("Orangeburg",), ("parcel_id",),
+       "qPayBill roll rows join the county layer by account number exactly (enrich_account_parcels, 78 of 93 "
+       "resolved 2026-10-09); the other Orangeburg rows are names only")
+
+
+def verdict_for(state: str, county: str, column: str) -> Optional[tuple[str, str]]:
+    """(kind, reason) when (state, county, column) is a cell that ends as a verdict, else None."""
+    return VERDICTS.get((str(state or "").upper(), str(county or "").strip().title(), column))
+
 
 #: Jasper: parcel_cache's own layer is token-walled; this is the public copy of the same county service
 SC_FILL_EXTRA: dict[str, dict] = {

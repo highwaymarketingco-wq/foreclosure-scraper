@@ -1593,6 +1593,18 @@ def next_action(cls: str, col: str, spec: Spec, where: str, wall: str, crec: Opt
 GIS_FILL_VERDICT_COLS = frozenset({"atty_deed_ref", "atty_legal_description", "assessed_value", "lot_size"})
 
 
+def fill_verdict_class(st: str, co: str, col: str, cls: Optional[str]) -> Optional[str]:
+    """A fill cell that ENDS as a verdict (gis_fill.VERDICTS: the county's only source is behind a bot check, or
+    no free source exists) reads walled / no source known instead of built-but-low-yield. Pure."""
+    if cls is None or not cls.startswith("built-but-low-yield"):
+        return cls
+    from foreclosure_scraper import gis_fill as _gf
+    v = _gf.verdict_for(st, co, col)
+    if not v:
+        return cls
+    return "walled (Cloudflare check on the county property card)" if v[0] == "walled" else "no source known"
+
+
 def classify_cell(spec: Spec, app: int, target: int, ran: bool, built: str, src: tuple[str, str, str]) -> Optional[str]:
     """The cell's gap class, or None when it is at 100% of its target. Pure."""
     if app == 0:
@@ -1688,6 +1700,7 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set], screens: Op
                 cls = None
         else:
             cls = classify_cell(spec, c["app"], c["target"], c["ran"], c["built"], c["src"])
+            cls = fill_verdict_class(st, co, col, cls)
         c["class"] = cls
         if cls is None:
             continue

@@ -153,9 +153,21 @@ def test_every_registered_sc_layer_names_its_fields():
         assert any(a.values()), county
 
 
-def test_not_fillable_reasons_are_stated():
-    assert ("SC", "Clarendon") in G.NOT_FILLABLE and "Cloudflare" in G.NOT_FILLABLE[("SC", "Clarendon")]["assessed_value"]
-    assert all(v for d in G.NOT_FILLABLE.values() for v in d.values())
+def test_verdicts_are_stated_and_typed():
+    kind, why = G.verdict_for("SC", "Clarendon", "assessed_value")
+    assert kind == "walled" and "Cloudflare" in why and "sc_qpublic" in why
+    assert G.verdict_for("sc", "clarendon", "lot_size")[0] == "walled"
+    assert G.verdict_for("SC", "Marion", "lot_size")[0] == "no source"
+    assert G.verdict_for("SC", "Berkeley", "atty_deed_ref") is None
+    assert G.verdict_for("NC", "Clarendon", "assessed_value") is None
+    assert all(k in ("walled", "no source") and r for k, r in G.VERDICTS.values())
+    assert all(v for d in G.LAYER_LACKS.values() for v in d.values())
+    # a cell with a build behind it is never a verdict
+    for (st, co, col) in G.VERDICTS:
+        sp = G.sc_spec(co)
+        if sp is not None and st == "SC":
+            a = G.asks(sp)
+            assert not {"assessed_value": a["value"], "lot_size": a["acres"]}.get(col, False), (co, col)
 
 
 def test_pin_aliases_and_literals():
@@ -351,9 +363,18 @@ def test_gap_matrix_reads_the_fill():
 def test_orangeburg_is_read_for_acres_and_its_gaps_are_stated():
     sp = G.sc_spec("Orangeburg")
     assert sp["acres"] == ["CalculatedAcres"] and not G.asks(sp)["deed"] and G.asks(sp)["acres"]
-    nf = G.NOT_FILLABLE
-    assert "parcel_id" in nf[("SC", "Aiken")] and "parcel_id" in nf[("SC", "Orangeburg")]
-    assert "Service not started" in nf[("SC", "Newberry")]["lot_size"] or "not started" in nf[("SC", "Newberry")]["lot_size"]
+    assert G.verdict_for("SC", "Aiken", "parcel_id")[0] == "no source"
+    assert G.verdict_for("SC", "Orangeburg", "parcel_id") is None            # 78 of 93 roll rows resolve: not a verdict
+    assert "not started" in G.verdict_for("SC", "Newberry", "lot_size")[1]
+
+
+def test_fill_verdict_class_turns_low_yield_into_a_verdict_only_for_listed_cells():
+    f = GM.fill_verdict_class
+    assert f("SC", "Clarendon", "assessed_value", "built-but-low-yield").startswith("walled")
+    assert f("SC", "Marion", "lot_size", "built-but-low-yield") == "no source known"
+    assert f("SC", "Berkeley", "assessed_value", "built-but-low-yield") == "built-but-low-yield"
+    assert f("SC", "Clarendon", "assessed_value", None) is None
+    assert f("SC", "Clarendon", "assessed_value", "sourced-not-built") == "sourced-not-built"
 
 
 # ------------------------------------------------------------------------------------ invariants
