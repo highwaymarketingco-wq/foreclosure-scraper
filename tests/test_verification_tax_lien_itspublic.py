@@ -520,3 +520,36 @@ def test_a_roll_row_whose_account_holds_only_personal_property_says_so():
                                "tax_owed": {"balance": 50.0, "year": 2025, "kind": "delinquent_tax"}})
     r = run(row, portal)
     assert (r.verdict, r.evidence["reason"]) == ("unconfirmed", "personal_property_only"), r.evidence
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-09: Brunswick (the older ITSNet build: another cell order, the situs in its own cell)
+# ---------------------------------------------------------------------------
+
+BRUNSWICK = p.PORTALS["Brunswick"].base
+
+
+class ItsNetPortal(FakePortal):
+    @staticmethod
+    def _row(b):
+        desc = "<br/>".join(b["ids"]) if b["ids"] else None
+        return {"id": f"{b['year']}/{b['bill']}",
+                "cell": [str(b["year"]), b["bill"], b["account"], b["owner"], f"{b['original']:,.2f}",
+                         f"{b['balance']:,.2f}", "", desc, f"{b['situs']} TESTVILLE 28000 COUNTY"]}
+
+
+def test_brunswick_reads_the_itsnet_cell_order():
+    situs = "1017 TEST ANDOVER PL SE"
+    bills = [bill(2026, 26001, ["201TT022", "204700000001"], situs, balance=900.0),
+             bill(2025, 25001, ["201TT022", "204700000001"], situs, balance=986.82),
+             bill(2024, 24001, ["201TT022", "204700000001"], situs, balance=120.0),
+             bill(2011, 11001, [], situs, balance=0.0)]                   # no description: dropped
+    row = {"state": "NC", "county": "Brunswick", "listing_type": "tax_sale", "source": "counties_nc.x",
+           "parcel_id": "201TT022", "street_address": "1017 TEST ANDOVER PL SE", "owner_name": "TESTOWNER ALPHA",
+           "raw": {"tax_owed": {"balance": 1106.82, "year": 2025, "kind": "delinquent_tax"}}}
+    r = run(row, ItsNetPortal(BRUNSWICK, bills))
+    assert r.verdict == "confirmed", r.evidence
+    assert r.evidence["delinquent_by_year"] == {"2025": 986.82, "2024": 120.0}
+    assert r.evidence["address_relation"] == "match"       # "... SE TESTVILLE 28000 COUNTY" cut to the street
+    rows = p.parse_rows({"rows": [ItsNetPortal._row(b) for b in bills]}, p.PORTALS["Brunswick"])
+    assert [b["year"] for b in rows] == [2026, 2025, 2024] and rows[0]["situs"] == "1017 TEST ANDOVER PL SE TESTVILLE 28000"

@@ -32,7 +32,11 @@ on bills before levy 2025 (Portal.real_without_units: a bill naming a parcel tha
 "Personal Property"), and its advertisement PDF's id (raw.nc_county_pdf_delinquent_tax.county_id,
 4,994 of 5,245 Catawba claim rows have no parcel_id) is the REID/LRK, zero-padded to 7 digits in
 the ParcelNumber field (Roll.pad). A county roll's numbers are the row's own only on the roll's own
-row (Roll.slug). A roll row with no parcel whose account answers only Personal Property bills is
+row (Roll.slug). Brunswick (https://tax.brunsco.net/ITSNet, the older ITSNet build, same calls,
+table "TaxBillSearch") orders the grid cells differently and prints the situs in its own cell with
+the zip and the taxing jurisdiction after it (Portal.cells = ITSNET_CELLS); the board parcel
+(201LA022) is its ParcelNumber; bills of 2012 and earlier carry no description and are not read.
+A roll row with no parcel whose account answers only Personal Property bills is
 unconfirmed, reason personal_property_only (Transylvania's roll lists business personal property
 with parcel "Escrow :" on 163 board rows: not a real-property claim).
 
@@ -178,6 +182,8 @@ class Portal:
     pin_pad: str = ""
     #: search the board parcel as [0-9A-Z] only (Transylvania boards carry 8511-59-1029-000)
     parcel_alnum: bool = False
+    #: the grid's cell order (CELLS; ITSNET_CELLS for the older ITSNet build)
+    cells: tuple = (0, 1, 3, 4, 5, 6, 7, None)
 
 
 PORTALS: dict[str, Portal] = {
@@ -193,6 +199,14 @@ PORTALS: dict[str, Portal] = {
         "Transylvania", "https://tax.transylvaniacounty.org", "ParcelNumber",
         rolls=(ITS_ROLL, TRANSYLVANIA_ROLL), full_model=True, map_ref=r"\bMS\.\d+$",
         parcel_alnum=True),
+    "Brunswick": Portal(
+        "Brunswick", "https://tax.brunsco.net/ITSNet", "ParcelNumber",
+        cities=("BOILING SPRING LAKES", "OCEAN ISLE BEACH", "BALD HEAD ISLAND", "CAROLINA SHORES",
+                "HOLDEN BEACH", "CASWELL BEACH", "SUNSET BEACH", "OAK ISLAND", "VARNAMTOWN",
+                "SANDY CREEK", "WILMINGTON", "SOUTHPORT", "SHALLOTTE", "NORTHWEST", "WINNABOW",
+                "CALABASH", "LONGWOOD", "BELVILLE", "ST JAMES", "BOLIVIA", "LELAND", "NAVASSA",
+                "SUPPLY", "ASH"),
+        real_without_units=True, cells=(0, 1, 3, 7, 4, 5, None, 8)),
     "Catawba": Portal(
         "Catawba", "https://taxbill.catawbacountync.gov/ITSPublicCT", "AlternateParcelIdentifier",
         cities=("SHERRILLS FORD", "LONG VIEW", "CLAREMONT", "CONOVER", "HICKORY", "MAIDEN",
@@ -418,23 +432,40 @@ def situs_street(situs: Optional[str], cities: tuple[str, ...] = ()) -> Optional
     return s or None
 
 
+#: the grid's cell order (year, bill, owner, description, original levy, balance, action, situs):
+#: the ITSPublic builds (Onslow, Graham, Transylvania, Catawba); situs None = in the description
+CELLS = (0, 1, 3, 4, 5, 6, 7, None)
+#: the older ITSNet build (Brunswick, 2026-10-09): year, bill, account, owner, original levy,
+#: balance, discovery year, description (parcel<br/>PIN), address ("1017 ANDOVER PL SE BOLIVIA
+#: 28422 COUNTY"); no action cell
+ITSNET_CELLS = (0, 1, 3, 7, 4, 5, None, 8)
+#: what follows the zip in an ITSNet address cell (the taxing jurisdiction): cut, the zip kept so
+#: situs_street() knows a place name precedes it
+_AFTER_ZIP = re.compile(r"(\s\d{5}(?:-\d{4})?)\b.*$")
+
+
 def parse_rows(payload: Any, portal: Optional[Portal] = None) -> list[dict]:
     """The bills of a GetSearchTableData answer (real property only), newest first."""
+    yi, bi, oi, di, li, ki, ai, si = portal.cells if portal is not None else CELLS
+    need = max(i for i in (yi, bi, oi, di, li, ki) if i is not None) + 1
     out = []
     for r in (payload.get("rows") if isinstance(payload, dict) else None) or []:
         cell = r.get("cell") if isinstance(r, dict) else None
-        if not isinstance(cell, list) or len(cell) < 7:
+        if not isinstance(cell, list) or len(cell) < need:
             continue
-        year = tc.to_int(_text(cell[0]))
+        year = tc.to_int(_text(cell[yi]))
         if not 1900 < year < 2100:
             continue
-        d = parse_description(cell[4], portal)
+        d = parse_description(cell[di], portal)
         if not d["real"] or not d["ids"]:
             continue
-        action = _text(cell[7]) if len(cell) > 7 else ""
-        out.append({"year": year, "bill": _text(cell[1]), "owner": _text(cell[3]) or None,
-                    "ids": d["ids"], "situs": d["situs"], "original": _money(cell[5]),
-                    "balance": _money(cell[6]) or 0.0,
+        action = _text(cell[ai]) if ai is not None and len(cell) > ai else ""
+        situs = d["situs"]
+        if si is not None:
+            situs = _AFTER_ZIP.sub(r"\1", _text(cell[si]) if len(cell) > si else "").strip() or None
+        out.append({"year": year, "bill": _text(cell[bi]), "owner": _text(cell[oi]) or None,
+                    "ids": d["ids"], "situs": situs, "original": _money(cell[li]),
+                    "balance": _money(cell[ki]) or 0.0,
                     "in_tax_foreclosure": "foreclosure" in action.lower()})
     out.sort(key=lambda b: (-b["year"], b["bill"]))
     return out
