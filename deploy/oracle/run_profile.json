@@ -121,17 +121,7 @@
   "enrichment_surface_contacts": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): copies agent / office phones into owner_phone, which then stops enrichment_voter_phone from finding the owner's own number on that row; its e-mail half is owner_email_of's job",
   "enrichment_usda_ers": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): the 3-digit county FIPS it reads is zero-padded to 5 and never matches, so every row gets {}; income and unemployment come from enrichment_census_demographics and valuation/location; economic on 0 rows"
  },
- "unwired_wire_pending": {
-  "enrichment_dnc": "UE1",
-  "enrichment_tail_extras": "UE1-UE4",
-  "enrichment_flood_zone": "UE1 (flood_zone mirrored from raw['flood']; its FEMA fetcher is not called by the run)",
-  "enrichment_hud_fmr": "UE1 (applied from data/fmr_cache; refreshed by scripts/refresh_fmr_cache.py on a monthly schedule)",
-  "enrichment_septic_status": "UE1 (applied from the layer cache) + UE4 (weekly layer refresh)",
-  "enrichment_bt_appraisal_card": "UE2",
-  "enrichment_source_consistency": "UE3",
-  "enrichment_property_category": "UE3",
-  "enrichment_usfws_wetlands": "UE4"
- },
+ "unwired_wire_pending": {},
  "tail_calls_required": [
   [
    "enrichment_dnc",

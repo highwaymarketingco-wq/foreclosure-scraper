@@ -3520,6 +3520,15 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("fhfa_value.failed", traceback=traceback.format_exc())
 
+    # BT appraisal cards (sqft / value / last sale) before the valuation loop reads them
+    try:
+        from .enrichment_tail_extras import enrich_network_pre_value
+        s = await _await_capped(enrich_network_pre_value(enriched), "tail_extras_network_pre_value", default_s=660)
+        if s:
+            enrichment_stats["tail_extras_network_pre_value"] = s
+    except Exception:
+        log.error("tail_extras_network_pre_value.failed", traceback=traceback.format_exc())
+
     # SC DEW lien cross-reference — attach UI-tax / benefit-overpayment liens to
     # matching property owners by name. No standalone board rows (the sc_dew
     # scraper is disabled); this one-time render fetch is the only DEW touch.
@@ -3721,6 +3730,20 @@ async def run_enrich_tail(st: TailState) -> dict:
             enrichment_stats["vacant_landuse"] = s
     except Exception:
         log.error("vacant_landuse.failed", traceback=traceback.format_exc())
+
+    # DNC scrub of every phone (enrichment_dnc; audit 2026-10-09 unwired_enrichers): data/dnc_registry.csv
+    # and data/internal_dnc.csv when present, 31-day re-scrub; no file = every phone 'unverified'.
+    try:
+        from .enrichment_dnc import enrich_dnc_scrub
+        enrichment_stats["dnc_scrub"] = enrich_dnc_scrub(enriched)
+    except Exception:
+        log.error("dnc_scrub.failed", traceback=traceback.format_exc())
+    # flood_zone mirror, HUD FMR and Buncombe septic from local tables (no network)
+    try:
+        from .enrichment_tail_extras import enrich_local_pre_gate
+        enrichment_stats["tail_extras_local_pre_gate"] = enrich_local_pre_gate(enriched)
+    except Exception:
+        log.error("tail_extras_local_pre_gate.failed", traceback=traceback.format_exc())
 
     # Call-ready gate (call_ready.py, docs/call_ready.md): lane, tier, reason and unmet conditions per
     # row, read off the checks verification.apply attached, restore_verified_tax and the block_binding
@@ -4235,6 +4258,13 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("board_qa.failed", traceback=traceback.format_exc())
 
+    # self-contradiction flags (enrich_board_qa just reassigned qa_flags) and the property category
+    try:
+        from .enrichment_tail_extras import enrich_local_after_qa
+        enrichment_stats["tail_extras_local_after_qa"] = enrich_local_after_qa(enriched)
+    except Exception:
+        log.error("tail_extras_local_after_qa.failed", traceback=traceback.format_exc())
+
     # Classify source links (record vs search-only) so the dashboard never shows a dead link.
     try:
         from .enrichment_source_link import enrich_source_link
@@ -4262,6 +4292,11 @@ async def run_enrich_tail(st: TailState) -> dict:
         _geo_flag_phases["usps_vacancy"] = enrich_usps_vacancy(enriched)
     except Exception:
         log.error("usps_vacancy.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_tail_extras import enrich_network_geo
+        _geo_flag_phases["tail_extras_geo"] = enrich_network_geo(enriched)
+    except Exception:
+        log.error("tail_extras_geo.failed", traceback=traceback.format_exc())
     _geo_results = await _gather_phases(_geo_flag_phases)
     _fd = _geo_results.get("fema_disaster")
     if _fd:
@@ -4276,6 +4311,8 @@ async def run_enrich_tail(st: TailState) -> dict:
     _uv = _geo_results.get("usps_vacancy")
     if _uv:
         enrichment_stats["usps_vacancy"] = _uv
+    if _geo_results.get("tail_extras_geo"):
+        enrichment_stats["tail_extras_geo"] = _geo_results["tail_extras_geo"]
 
     # Outreach stack — owner contact actions (letter/email/SMS), a postcard
     # mail-merge CSV, and persistent CRM status. Runs after skip-trace +

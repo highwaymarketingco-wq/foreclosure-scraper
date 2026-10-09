@@ -281,8 +281,6 @@ def test_frozen_keys_known_in_the_real_profile():
     assert st == G.FAIL and "lexington_assessment <- enrichment_lexington_assessment" in why
 
 
-@pytest.mark.xfail(strict=True, reason="audit 2026-10-09 unwired_enrichers: main.py lines UE1-UE4 not added "
-                   "yet; once they are, drop this marker and tidy run_profile.json unwired_wire_pending")
 def test_the_real_profile_has_nothing_pending():
     prof = G.load_profile()
     assert G.check_unwired(REPO, prof)[0] in (G.PASS, G.WARN)

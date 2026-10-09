@@ -59,8 +59,6 @@ def test_awaiting_steps_are_classified_and_real():
         assert hasattr(importlib.import_module(f"foreclosure_scraper.{mod}"), attr), (mod, attr)
 
 
-@pytest.mark.xfail(strict=True, reason="audit 2026-10-09 unwired_enrichers: main.py wiring lines UE1-UE4 "
-                   "not added yet; once they are, empty R.AWAITING_MAIN_WIRING and drop this marker")
 def test_awaiting_steps_are_wired():
     missing = sorted(R.AWAITING_MAIN_WIRING - _tail_imports())
     assert not missing, f"not yet in run_enrich_tail: {missing}"

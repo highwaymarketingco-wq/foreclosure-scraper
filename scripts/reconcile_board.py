@@ -106,13 +106,7 @@ NETWORK_STUBS: dict[tuple[str, str], str] = {
 #: report docs/audit_2026-10-09/unwired_enrichers.md, lines UE1-UE4). The stale-stub test skips
 #: them; tests/test_reconcile_board.py::test_awaiting_steps_are_wired is a strict xfail that starts
 #: failing once they are wired: then empty this set and drop the marker.
-AWAITING_MAIN_WIRING: frozenset[tuple[str, str]] = frozenset({
-    ("enrichment_dnc", "enrich_dnc_scrub"),
-    ("enrichment_tail_extras", "enrich_local_pre_gate"),
-    ("enrichment_tail_extras", "enrich_local_after_qa"),
-    ("enrichment_tail_extras", "enrich_network_pre_value"),
-    ("enrichment_tail_extras", "enrich_network_geo"),
-})
+AWAITING_MAIN_WIRING: frozenset[tuple[str, str]] = frozenset()
 
 #: Local steps run_enrich_tail imports that a reconcile RUNS (no network; they read the rows, the
 #: ledgers in docs/handoff/verification, local reference data, or the published board's keys).
