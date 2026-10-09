@@ -238,6 +238,9 @@ def legal_description_present(rec: dict) -> bool:
     cl = raw.get("county_legal")           # gis_fill.py: the assessor's short legal off the county parcel record
     if isinstance(cl, dict) and cl.get("text"):
         return True
+    dl = raw.get("deed_latest")            # lawyer_lane: the register index's description of the bound deed
+    if isinstance(dl, dict) and dl.get("bound") and dl.get("legal_description"):
+        return True
     mp = raw.get("mcdowell_probate")
     return isinstance(mp, dict) and bool(mp.get("legal_description"))
 
@@ -269,6 +272,9 @@ def deed_ref_present(raw: dict) -> bool:
         return True
     cd = raw.get("county_deed_ref")        # gis_fill.py / county_deed_ref.py: the county parcel record's own deed ref
     if isinstance(cd, dict) and cd.get("book") and cd.get("page"):
+        return True
+    dl = raw.get("deed_latest")            # lawyer_lane: the register-index deed BOUND to this parcel
+    if isinstance(dl, dict) and dl.get("bound") and dl.get("book") and dl.get("page"):
         return True
     mp = raw.get("mcdowell_probate")
     return isinstance(mp, dict) and bool(mp.get("deed_book_page"))

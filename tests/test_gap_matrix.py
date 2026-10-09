@@ -289,10 +289,22 @@ def test_flip_feed_columns_apply_only_in_flip_scope():
     assert set(gm.FLIP_FEED_COLS) <= gm.applicable_columns(inn, gm.row_rules(inn, inn["raw"], set()))
 
 
-def test_quiet_title_is_sourced_not_built_in_nc():
-    st = gm.source_status(gm.SPECS["quiet_title"], "NC", None)
-    assert st[0] == "free" and "not read yet" in st[2]
+def test_nc_quiet_title_is_read_by_nc_heir_notices():
+    # top-80 item: NC notices are now parsed (scrapers/public_notices/nc_heir_notices.py); a county
+    # with no Column paper is a wall verdict (ncnotices.com bodies are CAPTCHA-walled), not a gap
+    for col in ("quiet_title", "heir_naming_publication"):
+        st = gm.source_status(gm.SPECS[col], "NC", None)
+        assert st[0] == "walled" and "Column" in st[1]
+        assert gm.SPECS[col].sources == ()
+        assert any("nc_heir_notices" in p for p in gm.SPECS[col].producers)
     assert gm.source_status(gm.SPECS["heir_naming_publication"], "SC", None)[2].startswith("statewide: SC estate")
+
+
+def test_ledger_signals_accepts_several_verifier_signals():
+    assert gm.ledger_signals(gm.SPECS["lt_divorce_notice"]) == ("nc_ecourts_case", "divorce")
+    assert gm.ledger_signals(gm.SPECS["lt_lis_pendens"]) == ("foreclosure_rod", "nc_ecourts_case")
+    assert gm.ledger_signals(gm.SPECS["heir_estate"]) == ("probate_heir", "heir_roll")
+    assert gm.ledger_signals(gm.SPECS["address"]) == ()
 
 
 def _ledger(screens):

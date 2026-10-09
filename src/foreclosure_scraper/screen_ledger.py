@@ -133,6 +133,13 @@ DECLARED: tuple[Screen, ...] = (
     Screen("counties.column_legal_notices", ("heir_naming_publication", "quiet_title"),
            _module_counties("scrapers.newspapers.column_legal_notices", _column_sc_probate),
            "SC estate lane counties only; Column tags SC notices by newspaper region"),
+    # NC quiet-title / heir-naming notices: Column's statewide API, queried by notice text (top-80
+    # build list 2026-10-09). Covered = NC counties with at least one Column notice in 365 days
+    # (nc_heir_notices.COLUMN_NC_COUNTIES); the other 25 have no Column paper (verdict, not gap).
+    Screen("public_notices.nc_heir_notices", ("heir_naming_publication", "quiet_title"),
+           _module_counties("scrapers.public_notices.nc_heir_notices",
+                            lambda m: [("NC", c) for c in m.COLUMN_NC_COUNTIES]),
+           "NC counties with a Column paper; notices searched by text"),
     # county jail rosters (bulk, county-wide); unhealthy rosters are removed in build()
     Screen("national.jail_bookings", ("jail_booking",),
            _module_counties("scrapers.national.jail_bookings", _jail_rosters),

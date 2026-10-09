@@ -2638,6 +2638,190 @@
     "NC eCourts estate files (per lead)",
     "deed images (per lead)"
    ]
+  },
+  {
+   "id": "sc_lien_registries",
+   "group": "sc",
+   "place": "South Carolina, statewide",
+   "name": "SC state lien registries: employment-security (DEW) liens and SCDOR top delinquent taxpayers",
+   "kind": "A",
+   "wall": "Both are single-page apps that hand their search service a key only to the page they render: a plain request to the DEW registry's search service answers 'Invalid Security Key' (read 2026-10-09 with the key the scraper carries), and the DOR list is a rendered grid. The scrapers drive the rendered page in the stealth browser (existing code, not extended); no code may check one lien at its source.",
+   "url": "https://uitax.dew.sc.gov/LienRegistry/",
+   "what": "Whether a lien on the board (about 8,300 DEW rows and 320 DOR rows) is still active, or has been paid and released. A lien names a person or business, not a parcel: the property is attached by name, so the check is about the debtor.",
+   "steps": [
+    "Open the DEW registry address in Chrome. Pick Business Name or Last Name search; type the debtor exactly as the lead's evidence sheet shows it. Search.",
+    "Open the hit. Note: lien status (Active or Released), balance, date filed, date satisfied.",
+    "For SCDOR liens open <b>https://dor.sc.gov/delinquent-taxpayers</b>, choose the Individuals or Businesses tab, find the name and note the amount."
+   ],
+   "pull": "HOT and WARM SC leads whose listing type is a tax lien from DEW or DOR. Status, balance, date. 10 per sitting.",
+   "save": "Type into the CRM. No reader exists.",
+   "lane": "None. A two-column file (debtor, status) could be loaded later.",
+   "time": "About 3 minutes per name.",
+   "often": "Monthly.",
+   "gain": "Proof a state lien is still open before the call.",
+   "others": "The registry's own export, if SC DEW ever publishes it as a file.",
+   "minutes_month": 30,
+   "leads": "10 debtors a month",
+   "signal_columns": [
+    "lt_tax_lien"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Abbeville"
+    ],
+    [
+     "SC",
+     "Aiken"
+    ],
+    [
+     "SC",
+     "Anderson"
+    ],
+    [
+     "SC",
+     "Beaufort"
+    ],
+    [
+     "SC",
+     "Berkeley"
+    ],
+    [
+     "SC",
+     "Charleston"
+    ],
+    [
+     "SC",
+     "Cherokee"
+    ],
+    [
+     "SC",
+     "Colleton"
+    ],
+    [
+     "SC",
+     "Darlington"
+    ],
+    [
+     "SC",
+     "Dorchester"
+    ],
+    [
+     "SC",
+     "Florence"
+    ],
+    [
+     "SC",
+     "Georgetown"
+    ],
+    [
+     "SC",
+     "Greenville"
+    ],
+    [
+     "SC",
+     "Horry"
+    ],
+    [
+     "SC",
+     "Kershaw"
+    ],
+    [
+     "SC",
+     "Lancaster"
+    ],
+    [
+     "SC",
+     "Laurens"
+    ],
+    [
+     "SC",
+     "Lexington"
+    ],
+    [
+     "SC",
+     "Oconee"
+    ],
+    [
+     "SC",
+     "Orangeburg"
+    ],
+    [
+     "SC",
+     "Pickens"
+    ],
+    [
+     "SC",
+     "Richland"
+    ],
+    [
+     "SC",
+     "Spartanburg"
+    ],
+    [
+     "SC",
+     "Sumter"
+    ],
+    [
+     "SC",
+     "Union"
+    ],
+    [
+     "SC",
+     "York"
+    ]
+   ],
+   "short": "SC DEW and DOR liens",
+   "loads": "small",
+   "wall_class": "bot"
+  },
+  {
+   "id": "liensnc_login",
+   "group": "nc",
+   "place": "North Carolina, statewide",
+   "name": "LiensNC lien-agent appointments (the owner's own login)",
+   "kind": "A",
+   "wall": "A login. The account belongs to the owner and its sign-in is run by the owner's own Mac job; no audit or verification code signs in. The rows are typed tax_lien but are appointments of a lien agent for a construction project (45,093 rows on the 2026-10-07 board), not tax liens.",
+   "url": "https://apps.liensnc.com/scr/filing/advancedSearch.html",
+   "what": "An appointment of lien agent records that a construction project exists on the parcel. It names the owner and the contractor. It says nothing about taxes owed, so there is no tax claim to verify; a person can open the filing (each row's source link) to see whether the project is still shown.",
+   "steps": [
+    "Sign in with your own LiensNC account.",
+    "Open the filing from the lead's source link, or search the entry number.",
+    "Note: filing type, filing date, owner, contractor, and any later filings listed under related filings."
+   ],
+   "pull": "Only a lead you are about to call about the project. Entry number, filing date, related filings.",
+   "save": "Type into the CRM.",
+   "lane": "None.",
+   "time": "About 2 minutes per filing.",
+   "often": "Per lead, before the call.",
+   "gain": "Confirms the project is current.",
+   "others": "The county building-permit office.",
+   "minutes_month": 20,
+   "leads": "a few filings a month",
+   "signal_columns": [
+    "lt_tax_lien"
+   ],
+   "scope": [
+    [
+     "NC",
+     "Buncombe"
+    ],
+    [
+     "NC",
+     "Henderson"
+    ],
+    [
+     "NC",
+     "Iredell"
+    ],
+    [
+     "NC",
+     "Mecklenburg"
+    ]
+   ],
+   "short": "LiensNC filings",
+   "loads": "small",
+   "wall_class": "login"
   }
  ],
  "foia": {
