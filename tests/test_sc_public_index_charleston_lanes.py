@@ -407,13 +407,17 @@ def test_date_window_search_is_incremental_by_subtype_and_splits_capped_windows(
     assert st["trace"] and all("message" in t for t in st["trace"])
     import json as _json
     state = _json.loads((tmp_path / "state.json").read_text())
-    today = date.today().isoformat()
+    # the scraper's clock is UTC (datetime.utcnow); date.today() is local time and differs from it
+    # for four to five hours every evening in the US
+    from datetime import datetime as _dtm, timezone as _tz
+    _utc_today = _dtm.now(_tz.utc).date()
+    today = _utc_today.isoformat()
     assert state["filed_through"] == today and state["disposed_through"] == today
     # next run: starts from the saved day minus the overlap, not the lookback
     asyncio.run(mod._curl_search_county("charleston"))
     second = sess["s"].searches
     first_from = min(_dt_parse(q["from"]) for q in second if q["date"] == "CF")
-    assert (date.today() - first_from).days == mod.WINDOW_OVERLAP_DAYS
+    assert (_utc_today - first_from).days == mod.WINDOW_OVERLAP_DAYS
 
 
 def test_name_required_becomes_letters_with_the_date_filter(monkeypatch, tmp_path):
