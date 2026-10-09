@@ -47,7 +47,7 @@ import statistics
 import sys
 import time
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
@@ -407,12 +407,49 @@ def is_improved(rec: dict, raw: dict) -> bool:
     return rec.get("property_kind") not in ("land", "commercial") and not raw.get("vacant_lot")
 
 
+_OCEANFRONT: Optional[frozenset] = None
+
+
+def oceanfront_counties() -> frozenset:
+    """main.OCEANFRONT_COASTAL_COUNTIES ((county, state) pairs), read from main.py's source with
+    ast so the cube does not import the orchestrator."""
+    global _OCEANFRONT
+    if _OCEANFRONT is None:
+        import ast
+        out: set = set()
+        try:
+            tree = ast.parse((PKG / "main.py").read_text())
+            for node in tree.body:
+                tgt = node.target if isinstance(node, ast.AnnAssign) else (
+                    node.targets[0] if isinstance(node, ast.Assign) and node.targets else None)
+                if isinstance(tgt, ast.Name) and tgt.id == "OCEANFRONT_COASTAL_COUNTIES" and node.value is not None:
+                    for el in ast.walk(node.value):
+                        if isinstance(el, ast.Tuple) and len(el.elts) == 2 and all(
+                                isinstance(e, ast.Constant) for e in el.elts):
+                            out.add((el.elts[0].value, el.elts[1].value))
+        except (OSError, SyntaxError):
+            pass
+        _OCEANFRONT = frozenset(out)
+    return _OCEANFRONT
+
+
+def in_flip_scope(state: str, county: Optional[str]) -> bool:
+    """The owner's flip scope: config.in_scope (the 18 footprint counties) or an oceanfront
+    coastal county (beach-drive flips). A row with no county is in scope (it cannot be ruled out)."""
+    if not county:
+        return True
+    from foreclosure_scraper.config import in_scope
+    return bool(in_scope(county, state)) or (county, state) in oceanfront_counties()
+
+
 def row_rules(rec: dict, raw: dict, owner: set[str]) -> set[str]:
     """Which applicability rules hold for the row. Pure."""
     st = (rec.get("state") or "").strip().upper()
     et = entity_type(raw)
     lt = rec.get("listing_type")
     r = {"all", st}
+    if in_flip_scope(st, canonical_county(rec.get("county"))):
+        r.add("flip_scope")
     if is_improved(rec, raw):
         r.add("improved")
     if et != "government":
@@ -470,6 +507,10 @@ NC_ONEMAP = "NC OneMap statewide parcel layer (free ArcGIS REST)"
 NOTICES = (("NC", "NC public notices (ncpublicnotices scraper)"), ("SC", "SC public notices (sc_public_notices scraper)"))
 _F = "field"
 _S = "signal"
+#: Quiet-title suits naming heirs by publication are parsed only in Column's SC estate lane
+#: (column_legal_notices._parse_sc_quiet_title); no NC notice parser looks for them (2026-10-09).
+SC_QUIET_TITLE = (("SC", "SC estate notices via Column (column_legal_notices, SC estate lane)"),)
+NC_QUIET_TITLE_SOURCE = (("NC", "NC public notices carry quiet-title/heir notices; no parser reads them"),)
 
 SPECS: dict[str, Spec] = {
     # ---- fields --------------------------------------------------------------------------
@@ -553,8 +594,11 @@ SPECS: dict[str, Spec] = {
                         producers=("scrapers/counties_nc/nc_heir_estate_parcels.py",
                                    "scrapers/counties_nc/henderson_foreclosure_parcels.py"),
                         doc="raw.heir_estate present (a parcel owner-of-record naming heirs/estate)"),
-    "heir_naming_publication": Spec(_S, "county", "notices", statewide=NOTICES, producers=("scrapers/newspapers/column_legal_notices.py",),
-                                    doc="raw.heir_naming_publication present"),
+    "heir_naming_publication": Spec(_S, "county", "notices", statewide=SC_QUIET_TITLE,
+                                    sources=NC_QUIET_TITLE_SOURCE,
+                                    producers=("scrapers/newspapers/column_legal_notices.py",),
+                                    doc="raw.heir_naming_publication present",
+                                    ambiguity="parsed only from SC estate notices (Column); NC has no parser"),
     "owner_cluster": Spec(_S, "derived", "derived", producers=("enrichment_owner_cluster.py",),
                           statewide=(("NC", "board-wide owner clustering"), ("SC", "board-wide owner clustering")),
                           doc="raw.owner_cluster present; checked = owner_name present"),
@@ -687,7 +731,8 @@ SPECS: dict[str, Spec] = {
                              doc="raw.deed_chain.summary.chain_breaks truthy; checked = deed chain present"),
     "deed_chain_distress_transfer": Spec(_S, "derived", "gis_deed", producers=("enrichment_deed_chain.py",),
                                          doc="raw.deed_chain.summary.distress_transfers truthy; checked = deed chain present"),
-    "quiet_title": Spec(_S, "county", "court", statewide=NOTICES, producers=("scrapers/newspapers/column_legal_notices.py",),
+    "quiet_title": Spec(_S, "county", "court", statewide=SC_QUIET_TITLE, sources=NC_QUIET_TITLE_SOURCE,
+                        producers=("scrapers/newspapers/column_legal_notices.py",),
                         doc="is_quiet_title on raw.column/court/case/rod_docs/heir_naming_publication"),
     # ---- attorney checklist --------------------------------------------------------------
     "atty_legal_description": Spec(_F, "row", "gis_legal",
@@ -723,6 +768,15 @@ SPECS: dict[str, Spec] = {
                                         doc="hit = a tax_lien verdict 'confirmed'; checked = any decisive tax_lien "
                                             "verdict (confirmed/refuted/stale); applies to rows claiming delinquent tax"),
 }
+#: The owner's flip scope (2026-09-15, main._FLIP_LISTING_TYPES / _flip_outside_footprint): a flip
+#: type is wanted only in the 18 footprint counties (config.in_scope), plus the oceanfront coastal
+#: counties' beach-drive flips (owner, 2026-10-06). Outside them the run drops flip rows by design,
+#: so the flip feed columns do not apply there: the cell is "not applicable", not a gap.
+FLIP_FEED_COLS = ("lt_foreclosure_sale", "lt_sheriff_sale", "lt_auction", "lt_reo", "lt_hoa_sale")
+for _c in FLIP_FEED_COLS:
+    SPECS[_c] = replace(SPECS[_c], applies="flip_scope",
+                        doc=SPECS[_c].doc + "; applies in the owner's flip scope (18 footprint counties + "
+                                            "oceanfront beach-drive counties)")
 assert set(SPECS) == set(ALL_COLUMNS), set(ALL_COLUMNS) ^ set(SPECS)
 assert len(OWNER_COLUMNS) == 73
 
@@ -915,8 +969,9 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
         out.add("code_enforcement")
     if isinstance(raw.get("deed_chain"), dict):
         out |= {"deed_chain_break", "deed_chain_distress_transfer", "divorce_no_subsequent_deed"}
-    if isinstance(raw.get("marriage_license"), dict):
-        out.add("marriage_license")
+    ml = raw.get("marriage_license")
+    if isinstance(ml, dict) and (ml.get("checked_at") or ml.get("license_date") or ml.get("spouse_name")):
+        out.add("marriage_license")          # an undated no-match (retired module) is not a check
     if raw.get("incarceration") or raw.get("incarceration_check"):
         out.add("incarceration")
     if raw.get("bop_federal") or raw.get("bop_check"):
@@ -1492,7 +1547,12 @@ def classify_cell(spec: Spec, app: int, target: int, ran: bool, built: str, src:
     return "no source known"
 
 
-def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set]) -> dict:
+def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set], screens: Optional[dict] = None) -> dict:
+    """screens: a screen ledger (foreclosure_scraper.screen_ledger, docs/screen_ledger.json) of the
+    run that wrote the board. A county/state/feed-scope cell it records as screened RAN even with
+    no hit on the board ('screened, none found'); a county-roster row column it records (the tax
+    family) counts every applicable row as checked."""
+    from foreclosure_scraper import screen_ledger as SL
     counties = sorted(cube.rows, key=lambda k: (k[0], k[1] == UNKNOWN, k[1]))
     # feeds: which slugs emit each listing type, and where they have rows
     lt_slugs: dict[str, set[str]] = defaultdict(set)
@@ -1523,10 +1583,16 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set]) -> dict:
                 ran = state_hits[col][st] > 0
             else:
                 ran = pos > 0 or chk > 0
+            scr = bool(screens) and co != UNKNOWN and SL.screened(screens, col, st, co)
+            if scr and spec.kind == "signal" and (spec.scope in ("county", "state", "feed")
+                                                  or col in SL.COUNTY_ROSTER_ROW_COLUMNS):
+                ran = True
             if spec.kind == "field":
                 target = pos
             elif spec.scope in ("county", "state", "feed"):
                 target = app if ran else 0
+            elif scr and col in SL.COUNTY_ROSTER_ROW_COLUMNS:
+                target = app
             else:
                 target = chk
             if spec.statewide and dict(spec.statewide).get(st):
@@ -1539,6 +1605,7 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set]) -> dict:
                 built = "no"
             src = source_status(spec, st, crec) if co != UNKNOWN else ("unknown", "", "county unknown")
             cells[(st, co, col)] = dict(app=app, pos=pos, chk=chk, target=target, ran=ran, built=built, src=src,
+                                        screened=scr,
                                         v_any=cube.v_any[key][col], v_dec=cube.v_dec[key][col],
                                         v_conf=cube.v_conf[key][col], v_applies=cube.v_applies[key][col],
                                         v_wall=cube.v_wall[key][col])
@@ -1660,7 +1727,8 @@ def read_baseline(path: Optional[Path]) -> dict[tuple[str, str], dict]:
     return out
 
 
-def write_csvs(out_dir: Path, stamp: str, cube: Cube, roll: dict, baseline: dict) -> dict[str, Path]:
+def write_csvs(out_dir: Path, stamp: str, cube: Cube, roll: dict, baseline: dict,
+               baseline_label: str = "2026-10-01") -> dict[str, Path]:
     paths = {}
     head = ["State", "County", "Rows"]
     p = out_dir / f"county_signal_coverage_{stamp}.csv"
@@ -1681,10 +1749,10 @@ def write_csvs(out_dir: Path, stamp: str, cube: Cube, roll: dict, baseline: dict
                        + [pct(cube.pos[key][c], n) for c in ATTY_COLUMNS])
     paths["plus_attorney"] = p
     if baseline:
-        p = out_dir / f"county_signal_coverage_delta_2026-10-01_to_{stamp}.csv"
+        p = out_dir / f"county_signal_coverage_delta_{baseline_label}_to_{stamp}.csv"
         with open(p, "w", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["State", "County", "Rows_2026-10-01", f"Rows_{stamp}", "Rows_delta"]
+            w.writerow(["State", "County", f"Rows_{baseline_label}", f"Rows_{stamp}", "Rows_delta"]
                        + [f"{c}_pp" for c in OWNER_COLUMNS])
             keys = list(roll["counties"]) + [k for k in baseline if k not in cube.rows]
             for key in keys:
@@ -1747,6 +1815,10 @@ def summarize(cube: Cube, roll: dict, baseline: dict, ledger_counts: dict, sampl
     expected = {(st, c) for st, names in STATE_COUNTIES.items() for c in names}
     gaps = roll["gaps"]
     cls_counts = Counter(re.sub(r" \(.*", "", g["gap_class"]) for g in gaps)
+    # the 146 x 82 grid itself: one class per (county, column) cell, fill/check layer (the gap
+    # entries above also hold verify-layer entries, so they are not a count of cells)
+    cell_counts = Counter(re.sub(r" \(.*", "", c.get("class") or "at target")
+                          for (st, co, col), c in roll["cells"].items() if co != UNKNOWN)
     cls_rows = Counter()
     for g in gaps:
         cls_rows[re.sub(r" \(.*", "", g["gap_class"])] += g["est_rows_affected"]
@@ -1761,7 +1833,7 @@ def summarize(cube: Cube, roll: dict, baseline: dict, ledger_counts: dict, sampl
         baseline_unknown_rows={st: int(float(baseline.get((st, UNKNOWN), {}).get("Rows") or 0)) for st in ("NC", "SC")}
         if baseline else {},
         columns=per_col,
-        gap_class_counts=dict(cls_counts), gap_class_rows=dict(cls_rows),
+        gap_class_counts=dict(cls_counts), gap_class_rows=dict(cls_rows), cell_class_counts=dict(cell_counts),
         ledger_entries_by_county=ledger_counts,
         median_hit_rate_where_ran={f"{c}|{s}": round(v, 5) for (c, s), v in roll["median_rates"].items()},
         top_sources=cube.slug_rows.most_common(30),
@@ -1769,8 +1841,34 @@ def summarize(cube: Cube, roll: dict, baseline: dict, ledger_counts: dict, sampl
     )
 
 
-def run(board: Path, limit: Optional[int], use_verifiers: bool, today: date) -> Cube:
+def is_checkpoint(path: Path) -> bool:
+    """A checkpoint directory (data/checkpoint: board.json.gz + manifest.json), or its board.json.gz."""
+    p = Path(path)
+    if p.is_file() and p.name == "board.json.gz":
+        p = p.parent
+    return p.is_dir() and (p / "board.json.gz").is_file() and (p / "manifest.json").is_file()
+
+
+def board_rows(board: Path):
+    """The rows to measure, one at a time. A published board (docs/listings.json.gz or a docs/
+    directory) streams with the comps sidecar merged; a CHECKPOINT directory streams the rows it
+    would publish, through board_selfcheck's reader (validated to a Listing, web_artifact._to_dict),
+    exactly as compare_boards.py --candidate and audit_suite.py --checkpoint read it."""
     from foreclosure_scraper.board_stream import iter_board_rows_with_detail
+    p = Path(board)
+    if is_checkpoint(p):
+        sd = str(Path(__file__).resolve().parent)
+        if sd not in sys.path:
+            sys.path.insert(0, sd)
+        import board_selfcheck as BS
+        yield from BS._checkpoint_rows(p if p.is_dir() else p.parent)
+        return
+    if p.is_dir():
+        p = p / "listings.json.gz"
+    yield from iter_board_rows_with_detail(p, keys=("comps",))
+
+
+def run(board: Path, limit: Optional[int], use_verifiers: bool, today: date) -> Cube:
     idx, _ = load_ledger_index()
     vers = []
     if use_verifiers:
@@ -1778,7 +1876,7 @@ def run(board: Path, limit: Optional[int], use_verifiers: bool, today: date) -> 
         vers = discover()
     cube = Cube(today=today, ledger_idx=idx, verifiers=vers)
     t0 = time.time()
-    for rec in iter_board_rows_with_detail(board, keys=("comps",)):
+    for rec in board_rows(board):
         cube.add(rec)
         if cube.n % 50000 == 0:
             print(f"  ...{cube.n:,} rows ({time.time() - t0:.0f}s)", file=sys.stderr)
@@ -1790,13 +1888,20 @@ def run(board: Path, limit: Optional[int], use_verifiers: bool, today: date) -> 
 
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--board", default=str(REPO / "docs" / "listings.json.gz"))
+    ap.add_argument("--board", default=str(REPO / "docs" / "listings.json.gz"),
+                    help="docs/listings.json.gz, a board directory, or a checkpoint directory "
+                         "(board.json.gz + manifest.json, read as compare_boards.py reads it)")
     ap.add_argument("--out-dir", default=str(REPO / "docs" / "gap_matrix"))
     ap.add_argument("--date", default=date.today().isoformat())
     ap.add_argument("--baseline", default=str(REPO / "docs" / "gap_matrix" / "county_signal_coverage_2026-10-01_baseline.csv"))
+    ap.add_argument("--baseline-label", default="2026-10-01",
+                    help="the baseline's date, for the delta file's name and header")
     ap.add_argument("--matrix", default=str(REPO / "docs" / "county_records" / "county_records_matrix.json"))
     ap.add_argument("--desktop", default="", help="also copy the coverage CSVs here")
     ap.add_argument("--samples", default="", help="JSON of source-page sample results (counts only) to embed")
+    ap.add_argument("--screens", default=str(REPO / "docs" / "screen_ledger.json"),
+                    help="the screen ledger of the run that wrote the board ('' = none); "
+                         "ignored when older than screen_ledger.MAX_AGE_DAYS")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--no-verifiers", action="store_true")
     a = ap.parse_args(argv)
@@ -1807,21 +1912,30 @@ def main(argv: Optional[list[str]] = None) -> int:
     cube = run(Path(a.board), a.limit or None, not a.no_verifiers, today)
     matrix = load_matrix(Path(a.matrix))
     code = built_in_code()
-    roll = roll_up(cube, matrix, code)
+    from foreclosure_scraper import screen_ledger as SL
+    screens = SL.load(a.screens) if a.screens else {}
+    if screens and not SL.fresh(screens, today):
+        print(f"  screen ledger {a.screens} is stale (run_at {screens.get('run_at')}): ignored", file=sys.stderr)
+        screens = {}
+    roll = roll_up(cube, matrix, code, screens)
     baseline = read_baseline(Path(a.baseline)) if a.baseline else {}
     _, ledger_counts = load_ledger_index()
     samples = json.loads(Path(a.samples).read_text()) if a.samples and Path(a.samples).exists() else None
     summary = summarize(cube, roll, baseline, ledger_counts, samples)
     corr = correctness(cube)
-    paths = write_csvs(out, stamp, cube, roll, baseline)
+    paths = write_csvs(out, stamp, cube, roll, baseline, a.baseline_label)
     cell_head = ["state", "county", "column", "applicable", "hits", "checked", "target", "target_pct", "ran",
                  "built", "source_status", "source_wall", "source", "verified_any", "verified_decisive",
-                 "verified_confirmed", "verifier_covers_hits", "gap_class"]
+                 "verified_confirmed", "verifier_covers_hits", "screened", "gap_class"]
     cells = [[st, co, col, c["app"], c["pos"], c["chk"], c["target"], pct(c["target"], c["app"]), c["ran"],
               c["built"], c["src"][0], c["src"][1], c["src"][2], c["v_any"], c["v_dec"], c["v_conf"],
-              c["v_applies"], c.get("class")] for (st, co, col), c in roll["cells"].items()]
+              c["v_applies"], c.get("screened", False), c.get("class")] for (st, co, col), c in roll["cells"].items()]
     gap_head = list(roll["gaps"][0].keys()) if roll["gaps"] else []
     doc = dict(schema="gap-matrix-v1", date=stamp, board=str(Path(a.board).name), summary=summary,
+               baseline_label=a.baseline_label,
+               board_kind=("the reconciled pre-publish checkpoint (data/checkpoint)" if is_checkpoint(Path(a.board))
+                           else "the published board"),
+               screen_ledger=dict(run_at=screens.get("run_at"), cells=screens.get("cells_screened", 0)) if screens else None,
                scopes=SCOPES, correctness=corr,
                rows_by_county={f"{k[0]}|{k[1]}": n for k, n in sorted(cube.rows.items())},
                cells=dict(header=cell_head, rows=cells),
@@ -1860,7 +1974,7 @@ def render_readme(doc: dict, roll: dict, cube: Cube) -> str:
     cols = s["columns"]
     L: list[str] = []
     L.append(f"# Gap matrix {doc['date']}: columns x counties x check depth\n")
-    L.append("Generated by `scripts/gap_matrix.py` from the published board (one read-only pass; "
+    L.append(f"Generated by `scripts/gap_matrix.py` from {doc.get('board_kind') or 'the published board'} (one read-only pass; "
              "counts only, no names, phones or private addresses). Data: "
              f"`gap_matrix_{doc['date']}.json`; CSVs: " + ", ".join(f"`{v}`" for v in doc["files"].values()) + ".\n")
     L.append("## Headline\n")
@@ -1869,11 +1983,20 @@ def render_readme(doc: dict, roll: dict, cube: Cube) -> str:
              f"{', '.join(s['counties_missing']) or 'none'}; extra jurisdictions: {', '.join(s['extra_jurisdictions']) or 'none'}.")
     bu = s.get("baseline_unknown_rows") or {}
     L.append("- Rows with no county (UNKNOWN), a gap in themselves: " + ", ".join(
-        f"{st} {n:,} (10/1: {bu.get(st, 0):,})" for st, n in s["unknown_county_rows"].items()) + ".")
+        f"{st} {n:,} ({doc.get('baseline_label') or '10/1'}: {bu.get(st, 0):,})"
+        for st, n in s["unknown_county_rows"].items()) + ".")
     L.append(f"- Columns: the owner's **73** from county_signal_coverage_FINAL.csv (2026-10-01) plus **9** attorney "
              f"columns (`atty_*`) = {len(ALL_COLUMNS)}.")
     L.append("- Gap cells by class (count / estimated rows affected; a row counts once per column it misses): " + "; ".join(
-        f"{k} {v:,} / {s['gap_class_rows'].get(k, 0):,}" for k, v in sorted(s["gap_class_counts"].items())) + ".\n")
+        f"{k} {v:,} / {s['gap_class_rows'].get(k, 0):,}" for k, v in sorted(s["gap_class_counts"].items())) + ".")
+    cc = s.get("cell_class_counts") or {}
+    L.append(f"- The grid ({sum(cc.values()):,} cells = named counties x {len(ALL_COLUMNS)} columns, fill/check layer; "
+             "the gap entries above add verification-layer entries, so they are not cells): " + "; ".join(
+                 f"{k} {v:,}" for k, v in sorted(cc.items())) + ".")
+    sl = doc.get("screen_ledger")
+    L.append("- Screen ledger ('screened, none found', `docs/screen_ledger.json`): " + (
+        f"run of {sl.get('run_at')}, {sl.get('cells', 0):,} (column, county) screens." if sl else
+        "none for this board (written beside run_health.json from the next run on).") + "\n")
     L.append("Two views. **Fill** (the 10/1 numbers): the share of a county's rows that carry a value or a hit. "
              "**Check depth**: for each column and county, is it applicable, is a source known, is it built, did "
              "it run, what share of applicable rows were checked, and what share of hits carry a verdict. A signal "

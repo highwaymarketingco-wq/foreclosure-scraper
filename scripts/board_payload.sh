@@ -72,6 +72,7 @@ board_payload_paths() {
       docs/board.manifest.json \
       docs/run_meta.json \
       docs/run_health.json \
+      docs/screen_ledger.json \
       docs/foreclosure_sold_pool.json \
       docs/multifamily.json \
       docs/parcel_photos

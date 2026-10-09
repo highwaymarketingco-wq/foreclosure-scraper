@@ -45,6 +45,13 @@ def write_health_artifact(
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(health, indent=2, sort_keys=False))
+    # The run's screens ("screened, none found" per signal column and county), from the same
+    # per-source statuses, beside run_health.json. A failure here never fails the health file.
+    try:
+        from .screen_ledger import write_ledger
+        write_ledger(health, out_path.parent / "screen_ledger.json")
+    except Exception:  # noqa: BLE001 - the ledger is advisory; run_health must still land
+        pass
     return out_path
 
 

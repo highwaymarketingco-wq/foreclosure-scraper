@@ -270,3 +270,71 @@ def test_cube_roll_up_classes():
     assert all("DOE" not in str(g) and "ROE" not in str(g) for g in roll["gaps"])
     corr = gm.correctness(cube)
     assert corr["invariants"]["county_blank"]["total"] == 1
+
+
+# ---------------------------------------------------------------- 2026-10-09 remeasure: flip scope, SC-only quiet title, screens
+
+def test_flip_feed_columns_apply_only_in_flip_scope():
+    # Buncombe is a footprint county; Alamance is not (and not oceanfront); Dare is oceanfront
+    assert gm.in_flip_scope("NC", "Buncombe")
+    assert not gm.in_flip_scope("NC", "Alamance")
+    assert gm.in_flip_scope("NC", "Dare")
+    assert gm.in_flip_scope("NC", None)                 # no county: cannot be ruled out
+    out = row(county="Alamance", listing_type="tax_lien")
+    rules = gm.row_rules(out, out["raw"], set())
+    app = gm.applicable_columns(out, rules)
+    assert not (set(gm.FLIP_FEED_COLS) & app)
+    assert "lt_tax_lien" in app and "lt_divorce_notice" in app   # distressed types apply everywhere
+    inn = row(county="Buncombe")
+    assert set(gm.FLIP_FEED_COLS) <= gm.applicable_columns(inn, gm.row_rules(inn, inn["raw"], set()))
+
+
+def test_quiet_title_is_sourced_not_built_in_nc():
+    st = gm.source_status(gm.SPECS["quiet_title"], "NC", None)
+    assert st[0] == "free" and "not read yet" in st[2]
+    assert gm.source_status(gm.SPECS["heir_naming_publication"], "SC", None)[2].startswith("statewide: SC estate")
+
+
+def _ledger(screens):
+    return {"schema": "screen-ledger-v1", "run_at": "2026-10-07T00:00:00Z", "screens": screens}
+
+
+def test_screen_ledger_closes_county_and_tax_roster_cells():
+    cube = gm.Cube(today=TODAY)
+    for name in ("DOE JOHN", "ROE JANE"):
+        cube.add(row(county="Polk", owner_name=name, raw={"entity_type": "individual"}))
+    matrix = {("NC", "Polk"): dict(MATRIX_REC, county="polk")}
+    plain = gm.roll_up(cube, matrix, {})
+    assert plain["cells"][("NC", "Polk", "jail_booking")]["class"] == "no source known"
+    assert plain["cells"][("NC", "Polk", "two_year_delinquent")]["target"] == 0
+    led = _ledger({"jail_booking": {"NC|Polk": {"sources": ["national.jail_bookings"]}},
+                   "two_year_delinquent": {"NC|Polk": {"sources": ["counties_nc.polk_delinquent_tax"]}}})
+    roll = gm.roll_up(cube, matrix, {}, led)
+    jail = roll["cells"][("NC", "Polk", "jail_booking")]
+    assert jail["ran"] and jail["screened"] and jail["class"] is None and jail["target"] == jail["app"] == 2
+    tax = roll["cells"][("NC", "Polk", "two_year_delinquent")]
+    assert tax["class"] is None and tax["target"] == tax["app"]
+    # a screen never fills a FIELD
+    assert roll["cells"][("NC", "Polk", "phone")]["target"] == 0
+
+
+def test_screen_ledger_ignored_for_unknown_county():
+    cube = gm.Cube(today=TODAY)
+    cube.add(row(county=None, owner_name="X Y", raw={"entity_type": "individual"}))
+    led = _ledger({"jail_booking": {"NC|UNKNOWN": {"sources": ["x"]}}})
+    roll = gm.roll_up(cube, {}, {}, led)
+    assert not roll["cells"][("NC", "UNKNOWN", "jail_booking")]["screened"]
+
+
+def test_board_rows_reads_a_checkpoint(tmp_path):
+    import gzip
+    import json as _json
+    d = tmp_path / "ckpt"
+    d.mkdir()
+    (d / "manifest.json").write_text("{}")
+    with gzip.open(d / "board.json.gz", "wt") as f:
+        _json.dump([{"source": "t.s", "source_url": "https://example.test/1", "listing_type": "tax_lien",
+                     "state": "NC", "county": "Buncombe", "raw": {}}], f)
+    assert gm.is_checkpoint(d) and gm.is_checkpoint(d / "board.json.gz")
+    rows = list(gm.board_rows(d))
+    assert len(rows) == 1 and rows[0]["county"] == "Buncombe"
