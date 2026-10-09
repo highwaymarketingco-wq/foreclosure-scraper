@@ -29,7 +29,7 @@ from typing import Optional
 from bs4 import BeautifulSoup
 
 from .models import RodDoc
-from .sc_chain import Docs, NameQuery, Searcher, run_chain, run_search
+from .sc_chain import Docs, NameQuery, Searcher, run_chain, run_search, run_search_status
 from .sc_polite import PoliteSession
 
 PLATFORM = "cott_esearch_classic"
@@ -187,3 +187,15 @@ def _search_sync(state: str, county: str, name: str, max_docs: int) -> list[RodD
 async def search_by_name(state: str, county: str, name: str, max_docs: int = 50) -> list[RodDoc]:
     """Every instrument naming `name` as grantor or grantee (newest first)."""
     return await asyncio.to_thread(_search_sync, state, county, name, max_docs)
+
+
+def _search_status_sync(state: str, county: str, name: str, max_docs: int):
+    if _base(state, county) is None:
+        return [], "error", False
+    return run_search_status(platform=PLATFORM, state="SC", county=county.strip().title(), name=name,
+                             make_searcher=lambda: make_searcher(state, county), max_docs=max_docs)
+
+
+async def search_by_name_status(state: str, county: str, name: str, max_docs: int = 50):
+    """(docs, status, truncated): status ok | walled | capped | error | noname (rod/sc_chain.run_search_status)."""
+    return await asyncio.to_thread(_search_status_sync, state, county, name, max_docs)

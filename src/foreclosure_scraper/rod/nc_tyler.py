@@ -298,3 +298,8 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 80)
 
 def chain(county: str, owner_name: Optional[str], *, state: str = "NC", depth: int = 3) -> dict:
     return ADAPTER.chain(county, owner_name, state=state, depth=depth)
+
+
+async def search_by_name_status(state: str, county: str, name: str, max_docs: int = 80):
+    """(docs, status, truncated) -- see rod/nc_cott_v4.search_by_name_status."""
+    return await ADAPTER.search_by_name_status(state, county, name, max_docs)

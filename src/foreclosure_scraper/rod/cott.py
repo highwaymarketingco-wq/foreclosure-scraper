@@ -77,3 +77,12 @@ async def discover_recent_sold_recordings(
         return []
     base = COTT_COUNTIES[(state, county)]
     return await aumentum.discover_recent_sold_recordings_at(base, county, state, days_back, max_docs)
+
+
+async def search_by_name_status(state: str, county: str, name: str, max_docs: int = 80):
+    """(docs, status, truncated) for Polk and Rutherford through the paced v4 guest adapter, so a clean
+    "nothing indexed under that name" can be told from a failed fetch (enrichment_generic_rod stamps it)."""
+    if (state, county) not in COTT_COUNTIES:
+        return [], "error", False
+    from . import nc_cott_v4
+    return await nc_cott_v4.ADAPTER.search_by_name_status(state, county, name, max_docs)

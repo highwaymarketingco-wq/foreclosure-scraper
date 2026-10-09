@@ -14,7 +14,7 @@
  "decisions": [
   [
    "Click-throughs are allowed.",
-   "A plain 'I agree', disclaimer, disclosure popup or 'Sign in as a Guest' button that asks for no credentials is not a wall (Kania, Zacchaeus, Aldridge Pite, and the ten Cott guest-button deed counties: Alamance, Edgecombe, Halifax, Lenoir, Onslow, Pitt, Rowan, Rutherford, Scotland, Wilson)."
+   "A plain 'I agree', disclaimer, disclosure popup or 'Sign in as a Guest' button that asks for no credentials is not a wall (Kania, Zacchaeus, Aldridge Pite, and the nine Cott guest-button deed counties: Alamance, Edgecombe, Halifax, Lenoir, Onslow, Pitt, Rutherford, Scotland, Wilson; Rowan's sign-in page answers a script with a challenge page, see the Rowan card)."
   ],
   [
    "Cleared by the attorney.",
@@ -2822,6 +2822,86 @@
    "short": "LiensNC filings",
    "loads": "small",
    "wall_class": "login"
+  },
+  {
+   "group": "county",
+   "kind": "A",
+   "pull": "HOT leads only, 5 per sitting.",
+   "save": "Notes in the CRM.",
+   "lane": "None.",
+   "often": "Per HOT lead.",
+   "minutes_month": 5,
+   "leads": "per lead",
+   "state": "NC",
+   "loads": "crm",
+   "scope": [
+    [
+     "NC",
+     "Rowan"
+    ]
+   ],
+   "id": "nc_rowan_cott",
+   "place": "Rowan County, NC",
+   "name": "Rowan County deed search (Cott eSearch) behind a challenge page",
+   "wall": "The county's Cott eSearch sign-in page answers a script with a challenge page ('Just a moment', a bot check). Fetched once on 2026-10-07 and once more on 2026-10-09 with the same answer; nothing was retried or worked around. The nine other Cott guest-button counties open to a script.",
+   "url": "https://rod.rowancountync.gov/external/",
+   "what": "Liens, deeds of trust and the marriage index for Rowan owners (4,287 board rows). The county-wide sweep that reads the other nine Cott counties cannot reach it.",
+   "steps": [
+    "Open <b>https://rod.rowancountync.gov/external/</b> in a normal Chrome window. Wait for the check to finish or tick the box if one shows.",
+    "Click <b>Sign in as a Guest</b> (no user name or password).",
+    "Choose <b>Quick Name Search</b>, type the owner's last name and first name, leave 'Begins With' for the first name, and search 'All Matches'.",
+    "Note each lien, judgment, lis pendens or notice of foreclosure: date filed, kind, parties, book and page. Choose the <b>MARRIAGES</b> index type to check for a marriage license."
+   ],
+   "time": "About 4 minutes per lead.",
+   "gain": "Lien, foreclosure and marriage checks for a county we cannot read.",
+   "others": "County register of deeds office; abstractor.",
+   "county": "Rowan",
+   "short": "Rowan deeds behind a challenge",
+   "signal_columns": [
+    "liens",
+    "atty_rod_lien_checked",
+    "marriage_license",
+    "lien_priority"
+   ],
+   "wall_class": "bot"
+  },
+  {
+   "group": "county",
+   "kind": "A",
+   "pull": "HOT leads only, 5 per sitting.",
+   "save": "Notes in the CRM.",
+   "lane": "None.",
+   "often": "Per HOT lead.",
+   "minutes_month": 5,
+   "leads": "per lead",
+   "state": "NC",
+   "loads": "crm",
+   "scope": [
+    [
+     "NC",
+     "Forsyth"
+    ]
+   ],
+   "id": "nc_forsyth_vital",
+   "place": "Forsyth County, NC",
+   "name": "Forsyth County marriage records (Vital Records login)",
+   "wall": "Marriage records are under 'Vital Records' on the register's site, a username and password login with account registration (vital/login.php, re-fetched once 2026-10-09: login page). The property index itself (forsythdeeds.com) is open and is read by script.",
+   "url": "https://forsythdeeds.com/vital/login.php",
+   "what": "Marriage license check for Forsyth owners (6,582 board rows).",
+   "steps": [
+    "Open <b>https://forsythdeeds.com/</b>, accept the disclaimer, and choose <b>Vital Records</b>.",
+    "Register a free account with your own e-mail (this is the county's own login; we never hold it) and sign in.",
+    "Search the owner's name in the marriage index; note the spouse's name and the year."
+   ],
+   "time": "About 5 minutes per lead.",
+   "gain": "Marriage-license check where no script can read it.",
+   "others": "County register of deeds office.",
+   "county": "Forsyth",
+   "short": "Forsyth marriages need a login",
+   "signal_columns": [
+    "marriage_license"
+   ],
+   "wall_class": "login"
   }
  ],
  "foia": {
@@ -2995,7 +3075,7 @@
    "Allowed and built (Kania, Zacchaeus, Aldridge Pite readers run)."
   ],
   [
-   "Cott eSearch 'Sign in as a Guest' button: Alamance, Edgecombe, Halifax, Lenoir, Onslow, Pitt, Rowan, Rutherford, Scotland, Wilson (NC deeds)",
+   "Cott eSearch 'Sign in as a Guest' button: Alamance, Edgecombe, Halifax, Lenoir, Onslow, Pitt, Rutherford, Scotland, Wilson (NC deeds)",
    "A guest button on the vendor's sign-in page; no user name or password.",
    "Allowed. An engineer is adding the guest click to the Cott deed reader now."
   ],

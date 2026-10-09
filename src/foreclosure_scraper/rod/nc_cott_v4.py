@@ -257,3 +257,9 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 80)
 
 def chain(county: str, owner_name: Optional[str], *, state: str = "NC", depth: int = 3) -> dict:
     return ADAPTER.chain(county, owner_name, state=state, depth=depth)
+
+
+async def search_by_name_status(state: str, county: str, name: str, max_docs: int = 80):
+    """(docs, status, truncated): status ok | walled | capped | too_many | error | noname. 'ok' with no
+    docs is a checked "nothing indexed under that name" (enrichment_generic_rod stamps it)."""
+    return await ADAPTER.search_by_name_status(state, county, name, max_docs)
