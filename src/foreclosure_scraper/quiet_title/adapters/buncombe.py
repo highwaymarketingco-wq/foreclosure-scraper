@@ -297,6 +297,10 @@ class BuncombeAdapter(CottV4Register, CountyAdapter):
                            f"({last_err}); run the intake again later")
 
     def parcel(self, pin: str) -> Parcel:
+        # the board writes many Buncombe PINs as the 10-digit map PIN; the layer's pinnum is 15 digits
+        # (the 10 plus a 5-digit zero suffix for a parcel that is not a sub-unit) (audit 2026-10-09)
+        if len(pin) == 10 and pin.isdigit():
+            pin = pin + "00000"
         feats, fields, ex = self._gis(f"pinnum='{pin}'", f"County parcel record for PIN {pin}", "county_parcel_layer")
         if not feats:
             return Parcel(pin=pin, exhibit=ex.key, found=False, field_names=fields)

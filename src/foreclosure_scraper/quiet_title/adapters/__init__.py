@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from .base import CountyAdapter
 from .buncombe import BuncombeAdapter
+from .cott_onemap import OPEN_COTT, CottOneMapAdapter
 from .nc_onemap import NcOneMapAdapter, canonical_county
 from .polk import PolkAdapter
 
@@ -19,6 +20,10 @@ def adapter_class(county: str, state: str = "NC") -> type[CountyAdapter]:
     key = (state.strip().upper(), county.strip().lower().removesuffix(" county"))
     if key in ADAPTERS:
         return ADAPTERS[key]
+    # an open Cott v4 register (no guest button): parcel record + the register read live
+    cott = {c.lower(): c for c in OPEN_COTT}.get(key[1])
+    if key[0] == "NC" and cott:
+        return CottOneMapAdapter.for_cott_county(cott)
     if key[0] == "NC" and canonical_county(county):
         return NcOneMapAdapter.for_county(county)
     have = ", ".join(f"{c.title()} {s}" for s, c in sorted(ADAPTERS))
@@ -26,4 +31,4 @@ def adapter_class(county: str, state: str = "NC") -> type[CountyAdapter]:
                      f"statewide parcel layer.") from None
 
 
-__all__ = ["ADAPTERS", "CountyAdapter", "BuncombeAdapter", "NcOneMapAdapter", "PolkAdapter", "adapter_class"]
+__all__ = ["ADAPTERS", "CountyAdapter", "BuncombeAdapter", "CottOneMapAdapter", "NcOneMapAdapter", "PolkAdapter", "adapter_class"]

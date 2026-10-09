@@ -176,3 +176,55 @@ def test_parse_sc_reads_each_county_layers_deed_fields():
         {"book": "2345", "page": "12", "date": "2004-03-12"}
     assert parse_sc("Pickens", {"SALEDT": 1566777600000}) == {"book": None, "page": None, "date": "2019-08-26"}
     assert parse_sc("Oconee", {"deed_book": "", "deed_page": ""}) is None
+
+
+def test_intake_reads_open_cott_registers_and_pads_buncombe_pins():
+    from foreclosure_scraper.quiet_title.adapters import CottOneMapAdapter, adapter_class
+    from foreclosure_scraper.quiet_title.adapters.buncombe import BuncombeAdapter
+    a = adapter_class("Jackson")
+    assert issubclass(a, CottOneMapAdapter) and a.rod_base.endswith("/protected/v4/") and a.register_fetched
+    assert not issubclass(adapter_class("Rutherford"), CottOneMapAdapter)     # behind the guest button
+    seen = []
+
+    class Fake(BuncombeAdapter):
+        def __init__(self):
+            pass
+
+        def _gis(self, where, label, slug):
+            seen.append(where)
+            return [], [], type("E", (), {"key": "E1"})()
+    Fake().parcel("9629575926")
+    assert seen == ["pinnum='962957592600000'"]
+
+
+def test_intake_takes_the_only_deed_at_a_dateless_cited_book_page():
+    from foreclosure_scraper.quiet_title.intake import vesting_candidates
+    from foreclosure_scraper.quiet_title.model import Instrument
+    deed = Instrument(date="02/17/2011", date_iso="2011-02-17", index_code="CRP", kind="QUIT CLAIM", book="1", page="2")
+    dot = Instrument(date="02/17/2011", date_iso="2011-02-17", index_code="CRP", kind="DEED OF TRUST", book="1", page="2")
+    assert vesting_candidates([deed, dot], None) == ([deed], "NODATE")
+    assert vesting_candidates([deed, deed], None) == ([], "")
+
+
+def test_package_merge_takes_intake_and_owner_items(tmp_path):
+    import importlib.util as iu
+    p = Path(__file__).resolve().parents[1] / "scripts" / "lawyer_packages.py"
+    spec = iu.spec_from_file_location("lawyer_packages", p)
+    LP = iu.module_from_spec(spec)
+    spec.loader.exec_module(LP)
+    facts = {"county": "Polk", "state": "NC", "started": "2026-10-09T10:00:00-04:00",
+             "parcel": {"found": True, "owner": "DOE JOHN"},
+             "vesting": {"book": "413", "page": "362", "date_iso": "2015-06-03", "description": "LOT 7 TEST"},
+             "chain": [{"book": "359", "page": "2280"}], "register_fetched": True, "tax": {"bills": []}}
+    it = LP.intake_items(facts)
+    assert {k for k, v in it.items() if v["status"] == "sourced"} == \
+        {"parcel", "taxpayer", "legal_description", "deed_chain", "rod_checked"}
+    d = tmp_path / "P13077"
+    d.mkdir()
+    (d / "items.json").write_text('{"probate_checked": {"on": "2026-10-10", "source": "eCourts, none"}, '
+                                  '"heirs": {"on": "bad"}}')
+    own = LP.owner_items(tmp_path, "P130-77")
+    assert own["probate_checked"]["on"] == "2026-10-10" and "heirs" not in own
+    board = {"probate_checked": LL._src("walled"), "heirs": LL._src("missing")}
+    m = LP.merge(board, it, own)
+    assert m["probate_checked"]["status"] == "sourced" and m["heirs"]["status"] == "missing"

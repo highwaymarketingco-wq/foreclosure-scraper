@@ -56,7 +56,8 @@ def is_conveyance(inst: Instrument) -> bool:
         return False
     kind = (inst.kind or "").upper()
     if kind:
-        return ("DEED" in kind and not any(w in kind for w in ("TRUST", "SATISF", "RELEASE", "CANCEL"))) \
+        return (any(w in kind for w in ("DEED", "QUIT", "WARRANT")) and
+                not any(w in kind for w in ("TRUST", "SATISF", "RELEASE", "CANCEL"))) \
             or kind in ("D", "WD", "QCD", "WARRANTY", "QUITCLAIM")
     return idx == "DEE"
 
@@ -397,7 +398,11 @@ def _run(adapter: CountyAdapter, res: IntakeResult, pin: str, today: date, max_c
             rows, link = got
             res.deed_rows, res.deed_link = rows, link
             same, how = vesting_candidates(rows, p.deed_date)
-            if len(same) == 1:
+            if len(same) == 1 and how == "NODATE":
+                res.vesting = same[0]
+                res.vesting_note = (f"The county record cites book {p.deed_book} page {p.deed_page} with no date; the "
+                                    f"entry dated {same[0].date} is the only deed indexed there.")
+            elif len(same) == 1:
                 res.vesting = same[0]
                 res.vesting_note = (f"The entry at book {p.deed_book} page {p.deed_page} dated {same[0].date} "
                                     f"matches the county's deed date ({p.deed_date}){how}.")
@@ -468,7 +473,10 @@ def vesting_candidates(rows: list[Instrument], deed_date: Optional[str]) -> tupl
     than one entry, the deeds among them are kept (a deed of trust in the other book series is not
     the deed the record cites)."""
     if not deed_date:
-        return [], ""
+        # the record cites a book and page but no date (the statewide layer for many counties): the
+        # only deed indexed at that book/page is the deed it cites (audit 2026-10-09, lawyer_lane)
+        deeds = [r for r in rows if is_conveyance(r)]
+        return (deeds, "NODATE") if len(deeds) == 1 else ([], "")
     same = [r for r in rows if r.date_iso and r.date_iso.startswith(deed_date)]
     if len(deed_date) >= 10:
         return same, ""

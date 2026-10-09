@@ -1,6 +1,6 @@
 """The attorney's quiet-title packages for lane C (call_ready.py), written OUTSIDE the repository.
 
-  uv run python scripts/lawyer_packages.py [--board <board or checkpoint>] [--out DIR] [--near 3]
+  uv run python scripts/lawyer_packages.py [--board <board or checkpoint>] [--out DIR] [--near 4]
         [--owner-inputs DIR] [--intake-root DIR] [--no-pdf]
 
 For every lane C row (recomputed with call_ready on the row as published) it merges three sources
@@ -186,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default=str(OUT_DEFAULT))
     ap.add_argument("--owner-inputs", default=None, help="default <out>/owner_inputs")
     ap.add_argument("--intake-root", default=str(INTAKE_DEFAULT))
-    ap.add_argument("--near", type=int, default=3, help="list lane C rows with at most this many items open")
+    ap.add_argument("--near", type=int, default=4, help="list lane C rows with at most this many items open")
     ap.add_argument("--no-pdf", action="store_true")
     a = ap.parse_args(argv)
     out_root = Path(a.out).expanduser()
