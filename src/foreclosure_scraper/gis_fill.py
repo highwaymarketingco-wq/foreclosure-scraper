@@ -502,6 +502,17 @@ def _host_lock(host: str) -> threading.Lock:
         return _host_locks.setdefault(host, threading.Lock())
 
 
+class Feats(list):
+    """The attribute bags of one answer; .exceeded is the server's exceededTransferLimit (the answer is cut)."""
+    exceeded = False
+
+
+class Got(dict):
+    """{board pin: parsed record}; .complete is False when the answer was cut, so a pin missing from it is
+    unknown (left unscreened), not 'not in the layer'."""
+    complete = True
+
+
 class LayerClosed(RuntimeError):
     """The layer answered an error object / a non-200 status twice: closed for the run."""
 
@@ -556,7 +567,9 @@ def query(url: str, form: dict, key: Optional[str] = None) -> Optional[list[dict
         msg = str((j.get("error") or {}).get("message") or (j.get("error") or {}).get("code") or "error")
         return _fail(key, msg[:80])
     _errors[key] = 0
-    return [(f.get("attributes") or {}) for f in (j.get("features") or []) if isinstance(f, dict)]
+    out = Feats((f.get("attributes") or {}) for f in (j.get("features") or []) if isinstance(f, dict))
+    out.exceeded = bool(j.get("exceededTransferLimit"))
+    return out
 
 
 def _fail(url: str, why: str) -> None:
@@ -600,7 +613,8 @@ def fetch_nc(county: str, pins: list[str]) -> Optional[dict[str, dict]]:
             k = pin_key(a.get(f))
             if k and (k not in index or (parsed["deed"] and not index[k].get("deed"))):
                 index[k] = parsed
-    out = {}
+    out = Got()
+    out.complete = not feats.exceeded
     for p in pins:
         m = _lookup(p, index)
         if m is not None:
@@ -610,7 +624,7 @@ def fetch_nc(county: str, pins: list[str]) -> Optional[dict[str, dict]]:
 
 def fetch_sc(spec: dict, pins: list[str]) -> Optional[dict[str, dict]]:
     """{board pin: parsed} for the pins found, trying each id field for the pins still missing."""
-    out: dict[str, dict] = {}
+    out = Got()
     answered = False
     fields = ",".join(spec_fields(spec))
     for idf in spec["ids"]:
@@ -625,6 +639,8 @@ def fetch_sc(spec: dict, pins: list[str]) -> Optional[dict[str, dict]]:
                 break
             continue
         answered = True
+        if feats.exceeded:
+            out.complete = False
         index = {pin_key(a.get(idf)): {**parse_sc_attrs(spec, a), "parno": a.get(idf)} for a in feats
                  if pin_key(a.get(idf))}
         for p in todo:
@@ -856,7 +872,13 @@ def fetch_nc_like(county: str, pins: list[str]) -> Optional[dict[str, dict]]:
             k = pin_key(a.get(f))
             if k and (k not in index or (parsed["deed"] and not index[k].get("deed"))):
                 index[k] = parsed
-    return {p: m for p in pins for m in [_lookup(p, index)] if m is not None}
+    out = Got()
+    out.complete = not feats.exceeded
+    for p in pins:
+        m = _lookup(p, index)
+        if m is not None:
+            out[p] = m
+    return out
 
 
 def _fetch_chunk(st: str, co: str, pins: list[str]) -> Optional[dict[str, dict]]:
@@ -935,6 +957,8 @@ async def enrich_gis_fill(listings: list, budget_s: Optional[float] = None) -> d
                 if m is None and st == "NC" and len(pin_key(pin)) >= LIKE_MIN_KEY:
                     missed.setdefault(key, []).append(pin)
                     continue
+                if m is None and not getattr(got, "complete", True):
+                    continue          # the answer was cut: this pin is unknown, not 'not in the layer'
                 settle(key, pin, m)
     like_q = {k: list(v) for k, v in sorted(missed.items())}
     while like_q and not out_of_time():
@@ -956,6 +980,8 @@ async def enrich_gis_fill(listings: list, budget_s: Optional[float] = None) -> d
                 continue
             for pin in pins:
                 m = got.get(pin)
+                if m is None and not getattr(got, "complete", True):
+                    continue
                 if m is not None:
                     stats["found_by_like"] += 1
                 settle(key, pin, m)

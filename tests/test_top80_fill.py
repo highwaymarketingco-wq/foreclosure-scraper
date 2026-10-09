@@ -42,9 +42,11 @@ def _clean(monkeypatch):
 
 
 class FakeResp:
-    def __init__(self, features=None, status=200, error=None):
+    def __init__(self, features=None, status=200, error=None, exceeded=False):
         self.status_code = status
         self._j = {"error": error} if error else {"features": [{"attributes": a} for a in (features or [])]}
+        if exceeded:
+            self._j["exceededTransferLimit"] = True
 
     def json(self):
         return self._j
@@ -468,3 +470,16 @@ def test_like_pass_errors_end_the_like_pass_not_the_exact_lane(monkeypatch):
     assert len(exact) == 1 and st["requests"] == 3
     assert any(k.endswith("#like") for k in st["closed_layers"]) and G.NC_URL not in G.closed_layers()
     assert all("gis_fill" not in r.raw for r in rows)          # unasked rows are never turned into verdicts
+
+
+def test_a_cut_answer_never_becomes_a_not_in_layer_verdict(monkeypatch):
+    rows = [li(pin="166220709679"), li(pin="166220709680")]
+
+    def handler(url, data):
+        if "LIKE" in data["where"]:
+            return FakeResp([nc_feature("166220-70-9679")], exceeded=True)    # the server cut the list
+        return FakeResp([])
+    fake_post(monkeypatch, handler)
+    run(rows, budget_s=60)
+    assert rows[0].raw["gis_fill"]["found"] is True                  # what the cut answer holds is used
+    assert "gis_fill" not in rows[1].raw                             # the pin it may have cut stays unscreened
