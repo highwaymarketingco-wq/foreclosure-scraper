@@ -140,6 +140,13 @@ DECLARED: tuple[Screen, ...] = (
            _module_counties("scrapers.public_notices.nc_heir_notices",
                             lambda m: [("NC", c) for c in m.COLUMN_NC_COUNTIES]),
            "NC counties with a Column paper; notices searched by text"),
+    # NC ITSPublic tax-bill portals (top-80 2026-10-09): Onslow, Graham and ten counties of the newer
+    # build. The run reads each county's whole unpaid real-property roll for the newest delinquent year
+    # (older years within a time budget). A county that failed, or ran out of time before its newest
+    # year was complete, makes the run PARTIAL (not an OK status), so nothing is claimed on a half read.
+    Screen("counties_nc.nc_its_public_tax", TAX_COLUMNS,
+           _module_counties("scrapers.counties_nc.nc_its_public_tax", lambda m: [("NC", c) for c in m.PORTALS]),
+           "full unpaid real-property roll per county (ITSPublic portals)"),
     # county jail rosters (bulk, county-wide); unhealthy rosters are removed in build()
     Screen("national.jail_bookings", ("jail_booking",),
            _module_counties("scrapers.national.jail_bookings", _jail_rosters),
@@ -160,6 +167,13 @@ DECLARED: tuple[Screen, ...] = (
                             lambda m: [(s, c) for _n, c, s, marriage in m.COUNTIES if not marriage]),
            "county estate index"),
 )
+
+#: Enrichments that screen whole counties and say which ones in their run stats
+#: (run_health['enrichments'][name]['screened'] = {column: ["NC|County", ...]}). A county is listed
+#: only when the enrichment finished its sweep of that county without a failed page.
+ENRICHMENT_SCREENS: dict[str, tuple[str, ...]] = {
+    "onemap_sweeps": ("heir_estate", "rollback_exposure"),     # enrichment_onemap_sweeps (top-80 2026-10-09)
+}
 
 #: Sources that never screen a county, with the reason (kept so the exclusion is visible)
 EXCLUDED = {
@@ -264,6 +278,17 @@ def build(run_health: dict, *, generated_at: Optional[str] = None) -> dict:
                             e["sources"].append(slug)
                     else:
                         failed.setdefault(col, {}).setdefault(key, f"{slug}: {str(status)[:80]}")
+    enr = run_health.get("enrichments") or {}
+    for name, cols in ENRICHMENT_SCREENS.items():
+        got = ((enr.get(name) or {}).get("screened")) or {}
+        for col in cols:
+            for key in got.get(col) or []:
+                st, _, co = str(key).partition("|")
+                if co and co in STATE_COUNTIES.get(st, ()):
+                    e = screens.setdefault(col, {}).setdefault(
+                        f"{st}|{co}", {"sources": [], "basis": "county-wide sweep (enrichment)"})
+                    if f"enrichment:{name}" not in e["sources"]:
+                        e["sources"].append(f"enrichment:{name}")
     for col, by in failed.items():               # a county another source screened is screened
         for key in list(by):
             if key in screens.get(col, {}):
