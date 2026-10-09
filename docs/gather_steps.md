@@ -113,7 +113,7 @@ Ask for **electronic CSV/Excel**. When the file comes back, drop it in `~/forecl
 
 ## 10. Spartanburg CAMA extract (one email)
 
-Email **`Assessor@spartanburgcounty.org`** and request the **bulk CAMA extract** (parcel + sale price + heated sqft) in CSV/Excel. Drop the returned file in `~/foreclosure-scraper/`.
+Email **`[email]`** and request the **bulk CAMA extract** (parcel + sale price + heated sqft) in CSV/Excel. Drop the returned file in `~/foreclosure-scraper/`.
 
 ---
 

@@ -35,7 +35,7 @@ In NC, foreclosure sales are conducted by the Clerk of Superior Court (not the s
 | County | URL | Free | Public | Scrapable | Notes |
 |--------|-----|------|--------|-----------|-------|
 | Henderson NC | https://sheriffhendersoncounty.com/sheriff-sales/ | ✅ | ✅ | ✅ (HTML) | Has "Sheriff Sales" nav page with Notice of Sale PDFs. Currently shows May 27, 2026 sale notice. |
-| Buncombe NC | https://buncombesheriff.com/civil-process/ | ✅ | ✅ | ⚠️ (call-only) | Civil Process Division handles foreclosure executions but no online listing — must call (828) 250-4503 |
+| Buncombe NC | https://buncombesheriff.com/civil-process/ | ✅ | ✅ | ⚠️ (call-only) | Civil Process Division handles foreclosure executions but no online listing — must call [phone] |
 | Cleveland NC | https://www.clevelandcounty.com/main/ | ✅ | ✅ | ❌ | No online sheriff sale listing found |
 | Onslow NC | https://www.onslowcountync.gov/167/Sheriff | ✅ | ✅ | ❌ | No sheriff sale page found |
 

@@ -622,7 +622,7 @@
     "parcel_id": null,
     "street_address": null,
     "owner_name": null,
-    "defendant": "Estate of John W. Hager, Jr.; Hager, John W., Jr.; Hager, Unknown Spouse of  John W., Jr.",
+    "defendant": "Estate of [name], Jr.; Hager, John W., Jr.; Hager, Unknown Spouse of  John W., Jr.",
     "case_number": "25M000176-100",
     "board_value": null,
     "first_seen": "2026-08-26T22:52:37.507893",
@@ -2301,7 +2301,7 @@
     "parcel_id": "9732869192",
     "street_address": "424 KYFIELDS",
     "owner_name": "HENDERSON DEBRA BOYD",
-    "defendant": "frenchbroadcontracting@gmail.com",
+    "defendant": "[email]",
     "case_number": "fc-65973781",
     "board_value": 424400.0,
     "first_seen": "2026-06-02T12:37:30.205938",
@@ -2312,7 +2312,7 @@
     "rod_check": {
       "attempted": true,
       "fetch_ok": false,
-      "party": "frenchbroadcontracting@gmail.com"
+      "party": "[email]"
     }
   },
   {

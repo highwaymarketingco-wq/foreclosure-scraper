@@ -1210,7 +1210,7 @@ on 79,158 rows, each carrying an `extracted_at` timestamp. Excluding it from sli
 correct. But two real issues:
 1. 79k empty blocks is pure board bloat — the enricher should not write a block when
    it found nothing.
-2. The sampled hit is `fgreene@alaw.net`, `classification: "attorney"`. That is the
+2. The sampled hit is `[email]`, `classification: "attorney"`. That is the
    FORECLOSING FIRM's address, not the owner's. An "owner_email" that holds
    opposing counsel is worse than an empty one — anyone reading it as owner contact
    would be emailing the law firm about their own client's house. The
@@ -1256,7 +1256,7 @@ owns the enricher's cadence. I have already twice today changed something on an
 inferred premise and had the data refute me — this one gets recorded, not guessed.
 
 Related, and the sharper issue: `owner_email.best_email` on the sampled hit is
-`fgreene@alaw.net`, `classification: "attorney"` — the FORECLOSING FIRM. The block
+`[email]`, `classification: "attorney"` — the FORECLOSING FIRM. The block
 records the classification honestly, so the data is fine; the field NAME is the
 problem. Anything reading `owner_email` as owner contact is reading opposing
 counsel. `campaign_export.py:146` does exactly that: `email = st.get("owner_email")`.

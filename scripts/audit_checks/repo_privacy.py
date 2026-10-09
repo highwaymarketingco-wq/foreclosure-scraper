@@ -11,11 +11,11 @@ decision and are out of scope here (they are data the dashboard serves, not repo
                             markers fixtures use (Doe, Roe, Sample, Example, Test...)
 
 Each check fails on any hit and reports COUNTS ONLY (per top-level directory), never the value.
-Allowed on purpose (real configuration the code or the owner's manual needs; listed so a new one
-is a decision): the owner's own digest sender / recipient addresses in configuration, the land-buyer
-directory the buyer matching reads (src/foreclosure_scraper/data/land_buyers.json), and the
-government-office contacts in the owner-manual inputs (docs/walls_register.json,
-docs/OWNER_MANUAL_LANES.md, docs/county_records/).
+Allowed on purpose, each listed with its reason so a new one is a decision: the data payloads in
+DATA_PATHS (the published board, its shards and photos, the sold pool, the mail list, the buyer
+directory, the hand-off files, generated pseudonyms) and, in ALLOW_EMAILS, the owner's digest
+addresses and two government office role addresses the owner manual names. Everything else,
+docs/ included (reports, validation results, research notes, audit notes, playbooks), must be clean.
 
 No board pass: feed() does nothing; the scan runs once in finish(). CLI:
     uv run python scripts/audit_checks/repo_privacy.py        # counts per check and directory
@@ -31,8 +31,10 @@ from typing import Iterable, Optional
 
 _REPO = Path(__file__).resolve().parents[2]
 
-PHONE = re.compile(r"(?:\((\d{3})\) ?|(?<![\d\w.-])(\d{3})[-.])(\d{3})[-.]\d{4}(?![\d])")
-EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+#: a value right after a JSON escape ('\\n336-555-0100', '\\njane@...') still starts at the escape
+_START = r"(?:(?<=\\[nrt])|(?<![\w.-]))"
+PHONE = re.compile(r"(?:\((\d{3})\) ?|" + _START + r"(\d{3})[-.])(\d{3})[-.]\d{4}(?![\d])")
+EMAIL = re.compile(r"(?:(?<=\\[nrt])|(?<![A-Za-z0-9._%+\\-]))[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 ESTATE = re.compile(r"\b[Ee][Ss][Tt][Aa][Tt][Ee] [Oo][Ff],? ([A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.'-]*){1,3})")
 
 FAKE_EMAIL = re.compile(r"@(?:[\w.-]+\.)?example\.(?:com|org|net|gov)$|\.test$|\.invalid$|no-?reply|"
@@ -47,22 +49,33 @@ PLACEHOLDER_NAMES = frozenset(n.lower() for n in (
     "Otis Bramblewood", "Rosalind M Quillfeather C", "Maris Raleigh", "Maris Pike", "Velma Juno Crisp",
     "Ansel Pike", "Gerald Alvin McCrack-"))
 
-#: configuration values the code needs as real (each one a decision)
+#: configuration values the code or the owner's manual needs as real (each one a decision)
 ALLOW_EMAILS = frozenset({
     "highwaymarketingco@gmail.com",   # the digest sender (vm_lib.sh GMAIL_SENDER, config.py)
     "greghhigh@gmail.com",            # digest recipient (vm_lib.sh EMAIL_RECIPIENTS, config.py)
     "cashrandolphhigh@gmail.com",     # digest recipient
     "you@gmail.com",                  # a usage placeholder in scripts/foia_vacant_demolition.py
+    "civilcourtdata@lsc.gov",         # a government office role address the owner manual names
+    "taxforeclosures@unioncountync.gov",  # a county office role address the owner manual names
 })
-ALLOW_PATHS = re.compile(r"^(?:(?:src/foreclosure_scraper/data|docs)/land_buyers\.json|docs/walls_register\.json|"
-                         r"docs/OWNER_MANUAL_LANES\.md|docs/county_records/|"
-                         # generated pseudonyms (tests/test_verification_probate_heir.py builds them)
-                         r"tests/fixtures/verification/probate_heir_cases\.json)")
-#: board data and generated outputs (owner decision: the board publishes owners' names and phones)
-SKIP_PATHS = re.compile(r"^(?:docs/(?:listings|board|outreach|gap_matrix/|handoff/|data/|parcel_photos/|"
-                        r"run_meta|run_health|sold_pool|foreclosure_sold_pool|dashboard_data)|data/)")
+#: Data payloads the pipeline publishes or reads on purpose (not prose): skipped by name, each with
+#: its reason. The board publishes owners' names and phones by the owner's decision.
+DATA_PATHS: dict[str, str] = {
+    r"docs/listings": "the published board (listings*.json*): owner names and phones by owner decision",
+    r"docs/detail_shards/": "the board's lazy-detail shards, published with it",
+    r"docs/handoff/": "hand-off data files the VM reads (stealth leads, verification ledgers, SoS results)",
+    r"docs/parcel_photos/": "listing photos the dashboard serves",
+    r"docs/foreclosure_sold_pool\.json": "the sold pool main.py publishes every run",
+    r"docs/outreach_maillist\.csv": "the mail-merge list outreach.py writes every run",
+    r"docs/land_buyers\.json": "the dashboard's Land Buyers view (a copy of the buyer directory)",
+    r"src/foreclosure_scraper/data/land_buyers\.json": "the buyer directory enrichment_buyer_match reads",
+    r"tests/fixtures/verification/probate_heir_cases\.json": "generated pseudonyms (test_verification_probate_heir)",
+    r"data/": "local run data (git-ignored; anything tracked there is run output)",
+}
+SKIP_PATHS = re.compile("^(?:" + "|".join(DATA_PATHS) + ")")
+ALLOW_PATHS = re.compile(r"^$")   # nothing else is exempt
 TEXT_EXT = re.compile(r"\.(?:py|md|txt|html?|xml|json|csv|js|sh|ya?ml|toml|cfg|ini)$", re.I)
-MAX_BYTES = 5_000_000
+MAX_BYTES = 60_000_000
 
 
 def tracked_files(repo: Path = _REPO) -> list[str]:

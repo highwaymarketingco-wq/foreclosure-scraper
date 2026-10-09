@@ -28,7 +28,7 @@ The engine covers: judicial foreclosure (SC), power-of-sale foreclosure (NC, par
 
 9. **Cash buyer deed pulls.** Recent no-mortgage purchases from ROD index = active cash buyers = dispo targets. ROD index already accessed for NODs. Would query recent deeds where deed type = warranty/special warranty and no simultaneous DOT recorded. Status: not built.
 
-10. **USPS vacancy data.** HUD aggregated USPS vacancy data (huduser.gov, free gov/nonprofit registration, USPSVacancydata@hud.gov). Authoritative vacancy scoring by ZIP/tract. Status: not built. Listed in blueprint Section 7.
+10. **USPS vacancy data.** HUD aggregated USPS vacancy data (huduser.gov, free gov/nonprofit registration, [email]). Authoritative vacancy scoring by ZIP/tract. Status: not built. Listed in blueprint Section 7.
 
 ### BUILD_READY (endpoints identified, needs code)
 

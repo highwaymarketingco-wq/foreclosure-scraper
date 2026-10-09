@@ -976,7 +976,7 @@
    "lead_or_verification": "lead",
    "build_effort_hours": 0,
    "value": "None online; use SC-COLSTAR or the roster",
-   "manual_steps": "Call the MIE office (803-576-1900) or read the Columbia Star notices.",
+   "manual_steps": "Call the MIE office ([phone]) or read the Columbia Star notices.",
    "counts_as_not_previously_read": false,
    "notes": ""
   },
@@ -1196,7 +1196,7 @@
    "lead_or_verification": "lead",
    "build_effort_hours": 0,
    "value": "None online",
-   "manual_steps": "Ask the Tax Collector (864-467-7050) for the overage list.",
+   "manual_steps": "Ask the Tax Collector ([phone]) for the overage list.",
    "counts_as_not_previously_read": false,
    "notes": ""
   },

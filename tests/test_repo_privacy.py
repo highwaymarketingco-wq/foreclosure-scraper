@@ -34,3 +34,16 @@ def test_checks_have_the_interface():
     for c in R.make_checks():
         out = c.finish.__func__  # noqa: B018 - interface present (the scan itself runs in the suite)
         assert c.name.startswith("repo-privacy-") and callable(out)
+
+
+def test_values_right_after_a_json_escape_are_seen():
+    blob = "Phone:\\n" + "336-762" + "-4410\\n" + "jo.x" + "@" + "realmail.com"
+    c = R.scan_text(blob)
+    assert c["phones"] == 1 and c["emails"] == 1
+    assert [m.group(0) for m in R.EMAIL.finditer(blob)] == ["jo.x@realmail.com"]
+
+
+def test_board_data_paths_are_named_with_a_reason():
+    assert R.SKIP_PATHS.match("docs/listings_part_000.json.gz") and R.SKIP_PATHS.match("docs/detail_shards/a.json")
+    assert not R.SKIP_PATHS.match("docs/validation_2026-10-02/results/x.json")
+    assert all(reason for reason in R.DATA_PATHS.values())
