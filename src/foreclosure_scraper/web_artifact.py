@@ -2733,6 +2733,8 @@ RAW_KEEP = {
     "parcel_id_alias": "*",      # {short, long}: parcel_alias.apply's record of the short county id a
                                  # row was re-keyed from (680 rows); tax_binding.row_ids reads it to
                                  # decide which tax debts are the row's own parcel's
+    "parcel_id_superseded": "*", # {value, by, reason}: a resolver parcel the prior merge replaced with
+                                 # the row's valid prior parcel (board_persist.keep_prior_valid_parcel)
     "burke_spine": "*",          # {pin, reid, township, land_class, vacant_land, deed_book/page/date}:
                                  # nc_burke_spine (533 rows); enrichment_lrcpwa_parcel reads it
     "withdrawn_case_type_other": "*",  # enrichment_prior_correction correction 6 (260 Charleston

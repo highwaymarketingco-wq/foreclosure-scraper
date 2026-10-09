@@ -156,9 +156,11 @@ from .web_artifact import (
 from .dedupe import _house_no_of, different_valid_parcels as _different_valid_parcels_id
 from .dedupe import different_source_parcels as _different_source_parcels_id
 from .dedupe import identity as _identity
+from .dedupe import url_key_conflict
 from .dedupe import source_parcel as _source_parcel
 from .models import _normalize_parcel
 from .placeholder_twins import MAX_GROUP_ROWS, fold, real_house_no, sources_of, twin_pair_ok
+from .placeholder_twins import fallback_point_parcel, parcel_key, resolver_parcel
 from .validation import _PARCEL_BAD_PATTERNS
 
 log = structlog.get_logger()
@@ -585,6 +587,52 @@ def _keep_fresh_blocks(fresh: Listing, merged: Listing, stats: dict) -> None:
             stats[k] = stats.get(k, 0) + v
 
 
+def keep_prior_valid_parcel(fresh: Listing, prior: Listing, merged: Listing) -> Optional[str]:
+    """Identifier precedence after `merged = fresh.merge(prior)` (audit 2026-10-09 regressions W3).
+    Data fields follow the fresh scrape (Listing.merge, keep_fresh_blocks); the parcel id does not
+    when the fresh one is weaker than a VALID parcel (placeholder_twins.parcel_key) the prior copy of
+    the same row carries:
+      'short'     the fresh id is no valid parcel (a county's short account: validation nulls it, and
+                  the row lost its PIN; Lincoln nc_county_pdf county ids on the last run);
+      'resolver'  the fresh id was attached by a resolver (raw['parcel_from_geo'] /
+                  ['parcel_from_address']: PTS Cloud, Burke storm damage, heir parcels re-resolved).
+    The prior parcel wins unless it was itself attached at a geocoder fallback point. The fresh short
+    id stays the row's in raw['parcel_id_alias'] {short, long} (as parcel_alias keeps it); a
+    displaced resolver parcel is recorded in raw['parcel_id_superseded'] (not read as the row's id).
+    76 parcel ids and 11 phones were lost this way on the 2026-10-08 run. Returns the case or None."""
+    fp, pp = (fresh.parcel_id or "").strip(), (prior.parcel_id or "").strip()
+    if not fp or not pp or _normalize_parcel(fp) == _normalize_parcel(pp):
+        return None
+    st, cty = merged.state or prior.state, merged.county or prior.county
+    if parcel_key(st, cty, pp) is None or fallback_point_parcel(prior.raw):
+        return None
+    fresh_raw = fresh.raw if isinstance(fresh.raw, dict) else {}
+    if parcel_key(st, cty, fp) is None:
+        case = "short"
+    elif resolver_parcel(fresh_raw) and not resolver_parcel(prior.raw):
+        case = "resolver"
+    else:
+        return None
+    if not isinstance(merged.raw, dict):
+        merged.raw = {}
+    merged.parcel_id = pp
+    if case == "short":
+        merged.raw.setdefault("parcel_id_alias", {"short": fp, "long": pp})
+    else:
+        merged.raw["parcel_id_superseded"] = {"value": fp, "by": pp, "reason": "resolver_parcel"}
+    return case
+
+
+def _keep_prior_parcel(fresh: Listing, prior: Listing, merged: Listing, stats: dict) -> None:
+    try:
+        case = keep_prior_valid_parcel(fresh, prior, merged)
+    except Exception:  # noqa: BLE001 - a merge is never lost to this check
+        return
+    if case:
+        k = f"prior_parcel_kept_{case}"
+        stats[k] = stats.get(k, 0) + 1
+
+
 def merge_prior_board(
     fresh_deduped: list[Listing],
     docs_dir: Path | str | None = None,
@@ -796,6 +844,13 @@ def merge_prior_board(
                 for i in cands:
                     if _provably_different_dict(rec, fresh_deduped[i]):
                         continue
+                    # A shared URL key alone (a county roll's URL is every one of its rows' key) is the
+                    # same record only when the rows name the same county and owner (dedupe's rule;
+                    # audit 2026-10-09 regressions W2)
+                    if (sig[0] == "k" and str(sig[1]).startswith("url:")
+                            and url_key_conflict(rec, fresh_deduped[i])):
+                        stats["refused_url_key_conflict"] = stats.get("refused_url_key_conflict", 0) + 1
+                        continue
                     if _different_valid_parcels(rec, fresh_deduped[i]):
                         refused_parcel = True
                         continue
@@ -845,6 +900,8 @@ def merge_prior_board(
             # existing row is rare but possible — same tolerance patch_existing_rows()
             # applies), not just the first.
             merged = fresh_deduped[match_idx].merge(prior_li)
+            # identifiers first (a prior valid parcel over a fresh short or resolver id), then data
+            _keep_prior_parcel(fresh_deduped[match_idx], prior_li, merged, stats)
             if keep_mailing_off_address(fresh_deduped[match_idx], prior_li, merged):
                 stats["mailing_address_not_inherited"] = stats.get("mailing_address_not_inherited", 0) + 1
             _keep_fresh_tax(fresh_deduped[match_idx], merged, stats)
@@ -897,6 +954,7 @@ def merge_prior_board(
                 continue
             fresh_li = fresh_deduped[ti]
             merged = fresh_li.merge(prior_li)
+            _keep_prior_parcel(fresh_li, prior_li, merged, stats)
             if keep_mailing_off_address(fresh_li, prior_li, merged):
                 stats["mailing_address_not_inherited"] = stats.get("mailing_address_not_inherited", 0) + 1
             _keep_fresh_tax(fresh_li, merged, stats)
@@ -945,6 +1003,7 @@ def merge_prior_board(
             # fold(): Listing.merge() with fresh first (fresh wins, prior backfills), keeping the
             # prior's numbered situs over the fresh row's no-number sentinel.
             folded = fold(fresh_deduped[i], prior_li)
+            _keep_prior_parcel(fresh_deduped[i], prior_li, folded, stats)
             _keep_fresh_tax(fresh_deduped[i], folded, stats)
             _keep_fresh_blocks(fresh_deduped[i], folded, stats)
             fresh_deduped[i] = folded
