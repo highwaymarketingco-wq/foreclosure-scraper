@@ -1211,10 +1211,11 @@
    },
    "tax": {
     "url": "https://lrcpwa.ncptscloud.com/Cumberland/",
-    "free_by_parcel": "yes",
+    "free_by_parcel": "no",
     "shows_bill_history": "unknown",
-    "access": "open",
-    "notes": "Farragut NC PTS land-records (owner/value by parcel) verified working for Cumberland by the repo (enrichment_ncpts_lrc.py, 2026-08-19). Repo found the bcpwa bill search answers HTTP 500 for Cumberland, so per-parcel bill history is not confirmed online; the delinquent roll is a downloadable file. County tax page not opened."
+    "access": "none",
+    "notes": "Farragut NC PTS land-records (owner/value by parcel) verified working for Cumberland by the repo (enrichment_ncpts_lrc.py, 2026-08-19). Repo found the bcpwa bill search answers HTTP 500 for Cumberland, so per-parcel bill history is not confirmed online; the delinquent roll is a downloadable file. County tax page not opened.",
+    "access_note_2026_10_09": "lrcpwa.ncptscloud.com is the land-records (owner and value) site; the bcpwa bill search answers HTTP 500 for Cumberland (tax_lien_ptscloud, read 2026-10-06); the county's delinquent list is a yearly PDF (counties_nc.cumberland_delinquent_tax). No per-parcel balance source."
    },
    "gis": {
     "url": null,
@@ -1742,10 +1743,11 @@
    },
    "tax": {
     "url": "https://www.bttaxpayerportal.com/ITSPublicGT/TaxBillSearch",
-    "free_by_parcel": "yes",
+    "free_by_parcel": "no",
     "shows_bill_history": "yes",
-    "access": "open",
-    "notes": "BT/ITS public tax bill search (200), search by parcel number, owner or account, tax years 2016-2026."
+    "access": "none",
+    "notes": "BT/ITS public tax bill search (200), search by parcel number, owner or account, tax years 2016-2026.",
+    "access_note_2026_10_09": "The BT/ITSPublicGT build is the older 1.0.1: every search (parcel, bill number, a common surname) answered zero records on 2026-10-08 (tax_lien_itspublic). No per-parcel balance source."
    },
    "gis": {
     "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
@@ -4004,10 +4006,11 @@
    },
    "tax": {
     "url": "https://lrcpwa.ncptscloud.com/Stokes",
-    "free_by_parcel": "yes",
+    "free_by_parcel": "no",
     "shows_bill_history": "unknown",
-    "access": "open",
-    "notes": "County tax page links the PTS Real Property PWA, rendered 2026-10-07: parcel search by owner, address, REID or PIN. Bill lookup is on stokescountytax.com (not opened); bcpwa.ncptscloud.com/Stokes returns 404, so no PTS bill PWA."
+    "access": "none",
+    "notes": "County tax page links the PTS Real Property PWA, rendered 2026-10-07: parcel search by owner, address, REID or PIN. Bill lookup is on stokescountytax.com (not opened); bcpwa.ncptscloud.com/Stokes returns 404, so no PTS bill PWA.",
+    "access_note_2026_10_09": "lrcpwa.ncptscloud.com is land-records only; the bcpwa bill search answers HTTP 500 for Stokes (tax_lien_ptscloud, read 2026-10-06). No per-parcel balance source."
    },
    "gis": {
     "url": "https://www.stokescountygis.com/",
@@ -6203,8 +6206,9 @@
     "system": "County-run estate search on lex-co.com (Estate 1865-1994, Estate 1995-present, marriage indexes), reached through an acknowledgement disclaimer. Not a southcarolinaprobate.net participant.",
     "url": "https://www.lex-co.com/ProbateSearch/estates",
     "free_search": "yes",
-    "access": "disclaimer_click",
-    "notes": "The disclaimer cites the SC Family Privacy Protection Act of 2002: personal information from these records may not be obtained or used for commercial solicitation. That applies to SC public records generally and matters for a lead business. Search not run."
+    "access": "captcha",
+    "notes": "The disclaimer cites the SC Family Privacy Protection Act of 2002: personal information from these records may not be obtained or used for commercial solicitation. That applies to SC public records generally and matters for a lead business. Search not run.",
+    "access_note_2026_10_09": "was 'disclaimer_click'; walls_register.json access_overrides SC|lexington|probate (captcha: the search needs a reCAPTCHA token, 2026-10-07 source hunt) and card lexington_probate; the disclaimer also cites the SC Family Privacy Protection Act (no commercial use)"
    },
    "tax": {
     "url": "https://lexingtoncountytreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",

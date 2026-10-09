@@ -1,11 +1,11 @@
 {
- "generated": "2026-10-09 12:07 EDT",
- "commit": "0d2b6747",
+ "generated": "2026-10-09 12:43 EDT",
+ "commit": "c1cbb838",
  "fingerprint": {
   "inputs": {
-   "docs/walls_register.json": "ac3933b09bf3f9fe",
-   "docs/county_records/county_records_matrix.json": "e2cc378d0a18e76f",
-   "docs/county_records/nc_rod_platform_clusters.md": "aa876f9499cade01",
+   "docs/walls_register.json": "5f54a1893c6d1109",
+   "docs/county_records/county_records_matrix.json": "981494d1f282d776",
+   "docs/county_records/nc_rod_platform_clusters.md": "a4f5831e7c7cbb9d",
    "docs/county_records/sc_rod_platform_clusters.md": "a1031bf224f1ac1c",
    "docs/new_sources_2026-10-07_contact_and_facts.json": "aa5cddac3cb79e06",
    "docs/new_sources_2026-10-07_distress.json": "7572dfc70ff761f3",
@@ -20,6 +20,7 @@
    "NC|Anson|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
    "NC|Ashe|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
    "NC|Avery|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Beaufort|nc_lrsearch|FORECLOSURE_NC_LRSEARCH_ROD|on",
    "NC|Bertie|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
    "NC|Bladen|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
    "NC|Buncombe|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
@@ -93,6 +94,7 @@
    "SC|Oconee|publicsearch|FORECLOSURE_SC_PUBLICSEARCH_ROD|on",
    "SC|Pickens|acclaim_names|FORECLOSURE_SC_ACCLAIM_ROD|on",
    "SC|Spartanburg|sc_lookup|FORECLOSURE_SC_LOOKUP_ROD|on",
+   "SC|Sumter|sc_countyfusion|FORECLOSURE_SC_COUNTYFUSION_ROD|on",
    "SC|Union|sc_recordroom|FORECLOSURE_SC_RECORDROOM_ROD|on",
    "SC|York|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off"
   ],
@@ -132,18 +134,18 @@
  "inputs": [
   {
    "path": "docs/walls_register.json",
-   "sha": "ac3933b09bf3f9fe",
-   "date": "2026-10-09 12:07 (file time)"
+   "sha": "5f54a1893c6d1109",
+   "date": "2026-10-09"
   },
   {
    "path": "docs/county_records/county_records_matrix.json",
-   "sha": "e2cc378d0a18e76f",
-   "date": "2026-10-09 12:06 (file time)"
+   "sha": "981494d1f282d776",
+   "date": "2026-10-09 12:40 (file time)"
   },
   {
    "path": "docs/county_records/nc_rod_platform_clusters.md",
-   "sha": "aa876f9499cade01",
-   "date": "2026-10-07"
+   "sha": "a4f5831e7c7cbb9d",
+   "date": "2026-10-09"
   },
   {
    "path": "docs/county_records/sc_rod_platform_clusters.md",

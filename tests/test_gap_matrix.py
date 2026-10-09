@@ -290,19 +290,24 @@ def test_flip_feed_columns_apply_only_in_flip_scope():
 
 
 def test_nc_quiet_title_is_read_by_nc_heir_notices():
-    # top-80 item: NC notices are now parsed (scrapers/public_notices/nc_heir_notices.py); a county
-    # with no Column paper is a wall verdict (ncnotices.com bodies are CAPTCHA-walled), not a gap
+    # top-80 item: NC notices are now parsed (scrapers/public_notices/nc_heir_notices.py). A county
+    # with a Column paper is a read source; one without is a wall verdict (ncnotices.com bodies are
+    # CAPTCHA-walled), not a gap
+    m = gm.load_matrix(gm.REPO / "docs" / "county_records" / "county_records_matrix.json")
     for col in ("quiet_title", "heir_naming_publication"):
-        st = gm.source_status(gm.SPECS[col], "NC", None)
-        assert st[0] == "walled" and "Column" in st[1]
-        assert gm.SPECS[col].sources == ()
-        assert any("nc_heir_notices" in p for p in gm.SPECS[col].producers)
+        spec = gm.SPECS[col]
+        assert spec.sources == () and any("nc_heir_notices" in p for p in spec.producers)
+        johnston = gm.source_status(spec, "NC", m[("NC", "Johnston")])
+        assert johnston[0] == "free" and "Column" in johnston[2]
+        alleghany = gm.source_status(spec, "NC", m[("NC", "Alleghany")])
+        assert alleghany[0] == "walled" and "Column" in alleghany[1]
+        assert len(spec.statewide_except) == 25
     assert gm.source_status(gm.SPECS["heir_naming_publication"], "SC", None)[2].startswith("statewide: SC estate")
 
 
 def test_ledger_signals_accepts_several_verifier_signals():
     assert gm.ledger_signals(gm.SPECS["lt_divorce_notice"]) == ("nc_ecourts_case", "divorce")
-    assert gm.ledger_signals(gm.SPECS["lt_lis_pendens"]) == ("foreclosure_rod", "nc_ecourts_case")
+    assert gm.ledger_signals(gm.SPECS["lt_lis_pendens"]) == ("foreclosure_rod", "nc_ecourts_case", "court_wall")
     assert gm.ledger_signals(gm.SPECS["heir_estate"]) == ("probate_heir", "heir_roll")
     assert gm.ledger_signals(gm.SPECS["address"]) == ()
 

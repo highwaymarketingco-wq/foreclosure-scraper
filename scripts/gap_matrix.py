@@ -506,6 +506,8 @@ class Spec:
                                           # the detecting one (a notice is detected statewide, verified at the county probate court)
     producers: tuple = ()     # src/foreclosure_scraper-relative files whose code names counties
     statewide: tuple = ()     # ((state, source name), ...): a free statewide source the code reads
+    statewide_except: tuple = ()   # ((state, county), ...): counties that statewide source does NOT reach;
+                                   # there the state's `walls` entry (if any) applies instead
     sources: tuple = ()       # ((state, source name), ...): a free statewide source NOT yet read
     walls: tuple = ()         # ((state, wall), ...): the state's source is walled
     doc: str = ""             # how the column is computed (README)
@@ -534,6 +536,18 @@ _S = "signal"
 SC_QUIET_TITLE = (("SC", "SC estate notices via Column (column_legal_notices, SC estate lane)"),)
 NC_QUIET_TITLE_SOURCE = ()      # was: NC notices known, no parser. scrapers/public_notices/nc_heir_notices.py reads them
 NC_QUIET_TITLE_WALL = (("NC", "no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled"),)
+NC_QUIET_TITLE_READ = (("NC", "NC quiet-title / heir notices via Column (nc_heir_notices, notices searched by text)"),)
+
+
+def _nc_without_column_paper() -> tuple:
+    """The NC counties nc_heir_notices cannot reach (no Column notice in 365 days, measured
+    2026-10-09): there the source is a verdict (walled), not a gap."""
+    try:
+        from foreclosure_scraper.scrapers.public_notices.nc_heir_notices import COLUMN_NC_COUNTIES
+        from foreclosure_scraper.validation import NC_COUNTIES
+        return tuple(("NC", c) for c in NC_COUNTIES if c not in set(COLUMN_NC_COUNTIES))
+    except Exception:  # noqa: BLE001 - without the module every NC county reads as unreached
+        return ()
 
 SPECS: dict[str, Spec] = {
     # ---- fields --------------------------------------------------------------------------
@@ -570,19 +584,19 @@ SPECS: dict[str, Spec] = {
                         statewide=(("NC", "comps engine over county sales"), ("SC", "comps engine over county sales")),
                         doc="at least one comp whose match_quality has both +sqft and +beds"),
     # ---- listing types (feeds) -----------------------------------------------------------
-    "lt_foreclosure_sale": Spec(_S, "feed", "foreclosure", ledger="foreclosure_rod|foreclosure_sale_list",
+    "lt_foreclosure_sale": Spec(_S, "feed", "foreclosure", ledger="foreclosure_rod|foreclosure_sale_list|court_wall",
                                 statewide=(("NC", "trustee/law-firm sale lists + NC public notices"),),
                                 doc="listing_type == foreclosure_sale"),
     "lt_sheriff_sale": Spec(_S, "feed", "notices", statewide=NOTICES,
                             doc="listing_type == sheriff_sale",
                             ambiguity="NC forecloses by trustee/clerk, SC by Master-in-Equity; sheriff "
                                       "execution sales of land are rare, so 0 is expected"),
-    "lt_lis_pendens": Spec(_S, "feed", "court", ledger="foreclosure_rod|nc_ecourts_case",
+    "lt_lis_pendens": Spec(_S, "feed", "court", ledger="foreclosure_rod|nc_ecourts_case|court_wall",
                            statewide=(("NC", "NC eCourts Judgment Search (open JSON) + register indexes"),),
                            walls=(("SC", "SC Public Index terms forbid automated querying"),),
                            doc="listing_type == lis_pendens"),
-    "lt_tax_lien": Spec(_S, "feed", "tax", ledger="tax_lien|lien_registry_wall", doc="listing_type == tax_lien"),
-    "lt_tax_sale": Spec(_S, "feed", "tax", ledger="tax_lien|lien_registry_wall", doc="listing_type == tax_sale"),
+    "lt_tax_lien": Spec(_S, "feed", "tax", ledger="tax_lien|lien_registry_wall|nc_ecourts_case", doc="listing_type == tax_lien"),
+    "lt_tax_sale": Spec(_S, "feed", "tax", ledger="tax_lien|lien_registry_wall|foreclosure_sale_list", doc="listing_type == tax_sale"),
     "lt_auction": Spec(_S, "feed", "auction",
                        statewide=(("NC", "national auction sites"), ("SC", "national auction sites")),
                        doc="listing_type == auction"),
@@ -595,8 +609,8 @@ SPECS: dict[str, Spec] = {
                               statewide=(("NC", "NC eCourts Judgment Search (open JSON)"),),
                               walls=(("SC", "SC family-court index (Public Index/FCCMS) terms forbid automation"),),
                               doc="listing_type == divorce_notice"),
-    "lt_probate_notice": Spec(_S, "feed", "notices", statewide=NOTICES, ledger="probate_heir", verify_family="probate", doc="listing_type == probate_notice"),
-    "lt_estate_lead": Spec(_S, "feed", "probate", ledger="probate_heir|heir_roll", verify_family="probate", doc="listing_type == estate_lead"),
+    "lt_probate_notice": Spec(_S, "feed", "notices", statewide=NOTICES, ledger="probate_heir|court_wall", verify_family="probate", doc="listing_type == probate_notice"),
+    "lt_estate_lead": Spec(_S, "feed", "probate", ledger="probate_heir|heir_roll|court_wall", verify_family="probate", doc="listing_type == estate_lead"),
     "lt_elderly_disabled": Spec(_S, "feed", "gis_exempt", ledger="elderly_disabled",
                                 doc="listing_type == elderly_disabled"),
     "lt_tax_sale_overage": Spec(_S, "feed", "tax", doc="listing_type == tax_sale_overage",
@@ -617,7 +631,8 @@ SPECS: dict[str, Spec] = {
                         producers=("scrapers/counties_nc/nc_heir_estate_parcels.py",
                                    "scrapers/counties_nc/henderson_foreclosure_parcels.py"),
                         doc="raw.heir_estate present (a parcel owner-of-record naming heirs/estate)"),
-    "heir_naming_publication": Spec(_S, "county", "notices", statewide=SC_QUIET_TITLE,
+    "heir_naming_publication": Spec(_S, "county", "notices", statewide=SC_QUIET_TITLE + NC_QUIET_TITLE_READ,
+                                    statewide_except=_nc_without_column_paper(),
                                     sources=NC_QUIET_TITLE_SOURCE, walls=NC_QUIET_TITLE_WALL,
                                     producers=("scrapers/newspapers/column_legal_notices.py",
                                                "scrapers/public_notices/nc_heir_notices.py"),
@@ -758,7 +773,8 @@ SPECS: dict[str, Spec] = {
                              doc="raw.deed_chain.summary.chain_breaks truthy; checked = deed chain present"),
     "deed_chain_distress_transfer": Spec(_S, "derived", "gis_deed", producers=("enrichment_deed_chain.py",),
                                          doc="raw.deed_chain.summary.distress_transfers truthy; checked = deed chain present"),
-    "quiet_title": Spec(_S, "county", "court", statewide=SC_QUIET_TITLE, sources=NC_QUIET_TITLE_SOURCE,
+    "quiet_title": Spec(_S, "county", "court", statewide=SC_QUIET_TITLE + NC_QUIET_TITLE_READ,
+                        statewide_except=_nc_without_column_paper(), sources=NC_QUIET_TITLE_SOURCE,
                         walls=NC_QUIET_TITLE_WALL,
                         producers=("scrapers/newspapers/column_legal_notices.py",
                                    "scrapers/public_notices/nc_heir_notices.py"),
@@ -1153,6 +1169,9 @@ def source_status(spec: Spec, state: str, crec: Optional[dict], col: str = "") -
     different system of the same office (marriage licenses: the vital-records login, the probate
     court) than the name index the rest of the block describes."""
     sw = dict(spec.statewide).get(state)
+    if sw and spec.statewide_except and crec and \
+            (state, canonical_county(crec.get("county"))) in set(spec.statewide_except):
+        sw = None
     if sw:
         return "free", "", f"statewide: {sw}"
     wall = dict(spec.walls).get(state)
