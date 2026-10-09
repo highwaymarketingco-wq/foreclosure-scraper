@@ -2139,6 +2139,11 @@ RAW_KEEP = {
     "qa_flags": "*",                  # automated data-quality flags (dup_address, arv_below_asis, etc.)
     "last_sale": "*",                 # display-ready last sale {date, amount, basis, source} for the dashboard
     "also_seen_in": "*",              # every other source + link this property was seen at (kept on merge)
+    # identity pass (identity.py, audit 2026-10-09): provenance of what it changed on the row
+    "merged_records": "*",            # a second live record of the property merged in (its own blocks)
+    "twins_collapsed": "*",           # how many duplicate rows of the property were merged into this one
+    "unfused": "*",                   # the row was re-keyed to its own source record {from_parcel, to_parcel, ...}
+    "owner_conflict": "*",            # the county roll contradicted the owner: {decision, reason, block, loser}
     "corroboration": "*",             # court-confirmed vs single-source-aggregator flag {court_confirmed, tier, sources, label}
     "competition": "*",               # publication-reach/competition tag {level, reason, widely_published, sources}
     "signal_stack": "*",              # list-stacking: {count, signals[]} distinct distress signals per property

@@ -70,8 +70,10 @@ SLIM = "docs/listings_slim.json.gz"
 #: rename cannot make this check silently vacuous, which is the exact failure
 #: mode (a reader and a writer disagreeing) that produced five separate silent
 #: defects in one day.
+sys.path.insert(0, str(REPO / "src"))
+from foreclosure_scraper import identity as _idn  # noqa: E402  (the duplicate rule, see invariants())
+
 try:
-    sys.path.insert(0, str(REPO / "src"))
     from foreclosure_scraper.valuation.grading import ARV_FLAGS_CONTRADICTED
     CONTRADICTED = frozenset(ARV_FLAGS_CONTRADICTED)
 except Exception:  # noqa: BLE001 - the check must still run from a bare checkout
@@ -414,10 +416,17 @@ def invariants(board: Iterable[dict]) -> list[dict]:
             if not flags:
                 bad_unflagged_2m += 1
 
-        ident = _identifier(r)
+        # Duplicates are judged by identity.py (audit 2026-10-09, identity): one valid parcel or
+        # one numbered address, partitioned by PROPERTY (two real house numbers or units on one
+        # parcel are two properties, as dedupe's identity rule says; an aged copy at the owner's
+        # mailing address or of the same source record is not a second one). Fused rows (their
+        # own source record names another parcel) are judged by the identity audit check instead.
+        try:
+            ident = None if _idn.fused_record(r) else _idn.ident_key(r)
+        except Exception:  # noqa: BLE001 - an unreadable row cannot be judged
+            ident = None
         if ident:
-            addr = str(r.get("street_address") or "").strip().lower()
-            ident_addrs.setdefault(ident, []).append(addr)
+            ident_addrs.setdefault(hash(ident), []).append(_idn.view(total - 1, r, hash))
 
     out = []
     for field in MONEY_FIELDS:
@@ -453,19 +462,22 @@ def invariants(board: Iterable[dict]) -> list[dict]:
     dupes = 0
     fused_keys = 0
     fused_rows = 0
-    for addrs in ident_addrs.values():
-        if len(addrs) < 2:
+    multi_keys = 0
+    for views in ident_addrs.values():
+        if len(views) < 2:
             continue
-        distinct = {a for a in addrs if a}
+        distinct = {v["tag"] for v in views if v["tag"]}
         if len(distinct) >= FUSION_THRESHOLD:
             # Many DISTINCT real addresses under one key: the key is fused/placeholder in
             # the source data, not one property landed twice. dedupe() already refuses to
             # merge these (see FUSION_THRESHOLD's comment) -- reported below, not counted
             # as a breach.
             fused_keys += 1
-            fused_rows += len(addrs)
+            fused_rows += len(views)
             continue
-        dupes += len(addrs) - 1
+        parts = _idn.partition(views)
+        multi_keys += len(parts) > 1
+        dupes += sum(len(p) - 1 for p in parts)
 
     entry = {"name": "no duplicate identifiable properties", "count": dupes,
              "must_be": 0, "ok": dupes == 0,
@@ -473,6 +485,12 @@ def invariants(board: Iterable[dict]) -> list[dict]:
                     f"and split its enrichment ({unidentifiable:,} leads carry no "
                     "parcel/case/url/numbered-address and are excluded — they "
                     "cannot be judged either way)"}
+    if multi_keys:
+        entry["multi_address_keys"] = multi_keys
+        entry["multi_address_note"] = (
+            f"{multi_keys:,} parcel/address key(s) hold 2-3 different properties (house numbers or "
+            "units each named by its own record: an apartment complex's units, a parcel's two "
+            "structures): not duplicates, see identity.partition")
     if fused_keys:
         entry["fused_keys"] = fused_keys
         entry["fused_rows"] = fused_rows

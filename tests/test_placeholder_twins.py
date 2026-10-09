@@ -355,10 +355,12 @@ def test_board_selfcheck_duplicate_invariant_before_and_after():
     before = dupes(rows)
     PT.apply_collapse(rows, PT.plan_collapse(lambda: rows))
     after = dupes(rows)
-    # 7 real pairs gone; what is left is the ambiguous parcel (3 rows -> 2 dupes), the
-    # cross-source pair and the live pair, which this rule deliberately does not touch.
+    # 7 real pairs gone; what is left is the cross-source pair and the live pair, which this
+    # rule deliberately does not touch. The ambiguous parcel (two aged copies at two real house
+    # numbers, a live row with none) is two properties and a row that cannot be told which: no
+    # duplicate under identity.partition (audit 2026-10-09, identity).
     assert before - after == len(REAL_PAIRS)
-    assert after == 2 + 1 + 1
+    assert after == 1 + 1
 
 
 # --------------------------------------------------------------- resume script integration

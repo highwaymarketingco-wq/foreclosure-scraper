@@ -247,8 +247,9 @@ def test_fusion_threshold_excludes_placeholder_parcel_from_duplicate_count(tmp_p
     Pins the exact behaviour scripts/run_duplicate_merge_20260930.py's docstring documents."""
     mod = _load_selfcheck()
     assert mod.FUSION_THRESHOLD == 4
+    # a VALID parcel id (identity.ident_key: 7+ characters); 'MASTER' would name no parcel at all
     board = [
-        {**_row("MASTER", {}), "street_address": f"{n} Distinct Rd"} for n in range(1, 5)
+        {**_row("3208-90-5620-0000", {}), "street_address": f"{n} Distinct Rd"} for n in range(1, 5)
     ]
     inv = {i["name"]: i for i in mod.invariants(board)}
     entry = inv["no duplicate identifiable properties"]
@@ -454,17 +455,19 @@ def _old_invariants(board: list) -> list[dict]:
 def test_streaming_invariants_agrees_with_the_old_list_based_implementation(tmp_path):
     mod = _load_selfcheck()
     flag = next(iter(mod.CONTRADICTED))
+    # valid parcel ids (identity.ident_key, 2026-10-09): 'P1' / 'MASTER' name no parcel, and
+    # three rows at '1 Main St' would then be one property by their address
     board = [
-        _row("P1", {"arv_flags": [flag], "max_bid_70": 150_000, "roi_pct": 0.3,
+        _row("1000000001", {"arv_flags": [flag], "max_bid_70": 150_000, "roi_pct": 0.3,
                      "estimated_profit": 20_000, "wholesale_mao": 90_000,
                      "deal_status": "GREAT"}, equity_value=10_000),
-        _row("P2", {"arv_expected": 250_000, "max_bid_70": 175_000}, equity_value=60_000),
-        _row("P3", {"arv_expected": 3_000_000}),  # unflagged $3M ARV -- must breach
-        _row("P3", {"arv_expected": 3_000_000}),  # exact duplicate parcel_id + address
-        {**_row("MASTER", {}), "street_address": "1 Rd"},
-        {**_row("MASTER", {}), "street_address": "2 Rd"},
-        {**_row("MASTER", {}), "street_address": "3 Rd"},
-        {**_row("MASTER", {}), "street_address": "4 Rd"},  # 4 distinct -- fused, not dupes
+        _row("1000000002", {"arv_expected": 250_000, "max_bid_70": 175_000}, equity_value=60_000),
+        _row("1000000003", {"arv_expected": 3_000_000}),  # unflagged $3M ARV -- must breach
+        _row("1000000003", {"arv_expected": 3_000_000}),  # exact duplicate parcel_id + address
+        {**_row("3208-90-5620-0000", {}), "street_address": "1 Rd"},
+        {**_row("3208-90-5620-0000", {}), "street_address": "2 Rd"},
+        {**_row("3208-90-5620-0000", {}), "street_address": "3 Rd"},
+        {**_row("3208-90-5620-0000", {}), "street_address": "4 Rd"},  # 4 distinct -- fused, not dupes
         {"parcel_id": None, "street_address": "SR 1135", "county": "McDowell", "state": "NC",
          "source": "test", "case_number": None, "raw": {"calc": {}}},  # unidentifiable
     ]

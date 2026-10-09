@@ -97,6 +97,8 @@ DERIVED_BLOCKS = frozenset({
     "fhfa_value", "land_ratio", "vacant_lot", "land_use_commercial_hint", "county_backfill",
     "address_was_owner_mailing", "county_was_name_derived", "geocoded_by_name", "geo_missing",
     "parcel_id_alias", "withdrawn_case_type_other", "resolver_conflict_undone",
+    # identity.py's provenance (audit 2026-10-09, identity): written by the identity pass
+    "merged_records", "twins_collapsed", "unfused", "owner_conflict",
 })
 
 #: person blocks: they describe the OWNER (a person or entity), so the same block on two parcels
