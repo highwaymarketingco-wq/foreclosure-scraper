@@ -1784,8 +1784,52 @@ def _accepted(name: str, accepted: Iterable[str]) -> bool:
     return False
 
 
+#: The defaults file of accepted drops (audit 2026-10-09, regressions): intended corrections that the
+#: owner or an audit accepted, each with its reason and a BOUND (max_loss rows), so the comparison shows
+#: only real findings and a bigger loss of the same column still holds. docs/audit_2026-10-09/
+#: accepted_drops.md explains each entry. --accept-file replaces it, --no-accept-file ignores it.
+ACCEPT_FILE = REPO / "docs" / "board_versions" / "accepted_drops.json"
+
+
+def load_accept_file(path: Optional[Path]) -> list[dict]:
+    """[{kind: source|coverage|field, name, state?, max_loss?, reason}] from the defaults file; an entry
+    without a reason is ignored (an acceptance must say why)."""
+    if not path or not Path(path).is_file():
+        return []
+    try:
+        doc = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return []
+    out = []
+    for e in doc.get("entries") or []:
+        if isinstance(e, dict) and e.get("kind") in ("source", "coverage", "field") and e.get("name") \
+                and str(e.get("reason") or "").strip():
+            out.append(e)
+    return out
+
+
+def accept_reason(args, kind: str, name: str, loss: int, state: str = "ALL") -> Optional[str]:
+    """Why a blocker of this kind and name does not block, or None: a command-line accept flag
+    (unbounded), else a defaults-file entry whose state matches (absent = any) and whose max_loss
+    (absent = any) covers `loss` rows."""
+    flags = {"source": getattr(args, "accept_source_drop", []), "coverage": getattr(args, "accept_coverage_drop", []),
+             "field": getattr(args, "accept_field_loss", [])}[kind]
+    if _accepted(name, flags):
+        return f"accepted with --accept-{ {'source': 'source-drop', 'coverage': 'coverage-drop', 'field': 'field-loss'}[kind]}"
+    for e in getattr(args, "accept_entries", None) or []:
+        if e["kind"] != kind or not _accepted(name, [e["name"]]):
+            continue
+        if e.get("state") and e["state"] != state:
+            continue
+        mx = e.get("max_loss")
+        if mx is not None and loss > int(mx):
+            continue
+        return f"accepted ({ACCEPT_FILE.name if not getattr(args, 'accept_file', None) else Path(args.accept_file).name}): {e['reason']}"
+    return None
+
+
 def coverage_section(bs: BoardStats, cs: BoardStats, cmp: Comparison, missing_cov: Cov, missing_hw: Cov,
-                     accept: list[str]) -> tuple[list[dict], list[dict], list[dict]]:
+                     accept: list[str], args=None) -> tuple[list[dict], list[dict], list[dict]]:
     """Per column and signal, per state: counts first, then the three shares; a class for each.
     Returns (rows, blockers, notes)."""
     names = set(COLUMNS)
@@ -1849,9 +1893,12 @@ def coverage_section(bs: BoardStats, cs: BoardStats, cmp: Comparison, missing_co
                 item = {"section": "coverage", "name": f"{state}:{col}",
                         "detail": r["why"], "threshold": f"a drop of more than {COVERAGE_DROP_PP} percentage "
                         f"points on the like-for-like or HOT+WARM lens (each judged on at least {LENS_MIN_ROWS} rows)"}
-                if col.startswith("sig:") or _accepted(col, accept):
+                loss = max(ovb - ovc, r["count_hotwarm_both"][0] - r["count_hotwarm_both"][1])
+                why_ok = (accept_reason(args, "coverage", col, loss, state) if args is not None
+                          else ("accepted with --accept-coverage-drop" if _accepted(col, accept) else None))
+                if col.startswith("sig:") or why_ok:
                     item["why_not_blocking"] = ("a signal: verification removes refuted or stale signals on purpose"
-                                                if col.startswith("sig:") else "accepted with --accept-coverage-drop")
+                                                if col.startswith("sig:") else why_ok)
                     notes.append(item)
                 else:
                     blockers.append(item)
@@ -1944,8 +1991,9 @@ def build_report(args, base_in: BoardInput, cand_in: BoardInput, bs: BoardStats,
                            f"reason: {dict(miss_by_source.get(src, {}))}",
                  "threshold": f"under {SOURCE_DROP_RATIO:.0%} of the live count with at least "
                               f"{SOURCE_MIN_BASELINE_ROWS} live rows"}
-        if _accepted(src, args.accept_source_drop):
-            entry["why_not_blocking"] = "accepted with --accept-source-drop"
+        why_ok = accept_reason(args, "source", src, nb - held)
+        if why_ok:
+            entry["why_not_blocking"] = why_ok
             notes.append(entry)
         elif nb >= SOURCE_MIN_BASELINE_ROWS:
             blockers.append(entry)
@@ -1988,7 +2036,7 @@ def build_report(args, base_in: BoardInput, cand_in: BoardInput, bs: BoardStats,
     }
 
     # ---------------------------------------------------------------- 2 coverage
-    cov_rows, cov_block, cov_notes = coverage_section(bs, cs, cmp, miss_cov, miss_cov_hw, args.accept_coverage_drop)
+    cov_rows, cov_block, cov_notes = coverage_section(bs, cs, cmp, miss_cov, miss_cov_hw, args.accept_coverage_drop, args)
     blockers += cov_block
     notes += cov_notes
 
@@ -2006,8 +2054,9 @@ def build_report(args, base_in: BoardInput, cand_in: BoardInput, bs: BoardStats,
             item = {"section": "fields", "name": f"lost:{name}",
                     "detail": f"{lost:,} of {had:,} rows in both lost their {name} ({r['lost_pct']}%)",
                     "threshold": f"more than {FIELD_LOST_MAX_PCT}% of the overlapping rows that had it (at least {FIELD_MIN_ROWS})"}
-            if _accepted(name, args.accept_field_loss):
-                item["why_not_blocking"] = "accepted with --accept-field-loss"
+            why_ok = accept_reason(args, "field", name, lost)
+            if why_ok:
+                item["why_not_blocking"] = why_ok
                 notes.append(item)
             else:
                 blockers.append(item)
@@ -2371,6 +2420,16 @@ def _peak_rss_mb() -> float:
 
 
 def compare(args) -> dict:
+    if not getattr(args, "accept_entries", None):
+        # the defaults file was measured against the live board: read it when the baseline IS the
+        # live board (docs/), or when --accept-file names one
+        live = Path(args.baseline).resolve() == (REPO / "docs").resolve()
+        if getattr(args, "no_accept_file", False):
+            args.accept_entries = []
+        elif getattr(args, "accept_file", None):
+            args.accept_entries = load_accept_file(Path(args.accept_file))
+        else:
+            args.accept_entries = load_accept_file(ACCEPT_FILE) if live else []
     audit_b = AuditFeed(not args.no_audit_checks, Path(args.checks_dir) if args.checks_dir else None)
     dk = audit_b.detail_keys
     base_in = BoardInput(Path(args.baseline), args.baseline_kind, detail_keys=dk)
@@ -2475,6 +2534,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                     help="an intended source drop (exact slug, or a prefix ending in *): a note, not a blocker")
     ap.add_argument("--accept-coverage-drop", action="append", default=[], metavar="COLUMN")
     ap.add_argument("--accept-field-loss", action="append", default=[], metavar="FIELD")
+    ap.add_argument("--accept-file", default=None, metavar="JSON",
+                    help=f"accepted drops with reasons and bounds (default {ACCEPT_FILE.relative_to(REPO)})")
+    ap.add_argument("--no-accept-file", action="store_true", help="ignore the accepted-drops defaults file")
     ap.add_argument("--no-size-estimate", action="store_true", help="checkpoint: skip the gzip size estimate")
     ap.add_argument("--no-selfcheck", action="store_true")
     ap.add_argument("--no-audit-checks", action="store_true")

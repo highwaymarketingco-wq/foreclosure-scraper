@@ -1,0 +1,85 @@
+{
+ "schema": "accepted-drops-v1",
+ "about": "Intended corrections the comparison must not hold on, each with the proof and a bound (max_loss rows; a bigger loss of the same column still blocks). Read by scripts/compare_boards.py (--accept-file / --no-accept-file). docs/audit_2026-10-09/accepted_drops.md explains each. Measured on the comparison of the reconciled board (pin aa680fba) with the 10/7 board, 2026-10-09.",
+ "entries": [
+  {
+   "kind": "coverage",
+   "name": "lt_lis_pendens",
+   "max_loss": 9000,
+   "reason": "court_signals D5: NC eCourts claims of lien (6,511) and transcripts of judgment (1,436) reclassified out of lis_pendens = 7,947; observed loss 8,072 rows in both"
+  },
+  {
+   "kind": "coverage",
+   "name": "multi_year_delinquent_tax",
+   "max_loss": 3600,
+   "reason": "tax_binding scrub of county tax blocks that are not the row's own parcel (reconcile 2026-10-09: tax_owed unbound_rows 19,570, unbound_blocks 19,602) plus county-site verification (tax_lien refuted 751, stale 1,522); the multi_year block is parcel-bound (tax_binding BLOCK_PARCEL_FIELDS); observed 3,167"
+  },
+  {
+   "kind": "coverage",
+   "name": "sc_state_tax_lien",
+   "max_loss": 3500,
+   "reason": "block_binding: sc_state_tax_lien blocks of another person removed, 3,035 (sc_dew_lien_registry business liens); observed 3,033"
+  },
+  {
+   "kind": "coverage",
+   "name": "tax_aging_surfaced",
+   "max_loss": 12500,
+   "reason": "derived from tax_owed: tax_binding scrub of county tax blocks that are not the row's own parcel (reconcile 2026-10-09: tax_owed unbound_rows 19,570, unbound_blocks 19,602) plus county-site verification (tax_lien refuted 751, stale 1,522); observed 11,004"
+  },
+  {
+   "kind": "coverage",
+   "name": "x_tax_balance",
+   "max_loss": 12500,
+   "reason": "tax_binding scrub of county tax blocks that are not the row's own parcel (reconcile 2026-10-09: tax_owed unbound_rows 19,570, unbound_blocks 19,602) plus county-site verification (tax_lien refuted 751, stale 1,522); observed 11,021"
+  },
+  {
+   "kind": "coverage",
+   "name": "x_tax_years_late",
+   "max_loss": 4300,
+   "reason": "tax_binding scrub of county tax blocks that are not the row's own parcel (reconcile 2026-10-09: tax_owed unbound_rows 19,570, unbound_blocks 19,602) plus county-site verification (tax_lien refuted 751, stale 1,522); observed SC 3,737"
+  },
+  {
+   "kind": "coverage",
+   "name": "atty_legal_description",
+   "max_loss": 600,
+   "reason": "block_binding scrub of blocks that are another row's record (10/7 board: 42,618 rows, 63,702 blocks): gis_attrs_full other_parcel 2,839 / fallback_point 1,434, gis fallback 1,411; observed 429 HOT+WARM rows"
+  },
+  {
+   "kind": "coverage",
+   "name": "atty_deed_ref",
+   "max_loss": 300,
+   "reason": "block_binding scrub of blocks that are another row's record (10/7 board: 42,618 rows, 63,702 blocks): deed_chain fallback_point 4,813 / shared_copy 1,120; observed 192 HOT+WARM rows"
+  },
+  {
+   "kind": "coverage",
+   "name": "atty_taxpayer_of_record",
+   "state": "SC",
+   "max_loss": 1200,
+   "reason": "block_binding scrub of blocks that are another row's record (10/7 board: 42,618 rows, 63,702 blocks): owner_mailing other_person 7,396 / other_parcel 2,892, cama 1,414; observed SC 1,004"
+  },
+  {
+   "kind": "field",
+   "name": "tax_balance",
+   "max_loss": 15000,
+   "reason": "tax_binding scrub of county tax blocks that are not the row's own parcel (reconcile 2026-10-09: tax_owed unbound_rows 19,570, unbound_blocks 19,602) plus county-site verification (tax_lien refuted 751, stale 1,522); observed 13,029"
+  },
+  {
+   "kind": "field",
+   "name": "tax_years",
+   "max_loss": 6000,
+   "reason": "tax_binding scrub of county tax blocks that are not the row's own parcel (reconcile 2026-10-09: tax_owed unbound_rows 19,570, unbound_blocks 19,602) plus county-site verification (tax_lien refuted 751, stale 1,522); observed 5,121"
+  },
+  {
+   "kind": "field",
+   "name": "tax_levy_year",
+   "max_loss": 10500,
+   "reason": "tax_binding scrub of county tax blocks that are not the row's own parcel (reconcile 2026-10-09: tax_owed unbound_rows 19,570, unbound_blocks 19,602) plus county-site verification (tax_lien refuted 751, stale 1,522); observed 9,097"
+  },
+  {
+   "kind": "field",
+   "name": "mailing_address",
+   "max_loss": 15000,
+   "reason": "block_binding scrub of blocks that are another row's record (10/7 board: 42,618 rows, 63,702 blocks): owner_mailing other_person 7,396, other_parcel 2,892, other_address 2,520 (12,808); observed 13,343"
+  }
+ ]
+}

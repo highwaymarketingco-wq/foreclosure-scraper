@@ -88,7 +88,8 @@ def _run(tmp: Path, base: Path, cand: Path, *extra: str) -> tuple[int, dict]:
     if "--checks-dir" not in extra:
         (tmp / "no_checks").mkdir(exist_ok=True)
         extra = (*extra, "--checks-dir", str(tmp / "no_checks"))
-    rc = CB.main(["--baseline", str(base), "--candidate", str(cand), "--out", str(out), "--no-ledger", *extra])
+    rc = CB.main(["--baseline", str(base), "--candidate", str(cand), "--out", str(out), "--no-ledger",
+                  "--no-accept-file", *extra])
     return rc, json.loads(out.read_text())
 
 

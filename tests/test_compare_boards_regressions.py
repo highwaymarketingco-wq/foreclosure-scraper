@@ -42,7 +42,7 @@ def _board(d: Path, rows: list[dict]) -> Path:
 def _run(tmp: Path, base: Path, cand: Path) -> tuple[int, dict]:
     out = tmp / "cmp" / "report.json"
     (tmp / "no_checks").mkdir(parents=True, exist_ok=True)
-    rc = CB.main(["--baseline", str(base), "--candidate", str(cand), "--out", str(out), "--no-ledger",
+    rc = CB.main(["--baseline", str(base), "--candidate", str(cand), "--out", str(out), "--no-ledger", "--no-accept-file",
                   "--checks-dir", str(tmp / "no_checks")])
     return rc, json.loads(out.read_text())
 
@@ -115,3 +115,26 @@ def test_hot_warm_growth_without_the_value_is_not_a_regression_but_a_loss_on_row
     lost = [hot(i, comps=i >= 30) for i in range(300)] + [_row(1000 + i, "counties_nc.cold") for i in range(300)]
     rc, rep = _run(tmp_path / "b", _board(tmp_path / "base2", live), _board(tmp_path / "cand2", lost))
     assert "ALL:comps" in {b["name"] for b in rep["blockers"]}
+
+
+def test_an_accepted_drop_file_accepts_within_its_bound_only(tmp_path):
+    live = [_row(i, "counties_nc.test_roll") for i in range(300)]
+    cand = [dict(r, raw={**r["raw"], "tax_owed": None}) if i < 30 else r for i, r in enumerate(live)]
+    base, cd = _board(tmp_path / "base", live), _board(tmp_path / "cand", cand)
+
+    def run(entries, sub):
+        f = tmp_path / f"{sub}.json"
+        f.write_text(json.dumps({"entries": entries}))
+        out = tmp_path / sub / "r.json"
+        (tmp_path / "no_checks").mkdir(parents=True, exist_ok=True)
+        CB.main(["--baseline", str(base), "--candidate", str(cd), "--out", str(out), "--no-ledger",
+                 "--checks-dir", str(tmp_path / "no_checks"), "--accept-file", str(f)])
+        rep = json.loads(out.read_text())
+        return {b["name"] for b in rep["blockers"]}, {n["name"]: n for n in rep["notes"]}
+    entry = {"kind": "field", "name": "tax_balance", "reason": "scrubbed copies (test)"}
+    blockers, notes = run([{**entry, "max_loss": 40}], "ok")
+    assert "lost:tax_balance" not in blockers and "scrubbed copies" in notes["lost:tax_balance"]["why_not_blocking"]
+    blockers, _ = run([{**entry, "max_loss": 10}], "over")                 # 30 lost > the bound
+    assert "lost:tax_balance" in blockers
+    blockers, _ = run([{"kind": "field", "name": "tax_balance", "max_loss": 40}], "noreason")
+    assert "lost:tax_balance" in blockers                                  # no reason, no acceptance
