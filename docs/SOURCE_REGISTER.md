@@ -385,3 +385,4 @@ Investigated, found real and reachable, and deliberately NOT turned into leads. 
 | `newspapers.columbia_star` | The Columbia Star: weekly Master-in-Equity sale notices for Richland County | open RSS | the REST API is limited to approved addresses; the public RSS is read |
 | `newspapers.mecklenburg_times` | The Mecklenburg Times: real-estate legal notices (Mecklenburg, Union, Iredell) via RSS | open RSS | site returns 403 after about 12 requests in two minutes: run once a day |
 | `city_websites.raleigh_structure_fires` | City of Raleigh structure fires (city open data) | open | first fire-damage source |
+| `public_notices.nc_heir_notices` | NC quiet-title and heir-naming court notices (quiet-title special proceedings, tax foreclosures serving heirs, unknown-heirs notices), statewide, from the Column legal-notice API | open JSON | added 2026-10-09 (top-80 build); one probate-notice row per distinct notice; dateless |

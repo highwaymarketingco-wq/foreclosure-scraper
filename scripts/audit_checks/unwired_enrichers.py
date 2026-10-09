@@ -42,11 +42,12 @@ SEPTIC_MAX_AGE_DAYS = 14     # the weekly layer refresh, plus a missed run
 DNC_STATUSES = frozenset({"clear", "on_registry", "on_internal_dnc", "unverified", "do_not_dial",
                           "not_owner_contact"})
 DNC_BLOCKED = frozenset({"on_registry", "registered", "on_internal_dnc", "do_not_dial", "not_owner_contact"})
+#: (deed and marriage_license left this list 2026-10-09: live writers again, f6ccb681)
 #: rows carrying each retired key on the 10/7 board (350,013 rows, docs/audit_2026-10-09/unwired_enrichers.md)
 RETIRED_KEY_BASELINE = {
-    "ocr_extraction": 2220, "lexington_assessment": 1159, "marriage_license": 27, "rod_name_index": 7,
+    "ocr_extraction": 2220, "lexington_assessment": 1159, "rod_name_index": 7,
     "bankruptcy_petition": 0, "block_group": 0, "building_value_assessed": 0, "campaign_queue": 0,
-    "census_tract": 0, "contact": 0, "crime_stats": 0, "deed": 0, "deficiency_amount": 0, "economic": 0,
+    "census_tract": 0, "contact": 0, "crime_stats": 0, "deficiency_amount": 0, "economic": 0,
     "housing_market": 0, "land_value_assessed": 0, "market_stats": 0, "nearby_facilities": 0,
     "standardized_address": 0, "state_fips": 0, "tax_bill_url": 0, "workflow_status": 0,
     "workflow_status_at": 0, "workflow_tags": 0,

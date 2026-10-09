@@ -30,13 +30,13 @@ def test_shape():
 
 def test_a_county_with_no_checker_and_no_recorded_wall_is_counted():
     c = tk.ClaimHasChecker()
-    c.feed(row("NC", "Chowan"))                    # no checker, no wall card: counted
+    c.feed(row("NC", "Person"))                    # no checker, no wall card: counted (Chowan got one 2026-10-09)
     c.feed(row("NC", "Lincoln"))                   # Avalon wall card: recorded
     c.feed(row("NC", "Gates"))                     # no per-year source: recorded
     c.feed(row("SC", "Greenville", parcel_id="0999000100100"))     # tax_lien_greenville takes it
-    c.feed(row("NC", "Chowan", raw={}))            # no tax claim: not counted at all
+    c.feed(row("NC", "Person", raw={}))            # no tax claim: not counted at all
     out = c.finish()
-    assert (out["checked"], out["violations"]) == (4, 1) and "NC:Chowan" in out["detail"]
+    assert (out["checked"], out["violations"]) == (4, 1) and "NC:Person" in out["detail"]
 
 
 def test_a_gate_claim_no_verifier_takes_in_a_covered_county_is_a_violation():

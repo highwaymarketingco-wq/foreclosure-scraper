@@ -333,9 +333,11 @@ class _Config:
         try:
             prof = json.loads((_REPO / "deploy" / "oracle" / "run_profile.json").read_text())
             pend = (prof.get("unwired_wire_pending") or {})
+            main_src = (_REPO / "src" / "foreclosure_scraper" / "main.py").read_text()
             for mod in ("enrichment_onemap_sweeps", "enrichment_probate_spartan"):
-                if mod not in pend and mod not in json.dumps(prof):
-                    bad.append(f"run_profile.json does not list {mod}")
+                # either still pending (listed in the profile) or wired (imported by main.py)
+                if mod not in pend and mod not in json.dumps(prof) and f"from .{mod} import" not in main_src:
+                    bad.append(f"{mod} is neither wired in main.py nor listed in run_profile.json")
             if (prof.get("flags") or {}).get("FORECLOSURE_PROBATE_SPARTAN") != "1":
                 bad.append("run_profile flag FORECLOSURE_PROBATE_SPARTAN is not 1")
         except Exception as exc:  # noqa: BLE001
