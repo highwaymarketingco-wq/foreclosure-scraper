@@ -1,15 +1,15 @@
 {
- "generated": "2026-10-08 17:50 EDT",
- "commit": "82860c43",
+ "generated": "2026-10-08 20:27 EDT",
+ "commit": "5f99e0e3",
  "fingerprint": {
   "inputs": {
-   "docs/walls_register.json": "327452fb256478b7",
+   "docs/walls_register.json": "59b023bf9f440e24",
    "docs/county_records/county_records_matrix.json": "3ff143d0ce5ff97b",
    "docs/county_records/nc_rod_platform_clusters.md": "aa876f9499cade01",
    "docs/county_records/sc_rod_platform_clusters.md": "a1031bf224f1ac1c",
    "docs/new_sources_2026-10-07_contact_and_facts.json": "aa5cddac3cb79e06",
-   "docs/new_sources_2026-10-07_distress.json": "978a19a7a1b40c66",
-   "docs/new_sources_2026-10-07_liens_courts.json": "e837ace4bf3ba35b",
+   "docs/new_sources_2026-10-07_distress.json": "7572dfc70ff761f3",
+   "docs/new_sources_2026-10-07_liens_courts.json": "78c80420b0cb1aa0",
    "docs/gap_matrix/gap_matrix_2026-10-07.json": "321e8b5f9780fb4d",
    "docs/gap_matrix/county_signal_coverage_2026-10-07.csv": "827ec579e85aa18f"
   },
@@ -131,8 +131,8 @@
  "inputs": [
   {
    "path": "docs/walls_register.json",
-   "sha": "327452fb256478b7",
-   "date": "2026-10-08 17:50 (file time)"
+   "sha": "59b023bf9f440e24",
+   "date": "2026-10-08"
   },
   {
    "path": "docs/county_records/county_records_matrix.json",
@@ -156,13 +156,13 @@
   },
   {
    "path": "docs/new_sources_2026-10-07_distress.json",
-   "sha": "978a19a7a1b40c66",
-   "date": "2026-10-07"
+   "sha": "7572dfc70ff761f3",
+   "date": "2026-10-08"
   },
   {
    "path": "docs/new_sources_2026-10-07_liens_courts.json",
-   "sha": "e837ace4bf3ba35b",
-   "date": "2026-10-07"
+   "sha": "78c80420b0cb1aa0",
+   "date": "2026-10-08"
   },
   {
    "path": "docs/gap_matrix/gap_matrix_2026-10-07.json",
