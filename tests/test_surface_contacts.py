@@ -38,7 +38,10 @@ def test_email_found_in_notice_contact_actually_persists_onto_the_listing():
     li = _mk_listing(raw={"notice_contact": {"email": "attorney@examplefirm.test"}})
     stats = enrich_surface_contacts([li])
     assert stats["listings_with_new_emails"] == 1
-    assert li.raw["owner_email"]["best_email"] == "attorney@examplefirm.test"
+    # surfaced and kept, classified, but NOT the owner's address (audit 2026-10-09 column_accuracy)
+    assert li.raw["owner_email"]["emails"][0]["email"] == "attorney@examplefirm.test"
+    assert li.raw["owner_email"]["emails"][0]["classification"] == "attorney"
+    assert li.raw["owner_email"]["best_email"] is None
 
 
 def test_phone_and_email_persist_when_raw_is_none_and_gets_populated_by_the_function():
@@ -62,7 +65,8 @@ def test_non_dict_raw_still_surfaces_and_persists_when_data_was_attached_first()
     stats = enrich_surface_contacts([li])
     assert stats["listings_with_new_emails"] == 1
     assert stats["listings_with_new_phones"] == 1
-    assert li.raw["owner_email"]["best_email"] == "agent@broker.test"
+    assert li.raw["owner_email"]["emails"][0]["email"] == "agent@broker.test"
+    assert li.raw["owner_email"]["best_email"] is None      # an agent's address is not the owner's
     assert li.raw["owner_phone"]["phone"]
 
 

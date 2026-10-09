@@ -95,6 +95,98 @@ def owner_email_of(raw: dict | None) -> str | None:
                 return str(e)
     return None
 
+
+# --- the published owner_email block (audit 2026-10-09, column_accuracy) -------------------------
+#
+# THE DEFECT. raw['owner_email'].best_email is the board's e-mail column (gap_matrix 'email',
+# compare_boards, the public JSON). On the 2026-10-09 reconciled checkpoint 46,978 rows carried one;
+# 0 of a 58-row live sample (30 NC, 28 SC) was a correct owner address:
+#   * 41,196 rows: an ESCAPE ARTIFACT. enrichment_surface_contacts scanned json.dumps(raw) with an
+#     e-mail regex, so a newline before an address ('\n' in the dump) glued an 'n' to its front:
+#     the filing's 'evan@builder.test' was published as 'nevan@builder.test'. The real owner
+#     address (owner_email_of) sat on the same row, unrepaired.
+#   * the rest: best_email was emails[0] of a raw scan, i.e. whatever came first: a listing agent's
+#     (distressed.agent_email), a contractor's or the lien agent's from a LiensNC filing, a broker's.
+#     All classified 'other', so nothing downstream could tell them from the owner's.
+# THE RULE. best_email is the OWNER's address (owner_email_of) or None; every other address stays in
+# `emails` with its classification. Escape artifacts are repaired against the row's own strings.
+_ESCAPE_LEAD = ("n", "r", "t")
+
+
+def _raw_strings(v, depth: int = 0):
+    if depth > 8:
+        return
+    if isinstance(v, str):
+        yield v
+    elif isinstance(v, dict):
+        for x in v.values():
+            yield from _raw_strings(x, depth + 1)
+    elif isinstance(v, (list, tuple)):
+        for x in v:
+            yield from _raw_strings(x, depth + 1)
+
+
+def emails_in_raw(raw: dict | None) -> set[str]:
+    """Every e-mail address in the row's raw STRINGS (lowercased), read string by string, never off
+    a JSON dump (a dump turns a newline into the two characters '\\n', and the regex then reads the
+    'n' as the address's first letter)."""
+    out: set[str] = set()
+    for s in _raw_strings(raw if isinstance(raw, dict) else {}):
+        if "@" in s:
+            for m in _OWNER_EMAIL_RE.finditer(s):
+                out.add(m.group().strip(".").lower())
+    return out
+
+
+def repair_escape_artifact(email: str | None, raw: dict | None, known: set[str] | None = None) -> str | None:
+    """'nevan@x.test' -> 'evan@x.test' when the row's raw strings hold 'evan@x.test' and never
+    'nevan@x.test' (the dump artifact); anything else is returned lowercased and unchanged."""
+    if not email:
+        return email
+    e = str(email).strip().strip(".").lower()
+    if e[:1] in _ESCAPE_LEAD and len(e) > 4:
+        real = known if known is not None else emails_in_raw(raw)
+        if e not in real and e[1:] in real:
+            return e[1:]
+    return e
+
+
+def normalized_owner_email_block(raw: dict | None):
+    """The raw['owner_email'] block as it may be published: escape artifacts repaired in every
+    address, the owner's address (owner_email_of) marked classification 'owner', and best_email /
+    best_classification set to that owner address or None. A NEW dict (raw is not modified); the
+    block unchanged when it is not a dict. The LiensNC handoff shape ({'email', 'source':
+    'liensnc_filing'}) keeps its shape with the address repaired."""
+    if not isinstance(raw, dict):
+        return None
+    oe = raw.get("owner_email")
+    if not isinstance(oe, dict):
+        return oe
+    known = emails_in_raw({k: v for k, v in raw.items() if k != "owner_email"})
+    new = dict(oe)
+    if oe.get("email"):
+        new["email"] = repair_escape_artifact(oe["email"], raw, known)
+    owner = owner_email_of(raw)
+    owner = repair_escape_artifact(owner, raw, known) if owner else None
+    emails = []
+    for x in oe.get("emails") or []:
+        if not isinstance(x, dict) or not x.get("email"):
+            continue
+        y = dict(x)
+        y["email"] = repair_escape_artifact(x["email"], raw, known)
+        if owner and y["email"] == owner:
+            y["classification"] = "owner"
+        elif y.get("classification") == "owner":
+            y["classification"] = "other"      # an 'owner' mark on an address that is not owner_email_of's
+        emails.append(y)
+    if "emails" in oe or "best_email" in oe:
+        if owner and owner not in {y["email"] for y in emails}:
+            emails.insert(0, {"email": owner, "source": "owner_email_of", "classification": "owner"})
+        new["emails"] = emails
+        new["best_email"] = owner
+        new["best_classification"] = "owner" if owner else None
+    return new
+
 # Email regex — standard RFC 5322 simplified
 _EMAIL_RE = re.compile(
     r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",

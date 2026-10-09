@@ -99,6 +99,7 @@ import structlog
 
 from ...base_scraper import BaseScraper
 from ...enrichment_owner_mailing import _is_absentee
+from ...mailing_shape import unglue_house_number
 from ...models import Listing, ListingType, PropertyKind
 from ...tax_calendar import completed_delinquent_years
 
@@ -275,7 +276,8 @@ def _meta(detail: dict) -> dict[str, Any]:
 
 
 def _full_addr(line1: str | None, city: str | None, state: str | None, zip_: str | None) -> str | None:
-    line1 = (line1 or "").strip()
+    # the invoice glues the house number to the street ('1000MALACHI DRIVE'); audit 2026-10-09
+    line1 = unglue_house_number((line1 or "").strip()) or ""
     city = (city or "").strip()
     state = (state or "").strip()
     zip_ = (zip_ or "").strip()

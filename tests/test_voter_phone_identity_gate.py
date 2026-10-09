@@ -173,3 +173,55 @@ def test_mixed_batch_only_gates_the_eligible_rows(monkeypatch):
     assert "identity_check" not in legacy.raw["owner_phone"]
     assert "identity_check" not in foreign.raw["owner_phone"]
     assert stats["matched_addr"] == 1 and stats["regated"] == 1 and stats["contradicted"] == 1
+
+
+# --------------------------------------------------------------------------------------
+# Soundex tiers are checked against the voter file (audit 2026-10-09, column_accuracy)
+# --------------------------------------------------------------------------------------
+def _rec(last, first, phone, county="WAKE"):
+    return G.VoterRec(last=last, first=first, middle="", county=county, street_key=None, phone=phone)
+
+
+def test_a_fuzzy_phone_held_by_a_voter_with_another_name_is_not_dialable(monkeypatch):
+    monkeypatch.setattr(V, "_INDEX", {})
+    monkeypatch.setattr(V, "_NAME_COUNTY", {})
+    monkeypatch.setattr(V, "_FUZZY_INDEX", {})
+    # 'SANTOS ALEXANDRA' and 'SANDERS ALEXANDER' share Soundex S532 and a canonical first name
+    monkeypatch.setattr(V, "_NAME_COUNTY_FUZZY", {("WAKE", V._soundex("SANTOS"), V._canon_first("ALEXANDRA")): "9195550777"})
+    _gate_index(monkeypatch, _rec("SANDERS", "ALEXANDER", "9195550777"), _rec("SANTOS", "ALEXANDRA", "9195550999"))
+    li = _listing(owner="SANTOS ALEXANDRA", county="Wake", street=None)
+
+    V.enrich_voter_phone([li])
+
+    op = li.raw["owner_phone"]
+    assert op["match"] == "fuzzy:soundex+county-unique"
+    assert op["phone"] == "(919) 555-0777"                   # kept, never cleared
+    assert op["identity_check"] == "unverified" and op["do_not_dial"] is True
+    assert G.is_owner_phone_usable(op) is False
+
+
+def test_a_fuzzy_phone_held_by_the_owner_named_voter_stays_dialable(monkeypatch):
+    _empty_index(monkeypatch)
+    _gate_index(monkeypatch, _rec("SMITH", "JON", "9195551234"))
+    li = _listing(owner="SMITH JON A", raw={
+        "owner_phone": {"phone": "(919) 555-1234", "source": "ncsbe_voter",
+                        "match": "fuzzy:soundex+county-unique", "matched_name": "SMITH,JON"}})
+
+    V.enrich_voter_phone([li])
+
+    assert li.raw["owner_phone"]["identity_check"] == "corroborated"
+    assert G.is_owner_phone_usable(li.raw["owner_phone"]) is True
+
+
+def test_a_legacy_fuzzy_block_without_matched_name_is_regated(monkeypatch):
+    _empty_index(monkeypatch)
+    _gate_index(monkeypatch, _rec("PACK", "MICHAEL", "8285550101"))
+    li = _listing(owner="PARRISH, MICHAEL RAY", raw={
+        "owner_phone": {"phone": "(828) 555-0101", "source": "ncsbe_voter",
+                        "match": "fuzzy:soundex+county-unique"}})
+
+    stats = V.enrich_voter_phone([li])
+
+    assert stats["regated"] == 1
+    assert li.raw["owner_phone"]["identity_check"] == "unverified"
+    assert li.raw["owner_phone"]["do_not_dial"] is True

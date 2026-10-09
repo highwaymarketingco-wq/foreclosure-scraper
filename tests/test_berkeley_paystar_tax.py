@@ -65,7 +65,7 @@ def test_situs_and_mailing_are_kept_distinct_and_absentee_is_flagged_on_a_street
     li = _detail_to_listing(_REAL_DETAIL, "MjAyNS0wMDU5ODIz")
     om = li.raw["owner_mailing"]
     assert om["situs"] == "329 OLD COMMUNITY RD CROSS, SC 29436"
-    assert om["mailing"] == "2343HIGHWAY 311 CROSS, SC 29436"
+    assert om["mailing"] == "2343 HIGHWAY 311 CROSS, SC 29436"   # unglued (audit 2026-10-09)
     # Same city/state, but the STREET differs (rural highway mailing address
     # vs. the parcel's own road) -- _is_absentee's substring/token-subset
     # test correctly does not match these, so this real sample IS flagged
@@ -116,7 +116,7 @@ def test_missing_asset_meta_json_still_yields_a_bare_listing():
     assert li.parcel_id == "078-00-00-085"
     assert li.street_address is None    # no SITUS available without assetMetaJson
     # Mailing is still on the top-level invoice fields, independent of assetMetaJson.
-    assert li.raw["owner_mailing"]["mailing"] == "2343HIGHWAY 311 CROSS, SC 29436"
+    assert li.raw["owner_mailing"]["mailing"] == "2343 HIGHWAY 311 CROSS, SC 29436"
 
 
 def test_malformed_asset_meta_json_does_not_raise():
@@ -305,3 +305,12 @@ def test_all_zero_text_codes_are_blank_not_values():
     b = _detail_to_listing(_detail_with({"Sub": "000", "Block": "0", "Lot": "12"}), "h"
                            ).raw["berkeley_paystar_tax"]
     assert "subdivision" not in b and "block" not in b and b["lot"] == "12"
+
+
+def test_mailing_street_house_number_is_unglued():
+    """audit 2026-10-09 column_accuracy: the invoice writes '1000MALACHI DRIVE'; the county GIS
+    (the primary record) has '1000 MALACHI DRIVE'. Made-up address."""
+    from foreclosure_scraper.scrapers.counties_sc.berkeley_paystar_tax import _full_addr
+    assert _full_addr("313EXAMPLE DR", "SUMMERVILLE", "SC", "29486") == "313 EXAMPLE DR SUMMERVILLE, SC 29486"
+    assert _full_addr("100TH ST", "X", "SC", "1") == "100TH ST X, SC 1"
+    assert _full_addr("12A MAIN ST", "X", "SC", "1") == "12A MAIN ST X, SC 1"

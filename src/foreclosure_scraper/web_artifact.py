@@ -1983,7 +1983,14 @@ RAW_KEEP = {
     # Deed chain + lien picture from an NC register name index (enrichment_rod_chain.py, shape in
     # rod/nc_chain.py). Registered 2026-10-07 BEFORE its first run (the enricher ships off).
     "rod_chain": "*",
-    "lien_priority": "*",             # senior/junior liens + super-priority warnings
+    # The attorney's list (lawyer_lane.py, audit 2026-10-09): the latest deed bound to the parcel,
+    # the county parcel record's own deed reference it was bound by, and dated searches of the
+    # estate index and obituaries (a search that found nothing still dates the check).
+    "deed_latest": "*",
+    "county_deed_ref": "*",
+    "probate_search": "*",
+    "obituary_search": "*",
+    "lien_priority": "*",            # senior/junior liens + super-priority warnings
     "propwire": "*",                  # equity, owner, last sale (when present)
     "loopnet": "*",                   # multifamily-specific cap rate, units, etc.
     "reac": "*",                      # HUD REAC inspection scores {latest_score, scores[], distressed}
@@ -3750,6 +3757,22 @@ def _to_dict(li: Listing) -> dict:
     d = li.model_dump(mode="json", exclude_none=False)
     # Trim raw payload
     d["raw"] = _slim_raw(li.raw)
+    # The e-mail column means the OWNER's address (audit 2026-10-09, column_accuracy): carried
+    # owner_email blocks published escape artifacts ('nevan@' for 'evan@') and agents' or
+    # contractors' addresses as best_email. Normalized on a copy; li.raw is untouched.
+    if isinstance(d["raw"].get("owner_email"), dict):
+        from .enrichment_email_extract import normalized_owner_email_block
+        d["raw"]["owner_email"] = normalized_owner_email_block(li.raw)
+    # An SC assessed value is the 4% / 6% / 10.5% ratio figure; one equal to the market value is
+    # the appraisal copied into the wrong column (audit 2026-10-09, column_accuracy: 2,224 rows).
+    # Withheld from the published column; li is untouched.
+    if str(d.get("state") or "").upper() == "SC":
+        try:
+            av, mv = float(d.get("assessed_value") or 0), float(d.get("market_value") or 0)
+        except (TypeError, ValueError):
+            av = mv = 0.0
+        if av > 0 and mv > 0 and abs(av - mv) <= 0.01 * mv:
+            d["assessed_value"] = None
     # Null junk addresses in the PUBLISHED record so the dashboard/map don't
     # render a court-doc/lien placeholder ("Lis Pendens …", "Tract …", etc.)
     # as if it were a property. The listing is kept; raw is untouched.

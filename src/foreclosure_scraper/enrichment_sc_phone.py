@@ -178,6 +178,9 @@ class VoterIdentityIndex:
         self._by_name[(rec.last, rec.first)].append(rec)
         self._covered.add((rec.last, rec.first))
 
+    def has_records(self) -> bool:
+        return any(self._by_name.values())
+
     def records(self, last: str, first: str) -> list[VoterRec]:
         return list(self._by_name.get((last, first), ()))
 
@@ -259,6 +262,12 @@ def _voter_name(block: dict) -> Optional[tuple[str, str]]:
     return (m.group(1), m.group(2)) if m else None
 
 
+def _owner_name_candidates(owner: str) -> list[tuple[str, str]]:
+    """(LAST, FIRST) readings of an owner name, enrichment_voter_phone._name_candidates'."""
+    from .enrichment_voter_phone import _name_candidates
+    return list(_name_candidates(owner))
+
+
 def _owner_tokens(owner: str) -> set[str]:
     """Tokens of the owner name under both normalisations in play: name_normalize's
     (O'BRIEN -> OBRIEN) and the letters-only split _name_candidates used to make the match
@@ -282,6 +291,13 @@ def _middle_verdict(owner: str, rec: "VoterRec") -> str:
     return party_middle_verdict(owner, [party])
 
 
+def _is_fuzzy_tier(block: dict) -> bool:
+    """A Soundex match tier of enrichment_voter_phone ('fuzzy:soundex+addr',
+    'fuzzy:soundex+county-unique'): the stored phone belongs to a voter whose name only SOUNDS
+    like the owner's."""
+    return str(block.get("match") or "").lower().startswith("fuzzy:")
+
+
 def _xref_blocks(raw: dict) -> list[dict]:
     """The phone blocks on a row this gate polices: the cross-state xref lane (always), plus
     a DIRECT_SOURCES (same-state) match once it carries the `matched_name` provenance a
@@ -291,7 +307,8 @@ def _xref_blocks(raw: dict) -> list[dict]:
     op = raw.get("owner_phone")
     if isinstance(op, dict) and op.get("phone"):
         src = str(op.get("source") or "")
-        if src in XREF_SOURCES or (src in DIRECT_SOURCES and op.get("matched_name")):
+        if src in XREF_SOURCES or (src in DIRECT_SOURCES and (op.get("matched_name")
+                                                              or _is_fuzzy_tier(op))):
             out.append(op)
     sx = raw.get("sc_voter_xref")
     if isinstance(sx, dict) and sx.get("phone"):
@@ -337,6 +354,22 @@ def _check(li, raw: dict, block: dict, index: Optional[VoterIdentityIndex]) -> d
         return out(CONTRADICTED, "owner_name_missing")
     if owner_is_non_person(owner):
         return out(CONTRADICTED, "entity_or_estate_owner")
+    if str(block.get("source") or "") in DIRECT_SOURCES and _is_fuzzy_tier(block):
+        # FUZZY TIERS (audit 2026-10-09, column_accuracy). matched_name on a Soundex match is the
+        # OWNER's parsed name (the lookup key), not the voter's, so the name check below compared
+        # the owner with himself and passed every one. In a live sample 6 of 6 'fuzzy:soundex+
+        # county-unique' phones sat, in the voter file the enricher read, on a voter with another
+        # name (SANTOS ALEXANDRA -> a SANDERS ALEXANDER; a PARRISH -> a PACK), one of them call-ready.
+        # A fuzzy phone is the owner's only when a voter with the owner's own name holds it.
+        idx = index if index is not None else default_index()
+        cands = list(dict.fromkeys(([voter] if voter else []) + _owner_name_candidates(owner)))
+        idx.ensure(cands)
+        if idx.files_scanned or idx.has_records():
+            stored = _digits(block.get("phone"))
+            if any(r.phone == stored for c in cands for r in idx.records(*c)):
+                return out(CORROBORATED, "fuzzy_phone_on_owner_named_voter")
+            return out(UNVERIFIED, "fuzzy_phone_belongs_to_another_name")
+        # no voter files on this host: nothing to check against, the old verdict stands
     if voter is None:
         return out(UNVERIFIED, "no_match_key")
     last, first = voter
@@ -522,6 +555,10 @@ def flag_unverified_xref_phones(listings, apply: bool = False,
         # what the block would look like after the stamp, computed on a copy for a dry run
         b = block if apply else dict(block)
         touched = _set(b, "identity_check", verdict)
+        if _is_fuzzy_tier(b):
+            # why a Soundex phone passed or failed (audit 2026-10-09, column_accuracy): the
+            # column-accuracy invariant reads it to tell a re-checked fuzzy phone from an old one
+            touched |= _set(b, "identity_basis", res["reason"])
         if want_flag:
             touched |= _set(b, "do_not_dial", True)
             touched |= _set(b, "do_not_dial_reason", GATE_REASON_PREFIX + verdict)

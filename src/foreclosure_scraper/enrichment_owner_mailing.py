@@ -1008,7 +1008,10 @@ async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 1
                         counts["value_filled"] = counts.get("value_filled", 0) + 1
                     if not li.market_value:
                         li.market_value = val
-                    if not li.assessed_value:
+                    # not in SC (audit 2026-10-09 column_accuracy): an SC assessed value is the
+                    # 4% / 6% / 10.5% ratio figure, never the appraisal; copying the appraisal in
+                    # made assessed_value == market_value on 2,224 SC rows
+                    if not li.assessed_value and str(li.state or "").upper() != "SC":
                         li.assessed_value = val
                 # CAMA distress signals (the "D" ask via clean ArcGIS): record
                 # them for the operator and feed scoring. Owner-occupancy is

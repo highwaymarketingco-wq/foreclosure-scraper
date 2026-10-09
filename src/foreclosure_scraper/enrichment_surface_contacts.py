@@ -16,7 +16,6 @@ This is a FAST offline enricher — no network calls.
 """
 from __future__ import annotations
 
-import json
 import re
 from datetime import datetime
 from typing import Sequence
@@ -150,10 +149,12 @@ def _surface_emails_from_raw(raw: dict) -> list[dict]:
                 "classification": "attorney",
             })
     
-    # 3. Scan all raw for email patterns
-    raw_str = json.dumps(raw, default=str)
-    for m in _EMAIL_RE.finditer(raw_str):
-        e = m.group().lower().strip(".")
+    # 3. Scan all raw for email patterns. String by string (emails_in_raw), never off
+    #    json.dumps(raw): the dump writes a newline as the two characters '\n' and the regex then
+    #    read the 'n' as the address's first letter ('nevan@...' for 'evan@...'), 41,196 rows on the
+    #    2026-10-09 checkpoint (audit column_accuracy).
+    from .enrichment_email_extract import emails_in_raw
+    for e in sorted(emails_in_raw(raw)):
         if e not in seen and not any(d in e for d in ("noreply", "no-reply", "example.com")):
             seen.add(e)
             emails.append({
@@ -233,10 +234,14 @@ def enrich_surface_contacts(listings: Sequence[Listing]) -> dict:
         emails = _surface_emails_from_raw(raw)
         if emails:
             if not existing_emails:
+                # best_email is the OWNER's address or None (audit 2026-10-09, column_accuracy):
+                # emails[0] was whatever came first, a listing agent's, an attorney's or a
+                # contractor's, and the e-mail column published it as the owner's.
+                own = next((e for e in emails if e["classification"] == "owner"), None)
                 raw["owner_email"] = {
                     "emails": emails,
-                    "best_email": emails[0]["email"],
-                    "best_classification": emails[0]["classification"],
+                    "best_email": own["email"] if own else None,
+                    "best_classification": "owner" if own else None,
                     "surfaced_at": datetime.utcnow().isoformat(),
                 }
                 stats["listings_with_new_emails"] += 1

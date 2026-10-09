@@ -81,7 +81,7 @@ PARCEL_LAYERS: dict[str, dict] = {
         "url": "https://gis.rutherfordcountync.gov/arcgis/rest/services/TaxParcels/MapServer/0/query",
         "id_fields": ["Parcel_Number", "PIN"],   # PIN added 2026-09-21: 367 board rows carry the 10-digit PIN (data-quality audit)
         "map": {"owner": "Property_Owner", "address": "Physical_Address",
-                "market_value": "Total_Property_Value", "tax_value": "Total_Land_Value_Assessed",
+                "market_value": "Total_Property_Value",  # tax_value was Total_Land_Value_Assessed (land only; audit 2026-10-09)
                 "acreage": "Acreage", "living_sqft": "Heated_Area",  # Heated_Area = vision-gate sqft
                 "land_use": "Land_Class",
                 "owner_mailing": ["Owner_Mailing_Address_1", "Owner_Mailing_Address_2", "Owner_Mailing_Address_3", "Owner_Mailing_Address_City"],
@@ -117,7 +117,7 @@ PARCEL_LAYERS: dict[str, dict] = {
         "url": "https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/McDowell_Parcels/FeatureServer/0/query",
         "id_fields": ["parno", "altparno"],
         "map": {"owner": "ownname", "address": "siteadd", "market_value": "parval",
-                "tax_value": "landval", "acreage": "gisacres",
+                "acreage": "gisacres",  # tax_value was landval (land only; audit 2026-10-09)
                 "owner_mailing": "mailadd"},
     },
     "Cleveland": {  # internal 5-digit PID appears as COUNTY_PID/GIS_PID/LOCATE_PID
@@ -153,8 +153,12 @@ PARCEL_LAYERS: dict[str, dict] = {
         "map": {"owner": "OwnerName",
                 "address": ["StreetNumber", "StreetName", "StreetCommunity"],
                 "owner_mailing": ["StreetAddress", "City", "State", "Zip"],
-                "market_value": "CurrentAppraisedBuildingValue",
-                "tax_value": "CurrentTaxableBuildingValue",
+                # audit 2026-10-09 column_accuracy: both were the BUILDING component only
+                # (CurrentAppraisedBuildingValue / CurrentTaxableBuildingValue), so a house on
+                # 146,000 of land published 238,600 instead of 384,600 and every vacant lot got
+                # nothing. The layer publishes land and building separately: sum them.
+                "market_value": {"sum": ["CurrentAppraisedLandValue", "CurrentAppraisedBuildingValue"]},
+                "tax_value": {"sum": ["CurrentTaxableLandValue", "CurrentTaxableBuildingValue"]},
                 "acreage": "Acreage", "living_sqft": "LivingArea",
                 "land_use": "LandUse", "sale_price": "SaleAmount"},
     },
@@ -463,7 +467,7 @@ PARCEL_LAYERS: dict[str, dict] = {
         "url": "https://mapping.mitchellcountync.gov/arcgis/rest/services/WebMapNew/MapServer/12/query",
         "id_fields": ["GISPIN", "PIN", "TaxAcct"],
         "map": {"owner": "Owner1", "address": "LocAddr",
-                "market_value": "Total", "tax_value": "Land", "acreage": "LegalAc",
+                "market_value": "Total", "acreage": "LegalAc",  # tax_value was Land (land only; audit 2026-10-09)
                 "living_sqft": "Dwelling",
                 "owner_mailing": ["MailAddr", "MailCity", "MailState", "MailZip"]},
     },
@@ -472,7 +476,9 @@ PARCEL_LAYERS: dict[str, dict] = {
         "id_fields": ["TMS"],
         "map": {"owner": "OWNAM1", "address": "PHYSICAL_STREET_ADDRESS",
                 "market_value": "TOTAL_TAX_VALUE", "acreage": "DEEDED_ACRES",
-                "living_sqft": "BUILDING_VALUE", "land_use": "NEIGHBORHOOD_CODE",
+                # living_sqft was "BUILDING_VALUE", a dollar amount (audit 2026-10-09
+                # column_accuracy); the layer has no heated-area field
+                "land_use": "NEIGHBORHOOD_CODE",
                 "owner_mailing": ["OWCITY", "OWZIPA"]},
     },
     "Pickens": {  # 66,417 parcels; PIN is the board id
@@ -1243,7 +1249,7 @@ def nc_onemap_cfg(county: str) -> dict:
         "id_fields": ["parno", "altparno", "nparno"],
         "map": {"owner": "ownname", "address": "siteadd",
                 "owner_mailing": ["mailadd", "munit", "mcity", "mstate", "mzip"],
-                "market_value": "parval", "tax_value": "landval",
+                "market_value": "parval",  # tax_value was landval (land only; audit 2026-10-09)
                 "acreage": "gisacres", "land_use": "parusedesc",
                 "sale_price": None, "sale_date": "saledatetx",
                 "year_built": "structyear"},

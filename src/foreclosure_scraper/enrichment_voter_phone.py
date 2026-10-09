@@ -235,7 +235,10 @@ def enrich_voter_phone(listings) -> dict:
             # attempted here; a legacy block with no matched_name, or any other source,
             # is left exactly alone.
             op = raw.get("owner_phone")
-            if isinstance(op, dict) and op.get("source") == "ncsbe_voter" and op.get("matched_name"):
+            if isinstance(op, dict) and op.get("source") == "ncsbe_voter" and (
+                    op.get("matched_name") or str(op.get("match") or "").startswith("fuzzy:")):
+                # a legacy Soundex match (no matched_name) is re-gated too: its phone is checked
+                # against the voter file (audit 2026-10-09 column_accuracy, enrichment_sc_phone)
                 earlier.append(li)
             continue
         stats["nc_targets"] += 1
