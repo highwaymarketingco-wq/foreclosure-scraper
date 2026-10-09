@@ -140,7 +140,8 @@
   "web_artifact:patch_existing_rows": "run_meta.json and the high-water mark (small)",
   "web_artifact:merge_duplicate_rows": "run_meta.json and the high-water mark (small)",
   "web_artifact:delete_rows": "run_meta.json and the high-water mark (small)",
-  "web_artifact:_count_guard_and_backup": "the high-water mark (small)"
+  "web_artifact:_count_guard_and_backup": "the high-water mark (small)",
+  "enrichment_comps:carry_forward_from_board": "run_meta.json only (its run_time); the prior board itself is streamed with iter_board_rows_with_detail (fee0428a)"
  },
  "memory": {
   "kill_mb": 25600,
