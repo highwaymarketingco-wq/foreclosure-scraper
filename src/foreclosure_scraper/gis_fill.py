@@ -130,6 +130,10 @@ SC_FILL: dict[str, dict] = {
         url="https://services1.arcgis.com/2AGLxyiJoNiVHKwq/arcgis/rest/services/Parcels/FeatureServer/0/query",
         ids=["ParcelID", "TAXMAPID", "AprAccNum"], book="TransferBook", page="TransferPage",
         legal=["LegalDescription"], market="AprTotVal", acres=["deededacres"]),
+    # Orangeburg SC: owner / mailing / acres only (the layer has no value, deed or legal field)
+    "Orangeburg": dict(
+        url="https://services2.arcgis.com/bUKn95BqgpYYTnx3/arcgis/rest/services/Main_Public_Tax_Parcel_Map_WFL1/FeatureServer/0/query",
+        ids=["MAPBLOLOT", "parcel_id"], acres=["CalculatedAcres"]),
     # Beaufort SC: the EnerGov service parcel_cache.SC_DUAL_LAYERS reads (open, no token)
     "Beaufort": dict(
         url="https://gis.beaufortcountysc.gov/server/rest/services/EnerGov/MapServer/1/query",
@@ -149,23 +153,41 @@ def _nf(state: str, counties: Iterable[str], cols: Iterable[str], reason: str) -
 
 
 _QPUBLIC = ("the county's only parcel viewer is Schneider qPublic/Beacon, which answers scripts with a "
-            "Cloudflare 'Just a moment' check (2026-10-07 county records matrix); a person opens it in a "
-            "browser")
+            "Cloudflare 'Just a moment' check (2026-10-07 county records matrix; walls_register card "
+            "sc_qpublic has the owner's steps)")
 _nf("SC", ("Clarendon", "Edgefield", "Fairfield", "Lee"), ("assessed_value", "lot_size"), _QPUBLIC)
 _nf("SC", ("Chesterfield", "Marion", "Williamsburg"), ("assessed_value", "lot_size"),
-    "the county's only viewer is a WTH tgis map shell with no open ArcGIS parcel REST layer")
+    "the county's only viewer is a WTH 'tgis' map shell with no open ArcGIS parcel REST layer "
+    "(parcel_cache.py research note, 2026-09-21; re-read in the 2026-10-07 county records matrix)")
 _nf("SC", ("Jasper",), ("assessed_value", "lot_size"),
     "the layer parcel_cache reads now answers 'Token Required' (2026-10-09); the public June-17 copy of "
-    "the same service has market value and acres and is read here (SC_FILL_EXTRA)")
-_nf("SC", ("Dorchester", "Florence", "Lancaster", "Colleton"), ("assessed_value",),
+    "the same service has market value and acres and is read here (SC_FILL_EXTRA), for the 2 in 8 sampled "
+    "board parcels it holds")
+_nf("SC", ("Dorchester", "Lancaster", "Colleton"), ("assessed_value",),
     "the county's open parcel layer carries no value field (fields read 2026-10-09)")
+_nf("SC", ("Florence",), ("assessed_value",),
+    "the county's open layer publishes TOTBDGVAL, the BUILDING value only (no land value), which is not "
+    "an assessed or market value (parcel_cache.py note; fields read 2026-10-09)")
 _nf("SC", ("Florence", "Colleton"), ("atty_deed_ref", "atty_legal_description"),
     "the county's open parcel layer carries no deed or legal field (fields read 2026-10-09)")
 _nf("SC", ("Dorchester", "Lancaster", "Hampton"), ("atty_legal_description",),
     "the county's open parcel layer carries no legal-description field (fields read 2026-10-09)")
 _nf("SC", ("Orangeburg",), ("assessed_value", "atty_deed_ref", "atty_legal_description"),
     "the county's open Tax Parcel layer (Main_Public_Tax_Parcel_Map_WFL1) carries parcel number, owner "
-    "and acres only (fields read 2026-10-09)")
+    "and acres only (fields read 2026-10-09); the value is on the qPublic card (walls_register sc_qpublic)")
+_nf("SC", ("Newberry",), ("assessed_value", "lot_size"),
+    "the county's own parcel service (map.newberrycounty.net PropertyParcel/MapServer) answers 'Service "
+    "not started' (HTTP 500, 2026-10-09); no other open layer exists (matrix 2026-10-07)")
+_PID_NAME_ONLY = ("the rows carry a name only (probate / newspaper notices, HUD REAC property names, "
+                  "state tax-lien registry): no street address, no precise point, and an owner-name match to "
+                  "the county layer found 0 unique parcels of the {n} names that could be matched "
+                  "(Aiken 31, Orangeburg 31, 2026-10-09 checkpoint; most are ambiguous)")
+_nf("SC", ("Aiken",), ("parcel_id",), _PID_NAME_ONLY.format(n=31))
+_nf("SC", ("Hampton", "Marion"), ("parcel_id",), "the rows carry a name only (state tax-lien registry, bankruptcy "
+    "filing, probate notice): no address, no precise point; Marion has no open parcel layer to match against")
+_nf("SC", ("Orangeburg",), ("parcel_id",), _PID_NAME_ONLY.format(n=31) +
+    "; the 93 qPayBill roll rows are the exception: their account number joins the county layer exactly "
+    "(enrich_account_parcels, 78 of 93 resolved on 2026-10-09)")
 
 #: Jasper: parcel_cache's own layer is token-walled; this is the public copy of the same county service
 SC_FILL_EXTRA: dict[str, dict] = {

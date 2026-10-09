@@ -341,6 +341,19 @@ def test_gap_matrix_reads_the_fill():
     chk = GM.checked_columns(rec, set(), {})
     assert {"atty_deed_ref", "lot_size"} <= chk and "atty_legal_description" not in chk
     assert GM.GIS_FILL_VERDICT_COLS == frozenset(G.VERDICT_COLUMNS)
+    # the register index's deed bound to the parcel (lawyer_lane deed_latest) counts for both attorney columns
+    dl = {"bound": "book_page", "book": "12", "page": "34", "legal_description": "LOT 3 TEST SUBD"}
+    assert GM.deed_ref_present({"deed_latest": dl}) and GM.legal_description_present({"raw": {"deed_latest": dl}})
+    assert not GM.deed_ref_present({"deed_latest": {**dl, "bound": None}})
+    assert not GM.legal_description_present({"raw": {"deed_latest": {**dl, "bound": None}}})
+
+
+def test_orangeburg_is_read_for_acres_and_its_gaps_are_stated():
+    sp = G.sc_spec("Orangeburg")
+    assert sp["acres"] == ["CalculatedAcres"] and not G.asks(sp)["deed"] and G.asks(sp)["acres"]
+    nf = G.NOT_FILLABLE
+    assert "parcel_id" in nf[("SC", "Aiken")] and "parcel_id" in nf[("SC", "Orangeburg")]
+    assert "Service not started" in nf[("SC", "Newberry")]["lot_size"] or "not started" in nf[("SC", "Newberry")]["lot_size"]
 
 
 # ------------------------------------------------------------------------------------ invariants
@@ -406,7 +419,9 @@ def test_account_join_invariant():
     assert not feed_all(T.make_checks(), [r3])["top80-fill-account-join"]["ok"]
 
 
-def test_unscreened_is_a_ratchet():
+def test_unscreened_is_a_ratchet(monkeypatch):
+    assert T.UNSCREENED_MAX_SHARE == 1.0          # report-only until a gated run measures coverage
+    monkeypatch.setattr(T, "UNSCREENED_MAX_SHARE", 0.6)
     clean = good_row()
     open_rows = [{"state": "NC", "county": "Alamance", "parcel_id": f"1234-56-{i:04d}", "raw": {}} for i in range(5)]
     out = feed_all(T.make_checks(), [clean] + open_rows)["top80-fill-unscreened"]
