@@ -398,9 +398,11 @@ def url_key_conflict(a, b) -> Optional[str]:
 #: The as-scraped fields that tell two records of one URL apart (with the owner, the source id and
 #: the point): the same record scraped twice agrees on all of them. verification.core._fingerprint
 #: reads the same fields (less the URL, which is the key here).
-_URL_RECORD_FIELDS = ("source", "listing_type", "city", "state", "zip_code", "county", "plaintiff",
-                      "defendant", "trustee", "sale_date", "sale_time", "sale_location",
+_URL_RECORD_FIELDS = ("source", "listing_type", "city", "state", "zip_code", "county", "case_number",
+                      "plaintiff", "defendant", "trustee", "sale_date", "sale_time", "sale_location",
                       "opening_bid", "judgment_amount", "legal_description")
+#: Fields that NAME a record (beside the owner and the source id): a docket's case number or party.
+_URL_NAMING_FIELDS = ("case_number", "defendant", "plaintiff")
 
 
 def url_bucket_key(key: str, li) -> str:
@@ -413,9 +415,10 @@ def url_bucket_key(key: str, li) -> str:
     county home page with no owner). key_evidence() of the result is still URL."""
     pid = _get(li, "parcel_id") or nulled_source_parcel(None, _get(li, "raw"), _get(li, "source")) or ""
     owner = _owner_key(_get(li, "owner_name"))
-    if not owner and not pid:
+    if not owner and not pid and not any(_owner_key(_get(li, f)) for f in _URL_NAMING_FIELDS):
         # nothing names the record (76 such cleanup cases, 12 at one fallback point): alone,
-        # like the 'nokey' rows above, never merged on a URL
+        # like the 'nokey' rows above, never merged on a URL. A docket (case number, party) is
+        # named: its prior copy and its re-scrape of the same docket URL still fold.
         return f"{key}\x01nokey\x01{id(li)}"
     parts = [key, owner, _owner_key(pid)]
     for f in _URL_RECORD_FIELDS:

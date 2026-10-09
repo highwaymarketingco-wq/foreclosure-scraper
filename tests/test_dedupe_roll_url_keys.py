@@ -100,3 +100,16 @@ def test_url_key_conflict_reads_dicts_and_listings():
     assert D.url_key_conflict(a, roll_row("1", "OWNER B", county="Madison")) == "url_owner"
     assert D.url_key_conflict(a, {"county": "madison", "owner_name": "owner a"}) is None
     assert D.url_key_conflict(a, {"county": "Madison", "owner_name": None}) is None
+
+
+def test_a_docket_and_its_rescrape_on_one_docket_url_still_fold():
+    # no owner and no parcel, but a case number and a party name the record (a bankruptcy docket)
+    def bk(**kw):
+        base = dict(source="national.courtlistener_bankruptcy", source_url="https://example.invalid/docket/1/",
+                    listing_type=ListingType.BANKRUPTCY, state="SC", county=None, case_number="26-00123",
+                    defendant="Test Debtor", first_seen=T, last_seen=T)
+        base.update(kw)
+        return Listing(**base)
+    assert len(D.dedupe([bk(), bk()])) == 1
+    # another docket on the same URL (another case number) is another record
+    assert len(D.dedupe([bk(), bk(case_number="26-00999")])) == 2
