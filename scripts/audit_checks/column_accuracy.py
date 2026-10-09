@@ -10,7 +10,7 @@ against the primary record live; the classes found systematic got a fix and one 
   column-phone-agent-not-usable    an agent / office / attorney phone is never usable          max 0
   column-call-ready-phone-nanp     a call-ready row's phone is a NANP number                  max 0
   column-sc-assessed-not-market    an SC assessed value is not the market value               max 0
-  column-house-number-glued        '1000MALACHI DRIVE' (Berkeley 0; others max 40)
+  column-house-number-glued        '1000EXAMPLE DRIVE' (Berkeley 0; others max 40)
   column-layer-map-semantics       the layer registry maps values to totals, sqft to an area  max 0
   column-fill-call-list            report: HOT / WARM / call-ready fill and placeholders
 
@@ -393,7 +393,7 @@ _GLUED = re.compile(r"^\s*\d+(?!(?:ST|ND|RD|TH)\b)[A-Za-z]{3,}", re.I)
 
 class HouseNumberGlued(_Check):
     """column-house-number-glued: a mailing or situs street whose house number is glued to the
-    street name ('1000MALACHI DRIVE'). 10/9 checkpoint: 1,540 Berkeley PayStar mailings (fixed:
+    street name ('1000EXAMPLE DRIVE'). 10/9 checkpoint: 1,540 Berkeley PayStar mailings (fixed:
     mailing_shape.unglue_house_number in the scraper) + 33 rows from 12 sources' own text (left;
     max 40). Berkeley rows count against max 0 separately (detail)."""
     name = "column-house-number-glued"
@@ -427,7 +427,7 @@ class HouseNumberGlued(_Check):
 #: value columns may not be read from one COMPONENT (land or building) of the value; living_sqft
 #: may not be read from a money field
 _COMPONENT = re.compile(r"(?i)land|bldg|building|improv|impr$|^impr|dwelling_val")
-_MONEY = re.compile(r"(?i)value|val$|_val|apprais|tax|price|amount|amt")
+_MONEY = re.compile(r"(?i)value|val$|_val|apprais|tax|price|amount|amt|^dwelling$")
 
 
 def layer_map_problems() -> list[str]:
@@ -453,7 +453,7 @@ def layer_map_problems() -> list[str]:
 
 class LayerMapSemantics(_Check):
     """column-layer-map-semantics: the parcel-layer registry maps every value column to a TOTAL
-    and living_sqft to an area field (checked once, at finish). 10/9 before the fix: 7 entries.
+    and living_sqft to an area field (checked once, at finish). 10/9 before the fix: 8 entries.
     max 0."""
     name = "column-layer-map-semantics"
 

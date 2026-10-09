@@ -468,7 +468,8 @@ PARCEL_LAYERS: dict[str, dict] = {
         "id_fields": ["GISPIN", "PIN", "TaxAcct"],
         "map": {"owner": "Owner1", "address": "LocAddr",
                 "market_value": "Total", "acreage": "LegalAc",  # tax_value was Land (land only; audit 2026-10-09)
-                "living_sqft": "Dwelling",
+                # living_sqft was "Dwelling": the DWELLING VALUE in dollars (live 2026-10-09: 420,900
+                # on a 492,600 total), not an area (audit column_accuracy); no area field mapped
                 "owner_mailing": ["MailAddr", "MailCity", "MailState", "MailZip"]},
     },
     "Polk": {  # 16,878 parcels; TMS (dash format) is the board id
@@ -766,6 +767,23 @@ PARCEL_LAYERS["Dorchester"] = {
     "map": {"owner": "OWNER", "address": "PROPERTY_LOCATION",
             "owner_mailing": ["MAILING_ADDRESS", "CITY_STATE_ZIP"],
             "acreage": "TAXED_ACRES", "sale_price": "SALE_PRICE", "sale_date": "SALE_DATE"},
+}
+
+#: ORANGEBURG SC, added 2026-10-09 (top-80 fill group, item 59/27). The county's public Tax Parcel
+#: viewer service (item 'Orangeburg County Public Tax Parcel Map', owner account wjeffcoat_oc on
+#: ArcGIS Online): open, no token, 62,555 parcels, fields read 2026-10-09. MAPBLOLOT is the TMS in
+#: the board's shape ('0001-00-00-001.000'); parcel_id is the CAMA account number. The layer carries
+#: NO value, deed, legal or situs field, only owner, owner mailing and calculated acres, so it
+#: serves the parcel-id and acreage cells (an owner-name match to a parcel needs this cache) and
+#: leaves assessed_value to the county's qPublic viewer (Cloudflare check, a person does that).
+PARCEL_LAYERS["Orangeburg"] = {
+    "state": "SC",
+    "url": ("https://services2.arcgis.com/bUKn95BqgpYYTnx3/arcgis/rest/services/"
+            "Main_Public_Tax_Parcel_Map_WFL1/FeatureServer/0/query"),
+    "id_fields": ["MAPBLOLOT", "parcel_id"],
+    "page_delay_s": 1.7,
+    "map": {"owner": "owner1", "owner_mailing": ["own_street", "own_city", "own_state", "own_zip"],
+            "acreage": "CalculatedAcres"},
 }
 
 #: 2026-10-07: property facts the already-downloaded county layers publish and the cache used to

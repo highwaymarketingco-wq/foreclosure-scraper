@@ -1983,6 +1983,9 @@ RAW_KEEP = {
     # Deed chain + lien picture from an NC register name index (enrichment_rod_chain.py, shape in
     # rod/nc_chain.py). Registered 2026-10-07 BEFORE its first run (the enricher ships off).
     "rod_chain": "*",
+    # County-wide adverse-lien sweep of an AcclaimWeb register matched to the owner, with 'screened,
+    # none found' for the swept window (enrichment_register_lien_sweep.py, audit 2026-10-09 top80).
+    "rod_lien_sweep": "*",
     # The attorney's list (lawyer_lane.py, audit 2026-10-09): the latest deed bound to the parcel,
     # the county parcel record's own deed reference it was bound by, and dated searches of the
     # estate index and obituaries (a search that found nothing still dates the check).
@@ -3763,7 +3766,7 @@ def _to_dict(li: Listing) -> dict:
     # Trim raw payload
     d["raw"] = _slim_raw(li.raw)
     # The e-mail column means the OWNER's address (audit 2026-10-09, column_accuracy): carried
-    # owner_email blocks published escape artifacts ('nevan@' for 'evan@') and agents' or
+    # owner_email blocks published escape artifacts ('npat@' for 'pat@') and agents' or
     # contractors' addresses as best_email. Normalized on a copy; li.raw is untouched.
     if isinstance(d["raw"].get("owner_email"), dict):
         from .enrichment_email_extract import normalized_owner_email_block

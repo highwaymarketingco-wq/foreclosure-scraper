@@ -359,7 +359,7 @@ def _check(li, raw: dict, block: dict, index: Optional[VoterIdentityIndex]) -> d
         # OWNER's parsed name (the lookup key), not the voter's, so the name check below compared
         # the owner with himself and passed every one. In a live sample 6 of 6 'fuzzy:soundex+
         # county-unique' phones sat, in the voter file the enricher read, on a voter with another
-        # name (SANTOS ALEXANDRA -> a SANDERS ALEXANDER; a PARRISH -> a PACK), one of them call-ready.
+        # name (same first name, a different surname that only sounds alike), one of them call-ready.
         # A fuzzy phone is the owner's only when a voter with the owner's own name holds it.
         idx = index if index is not None else default_index()
         cands = list(dict.fromkeys(([voter] if voter else []) + _owner_name_candidates(owner)))

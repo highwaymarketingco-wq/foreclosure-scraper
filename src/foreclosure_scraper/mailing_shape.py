@@ -31,7 +31,7 @@ from typing import Any
 
 __all__ = ["mailing_dict", "mailing_of", "unglue_house_number"]
 
-#: a house number glued to the street name ("1000MALACHI DRIVE"), never an ordinal street
+#: a house number glued to the street name ("1000EXAMPLE DRIVE"), never an ordinal street
 #: ("100TH ST", "2ND AVE") or a lettered unit ("12A MAIN ST": one letter)
 _GLUED_NUMBER = re.compile(r"^(\s*\d+)(?!(?:ST|ND|RD|TH)\b)([A-Za-z]{3,})", re.I)
 
@@ -73,7 +73,7 @@ def mailing_of(obj: Any) -> dict:
 
 
 def unglue_house_number(line: str | None) -> str | None:
-    """'1000MALACHI DRIVE' -> '1000 MALACHI DRIVE' (audit 2026-10-09, column_accuracy: Berkeley's
+    """'1000EXAMPLE DRIVE' -> '1000 EXAMPLE DRIVE' (audit 2026-10-09, column_accuracy: Berkeley's
     PayStar invoices publish the owner's mailing street this way, 1,540 board rows; the county GIS
     has the spaced form). Ordinals and one-letter units are left alone. Pure."""
     if not line:

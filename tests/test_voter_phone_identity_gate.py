@@ -186,10 +186,10 @@ def test_a_fuzzy_phone_held_by_a_voter_with_another_name_is_not_dialable(monkeyp
     monkeypatch.setattr(V, "_INDEX", {})
     monkeypatch.setattr(V, "_NAME_COUNTY", {})
     monkeypatch.setattr(V, "_FUZZY_INDEX", {})
-    # 'SANTOS ALEXANDRA' and 'SANDERS ALEXANDER' share Soundex S532 and a canonical first name
-    monkeypatch.setattr(V, "_NAME_COUNTY_FUZZY", {("WAKE", V._soundex("SANTOS"), V._canon_first("ALEXANDRA")): "9195550777"})
-    _gate_index(monkeypatch, _rec("SANDERS", "ALEXANDER", "9195550777"), _rec("SANTOS", "ALEXANDRA", "9195550999"))
-    li = _listing(owner="SANTOS ALEXANDRA", county="Wake", street=None)
+    # 'ROBERTS ALEXANDRA' and 'RUPERTS ALEXANDER' share Soundex R163 and a canonical first name
+    monkeypatch.setattr(V, "_NAME_COUNTY_FUZZY", {("WAKE", V._soundex("ROBERTS"), V._canon_first("ALEXANDRA")): "9195550777"})
+    _gate_index(monkeypatch, _rec("RUPERTS", "ALEXANDER", "9195550777"), _rec("ROBERTS", "ALEXANDRA", "9195550999"))
+    li = _listing(owner="ROBERTS ALEXANDRA", county="Wake", street=None)
 
     V.enrich_voter_phone([li])
 
@@ -215,8 +215,8 @@ def test_a_fuzzy_phone_held_by_the_owner_named_voter_stays_dialable(monkeypatch)
 
 def test_a_legacy_fuzzy_block_without_matched_name_is_regated(monkeypatch):
     _empty_index(monkeypatch)
-    _gate_index(monkeypatch, _rec("PACK", "MICHAEL", "8285550101"))
-    li = _listing(owner="PARRISH, MICHAEL RAY", raw={
+    _gate_index(monkeypatch, _rec("OTHERMAN", "MICHAEL", "8285550101"))
+    li = _listing(owner="EXAMPLEFORD, MICHAEL RAY", raw={
         "owner_phone": {"phone": "(828) 555-0101", "source": "ncsbe_voter",
                         "match": "fuzzy:soundex+county-unique"}})
 

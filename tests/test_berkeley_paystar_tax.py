@@ -308,8 +308,8 @@ def test_all_zero_text_codes_are_blank_not_values():
 
 
 def test_mailing_street_house_number_is_unglued():
-    """audit 2026-10-09 column_accuracy: the invoice writes '1000MALACHI DRIVE'; the county GIS
-    (the primary record) has '1000 MALACHI DRIVE'. Made-up address."""
+    """audit 2026-10-09 column_accuracy: the invoice writes '1000EXAMPLE DRIVE'; the county GIS
+    (the primary record) has '1000 EXAMPLE DRIVE'. Made-up address."""
     from foreclosure_scraper.scrapers.counties_sc.berkeley_paystar_tax import _full_addr
     assert _full_addr("313EXAMPLE DR", "SUMMERVILLE", "SC", "29486") == "313 EXAMPLE DR SUMMERVILLE, SC 29486"
     assert _full_addr("100TH ST", "X", "SC", "1") == "100TH ST X, SC 1"

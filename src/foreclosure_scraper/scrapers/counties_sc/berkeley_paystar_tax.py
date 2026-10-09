@@ -276,7 +276,7 @@ def _meta(detail: dict) -> dict[str, Any]:
 
 
 def _full_addr(line1: str | None, city: str | None, state: str | None, zip_: str | None) -> str | None:
-    # the invoice glues the house number to the street ('1000MALACHI DRIVE'); audit 2026-10-09
+    # the invoice glues the house number to the street ('1000EXAMPLE DRIVE'); audit 2026-10-09
     line1 = unglue_house_number((line1 or "").strip()) or ""
     city = (city or "").strip()
     state = (state or "").strip()

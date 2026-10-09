@@ -18,21 +18,21 @@ def _li(raw):
 
 
 def test_raw_scan_reads_strings_not_a_json_dump():
-    # a newline before the address: json.dumps writes '\n', the old scan read 'nevan@...'
-    raw = {"liensnc": {"owner_text": "BUILDER LLC\nevan@builder.test\n555 Main St"}}
-    assert emails_in_raw(raw) == {"evan@builder.test"}
+    # a newline before the address: json.dumps writes '\n', the old scan read 'npat@...'
+    raw = {"liensnc": {"owner_text": "BUILDER LLC\npat@builder.test\n555 Main St"}}
+    assert emails_in_raw(raw) == {"pat@builder.test"}
     li = _li(dict(raw))
     enrich_surface_contacts([li])
     got = {e["email"] for e in li.raw["owner_email"]["emails"]}
-    assert "nevan@builder.test" not in got and "evan@builder.test" in got
+    assert "npat@builder.test" not in got and "pat@builder.test" in got
     # the filing's owner block is the owner's address
-    assert li.raw["owner_email"]["best_email"] == "evan@builder.test"
+    assert li.raw["owner_email"]["best_email"] == "pat@builder.test"
     assert li.raw["owner_email"]["best_classification"] == "owner"
 
 
 def test_repair_only_when_the_row_proves_the_artifact():
-    raw = {"x": "contact: evan@builder.test"}
-    assert repair_escape_artifact("nevan@builder.test", raw) == "evan@builder.test"
+    raw = {"x": "contact: pat@builder.test"}
+    assert repair_escape_artifact("npat@builder.test", raw) == "pat@builder.test"
     # a real address that starts with n is never touched
     assert repair_escape_artifact("nora@home.test", {"x": "nora@home.test"}) == "nora@home.test"
     assert repair_escape_artifact("nora@home.test", {}) == "nora@home.test"
@@ -40,20 +40,20 @@ def test_repair_only_when_the_row_proves_the_artifact():
 
 def test_carried_block_normalized_at_publish():
     raw = {
-        "liensnc": {"owner_text": "OWNER NAME\nevan@builder.test"},
+        "liensnc": {"owner_text": "OWNER NAME\npat@builder.test"},
         "notices": [{"claimant": "SUB CO\ncrew@contractor.test"}],
         "owner_email": {"emails": [{"email": "ncrew@contractor.test", "classification": "other"},
-                                   {"email": "nevan@builder.test", "classification": "other"}],
+                                   {"email": "npat@builder.test", "classification": "other"}],
                         "best_email": "ncrew@contractor.test", "best_classification": "other"},
     }
     blk = normalized_owner_email_block(raw)
-    assert blk["best_email"] == "evan@builder.test" and blk["best_classification"] == "owner"
+    assert blk["best_email"] == "pat@builder.test" and blk["best_classification"] == "owner"
     by = {e["email"]: e["classification"] for e in blk["emails"]}
-    assert by == {"crew@contractor.test": "other", "evan@builder.test": "owner"}
+    assert by == {"crew@contractor.test": "other", "pat@builder.test": "owner"}
     # raw is not modified
     assert raw["owner_email"]["best_email"] == "ncrew@contractor.test"
     d = _to_dict(_li(raw))
-    assert d["raw"]["owner_email"]["best_email"] == "evan@builder.test"
+    assert d["raw"]["owner_email"]["best_email"] == "pat@builder.test"
 
 
 def test_agent_only_block_publishes_no_owner_email():

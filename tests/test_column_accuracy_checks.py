@@ -17,11 +17,11 @@ def _run(check, rows):
 
 
 def test_email_owner_only():
-    good = {"raw": {"owner_email": {"best_email": "evan@x.test", "best_classification": "owner"},
-                    "liensnc": {"owner_text": "evan@x.test"}}}
+    good = {"raw": {"owner_email": {"best_email": "pat@x.test", "best_classification": "owner"},
+                    "liensnc": {"owner_text": "pat@x.test"}}}
     agent = {"raw": {"owner_email": {"best_email": "a@realty.test", "best_classification": "other"}}}
-    artifact = {"raw": {"owner_email": {"best_email": "nevan@x.test", "best_classification": "owner"},
-                        "liensnc": {"owner_text": "OWNER\nevan@x.test"}}}
+    artifact = {"raw": {"owner_email": {"best_email": "npat@x.test", "best_classification": "owner"},
+                        "liensnc": {"owner_text": "OWNER\npat@x.test"}}}
     r = _run(CA.EmailOwnerOnly(), [good, agent, artifact])
     assert (r["checked"], r["violations"], r["ok"]) == (3, 2, False)
 
@@ -56,10 +56,12 @@ def test_layer_map_semantics_catches_component_and_money_fields(monkeypatch):
     bad["Testcounty"] = {"url": "u", "id_fields": ["PIN"],
                          "map": {"market_value": "CurrentAppraisedBuildingValue", "tax_value": "landval",
                                  "living_sqft": "BUILDING_VALUE"}}
+    bad["Testtwo"] = {"url": "u", "id_fields": ["PIN"], "map": {"living_sqft": "Dwelling"}}
     monkeypatch.setattr(P, "PARCEL_LAYERS", bad)
     assert sorted(CA.layer_map_problems()) == ["Testcounty.living_sqft=BUILDING_VALUE",
                                                "Testcounty.market_value=CurrentAppraisedBuildingValue",
-                                               "Testcounty.tax_value=landval"]
+                                               "Testcounty.tax_value=landval",
+                                               "Testtwo.living_sqft=Dwelling"]
 
 
 def test_placeholder_classes():

@@ -151,7 +151,7 @@ def _surface_emails_from_raw(raw: dict) -> list[dict]:
     
     # 3. Scan all raw for email patterns. String by string (emails_in_raw), never off
     #    json.dumps(raw): the dump writes a newline as the two characters '\n' and the regex then
-    #    read the 'n' as the address's first letter ('nevan@...' for 'evan@...'), 41,196 rows on the
+    #    read the 'n' as the address's first letter ('npat@...' for 'pat@...'), 41,196 rows on the
     #    2026-10-09 checkpoint (audit column_accuracy).
     from .enrichment_email_extract import emails_in_raw
     for e in sorted(emails_in_raw(raw)):

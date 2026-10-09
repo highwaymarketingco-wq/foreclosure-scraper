@@ -103,7 +103,7 @@ def owner_email_of(raw: dict | None) -> str | None:
 # 0 of a 58-row live sample (30 NC, 28 SC) was a correct owner address:
 #   * 41,196 rows: an ESCAPE ARTIFACT. enrichment_surface_contacts scanned json.dumps(raw) with an
 #     e-mail regex, so a newline before an address ('\n' in the dump) glued an 'n' to its front:
-#     the filing's 'evan@builder.test' was published as 'nevan@builder.test'. The real owner
+#     the filing's 'pat@builder.test' was published as 'npat@builder.test'. The real owner
 #     address (owner_email_of) sat on the same row, unrepaired.
 #   * the rest: best_email was emails[0] of a raw scan, i.e. whatever came first: a listing agent's
 #     (distressed.agent_email), a contractor's or the lien agent's from a LiensNC filing, a broker's.
@@ -139,8 +139,8 @@ def emails_in_raw(raw: dict | None) -> set[str]:
 
 
 def repair_escape_artifact(email: str | None, raw: dict | None, known: set[str] | None = None) -> str | None:
-    """'nevan@x.test' -> 'evan@x.test' when the row's raw strings hold 'evan@x.test' and never
-    'nevan@x.test' (the dump artifact); anything else is returned lowercased and unchanged."""
+    """'npat@x.test' -> 'pat@x.test' when the row's raw strings hold 'pat@x.test' and never
+    'npat@x.test' (the dump artifact); anything else is returned lowercased and unchanged."""
     if not email:
         return email
     e = str(email).strip().strip(".").lower()
