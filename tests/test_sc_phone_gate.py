@@ -554,14 +554,18 @@ def test_dnc_without_a_registry_file_still_tags_an_unsourced_phone_unverified(mo
 
 
 def test_dnc_still_counts_an_already_scrubbed_listing_once(monkeypatch):
+    # since 2026-10-09 a clear counts for 31 days from its scrubbed_at (enrichment_dnc.RESCRUB_DAYS):
+    # a dated, current clear is left untouched; an undated one is scrubbed again (tests/test_dnc_scrub.py)
+    from datetime import datetime, timezone
     monkeypatch.setattr(dnc_mod, "_DNC_SET", set())
     monkeypatch.setattr(dnc_mod, "_DNC_PATH", Path("/nonexistent/dnc_registry.csv"))
+    entry = {"phone": "9195551234", "dnc_status": "clear", "dnc_registered": False,
+             "scrubbed_at": datetime.now(timezone.utc).isoformat()}
     li = _listing(state="NC", county="Wake", raw={
-        "owner_phone": {"phone": "9195551234"},
-        "dnc_scrub": [{"phone": "9195551234", "dnc_status": "clear"}]})
+        "owner_phone": {"phone": "9195551234"}, "dnc_scrub": [dict(entry)]})
     stats = dnc_mod.enrich_dnc_scrub([li])
     assert stats["scrubbed"] == 1
-    assert li.raw["dnc_scrub"] == [{"phone": "9195551234", "dnc_status": "clear"}]      # untouched
+    assert li.raw["dnc_scrub"] == [entry]      # untouched
 
 
 def test_a_phone_with_no_source_still_counts_for_the_workflow_trigger_and_the_sms_export(tmp_path):

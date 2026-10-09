@@ -42,10 +42,12 @@ TIERS (how ready the lead is)
                                   contact is a mailing address (an estate's representative).
   D  research                     a gate condition is not met (the list says which).
 
-A phone on the DNC registry or flagged do-not-dial never makes tier A or B (the lead is mailed).
-The DNC scrub itself is a dial-time step: no registry file has been loaded (raw['dnc_scrub'] is
-absent or 'unverified' on every row), so dnc_status is published and 'dnc_not_scrubbed' is listed,
-but it does not lower the tier.
+A phone on the national Do Not Call registry or the company's own list, or flagged do-not-dial,
+never makes tier A or B (the lead is mailed). The scrub (enrichment_dnc, run in the tail just before
+this gate) reads data/dnc_registry.csv and data/internal_dnc.csv when the operator has put them
+there: with no registry file every phone stays 'unverified', 'dnc_not_scrubbed' is listed and does
+not lower the tier (the scrub is then a dial-time step). A 'clear' older than 31 days
+(enrichment_dnc.RESCRUB_DAYS) is read as 'unverified'.
 
 RANK (0-100, ORDER within a tier, never a filter; Fullmer ranks, he does not delete): ripeness by
 years delinquent (fullmer_rank.delinq_ripeness_points: year 1 is early, 2 is the base, ramping to
@@ -112,8 +114,8 @@ UNMET_WORDS = {
     "phone_other_record": "the phone on the row belongs to another person's or property's record",
     "phone_not_owner": "the phone on the row is an agent's, a people-search result or marked do-not-dial",
     "phone_unlinked": "nothing ties the phone on the row to the owner (no parcel, address or name match)",
-    "dnc_registered": "the phone is on the Do Not Call registry or blocked; mail instead",
-    "dnc_not_scrubbed": "the phone has not been scrubbed against the Do Not Call list (do it before dialing)",
+    "dnc_registered": "the phone is on the Do Not Call registry or the company's do-not-call list, or blocked; mail instead",
+    "dnc_not_scrubbed": "the phone has not been scrubbed against the Do Not Call registry in the last 31 days (do it before dialing)",
     "mailing_missing": "no mailing address on the county record",
     "mailing_other_record": "the mailing address on the row is another property's or person's record",
     "mailing_malformed": "the mailing address is incomplete (no number, box or ZIP)",
@@ -526,13 +528,22 @@ def _digits10(v: Any) -> str:
     return d[1:] if len(d) == 11 and d.startswith("1") else d
 
 
-def dnc_status(raw: dict, phone: Any) -> str:
-    """raw['dnc_scrub']'s status for this phone: clear | registered | unverified | do_not_dial |
-    not_owner_contact, or 'not_scrubbed' when the scrub never ran for it."""
+#: dnc statuses that keep a phone from being dialed ('registered' is the name before 2026-10-09)
+DNC_BLOCKED = frozenset({"on_registry", "registered", "on_internal_dnc", "do_not_dial", "not_owner_contact"})
+
+
+def dnc_status(raw: dict, phone: Any, now: Optional[datetime] = None) -> str:
+    """raw['dnc_scrub']'s status for this phone: clear | on_registry | on_internal_dnc | unverified |
+    do_not_dial | not_owner_contact, or 'not_scrubbed' when the scrub never ran for it. A clear
+    older than enrichment_dnc.RESCRUB_DAYS is 'unverified': it no longer allows a call."""
+    from .enrichment_dnc import status_expired
     want = _digits10(phone)
     for e in raw.get("dnc_scrub") or [] if isinstance(raw.get("dnc_scrub"), list) else []:
         if isinstance(e, dict) and _digits10(e.get("phone")) == want and want:
-            return str(e.get("dnc_status") or "unverified")
+            st = str(e.get("dnc_status") or "unverified")
+            if st == "clear" and status_expired(e, now or datetime.now(timezone.utc)):
+                return "unverified"
+            return st
     return "not_scrubbed"
 
 
@@ -832,7 +843,7 @@ def _contact_tier(phone: dict, mail: dict, unmet: list[str]) -> str:
     """A / B / C / D from the contact facts, once the lane's issue conditions hold."""
     link = phone.get("link")
     dnc = phone.get("dnc")
-    blocked = dnc in ("registered", "do_not_dial", "not_owner_contact")
+    blocked = dnc in DNC_BLOCKED
     if link in ("tied", "name_match_only") and not blocked:
         if dnc in (None, "not_scrubbed", "unverified"):
             unmet.append("dnc_not_scrubbed")
@@ -1021,7 +1032,7 @@ def _call_ready(row: Any, today: date) -> dict:
             if m:
                 unmet.append(m)
             dialable = phone.get("link") in ("tied", "name_match_only") and \
-                phone.get("dnc") not in ("registered", "do_not_dial", "not_owner_contact")
+                phone.get("dnc") not in DNC_BLOCKED
             if dialable:
                 lane = "A"
                 if not unmet:
@@ -1029,7 +1040,7 @@ def _call_ready(row: Any, today: date) -> dict:
             else:
                 lane = "E"
                 hard = list(unmet)
-                if phone.get("dnc") in ("registered", "do_not_dial", "not_owner_contact"):
+                if phone.get("dnc") in DNC_BLOCKED:
                     unmet.append("dnc_registered")
                 else:
                     unmet.append({"other_record": "phone_other_record", "not_owner": "phone_not_owner",
