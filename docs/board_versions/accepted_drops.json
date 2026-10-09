@@ -80,6 +80,12 @@
    "name": "mailing_address",
    "max_loss": 15000,
    "reason": "block_binding scrub of blocks that are another row's record (10/7 board: 42,618 rows, 63,702 blocks): owner_mailing other_person 7,396, other_parcel 2,892, other_address 2,520 (12,808); observed 13,343"
+  },
+  {
+   "kind": "field",
+   "name": "phone",
+   "max_loss": 9500,
+   "reason": "phones_lost: block_binding and the fixed rules remove phones that name another person, a county office number OCR'd from a shared roster, and one contractor's number on many owners' filings (about 8,200 contractor phones next run); 1,045 of the 1,124 lost phones on the reconciled board were removed correctly"
   }
  ]
 }
