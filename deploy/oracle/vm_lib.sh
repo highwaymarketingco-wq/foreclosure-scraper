@@ -110,9 +110,24 @@ vm_load_env() {
   export FORECLOSURE_SC_RECORDROOM_ROD="${FORECLOSURE_SC_RECORDROOM_ROD:-1}"
   export FORECLOSURE_SC_COTT_ESEARCH_ROD="${FORECLOSURE_SC_COTT_ESEARCH_ROD:-1}"
   export FORECLOSURE_SC_LOOKUP_ROD="${FORECLOSURE_SC_LOOKUP_ROD:-1}"
+  # 2026-10-09 top80 (Logan/Harris): county-wide adverse-lien sweep of the two AcclaimWeb registers (Horry,
+  # Pickens) matched to every board owner offline; plain HTTP, about 5 s a month of data, cached in data/lien_sweep.
+  export FORECLOSURE_SC_LIEN_SWEEP="${FORECLOSURE_SC_LIEN_SWEEP:-1}"
+  export FORECLOSURE_LIEN_SWEEP_BUDGET_S="${FORECLOSURE_LIEN_SWEEP_BUDGET_S:-600}"
+  # 2026-10-09 top80 (register_other): marriage-index check on the six Cott v4 tenants that publish one
+  # (Onslow, Alamance, Alexander, Pamlico, Edgecombe, Rutherford); plain HTTP, 1.6 s a host, 30 lookups a
+  # county a run on its own budget; also gated by FORECLOSURE_NC_COTT_ROD.
+  export FORECLOSURE_REGISTER_CHECKS="${FORECLOSURE_REGISTER_CHECKS:-1}"
+  export FORECLOSURE_REGISTER_CHECKS_BUDGET_S="${FORECLOSURE_REGISTER_CHECKS_BUDGET_S:-900}"
   export FORECLOSURE_GENERIC_ROD_BUDGET_S="${FORECLOSURE_GENERIC_ROD_BUDGET_S:-2400}"
   export GENERIC_ROD_COUNTY_CONCURRENCY="${GENERIC_ROD_COUNTY_CONCURRENCY:-8}"
   export ROD_CHAIN_COUNTY_CONCURRENCY="${ROD_CHAIN_COUNTY_CONCURRENCY:-8}"
+  # 2026-10-09 top80 (fill group): deed book/page, short legal, value and acreage off the county's own free
+  # parcel layer (NC OneMap for every NC county, 15 SC county layers); plain HTTP, 40 parcels a request, 2 s a
+  # host, round-robin over counties inside the budget (gis_fill.py). Needs the main.py wiring line in
+  # docs/audit_2026-10-09/top80_fill.md.
+  export FORECLOSURE_GIS_FILL="${FORECLOSURE_GIS_FILL:-1}"
+  export FORECLOSURE_GIS_FILL_BUDGET_S="${FORECLOSURE_GIS_FILL_BUDGET_S:-2400}"
   export OBITUARY_LOOKUPS="${OBITUARY_LOOKUPS:-0}"
   export FORECLOSURE_MECKLENBURG_DELINQUENT="${FORECLOSURE_MECKLENBURG_DELINQUENT:-0}"
   # Richland map-viewer reader: about 4 s a row on one host; 500 fits the 2,400 s resolver cap (the 10/8

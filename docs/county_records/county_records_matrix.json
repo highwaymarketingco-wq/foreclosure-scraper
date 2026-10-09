@@ -15,7 +15,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "unknown",
     "how_verified": "2026-10-07: rod.alamancecountync.gov 'Deeds Search' 301-redirects to cotthosting.com/NCALAMANCEEXTERNAL/User/Login.aspx?bSkipAutoGuest=true. That page is an 'Account Sign In' with a free 'Sign in as a Guest' button and loads Google reCAPTCHA v3 in its head; it also carries the vendor shopping cart / service-fee text. Did not sign in. Alamance's Spatialest property card config deep-links Deed Book & Page and Plat Book & Page into this Cott tenant (SrchBookPage, idx=CRP and idx=PLT).",
-    "notes": "Free guest search: a 'Sign in as a Guest' button (no user ID or password) on the vendor sign-in page. The page also loads Google reCAPTCHA v3 in its head, as every Cott eSearch page does (Alexander and Buncombe load it too while landing straight in as Guest User); the repo's Buncombe work found that reCAPTCHA gates only the paid image-order flow. Cott results grid has a Description column (brief legal), per the repo's Buncombe/Polk work on the same app. Index start year is on a 'Certified Dates' page that needs a session; not opened."
+    "notes": "Free guest search: a 'Sign in as a Guest' button (no user ID or password) on the vendor sign-in page. The page also loads Google reCAPTCHA v3 in its head, as every Cott eSearch page does (Alexander and Buncombe load it too while landing straight in as Guest User); the repo's Buncombe work found that reCAPTCHA gates only the paid image-order flow. Cott results grid has a Description column (brief legal), per the repo's Buncombe/Polk work on the same app. Index start year is on a 'Certified Dates' page that needs a session; not opened.",
+    "column_access": {
+     "marriage_license": "index"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -61,7 +64,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "unknown",
     "how_verified": "2026-10-07: GET SrchName.aspx redirected twice and landed on 'eSearch | Quick Name Search' as an automatic 'Guest User' (no sign-in, no disclaimer). Index Type list includes CONSOLIDATED REAL PROPERTY, PRE 95 REAL ESTATE, MAP\\PLATS and RIGHT OF WAY PLANS. Page loads reCAPTCHA v3 script and shows the vendor shopping cart. The registry's alexanderdeeds.com is NOT the ROD (it is an unrelated personal website).",
-    "notes": "Pre-1995 real estate is a separate index, so older books are online in some form; earliest year sits on a 'Certified Dates' page not opened. Image viewing appears to run through a paid cart; not tested."
+    "notes": "Pre-1995 real estate is a separate index, so older books are online in some form; earliest year sits on a 'Certified Dates' page not opened. Image viewing appears to run through a paid cart; not tested.",
+    "column_access": {
+     "marriage_license": "index"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -258,8 +264,9 @@
     "url": "http://webtax.averycountync.gov/itsnet/",
     "free_by_parcel": "yes",
     "shows_bill_history": "unknown",
-    "access": "open",
-    "notes": "ITS.NET real estate search (owner, account, parcel) with Tax Bill Search and Sales Search pages. Online payments page notes payment options not currently available."
+    "access": "blocked",
+    "notes": "ITS.NET real estate search (owner, account, parcel) with Tax Bill Search and Sales Search pages. Online payments page notes payment options not currently available.",
+    "access_note_2026_10_09": "was 'open'; walls_register.json card dc_ip_block (checked 2026-10-09): a script may not read this county's tax bill site"
    },
    "gis": {
     "url": "https://agdonline.maps.arcgis.com/apps/webappviewer/index.html?id=7c399996997242bdbf2a0bf5c18e3a2a",
@@ -534,8 +541,9 @@
     "url": "https://lrcpwa.ncptscloud.com/Burke/",
     "free_by_parcel": "yes",
     "shows_bill_history": "unknown",
-    "access": "open",
-    "notes": "Farragut NC PTS land-records (values/owner) per repo (enrichment_lrcpwa_parcel.py; key is the REID, the 10-digit PIN returns HTTP 500). Repo found Burke's bcpwa bill search answers HTTP 500 (no public bill search), so bill history is not confirmed online. Not re-opened today."
+    "access": "captcha",
+    "notes": "Farragut NC PTS land-records (values/owner) per repo (enrichment_lrcpwa_parcel.py; key is the REID, the 10-digit PIN returns HTTP 500). Repo found Burke's bcpwa bill search answers HTTP 500 (no public bill search), so bill history is not confirmed online. Not re-opened today.",
+    "access_note_2026_10_09": "was 'open'; walls_register.json card avalon_tax (checked 2026-10-09): a script may not read this county's tax bill site"
    },
    "gis": {
     "url": "https://gis.burkenc.org/arcgis/rest/services/ProdParcelViewFC/MapServer/0",
@@ -566,8 +574,11 @@
     "legal_description_in_index": "unknown",
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
-    "how_verified": "2026-10-07: plain GET returns only the Blazor shell, so the page was rendered in a headless browser and the single 'Acknowledge Disclaimer to Begin Searching Records' button clicked (accuracy-only disclaimer, no automation language). The Welcome page lists: Full System keyed Consolidated Real Property Index 01/01/1938 to 10/06/2026; Imaging System 'January 1, 1791 - current', Deed Book 1 - current, Deed of Trust Book 1 - 807, Plat Book 1 - current, Condo Book 1 - current, Highway Maps; Scanned Index Books 1791 through 12/31/1982; images 'may be both viewed and printed from this system'.",
-    "notes": "One of the deepest free archives in the batch: keyed index from 1938, scanned index books and deed images back to 1791. The app is server-side Blazor (needs a real browser/websocket), so a plain-HTTP reader will not work. County site cabarruscounty.us returns Akamai 403 to scripts."
+    "how_verified": "2026-10-07: plain GET returns only the Blazor shell, so the page was rendered in a headless browser and the single 'Acknowledge Disclaimer to Begin Searching Records' button clicked (accuracy-only disclaimer, no automation language). The Welcome page lists: Full System keyed Consolidated Real Property Index 01/01/1938 to 10/06/2026; Imaging System 'January 1, 1791 - current', Deed Book 1 - current, Deed of Trust Book 1 - 807, Plat Book 1 - current, Condo Book 1 - current, Highway Maps; Scanned Index Books 1791 through 12/31/1982; images 'may be both viewed and printed from this system'. | 2026-10-09 top80 Logan/Harris: the Full System name search reaches the land index only; its Marriage index can be picked on the 'Instrument Date' tab, which lists marriage instruments by recording date as instrument number, book and page with no party names (live, 38 in one week in Cabarrus), so an owner cannot be looked up and a browser sweep of the years needed is hours. A person asks the Register of Deeds office for the marriage index.",
+    "notes": "One of the deepest free archives in the batch: keyed index from 1938, scanned index books and deed images back to 1791. The app is server-side Blazor (needs a real browser/websocket), so a plain-HTTP reader will not work. County site cabarruscounty.us returns Akamai 403 to scripts.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -796,8 +807,11 @@
     "legal_description_in_index": "unknown",
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
-    "how_verified": "2026-10-07: county ROD page links 'Online Deed Search' to catawbarod.org (Logan Systems). Rendered in a headless browser and clicked the one 'Acknowledge Disclaimer' button: Welcome page lists keyed Consolidated Real Property Index 01/03/1984 to 09/25/2026; Land Record Imaging Book 1 - current; Plat Book 11/28/1911 (Book 1) - current; Corporation Books 1-57; Scanned Index Books covering January 1, 1842 through December 31, 1992; images 'may be both viewed and printed'. Disclaimer is the Logan accuracy-only text.",
-    "notes": "Keyed index from 1984; 1842-1992 through scanned index-book images. Server-side Blazor app: needs a real browser, a plain-HTTP reader will not see results."
+    "how_verified": "2026-10-07: county ROD page links 'Online Deed Search' to catawbarod.org (Logan Systems). Rendered in a headless browser and clicked the one 'Acknowledge Disclaimer' button: Welcome page lists keyed Consolidated Real Property Index 01/03/1984 to 09/25/2026; Land Record Imaging Book 1 - current; Plat Book 11/28/1911 (Book 1) - current; Corporation Books 1-57; Scanned Index Books covering January 1, 1842 through December 31, 1992; images 'may be both viewed and printed'. Disclaimer is the Logan accuracy-only text. | 2026-10-09 top80 Logan/Harris: the Full System name search reaches the land index only; its Marriage index can be picked on the 'Instrument Date' tab, which lists marriage instruments by recording date as instrument number, book and page with no party names (live, 38 in one week in Cabarrus), so an owner cannot be looked up and a browser sweep of the years needed is hours. A person asks the Register of Deeds office for the marriage index.",
+    "notes": "Keyed index from 1984; 1842-1992 through scanned index-book images. Server-side Blazor app: needs a real browser, a plain-HTTP reader will not see results.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -842,8 +856,11 @@
     "legal_description_in_index": "unknown",
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
-    "how_verified": "2026-10-07: chathamncrod.org rendered in a headless browser (site info confirms Chatham County ROD, Pittsboro NC); clicked the one 'Acknowledge Disclaimer' button (accuracy-only text). Welcome page: keyed Consolidated Real Property Index 01/02/1987 to 09/24/2026; imaging Land Books 242 to current, 'All Letter Books Available', Grant Book 0001, Plat Cabinet A, Plat Books 1-38, 86-99, 2000-current, condo, corporation and highway ROW books; Scanned Index Books from the inception of the county through December 31, 1987; images 'may be both viewed and printed'.",
-    "notes": "index_online_back_to_year 1771 = county formation (page says 'inception of the County'); 1771-1987 is scanned index-book images, keyed index from 1987. NCARD links chathamnc.org for the ROD; the ROD search host was found by name and confirmed by its own site info."
+    "how_verified": "2026-10-07: chathamncrod.org rendered in a headless browser (site info confirms Chatham County ROD, Pittsboro NC); clicked the one 'Acknowledge Disclaimer' button (accuracy-only text). Welcome page: keyed Consolidated Real Property Index 01/02/1987 to 09/24/2026; imaging Land Books 242 to current, 'All Letter Books Available', Grant Book 0001, Plat Cabinet A, Plat Books 1-38, 86-99, 2000-current, condo, corporation and highway ROW books; Scanned Index Books from the inception of the county through December 31, 1987; images 'may be both viewed and printed'. | 2026-10-09 top80 Logan/Harris: the Full System name search reaches the land index only; its Marriage index can be picked on the 'Instrument Date' tab, which lists marriage instruments by recording date as instrument number, book and page with no party names (live, 38 in one week in Cabarrus), so an owner cannot be looked up and a browser sweep of the years needed is hours. A person asks the Register of Deeds office for the marriage index.",
+    "notes": "index_online_back_to_year 1771 = county formation (page says 'inception of the County'); 1771-1987 is scanned index-book images, keyed index from 1987. NCARD links chathamnc.org for the ROD; the ROD search host was found by name and confirmed by its own site info.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -1164,8 +1181,11 @@
     "legal_description_in_index": "unknown",
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
-    "how_verified": "2026-10-07: ccrod.org 'Search Records Menu' links ccrodinternet.org (Logan Systems). Rendered in a headless browser and clicked the one 'Acknowledge Disclaimer' button (accuracy-only text). Welcome page: keyed Land index 03/20/1741 to 10/06/2026; note that books 905 (Dec 19 1961) to 2136 (Dec 30 1967) were re-indexed and loaded March 8 2022; Imaging System retrieves deed, plat and condo book images as PDFs that 'may be both viewed and printed'; Scanned index books: land 1/17/1771-12/31/1986, plat 1/17/1777-12/31/1992, highway right of ways.",
-    "notes": "Deepest keyed index in the batch (keyed entries reported back to 1741, though older decades may be partial; scanned index books fill 1771-1986). Server-side Blazor app needs a real browser."
+    "how_verified": "2026-10-07: ccrod.org 'Search Records Menu' links ccrodinternet.org (Logan Systems). Rendered in a headless browser and clicked the one 'Acknowledge Disclaimer' button (accuracy-only text). Welcome page: keyed Land index 03/20/1741 to 10/06/2026; note that books 905 (Dec 19 1961) to 2136 (Dec 30 1967) were re-indexed and loaded March 8 2022; Imaging System retrieves deed, plat and condo book images as PDFs that 'may be both viewed and printed'; Scanned index books: land 1/17/1771-12/31/1986, plat 1/17/1777-12/31/1992, highway right of ways. | 2026-10-09 top80 Logan/Harris: the Full System name search reaches the land index only; its Marriage index can be picked on the 'Instrument Date' tab, which lists marriage instruments by recording date as instrument number, book and page with no party names (live, 38 in one week in Cabarrus), so an owner cannot be looked up and a browser sweep of the years needed is hours. A person asks the Register of Deeds office for the marriage index.",
+    "notes": "Deepest keyed index in the batch (keyed entries reported back to 1741, though older decades may be partial; scanned index books fill 1771-1986). Server-side Blazor app needs a real browser.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -1490,7 +1510,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: SrchName.aspx 302s to the Cott 'Account Sign In' page, which has a 'Sign in as a Guest' button and says 'You no longer Need a User ID and Password'. Disclaimer: accuracy and indemnity text, 'released' records only, no automation language. Vendor shopping cart / service-fee text present; reCAPTCHA v3 script in head (same as every Cott page). Did not sign in.",
-    "notes": "Free guest search through a click-through guest button. Image viewing likely goes through the vendor cart (as in Buncombe/Polk); not tested. Index start year is on a 'Certified Dates' page not opened. Registry's CAPTCHA/login flags were on the county .gov ROD page, not this search."
+    "notes": "Free guest search through a click-through guest button. Image viewing likely goes through the vendor cart (as in Buncombe/Polk); not tested. Index start year is on a 'Certified Dates' page not opened. Registry's CAPTCHA/login flags were on the county .gov ROD page, not this search.",
+    "column_access": {
+     "marriage_license": "index"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -1503,8 +1526,9 @@
     "url": "https://taxpa.edgecombecountync.gov/paas/",
     "free_by_parcel": "unknown",
     "shows_bill_history": "unknown",
-    "access": "disclaimer_click",
-    "notes": "Keystone WebPAAS 'Public Access' (Parcels, Deeds, Download, Forms menus) behind an accuracy-only disclaimer; search pages not opened. County also posts a tax foreclosure list page."
+    "access": "blocked",
+    "notes": "Keystone WebPAAS 'Public Access' (Parcels, Deeds, Download, Forms menus) behind an accuracy-only disclaimer; search pages not opened. County also posts a tax foreclosure list page.",
+    "access_note_2026_10_09": "was 'disclaimer_click'; walls_register.json card dc_ip_block (checked 2026-10-09): a script may not read this county's tax bill site"
    },
    "gis": {
     "url": "https://gis.edgecombecountync.gov/maps/",
@@ -1723,7 +1747,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: GET cotthosting.com/ncgraham (200) lands directly on Quick Name Search as Guest User; disclaimer text says real estate records available from 1872 to present and is accuracy/indemnity only; index types CONSOLIDATED REAL PROPERTY and PRE-95 REAL ESTATE; page has a shopping cart and loads reCAPTCHA v3.",
-    "notes": "Cott v4 results carry a short Description column (layout verified in repo rod/aumentum.py on other v4 tenants). Image viewing may be free with watermark or may need cart purchase; not tested."
+    "notes": "Cott v4 results carry a short Description column (layout verified in repo rod/aumentum.py on other v4 tenants). Image viewing may be free with watermark or may need cart purchase; not tested.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -2429,8 +2456,9 @@
     "url": "https://taxaccess.leecountync.gov/PT/search/commonsearch.aspx?mode=realprop",
     "free_by_parcel": "yes",
     "shows_bill_history": "unknown",
-    "access": "disclaimer_click",
-    "notes": "Tyler iasWorld real estate search (200) with Parcel ID, Owner and Legal 1/2/3 search fields, sales and map search; page carries an I-agree terms panel and a 'system unavailable due to maintenance' banner text."
+    "access": "blocked",
+    "notes": "Tyler iasWorld real estate search (200) with Parcel ID, Owner and Legal 1/2/3 search fields, sales and map search; page carries an I-agree terms panel and a 'system unavailable due to maintenance' banner text.",
+    "access_note_2026_10_09": "was 'disclaimer_click'; walls_register.json card dc_ip_block (checked 2026-10-09): a script may not read this county's tax bill site"
    },
    "gis": {
     "url": "https://leecountync.maps.arcgis.com/apps/webappviewer/index.html?id=a253370dfbff416bbffee626143242ab",
@@ -2521,8 +2549,9 @@
     "url": "https://www.lincolncountytax.com/",
     "free_by_parcel": "unknown",
     "shows_bill_history": "unknown",
-    "access": "unknown",
-    "notes": "lincolncountytax.com (200) is a CivicPlus JavaScript shell; content not readable without a browser. County parcel viewer arcgisserver.lincolncountync.gov/taxparcelviewer/ (not opened)."
+    "access": "captcha",
+    "notes": "lincolncountytax.com (200) is a CivicPlus JavaScript shell; content not readable without a browser. County parcel viewer arcgisserver.lincolncountync.gov/taxparcelviewer/ (not opened).",
+    "access_note_2026_10_09": "was 'unknown'; walls_register.json card avalon_tax (checked 2026-10-09): a script may not read this county's tax bill site"
    },
    "gis": {
     "url": "https://arcgisserver.lincolncountync.gov/arcgis/rest/services/Server_TaxParcelViewerSP/MapServer/0",
@@ -2705,8 +2734,9 @@
     "url": "https://www.bttaxpayerportal.com/ITSPublicMD/",
     "free_by_parcel": "yes",
     "shows_bill_history": "unknown",
-    "access": "open",
-    "notes": "BT/ITS public basic search (200) by owner, parcel number or address. Collector site mcdowellnctax.com not opened."
+    "access": "captcha",
+    "notes": "BT/ITS public basic search (200) by owner, parcel number or address. Collector site mcdowellnctax.com not opened.",
+    "access_note_2026_10_09": "was 'open'; walls_register.json card avalon_tax (checked 2026-10-09): a script may not read this county's tax bill site"
    },
    "gis": {
     "url": "https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/McDowell_Parcels/FeatureServer/0",
@@ -2922,7 +2952,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "unknown",
     "how_verified": "2026-10-07: GET SrchName.aspx (200) opens as Guest User with index types CONSOLIDATED REAL PROPERTY, FIXTURE FILINGS, REAL ESTATE and a shopping cart; no disclaimer or coverage text in the HTML. nashrod.com (registry) not opened.",
-    "notes": "Image cost not tested; coverage not stated."
+    "notes": "Image cost not tested; coverage not stated.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -3060,7 +3093,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "unknown",
     "how_verified": "2026-10-07: GET deeds.onslowcountync.gov (200) redirects to the Cott sign-in page: temporary/guest users click 'Sign in as a Guest'; new account holders 'select and pay for desired subscription, if required'; Certified Dates page and shopping cart present.",
-    "notes": "Guest index search is free; what the paid subscription adds (likely images/printing) was not read."
+    "notes": "Guest index search is free; what the paid subscription adds (likely images/printing) was not read.",
+    "column_access": {
+     "marriage_license": "index"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -3152,7 +3188,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: opened county ROD page (links 'Online Search' to cotthosting) and the eSearch Quick Name page: loads as 'Guest User' with no click-through; page text says indexes and deed books 1872 to 5/31/1988 are viewable online under a 'Real Estate Prior to June 1988' tab and 6/1/1988-present via name search; index types include MAP/PLATS 1995-PRESENT and plat cabinets A/B by book/page. Disclaimer text read: accuracy notes only, no automation language. No search run.",
-    "notes": "Pre-6/1988 records are scanned index books and deed books (browse by letter), not a typed index. Page loads Google reCAPTCHA v3 script (invisible) and a shopping cart for copies; whether image viewing is free was not tested. County notes some old images are illegible and need an office visit."
+    "notes": "Pre-6/1988 records are scanned index books and deed books (browse by letter), not a typed index. Page loads Google reCAPTCHA v3 script (invisible) and a shopping cart for copies; whether image viewing is free was not tested. County notes some old images are illegible and need an office visit.",
+    "column_access": {
+     "marriage_license": "index"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey 'Smart Search', estate case types); no county-specific online estate index was found in this pass",
@@ -3382,7 +3421,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: regdeeds.pittcountync.gov/external/ redirects to an 'Account Sign In' page that also offers a 'Sign in as a Guest' button and states in bold that there is no need to create an account. Page text is browser requirements and the GS 132-1.10 redaction notice; no automation language. Did not sign in as guest, so coverage dates ('Certified Dates' page sits behind a postback) were not read.",
-    "notes": "Guest access is a button, not credentials. Shopping cart / purchase history present for copies; image cost untested. Same vendor app as Pamlico and Polk."
+    "notes": "Guest access is a button, not credentials. Shopping cart / purchase history present for copies; image cost untested. Same vendor app as Pamlico and Polk.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey 'Smart Search', estate case types); no county-specific online estate index was found in this pass",
@@ -3428,7 +3470,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: opened the eSearch Quick Name page: loads as 'Guest User' with no click-through or credentials; index types offered are CONSOLIDATED REAL PROPERTY and PRE 95 REAL ESTATE; no automation language on the page. No search run. Repo rod/cott.py + rod/aumentum.py record a live-verified name and date-range search on this tenant (2026-10-02) and a results grid with a Description column.",
-    "notes": "Description column is a short property description, not the full deed legal. Coverage start year not stated on the page. Shopping cart present; repo docs record image ordering as a paid flow behind reCAPTCHA, so treat images as not free until tested."
+    "notes": "Description column is a short property description, not the full deed legal. Coverage start year not stated on the page. Shopping cart present; repo docs record image ordering as a paid flow behind reCAPTCHA, so treat images as not free until tested.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey 'Smart Search', estate case types); no county-specific online estate index was found in this pass",
@@ -3658,7 +3703,12 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: rod.rowancountync.gov redirects to the eSearch 'Account Sign In' page, which carries a 'Sign in as a Guest' button. Page text: 'Available Historical Index Dates to search 1753-1921; Available Historical Image Dates to search 1753-1875 (Record Books 1-50); for all other dates see the Certified Dates tab', and 'Select and Pay for desired subscription, if required' for new accounts. No automation language. Did not sign in.",
-    "notes": "Guest access is a button, not credentials, but the page also talks about paid subscriptions 'if required', so some features (likely images or printing) may be paid. Modern-era coverage dates sit behind the Certified Dates page. Page loads an invisible reCAPTCHA v3 script."
+    "notes": "Guest access is a button, not credentials, but the page also talks about paid subscriptions 'if required', so some features (likely images or printing) may be paid. Modern-era coverage dates sit behind the Certified Dates page. Page loads an invisible reCAPTCHA v3 script.",
+    "column_access": {
+     "marriage_license": "blocked",
+     "liens": "blocked",
+     "atty_rod_lien_checked": "blocked"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey 'Smart Search', estate case types); no county-specific online estate index was found in this pass",
@@ -3704,7 +3754,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: county ROD page links 'Register of Deeds Index Search' to the cotthosting tenant and says records date back to the 1700s. The search URL redirects to an 'Account Sign In' page whose text says 'To Search Click on the Sign in as a Guest button to the left'; the guest button is present in the page. No automation language. Did not sign in.",
-    "notes": "CORRECTION to repo notes (rod/cott.py, rod/aumentum.py, doc_images.py call Rutherford 'login walled'): the sign-in page offers a no-credentials guest button and tells the public to use it, so it is a click-through, not a credential wall. Online index start year not stated (Certified Dates page not read)."
+    "notes": "CORRECTION to repo notes (rod/cott.py, rod/aumentum.py, doc_images.py call Rutherford 'login walled'): the sign-in page offers a no-credentials guest button and tells the public to use it, so it is a click-through, not a credential wall. Online index start year not stated (Certified Dates page not read).",
+    "column_access": {
+     "marriage_license": "index"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey 'Smart Search', estate case types); no county-specific online estate index was found in this pass",
@@ -3717,8 +3770,9 @@
     "url": "https://rutherfordcountync.gov/tax_search/#/WildfireSearch",
     "free_by_parcel": "unknown",
     "shows_bill_history": "unknown",
-    "access": "open",
-    "notes": "County tax page links 'Search Tax Bill Information' (view-only) to a Revize JS search that did not render in a browser on 2026-10-07; payments go through Invoice Cloud. County also posts a delinquent tax bill list. The county GIS parcel layer is the reliable open source for owner and values."
+    "access": "blocked",
+    "notes": "County tax page links 'Search Tax Bill Information' (view-only) to a Revize JS search that did not render in a browser on 2026-10-07; payments go through Invoice Cloud. County also posts a delinquent tax bill list. The county GIS parcel layer is the reliable open source for owner and values.",
+    "access_note_2026_10_09": "was 'open'; walls_register.json card avalon_tax + dc_ip_block (checked 2026-10-09): a script may not read this county's tax bill site"
    },
    "gis": {
     "url": "https://gis.rutherfordcountync.gov/arcgis/rest/services/TaxParcels/MapServer/0",
@@ -4025,8 +4079,11 @@
     "legal_description_in_index": "yes",
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
-    "how_verified": "2026-10-07: read the full disclaimer at search.transylvaniadeeds.com (accuracy/liability and a warning against modifying records; no automation language; Accept button). Its 'Data Availability' block: deed index 1/1/1973-present, deed images 1/1/1973-present, other index 1/1/1973-present, other images 1/1/1980-present, backscanned plats PF1-3 and PB1-5, plat index from the beginning through 1988. Repo rod/logan.py and rod/doc_images.py record a live index sweep with a Legal Desc column and a free PDF image fetch (view_image.php -> application/pdf). No search run in this pass.",
-    "notes": "Online coverage starts 1973, so chains older than that need the office books or an abstractor. Index rows carry a short legal description. Plats are backscanned."
+    "how_verified": "2026-10-07: read the full disclaimer at search.transylvaniadeeds.com (accuracy/liability and a warning against modifying records; no automation language; Accept button). Its 'Data Availability' block: deed index 1/1/1973-present, deed images 1/1/1973-present, other index 1/1/1973-present, other images 1/1/1980-present, backscanned plats PF1-3 and PB1-5, plat index from the beginning through 1988. Repo rod/logan.py and rod/doc_images.py record a live index sweep with a Legal Desc column and a free PDF image fetch (view_image.php -> application/pdf). No search run in this pass. | 2026-10-09 top80 Logan/Harris: The Lookup holds land-record indexes only (no marriage index on the search page); the county issues marriage licenses outside this system.",
+    "notes": "Online coverage starts 1973, so chains older than that need the office books or an abstractor. Index rows carry a short legal description. Plats are backscanned.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey 'Smart Search', estate case types); no county-specific online estate index was found in this pass",
@@ -4131,8 +4188,9 @@
     "url": null,
     "free_by_parcel": "unknown",
     "shows_bill_history": "unknown",
-    "access": "unknown",
-    "notes": "County tax pages on unioncountync.gov returned 'Access Denied' to a script and no tax bill search URL was found in this pass. GIS parcel data below covers owner and deed reference."
+    "access": "blocked",
+    "notes": "County tax pages on unioncountync.gov returned 'Access Denied' to a script and no tax bill search URL was found in this pass. GIS parcel data below covers owner and deed reference.",
+    "access_note_2026_10_09": "was 'unknown'; walls_register.json card nc_tax_walled (checked 2026-10-09): a script may not read this county's tax bill site"
    },
    "gis": {
     "url": "https://gisweb1.unioncountync.gov/maps/",
@@ -5063,8 +5121,9 @@
     "url": "https://sc-charleston.publicaccessnow.com/RealPropertyBillSearch.aspx",
     "free_by_parcel": "yes",
     "shows_bill_history": "unknown",
-    "access": "open",
-    "notes": "Public Access site (read 2026-10-07): Real Property Record, Sales and Bill searches; bill search by PIN (no dashes) or owner/address; no login or CAPTCHA seen."
+    "access": "blocked",
+    "notes": "Public Access site (read 2026-10-07): Real Property Record, Sales and Bill searches; bill search by PIN (no dashes) or owner/address; no login or CAPTCHA seen.",
+    "access_note_2026_10_09": "was 'open'; walls_register.json card sc_tax_walled (checked 2026-10-09): a script may not read this county's tax bill site"
    },
    "gis": {
     "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_css/MapServer/4",
@@ -5627,8 +5686,9 @@
     "url": "https://georgetowncountysctax.com/",
     "free_by_parcel": "unknown",
     "shows_bill_history": "unknown",
-    "access": "open",
-    "notes": "Tax site loads as a JavaScript app ('Loading...') on 2026-10-07; search fields not readable without running it. Repo walls register: no qPayBill for Georgetown and no per-parcel tax balance captured."
+    "access": "captcha",
+    "notes": "Tax site loads as a JavaScript app ('Loading...') on 2026-10-07; search fields not readable without running it. Repo walls register: no qPayBill for Georgetown and no per-parcel tax balance captured.",
+    "access_note_2026_10_09": "was 'open'; walls_register.json card sc_tax_walled (checked 2026-10-09): a script may not read this county's tax bill site"
    },
    "gis": {
     "url": "https://gis1.georgetowncountysc.org/portal/rest/services/GCGIS_Energov/MapServer/2",
@@ -5797,8 +5857,11 @@
     "legal_description_in_index": "yes",
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
-    "how_verified": "2026-10-07: county ROD page links 'Index to Database' to acclaimweb.horrycounty.org. Landing shows 'Welcome Guest', an Accept Disclaimer button (accuracy-only text) and search types Name, Book/Page, New Legal Description, Legal Description/Memo, Document Type, Consideration, Record Date. Opening the name search redirects to the disclaimer. A notice says redaction bars are removed 'upon purchase' and there is a cart, so image cost is unclear. No search run; index start year not stated on pages read.",
-    "notes": "Guest search after a disclaimer click. Images appear viewable with redactions; purchase may be needed for clean copies. The repo's rod/acclaim.py reader (Pickens) is the same platform."
+    "how_verified": "2026-10-07: county ROD page links 'Index to Database' to acclaimweb.horrycounty.org. Landing shows 'Welcome Guest', an Accept Disclaimer button (accuracy-only text) and search types Name, Book/Page, New Legal Description, Legal Description/Memo, Document Type, Consideration, Record Date. Opening the name search redirects to the disclaimer. A notice says redaction bars are removed 'upon purchase' and there is a cart, so image cost is unclear. No search run; index start year not stated on pages read. | 2026-10-09 top80 Logan/Harris: AcclaimWeb's document-type list has no marriage or vital type; SC marriage licenses are issued by the county Probate Court (a separate system, not this register).",
+    "notes": "Guest search after a disclaimer click. Images appear viewable with redactions; purchase may be needed for clean copies. The repo's rod/acclaim.py reader (Pickens) is the same platform.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "Spartan Technology 'Public Probate Portal' (HorryACMSPortal), linked from the county Probate Court page. Not a southcarolinaprobate.net participant.",
@@ -6401,8 +6464,11 @@
     "legal_description_in_index": "yes",
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
-    "how_verified": "2026-10-07: county ROD page links pickensscrod.us/oncoreweb/; AcclaimWeb landing shows an Accept Disclaimer (accuracy-only text) for guests and search types Official Records Name, Document Type, Description, Consideration, TMS #, Record Date. No search run. Repo's rod/doc_images.py marks Pickens images 'unconfirmed' (cart/shopping-cart controllers live).",
-    "notes": "TMS # search lets a lead's parcel number go straight to its recorded documents. Image cost unknown."
+    "how_verified": "2026-10-07: county ROD page links pickensscrod.us/oncoreweb/; AcclaimWeb landing shows an Accept Disclaimer (accuracy-only text) for guests and search types Official Records Name, Document Type, Description, Consideration, TMS #, Record Date. No search run. Repo's rod/doc_images.py marks Pickens images 'unconfirmed' (cart/shopping-cart controllers live). | 2026-10-09 top80 Logan/Harris: AcclaimWeb's document-type list has no marriage or vital type; SC marriage licenses are issued by the county Probate Court (a separate system, not this register).",
+    "notes": "TMS # search lets a lead's parcel number go straight to its recorded documents. Image cost unknown.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "Pickens County Probate Court (county page: marriage/estate information only, no online index). Not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read.",
@@ -6539,8 +6605,11 @@
     "legal_description_in_index": "yes",
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
-    "how_verified": "2026-10-07: landing is a legal disclaimer (warranty/Tort Claims Act text, no automation language; says 'Indexes are currently in quality control'). A plain GET of index.php?Accept=Accept opened the Lookup with Name, Book/Page (DEEDS, MORTGAGES, PLATS, liens), Instrument Types and UCC searches, and an 'Old Index Books' panel: scanned grantor/grantee index books for deeds 1785-1919, 1919-1959, 1923-1969, 1960-1969, 1976-1979; mortgages 1904-1934, 1935-1977, 1978-1989; plats 1800-1973 and 1974-1992. Opening '1785-1919deeds' showed an alphabetical grantor/grantee page viewer (no search run on names). A book/page test for deed books 'A' and '1' returned only the empty results shell, because results load by DataTables AJAX (repo's logan_render.py needs a rendering browser), so whether pre-computer deed books themselves are imaged was not confirmed. Result header includes a Legal Description column. robots.txt now 404 (repo had recorded 'Disallow: /'). Images free per repo's rod/doc_images.py audit.",
-    "notes": "Owner's claim confirmed for the INDEX: old grantor/grantee index books are online back to 1785 and plats to 1800. Pre-computer deed images not confirmed."
+    "how_verified": "2026-10-07: landing is a legal disclaimer (warranty/Tort Claims Act text, no automation language; says 'Indexes are currently in quality control'). A plain GET of index.php?Accept=Accept opened the Lookup with Name, Book/Page (DEEDS, MORTGAGES, PLATS, liens), Instrument Types and UCC searches, and an 'Old Index Books' panel: scanned grantor/grantee index books for deeds 1785-1919, 1919-1959, 1923-1969, 1960-1969, 1976-1979; mortgages 1904-1934, 1935-1977, 1978-1989; plats 1800-1973 and 1974-1992. Opening '1785-1919deeds' showed an alphabetical grantor/grantee page viewer (no search run on names). A book/page test for deed books 'A' and '1' returned only the empty results shell, because results load by DataTables AJAX (repo's logan_render.py needs a rendering browser), so whether pre-computer deed books themselves are imaged was not confirmed. Result header includes a Legal Description column. robots.txt now 404 (repo had recorded 'Disallow: /'). Images free per repo's rod/doc_images.py audit. | 2026-10-09 top80 Logan/Harris: The Lookup holds land-record indexes only (no marriage index on the search page); the county issues marriage licenses outside this system.",
+    "notes": "Owner's claim confirmed for the INDEX: old grantor/grantee index books are online back to 1785 and plats to 1800. Pre-computer deed images not confirmed.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "Spartanburg County Probate Court. No online estate search found; spartanburgcounty.gov returned a Cloudflare block page on 2026-10-07. Not a southcarolinaprobate.net participant per the repo's 2026-10-02 dropdown read. Estate notices are published in the Spartan Weekly (repo reads them).",

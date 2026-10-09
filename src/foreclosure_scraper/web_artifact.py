@@ -1991,6 +1991,12 @@ RAW_KEEP = {
     # estate index and obituaries (a search that found nothing still dates the check).
     "deed_latest": "*",
     "county_deed_ref": "*",
+    # gis_fill.py (top-80 fill group, 2026-10-09): the assessor's short legal off the county parcel record,
+    # the dated screen of that record (found / deed / legal / value / acres, 'none' = a per-row verdict),
+    # and the parcel an Orangeburg qPayBill roll row's account number joins to in the county layer.
+    "county_legal": "*",
+    "gis_fill": "*",
+    "parcel_from_account": "*",
     "probate_search": "*",
     "obituary_search": "*",
     "lien_priority": "*",            # senior/junior liens + super-priority warnings

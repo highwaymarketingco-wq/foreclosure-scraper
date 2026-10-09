@@ -35,9 +35,15 @@
   "FORECLOSURE_SC_RECORDROOM_ROD": "1",
   "FORECLOSURE_SC_COTT_ESEARCH_ROD": "1",
   "FORECLOSURE_SC_LOOKUP_ROD": "1",
+  "FORECLOSURE_SC_LIEN_SWEEP": "1",
+  "FORECLOSURE_LIEN_SWEEP_BUDGET_S": "600",
+  "FORECLOSURE_REGISTER_CHECKS": "1",
+  "FORECLOSURE_REGISTER_CHECKS_BUDGET_S": "900",
   "FORECLOSURE_GENERIC_ROD_BUDGET_S": "2400",
   "GENERIC_ROD_COUNTY_CONCURRENCY": "8",
   "ROD_CHAIN_COUNTY_CONCURRENCY": "8",
+  "FORECLOSURE_GIS_FILL": "1",
+  "FORECLOSURE_GIS_FILL_BUDGET_S": "2400",
   "OBITUARY_LOOKUPS": "0",
   "FORECLOSURE_MECKLENBURG_DELINQUENT": "0",
   "RICHLAND_PARCEL_MAX": "500"
@@ -46,10 +52,12 @@
   "VISION_PROVIDER": "vm_lib.sh picks gemini when a Gemini key file exists, else anthropic; the declared value is vm_lib.sh's text default",
   "FORECLOSURE_STREETVIEW": "exported only when a maps key file exists (free tier clamp 9,000/month)",
   "FORECLOSURE_NC_HARRIS_ROD": "browser-rendered register platforms stay OFF until a run has measured their memory and time (HANDOFF item 82)",
-  "FORECLOSURE_GENERIC_ROD_BUDGET_S": "the generic register pass's own budget (enrichment_generic_rod); it only applies in full once main.py runs generic_rod under its own _await_capped (audit 2026-10-09 additions_verify wiring), before that the ROD group's 900 s cap still cancels it (its counts are then logged as generic_rod.cancelled)",
-  "GENERIC_ROD_COUNTY_CONCURRENCY": "register counties read side by side; each county is its own host and the adapters hold a per-host lock, so never two requests on one host",
   "FORECLOSURE_NC_HARRIS_MARRIAGE": "Mecklenburg/Carteret Marriage index in the same guest browser (rod/nc_harris.marriage_search); a second browser lookup per lead (measured 15-20 s, 540 MB peak on 2026-10-09), so OFF with the Harris flag it depends on",
   "FORECLOSURE_SC_LIEN_SWEEP": "county-wide AcclaimWeb lien sweep (Horry, Pickens), enrichment_register_lien_sweep; plain HTTP, cached, newest month first inside FORECLOSURE_LIEN_SWEEP_BUDGET_S (needs the main.py wiring line in docs/audit_2026-10-09/top80_logan_harris.md)",
+  "FORECLOSURE_GENERIC_ROD_BUDGET_S": "the generic register pass's own budget (enrichment_generic_rod); it only applies in full once main.py runs generic_rod under its own _await_capped (audit 2026-10-09 additions_verify wiring), before that the ROD group's 900 s cap still cancels it (its counts are then logged as generic_rod.cancelled)",
+  "FORECLOSURE_REGISTER_CHECKS": "marriage-index check (enrichment_register_checks) on the six Cott v4 tenants with a MARRIAGES index; needs main.py to run it after generic_rod (wiring in docs/audit_2026-10-09/top80_register_other.md); also needs FORECLOSURE_NC_COTT_ROD=1",
+  "FORECLOSURE_GIS_FILL": "county parcel-record fill (gis_fill): NC OneMap + 15 SC county layers, deed book/page, short legal, value, acreage, and the Orangeburg qPayBill account-to-parcel join; plain HTTP, 40 parcels a request, 2 s a host; needs the main.py wiring line in docs/audit_2026-10-09/top80_fill.md",
+  "GENERIC_ROD_COUNTY_CONCURRENCY": "register counties read side by side; each county is its own host and the adapters hold a per-host lock, so never two requests on one host",
   "OBITUARY_LOOKUPS": "live obituary name lookups (Echovita / Find a Grave) per dead-owner lead: OFF until the owner decides (HANDOFF item 82)",
   "FORECLOSURE_MECKLENBURG_DELINQUENT": "Mecklenburg delinquent XLSX (one-year balances, +29k rows, +12 min geocoding): OFF by the 10/7 decision (vm_lib 9edff1f3)",
   "RICHLAND_PARCEL_MAX": "Richland map-viewer lookups per run (one host, about 4 s a row, inside RESOLVER_PHASE_MAX_SECONDS 2,400); HOT and WARM rows first"
@@ -124,7 +132,11 @@
   "enrichment_surface_contacts": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): copies agent / office phones into owner_phone, which then stops enrichment_voter_phone from finding the owner's own number on that row; its e-mail half is owner_email_of's job",
   "enrichment_usda_ers": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): the 3-digit county FIPS it reads is zero-padded to 5 and never matches, so every row gets {}; income and unemployment come from enrichment_census_demographics and valuation/location; economic on 0 rows"
  },
- "unwired_wire_pending": {},
+ "unwired_wire_pending": {
+  "gis_fill": "main.py, right after the enrich_gis_attrs try/except (the 'GIS attribute backfill' block, before the Richland SC map-viewer reader): try: from .gis_fill import enrich_gis_fill; s = await _await_capped(enrich_gis_fill(enriched), \"gis_fill\", default_s=float(os.environ.get(\"FORECLOSURE_GIS_FILL_BUDGET_S\", \"2400\")) + 180); if s and \"skipped\" not in s: enrichment_stats[\"gis_fill\"] = s; except Exception: log.error(\"gis_fill.failed\", traceback=traceback.format_exc()) (top80_fill)",
+  "enrichment_register_checks": "main.py, in the register block right after the generic_rod stats loop (the for _rod_name in (... \"generic_rod\") loop): try: from .enrichment_register_checks import enrich_register_checks; s = await _await_capped(enrich_register_checks(enriched), \"register_checks\", default_s=float(os.environ.get(\"FORECLOSURE_REGISTER_CHECKS_BUDGET_S\", \"900\")) + 120); if s and \"skipped\" not in s: enrichment_stats[\"register_checks\"] = s; except Exception: log.error(\"register_checks.failed\", traceback=traceback.format_exc()) (top80_register_other)",
+  "enrichment_register_lien_sweep": "main.py, in the register block right after the enrich_nc_rod_render try/except: from .enrichment_register_lien_sweep import enrich_register_lien_sweep; s = await _await_capped(enrich_register_lien_sweep(enriched), \"register_lien_sweep\", default_s=float(os.environ.get(\"FORECLOSURE_LIEN_SWEEP_BUDGET_S\", \"600\")) + 180); if s and \"skipped\" not in s: enrichment_stats[\"register_lien_sweep\"] = s (top80_logan_harris)"
+ },
  "tail_calls_required": [
   [
    "enrichment_dnc",

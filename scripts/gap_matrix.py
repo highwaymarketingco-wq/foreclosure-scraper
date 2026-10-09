@@ -235,6 +235,9 @@ def legal_description_present(rec: dict) -> bool:
     ga = raw.get("gis_attrs_full")
     if isinstance(ga, dict) and any(_LEGAL_KEYS.match(str(k)) and v not in _EMPTY for k, v in ga.items()):
         return True
+    cl = raw.get("county_legal")           # gis_fill.py: the assessor's short legal off the county parcel record
+    if isinstance(cl, dict) and cl.get("text"):
+        return True
     mp = raw.get("mcdowell_probate")
     return isinstance(mp, dict) and bool(mp.get("legal_description"))
 
@@ -263,6 +266,9 @@ def deed_ref_present(raw: dict) -> bool:
         return True
     ga = raw.get("gis_attrs_full")
     if isinstance(ga, dict) and any(ga.get(k) not in _EMPTY for k in _DEED_BOOK_KEYS):
+        return True
+    cd = raw.get("county_deed_ref")        # gis_fill.py / county_deed_ref.py: the county parcel record's own deed ref
+    if isinstance(cd, dict) and cd.get("book") and cd.get("page"):
         return True
     mp = raw.get("mcdowell_probate")
     return isinstance(mp, dict) and bool(mp.get("deed_book_page"))
@@ -343,6 +349,9 @@ def rod_checked(raw: dict) -> bool:
     rod = raw.get("rod")
     if isinstance(rod, dict) and (rod.get("instrument_count") is not None or rod.get("book")):
         return True
+    sweep = raw.get("rod_lien_sweep")
+    if isinstance(sweep, dict) and sweep.get("status") and sweep.get("checked_at"):
+        return True               # county-wide lien sweep (top80 Logan/Harris): dated, window-bounded
     return bool(raw.get("rod_docs")) or isinstance(raw.get("nc_rod"), dict)
 
 
@@ -487,12 +496,19 @@ class Spec:
     applies: str = "all"      # a row_rules() rule
     states: tuple = ("NC", "SC")
     ledger: Optional[str] = None
+    verify_family: Optional[str] = None   # the matrix family of the VERIFYING source when it differs from
+                                          # the detecting one (a notice is detected statewide, verified at the county probate court)
     producers: tuple = ()     # src/foreclosure_scraper-relative files whose code names counties
     statewide: tuple = ()     # ((state, source name), ...): a free statewide source the code reads
     sources: tuple = ()       # ((state, source name), ...): a free statewide source NOT yet read
     walls: tuple = ()         # ((state, wall), ...): the state's source is walled
     doc: str = ""             # how the column is computed (README)
     ambiguity: str = ""       # where the 10/1 definition is ambiguous
+
+
+def ledger_signals(spec: "Spec") -> tuple:
+    """The verifier signal names a column's hit rows are verified by (Spec.ledger, 'a|b' = either)."""
+    return tuple(x for x in (spec.ledger or "").split("|") if x)
 
 
 SCOPES = {
@@ -510,7 +526,8 @@ _S = "signal"
 #: Quiet-title suits naming heirs by publication are parsed only in Column's SC estate lane
 #: (column_legal_notices._parse_sc_quiet_title); no NC notice parser looks for them (2026-10-09).
 SC_QUIET_TITLE = (("SC", "SC estate notices via Column (column_legal_notices, SC estate lane)"),)
-NC_QUIET_TITLE_SOURCE = (("NC", "NC public notices carry quiet-title/heir notices; no parser reads them"),)
+NC_QUIET_TITLE_SOURCE = ()      # was: NC notices known, no parser. scrapers/public_notices/nc_heir_notices.py reads them
+NC_QUIET_TITLE_WALL = (("NC", "no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled"),)
 
 SPECS: dict[str, Spec] = {
     # ---- fields --------------------------------------------------------------------------
@@ -539,27 +556,27 @@ SPECS: dict[str, Spec] = {
     "assessed_value": Spec(_F, "row", "gis", statewide=(("NC", NC_ONEMAP),),
                            doc="assessed_value, market_value or tax_value non-zero",
                            ambiguity="market_value can be a model value, not the county's assessment"),
-    "comps": Spec(_F, "row", "sales", applies="improved", ledger="comps",
+    "comps": Spec(_F, "row", "sales", applies="improved", ledger="comps", verify_family="sales",
                   statewide=(("NC", "comps engine over county sales"), ("SC", "comps engine over county sales")),
                   doc="raw.comps (lazy-detail sidecar) is a non-empty list",
                   ambiguity="any comp counts, including kind-only matches across a whole county"),
-    "comps_tight": Spec(_F, "row", "sales", applies="improved", ledger="comps",
+    "comps_tight": Spec(_F, "row", "sales", applies="improved", ledger="comps", verify_family="sales",
                         statewide=(("NC", "comps engine over county sales"), ("SC", "comps engine over county sales")),
                         doc="at least one comp whose match_quality has both +sqft and +beds"),
     # ---- listing types (feeds) -----------------------------------------------------------
-    "lt_foreclosure_sale": Spec(_S, "feed", "foreclosure", ledger="foreclosure_rod",
+    "lt_foreclosure_sale": Spec(_S, "feed", "foreclosure", ledger="foreclosure_rod|foreclosure_sale_list",
                                 statewide=(("NC", "trustee/law-firm sale lists + NC public notices"),),
                                 doc="listing_type == foreclosure_sale"),
     "lt_sheriff_sale": Spec(_S, "feed", "notices", statewide=NOTICES,
                             doc="listing_type == sheriff_sale",
                             ambiguity="NC forecloses by trustee/clerk, SC by Master-in-Equity; sheriff "
                                       "execution sales of land are rare, so 0 is expected"),
-    "lt_lis_pendens": Spec(_S, "feed", "court", ledger="foreclosure_rod",
+    "lt_lis_pendens": Spec(_S, "feed", "court", ledger="foreclosure_rod|nc_ecourts_case",
                            statewide=(("NC", "NC eCourts Judgment Search (open JSON) + register indexes"),),
                            walls=(("SC", "SC Public Index terms forbid automated querying"),),
                            doc="listing_type == lis_pendens"),
-    "lt_tax_lien": Spec(_S, "feed", "tax", ledger="tax_lien", doc="listing_type == tax_lien"),
-    "lt_tax_sale": Spec(_S, "feed", "tax", ledger="tax_lien", doc="listing_type == tax_sale"),
+    "lt_tax_lien": Spec(_S, "feed", "tax", ledger="tax_lien|lien_registry_wall", doc="listing_type == tax_lien"),
+    "lt_tax_sale": Spec(_S, "feed", "tax", ledger="tax_lien|lien_registry_wall", doc="listing_type == tax_sale"),
     "lt_auction": Spec(_S, "feed", "auction",
                        statewide=(("NC", "national auction sites"), ("SC", "national auction sites")),
                        doc="listing_type == auction"),
@@ -568,12 +585,12 @@ SPECS: dict[str, Spec] = {
     "lt_hoa_sale": Spec(_S, "feed", "notices", statewide=NOTICES, doc="listing_type == hoa_sale",
                         ambiguity="10/2 note: a working source exists but its rows are typed foreclosure_sale"),
     "lt_distressed": Spec(_S, "feed", "county_layers", doc="listing_type == distressed (generic distress layers)"),
-    "lt_divorce_notice": Spec(_S, "feed", "court", ledger="divorce",
+    "lt_divorce_notice": Spec(_S, "feed", "court", ledger="nc_ecourts_case|divorce",
                               statewide=(("NC", "NC eCourts Judgment Search (open JSON)"),),
                               walls=(("SC", "SC family-court index (Public Index/FCCMS) terms forbid automation"),),
                               doc="listing_type == divorce_notice"),
-    "lt_probate_notice": Spec(_S, "feed", "notices", statewide=NOTICES, ledger="probate_heir", doc="listing_type == probate_notice"),
-    "lt_estate_lead": Spec(_S, "feed", "probate", ledger="probate_heir", doc="listing_type == estate_lead"),
+    "lt_probate_notice": Spec(_S, "feed", "notices", statewide=NOTICES, ledger="probate_heir", verify_family="probate", doc="listing_type == probate_notice"),
+    "lt_estate_lead": Spec(_S, "feed", "probate", ledger="probate_heir|heir_roll", verify_family="probate", doc="listing_type == estate_lead"),
     "lt_elderly_disabled": Spec(_S, "feed", "gis_exempt", ledger="elderly_disabled",
                                 doc="listing_type == elderly_disabled"),
     "lt_tax_sale_overage": Spec(_S, "feed", "tax", doc="listing_type == tax_sale_overage",
@@ -583,22 +600,23 @@ SPECS: dict[str, Spec] = {
                           statewide=(("NC", "CourtListener/RECAP (federal)"), ("SC", "CourtListener/RECAP (federal)")),
                           doc="listing_type == bankruptcy"),
     # ---- raw signals ---------------------------------------------------------------------
-    "multi_year_delinquent_tax": Spec(_S, "row", "tax", ledger="tax_lien",
+    "multi_year_delinquent_tax": Spec(_S, "row", "tax", ledger="tax_lien|lien_registry_wall",
                                       producers=("enrichment_tax_owed.py",
                                                  "scrapers/counties_generic/multi_year_delinquent_tax.py"),
                                       doc="raw.multi_year_delinquent_tax present; checked = the tax roll was read "
                                           "(any property-tax block on the row)"),
     "repeat_tax_loss": Spec(_S, "derived", "tax", producers=("enrichment_repeat_tax_loss.py",),
                             doc="raw.repeat_tax_loss present; checked = tax roll read"),
-    "heir_estate": Spec(_S, "county", "gis", ledger="probate_heir",
+    "heir_estate": Spec(_S, "county", "gis", ledger="probate_heir|heir_roll",
                         producers=("scrapers/counties_nc/nc_heir_estate_parcels.py",
                                    "scrapers/counties_nc/henderson_foreclosure_parcels.py"),
                         doc="raw.heir_estate present (a parcel owner-of-record naming heirs/estate)"),
     "heir_naming_publication": Spec(_S, "county", "notices", statewide=SC_QUIET_TITLE,
-                                    sources=NC_QUIET_TITLE_SOURCE,
-                                    producers=("scrapers/newspapers/column_legal_notices.py",),
+                                    sources=NC_QUIET_TITLE_SOURCE, walls=NC_QUIET_TITLE_WALL,
+                                    producers=("scrapers/newspapers/column_legal_notices.py",
+                                               "scrapers/public_notices/nc_heir_notices.py"),
                                     doc="raw.heir_naming_publication present",
-                                    ambiguity="parsed only from SC estate notices (Column); NC has no parser"),
+                                    ambiguity="SC: Column estate lane; NC: Column notices searched by text (nc_heir_notices); 75 of 100 NC counties have a Column paper"),
     "owner_cluster": Spec(_S, "derived", "derived", producers=("enrichment_owner_cluster.py",),
                           statewide=(("NC", "board-wide owner clustering"), ("SC", "board-wide owner clustering")),
                           doc="raw.owner_cluster present; checked = owner_name present"),
@@ -703,12 +721,12 @@ SPECS: dict[str, Spec] = {
     **{col: Spec(_S, "derived", "derived", statewide=(("NC", "derived from owner_name"), ("SC", "derived from owner_name")),
                  doc=f"owner_name matches /{pat.pattern}/; checked = owner_name present")
        for col, pat in NAME_TOKENS},
-    "two_year_delinquent": Spec(_S, "row", "tax", ledger="tax_lien",
+    "two_year_delinquent": Spec(_S, "row", "tax", ledger="tax_lien|lien_registry_wall",
                                 producers=("scrapers/counties_nc/albemarle_observer_tax_lists.py",
                                            "scrapers/counties_nc/nc_its_public_tax.py",
                                            "scrapers/counties_sc/sc_catalis_delinquent_roll.py"),
                                 doc="raw.two_year_delinquent.is_two_year_plus is true; checked = tax roll read"),
-    "tax_aging_surfaced": Spec(_S, "row", "tax", ledger="tax_lien", producers=("enrichment_tax_aging.py",),
+    "tax_aging_surfaced": Spec(_S, "row", "tax", ledger="tax_lien|lien_registry_wall", producers=("enrichment_tax_aging.py",),
                                doc="raw.tax_aging_surfaced.status != 'current' and years_delinquent > 0; "
                                    "checked = tax roll read"),
     "divorce": Spec(_S, "row", "court", applies="person", ledger="divorce",
@@ -735,7 +753,9 @@ SPECS: dict[str, Spec] = {
     "deed_chain_distress_transfer": Spec(_S, "derived", "gis_deed", producers=("enrichment_deed_chain.py",),
                                          doc="raw.deed_chain.summary.distress_transfers truthy; checked = deed chain present"),
     "quiet_title": Spec(_S, "county", "court", statewide=SC_QUIET_TITLE, sources=NC_QUIET_TITLE_SOURCE,
-                        producers=("scrapers/newspapers/column_legal_notices.py",),
+                        walls=NC_QUIET_TITLE_WALL,
+                        producers=("scrapers/newspapers/column_legal_notices.py",
+                                   "scrapers/public_notices/nc_heir_notices.py"),
                         doc="is_quiet_title on raw.column/court/case/rod_docs/heir_naming_publication"),
     # ---- attorney checklist --------------------------------------------------------------
     "atty_legal_description": Spec(_F, "row", "gis_legal",
@@ -962,6 +982,10 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
     if tax:
         out |= {"multi_year_delinquent_tax", "repeat_tax_loss", "two_year_delinquent", "tax_aging_surfaced",
                 "bankruptcy_tax_combo"}
+    # gis_fill.py screened this parcel in its county layer and the record is blank for the field: a dated
+    # per-row 'screened, none found' verdict for the four fill columns it covers (roll_up counts it)
+    from foreclosure_scraper import gis_fill as _gf
+    out |= _gf.verdict_columns(raw)
     if isinstance(raw.get("owner_email"), dict):
         out.add("email")
     if isinstance(raw.get("divorce"), dict):
@@ -987,6 +1011,9 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
         out.add("vacant_lot")
     if raw.get("rod") or raw.get("liens"):
         out |= {"liens", "lien_priority"}
+    sweep = raw.get("rod_lien_sweep")
+    if isinstance(sweep, dict) and sweep.get("status") and sweep.get("checked_at"):
+        out.add("liens")          # 'screened, none found' is a check; the stamp carries its window
     if raw.get("nc_ecourts") or raw.get("court") or raw.get("court_record"):
         out.add("child_support")
     if raw.get("liensnc"):
@@ -1134,6 +1161,11 @@ def source_status(spec: Spec, state: str, crec: Optional[dict], col: str = "") -
             "rod", "probate", "tax", "assessor", "gis", "gis_legal", "gis_deed") else ""
     rod, pro, tax, gis = (crec.get(k) or {} for k in ("rod", "probate", "tax", "gis"))
     if fam == "rod":
+        ca = str((rod.get("column_access") or {}).get(col) or "").lower() if col else ""
+        if ca in ACCESS_WALL:
+            return "walled", ACCESS_WALL[ca], f"register: {_host(rod.get('url'))} ({col}: {ca})"
+        if ca == "none":
+            return "unknown", "", f"register: {_host(rod.get('url'))} ({col}: no free source)"
         st, w = _access_status(rod, "free_name_search")
         return st, w, f"register: {rod.get('platform') or ''} {_host(rod.get('url'))}".strip()
     if fam == "probate":
@@ -1151,15 +1183,16 @@ def source_status(spec: Spec, state: str, crec: Optional[dict], col: str = "") -
             return "free", "", f"county GIS legal field: {_host(gis.get('url'))}"
         if str(rod.get("legal_description_in_index")) == "yes":
             st, w = _access_status(rod, "free_name_search")
-        ca = str((rod.get("column_access") or {}).get(col) or "").lower() if col else ""
-        if ca in ACCESS_WALL:
-            return "walled", ACCESS_WALL[ca], f"register: {_host(rod.get('url'))} ({col}: {ca})"
-        if ca == "none":
-            return "unknown", "", f"register: {_host(rod.get('url'))} ({col}: no free source)"
             return st, w, f"register index: {_host(rod.get('url'))}"
         if str(gis.get("legal_description_field")) == "no" and str(rod.get("legal_description_in_index")) == "no":
             return "walled", "only on the deed image", f"register: {_host(rod.get('url'))}"
         return "unknown", "", ""
+    if fam == "sales":
+        # the VERIFYING source of a sold comp is a recorded sale price keyed to an address. Read
+        # 2026-10-09: NC OneMap carries a sale date but no price; the only county layers with a
+        # price are Buncombe (verified: verifiers/comps_buncombe), Anderson (SALOCA is a legal
+        # description, no address key) and Cleveland (no address; a two-hop join nobody validated)
+        return "unknown", "", "no free per-sale price record outside Buncombe"
     if fam == "gis_deed":
         if str(gis.get("deed_book_page_field")) == "yes":
             return "free", "", f"county GIS deed book/page: {_host(gis.get('url'))}"
@@ -1220,6 +1253,13 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
         if spec.scope == "feed":
             files += listing_type_producers(LISTING_TYPE_COLS[col])
         out[col] = counties_named_in([f for f in files if f.exists()], pats) if files else set()
+    # marriage licenses: the Cott v4 tenants whose guest search carries a MARRIAGES index are read by
+    # enrichment_register_checks (rod/register_checks.MARRIAGE_ADAPTER); the module names no county in text
+    try:
+        from foreclosure_scraper.rod import register_checks as _rc
+        out.setdefault("marriage_license", set()).update(("NC", c) for c in _rc.MARRIAGE_ADAPTER.counties)
+    except Exception:  # noqa: BLE001 - a missing optional module only leaves the cell 'not built'
+        pass
     return out
 
 
@@ -1444,22 +1484,24 @@ class Cube:
             if ok:
                 sig_applies[v.signal] = "wall" if v.wall else "live"
         for c in pos & app:
-            sig = SPECS[c].ledger
-            if not sig:
+            sigs = ledger_signals(SPECS[c])
+            if not sigs:
                 continue
-            vd = verdicts.get(sig)
             if c == "atty_tax_verified_confirmed":
                 continue
+            # a column may name several verifier signals ("a|b"): the best verdict of any of them
+            vds = [verdicts.get(sg) for sg in sigs]
+            vd = next((v for v in vds if v in DECISIVE), None) or next((v for v in vds if v), None)
             if vd:
                 self.v_any[key][c] += 1
             if vd in DECISIVE:
                 self.v_dec[key][c] += 1
             if vd == "confirmed":
                 self.v_conf[key][c] += 1
-            a = sig_applies.get(sig)
-            if a == "live":
+            kinds = {sig_applies.get(sg) for sg in sigs}
+            if "live" in kinds:
                 self.v_applies[key][c] += 1
-            elif a == "wall":
+            elif "wall" in kinds:
                 self.v_wall[key][c] += 1
         src = str(rec.get("source") or "")
         self.slug_county[(src, key)] += 1
@@ -1541,6 +1583,10 @@ def next_action(cls: str, col: str, spec: Spec, where: str, wall: str, crec: Opt
     return f"research a free source for {col} in this county"
 
 
+#: fill columns whose per-row 'screened, none found' verdict (gis_fill.verdict_columns) counts as checked
+GIS_FILL_VERDICT_COLS = frozenset({"atty_deed_ref", "atty_legal_description", "assessed_value", "lot_size"})
+
+
 def classify_cell(spec: Spec, app: int, target: int, ran: bool, built: str, src: tuple[str, str, str]) -> Optional[str]:
     """The cell's gap class, or None when it is at 100% of its target. Pure."""
     if app == 0:
@@ -1600,7 +1646,9 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set], screens: Op
                                                   or col in SL.COUNTY_ROSTER_ROW_COLUMNS):
                 ran = True
             if spec.kind == "field":
-                target = pos
+                # a fill column gis_fill screens: a row whose county parcel record is blank for it carries a
+                # 'screened, none found' verdict (checked), which closes the row like a hit
+                target = chk if col in GIS_FILL_VERDICT_COLS else pos
             elif spec.scope in ("county", "state", "feed"):
                 target = app if ran else 0
             elif scr and col in SL.COUNTY_ROSTER_ROW_COLUMNS:
@@ -1658,19 +1706,24 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set], screens: Op
         if c["v_dec"] >= c["pos"]:
             continue
         missing = c["pos"] - c["v_dec"]
+        vsrc = c["src"]
+        if spec.verify_family:
+            import dataclasses
+            vsrc = source_status(dataclasses.replace(spec, family=spec.verify_family, statewide=(), sources=(),
+                                                     walls=()), st, matrix.get((st, co)))
         if c["v_applies"] > 0:
-            cls, act = "built-but-low-yield", f"run the {spec.ledger} sweep over the {missing:,} unverified hit rows"
+            cls, act = "built-but-low-yield", f"run the {spec.ledger.replace('|', ' / ')} sweep over the {missing:,} unverified hit rows"
         elif c["v_wall"] > 0:
             cls, act = "walled (verifier is a declared wall)", f"human lane for {spec.ledger} in this county"
-        elif c["src"][0] == "walled":
-            cls, act = f"walled ({c['src'][1]})", f"human lane for {spec.ledger}: {c['src'][2]}"[:160]
-        elif c["src"][0] == "free":
-            cls, act = "sourced-not-built", f"write a {spec.ledger} verifier for this county ({c['src'][2]})"[:160]
+        elif vsrc[0] == "walled":
+            cls, act = f"walled ({vsrc[1]})", f"human lane for {spec.ledger}: {vsrc[2]}"[:160]
+        elif vsrc[0] == "free":
+            cls, act = "sourced-not-built", f"write a {spec.ledger} verifier for this county ({vsrc[2]})"[:160]
         else:
             cls, act = "no source known", f"find an authoritative page to verify {spec.ledger} here"
         gaps.append(dict(state=st, county=co, column=col, layer="verify", kind=spec.kind, scope=spec.scope,
                          applicable=c["pos"], target=c["v_dec"], pct=pct(c["v_dec"], c["pos"]),
-                         est_rows_affected=missing, gap_class=cls, next_action=act, source=c["src"][2],
+                         est_rows_affected=missing, gap_class=cls, next_action=act, source=vsrc[2],
                          built=c["built"], ran=c["ran"],
                          matrix_ref=f"county_records_matrix.json#{st}/{co}" if matrix.get((st, co)) else ""))
     gaps.sort(key=lambda g: (-g["est_rows_affected"], g["state"], g["county"], g["column"]))
