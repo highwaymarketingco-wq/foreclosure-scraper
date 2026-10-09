@@ -1590,28 +1590,31 @@
   {
    "id": "avalon_tax",
    "group": "county",
-   "place": "Cleveland and Caldwell Counties, NC",
-   "name": "Cleveland and Caldwell tax bill sites (Avalon)",
+   "place": "Lincoln, Rutherford, McDowell, Cleveland, Burke and Caldwell Counties, NC",
+   "name": "NC tax bill sites on Catalis Avalon (Lincoln, Rutherford, McDowell, Cleveland, Burke, Caldwell)",
    "kind": "A",
-   "wall": "Google CAPTCHA loaded by the tax site (the search sits behind it).",
-   "url": "https://www.clevelandcountytaxes.com/taxes.html",
-   "what": "Taxpayer and bill status per parcel. Cleveland's current deed book and page is also not in any free map layer, so it comes from the deed index or this site.",
+   "wall": "Google CAPTCHA loaded by the tax site (Lincoln, McDowell, Cleveland, Burke, Caldwell), and the sites' shared data host (d1ebsyxxbc7tep.cloudfront.net) answers HTTP 403 'Request blocked' to our computer, Rutherford included, whose page has no CAPTCHA (checked 2026-10-09). Rutherford's pay-online page (InvoiceCloud) has a Cloudflare check on its Search button. None of the six is on a tax site a script can read.",
+   "url": "https://www.lincolncountytax.com/#/",
+   "what": "Whether the county property tax on a lead's parcel is unpaid now, for which years and how much, and the date each recent year was paid. On the 2026-10-07 board 3,453 lane A leads (a phone a closer may dial, nothing else missing) wait only on this check: Lincoln 1,566, Rutherford 1,231, McDowell 633, Cleveland 15, Burke 8. Cleveland's current deed book and page is also not in any free map layer, so it comes from the deed index or this site.",
    "steps": [
-    "Open <b>https://www.clevelandcountytaxes.com/taxes.html</b> (Caldwell: <b>https://www.caldwellcountynctax.com/taxes.html</b>).",
-    "Pass the CAPTCHA if shown. Search by owner name or parcel number.",
-    "Note unpaid years and amount due for each lead."
+    "Open the county's tax site in Chrome (a normal window): Lincoln <b>https://www.lincolncountytax.com/#/</b>, Rutherford <b>https://rutherfordcountync.gov/tax_search/#/WildfireSearch</b>, McDowell <b>https://mcdowellnctax.com</b>, Cleveland <b>https://www.clevelandcountytaxes.com/taxes.html</b>, Burke <b>https://www.burkenctax.com/taxes.html#/</b>, Caldwell <b>https://www.caldwellcountynctax.com/taxes.html</b>.",
+    "If the page stays empty or shows 'Request blocked', open it on your phone over cellular data (the block is on our internet address, not on you).",
+    "Pass the CAPTCHA if it shows ('I'm not a robot'). Do not use any add-on or service that solves it for you.",
+    "Search by parcel number. Lincoln: the 10-digit PIN on the lead's evidence sheet (most Lincoln leads show only a street: search the street, then pick the house number). Rutherford: the 7-digit parcel number on the board (not the 10-digit PIN). McDowell: the 12-digit PIN. Burke: the PIN or the street. Cleveland and Caldwell: parcel number or street.",
+    "Open each tax year shown. Write down the years still unpaid and the amount due today, and for the two latest years the date paid.",
+    "Add one line per parcel to the CSV below."
    ],
-   "pull": "HOT and WARM leads: unpaid years, amount due, taxpayer name. 10 per sitting.",
-   "save": "Notes in the CRM, or a CSV (parcel_id, unpaid_years, amount_due) in ~/Downloads.",
-   "lane": "None.",
-   "time": "About 1 minute per parcel.",
-   "often": "Monthly.",
-   "gain": "Delinquent-tax status where the county does not publish a list we read.",
-   "others": "County tax office by phone.",
-   "minutes_month": 10,
-   "leads": "10 parcels a month",
+   "pull": "Lane A leads first: the daily closers' list marks them 'the county tax site has not been checked'. Highest rank first, 20 per sitting.",
+   "save": "A CSV in <b>~/Downloads</b> named <b>tax_checks_&lt;county&gt;_&lt;date&gt;.csv</b> with the columns parcel_id, county, checked_on, unpaid_years, amount_due, paid_on_2025, paid_on_2024. No loader reads it yet (open work: a loader that turns each line into a county check the call-ready gate accepts).",
+   "lane": "None (no loader yet).",
+   "time": "About 1 to 2 minutes per parcel once past the check.",
+   "often": "Before calling: a check older than 30 days no longer counts.",
+   "gain": "Each checked lead with a balance due can move to the call list; a paid one leaves it. Today none of the 3,453 can be called on a checked tax debt.",
+   "others": "The county tax office by phone.",
+   "minutes_month": 300,
+   "leads": "3,453 waiting lane A leads (2026-10-07 board)",
    "state": "NC",
-   "county": "Cleveland",
+   "county": "(several)",
    "signal_columns": [
     "two_year_delinquent",
     "multi_year_delinquent_tax",
@@ -1620,14 +1623,30 @@
    "scope": [
     [
      "NC",
+     "Lincoln"
+    ],
+    [
+     "NC",
+     "Rutherford"
+    ],
+    [
+     "NC",
+     "McDowell"
+    ],
+    [
+     "NC",
      "Cleveland"
+    ],
+    [
+     "NC",
+     "Burke"
     ],
     [
      "NC",
      "Caldwell"
     ]
    ],
-   "short": "Cleveland/Caldwell tax",
+   "short": "NC Avalon tax",
    "loads": "small",
    "wall_class": "captcha"
   },
@@ -1829,15 +1848,16 @@
   {
    "id": "nc_tax_walled",
    "group": "county",
-   "place": "Ashe, Cherokee (NC), Halifax and Union (NC) Counties",
+   "place": "Ashe, Bertie, Cherokee (NC), Halifax and Union (NC) Counties",
    "name": "NC tax lookups behind a check or a login",
    "kind": "A",
-   "wall": "Ashe and Halifax: Cloudflare check on qPublic. Cherokee NC: tax statements behind an account login with a registration ID. Union NC: county tax pages answered 'Access Denied' to scripts.",
+   "wall": "Ashe and Halifax: Cloudflare check on qPublic. Cherokee NC: tax statements behind an account login with a registration ID. Union NC: county tax pages answered 'Access Denied' to scripts. Bertie: a Cloudflare check ('Verification required') in front of its tax-bill site, secure.webtaxpay.com (2026-10-09).",
    "url": "https://qpublic.schneidercorp.com/Application.aspx?App=AsheCountyNC&Layer=Parcels&PageType=Search",
    "what": "Tax-bill status for leads in these counties.",
    "steps": [
     "Open the county's tax site (county table below). Pass the check.",
-    "Search the parcel. Note unpaid years and amount due. For Cherokee NC, call the tax office if the site wants a registration ID you do not have."
+    "Search the parcel. Note unpaid years and amount due. For Cherokee NC, call the tax office if the site wants a registration ID you do not have.",
+    "Bertie: open <b>http://bertie.webtaxpay.com</b>, let the check finish, then search the PIN or the owner and note each year's balance and payment."
    ],
    "pull": "HOT leads only.",
    "save": "Notes in the CRM.",
@@ -1871,11 +1891,68 @@
     [
      "NC",
      "Union"
+    ],
+    [
+     "NC",
+     "Bertie"
     ]
    ],
    "short": "NC tax lookups",
    "loads": "small",
    "wall_class": "bot"
+  },
+  {
+   "id": "sc_tax_walled",
+   "group": "county",
+   "place": "Charleston, Georgetown, Dorchester and Anderson Counties, SC",
+   "name": "SC tax bill sites behind a check or a login",
+   "kind": "A",
+   "wall": "Charleston: a Cloudflare check (Turnstile) in front of every search on sc-charleston.publicaccessnow.com. Georgetown and the Dorchester treasurer's site (dorchestercountytaxesonline.com): Google CAPTCHA, and their data host answers HTTP 403 'Request blocked'. Anderson: the tax pages send you to the ACPASS sign-in (checked 2026-10-09).",
+   "url": "https://sc-charleston.publicaccessnow.com/",
+   "what": "Whether the county property tax on a lead's parcel is unpaid, and when recent years were paid. Charleston (4,232 board rows with a tax claim), Georgetown (361) and Anderson (446) have no other per-parcel source. Dorchester's delinquent-tax collector is now read by code (only bills that went delinquent); a payment made on time shows only on the treasurer's site.",
+   "steps": [
+    "Charleston: open <b>https://sc-charleston.publicaccessnow.com/</b>, choose Real Property Bill Search, let the check finish, enter the 10-digit PIN, open each year's bill and note the status, paid date and balance.",
+    "Georgetown: open <b>https://georgetowncountysctax.com/#/</b> (if it stays empty, use your phone on cellular data), pass the CAPTCHA, search the map number (for example 01-0426-004-00-00.001) and note each year's status and paid date.",
+    "Dorchester (only when a lead needs proof it was paid on time): open <b>https://dorchestercountytaxesonline.com</b>, pass the CAPTCHA, search the map number (NNN-NN-NN-NNN-NNN) and note each year's paid date.",
+    "Anderson: sign in to ACPASS with your own account, open Pay My Taxes, search the map number (NNN-NN-NN-NNN) and note each year's status and paid date."
+   ],
+   "pull": "Leads about to be mailed or called, highest rank first. 10 per sitting.",
+   "save": "A CSV in <b>~/Downloads</b> named <b>tax_checks_&lt;county&gt;_&lt;date&gt;.csv</b> (parcel_id, county, checked_on, unpaid_years, amount_due, paid_on_2025, paid_on_2024). No loader yet.",
+   "lane": "None.",
+   "time": "About 1 to 2 minutes per parcel.",
+   "often": "Monthly, and before any mailing.",
+   "gain": "A checked tax debt (or its removal) on SC leads in four counties. Charleston's own weekly tax-sale spreadsheet (RP-Tax-Sale-Listing.xlsx) shows who dropped off the sale list, a partial stand-in.",
+   "others": "The county treasurer's office by phone.",
+   "minutes_month": 40,
+   "leads": "per lead",
+   "state": "SC",
+   "county": "(several)",
+   "signal_columns": [
+    "two_year_delinquent",
+    "multi_year_delinquent_tax",
+    "tax_aging_surfaced"
+   ],
+   "scope": [
+    [
+     "SC",
+     "Charleston"
+    ],
+    [
+     "SC",
+     "Georgetown"
+    ],
+    [
+     "SC",
+     "Dorchester"
+    ],
+    [
+     "SC",
+     "Anderson"
+    ]
+   ],
+   "short": "SC tax lookups",
+   "loads": "small",
+   "wall_class": "captcha"
   },
   {
    "id": "nc_paid_images",
@@ -2940,6 +3017,10 @@
   [
    "Utility shutoff lists (NC)",
    "NC G.S. 132-1.1 removes utility billing records from the public-records law."
+  ],
+  [
+   "NC tax bills by year for Gates, Washington, Tyrrell and Perquimans",
+   "Gates' tax-bill portal publishes no bills (zero records on every search, 2026-10-08 and 10-09); Washington and Tyrrell link only a payment form with no lookup; Perquimans' site shows one account total with no years. The county tax offices answer by phone."
   ]
  ],
  "stop": [
@@ -2990,7 +3071,8 @@
   "Catalis/Avalon SC tax sites (Pickens, Chester, Hampton, Fairfield, Aiken): the shared CDN rate-limits (429 then 403 in September); at the safe pace a run reads about 75 bills, Pickens only, and the other four counties are never reached. A separate long lane is a run decision.",
   "NC DEQ land-use restriction layer (state contamination): needs an ArcGIS Online sign-in token since 2026-10; a person can browse the DEQ Land Use Restrictions search by hand. The public Brownfields point layer on the same server is an unwired partial substitute.",
   "McCormick SC forfeited land: the list is printed only in the McCormick Messenger; the treasurer page carries none (2026-10-08).",
-  "Greenwood SC tax portal (corebtpay): off season it lists only PAID bills; the reader now stops after a short check and resumes when unpaid bills return (after January 15)."
+  "Greenwood SC tax portal (corebtpay): off season it lists only PAID bills; the reader now stops after a short check and resumes when unpaid bills return (after January 15).",
+  "Anderson SC tax (2026-10-09, audit tax_checkers_2): the treasurer's Pay My Taxes and taxes pages sent a script to the ACPASS sign-in; the 2026-09-10 recheck above read the content as served before the redirect. Owner decision whether that is open; until then it is on the SC tax-lookups card and no verifier reads it."
  ],
  "sources_static": [
   "docs/MASTER_GAPS_WALLS_AND_MANUAL_LANES.md, docs/walls_register.md, docs/blocked_sources_forensic.md, docs/manual_source_inventory.md, docs/manual_playbook_and_limits.md, docs/honest_operator_manual.md, docs/operator_manual_manual_steps_and_paywalls_2026-10-04.md",
