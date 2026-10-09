@@ -53,7 +53,10 @@ GROUP_FLAGS = ("FORECLOSURE_COUNTY_LIEN_SWEEP", "FORECLOSURE_COUNTY_MARRIAGE_SWE
 
 #: marriage verdicts this group put in the matrix (state, county, column) -> value
 MARRIAGE_VERDICTS = {("SC", "greenville"): "none", ("NC", "lincoln"): "none", ("NC", "henderson"): "none",
-                     ("NC", "madison"): "none", ("NC", "orange"): "none"}
+                     ("NC", "madison"): "none", ("NC", "orange"): "none", ("NC", "franklin"): "none",
+                     ("NC", "gates"): "none", ("NC", "hertford"): "none", ("NC", "hyde"): "none",
+                     ("NC", "montgomery"): "none", ("NC", "caldwell"): "none", ("NC", "camden"): "none",
+                     ("NC", "caswell"): "none", ("NC", "chowan"): "none", ("NC", "currituck"): "none"}
 
 
 def _raw(row: dict) -> dict:

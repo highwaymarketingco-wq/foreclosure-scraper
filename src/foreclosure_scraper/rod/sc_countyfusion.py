@@ -199,11 +199,24 @@ def adverse_type_ids(types: list[tuple[str, str]]) -> list[str]:
 # the adapter
 # ------------------------------------------------------------------------------------------------
 
+
+def clean_name(name: Optional[str]) -> str:
+    """The owner string without the trailing comma / semicolon some county rolls leave on a name
+    ('DOE JOHN A,'), which makes the shared name parser drop the given name and search the surname alone."""
+    return re.sub(r"[\s,;]+$", "", name or "").strip()
+
+
 class CountyFusion(NcRodPlatform):
     platform = PLATFORM
     state = "SC"
     counties = COUNTIES
     cap_env = "FORECLOSURE_SC_COUNTYFUSION_ROD_MAX"
+
+    def search_by_name_sync(self, state, county, name, max_docs=80):
+        return super().search_by_name_sync(state, county, clean_name(name), max_docs)
+
+    def search_by_name_status_sync(self, state, county, name, max_docs=80):
+        return super().search_by_name_status_sync(state, county, clean_name(name), max_docs)
 
     def source_url(self, cfg: FusionCounty) -> str:
         return f"{cfg.base}login.do?countyname={cfg.name}"
@@ -286,4 +299,4 @@ async def search_by_name_status(state: str, county: str, name: str, max_docs: in
 
 
 def chain(county: str, owner_name: Optional[str], *, state: str = "SC", depth: int = 3) -> dict:
-    return ADAPTER.chain(county, owner_name, state=state, depth=depth)
+    return ADAPTER.chain(county, clean_name(owner_name), state=state, depth=depth)

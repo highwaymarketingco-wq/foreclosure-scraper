@@ -117,7 +117,7 @@ vm_load_env() {
   # 2026-10-09 top80 (register_other): marriage-index check on the six Cott v4 tenants that publish one
   # (Onslow, Alamance, Alexander, Pamlico, Edgecombe, Rutherford); plain HTTP, 1.6 s a host, 30 lookups a
   # county a run on its own budget; also gated by FORECLOSURE_NC_COTT_ROD.
-  # 2026-10-09 top80 (register_cchs_kofile): county-wide adverse-instrument sweeps of 22 Courthouse Computer
+  # 2026-10-09 top80 (register_cchs_kofile): county-wide adverse-instrument sweeps of 23 Courthouse Computer
   # Systems (classic ASP, LRSearch), GovOS CountyFusion and GovOS/Kofile PublicSearch counties, matched to every
   # board owner offline, plus Beaufort's Marriages index; plain HTTP, cached in data/county_sweeps. Sumter
   # (CountyFusion) and Beaufort (LRSearch) are also read by owner name (30 lookups a county a run).

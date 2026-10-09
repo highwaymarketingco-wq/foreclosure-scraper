@@ -298,7 +298,7 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: beaufortcountyrod.com 301s to us5.courthousecomputersystems.com/BeaufortNC2/ which shows a Terms of Use disclaimer with an Accept button (accuracy, indemnity and criminal-misuse text; no automation language), then tabs Consolidated Index, Vital Index, Old Index Books, View Images/Maps. The site's own 'What's Available?' dialog (POST WhatsAvailable/LR_GetWhatsAvailableHTML) returned 'Verified Date Range 8/31/1981 - 10/6/2026', Map books 0-45 plus several, Map Book 0-24, Highway Maps 1.",
-    "notes": "Keyed index from 8/31/1981; before that an 'Old Index Books' tab (scanned books, range not read). Registry row pointed at Beaufort County SC's site by mistake; this is the NC ROD. Repo found CCHS us5 images free for Burke/Cleveland (classic CCHS app); not tested on this LRSearch tenant."
+    "notes": "Keyed index from 8/31/1981; before that an 'Old Index Books' tab (scanned books, range not read). Registry row pointed at Beaufort County SC's site by mistake; this is the NC ROD. Repo found CCHS us5 images free for Burke/Cleveland (classic CCHS app); not tested on this LRSearch tenant. 2026-10-09: open, no login or CAPTCHA. The 10/7 'walled' was Cloudflare's passive jsd beacon on the landing page (a script path containing 'challenge-platform') read as a challenge page; the search pages answer 200. Read by rod/nc_lrsearch.py (name index) and rod/county_sweeps.py (adverse instruments by document type and date; the Marriages index by date). The site's Marriages tab is an open index (last/given/date), no login."
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -528,7 +528,7 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: us5.courthousecomputersystems.com/burkenc/ returned the ROD home with an accuracy-only disclaimer and 'Click here to acknowledge this disclaimer and enter the site' (JS window.open); no automation language. Repo evidence: rod/cchs.py reads Burke's SearchService.asp live (Cloudflare sits in front of SearchService.asp and intermittently 403s one TLS fingerprint or the other); rod/doc_images.py records Burke images FREE via GenerateSingleImageForPrint.asp (image/tiff).",
-    "notes": "MASTER_GAPS lists 'CCHS ROD (Burke/Lincoln/Cleveland/Henderson) DECOMMISSIONED' but cchs.py re-verified Burke live 2026-09-28 and 2026-10-02, and the landing page answered today; treat the MASTER_GAPS line as stale. Index start year not shown on the landing page."
+    "notes": "MASTER_GAPS lists 'CCHS ROD (Burke/Lincoln/Cleveland/Henderson) DECOMMISSIONED' but cchs.py re-verified Burke live 2026-09-28 and 2026-10-02, and the landing page answered today; treat the MASTER_GAPS line as stale. Index start year not shown on the landing page. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages."
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -624,7 +624,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: caldwellrod.org 'Real Estate Records' page says records date back to 1841 when the county was formed, 'All of our real estate indexes are available online and images of all of our documents are available from the early 1900's forward', and links 'Access Our Online Records' to us3.courthousecomputersystems.com/CaldwellNC/. That page answered 200 with an accuracy-only disclaimer and 'Click here to acknowledge this disclaimer and enter the site'. The reCAPTCHA flagged on caldwellrod.org is the site's own contact-form widget, not the search.",
-    "notes": "Index from 1841 per the ROD's own statement; images from the early 1900s on. Images: county states they are online, no fee mentioned; repo found the same CCHS classic app serves Burke images free. Same CCHS app family as Burke, so rod/cchs.py could likely be pointed at it (host us3, not us5). Registry's caldwellrod.com is not the ROD."
+    "notes": "Index from 1841 per the ROD's own statement; images from the early 1900s on. Images: county states they are online, no fee mentioned; repo found the same CCHS classic app serves Burke images free. Same CCHS app family as Burke, so rod/cchs.py could likely be pointed at it (host us3, not us5). Registry's caldwellrod.com is not the ROD. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -670,7 +673,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: camdencountync.gov/315/Register-of-Deeds links 'Search Land Conveyances' to us5.courthousecomputersystems.com/camdennc/ and states 'Online searches for land conveyances are available by name from May 3, 1999' (land records begin 1777). The CCHS page answered 200 with an accuracy-only disclaimer and 'Click here to acknowledge this disclaimer and enter the site'; it links an AlternaTIFF install page (TIFF image viewer). Registry's camdenrod.permitium.com is the vital-records order counter, not the ROD.",
-    "notes": "Shallow online index (1999 on); anything older needs the books in Camden. Same CCHS classic app family as Burke (whose images the repo found free); Camden image policy not tested."
+    "notes": "Shallow online index (1999 on); anything older needs the books in Camden. Same CCHS classic app family as Burke (whose images the repo found free); Camden image policy not tested. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -762,7 +768,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: caswellrod.net is a frameset onto us5.courthousecomputersystems.com/caswellnc/ (200). Its Search Online link goes to disclaimer.asp: accuracy-only disclaimer plus G.S. 132-1.10 redaction notice, no automation language. A 'Public and Genealogists' administrative-order PDF is linked (not read). Registry had no ROD row for Caswell.",
-    "notes": "Coverage years not stated on the pages read (secondary sources say land records start 1777; unverified). Same CCHS classic app family as Burke."
+    "notes": "Coverage years not stated on the pages read (secondary sources say land records start 1777; unverified). Same CCHS classic app family as Burke. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -952,7 +961,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: chowancounty-nc.gov menu 'Deeds Online' links us4.courthousecomputersystems.com/ChowanNC/, which answered 200 with the CCHS accuracy-only disclaimer and 'Click here to acknowledge this disclaimer and enter the site', plus an AlternaTIFF (TIFF image viewer) install link. Registry had no ROD row for Chowan.",
-    "notes": "Coverage years not stated on the landing page. Same CCHS classic app family as Burke (us4 host, like the repo's Lincoln/Henderson tenants)."
+    "notes": "Coverage years not stated on the landing page. Same CCHS classic app family as Burke (us4 host, like the repo's Lincoln/Henderson tenants). 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -1044,7 +1056,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: us5.courthousecomputersystems.com/clevelandnc/ answered 200 with the CCHS accuracy-only disclaimer. Repo evidence: rod/cchs.py reads Cleveland SearchService.asp (Cloudflare intermittently 403s one TLS fingerprint); rod/doc_images.py records Cleveland images free (same us5 host/app family as Burke).",
-    "notes": "MASTER_GAPS 'CCHS DECOMMISSIONED' line is stale for Cleveland (landing page and repo reader both live). Coverage years not shown on the landing page."
+    "notes": "MASTER_GAPS 'CCHS DECOMMISSIONED' line is stale for Cleveland (landing page and repo reader both live). Coverage years not shown on the landing page. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -1231,7 +1246,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: currituckcountync.gov/rod/ links 'Online Deed Search' to us3.courthousecomputersystems.com/currituckNC/, which answered 200 with the CCHS accuracy-only disclaimer page and menu (Search Online). No CAPTCHA on the deed site; the reCAPTCHA the registry flagged is on the county WordPress site's forms.",
-    "notes": "Coverage years not shown on the landing page. Same CCHS classic app family as Burke (us3 host, like Caldwell)."
+    "notes": "Coverage years not shown on the landing page. Same CCHS classic app family as Burke (us3 host, like Caldwell). 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -1277,7 +1295,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: us5.courthousecomputersystems.com/DareNC/ answered 200 with the CCHS accuracy-only disclaimer. The county page tax.darecountync.gov/deedhistory.php says the CCHS site shows documents recorded after 01/01/1976, 'Images are available and indexes are verified only from December 13, 1999 forward' (pre-1999 index copied from Cott tape, unverified), and offers a GET form (deedhistory_sql.php?parcel=<9-digit parcel>) that returns a parcel's deed history to get book/page for each transfer. Not submitted. darenc.gov itself returned Akamai 403 to a plain GET.",
-    "notes": "Rare free deed-chain-by-parcel tool: parcel number in, list of deed book/pages out, then images on CCHS. Index before 12/13/1999 is unverified tape conversion; before 1976 not online."
+    "notes": "Rare free deed-chain-by-parcel tool: parcel number in, list of deed book/pages out, then images on CCHS. Index before 12/13/1999 is unverified tape conversion; before 1976 not online. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -1418,7 +1439,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: duplinrod.com -> duplinrod.net frameset -> courthousecomputersystems.com/DuplinCountyROD/. Its 'Real Property Records Search' goes to a 'Disclaimer: Real Property Records' page (accuracy-only text plus farm-proximity notice; no automation language) whose link opens us4.courthousecomputersystems.com/duplinncnw/application.asp. Also offers free searches for marriage bonds, cohabitation records, enslaved-persons records and land grant maps. Did not open the application.",
-    "notes": "Registry's duplinrod.permitium.com 'login' row is the vital-records order counter, not the ROD. Coverage years not stated on the pages read. Same CCHS classic app family as Burke."
+    "notes": "Registry's duplinrod.permitium.com 'login' row is the vital-records order counter, not the ROD. Coverage years not stated on the pages read. Same CCHS classic app family as Burke. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts portal (Tyler Odyssey Smart Search, Estate case category); files are kept by the county Clerk of Superior Court, Estates division",
@@ -1609,7 +1633,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: GET landing page (200) shows accuracy/liability disclaimer and a click-to-enter link; GET FranklinNCNW/realestatesearch.asp (200) shows the search form with a Description field and the 'What's Available' text: Consolidated Real Property Verified Index 01/02/1950 to present, real estate deeds from Book 100 and consecutive books 650 to current, Maps C1-C3 and 1-14, 1989-2026, an 'Images as PDF' option and 'Log In To Print'. GET FranklinNCNW/application.asp returned a Cloudflare 'Just a moment' 403 challenge.",
-    "notes": "Images view on screen; printing needs a print-session login. Same CCHS app family where the repo verified free TIFF images (Burke, Lincoln, Henderson). The application window is behind an intermittent Cloudflare JS challenge for non-browser clients. Older deed books (below Book 650, other than the Book 100 series) may not be imaged online."
+    "notes": "Images view on screen; printing needs a print-session login. Same CCHS app family where the repo verified free TIFF images (Burke, Lincoln, Henderson). The application window is behind an intermittent Cloudflare JS challenge for non-browser clients. Older deed books (below Book 650, other than the Book 100 series) may not be imaged online. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -1701,7 +1728,10 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: gatesrod.net (200) is a frameset pointing at us5.courthousecomputersystems.com/gatesnc/; that landing page (200) has the standard CCHS accuracy disclaimer and Search Online link; GatesNCNW/realestatesearch.asp (200) shows the search form with 'Prior to 1995 / 1995 Forward' index choice, Description field, 'Images as PDF' and 'Log In To Print'. The 'What's Available' panel was empty in the static HTML.",
-    "notes": "Has a separate pre-1995 index; start year not stated in the HTML. Images: the search page offers 'Images as PDF' with no cart, and login is only for printing (same CCHS classic app where the repo verified free images in Burke, Lincoln and Henderson); an image was not opened."
+    "notes": "Has a separate pre-1995 index; start year not stated in the HTML. Images: the search page offers 'Images as PDF' with no cart, and login is only for printing (same CCHS classic app where the repo verified free images in Burke, Lincoln and Henderson); an image was not opened. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -2075,7 +2105,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: landing page (200) has the CCHS accuracy disclaimer and click-to-enter; HendersonNCNW/realestatesearch.asp (200) 'What's Available': verified date range 11/22/1966 to 10/02/2026, deed images books 200-1692, deed of trust images 173-2912, plat images 1-1491, condo plats, highway right-of-way. Repo rod/doc_images.py records Henderson CCHS images as free.",
-    "notes": "Note hendersondeeds.com is Henderson County KENTUCKY (repo trap). SearchService.asp sits behind an intermittent Cloudflare check for non-browser clients (repo rod/cchs.py). Deeds older than book 200 are not imaged online."
+    "notes": "Note hendersondeeds.com is Henderson County KENTUCKY (repo trap). SearchService.asp sits behind an intermittent Cloudflare check for non-browser clients (repo rod/cchs.py). Deeds older than book 200 are not imaged online. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -2121,7 +2154,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: hertfordrod.net (200) frames us4.courthousecomputersystems.com/hertfordnc/ (200, welcome page with Search Online link, no restriction text); HertfordNCNW/realestatesearch.asp (200) 'What's Available': Verified Deed Index 09/26/1901 to 09/23/2026, Deed Book A-V and 1-874, Map Book 1-13, Corporations Book 1-6; 'Images as PDF' option, 'Log In To Print'.",
-    "notes": "Strong county: verified index and deed books from 1901. Images view free (CCHS classic; printing needs login)."
+    "notes": "Strong county: verified index and deed books from 1901. Images view free (CCHS classic; printing needs login). 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -2213,7 +2249,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: hyderod.net (200) frames us4.courthousecomputersystems.com/Hydenc/ (200, home page with Search Online and Plat Cross References); HydeNCNW/realestatesearch.asp (200) 'What's Available': verified date range 01/24/1991 to 10/02/2026, deed images books 40-41, 81-84, 95, 102-314, plat images, land book images 1-7, land title maps.",
-    "notes": "Index verified only from 1991 although older deed books are imaged; pre-1991 chains may need the imaged books browsed by book/page."
+    "notes": "Index verified only from 1991 although older deed books are imaged; pre-1991 chains may need the imaged books browsed by book/page. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -2536,7 +2575,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: lincolnrod.com (200) office site; LincolnNCNW/realestatesearch.asp (200) 'What's Available': verified date range printed as '12/01/0992 - 07/15/2026' (start year is a data-entry error), deed images from book 0 upward, plat images, articles of incorporation, chattel mortgages, 'Deed 1779-1783' and grant images; 'Log In To Print' only. Repo rod/doc_images.py lists Lincoln CCHS images as free.",
-    "notes": "Old deed and grant books are imaged, but the verified-index start year cannot be read from the page. SearchService.asp has an intermittent Cloudflare check for non-browser clients (repo rod/cchs.py)."
+    "notes": "Old deed and grant books are imaged, but the verified-index start year cannot be read from the page. SearchService.asp has an intermittent Cloudflare check for non-browser clients (repo rod/cchs.py). 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -2629,7 +2671,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: MadisonNCNW/realestatesearch.asp (200) 'What's Available': Pre-1995 Real Property Index 07/01/1987-12/31/1994, Consolidated Real Property Verified Index 01/01/1995 to 10/06/2026, Consolidated Book 0 and 298-842, Deed Book 0-297, Plat 0-11; 'Images as PDF', 'Log In To Print' only.",
-    "notes": "All deed books (0-842) are listed as imaged, but the name index only reaches 1987; earlier chains mean browsing imaged books by book/page from the deed references."
+    "notes": "All deed books (0-842) are listed as imaged, but the name index only reaches 1987; earlier chains mean browsing imaged books by book/page from the deed references. 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -2860,7 +2905,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: montgomeryrod.net (200) frames us4.courthousecomputersystems.com/montgomerync/; MontgomeryNCNW/realestatesearch.asp (200) 'What's Available': verified date range 06/15/1792 to 10/06/2026, deed images across old and modern books, map images, condo, highway maps; 'Images as PDF', 'Log In To Print' only.",
-    "notes": "Strongest index depth in the batch (verified from 1792)."
+    "notes": "Strongest index depth in the batch (verified from 1792). 2026-10-09: realestatesearch.asp and SearchService.asp answer an ordinary polite request with HTTP 200 and no challenge (application.asp, the frame page, is the Cloudflare 403); rod/county_sweeps.py reads the county's adverse instruments (liens, judgments, lis pendens, foreclosures, tax liens) from those two pages. The instrument dictionary has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -3142,7 +3190,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: landing page (200) has the CCHS accuracy disclaimer and click-to-enter; OrangeNCNW/realestatesearch.asp (200) 'What's Available': verified date range 09/01/1932 to 9/24/2026, Records Book 1-59, Deed of Trust Book A and 1-212, Plat Book 1-128, highway maps; search has a 'Description / PIN' field; 'Log In To Print' only.",
-    "notes": "Images view free (CCHS classic; printing needs login)."
+    "notes": "Images view free (CCHS classic; printing needs login). 2026-10-09: adverse instruments swept county-wide (rod/county_sweeps.py); the instrument dictionary (191 kinds) has no marriage kind.",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
@@ -5720,7 +5771,10 @@
     "plat_books_or_maps_online": "yes",
     "terms_forbid_automation": "unknown",
     "how_verified": "2026-10-07: county 'Search Records' page lists Grantor/Grantee/Mortgagor/Mortgagee indexes 1787 to present, plats index 1951+, document images: deeds 1787+, mortgages 1919+, plats 1903+, misc liens 1955+; pre-1985 section = all index books, deeds and land grants; links GovOS Cloud Search, the viewer, and the library's pre-1800 deed books. Opened greenville.sc.publicsearch.us landing: no sign-in wall shown, but a notice that S.C. Code 30-2-50 makes using these records for commercial solicitation a misdemeanor. viewer.greenvillecounty.org is a JS app (not run). No search was run.",
-    "notes": "Deepest free online reach in this batch. Image access cost not stated on the pages read (only certified copies are sold). GovOS search may want a free account (Oconee's GovOS site does); not checked. Repo MASTER_GAPS lists Greenville as a county the owner said not to build new sources for, so any automation here is the owner's call."
+    "notes": "Deepest free online reach in this batch. Image access cost not stated on the pages read (only certified copies are sold). GovOS search may want a free account (Oconee's GovOS site does); not checked. Repo MASTER_GAPS lists Greenville as a county the owner said not to build new sources for, so any automation here is the owner's call. 2026-10-09: marriage licences are issued by the Probate Court; the register has no marriage instrument type and the county's Probate Case Search (free, by name) lists estate and guardianship party types only (no applicant, spouse or licence case).",
+    "column_access": {
+     "marriage_license": "none"
+    }
    },
    "probate": {
     "system": "Greenville County Probate Court 'Probate Case Search' (greenvillecounty.org/appsAS400/Probate): free search by party name or case number with party-type filter, no login (opened 2026-10-07; repo research 2026-09-21 says the detail page gives decedent address and date of death). Copies by request form or email. Not in the southcarolinaprobate.net dropdown.",
@@ -6373,7 +6427,7 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "unknown",
     "how_verified": "2026-10-07: landing loads as 'Official Record Search - Quick Search - Oconee County Register of Deeds' with optional Sign In/Register, a Cart, and an anonymous session. robots.txt is 'Allow: /$, Disallow: /'. Year 1955 is from the repo's rod/kofile.py (2026-10-02), which read the doc-type facets across '1955-2026 history'. No search run. Contrast: the Greenwood tenant of the same platform (greenwood.sc.publicsearch.us) now says a verified account is required.",
-    "notes": "Anonymous search works per repo (WebSocket API). robots.txt disallows everything but the home page (owner policy: robots is not a wall, but noted). Cart suggests paid copies; repo's doc_images.py lists Oconee images as free via a stealth browser."
+    "notes": "Anonymous search works per repo (WebSocket API). robots.txt disallows everything but the home page (owner policy: robots is not a wall, but noted). Cart suggests paid copies; repo's doc_images.py lists Oconee images as free via a stealth browser. 2026-10-09: adverse instruments swept county-wide by document type and date (rod/county_sweeps.py, PublicSearch WebSocket, docTypes filter)."
    },
    "probate": {
     "system": "southcarolinaprobate.net: Oconee Probate's own page says 'Our records are now available online' at the SC Probate Website, index only (no document images), marriage licenses from 1988. The repo's 2026-10-02 probe of that site returned 'no records' for a common surname, which conflicts with the county's statement.",
@@ -6655,7 +6709,7 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "unknown",
     "how_verified": "2026-10-07: sumtercountysc.gov ROD page links 'RoD Document Search' to countyfusion2.kofiletech.us (SumterSC). Its page says 'Click the Login as Guest button to begin' and has a 'Login as Guest' button (no password), alongside optional accounts. County page warns not to rely on the database for title searches. Stopped before entering.",
-    "notes": "Guest click-through, no credentials. Coverage dates appear only after entry."
+    "notes": "Guest click-through, no credentials. Coverage dates appear only after entry. 2026-10-09: the 'Login as Guest' button takes no username or password and the disclaimer is a plain Accept; no CAPTCHA or challenge. Read by rod/sc_countyfusion.py (name index) and rod/county_sweeps.py (adverse instruments by document type and date)."
    },
    "probate": {
     "system": "Sumter County Probate Court. Listed in the southcarolinaprobate.net dropdown, but the repo's 2026-10-02 probe returned 'no records', so the court does not appear to feed it.",

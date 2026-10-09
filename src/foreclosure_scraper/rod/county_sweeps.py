@@ -210,7 +210,7 @@ _NOT_ADV = re.compile(r"SATISF|RELEASE|WITHDRAW|CANCEL|AMEND|SUBORDIN|ASSIGN|RES
 #: Courthouse Computer Systems classic-ASP tenants on the vendor's own us3/us4/us5 servers: county ->
 #: (server, application folder). Read 2026-10-09: application.asp (the frame page) answers a script with a
 #: Cloudflare 403, but realestatesearch.asp and SearchService.asp (the two pages the search itself uses)
-#: answer an ordinary browser request with a plain 200 on 15 of 15 tenants tried, no challenge, no cookie
+#: answer an ordinary browser request with a plain 200 on 17 of 17 tenants (all swept end to end), no challenge, no cookie
 #: from application.asp needed. This reader asks for those two and nothing else; the first challenge,
 #: CAPTCHA or 403 walls the county for the run (nc_polite) and nothing retries it.
 HOSTED_CCHS: dict[str, tuple[str, str]] = {

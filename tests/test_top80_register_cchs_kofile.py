@@ -271,6 +271,14 @@ def test_lr_adapter_name_search_and_checked_negative(monkeypatch):
     assert not any(u.rstrip("/").endswith("BeaufortNC2") for m, u, p, d in sess.calls)   # the landing page is never fetched
 
 
+def test_name_adapters_drop_a_trailing_comma_before_parsing(monkeypatch):
+    sess = install(monkeypatch, lr_routes(lambda m, u, p, d: FakeResp(grid([]))), L.ADAPTER)
+    L.ADAPTER.search_by_name_status_sync("NC", "Beaufort", "TESTER ALVIN Q,")
+    post = [d for m, u, p, d in sess.calls if m == "POST"][0]
+    assert post["Last"] == "TESTER" and post["Given"] == "ALVIN"       # not a surname-only search
+    assert F.clean_name("TESTER ALVIN Q , ;") == "TESTER ALVIN Q" and L.clean_name(None) == ""
+
+
 # ------------------------------------------------------------------------------------------------
 # the sweep core
 # ------------------------------------------------------------------------------------------------

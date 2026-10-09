@@ -185,3 +185,22 @@ server action paced on the same per-host clock and wall-checked, one browser in 
 lookup at a time per county. Every adapter is tested on hand-written pages (made-up names) for the parse, an
 empty answer, an error page and a blocked page; the browser adapters through the real page wrapper with a
 scripted fake browser page.
+
+## Update 2026-10-09 (top-80 build, CCS and GovOS registers): what the "walled" rows really were
+
+* **CCS LRSearch (Beaufort)** is open: no login, CAPTCHA or challenge. The 10/7 "challenge marker" was Cloudflare's
+  passive browser beacon (a script path containing `challenge-platform/scripts/jsd/main.js`) on the landing page,
+  which the shared wall detector reads as a challenge page. Its search pages answer 200 to an ordinary request.
+  Read by `rod/nc_lrsearch.py` (name index, Marriages index) and `rod/county_sweeps.py` (adverse instruments).
+* **CCS classic ASP on the vendor's us3/us4/us5 servers**: `application.asp` (the frame page) is the Cloudflare 403;
+  `realestatesearch.asp` and `SearchService.asp`, the two pages the search itself uses, answered an ordinary request
+  with HTTP 200 and no challenge on 17 of 17 tenants (all swept end to end) (Caldwell, Camden, Caswell, Chowan, Currituck, Dare,
+  Duplin, Franklin, Gates, Hertford, Hyde, Montgomery, Madison, Lincoln, Henderson). `rod/county_sweeps.py` asks for
+  those two pages only, through a client that does not mistake the passive beacon for a challenge and still walls the
+  county on a "Just a moment" page, a CAPTCHA or any 403/503. Deed chains and mortgages by name stay with a person
+  (the older reader `rod/cchs.py` is unchanged).
+* **GovOS CountyFusion (Sumter)**: "Login as Guest" is a button on the login form that takes no username or password
+  (the same shape as the Cott "Sign in as a Guest" button ruled a click-through on 2026-10-07), then a plain Accept on
+  the disclaimer. Read by `rod/sc_countyfusion.py` and the sweeps.
+* **GovOS/Kofile PublicSearch (Oconee)**: the document-type list is embedded in the root page; the WebSocket accepts a
+  `docTypes` filter with a date range, so every adverse instrument of a window can be listed.
