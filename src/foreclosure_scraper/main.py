@@ -1411,6 +1411,10 @@ async def run() -> int:
             # task that dies here must not take the whole phase with it.
             log.error("orchestrator.scraper_task_failed", source=t.get_name(),
                       traceback=traceback.format_exc())
+    # `done` is a set: put the results back in scraper order so dedupe keeps the same winner on
+    # every run (audit 2026-10-09, regressions).
+    _slug_order = {s.slug: i for i, s in enumerate(scrapers)}
+    results.sort(key=lambda r: _slug_order.get(r[0], len(_slug_order)))
 
     raw: list[Listing] = []
     by_source: Counter = Counter()
