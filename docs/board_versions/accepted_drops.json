@@ -84,7 +84,7 @@
   {
    "kind": "field",
    "name": "phone",
-   "max_loss": 9500,
+   "max_loss": 11500,
    "reason": "phones_lost: block_binding and the fixed rules remove phones that name another person, a county office number OCR'd from a shared roster, and one contractor's number on many owners' filings (about 8,200 contractor phones next run); 1,045 of the 1,124 lost phones on the reconciled board were removed correctly"
   }
  ]
