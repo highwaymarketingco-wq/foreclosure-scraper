@@ -260,3 +260,36 @@ def test_the_normalizer_check_flags_a_city_tail_conflict(monkeypatch):
     c2 = type(c)()
     c2.feed(row)
     assert c2.finish()["violations"] == 1
+
+
+# --------------------------------------------------------------------------------------------
+# the best-of-both phone restore (scripts/restore_best_of_both_phones.py)
+# --------------------------------------------------------------------------------------------
+
+def _restore_mod():
+    import importlib.util
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "scripts"))
+    spec = importlib.util.spec_from_file_location("restore_bob", root / "scripts" / "restore_best_of_both_phones.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_restore_brings_the_filing_with_its_phone_and_keeps_only_what_the_rules_keep():
+    m = _restore_mod()
+    live = _row("PAT Q SAMPLE", "900 SAMPLE RD", "Pat Sample", source="counties_generic.liensnc")
+    cand = {k: v for k, v in live.items() if k != "raw"}
+    cand["street_address"] = "900 SAMPLE RD CHARLOTTE NC 28207"
+    cand["raw"] = {"gis": {"owner": "PAT Q SAMPLE"}}
+    blocks = m.candidate_block(live, cand)
+    assert set(blocks) == {"owner_phone", "liensnc"}
+    assert m.kept_by_rules(cand, blocks)
+    builder = _row("PAT Q SAMPLE", "900 SAMPLE RD", "Example Builders", source="counties_generic.liensnc")
+    assert not m.kept_by_rules(cand, m.candidate_block(builder, cand))
+    # a voter phone brings no filing along
+    voter = {**live, "raw": {"owner_phone": {"phone": "(704) 555-0109", "source": "ncsbe_voter"},
+                             "liensnc": live["raw"]["liensnc"]}}
+    assert set(m.candidate_block(voter, cand)) == {"owner_phone"}

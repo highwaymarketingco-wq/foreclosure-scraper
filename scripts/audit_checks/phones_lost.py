@@ -41,7 +41,7 @@ from foreclosure_scraper.verification.core import address_relation  # noqa: E402
 SAMPLE = 8
 #: violations allowed. Each is a defect fixed in code (address_key, block_binding, nc_lincoln_bulk +
 #: parcel_alias); the 10/7 and aa680fba boards predate the fixes and fail the last three. The
-#: normalizer keeps 11 (aa680fba) / 7 (10/7) rows whose street has no suffix ("10 THE SAMPLE
+#: normalizer read 1,404 of 1,422 such aa680fba rows as another house; it keeps 11 (aa680fba) / 7 (10/7) rows whose street has no suffix ("10 THE SAMPLE
 #: CHARLOTTE NC"): the city cannot be told from the street there; 15 leaves room for a few more.
 MAX = {
     "phones-address-tail-normalizer": 15,
