@@ -1,0 +1,55 @@
+{
+ "buckets": 1,
+ "counts": {
+  "confirmed": 82,
+  "refuted": 31,
+  "rows": 125,
+  "stale": 0,
+  "unconfirmed": 12,
+  "wall": 0
+ },
+ "generated_at": "2026-10-07T01:50:40Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "SMB-LTSEO05",
+ "kind": "verification_ledger_manifest",
+ "last_run": {
+  "at": "2026-10-07T01:50:40Z",
+  "host": "SMB-LTSEO05",
+  "keys_file": false,
+  "recheck": true,
+  "requests": {
+   "errors": {},
+   "requests": {
+    "gis.buncombecounty.org": 152,
+    "tax.buncombenc.gov": 318,
+    "vt.ncsbe.gov": 315
+   }
+  },
+  "result": {
+   "checked": 115,
+   "confirmed": 82,
+   "refuted": 31,
+   "unconfirmed": 2
+  },
+  "seconds": 1020,
+  "verdicts": [
+   "confirmed",
+   "refuted",
+   "stale"
+  ]
+ },
+ "rows": 125,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 234383,
+   "file": "000.json",
+   "rows": 125,
+   "sha256": "bee7b23d49e2e4f58ac32524b381fad4e9643eedd7ec32cfa29870625980243c"
+  }
+ ],
+ "signal": "elderly_disabled",
+ "version": 1
+}

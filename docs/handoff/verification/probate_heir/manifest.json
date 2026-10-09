@@ -1,0 +1,50 @@
+{
+ "buckets": 1,
+ "counts": {
+  "confirmed": 18,
+  "refuted": 1,
+  "rows": 55,
+  "stale": 0,
+  "unconfirmed": 36,
+  "wall": 0
+ },
+ "generated_at": "2026-10-07T18:13:20Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "SMB-LTSEO05",
+ "kind": "verification_ledger_manifest",
+ "last_run": {
+  "at": "2026-10-07T18:13:20Z",
+  "host": "SMB-LTSEO05",
+  "keys_file": true,
+  "recheck": true,
+  "requests": {
+   "errors": {
+    "registerofdeeds.buncombenc.gov": 1
+   },
+   "requests": {
+    "gis.buncombecounty.org": 1,
+    "registerofdeeds.buncombenc.gov": 2
+   }
+  },
+  "result": {
+   "checked": 1,
+   "unconfirmed": 1
+  },
+  "seconds": 63,
+  "verdicts": []
+ },
+ "rows": 55,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 110903,
+   "file": "000.json",
+   "rows": 55,
+   "sha256": "904b4e118b58bb93c658fab48a2e668c0f3f698ccb91eeb356b23704bcd64f7d"
+  }
+ ],
+ "signal": "probate_heir",
+ "version": 1
+}

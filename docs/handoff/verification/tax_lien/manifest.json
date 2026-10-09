@@ -1,0 +1,205 @@
+{
+ "buckets": 16,
+ "counts": {
+  "confirmed": 11560,
+  "refuted": 775,
+  "rows": 19709,
+  "stale": 1598,
+  "unconfirmed": 5776,
+  "wall": 0
+ },
+ "generated_at": "2026-10-09T00:37:43Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "SMB-LTSEO05",
+ "kind": "verification_ledger_manifest",
+ "last_run": {
+  "at": "2026-10-09T00:37:42Z",
+  "county": null,
+  "host": "SMB-LTSEO05",
+  "max_rows": 12500,
+  "recheck_only": false,
+  "requests": {
+   "errors": {
+    "bcpwa.ncptscloud.com": 1,
+    "newhanovercountynccss.munisselfservice.com": 1,
+    "tax.onslowcountync.gov": 1
+   },
+   "requests": {
+    "allendaletreasurer.qpaybill.com": 6,
+    "bambergcountytreasurer.qpaybill.com": 3,
+    "barnwelltreasurer.qpaybill.com": 10,
+    "bcpwa.ncptscloud.com": 5932,
+    "calhountreasurer.qpaybill.com": 6,
+    "cherokeecountysctax.qpaybill.com": 23,
+    "chesterfieldcountytax.qpaybill.com": 7,
+    "clarendoncountysctax.qpaybill.com": 21,
+    "colleton.qpaybill.com": 156,
+    "darlingtontreasurer.qpaybill.com": 152,
+    "dilloncountysctaxes.qpaybill.com": 6,
+    "edgefieldcountysc.qpaybill.com": 185,
+    "horrycountytreasurer.qpaybill.com": 429,
+    "jaspercountydelinquenttax.qpaybill.com": 77,
+    "kershawcounty.qpaybill.com": 552,
+    "lancastersctax.qpaybill.com": 48,
+    "laurenstreasurer.qpaybill.com": 97,
+    "leetreasurer.qpaybill.com": 7,
+    "lexingtoncountytreasurer.qpaybill.com": 988,
+    "marlborocountytax.qpaybill.com": 268,
+    "mccormicktreasurer.qpaybill.com": 88,
+    "newberrytreasurer.qpaybill.com": 75,
+    "newhanovercountynccss.munisselfservice.com": 3793,
+    "oconeesctax.qpaybill.com": 513,
+    "orangeburgtreasurer.qpaybill.com": 12,
+    "saludacountytreasurer.qpaybill.com": 176,
+    "services1.arcgis.com": 31,
+    "spartanburgcountytax.qpaybill.com": 701,
+    "sumtercounty.qpaybill.com": 81,
+    "tax.buncombenc.gov": 5281,
+    "tax.onslowcountync.gov": 121,
+    "taxes.paystar.io": 23,
+    "uniontreasurer.qpaybill.com": 3,
+    "williamsburgtreasurer.qpaybill.com": 406,
+    "www.bttaxpayerportal.com": 647
+   }
+  },
+  "result": {
+   "checked": 12500,
+   "confirmed": 8156,
+   "deferred": 841,
+   "rechecked_after_deferral": 841,
+   "refuted": 485,
+   "stale": 707,
+   "unconfirmed": 3152
+  },
+  "seconds": 14444,
+  "selection": {
+   "applies": 71592,
+   "due_new": 62491,
+   "due_version": 7887,
+   "not_due_retry": 117,
+   "not_due_ttl": 1097,
+   "same_property_queued": 214
+  },
+  "source": null,
+  "tier": null
+ },
+ "rows": 19709,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 1797952,
+   "file": "000.json",
+   "rows": 1179,
+   "sha256": "76cd4a2a5e87ce5bc814d2fa667d20ebb3cef162091b1b890cb10fa603839849"
+  },
+  {
+   "bucket": 1,
+   "bytes": 1893889,
+   "file": "001.json",
+   "rows": 1262,
+   "sha256": "8fc21ac806c97b55eacb55c64adc405ecae6456197085a3433b00cba0983e072"
+  },
+  {
+   "bucket": 2,
+   "bytes": 1880021,
+   "file": "002.json",
+   "rows": 1262,
+   "sha256": "0d79c36d2ab7fa8a2767087ea4cd7cb35e0ac03167f3311217303a902257d7a3"
+  },
+  {
+   "bucket": 3,
+   "bytes": 1861759,
+   "file": "003.json",
+   "rows": 1225,
+   "sha256": "dfe5410893450e3f71b38a405efc4c41db293578d49950215b8b42310ecbeed1"
+  },
+  {
+   "bucket": 4,
+   "bytes": 1822755,
+   "file": "004.json",
+   "rows": 1205,
+   "sha256": "112e16c88d26c75dfb055d4a0b5cb9fa94a0ffe939109b043f039b629a60aa05"
+  },
+  {
+   "bucket": 5,
+   "bytes": 1910831,
+   "file": "005.json",
+   "rows": 1249,
+   "sha256": "de2adc998dedb619189079b60b17aae25cf12ed81215000d9d831fb1fdc2f281"
+  },
+  {
+   "bucket": 6,
+   "bytes": 1808075,
+   "file": "006.json",
+   "rows": 1208,
+   "sha256": "4ca7bb2f30dde7439487453700789f60b61f8c7f94249dae5a683df9b69864a5"
+  },
+  {
+   "bucket": 7,
+   "bytes": 1856243,
+   "file": "007.json",
+   "rows": 1236,
+   "sha256": "d6d960cd2aa708c72e35484f5afdc10d29fdb5d3f24b329bd39f34f2ea80eede"
+  },
+  {
+   "bucket": 8,
+   "bytes": 1879200,
+   "file": "008.json",
+   "rows": 1248,
+   "sha256": "371ca1d2d3a27c209334e9b7237ccf1e22627a49838fd4934b844c2ea01df5df"
+  },
+  {
+   "bucket": 9,
+   "bytes": 1895210,
+   "file": "009.json",
+   "rows": 1263,
+   "sha256": "ca3ee30748f1e5f1cdab8cf3940376ec758b2f5eafbbb520bae2d9f7adf936ad"
+  },
+  {
+   "bucket": 10,
+   "bytes": 1767937,
+   "file": "010.json",
+   "rows": 1197,
+   "sha256": "59252740207d9c983c06099e69d2d12c33c32901c2478d70e7eec86bc29227fb"
+  },
+  {
+   "bucket": 11,
+   "bytes": 1797783,
+   "file": "011.json",
+   "rows": 1210,
+   "sha256": "b7d69c5adae5ccc1a3e1ac4cfbf8728314653f4887ab4a8f43b6d37a7f0ae1f7"
+  },
+  {
+   "bucket": 12,
+   "bytes": 1854831,
+   "file": "012.json",
+   "rows": 1249,
+   "sha256": "1ce54e448e789c3e1618c77aece17427b73568123f34b69ef848b2aa77f42fa5"
+  },
+  {
+   "bucket": 13,
+   "bytes": 1846558,
+   "file": "013.json",
+   "rows": 1231,
+   "sha256": "695d9232d88eb7056716e1ae8f76221e9c7828c8625fde9bf6e1155ad4f7d81c"
+  },
+  {
+   "bucket": 14,
+   "bytes": 1894346,
+   "file": "014.json",
+   "rows": 1255,
+   "sha256": "4338be3cd690e082a5232e294e7fbe7e96960c4271bfcf22d0124420798bd6ad"
+  },
+  {
+   "bucket": 15,
+   "bytes": 1874433,
+   "file": "015.json",
+   "rows": 1230,
+   "sha256": "268770b2477a7d18a1cde13c56884c45dfdbd9320ffd871c5e28f6119a7149ff"
+  }
+ ],
+ "signal": "tax_lien",
+ "version": 1
+}

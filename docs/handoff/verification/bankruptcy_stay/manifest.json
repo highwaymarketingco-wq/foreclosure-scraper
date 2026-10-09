@@ -1,0 +1,52 @@
+{
+ "buckets": 1,
+ "counts": {
+  "confirmed": 6,
+  "refuted": 63,
+  "rows": 100,
+  "stale": 1,
+  "unconfirmed": 28,
+  "wall": 0
+ },
+ "generated_at": "2026-10-06T22:14:29Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "SMB-LTSEO05",
+ "kind": "verification_ledger_manifest",
+ "last_run": {
+  "at": "2026-10-06T22:14:29Z",
+  "host": "SMB-LTSEO05",
+  "keys_file": false,
+  "recheck": true,
+  "requests": {
+   "errors": {},
+   "requests": {
+    "www.courtlistener.com": 77
+   }
+  },
+  "result": {
+   "checked": 76,
+   "refuted": 63,
+   "stale": 1,
+   "unconfirmed": 12
+  },
+  "seconds": 142,
+  "verdicts": [
+   "refuted",
+   "stale"
+  ]
+ },
+ "rows": 100,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 132468,
+   "file": "000.json",
+   "rows": 100,
+   "sha256": "603d21b2b99e8805f63214e28b1af8eda8f9ed06ce3057ad072e16449a8ea536"
+  }
+ ],
+ "signal": "bankruptcy_stay",
+ "version": 1
+}

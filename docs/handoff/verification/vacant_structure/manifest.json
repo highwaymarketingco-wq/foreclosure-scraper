@@ -1,0 +1,53 @@
+{
+ "buckets": 1,
+ "counts": {
+  "confirmed": 28,
+  "refuted": 1,
+  "rows": 50,
+  "stale": 2,
+  "unconfirmed": 19,
+  "wall": 0
+ },
+ "generated_at": "2026-10-06T20:33:57Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "SMB-LTSEO05",
+ "kind": "verification_ledger_manifest",
+ "last_run": {
+  "at": "2026-10-06T20:15:37Z",
+  "host": "SMB-LTSEO05",
+  "keys_file": false,
+  "recheck": true,
+  "requests": {
+   "errors": {},
+   "requests": {
+    "gisweb.hendersoncountync.gov": 3,
+    "services1.arcgis.com": 3
+   }
+  },
+  "result": {
+   "checked": 6,
+   "refuted": 1,
+   "stale": 2,
+   "unconfirmed": 3
+  },
+  "seconds": 7,
+  "verdicts": [
+   "refuted",
+   "stale"
+  ]
+ },
+ "rows": 50,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 64231,
+   "file": "000.json",
+   "rows": 50,
+   "sha256": "d444a0da5faff03a945e66e4ea99939822fb2981301456add46a7ac95a3982c1"
+  }
+ ],
+ "signal": "vacant_structure",
+ "version": 1
+}

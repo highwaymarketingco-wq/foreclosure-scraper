@@ -1,0 +1,53 @@
+{
+ "buckets": 1,
+ "counts": {
+  "confirmed": 17,
+  "refuted": 1,
+  "rows": 106,
+  "stale": 5,
+  "unconfirmed": 81,
+  "wall": 0
+ },
+ "generated_at": "2026-10-06T20:33:57Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "SMB-LTSEO05",
+ "kind": "verification_ledger_manifest",
+ "last_run": {
+  "at": "2026-10-06T20:16:26Z",
+  "host": "SMB-LTSEO05",
+  "keys_file": false,
+  "recheck": true,
+  "requests": {
+   "errors": {},
+   "requests": {
+    "gis.buncombecounty.org": 8,
+    "registerofdeeds.buncombenc.gov": 17
+   }
+  },
+  "result": {
+   "checked": 8,
+   "refuted": 1,
+   "stale": 5,
+   "unconfirmed": 2
+  },
+  "seconds": 33,
+  "verdicts": [
+   "refuted",
+   "stale"
+  ]
+ },
+ "rows": 106,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 201905,
+   "file": "000.json",
+   "rows": 106,
+   "sha256": "83ed693268ed0093ee80ad2f1aa2f678723f0ab01eeeb50db91458852c529783"
+  }
+ ],
+ "signal": "foreclosure_rod",
+ "version": 1
+}

@@ -1,0 +1,60 @@
+{
+ "buckets": 1,
+ "counts": {
+  "confirmed": 137,
+  "refuted": 21,
+  "rows": 227,
+  "stale": 19,
+  "unconfirmed": 48,
+  "wall": 0
+ },
+ "generated_at": "2026-10-06T20:33:57Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "SMB-LTSEO05",
+ "kind": "verification_ledger_manifest",
+ "last_run": {
+  "at": "2026-10-06T20:27:48Z",
+  "host": "SMB-LTSEO05",
+  "keys_file": false,
+  "recheck": true,
+  "requests": {
+   "errors": {},
+   "requests": {
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:p2c.lincolnsheriff.org": 1,
+    "roster:tepsweb.cityofgastonia.com": 1
+   }
+  },
+  "result": {
+   "checked": 54,
+   "confirmed": 2,
+   "refuted": 21,
+   "stale": 19,
+   "unconfirmed": 12
+  },
+  "seconds": 27,
+  "verdicts": [
+   "refuted",
+   "stale"
+  ]
+ },
+ "rows": 227,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 288955,
+   "file": "000.json",
+   "rows": 227,
+   "sha256": "e8a248b808193fa0bd0ca8d1ddc5ee26ce0225dc7774d98089f974dca8455787"
+  }
+ ],
+ "signal": "jail_booking",
+ "version": 1
+}
