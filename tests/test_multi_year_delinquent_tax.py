@@ -94,12 +94,12 @@ def test_buncombe_owner_and_situs_come_from_the_right_columns():
 
 
 def test_buncombe_situs_is_not_the_mailing_address():
-    """house_num='0' + street 'TIPTON HILL RD' is the parcel; '23 BULLMAN DR' is
+    """house_num='0' + street 'TIPTON HILL RD' is the parcel; '23 SAMPLEMAN DR' is
     where the taxpayer gets mail. Confusing the two invents a fake situs and
     destroys the absentee signal."""
     _, ob = myd.row_to_obs(FIX["buncombe_2025_absentee_situs_differs"], BUNC(2025))
     assert ob.situs == "TIPTON HILL RD"
-    assert ob.mailing.startswith("23 BULLMAN DR")
+    assert ob.mailing.startswith("23 SAMPLEMAN DR")
 
 
 def test_buncombe_keeps_the_owed_components():

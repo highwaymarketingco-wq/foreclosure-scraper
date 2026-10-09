@@ -76,8 +76,8 @@ def parse_contact(cell: str) -> dict:
     """Split a LiensNC party cell into name / address / phone / email.
 
     Cells look like:
-      "Kristie Richardson & Michael Richardson 139 Ball Gap Rd, Arden, NC 28704
-       United States Phone: 828-551-2326 richardson.michaeld@ymail.com"
+      "Kristie Richardson & Michael Richardson 139 Sample Gap Rd, Arden, NC 28704
+       United States Phone: 828-555-0485 contact01@sample-mail.test"
     """
     out: dict = {}
     txt = cell

@@ -145,11 +145,11 @@ const propertyData = {
   <div class="callout background-navy">
     <h2>Agent Information</h2>
     <p>Damion  Patton <br>
-      Damion Patton <br>
+      Dana Pattonson <br>
       Phone:
-      (828) 403-1756
+      (828) 555-0877
     </p>
-    <a class="button mailto-agent" href="/cdn-cgi/l/email-protection#593d383430363729382d2d36372b3c38353c2a2d382d3c193e34383035773a3634">Email Agent</a>
+    <a class="button mailto-agent" href="/cdn-cgi/l/email-protection#593a36372d383a2d696d192a383429353c7434383035772d3c2a2d">Email Agent</a>
   </div>
 </div>
 </body></html>
@@ -159,8 +159,8 @@ const propertyData = {
 def test_decode_cfemail_matches_the_real_page_js():
     """Verified live against the actual decoded value homesteps.com's own
     client-side JS renders for this exact obfuscated string."""
-    hexstr = "593d383430363729382d2d36372b3c38353c2a2d382d3c193e34383035773a3634"
-    assert _decode_cfemail(hexstr) == "damionpattonrealestate@gmail.com"
+    hexstr = "593a36372d383a2d696d192a383429353c7434383035772d3c2a2d"
+    assert _decode_cfemail(hexstr) == "contact04@sample-mail.test"
 
 
 def test_decode_cfemail_garbage_input_returns_none():
@@ -176,8 +176,8 @@ def test_parse_detail_page_extracts_county_specs_latlng_and_agent():
     assert detail["latitude"] == 35.937209
     assert detail["longitude"] == -81.613939
     assert detail["agent"]["name"] == "Damion  Patton"
-    assert detail["agent"]["phone"] == "(828) 403-1756"
-    assert detail["agent"]["email"] == "damionpattonrealestate@gmail.com"
+    assert detail["agent"]["phone"] == "(828) 555-0877"
+    assert detail["agent"]["email"] == "contact04@sample-mail.test"
     assert detail["specs"]["county"] == "CALDWELL"  # raw, pre-.title() value kept too
 
 
@@ -209,7 +209,7 @@ class TestRawKeepRegression:
             "homesteps_kind": "Single-Family",
             "homesteps_details": "2 beds, 2 baths, 1,296 sq. ft.",
             "homesteps_img_kind_slug": "single-family-property",
-            "homesteps_agent": {"name": "Damion Patton", "phone": "(828) 403-1756"},
+            "homesteps_agent": {"name": "Dana Pattonson", "phone": "(828) 555-0877"},
             "homesteps_specs": {"year built": "1988"},
             "images": {"real": ["https://rbimages.blob.core.windows.net/x.jpg"]},
         }

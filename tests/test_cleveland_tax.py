@@ -27,8 +27,8 @@ from selectolax.parser import HTMLParser
 # inline upset-bid paragraph + the "CURRENTLY IN FORECLOSURE" pending block.
 SAMPLE = """
 <html><body>
-<p>For questions, please contact the legal department at (704) 476-3089 or
-e-mail christie.wooten@clevelandcountync.gov. Auctions Scheduled and/or cases
+<p>For questions, please contact the legal department at (704) 555-0573 or
+e-mail contact03@sample-mail.test. Auctions Scheduled and/or cases
 that are currently in the 10-day upset bid period:</p>
 <p>1. Parcel 57139 /&nbsp;File # 26CV000065-220 /&nbsp;Address: 2500 Parnell
 Drive, Shelby / Map 6-4A, Block 3, Lot 7- This file is in the 10-day upset bid

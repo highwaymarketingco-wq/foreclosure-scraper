@@ -10,17 +10,17 @@ from foreclosure_scraper.scrapers.newspapers import column_legal_notices as C
 
 def test_phone_and_email_from_trustee_block():
     r = C._notice_email(
-        "Substitute Trustee Services, Inc. Attorney for Trustee. Phone: (704) 333-8107. "
-        "jane@brockscott.com PIN 1566620782 File 26SP000132")
-    assert r["phone"] == "(704) 333-8107"
-    assert r["email"] == "jane@brockscott.com"
+        "Substitute Trustee Services, Inc. Attorney for Trustee. Phone: (704) 555-0410. "
+        "contact14@sample-mail.test PIN 1566620782 File 26SP000132")
+    assert r["phone"] == "(704) 555-0410"
+    assert r["email"] == "contact14@sample-mail.test"
     assert r["contact_role"] == "trustee/attorney"
 
 
 def test_phone_only_no_email_is_still_captured():
     r = C._notice_email(
-        "The Kania Law Firm, P.A., Substitute Trustee, Telephone 828-252-8010. Parcel 909421.")
-    assert r["phone"] == "(828) 252-8010"
+        "The Kania Law Firm, P.A., Substitute Trustee, Telephone 828-555-0311. Parcel 909421.")
+    assert r["phone"] == "(828) 555-0311"
     assert r.get("email") is None
 
 
@@ -35,8 +35,8 @@ def test_bad_area_or_exchange_rejected():
     # 011-... / 1xx exchange are not valid NANP numbers -> rejected
     assert C._norm_phone("011-555-0199") is None
     assert C._norm_phone("704-133-0199") is None      # exchange starts with 1
-    assert C._norm_phone("(704) 333-8107") == "(704) 333-8107"
-    assert C._norm_phone("1-828-252-8010") == "(828) 252-8010"  # strips leading 1
+    assert C._norm_phone("(704) 555-0410") == "(704) 555-0410"
+    assert C._norm_phone("1-828-555-0311") == "(828) 555-0311"  # strips leading 1
 
 
 def test_liability_disclaimer_is_not_mistaken_for_a_firm_name():
@@ -47,8 +47,8 @@ def test_liability_disclaimer_is_not_mistaken_for_a_firm_name():
     # `name` must be absent rather than wrong.
     r = C._notice_email(
         "Neither the Trustee, the Substitute Trustee, nor the Attorney for the Trustee "
-        "will be liable for any lost profits. Telephone: (910) 864-3068.")
-    assert r["phone"] == "(910) 864-3068"
+        "will be liable for any lost profits. Telephone: (910) 555-0496.")
+    assert r["phone"] == "(910) 555-0496"
     assert r.get("name") is None
 
 
@@ -58,7 +58,7 @@ def test_real_firm_name_still_captured_alongside_disclaimer_boilerplate():
     # without losing the latter.
     r = C._notice_email(
         "Neither the Trustee nor the Substitute Trustee will be liable for any lost "
-        "profits. The Hollifield Law Firm, Substitute Trustee, Telephone (828) 255-0098.")
-    assert r["phone"] == "(828) 255-0098"
+        "profits. The Hollifield Law Firm, Substitute Trustee, Telephone (828) 555-0788.")
+    assert r["phone"] == "(828) 555-0788"
     assert r["name"] == "The Hollifield Law Firm, Substitute Trustee"
     assert not r["name"].lower().startswith("neither")

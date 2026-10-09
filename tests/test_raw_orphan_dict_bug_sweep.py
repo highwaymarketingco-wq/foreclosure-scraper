@@ -38,11 +38,11 @@ def _mk_listing(raw=None, **kw) -> Listing:
 
 
 def test_email_extract_persists_onto_the_listing_not_an_orphan_copy():
-    li = _mk_listing(raw={"description": "Contact the trustee at foreclosure@examplefirm.com for details"})
+    li = _mk_listing(raw={"description": "Contact the trustee at foreclosure@examplefirm.test for details"})
     stats = enrich_extract_emails([li])
     assert stats["listings_with_emails"] == 1
     assert isinstance(li.raw, dict)
-    assert li.raw["owner_email"]["best_email"] == "foreclosure@examplefirm.com"
+    assert li.raw["owner_email"]["best_email"] == "foreclosure@examplefirm.test"
 
 
 def test_email_extract_raw_becomes_a_real_dict_even_when_it_starts_as_none():

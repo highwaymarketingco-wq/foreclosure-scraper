@@ -24,8 +24,8 @@ never does — live-confirmed against a current NC listing (small volume:
   * **Precise lat/lng** (a `propertyLatLng` JS object on the page) and
     **listing-agent name + phone + email** — a real, free, direct contact
     channel (HERMES sec 9's #1 ceiling), confirmed live
-    ("Damion Patton", "(828) 403-1756",
-    "damionpattonrealestate@gmail.com"). The email is Cloudflare-
+    ("Dana Pattonson", "(828) 555-0877",
+    "contact04@sample-mail.test"). The email is Cloudflare-
     obfuscated in the raw HTML (`/cdn-cgi/l/email-protection#<hex>`) but
     decodes with the standard single-byte XOR cipher — no login, no
     bypass, just reading what the page already sends every visitor's

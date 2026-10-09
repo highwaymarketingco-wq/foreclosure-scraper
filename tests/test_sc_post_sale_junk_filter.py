@@ -99,7 +99,7 @@ def test_empty_text_not_flagged():
         "GIS & E911 Addressing",
         "GIS & E-911 Addressing",
         "RZ.pagelinkfilter = 'linklevel=0 and linksectionid=0';",
-        "Please Contact Planning 864-596-3570 for questions concerning subdividing",
+        "Please Contact Planning 864-555-0962 for questions concerning subdividing",
         "Office hours: Monday - Friday 8:30am to 5:00pm",
     ],
 )

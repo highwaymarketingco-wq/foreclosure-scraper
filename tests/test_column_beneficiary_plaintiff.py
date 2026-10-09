@@ -22,7 +22,7 @@ from foreclosure_scraper.scrapers.newspapers import column_legal_notices as C
 BENEFICIARY_BODY = """
 NORTH CAROLINA GASTON COUNTY
 
-Special Proceedings No. 26SP000371-350 Substitute Trustee: Philip A. Glass.
+Special Proceedings No. 26SP009971-350 Substitute Trustee: Peter A. Example.
 
 NOTICE OF FORECLOSURE SALE
 
@@ -30,15 +30,15 @@ Date of Sale: September 29, 2026 Time of Sale: 10:00 a.m.
 
 Place of Sale: Gaston County Courthouse
 
-Description of Property: See Attached Description Record Owners: Heirs of Eleanor S. Grass
+Description of Property: See Attached Description Record Owners: Heirs of Elena S. Testgrass
 
-Address of Property: 5306 Old Course Drive Cramerton, NC 28032
+Address of Property: 5306 Example Course Drive Cramerton, NC 28032
 
 CONDITIONS OF SALE: Deed of Trust:
 
 Book 5337 Page: 168 Dated: May 11, 2022
 
-Grantors: Eleanor S. Grass, an unmarried woman
+Grantors: Elena S. Testgrass, an unmarried woman
 
 Original Beneficiary: State Employees' Credit Union This sale is made subject to all unpaid taxes and superior liens or encumbrances of record.
 
@@ -51,14 +51,14 @@ PIN: 3574-92-4237 Property Address: 5306 Course Dr. Cramerton, NC 28032
 NO_BENEFICIARY_BODY = """
 NORTH CAROLINA
 
-25SP000318-100
+25SP009918-100
 
 BUNCOMBE COUNTY
 
 AMENDED NOTICE OF FORECLOSURE SALE
 
 Under and by virtue of a Power of Sale contained in that certain Deed of
-Trust executed by George R. Hunter, Sr. to Neuse, Incorporated, Trustee,
+Trust executed by Gerald R. Sampleton, Sr. to Neuse, Incorporated, Trustee,
 which was dated November 1, 2013 and recorded on November 13, 2013 in Book
 5162 at Page 853, Buncombe County Registry, North Carolina.
 
@@ -69,7 +69,7 @@ Note evidencing said default having directed that the Deed of Trust be
 foreclosed, the undersigned Substitute Trustee will offer for sale at the
 courthouse door January 29, 2026 at 11:00 AM.
 
-Address of Property: 100 Avery Creek Road, Arden, NC 28704
+Address of Property: 100 Sample Creek Road, Arden, NC 28704
 """
 
 

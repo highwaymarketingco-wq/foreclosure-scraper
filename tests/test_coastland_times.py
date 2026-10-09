@@ -32,12 +32,12 @@ from foreclosure_scraper.scrapers.newspapers import coastland_times as mod
 # Live-captured body text (2026-10-01), reconstructed as a page the module's
 # own _extract_body() parses the same way the real site's HTML does.
 _LABELED_TEMPLATE_BODY = (
-    "Special Proceedings No. 25SP000163-270 Substitute Trustee: NOTICE OF "
+    "Special Proceedings No. 25SP009963-270 Substitute Trustee: NOTICE OF "
     "FORECLOSURE SALE Date of Sale: July 14, 2026 Time of Sale: 10:30 a.m. "
     "Place of Sale: Dare County Courthouse Description of Property: See "
-    "Attached Description Record Owners: Heirs of Janson Fros Address of "
-    "Property: 4013 Mill Landing Road Wanchese, NC 27981 Book : 2350 Page: "
-    "773 Dated: January 24, 2020 Grantors: Janson Fros, unmarried Original "
+    "Attached Description Record Owners: Heirs of Jason Testfros Address of "
+    "Property: 4013 Sample Landing Road Wanchese, NC 27981 Book : 2350 Page: "
+    "773 Dated: January 24, 2020 Grantors: Jason Testfros, unmarried Original "
     "Beneficiary: State Employees' Credit Union CONDITIONS OF SALE: This "
     "sale is made subject to all unpaid taxes and superior liens."
 )
@@ -71,20 +71,20 @@ def test_labeled_address_template_not_fabricated_from_time_of_sale(monkeypatch):
     assert li is not None
     # The real labeled address, not "30 a.m. Place" fabricated from the
     # "Time of Sale: 10:30 a.m. Place of Sale:" boilerplate.
-    assert li.street_address == "4013 Mill Landing Road"
+    assert li.street_address == "4013 Sample Landing Road"
     assert li.city == "Wanchese"
     assert li.zip_code == "27981"
     assert "a.m." not in (li.street_address or "").lower()
     assert "place" not in (li.street_address or "").lower()
     # Owner wired from the "Record Owners:" label.
-    assert li.owner_name == "Heirs of Janson Fros"
-    assert li.defendant == "Heirs of Janson Fros"
-    assert li.case_number == "25SP000163-270"
+    assert li.owner_name == "Heirs of Jason Testfros"
+    assert li.defendant == "Heirs of Jason Testfros"
+    assert li.case_number == "25SP009963-270"
 
 
 def test_grantors_label_used_when_no_record_owners_label():
     body = _LABELED_TEMPLATE_BODY.replace(
-        "Record Owners: Heirs of Janson Fros ", ""
+        "Record Owners: Heirs of Jason Testfros ", ""
     )
     li = mod._parse_detail(
         _page("NOTICE OF FORECLOSURE SALE", body),
@@ -92,7 +92,7 @@ def test_grantors_label_used_when_no_record_owners_label():
         "newspapers.coastland_times",
     )
     assert li is not None
-    assert li.owner_name == "Janson Fros, unmarried"
+    assert li.owner_name == "Jason Testfros, unmarried"
 
 
 def test_ordinal_date_and_oclock_time_parsed():
@@ -145,8 +145,8 @@ def test_fetch_end_to_end_with_labeled_template(monkeypatch):
     detail_html = _page("NOTICE OF FORECLOSURE SALE", _LABELED_TEMPLATE_BODY)
     out = _run_fetch(monkeypatch, detail_html)
     assert len(out) == 1
-    assert out[0].street_address == "4013 Mill Landing Road"
-    assert out[0].owner_name == "Heirs of Janson Fros"
+    assert out[0].street_address == "4013 Sample Landing Road"
+    assert out[0].owner_name == "Heirs of Jason Testfros"
 
 
 def test_scraper_registered():

@@ -29,9 +29,9 @@ from foreclosure_scraper.scrapers.newspapers import carolina_coast as mod
 # Real captured shape (Carolina Coast / Carteret NC, 2026-10-04).
 CC_RSS = """<rss><channel>
 <item>
-<title>NOTICE OF FORECLOSURE SALE 25SP001124-150 168 BAYBERRY RD NEWPORT, NC</title>
+<title>NOTICE OF FORECLOSURE SALE 25SP009924-150 168 SAMPLE RD NEWPORT, NC</title>
 <link>https://www.carolinacoastonline.com/classifieds/community/announcements/legal/ad_cc.html</link>
-<description>NOTICE OF FORECLOSURE SALE 25SP001124-150 168 BAYBERRY RD NEWPORT, NC Under and by virtue of the power of sale contained in that certain Deed of Trust executed by Jane Doe</description>
+<description>NOTICE OF FORECLOSURE SALE 25SP009924-150 168 SAMPLE RD NEWPORT, NC Under and by virtue of the power of sale contained in that certain Deed of Trust executed by Jane Doe</description>
 <pubDate>Sun, 04 Oct 2026 00:00:00 -0400</pubDate>
 </item>
 </channel></rss>"""

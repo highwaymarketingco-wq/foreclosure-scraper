@@ -35,10 +35,10 @@ def test_raw_becomes_a_real_dict_when_it_starts_as_none():
 
 
 def test_email_found_in_notice_contact_actually_persists_onto_the_listing():
-    li = _mk_listing(raw={"notice_contact": {"email": "attorney@examplefirm.com"}})
+    li = _mk_listing(raw={"notice_contact": {"email": "attorney@examplefirm.test"}})
     stats = enrich_surface_contacts([li])
     assert stats["listings_with_new_emails"] == 1
-    assert li.raw["owner_email"]["best_email"] == "attorney@examplefirm.com"
+    assert li.raw["owner_email"]["best_email"] == "attorney@examplefirm.test"
 
 
 def test_phone_and_email_persist_when_raw_is_none_and_gets_populated_by_the_function():
@@ -57,19 +57,19 @@ def test_non_dict_raw_still_surfaces_and_persists_when_data_was_attached_first()
     """Covers the real production shape: a scraper attaches a dict payload
     (this IS a dict, just built fresh), and the enricher must write onto
     that same object -- not an orphaned copy."""
-    li = _mk_listing(raw={"distressed": {"agent_email": "Agent@Broker.com",
+    li = _mk_listing(raw={"distressed": {"agent_email": "Agent@Broker.test",
                                           "agent_phones": [{"number": "704-555-0100", "type": "MOBILE"}]}})
     stats = enrich_surface_contacts([li])
     assert stats["listings_with_new_emails"] == 1
     assert stats["listings_with_new_phones"] == 1
-    assert li.raw["owner_email"]["best_email"] == "agent@broker.com"
+    assert li.raw["owner_email"]["best_email"] == "agent@broker.test"
     assert li.raw["owner_phone"]["phone"]
 
 
 def test_does_not_overwrite_an_existing_owner_email():
     li = _mk_listing(raw={
-        "owner_email": {"emails": [{"email": "already@set.com"}], "best_email": "already@set.com"},
-        "notice_contact": {"email": "new@shouldnotwin.com"},
+        "owner_email": {"emails": [{"email": "already@set.test"}], "best_email": "already@set.test"},
+        "notice_contact": {"email": "new@shouldnotwin.test"},
     })
     enrich_surface_contacts([li])
-    assert li.raw["owner_email"]["best_email"] == "already@set.com"
+    assert li.raw["owner_email"]["best_email"] == "already@set.test"

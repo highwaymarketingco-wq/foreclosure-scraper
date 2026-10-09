@@ -287,7 +287,7 @@ def _finalize(records: list[dict], default_county: str | None,
             parties = allp
         elif style and not plaintiff and not defendant:
             # Single-party caption with no "vs" — common for estates
-            # ("In re: Estate of MARGARET P WHITMIRE", "MARGARET WHITMIRE,
+            # ("In re: Estate of MARGO P SAMPLETON", "MARGARET WHITMIRE,
             # Deceased"). Strip the boilerplate and keep the person as the
             # defendant/party-of-interest (the likely record owner).
             cap = _CASE_RE.sub(" ", style)

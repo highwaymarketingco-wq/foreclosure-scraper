@@ -292,7 +292,7 @@ def test_addr_re_skips_probate_estate_false_positives():
     from foreclosure_scraper.scrapers.public_notices.ncpublicnotices import ADDR_RE
     probate_texts = [
         "Having qualified on the 27 day of May, 2026 as Limited Personal "
-        "Representative of the Estate of Jerry Basel Wilson",
+        "Representative of the Estate of Jerold Basel Wiltest",
         "Notice qualified 19 May, 2026 as Executor of the Estate",
         "qualified on the 26 day of May, 2026 as Administrator of the Estate "
         "of Jeffrey Brent Saunders",

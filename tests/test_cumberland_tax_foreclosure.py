@@ -20,9 +20,9 @@ from foreclosure_scraper.scrapers.counties_nc.cumberland_tax_foreclosure import 
 
 CONTACT_TABLE = """
 <table class="table contact-us-table">
-<tr><td>Phone:</td><td>910-678-7507</td></tr>
+<tr><td>Phone:</td><td>910-555-0989</td></tr>
 <tr><td>Address:</td><td>117 Dick Street, Room 530 Fayetteville, NC 28301</td></tr>
-<tr><td>Fax:</td><td>910-678-7582</td></tr>
+<tr><td>Fax:</td><td>910-555-0674</td></tr>
 </table>
 """
 

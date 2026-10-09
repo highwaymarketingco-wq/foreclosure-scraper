@@ -60,7 +60,7 @@ the 46,801 rows' raw['liensnc']['filing_type'] is literally "Appointment of
 Lien Agent" (there is no Notice of Commencement or Claim of Lien filing type
 present at all), and raw['liensnc']['filed_by'] on every row is a LiensNC
 PORTAL LOGIN/contact string for the lien agent -- a username ('ddavis5',
-'zetterholmj') or a contractor's ops email ('permits@sugarhollowsolar.com'),
+'zetterholmj') or a contractor's ops email ('contact02@sample-mail.test'),
 never a person's deed-owner-shaped name. Comparing filed_by to owner_name
 would flag 100% of rows, which is not a signal, it is the shape of every row
 on this board. Not implemented; documented here so nobody rebuilds it and

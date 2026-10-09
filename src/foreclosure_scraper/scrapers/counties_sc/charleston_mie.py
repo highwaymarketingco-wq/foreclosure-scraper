@@ -18,7 +18,7 @@ login/CAPTCHA/WAF defeat):
 
         07-07-26 25-06873 Computershare Delaware Peter J. Dieppe IV
         3501400030 1906 Capri Drive $453,617.57 1 st Riley Pope & Laney
-        803-799-9993 West Ashley
+        803-555-0503 West Ashley
 
     i.e. MM-DD-YY sale date, case#, plaintiff, defendant, 10-digit TMS, street
     address, $judgment, lien position, attorney, phone, city. Some rows carry a
@@ -205,7 +205,7 @@ def parse_auction_list(raw: bytes, source_url: str = AUCTION_LIST_URL) -> list[L
                 pass
 
         # After the $ amount the row tail carries: <lien position> <attorney
-        # firm> <phone> <city> (e.g. "1 st Riley Pope & Laney 803-799-9993 West
+        # firm> <phone> <city> (e.g. "1 st Riley Pope & Laney 803-555-0503 West
         # Ashley"). The parser historically stopped at the amount and dropped
         # all of these. Recover firm -> trustee, phone -> raw, city -> city.
         attorney_firm = None

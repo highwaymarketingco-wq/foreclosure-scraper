@@ -170,7 +170,7 @@ def test_haywood_is_in_footprint_and_classifies_real_rows():
         "county_meta": "Haywood",
         "city_meta": "Waynesville",
         "text": ("NOTICE TO CREDITORS Having qualified as Administrator, Patton "
-                 "Medford Phillips of the Estate of Tammie Denise Phillips, late of "
+                 "Medford Philtest of the Estate of Tamsin Denise Philtest, late of "
                  "Haywood County, State of North Carolina, this is to notify all "
                  "persons, firms and corporations having claims against the estate "
                  "to exhibit them to the undersigned in c"),
@@ -179,7 +179,7 @@ def test_haywood_is_in_footprint_and_classifies_real_rows():
     assert li2 is not None
     assert li2.county == "Haywood"
     assert li2.listing_type is ListingType.PROBATE_NOTICE
-    assert li2.defendant == "Tammie Denise Phillips"
+    assert li2.defendant == "Tamsin Denise Philtest"
 
 
 # ------------------------------------------------------- classification ----
@@ -241,9 +241,9 @@ def test_non_lead_notices_are_dropped():
 
 def test_estate_notice_carries_the_decedent_and_probate_signal(listings):
     estate = next(li for li in listings if li.listing_type is ListingType.PROBATE_NOTICE)
-    assert estate.defendant == "Wanda Faye Wilson"
-    assert estate.owner_name == "Wanda Faye Wilson"
-    assert estate.raw["probate"]["decedent"] == "Wanda Faye Wilson"
+    assert estate.defendant == "Wendy Faye Wiltest"
+    assert estate.owner_name == "Wendy Faye Wiltest"
+    assert estate.raw["probate"]["decedent"] == "Wendy Faye Wiltest"
     assert estate.raw["relationship_signal"]["kind"] == "probate"
     assert estate.street_address is None   # an estate notice names no property
     assert estate.sale_date is None

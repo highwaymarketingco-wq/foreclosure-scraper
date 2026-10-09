@@ -89,7 +89,7 @@ def test_no_case_number_noise_row_is_dropped():
 def test_classify_requires_a_case_number_regardless_of_sale_language():
     sale_text = "NOTICE OF SALE will sell to the highest bidder at public auction."
     assert M._classify(sale_text, None) is None
-    assert M._classify(sale_text, "2025-CP-04-02240") == (ListingType.FORECLOSURE_SALE, "sale")
+    assert M._classify(sale_text, "2025-CP-04-09240") == (ListingType.FORECLOSURE_SALE, "sale")
     filed_text = "SUMMONS AND NOTICE OF FILING OF COMPLAINT, no sale scheduled yet."
     assert M._classify(filed_text, "2026-CP-04-00334") == (ListingType.LIS_PENDENS, "filed")
 
@@ -102,22 +102,22 @@ def test_lis_pendens_classified_and_case_number_normalized():
     assert li.listing_type is ListingType.LIS_PENDENS
     assert li.county == "Spartanburg"
     assert li.state == "SC"
-    assert li.case_number == "2026CP4204581"
+    assert li.case_number == "2026CP4209581"
     assert li.foreclosure_process == "judicial"
     assert li.source_url == "https://www.scpublicnotices.com/Details.aspx?ID=650001"
 
 
 def test_plaintiff_does_not_swallow_the_case_number_preamble():
     """Real text: 'STATE OF SOUTH CAROLINA, COUNTY OF SPARTANBURG; IN THE
-    COURT OF COMMON PLEAS; CASE NO. 2026CP4204581 FIRST PIEDMONT FEDERAL
+    COURT OF COMMON PLEAS; CASE NO. 2026CP4209581 FIRST PIEDMONT FEDERAL
     SAVINGS AND LOAN ASSOCIATION, PLAINTIFF V. ...'. Before the
     _LEADING_CASE_NO_RE fix, _tidy_party() returned the whole 'CASE NO.
-    2026CP4204581 FIRST PIEDMONT...' string -- a wrong value in a real
+    2026CP4209581 FIRST PIEDMONT...' string -- a wrong value in a real
     listing, this codebase's defining failure mode."""
     li = _listings()["650001"]
     assert li.plaintiff == "FIRST PIEDMONT FEDERAL SAVINGS AND LOAN ASSOCIATION"
     assert "CASE NO" not in (li.plaintiff or "")
-    assert "2026CP4204581" not in (li.plaintiff or "")
+    assert "2026CP4209581" not in (li.plaintiff or "")
 
 
 def test_defendant_captured_across_a_k_a_slashes():
@@ -135,12 +135,12 @@ def test_foreclosure_sale_classified_with_decree_language():
     assert li is not None
     assert li.listing_type is ListingType.FORECLOSURE_SALE
     assert li.county == "Anderson"
-    assert li.case_number == "2025-CP-04-02240"
+    assert li.case_number == "2025-CP-04-09240"
     assert li.raw["public_notice"]["foreclosure_signal"] is True
 
 
 def test_case_number_tail_is_not_fabricated_as_a_street_address():
-    """Real text: 'C/A No: 2025-CP-04-02240 BY VIRTUE OF A DECREE of the
+    """Real text: 'C/A No: 2025-CP-04-09240 BY VIRTUE OF A DECREE of the
     Court of Common Pleas for Anderson County...'. Before the fix,
     street_address came back '02240 BY VIRTUE OF A DECREE of the Court' --
     the case number's own trailing digits read as a house number. The
@@ -153,13 +153,13 @@ def test_case_number_tail_is_not_fabricated_as_a_street_address():
 # --------------------------------------------------- regex unit coverage --
 
 def test_case_re_matches_hyphenated_concatenated_and_embedded_forms():
-    assert M._CASE_RE.search("CASE NO. 2026CP4204581 FIRST").group(1) == "2026CP4204581"
-    assert M._CASE_RE.search("C/A No: 2025-CP-04-02240 BY VIRTUE").group(1) == "2025-CP-04-02240"
-    assert M._CASE_RE.search("DOCKETNO.2026CP1004189PennyMac").group(1) == "2026CP1004189"
+    assert M._CASE_RE.search("CASE NO. 2026CP4209581 FIRST").group(1) == "2026CP4209581"
+    assert M._CASE_RE.search("C/A No: 2025-CP-04-09240 BY VIRTUE").group(1) == "2025-CP-04-09240"
+    assert M._CASE_RE.search("DOCKETNO.2026CP1009189PennyMac").group(1) == "2026CP1009189"
 
 
 def test_tidy_party_strips_leading_case_number_preamble():
-    raw = "CASE NO. 2026CP4204581 FIRST PIEDMONT FEDERAL SAVINGS AND LOAN ASSOCIATION"
+    raw = "CASE NO. 2026CP4209581 FIRST PIEDMONT FEDERAL SAVINGS AND LOAN ASSOCIATION"
     assert M._tidy_party(raw) == "FIRST PIEDMONT FEDERAL SAVINGS AND LOAN ASSOCIATION"
 
 

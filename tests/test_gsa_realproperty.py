@@ -50,17 +50,17 @@ _PAGE_WITH_PROPERTY_TYPE = """
   <div class="item">
     <div class="block">
       <h5 style="white-space: nowrap;">
-        Samantha Tremaine
+        Samara Tremtest
       </h5>
       <small>GSA</small>
     </div>
   </div>
   <div class="item">
     <h6>
-      <i class="fa-solid fa-mobile-screen" role="presentation"></i> (202) 549-9646
+      <i class="fa-solid fa-mobile-screen" role="presentation"></i> (202) 555-0501
     </h6>
     <h5>
-      samantha.tremaine@gsa.gov
+      contact19@sample-mail.test
     </h5>
   </div>
 </div>
@@ -132,9 +132,9 @@ def test_listed_agent_contact_is_captured_into_notice_contact():
     phone+email surfacing picks it up with no enricher change needed."""
     li = parse_detail(_PAGE_WITH_PROPERTY_TYPE, "27", _URL)
     nc = li.raw["notice_contact"]
-    assert nc["name"] == "Samantha Tremaine"
-    assert nc["phone"] == "(202) 549-9646"
-    assert nc["email"] == "samantha.tremaine@gsa.gov"
+    assert nc["name"] == "Samara Tremtest"
+    assert nc["phone"] == "(202) 555-0501"
+    assert nc["email"] == "contact19@sample-mail.test"
     assert nc["contact_role"] == "GSA listing agent"
 
 

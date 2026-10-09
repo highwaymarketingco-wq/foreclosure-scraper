@@ -17,15 +17,15 @@
   "features": [
     {"attributes": {
       "ID": 1, "ParcelNumber": "060502683700000", "OwnerStatus": "A",
-      "OwnerFullName": "DAVID T MANLY; MARGARET DILLON",
-      "Phone": "8286289884", "Phone2": null,
-      "MailAddress1": "5 SHARON DR", "MailAddress2": null, "MailCity": "FAIRVIEW",
+      "OwnerFullName": "DANIEL T SAMPLE; MARGOT TESTER",
+      "Phone": "8285550445", "Phone2": null,
+      "MailAddress1": "5 SAMPLE DR", "MailAddress2": null, "MailCity": "FAIRVIEW",
       "MailState": "NC", "MailZip": "28730", "LastUpdateDate": 1785369600000}},
     {"attributes": {
       "ID": 2, "ParcelNumber": "971370653100000", "OwnerStatus": "A",
-      "OwnerFullName": "WILLIAM T GALYEAN",
-      "Phone": "8282755283", "Phone2": "7042749014",
-      "MailAddress1": "389 SUGAR HOLLOW RD", "MailAddress2": null, "MailCity": "FAIRVIEW",
+      "OwnerFullName": "WILLIS T SAMPLETON",
+      "Phone": "8285550427", "Phone2": "7045550604",
+      "MailAddress1": "389 EXAMPLE HOLLOW RD", "MailAddress2": null, "MailCity": "FAIRVIEW",
       "MailState": "NC", "MailZip": "28730", "LastUpdateDate": 1785369600000}},
     {"attributes": {
       "ID": 3, "ParcelNumber": "964809813900000", "OwnerStatus": "A",
@@ -35,21 +35,21 @@
       "MailState": "NC", "MailZip": "28801", "LastUpdateDate": 1785369600000}},
     {"attributes": {
       "ID": 4, "ParcelNumber": "868587595400001", "OwnerStatus": "A",
-      "OwnerFullName": "FRANKLIN L COURSON",
-      "Phone": "8283011158", "Phone2": null,
-      "MailAddress1": "12 SPLIT CARD LN", "MailAddress2": null, "MailCity": "ASHEVILLE",
+      "OwnerFullName": "FRANK L TESTCOURT",
+      "Phone": "8285550658", "Phone2": null,
+      "MailAddress1": "12 SAMPLE CARD LN", "MailAddress2": null, "MailCity": "ASHEVILLE",
       "MailState": "NC", "MailZip": "28806", "LastUpdateDate": 1785369600000}},
     {"attributes": {
       "ID": 5, "ParcelNumber": "868587595400002", "OwnerStatus": "A",
-      "OwnerFullName": "WALTER ADAMS",
-      "Phone": "8287124040", "Phone2": null,
-      "MailAddress1": "14 SPLIT CARD LN", "MailAddress2": null, "MailCity": "ASHEVILLE",
+      "OwnerFullName": "WALTON EXAMPLE",
+      "Phone": "8285550955", "Phone2": null,
+      "MailAddress1": "14 SAMPLE CARD LN", "MailAddress2": null, "MailCity": "ASHEVILLE",
       "MailState": "NC", "MailZip": "28806", "LastUpdateDate": 1785369600000}},
     {"attributes": {
       "ID": 6, "ParcelNumber": "060505914100000", "OwnerStatus": "X",
-      "OwnerFullName": "PETER LOOMIS HELLEBUSH (PRIOR OWNER)",
-      "Phone": "3364622897", "Phone2": null,
-      "MailAddress1": "820 ARBOR RD", "MailAddress2": null, "MailCity": "WINSTON SALEM",
+      "OwnerFullName": "PETE LOGAN SAMPLEBUSH (PRIOR OWNER)",
+      "Phone": "3365550261", "Phone2": null,
+      "MailAddress1": "820 EXAMPLE RD", "MailAddress2": null, "MailCity": "WINSTON SALEM",
       "MailState": "NC", "MailZip": "27104", "LastUpdateDate": 1785369600000}}
   ]
 }

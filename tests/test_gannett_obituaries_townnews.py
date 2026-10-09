@@ -27,7 +27,7 @@ REAL_RSS = """<?xml version="1.0" encoding="UTF-8"?>
     <pubDate>Fri, 02 Oct 2026 09:48:00 -0400</pubDate>
     <guid isPermaLink="false">http://www.thedigitalcourier.com/tncms/asset/editorial/0b49e181-403f-55bf-bc42-19f7ef373174</guid>
     <link>https://www.thedigitalcourier.com/archives/charles-e-smith/article_0b49e181-403f-55bf-bc42-19f7ef373174.html</link>
-    <author>cbumgarner@thedigitalcourier.com (cbumgarner)</author>
+    <author>contact18@sample-mail.test (cbumgarner)</author>
     <enclosure url="https://bloximages.newyork1.vip.townnews.com/thedigitalcourier.com/content/tncms/assets/v3/editorial/6/3a/63a8c5a5-0117-5e1c-9dab-8149a23f35d2/6abfb7eb51ecf.image.jpg?resize=300%2C402" length="222824" type="image/jpeg" />
 </item>
 <item>

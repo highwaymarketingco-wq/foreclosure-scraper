@@ -44,8 +44,8 @@ matching how sibling REO scrapers freddie_homesteps/hubzu already do it);
 RAW_KEEP. Also added: each listing's own `/propertydetails?caseNumber=`
 page (confirmed live, NO auth/token needed, unlike the search handler)
 carries a "Listing Broker" contact block with a real name + direct phone +
-email (live example: "COREY ADAMSKI", "(828) 231-4430",
-"COREYADAMSKI@GMAIL.COM") -- genuine free contactability HERMES sec 9
+email (live example: "COLE ADAMSTEST", "(828) 555-0682",
+"CONTACT05@SAMPLE-MAIL.TEST") -- genuine free contactability HERMES sec 9
 calls the #1 ceiling, previously never fetched at all. Also captured from
 that same searchresult row (also previously dropped): `inAmenities`/
 `outAmenities`/`parkingType`/`numberOfStories` and `bidderTypes`/
@@ -151,7 +151,7 @@ def _extract_broker(html: str) -> dict:
             # visually-hidden "Listing Broker's Phone number" <span
             # class=sr-only> AND the visible number in a sibling <span> --
             # .text() concatenates both ("Listing Broker's Phone
-            # number(828) 231-4430", confirmed live) with no separator.
+            # number(828) 555-0682", confirmed live) with no separator.
             href = (tel.attributes.get("href") or "")
             out["phone"] = href[4:].strip() or None if href.startswith("tel:") else None
         for a in container.css("a[title]"):

@@ -117,7 +117,7 @@ _DETAIL_FRAGMENT = (
     r'\"buildingAreaTotal\":2528,\"auctionStartDate\":\"2026-10-05T10:00:00+00:00\",\"liveAuctionStartTime\":\"10:00 AM\",'
     r'\"liveAuctionLocationDescription\":\"Richland County Judicial Center, Columbia, South Carolina\",'
     r'\"eventName\":\"October Foreclosure Sale\",\"bidType\":\"Est. Opening Bid\",'
-    r'\"fclrtName\":\"Bell Carrington Price & Gregg, LLC\",\"fclrtPhone\":\"803-509-5078\",'
+    r'\"fclrtName\":\"Bell Carrington Price & Gregg, LLC\",\"fclrtPhone\":\"803-555-0714\",'
     r'\"fclrtAddress\":\"339 Heyward St, 2nd Floor\",\"fclrtCity\":\"Columbia\",\"fclrtState\":\"SC\",\"fclrtZip\":\"29201\"}"])</script>'
 ) + "x" * 5000
 
@@ -129,7 +129,7 @@ def test_fetch_detail_extracts_trustee_contact_and_gallery(monkeypatch):
     monkeypatch.setattr(mod, "get_text", fake_get_text)
     out = asyncio.run(mod._fetch_detail("https://www.xome.com/auctions/x"))
     assert out["fclrtName"] == "Bell Carrington Price & Gregg, LLC"
-    assert out["fclrtPhone"] == "803-509-5078"
+    assert out["fclrtPhone"] == "803-555-0714"
     assert out["auctionStartDate"] == "2026-10-05T10:00:00+00:00"
     assert out["buildingAreaTotal"] == 2528.0
     assert out["publicRemarks"].startswith("This property will be sold")
@@ -162,6 +162,6 @@ def test_end_to_end_fetch_applies_detail_enrichment_within_cap(monkeypatch):
     out = asyncio.run(mod.Xome().fetch())
     assert len(out) >= 1
     li = out[0]
-    assert li.raw["xome"]["trustee_phone"] == "803-509-5078"
+    assert li.raw["xome"]["trustee_phone"] == "803-555-0714"
     assert li.raw["images"]["real"][0].startswith("https://xomeauction.propertiescdn.com/")
     assert li.description.startswith("This property will be sold")

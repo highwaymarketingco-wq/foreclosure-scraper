@@ -74,14 +74,14 @@ _REAL_SHAPE_DETAIL_HTML = """
 <div class="field field--name-field-contact-information field--type-address">
   <div class=title>Contact Information</div>
   <div class=field__item><p class=address translate=no>
-    <span class=given-name>Paul Reed, Property Appraisal &amp; Liquidation Specialist</span><br>
+    <span class=given-name>Paula Reedson, Property Appraisal &amp; Liquidation Specialist</span><br>
     <span class=organization>Internal Revenue Service</span><br>
-    <a href="mailto:paul.reed@irs.gov?subject=Question">paul.reed@irs.gov</a>
+    <a href="mailto:contact06@sample-mail.test?subject=Question">contact06@sample-mail.test</a>
   </p></div>
 </div>
 <div class="field field--name-field-contact-phone">
   <div class=title>Contact Phone Number</div>
-  <div class=field__item>770-826-1271</div>
+  <div class=field__item>770-555-0918</div>
 </div>
 </body></html>
 """
@@ -171,10 +171,10 @@ class TestPropertySpecs:
 class TestContactInfo:
     def test_captures_name_org_email_phone(self):
         contact = _extract_contact(_tree())
-        assert contact["name"] == "Paul Reed, Property Appraisal & Liquidation Specialist"
+        assert contact["name"] == "Paula Reedson, Property Appraisal & Liquidation Specialist"
         assert contact["organization"] == "Internal Revenue Service"
-        assert contact["email"] == "paul.reed@irs.gov"  # mailto query string stripped
-        assert contact["phone"] == "770-826-1271"
+        assert contact["email"] == "contact06@sample-mail.test"  # mailto query string stripped
+        assert contact["phone"] == "770-555-0918"
 
     def test_no_contact_block_returns_empty_dict(self):
         tree = HTMLParser("<html><body><p>nothing</p></body></html>")
@@ -266,8 +266,8 @@ class TestEndToEndFetch:
         irs_raw = li.raw["irs_treasury"]
         assert irs_raw["parcel_ids"] == ["0209 02027", "0209 02028"]
         assert irs_raw["county_source"] == "legal_description"
-        assert irs_raw["contact"]["email"] == "paul.reed@irs.gov"
-        assert irs_raw["contact"]["phone"] == "770-826-1271"
+        assert irs_raw["contact"]["email"] == "contact06@sample-mail.test"
+        assert irs_raw["contact"]["phone"] == "770-555-0918"
 
         # document_links.stamp_documents() wiring -- both linked PDFs survive.
         assert len(li.raw["documents"]) == 2

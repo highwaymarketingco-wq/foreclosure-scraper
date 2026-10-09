@@ -9,7 +9,7 @@ attorney's published phone + email -- a real reachable case contact -- but
 this module never called it. Live-confirmed 2026-10-04 the helper correctly
 extracts real contact info from this exact site's real notice bodies (2 of 2
 live-fetched current cards produced a hit: a Rutherford County notice with
-phone "(828) 286-8222" / name "Alayna P. English Law Office", and a DEQ
+phone "(828) 555-0948" / name "Alana P. Englishtest Law Office", and a DEQ
 consent-order notice with phone + email). Wired identically to the 3 sibling
 scrapers.
 
@@ -32,7 +32,7 @@ NOTICE_HTML = """<html><head>
 <p>Address of Property: 100 Example Road Rutherfordton, NC 28139</p>
 <p>Deed of Trust: Book 2001 Page: 1234 Dated: January 5, 2022</p>
 <p>Any questions regarding this sale should be directed to Pat E. Trustee Law Office,
-Substitute Trustee, at (828) 286-8222.</p>
+Substitute Trustee, at (828) 555-0948.</p>
 </div></body></html>"""
 
 
@@ -40,13 +40,13 @@ def test_contact_is_captured_from_the_notice_body():
     li = parse_notice(NOTICE_HTML, "https://example.com/ad_x.html")
     assert li is not None
     assert "notice_contact" in li.raw
-    assert li.raw["notice_contact"]["phone"] == "(828) 286-8222"
+    assert li.raw["notice_contact"]["phone"] == "(828) 555-0948"
 
 
 def test_contact_absent_when_body_has_none():
     html_no_contact = NOTICE_HTML.replace(
         "<p>Any questions regarding this sale should be directed to Pat E. Trustee Law Office,\n"
-        "Substitute Trustee, at (828) 286-8222.</p>",
+        "Substitute Trustee, at (828) 555-0948.</p>",
         "",
     )
     assert "286-8222" not in html_no_contact  # guard: the replace actually matched

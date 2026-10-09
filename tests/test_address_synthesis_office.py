@@ -31,9 +31,9 @@ def florence(decedent: str, case: str) -> str:
             "eight (8) months after the date of the first publication of this Notice")
 
 
-ESTATES = [("JANE ANN DOE", "2026ES2100725"), ("RICHARD ROE", "2026ES2100726"),
-           ("MARY P SMITH", "2026ES2100604"), ("GLORIA B JONES", "2026ES2100570"),
-           ("SUMI K LEE", "2026ES2100562")]
+ESTATES = [("JANE ANN DOE", "2026ES2109725"), ("RICHARD ROE", "2026ES2109726"),
+           ("MAREN P SAMPLE", "2026ES2109604"), ("GLENNA B TESTER", "2026ES2109570"),
+           ("SUMMER K EXAMPLE", "2026ES2109562")]
 
 
 def _notice(n, decedent, case, *, county="Florence", state="SC", desc=None, **kw):
@@ -54,7 +54,7 @@ def test_the_court_named_in_the_notice_is_an_office():
 
 def test_synthesis_skips_the_court_address():
     li = _notice(1, *ESTATES[0])
-    assert _synth_for_listing(li) == "JANE ANN DOE — 2026ES2100725"
+    assert _synth_for_listing(li) == "JANE ANN DOE — 2026ES2109725"
 
 
 def test_five_florence_estates_stay_five_rows():
@@ -78,7 +78,7 @@ def test_a_published_copy_carrying_the_court_address_is_repaired():
     others = [_notice(i, d2, c2) for i, (d2, c2) in enumerate(ESTATES[1:], 1)]
     rows = [pub] + others
     enrich_with_address_synthesis(rows)
-    assert pub.street_address == "JANE ANN DOE — 2026ES2100725"
+    assert pub.street_address == "JANE ANN DOE — 2026ES2109725"
     assert pub.parcel_id is None and pub.latitude is None and pub.longitude is None
     assert pub.raw["parcel_from_address"]["withdrawn_parcel"] == "9016701008"
     assert pub.raw["address_not_property"]["address"] == "181 N IRBY ST"
@@ -124,7 +124,7 @@ def test_the_decedents_own_address_is_still_taken():
 
 
 def test_a_property_address_in_a_notice_is_still_taken():
-    desc = ("NOTICE OF FORECLOSURE SALE 26SP000132-110 Under the power of sale in a Deed of Trust "
+    desc = ("NOTICE OF FORECLOSURE SALE 26SP009932-110 Under the power of sale in a Deed of Trust "
             "by JANE DOE the Substitute Trustee will sell at the courthouse door the property "
             "located at 77 Hill St, Shelby NC")
     li = Listing(source="public_notices.nc_notices_counties", source_url="https://example.test/1",

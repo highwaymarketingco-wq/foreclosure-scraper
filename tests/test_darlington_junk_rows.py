@@ -41,7 +41,7 @@ OFFICE_HOURS = _table(
     "<tr><td>Days</td><td>Hours</td></tr>"
     "<tr><td>Monday</td><td>8:30 a.m. - 5:00 p.m.</td></tr>"
     "<tr><td>Tuesday</td><td>8:30 a.m. - 5:00 p.m.</td></tr>"
-    "<tr><td>Saturday</td><td>Closed 24/7 843-398-4170</td></tr>"
+    "<tr><td>Saturday</td><td>Closed 24/7 843-555-0968</td></tr>"
 )
 
 REAL_SALE = _table(

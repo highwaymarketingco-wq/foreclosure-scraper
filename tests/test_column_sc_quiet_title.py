@@ -22,8 +22,8 @@ integrated -- see column_legal_notices.py's module docstring): 2 unique cases
 (6 republished rows) across a 200-day, 15-county SC footprint scan. Rare, but
 real, parseable, and free. The two fixtures below are the verbatim OCR body
 text of those two real notices (Pickens County / Redrock Capital, LLC v.
-Estate of Lonella B. McCracken et al., case 2026-CP-39-00250; Horry County /
-LB Park, LLC v. Estate of Sadie L. Rush et al., case 2026-CP-26-04023).
+Estate of Lorena B. McSampleton et al., case 2026-CP-39-09950; Horry County /
+LB Park, LLC v. Estate of Sally L. Rushtest et al., case 2026-CP-26-09923).
 """
 from pathlib import Path
 
@@ -53,13 +53,13 @@ def test_mccracken_quiet_title_detected_with_case_and_plaintiff():
     r = C._parse_sc_quiet_title(MCCRACKEN)
     assert r is not None
     assert r["is_quiet_title"] is True
-    assert r["case_number"] == "2026-CP-39-00250"
+    assert r["case_number"] == "2026-CP-39-09950"
     assert r["plaintiff"] == "Redrock Capital, LLC"
 
 
 def test_mccracken_property_address_and_parcel_extracted():
     r = C._parse_sc_quiet_title(MCCRACKEN)
-    assert r["street_address"] == "101 South Fifth Street"
+    assert r["street_address"] == "101 South Sample Street"
     assert r["county"] == "Pickens"
     assert r["parcel_id"] == "5019-15-63-3697"
 
@@ -68,7 +68,7 @@ def test_mccracken_both_co_owner_decedents_captured():
     # The property had two now-deceased co-owners (mother/son); both estates'
     # heirs are named as defendants, not just the first.
     r = C._parse_sc_quiet_title(MCCRACKEN)
-    assert r["decedents"] == ["Lonella B. McCracken", "George Allen McCracken"]
+    assert r["decedents"] == ["Lorena B. McSampleton", "Gerald Alvin McSampleton"]
 
 
 def test_mccracken_named_heirs_extracted_without_institutional_codefendants():
@@ -76,9 +76,9 @@ def test_mccracken_named_heirs_extracted_without_institutional_codefendants():
     # and a city as co-defendants -- only the person names must survive.
     r = C._parse_sc_quiet_title(MCCRACKEN)
     assert r["named_heirs"] == [
-        "Linda Lister", "Brenda Waters", "Pamela Ann Anderson",
-        "Veronica Wimpey", "Renee Elswick", "Junia Marie Johnson",
-        "Steven D. Thomas", "April L. Barry",
+        "Lena Listest", "Bryn Watertest", "Paula Ann Andertest",
+        "Vera Wimptest", "Rena Elstest", "Julia Marie Johntest",
+        "Stefan D. Thomtest", "Avril L. Barrtest",
     ]
     for institutional in ("Truist Bank", "Prime Acceptance Corp", "the City of Easley"):
         assert institutional not in r["named_heirs"]
@@ -87,13 +87,13 @@ def test_mccracken_named_heirs_extracted_without_institutional_codefendants():
 def test_rush_quiet_title_heirs_include_a_jr_suffix():
     r = C._parse_sc_quiet_title(RUSH)
     assert r is not None
-    assert r["case_number"] == "2026-CP-26-04023"
+    assert r["case_number"] == "2026-CP-26-09923"
     assert r["plaintiff"] == "LB Park, LLC"
-    assert r["street_address"] == "201 Long Avenue"
+    assert r["street_address"] == "201 Sample Avenue"
     assert r["county"] == "Horry"
     assert r["parcel_id"] == "339.08.01.0012"
-    assert r["decedents"] == ["Sadie L. Rush"]
-    assert r["named_heirs"] == ["Joseph Robert Rush, Jr", "Parks Edward Rush", "Robert R. Rush"]
+    assert r["decedents"] == ["Sally L. Rushtest"]
+    assert r["named_heirs"] == ["Josef Robert Rushtest, Jr", "Parris Edward Rushtest", "Roberto R. Rushtest"]
     # A federal agency, a state agency and a hospital also appear as
     # co-defendants in this caption; none of them are heirs.
     for institutional in ("Conway Hospital", "Synchrony Bank", "Internal Revenue Service",
@@ -118,14 +118,14 @@ def test_sc_probate_listing_backfills_address_and_plaintiff_from_quiet_title():
     }
     li = scraper._sc_probate_listing(it, "Pickens")
     assert li is not None
-    assert li.street_address == "101 South Fifth Street"
+    assert li.street_address == "101 South Sample Street"
     assert li.parcel_id == "5019-15-63-3697"
     assert li.plaintiff == "Redrock Capital, LLC"
-    assert li.case_number == "2026-CP-39-00250"
-    assert li.owner_name == "Lonella B. McCracken"
+    assert li.case_number == "2026-CP-39-09950"
+    assert li.owner_name == "Lorena B. McSampleton"
     assert li.county == "Pickens"
     assert "heir_naming_publication" in li.raw
-    assert li.raw["heir_naming_publication"]["named_heirs"][0] == "Linda Lister"
+    assert li.raw["heir_naming_publication"]["named_heirs"][0] == "Lena Listest"
 
 
 def test_sc_probate_listing_ordinary_notice_has_no_heir_naming_publication_key():

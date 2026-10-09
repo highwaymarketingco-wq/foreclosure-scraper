@@ -25,11 +25,11 @@ _HTML = """
 <table>
 <tr><th>Location</th><th>Price</th><th>Type</th><th>Description</th><th>Broker</th></tr>
 <tr><th>7120 Myrtle Grove Rd, Wilmington, NC 28409</th><td>Please Inquire</td>
-    <td>Vacant Land</td><td>1.19-acre lot</td><td>Matt Clawson 919-716-4183</td></tr>
+    <td>Vacant Land</td><td>1.19-acre lot</td><td>Mat Clawtest 919-555-0721</td></tr>
 <tr><th>805 Driftwood Ln, North, SC 29112</th><td>$95,000</td>
     <td>Residential</td><td>2 BR/1 BA cottage</td><td>Jane Doe 803-555-1212</td></tr>
 <tr><th>22 Baltimore Rd, Rockville, MD 20850</th><td>Please Inquire</td>
-    <td>Commercial</td><td>Office building</td><td>Jack Leary 443-463-9088</td></tr>
+    <td>Commercial</td><td>Office building</td><td>Jake Learytest 443-555-0963</td></tr>
 </table>
 """
 
@@ -72,8 +72,8 @@ _HTML_REAL_BROKER_MARKUP = (
     "<tr><th>7120 Myrtle Grove Rd, Wilmington, NC 28409</th><td>Please Inquire</td>"
     "<td>Vacant Land</td><td>1.19-acre lot</td>"
     '<td class="fcb-table__content-cell"><p>'
-    '<a href="mailto:philipwmatthews@outlook.com">Philip Matthews</a><br>'
-    '<a aria-label="9 1 9. 6 6 9. 5 3 6 1." href="tel:+19196695361">919-669-5361</a>'
+    '<a href="mailto:contact15@sample-mail.test">Phil Mathtest</a><br>'
+    '<a aria-label="9 1 9. 5 5 5. 0 6 9 1." href="tel:+19195550691">919-555-0691</a>'
     "</p></td></tr>"
     "</table>"
 )
@@ -83,12 +83,12 @@ def test_parse_pulls_broker_email_and_phone_from_hrefs_not_flattened_text():
     out = parse(_HTML_REAL_BROKER_MARKUP)
     assert len(out) == 1
     raw = out[0].raw["first_citizens_reo"]
-    assert raw["broker_email"] == "philipwmatthews@outlook.com"
-    assert raw["broker_phone"] == "+19196695361"
+    assert raw["broker_email"] == "contact15@sample-mail.test"
+    assert raw["broker_phone"] == "+19195550691"
     # The flattened display text (no separator between name and phone) is
     # still kept as-is for backward compatibility, just no longer the only
     # way to get the phone/email.
-    assert raw["broker"] == "Philip Matthews919-669-5361"
+    assert raw["broker"] == "Phil Mathtest919-555-0691"
 
 
 def test_parse_broker_cell_without_links_leaves_email_phone_none():
@@ -123,22 +123,22 @@ _REAL_JSON = json.dumps({
             "propertyAddress": "7120 Myrtle Grove Rd, Wilmington, NC 28409",
             "city": "Wilmington", "state": "NC", "propertyType": "Vacant Land",
             "description": "1.19-acre lot", "price": "Please Inquire",
-            "broker": "Philip Matthews", "phone": "919-669-5361",
-            "email": "philipwmatthews@outlook.com",
+            "broker": "Phil Mathtest", "phone": "919-555-0691",
+            "email": "contact15@sample-mail.test",
         },
         {
             "propertyAddress": "118 Hard St, Graniteville, SC 29829",
             "city": "Graniteville", "state": "SC", "propertyType": "Commercial",
             "description": "Manufacturing/recycling building on 4.7031 acres",
-            "price": "Please Inquire", "broker": "Matthew Clawson",
-            "phone": "919-716-4183", "email": "Matthew.Clawson@firstcitizens.com",
+            "price": "Please Inquire", "broker": "Mathis Clawtest",
+            "phone": "919-555-0721", "email": "contact16@sample-mail.test",
         },
         {
             "propertyAddress": "22 Baltimore Rd, Rockville, MD 20850",
             "city": "Rockville", "state": "MD", "propertyType": "Commercial",
             "description": "Historic office building", "price": "Please Inquire",
-            "broker": "Jack Leary", "phone": "443-463-9088",
-            "email": "baltimorejacksells@gmail.com",
+            "broker": "Jake Learytest", "phone": "443-555-0963",
+            "email": "contact17@sample-mail.test",
         },
     ],
 })
@@ -152,8 +152,8 @@ def test_parse_json_keeps_only_nc_sc_with_clean_fields():
     assert nc.street_address == "7120 Myrtle Grove Rd"
     assert nc.zip_code == "28409"
     assert nc.property_kind == PropertyKind.LAND
-    assert nc.raw["first_citizens_reo"]["broker_phone"] == "919-669-5361"
-    assert nc.raw["first_citizens_reo"]["broker_email"] == "philipwmatthews@outlook.com"
+    assert nc.raw["first_citizens_reo"]["broker_phone"] == "919-555-0691"
+    assert nc.raw["first_citizens_reo"]["broker_email"] == "contact15@sample-mail.test"
 
 
 def test_parse_json_malformed_input_returns_empty_not_a_crash():

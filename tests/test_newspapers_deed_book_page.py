@@ -23,9 +23,9 @@ from foreclosure_scraper.scrapers.newspapers import tryon_bulletin as tb
 
 # Real captured shape (Hendersonville Lightning, 2026-10-04 live fetch).
 HVL_HTML = """<html><body>
-<h3 class="title">NOTICE OF FORECLOSURE SALE, FILE NO. 2016-SP-21</h3>
-<p>NORTH CAROLINA, HENDERSON COUNTY FILE NO. 2016-SP-21 Under and by virtue of a Power of
-Sale contained in that certain Deed of Trust executed by Keith Brock and Diane Brock, which
+<h3 class="title">NOTICE OF FORECLOSURE SALE, FILE NO. 2016-SP-99</h3>
+<p>NORTH CAROLINA, HENDERSON COUNTY FILE NO. 2016-SP-99 Under and by virtue of a Power of
+Sale contained in that certain Deed of Trust executed by Kevin Sampleton and Denise Sampleton, which
 was dated September 28, 2000 and recorded on January 5, 2001 in Book 935 at Page 148,
 Henderson County Registry, North Carolina. Property address: 100 Example Rd, Hendersonville,
 NC 28792. The sale will take place on October 28, 2026, at 2:00 PM.</p>

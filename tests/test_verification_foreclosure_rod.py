@@ -152,7 +152,7 @@ def test_claim_dates_and_kind():
     ("MASSIE(LE) DAVID A;FARMER(LE) JOYCE", True, [("MASSIE", "DAVID", "A"), ("FARMER", "JOYCE", "")]),
     ("FREDRICH, CHAD FREDRICH, TIA", True, [("FREDRICH", "CHAD", ""), ("FREDRICH", "TIA", "")]),
     ("SHOAF, MICHAEL EDWARD LAKEVIEW LOAN SERVICING, LLC/ BY AIF", True, [("SHOAF", "MICHAEL", "")]),
-    ("KevinKerr", False, []), ("frenchbroadcontracting@gmail.com", False, []),
+    ("KevinKerr", False, []), ("contact22@sample-mail.test", False, []),
     ("JPMORGAN CHASE BANK NATIONAL ASSOCIATION", True, []),
     ("REGENIA SEBREN ANN EDWARDS JEFF FRIDAY HEIRS", True, [])])
 def test_persons_in(value, sfc, want):

@@ -58,7 +58,7 @@ def test_hoa_named_as_party_is_caught(names):
 
 
 def test_estate_co_defendant_is_caught_even_though_owner_name_signal_never_sees_it():
-    sig = classify_co_defendants(["Allen Estate Of, Roy Douglas", "1St Franklin Financial Corporation"])
+    sig = classify_co_defendants(["Sampleton Estate Of, Ray Douglas", "1St Franklin Financial Corporation"])
     assert sig is not None
     assert sig["estate_co_defendants"]
     assert sig["estate_co_defendants"][0]["grade"] == "strong"
@@ -102,7 +102,7 @@ def _row(co_defendants, container="court"):
 def test_enrich_reads_both_raw_shapes_and_never_drops():
     rows = [
         _row(["Arthur State Bank, Mortgagee And Assignee"], container="court"),
-        _row(["Allen Estate Of, Roy Douglas"], container="sc_public_index"),
+        _row(["Sampleton Estate Of, Ray Douglas"], container="sc_public_index"),
         _row(["Smith, John"], container="court"),
         _row(None),
         _row([]),

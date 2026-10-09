@@ -1,7 +1,7 @@
 """Cleveland NC tax foreclosure sales — county Legal Department (in-house).
 
 Cleveland County runs its tax foreclosure sales IN-HOUSE through its own Legal
-Department (contact christie.wooten@clevelandcountync.gov / 704-476-3089), NOT
+Department (contact contact03@sample-mail.test / 704-555-0573), NOT
 through an outside firm. (A minority of parcels are farmed out to Kania Law
 Firm; the page links those separately and we scrape Kania on its own.)
 

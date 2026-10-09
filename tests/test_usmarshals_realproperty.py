@@ -64,8 +64,8 @@ _DETAIL_ON_MARKET = """
 <dl>
     <dt>Broker</dt>
     <dd>
-        Brendon Payne<br />
-        +1 (843) 222-5771<br />
+        Brandon Paynetest<br />
+        +1 (843) 555-0550<br />
         Broker ID: 66802
     </dd>
 </dl>
@@ -111,8 +111,8 @@ def test_broker_name_and_phone_are_cleanly_separated():
     "Broker ID: N" all run together across <br/> breaks -- must not leak
     into a single garbled trustee string."""
     li = _parse_detail(_DETAIL_ON_MARKET, "/properties/11182-0", _ADDR)
-    assert li.trustee == "Brendon Payne"
-    assert li.raw["usmarshals"]["broker_phone"] == "+1 (843) 222-5771"
+    assert li.trustee == "Brandon Paynetest"
+    assert li.raw["usmarshals"]["broker_phone"] == "+1 (843) 555-0550"
     assert "Broker ID" not in li.trustee
 
 
@@ -125,8 +125,8 @@ def test_broker_contact_is_surfaced_into_notice_contact():
     surfaces instead of sitting unused."""
     li = _parse_detail(_DETAIL_ON_MARKET, "/properties/11182-0", _ADDR)
     nc = li.raw["notice_contact"]
-    assert nc["name"] == "Brendon Payne"
-    assert nc["phone"] == "+1 (843) 222-5771"
+    assert nc["name"] == "Brandon Paynetest"
+    assert nc["phone"] == "+1 (843) 555-0550"
     assert nc["contact_role"] == "listing broker"
 
 

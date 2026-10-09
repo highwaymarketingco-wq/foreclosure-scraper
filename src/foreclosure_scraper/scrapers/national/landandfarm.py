@@ -35,7 +35,7 @@ MAX_PAGES = 10
 # search page's description is cut off mid-sentence at ~250 chars), a real
 # datePosted, and a structured additionalProperty list (Acreage/Activities/
 # Lot Description/Present Use/Proposed Use) -- confirmed live on a real
-# current Buncombe listing: phone "(828) 506-8701", present/proposed use
+# current Buncombe listing: phone "(828) 555-0756", present/proposed use
 # values like "Residential Single"/"Commercial". Also confirmed live: unlike
 # the search-results page (Akamai-gated, needs StealthyFetcher), the DETAIL
 # page is reachable via plain curl_cffi impersonation -- no expensive

@@ -42,7 +42,7 @@ missing almost everything actually on the page:
 5. **Government contact (name/phone/email) never captured** — every ad has
    a "Contact Information" block naming the IRS Property Appraisal &
    Liquidation Specialist running THAT sale, with a direct phone and email
-   (live: "Paul Reed", "770-826-1271", "paul.reed@irs.gov") — real, free
+   (live: "Paula Reedson", "770-555-0918", "contact06@sample-mail.test") — real, free
    contactability for whoever is working this lead, same mission as
    HERMES sec 9's contactability ceiling.
 6. **Linked PDFs never captured** — every ad links a signed "Notice of

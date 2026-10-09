@@ -38,7 +38,7 @@ NOTICE_OF_SALE_RSS = """<rss><channel>
 <item>
 <title>NOTICE OF SALE C/A</title>
 <link>https://www.indexjournal.com/classifieds/community/announcements/legal/ad_notice_of_sale.html</link>
-<description>NOTICE OF SALE C/A No. 2025CP2400887 BY VIRTUE of the decree heretofore granted in the case of: U.S. BANK TRUST NA v. JOHN Q PUBLIC, the undersigned Master In Equity for Greenwood County will sell</description>
+<description>NOTICE OF SALE C/A No. 2025CP2409987 BY VIRTUE of the decree heretofore granted in the case of: U.S. BANK TRUST NA v. JOHN Q PUBLIC, the undersigned Master In Equity for Greenwood County will sell</description>
 <pubDate>Fri, 02 Oct 2026 01:00:20 -0400</pubDate>
 </item>
 </channel></rss>"""

@@ -24,7 +24,7 @@ confirmed live, previously undocumented:
    COUNTIES`). `_townnews._classify()` returns `ListingType.FORECLOSURE_SALE`
    for the real NC substitute-trustee "Notice of Foreclosure Sale" template
    this feed almost always returns (live-sampled today: both of 2 current
-   rows -- "NOTICE OF FORECLOSURE SALE 25SP001124-150 168 BAYBERRY RD
+   rows -- "NOTICE OF FORECLOSURE SALE 25SP009924-150 168 SAMPLE RD
    NEWPORT, NC" and a timeshare-lien foreclosure -- classified
    FORECLOSURE_SALE). FORECLOSURE_SALE is a flip type, and
    `main._flip_outside_footprint()` rejects ANY flip-type row outside the

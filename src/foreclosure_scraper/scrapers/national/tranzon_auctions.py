@@ -124,8 +124,8 @@ def _county_for(city: str | None, state: str) -> str | None:
 # search page): the FULL photo gallery at /propertyimages/{id}_{set}.jpg (25
 # real photos on the sampled listing vs. the single /propertyimagesmedium/
 # thumbnail the search page's own row captures), the listing agent's real
-# name/phone/email (a HERMES sec 9 contactability signal -- "Anna Spencer,
-# AARE", "352-400-3233", "aspencer@tranzon.com"), and a full narrative
+# name/phone/email (a HERMES sec 9 contactability signal -- "Ana Spenceton,
+# AARE", "352-555-0990", "contact07@sample-mail.test"), and a full narrative
 # property description (beds/baths/sqft/garage/lot, truncated to a bare
 # title on the search page). A "Property Information Package" download is
 # gated behind a JS-bound "#spvault" control with no plain href in the

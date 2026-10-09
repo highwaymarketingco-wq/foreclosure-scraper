@@ -242,11 +242,11 @@ def test_anderson_block_status_escalates_to_the_chrome_tier_once(monkeypatch):
     async def imp(url, **k):
         seen.append(url)
         return ("<table><tr><th>Case</th><th>Defendant</th></tr>"
-                "<tr><td>2024-CP-04-00123</td><td>Sample Ownername</td><td>12 Main St Anderson</td></tr></table>" + " " * 200)
+                "<tr><td>2024-CP-04-09123</td><td>Sample Ownername</td><td>12 Main St Anderson</td></tr></table>" + " " * 200)
     monkeypatch.setattr(anders, "get_text_impersonate", imp)
     out = asyncio.run(anders.AndersonSheriff().safe_run())
     assert seen == [anders.PAGE_URL] and len(out) == 1
-    assert out[0].case_number == "2024-CP-04-00123" and out[0].county == "Anderson"
+    assert out[0].case_number == "2024-CP-04-09123" and out[0].county == "Anderson"
 
 
 # =========================================================================== #
@@ -261,10 +261,10 @@ _CRED = (FIX / "daily_courier_ad_creditors.html").read_text()
 
 
 @pytest.mark.parametrize("text,expect", [
-    ("Special Proceedings No. 26SP000130-800 Trustee", "26SP000130"),
+    ("Special Proceedings No. 26SP009930-800 Trustee", "26SP009930"),
     ("File 25 SP 123 in", "25SP123"), ("24CVD1234", "24CVD1234"), ("26M000412", "26M000412")])
 def test_daily_courier_file_numbers_including_the_six_digit_form(text, expect):
-    """Live: '26SP000130-800' never matched the old 1-5 digit pattern, so case_number was always empty."""
+    """Live: '26SP009930-800' never matched the old 1-5 digit pattern, so case_number was always empty."""
     m = dc.FILE_RE.search(text)
     assert m and f"{m.group(1)}{m.group(2).upper()}{m.group(3)}" == expect
 
@@ -299,17 +299,17 @@ def test_daily_courier_owner_sentence_style_label_2026_10_01():
     Owners:'/'Present Owner(s):' and left owner_name/defendant silently None
     on this real notice shape."""
     body = (
-        "NOTICE OF FORECLOSURE SALE File No. 26SP000047-800. "
+        "NOTICE OF FORECLOSURE SALE File No. 26SP009947-800. "
         "RECORD OWNERS OF THE REAL PROPERTY: The record owner(s) of the "
         "subject real property as reflected on the records of the "
         "Rutherford County Register of Deeds not more than 10 days prior "
-        "to the posting of this Notice is or are Chelsie Sherel Littlejohn "
-        "and Avery Vincent Harris. DATE, TIME AND PLACE OF SALE: The sale "
+        "to the posting of this Notice is or are Chelsea Sample Littletest "
+        "and Avery Victor Testharris. DATE, TIME AND PLACE OF SALE: The sale "
         "will be held on October 7, 2026. PROPERTY TO BE SOLD: believed to "
         "have the address of 115 Lake Hill Farm Rd, Mooresboro, NC 28114."
     )
     li = dc.parse_notice(_wrap_notice("NORTH CAROLINA RUTHERFORD COUNTY", body), "u")
-    assert li.defendant == "Chelsie Sherel Littlejohn and Avery Vincent Harris"
+    assert li.defendant == "Chelsea Sample Littletest and Avery Victor Testharris"
     assert li.owner_name == li.defendant
     assert li.street_address == "115 Lake Hill Farm Rd,"
 
@@ -319,15 +319,15 @@ def test_daily_courier_present_record_owners_and_bare_address_label_2026_10_01()
     the old pattern didn't account for) and a bare 'ADDRESS:' label (no
     'Property'/'of the Property' prefix) both left fields silently None."""
     body = (
-        "NOTICE OF FORECLOSURE SALE FILE NUMBER: 26SP000102-800 "
+        "NOTICE OF FORECLOSURE SALE FILE NUMBER: 26SP009902-800 "
         "PARCEL IDENTIFICATION NUMBER(S): 420719 "
-        "ADDRESS: 165 FERNWOOD DR FOREST CITY, NC 28043 "
-        "PRESENT RECORD OWNER(S): UNKNOWN HEIRS OF STEVEN DWAYNE TILLER "
+        "ADDRESS: 165 SAMPLEWOOD DR FOREST CITY, NC 28043 "
+        "PRESENT RECORD OWNER(S): UNKNOWN HEIRS OF STEPHEN DWIGHT SAMPLER "
         "THE LAND DESCRIBED HEREIN IS SITUATED IN THE STATE OF NORTH CAROLINA."
     )
     li = dc.parse_notice(_wrap_notice("NOTICE OF FORECLOSURE SALE", body), "u")
-    assert li.defendant == "UNKNOWN HEIRS OF STEVEN DWAYNE TILLER"
-    assert li.street_address == "165 FERNWOOD DR"
+    assert li.defendant == "UNKNOWN HEIRS OF STEPHEN DWIGHT SAMPLER"
+    assert li.street_address == "165 SAMPLEWOOD DR"
     assert li.city == "Forest City" and li.zip_code == "28043"
 
 

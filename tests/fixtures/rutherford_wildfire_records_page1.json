@@ -33,21 +33,21 @@
      "AllowPayment": true,
      "Blacklist": false,
      "Description": "DELINQUENT",
-     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)555-0679",
      "CSSClass": null
     },
     {
      "AllowPayment": false,
      "Blacklist": false,
      "Description": "OUTSIDE LAW FIRM",
-     "Message": "PLEASE CONTACT KANIA LAW FIRM (828)252-8010",
+     "Message": "PLEASE CONTACT KANIA LAW FIRM (828)555-0311",
      "CSSClass": null
     },
     {
      "AllowPayment": true,
      "Blacklist": false,
      "Description": "ADVERTISED",
-     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)555-0679",
      "CSSClass": null
     }
    ],
@@ -255,14 +255,14 @@
      "AllowPayment": true,
      "Blacklist": false,
      "Description": "DELINQUENT",
-     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)555-0679",
      "CSSClass": null
     },
     {
      "AllowPayment": true,
      "Blacklist": false,
      "Description": "ADVERTISED",
-     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)555-0679",
      "CSSClass": null
     }
    ],
@@ -446,14 +446,14 @@
      "AllowPayment": true,
      "Blacklist": false,
      "Description": "DELINQUENT",
-     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)555-0679",
      "CSSClass": null
     },
     {
      "AllowPayment": true,
      "Blacklist": false,
      "Description": "ADVERTISED",
-     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)555-0679",
      "CSSClass": null
     }
    ],
@@ -637,7 +637,7 @@
      "AllowPayment": true,
      "Blacklist": false,
      "Description": "DELINQUENT",
-     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)555-0679",
      "CSSClass": null
     }
    ],
@@ -833,7 +833,7 @@
      "AllowPayment": true,
      "Blacklist": false,
      "Description": "DELINQUENT",
-     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)555-0679",
      "CSSClass": null
     }
    ],
@@ -1005,14 +1005,14 @@
      "AllowPayment": true,
      "Blacklist": false,
      "Description": "DELINQUENT",
-     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)555-0679",
      "CSSClass": null
     },
     {
      "AllowPayment": true,
      "Blacklist": false,
      "Description": "ADVERTISED",
-     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)555-0679",
      "CSSClass": null
     }
    ],

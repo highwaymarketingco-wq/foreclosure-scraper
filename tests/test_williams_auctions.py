@@ -77,7 +77,7 @@ _DETAIL_PENDING = """
 <img id="previewimg" class="img-responsive full" src="https://auctionnetworkimages.blob.core.windows.net/assets/media/08721150_largesize.jpg" alt="Listing Image" />
 <img class="img-thumbnail" src="https://auctionnetworkimages.blob.core.windows.net/assets/media/08721150_thumbfit.jpg" data-full-size-src="https://auctionnetworkimages.blob.core.windows.net/assets/media/08721150_largesize.jpg" alt="Listing Image" />
 <img class="img-thumbnail" src="https://auctionnetworkimages.blob.core.windows.net/assets/media/99676ab1_thumbfit.jpg" data-full-size-src="https://auctionnetworkimages.blob.core.windows.net/assets/media/99676ab1_largesize.jpg" alt="Listing Image" />
-<p><strong>Auction Information:</strong> <span>800-801-8003</span></p>
+<p><strong>Auction Information:</strong> <span>800-555-0562</span></p>
 <p><strong>Foreclosure/Trustee </strong> <span><strong>#23-12118-FC03 </strong></span></p>
 <div class="detail__show-time-classified">
     <strong>LIVE Auction</strong>
@@ -108,7 +108,7 @@ _DETAIL_UPSET_BID = """
     <div class="feature-val">Residential</div>
 </div>
 <img class="img-thumbnail" src="thumb1.jpg" data-full-size-src="https://auctionnetworkimages.blob.core.windows.net/assets/media/1490f7ea_largesize.jpg" alt="Listing Image" />
-<p><strong>Auction Information:</strong> <span>800-801-8003</span></p>
+<p><strong>Auction Information:</strong> <span>800-555-0562</span></p>
 <p><strong>Foreclosure/Trustee </strong> <span><strong># </strong></span></p>
 <div class="live-auction-timing">
 </div>
@@ -165,7 +165,7 @@ def test_auction_info_phone_is_surfaced_into_notice_contact():
     key enrich_surface_contacts.py's existing phone surfacer reads) so this
     real, dialable auction-desk number actually surfaces."""
     li = _parse_detail(_DETAIL_PENDING, _PENDING_URL)
-    assert li.raw["notice_contact"]["phone"] == "800-801-8003"
+    assert li.raw["notice_contact"]["phone"] == "800-555-0562"
     assert li.raw["notice_contact"]["contact_role"] == "Williams & Williams auction desk"
 
 

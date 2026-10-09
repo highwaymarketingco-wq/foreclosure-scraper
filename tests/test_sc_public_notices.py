@@ -178,11 +178,11 @@ def test_estate_notice_under_a_tax_category_still_gets_probate_enrichment():
     """Overlapping keyword bundles mean an estate notice can first surface under
     Tax Sales; the probate signal must follow the refined type, not the category."""
     li = M._to_listing(
-        _row("Laurens", "NOTICE TO CREDITORS OF THE ESTATE OF HAROLD B GREER, deceased. "
+        _row("Laurens", "NOTICE TO CREDITORS OF THE ESTATE OF HAROLD B TESTGREER, deceased. "
                         "All persons having claims against this estate..."), "26", "s")
     assert li.listing_type is ListingType.PROBATE_NOTICE
     assert li.raw["relationship_signal"]["kind"] == "probate"
-    assert li.raw["probate"]["decedent"] == "HAROLD B GREER"
+    assert li.raw["probate"]["decedent"] == "HAROLD B TESTGREER"
     assert li.foreclosure_process is None       # not a foreclosure or tax track
 
 

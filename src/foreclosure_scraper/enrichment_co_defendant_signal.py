@@ -38,7 +38,7 @@ MEASURED ON THE LIVE BOARD, 2026-10-01 (`docs/listings.json`, raw string scan)
             confirming a RECORDED ASSESSMENT LIEN the HOA's own filings are
             walled (ROD-indexed, not independently scraped; see
             docs/walls_register.md) but this caption admits it for free.
-      - 17  (0.9%) carry an ESTATE/HEIRS token ("Allen Estate Of, Roy Douglas",
+      - 17  (0.9%) carry an ESTATE/HEIRS token ("Sampleton Estate Of, Ray Douglas",
             "Austin, Estate Of Alice") that `enrichment_owner_name_signal.classify()`
             would grade STRONG if it ran on this string -- but that enricher only
             ever reads `li.owner_name`, never `co_defendants`, so these probate

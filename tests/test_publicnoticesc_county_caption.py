@@ -27,7 +27,7 @@ from foreclosure_scraper.scrapers.public_notices import publicnoticesc as M
 FAIRFIELD_MISMATCH_TEXT = (
     "SUMMONS AND NOTICES (Non-Jury) FORECLOSURE OF REAL ESTATE MORTGAGE "
     "STATE OF SOUTH CAROLINA COUNTY OF FAIRFIELD IN THE COURT OF COMMON "
-    "PLEAS C/A NO.: 2022CP2000208 U.S. Bank Trust National Association, "
+    "PLEAS C/A NO.: 2022CP2009908 U.S. Bank Trust National Association, "
     "not in its individual capacity, Plaintiff, v. JOHN DOE, Defendants."
 )
 
@@ -84,7 +84,7 @@ def test_excludes_an_out_of_footprint_case_whose_publication_is_not():
 def test_falls_back_to_county_meta_when_no_caption_county_present():
     """The common case (preview truncates before any caption, or no 'COUNTY
     OF' phrasing at all): behavior is UNCHANGED from before this fix."""
-    text = "NOTICE OF SALE case no. 2026CP4204581 will sell to highest bidder..."
+    text = "NOTICE OF SALE case no. 2026CP4209581 will sell to highest bidder..."
     row = _row("900003", "Spartanburg", text)
     li = M._to_listing(row, "public_notices.publicnoticesc")
     assert li is not None
@@ -98,7 +98,7 @@ def test_caption_county_outside_the_300_char_caption_zone_is_ignored():
     depth even though the preview truncates early enough in practice that
     this has not been observed live."""
     filler = "A" * 400
-    text = f"NOTICE OF SALE case no. 2026CP4204581. {filler} COUNTY OF RICHLAND mentioned late."
+    text = f"NOTICE OF SALE case no. 2026CP4209581. {filler} COUNTY OF RICHLAND mentioned late."
     row = _row("900004", "Spartanburg", text)
     li = M._to_listing(row, "public_notices.publicnoticesc")
     assert li is not None

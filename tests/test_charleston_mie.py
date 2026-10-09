@@ -35,14 +35,14 @@ _AUCTION_HTML = (
     "<p>JULY SALES</p>"
     "<p>07-07-26 25-06873 Computershare Delaware Peter J. Dieppe IV "
     "3501400030 1906 Capri Drive $453,617.57 1 st Riley Pope &amp; Laney "
-    "803-799-9993 West Ashley</p>"
+    "803-555-0503 West Ashley</p>"
     "<p>07-07-26 24-04968 Colony North Management Christan A. Rainey "
     "4840800302 7814 Jean Rebault Drive $6,439.73 HOA LIEN Ashley Green "
-    "803-724-5002 North Charleston</p>"
+    "803-555-0314 North Charleston</p>"
     "<p>AUGUST SALES</p>"
     "<p>08-04-26 RE-OPEN 09-03-26 26-00297 Wilmington Trust 78 Devereaux Ave "
-    "3400000043 1977 Central Park Road $379,502.01 1 st J. Martin Page "
-    "803-509-5078 James Island</p>"
+    "3400000043 1977 Central Park Road $379,502.01 1 st J. Marten Pagetest "
+    "803-555-0714 James Island</p>"
     "</body></html>"
 ).encode("windows-1252")
 

@@ -37,7 +37,7 @@ def _listing(**kw) -> Listing:
 
 # ---------------------------------------------------------------- phone hygiene
 @pytest.mark.parametrize("digits", [
-    "8286289884", "7042749014", "8287830905",
+    "8285550445", "7045550604", "8285550690",
 ])
 def test_valid_nanp_accepts_real_numbers(digits):
     assert cp._valid_nanp(digits)
@@ -58,7 +58,7 @@ def test_valid_nanp_rejects_junk(digits):
 
 
 def test_clean_digits_strips_country_code_and_formatting():
-    assert cp._clean_digits("1 (828) 628-9884") == "8286289884"
+    assert cp._clean_digits("1 (828) 555-0445") == "8285550445"
     assert cp._clean_digits(None) == ""
 
 
@@ -112,9 +112,9 @@ def test_no_source_config_uses_a_wildcard():
 def test_index_keys_exact_parcel_and_unambiguous_base():
     idx = cp._index_rows(BUN_ROWS, BUN_SPEC)
     # exact 15-digit key
-    assert idx["060502683700000"]["phones"] == ["8286289884"]
+    assert idx["060502683700000"]["phones"] == ["8285550445"]
     # unambiguous 10-digit base derived from it
-    assert idx["0605026837"]["phones"] == ["8286289884"]
+    assert idx["0605026837"]["phones"] == ["8285550445"]
     assert idx["0605026837"]["_base_match"] is True
 
 
@@ -139,8 +139,8 @@ def test_index_honors_the_active_owner_status_filter():
 def test_index_keeps_second_number_and_mailing_and_as_of():
     idx = cp._index_rows(BUN_ROWS, BUN_SPEC)
     rec = idx["971370653100000"]
-    assert rec["phones"] == ["8282755283", "7042749014"]
-    assert rec["mailing"] == "389 SUGAR HOLLOW RD FAIRVIEW NC 28730"
+    assert rec["phones"] == ["8285550427", "7045550604"]
+    assert rec["mailing"] == "389 EXAMPLE HOLLOW RD FAIRVIEW NC 28730"
     assert rec["as_of"] == "2026-07-30"
 
 
@@ -149,18 +149,18 @@ def test_split_integer_phone_columns_are_zero_padded():
     4-digit line '0905', not a 3-digit number."""
     rows = [f["attributes"] for f in LINCOLN["taxpayer"]["features"]]
     idx = cp._index_rows(rows, LIN_SPEC)
-    assert idx["0195049"]["phones"] == ["8287830905", "7042749014"]
-    assert idx["0309770"]["phones"] == ["8014873801"]
+    assert idx["0195049"]["phones"] == ["8285550690", "7045550604"]
+    assert idx["0309770"]["phones"] == ["8015550931"]
     assert "0000001" not in idx     # 999/999/9999 placeholder
 
 
 # ---------------------------------------------------------------- record shape
 def test_record_carries_the_compliance_and_consumer_fields():
     idx = cp._index_rows(BUN_ROWS, BUN_SPEC)
-    li = _listing(owner_name="DAVID MANLY", parcel_id="060502683700000")
+    li = _listing(owner_name="DANIEL SAMPLE", parcel_id="060502683700000")
     rec = cp._record(idx["060502683700000"], BUN_SPEC, li, "2026-08-03")
     # shape the dashboard + enrichment_line_type already consume
-    assert rec["phone"] == "(828) 628-9884"
+    assert rec["phone"] == "(828) 555-0445"
     assert rec["source"] == "buncombe_accela"
     assert rec["line_type"] == "unknown"
     # DNC/TCPA hygiene: county-published, never consented
@@ -174,7 +174,7 @@ def test_record_carries_the_compliance_and_consumer_fields():
 
 def test_base_match_is_downgraded_to_medium_confidence():
     idx = cp._index_rows(BUN_ROWS, BUN_SPEC)
-    li = _listing(owner_name="DAVID MANLY", parcel_id="0605026837")
+    li = _listing(owner_name="DANIEL SAMPLE", parcel_id="0605026837")
     rec = cp._record(idx["0605026837"], BUN_SPEC, li, "2026-08-03")
     assert rec["confidence"] == "medium" and rec["match"] == "parcel_id_base"
 
@@ -183,43 +183,43 @@ def test_base_match_is_downgraded_to_medium_confidence():
 def test_attach_fills_an_empty_slot():
     li = _listing(parcel_id="060502683700000")
     counts = {"filled": 0, "alternates": 0, "confirmed_existing": 0}
-    cp._attach(li, {"phone": "(828) 628-9884", "source": "buncombe_accela"}, counts)
+    cp._attach(li, {"phone": "(828) 555-0445", "source": "buncombe_accela"}, counts)
     assert li.raw["owner_phone"]["source"] == "buncombe_accela"
     assert counts["filled"] == 1
 
 
 def test_attach_never_overwrites_an_existing_voter_phone():
     li = _listing(parcel_id="060502683700000")
-    li.raw = {"owner_phone": {"phone": "(828) 279-5724", "source": "ncsbe_voter",
+    li.raw = {"owner_phone": {"phone": "(828) 555-0992", "source": "ncsbe_voter",
                               "line_type": "wireless", "tcpa_class": "manual_only"}}
     counts = {"filled": 0, "alternates": 0, "confirmed_existing": 0}
     payload = cp._record(cp._index_rows(BUN_ROWS, BUN_SPEC)["060502683700000"],
                          BUN_SPEC, li, "2026-08-03")
     cp._attach(li, payload, counts)
     op = li.raw["owner_phone"]
-    assert op["phone"] == "(828) 279-5724" and op["source"] == "ncsbe_voter"
+    assert op["phone"] == "(828) 555-0992" and op["source"] == "ncsbe_voter"
     assert op["line_type"] == "wireless"          # line_type classification survives
     assert counts["filled"] == 0 and counts["alternates"] == 1
     alt = op["alternates"][0]
-    assert alt["phone"] == "(828) 628-9884"
+    assert alt["phone"] == "(828) 555-0445"
     assert alt["county_published"] is True and alt["consent"] == "none"
     assert alt["needs_dnc_scrub"] is True
 
 
 def test_attach_records_agreement_as_corroboration_not_a_duplicate():
     li = _listing(parcel_id="060502683700000")
-    li.raw = {"owner_phone": {"phone": "(828) 628-9884", "source": "ncsbe_voter"}}
+    li.raw = {"owner_phone": {"phone": "(828) 555-0445", "source": "ncsbe_voter"}}
     counts = {"filled": 0, "alternates": 0, "confirmed_existing": 0}
-    cp._attach(li, {"phone": "(828) 628-9884", "source": "buncombe_accela"}, counts)
+    cp._attach(li, {"phone": "(828) 555-0445", "source": "buncombe_accela"}, counts)
     assert counts["confirmed_existing"] == 1 and counts["alternates"] == 0
     assert li.raw["owner_phone"]["corroborated_by"] == ["buncombe_accela"]
 
 
 def test_attach_is_idempotent_for_alternates():
     li = _listing(parcel_id="060502683700000")
-    li.raw = {"owner_phone": {"phone": "(828) 279-5724", "source": "ncsbe_voter"}}
+    li.raw = {"owner_phone": {"phone": "(828) 555-0992", "source": "ncsbe_voter"}}
     counts = {"filled": 0, "alternates": 0, "confirmed_existing": 0}
-    payload = {"phone": "(828) 628-9884", "source": "buncombe_accela", "match": "parcel_id",
+    payload = {"phone": "(828) 555-0445", "source": "buncombe_accela", "match": "parcel_id",
                "confidence": "high", "county_published": True, "consent": "none",
                "needs_dnc_scrub": True, "fetched": "2026-08-03", "county_owner": None,
                "county_mailing": None}
@@ -273,8 +273,8 @@ def offline(monkeypatch, tmp_path):
 @pytest.mark.asyncio
 async def test_end_to_end_buncombe_pages_and_fills(offline):
     listings = [
-        _listing(owner_name="DAVID MANLY", parcel_id="060502683700000"),
-        _listing(owner_name="WILLIAM GALYEAN", parcel_id="9713706531"),   # base-form id
+        _listing(owner_name="DANIEL SAMPLE", parcel_id="060502683700000"),
+        _listing(owner_name="WILLIS SAMPLETON", parcel_id="9713706531"),   # base-form id
         _listing(owner_name="NOBODY", parcel_id="1111111111"),            # no county record
         _listing(owner_name="NO PARCEL"),                                 # not a target
         _listing(owner_name="OTHER COUNTY", county="Watauga", parcel_id="060502683700000"),
@@ -284,10 +284,10 @@ async def test_end_to_end_buncombe_pages_and_fills(offline):
     assert bun["targets"] == 3 and bun["matched"] == 2
     assert stats["filled"] == 2
 
-    assert listings[0].raw["owner_phone"]["phone"] == "(828) 628-9884"
+    assert listings[0].raw["owner_phone"]["phone"] == "(828) 555-0445"
     second = listings[1].raw["owner_phone"]
-    assert second["phone"] == "(828) 275-5283"
-    assert second["alt_phones"] == ["(704) 274-9014"]
+    assert second["phone"] == "(828) 555-0427"
+    assert second["alt_phones"] == ["(704) 555-0604"]
     assert second["confidence"] == "medium"        # matched via the 10-digit base form
     assert not isinstance(listings[2].raw, dict) or "owner_phone" not in (listings[2].raw or {})
     assert not (listings[4].raw or {}).get("owner_phone")   # unconfigured county untouched
@@ -298,7 +298,7 @@ async def test_end_to_end_lincoln_bridges_parcel_to_taxpayer(offline):
     listings = [
         _listing(county="Lincoln", owner_name="FEDERAL NATIONAL MORTGAGE",
                  parcel_id="3633246157"),
-        _listing(county="Lincoln", owner_name="MORETZ AUSTIN", parcel_id="3602373054"),
+        _listing(county="Lincoln", owner_name="SAMPLE AUSTIN", parcel_id="3602373054"),
         _listing(county="Lincoln", owner_name="PLACEHOLDER", parcel_id="3625271987"),
     ]
     stats = await cp.enrich_county_phone(listings)
@@ -306,12 +306,12 @@ async def test_end_to_end_lincoln_bridges_parcel_to_taxpayer(offline):
     assert lin["targets"] == 3 and lin["matched"] == 2
 
     first = listings[0].raw["owner_phone"]
-    assert first["phone"] == "(801) 487-3801"
+    assert first["phone"] == "(801) 555-0931"
     assert first["match"] == "parcel_id+ownerid"
     assert first["county_mailing"] == "PO BOX 650043 DALLAS TX 75265-0043"
     assert first["county_published"] is True and first["consent"] == "none"
     # Falls back to COOWNERID when OWNERID is blank.
-    assert listings[1].raw["owner_phone"]["phone"] == "(828) 783-0905"
+    assert listings[1].raw["owner_phone"]["phone"] == "(828) 555-0690"
     # Taxpayer row exists but holds only a placeholder number -> no phone attached.
     assert not (listings[2].raw or {}).get("owner_phone")
 
@@ -335,7 +335,7 @@ async def test_bulk_index_is_cached_between_runs(offline, monkeypatch):
     li = _listing(parcel_id="060502683700000")
     await cp.enrich_county_phone([li])
     assert calls == []                                  # served from cache
-    assert li.raw["owner_phone"]["phone"] == "(828) 628-9884"
+    assert li.raw["owner_phone"]["phone"] == "(828) 555-0445"
 
 
 @pytest.mark.asyncio

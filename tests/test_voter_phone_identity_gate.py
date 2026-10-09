@@ -79,17 +79,17 @@ def test_an_earlier_match_is_contradicted_once_owner_name_moves_on(monkeypatch):
     _empty_index(monkeypatch)
     _gate_index(monkeypatch)
     # Mirrors the live Buncombe case this fix was built from: the phone still names the
-    # voter it was matched to ("BAKER,BETTY"); owner_name has since moved on.
-    li = _listing(owner="MAXWELL, RONALD", raw={
-        "owner_phone": {"phone": "(828) 712-9100", "source": "ncsbe_voter", "line_type": "unknown",
+    # voter it was matched to ("SAMPLE,BETH"); owner_name has since moved on.
+    li = _listing(owner="EXAMPLE, ROLAND", raw={
+        "owner_phone": {"phone": "(828) 555-0142", "source": "ncsbe_voter", "line_type": "unknown",
                         "needs_dnc_scrub": True, "match": "name+county-unique",
-                        "matched_name": "BAKER,BETTY"},
+                        "matched_name": "SAMPLE,BETH"},
     })
 
     stats = V.enrich_voter_phone([li])
 
     op = li.raw["owner_phone"]
-    assert op["phone"] == "(828) 712-9100"                      # kept, never cleared
+    assert op["phone"] == "(828) 555-0142"                      # kept, never cleared
     assert op["identity_check"] == "contradicted"
     assert op["do_not_dial"] is True
     assert G.is_owner_phone_usable(op) is False
@@ -119,9 +119,9 @@ def test_a_legacy_block_with_no_matched_name_is_left_exactly_alone(monkeypatch):
     sibling fix in this family (owner_name/bop_federal/incarceration/jail_bookings) uses."""
     _empty_index(monkeypatch)
     _gate_index(monkeypatch)
-    legacy = {"phone": "(828) 712-9100", "source": "ncsbe_voter", "line_type": "unknown",
+    legacy = {"phone": "(828) 555-0142", "source": "ncsbe_voter", "line_type": "unknown",
              "needs_dnc_scrub": True, "match": "name+county-unique"}
-    li = _listing(owner="MAXWELL, RONALD", raw={"owner_phone": dict(legacy)})
+    li = _listing(owner="EXAMPLE, ROLAND", raw={"owner_phone": dict(legacy)})
 
     stats = V.enrich_voter_phone([li])
 
@@ -133,13 +133,13 @@ def test_a_legacy_block_with_no_matched_name_is_left_exactly_alone(monkeypatch):
 def test_a_phone_from_another_source_is_never_gated_or_clobbered(monkeypatch):
     _empty_index(monkeypatch)
     _gate_index(monkeypatch)
-    li = _listing(owner="MAXWELL, RONALD", raw={
-        "owner_phone": {"phone": "(828) 000-0000", "source": "liensnc_filing"},
+    li = _listing(owner="EXAMPLE, ROLAND", raw={
+        "owner_phone": {"phone": "(828) 555-0923", "source": "liensnc_filing"},
     })
 
     stats = V.enrich_voter_phone([li])
 
-    assert li.raw["owner_phone"]["phone"] == "(828) 000-0000"
+    assert li.raw["owner_phone"]["phone"] == "(828) 555-0923"
     assert "identity_check" not in li.raw["owner_phone"]
     assert stats["regated"] == 0 and stats["matched"] == 0
 

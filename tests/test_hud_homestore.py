@@ -75,7 +75,7 @@ _REAL_SHAPE_DETAIL_HTML = """
   </div>
   <div class="col-12 col-lg-4 d-flex flex-column">
     <div class="font-weight-bold">RAINE CUSTOMER SERVICE</div>
-    <a href="/cdn-cgi/l/email-protection#x" title="INFO@RAINECOMPANIES.COM">
+    <a href="/cdn-cgi/l/email-protection#x" title="CONTACT20@SAMPLE-MAIL.TEST">
       <span class="__cf_email__">[email&#160;protected]</span>
     </a>
     <div class="d-flex flex-row">
@@ -89,15 +89,15 @@ _REAL_SHAPE_DETAIL_HTML = """
     <button data-title="The Listing Broker was hired by the Asset Manager to assist with the marketing of the home.">info</button>
   </div>
   <div class="col-12 col-lg-4 d-flex flex-column align-items-start justify-content-start mb-2 mb-lg-0">
-    <div class="font-weight-bold">COREY ADAMSKI</div>
-    <a href="/cdn-cgi/l/email-protection#0d2d4e4" class="truncate" title="COREYADAMSKI@GMAIL.COM">
+    <div class="font-weight-bold">COLE ADAMSTEST</div>
+    <a href="/cdn-cgi/l/email-protection#0d2d4e4" class="truncate" title="CONTACT05@SAMPLE-MAIL.TEST">
       <span class="sr-only">Listing Broker's Email id</span>
       <span class="__cf_email__" data-cfemail="a0e3">[email&#160;protected]</span>
     </a>
     <div class="d-flex flex-row">
-      <a href="tel:(828) 231-4430">
+      <a href="tel:(828) 555-0682">
         <span class="sr-only">Listing Broker's Phone number</span>
-        <span>(828) 231-4430</span>
+        <span>(828) 555-0682</span>
       </a>
       <div class="text-muted ml-2" aria-hidden="true">phone</div>
     </div>
@@ -111,8 +111,8 @@ _REAL_SHAPE_DETAIL_HTML = """
     <h2 class="h5 mb-3 font-weight-bold">Field Service Manager</h2>
   </div>
   <div class="col-12 col-lg-4 d-flex flex-column">
-    <div class="font-weight-bold">EDDIE SAN ROMAN</div>
-    <a href="/cdn-cgi/l/email-protection#y" title="E.SANROMAN@24ASSET.COM">
+    <div class="font-weight-bold">EDDIE SAN TESTMAN</div>
+    <a href="/cdn-cgi/l/email-protection#y" title="E.TESTMAN@SAMPLE-MAIL.TEST">
       <span class="__cf_email__">[email&#160;protected]</span>
     </a>
   </div>
@@ -199,25 +199,25 @@ class TestBrokerExtraction:
         heading text differs. Must not pick up Asset Manager's or Field
         Service Manager's name/phone/email instead."""
         broker = _extract_broker(_REAL_SHAPE_DETAIL_HTML)
-        assert broker["name"] == "COREY ADAMSKI"
-        assert broker["phone"] == "(828) 231-4430"
-        assert broker["email"] == "COREYADAMSKI@GMAIL.COM"
+        assert broker["name"] == "COLE ADAMSTEST"
+        assert broker["phone"] == "(828) 555-0682"
+        assert broker["email"] == "CONTACT05@SAMPLE-MAIL.TEST"
 
     def test_phone_reads_the_tel_href_not_the_concatenated_link_text(self):
         """The <a href="tel:..."> wraps a visually-hidden sr-only span AND
         the visible number in a separate sibling span; .text() on the
         anchor concatenates BOTH with no separator ("Listing Broker's
-        Phone number(828) 231-4430", confirmed live before this fix)."""
+        Phone number(828) 555-0682", confirmed live before this fix)."""
         broker = _extract_broker(_REAL_SHAPE_DETAIL_HTML)
         assert "Phone number" not in broker["phone"]
-        assert broker["phone"] == "(828) 231-4430"
+        assert broker["phone"] == "(828) 555-0682"
 
     def test_email_from_title_attribute_not_the_cloudflare_hex(self):
         """The Cloudflare-obfuscated __cf_email__ span is unreadable
         without a hex decode -- but the SAME <a>'s title attribute already
         carries the plain-text address, no decode needed."""
         broker = _extract_broker(_REAL_SHAPE_DETAIL_HTML)
-        assert broker["email"] == "COREYADAMSKI@GMAIL.COM"
+        assert broker["email"] == "CONTACT05@SAMPLE-MAIL.TEST"
 
     def test_no_listing_broker_heading_returns_empty_dict(self):
         assert _extract_broker("<html><body><p>nothing here</p></body></html>") == {}

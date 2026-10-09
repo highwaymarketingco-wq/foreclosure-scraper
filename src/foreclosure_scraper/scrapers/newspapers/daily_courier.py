@@ -46,8 +46,8 @@ contact, HERMES sec 9's #1 contactability priority -- but this module never call
 inconsistency with no apparent reason (not a wall; the same body text is already in hand).
 Live-confirmed 2026-10-04 the helper DOES extract real contact info from this exact site's
 real notice bodies: 2 of 2 live-fetched current cards produced a hit (a Rutherford County
-notice: phone ``(828) 286-8222``, name ``"Alayna P. English Law Office"``; a DEQ consent-order
-notice: phone ``(919) 707-3613`` + email ``kate.shadwell@deq.nc.gov``) -- confirming the
+notice: phone ``(828) 555-0948``, name ``"Alana P. Englishtest Law Office"``; a DEQ consent-order
+notice: phone ``(919) 555-0731`` + email ``contact08@sample-mail.test``) -- confirming the
 extraction mechanism works on this CMS/body shape, even though the host's aggressive 429
 rate-limiting (confirmed live: a 6 s-paced fetch of a 3rd card still got rate-limited) meant
 a foreclosure-specifically-titled card wasn't captured with a contact hit this batch. NC

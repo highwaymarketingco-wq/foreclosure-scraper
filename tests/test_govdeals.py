@@ -220,7 +220,7 @@ _DETAIL_WITH_ATTACHMENTS_AND_CONTACT = {
     "assetPhotos": ["/photos/12345/12345_77_abc.jpg"],
     "assetAttachments": [{"url": "/attachments/notice.pdf"}, "https://example.com/deed.pdf"],
     "sellerContactName": "Jane Seller", "sellerContactEmail": "jane@example.gov",
-    "sellerContactPhone": "555-123-4567",
+    "sellerContactPhone": "555-555-0587",
 }
 
 
@@ -246,7 +246,7 @@ def test_apply_detail_captures_seller_contact_when_present():
     li = _to_listing(dict(_SC_HOME_ROW, accountId=30033, assetId=6), "national.govdeals")
     _apply_detail(li, _DETAIL_WITH_ATTACHMENTS_AND_CONTACT)
     contact = li.raw["govdeals"]["seller_contact"]
-    assert contact == {"name": "Jane Seller", "email": "jane@example.gov", "phone": "555-123-4567"}
+    assert contact == {"name": "Jane Seller", "email": "jane@example.gov", "phone": "555-555-0587"}
 
 
 def test_apply_detail_skips_seller_contact_when_all_blank():

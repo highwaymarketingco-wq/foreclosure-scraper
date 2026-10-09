@@ -42,7 +42,7 @@ DETAIL_HTML = """
   </div>
   <div class="caseCard">
     <div class="row"><label class="fieldName">Case Number</label>
-        <span class="fieldValue">25SP000078-100</span></div>
+        <span class="fieldValue">25SP009978-100</span></div>
     <div class="row"><label class="fieldName">Case Type</label>
         <span class="fieldValue">Estate</span></div>
     <div class="row"><label class="fieldName">File Date</label>
@@ -50,7 +50,7 @@ DETAIL_HTML = """
     <div class="row"><label class="fieldName">Location</label>
         <span class="fieldValue">Henderson County</span></div>
     <div class="row"><label class="fieldName">Defendant</label>
-        <span class="fieldValue">MARGARET P WHITMIRE</span></div>
+        <span class="fieldValue">MARGO P SAMPLETON</span></div>
     <div class="row"><label class="fieldName">Plaintiff</label>
         <span class="fieldValue">WELLS FARGO BANK NA</span></div>
   </div>
@@ -97,12 +97,12 @@ def test_detail_card_extraction():
     assert div["defendant"] == "JEREMIAH CALDWELL"
     assert "JEREMIAH CALDWELL" in div["party_names"]
 
-    est = by_case["25SP000078-100"]
+    est = by_case["25SP009978-100"]
     assert est["county"] == "Henderson"
-    assert est["defendant"] == "MARGARET P WHITMIRE"
+    assert est["defendant"] == "MARGO P SAMPLETON"
     # The bank plaintiff is an entity -> excluded from resolvable party_names,
     # but the human defendant is kept.
-    assert "MARGARET P WHITMIRE" in est["party_names"]
+    assert "MARGO P SAMPLETON" in est["party_names"]
     assert all("WELLS FARGO" not in n for n in est["party_names"])
 
 
@@ -159,17 +159,17 @@ def test_estate_single_party_caption():
     <table><thead><tr><th>Case Number</th><th>Style</th>
       <th>Case Type</th><th>County</th></tr></thead>
     <tbody>
-      <tr><td>25SP000078</td><td>IN RE ESTATE OF MARGARET P WHITMIRE</td>
+      <tr><td>25SP009978</td><td>IN RE ESTATE OF MARGO P SAMPLETON</td>
           <td>Estate</td><td>Henderson</td></tr>
-      <tr><td>25E000512</td><td>ROY LEE ADAMS, Deceased</td>
+      <tr><td>25E009912</td><td>RAY LEE SAMPLEMS, Deceased</td>
           <td>Estate</td><td>Buncombe</td></tr>
     </tbody></table>"""
     recs = mod.parse_nc_ecourts_html(html)
     assert len(recs) == 2
     by_case = {r["case_number"]: r for r in recs}
-    assert by_case["25SP000078"]["party_names"] == ["MARGARET P WHITMIRE"]
-    assert by_case["25SP000078"]["defendant"] == "MARGARET P WHITMIRE"
-    assert by_case["25E000512"]["party_names"] == ["ROY LEE ADAMS"]
+    assert by_case["25SP009978"]["party_names"] == ["MARGO P SAMPLETON"]
+    assert by_case["25SP009978"]["defendant"] == "MARGO P SAMPLETON"
+    assert by_case["25E009912"]["party_names"] == ["RAY LEE SAMPLEMS"]
 
 
 def test_estate_matter_of_caption_stripped():
@@ -180,21 +180,21 @@ def test_estate_matter_of_caption_stripped():
     <table><thead><tr><th>Case Number</th><th>Style</th>
       <th>Case Type</th><th>County</th></tr></thead>
     <tbody>
-      <tr><td>25SP000411</td><td>IN THE MATTER OF THE ESTATE OF HAROLD JENKINS</td>
+      <tr><td>25SP009911</td><td>IN THE MATTER OF THE ESTATE OF HAROLD TESTKINS</td>
           <td>Special Proceeding</td><td>Cleveland</td></tr>
       <tr><td>25SP000412</td><td>IN THE MATTER OF THE GUARDIANSHIP OF EDNA MAE POOLE</td>
           <td>Special Proceeding</td><td>Gaston</td></tr>
     </tbody></table>"""
     by_case = {r["case_number"]: r for r in mod.parse_nc_ecourts_html(html)}
-    assert by_case["25SP000411"]["defendant"] == "HAROLD JENKINS"
+    assert by_case["25SP009911"]["defendant"] == "HAROLD TESTKINS"
     assert by_case["25SP000412"]["defendant"] == "EDNA MAE POOLE"
 
 
 def test_estate_prefix_regex_directly():
     strip = lambda s: mod._ESTATE_PREFIX_RE.sub(" ", s).strip()
-    assert strip("IN THE MATTER OF THE ESTATE OF HAROLD JENKINS") == "HAROLD JENKINS"
-    assert strip("IN RE: ESTATE OF MARGARET P WHITMIRE") == "MARGARET P WHITMIRE"
-    assert strip("ESTATE OF ROY LEE ADAMS") == "ROY LEE ADAMS"
+    assert strip("IN THE MATTER OF THE ESTATE OF HAROLD TESTKINS") == "HAROLD TESTKINS"
+    assert strip("IN RE: ESTATE OF MARGO P SAMPLETON") == "MARGO P SAMPLETON"
+    assert strip("ESTATE OF RAY LEE SAMPLEMS") == "RAY LEE SAMPLEMS"
     assert strip("IN THE MATTER OF THE GUARDIANSHIP OF EDNA MAE POOLE") == "EDNA MAE POOLE"
 
 

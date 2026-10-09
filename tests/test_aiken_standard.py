@@ -32,7 +32,7 @@ NOTICE_OF_SALE_RSS = """<rss><channel>
 <item>
 <title>NOTICE OF SALE CIVIL ACTION NO.</title>
 <link>https://www.postandcourier.com/aikenstandard/classifieds/community/announcements/legal/ad_notice_of_sale.html</link>
-<description>NOTICE OF SALE CIVIL ACTION NO. 2025CP0203241 BY VIRTUE of the decree heretofore granted in the case of: ROCKET MORTGAGE LLC v. TYRONE B. JONES; ONEMAIN FINANCIAL GROUP, LLC, the undersigned Master In Equity for</description>
+<description>NOTICE OF SALE CIVIL ACTION NO. 2025CP0209941 BY VIRTUE of the decree heretofore granted in the case of: ROCKET MORTGAGE LLC v. TOBIAS B. SAMPLE; ONEMAIN FINANCIAL GROUP, LLC, the undersigned Master In Equity for</description>
 <pubDate>Fri, 02 Oct 2026 01:00:20 -0400</pubDate>
 </item>
 </channel></rss>"""

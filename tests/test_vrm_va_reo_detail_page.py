@@ -75,9 +75,9 @@ REAL_DETAIL_HTML = """
 <div class="col-6 col-sm-3 col-md-5 col-lg-4 col-xxl-4 mr-0 pr-0 mb-2">Name</div>
 <div class="col-6 col-sm-9 col-md-7 col-lg-8 col-xxl-8 ml-0 mr-0 pl-0 pr-0 mb-2">Jeff&nbsp;Sweyer</div>
 <div class="col-6 col-sm-3 col-md-5 col-lg-4 col-xxl-4 mr-0 pr-0 mb-2">Phone</div>
-<div class="col-6 col-sm-9 col-md-7 col-lg-8 col-xxl-8 ml-0 mr-0 pl-0 pr-0 mb-2">(910) 262-8112</div>
+<div class="col-6 col-sm-9 col-md-7 col-lg-8 col-xxl-8 ml-0 mr-0 pl-0 pr-0 mb-2">(910) 555-0386</div>
 <div class="col-6 col-sm-3 col-md-5 col-lg-4 col-xxl-4 mr-0 pr-0 mb-2">Email</div>
-<div class="col-6 col-sm-9 col-md-7 col-lg-8 col-xxl-8 ml-0 mr-0 pl-0 pr-0 mb-2">jsweyer@bhhscpp.com</div>
+<div class="col-6 col-sm-9 col-md-7 col-lg-8 col-xxl-8 ml-0 mr-0 pl-0 pr-0 mb-2">contact23@sample-mail.test</div>
 <div class="col-6 col-sm-3 col-md-5 col-lg-4 col-xxl-4 mr-0 pr-0 mb-2">License</div>
 <div class="col-6 col-sm-9 col-md-7 col-lg-8 col-xxl-8 ml-0 mr-0 pl-0 pr-0 mb-2">192129</div>
 <div class="col-6 col-sm-3 col-md-5 col-lg-4 col-xxl-4 mr-0 pr-0 mb-2 col-bold-font">Brokerage</div>
@@ -85,7 +85,7 @@ REAL_DETAIL_HTML = """
 <div class="col-6 col-sm-3 col-md-5 col-lg-4 col-xxl-4 mr-0 pr-0 mb-2">Name</div>
 <div class="col-6 col-sm-9 col-md-7 col-lg-8 col-xxl-8 ml-0 mr-0 pl-0 pr-0 mb-2">Berkshire Hathaway HomeServices Carolina Premier P</div>
 <div class="col-6 col-sm-3 col-md-5 col-lg-4 col-xxl-4 mr-0 pr-0 mb-2">Phone</div>
-<div class="col-6 col-sm-9 col-md-7 col-lg-8 col-xxl-8 ml-0 mr-0 pl-0 pr-0 mb-2">(910) 777-0000</div>
+<div class="col-6 col-sm-9 col-md-7 col-lg-8 col-xxl-8 ml-0 mr-0 pl-0 pr-0 mb-2">(910) 555-0288</div>
 </div>
 <img class="d-block" src="https://media.vrmproperties.com/media/1cb590f7-9160-4911-a559-23e1bdfe9986">
 <img class="d-block" src="https://media.vrmproperties.com/media/cad420d7-ece3-4ba1-80e8-6d7b06d09886">
@@ -124,8 +124,8 @@ def test_parse_detail_page_extracts_house_facts_and_agent_contact():
     assert out["lot_text"] == "544 SF"
     assert out["year_built_text"] == "2023"
     assert out["agent_name"] == "Jeff Sweyer"
-    assert out["agent_phone"] == "(910) 262-8112"
-    assert out["agent_email"] == "jsweyer@bhhscpp.com"
+    assert out["agent_phone"] == "(910) 555-0386"
+    assert out["agent_email"] == "contact23@sample-mail.test"
     assert out["agent_license"] == "192129"
     assert "three-level townhome" in out["description"]
     assert len(out["gallery"]) == 3
@@ -138,8 +138,8 @@ def test_parse_detail_page_does_not_conflate_agent_and_brokerage_name():
     out = M._parse_detail_page(REAL_DETAIL_HTML)
     assert out["agent_name"] == "Jeff Sweyer"
     assert out["brokerage_name"] == "Berkshire Hathaway HomeServices Carolina Premier P"
-    assert out["agent_phone"] == "(910) 262-8112"
-    assert out["brokerage_phone"] == "(910) 777-0000"
+    assert out["agent_phone"] == "(910) 555-0386"
+    assert out["brokerage_phone"] == "(910) 555-0288"
 
 
 def test_parse_lot_sqft_units():
@@ -168,8 +168,8 @@ def test_enrich_from_detail_fills_agent_contact_above_all():
     li = _make_listing()
     asyncio.run(M._enrich_from_detail(c, li))
     assert li.raw["vrm_va_reo"]["agent_name"] == "Jeff Sweyer"
-    assert li.raw["vrm_va_reo"]["agent_phone"] == "(910) 262-8112"
-    assert li.raw["vrm_va_reo"]["agent_email"] == "jsweyer@bhhscpp.com"
+    assert li.raw["vrm_va_reo"]["agent_phone"] == "(910) 555-0386"
+    assert li.raw["vrm_va_reo"]["agent_email"] == "contact23@sample-mail.test"
     # beds/baths/sqft/list_price from the card must survive, untouched
     assert li.raw["vrm_va_reo"]["beds"] == 2
 

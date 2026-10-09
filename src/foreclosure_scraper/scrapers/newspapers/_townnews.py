@@ -164,7 +164,7 @@ RECORD_OWNER_RE = re.compile(
 )
 # Many NC power-of-sale notices never use the "PRESENT RECORD OWNER(S)" label
 # at all -- they name the current owner only as the grantor of the foreclosed
-# Deed of Trust ("...Deed of Trust executed by Joni O. Mattson dated...").
+# Deed of Trust ("...Deed of Trust executed by Jodi O. Exampleson dated...").
 # Found live 2026-10-01 on newspapers.carolina_coast (Onslow/Carteret NC): 6 of
 # 7 live rows had this exact shape and owner_name/defendant were silently None
 # for ALL of them even though the name is right there in the RSS text -- the
@@ -232,8 +232,8 @@ def _clean(s: str) -> str:
     # silently breaking every name-capture regex in this module that relies
     # on `$` (end of string) as a valid stop token for a name that happens to
     # be the very last thing before the cutoff. Found live 2026-10-01 on
-    # newspapers.carolina_coast: GRANTOR_RE failed to capture "DARRELL G.
-    # BUTNER" purely because of the trailing "…", even though the full name
+    # newspapers.carolina_coast: GRANTOR_RE failed to capture "DARREN G.
+    # SAMPLER" purely because of the trailing "…", even though the full name
     # was present right up to it. Stripping it moves the string's real end
     # back to the last real character, as if no truncation marker were there.
     return out.rstrip("…").rstrip()

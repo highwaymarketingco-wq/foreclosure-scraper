@@ -39,7 +39,7 @@ def test_parcel_re_matches_real_sc_tms(tms):
 
 
 @pytest.mark.parametrize("not_tms", [
-    "864-596-2597",         # county phone number
+    "864-555-0510",         # county phone number
     "Monday-Friday",
     "2025",
 ])

@@ -24,13 +24,13 @@ def test_real_estate_company_is_not_flagged_as_a_decedent_estate():
 
 
 def test_genuine_estates_are_flagged():
-    for n in ("ESTATE OF ALLIE M GRAHAM", "SMITH HEIRS", "JONES HEIR",
+    for n in ("ESTATE OF ALMA M SAMPLETON", "SMITH HEIRS", "JONES HEIR",
               "DECEASED OWNER"):
         assert S._ESTATE.search(n), n
 
 
 def test_estate_flag_lands_on_the_lead():
-    li = S._to_listing(_cells(owner="ESTATE OF ALLIE M GRAHAM"), "Union")
+    li = S._to_listing(_cells(owner="ESTATE OF ALMA M SAMPLETON"), "Union")
     assert li.raw["sc_ust_registry"]["estate_owned"] is True
     li2 = S._to_listing(_cells(owner="WILLARD OIL CO INC"), "Union")
     assert li2.raw["sc_ust_registry"]["estate_owned"] is False

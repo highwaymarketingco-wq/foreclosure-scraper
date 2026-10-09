@@ -7,7 +7,7 @@ JSON-LD `offeredBy` never carries a `telephone` field, but each listing's
 own DETAIL page carries a richer JSON-LD block with a REAL
 `offers.seller.telephone`, full untruncated description, `datePosted`, and
 a structured `additionalProperty` list. Confirmed live: phone
-"(828) 506-8701" on a real current Buncombe listing, reachable via plain
+"(828) 555-0756" on a real current Buncombe listing, reachable via plain
 curl_cffi impersonation (no StealthyFetcher needed for the detail page).
 """
 from __future__ import annotations
@@ -50,7 +50,7 @@ _DETAIL_HTML = """
  },
  "offers":{
    "@type":"Offer","price":1895000,"priceCurrency":"USD",
-   "seller":{"@type":"RealEstateAgent","name":"Billy May","telephone":"(828) 506-8701"}
+   "seller":{"@type":"RealEstateAgent","name":"Billy May","telephone":"(828) 555-0756"}
  }
 }
 </script>
@@ -60,7 +60,7 @@ _DETAIL_HTML = """
 
 def test_parse_detail_extras_pulls_phone_date_and_properties():
     extras = _parse_detail_extras(_DETAIL_HTML)
-    assert extras["agent_phone"] == "(828) 506-8701"
+    assert extras["agent_phone"] == "(828) 555-0756"
     assert extras["date_posted"] == "2025-05-16"
     assert extras["additional_properties"]["Acreage"] == "124.85 acres"
     assert len(extras["full_description"]) > 200
@@ -78,13 +78,13 @@ def _base_listing(description="short", agent_phone=None) -> Listing:
 
 def test_apply_detail_extras_fills_missing_phone():
     li = _base_listing(agent_phone=None)
-    _apply_detail_extras(li, {"agent_phone": "(828) 506-8701"})
-    assert li.raw["landwatch"]["agent_phone"] == "(828) 506-8701"
+    _apply_detail_extras(li, {"agent_phone": "(828) 555-0756"})
+    assert li.raw["landwatch"]["agent_phone"] == "(828) 555-0756"
 
 
 def test_apply_detail_extras_does_not_overwrite_existing_phone():
     li = _base_listing(agent_phone="(555) 000-0000")
-    _apply_detail_extras(li, {"agent_phone": "(828) 506-8701"})
+    _apply_detail_extras(li, {"agent_phone": "(828) 555-0756"})
     assert li.raw["landwatch"]["agent_phone"] == "(555) 000-0000"
 
 

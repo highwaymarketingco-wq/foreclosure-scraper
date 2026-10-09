@@ -361,7 +361,7 @@ def _parse_detail(html: str, detail_url: str) -> Listing | None:
     if doc_urls:
         stamp_documents(li, doc_urls)
     # EXTRACTION-COMPLETENESS AUDIT 2026-10-03: auction_phone was already
-    # parsed (live-verified on 2 NC listings, byte-identical "800-801-8003"
+    # parsed (live-verified on 2 NC listings, byte-identical "800-555-0562"
     # both times -- a company auction-info line, not a per-case trustee
     # number, same posture as the per-listing PDF this module already
     # describes as "GENERIC boilerplate... still captured, it is a real

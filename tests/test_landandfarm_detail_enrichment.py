@@ -9,7 +9,7 @@ REAL `offers.seller.telephone`, the full untruncated description (the
 search page truncates at ~250 chars), a real `datePosted`, and a
 structured `additionalProperty` list (Acreage/Activities/Lot Description/
 Present Use/Proposed Use) -- confirmed live on a real current Buncombe
-listing: phone "(828) 506-8701". Also confirmed live: unlike the
+listing: phone "(828) 555-0756". Also confirmed live: unlike the
 search-results page (Akamai-gated, needs StealthyFetcher), the detail page
 is reachable via plain curl_cffi impersonation (`get_text_impersonate`) --
 no extra render cost. Wired as a best-effort, per-county-capped enrichment
@@ -53,7 +53,7 @@ _DETAIL_HTML = """
  },
  "offers":{
    "@type":"Offer","price":1895000,"priceCurrency":"USD",
-   "seller":{"@type":"RealEstateAgent","name":"Billy May","telephone":"(828) 506-8701"}
+   "seller":{"@type":"RealEstateAgent","name":"Billy May","telephone":"(828) 555-0756"}
  }
 }
 </script>
@@ -63,7 +63,7 @@ _DETAIL_HTML = """
 
 def test_parse_detail_extras_pulls_phone_date_and_properties():
     extras = _parse_detail_extras(_DETAIL_HTML)
-    assert extras["agent_phone"] == "(828) 506-8701"
+    assert extras["agent_phone"] == "(828) 555-0756"
     assert extras["date_posted"] == "2025-05-16"
     assert extras["additional_properties"]["Acreage"] == "124.85 acres"
     assert extras["additional_properties"]["Proposed Use"] == ["Commercial", "Residential Single"]
@@ -87,13 +87,13 @@ def _base_listing(description="short", agent_phone=None) -> Listing:
 
 def test_apply_detail_extras_fills_missing_phone():
     li = _base_listing(agent_phone=None)
-    _apply_detail_extras(li, {"agent_phone": "(828) 506-8701"})
-    assert li.raw["landandfarm"]["agent_phone"] == "(828) 506-8701"
+    _apply_detail_extras(li, {"agent_phone": "(828) 555-0756"})
+    assert li.raw["landandfarm"]["agent_phone"] == "(828) 555-0756"
 
 
 def test_apply_detail_extras_does_not_overwrite_existing_phone():
     li = _base_listing(agent_phone="(555) 000-0000")
-    _apply_detail_extras(li, {"agent_phone": "(828) 506-8701"})
+    _apply_detail_extras(li, {"agent_phone": "(828) 555-0756"})
     assert li.raw["landandfarm"]["agent_phone"] == "(555) 000-0000"
 
 

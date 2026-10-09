@@ -46,7 +46,7 @@ GUARDED_PARSERS = [
 @pytest.mark.parametrize("cells", [
     ["Monday", "8:30 a.m. - 5:00 p.m."],
     ["Tuesday", "8:30 a.m. - 5:00 p.m."],
-    ["Saturday", "Closed 24/7 843-398-4170"],
+    ["Saturday", "Closed 24/7 843-555-0968"],
     ["Days", "Hours"],
     ["", "Monday", "9:00"],              # blank leading cell -- slipped the old 2-cell test
 ])

@@ -30,7 +30,7 @@ WHY THIS MATTERS MORE THAN ITS SUBJECT SUGGESTS
 
 A PROBATE SIGNAL HIDING IN A TANK REGISTRY
     39 of the 3,332 name an owner of record as "ESTATE OF ..." or "... HEIRS" —
-    e.g. 'ESTATE OF ALLIE M GRAHAM' at 6511 HWY 72, Whitmire (Union), a
+    e.g. 'ESTATE OF ALMA M SAMPLETON' at 6599 HWY 72, Whitmire (Union), a
     service station whose tanks were abandoned in 1996. An estate still holding
     a contaminated commercial parcel thirty years on is about as motivated as a
     seller gets, and no probate source in the engine surfaces it.

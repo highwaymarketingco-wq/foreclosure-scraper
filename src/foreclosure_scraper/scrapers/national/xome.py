@@ -56,7 +56,7 @@ address + alternate location), and -- the HERMES sec 9 #1 priority --
 `fclrtName`/`fclrtPhone`/`fclrtAddress`/`fclrtCity`/`fclrtState`/`fclrtZip`,
 the REAL foreclosure law firm/trustee conducting the sale with a direct
 phone number (confirmed live: "Bell Carrington Price & Gregg, LLC",
-"803-509-5078", a real NC/SC foreclosure firm this codebase's own
+"803-555-0714", a real NC/SC foreclosure firm this codebase's own
 `law_firms.bell_carrington` scraper already tracks independently -- this is
 free, zero-cost corroboration/contactability on every xome row). Wired as a
 best-effort per-row detail fetch, capped at `DETAIL_FETCH_CAP` total across

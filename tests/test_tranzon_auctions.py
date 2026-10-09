@@ -125,9 +125,9 @@ _DETAIL_HTML = """
 <html><body>
 <section class="edescription edescription-column">
   <h2>Contact Agent</h2>
-  <p id="ContentPlaceHolder1_cname">Anna Spencer, AARE<br/>Tranzon Driggers</p>
-  <span class="edescription_tel">352-400-3233</span>
-  <a href="mailto:aspencer@tranzon.com" id="ContentPlaceHolder1_cemail" class="edescription_email">aspencer@tranzon.com</a>
+  <p id="ContentPlaceHolder1_cname">Ana Spenceton, AARE<br/>Tranzon Driggers</p>
+  <span class="edescription_tel">352-555-0990</span>
+  <a href="mailto:contact07@sample-mail.test" id="ContentPlaceHolder1_cemail" class="edescription_email">contact07@sample-mail.test</a>
 </section>
 <section class="edescription">
   2BR/2BA Block Home on 0.29± Acres, Beverly Hills, FL. This 2-bedroom,
@@ -156,9 +156,9 @@ def test_fetch_detail_extracts_full_gallery_and_agent_contact(monkeypatch):
         "https://www.tranzon.com/propertyimages/182693_18245.jpg",
         "https://www.tranzon.com/propertyimages/182694_18245.jpg",
     ]
-    assert out["agent_name"] == "Anna Spencer, AARE Tranzon Driggers"
-    assert out["agent_phone"] == "352-400-3233"
-    assert out["agent_email"] == "aspencer@tranzon.com"
+    assert out["agent_name"] == "Ana Spenceton, AARE Tranzon Driggers"
+    assert out["agent_phone"] == "352-555-0990"
+    assert out["agent_email"] == "contact07@sample-mail.test"
 
 
 def test_fetch_detail_narrative_description_excludes_boilerplate(monkeypatch):
@@ -202,5 +202,5 @@ def test_end_to_end_fetch_wires_detail_enrichment(monkeypatch):
         "https://www.tranzon.com/propertyimages/182693_18245.jpg",
         "https://www.tranzon.com/propertyimages/182694_18245.jpg",
     ]
-    assert li.raw["tranzon"]["agent_phone"] == "352-400-3233"
+    assert li.raw["tranzon"]["agent_phone"] == "352-555-0990"
     assert "2-car garage" in li.description

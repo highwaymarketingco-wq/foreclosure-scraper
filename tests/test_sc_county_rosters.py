@@ -45,8 +45,8 @@ _LAURENS_12COL_ROW = """<table><tr class="standardRow">
 <td>U.S. Bank &amp; Trust Company-PLT</td><td>04/27/2026</td>
 <td><a href="../PublicIndex/CaseDetails.aspx?CourtAgency=30002&amp;Casenum=2026CP3000125&amp;CaseType=V&amp;Org=CR">2026CP3000125</a><br/>U.S. Bank &amp; Trust Company vs Randall J Owens , defendant, et al</td>
 <td>Foreclosure 420</td>
-<td>B. Lindsay Crawford III&nbsp;&nbsp;(803) 790-2626</td>
-<td>Rodney M. Brown&nbsp;&nbsp;(864) 862-2528</td>
+<td>B. Linden Crawtest III&nbsp;&nbsp;(803) 555-0705</td>
+<td>Rodger M. Browntest&nbsp;&nbsp;(864) 555-0675</td>
 <td class="notesTD"><div class="notesCell">Continued per email from Mr. Brown</div></td></tr></table>"""
 
 
