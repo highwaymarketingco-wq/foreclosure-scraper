@@ -1,0 +1,69 @@
+{
+ "buckets": 1,
+ "counts": {
+  "confirmed": 0,
+  "refuted": 0,
+  "rows": 1274,
+  "stale": 0,
+  "unconfirmed": 0,
+  "wall": 1274
+ },
+ "generated_at": "2026-10-09T01:46:52Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "SMB-LTSEO05",
+ "kind": "verification_ledger_manifest",
+ "last_run": {
+  "at": "2026-10-09T01:46:52Z",
+  "county": null,
+  "host": "SMB-LTSEO05",
+  "max_rows": 3500,
+  "recheck_only": false,
+  "requests": {
+   "errors": {},
+   "requests": {
+    "arcgisserver.lincolncountync.gov": 11,
+    "arcserver2.oconeesc.com": 6,
+    "gis.gastoncountync.gov": 5,
+    "gis.morgantonnc.gov": 49,
+    "gis.rutherfordcountync.gov": 137,
+    "gis.transylvaniacounty.org": 22,
+    "gisweb.hendersoncountync.gov": 61,
+    "laurenscountygis.org": 43,
+    "mapping.mitchellcountync.gov": 52,
+    "maps.spartanburgcounty.org": 30,
+    "portal-nc.tylertech.cloud": 486,
+    "services.nconemap.gov": 39,
+    "services1.arcgis.com": 59,
+    "services9.arcgis.com": 20
+   }
+  },
+  "result": {
+   "checked": 1286,
+   "wall": 1286
+  },
+  "seconds": 2040,
+  "selection": {
+   "applies": 1290,
+   "due_new": 1290,
+   "same_property_queued": 4
+  },
+  "source": null,
+  "tier": [
+   "HOT,WARM"
+  ]
+ },
+ "rows": 1274,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 989101,
+   "file": "000.json",
+   "rows": 1274,
+   "sha256": "3a72b7410eafcd5611ad8585934092e2fab68fdf1cc3e99368740bdd2667d32a"
+  }
+ ],
+ "signal": "court_wall",
+ "version": 1
+}
