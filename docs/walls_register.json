@@ -3486,5 +3486,147 @@
    "(a person, or a script if terms allow once read)",
    "(allowed; buildable)"
   ]
- ]
+ ],
+ "file_map": {
+  "intro": "Built from the cards below. When in doubt, save into ~/Downloads and tell Claude what you saved. Only court result lists go in the court drop folder.",
+  "rows": [
+   {
+    "what": "Court result lists",
+    "cards": [
+     "nc_sp",
+     "nc_est",
+     "sc_publicindex"
+    ],
+    "from": "NC eCourts (after you pass the picture check) and SC Public Index",
+    "save": "Cmd + S, Format <b>Web Page, HTML Only</b>. Name it <b>&lt;county&gt;_nc_&lt;what&gt;_&lt;date&gt;.html</b> (or <b>_sc_</b>)",
+    "where": "<b>~/Desktop/Court Pages (drop here)/</b>",
+    "next": "Double-click <b>Ingest Saved Court Pages</b> on the Desktop. It moves every .html, .htm and .csv out of the folder afterwards, read or not",
+    "board": "New foreclosure, estate and court leads, matched to parcels; no duplicates"
+   },
+   {
+    "what": "One NC court case",
+    "cards": [
+     "nc_verify"
+    ],
+    "from": "NC eCourts case page that Claude opens for you",
+    "save": "HTML Only, filename with the parcel number",
+    "where": "<b>~/Downloads</b> (not the court drop folder)",
+    "next": "Tell Claude; Claude runs the lead checker",
+    "board": "That one lead is confirmed or dropped"
+   },
+   {
+    "what": "Phones and emails (contact sheets)",
+    "cards": [
+     "people_search",
+     "propwire"
+    ],
+    "from": "People-search sites, PropWire export",
+    "save": "CSV with columns such as parcel_id, property_address, owner_name, phone1, phone2, email",
+    "where": "<b>~/Downloads</b>",
+    "next": "Tell Claude: \"contact sheet saved\". Claude runs scripts/ingest_contacts.py",
+    "board": "Phones and emails on the matched rows (by parcel number, else address); every phone is held until the Do Not Call scrub clears it"
+   },
+   {
+    "what": "National Do Not Call registry",
+    "from": "The federal registry's seller site (telemarketer access, by area code; you sign in yourself)",
+    "save": "As downloaded: one 10-digit number per line, or the two columns \"area code, number\" (a third column \"D\" is skipped)",
+    "where": "<b>data/dnc_registry.csv</b> in the engine folder, or one file per area code (.csv or .txt) in <b>data/dnc_registry/</b>",
+    "next": "Tell Claude it is saved. The scrub runs with the next engine run. Refresh it at least every 31 days: older answers stop counting",
+    "board": "Each phone shows clear or on the registry. A missing, cut-short or tiny file (under 1,000 numbers) leaves phones 'unverified', never clear"
+   },
+   {
+    "what": "Your company's own Do Not Call list",
+    "from": "Your own records: anyone who asked not to be called",
+    "save": "A CSV; every 10-digit number in any cell counts",
+    "where": "<b>data/internal_dnc.csv</b> in the engine folder",
+    "next": "Add a number the day someone asks. It is read on every scrub; tell Claude if you want it applied before the next run",
+    "board": "That phone shows 'on your own list', which beats any registry answer"
+   },
+   {
+    "what": "Records-request letters (to send)",
+    "from": "Already drafted: <b>~/Desktop/Records_Requests/letters/</b> (paste the .txt into an email) and <b>forms/</b> (county forms to attach)",
+    "save": "Nothing to save. Follow README_How_to_send.md; log each send in <b>Tracking.csv</b>",
+    "where": "<b>~/Desktop/Records_Requests/</b>",
+    "next": "Send in the README's order. Do not sign a use statement before counsel answers",
+    "board": "Nothing yet"
+   },
+   {
+    "what": "Replies to records requests",
+    "from": "County or SCDOT emails",
+    "save": "Print each reply email to PDF",
+    "where": "<b>~/Desktop/Records_Requests/Replies/&lt;County&gt;/</b>",
+    "next": "Fill in Tracking.csv (fee estimate, notes). Tell Claude if a fee needs your OK",
+    "board": "Nothing"
+   },
+   {
+    "what": "A county roll file you received",
+    "from": "The county's reply (CSV, Excel, text or zip)",
+    "save": "Exactly as received (keep a zip zipped), named <b>&lt;ST&gt;_&lt;County&gt;_roll_&lt;YYYY-MM-DD&gt;.&lt;ext&gt;</b>",
+    "where": "<b>~/Desktop/Records_Requests/Received/</b> (never the court drop folder)",
+    "next": "Fill in date_received and file_saved_as in Tracking.csv, then tell Claude: \"roll file saved for &lt;County&gt;\". Claude loads it with scripts/ingest_county_roll.py",
+    "board": "Owner mailing address and property facts fill in on that county's rows at the next run (fill only, never overwrites)"
+   },
+   {
+    "what": "Attorney package pulls",
+    "cards": [
+     "lawyer_owner_pulls"
+    ],
+    "from": "The documents the attorney's list asks for, per lead",
+    "save": "The PDFs, plus one <b>items.json</b> per parcel (each item: date, source, file name)",
+    "where": "<b>~/Desktop/Call_Sheets/lawyer/owner_inputs/&lt;PIN&gt;/</b> (private, never in the repository)",
+    "next": "Tell Claude; Claude reruns scripts/lawyer_packages.py. Finished packages land in <b>~/Desktop/Call_Sheets/lawyer/&lt;date&gt;/packages/</b>",
+    "board": "Nothing on the public board; the lead turns READY in the attorney's list when every item is dated"
+   },
+   {
+    "what": "Tax check sheets",
+    "cards": [
+     "avalon_tax",
+     "sc_tax_walled"
+    ],
+    "from": "County tax sites you look up by hand",
+    "save": "CSV named <b>tax_checks_&lt;county&gt;_&lt;date&gt;.csv</b> with the columns on the card",
+    "where": "<b>~/Downloads</b>",
+    "next": "Tell Claude",
+    "board": "Nothing until a small loader is built"
+   },
+   {
+    "what": "SC property card sheet",
+    "cards": [
+     "sc_qpublic"
+    ],
+    "from": "qPublic property cards",
+    "save": "CSV <b>sc_cards_&lt;date&gt;.csv</b> with the columns on the card",
+    "where": "<b>~/Downloads</b>",
+    "next": "Tell Claude",
+    "board": "Nothing until a small loader is built"
+   },
+   {
+    "what": "Deed of trust PDFs",
+    "cards": [
+     "nc_paid_images"
+    ],
+    "from": "Paid deed images",
+    "save": "PDF named <b>&lt;parcel&gt;_dot.pdf</b>",
+    "where": "<b>~/Downloads</b>",
+    "next": "Tell Claude; Claude reads the loan amount",
+    "board": "Nothing; the amount goes in your notes"
+   }
+  ],
+  "small_row": {
+   "what": "Other saved pages and PDFs",
+   "from": "Sites behind a check",
+   "save": "HTML Only, or the PDF or file as it comes",
+   "where": "<b>~/Downloads</b> (never the court drop folder)",
+   "next": "Tell Claude what you saved",
+   "board": "Nothing until a small loader is built (about an hour each)"
+  },
+  "crm_row": {
+   "what": "Notes typed into your CRM",
+   "from": "Sites with no reader",
+   "save": "Type it in",
+   "where": "Your CRM",
+   "next": "Nothing",
+   "board": "Nothing; it stays in your notes"
+  }
+ }
 }

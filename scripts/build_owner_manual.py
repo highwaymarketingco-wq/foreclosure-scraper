@@ -590,6 +590,35 @@ def unknown_text(m: dict) -> str:
     return " ".join(parts)
 
 
+def file_map(reg: dict) -> list[dict]:
+    """The one-page 'Where every file goes' table: the register's rows, each naming its cards, then one
+    row for every other card that needs a loader and one for CRM-only cards. Every card lands in a row."""
+    fm = reg["file_map"]
+    by_id = {c["id"]: c for c in reg["cards"]}
+    named: set[str] = set()
+    rows = []
+    for r in fm["rows"]:
+        ids = r.get("cards", [])
+        missing = [i for i in ids if i not in by_id]
+        if missing:
+            raise SystemExit(f"file_map row '{r['what']}' names unknown cards: {missing}")
+        named.update(ids)
+        rows.append(dict(r, names=[by_id[i]["short"] for i in ids]))
+    for key, loads in (("small_row", ("small", "yes")), ("crm_row", ("crm", None))):
+        rest = [c["short"] for c in reg["cards"] if c["id"] not in named and (c.get("loads") or "crm") in loads]
+        if rest:
+            rows.append(dict(fm[key], names=rest))
+    return rows
+
+
+FILE_MAP_COLS = ("What you pulled", "Where you got it", "How to save it", "Exact folder or path", "What to do next", "What changes on the board")
+
+
+def _fm_cells(r: dict) -> list[str]:
+    what = r["what"] + (f" (cards: {', '.join(r['names'])})" if r["names"] else "")
+    return [what, r["from"], r["save"], r["where"], r["next"], r["board"]]
+
+
 def build_md(m: dict) -> str:
     reg = m["reg"]
     L: list[str] = []
@@ -614,7 +643,7 @@ def build_md(m: dict) -> str:
     a("")
     a("**The rule we keep:** our code never solves a CAPTCHA, never gets past a bot check or a paywall, and never creates accounts. The only stored login is LiensNC's, by the owner's choice. Everything below that needs a person, you do in a normal browser; our tools read the files you save.")
     a("")
-    titles = ["How to read this", "Owner decisions in force", "Built (computed from the repo)", "What I need from you, in order",
+    titles = ["Where every file goes (one page)", "How to read this", "Owner decisions in force", "Built (computed from the repo)", "What I need from you, in order",
               "How saving and loading works", "What really stays manual"] + [GROUP_TITLE[g] for g in GROUP_TITLE] + [
               "Every walled record in the source hunts", "Scrapers switched off or blocked in the last run", "The UNKNOWN-county rows",
               "Every county at a glance", "Paid or attorney-only (type B): prices", "Appendix C: allowed, built or buildable (not walls)",
@@ -623,6 +652,15 @@ def build_md(m: dict) -> str:
     a("")
     for t in titles:
         a(f"- [{t}](#{re.sub(r'[^a-z0-9 -]', '', t.lower()).replace(' ', '-')})")
+    a("")
+    a("## Where every file goes (one page)")
+    a("")
+    a(md_text(reg["file_map"]["intro"]))
+    a("")
+    a("| " + " | ".join(FILE_MAP_COLS) + " |")
+    a("|" + "---|" * len(FILE_MAP_COLS))
+    for r in file_map(reg):
+        a("| " + " | ".join(md_cell(x) for x in _fm_cells(r)) + " |")
     a("")
     a("## How to read this")
     a("")
@@ -836,6 +874,8 @@ ol.steps { margin: 2pt 0 2pt 16pt; padding: 0; } ol.steps li { margin-bottom: 2p
 .card-wrap { margin: 6pt 0 12pt; }
 a { color: #0b2545; text-decoration: none; }
 section.part { break-before: page; }
+table.fmap { font-size: 6pt; line-height: 1.1; table-layout: fixed; width: 100%; } table.fmap td, table.fmap th { padding: 1px 3px; vertical-align: top; overflow-wrap: anywhere; }
+table.fmap th:nth-child(1) { width: 20%; } table.fmap th:nth-child(2) { width: 13%; } table.fmap th:nth-child(3) { width: 18%; } table.fmap th:nth-child(4) { width: 16%; } table.fmap th:nth-child(5) { width: 17%; } table.fmap th:nth-child(6) { width: 16%; }
 @media print { body { padding: 0; max-width: none; } a { color: #000; } }
 """
 
@@ -868,13 +908,16 @@ def build_html(m: dict) -> str:
       + f"<li>Deed adapters registered in enrichment_generic_rod.py: {len(m['registry'])}</li></ul></div>"
       "<div class='box'><b>The rule we keep.</b> Our code never solves a CAPTCHA, never gets past a bot check or a paywall, and never creates accounts. "
       "The only stored login is LiensNC's, by the owner's choice. Everything here that needs a person, you do in a normal browser; our tools read the files you save.</div></section>")
-    toc = [("read", "How to read this"), ("decisions", "Owner decisions in force"), ("built", "Built (computed from the repo)"),
+    toc = [("filemap", "Where every file goes (one page)"), ("read", "How to read this"), ("decisions", "Owner decisions in force"), ("built", "Built (computed from the repo)"),
            ("top15", "What I need from you, in order"), ("saving", "How saving and loading works"), ("manual", "What really stays manual")]
     toc += [("grp-" + g, GROUP_TITLE[g]) for g in GROUP_TITLE]
     toc += [("news", "Every walled record in the source hunts"), ("dormant", "Scrapers switched off or blocked"), ("unknown", "The UNKNOWN-county rows"),
             ("counties", "Every county at a glance"), ("paid", "Paid or attorney-only: prices"), ("appxc", "Appendix C: allowed (not walls)"),
             ("absent", "Data that does not exist"), ("stop", "Stop doing these"), ("gaps", "Gaps and disagreements"), ("sources", "Where this came from")]
     a("<section class='toc'><h2>Contents</h2><ol>" + "".join(f"<li><a href='#{i}'>{h(t)}</a></li>" for i, t in toc) + "</ol></section>")
+    a(f"<section id='filemap' class='part'><h2>Where every file goes (one page)</h2><p class='small'>{reg['file_map']['intro']}</p><table class='fmap'><thead><tr>"
+      + "".join(f"<th>{h(c)}</th>" for c in FILE_MAP_COLS) + "</tr></thead><tbody>"
+      + "".join("<tr>" + "".join(f"<td>{x}</td>" for x in _fm_cells(r)) + "</tr>" for r in file_map(reg)) + "</tbody></table></section>")
     a("<section id='read'><h2>How to read this</h2><ul>" + "".join(f"<li><span class='kind k{k}'>{k}</span> {reg['kind_def'][k]}</li>" for k in ("A", "B", "C")) + "</ul>")
     a(f"<p><b>Totals:</b> {h(totals_text(m))}</p>")
     a(f"<p><b>How the ranking works.</b> The coverage file shows, per county and signal, the share of rows that carry it. A cell is <b>thin</b> when it is under {LOW:g}%. "
