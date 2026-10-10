@@ -38,6 +38,8 @@ def repo(tmp_path: Path) -> Path:
         "appendix_c": [["A site", "Terms only.", "Buildable."]], "paid": [["PACER", "$0.10 a page", "Dockets", "CourtListener"]],
         "does_not_exist": [["Payoff", "Servicer only."]], "stop": [["Old saves", "Automatic."]], "gaps": ["None."],
         "sources_static": ["Fixtures."], "saving_md": ["Save pages."], "saving_html": ["<p>Save pages.</p>"],
+        "file_map": {"intro": "Where files go.", "rows": [], "small_row": {"what": "Saved pages", "from": "x", "save": "x", "where": "~/Downloads", "next": "Tell Claude", "board": "Nothing"},
+                     "crm_row": {"what": "Notes", "from": "x", "save": "x", "where": "CRM", "next": "Nothing", "board": "Nothing"}},
         "unknown_bullets": ["Nothing."],
     }
     (tmp_path / "docs" / "walls_register.json").write_text(json.dumps(reg))
@@ -131,3 +133,16 @@ def test_check_detects_stale_inputs(repo, capsys):
     out = capsys.readouterr().out
     assert "registered deed adapter added: NC|Wallton|nc_lookup" in out
     assert "input file changed: docs/county_records/county_records_matrix.json" in out
+
+
+def test_file_map_section_covers_every_card(tmp_path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("bom_fm", Path(__file__).resolve().parent.parent / "scripts" / "build_owner_manual.py")
+    bom = importlib.util.module_from_spec(spec); spec.loader.exec_module(bom)
+    reg = json.loads((Path(__file__).resolve().parent.parent / "docs" / "walls_register.json").read_text())
+    rows = bom.file_map(reg)
+    named = {n for r in rows for n in r["names"]}
+    assert named == {c["short"] for c in reg["cards"]}
+    text = " ".join(" ".join(bom._fm_cells(r)) for r in rows)
+    for must in ("dnc_registry.csv", "internal_dnc.csv", "Records_Requests/Received", "owner_inputs", "Court Pages (drop here)"):
+        assert must in text
