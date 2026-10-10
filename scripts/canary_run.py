@@ -226,6 +226,11 @@ def profile_env(repo: Path = REPO) -> dict:
 def canary_env(ws: Path, base: dict, *, no_stealth: bool = False) -> dict:
     rrepo = ws / "repo"
     env = dict(base)
+    # the canary proves every enricher runs end to end on a few counties, not that it finishes its
+    # real budget: every phase is capped (a 3,237-row canary spent 3 h inside the photo, street-view
+    # and geocode phases' own budgets); a caller's value wins
+    env.setdefault("ENRICH_PHASE_CAP_ALL", "120")
+    env.setdefault("RESOLVER_PHASE_MAX_SECONDS", "120")
     env.update({
         "FORECLOSURE_ONLY_SOURCES": ",".join(SOURCE_SUBSTRINGS),
         "FULLRUN_STOP_BEFORE_PUBLISH": "1",

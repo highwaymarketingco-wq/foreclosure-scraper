@@ -90,6 +90,11 @@ async def _await_capped(coro, name: str, default_s: int = 900):
         # own budgets (audit 2026-10-09 W5)
         _env = os.environ.get("ENRICH_PHASE_MAX_SECONDS")
         _budget = float(default_s) if (default_s != 900 or not _env) else float(_env)
+        # ENRICH_PHASE_CAP_ALL: a hard ceiling on EVERY phase, for the canary only (it proves each
+        # enricher runs end to end on a few counties; a real run never sets it)
+        _cap_all = os.environ.get("ENRICH_PHASE_CAP_ALL")
+        if _cap_all:
+            _budget = min(_budget, float(_cap_all))
         return await asyncio.wait_for(coro, timeout=_budget)
     except asyncio.TimeoutError:
         log.warning("enrich.time_capped", phase=name, budget_s=_budget)
