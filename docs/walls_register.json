@@ -3628,5 +3628,123 @@
    "next": "Nothing",
    "board": "Nothing; it stays in your notes"
   }
+ },
+ "engine_guide": {
+  "title": "How the engine works and where your files enter (two pages)",
+  "intro": "One run of the engine, in order. Every step only adds to a row or marks it; nothing you saved is thrown away.",
+  "steps": [
+   [
+    "Pull the sources",
+    "Scrapers read the free public sites (court lists, notices, tax rolls, auctions). Walled sites (a picture check, a login, a paywall) are skipped and listed in this manual. The Mac's own browser jobs run at 6 am and hand their leads to the main run (the stealth hand-off)."
+   ],
+   [
+    "Merge with the last board",
+    "New rows are added to the board from the last run, so a lead found once is kept even if its site is down today."
+   ],
+   [
+    "Remove duplicates",
+    "Rows for the same property and the same case are folded into one."
+   ],
+   [
+    "Fill in each property",
+    "The parcel and county map record (owner, mailing address, value, acres), the register of deeds (deeds, deed chain, liens), the documents and pictures (scanned notices and deeds are read), the county tax site, the courts, and heirs and obituaries for owners who have died."
+   ],
+   [
+    "Recheck",
+    "County sites are checked again for each signal. A signal the county no longer shows, or shows as paid, sold or dismissed, is hidden from scoring and the call list. Each check keeps its date."
+   ],
+   [
+    "Clean up",
+    "A block of data stays on a row only if it is that row's own (same parcel, same address or same owner). A tax debt, phone or deed that belongs to another property is removed."
+   ],
+   [
+    "Value the property",
+    "An after-repair value and equity from county values and nearby sales."
+   ],
+   [
+    "Score",
+    "Each row gets HOT, WARM or COLD from its checked problems, equity and timing."
+   ],
+   [
+    "Sort into call lanes",
+    "Lane A owner call (delinquent tax), B heir lane (open estate), C quiet-title lawyer lane, D foreclosure flip, E mail only. Tier A call now, B confirm identity first, C mail, D research (the row says what is missing). The Do Not Call scrub runs here."
+   ],
+   [
+    "Publish",
+    "The board goes to the dashboard."
+   ],
+   [
+    "Daily call list",
+    "<b>scripts/call_list_daily.py</b> reads the published board and the newest checks and writes the day's call sheets to <b>~/Desktop/Call_Sheets/</b>."
+   ]
+  ],
+  "when_def": "<b>Right away</b>: the board changes when the loader finishes. <b>Next quick re-score</b>: the next run of scripts/reconcile_board.py (the local steps only: recheck results, cleanup, value, score, lanes, Do Not Call). <b>Next full run</b>: the next full engine run.",
+  "inputs_cols": [
+   "Your file",
+   "Which step picks it up",
+   "When",
+   "What you will see change"
+  ],
+  "inputs": [
+   [
+    "Court result lists (Court Pages drop folder)",
+    "<b>Ingest Saved Court Pages</b> (scripts/ingest_saved.sh): SC lists through scripts/ingest_publicindex_files.py, NC lists through scripts/parse_nc_ecourts_export.py and scripts/ingest_fresh_court_leads.py. New cases are matched to parcels and scored.",
+    "Right away (it refuses while a full run holds the board; try again after)",
+    "New foreclosure, estate and court rows; the notice at the end says how many were added. Lanes B and D can gain rows."
+   ],
+   [
+    "Contact sheets (CSV)",
+    "scripts/ingest_contacts.py matches each row by parcel number, else address",
+    "Phones and emails right away; the Do Not Call answer at the next quick re-score or full run",
+    "Phone and email columns; each new phone shows not scrubbed until the scrub runs, then lane A and B tiers can rise"
+   ],
+   [
+    "Do Not Call files (data/dnc_registry.csv or data/dnc_registry/, data/internal_dnc.csv)",
+    "The Do Not Call scrub (src/foreclosure_scraper/enrichment_dnc.py), inside the lane step",
+    "Next quick re-score or full run",
+    "Each phone shows clear, on the registry or on your own list. A phone on either list leaves tiers A and B; the lead moves to mail"
+   ],
+   [
+    "County roll file from a records request",
+    "scripts/ingest_county_roll.py loads it into the parcel cache (not the board)",
+    "Next full run (the parcel step comes before what a quick re-score can redo)",
+    "Owner, mailing address, value and land use on that county's rows; more rows meet the mailing-address condition of lanes A and E"
+   ],
+   [
+    "Attorney package pulls (~/Desktop/Call_Sheets/lawyer/owner_inputs/&lt;PIN&gt;/)",
+    "scripts/lawyer_packages.py merges them with the board and the intake sheets",
+    "Right away when Claude reruns it; the board itself does not change",
+    "A finished package in ~/Desktop/Call_Sheets/lawyer/&lt;date&gt;/packages/ once every item is sourced and dated"
+   ],
+   [
+    "SC probate pages (southcarolinaprobate.net, Anderson, Lexington)",
+    "No loader yet; a small one is about an hour each",
+    "After that loader is built, right away",
+    "Estates with a personal representative; lane B rows in those counties"
+   ],
+   [
+    "The Mac stealth hand-off (automatic, 6 am)",
+    "scripts/run_stealth_sources.py writes docs/handoff/stealth_leads/ and pushes it; the full run reads it (national.stealth_handoff)",
+    "Next full run",
+    "New rows from the walled-for-servers sites, under their own source names"
+   ],
+   [
+    "LiensNC pages you saved",
+    "scripts/ingest_liensnc.py adds them; clusters of filings get a builder distress flag",
+    "Right away (run alone, while no other job holds the board)",
+    "New lien-agent rows and the builder distress flag; they are construction projects, not tax debts"
+   ]
+  ],
+  "timing": [
+   "<b>Quick re-score</b> (scripts/reconcile_board.py): about 40 minutes. No sites are fetched.",
+   "<b>Full run</b> (deploy/oracle/vm_run.sh on the server): about 18 to 20 hours.",
+   "<b>Daily call list</b> (scripts/call_list_daily.py): about a minute.",
+   "<b>Checked, none found</b> means the engine looked at that county source on the date shown and the source had nothing for this property. It is a real answer with a date, not a gap. A blank means nobody checked yet."
+  ],
+  "dont": [
+   "Do not edit the board files (docs/listings.json and the files next to it) or anything in docs/handoff/. The next run rebuilds them and your change is lost or breaks the load.",
+   "Do not run two engine jobs at once (a full run, a quick re-score, a court ingest, a LiensNC ingest, a contact load). They share one board lock; the second one refuses, and on the 8 GB Mac two at once can crash it.",
+   "Do not put anything but court result lists in the Court Pages drop folder: it moves every file out afterwards, read or not."
+  ]
  }
 }

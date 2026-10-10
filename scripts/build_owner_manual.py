@@ -643,7 +643,7 @@ def build_md(m: dict) -> str:
     a("")
     a("**The rule we keep:** our code never solves a CAPTCHA, never gets past a bot check or a paywall, and never creates accounts. The only stored login is LiensNC's, by the owner's choice. Everything below that needs a person, you do in a normal browser; our tools read the files you save.")
     a("")
-    titles = ["Where every file goes (one page)", "How to read this", "Owner decisions in force", "Built (computed from the repo)", "What I need from you, in order",
+    titles = ["Where every file goes (one page)", reg["engine_guide"]["title"], "How to read this", "Owner decisions in force", "Built (computed from the repo)", "What I need from you, in order",
               "How saving and loading works", "What really stays manual"] + [GROUP_TITLE[g] for g in GROUP_TITLE] + [
               "Every walled record in the source hunts", "Scrapers switched off or blocked in the last run", "The UNKNOWN-county rows",
               "Every county at a glance", "Paid or attorney-only (type B): prices", "Appendix C: allowed, built or buildable (not walls)",
@@ -661,6 +661,31 @@ def build_md(m: dict) -> str:
     a("|" + "---|" * len(FILE_MAP_COLS))
     for r in file_map(reg):
         a("| " + " | ".join(md_cell(x) for x in _fm_cells(r)) + " |")
+    a("")
+    eg = reg["engine_guide"]
+    a(f"## {eg['title']}")
+    a("")
+    a(md_text(eg["intro"]))
+    a("")
+    for i, (t, x) in enumerate(eg["steps"], 1):
+        a(f"{i}. **{t}.** {md_text(x)}")
+    a("")
+    a(md_text(eg["when_def"]))
+    a("")
+    a("| " + " | ".join(eg["inputs_cols"]) + " |")
+    a("|" + "---|" * len(eg["inputs_cols"]))
+    for r in eg["inputs"]:
+        a("| " + " | ".join(md_cell(x) for x in r) + " |")
+    a("")
+    a("**How long things take**")
+    a("")
+    for x in eg["timing"]:
+        a(f"- {md_text(x)}")
+    a("")
+    a("**What not to do**")
+    a("")
+    for x in eg["dont"]:
+        a(f"- {md_text(x)}")
     a("")
     a("## How to read this")
     a("")
@@ -908,7 +933,7 @@ def build_html(m: dict) -> str:
       + f"<li>Deed adapters registered in enrichment_generic_rod.py: {len(m['registry'])}</li></ul></div>"
       "<div class='box'><b>The rule we keep.</b> Our code never solves a CAPTCHA, never gets past a bot check or a paywall, and never creates accounts. "
       "The only stored login is LiensNC's, by the owner's choice. Everything here that needs a person, you do in a normal browser; our tools read the files you save.</div></section>")
-    toc = [("filemap", "Where every file goes (one page)"), ("read", "How to read this"), ("decisions", "Owner decisions in force"), ("built", "Built (computed from the repo)"),
+    toc = [("filemap", "Where every file goes (one page)"), ("engine", reg["engine_guide"]["title"]), ("read", "How to read this"), ("decisions", "Owner decisions in force"), ("built", "Built (computed from the repo)"),
            ("top15", "What I need from you, in order"), ("saving", "How saving and loading works"), ("manual", "What really stays manual")]
     toc += [("grp-" + g, GROUP_TITLE[g]) for g in GROUP_TITLE]
     toc += [("news", "Every walled record in the source hunts"), ("dormant", "Scrapers switched off or blocked"), ("unknown", "The UNKNOWN-county rows"),
@@ -918,6 +943,13 @@ def build_html(m: dict) -> str:
     a(f"<section id='filemap' class='part'><h2>Where every file goes (one page)</h2><p class='small'>{reg['file_map']['intro']}</p><table class='fmap'><thead><tr>"
       + "".join(f"<th>{h(c)}</th>" for c in FILE_MAP_COLS) + "</tr></thead><tbody>"
       + "".join("<tr>" + "".join(f"<td>{x}</td>" for x in _fm_cells(r)) + "</tr>" for r in file_map(reg)) + "</tbody></table></section>")
+    eg = reg["engine_guide"]
+    a(f"<section id='engine' class='part'><h2>{h(eg['title'])}</h2><p class='small'>{eg['intro']}</p><ol class='steps'>"
+      + "".join(f"<li><b>{h(t)}.</b> {x}</li>" for t, x in eg["steps"]) + f"</ol><p class='small'>{eg['when_def']}</p><table class='fmap'><thead><tr>"
+      + "".join(f"<th>{h(c)}</th>" for c in eg["inputs_cols"]) + "</tr></thead><tbody>"
+      + "".join("<tr>" + "".join(f"<td>{x}</td>" for x in r) + "</tr>" for r in eg["inputs"]) + "</tbody></table>"
+      + "<h3>How long things take</h3><ul>" + "".join(f"<li>{x}</li>" for x in eg["timing"]) + "</ul>"
+      + "<h3>What not to do</h3><ul>" + "".join(f"<li>{x}</li>" for x in eg["dont"]) + "</ul></section>")
     a("<section id='read'><h2>How to read this</h2><ul>" + "".join(f"<li><span class='kind k{k}'>{k}</span> {reg['kind_def'][k]}</li>" for k in ("A", "B", "C")) + "</ul>")
     a(f"<p><b>Totals:</b> {h(totals_text(m))}</p>")
     a(f"<p><b>How the ranking works.</b> The coverage file shows, per county and signal, the share of rows that carry it. A cell is <b>thin</b> when it is under {LOW:g}%. "
