@@ -1310,5 +1310,15 @@ def carry_forward_from_board(listings: list[Listing], docs_dir=None) -> dict:
         as_of = str(json.loads((docs / "run_meta.json").read_text()).get("run_time") or "")[:10]
     except (OSError, ValueError):
         as_of = ""
-    return carry_forward_from_prior(listings, iter_board_rows_with_detail(board, keys=("comps",)),
-                                    prior_as_of=as_of or None)
+    try:
+        from .board_stream import detail_source
+        detail_source(docs)
+    except Exception:  # noqa: BLE001 - no or unreadable detail payload: comps live there
+        log.warning("comps_carry.skipped", reason="no detail payload", docs=str(docs))
+        return {"needing": 0, "carried": 0, "skipped": "no detail payload"}
+    try:
+        return carry_forward_from_prior(
+            listings, iter_board_rows_with_detail(board, keys=("comps",)), prior_as_of=as_of or None)
+    except Exception as exc:  # noqa: BLE001 - never fail the run over a carry
+        log.warning("comps_carry.skipped", reason=f"{type(exc).__name__}: {exc}"[:200])
+        return {"needing": 0, "carried": 0, "skipped": f"unreadable prior board: {type(exc).__name__}"}

@@ -158,3 +158,11 @@ def test_enrich_stamps_picked_on_and_drops_a_stale_median(monkeypatch):
     assert round(local.raw["comp_median_ppsf"]) == 167
     assert far.raw["comps"][0]["geo_anchored"] is False
     assert "comp_median_ppsf" not in far.raw
+
+
+def test_carry_from_board_without_detail_payload_skips(tmp_path):
+    import gzip, json
+    with gzip.open(tmp_path / "listings.json.gz", "wt") as fh:
+        json.dump([{"state": "NC", "county": "Lincoln", "street_address": "12 Test Rd"}], fh)
+    s = ec.carry_forward_from_board([_li()], docs_dir=tmp_path)
+    assert s["skipped"] == "no detail payload"
