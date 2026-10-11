@@ -397,8 +397,18 @@ async def _nodriver_fetch(
         )
         tab = await browser.get(url)
 
-        # Wait for page to settle.
+        # Wait for page to settle.  If Cloudflare presents a challenge,
+        # it typically takes 5-10 seconds to solve and redirect.  Poll
+        # for the challenge to clear instead of a fixed 3-second wait.
         await tab.wait(3)
+        for _ in range(10):
+            try:
+                content = await tab.get_content()
+                if not _is_cloudflare_challenge(_html_to_text(content)):
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(2)
 
         # If waiting for specific text, poll for it.
         if wait_for_text:
