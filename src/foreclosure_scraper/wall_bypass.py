@@ -85,6 +85,10 @@ async def fetch_with_pydoll(
 def _find_chrome_binary() -> str | None:
     """Find Chrome/Chromium binary on macOS/Linux."""
     import shutil
+    # Explicit env override.
+    env_path = os.environ.get("CHROME_BINARY")
+    if env_path and os.path.isfile(env_path):
+        return env_path
     # Common macOS paths
     mac_paths = [
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -93,7 +97,11 @@ def _find_chrome_binary() -> str | None:
     for p in mac_paths:
         if os.path.exists(p):
             return p
-    # Linux / system PATH
+    # Linux — snap first (Ubuntu VM), then system PATH.
+    linux_paths = ["/snap/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"]
+    for p in linux_paths:
+        if os.path.exists(p):
+            return p
     return shutil.which("google-chrome") or shutil.which("chrome") or shutil.which("chromium")
 
 
@@ -218,15 +226,11 @@ async def fetch_with_nodriver(
 async def _nodriver_fetch(
     url: str, timeout_s: int, wait_for_text: str | None
 ) -> str:
-    try:
-        import nodriver
-    except ImportError:
-        log.warning("wall_bypass.nodriver_not_installed")
-        return ""
+    from foreclosure_scraper.browser_utils import start_browser
 
     browser = None
     try:
-        browser = await nodriver.start(
+        browser = await start_browser(
             headless=_NODRIVER_HEADLESS,
             browser_args=[
                 "--no-sandbox",

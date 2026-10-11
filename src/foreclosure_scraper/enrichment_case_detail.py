@@ -140,14 +140,14 @@ async def _get_browser():
             _browser_ctx["browser"] = None
 
     try:
-        import nodriver as uc
+        from foreclosure_scraper.browser_utils import start_browser
     except ImportError:
         return None
 
     # Try headless first — if F5 blocks it, fall back to headless=False
     for headless in (True, False):
         try:
-            _browser_ctx["browser"] = await uc.start(headless=headless)
+            _browser_ctx["browser"] = await start_browser(headless=headless)
             _browser_ctx["headless"] = headless
             log.info("nodriver.browser_started", headless=headless)
             return _browser_ctx["browser"]

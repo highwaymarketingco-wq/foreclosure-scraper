@@ -454,7 +454,7 @@ async def _nodriver_search_county(county: str) -> list[dict[str, str]]:
     (all 26 prefixes) took 353.0s wall-clock and returned 1,233 deduped real
     CP cases.
     """
-    import nodriver as uc
+    from foreclosure_scraper.browser_utils import start_browser
 
     base_url = f"https://publicindex.sccourts.org/{county}/publicindex/"
 
@@ -464,10 +464,10 @@ async def _nodriver_search_county(county: str) -> list[dict[str, str]]:
     try:
         try:
             # Try headless first (8GB-safe headline case). Do NOT gate the
-            # headed fallback on an exception here -- uc.start(headless=True)
+            # headed fallback on an exception here -- start_browser(headless=True)
             # succeeds every time for this site; the block is detected from
             # the resulting PAGE, below.
-            browser = await uc.start(headless=True)
+            browser = await start_browser(headless=True)
             page = await browser.get(base_url)
             # Wait for F5 JS challenge to resolve (also long enough for a
             # WAF chrome-error interstitial, if any, to settle before we
@@ -486,7 +486,7 @@ async def _nodriver_search_county(county: str) -> list[dict[str, str]]:
                 except Exception as exc:
                     log.warning("sc_public_index.browser_stop_fail",
                                 county=county, error=str(exc)[:160])
-                browser = await uc.start(headless=False)
+                browser = await start_browser(headless=False)
                 page = await browser.get(base_url)
                 await asyncio.sleep(12)
 
