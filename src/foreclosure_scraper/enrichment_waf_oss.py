@@ -61,7 +61,7 @@ GEMINI_TIMEOUT_S = 30.0
 # force-cancelled mid-browser-op. This does NOT weaken the bypass itself:
 # a real puzzle solve finishes in seconds, so the budget only cuts short
 # the pathological "stuck in an unresolvable retry loop" case.
-MAX_TOTAL_SOLVE_SECONDS = float(os.environ.get("WAF_SOLVE_MAX_SECONDS", "90"))
+MAX_TOTAL_SOLVE_SECONDS = float(os.environ.get("WAF_SOLVE_MAX_SECONDS", "300"))
 
 
 def _gemini_keys() -> list[str]:
@@ -129,6 +129,9 @@ async def _identify_tiles(
                 continue
             if r.status_code == 429:
                 log.info("waf.gemini.rate_limit_rotate", key_idx=idx)
+                # Brief delay on rate-limit so we don't burn through all keys
+                # in the same second (observed in Run 2: all 9 keys 429'd in 1s).
+                await asyncio.sleep(2.0)
                 continue
             if r.status_code != 200:
                 log.warning(
@@ -152,6 +155,79 @@ async def _identify_tiles(
                     key_idx=idx, error=str(exc)[:160], body=r.text[:200],
                 )
                 continue
+
+    # --- Anthropic Claude fallback (vision) ---
+    # If every Gemini key is rate-limited, try Claude. We have ANTHROPIC_API_KEY
+    # configured. Claude can analyse the 3x3 grid just as well as Gemini.
+    claude_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if claude_key:
+        log.info("waf.claude.fallback_start")
+        try:
+            solution = await _identify_tiles_claude(canvas_jpeg_b64, target_object, claude_key)
+            if solution is not None:
+                log.info("waf.claude.solved", target=target_object, n_selected=len(solution))
+                return solution
+        except Exception as exc:  # noqa: BLE001
+            log.warning("waf.claude.fallback_fail", error=str(exc)[:160])
+
+    return None
+
+
+async def _identify_tiles_claude(
+    canvas_jpeg_b64: str, target_object: str, api_key: str,
+) -> Optional[list[int]]:
+    """Ask Claude which tiles (1-9) in the 3x3 grid contain `target_object`.
+
+    Uses Anthropic's messages API with vision (image content). Returns list of
+    1-based tile numbers, or None on failure.
+    """
+    prompt = (
+        f"This image is a 3x3 grid of 9 numbered tiles. Tiles are numbered "
+        f"left-to-right, top-to-bottom: top row is 1, 2, 3; middle row is "
+        f"4, 5, 6; bottom row is 7, 8, 9. Reply with ONLY a JSON array of "
+        f"tile numbers that contain \"{target_object}\". Example: [1,3,5]. "
+        f"No other text."
+    )
+    body = {
+        "model": "claude-sonnet-4-20250514",
+        "max_tokens": 100,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": canvas_jpeg_b64,
+                }},
+                {"type": "text", "text": prompt},
+            ],
+        }],
+    }
+    url = "https://api.anthropic.com/v1/messages"
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=GEMINI_TIMEOUT_S) as client:
+            r = await client.post(url, json=body, headers=headers)
+        if r.status_code != 200:
+            log.warning("waf.claude.bad_status", status=r.status_code, body=r.text[:200])
+            return None
+        ans = r.json()["content"][0]["text"].strip()
+        # Extract JSON array from response (Claude sometimes wraps in markdown)
+        import re as _re
+        m = _re.search(r'\[[\d\s,]+\]', ans)
+        if not m:
+            log.warning("waf.claude.parse_fail", body=ans[:200])
+            return None
+        solution = json.loads(m.group(0))
+        if (isinstance(solution, list)
+                and all(isinstance(i, int) and 1 <= i <= 9 for i in solution)):
+            return solution
+    except Exception as exc:  # noqa: BLE001
+        log.warning("waf.claude.error", error=str(exc)[:160])
     return None
 
 

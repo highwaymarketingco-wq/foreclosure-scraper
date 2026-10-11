@@ -657,7 +657,7 @@ class NCECourtsEstates(BaseScraper):
     # come back empty when the image-grid solve fails. Keep min 0 so a blocked
     # run is classified by safe_run's block-signal logic, not as a regression.
     expected_min_count = 0
-    timeout_s = 300.0
+    timeout_s = 600.0
     requires_apify = False
     optional = True
 
