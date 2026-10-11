@@ -131,3 +131,20 @@ def test_evaluate_names_each_failure():
 def test_fresh_rows_are_the_ones_first_seen_after_prepare():
     rows = [{"first_seen": "2026-10-09T01:00:00"}, {"first_seen": "2026-10-01T00:00:00"}, {}]
     assert len(list(C.fresh_rows(rows, "2026-10-09T00:00:00"))) == 1
+
+
+def test_capped_and_legit_empty_do_not_fail_but_real_silence_does():
+    inp = _ok_inputs(failures={"failed": {}, "time_capped": {"owner_mailing": 1, "court_bid": 1}},
+                     expectations={"key_share": {"owner_mailing": 0.5, "calc": 0.99},
+                                   "stripped_keys": ["calc", "owner_mailing"]},
+                     fresh_shares={"calc": 1.0, "owner_mailing": 0.1},
+                     stats={"geocode": {}}, stats_baseline=["geocode", "court_bid", "land_ratio", "reconcile"])
+    res = C.evaluate(**inp)
+    assert res["ok"], res
+    det = " ".join(c["detail"] for c in res["checks"])
+    assert "time cap: owner_mailing" in det and "time-capped (not judged): court_bid" in det
+    assert "no eligible row (stats only on a hit): land_ratio" in det
+    res = C.evaluate(**{**inp, "stats_baseline": ["geocode", "equity"]})
+    assert not res["ok"]
+    res = C.evaluate(**{**inp, "failures": {"failed": {}, "time_capped": {}}})
+    assert not res["ok"]                         # owner_mailing short with no cap: a real failure

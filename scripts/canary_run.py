@@ -80,6 +80,17 @@ KEY_SHARE = 0.25
 #: reached far fewer rows than the run that built the prior board is as suspect as a dead one)
 PRODUCED_RATIO = 0.3
 #: lifecycle markers of rows the run carries, not enrichment products: never stripped or asserted
+#: main.py records these enrichers' stats only when they tagged something (`if s and s.get("tagged")`
+#: and the like), so silence on four small counties is "no eligible row", not a dead enricher
+STATS_ONLY_ON_HIT = frozenset({"divorce_no_subsequent_deed", "land_ratio", "notice_service_defect",
+                               "vacant_landuse", "rollback_exposure", "helene_damage", "census_rent",
+                               "census_demographics", "bankruptcy_stay", "repeat_tax_loss",
+                               "liensnc_posthumous", "platted_lots", "lrcpwa_photo"})
+#: stats keys of tools that are not run steps (a reconcile's own block)
+NOT_RUN_STATS = frozenset({"reconcile"})
+#: the time-capped phase whose truncation explains a missing key
+KEY_PHASE = {"owner_mailing": "owner_mailing", "footprint": "footprint_sqft", "images": "with_images",
+             "flood": "flood", "comps": "comps", "vision": "vision"}
 LIFECYCLE_KEYS = frozenset({"pulled_sale", "stale_case", "is_new", "first_seen_run", "geo_imprecise"})
 
 
@@ -190,6 +201,11 @@ def prepare(ws: Path, repo: Path = REPO, board: Path | None = None, key_share: f
         if isinstance(raw, dict):
             for k in strip:
                 raw.pop(k, None)
+            # footprint_sqft skips a row that already has living_sqft; an estimate it made on an
+            # earlier run sits in the Listing field, so strip that too or nothing is re-produced
+            if "footprint" in strip and r.get("living_sqft_estimated"):
+                r["living_sqft"] = None
+                r["living_sqft_estimated"] = False
     prior_n = write_prior(kept, rrepo / "docs" / "listings.json.gz")
     exp = {"prepared_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
            "stripped_keys": strip, "frozen_keys": frozen, "key_share_threshold": key_share,
@@ -304,21 +320,30 @@ def evaluate(*, rc: int | None, manifest: dict | None, failures: dict, expectati
     want = expectations.get("stripped_keys")
     if want is None:
         want = sorted(k for k, s in base.items() if s >= key_share and k not in LIFECYCLE_KEYS)
-    short = [k for k in want if (fresh_shares.get(k) or 0) < PRODUCED_RATIO * float(base.get(k) or 0)
-             or not fresh_shares.get(k)]
+    capped = failures.get("time_capped") or {}
+    short_all = [k for k in want if (fresh_shares.get(k) or 0) < PRODUCED_RATIO * float(base.get(k) or 0)
+                 or not fresh_shares.get(k)]
+    short = [k for k in short_all if KEY_PHASE.get(k, k) not in capped]
+    short_capped = [k for k in short_all if k not in short]
     add("raw-keep-produced", fresh_n > 0 and not short,
         f"{len(want) - len(short)}/{len(want)} enrichment keys stripped from the prior rows came back on "
         f">= {PRODUCED_RATIO:.0%} of their baseline share ({fresh_n} rows)"
         + (f"; not produced (share now vs before): "
            + ", ".join(f"{k} {fresh_shares.get(k, 0):.2f}/{float(base.get(k) or 0):.2f}" for k in short[:20])
            if short else "")
+        + (f"; not judged, its phase hit the time cap: {', '.join(short_capped)}" if short_capped else "")
         + (f"; frozen (no run step writes them): {', '.join(expectations.get('frozen_keys') or [])}"
            if expectations.get("frozen_keys") else ""))
-    base = sorted(set(stats_baseline or ()))
-    gone = [k for k in base if k not in (stats or {})]
+    base = sorted(set(stats_baseline or ()) - NOT_RUN_STATS)
+    silent = [k for k in base if k not in (stats or {})]
+    s_capped = [k for k in silent if k in capped]
+    s_empty = [k for k in silent if k not in capped and k in STATS_ONLY_ON_HIT]
+    gone = [k for k in silent if k not in s_capped and k not in s_empty]
     add("enrichment-stats", not gone,
-        f"{len(base) - len(gone)}/{len(base)} enrichers of the baseline run reported stats"
-        + (f"; silent: {', '.join(gone[:20])}" if gone else ""))
+        f"{len(base) - len(silent)}/{len(base)} enrichers of the baseline run reported stats"
+        + (f"; silent: {', '.join(gone[:20])}" if gone else "")
+        + (f"; time-capped (not judged): {', '.join(s_capped)}" if s_capped else "")
+        + (f"; no eligible row (stats only on a hit): {', '.join(s_empty)}" if s_empty else ""))
     add("audit-suite", suite_rc == 0, f"audit_suite.py exit {suite_rc}")
     return {"ok": all(c["ok"] for c in checks), "checks": checks,
             "time_capped": failures.get("time_capped") or {}}
