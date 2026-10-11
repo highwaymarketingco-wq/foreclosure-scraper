@@ -85,7 +85,7 @@ async def start_browser(headless: bool = True, **extra: Any):
     Parameters
     ----------
     headless : bool
-        Forwarded to ``nodriver.start()``.
+        When True, launch Chrome in headless mode via ``--headless=new``.
     **extra
         Additional keyword arguments forwarded to ``nodriver.start()``.
     """
@@ -95,7 +95,11 @@ async def start_browser(headless: bool = True, **extra: Any):
     if not headless:
         _ensure_display()
 
-    kwargs: dict[str, Any] = {"headless": headless}
+    # Don't use nodriver's headless parameter — older versions pass
+    # `--headless` which snap Chromium 155+ rejects ("unknown flag").
+    # Instead, pass `--headless=new` as a browser arg, which works on
+    # all Chrome/Chromium 109+ (Jan 2023+).
+    kwargs: dict[str, Any] = {"headless": False}
 
     chrome_path = _find_chrome_binary()
     if chrome_path:
@@ -107,6 +111,13 @@ async def start_browser(headless: bool = True, **extra: Any):
     is_root = os.geteuid() == 0 if hasattr(os, "geteuid") else False
     if is_snap or is_root:
         kwargs["sandbox"] = False
+
+    # Collect browser_args from caller and add --headless=new if needed.
+    browser_args = list(extra.pop("browser_args", []))
+    if headless:
+        browser_args.append("--headless=new")
+    if browser_args:
+        kwargs["browser_args"] = browser_args
 
     kwargs.update(extra)
     return await uc.start(**kwargs)

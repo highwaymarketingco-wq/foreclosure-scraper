@@ -234,7 +234,10 @@ async def _pydoll_fetch(
     browser = None
     try:
         opts = ChromiumOptions()
-        opts.headless = _PYDOLL_HEADLESS
+        # Don't use opts.headless — it passes `--headless` which snap
+        # Chromium 155+ rejects.  Use `--headless=new` as an argument.
+        if _PYDOLL_HEADLESS:
+            opts.add_argument("--headless=new")
         chrome_bin = _find_chrome_binary()
         if chrome_bin:
             opts.binary_location = chrome_bin
