@@ -47,7 +47,7 @@ class PeopleSearchScraper(BaseScraper):
     category = "people_search"
     timeout_s = 300.0
 
-    async def _collect(self) -> list[Listing]:
+    async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
         for site_name, cfg in _SITES.items():

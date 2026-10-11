@@ -42,7 +42,7 @@ class NcCchsDeedsScraper(BaseScraper):
     category = "rod"
     timeout_s = 600.0
 
-    async def _collect(self) -> list[Listing]:
+    async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
         cutoff = (datetime.now() - timedelta(days=90)).strftime("%m/%d/%Y")
         end_date = datetime.now().strftime("%m/%d/%Y")

@@ -57,6 +57,88 @@ def _nodriver_sem() -> asyncio.Semaphore:
 
 
 # ---------------------------------------------------------------------------
+# Cloudflare challenge detection
+# ---------------------------------------------------------------------------
+
+#: Markers that indicate a Cloudflare challenge/interstitial page.
+_CF_CHALLENGE_MARKERS = (
+    "just a moment",
+    "challenge-platform",
+    "cf-browser-verification",
+    "cf-challenge",
+    "/cdn-cgi/challenge-platform/",
+    "checking your browser",
+    "enable javascript and cookies to continue",
+    "ray id",  # often on challenge pages
+    "attention required! | cloudflare",
+)
+
+
+def _is_cloudflare_challenge(text: str) -> bool:
+    """Return True if *text* looks like a Cloudflare challenge page.
+
+    Checks for the common Cloudflare interstitial markers. The check is
+    intentionally broad — false positives just trigger a retry, not a crash.
+    """
+    if not text or len(text) < 50:
+        # Very short or empty responses are suspicious — treat as challenge.
+        return True
+    lower = text.lower()
+    return any(marker in lower for marker in _CF_CHALLENGE_MARKERS)
+
+
+# ---------------------------------------------------------------------------
+# curl-cffi — Chrome impersonation (Tier 1.5, between httpx and pydoll)
+# ---------------------------------------------------------------------------
+
+async def fetch_with_curl_cffi(
+    url: str,
+    *,
+    timeout_s: int = 20,
+    impersonate: str = "chrome120",
+) -> str:
+    """Fetch a URL using curl-cffi's browser impersonation feature.
+
+    curl-cffi replays the TLS/JA3 fingerprint and HTTP/2 settings of a real
+    Chrome browser, which is enough to pass many Cloudflare "managed"
+    challenges without launching a full browser process. This is significantly
+    faster (~1-2s) than pydoll/nodriver and is tried first when cheaper
+    tiers (httpx) fail.
+
+    Returns page text on success, or ``""`` on failure.
+    """
+    try:
+        from curl_cffi.requests import AsyncSession
+    except ImportError:
+        log.debug("wall_bypass.curl_cffi_not_installed")
+        return ""
+
+    try:
+        async with AsyncSession(impersonate=impersonate, timeout=timeout_s) as s:
+            resp = await s.get(url, allow_redirects=True)
+            if resp.status_code != 200:
+                log.debug(
+                    "wall_bypass.curl_cffi_non_200",
+                    status=resp.status_code,
+                    url=url[:120],
+                )
+                return ""
+            text = resp.text
+            if not text or _is_cloudflare_challenge(text):
+                log.debug("wall_bypass.curl_cffi_challenge", url=url[:120])
+                return ""
+            log.info("wall_bypass.curl_cffi_ok", url=url[:120], length=len(text))
+            return text
+    except Exception as exc:
+        log.debug(
+            "wall_bypass.curl_cffi_error",
+            url=url[:120],
+            error=f"{type(exc).__name__}: {exc}"[:200],
+        )
+        return ""
+
+
+# ---------------------------------------------------------------------------
 # pydoll — Cloudflare Turnstile + JS challenges
 # ---------------------------------------------------------------------------
 
@@ -76,10 +158,41 @@ async def fetch_with_pydoll(
     Returns rendered page text, or "" on failure.
     """
     async with _pydoll_sem():
-        return await asyncio.wait_for(
-            _pydoll_fetch(url, timeout_s, wait_for_selector),
-            timeout=timeout_s + 20,  # hard outer bound
-        )
+        # First attempt with the caller's timeout.
+        try:
+            text = await asyncio.wait_for(
+                _pydoll_fetch(url, timeout_s, wait_for_selector),
+                timeout=timeout_s + 20,  # hard outer bound
+            )
+        except (asyncio.TimeoutError, Exception) as exc:
+            log.debug(
+                "wall_bypass.pydoll_first_attempt_failed",
+                url=url[:120],
+                error=f"{type(exc).__name__}: {exc}"[:160],
+            )
+            text = ""
+
+        if text and len(text) > 100 and not _is_cloudflare_challenge(text):
+            return text
+
+        # Second attempt with a longer timeout — Cloudflare challenges can
+        # need more time to clear, especially on slow connections.
+        retry_timeout = timeout_s + 15
+        log.info("wall_bypass.pydoll_retry", url=url[:120], retry_timeout=retry_timeout)
+        try:
+            text = await asyncio.wait_for(
+                _pydoll_fetch(url, retry_timeout, wait_for_selector),
+                timeout=retry_timeout + 25,
+            )
+        except (asyncio.TimeoutError, Exception) as exc:
+            log.debug(
+                "wall_bypass.pydoll_retry_failed",
+                url=url[:120],
+                error=f"{type(exc).__name__}: {exc}"[:160],
+            )
+            text = ""
+
+        return text or ""
 
 
 def _find_chrome_binary() -> str | None:
@@ -217,21 +330,48 @@ async def fetch_with_nodriver(
     Returns rendered page text, or "" on failure.
     """
     async with _nodriver_sem():
-        return await asyncio.wait_for(
+        # First attempt — uses the configured headless setting.
+        text = await asyncio.wait_for(
             _nodriver_fetch(url, timeout_s, wait_for_text),
             timeout=timeout_s + 20,
         )
 
+        if text and len(text) > 100 and not _is_cloudflare_challenge(text):
+            return text
+
+        # Retry with headed mode (headless=False). F5/DataDome and some
+        # Cloudflare challenges detect headless Chrome and return a challenge
+        # page. A real (visible) browser window passes these checks.
+        log.info(
+            "wall_bypass.nodriver_retry_headed",
+            url=url[:120],
+            first_empty=not text,
+            first_is_cf=_is_cloudflare_challenge(text) if text else False,
+        )
+        try:
+            text = await asyncio.wait_for(
+                _nodriver_fetch(url, timeout_s, wait_for_text, headless=False),
+                timeout=timeout_s + 30,
+            )
+        except asyncio.TimeoutError:
+            log.warning("wall_bypass.nodriver_retry_timeout", url=url[:120])
+            text = ""
+
+        return text or ""
+
 
 async def _nodriver_fetch(
-    url: str, timeout_s: int, wait_for_text: str | None
+    url: str, timeout_s: int, wait_for_text: str | None, headless: bool | None = None
 ) -> str:
     from foreclosure_scraper.browser_utils import start_browser
+
+    # Allow per-call headless override; fall back to the module default.
+    _headless = _NODRIVER_HEADLESS if headless is None else headless
 
     browser = None
     try:
         browser = await start_browser(
-            headless=_NODRIVER_HEADLESS,
+            headless=_headless,
             browser_args=[
                 "--no-sandbox",
                 "--disable-gpu",

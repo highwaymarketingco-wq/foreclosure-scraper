@@ -37,7 +37,7 @@ class ScTaxWalledScraper(BaseScraper):
     category = "tax"
     timeout_s = 600.0
 
-    async def _collect(self) -> list[Listing]:
+    async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
         for county, cfg in _COUNTY_SITES.items():

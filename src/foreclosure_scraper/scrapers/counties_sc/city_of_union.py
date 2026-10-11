@@ -35,7 +35,7 @@ class CityOfUnionScraper(BaseScraper):
     category = "municipal"
     timeout_s = 300.0
 
-    async def _collect(self) -> list[Listing]:
+    async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
         from ...wall_bypass import fetch_through_walls, fetch_with_nodriver

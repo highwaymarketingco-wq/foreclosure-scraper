@@ -35,7 +35,7 @@ class LexingtonProbateScraper(BaseScraper):
     category = "probate"
     timeout_s = 300.0
 
-    async def _collect(self) -> list[Listing]:
+    async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
         try:

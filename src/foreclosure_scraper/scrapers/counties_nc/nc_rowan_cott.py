@@ -31,7 +31,7 @@ class NcRowanCottScraper(BaseScraper):
     category = "rod"
     timeout_s = 300.0
 
-    async def _collect(self) -> list[Listing]:
+    async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
         from ...wall_bypass import fetch_with_nodriver, fetch_through_walls
