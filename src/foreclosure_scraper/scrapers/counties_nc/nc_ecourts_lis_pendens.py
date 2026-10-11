@@ -619,11 +619,22 @@ class NCECourtsLisPendens(BaseScraper):
                 log.warning("nc_ecourts.template_json_failed", error=str(exc))
                 return []
 
-            # Step 2: paginate through all hits across the 14 target counties
+            # Step 2: paginate through all hits across the 14 target counties.
+            # Time budget: stop paginating at 250s (of the 300s scraper timeout)
+            # so we leave ~50s for hit→Listing conversion + docket history.
+            # With self.partial, any listings already converted are salvaged.
+            import time as _time
+            _budget = 250.0
+            _t0 = _time.monotonic()
             all_hits: list[dict] = []
             page_from = 0
             total = 0
             for _ in range(self.MAX_PAGES):
+                if _time.monotonic() - _t0 > _budget:
+                    log.warning("nc_ecourts.time_budget_reached",
+                                fetched=len(all_hits), reported_total=total,
+                                budget_s=_budget)
+                    break
                 so = _build_search_object(
                     template,
                     counties=TARGET_COUNTIES,
@@ -656,13 +667,13 @@ class NCECourtsLisPendens(BaseScraper):
                     break
                 page_from += len(hits)
 
-            log.info("nc_ecourts.fetched", total_hits=len(all_hits), reported_total=total)
-            # 2026-10-08 (source-completeness audit): MAX_PAGES used to end the loop
-            # silently. Measured live 2026-10-08: 80,061 hits in the 90-day window
-            # against the 90,000-hit cap (11% headroom). Say so when the cap binds.
-            if total and len(all_hits) < total and len(all_hits) >= self.MAX_PAGES * self.PAGE_SIZE:
-                log.warning("nc_ecourts.page_cap_reached", fetched=len(all_hits),
-                            reported_total=total, max_pages=self.MAX_PAGES)
+            if len(all_hits) < total:
+                log.warning("nc_ecourts.page_cap_reached",
+                            fetched=len(all_hits), reported_total=total,
+                            max_pages=self.MAX_PAGES)
+
+            log.info("nc_ecourts.fetched", total_hits=len(all_hits), reported_total=total,
+                     elapsed_s=round(_time.monotonic() - _t0, 1))
 
         # Docket-history sidecar (Dirty Deeds Tier B #37) -- record every
         # foreclosure-cause hit's case/status BEFORE the terminal-status
@@ -698,7 +709,7 @@ class NCECourtsLisPendens(BaseScraper):
         )
 
         # Step 3: convert hits to listings, filtering to foreclosure-relevant causes
-        listings: list[Listing] = []
+        listings = self.partial
         seen_keys: set[str] = set()
         want_judgments = judgment_liens_enabled()
         for h in all_hits:

@@ -765,7 +765,7 @@ class SCPublicNotices(BaseScraper):
     timeout_s = 1200.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
+        out = self.partial
         # The categories are overlapping keyword bundles, so the same notice id
         # comes back under several of them. Keep the first sighting — _CATEGORIES
         # runs most-specific-first — so one notice yields exactly one lead.

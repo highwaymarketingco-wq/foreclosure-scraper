@@ -595,7 +595,7 @@ class NCECourtsDivorce(BaseScraper):
         end = datetime.now()
         start = end - timedelta(days=self.JUDGMENT_LOOKBACK_DAYS)
 
-        listings: list[Listing] = []
+        listings = self.partial
         seen: set[tuple[str, str]] = set()
 
         from ...http_client import client
@@ -618,7 +618,18 @@ class NCECourtsDivorce(BaseScraper):
                 return []
 
             # Step 2: page through the family/divorce judgments.
+            # Time budget: stop at 250s to leave room for conversion.
+            import time as _time
+            _t0 = _time.monotonic()
+            _budget = 250.0
+            pg = 0
+            total = 0
             for pg in range(self.JUDGMENT_MAX_PAGES):
+                if _time.monotonic() - _t0 > _budget:
+                    log.warning("nc_ecourts_divorce.time_budget_reached",
+                                page=pg, listings=len(listings),
+                                budget_s=_budget)
+                    break
                 so = _lp._build_search_object(
                     template,
                     counties=_lp.TARGET_COUNTIES,
@@ -649,14 +660,14 @@ class NCECourtsDivorce(BaseScraper):
                 if (pg + 1) * self.JUDGMENT_PAGE_SIZE >= total:
                     break
             else:
-                # 2026-10-08 (source-completeness audit): the page cap used to end
-                # the loop silently. Measured live 2026-10-08: 104,580 hits in the
-                # 120-day window against the 120,000-hit cap (13% headroom).
+                # Loop exhausted MAX_PAGES without break — server still has more
                 log.warning("nc_ecourts_divorce.page_cap_reached",
-                            max_pages=self.JUDGMENT_MAX_PAGES,
-                            reported_total=result.get("totalHits"))
+                            page=pg, listings=len(listings),
+                            reported_total=total,
+                            max_pages=self.JUDGMENT_MAX_PAGES)
 
-        log.info("nc_ecourts_divorce.parsed", listings=len(listings))
+        log.info("nc_ecourts_divorce.parsed", listings=len(listings),
+                 elapsed_s=round(_time.monotonic() - _t0, 1))
         return listings
 
     def _judgment_hit_to_listing(self, hit: dict) -> Optional[Listing]:

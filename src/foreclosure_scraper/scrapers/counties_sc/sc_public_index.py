@@ -147,12 +147,23 @@ def _county_from_cp_case(case_number: str) -> str | None:
     return SC_COUNTY_BY_CODE.get(m.group(2))
 
 
-def _build_page_action(court_type: str, case_type: str):
+def _build_page_action(court_type: str, case_type: str,
+                       date_from_str: str | None = None,
+                       date_to_str: str | None = None):
     """Return an async ``page_action(page)`` that passes the disclaimer and
-    drives the empty-name + date-range search for one court/case-type."""
+    drives the empty-name + date-range search for one court/case-type.
+
+    When *date_from_str* / *date_to_str* are supplied (``mm/dd/YYYY``) the
+    search is narrowed to that sub-window; otherwise the full LOOKBACK_DAYS
+    range is used (backward-compatible).
+    """
     today = datetime.utcnow()
-    date_to = today.strftime("%m/%d/%Y")
-    date_from = (today - timedelta(days=LOOKBACK_DAYS)).strftime("%m/%d/%Y")
+    if date_from_str and date_to_str:
+        date_from = date_from_str
+        date_to = date_to_str
+    else:
+        date_to = today.strftime("%m/%d/%Y")
+        date_from = (today - timedelta(days=LOOKBACK_DAYS)).strftime("%m/%d/%Y")
 
     async def fill_form(page):  # type: ignore[no-untyped-def]
         # Wait for either the disclaimer Accept button or the search form.
@@ -494,8 +505,70 @@ def _parse_results(
     return out
 
 
+# --- Cap-splitting date-window logic (mirrors Charleston's proven approach) --- #
+
+#: The SC Public Index results grid caps at 250 rows per query.
+_GRID_CAP_ROWS = 250
+
+#: Initial sub-window size in days when splitting the lookback range.
+_WINDOW_DAYS = int(os.environ.get("FORECLOSURE_SC_PI_WINDOW_DAYS", "15"))
+
+#: Hard floor — never split a window narrower than this (1 day = same-day
+#: filings only). If a single day still hits the cap, we accept the loss and
+#: log it (a day with 250+ distinct CP or GS filings in one county is rare).
+_WINDOW_MIN_DAYS = 1
+
+
+def _date_windows(start: datetime, end: datetime,
+                  days: int) -> list[tuple[datetime, datetime]]:
+    """Split [start, end] into consecutive ``days``-wide windows."""
+    out: list[tuple[datetime, datetime]] = []
+    d = start
+    while d <= end:
+        e = min(end, d + timedelta(days=days - 1))
+        out.append((d, e))
+        d = e + timedelta(days=1)
+    return out
+
+
+def _grid_row_count(html: str) -> int:
+    """Count data rows (standardRow / altRow) in the SearchResults grid."""
+    if not html:
+        return -1
+    tree = HTMLParser(html)
+    grid = tree.css_first("table#ContentPlaceHolder1_SearchResults")
+    if not grid:
+        return -1
+    return sum(1 for _ in grid.css("tr.standardRow, tr.altRow"))
+
+
+async def _fetch_window(
+    fetcher, url: str, court_type: str, case_type: str,
+    date_from: str, date_to: str,
+) -> str:
+    """One StealthyFetcher fetch for a single date window. Returns HTML or ''."""
+    try:
+        result = await fetcher.async_fetch(
+            url,
+            headless=True,
+            network_idle=True,
+            timeout=180000,
+            page_action=_build_page_action(court_type, case_type, date_from, date_to),
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("scpi_bulk.window_fetch_failed", error=str(exc)[:300])
+        return ""
+    body = getattr(result, "body", b"")
+    return body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
+
+
 async def _scrape_county(county: str) -> list[Listing]:
-    """Fetch + parse one county across all configured court/case-type searches."""
+    """Fetch + parse one county across all configured court/case-type searches.
+
+    Uses cap-splitting: the lookback range is divided into sub-windows. When a
+    window returns >= _GRID_CAP_ROWS (250), it is split in half and re-queried
+    until each window is under the cap or reaches the 1-day floor.
+    """
     try:
         from scrapling.fetchers import StealthyFetcher
     except ImportError:
@@ -506,42 +579,70 @@ async def _scrape_county(county: str) -> list[Listing]:
     out: list[Listing] = []
     seen_cases: set[str] = set()
 
+    today = datetime.utcnow()
+    lookback_start = today - timedelta(days=LOOKBACK_DAYS)
+
     for court_type, case_type, court_system in SEARCHES:
-        try:
-            result = await StealthyFetcher.async_fetch(
-                url,
-                headless=True,
-                network_idle=True,
-                timeout=180000,
-                page_action=_build_page_action(court_type, case_type),
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "scpi_bulk.fetch_failed",
-                county=county, court_system=court_system, error=str(exc)[:300],
-            )
-            continue
+        # Build the initial set of date windows for this search.
+        queue = _date_windows(lookback_start, today, _WINDOW_DAYS)
+        total_rows = 0
 
-        body = getattr(result, "body", b"")
-        html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
-        if not html:
-            log.warning("scpi_bulk.empty_body", county=county, court_system=court_system)
-            continue
+        while queue:
+            win_start, win_end = queue.pop(0)
+            df = win_start.strftime("%m/%d/%Y")
+            dt = win_end.strftime("%m/%d/%Y")
 
-        rows = _parse_results(html, county, court_system)
-        # Cross-search de-dupe on case number (a case shouldn't appear in both
-        # civil and criminal sweeps, but guard anyway).
-        for lst in rows:
-            key = (lst.county or county, lst.case_number or lst.source_url)
-            ck = f"{key[0]}:{key[1]}"
-            if ck in seen_cases:
+            html = await _fetch_window(StealthyFetcher, url, court_type, case_type, df, dt)
+            if not html:
+                log.warning(
+                    "scpi_bulk.empty_window",
+                    county=county, court_system=court_system,
+                    date_from=df, date_to=dt,
+                )
                 continue
-            seen_cases.add(ck)
-            out.append(lst)
+
+            n_rows = _grid_row_count(html)
+            if n_rows >= _GRID_CAP_ROWS and win_end > win_start:
+                # Cap hit — split this window in half and re-query both halves.
+                mid = win_start + timedelta(days=(win_end - win_start).days // 2)
+                queue[:0] = [
+                    (win_start, mid),
+                    (mid + timedelta(days=1), win_end),
+                ]
+                log.info(
+                    "scpi_bulk.cap_split",
+                    county=county, court_system=court_system,
+                    date_from=df, date_to=dt, rows=n_rows,
+                    split_into=f"{df}..{mid.strftime('%m/%d/%Y')} + "
+                    f"{(mid + timedelta(days=1)).strftime('%m/%d/%Y')}..{dt}",
+                )
+                continue
+
+            if n_rows >= _GRID_CAP_ROWS and win_end == win_start:
+                # Single-day window still at cap — can't split further.
+                log.warning(
+                    "scpi_bulk.cap_floor",
+                    county=county, court_system=court_system,
+                    date=df, rows=n_rows,
+                    msg="Single-day window still at 250-row cap; excess lost",
+                )
+
+            rows = _parse_results(html, county, court_system)
+            total_rows += len(rows)
+            for lst in rows:
+                key = (lst.county or county, lst.case_number or lst.source_url)
+                ck = f"{key[0]}:{key[1]}"
+                if ck in seen_cases:
+                    continue
+                seen_cases.add(ck)
+                out.append(lst)
+
+            # Polite pause between windows.
+            await asyncio.sleep(0.5)
 
         log.info(
             "scpi_bulk.search_done",
-            county=county, court_system=court_system, rows=len(rows),
+            county=county, court_system=court_system, rows=total_rows,
         )
         # Small pause between the two searches on the same host.
         await asyncio.sleep(1.0)
@@ -557,7 +658,7 @@ class SCPublicIndexBulk(BaseScraper):
     slug = SLUG
     name = "SC Public Index — Bulk Court Records (civil + criminal)"
     category = "motivated_seller"
-    timeout_s = 900.0
+    timeout_s = 1800.0  # was 900 — cap-splitting multiplies fetches per county
     expected_min_count = 10
     requires_apify = False
 
@@ -576,7 +677,7 @@ class SCPublicIndexBulk(BaseScraper):
             else COUNTIES
         )
 
-        out: list[Listing] = []
+        out = self.partial
         for county in counties:
             try:
                 out.extend(await _scrape_county(county))

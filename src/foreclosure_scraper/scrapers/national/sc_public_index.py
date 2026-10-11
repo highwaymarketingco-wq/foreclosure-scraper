@@ -133,7 +133,7 @@ BATCH_SIZE = int(os.environ.get("SC_PUBLIC_INDEX_BATCH_SIZE", "2"))
 #: that takes longer than the scripted 12s to clear) can't eat this run's
 #: whole timeout_s and take the other BATCHED counties' already-collectible
 #: rows down with it.
-COUNTY_TIMEOUT_S = float(os.environ.get("SC_PUBLIC_INDEX_COUNTY_TIMEOUT", "480"))
+COUNTY_TIMEOUT_S = float(os.environ.get("SC_PUBLIC_INDEX_COUNTY_TIMEOUT", "600"))
 
 
 def _select_county_batch(counties: list[str], batch_size: int) -> list[str]:
@@ -511,35 +511,57 @@ async def _nodriver_search_county(county: str) -> list[dict[str, str]]:
                 log.warning("sc_public_index.no_form", county=county, page_size=len(html))
                 return []
 
-            # Search each prefix
-            for prefix in SEARCH_PREFIXES:
-                # Fill last name field via JS
+            # Search each prefix, subdividing when the 250-row grid cap is hit.
+            # When a single-letter prefix returns >= 250 rows, we subdivide it
+            # into two-letter prefixes (AA, AB, ..., AZ) to capture excess cases
+            # that the server would otherwise silently drop. A two-letter prefix
+            # that still hits the cap is logged and accepted (rare).
+            queries_done = 0
+            _MAX_Q = int(os.environ.get("SC_PI_NODRIVER_MAX_QUERIES", "80"))
+
+            async def _prefix_search(name_prefix: str) -> tuple[list[dict[str, str]], int]:
+                """One form-fill + search + parse. Returns (results, grid_rows)."""
+                nonlocal queries_done
+                if queries_done >= _MAX_Q:
+                    return [], -1
+                queries_done += 1
                 await page.evaluate(f"""
                     var el = document.getElementById('ContentPlaceHolder1_TextBoxlastName');
-                    if (el) {{ el.value = '{prefix}'; }}
+                    if (el) {{ el.value = '{name_prefix}'; }}
                 """)
                 await asyncio.sleep(0.5)
-
-                # Blur to trigger NoBot state calculation
                 await page.evaluate(
                     "document.getElementById('ContentPlaceHolder1_TextBoxlastName').blur();"
                 )
                 await asyncio.sleep(2)
-
-                # Click search button via JS
                 await page.evaluate("""
                     var btn = document.querySelector('input[name="ctl00$ContentPlaceHolder1$ButtonSearch"]');
                     if (btn) { btn.click(); }
                 """)
                 await asyncio.sleep(8)
-
-                # Parse results
                 html2 = await page.get_content()
-                page_results = _parse_search_results(html2)
+                results = _parse_search_results(html2)
+                n_grid = _grid_rows(html2)
+                log.info("sc_public_index.prefix_done", county=county,
+                         prefix=name_prefix, cases=len(results), grid_rows=n_grid)
+                return results, n_grid
+
+            for prefix in SEARCH_PREFIXES:
+                page_results, n_grid = await _prefix_search(prefix)
                 all_results.extend(page_results)
 
-                log.info("sc_public_index.prefix_done", county=county,
-                         prefix=prefix, cases=len(page_results))
+                # Cap detection: subdivide into two-letter prefixes.
+                if n_grid >= GRID_CAP_ROWS:
+                    log.info("sc_public_index.cap_subdivide",
+                             county=county, prefix=prefix, grid_rows=n_grid)
+                    for second in SEARCH_PREFIXES:
+                        sub_results, sub_n = await _prefix_search(prefix + second)
+                        all_results.extend(sub_results)
+                        if sub_n >= GRID_CAP_ROWS:
+                            log.warning("sc_public_index.cap_floor",
+                                        county=county, prefix=prefix + second,
+                                        grid_rows=sub_n,
+                                        msg="Two-letter prefix still at cap; excess lost")
 
                 await asyncio.sleep(REQUEST_DELAY)
 
@@ -1055,7 +1077,7 @@ class SCPublicIndexScraper(BaseScraper):
     # matches this file's sibling counties_sc.sc_public_notices (also a
     # multi-minute, multi-step WAF-flow scraper) rather than inventing a new
     # outlier value.
-    timeout_s = 1200.0
+    timeout_s = 1800.0  # was 1200 — cap-subdivision can double per-county query count
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

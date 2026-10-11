@@ -450,15 +450,46 @@ async def _run_queries(
     # The render path is KEPT as a fallback rather than deleted: if DEW starts requiring
     # a real page context, the browser lane is how this keeps working.
     if os.getenv("DEW_LIEN_FORCE_RENDER", "") not in ("1", "true", "True"):
+        # Auto-refresh the SecurityKey if the hardcoded one has gone stale.
+        # The key rotates when DEW redeploys the SPA; a stale key returns
+        # "Invalid Security Key" (HTTP 200 with an error body, not a 4xx).
+        active_key = SECURITY_KEY
         for payload in queries:
             try:
                 async with httpx.AsyncClient(timeout=180.0) as c:
                     r = await c.post(SVC_URL, json=payload, headers={
                         "Content-Type": "application/json",
-                        "SecurityKey": SECURITY_KEY,
+                        "SecurityKey": active_key,
                         "User-Agent": _UA_DIRECT,
                     })
                 r.raise_for_status()
+                # Detect stale key: the response body contains an error message
+                # rather than a JSON array of liens.
+                body_preview = (r.text or "")[:200].lower()
+                if "invalid security key" in body_preview or "invalidsecuritykey" in body_preview.replace(" ", ""):
+                    log.warning("dew_lien.stale_key",
+                                note="SecurityKey rejected — attempting live extraction")
+                    try:
+                        from ...spa_key_extractor import extract_dew_security_key
+                        fresh_key = await extract_dew_security_key()
+                        if fresh_key and fresh_key != active_key:
+                            log.info("dew_lien.key_refreshed",
+                                     old_prefix=active_key[:8],
+                                     new_prefix=fresh_key[:8])
+                            active_key = fresh_key
+                            # Retry with the fresh key
+                            r = await c.post(SVC_URL, json=payload, headers={
+                                "Content-Type": "application/json",
+                                "SecurityKey": active_key,
+                                "User-Agent": _UA_DIRECT,
+                            })
+                            r.raise_for_status()
+                        else:
+                            log.warning("dew_lien.key_refresh_failed",
+                                        note="falling back to rendered lane")
+                    except Exception as exc:
+                        log.warning("dew_lien.key_extract_error",
+                                    error=str(exc)[:120])
                 # _decode_rows is tolerant of a truncated body and of the
                 # WCF {d:[...]} wrapper, so reuse it rather than re-implementing.
                 rows = _decode_rows(r.text)
@@ -589,7 +620,7 @@ class SCDEWLienRegistry(BaseScraper):
             ]
             rows = await _run_queries(fallback, active_only=True, max_rows=self.max_rows)
 
-        out: list[Listing] = []
+        out = self.partial
         seen: set = set()
         for row in rows:
             li = _to_listing(row, self.slug)

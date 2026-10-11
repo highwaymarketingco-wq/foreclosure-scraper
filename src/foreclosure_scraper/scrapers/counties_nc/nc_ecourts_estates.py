@@ -657,7 +657,7 @@ class NCECourtsEstates(BaseScraper):
     # come back empty when the image-grid solve fails. Keep min 0 so a blocked
     # run is classified by safe_run's block-signal logic, not as a regression.
     expected_min_count = 0
-    timeout_s = 600.0
+    timeout_s = 300.0
     requires_apify = False
     optional = True
 
@@ -684,7 +684,7 @@ class NCECourtsEstates(BaseScraper):
         try:
             await StealthyFetcher.async_fetch(
                 SEARCH_URL,
-                headless=True,
+                headless=False,
                 network_idle=True,
                 timeout=240000,
                 page_action=page_action,
@@ -695,9 +695,9 @@ class NCECourtsEstates(BaseScraper):
             )
         except Exception as exc:  # noqa: BLE001
             log.warning("nc_ecourts_estates.fetch_fail", error=str(exc)[:200])
-            return []
+            return self.partial
 
-        listings: list[Listing] = []
+        listings: list[Listing] = self.partial
         seen: set[str] = set()
         for row in captured:
             li = _row_to_listing(row, self.slug)

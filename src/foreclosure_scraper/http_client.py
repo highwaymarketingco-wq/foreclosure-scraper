@@ -453,6 +453,7 @@ async def get_text(
     headers: dict | None = None,
     referer: str | None = None,
     impersonate: bool = False,
+    wall_bypass: bool = False,
 ) -> str:
     """GET a URL and return text, with retry on transient errors.
 
@@ -462,10 +463,17 @@ async def get_text(
        system curl binary often succeeds where httpx fails on macOS.
     3. curl-cffi Chrome impersonation — real TLS fingerprint for hosts that
        403/406 on plain httpx.
+    4. wall-bypass browsers (pydoll → nodriver) — real Chrome processes for
+       Cloudflare Turnstile, DataDome, and JS challenges that defeat TLS
+       fingerprinting. Only tried when ``wall_bypass=True`` AND all cheaper
+       tiers have failed. Slow (~5-15s) but free.
 
     Hosts seen blocking plain httpx are remembered process-wide so later
     fetches impersonate first and skip the doomed attempt.
     """
+    # Allow forcing wall_bypass via env var for standalone walled-source runs
+    if os.environ.get("WALL_BYPASS_FORCE", "0") == "1":
+        wall_bypass = True
     h = dict(headers or {})
     if referer:
         h["Referer"] = referer
@@ -499,13 +507,29 @@ async def get_text(
         # Only the impersonation tier can plausibly fix a fingerprint block; a
         # generic 404/410 won't change, so don't waste a fetch on those.
         if not (impersonate and (code in _BLOCK_CODES)):
+            if wall_bypass and code in _BLOCK_CODES:
+                # Last resort: real browser (pydoll → nodriver).
+                from . import wall_bypass as _wb
+                log.info("get_text.wall_bypass", host=host, code=code)
+                text = await _wb.fetch_through_walls(url, render_first=False)
+                if text and len(text) > 100:
+                    return text
             raise
         log.info("get_text.escalate_impersonate", host=host, code=code)
         if host:
             _impersonate_hosts.add(host)
-        return await get_text_impersonate(
-            url, timeout=timeout, headers=headers, referer=referer
-        )
+        try:
+            return await get_text_impersonate(
+                url, timeout=timeout, headers=headers, referer=referer
+            )
+        except Exception:
+            if wall_bypass:
+                from . import wall_bypass as _wb
+                log.info("get_text.wall_bypass_after_impersonate", host=host)
+                text = await _wb.fetch_through_walls(url, render_first=False)
+                if text and len(text) > 100:
+                    return text
+            raise
     except (httpx.TransportError, httpx.TimeoutException) as exc:
         # httpx timed out — try curl subprocess fallback before giving up.
         # This is the key workaround for macOS networks where httpx hangs but
@@ -518,9 +542,18 @@ async def get_text(
             return result
         # curl also failed — try impersonation as last resort
         if impersonate:
-            return await get_text_impersonate(
-                url, timeout=timeout, headers=headers, referer=referer
-            )
+            try:
+                return await get_text_impersonate(
+                    url, timeout=timeout, headers=headers, referer=referer
+                )
+            except Exception:
+                pass
+        if wall_bypass:
+            from . import wall_bypass as _wb
+            log.info("get_text.wall_bypass_after_timeout", host=host)
+            text = await _wb.fetch_through_walls(url, render_first=False)
+            if text and len(text) > 100:
+                return text
         raise
 
 

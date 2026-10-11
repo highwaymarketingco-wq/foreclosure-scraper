@@ -74,7 +74,7 @@ import structlog
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
-from ...layer_guard import LayerHarvest
+from ...layer_guard import LayerHarvest, PartialHarvest
 from ...models import Listing, ListingType, PropertyKind
 from ...sc_case_county import SC_COUNTY_BY_CODE
 
@@ -459,27 +459,36 @@ class SCProbateNotices(BaseScraper):
         # land in self.partial the moment ITS OWN task resolves, not when the
         # slowest one does.
         async with client(timeout=60.0) as c:
-            with guard:
-                tasks = [asyncio.ensure_future(guard.harvest(paper.host, self._one(c, paper)))
-                         for paper in PAPERS]
-                for finished in asyncio.as_completed(tasks):
-                    try:
-                        res = await finished
-                    except asyncio.CancelledError:
-                        # MUST propagate, not be swallowed: a CancelledError here is
-                        # an outer caller (safe_run()'s own wait_for, or an
-                        # orchestrator-level _await_capped) stopping this scraper.
-                        # Catching it as an ordinary failure would make wait_for()
-                        # see a normal return instead of a cancellation and silently
-                        # defeat the timeout this exact fix depends on elsewhere.
-                        raise
-                    except Exception:
-                        # guard.harvest() already banks a real failure for verify()
-                        # to re-raise; this only catches something stranger. A
-                        # tolerated host blowing up must not take the other papers'
-                        # rows down with it.
-                        continue
-                    out.extend(res)
+            try:
+                with guard:
+                    tasks = [asyncio.ensure_future(guard.harvest(paper.host, self._one(c, paper)))
+                             for paper in PAPERS]
+                    for finished in asyncio.as_completed(tasks):
+                        try:
+                            res = await finished
+                        except asyncio.CancelledError:
+                            # MUST propagate, not be swallowed: a CancelledError here is
+                            # an outer caller (safe_run()'s own wait_for, or an
+                            # orchestrator-level _await_capped) stopping this scraper.
+                            # Catching it as an ordinary failure would make wait_for()
+                            # see a normal return instead of a cancellation and silently
+                            # defeat the timeout this exact fix depends on elsewhere.
+                            raise
+                        except Exception:
+                            # guard.harvest() already banks a real failure for verify()
+                            # to re-raise; this only catches something stranger. A
+                            # tolerated host blowing up must not take the other papers'
+                            # rows down with it.
+                            continue
+                        out.extend(res)
+            except PartialHarvest as exc:
+                # Pickens (yourpickenscounty.com) is the anchor paper and is NOT
+                # in the tolerated set, so a Pickens failure raises PartialHarvest
+                # from guard.__exit__. But as_completed already banked every
+                # completed paper's rows into self.partial — we must NOT discard
+                # them. Log the partial harvest and ship what we have.
+                log.warning("sc_probate_notices.partial_harvest_shipped",
+                            error=str(exc)[:200], rows=len(out))
         return out
 
     @staticmethod
