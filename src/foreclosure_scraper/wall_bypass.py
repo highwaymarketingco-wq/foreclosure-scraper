@@ -245,10 +245,10 @@ async def _pydoll_fetch(
         opts.add_argument("--disable-gpu")
 
         browser = Chrome(options=opts)
-        await browser.__aenter__()
-        # __aenter__ doesn't auto-start; we must call start() explicitly.
-        initial_tab = await browser.start()
-        tab = await browser.new_tab(url)
+        # Don't call __aenter__ — it starts Chrome, and then start()
+        # would try to start it again, causing a port conflict and
+        # "Connection refused" on the WebSocket.  Just call start().
+        tab = await browser.start()
         # Enable auto-solve for any Cloudflare challenge that appears.
         await tab.enable_auto_solve_cloudflare_captcha(
             time_to_wait_captcha=10.0,
@@ -307,12 +307,11 @@ async def _pydoll_fetch(
         )
         return ""
     finally:
-        # Ensure the browser process is always cleaned up, even on
-        # CancelledError from asyncio.wait_for — the async with context
-        # manager's __aexit__ may not complete if the task is cancelled.
+        # Clean up the browser process.  Use close() since we called
+        # start() directly (not __aenter__), so __aexit__ may not work.
         if browser is not None:
             try:
-                await browser.__aexit__(None, None, None)
+                await browser.close()
             except Exception:
                 pass
 
