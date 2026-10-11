@@ -81,16 +81,28 @@ class YorkDelinquentTax(BaseScraper):
             log.warning("york_tax.fetch_fail", error=str(exc)[:160])
             html = ""
 
-        # If get_text returned empty or a CF block page, try real-browser
-        # render fallback before giving up.
-        if not html or len(html) < 200 or (
-            "cloudflare" in html.lower() and ("blocked" in html.lower() or "attention required" in html.lower())
-        ):
-            log.warning("york_tax.cloudflare_blocked", url=PAGE_URL)
+        # If get_text returned empty or a CF block/challenge page, try
+        # real-browser render fallback before giving up.  curl-cffi often
+        # returns HTTP 200 with Cloudflare's "Just a moment..." challenge
+        # HTML — the old check only looked for "blocked"/"attention
+        # required" and silently swallowed the challenge page.
+        def _is_cf_wall(text: str) -> bool:
+            t = (text or "").lower()
+            return (
+                "just a moment" in t
+                or "checking your browser" in t
+                or "cf-browser-verification" in t
+                or "cf-challenge" in t
+                or ("cloudflare" in t and ("blocked" in t or "attention required" in t))
+                or "turnstile" in t
+            )
+
+        if not html or len(html) < 200 or _is_cf_wall(html):
+            log.warning("york_tax.cloudflare_blocked", url=PAGE_URL, html_len=len(html))
             html = await _fetch_through_cf(PAGE_URL)
             if not html or len(html) < 200:
                 return out
-            if "cloudflare" in html.lower() and ("blocked" in html.lower() or "attention required" in html.lower()):
+            if _is_cf_wall(html):
                 log.warning("york_tax.cloudflare_still_blocked_after_render")
                 return out
             log.info("york_tax.cf_render_succeeded", html_len=len(html))
