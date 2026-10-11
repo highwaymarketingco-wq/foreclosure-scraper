@@ -32,7 +32,7 @@ if _env.exists():
 
 from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 from foreclosure_scraper.verification.core import row_keys
-from foreclosure_scraper.web_artifact import load_board, write_artifact
+from foreclosure_scraper.web_artifact import append_new_rows, write_artifact
 
 WALLED_DIR = ROOT / "data" / "walled_output"
 
@@ -138,26 +138,12 @@ def _convert_walled_row(row: dict) -> Listing | None:
 def main():
     docs_dir = ROOT / "docs"
 
-    # 1. Load existing board
-    print("Loading existing board...", flush=True)
-    board = load_board(docs_dir)
-    print(f"  Existing board: {len(board)} listings", flush=True)
-
-    # Build dedupe index from existing board using row_keys() multi-key
-    # identity (parcel > address > case_number > fingerprint).  This is the
-    # same logic the main pipeline uses; a row matches the board on ANY of
-    # its identity keys, not just one.
-    board_keys: dict[str, int] = {}
-    for i, li in enumerate(board):
-        for k in row_keys(li):
-            board_keys[k] = i  # last writer wins; row_keys are all equivalent
-
-    # Track keys of new listings to avoid intra-walled dupes
-    new_keys: set[str] = set()
-
-    # 2. Load all walled output
+    # 1. Load all walled output into Listing objects (this is small — tens of
+    #    thousands of rows, not the 3.9 GB board).  Deduplicate within the
+    #    walled set using row_keys().
     print(f"Loading walled output from {WALLED_DIR}...", flush=True)
     new_listings: list[Listing] = []
+    new_keys: set[str] = set()
     skipped_dupes = 0
     skipped_invalid = 0
 
@@ -176,56 +162,38 @@ def main():
 
             keys = row_keys(li)
 
-            # Check if duplicate of existing board listing (any key match)
-            matched_idx = None
-            for k in keys:
-                if k in board_keys:
-                    matched_idx = board_keys[k]
-                    break
-
-            if matched_idx is not None and matched_idx < len(board):
-                # Update last_seen on the existing board row
-                board[matched_idx].last_seen = li.last_seen
-                # Merge non-null fields from the walled row into the board row
-                board[matched_idx] = board[matched_idx].merge(li)
-                skipped_dupes += 1
-                continue
-
-            # Check if duplicate of a new listing we just added
+            # Check if duplicate of a listing we already added
             if any(k in new_keys for k in keys):
                 skipped_dupes += 1
                 continue
 
-            # New listing
             new_listings.append(li)
             new_keys.update(keys)
 
     print(f"\n  New listings to add: {len(new_listings)}", flush=True)
-    print(f"  Duplicates (last_seen updated): {skipped_dupes}", flush=True)
+    print(f"  Duplicates within walled set: {skipped_dupes}", flush=True)
     print(f"  Invalid (skipped): {skipped_invalid}", flush=True)
 
     if not new_listings:
         print("No new listings to add. Exiting.", flush=True)
         return
 
-    # 3. Merge: board + new_listings
-    merged = board + new_listings
-    print(f"  Merged board: {len(merged)} listings", flush=True)
-
-    # 4. Write via write_artifact (requires board lock)
-    print("Writing board via write_artifact()...", flush=True)
+    # 2. Append to board using append_new_rows() which STREAMS the existing
+    #    board from disk — never loads the full 3.9 GB into memory.  It
+    #    deduplicates against existing board rows using the same row_keys()
+    #    signatures during a single streaming pass.
+    print(f"Appending {len(new_listings)} listings to board (streaming)...", flush=True)
     summary = {
         "run_timestamp": datetime.now(timezone.utc).isoformat(),
         "source": "wire_walled_to_board.py",
-        "total_listings": len(merged),
         "new_from_walled": len(new_listings),
-        "duplicates_updated": skipped_dupes,
+        "duplicates_within_walled": skipped_dupes,
+        "invalid_skipped": skipped_invalid,
     }
     try:
-        paths = write_artifact(merged, summary, docs_dir)
-        print(f"  Written: {paths[0]}", flush=True)
-        print(f"  Meta:    {paths[1]}", flush=True)
-        print(f"\nDone! Board now has {len(merged)} listings.", flush=True)
+        result = append_new_rows(new_listings, summary, docs_dir)
+        print(f"  Result: {result}", flush=True)
+        print(f"\nDone! Appended {len(new_listings)} listings to board.", flush=True)
     except Exception as exc:
         print(f"  ERROR: {exc}", flush=True)
         raise
