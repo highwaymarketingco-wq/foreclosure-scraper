@@ -97,24 +97,25 @@ WALLED_SOURCE_MAP = {
     # LiensNC
     "liensnc_login": ["counties_generic.liensnc"],
 
-    # Sources with NO scraper — these will be recorded as "no scraper code"
-    "sc_qpublic": [],
-    "people_search": [],
-    "unclaimed": [],
-    "gaston_rod": [],
-    "avalon_tax": [],
-    "nc_rod_captcha": [],
-    "nc_cchs_cf": [],
-    "nc_tax_walled": [],
-    "sc_tax_walled": [],
-    "dc_ip_block": [],
-    "lexington_probate": [],
-    "sc_rod_walled": [],
-    "morganton": [],
-    "city_union": [],
+    # New scrapers built 2026-10-11
+    "sc_qpublic": ["counties_sc.sc_qpublic"],
+    "people_search": ["national.people_search"],
+    "unclaimed": ["national.nc_unclaimed"],
+    "gaston_rod": ["counties_nc.nc_cchs_deeds"],
+    "avalon_tax": ["counties_nc.nc_avalon_tax"],
+    "nc_rod_captcha": ["counties_nc.nc_rod_captcha"],
+    "nc_cchs_cf": ["counties_nc.nc_cchs_deeds"],
+    "nc_tax_walled": ["counties_nc.nc_avalon_tax"],
+    "sc_tax_walled": ["counties_sc.sc_tax_walled"],
+    "dc_ip_block": ["counties_nc.dc_ip_block"],
+    "lexington_probate": ["counties_sc.lexington_probate"],
+    "sc_rod_walled": ["counties_sc.sc_rod_walled"],
+    "morganton": ["counties_nc.morganton_nc"],
+    "city_union": ["counties_sc.city_of_union"],
     "lawyer_owner_pulls": [],
-    "nc_rowan_cott": [],
-    "nc_forsyth_vital": [],
+    "nc_rowan_cott": ["counties_nc.nc_rowan_cott"],
+    "nc_tylertech_estates": ["counties_nc.nc_tylertech_estates"],
+    "nc_forsyth_vital": [],  # TRUE WALL: login required — manual lane only
 }
 
 
