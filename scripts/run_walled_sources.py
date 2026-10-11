@@ -123,18 +123,47 @@ def _now_iso() -> str:
 
 
 def _listing_to_dict(li) -> dict:
-    """Convert a Listing object to a JSON-serializable dict."""
-    d = {
-        "owner_name": getattr(li, "owner_name", ""),
-        "address": getattr(li, "address", ""),
-        "city": getattr(li, "city", ""),
-        "state": getattr(li, "state", ""),
-        "zip": getattr(li, "zip", ""),
-        "listing_type": str(getattr(li, "listing_type", "")),
-        "source": getattr(li, "source", ""),
-    }
-    if hasattr(li, "raw") and li.raw:
-        d["raw_keys"] = list(li.raw.keys())
+    """Convert a Listing object to a JSON-serializable dict.
+
+    Serializes the full Pydantic model so field names can never drift from
+    the Listing definition.  The wire_walled_to_board.py script reads these
+    dicts back into Listing objects; if a field is missing here it is None
+    there, which means dedupe_key() falls back to url:walled://<source> and
+    every row from one source collapses to a single board entry.
+    """
+    # Pydantic v2: model_dump() gives every field.
+    if hasattr(li, "model_dump"):
+        d = li.model_dump(mode="json")
+        # Drop empty raw to save space, but keep the keys for debugging.
+        raw = d.pop("raw", None)
+        if raw:
+            d["raw_keys"] = list(raw.keys())
+            d["raw"] = raw  # keep for wire_walled_to_board
+        return d
+    # Fallback for non-Pydantic objects (shouldn't happen in this codebase).
+    fields = [
+        "source", "source_url", "listing_type", "property_kind",
+        "street_address", "city", "state", "zip_code", "county",
+        "parcel_id", "legal_description", "latitude", "longitude",
+        "sale_date", "sale_time", "sale_location", "opening_bid",
+        "judgment_amount", "upset_bid_deadline", "auction_status",
+        "redemption_deadline", "foreclosure_process",
+        "plaintiff", "defendant", "trustee", "case_number",
+        "zoning", "acreage", "lot_size_sqft", "living_sqft",
+        "living_sqft_estimated", "bedrooms", "bathrooms", "year_built",
+        "assessed_value", "market_value", "tax_value",
+        "owner_name", "land_use", "description",
+        "first_seen", "last_seen",
+    ]
+    d = {}
+    for f in fields:
+        v = getattr(li, f, None)
+        if v is not None:
+            d[f] = v
+    raw = getattr(li, "raw", None)
+    if raw:
+        d["raw_keys"] = list(raw.keys())
+        d["raw"] = raw
     return d
 
 
@@ -295,7 +324,25 @@ async def main():
     data_count = zero_count = no_scraper_count2 = error_count = blocked_count = 0
 
     for r in all_results:
-        status = "NO_SCRAPER" if not r["scrapers"] else ("DATA" if r["total_rows"] > 0 else "ZERO")
+        if not r["scrapers"]:
+            status = "NO_SCRAPER"
+        elif r["total_rows"] > 0:
+            status = "DATA"
+        else:
+            # Distinguish WHY a source produced zero rows.
+            # BLOCKED: WAF/anti-bot (403/406/429). TIMEOUT: exceeded budget.
+            # ERROR: code/parse exception. ZERO_RESULT: ran clean, genuinely empty.
+            outcomes = [s["outcome"] for s in r["scrapers"]]
+            if any(o == OUTCOME_BLOCKED for o in outcomes):
+                status = "BLOCKED"
+            elif any(o == OUTCOME_TIMEOUT for o in outcomes):
+                status = "TIMEOUT"
+            elif any(o == OUTCOME_ERROR for o in outcomes):
+                status = "ERROR"
+            elif any(o == OUTCOME_PARTIAL for o in outcomes):
+                status = "PARTIAL"
+            else:
+                status = "ZERO"
         summary["results"].append({
             "wall_id": r["wall_id"],
             "total_rows": r["total_rows"],
@@ -340,6 +387,18 @@ async def main():
         elif status == "ZERO":
             outcomes = ", ".join(f"{s[0]}={s[1]}" for s in r["outcomes"])
             print(f"  ZERO     {wid:25s} {0:6d} rows ({outcomes})")
+        elif status == "BLOCKED":
+            outcomes = ", ".join(f"{s[0]}={s[1]}" for s in r["outcomes"])
+            print(f"  BLOCKED  {wid:25s} {0:6d} rows ({outcomes})")
+        elif status == "TIMEOUT":
+            outcomes = ", ".join(f"{s[0]}={s[1]}" for s in r["outcomes"])
+            print(f"  TIMEOUT  {wid:25s} {0:6d} rows ({outcomes})")
+        elif status == "ERROR":
+            outcomes = ", ".join(f"{s[0]}={s[1]}" for s in r["outcomes"])
+            print(f"  ERROR    {wid:25s} {0:6d} rows ({outcomes})")
+        elif status == "PARTIAL":
+            outcomes = ", ".join(f"{s[0]}={s[1]}" for s in r["outcomes"])
+            print(f"  PARTIAL  {wid:25s} {rows:6d} rows ({outcomes})")
         elif status == "NO_SCRAPER":
             print(f"  NOSCRAPER {wid:25s} — no code exists")
 

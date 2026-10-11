@@ -671,6 +671,20 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
                     # falls back to _parse_search_results on an unknown layout.
                     page_results = _parse_charleston_results(r3.text, parse_stats)
                     results.extend(page_results)
+
+                    # Cap detection: log when a prefix hits the 250-row grid cap
+                    # so excess rows are visible (the nodriver path already does this).
+                    n_grid = _grid_rows(r3.text)
+                    if n_grid >= GRID_CAP_ROWS:
+                        log.warning("sc_public_index.charleston_cap_hit",
+                                    county=county, prefix=prefix,
+                                    grid_rows=n_grid,
+                                    msg="Charleston prefix at 250-row grid cap; excess rows silently dropped by server")
+                    else:
+                        log.info("sc_public_index.charleston_prefix_done",
+                                 county=county, prefix=prefix,
+                                 cases=len(page_results), grid_rows=n_grid)
+
                     search_hidden = _get_hidden_fields(r3.text)
                     await asyncio.sleep(REQUEST_DELAY)
                 except Exception:

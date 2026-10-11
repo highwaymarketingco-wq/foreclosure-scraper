@@ -684,7 +684,7 @@ class NCECourtsEstates(BaseScraper):
         try:
             await StealthyFetcher.async_fetch(
                 SEARCH_URL,
-                headless=False,
+                headless=True,
                 network_idle=True,
                 timeout=240000,
                 page_action=page_action,

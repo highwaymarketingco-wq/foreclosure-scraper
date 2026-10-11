@@ -107,6 +107,7 @@ async def _pydoll_fetch(
         log.warning("wall_bypass.pydoll_not_installed")
         return ""
 
+    browser = None
     try:
         opts = ChromiumOptions()
         opts.headless = _PYDOLL_HEADLESS
@@ -116,56 +117,57 @@ async def _pydoll_fetch(
         opts.add_argument("--no-sandbox")
         opts.add_argument("--disable-gpu")
 
-        async with Chrome(options=opts) as browser:
-            # __aenter__ doesn't auto-start; we must call start() explicitly.
-            initial_tab = await browser.start()
-            tab = await browser.new_tab(url)
-            # Enable auto-solve for any Cloudflare challenge that appears.
-            await tab.enable_auto_solve_cloudflare_captcha(
-                time_to_wait_captcha=10.0,
-            )
-            # Navigate (new_tab may not wait for full load).
-            await tab.go_to(url, timeout=timeout_s)
+        browser = Chrome(options=opts)
+        await browser.__aenter__()
+        # __aenter__ doesn't auto-start; we must call start() explicitly.
+        initial_tab = await browser.start()
+        tab = await browser.new_tab(url)
+        # Enable auto-solve for any Cloudflare challenge that appears.
+        await tab.enable_auto_solve_cloudflare_captcha(
+            time_to_wait_captcha=10.0,
+        )
+        # Navigate (new_tab may not wait for full load).
+        await tab.go_to(url, timeout=timeout_s)
 
-            # If caller wants to wait for a specific element, poll for it.
-            if wait_for_selector:
-                deadline = asyncio.get_event_loop().time() + timeout_s
-                while asyncio.get_event_loop().time() < deadline:
-                    try:
-                        el = await tab.find(
-                            class_name=wait_for_selector, timeout=2, raise_exc=False
-                        )
-                        if el:
-                            break
-                    except Exception:
-                        pass
-                    await asyncio.sleep(1)
-
-            # Give Cloudflare a moment to clear if it's still processing.
-            await asyncio.sleep(2)
-
-            # Get page source — page_source is a coroutine property.
-            try:
-                html = await tab.page_source
-            except Exception:
-                # Fallback: execute JS to get document content
+        # If caller wants to wait for a specific element, poll for it.
+        if wait_for_selector:
+            deadline = asyncio.get_event_loop().time() + timeout_s
+            while asyncio.get_event_loop().time() < deadline:
                 try:
-                    result = await tab.execute_script(
-                        "document.documentElement.outerHTML"
+                    el = await tab.find(
+                        class_name=wait_for_selector, timeout=2, raise_exc=False
                     )
-                    html = (
-                        result.get("result", {}).get("value", "")
-                        if isinstance(result, dict)
-                        else str(result)
-                    )
+                    if el:
+                        break
                 except Exception:
-                    html = ""
+                    pass
+                await asyncio.sleep(1)
 
-            if not html:
-                return ""
+        # Give Cloudflare a moment to clear if it's still processing.
+        await asyncio.sleep(2)
 
-            # Extract visible text from HTML.
-            return _html_to_text(html)
+        # Get page source — page_source is a coroutine property.
+        try:
+            html = await tab.page_source
+        except Exception:
+            # Fallback: execute JS to get document content
+            try:
+                result = await tab.execute_script(
+                    "document.documentElement.outerHTML"
+                )
+                html = (
+                    result.get("result", {}).get("value", "")
+                    if isinstance(result, dict)
+                    else str(result)
+                )
+            except Exception:
+                html = ""
+
+        if not html:
+            return ""
+
+        # Extract visible text from HTML.
+        return _html_to_text(html)
 
     except asyncio.TimeoutError:
         log.warning("wall_bypass.pydoll_timeout", url=url[:120])
@@ -177,6 +179,15 @@ async def _pydoll_fetch(
             error=f"{type(exc).__name__}: {exc}"[:200],
         )
         return ""
+    finally:
+        # Ensure the browser process is always cleaned up, even on
+        # CancelledError from asyncio.wait_for — the async with context
+        # manager's __aexit__ may not complete if the task is cancelled.
+        if browser is not None:
+            try:
+                await browser.__aexit__(None, None, None)
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------------

@@ -477,13 +477,16 @@ async def _run_queries(
                                      old_prefix=active_key[:8],
                                      new_prefix=fresh_key[:8])
                             active_key = fresh_key
-                            # Retry with the fresh key
-                            r = await c.post(SVC_URL, json=payload, headers={
-                                "Content-Type": "application/json",
-                                "SecurityKey": active_key,
-                                "User-Agent": _UA_DIRECT,
-                            })
-                            r.raise_for_status()
+                            # Retry with the fresh key in a NEW client — the
+                            # original client's connection may have gone stale
+                            # during the (potentially slow) key extraction.
+                            async with httpx.AsyncClient(timeout=180.0) as c2:
+                                r = await c2.post(SVC_URL, json=payload, headers={
+                                    "Content-Type": "application/json",
+                                    "SecurityKey": active_key,
+                                    "User-Agent": _UA_DIRECT,
+                                })
+                                r.raise_for_status()
                         else:
                             log.warning("dew_lien.key_refresh_failed",
                                         note="falling back to rendered lane")

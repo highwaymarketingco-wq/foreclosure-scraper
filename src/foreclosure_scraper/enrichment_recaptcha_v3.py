@@ -65,7 +65,7 @@ _SITE_KEY_RE = re.compile(
 #: JS that extracts the site key from the page at runtime.
 _EXTRACT_SITE_KEY_JS = """
 (() => {
-    // Method 1: Search for grecaptcha.render() calls
+    // Method 1: Search for grecaptcha.render() calls in inline scripts
     const scripts = document.querySelectorAll('script');
     for (const s of scripts) {
         const text = s.textContent || '';
@@ -84,7 +84,7 @@ _EXTRACT_SITE_KEY_JS = """
     // Method 4: Search the page source for the render key
     const html = document.documentElement.innerHTML;
     const m2 = html.match(/['"]?sitekey['"]?\\s*[:=,]\\s*['"]([0-9A-Za-z_-]{40})['"]/i);
-    if (m2) return m2[0];
+    if (m2) return m2[1];
 
     // Method 5: Check window.___grecaptcha_cfg
     try {
