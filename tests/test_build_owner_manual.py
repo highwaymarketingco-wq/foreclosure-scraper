@@ -41,6 +41,13 @@ def repo(tmp_path: Path) -> Path:
         "file_map": {"intro": "Where files go.", "rows": [], "small_row": {"what": "Saved pages", "from": "x", "save": "x", "where": "~/Downloads", "next": "Tell Claude", "board": "Nothing"},
                      "crm_row": {"what": "Notes", "from": "x", "save": "x", "where": "CRM", "next": "Nothing", "board": "Nothing"}},
         "unknown_bullets": ["Nothing."],
+        "engine_guide": {"title": "How the engine works (two pages).", "intro": "One run, in order.",
+                          "steps": [["Pull the sources", "Scrapers read free sites."]],
+                          "when_def": {"immediate": "Right away.", "re-score": "Next re-score.", "full": "Next full run."},
+                          "inputs_cols": ["what", "picked_up_by", "when", "see"],
+                          "inputs": [["Saved court pages", "Ingest Saved Court Pages", "immediate", "Court signals"]],
+                          "timing": [["Quick re-score", "about 40 minutes"]],
+                          "dont": ["Do not edit board files by hand."]},
     }
     (tmp_path / "docs" / "walls_register.json").write_text(json.dumps(reg))
 
