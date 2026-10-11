@@ -191,12 +191,12 @@ class YorkDelinquentTax(BaseScraper):
         real table -- same posture as counties_sc.sc_tax_delinquent.py's PDF
         reader."""
         try:
-            import httpx as _httpx
-            async with _httpx.AsyncClient(timeout=60.0) as c:
-                resp = await c.get(url, follow_redirects=True, timeout=60.0)
-            if resp.status_code != 200:
-                log.warning("york_tax.pdf_http_fail", url=url, status=resp.status_code)
+            from curl_cffi import requests as _cffi
+            r = _cffi.get(url, impersonate="chrome", timeout=60.0)
+            if r.status_code != 200:
+                log.warning("york_tax.pdf_http_fail", url=url, status=r.status_code)
                 return []
+            resp_content = r.content
             import pdfplumber
         except Exception as exc:  # noqa: BLE001
             log.warning("york_tax.pdf_fetch_fail", url=url, error=str(exc)[:160])
@@ -205,7 +205,7 @@ class YorkDelinquentTax(BaseScraper):
         out: list[Listing] = []
         now = datetime.utcnow()
         try:
-            with pdfplumber.open(io.BytesIO(resp.content)) as pdf:
+            with pdfplumber.open(io.BytesIO(resp_content)) as pdf:
                 for page in pdf.pages:
                     for tbl in page.extract_tables() or []:
                         if not tbl or len(tbl) < 2:
