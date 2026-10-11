@@ -79,24 +79,20 @@ class YorkDelinquentTax(BaseScraper):
             html = await get_text(PAGE_URL, wall_bypass=True, impersonate=True, timeout=40.0)
         except Exception as exc:
             log.warning("york_tax.fetch_fail", error=str(exc)[:160])
-            return out
+            html = ""
 
-        if not html or len(html) < 200:
-            return out
-
-        # Cloudflare block detection — if the page is a CF challenge/block,
-        # try real-browser render fallback before giving up.
-        if "cloudflare" in html.lower() and ("blocked" in html.lower() or "attention required" in html.lower()):
+        # If get_text returned empty or a CF block page, try real-browser
+        # render fallback before giving up.
+        if not html or len(html) < 200 or (
+            "cloudflare" in html.lower() and ("blocked" in html.lower() or "attention required" in html.lower())
+        ):
             log.warning("york_tax.cloudflare_blocked", url=PAGE_URL)
-            # Try real-browser render (StealthyFetcher/camoufox) which can
-            # solve CF JS challenges that curl-cffi cannot.
             html = await _fetch_through_cf(PAGE_URL)
             if not html or len(html) < 200:
-                return self.partial
-            # If still CF after render, report BLOCKED
+                return out
             if "cloudflare" in html.lower() and ("blocked" in html.lower() or "attention required" in html.lower()):
                 log.warning("york_tax.cloudflare_still_blocked_after_render")
-                return self.partial
+                return out
             log.info("york_tax.cf_render_succeeded", html_len=len(html))
 
         # York County uses CivicPlus CMS — look for property listings in tables
