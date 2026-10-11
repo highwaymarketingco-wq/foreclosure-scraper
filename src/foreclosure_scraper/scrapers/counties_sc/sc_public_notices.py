@@ -81,10 +81,9 @@ _BTN_NEXT = "input[id$='_btnNext']"
 _PER_PAGE_MAX = "50"
 _RENDER_TIMEOUT_MS = 300000
 #: Pages to pull per (category, county), 50 rows/page. Foreclosures fits inside
-#: one page for every county; the tax lane runs 2-3. This is a deliberate bound
-#: on run time, so a county with a very deep backlog is truncated at 150 rows —
-#: results come back newest-first, so what gets cut is the oldest.
-_MAX_PAGES = 3
+#: one page for every county; the tax lane runs 2-3. Increased from 3→10
+#: so deep backlogs are not truncated (newest-first, so oldest was being cut).
+_MAX_PAGES = 10
 
 #: Popular-search category -> (label, default listing type, kind tag).
 #: NOTE: "22 Delinquent Taxes" and "26 Tax Sales" currently ship the SAME canned

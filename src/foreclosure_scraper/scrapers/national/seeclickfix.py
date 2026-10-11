@@ -112,7 +112,7 @@ _DISTRESS_KEYWORDS = (
 )
 
 _PER_PAGE = 100
-_MAX_PAGES = 5  # 500 issues per city max
+_MAX_PAGES = 15  # 1500 issues per city max (was 5/500)
 
 
 class SeeClickFixScraper(BaseScraper):
