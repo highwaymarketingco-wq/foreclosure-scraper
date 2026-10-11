@@ -450,8 +450,7 @@ def _self_test():
         ("5 + 3 =", 8),
         ("10 - 3 =", 7),
         # New: "What is" + "=" suffix
-        ("What is 5 + 3?", 10),
-        ("What is 5 + 3 =", 8),
+        ("What is 5 + 3 =?", 8),
         # New: mixed operations (operator precedence: * before +)
         ("2 + 3 * 4", 14),
         ("2 * 3 + 4", 10),

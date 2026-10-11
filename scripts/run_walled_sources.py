@@ -269,6 +269,23 @@ async def main():
     print(f"Sources with scraper code: {len(WALLED_SOURCE_MAP) - no_scraper_count}")
     print(f"Sources with NO scraper code: {no_scraper_count}")
     print(f"Total scraper instances to run: {scraper_count}")
+    # --- Resumable manifest: skip already-completed scrapers ---
+    completed_slugs: set[str] = set()
+    for existing in OUTPUT_DIR.glob("*_data.json"):
+        try:
+            with open(existing) as f:
+                d = json.load(f)
+            slug = d.get("slug", existing.stem.replace("_data", ""))
+            if slug:
+                completed_slugs.add(slug)
+        except Exception:
+            pass
+    if completed_slugs:
+        print(f"\nResume: {len(completed_slugs)} scrapers already have data — skipping them.")
+        preview = ", ".join(sorted(completed_slugs)[:10])
+        if len(completed_slugs) > 10:
+            preview += "..."
+        print(f"  Completed: {preview}")
     print(f"\nEach scraper's result is saved immediately to {OUTPUT_DIR}/<slug>.json")
     print()
 
@@ -290,6 +307,18 @@ async def main():
         wall_total = 0
         for cls in scraper_classes:
             slug = getattr(cls, "slug", "?")
+            # Skip already-completed scrapers (resumable manifest)
+            if slug in completed_slugs:
+                # Load existing result
+                result_file = OUTPUT_DIR / f"{slug}.json"
+                data_file = OUTPUT_DIR / f"{slug}_data.json"
+                if result_file.exists():
+                    with open(result_file) as f:
+                        result = json.load(f)
+                    wall_results.append(result)
+                    wall_total += result.get("rows", 0)
+                    print(f"  [{wall_id:25s}] {slug}... CACHED {result.get('rows', 0):5d} rows ({result.get('outcome', '?')})")
+                    continue
             print(f"  [{wall_id:25s}] running {slug}...", end=" ", flush=True)
             result = await run_one_scraper(cls)
             wall_results.append(result)
