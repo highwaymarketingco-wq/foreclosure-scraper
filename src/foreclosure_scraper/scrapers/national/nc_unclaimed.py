@@ -16,7 +16,7 @@ import structlog
 from bs4 import BeautifulSoup
 
 from ...base_scraper import BaseScraper, OUTCOME_OK
-from ...http_client import client
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -46,7 +46,7 @@ class NcUnclaimedScraper(BaseScraper):
                 url = f"{_URL}?lastName={surname}"
                 log.info("nc_unclaimed.fetching", surname=surname)
 
-                html = await client.get_text(
+                html = await get_text(
                     url,
                     wall_bypass=True,
                     timeout=30.0,

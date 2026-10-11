@@ -14,7 +14,7 @@ import structlog
 from bs4 import BeautifulSoup
 
 from ...base_scraper import BaseScraper, OUTCOME_OK
-from ...http_client import client
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -40,7 +40,7 @@ class MorgantonNcScraper(BaseScraper):
         for url in _URLS:
             try:
                 log.info("morganton_nc.fetching", url=url)
-                html = await client.get_text(url, wall_bypass=True, timeout=30.0)
+                html = await get_text(url, wall_bypass=True, timeout=30.0)
 
                 if not html or len(html) < 500:
                     from ...wall_bypass import fetch_with_nodriver

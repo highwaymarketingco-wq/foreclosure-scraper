@@ -37,13 +37,31 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...http_client import client, get_text
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 from ._sc_tax_table import is_usable_row
 
 log = structlog.get_logger()
 
 PAGE_URL = "https://www.yorkcountysc.gov/216/Tax-Collection"
+
+
+async def _fetch_through_cf(url: str) -> str:
+    """Fetch York County page through Cloudflare using real-browser render.
+
+    The standard get_text(wall_bypass=True) escalation calls
+    fetch_through_walls(render_first=False), which skips the StealthyFetcher
+    tier — the one tier that can solve CF JS challenges. This helper
+    calls it directly with render_first=True to use a real browser.
+    """
+    try:
+        from ...wall_bypass import fetch_through_walls
+        text = await fetch_through_walls(url, render_first=True, timeout_s=45)
+        if text and len(text) > 200:
+            return text
+    except Exception as exc:
+        log.warning("york_tax.cf_render_fail", error=str(exc)[:160])
+    return ""
 
 
 class YorkDelinquentTax(BaseScraper):
@@ -58,13 +76,28 @@ class YorkDelinquentTax(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         try:
-            html = await get_text(PAGE_URL, impersonate=True, timeout=40.0)
+            html = await get_text(PAGE_URL, wall_bypass=True, impersonate=True, timeout=40.0)
         except Exception as exc:
             log.warning("york_tax.fetch_fail", error=str(exc)[:160])
             return out
 
         if not html or len(html) < 200:
             return out
+
+        # Cloudflare block detection — if the page is a CF challenge/block,
+        # try real-browser render fallback before giving up.
+        if "cloudflare" in html.lower() and ("blocked" in html.lower() or "attention required" in html.lower()):
+            log.warning("york_tax.cloudflare_blocked", url=PAGE_URL)
+            # Try real-browser render (StealthyFetcher/camoufox) which can
+            # solve CF JS challenges that curl-cffi cannot.
+            html = await _fetch_through_cf(PAGE_URL)
+            if not html or len(html) < 200:
+                return self.partial
+            # If still CF after render, report BLOCKED
+            if "cloudflare" in html.lower() and ("blocked" in html.lower() or "attention required" in html.lower()):
+                log.warning("york_tax.cloudflare_still_blocked_after_render")
+                return self.partial
+            log.info("york_tax.cf_render_succeeded", html_len=len(html))
 
         # York County uses CivicPlus CMS — look for property listings in tables
         rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
@@ -150,7 +183,8 @@ class YorkDelinquentTax(BaseScraper):
         real table -- same posture as counties_sc.sc_tax_delinquent.py's PDF
         reader."""
         try:
-            async with client(timeout=60.0) as c:
+            import httpx as _httpx
+            async with _httpx.AsyncClient(timeout=60.0) as c:
                 resp = await c.get(url, follow_redirects=True, timeout=60.0)
             if resp.status_code != 200:
                 log.warning("york_tax.pdf_http_fail", url=url, status=resp.status_code)

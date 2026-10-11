@@ -22,7 +22,7 @@ import structlog
 from bs4 import BeautifulSoup
 
 from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_OK
-from ...http_client import client
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -56,11 +56,11 @@ class DcIpBlockScraper(BaseScraper):
                 log.info("dc_ip_block.trying", county=county)
 
                 # Tier 1: plain httpx
-                html = await client.get_text(base_url, timeout=15.0)
+                html = await get_text(base_url, timeout=15.0)
 
                 if not html or len(html) < 500:
                     # Tier 2: curl-cffi impersonation
-                    html = await client.get_text(
+                    html = await get_text(
                         base_url, impersonate=True, timeout=15.0)
 
                 if not html or len(html) < 500:

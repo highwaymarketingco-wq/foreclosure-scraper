@@ -79,7 +79,11 @@ class NcTylerTechEstatesScraper(BaseScraper):
         return results
 
     async def _solve_with_playwright(self) -> list[Listing]:
-        """Try to solve picture CAPTCHA with Playwright + Gemini Vision."""
+        """Solve AWS WAF picture CAPTCHA via enrichment_waf_oss solver.
+
+        Uses the same proven solver as nc_ecourts_estates: Gemini vision
+        identifies tiles in the 3x3 grid, Anthropic Claude as fallback.
+        """
         results: list[Listing] = []
         try:
             from playwright.async_api import async_playwright
@@ -95,31 +99,24 @@ class NcTylerTechEstatesScraper(BaseScraper):
             page = await browser.new_page()
             await page.goto(_URL, timeout=30000)
 
-            # Take screenshot of the CAPTCHA
-            screenshot = await page.screenshot()
-
-            # Try Gemini Vision to identify matching images
+            # Use the proven WAF solver from enrichment_waf_oss
             try:
-                import base64
-                from ...enrichment_vision import describe_image
-
-                img_b64 = base64.b64encode(screenshot).decode()
-                description = await describe_image(
-                    img_b64,
-                    "What images do you see in this CAPTCHA grid? "
-                    "Describe each cell and what it shows."
-                )
-                log.info("nc_tylertech.vision_result",
-                         description=str(description)[:200])
-                # This is a best-effort attempt — picture CAPTCHAs are hard
-                # If vision can't solve it, we record the block and move on
+                from ...enrichment_waf_oss import solve_waf_via_browser
+                solved = await solve_waf_via_browser(page)
+                if solved:
+                    log.info("nc_tylertech.waf_solved")
+                    # Wait for page to settle after WAF solve
+                    await page.wait_for_load_state("networkidle", timeout=15000)
+                    html = await page.content()
+                    results.extend(self._parse_html(html))
+                else:
+                    log.warning("nc_tylertech.waf_solve_failed")
             except Exception as exc:
-                log.warning("nc_tylertech.vision_failed",
+                log.warning("nc_tylertech.waf_error",
                             error=str(exc)[:160])
-
-            # Try to get whatever content is on the page
-            html = await page.content()
-            results.extend(self._parse_html(html))
+                # Try to get whatever content is on the page anyway
+                html = await page.content()
+                results.extend(self._parse_html(html))
 
             await browser.close()
 

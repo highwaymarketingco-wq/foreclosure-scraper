@@ -54,6 +54,20 @@ PER_SCRAPER_TIMEOUT = 300.0
 SPECIAL_TIMEOUTS = {
     # liensnc: board pass (~30s) + login (~10s) + incremental scrape
     "counties_generic.liensnc": 900.0,
+    # sc_public_index: 44 counties × ~10s each (headless batch + headed fallback)
+    "national.sc_public_index": 1200.0,
+    "counties_sc.sc_public_index": 1200.0,
+    "counties_sc.sc_public_index_lis_pendens": 1200.0,
+    # nc_ecourts_estates: WAF CAPTCHA solving can take 300s alone
+    "counties_nc.nc_ecourts_estates": 900.0,
+    # nc_tylertech_estates: same WAF CAPTCHA path
+    "counties_nc.nc_tylertech_estates": 900.0,
+    # qpublic: 24 counties × ~10s each
+    "counties_sc.sc_qpublic": 900.0,
+    # sc_rod_walled: 6 counties
+    "counties_sc.sc_rod_walled": 600.0,
+    # nc_avalon_tax: multiple NC counties
+    "counties_nc.nc_avalon_tax": 600.0,
 }
 
 # The 37 Type-A walled source IDs from docs/walls_register.json

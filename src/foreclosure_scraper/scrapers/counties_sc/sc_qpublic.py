@@ -17,7 +17,7 @@ import structlog
 from bs4 import BeautifulSoup
 
 from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_OK
-from ...http_client import client
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -70,7 +70,7 @@ class ScQpublicScraper(BaseScraper):
                 url = f"{_BASE}/Application.aspx?App={cfg['app']}&Page=search"
 
                 log.info("sc_qpublic.fetching", county=county)
-                html = await client.get_text(
+                html = await get_text(
                     url,
                     wall_bypass=True,
                     timeout=30.0,

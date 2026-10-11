@@ -17,7 +17,7 @@ import structlog
 from bs4 import BeautifulSoup
 
 from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_OK
-from ...http_client import client
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -53,7 +53,7 @@ class NcCchsDeedsScraper(BaseScraper):
                 search_url = f"{base}/search/?doctype=DEED&fromdate={cutoff}&todate={end_date}"
 
                 log.info("nc_cchs.fetching", county=county)
-                html = await client.get_text(
+                html = await get_text(
                     search_url,
                     wall_bypass=True,
                     timeout=30.0,

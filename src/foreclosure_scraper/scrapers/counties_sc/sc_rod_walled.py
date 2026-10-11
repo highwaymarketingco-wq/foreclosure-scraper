@@ -13,7 +13,7 @@ import structlog
 from bs4 import BeautifulSoup
 
 from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_OK
-from ...http_client import client
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -56,7 +56,7 @@ class ScRodWalledScraper(BaseScraper):
                 ]:
                     url = f"{base_url}{path}"
                     log.info("sc_rod_walled.fetching", county=county, path=path)
-                    html = await client.get_text(url, wall_bypass=True, timeout=30.0)
+                    html = await get_text(url, wall_bypass=True, timeout=30.0)
                     if html and len(html) > 500:
                         break
 
