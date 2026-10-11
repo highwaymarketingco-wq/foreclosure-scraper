@@ -8,9 +8,42 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 from typing import Any
 
 __all__ = ["start_browser"]
+
+
+def _ensure_display() -> None:
+    """On Linux without a DISPLAY, start Xvfb so headed Chrome works.
+
+    sc_public_index and other WAF-protected sites require headless=False
+    Chrome. On a headless server (no X server), this auto-starts Xvfb.
+    """
+    if os.name != "posix" or not shutil.which("Xvfb"):
+        return
+    if os.environ.get("DISPLAY"):
+        return
+    # Check if Xvfb is already running on :99
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "Xvfb :99"],
+            capture_output=True, text=True, timeout=2,
+        )
+        if result.returncode == 0:
+            os.environ["DISPLAY"] = ":99"
+            return
+    except Exception:
+        pass
+    # Start Xvfb
+    try:
+        subprocess.Popen(
+            ["Xvfb", ":99", "-screen", "0", "1920x1080x24"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        os.environ["DISPLAY"] = ":99"
+    except Exception:
+        pass
 
 
 def _find_chrome_binary() -> str | None:
@@ -57,6 +90,10 @@ async def start_browser(headless: bool = True, **extra: Any):
         Additional keyword arguments forwarded to ``nodriver.start()``.
     """
     import nodriver as uc
+
+    # On Linux servers, ensure a virtual display for headed Chrome.
+    if not headless:
+        _ensure_display()
 
     kwargs: dict[str, Any] = {"headless": headless}
 
