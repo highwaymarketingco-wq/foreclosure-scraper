@@ -1,4 +1,4 @@
-"""Free wall-bypass fetch tiers — pydoll (Turnstile) + nodriver (DataDome/hard CF).
+"""Free wall-bypass fetch tiers — curl-cffi, pydoll (Turnstile) + nodriver (DataDome/hard CF).
 
 These sit ABOVE the curl-cffi impersonation tier in http_client.get_text's
 escalation chain. They launch real browser processes, so they are slower
@@ -9,12 +9,15 @@ Tier order in the full chain:
   2. curl subprocess fallback (http_client._curl_fallback_text)
   3. curl-cffi Chrome impersonation (http_client.get_text_impersonate)
   4. StealthyFetcher / camoufox (render.fetch_rendered) — JS rendering
-  5. pydoll (this module) — Cloudflare Turnstile + JS challenges
-  6. nodriver (this module) — DataDome + harder anti-bot
+  5. curl-cffi impersonation (this module, fetch_with_curl_cffi) — Tier 1.5
+  6. pydoll (this module) — Cloudflare Turnstile + JS challenges
+  7. nodriver (this module) — DataDome + harder anti-bot
 
 All tiers are FREE — no paid CAPTCHA solving service is used. pydoll has
 built-in Cloudflare Turnstile bypass via CDP; nodriver is undetected Chrome
-that defeats DataDome and similar fingerprinting systems.
+that defeats DataDome and similar fingerprinting systems. nodriver and pydoll
+both auto-retry with headed mode (headless=False) when a Cloudflare challenge
+page is detected, since headless Chrome is fingerprinted by many WAFs.
 
 Each function returns rendered page text (visible text preferred, HTML
 fallback) or "" on failure — matching the render.fetch_rendered contract.
@@ -331,10 +334,21 @@ async def fetch_with_nodriver(
     """
     async with _nodriver_sem():
         # First attempt — uses the configured headless setting.
-        text = await asyncio.wait_for(
-            _nodriver_fetch(url, timeout_s, wait_for_text),
-            timeout=timeout_s + 20,
-        )
+        try:
+            text = await asyncio.wait_for(
+                _nodriver_fetch(url, timeout_s, wait_for_text),
+                timeout=timeout_s + 20,
+            )
+        except asyncio.TimeoutError:
+            log.warning("wall_bypass.nodriver_timeout", url=url[:120])
+            text = ""
+        except Exception as exc:
+            log.debug(
+                "wall_bypass.nodriver_error",
+                url=url[:120],
+                error=f"{type(exc).__name__}: {exc}"[:160],
+            )
+            text = ""
 
         if text and len(text) > 100 and not _is_cloudflare_challenge(text):
             return text
@@ -457,19 +471,26 @@ async def fetch_through_walls(
         try:
             from .render import fetch_rendered
             text = await fetch_rendered(url)
-            if text and len(text) > 100:
+            if text and len(text) > 100 and not _is_cloudflare_challenge(text):
                 return text
         except Exception:
             pass
 
+    # Tier 1.5: curl-cffi Chrome impersonation — passes many Cloudflare
+    # managed challenges without a full browser (~1-2s, much cheaper than
+    # pydoll/nodriver).
+    text = await fetch_with_curl_cffi(url)
+    if text and len(text) > 100 and not _is_cloudflare_challenge(text):
+        return text
+
     # Tier 2: pydoll (Turnstile + Cloudflare JS challenge).
     text = await fetch_with_pydoll(url, timeout_s=timeout_s)
-    if text and len(text) > 100:
+    if text and len(text) > 100 and not _is_cloudflare_challenge(text):
         return text
 
     # Tier 3: nodriver (DataDome + harder cases).
     text = await fetch_with_nodriver(url, timeout_s=timeout_s)
-    if text:
+    if text and not _is_cloudflare_challenge(text):
         return text
 
     return ""

@@ -44,11 +44,125 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import time
 from typing import Optional
 
 import structlog
 
 log = structlog.get_logger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Token cache with freshness (TTL) management
+# ---------------------------------------------------------------------------
+
+#: Maximum age (in seconds) of a cached reCAPTCHA V3 token before it must be
+#: refreshed. reCAPTCHA V3 tokens have a ~120s TTL on Google's side; we use
+#: 90s to leave a safety margin so the token is still valid when the consuming
+#: API receives it.
+_TOKEN_TTL_S = int(os.environ.get("RECAPTCHA_V3_TOKEN_TTL_S", "90"))
+
+#: Cached token and its capture timestamp.
+_cached_token: Optional[str] = None
+_cached_token_ts: float = 0.0
+_cached_token_url: Optional[str] = None
+_cached_token_action: Optional[str] = None
+_token_lock = asyncio.Lock()
+
+
+def _is_token_fresh(
+    url: str | None = None,
+    action: str | None = None,
+) -> bool:
+    """Return True if the cached token is still fresh and matches the params.
+
+    A token is fresh if:
+    - It exists (non-None)
+    - Its age is less than ``_TOKEN_TTL_S``
+    - It was captured for the same URL and action (different pages may use
+      different site keys, so a token from one page won't work on another)
+    """
+    global _cached_token, _cached_token_ts, _cached_token_url, _cached_token_action
+    if _cached_token is None:
+        return False
+    age = time.monotonic() - _cached_token_ts
+    if age >= _TOKEN_TTL_S:
+        return False
+    if url is not None and _cached_token_url is not None and url != _cached_token_url:
+        return False
+    if action is not None and _cached_token_action is not None and action != _cached_token_action:
+        return False
+    return True
+
+
+async def get_cached_recaptcha_v3_token(
+    url: str = "https://www.lex-co.com/ProbateSearch/estates",
+    action: str = "search",
+    site_key: Optional[str] = None,
+    headless: bool = True,
+    timeout_ms: int = 30000,
+) -> Optional[str]:
+    """Return a fresh reCAPTCHA V3 token, refreshing the cache if stale.
+
+    If a previously captured token is still fresh (< 90s old) and was captured
+    for the same URL and action, it is returned immediately without launching
+    a browser. Otherwise, a new token is captured via :func:`get_recaptcha_v3_token`
+    and cached.
+
+    Args:
+        url: The page URL that loads reCAPTCHA V3.
+        action: The reCAPTCHA action string.
+        site_key: The reCAPTCHA site key. If None, extracted from the page.
+        headless: Whether to run the browser headless.
+        timeout_ms: Total timeout for the operation.
+
+    Returns:
+        The reCAPTCHA V3 token string, or None if capture failed.
+    """
+    global _cached_token, _cached_token_ts, _cached_token_url, _cached_token_action
+
+    # Fast path: return cached token if still fresh.
+    if _is_token_fresh(url=url, action=action):
+        log.info("recaptcha_v3.token_cache_hit", age_s=round(time.monotonic() - _cached_token_ts, 1))
+        return _cached_token
+
+    async with _token_lock:
+        # Double-check after acquiring the lock — another task may have
+        # refreshed the token while we were waiting.
+        if _is_token_fresh(url=url, action=action):
+            log.info("recaptcha_v3.token_cache_hit_after_lock")
+            return _cached_token
+
+        log.info("recaptcha_v3.token_cache_miss_refreshing", url=url[:80], action=action)
+        token = await get_recaptcha_v3_token(
+            url=url,
+            action=action,
+            site_key=site_key,
+            headless=headless,
+            timeout_ms=timeout_ms,
+        )
+        if token:
+            _cached_token = token
+            _cached_token_ts = time.monotonic()
+            _cached_token_url = url
+            _cached_token_action = action
+            log.info("recaptcha_v3.token_cached", ttl_s=_TOKEN_TTL_S)
+        return token
+
+
+def invalidate_cached_recaptcha_v3_token() -> None:
+    """Clear the cached reCAPTCHA V3 token.
+
+    Call this if the token was rejected by the API (e.g. 400/403 response)
+    so the next call to :func:`get_cached_recaptcha_v3_token` captures a
+    fresh token.
+    """
+    global _cached_token, _cached_token_ts, _cached_token_url, _cached_token_action
+    _cached_token = None
+    _cached_token_ts = 0.0
+    _cached_token_url = None
+    _cached_token_action = None
+    log.info("recaptcha_v3.token_cache_invalidated")
 
 
 # ---------------------------------------------------------------------------
@@ -329,7 +443,9 @@ async def search_with_recaptcha_v3(
     """
     import httpx
 
-    token = await get_recaptcha_v3_token(url=url, action=action, site_key=site_key)
+    # Use the cached token function so we get a fresh token if the cached
+    # one is older than 90s.
+    token = await get_cached_recaptcha_v3_token(url=url, action=action, site_key=site_key)
     if not token:
         log.warning("recaptcha_v3_search.no_token")
         return None
@@ -347,6 +463,11 @@ async def search_with_recaptcha_v3(
     try:
         async with httpx.AsyncClient(timeout=30.0) as c:
             r = await c.post(api_url, json=search_payload, headers=headers)
+            # If the token was rejected, invalidate the cache so the next
+            # call captures a fresh one.
+            if r.status_code in (400, 403):
+                log.warning("recaptcha_v3_search.token_rejected", status=r.status_code)
+                invalidate_cached_recaptcha_v3_token()
             r.raise_for_status()
             return r.json()
     except Exception as exc:
@@ -363,8 +484,12 @@ async def _self_test():
     import inspect
     print("reCAPTCHA V3 token capture self-test")
     print(f"  get_recaptcha_v3_token:      {'async' if inspect.iscoroutinefunction(get_recaptcha_v3_token) else 'SYNC'}")
+    print(f"  get_cached_recaptcha_v3_token: {'async' if inspect.iscoroutinefunction(get_cached_recaptcha_v3_token) else 'SYNC'}")
     print(f"  search_with_recaptcha_v3:    {'async' if inspect.iscoroutinefunction(search_with_recaptcha_v3) else 'SYNC'}")
     print(f"  _simulate_human:             {'async' if inspect.iscoroutinefunction(_simulate_human) else 'SYNC'}")
+    print(f"  _is_token_fresh:             {'async' if inspect.iscoroutinefunction(_is_token_fresh) else 'SYNC'}")
+    print(f"  invalidate_cached_recaptcha_v3_token: {'async' if inspect.iscoroutinefunction(invalidate_cached_recaptcha_v3_token) else 'SYNC'}")
+    print(f"  _TOKEN_TTL_S:                {_TOKEN_TTL_S}s")
     print(f"  _SITE_KEY_RE:                {len(_SITE_KEY_RE.pattern)} chars")
     print(f"  _EXTRACT_SITE_KEY_JS:        {len(_EXTRACT_SITE_KEY_JS)} chars")
     print(f"  _EXECUTE_RECAPTCHA_JS:       {len(_EXECUTE_RECAPTCHA_JS)} chars")
@@ -374,6 +499,22 @@ async def _self_test():
     m = _SITE_KEY_RE.search(test_html)
     assert m, "regex should match"
     print(f"  regex test:                  OK (matched {m.group(1)[:16]}...)")
+
+    # Test token freshness logic
+    global _cached_token, _cached_token_ts, _cached_token_url, _cached_token_action
+    _cached_token = "fake_token"
+    _cached_token_ts = time.monotonic()
+    _cached_token_url = "https://example.com"
+    _cached_token_action = "search"
+    assert _is_token_fresh(url="https://example.com", action="search"), "fresh token should return True"
+    assert not _is_token_fresh(url="https://other.com", action="search"), "different URL should return False"
+    assert not _is_token_fresh(url="https://example.com", action="login"), "different action should return False"
+    # Simulate expired token.
+    _cached_token_ts = time.monotonic() - _TOKEN_TTL_S - 1
+    assert not _is_token_fresh(url="https://example.com", action="search"), "expired token should return False"
+    invalidate_cached_recaptcha_v3_token()
+    assert _cached_token is None, "invalidate should clear the token"
+    print("  token freshness:             OK")
 
     print("  All tests passed.")
 
