@@ -1505,7 +1505,7 @@
    "place": "Gaston County, NC",
    "name": "Gaston register of deeds index and deed images",
    "kind": "A",
-   "wall": "Cloudflare 'Just a moment...' check in front of the deed search (a 403 to scripts on 2026-10-07). Deed images are a paid order.",
+   "wall": "Cloudflare 'Just a moment...' check in front of the deed search (a 403 to scripts on 2026-10-07). Deed images are a paid order. Re-checked 2026-10-11: a plain script request still gets HTTP 403 with the Cloudflare 'Just a moment...' interactive challenge (cf-mitigated: challenge). A person in a normal browser passes it automatically, so the site looks open to a person.",
    "url": "https://gastonnc.courthousecomputersystems.com/",
    "what": "Deeds, deeds of trust, lis pendens and satisfactions for a Gaston owner. Gaston is our third-biggest NC county (about 9,300 rows on your sheet), and our free reader for this index now meets the check.",
    "steps": [
@@ -2331,7 +2331,7 @@
    "place": "Beaufort, Aiken, Jasper, Clarendon, Kershaw, Hampton, Lexington and Orangeburg Counties, SC",
    "name": "SC deed searches behind a CAPTCHA, a Cloudflare check or a free account",
    "kind": "A",
-   "wall": "Beaufort: CAPTCHA on every search. Aiken: Cloudflare check on the county site. Jasper: CAPTCHA on the deed search. Clarendon: blocks automated reads (a person searches free). Kershaw and Hampton: free Neumo account login. Lexington: free CountyFusion guest account. Orangeburg: free county ROD account.",
+   "wall": "Beaufort: CAPTCHA on every search. Aiken: Cloudflare check on the county site. Jasper: CAPTCHA on the deed search. Clarendon: blocks automated reads (a person searches free). Kershaw and Hampton: free Neumo account login. Lexington: free CountyFusion guest account. Orangeburg: free county ROD account. Update 2026-10-11: Beaufort's ROD site certificate has expired; scripts cannot connect and browsers show a security warning first.",
    "url": "https://rod.beaufortcountysc.gov/searchng/",
    "what": "Deed chains and mortgages for SC leads in these counties.",
    "steps": [
@@ -2843,7 +2843,7 @@
    "id": "nc_rowan_cott",
    "place": "Rowan County, NC",
    "name": "Rowan County deed search (Cott eSearch) behind a challenge page",
-   "wall": "The county's Cott eSearch sign-in page answers a script with a challenge page ('Just a moment', a bot check). Fetched once on 2026-10-07 and once more on 2026-10-09 with the same answer; nothing was retried or worked around. The nine other Cott guest-button counties open to a script.",
+   "wall": "The county's Cott eSearch sign-in page answers a script with a challenge page ('Just a moment', a bot check). Fetched once on 2026-10-07 and once more on 2026-10-09 with the same answer; nothing was retried or worked around. The nine other Cott guest-button counties open to a script. Update 2026-10-11: one plain request answered HTTP 200 with the real sign-in page (guest button, no challenge). The challenge seems intermittent; re-check before treating Rowan as script-readable.",
    "url": "https://rod.rowancountync.gov/external/",
    "what": "Liens, deeds of trust and the marriage index for Rowan owners (4,287 board rows). The county-wide sweep that reads the other nine Cott counties cannot reach it.",
    "steps": [

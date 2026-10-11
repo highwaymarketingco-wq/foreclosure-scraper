@@ -3756,7 +3756,7 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "no",
     "how_verified": "2026-10-07: rod.rowancountync.gov redirects to the eSearch 'Account Sign In' page, which carries a 'Sign in as a Guest' button. Page text: 'Available Historical Index Dates to search 1753-1921; Available Historical Image Dates to search 1753-1875 (Record Books 1-50); for all other dates see the Certified Dates tab', and 'Select and Pay for desired subscription, if required' for new accounts. No automation language. Did not sign in.",
-    "notes": "Guest access is a button, not credentials, but the page also talks about paid subscriptions 'if required', so some features (likely images or printing) may be paid. Modern-era coverage dates sit behind the Certified Dates page. Page loads an invisible reCAPTCHA v3 script.",
+    "notes": "Guest access is a button, not credentials, but the page also talks about paid subscriptions 'if required', so some features (likely images or printing) may be paid. Modern-era coverage dates sit behind the Certified Dates page. Page loads an invisible reCAPTCHA v3 script. 2026-10-11 recheck: one plain GET answered HTTP 200 with the eSearch 'Account Sign In' page (guest button present, reCAPTCHA v3 script only, no Cloudflare challenge). The challenge seen on 10-07 and 10-09 did not appear this time.",
     "column_access": {
      "marriage_license": "blocked",
      "liens": "blocked",
@@ -5018,7 +5018,7 @@
     "plat_books_or_maps_online": "unknown",
     "terms_forbid_automation": "unknown",
     "how_verified": "2026-10-07: /searchng/ redirected to /BrowserViewDMP/ ('Search - BrowserView', NewVision Systems). Every search tab (name, instrument, book/page, town, lot/block) carries 'Please verify that you are not a robot'; the page also has Log In / Create account and a 'Print Cart'. Stopped at the CAPTCHA.",
-    "notes": "County site also lists 'Register of Deeds Old Plats' (not opened). Coverage years not shown on the landing."
+    "notes": "County site also lists 'Register of Deeds Old Plats' (not opened). Coverage years not shown on the landing. 2026-10-11 recheck: the site's TLS certificate has expired (CERTIFICATE_VERIFY_FAILED: certificate has expired), so a script gets no page at all and a browser shows a security warning before the CAPTCHA page. Access level unchanged (still CAPTCHA behind it)."
    },
    "probate": {
     "system": "Beaufort County Probate Court page offers forms (sccourts.org) and marriage licence info; no online estate search found. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
