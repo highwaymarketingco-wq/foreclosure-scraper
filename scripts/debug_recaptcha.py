@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Debug Lincoln county tax SPA — trigger search to get delinquent data."""
+"""Debug Lincoln county tax SPA — close all modals, trigger search."""
 import asyncio
 import json
 from playwright.async_api import async_playwright
@@ -16,7 +16,7 @@ async def main():
             ct = response.headers.get('content-type', '')
             if 'json' in ct or 'xml' in ct or 'text' in ct:
                 if 'lincolncountytax' in url or 'cloudfront' in url:
-                    if any(x in url.lower() for x in ['api', 'ajax', 'search', 'list', 'delinquent', 'query', 'service', 'handler', 'ashx', 'wildfire']):
+                    if any(x in url.lower() for x in ['api', 'ajax', 'search', 'list', 'delinquent', 'query', 'service', 'handler', 'ashx', 'wildfire', 'suggestion']):
                         try:
                             body = await response.text()
                             api_calls.append({
@@ -43,17 +43,33 @@ async def main():
             await asyncio.sleep(3)
             await page.wait_for_load_state("networkidle", timeout=15000)
         
-        # Wait for SPA
-        await asyncio.sleep(3)
+        # Close "First time here?" modal
+        close_btn = page.locator("button:has-text('Close'), a:has-text('Close'), button:has-text(\"Don't show\")")
+        if await close_btn.count() > 0:
+            print("Closing tips modal...")
+            await close_btn.first.click()
+            await asyncio.sleep(2)
+        else:
+            # Try clicking outside or pressing Escape
+            print("No Close button, pressing Escape...")
+            await page.keyboard.press("Escape")
+            await asyncio.sleep(2)
         
-        # Find search input and type a wildcard
-        search_input = page.locator("input[placeholder*='looking']")
+        # Also try clicking any dismiss button
+        dismiss = page.locator("[data-dismiss='modal'], .close, .modal-close")
+        if await dismiss.count() > 0:
+            print("Clicking dismiss...")
+            await dismiss.first.click()
+            await asyncio.sleep(2)
+        
+        # Now try the search
+        search_input = page.locator("#searchBox")
         if await search_input.count() > 0:
-            print("Found search input, typing 'a'...")
+            print("Found search box, typing 'a'...")
             await search_input.first.click()
             await asyncio.sleep(1)
             await search_input.first.fill("a")
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
             await page.wait_for_load_state("networkidle", timeout=15000)
             
             # Check if reCAPTCHA challenge appeared
@@ -73,14 +89,7 @@ async def main():
                     cell_texts = [await c.inner_text() for c in cells]
                     print(f"  Row {j}: {cell_texts}")
         else:
-            print("No search input found")
-            # Try pressing Enter or clicking a search button
-            search_btn = page.locator("button:has-text('Search'), a:has-text('Search')")
-            if await search_btn.count() > 0:
-                print("Clicking Search button...")
-                await search_btn.first.click()
-                await asyncio.sleep(5)
-                await page.wait_for_load_state("networkidle", timeout=15000)
+            print("No search box found")
         
         # Print API calls
         print(f"\n=== API CALLS ({len(api_calls)}) ===")
