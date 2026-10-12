@@ -156,13 +156,41 @@ class YorkOverageClaims(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
+        pdf_bytes: bytes | None = None
+
+        # 1. Try curl_cffi (impersonates Chrome TLS fingerprint — defeats Cloudflare)
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_s, follow_redirects=True) as c:
-                resp = await c.get(PDF_URL, headers=_HEADERS)
-                resp.raise_for_status()
+            from curl_cffi import requests as cc_requests
+            resp = cc_requests.get(
+                PDF_URL,
+                headers=_HEADERS,
+                impersonate="chrome",
+                timeout=30,
+                allow_redirects=True,
+            )
+            if resp.status_code == 200 and len(resp.content) > 1000:
                 pdf_bytes = resp.content
+                log.info("york_overage.fetched_via_curl_cffi",
+                         size=len(pdf_bytes))
         except Exception as exc:
-            log.warning("york_overage.fetch_fail", error=str(exc)[:160])
+            log.warning("york_overage.curl_cffi_fail", error=str(exc)[:160])
+
+        # 2. Fallback: httpx with full browser UA
+        if not pdf_bytes:
+            try:
+                async with httpx.AsyncClient(
+                    timeout=self.timeout_s, follow_redirects=True
+                ) as c:
+                    resp = await c.get(PDF_URL, headers=_HEADERS)
+                    if resp.status_code == 200:
+                        pdf_bytes = resp.content
+                        log.info("york_overage.fetched_via_httpx",
+                                 size=len(pdf_bytes))
+            except Exception as exc:
+                log.warning("york_overage.httpx_fail", error=str(exc)[:160])
+
+        if not pdf_bytes:
+            log.warning("york_overage.fetch_fail", error="All download methods failed")
             return out
 
         try:
