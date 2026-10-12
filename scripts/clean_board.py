@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Clean the board: remove (1) criminal-case estate rows, (2) true duplicate rows.
 
-Streams the 3.9GB board — never loads it all at once.
+Streams the 3.9GB board using a buffered character-by-character JSON parser.
+Never loads the whole file — peak memory is one row at a time.
+
+The board is a single JSON array: [{"source": ...}, {"source": ...}, ...]
+We parse it as a stream of top-level array elements.
 
 Strategy:
   Pass 1 (stream): read every row, compute row_keys() signatures.
     - Drop rows from nc_ecourts_estates with criminal case numbers (CR/CRS/IF/VR/CVL).
-    - For duplicates: keep the FIRST occurrence (most complete, earliest scraped),
-      drop subsequent rows that share ANY identity key (parcel, case, address).
+    - For duplicates: keep the FIRST occurrence, drop subsequent rows that share
+      ANY identity key (parcel, case, address).
     - Track what was dropped and why.
   Write cleaned board to a temp file, then atomic rename.
 
@@ -42,7 +46,97 @@ _IDENTITY_FIELDS = (
 )
 
 
-def _norm(v: str | None) -> str:
+# ---------------------------------------------------------------------------
+# Streaming JSON array parser
+# ---------------------------------------------------------------------------
+
+def _stream_json_array(fin):
+    """Yield top-level objects from a JSON array file, one at a time.
+
+    Reads the file in chunks, parses one complete object at a time using
+    json.JSONDecoder.raw_decode. Memory: one row + one read buffer.
+    """
+    buf = ""
+    decoder = json.JSONDecoder()
+    started = False
+    eof = False
+
+    while not eof:
+        chunk = fin.read(65536)
+        if not chunk:
+            eof = True
+        else:
+            buf += chunk
+
+        if not started:
+            # Skip whitespace and find opening '['
+            stripped = buf.lstrip()
+            if not stripped:
+                continue
+            if stripped[0] != "[":
+                # Maybe line-delimited JSON or single object
+                # Fall back: try to parse the whole buffer
+                yield from _fallback_parse(buf, fin, decoder)
+                return
+            # Find position of '[' in original buf
+            idx = len(buf) - len(stripped)
+            buf = buf[idx + 1:]  # Skip past '['
+            started = True
+
+        # Parse objects from buffer
+        while True:
+            # Skip whitespace and commas
+            t = buf.lstrip()
+            if not t:
+                break  # Need more data
+            ws_len = len(buf) - len(t)
+            buf = buf[ws_len:]
+
+            if buf[0] == "]":
+                return  # End of array
+
+            if buf[0] == ",":
+                buf = buf[1:]
+                continue
+
+            # Try to decode an object
+            try:
+                obj, end_idx = decoder.raw_decode(buf)
+                yield obj
+                buf = buf[end_idx:]
+            except json.JSONDecodeError:
+                # Not enough data yet — read more
+                break
+
+
+def _fallback_parse(initial_buf, fin, decoder):
+    """Fallback for line-delimited or non-array JSON."""
+    buf = initial_buf
+    for line in fin:
+        buf += line
+    # Try parsing as array
+    try:
+        arr = json.loads(buf)
+        for obj in arr:
+            yield obj
+        return
+    except (json.JSONDecodeError, MemoryError):
+        pass
+    # Try line-delimited
+    for line in buf.split("\n"):
+        line = line.strip().rstrip(",")
+        if line and line not in ("[", "]"):
+            try:
+                yield json.loads(line)
+            except json.JSONDecodeError:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# Identity / dedup logic (mirrors verification/core.py row_keys())
+# ---------------------------------------------------------------------------
+
+def _norm(v) -> str:
     if not v:
         return ""
     return str(v).strip().lower()
@@ -68,7 +162,6 @@ def _row_keys(row: dict) -> set[str]:
     # 2. Case number
     case = _norm(row.get("case_number"))
     if case and state and county:
-        # Normalize: strip dashes/spaces
         case_clean = re.sub(r"[\s\-]", "", case)
         keys.add(f"case:{state}:{county}:{case_clean}")
 
@@ -100,7 +193,6 @@ def _is_criminal_estate(row: dict) -> bool:
     case = _norm(row.get("case_number"))
     if case and _CRIMINAL_CASE_RE.match(case):
         return True
-    # Also check case_type field if present
     case_type = _norm(row.get("case_type", ""))
     if case_type and _CRIMINAL_CASE_RE.match(case_type):
         return True
@@ -108,7 +200,7 @@ def _is_criminal_estate(row: dict) -> bool:
 
 
 def _completeness_score(row: dict) -> int:
-    """Higher = more complete row. Used to decide which duplicate to keep."""
+    """Higher = more complete row."""
     score = 0
     for f in ("parcel_id", "street_address", "case_number", "zip_code",
               "owner_name", "defendant", "plaintiff", "sale_date",
@@ -119,6 +211,10 @@ def _completeness_score(row: dict) -> int:
     return score
 
 
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
 def main():
     if not BOARD_PATH.exists():
         print(f"ERROR: board not found at {BOARD_PATH}", file=sys.stderr)
@@ -127,7 +223,7 @@ def main():
     board_size = BOARD_PATH.stat().st_size
     print(f"Board: {BOARD_PATH} ({board_size / 1e9:.2f} GB)")
 
-    seen_keys: dict[str, dict] = {}  # key -> first row that claimed it
+    seen_keys: set[str] = set()  # All identity keys we've seen so far
     dropped_criminal = 0
     dropped_dupe = 0
     kept = 0
@@ -135,48 +231,29 @@ def main():
     dropped_examples: list[dict] = []
     criminal_examples: list[dict] = []
 
-    # Stream read: one JSON object per line
-    # The board is a JSON array, so we need to handle the [ ] wrapper
     tmp_path = BOARD_PATH.parent / "_listings_cleaning.json"
     print(f"Writing cleaned board to {tmp_path}...")
 
     start = time.time()
     last_report = start
 
-    with open(BOARD_PATH, "r") as fin, open(tmp_path, "w") as fout:
-        # Read the opening bracket
-        first_char = fin.read(1)
-        if first_char == "[":
-            fout.write("[")
-        else:
-            # Not an array — maybe line-delimited JSON
-            fin.seek(0)
+    with open(BOARD_PATH, "rb") as fin_bin, open(tmp_path, "w") as fout:
+        # Wrap binary file in text mode for the parser
+        import io
+        fin = io.TextIOWrapper(fin_bin, encoding="utf-8", errors="replace")
 
+        fout.write("[")
         first_row = True
-        for line in fin:
-            line = line.strip()
-            if not line or line in ("[", "]", ","):
-                continue
-            # Strip trailing comma
-            if line.endswith(","):
-                line = line[:-1]
-            if line == "]":
-                continue
 
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-
+        for row in _stream_json_array(fin):
             total += 1
-            idx = total  # 1-indexed
 
             # --- Check 1: criminal estate rows ---
             if _is_criminal_estate(row):
                 dropped_criminal += 1
                 if len(criminal_examples) < 20:
                     criminal_examples.append({
-                        "row_num": idx,
+                        "row_num": total,
                         "case_number": row.get("case_number"),
                         "case_type": row.get("case_type", ""),
                         "county": row.get("county"),
@@ -189,18 +266,10 @@ def main():
             is_dupe = False
             for k in keys:
                 if k in seen_keys:
-                    # This row shares an identity key with an existing row
-                    existing = seen_keys[k]
-                    # Keep the more complete one
-                    if _completeness_score(row) > _completeness_score(existing):
-                        # Replace — but we can't easily go back and remove the
-                        # already-written row. So just skip this one and keep
-                        # the first (simplest, safest for streaming).
-                        pass
                     is_dupe = True
                     if len(dropped_examples) < 50:
                         dropped_examples.append({
-                            "row_num": idx,
+                            "row_num": total,
                             "matched_key": k,
                             "case_number": row.get("case_number"),
                             "parcel_id": row.get("parcel_id"),
@@ -215,12 +284,11 @@ def main():
                 continue
 
             # Keep this row — record its keys
-            for k in keys:
-                seen_keys[k] = row
+            seen_keys.update(keys)
 
             # Write to output
             if not first_row:
-                fout.write(",\n")
+                fout.write(",")
             fout.write(json.dumps(row, ensure_ascii=False))
             first_row = False
             kept += 1
@@ -235,10 +303,7 @@ def main():
                           f"{rate:.0f} rows/s | {elapsed:.0f}s")
                     last_report = time.time()
 
-    # Close the array
-    fout_write = open(tmp_path, "a")
-    fout_write.write("\n]")
-    fout_write.close()
+        fout.write("]")
 
     elapsed = time.time() - start
     print(f"\nDone in {elapsed:.0f}s")
@@ -267,17 +332,19 @@ def main():
     tmp_size = tmp_path.stat().st_size
     print(f"Cleaned board: {tmp_size / 1e9:.2f} GB")
 
-    # Atomic rename
+    # Atomic rename with backup
     backup_path = BOARD_PATH.parent / "_listings_pre_cleanup.json"
     print(f"Backing up original to {backup_path}...")
+    if backup_path.exists():
+        backup_path.unlink()
     shutil.move(str(BOARD_PATH), str(backup_path))
     shutil.move(str(tmp_path), str(BOARD_PATH))
     print(f"Done. Cleaned board is at {BOARD_PATH}")
 
-    # Remove backup after verification
+    # Verify
     if BOARD_PATH.exists() and BOARD_PATH.stat().st_size > 0:
-        print(f"Verified: {BOARD_PATH} exists and is non-empty.")
-        print(f"Backup kept at {backup_path} — remove manually when confident.")
+        print(f"Verified: {BOARD_PATH} exists ({BOARD_PATH.stat().st_size / 1e9:.2f} GB).")
+        print(f"Backup kept at {backup_path}")
     else:
         print("ERROR: cleaned board is empty! Restoring backup...")
         shutil.move(str(backup_path), str(BOARD_PATH))
