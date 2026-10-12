@@ -125,15 +125,26 @@ async def transcribe_audio(audio_path: str) -> str:
 # reCAPTCHA V2 audio solver — Playwright automation
 # ---------------------------------------------------------------------------
 
-# Selectors for the reCAPTCHA widget
+# Selectors for the reCAPTCHA widget — Google changes these periodically,
+# so we try multiple variants.
 _RECAPTCHA_FRAME = "iframe[title*='reCAPTCHA']"
-_RECAPTCHA_CHECKBOX = ".recaptcha-checkbox-border"
-_AUDIO_BUTTON = "#recaptcha-audio-button"
-_AUDIO_DOWNLOAD = ".rc-audiochallenge-tdownload-link"
+_RECAPTCHA_CHECKBOX_SELECTORS = [
+    ".recaptcha-checkbox-border",
+    "#recaptcha-anchor",
+    "#recaptcha-anchor-label",
+]
+_AUDIO_BUTTON_SELECTORS = [
+    "#recaptcha-audio-button",
+    ".rc-button-audio",
+    "#recaptcha-reload-button",
+]
+_AUDIO_DOWNLOAD_SELECTORS = [
+    ".rc-audiochallenge-tdownload-link",
+    "a[href*='audio']",
+    ".rc-audiochallenge-download-link",
+]
 _AUDIO_RESPONSE_INPUT = "#audio-response"
 _VERIFY_BUTTON = "#recaptcha-verify-button"
-# Sometimes the audio challenge isn't immediately available — there's a
-# "Get an audio challenge" button in the image challenge view
 _GET_AUDIO_CHALLENGE = ".rc-button-audio"
 
 
@@ -169,13 +180,20 @@ async def solve_recaptcha_v2(
         return False
 
     # Click the checkbox — this either solves it (invisible mode) or opens
-    # the challenge view.
-    try:
-        checkbox = await frame.wait_for_selector(_RECAPTCHA_CHECKBOX, timeout=10000)
-        await checkbox.click()
-        await page.wait_for_timeout(3000)
-    except Exception as exc:
-        log.warning("recaptcha.checkbox_click_failed", error=str(exc)[:120])
+    # the challenge view. Try multiple selectors since Google changes the DOM.
+    checkbox_clicked = False
+    for sel in _RECAPTCHA_CHECKBOX_SELECTORS:
+        try:
+            checkbox = await frame.wait_for_selector(sel, timeout=5000)
+            if checkbox:
+                await checkbox.click()
+                checkbox_clicked = True
+                await page.wait_for_timeout(3000)
+                break
+        except Exception:
+            continue
+    if not checkbox_clicked:
+        log.warning("recaptcha.checkbox_click_failed", error="No checkbox selector matched")
 
     # Check if it's already solved (sometimes invisible mode just passes).
     try:
@@ -204,22 +222,16 @@ async def solve_recaptcha_v2(
         log.info("recaptcha.attempt", attempt=attempt + 1, max=max_retries)
 
         # If we see image challenge, click the audio button.
-        try:
-            audio_btn = await challenge_frame.query_selector(_GET_AUDIO_CHALLENGE)
-            if audio_btn:
-                await audio_btn.click()
-                await page.wait_for_timeout(1500)
-        except Exception:
-            pass
-
-        # Also try the direct audio button (some versions show it immediately).
-        try:
-            audio_btn = await challenge_frame.query_selector(_AUDIO_BUTTON)
-            if audio_btn:
-                await audio_btn.click()
-                await page.wait_for_timeout(1000)
-        except Exception:
-            pass
+        # Try multiple audio button selectors.
+        for sel in _AUDIO_BUTTON_SELECTORS:
+            try:
+                audio_btn = await challenge_frame.query_selector(sel)
+                if audio_btn:
+                    await audio_btn.click()
+                    await page.wait_for_timeout(1500)
+                    break
+            except Exception:
+                continue
 
         # Step 4: Download the audio clip.
         audio_path = await _download_audio_clip(page, challenge_frame)
@@ -306,9 +318,19 @@ async def _download_audio_clip(
     """
     try:
         # The audio download link's href is the audio URL.
-        link = await challenge_frame.wait_for_selector(
-            _AUDIO_DOWNLOAD, timeout=30000
-        )
+        # Try multiple selectors since Google changes the DOM.
+        link = None
+        for sel in _AUDIO_DOWNLOAD_SELECTORS:
+            try:
+                link = await challenge_frame.wait_for_selector(sel, timeout=10000)
+                if link:
+                    break
+            except Exception:
+                continue
+
+        if not link:
+            log.warning("recaptcha.no_audio_link")
+            return None
         href = await link.get_attribute("href")
         if not href:
             log.warning("recaptcha.no_audio_href")
