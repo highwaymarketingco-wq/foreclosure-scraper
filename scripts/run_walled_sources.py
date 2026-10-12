@@ -68,6 +68,8 @@ SPECIAL_TIMEOUTS = {
     "counties_sc.sc_rod_walled": 600.0,
     # nc_avalon_tax: multiple NC counties
     "counties_nc.nc_avalon_tax": 600.0,
+    # echovita: 40 pages × ~2s + 120 detail reads × ~2s = ~320s
+    "public_notices.echovita_obituaries": 600.0,
 }
 
 # The 37 Type-A walled source IDs from docs/walls_register.json
