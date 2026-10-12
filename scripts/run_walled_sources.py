@@ -77,6 +77,7 @@ SPECIAL_TIMEOUTS = {
 # pile up and cause OOM.
 SKIP_SOURCES = {
     "counties_sc.sc_qpublic",  # Oracle Cloud IP banned by schneidercorp.com
+    "national.people_search",  # All people-search sites 403 on Oracle Cloud IP
 }
 
 # The 37 Type-A walled source IDs from docs/walls_register.json
