@@ -283,7 +283,18 @@ async def solve_recaptcha_v2(
                 if clicked in ('id', 'class', 'aria', 'title'):
                     audio_clicked = True
                     log.info("recaptcha.audio_btn_js", method=clicked)
-                    await page.wait_for_timeout(2000)
+                    # Wait for challenge frame to reload with audio challenge
+                    await page.wait_for_timeout(3000)
+                    # Wait for audio elements to appear in the frame
+                    try:
+                        await challenge_frame.wait_for_selector(
+                            "audio source, .rc-audiochallenge-tdo-link, a[href*='.mp3'], a[href*='.wav']",
+                            timeout=10000,
+                        )
+                    except Exception:
+                        # Frame may have reloaded — re-fetch it
+                        log.warning("recaptcha.audio_wait_timeout",
+                                    attempt=attempt + 1)
                 else:
                     log.warning("recaptcha.audio_btn_js_fail",
                                 attempt=attempt + 1, elements=clicked[:500])
