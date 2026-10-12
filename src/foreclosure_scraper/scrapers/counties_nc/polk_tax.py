@@ -111,9 +111,14 @@ async def _search_via_nodriver(browser, letter: str) -> str:
         const txt = document.querySelector('input[name="SearchText"]');
         if (txt) { txt.value = '""" + letter + """'; txt.dispatchEvent(new Event('input', {bubbles: true})); }
 
-        // Submit the form
-        const form = document.querySelector('form');
-        if (form) { form.submit(); }
+        // Submit the form — click the submit button instead of form.submit()
+        // since form.submit() may bypass event handlers
+        const submitBtn = document.querySelector('input[type="submit"]');
+        if (submitBtn) { submitBtn.click(); }
+        else { 
+            const form = document.querySelector('form');
+            if (form) { form.submit(); }
+        }
         return 'submitted';
     })()
     """
@@ -185,7 +190,7 @@ class PolkTaxAuction(BaseScraper):
         seen_ids: set[str] = set()
         letter_errors = 0
 
-        browser = await start_browser(headless=True)
+        browser = await start_browser(headless=False)
         try:
             for letter in _SEARCH_LETTERS:
                 try:
