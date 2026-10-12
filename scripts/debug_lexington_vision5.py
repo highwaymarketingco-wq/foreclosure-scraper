@@ -134,7 +134,7 @@ If none match, return []."""
                 {"inline_data": {"mime_type": "image/png", "data": screenshot_b64}}
             ]
         }],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 200}
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1000}
     }
 
     # Try keys with 3s delay
@@ -166,24 +166,35 @@ If none match, return []."""
                 text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
                 print(f"  Gemini response: {text}")
 
-                # Parse tiles
+                # Parse tiles — handle truncated responses
                 text = text.strip()
                 text = re.sub(r'^```(?:json)?\s*', '', text)
                 text = re.sub(r'\s*```$', '', text)
                 text = text.strip()
 
                 tiles = []
+                # Try full array match first
                 match = re.search(r'\[([0-9,\s]*)\]', text)
                 if match:
                     tile_strs = [t.strip() for t in match.group(1).split(",") if t.strip()]
                     tiles = [int(t) for t in tile_strs]
                 else:
-                    try:
-                        parsed = json.loads(text)
-                        if isinstance(parsed, list):
-                            tiles = [int(t) for t in parsed]
-                    except BaseException:
-                        pass
+                    # Handle truncated response like "[0, 3, " (no closing bracket)
+                    match_open = re.search(r'\[([0-9,\s]+)', text)
+                    if match_open:
+                        tile_strs = [t.strip() for t in match_open.group(1).split(",") if t.strip()]
+                        tiles = [int(t) for t in tile_strs]
+                    else:
+                        # Try parsing as JSON directly
+                        try:
+                            parsed = json.loads(text)
+                            if isinstance(parsed, list):
+                                tiles = [int(t) for t in parsed]
+                        except BaseException:
+                            pass
+
+                # Filter out invalid tile numbers
+                tiles = [t for t in tiles if 0 <= t < total]
 
                 print(f"  Tiles to click: {tiles}")
 
