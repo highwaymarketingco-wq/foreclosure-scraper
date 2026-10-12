@@ -157,7 +157,7 @@ async def solve_recaptcha_v2(
     # Step 1: Find the reCAPTCHA iframe and click the checkbox.
     try:
         recaptcha_frame = await page.wait_for_selector(
-            _RECAPTCHA_FRAME, timeout=10000
+            _RECAPTCHA_FRAME, timeout=20000
         )
     except Exception:
         log.warning("recaptcha.no_widget")
@@ -171,9 +171,9 @@ async def solve_recaptcha_v2(
     # Click the checkbox — this either solves it (invisible mode) or opens
     # the challenge view.
     try:
-        checkbox = await frame.wait_for_selector(_RECAPTCHA_CHECKBOX, timeout=5000)
+        checkbox = await frame.wait_for_selector(_RECAPTCHA_CHECKBOX, timeout=10000)
         await checkbox.click()
-        await page.wait_for_timeout(2000)
+        await page.wait_for_timeout(3000)
     except Exception as exc:
         log.warning("recaptcha.checkbox_click_failed", error=str(exc)[:120])
 
@@ -189,7 +189,7 @@ async def solve_recaptcha_v2(
     # Step 2: Switch to the challenge frame (a second iframe appears).
     try:
         challenge_frame_element = await page.wait_for_selector(
-            "iframe[title*='recaptcha challenge']", timeout=10000
+            "iframe[title*='recaptcha challenge']", timeout=20000
         )
         challenge_frame = await challenge_frame_element.content_frame()
         if challenge_frame is None:
@@ -307,7 +307,7 @@ async def _download_audio_clip(
     try:
         # The audio download link's href is the audio URL.
         link = await challenge_frame.wait_for_selector(
-            _AUDIO_DOWNLOAD, timeout=10000
+            _AUDIO_DOWNLOAD, timeout=30000
         )
         href = await link.get_attribute("href")
         if not href:
