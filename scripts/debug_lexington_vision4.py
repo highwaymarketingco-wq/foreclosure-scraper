@@ -6,6 +6,7 @@ Also handle 4x4 grids (not just 3x3).
 """
 import asyncio
 import base64
+import json
 import os
 import re
 import httpx
@@ -119,7 +120,7 @@ If no tiles match, return []. If you can't see the grid clearly, return []."""
                         {"inline_data": {"mime_type": "image/png", "data": screenshot_b64}}
                     ]
                 }],
-                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 100}
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 500}
             }
 
             try:
@@ -138,56 +139,67 @@ If no tiles match, return []. If you can't see the grid clearly, return []."""
                     text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
                     print(f"  {model} response: {text}")
 
+                    # Try to extract JSON array from response
+                    text = text.strip()
+                    text = re.sub(r'^```(?:json)?\s*', '', text)
+                    text = re.sub(r'\s*```$', '', text)
+                    text = text.strip()
+
+                    tiles = []
                     match = re.search(r'\[([0-9,\s]*)\]', text)
                     if match:
                         tile_strs = [t.strip() for t in match.group(1).split(",") if t.strip()]
                         tiles = [int(t) for t in tile_strs]
-                        print(f"  Tiles to click: {tiles}")
+                    else:
+                        try:
+                            parsed = json.loads(text)
+                            if isinstance(parsed, list):
+                                tiles = [int(t) for t in parsed]
+                        except BaseException:
+                            pass
 
-                        if not tiles:
-                            # Maybe skip
-                            try:
-                                await challenge_frame.evaluate("""() => {
-                                    const btn = document.querySelector('.rc-imageselect-skip, .rc-button-skip');
-                                    if (btn) btn.click();
-                                }""")
-                                print("  Clicked skip (no matching tiles)")
-                            except BaseException:
-                                pass
-                            return True
+                    print(f"  Tiles to click: {tiles}")
 
-                        # Click tiles
-                        for tile_idx in tiles:
-                            if tile_idx >= total_tiles:
-                                continue
-                            try:
-                                clicked = await challenge_frame.evaluate(f"""(idx) => {{
-                                    const cells = document.querySelectorAll('td.rc-imageselect-tile, .rc-imageselect-tiletarget, .rc-imageselect-tile');
-                                    if (cells[idx]) {{ cells[idx].click(); return true; }}
-                                    return false;
-                                }}""", tile_idx)
-                                print(f"    Tile {tile_idx}: clicked={clicked}")
-                                await asyncio.sleep(0.3)
-                            except BaseException as e:
-                                print(f"    Tile {tile_idx}: error={e}")
-
-                        await asyncio.sleep(1)
-
-                        # Click verify
+                    if not tiles:
                         try:
                             await challenge_frame.evaluate("""() => {
-                                const btn = document.getElementById('recaptcha-verify-button')
-                                    || document.querySelector('.rc-button-default');
+                                const btn = document.querySelector('.rc-imageselect-skip, .rc-button-skip');
                                 if (btn) btn.click();
                             }""")
-                            print("  Verify button clicked")
-                        except BaseException as e:
-                            print(f"  Verify button error: {e}")
-
+                            print("  Clicked skip (no matching tiles)")
+                        except BaseException:
+                            pass
                         return True
-                    else:
-                        print(f"  Could not parse tiles from response")
-                        continue
+
+                    # Click tiles
+                    for tile_idx in tiles:
+                        if tile_idx >= total_tiles:
+                            continue
+                        try:
+                            clicked = await challenge_frame.evaluate(f"""(idx) => {{
+                                const cells = document.querySelectorAll('td.rc-imageselect-tile, .rc-imageselect-tiletarget, .rc-imageselect-tile');
+                                if (cells[idx]) {{ cells[idx].click(); return true; }}
+                                return false;
+                            }}""", tile_idx)
+                            print(f"    Tile {tile_idx}: clicked={clicked}")
+                            await asyncio.sleep(0.3)
+                        except BaseException as e:
+                            print(f"    Tile {tile_idx}: error={e}")
+
+                    await asyncio.sleep(1)
+
+                    # Click verify
+                    try:
+                        await challenge_frame.evaluate("""() => {
+                            const btn = document.getElementById('recaptcha-verify-button')
+                                || document.querySelector('.rc-button-default');
+                            if (btn) btn.click();
+                        }""")
+                        print("  Verify button clicked")
+                    except BaseException as e:
+                        print(f"  Verify button error: {e}")
+
+                    return True
             except BaseException as e:
                 print(f"  {model} error: {e}")
                 continue
