@@ -242,7 +242,7 @@ async def solve_recaptcha_v2(
         log.info("recaptcha.attempt", attempt=attempt + 1, max=max_retries)
 
         # If we see image challenge, click the audio button.
-        # Try multiple audio button selectors.
+        # Try multiple audio button selectors, including waiting for them.
         audio_clicked = False
         for sel in _AUDIO_BUTTON_SELECTORS:
             try:
@@ -254,6 +254,41 @@ async def solve_recaptcha_v2(
                     break
             except Exception:
                 continue
+
+        # Fallback: use JS to find and click audio button
+        if not audio_clicked:
+            try:
+                clicked = await challenge_frame.evaluate("""() => {
+                    // Try by ID
+                    const el = document.getElementById('recaptcha-audio-button');
+                    if (el) { el.click(); return 'id'; }
+                    // Try by class
+                    const cls = document.querySelector('.rc-button-audio');
+                    if (cls) { cls.click(); return 'class'; }
+                    // Try by aria-label
+                    const aria = document.querySelector('[aria-label*="audio" i]');
+                    if (aria) { aria.click(); return 'aria'; }
+                    // Try by title
+                    const title = document.querySelector('[title*="audio" i]');
+                    if (title) { title.click(); return 'title'; }
+                    // List all clickable elements for debugging
+                    const btns = Array.from(document.querySelectorAll('button, a, img, div[role="button"]'));
+                    const info = btns.map(b => ({
+                        tag: b.tagName, id: b.id, cls: b.className,
+                        aria: b.getAttribute('aria-label'),
+                        title: b.getAttribute('title'),
+                    }));
+                    return JSON.stringify(info);
+                }""")
+                if clicked in ('id', 'class', 'aria', 'title'):
+                    audio_clicked = True
+                    log.info("recaptcha.audio_btn_js", method=clicked)
+                    await page.wait_for_timeout(2000)
+                else:
+                    log.warning("recaptcha.audio_btn_js_fail",
+                                attempt=attempt + 1, elements=clicked[:500])
+            except Exception as e:
+                log.warning("recaptcha.audio_btn_js_error", error=str(e)[:160])
 
         if not audio_clicked:
             # Debug: dump challenge frame HTML to see what's there
