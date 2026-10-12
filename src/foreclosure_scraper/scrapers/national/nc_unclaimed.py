@@ -108,18 +108,36 @@ class NcUnclaimedScraper(BaseScraper):
             token = None
             for attempt in range(3):
                 try:
+                    # First, try clicking the Turnstile checkbox directly
+                    # The widget renders in an iframe — we need to click inside it
+                    for frame in page.frames:
+                        if "challenges.cloudflare" in (frame.url or ""):
+                            try:
+                                checkbox = await frame.query_selector("input[type='checkbox'], .cb-i, .mark")
+                                if checkbox:
+                                    box = await checkbox.bounding_box()
+                                    if box:
+                                        await page.mouse.click(box["x"] + box["width"]/2,
+                                                                box["y"] + box["height"]/2)
+                                        log.info("nc_unclaimed.turnstile_click",
+                                                 attempt=attempt + 1,
+                                                 x=box["x"], y=box["y"])
+                                        await asyncio.sleep(5)
+                                        break
+                            except Exception:
+                                pass
+
                     token = await page.evaluate("""() => {
-                        // Try to get existing token
                         try { let t = turnstile.getResponse(); if (t && t.length > 10) return t; } catch(e) {}
-                        // Try to get from hidden field
                         const el = document.querySelector('[name="cf-turnstile-response"]');
                         if (el && el.value && el.value.length > 10) return el.value;
-                        // Try execute with proper params
-                        const widgets = document.querySelectorAll('[id^="cf-chl-widget"]');
-                        if (widgets.length > 0) {
-                            try { turnstile.execute(widgets[0].id, {action: 'submit'}); } catch(e) {}
-                        }
-                        // Also try clicking the SEARCH button to trigger Turnstile callback
+                        return null;
+                    }""")
+                    if token and len(token) > 10:
+                        break
+
+                    # Also try clicking the SEARCH button to trigger Turnstile callback
+                    await page.evaluate("""() => {
                         const btns = document.querySelectorAll('button');
                         for (const b of btns) {
                             if (b.innerText && b.innerText.toUpperCase().includes('SEARCH')) {
@@ -127,10 +145,8 @@ class NcUnclaimedScraper(BaseScraper):
                                 break;
                             }
                         }
-                        return null;
                     }""")
-                    if token and len(token) > 10:
-                        break
+
                     # Wait for callback to fire after clicking SEARCH
                     await asyncio.sleep(8)
                     token = await page.evaluate("""() => {
