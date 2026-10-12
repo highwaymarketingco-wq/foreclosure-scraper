@@ -136,8 +136,15 @@ _RECAPTCHA_CHECKBOX_SELECTORS = [
 _AUDIO_BUTTON_SELECTORS = [
     "#recaptcha-audio-button",
     ".rc-button-audio",
+    "a.rc-button-audio",
+    "button.rc-button-audio",
+    "[aria-label*='audio' i]",
+    "[aria-label*='Get an audio' i]",
+    "a:has-text('audio')",
     "button:has-text('AUDIO')",
+    "a:has-text('AUDIO')",
     ".rc-button.goog-inline-block[aria-label*='audio' i]",
+    "#recaptcha-reload-button",  # sometimes the reload doubles as audio toggle
 ]
 _AUDIO_DOWNLOAD_SELECTORS = [
     ".rc-audiochallenge-tdownload-link",
@@ -147,6 +154,12 @@ _AUDIO_DOWNLOAD_SELECTORS = [
     "a[download]",
     ".audio-media-link",
     "a[href*='.mp3']",
+    "a[href*='google.com/recaptcha/api2/audio']",
+    "audio source[src]",
+    "audio[src]",
+    "#audio-source",
+    ".rc-audiochallenge-play-button",
+    "a[href*='.wav']",
 ]
 _AUDIO_RESPONSE_INPUT = "#audio-response"
 _VERIFY_BUTTON = "#recaptcha-verify-button"
@@ -228,20 +241,38 @@ async def solve_recaptcha_v2(
 
         # If we see image challenge, click the audio button.
         # Try multiple audio button selectors.
+        audio_clicked = False
         for sel in _AUDIO_BUTTON_SELECTORS:
             try:
                 audio_btn = await challenge_frame.query_selector(sel)
                 if audio_btn:
                     await audio_btn.click()
+                    audio_clicked = True
                     await page.wait_for_timeout(1500)
                     break
             except Exception:
                 continue
 
+        if not audio_clicked:
+            # Debug: dump challenge frame HTML to see what's there
+            try:
+                frame_html = await challenge_frame.content()
+                log.warning("recaptcha.no_audio_button_clicked",
+                            frame_html_excerpt=frame_html[:500])
+            except Exception:
+                log.warning("recaptcha.no_audio_button_clicked_no_html")
+
         # Step 4: Download the audio clip.
         audio_path = await _download_audio_clip(page, challenge_frame)
         if not audio_path:
-            log.warning("recaptcha.no_audio_clip", attempt=attempt + 1)
+            # Debug: dump challenge frame HTML
+            try:
+                frame_html = await challenge_frame.content()
+                log.warning("recaptcha.no_audio_clip",
+                            attempt=attempt + 1,
+                            frame_html_excerpt=frame_html[:800])
+            except Exception:
+                log.warning("recaptcha.no_audio_clip", attempt=attempt + 1)
             # Try refreshing the challenge
             try:
                 reload_btn = await challenge_frame.query_selector("#recaptcha-reload-button")

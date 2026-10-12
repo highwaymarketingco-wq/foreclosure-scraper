@@ -91,6 +91,35 @@ class NcUnclaimedScraper(BaseScraper):
             import asyncio
             await asyncio.sleep(5)
 
+            # Debug: log page state
+            try:
+                page_url = page.url
+                page_title = await page.title()
+                # Count visible inputs
+                input_count = await page.locator("input").count()
+                button_count = await page.locator("button").count()
+                log.info("nc_unclaimed.page_state",
+                         url=page_url, title=page_title,
+                         inputs=input_count, buttons=button_count)
+                # Log all input names/ids
+                inputs_info = await page.evaluate("""() => {
+                    return Array.from(document.querySelectorAll('input')).map(i => ({
+                        name: i.name, id: i.id, type: i.type,
+                        placeholder: i.placeholder,
+                        class: i.className
+                    }))
+                }""")
+                log.info("nc_unclaimed.inputs", inputs=inputs_info)
+                # Log all button texts
+                buttons_info = await page.evaluate("""() => {
+                    return Array.from(document.querySelectorAll('button')).map(b => ({
+                        text: b.innerText, type: b.type, class: b.className
+                    }))
+                }""")
+                log.info("nc_unclaimed.buttons", buttons=buttons_info)
+            except Exception as exc:
+                log.warning("nc_unclaimed.debug_failed", error=str(exc)[:160])
+
             # Search for each surname
             for surname in _SEARCH_NAMES:
                 try:
