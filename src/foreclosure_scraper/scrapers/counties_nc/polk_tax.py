@@ -97,8 +97,17 @@ async def _search_via_nodriver(browser, letter: str) -> str:
     that blocks both curl-cffi and plain Playwright (confirmed 2026-10-12).
     All form interactions done via a single evaluate() call since nodriver
     doesn't have Playwright's select_option/fill helpers."""
+    # Retry loop — Cloudflare intermittently shows "Just a moment" challenge
+    # even in headful mode. 28,965 chars = challenge page, ~3,085 = form page.
     page = await browser.get(_SEARCH_FORM_URL)
-    await asyncio.sleep(10)  # wait for Cloudflare + page render
+    for attempt in range(4):
+        await asyncio.sleep(8 if attempt == 0 else 12)
+        content = await page.get_content()
+        if len(content) < 10000 and "just a moment" not in content.lower():
+            break  # form loaded (3K chars, no challenge)
+        # Still blocked — wait and retry with a fresh page load
+        page = await browser.get(_SEARCH_FORM_URL)
+        await asyncio.sleep(5)
 
     # Fill the entire form via JS and submit.
     # The form is bare HTML — no JS, no CSS, no IDs. Uses name= attributes.
@@ -226,9 +235,24 @@ class PolkTaxAuction(BaseScraper):
         browser = await start_browser(headless=False)
         try:
             for term in _SEARCH_TERMS:
-                try:
-                    html = await _search_via_nodriver(browser, term)
-                except Exception:
+                html = None
+                for attempt in range(3):
+                    try:
+                        html = await _search_via_nodriver(browser, term)
+                    except Exception:
+                        html = None
+                        continue
+                    # Check if we got Cloudflare challenge instead of results
+                    low = html.lower()
+                    if ("just a moment" in low or "sorry, you have been blocked" in low
+                            or len(html) > 25000 and "taxdetail" not in low and "gvhdr" not in low
+                            and "no records" not in low and "too many records" not in low):
+                        # Cloudflare challenge — wait and retry
+                        await asyncio.sleep(8)
+                        html = None
+                        continue
+                    break
+                if html is None:
                     term_errors += 1
                     continue
                 out.extend(self._parse_search_html(html, seen_ids))
