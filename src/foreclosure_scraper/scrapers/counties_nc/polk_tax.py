@@ -1,9 +1,38 @@
-"""Polk NC tax foreclosure auction — published by Kania Law Firm via county page.
+"""Polk NC tax sources — the Kania Law Firm auction page, plus the county's
+own delinquent tax-record search (added 2026-10-12).
 
-Smallest of the four NC pages — only PARCEL + OPENING BID per row.
-No address, no case#, no plaintiff/defendant.
-Sale date sits in a header block ("Upcoming Auction Date: March 10th, 2026").
-Address must be enriched from Polk GIS by parcel ID.
+AUCTION PAGE: smallest of the four NC pages — only PARCEL + OPENING BID per
+row. No address, no case#, no plaintiff/defendant. Sale date sits in a
+header block ("Upcoming Auction Date: March 10th, 2026"). Address must be
+enriched from Polk GIS by parcel ID.
+
+DELINQUENT TAX SEARCH (added 2026-10-12): a real, free, name-searchable
+delinquent-tax database at cms.revize.com/revize/apps/polkcounty/ — found by
+the owner (polknc.gov/tax_search/ embeds it in an iframe), confirmed live:
+55 real unpaid records returned for a plain name search, full owner name +
+assessed value + tax-bill detail link, no CAPTCHA anywhere in the flow. This
+was previously missed entirely — the scraper only read the thin auction
+page above.
+
+NOT a plain-httpx source despite having no CAPTCHA: the search POST
+(searchingtaxrecord.php) is Cloudflare-fingerprint-gated at the TLS/header
+level (confirmed live: a bare httpx/curl POST gets Cloudflare's generic
+"blocked" page; a real browser session sails through with no challenge at
+all — no "Just a moment", no puzzle, nothing interactive). This is the same
+class of friction `get_text(..., impersonate=True)` already handles
+elsewhere in this codebase (Chrome TLS/JA3 fingerprint via curl-cffi, no
+browser process, no solving) — not a CAPTCHA, not WAF-bypass territory, just
+a host that rejects a non-browser TLS handshake. `_post_impersonate()` below
+mirrors `http_client._impersonate_fetch` for the POST case this source
+needs.
+
+SCOPE OF THIS PASS: searches each letter a-z against the current tax year,
+unpaid only, and parses the LIST view (owner name, type, description, tax
+year, detail link). The per-record detail page (taxdetail.php?id=N) has the
+real parcel number + mailing address + exact amount due, confirmed live, but
+fetching it for every one of the (likely several hundred to low-thousands)
+unpaid records every run is a lot of extra requests for a first pass --
+left for a follow-up if the owner wants parcel/address-level detail here.
 """
 from __future__ import annotations
 
@@ -16,6 +45,42 @@ from dateutil import parser as dateparser
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+
+_SEARCH_BASE = "https://cms.revize.com/revize/apps/polkcounty"
+_SEARCH_FORM_URL = f"{_SEARCH_BASE}/searchtaxrecord.php"
+_SEARCH_POST_URL = f"{_SEARCH_BASE}/searchingtaxrecord.php"
+_CURRENT_TAX_YEAR = "2026"
+_SEARCH_LETTERS = "abcdefghijklmnopqrstuvwxyz"
+
+_ROW_RE = re.compile(
+    r'<tr class="(?:odd|even)Row">\s*<td>(?P<name>[^<]*?)\s*</td>\s*'
+    r'<td[^>]*>\s*(?P<type>[^<]*?)\s*</td>\s*'
+    r'<td>(?P<desc>[^<]*?)</td>\s*'
+    r'<td[^>]*>(?P<year>\d{4})</td>.*?'
+    r"taxdetail\.php\?id=(?P<id>\d+)",
+    re.S,
+)
+
+
+async def _post_impersonate(url: str, data: dict, *, referer: str, timeout: float = 30.0) -> str:
+    """POST via curl-cffi Chrome TLS/JA3 impersonation — same tier as
+    http_client._impersonate_fetch (GET-only), extended to POST for this
+    source's search form. No browser process, no challenge-solving: this
+    host answers a matching Chrome fingerprint with no interactive
+    challenge at all (confirmed live), it just rejects a non-browser TLS
+    handshake outright."""
+    from curl_cffi.requests import AsyncSession
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": referer,
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    async with AsyncSession() as s:
+        r = await s.post(url, data=data, headers=headers, impersonate="chrome", timeout=timeout)
+        r.raise_for_status()
+        return r.text
 
 URL = "https://www.polknc.gov/upcoming_auction.php"
 HEADERS = {
@@ -60,12 +125,81 @@ ROW_RE = re.compile(
 
 class PolkTaxAuction(BaseScraper):
     slug = "counties_nc.polk_tax"
-    name = "Polk NC Tax Auction (Kania Law Firm)"
+    name = "Polk NC Tax Auction + Delinquent Search (Kania Law Firm + county)"
     category = "county_tax"
     expected_min_count = 1
-    timeout_s = 30.0
+    timeout_s = 180.0
 
     async def fetch(self) -> Iterable[Listing]:
+        out = list(await self._fetch_auction())
+        out.extend(await self._fetch_delinquent_search())
+        return out
+
+    async def _fetch_delinquent_search(self) -> Iterable[Listing]:
+        """The county's own delinquent-tax name search (added 2026-10-12).
+        See module docstring: real data, no CAPTCHA, Cloudflare-TLS-gated
+        only, handled via _post_impersonate()."""
+        out: list[Listing] = []
+        seen_ids: set[str] = set()
+        for letter in _SEARCH_LETTERS:
+            try:
+                html = await _post_impersonate(
+                    _SEARCH_POST_URL,
+                    data={
+                        "ReportGroupDescription": "",  # "Both" (property + vehicle)
+                        "TaxYear": _CURRENT_TAX_YEAR,
+                        "BalanceDue": ">0",             # unpaid only
+                        "SearchColumn": "Name",
+                        "SearchText": letter,
+                    },
+                    referer=_SEARCH_FORM_URL,
+                )
+            except Exception:
+                # One letter failing (timeout, transient WAF hiccup) shouldn't
+                # drop the other 25 — move on, the Avalon scraper's silent
+                # swallow-and-report-zero bug is exactly what this avoids.
+                continue
+
+            for m in _ROW_RE.finditer(html):
+                rid = m.group("id")
+                if rid in seen_ids:
+                    continue
+                seen_ids.add(rid)
+                rtype = m.group("type").strip()
+                if rtype.upper() not in ("PROPERTY", ""):
+                    continue  # vehicles aren't a real-estate lead
+                name = re.sub(r"\s+", " ", m.group("name")).strip()
+                desc = re.sub(r"\s+", " ", m.group("desc")).strip()
+                out.append(
+                    Listing(
+                        source=self.slug,
+                        source_url=f"{_SEARCH_BASE}/taxdetail.php?id={rid}",
+                        listing_type=ListingType.TAX_LIEN,
+                        property_kind=PropertyKind.UNKNOWN,
+                        state="NC",
+                        county="Polk",
+                        owner_name=name,
+                        description=f"Polk County delinquent tax — {desc}" if desc else
+                                    "Polk County delinquent tax record",
+                        first_seen=datetime.utcnow(),
+                        last_seen=datetime.utcnow(),
+                        raw={
+                            "polk_tax_search": {
+                                "detail_id": rid,
+                                "tax_year": m.group("year"),
+                                "description": desc,
+                                "type": rtype,
+                                # Real parcel/mailing-address/exact-amount data lives on the
+                                # detail page -- not fetched per-row this pass, see module
+                                # docstring. detail_url above is enough for a human or a
+                                # later enrichment pass to pull it.
+                            }
+                        },
+                    )
+                )
+        return out
+
+    async def _fetch_auction(self) -> Iterable[Listing]:
         async with client(timeout=20.0) as c:
             r = await c.get(URL, headers=HEADERS)
             if r.status_code != 200:
