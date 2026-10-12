@@ -274,12 +274,12 @@ async def solve_waf_via_browser(page) -> bool:
 
         # Wait for the canvas (3x3 puzzle grid) to render
         try:
-            await page.wait_for_selector("canvas", timeout=20000)
+            await page.wait_for_selector("canvas", timeout=45000)
             # Also wait until the canvas is non-trivial size (rendered)
             await page.wait_for_function(
                 "() => { const c = document.querySelector('canvas'); "
                 "return c && c.width > 100 && c.height > 100; }",
-                timeout=15000,
+                timeout=30000,
             )
             # AWS WAF sometimes takes a beat to actually draw — give it 1s
             await asyncio.sleep(1.0)
