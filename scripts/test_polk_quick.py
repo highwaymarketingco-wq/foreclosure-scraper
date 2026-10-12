@@ -53,20 +53,16 @@ async def main():
             result = await page.evaluate(js, await_promise=True)
             print(f"[polk-test] Form submit result: {result}")
             
-            # Poll for results
+            # Poll for results — use result markers, not raw page size
             found = False
             for i in range(20):
                 await asyncio.sleep(2)
                 content = await page.get_content()
-                clen = len(content)
-                has_taxdetail = "taxdetail" in content.lower()
-                has_too_many = "too many records" in content.lower()
-                print(f"  poll {i+1}: {clen} chars, taxdetail={has_taxdetail}, too_many={has_too_many}")
-                if has_taxdetail or (clen > 5000 and not has_too_many):
+                low = content.lower()
+                if ("taxdetail" in low or "oddrow" in low or "evenrow" in low
+                        or "gvhdr" in low or "too many records" in low
+                        or "no records" in low):
                     found = True
-                    break
-                if has_too_many:
-                    print(f"  [polk-test] 'too many records' — surname too common")
                     break
             
             content = await page.get_content()
