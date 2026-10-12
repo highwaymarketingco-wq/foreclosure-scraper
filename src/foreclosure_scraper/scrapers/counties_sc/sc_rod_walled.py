@@ -137,9 +137,41 @@ class ScRodWalledScraper(BaseScraper):
         # Wait for SPA to load
         await asyncio.sleep(3)
 
+        # Debug: log page state
+        try:
+            inputs_info = await page.evaluate("""() => {
+                return Array.from(document.querySelectorAll('input, button, a.btn')).map(i => ({
+                    tag: i.tagName, name: i.name, id: i.id, type: i.type,
+                    text: i.innerText || i.value || '', placeholder: i.placeholder
+                }))
+            }""")
+            log.info("sc_rod_walled.page_state", county=county,
+                      url=page.url, elements=inputs_info)
+        except Exception as exc:
+            log.warning("sc_rod_walled.debug_failed", county=county, error=str(exc)[:160])
+
         # Try to find and fill date range / search form
         # Beaufort BrowserView: has date pickers and a Search button
         # Jasper/Clarendon: Courthouse Computer Systems / Acclaim portals
+
+        # First, try clicking a "90 Days" quick button (Beaufort has these)
+        for sel in ["button:has-text('90 Days')", "a:has-text('90 Days')",
+                     "button:has-text('30 Days')", "a:has-text('30 Days')"]:
+            try:
+                el = page.locator(sel).first
+                if await el.count() > 0:
+                    await el.click()
+                    log.info("sc_rod_walled.quick_btn", county=county, selector=sel)
+                    await asyncio.sleep(5)
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=15000)
+                    except Exception:
+                        pass
+                    # Skip manual form fill — quick button handles dates
+                    content = await page.content()
+                    return self._parse_results(content, page.url, county, state)
+            except Exception:
+                continue
 
         # Generic approach: look for date inputs, fill them, click search
         date_from_selectors = [
@@ -220,6 +252,12 @@ class ScRodWalledScraper(BaseScraper):
 
         # Parse results from table or grid
         content = await page.content()
+        return self._parse_results(content, page.url, county, state)
+
+    def _parse_results(self, content: str, base_url: str,
+                       county: str, state: str) -> list[Listing]:
+        """Parse search results HTML into listings."""
+        results: list[Listing] = []
         soup = BeautifulSoup(content, "html.parser")
 
         # Try various result table selectors
