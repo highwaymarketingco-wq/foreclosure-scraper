@@ -10,7 +10,7 @@ os.environ.setdefault("DISPLAY", ":99")
 async def test_scraper(module_path):
     """Import and run a scraper module, print results."""
     import importlib
-    from foreclosure_scraper.scrapers.base import BaseScraper
+    from foreclosure_scraper.base_scraper import BaseScraper
     
     mod = importlib.import_module(f"foreclosure_scraper.scrapers.{module_path}")
     
