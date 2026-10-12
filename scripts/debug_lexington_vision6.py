@@ -378,9 +378,20 @@ async def main():
             # Check if "Click verify once" is in the raw prompt
             # This means previous tiles were correct and we just need to verify
             if "click verify once" in raw_prompt.lower() and prev_prompt:
-                print(f"  'Click verify once' detected — verifying previous answer")
-                await click_verify_only(challenge_frame)
-                await asyncio.sleep(8)
+                verify_count_key = "_verify_count"
+                vc = getattr(main, verify_count_key, 0) + 1
+                setattr(main, verify_count_key, vc)
+                print(f"  'Click verify once' detected (attempt {vc})")
+                if vc <= 2:
+                    await click_verify_only(challenge_frame)
+                    await asyncio.sleep(12)
+                else:
+                    print(f"  Verify stuck {vc} times — reloading challenge")
+                    await reload_challenge(challenge_frame)
+                    await asyncio.sleep(6)
+                    setattr(main, verify_count_key, 0)
+                    prev_prompt = ""
+                    prev_hash = ""
                 continue
 
             if not clean or total == 0:
