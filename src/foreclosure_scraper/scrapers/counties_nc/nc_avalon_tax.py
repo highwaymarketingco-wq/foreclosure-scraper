@@ -49,76 +49,109 @@ class NcAvalonTaxScraper(BaseScraper):
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
-        for county, cfg in _COUNTY_SITES.items():
-            try:
-                base_url = cfg["url"]
-                search_url = f"{base_url}/List/Delinquent"
+        from playwright.async_api import async_playwright
 
-                log.info("nc_avalon.fetching", county=county)
-                html = await get_text(
-                    search_url,
-                    wall_bypass=True,
-                    timeout=30.0,
-                )
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-gpu"],
+            )
 
-                if not html or len(html) < 500:
-                    html = await get_text(
-                        base_url,
-                        wall_bypass=True,
-                        timeout=30.0,
-                    )
+            for county, cfg in _COUNTY_SITES.items():
+                try:
+                    base_url = cfg["url"]
+                    search_url = f"{base_url}/List/Delinquent"
 
-                if not html or len(html) < 500:
-                    log.warning("nc_avalon.empty", county=county)
-                    continue
+                    log.info("nc_avalon.fetching", county=county)
 
-                if "g-recaptcha" in html or "recaptcha" in html.lower():
-                    log.info("nc_avalon.recaptcha_detected", county=county)
-                    from ...wall_bypass import fetch_with_nodriver
-                    html = await fetch_with_nodriver(search_url, timeout_s=45)
-                    if not html or len(html) < 500:
-                        log.warning("nc_avalon.nodriver_failed", county=county)
-                        continue
+                    page = await browser.new_page()
+                    try:
+                        await page.goto(search_url, timeout=45000)
+                        await page.wait_for_load_state("networkidle", timeout=20000)
 
-                soup = BeautifulSoup(html, "html.parser")
-                rows = soup.select(
-                    "table tr, .data-table tr, .delinquent-list .item, "
-                    ".search-results tr, .grid-view tr"
-                )
+                        html = await page.content()
 
-                for row in rows[1:]:
-                    cells = row.find_all("td")
-                    if len(cells) < 3:
-                        continue
+                        # If reCAPTCHA present, solve it
+                        if "g-recaptcha" in html or "recaptcha" in html.lower():
+                            log.info("nc_avalon.recaptcha_detected", county=county)
+                            try:
+                                from ...enrichment_recaptcha_audio import solve_recaptcha_v2
+                                solved = await solve_recaptcha_v2(page)
+                                if solved:
+                                    log.info("nc_avalon.recaptcha_solved", county=county)
+                                    await page.wait_for_load_state("networkidle", timeout=20000)
+                                    html = await page.content()
+                                else:
+                                    log.warning("nc_avalon.recaptcha_failed", county=county)
+                            except Exception as exc:
+                                log.warning("nc_avalon.recaptcha_error",
+                                            county=county, error=str(exc)[:160])
 
-                    parcel_id = cells[0].get_text(strip=True)
-                    owner = cells[1].get_text(strip=True) if len(cells) > 1 else ""
-                    addr = cells[2].get_text(strip=True) if len(cells) > 2 else ""
-                    amount = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+                        if not html or len(html) < 500:
+                            log.warning("nc_avalon.empty", county=county)
+                            continue
 
-                    amount_val = None
-                    if amount:
-                        m = re.search(r"[\$]([\d,.]+)", amount)
-                        if m:
-                            amount_val = float(m.group(1).replace(",", ""))
+                        # Check for search form and try to get delinquent list
+                        # Catalis sites may need clicking a "Delinquent" tab/link
+                        delinquent_link = page.locator("a:has-text('Delinquent'), a:has-text('delinquent')")
+                        if await delinquent_link.count() > 0:
+                            await delinquent_link.first.click()
+                            await page.wait_for_load_state("networkidle", timeout=20000)
+                            html = await page.content()
 
-                    results.append(Listing(
-                        source=self.slug,
-                        source_url=base_url,
-                        listing_type=ListingType.TAX_LIEN,
-                        property_kind=PropertyKind.UNKNOWN,
-                        street_address=addr,
-                        county=county.title(),
-                        state=cfg["state"],
-                        parcel_id=parcel_id,
-                        owner_name=owner,
-                        tax_value=amount_val,
-                        raw={"county": county, "amount_due": amount},
-                    ))
+                        results_county = self._parse_html(html, base_url, county, cfg["state"])
+                        results.extend(results_county)
 
-                log.info("nc_avalon.county_done", county=county, found=len(results))
+                        log.info("nc_avalon.county_done", county=county, found=len(results_county))
 
-            except Exception as exc:
-                log.warning("nc_avalon.county_error", county=county, error=str(exc)[:200])
+                    finally:
+                        await page.close()
+
+                except Exception as exc:
+                    log.warning("nc_avalon.county_error", county=county, error=str(exc)[:200])
+
+            await browser.close()
+
+        return results
+
+    def _parse_html(self, html: str, base_url: str, county: str, state: str) -> list[Listing]:
+        """Parse delinquent tax list HTML."""
+        results: list[Listing] = []
+        soup = BeautifulSoup(html, "html.parser")
+
+        rows = soup.select(
+            "table tr, .data-table tr, .delinquent-list .item, "
+            ".search-results tr, .grid-view tr"
+        )
+
+        for row in rows[1:]:
+            cells = row.find_all("td")
+            if len(cells) < 3:
+                continue
+
+            parcel_id = cells[0].get_text(strip=True)
+            owner = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+            addr = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+            amount = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+
+            amount_val = None
+            if amount:
+                m = re.search(r"[\$]([\d,.]+)", amount)
+                if m:
+                    amount_val = float(m.group(1).replace(",", ""))
+
+            results.append(Listing(
+                source=self.slug,
+                source_url=base_url,
+                listing_type=ListingType.TAX_LIEN,
+                property_kind=PropertyKind.UNKNOWN,
+                street_address=addr,
+                county=county.title(),
+                state=state,
+                parcel_id=parcel_id,
+                owner_name=owner,
+                tax_value=amount_val,
+                raw={"county": county, "amount_due": amount},
+            ))
 
         return results
