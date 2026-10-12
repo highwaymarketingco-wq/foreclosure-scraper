@@ -301,8 +301,16 @@ class NcSosUccScraper(BaseScraper):
     # `return []` with no `disabled` flag, so safe_run() recorded the
     # ambiguous OUTCOME_ZERO every run instead of the accurate
     # OUTCOME_DORMANT this confirmed-permanently-dead source deserves.
-    disabled = False
-    disabled_reason = ""
+    disabled = True
+    disabled_reason = (
+        "sosnc.gov has no public UCC search. The URL by_title/_uniform_commercial_code "
+        "307-redirects to the Business Registration search page (CorpSearchType only "
+        "has Corporation/SOSID/Officials/RegisteredAgents — no UCC option). The UCC "
+        "results endpoint _Uniform_Commercial_Code_Results returns 403 Cloudflare. "
+        "The /uniform_commercial_code path requires account login. Confirmed dead "
+        "2026-10-12 via scrapling (Cloudflare solved, page loaded, form submitted, "
+        "no UCC results). Re-confirmed original 2026-10-01 finding."
+    )
 
     async def fetch(self) -> list[Listing]:
         """Fetch UCC filings via scrapling stealth render.
