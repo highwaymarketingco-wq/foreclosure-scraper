@@ -36,10 +36,9 @@ async def main():
         print("ERROR: nodriver not installed")
         return
 
-    print("Starting nodriver browser...")
-    config = uc.Config(sandbox=False, headless=False)
-    config.add_argument("--disable-gpu")
-    browser = await uc.start(config)
+    print("Starting nodriver browser (via start_browser)...")
+    from foreclosure_scraper.browser_utils import start_browser
+    browser = await start_browser(headless=False)
 
     page = await browser.get("about:blank")
 

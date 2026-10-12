@@ -118,9 +118,8 @@ async def test_curl_cffi():
     try:
         import nodriver as uc
 
-        config = uc.Config(sandbox=False, headless=False)
-        config.add_argument("--disable-gpu")
-        browser = await uc.start(config)
+        from foreclosure_scraper.browser_utils import start_browser
+        browser = await start_browser(headless=False)
         page = await browser.get(spa_urls[0])
         await asyncio.sleep(15)  # Wait for SPA to load
 

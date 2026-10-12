@@ -73,9 +73,8 @@ async def test_nc_sos_ucc_nodriver():
         url = "https://www.sosnc.gov/online_services/search/by_title/_u_cc"
         print(f"Fetching: {url}")
 
-        config = uc.Config(sandbox=False, headless=False)
-        config.add_argument("--disable-gpu")
-        browser = await uc.start(config)
+        from foreclosure_scraper.browser_utils import start_browser
+        browser = await start_browser(headless=False)
         page = await browser.get(url)
         await asyncio.sleep(15)
 
