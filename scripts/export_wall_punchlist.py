@@ -209,7 +209,7 @@ def export(board: Path, ledger_directory: Path, out_dir: Path, summary_path: Opt
         jf.write("[")
         for row in _rows(board, verifiers):
             board_rows += 1
-            if exclude_sources and str(getattr(row, "source", "") or "") in exclude_sources:
+            if exclude_sources and str((row.get("source") if isinstance(row, dict) else getattr(row, "source", "")) or "") in exclude_sources:
                 continue
             items, covered = classify(row, verifiers, ledgers)
             if not covered and include_uncovered:
