@@ -239,7 +239,7 @@ async def speech_to_text_groq(audio_data):
             "language": (None, "en"),
             "response_format": (None, "json"),
             "temperature": (None, "0"),
-            "prompt": (None, "The following audio contains a sequence of numbers and letters. Please transcribe them exactly."),
+            "prompt": (None, "A distorted robotic voice reads out a sequence of numbers and single letters. Transcribe ONLY the numbers and letters, nothing else. Example: 7 3 9 2 5 1"),
         }
 
         async with httpx.AsyncClient(timeout=30) as client:
@@ -331,7 +331,17 @@ async def search_entity(page, entity_name, max_captcha_attempts=8):
                     resp = await get_recaptcha_response(page)
                     if resp:
                         print(f"  SOLVED! Token: {resp[:40]}...")
-                    break
+                        break
+                    # Re-click checkbox
+                    print("  Re-clicking checkbox...")
+                    anchor = await find_anchor_frame(page)
+                    if anchor:
+                        try:
+                            await anchor.click(".recaptcha-checkbox-border")
+                            await asyncio.sleep(5)
+                        except BaseException:
+                            pass
+                    continue
 
                 solved = await solve_audio_challenge(page, challenge_frame)
                 if solved:

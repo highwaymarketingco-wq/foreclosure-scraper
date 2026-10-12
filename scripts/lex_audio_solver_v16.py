@@ -253,7 +253,7 @@ async def speech_to_text(filepath, audio_data):
                 "language": (None, "en"),
                 "response_format": (None, "json"),
                 "temperature": (None, "0"),
-                "prompt": (None, "The following audio contains a sequence of numbers and letters. Please transcribe them exactly."),
+                "prompt": (None, "A distorted robotic voice reads out a sequence of numbers and single letters. Transcribe ONLY the numbers and letters, nothing else. Example: 7 3 9 2 5 1"),
             }
             
             async with httpx.AsyncClient(timeout=30) as client:
@@ -408,11 +408,26 @@ async def main():
                     break
             
             if not challenge_frame:
-                print("  No challenge frame — may have auto-solved or closed")
+                print("  No challenge frame — checking if auto-solved")
                 resp = await get_recaptcha_response(page)
                 if resp:
                     print(f"  SOLVED! Token: {resp[:60]}...")
-                break
+                    break
+                # Challenge frame gone but no token — re-click checkbox
+                print("  Re-clicking reCAPTCHA checkbox to re-trigger challenge...")
+                anchor_frame = None
+                for frame in page.frames:
+                    if "recaptcha/api2/anchor" in frame.url:
+                        anchor_frame = frame
+                        break
+                if anchor_frame:
+                    try:
+                        await anchor_frame.click(".recaptcha-checkbox-border")
+                        print("  Checkbox re-clicked")
+                        await asyncio.sleep(5)
+                    except BaseException as e:
+                        print(f"  Re-click error: {e}")
+                continue
             
             solved = await solve_audio_challenge(page, challenge_frame)
             if solved:
