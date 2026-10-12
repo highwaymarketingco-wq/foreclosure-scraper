@@ -253,15 +253,38 @@ async def solve_recaptcha_v2(
                     log.info("recaptcha.audio_btn_css", selector=sel)
                     # Wait for challenge frame to reload with audio challenge
                     await page.wait_for_timeout(3000)
-                    # Wait for audio elements to appear
+                    # Re-fetch the challenge frame (it reloads after audio button click)
+                    try:
+                        challenge_frame_element = await page.wait_for_selector(
+                            "iframe[title*='recaptcha challenge']", timeout=5000
+                        )
+                        challenge_frame = await challenge_frame_element.content_frame()
+                    except Exception:
+                        pass  # Keep old reference
+                    # Wait for audio elements to appear in the re-fetched frame
                     try:
                         await challenge_frame.wait_for_selector(
                             "audio source, .rc-audiochallenge-tdo-link, a[href*='.mp3'], a[href*='.wav']",
-                            timeout=10000,
+                            timeout=15000,
                         )
                     except Exception:
-                        log.warning("recaptcha.audio_wait_timeout",
-                                    attempt=attempt + 1)
+                        # Try JS to check if audio content is there
+                        try:
+                            has_audio = await challenge_frame.evaluate("""() => {
+                                return !!(
+                                    document.querySelector('audio source[src]') ||
+                                    document.querySelector('audio[src]') ||
+                                    document.querySelector('.rc-audiochallenge')
+                                );
+                            }""")
+                            if has_audio:
+                                log.info("recaptcha.audio_detected_js")
+                            else:
+                                log.warning("recaptcha.audio_wait_timeout",
+                                            attempt=attempt + 1)
+                        except Exception:
+                            log.warning("recaptcha.audio_wait_timeout",
+                                        attempt=attempt + 1)
                     break
             except Exception:
                 continue
