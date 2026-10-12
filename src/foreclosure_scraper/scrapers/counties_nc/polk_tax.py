@@ -133,13 +133,17 @@ async def _search_via_nodriver(browser, letter: str) -> str:
     })()
     """
     result = await page.evaluate(js, await_promise=True)
-    # Wait for navigation/results to load — Cloudflare challenge + form POST
-    # can take 10+ seconds. Poll for content change.
+    # Wait for navigation/results to load. The form page itself is ~28K chars,
+    # so checking len > 5000 breaks prematurely. Instead, poll for actual
+    # result-page markers: result table rows (oddRow/evenRow), the grid header
+    # (gvHdr), taxdetail links, or the "too many records" error.
     for _ in range(20):
         await asyncio.sleep(2)
         content = await page.get_content()
-        # Results page should be >5K chars or contain taxdetail links
-        if len(content) > 5000 or "taxdetail" in content.lower():
+        low = content.lower()
+        if ("taxdetail" in low or "oddrow" in low or "evenrow" in low
+                or "gvhdr" in low or "too many records" in low
+                or "no records" in low):
             break
     return await page.get_content()
 
