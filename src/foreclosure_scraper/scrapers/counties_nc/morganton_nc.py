@@ -56,9 +56,9 @@ class MorgantonNcScraper(BaseScraper):
                     page = await browser.new_page()
                     await page.goto(url, timeout=45000)
 
-                    # Solve Cloudflare Turnstile/WAF — retry up to 3 times
+                    # Solve Cloudflare Turnstile/WAF — retry up to 5 times
                     cf_solved = False
-                    for attempt in range(3):
+                    for attempt in range(5):
                         try:
                             from ...enrichment_waf_oss import solve_waf_via_browser
                             await solve_waf_via_browser(page)
@@ -70,7 +70,12 @@ class MorgantonNcScraper(BaseScraper):
                         html = await page.content()
                         if "Performing security verification" in html or "Just a moment" in html:
                             log.info("morganton_nc.cf_still_blocking", url=url, attempt=attempt+1)
-                            await page.wait_for_timeout(8000)
+                            # Try reloading the page — sometimes triggers pass
+                            try:
+                                await page.reload(wait_until="domcontentloaded", timeout=30000)
+                                await page.wait_for_timeout(10000)
+                            except Exception:
+                                pass
                             continue
 
                         cf_solved = True
