@@ -250,7 +250,18 @@ async def solve_recaptcha_v2(
                 if audio_btn:
                     await audio_btn.click()
                     audio_clicked = True
-                    await page.wait_for_timeout(1500)
+                    log.info("recaptcha.audio_btn_css", selector=sel)
+                    # Wait for challenge frame to reload with audio challenge
+                    await page.wait_for_timeout(3000)
+                    # Wait for audio elements to appear
+                    try:
+                        await challenge_frame.wait_for_selector(
+                            "audio source, .rc-audiochallenge-tdo-link, a[href*='.mp3'], a[href*='.wav']",
+                            timeout=10000,
+                        )
+                    except Exception:
+                        log.warning("recaptcha.audio_wait_timeout",
+                                    attempt=attempt + 1)
                     break
             except Exception:
                 continue
@@ -425,9 +436,21 @@ async def _download_audio_clip(
                 continue
 
         if not link:
-            log.warning("recaptcha.no_audio_link")
-            return None
-        href = await link.get_attribute("href")
+            # JS fallback: try to find audio URL via evaluate
+            href = await challenge_frame.evaluate("""() => {
+                const audio = document.querySelector('audio source[src], audio[src]');
+                if (audio) return audio.src || audio.getAttribute('src');
+                const a = document.querySelector('a[href*=".mp3"], a[href*="audio"], a[download]');
+                if (a) return a.href;
+                return null;
+            }""")
+            if href:
+                log.info("recaptcha.audio_link_js", url=href[:120])
+            else:
+                log.warning("recaptcha.no_audio_link")
+                return None
+        else:
+            href = await link.get_attribute("href")
         if not href:
             log.warning("recaptcha.no_audio_href")
             return None
