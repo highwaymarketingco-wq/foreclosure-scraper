@@ -1,35 +1,49 @@
 """NC Register of Deeds sites with CAPTCHA/math gate — 9 counties.
 
-Sites and gate types:
-- rodrecords.wake.gov — Google CAPTCHA on entry
-- rodrecords.durhamcountync.gov — Google CAPTCHA
-- brunswick-live.inttek.net — math question (use math_captcha.py). URL FIXED
-  2026-10-12: the old rodrecords.brunswickcountync.gov is a hard NXDOMAIN
-  (confirmed from two separate networks), not a reachable-but-captcha'd
-  site -- the county migrated platforms. Live-confirmed 2026-10-12 via
-  brunswickcountync.gov/990/Register-of-Deeds -> "Online Record Search" ->
-  brunswick-live.inttek.net, which shows the exact same math-question gate
-  this file already expects ("Four Minus One Equals ___"). The real
-  post-login search path on this Inttek platform is NOT verified (the math
-  gate itself was not cleared while finding this) -- search_path below is
-  a guess based on the old assumption and may need correcting once someone
-  gets past the gate.
-- rod.iredellcountync.gov — Google CAPTCHA
-- rod.cravencountync.gov — math question
-- rod.greenecountync.gov — Google CAPTCHA
-- rod.harnettcountync.gov — Google CAPTCHA
-- rod.randolphcountync.gov — math question
-- us6.courthousecomputersystems.com/StokesNC/ — Google reCAPTCHA. URL FIXED
-  2026-10-12: same pattern as Brunswick -- old rod.stokescountync.gov never
-  resolved (DNS timeout/failure confirmed from two separate networks), the
-  county migrated to a different vendor (Courthouse Computer Systems, not
-  Avenu/Inttek like Brunswick). Live-confirmed 2026-10-12 via
-  co.stokes.nc.us/departments/register_of_deeds.php -> "Search Property
-  Records" -> us6.courthousecomputersystems.com/StokesNC/, which shows a
-  real Google reCAPTCHA ("I'm not a robot") behind a terms-of-use
-  disclaimer -- the gate type this file already expects. Did not attempt
-  the reCAPTCHA itself (not this file's lane); the real post-disclaimer
-  search_path is unverified.
+ALL 9 URLS REWRITTEN 2026-10-12. Before this date only 2 of 9 (Brunswick,
+Stokes) had ever been checked against a live site -- the other 7 had never
+actually been verified, and every single one was dead: 5 hard DNS failures
+(Iredell, Craven, Greene, Harnett, Randolph -- "Could not resolve host",
+confirmed from two separate networks) plus Wake (404 -- the domain itself
+was right, the code was just missing the real `/web` app path) and Durham
+(the whole county domain family changed to dconc.gov). The old docstring's
+gate-type claims below were therefore also unverified guesses in several
+cases, not confirmed observations -- corrected where live evidence now
+exists.
+
+Sites and gate types (all confirmed live 2026-10-12 unless noted):
+- rodrecords.wake.gov/web — real Google reCAPTCHA checkbox, confirmed by
+  screenshot (Tyler Technologies "Self-Service" platform v2026.1.5). Old
+  code hit the bare domain (404); the app lives under /web.
+- rodweb.dconc.gov/web — Durham's new domain (county migrated away from
+  durhamcountync.gov entirely). Same Tyler "Self-Service" platform as
+  Wake -- gate very likely the same reCAPTCHA, not individually
+  screenshotted.
+- brunswick-live.inttek.net — math question, confirmed by screenshot
+  ("Four Minus One Equals ___"), use math_captcha.py. Real post-gate
+  search_path still unverified (gate itself not cleared).
+- iredellnc.courthousecomputersystems.com — real Google reCAPTCHA,
+  confirmed by screenshot ("Please Verify You are Not a Robot"). NOTE:
+  this platform only covers records from 1964 forward; pre-1964 records
+  need a second, separate system (cotthosting.com/NCIredellExternal) --
+  out of scope for now, flagging it exists.
+- greenenc.courthousecomputersystems.com — same Courthouse Computer
+  Systems platform as Stokes/Iredell (both confirmed reCAPTCHA); this
+  county's own site says the system went live Dec 2025. High-confidence
+  reCAPTCHA by platform match, not individually screenshotted.
+- us6.courthousecomputersystems.com/HarnettNC — SAME base domain as
+  Stokes, just a different county path (shared multi-tenant platform).
+  High-confidence reCAPTCHA by platform match.
+- us5.courthousecomputersystems.com/RandolphNC2 — different server
+  instance (us5, not us6) and an unexpected "2" suffix on the county
+  code. Owner directly observed CAPTCHA + disclaimer live 2026-10-12 --
+  this corrects the old docstring's "math question" guess, which was
+  never actually verified against this (or any) live URL.
+- us5.courthousecomputersystems.com/CravenNC2 — same us5 instance as
+  Randolph. Same correction: owner-confirmed CAPTCHA + disclaimer live
+  2026-10-12, not the old docstring's unverified "math question" guess.
+- us6.courthousecomputersystems.com/StokesNC — real Google reCAPTCHA,
+  confirmed by screenshot, behind a terms-of-use disclaimer.
 
 Strategy:
 1. Launch Playwright browser (headless on VM).
@@ -55,14 +69,14 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 _COUNTY_SITES = {
-    "wake": {"url": "https://rodrecords.wake.gov", "gate": "recaptcha", "search_path": "/search/deeds"},
-    "durham": {"url": "https://rodrecords.durhamcountync.gov", "gate": "recaptcha", "search_path": "/search/deeds"},
+    "wake": {"url": "https://rodrecords.wake.gov/web", "gate": "recaptcha", "search_path": "/user/disclaimer"},
+    "durham": {"url": "https://rodweb.dconc.gov/web", "gate": "recaptcha", "search_path": "/user/disclaimer"},
     "brunswick": {"url": "https://brunswick-live.inttek.net", "gate": "math", "search_path": "/search"},
-    "iredell": {"url": "https://rod.iredellcountync.gov", "gate": "recaptcha", "search_path": "/search"},
-    "craven": {"url": "https://rod.cravencountync.gov", "gate": "math", "search_path": "/search"},
-    "greene": {"url": "https://rod.greenecountync.gov", "gate": "recaptcha", "search_path": "/search"},
-    "harnett": {"url": "https://rod.harnettcountync.gov", "gate": "recaptcha", "search_path": "/search"},
-    "randolph": {"url": "https://rod.randolphcountync.gov", "gate": "math", "search_path": "/search"},
+    "iredell": {"url": "https://iredellnc.courthousecomputersystems.com", "gate": "recaptcha", "search_path": "/search"},
+    "craven": {"url": "https://us5.courthousecomputersystems.com/CravenNC2", "gate": "recaptcha", "search_path": "/search"},
+    "greene": {"url": "https://greenenc.courthousecomputersystems.com", "gate": "recaptcha", "search_path": "/search"},
+    "harnett": {"url": "https://us6.courthousecomputersystems.com/HarnettNC", "gate": "recaptcha", "search_path": "/search"},
+    "randolph": {"url": "https://us5.courthousecomputersystems.com/RandolphNC2", "gate": "recaptcha", "search_path": "/search"},
     "stokes": {"url": "https://us6.courthousecomputersystems.com/StokesNC", "gate": "recaptcha", "search_path": "/search"},
 }
 
