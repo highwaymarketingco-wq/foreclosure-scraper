@@ -100,19 +100,31 @@ async def _search_via_nodriver(browser, letter: str) -> str:
     page = await browser.get(_SEARCH_FORM_URL)
     await asyncio.sleep(10)  # wait for Cloudflare + page render
 
-    # Fill the entire form via JS and submit
+    # Fill the entire form via JS and submit.
+    # The form is bare HTML — no JS, no CSS, no IDs. Uses name= attributes.
+    # Form action="searchingtaxrecord.php" method="post" — plain POST.
+    # IMPORTANT: BalanceDue option values use HTML entities: &gt;0 not >0.
     js = """
     (async () => {
         // Radio: "Both" (empty value) so property + vehicle both show
         const radios = document.querySelectorAll('input[name="ReportGroupDescription"]');
         for (const r of radios) { if (r.value === '') r.checked = true; }
 
-        // Select dropdowns
+        // Select dropdowns — match by iterating options (handles HTML entities)
         const setSelect = (name, val) => {
             const sel = document.querySelector(`select[name="${name}"]`);
-            if (sel) { sel.value = val; sel.dispatchEvent(new Event('change', {bubbles: true})); }
+            if (sel) {
+                for (let i = 0; i < sel.options.length; i++) {
+                    if (sel.options[i].value === val || sel.options[i].textContent === val) {
+                        sel.selectedIndex = i;
+                        sel.dispatchEvent(new Event('change', {bubbles: true}));
+                        break;
+                    }
+                }
+            }
         };
         setSelect('TaxYear', '""" + _CURRENT_TAX_YEAR + """');
+        // BalanceDue: option value is "&gt;0" in HTML but browser decodes to ">0"
         setSelect('BalanceDue', '>0');
         setSelect('SearchColumn', 'Name');
 
@@ -120,10 +132,7 @@ async def _search_via_nodriver(browser, letter: str) -> str:
         const txt = document.querySelector('input[name="SearchText"]');
         if (txt) { txt.value = '""" + letter + """'; txt.dispatchEvent(new Event('input', {bubbles: true})); }
 
-        // Submit the form — requestSubmit() triggers the form's submit
-        // handler and causes real navigation (confirmed working on VM).
-        // form.submit() bypasses event handlers; submitBtn.click() doesn't
-        // navigate reliably in nodriver.
+        // Submit the form — requestSubmit() triggers real navigation
         const form = document.querySelector('form');
         if (form) {
             if (form.requestSubmit) { form.requestSubmit(); }
