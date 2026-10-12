@@ -39,7 +39,10 @@ class LexingtonProbateScraper(BaseScraper):
         results: list[Listing] = []
 
         try:
-            from playwright.async_api import async_playwright
+            try:
+                from patchright.async_api import async_playwright
+            except ImportError:
+                from playwright.async_api import async_playwright
         except ImportError:
             log.error("lexington_probate.no_playwright")
             return results
