@@ -42,14 +42,16 @@ async def main():
         print(f"  POST: {API_URL}")
 
         js_fetch = f"""
-        const resp = await fetch("{API_URL}", {{
-            method: "POST",
-            headers: {{"Content-Type": "application/json"}},
-            body: JSON.stringify({{value: "a", skip: 0, direct: false}})
-        }});
-        const status = resp.status;
-        const text = await resp.text();
-        JSON.stringify({{status: status, length: text.length, preview: text.substring(0, 500)}})
+        (async () => {{
+            const resp = await fetch("{API_URL}", {{
+                method: "POST",
+                headers: {{"Content-Type": "application/json"}},
+                body: JSON.stringify({{value: "a", skip: 0, direct: false}})
+            }});
+            const status = resp.status;
+            const text = await resp.text();
+            return JSON.stringify({{status: status, length: text.length, preview: text.substring(0, 500)}});
+        }})()
         """
 
         try:
@@ -73,13 +75,15 @@ async def main():
         # Try with search term 'smith'
         print(f"\n=== Trying search term 'smith' ===")
         js_fetch2 = f"""
-        const resp = await fetch("{API_URL}", {{
-            method: "POST",
-            headers: {{"Content-Type": "application/json"}},
-            body: JSON.stringify({{value: "smith", skip: 0, direct: false}})
-        }});
-        const text = await resp.text();
-        text
+        (async () => {{
+            const resp = await fetch("{API_URL}", {{
+                method: "POST",
+                headers: {{"Content-Type": "application/json"}},
+                body: JSON.stringify({{value: "smith", skip: 0, direct: false}})
+            }});
+            const text = await resp.text();
+            return text;
+        }})()
         """
 
         try:
