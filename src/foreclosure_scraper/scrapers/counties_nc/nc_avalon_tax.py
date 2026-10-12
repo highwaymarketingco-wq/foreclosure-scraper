@@ -1,20 +1,19 @@
-"""NC Catalis Avalon tax sites — Google CAPTCHA + cloudfront block.
+"""NC Catalis Avalon tax sites — delinquent tax records via CloudFront API.
 
-lincolncountytax.com and similar sites are hosted by Catalis Avalon.
-They use Google reCAPTCHA + a cloudfront.net data host that blocks datacenter IPs.
+lincolncountytax.com is a Catalis Avalon (Wildfire) SPA.
+The SPA loads data from a CloudFront API at:
+    POST https://d1ebsyxxbc7tep.cloudfront.net/data/{guid}/Wildfire/Records
+    Body: {"value":"a","skip":0,"direct":false}
 
-Strategy:
-1. Try wall_bypass (curl-cffi impersonation → pydoll → nodriver) to get past
-   the Cloudflare/CAPTCHA wall on the main page.
-2. If the data host (cloudfront.net) blocks our IP, fall back to parsing
-   whatever data is embedded in the initial page HTML.
-3. For Google reCAPTCHA V2, use enrichment_recaptcha_audio.solve_recaptcha_v2()
-   with Playwright to clear the checkbox.
+Each record has an `isDelinquent` boolean — we filter for delinquent records.
 
-Counties: Lincoln, Rutherford, McDowell, Cleveland, Burke, Caldwell
+Counties: Lincoln (only county with a working domain on this platform).
+Other Catalis domains (rutherfordcountytax.com, etc.) are DNS-dead.
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import re
 from datetime import datetime, timedelta
 from typing import Any
@@ -28,23 +27,30 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
+# Only Lincoln County — other Catalis domains are DNS-dead
 _COUNTY_SITES = {
-    "lincoln": {"url": "https://www.lincolncountytax.com", "state": "NC"},
-    "rutherford": {"url": "https://www.rutherfordcountytax.com", "state": "NC"},
-    "mcdowell": {"url": "https://www.mcdowellcountytax.com", "state": "NC"},
-    "cleveland": {"url": "https://www.clevelandcountytax.com", "state": "NC"},
-    "burke": {"url": "https://www.burkecountytax.com", "state": "NC"},
-    "caldwell": {"url": "https://www.caldwellcountytax.com", "state": "NC"},
+    "lincoln": {
+        "url": "https://www.lincolncountytax.com",
+        "state": "NC",
+        "guid": "a45b9ca6-46be-4396-9468-56194741a38e",
+    },
+    "caldwell": {
+        "url": "https://www.caldwellcountytax.com",
+        "state": "NC",
+        "guid": None,  # Will discover from page
+    },
 }
+
+_CLOUDFRONT_BASE = "https://d1ebsyxxbc7tep.cloudfront.net"
 
 
 class NcAvalonTaxScraper(BaseScraper):
-    """NC Catalis Avalon tax search via wall_bypass + reCAPTCHA solver."""
+    """NC Catalis Avalon tax search via CloudFront Wildfire API."""
 
     slug = "counties_nc.nc_avalon_tax"
     name = "NC Avalon Tax (Catalis)"
     category = "tax"
-    timeout_s = 900.0
+    timeout_s = 600.0
 
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
@@ -69,40 +75,42 @@ class NcAvalonTaxScraper(BaseScraper):
                         await page.goto(search_url, timeout=45000)
                         await page.wait_for_load_state("networkidle", timeout=20000)
 
-                        html = await page.content()
+                        # Accept disclaimer
+                        accept_btn = page.locator("button:has-text('Accept')")
+                        if await accept_btn.count() > 0:
+                            await accept_btn.first.click()
+                            await asyncio.sleep(2)
 
-                        # If reCAPTCHA present, solve it
-                        if "g-recaptcha" in html or "recaptcha" in html.lower():
-                            log.info("nc_avalon.recaptcha_detected", county=county)
-                            try:
-                                from ...enrichment_recaptcha_audio import solve_recaptcha_v2
-                                solved = await solve_recaptcha_v2(page)
-                                if solved:
-                                    log.info("nc_avalon.recaptcha_solved", county=county)
-                                    await page.wait_for_load_state("networkidle", timeout=20000)
-                                    html = await page.content()
-                                else:
-                                    log.warning("nc_avalon.recaptcha_failed", county=county)
-                            except Exception as exc:
-                                log.warning("nc_avalon.recaptcha_error",
-                                            county=county, error=str(exc)[:160])
+                        # Close tips modal
+                        close_btn = page.locator("button:has-text('Close')")
+                        if await close_btn.count() > 0:
+                            await close_btn.first.click()
+                            await asyncio.sleep(1)
+                        await page.keyboard.press("Escape")
+                        await asyncio.sleep(1)
 
-                        if not html or len(html) < 500:
-                            log.warning("nc_avalon.empty", county=county)
-                            continue
-
-                        # Check for search form and try to get delinquent list
-                        # Catalis sites may need clicking a "Delinquent" tab/link
-                        delinquent_link = page.locator("a:has-text('Delinquent'), a:has-text('delinquent')")
-                        if await delinquent_link.count() > 0:
-                            await delinquent_link.first.click()
-                            await page.wait_for_load_state("networkidle", timeout=20000)
+                        # Discover guid from page if not known
+                        guid = cfg.get("guid")
+                        if not guid:
                             html = await page.content()
+                            m = re.search(
+                                r"cloudfront\.net/(?:views|css|data)/([a-f0-9-]{36})",
+                                html,
+                            )
+                            if m:
+                                guid = m.group(1)
+                                log.info("nc_avalon.guid_found", county=county, guid=guid)
+                            else:
+                                log.warning("nc_avalon.no_guid", county=county)
+                                continue
 
-                        results_county = self._parse_html(html, base_url, county, cfg["state"])
-                        results.extend(results_county)
+                        # Query the Wildfire API for delinquent records
+                        # Try different search terms to find delinquent records
+                        # The API returns all records, we filter by isDelinquent
+                        county_results = await self._fetch_via_api(page, base_url, guid, county, cfg["state"])
+                        results.extend(county_results)
 
-                        log.info("nc_avalon.county_done", county=county, found=len(results_county))
+                        log.info("nc_avalon.county_done", county=county, found=len(county_results))
 
                     finally:
                         await page.close()
@@ -114,44 +122,126 @@ class NcAvalonTaxScraper(BaseScraper):
 
         return results
 
-    def _parse_html(self, html: str, base_url: str, county: str, state: str) -> list[Listing]:
-        """Parse delinquent tax list HTML."""
+    async def _fetch_via_api(
+        self, page, base_url: str, guid: str, county: str, state: str
+    ) -> list[Listing]:
+        """Query the Wildfire Records API and filter for delinquent records."""
         results: list[Listing] = []
-        soup = BeautifulSoup(html, "html.parser")
+        api_url = f"{_CLOUDFRONT_BASE}/data/{guid}/Wildfire/Records"
 
-        rows = soup.select(
-            "table tr, .data-table tr, .delinquent-list .item, "
-            ".search-results tr, .grid-view tr"
-        )
+        # Search with broad terms to get as many delinquent records as possible
+        # The API paginates with skip
+        search_terms = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j",
+                        "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
+                        "u", "v", "w", "x", "y", "z"]
 
-        for row in rows[1:]:
-            cells = row.find_all("td")
-            if len(cells) < 3:
-                continue
+        seen_ids: set[str] = set()
+        total_delinquent = 0
 
-            parcel_id = cells[0].get_text(strip=True)
-            owner = cells[1].get_text(strip=True) if len(cells) > 1 else ""
-            addr = cells[2].get_text(strip=True) if len(cells) > 2 else ""
-            amount = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+        for term in search_terms:
+            skip = 0
+            page_size = 20  # API default
 
-            amount_val = None
-            if amount:
-                m = re.search(r"[\$]([\d,.]+)", amount)
-                if m:
-                    amount_val = float(m.group(1).replace(",", ""))
+            while True:
+                try:
+                    response = await page.evaluate(
+                        """async (params) => {
+                            const resp = await fetch(params.url, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    value: params.term,
+                                    skip: params.skip,
+                                    direct: false
+                                })
+                            });
+                            return await resp.text();
+                        }""",
+                        {"url": api_url, "term": term, "skip": skip},
+                    )
 
-            results.append(Listing(
-                source=self.slug,
-                source_url=base_url,
-                listing_type=ListingType.TAX_LIEN,
-                property_kind=PropertyKind.UNKNOWN,
-                street_address=addr,
-                county=county.title(),
-                state=state,
-                parcel_id=parcel_id,
-                owner_name=owner,
-                tax_value=amount_val,
-                raw={"county": county, "amount_due": amount},
-            ))
+                    if not response:
+                        break
+
+                    data = json.loads(response)
+                    records = data.get("Records", [])
+                    total_records = data.get("TotalRecords", 0)
+
+                    if not records:
+                        break
+
+                    for rec in records:
+                        billing_id = rec.get("BillingID", "")
+                        if billing_id in seen_ids:
+                            continue
+                        seen_ids.add(billing_id)
+
+                        if not rec.get("isDelinquent", False):
+                            continue
+
+                        total_delinquent += 1
+
+                        # Extract fields
+                        owner = rec.get("OwnerName1", "")
+                        owner2 = rec.get("OwnerName2", "")
+                        if owner2:
+                            owner = f"{owner} / {owner2}"
+
+                        addr_obj = rec.get("SitusAddress", {})
+                        addr = addr_obj.get("Line1", "")
+                        city = addr_obj.get("City", "") or ""
+                        zip_code = addr_obj.get("Zip", "") or ""
+
+                        values = rec.get("Values", {})
+                        amount_due = values.get("AmountDue", 0)
+
+                        payment = rec.get("Payment", {})
+                        payment_status = payment.get("Status", "")
+
+                        parcel = rec.get("ParcelNumber", "")
+                        bill_num = ""
+                        ids = rec.get("IDs", {})
+                        if ids.get("ID1"):
+                            bill_num = ids["ID1"].get("Value", "")
+
+                        results.append(Listing(
+                            source=self.slug,
+                            source_url=base_url,
+                            listing_type=ListingType.TAX_LIEN,
+                            property_kind=PropertyKind.UNKNOWN,
+                            street_address=addr,
+                            city=city,
+                            state=state,
+                            zip_code=zip_code,
+                            county=county.title(),
+                            parcel_id=parcel,
+                            owner_name=owner,
+                            tax_value=amount_due if amount_due else None,
+                            raw={
+                                "county": county,
+                                "amount_due": amount_due,
+                                "bill_number": bill_num,
+                                "payment_status": payment_status,
+                                "year": rec.get("Year"),
+                                "owner_id": rec.get("OwnerID"),
+                            },
+                        ))
+
+                    skip += len(records)
+
+                    # Stop if we've gone through all records for this term
+                    if skip >= total_records or len(records) < page_size:
+                        break
+
+                    # Rate limit
+                    await asyncio.sleep(0.5)
+
+                except Exception as exc:
+                    log.warning("nc_avalon.api_error", county=county, term=term, skip=skip, error=str(exc)[:160])
+                    break
+
+            log.info("nc_avalon.term_done", county=county, term=term, delinquent=total_delinquent)
 
         return results
