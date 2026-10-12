@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Debug reCAPTCHA on Lincoln county tax site."""
+"""Debug Lincoln county tax SPA — intercept API calls."""
 import asyncio
-import re
+import json
 from playwright.async_api import async_playwright
 
 async def main():
@@ -9,42 +9,57 @@ async def main():
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-gpu"])
         page = await browser.new_page()
         
+        # Intercept API calls
+        api_calls = []
+        async def on_response(response):
+            url = response.url
+            if any(x in url for x in ['api', 'Ajax', 'Search', 'List', 'Delinquent', 'query']):
+                try:
+                    body = await response.text()
+                    api_calls.append({
+                        'url': url[:200],
+                        'status': response.status,
+                        'body_preview': body[:500]
+                    })
+                except:
+                    api_calls.append({'url': url[:200], 'status': response.status})
+        
+        page.on("response", on_response)
+        
         url = "https://www.lincolncountytax.com/List/Delinquent"
         print(f"Navigating to {url}")
         await page.goto(url, timeout=30000)
-        await page.wait_for_load_state("networkidle", timeout=15000)
+        await page.wait_for_load_state("networkidle", timeout=20000)
         
-        print(f"Page URL: {page.url}")
-        print(f"Page title: {await page.title()}")
+        # Wait a bit for SPA to load
+        await asyncio.sleep(5)
         
-        # List all iframes
-        frames = page.frames
-        for f in frames:
-            print(f"Frame: url={f.url[:200]} name={f.name}")
+        # Try to find and interact with any search/filter buttons
+        buttons = await page.query_selector_all("button, input[type='submit'], a.btn")
+        for btn in buttons:
+            text = await btn.inner_text() if btn else ""
+            print(f"Button: {text[:100]}")
         
-        # Get page content
-        html = await page.content()
-        print(f"Page length: {len(html)}")
+        # Look for any data tables
+        tables = await page.query_selector_all("table")
+        print(f"Tables found: {len(tables)}")
+        for i, table in enumerate(tables):
+            rows = await table.query_selector_all("tr")
+            print(f"  Table {i}: {len(rows)} rows")
+            if rows:
+                first_row = await rows[0].inner_text()
+                print(f"    First row: {first_row[:200]}")
         
-        # Find recaptcha-related elements
-        for m in re.finditer(r'<iframe[^>]*>', html, re.I):
-            tag = m.group()
-            if 'recaptcha' in tag.lower() or 'captcha' in tag.lower() or 'google' in tag.lower():
-                print(f"CAPTCHA iframe: {tag[:300]}")
+        # Print API calls
+        print(f"\n=== API CALLS ({len(api_calls)}) ===")
+        for call in api_calls:
+            print(f"  [{call.get('status', '?')}] {call['url']}")
+            if 'body_preview' in call:
+                print(f"    Body: {call['body_preview'][:200]}")
         
-        for m in re.finditer(r'class="[^"]*(?:recaptcha|captcha|g-recaptcha)[^"]*"', html, re.I):
-            print(f"CAPTCHA class: {m.group()[:200]}")
-        
-        for m in re.finditer(r'data-sitekey="([^"]+)"', html):
-            print(f"sitekey: {m.group(1)}")
-        
-        # Check for Turnstile
-        if 'turnstile' in html.lower() or 'cf-turnstile' in html.lower():
-            print("Turnstile detected!")
-        
-        # Print first 2000 chars of body text
+        # Get body text
         body_text = await page.inner_text("body")
-        print(f"\nBody text (first 1000):\n{body_text[:1000]}")
+        print(f"\nBody text (last 1000):\n{body_text[-1000:]}")
         
         await browser.close()
 
