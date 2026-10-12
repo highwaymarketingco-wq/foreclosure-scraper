@@ -61,9 +61,14 @@ class NcUnclaimedScraper(BaseScraper):
         import asyncio
         import httpx
 
+        import os
+        # Use non-headless if Xvfb is available (Turnstile requires interaction)
+        xvfb = os.environ.get("DISPLAY", "")
+        headless = not bool(xvfb)
+
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(
-                headless=True,
+                headless=headless,
                 args=[
                     "--no-sandbox",
                     "--disable-gpu",
