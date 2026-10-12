@@ -21,7 +21,7 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-_URL = "https://unclaimed.nccash.gov/"
+_URL = "https://unclaimed.nccash.gov/app/claim-search"
 _API = "https://unclaimed.nccash.gov/SWS/properties"
 
 # Common NC surnames for unclaimed property search
@@ -123,21 +123,27 @@ class NcUnclaimedScraper(BaseScraper):
             # Search for each surname
             for surname in _SEARCH_NAMES:
                 try:
-                    # Wait for search form — try multiple selectors
-                    last_name_input = page.locator(
-                        "input[name*='lastName'], input[name*='LastName'], "
-                        "input[placeholder*='Last'], input[id*='lastName'], "
-                        "input[id*='lastname'], input[formcontrolname*='name']"
-                    )
+                    # Wait for search form — exact selectors from page DOM
+                    last_name_input = page.locator("input[name='lastName'], #lastName")
                     if await last_name_input.count() > 0:
                         await last_name_input.first.fill(surname)
 
-                        # Click search button
-                        search_btn = page.locator(
-                            "button:has-text('Search'), input[type='submit'], "
-                            "button[type='submit'], .search-btn, "
-                            "button:has-text('SEARCH')"
-                        )
+                        # Wait for Turnstile token to populate before clicking search
+                        # Turnstile managed mode auto-solves — wait for the hidden field
+                        try:
+                            await page.wait_for_function(
+                                """() => {
+                                    const el = document.querySelector('[name=\"cf-turnstile-response\"]');
+                                    return el && el.value && el.value.length > 10;
+                                }""",
+                                timeout=20000,
+                            )
+                            log.info("nc_unclaimed.turnstile_solved", surname=surname)
+                        except Exception:
+                            log.warning("nc_unclaimed.turnstile_timeout", surname=surname)
+
+                        # Click search button (id=btn-turnstile, text=SEARCH)
+                        search_btn = page.locator("#btn-turnstile, button:has-text('SEARCH')")
                         if await search_btn.count() > 0:
                             await search_btn.first.click()
                             # Wait for API response
