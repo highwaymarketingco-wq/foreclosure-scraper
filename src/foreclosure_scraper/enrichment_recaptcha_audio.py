@@ -138,13 +138,15 @@ _AUDIO_BUTTON_SELECTORS = [
     ".rc-button-audio",
     "a.rc-button-audio",
     "button.rc-button-audio",
+    ".rc-button.goog-inline-block[aria-label*='audio' i]",
     "[aria-label*='audio' i]",
     "[aria-label*='Get an audio' i]",
     "a:has-text('audio')",
     "button:has-text('AUDIO')",
     "a:has-text('AUDIO')",
-    ".rc-button.goog-inline-block[aria-label*='audio' i]",
-    "#recaptcha-reload-button",  # sometimes the reload doubles as audio toggle
+    # Fallback: find any clickable element with audio-related class/attribute
+    "[class*='audio' i]",
+    "a[href*='audio']",
 ]
 _AUDIO_DOWNLOAD_SELECTORS = [
     ".rc-audiochallenge-tdownload-link",
@@ -258,9 +260,21 @@ async def solve_recaptcha_v2(
             try:
                 frame_html = await challenge_frame.content()
                 log.warning("recaptcha.no_audio_button_clicked",
-                            frame_html_excerpt=frame_html[:500])
+                            attempt=attempt + 1,
+                            frame_html_excerpt=frame_html[:1000])
             except Exception:
-                log.warning("recaptcha.no_audio_button_clicked_no_html")
+                log.warning("recaptcha.no_audio_button_clicked_no_html",
+                            attempt=attempt + 1)
+            # Skip audio download — can't download what we never opened
+            # Try reloading the challenge to get a fresh layout
+            try:
+                reload_btn = await challenge_frame.query_selector("#recaptcha-reload-button")
+                if reload_btn:
+                    await reload_btn.click()
+                    await page.wait_for_timeout(2000)
+            except Exception:
+                pass
+            continue
 
         # Step 4: Download the audio clip.
         audio_path = await _download_audio_clip(page, challenge_frame)
