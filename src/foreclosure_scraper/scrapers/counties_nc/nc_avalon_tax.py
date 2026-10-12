@@ -34,11 +34,6 @@ _COUNTY_SITES = {
         "state": "NC",
         "guid": "a45b9ca6-46be-4396-9468-56194741a38e",
     },
-    "caldwell": {
-        "url": "https://www.caldwellcountytax.com",
-        "state": "NC",
-        "guid": None,  # Will discover from page
-    },
 }
 
 _CLOUDFRONT_BASE = "https://d1ebsyxxbc7tep.cloudfront.net"
@@ -179,7 +174,11 @@ class NcAvalonTaxScraper(BaseScraper):
                         seen_ids.add(billing_id)
 
                         if not rec.get("isDelinquent", False):
-                            continue
+                            # Also check AmountDue > 0 — taxes owed but not yet delinquent
+                            values = rec.get("Values", {})
+                            amount_due = values.get("AmountDue", 0)
+                            if not amount_due or amount_due <= 0:
+                                continue
 
                         total_delinquent += 1
 
