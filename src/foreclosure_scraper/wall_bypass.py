@@ -330,6 +330,7 @@ async def fetch_with_nodriver(
     *,
     timeout_s: int = _NODRIVER_TIMEOUT_S,
     wait_for_text: str | None = None,
+    return_html: bool = False,
 ) -> str:
     """Fetch a URL with nodriver (undetected Chrome).
 
@@ -337,13 +338,13 @@ async def fetch_with_nodriver(
     fingerprinting anti-bot systems that go beyond Cloudflare. It uses
     CDP directly and patches Chrome's automation fingerprints.
 
-    Returns rendered page text, or "" on failure.
+    Returns rendered page text (or raw HTML if return_html=True), or "" on failure.
     """
     async with _nodriver_sem():
         # First attempt — uses the configured headless setting.
         try:
             text = await asyncio.wait_for(
-                _nodriver_fetch(url, timeout_s, wait_for_text),
+                _nodriver_fetch(url, timeout_s, wait_for_text, return_html=return_html),
                 timeout=timeout_s + 20,
             )
         except asyncio.TimeoutError:
@@ -382,7 +383,8 @@ async def fetch_with_nodriver(
 
 
 async def _nodriver_fetch(
-    url: str, timeout_s: int, wait_for_text: str | None, headless: bool | None = None
+    url: str, timeout_s: int, wait_for_text: str | None, headless: bool | None = None,
+    return_html: bool = False,
 ) -> str:
     from foreclosure_scraper.browser_utils import start_browser
 
@@ -445,6 +447,9 @@ async def _nodriver_fetch(
 
         if not html:
             return ""
+
+        if return_html:
+            return html
 
         return _html_to_text(html)
 

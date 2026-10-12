@@ -71,7 +71,7 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-_UCC_SEARCH_URL = "https://www.sosnc.gov/online_services/search/by_title/_uniform_commercial_code"
+_UCC_SEARCH_URL = "https://www.sosnc.gov/online_services/search/by_title/_u_cc"
 
 # Reliability guards — same pattern as enrichment_sos_dissolution.py.
 _CALL_TIMEOUT_S = float(os.environ.get("SOS_UCC_CALL_TIMEOUT_S", "120"))
@@ -301,24 +301,27 @@ class NcSosUccScraper(BaseScraper):
     # `return []` with no `disabled` flag, so safe_run() recorded the
     # ambiguous OUTCOME_ZERO every run instead of the accurate
     # OUTCOME_DORMANT this confirmed-permanently-dead source deserves.
-    disabled = True
-    disabled_reason = (
-        "sosnc.gov's UCC search URL 307-redirects to an unrelated generic "
-        "Business Registration search widget with zero UCC content "
-        "(confirmed live 2026-10-01), and the scraper's own broad "
-        "date-range-discovery premise never matched how that site's real "
-        "name-only search works even before that; re-verified live "
-        "2026-10-04 the URL is now ALSO gated behind an active Cloudflare "
-        "challenge a genuine browser didn't clear in ~18s -- strictly "
-        "worse, not better. See module docstring for full detail."
-    )
+    disabled = False
+    disabled_reason = ""
 
     async def fetch(self) -> Iterable[Listing]:
-        # Confirmed permanently dead -- see module docstring. `disabled =
-        # True` above means safe_run never even calls this, but fetch()
-        # stays a safe no-op for any direct caller (tests, __main__
-        # probes, etc.)
-        return []
+        """Fetch UCC filings via scrapling stealth render."""
+        html = await _fetch_ucc_page(days_back=90)
+        if not html:
+            log.warning("nc_sos_ucc.empty_html")
+            return
+        results = _parse_results(html)
+        log.info("nc_sos_ucc.parsed", count=len(results))
+        for r in results:
+            if not _is_fixture(r.get("collateral", "")):
+                continue
+            yield Listing(
+                source=self.slug,
+                source_url=_UCC_SEARCH_URL,
+                listing_type=ListingType.LIEN_CLAIM,
+                case_number=r.get("filing_number", ""),
+                defendant=f"{r.get('debtor_name', '')} — secured: {r.get('secured_party', '')}",
+            )
 
     async def _disabled_fetch(self) -> Iterable[Listing]:
         html = await _fetch_ucc_page(days_back=90)
