@@ -21,7 +21,7 @@ GEMINI_KEYS = [
 GEMINI_KEYS = [k for k in GEMINI_KEYS if k]
 _key_idx = 0
 
-LEXINGTON_URL = "https://www.lex-co.com/Departments/ProbateCourt/ProbateCourtRecordsSearch.aspx"
+LEXINGTON_URL = "https://www.lex-co.com/ProbateSearch/estates"
 
 
 def _get_key():
@@ -154,9 +154,13 @@ async def main():
         await page.goto(LEXINGTON_URL, timeout=60000)
         await asyncio.sleep(5)
 
-        # Take initial screenshot
-        await page.screenshot(path="/tmp/lexington_initial.png")
-        print("Initial screenshot saved")
+        # Wait for reCAPTCHA to load
+        await asyncio.sleep(10)
+
+        # List all frames
+        print("Frames after page load:")
+        for frame in page.frames:
+            print(f"  {frame.url[:120]}")
 
         # Find reCAPTCHA iframe
         recaptcha_frame = None
