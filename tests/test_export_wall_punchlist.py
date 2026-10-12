@@ -110,3 +110,30 @@ def test_blocked_evidence_rules():
     assert ewp.is_blocked_evidence({"http_status": 403})
     assert not ewp.is_blocked_evidence({"reason": "portal_unhealthy", "portal_health": "timeout"})
     assert not ewp.is_blocked_evidence({"reason": "tenant_unhealthy", "tenant_health": "http_503"})
+
+
+def test_ready_marker(tmp_path):
+    board, ldir, verifiers = _setup(tmp_path)
+    s, items, out = _run(tmp_path, board, ldir, verifiers)
+    mp = ewp.write_ready_marker(out, s, now="2026-10-11T00:00:00Z")
+    m = json.loads(mp.read_text())
+    assert m["kind"] == "wall_punchlist_ready" and m["listings"] == 4
+    assert len(m["punchlist_sha256"]) == 64 and m["json"].endswith("wall_punchlist.json")
+
+
+def test_sweep_chains_export(tmp_path, monkeypatch):
+    spec = importlib.util.spec_from_file_location(
+        "verification_sweep", Path(__file__).resolve().parents[1] / "scripts" / "verification_sweep.py")
+    vs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vs)
+    calls = []
+
+    class R:
+        returncode, stdout, stderr = 0, "ready marker: x", ""
+    import subprocess
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: calls.append(cmd) or R())
+    assert vs.export_punchlist(tmp_path / "listings.json.gz", tmp_path) == 0
+    assert calls and "--ready-marker" in calls[0] and calls[0][1].endswith("export_wall_punchlist.py")
+    monkeypatch.setenv("VERIFY_PUNCHLIST_EXPORT", "0")
+    calls.clear()
+    assert vs.export_punchlist(tmp_path / "x", tmp_path) == 0 and not calls

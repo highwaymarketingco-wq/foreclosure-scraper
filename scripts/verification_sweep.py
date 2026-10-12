@@ -416,10 +416,42 @@ def run(args) -> int:
         for sig, t in tallies.items()) + f" [{now.date().isoformat()}]")
     if not checked:
         print("nothing checked; no commit", flush=True)
-        return 0
-    res, detail = L.publish_ledgers(paths, msg)
-    print(f"git: {res} {detail}", flush=True)
+    else:
+        res, detail = L.publish_ledgers(paths, msg)
+        print(f"git: {res} {detail}", flush=True)
+    export_punchlist(Path(args.docs) / "listings.json.gz", ldir)
     return 0
+
+
+def export_punchlist(board: Path, ldir: Path) -> int:
+    """The sweep's last step (docs/VERIFICATION_HANDOFF_PLAN.md section h): re-export the wall
+    punch list from the ledgers just saved and write data/handoff/wall_punchlist.ready for the
+    walled-source platform's watcher. A separate process (its own board pass, its memory freed
+    when it exits), after this run's board scan is over. VERIFY_PUNCHLIST_EXPORT=0 skips it;
+    a failure is printed and never fails the sweep. Returns the export's exit code."""
+    if os.environ.get("VERIFY_PUNCHLIST_EXPORT") == "0":
+        print("punch list export: skipped (VERIFY_PUNCHLIST_EXPORT=0)", flush=True)
+        return 0
+    import subprocess
+    cmd = [sys.executable, str(REPO / "scripts" / "export_wall_punchlist.py"),
+           "--board", str(board), "--ledger-dir", str(ldir), "--ready-marker"]
+    if Path(ldir).resolve() != L.LEDGER_DIR.resolve():
+        # a sweep on another ledger directory (a test, a dry copy) never overwrites the real
+        # punch list, marker or committed summary: its export goes beside that directory
+        side = Path(ldir).parent / "wall_punchlist_out"
+        cmd += ["--out-dir", str(side), "--summary", str(side / "wall_punchlist_summary.json")]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=float(os.environ.get("VERIFY_PUNCHLIST_TIMEOUT_S", "1800")))
+    except Exception as exc:  # noqa: BLE001 - the sweep's ledgers are already saved
+        print(f"!! punch list export failed: {type(exc).__name__}: {exc}", flush=True)
+        return 1
+    tail = (r.stdout or "").strip().splitlines()
+    print("punch list export: rc=%d %s" % (r.returncode, " | ".join(
+        ln for ln in tail if ln.startswith(("{", "ready marker", "peak_rss")))), flush=True)
+    if r.returncode:
+        print((r.stderr or "")[-1500:], flush=True)
+    return r.returncode
 
 
 if __name__ == "__main__":

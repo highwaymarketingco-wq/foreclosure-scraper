@@ -257,6 +257,33 @@ def export(board: Path, ledger_directory: Path, out_dir: Path, summary_path: Opt
     return summary
 
 
+READY_KIND = "wall_punchlist_ready"
+
+
+def write_ready_marker(out_dir: Path, summary: dict, *, now: Optional[str] = None) -> Path:
+    """data/handoff/wall_punchlist.ready: written (atomically) only after both output files are
+    complete, so a watcher that sees a new marker can read the punch list at once. Its
+    `punchlist_sha256` changes exactly when the punch list does; a consumer remembers the last
+    value it processed and skips a marker it has seen."""
+    import hashlib
+    from datetime import datetime, timezone
+    jp = out_dir / "wall_punchlist.json"
+    h = hashlib.sha256()
+    with open(jp, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    marker = {"kind": READY_KIND, "format_version": FORMAT_VERSION,
+              "generated_at": now or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "json": str(jp), "csv": str(out_dir / "wall_punchlist.csv"),
+              "punchlist_sha256": h.hexdigest(), "listings": summary["listings"],
+              "by_category": summary["by_category"], "board_rows": summary["board_rows"]}
+    mp = out_dir / "wall_punchlist.ready"
+    tmp = out_dir / ".wall_punchlist.ready.tmp"
+    tmp.write_text(json.dumps(marker, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(mp)
+    return mp
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--board", default=str(REPO / "docs" / "listings.json.gz"))
@@ -264,11 +291,15 @@ def main(argv=None) -> int:
     ap.add_argument("--out-dir", default=str(REPO / "data" / "handoff"))
     ap.add_argument("--summary", default=str(REPO / "docs" / "handoff" / "wall_punchlist_summary.json"))
     ap.add_argument("--no-uncovered", action="store_true")
+    ap.add_argument("--ready-marker", action="store_true",
+                    help="after a complete export, write <out-dir>/wall_punchlist.ready")
     a = ap.parse_args(argv)
     s = export(Path(a.board), Path(a.ledger_dir), Path(a.out_dir), Path(a.summary) if a.summary else None,
                include_uncovered=not a.no_uncovered)
     print(json.dumps({k: s[k] for k in ("board_rows", "listings", "by_category")}, sort_keys=True))
     print(json.dumps(s["wall"], indent=1))
+    if a.ready_marker:
+        print(f"ready marker: {write_ready_marker(Path(a.out_dir), s)}")
     print(f"peak_rss_mb={peak_rss_mb():.0f}")
     return 0
 
