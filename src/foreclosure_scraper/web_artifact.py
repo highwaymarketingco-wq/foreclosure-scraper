@@ -4978,18 +4978,44 @@ def write_artifact(
 # ===========================================================================
 
 _APPEND_SIG_FIELDS = ("state", "county", "parcel_id", "street_address", "zip_code",
-                     "case_number", "source_url", "listing_type")
+                     "case_number", "source_url", "listing_type",
+                     # Added 2026-10-11: row_keys() fingerprint needs these to
+                     # match the wire script's row_keys() for identity-less rows.
+                     # Without them, the fingerprint differs between the wire
+                     # script's Listing objects and the board's model_construct
+                     # dicts, so duplicates of identity-less rows slip through.
+                     "source", "city", "plaintiff", "defendant", "trustee",
+                     "sale_date", "sale_time", "sale_location", "opening_bid",
+                     "judgment_amount", "legal_description")
 
 
 def _append_row_sigs(li: Listing) -> set:
     """Same-property signatures for a Listing. Duplicates scripts/run_scoped_scrapers.py's
     _sigs_of()/board_overlap() exactly (not imported: scripts/ is a collection of entry points,
-    not an importable package this library module should depend on -- the dependency would also
-    point the wrong way). Keep the two in sync if dedupe.py's signature set changes."""
+    not an importable package this library should depend on -- the dependency would also
+    point the wrong way). Keep the two in sync if dedupe.py's signature set changes.
+
+    2026-10-11 FIX: Also include row_keys() from verification.core. Previously, identity-less
+    rows (no parcel, no address, no case_number) fell back to ('k', 'url:<source_url>').
+    But the wire script (wire_walled_to_board.py) dedupes using row_keys() which falls back
+    to 'row:<fingerprint>' (hash of ALL identity fields). When a walled row had
+    source_url='walled://judgment_liens' and the board row had source_url='https://court.gov',
+    they never matched -- so 173 of 232 duplicates slipped through. Adding row_keys() makes
+    both sides use the same fingerprint for identity-less rows.
+    """
     from .dedupe import _strong_sigs
+    from .verification.core import row_keys as _ver_row_keys
     out = set(_strong_sigs(li))
     try:
         out.add(("k", li.dedupe_key()))
+    except Exception:  # noqa: BLE001
+        pass
+    # Add row_keys() signatures (parcel:state:county:parcel, addr:..., case:..., row:fingerprint)
+    # These are the SAME keys the wire script uses for its in-set dedup, so a candidate
+    # that survived the wire script's dedup will also match an existing board row here.
+    try:
+        for k in _ver_row_keys(li):
+            out.add(("rk", k))
     except Exception:  # noqa: BLE001
         pass
     return out

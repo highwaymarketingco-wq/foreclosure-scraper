@@ -106,6 +106,10 @@ ESTATE_CASE_TYPE_RE = re.compile(
     re.I,
 )
 
+# Criminal case-number prefixes that must never appear in an estate result.
+# If the category filter fails and criminal cases leak in, this catches them.
+_CRIMINAL_CASE_RE = re.compile(r"^\s*(CR|CRS|IF|VR|CVL)\s*\d", re.I)
+
 # Party-role labels for the actionable contact on an estate. The decedent is
 # the property owner; the executor/administrator/PR is the person who can sell.
 _EXECUTOR_ROLE_RE = re.compile(
@@ -185,8 +189,17 @@ def _row_to_listing(row: dict, slug: str) -> Optional[Listing]:
       }
     """
     case_type = row.get("case_type") or ""
-    # Second-pass guard: skip rows whose caseType isn't estate-shaped.
-    if case_type and not ESTATE_CASE_TYPE_RE.search(case_type):
+    # Guard: require a positive estate-shaped caseType. Previously an empty
+    # case_type passed through this guard (the `if case_type and ...` check
+    # skipped when case_type was falsy), letting criminal rows (CR/CRS numbers)
+    # through when the category filter wasn't applied. Now: no caseType, no pass.
+    if not case_type or not ESTATE_CASE_TYPE_RE.search(case_type):
+        return None
+
+    case_number = (row.get("case_number") or "").strip()
+    # Criminal case numbers (CR/CRS/IF) must never appear in estate results.
+    # This is a defense-in-depth guard for when the category filter leaks.
+    if case_number and _CRIMINAL_CASE_RE.match(case_number):
         return None
 
     location = row.get("location") or ""
@@ -245,7 +258,6 @@ def _row_to_listing(row: dict, slug: str) -> Optional[Listing]:
     if not decedent:
         return None
 
-    case_number = (row.get("case_number") or "").strip()
     detail_url = row.get("detail_url") or f"{SEARCH_URL}#/search?caseNumber={case_number}"
 
     filed_iso = None
@@ -352,6 +364,15 @@ async def _drive_estate_search(page, counties: list[str], lookback_days: int) ->
     # Step 3: select the Estate case category once.
     selected = await _select_case_category(page, ESTATE_CATEGORY_LABELS)
     log.info("nc_ecourts_estates.category_selected", ok=selected)
+    if not selected:
+        # Without the Estate category filter the Smart Search returns ALL case
+        # types (criminal, civil, traffic, etc.). Running a blank per-county
+        # search without the filter produced 10 criminal cases (CR/CRS numbers)
+        # mislabelled as estates on 2026-10-11. Abort instead of polluting the
+        # board with non-estate rows.
+        log.warning("nc_ecourts_estates.category_select_failed_abort")
+        _dump("estates_no_category", await _safe_content(page))
+        return rows
 
     # Step 4: per-county blank search, page the hitlist.
     for county in counties:

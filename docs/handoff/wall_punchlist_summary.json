@@ -2,7 +2,7 @@
  "board_rows": 350013,
  "by_category": {
   "uncovered": 159560,
-  "wall": 72360
+  "wall": 27972
  },
  "format_version": 1,
  "kind": "wall_punchlist_summary",
@@ -61,7 +61,7 @@
    "generated_at": "2026-10-06T20:33:57Z"
   }
  },
- "listings": 231920,
+ "listings": 187532,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4294,
@@ -132,10 +132,9 @@
    "counties_generic.arcgis_distress.spartanburg_city_tax_sale": 25,
    "counties_generic.arcgis_distress.spartanburg_infill_eligible": 2,
    "counties_generic.arcgis_distress.spartanburg_property_cleanup": 23,
-   "counties_generic.liensnc": 39006,
    "counties_nc.nc_heir_estate_parcels": 12,
-   "counties_nc.rutherford_tax": 5103,
-   "counties_nc.rutherford_wildfire_tax": 3426,
+   "counties_nc.rutherford_tax": 5104,
+   "counties_nc.rutherford_wildfire_tax": 3429,
    "counties_sc.anderson_master_in_equity": 3,
    "counties_sc.cherokee_delinquent_tax": 66,
    "counties_sc.greenville_delinquent_tax": 190,
@@ -166,7 +165,6 @@
    "law_firms.brock_scott": 3,
    "law_firms.hutchens": 4,
    "law_firms.mcmichael_taylor_gray": 3,
-   "liensnc": 5386,
    "national.distressed": 9,
    "national.foreclosure_dot_com": 18,
    "national.homeharvest": 1,
@@ -186,12 +184,11 @@
   "by_signal": {
    "court_wall": 5741,
    "divorce": 5099,
-   "lien_registry_wall": 61520
+   "lien_registry_wall": 17132
   },
   "by_wall_path": {
-   "avalon_tax": 8529,
+   "avalon_tax": 8533,
    "divorce_sc_wall": 5099,
-   "liensnc_login": 44392,
    "nc_est": 1965,
    "nc_sp": 155,
    "sc_lien_registries": 8599,
@@ -199,25 +196,25 @@
    "sc_publicindex": 3506
   },
   "by_wall_state": {
-   "not_yet_labelled": 71086,
+   "not_yet_labelled": 26698,
    "recorded": 1274
   },
   "top_counties": {
-   "NC:": 1848,
-   "NC:brunswick": 3134,
-   "NC:durham": 1635,
-   "NC:guilford": 1340,
-   "NC:harnett": 1256,
-   "NC:johnston": 1455,
-   "NC:mecklenburg": 4679,
-   "NC:rutherford": 8803,
-   "NC:union": 1229,
-   "NC:wake": 5480,
+   "NC:buncombe": 209,
+   "NC:cabarrus": 157,
+   "NC:rutherford": 8580,
    "SC:anderson": 1334,
+   "SC:beaufort": 1221,
    "SC:charleston": 3284,
+   "SC:cherokee": 1013,
+   "SC:georgetown": 202,
+   "SC:greenville": 711,
    "SC:horry": 1672,
+   "SC:laurens": 1004,
+   "SC:oconee": 1015,
    "SC:pickens": 1456,
-   "SC:spartanburg": 3641
+   "SC:spartanburg": 3641,
+   "SC:union": 433
   }
  }
 }
