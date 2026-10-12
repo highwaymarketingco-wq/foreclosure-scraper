@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Debug Lincoln county tax — query Wildfire/Records API directly."""
+"""Quick check: query Lincoln county Wildfire API and count delinquent vs paid."""
 import asyncio
 import json
 from playwright.async_api import async_playwright
@@ -9,69 +9,73 @@ async def main():
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-gpu"])
         page = await browser.new_page()
         
-        # Intercept the Records API call
-        records_response = None
-        async def on_response(response):
-            url = response.url
-            if 'Wildfire/Records' in url and response.request.method == 'POST':
-                nonlocal records_response
-                try:
-                    body = await response.text()
-                    records_response = {
-                        'url': url,
-                        'method': response.request.method,
-                        'request_body': response.request.post_data,
-                        'request_headers': dict(response.request.headers),
-                        'response_body': body[:5000]
-                    }
-                except:
-                    pass
-        
-        page.on("response", on_response)
-        
         url = "https://www.lincolncountytax.com/List/Delinquent"
         await page.goto(url, timeout=30000)
         await page.wait_for_load_state("networkidle", timeout=20000)
         
         # Accept disclaimer
-        accept_btn = page.locator("button:has-text('Accept')")
-        if await accept_btn.count() > 0:
-            await accept_btn.first.click()
+        accept = page.locator("button:has-text('Accept')")
+        if await accept.count() > 0:
+            await accept.first.click()
             await asyncio.sleep(2)
         
-        # Close tips modal
-        close_btn = page.locator("button:has-text('Close')")
-        if await close_btn.count() > 0:
-            await close_btn.first.click()
+        close = page.locator("button:has-text('Close')")
+        if await close.count() > 0:
+            await close.first.click()
             await asyncio.sleep(1)
         await page.keyboard.press("Escape")
         await asyncio.sleep(1)
         
-        # Type and search
-        search_input = page.locator("#searchBox")
-        await search_input.first.click()
-        await asyncio.sleep(0.5)
-        await search_input.first.fill("a")
-        await asyncio.sleep(2)
-        await page.keyboard.press("Enter")
-        await asyncio.sleep(10)
+        # Query API
+        api_url = "https://d1ebsyxxbc7tep.cloudfront.net/data/a45b9ca6-46be-4396-9468-56194741a38e/Wildfire/Records"
         
-        if records_response:
-            print("=== RECORDS API REQUEST ===")
-            print(f"URL: {records_response['url']}")
-            print(f"Method: {records_response['method']}")
-            print(f"Request body: {records_response.get('request_body', 'N/A')}")
-            print(f"\n=== RESPONSE (first 3000 chars) ===")
-            print(records_response['response_body'][:3000])
-        else:
-            print("No Records API call captured")
+        response = await page.evaluate(
+            """async (url) => {
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({value: 'a', skip: 0, direct: false})
+                });
+                return await resp.text();
+            }""",
+            api_url,
+        )
         
-        # Also check if there are any filter buttons/tabs for delinquent
-        btns = await page.query_selector_all("button, a.btn, .nav-link, .tab")
-        for btn in btns:
-            text = await btn.inner_text()
-            if any(x in text.lower() for x in ['delinquent', 'unpaid', 'past due', 'owed', 'filter']):
-                print(f"Filter button found: {text}")
+        data = json.loads(response)
+        records = data.get("Records", [])
+        total = data.get("TotalRecords", 0)
+        
+        delinquent = [r for r in records if r.get("isDelinquent")]
+        unpaid = [r for r in records if r.get("Payment", {}).get("Status") != "Paid"]
+        amount_due = [r for r in records if r.get("Values", {}).get("AmountDue", 0) > 0]
+        
+        print(f"Total records (API): {total}")
+        print(f"Records in this page: {len(records)}")
+        print(f"isDelinquent=True: {len(delinquent)}")
+        print(f"Payment Status != Paid: {len(unpaid)}")
+        print(f"AmountDue > 0: {len(amount_due)}")
+        
+        if amount_due:
+            for r in amount_due[:5]:
+                print(f"\n  AmountDue record:")
+                print(f"    Owner: {r.get('OwnerName1')}")
+                print(f"    AmountDue: {r.get('Values', {}).get('AmountDue')}")
+                print(f"    Payment: {r.get('Payment', {}).get('Status')}")
+                print(f"    isDelinquent: {r.get('isDelinquent')}")
+                print(f"    ARStatus: {r.get('ARStatus')}")
+                print(f"    CollectionStatus: {r.get('CollectionStatus')}")
+        
+        if unpaid:
+            for r in unpaid[:5]:
+                print(f"\n  Unpaid record:")
+                print(f"    Owner: {r.get('OwnerName1')}")
+                print(f"    AmountDue: {r.get('Values', {}).get('AmountDue')}")
+                print(f"    Payment: {r.get('Payment', {}).get('Status')}")
+                print(f"    isDelinquent: {r.get('isDelinquent')}")
+        
+        # Check if there's a RequiresGetDelinquents field
+        delinq_flag = [r for r in records if r.get("RequiresGetDelinquents")]
+        print(f"\nRequiresGetDelinquents=True: {len(delinq_flag)}")
         
         await browser.close()
 
