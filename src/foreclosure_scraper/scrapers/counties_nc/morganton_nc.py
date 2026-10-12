@@ -36,14 +36,17 @@ class MorgantonNcScraper(BaseScraper):
         results: list[Listing] = []
 
         try:
-            from playwright.async_api import async_playwright
+            from patchright.async_api import async_playwright
         except ImportError:
-            log.error("morganton_nc.no_playwright")
-            return results
+            try:
+                from playwright.async_api import async_playwright
+            except ImportError:
+                log.error("morganton_nc.no_playwright")
+                return results
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                headless=True,
+                headless=False,
                 args=["--no-sandbox", "--disable-gpu"],
             )
 
