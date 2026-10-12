@@ -4,13 +4,9 @@ unclaimed.nccash.gov hosts NC's unclaimed property database behind a
 Cloudflare Turnstile challenge. The Angular SPA calls POST /SWS/properties
 with a Turnstile token.
 
-Strategy: Use pydoll (Cloudflare Turnstile bypass) to render the page,
-solve Turnstile automatically, then execute search queries through the
-browser. The Angular app makes XHR calls to /SWS/properties — we intercept
-those responses.
-
-If pydoll is unavailable or fails, fall back to Playwright with the
-enrichment_waf_oss solver.
+Strategy: Playwright renders the SPA. Turnstile in managed mode auto-solves
+without user interaction — we just wait for the page to settle. The Angular
+app makes XHR calls to /SWS/properties — we intercept those responses.
 """
 from __future__ import annotations
 
@@ -36,7 +32,7 @@ _SEARCH_NAMES = [
 
 
 class NcUnclaimedScraper(BaseScraper):
-    """NC Unclaimed Property — Turnstile via pydoll/Playwright."""
+    """NC Unclaimed Property — Turnstile auto-solve via Playwright."""
 
     slug = "national.nc_unclaimed"
     name = "NC Unclaimed Property"
@@ -47,25 +43,14 @@ class NcUnclaimedScraper(BaseScraper):
         results: list[Listing] = []
 
         try:
-            from ...wall_bypass import fetch_with_pydoll
-            html = await fetch_with_pydoll(_URL, timeout_s=120)
-            if html and len(html) > 1500:
-                results = self._search_via_browser(html)
-                if results:
-                    return results
-        except Exception as exc:
-            log.warning("nc_unclaimed.pydoll_failed", error=str(exc)[:160])
-
-        # Fallback: Playwright with WAF solver
-        try:
             results = await self._fetch_with_playwright()
-        except Exception as exc:
+        except BaseException as exc:
             log.warning("nc_unclaimed.playwright_failed", error=str(exc)[:160])
 
         return results
 
     async def _fetch_with_playwright(self) -> list[Listing]:
-        """Use Playwright to render the SPA, solve Turnstile, and search."""
+        """Use Playwright to render the SPA. Turnstile auto-solves in managed mode."""
         results: list[Listing] = []
         try:
             from playwright.async_api import async_playwright
@@ -73,8 +58,9 @@ class NcUnclaimedScraper(BaseScraper):
             log.error("nc_unclaimed.no_playwright")
             return results
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
+        browser = None
+        try:
+            browser = await async_playwright().chromium.launch(
                 headless=True,
                 args=["--no-sandbox", "--disable-gpu"],
             )
@@ -93,26 +79,27 @@ class NcUnclaimedScraper(BaseScraper):
 
             page.on("response", handle_response)
 
-            await page.goto(_URL, timeout=45000)
+            await page.goto(_URL, timeout=60000)
 
-            # Try WAF solver for Turnstile
+            # Turnstile managed mode auto-solves — just wait for SPA to settle.
+            # Give the Angular app time to bootstrap and Turnstile to clear.
             try:
-                from ...enrichment_waf_oss import solve_waf_via_browser
-                solved = await solve_waf_via_browser(page)
-                if solved:
-                    log.info("nc_unclaimed.turnstile_solved")
-                    await page.wait_for_load_state("networkidle", timeout=20000)
-            except Exception as exc:
-                log.warning("nc_unclaimed.waf_error", error=str(exc)[:160])
+                await page.wait_for_load_state("networkidle", timeout=30000)
+            except Exception:
+                pass  # networkidle may not fire if Turnstile keeps a connection open
+
+            # Wait a bit more for Angular to render the search form
+            import asyncio
+            await asyncio.sleep(5)
 
             # Search for each surname
             for surname in _SEARCH_NAMES:
                 try:
-                    # Wait for search form to appear
+                    # Wait for search form — try multiple selectors
                     last_name_input = page.locator(
                         "input[name*='lastName'], input[name*='LastName'], "
                         "input[placeholder*='Last'], input[id*='lastName'], "
-                        "input[id*='lastname']"
+                        "input[id*='lastname'], input[formcontrolname*='name']"
                     )
                     if await last_name_input.count() > 0:
                         await last_name_input.first.fill(surname)
@@ -120,11 +107,18 @@ class NcUnclaimedScraper(BaseScraper):
                         # Click search button
                         search_btn = page.locator(
                             "button:has-text('Search'), input[type='submit'], "
-                            "button[type='submit']"
+                            "button[type='submit'], .search-btn, "
+                            "button:has-text('SEARCH')"
                         )
                         if await search_btn.count() > 0:
                             await search_btn.first.click()
-                            await page.wait_for_load_state("networkidle", timeout=30000)
+                            # Wait for API response
+                            import asyncio
+                            await asyncio.sleep(3)
+                            try:
+                                await page.wait_for_load_state("networkidle", timeout=15000)
+                            except Exception:
+                                pass
 
                     # Parse captured API response
                     for resp in api_responses:
@@ -139,7 +133,12 @@ class NcUnclaimedScraper(BaseScraper):
                     log.warning("nc_unclaimed.surname_error",
                                 surname=surname, error=str(exc)[:160])
 
-            await browser.close()
+        finally:
+            if browser:
+                try:
+                    await browser.close()
+                except BaseException:
+                    pass
 
         return results
 
