@@ -9,12 +9,23 @@ os.environ.setdefault("DISPLAY", ":99")
 
 async def test_scraper(module_path):
     """Import and run a scraper module, print results."""
-    parts = module_path.split(".")
-    class_name = "Scraper"
-    
     import importlib
+    from foreclosure_scraper.scrapers.base import BaseScraper
+    
     mod = importlib.import_module(f"foreclosure_scraper.scrapers.{module_path}")
-    scraper_class = getattr(mod, class_name)
+    
+    # Find the BaseScraper subclass
+    scraper_class = None
+    for name in dir(mod):
+        obj = getattr(mod, name)
+        if (isinstance(obj, type) and issubclass(obj, BaseScraper) 
+                and obj is not BaseScraper and not name.startswith("_")):
+            scraper_class = obj
+            break
+    
+    if not scraper_class:
+        print(f"No BaseScraper subclass found in {module_path}")
+        return 0
     
     s = scraper_class()
     print(f"Running {module_path}...")
