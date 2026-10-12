@@ -136,12 +136,17 @@ _RECAPTCHA_CHECKBOX_SELECTORS = [
 _AUDIO_BUTTON_SELECTORS = [
     "#recaptcha-audio-button",
     ".rc-button-audio",
-    "#recaptcha-reload-button",
+    "button:has-text('AUDIO')",
+    ".rc-button.goog-inline-block[aria-label*='audio' i]",
 ]
 _AUDIO_DOWNLOAD_SELECTORS = [
     ".rc-audiochallenge-tdownload-link",
     "a[href*='audio']",
     ".rc-audiochallenge-download-link",
+    "a.rc-button",
+    "a[download]",
+    ".audio-media-link",
+    "a[href*='.mp3']",
 ]
 _AUDIO_RESPONSE_INPUT = "#audio-response"
 _VERIFY_BUTTON = "#recaptcha-verify-button"

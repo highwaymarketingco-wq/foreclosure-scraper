@@ -58,9 +58,8 @@ class NcUnclaimedScraper(BaseScraper):
             log.error("nc_unclaimed.no_playwright")
             return results
 
-        browser = None
-        try:
-            browser = await async_playwright().chromium.launch(
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(
                 headless=True,
                 args=["--no-sandbox", "--disable-gpu"],
             )
@@ -133,12 +132,7 @@ class NcUnclaimedScraper(BaseScraper):
                     log.warning("nc_unclaimed.surname_error",
                                 surname=surname, error=str(exc)[:160])
 
-        finally:
-            if browser:
-                try:
-                    await browser.close()
-                except BaseException:
-                    pass
+            await browser.close()
 
         return results
 
