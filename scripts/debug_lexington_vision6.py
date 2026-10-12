@@ -413,13 +413,53 @@ async def main():
 
             if not clean or total == 0:
                 print("  Challenge empty — may be solved or transitioning")
-                await asyncio.sleep(3)
-                resp = await get_recaptcha_response(page)
-                if resp:
-                    print(f"Solved! Token: {resp[:60]}...")
-                    solved = True
+                # Wait longer — Google may be processing the last round
+                for _ in range(5):
+                    await asyncio.sleep(3)
+                    resp = await get_recaptcha_response(page)
+                    if resp:
+                        print(f"Solved! Token: {resp[:60]}...")
+                        solved = True
+                        break
+                    # Check if challenge frame is gone/collapsed
+                    try:
+                        frame_url = challenge_frame.url
+                        if not frame_url or "bframe" not in frame_url:
+                            print("  Challenge frame gone — checking if solved")
+                            resp = await get_recaptcha_response(page)
+                            if resp:
+                                print(f"Solved! Token: {resp[:60]}...")
+                                solved = True
+                                break
+                            # Frame gone but no token — try clicking checkbox again
+                            break
+                    except BaseException:
+                        print("  Challenge frame detached — likely solved")
+                        resp = await get_recaptcha_response(page)
+                        if resp:
+                            print(f"Solved! Token: {resp[:60]}...")
+                            solved = True
+                            break
+                        break
+                if solved:
                     break
-                # Try reload
+                # Check anchor frame checkbox state
+                try:
+                    checked = await recaptcha_frame.evaluate("""() => {
+                        const cb = document.querySelector('.recaptcha-checkbox-checkmark');
+                        return cb ? true : false;
+                    }""")
+                    if checked:
+                        print("  Checkbox shows solved state!")
+                        resp = await get_recaptcha_response(page)
+                        if resp:
+                            print(f"Solved! Token: {resp[:60]}...")
+                            solved = True
+                            break
+                except BaseException:
+                    pass
+                # Only reload if we're truly stuck (not transitioning)
+                print("  Challenge empty after 15s — reloading")
                 await reload_challenge(challenge_frame)
                 await asyncio.sleep(5)
                 continue
