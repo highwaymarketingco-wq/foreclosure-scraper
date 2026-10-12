@@ -53,13 +53,24 @@ async def login(page):
     await email_field.fill(EMAIL)
     print(f"Email filled: {EMAIL}")
 
-    # Fill password
+    # Fill password — use type() instead of fill() for tricky fields
     password_field = await page.query_selector("input[type='password']")
     if not password_field:
         print("ERROR: Cannot find password field")
         return False
+    await password_field.click()
     await password_field.fill(PASSWORD)
-    print("Password filled")
+    # Verify it was filled
+    pw_val = await password_field.evaluate("el => el.value")
+    if not pw_val:
+        print("  fill() failed, trying type()...")
+        await password_field.click()
+        await page.keyboard.type(PASSWORD, delay=50)
+        pw_val = await password_field.evaluate("el => el.value")
+    if not pw_val:
+        print("ERROR: Cannot fill password field")
+        return False
+    print(f"Password filled (len={len(pw_val)})")
 
     # Click login
     login_btn = await page.query_selector("#LoginBtn")
