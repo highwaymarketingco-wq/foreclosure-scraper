@@ -105,20 +105,35 @@ class NcUnclaimedScraper(BaseScraper):
                 try:
                     token = await page.evaluate("""() => {
                         // Try to get existing token
-                        let t = turnstile.getResponse();
-                        if (t && t.length > 10) return t;
-                        // Try to execute
+                        try { let t = turnstile.getResponse(); if (t && t.length > 10) return t; } catch(e) {}
+                        // Try to get from hidden field
+                        const el = document.querySelector('[name="cf-turnstile-response"]');
+                        if (el && el.value && el.value.length > 10) return el.value;
+                        // Try execute with proper params
                         const widgets = document.querySelectorAll('[id^="cf-chl-widget"]');
                         if (widgets.length > 0) {
-                            turnstile.execute(widgets[0].id);
+                            try { turnstile.execute(widgets[0].id, {action: 'submit'}); } catch(e) {}
+                        }
+                        // Also try clicking the SEARCH button to trigger Turnstile callback
+                        const btns = document.querySelectorAll('button');
+                        for (const b of btns) {
+                            if (b.innerText && b.innerText.toUpperCase().includes('SEARCH')) {
+                                try { b.click(); } catch(e) {}
+                                break;
+                            }
                         }
                         return null;
                     }""")
                     if token and len(token) > 10:
                         break
-                    # Wait for callback
-                    await asyncio.sleep(5)
-                    token = await page.evaluate("() => { try { return turnstile.getResponse(); } catch(e) { return null; } }")
+                    # Wait for callback to fire after clicking SEARCH
+                    await asyncio.sleep(8)
+                    token = await page.evaluate("""() => {
+                        try { let t = turnstile.getResponse(); if (t && t.length > 10) return t; } catch(e) {}
+                        const el = document.querySelector('[name="cf-turnstile-response"]');
+                        if (el && el.value && el.value.length > 10) return el.value;
+                        return null;
+                    }""")
                     if token and len(token) > 10:
                         break
                 except Exception as exc:
