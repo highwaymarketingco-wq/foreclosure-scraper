@@ -120,7 +120,8 @@ async def test_curl_cffi():
 
         browser = await uc.start(
             headless=False,
-            browser_args=["--no-sandbox", "--disable-gpu"],
+            browser_args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
+            sandbox=False,
         )
         page = await browser.get(spa_urls[0])
         await asyncio.sleep(15)  # Wait for SPA to load

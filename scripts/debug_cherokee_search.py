@@ -75,12 +75,18 @@ async def search_and_extract(page, book_type="", description=""):
     await page.goto(SEARCH_URL, timeout=60000)
     await asyncio.sleep(3)
 
-    # Fill BookType
+    # Fill BookType (it's a <select> element, not a text input)
     if book_type:
         bt = await page.query_selector("#BookType")
         if bt:
-            await bt.fill(book_type)
-            print(f"Filled BookType: {book_type}")
+            await bt.select_option(label=book_type)
+            print(f"Selected BookType: {book_type}")
+        else:
+            print(f"BookType select not found, trying by name")
+            bt = await page.query_selector("select[name='BookType']")
+            if bt:
+                await bt.select_option(label=book_type)
+                print(f"Selected BookType: {book_type}")
 
     # Fill IndexDescription
     if description:

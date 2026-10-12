@@ -75,12 +75,20 @@ async def get_challenge_info(challenge_frame):
         info = await challenge_frame.evaluate("""() => {
             let prompt = '';
             const descEls = document.querySelectorAll(
-                '.rc-imageselect-desc-no-canonical, .rc-imageselect-desc, strong'
+                '.rc-imageselect-desc-no-canonical, .rc-imageselect-desc'
             );
             for (const el of descEls) {
                 if (el.textContent && el.textContent.trim()) {
                     prompt = el.textContent.trim();
                     break;
+                }
+            }
+            // Fallback: try .rc-imageselect-desc-wrapper > div:first-child
+            if (!prompt) {
+                const wrapper = document.querySelector('.rc-imageselect-desc-wrapper');
+                if (wrapper) {
+                    const firstDiv = wrapper.querySelector('div');
+                    if (firstDiv) prompt = firstDiv.textContent.trim();
                 }
             }
             const tiles = document.querySelectorAll(
@@ -375,9 +383,10 @@ async def main():
             total = info.get("total", 0)
             clean = _clean_prompt(raw_prompt)
 
-            # Check if "Click verify once" is in the raw prompt
-            # This means previous tiles were correct and we just need to verify
-            if "click verify once" in raw_prompt.lower() and prev_prompt:
+            # "Click verify once" in raw prompt means previous round may have been correct.
+            # But only skip Gemini call if we genuinely can't extract a real challenge prompt.
+            if "click verify once" in raw_prompt.lower() and not clean and total > 0:
+                # Tiles exist but no challenge prompt extracted — try verify
                 verify_count_key = "_verify_count"
                 vc = getattr(main, verify_count_key, 0) + 1
                 setattr(main, verify_count_key, vc)

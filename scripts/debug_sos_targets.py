@@ -30,13 +30,19 @@ async def test_nc_sos_ucc_scrapling():
             time.sleep(15)
             print("  page_action done")
 
-        page = StealthyFetcher.fetch(
-            url,
-            headless=False,
-            network_idle=True,
-            page_action=page_action,
-            solve_cloudflare=True,
-            timeout=60000,
+        # Run scrapling's sync API in a thread to avoid asyncio conflict
+        import concurrent.futures
+        loop = asyncio.get_event_loop()
+        page = await loop.run_in_executor(
+            None,
+            lambda: StealthyFetcher.fetch(
+                url,
+                headless=False,
+                network_idle=True,
+                page_action=page_action,
+                solve_cloudflare=True,
+                timeout=60000,
+            )
         )
 
         print(f"  Status: {page.status}")
@@ -69,7 +75,8 @@ async def test_nc_sos_ucc_nodriver():
 
         browser = await uc.start(
             headless=False,
-            browser_args=["--no-sandbox", "--disable-gpu"],
+            browser_args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
+            sandbox=False,
         )
         page = await browser.get(url)
         await asyncio.sleep(15)
@@ -99,7 +106,7 @@ async def test_sc_sos_entity_patchright():
     try:
         from patchright.async_api import async_playwright
 
-        url = "https://businessfilings.sc.gov/BusinessSearch/"
+        url = "https://businessfilings.sc.gov/businessfiling"
         print(f"Fetching: {url}")
 
         async with async_playwright() as pw:
