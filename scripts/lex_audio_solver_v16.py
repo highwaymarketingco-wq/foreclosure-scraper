@@ -413,8 +413,12 @@ async def main():
                 if resp:
                     print(f"  SOLVED! Token: {resp[:60]}...")
                     break
-                # Challenge frame gone but no token — re-click checkbox
-                print("  Re-clicking reCAPTCHA checkbox to re-trigger challenge...")
+                # Challenge frame gone, no token — session burned.
+                # Reload entire page and start fresh.
+                print("  Session burned — reloading entire page...")
+                await page.goto(LEXINGTON_URL, timeout=60000)
+                await asyncio.sleep(5)
+                # Re-click reCAPTCHA checkbox
                 anchor_frame = None
                 for frame in page.frames:
                     if "recaptcha/api2/anchor" in frame.url:
@@ -423,10 +427,10 @@ async def main():
                 if anchor_frame:
                     try:
                         await anchor_frame.click(".recaptcha-checkbox-border")
-                        print("  Checkbox re-clicked")
+                        print("  Checkbox clicked after reload")
                         await asyncio.sleep(5)
                     except BaseException as e:
-                        print(f"  Re-click error: {e}")
+                        print(f"  Checkbox error after reload: {e}")
                 continue
             
             solved = await solve_audio_challenge(page, challenge_frame)
