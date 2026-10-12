@@ -133,6 +133,30 @@ WALLED_SOURCE_MAP = {
 }
 
 
+def _kill_orphan_browsers():
+    """Kill orphaned Chrome/Chromium processes between scrapers.
+
+    Browser automation (pydoll, nodriver) leaks processes on timeout paths —
+    even with the BaseException fix, the OS may not reap zombie renderers
+    immediately. This is a safety net: between each scraper, find any Chrome
+    processes that aren't children of our Python process and SIGKILL them.
+
+    On macOS (local dev) this is a no-op since we only run on the VM.
+    """
+    import signal as sig
+    try:
+        # Only run on Linux (the VM). On macOS, pkill would kill the user's
+        # own Chrome, which is not what we want.
+        if sys.platform != "linux":
+            return
+        os.system("pkill -9 -f 'chromium.*--headless' 2>/dev/null")
+        os.system("pkill -9 -f 'chrome.*--headless' 2>/dev/null")
+        os.system("pkill -9 -f 'chromium.*--no-sandbox' 2>/dev/null")
+        os.system("pkill -9 -f 'chrome.*--no-sandbox' 2>/dev/null")
+    except Exception:
+        pass
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -335,6 +359,13 @@ async def main():
                     continue
             print(f"  [{wall_id:25s}] running {slug}...", end=" ", flush=True)
             result = await run_one_scraper(cls)
+
+            # Browser recycling: kill orphaned Chrome processes between scrapers.
+            # Long-lived browser automation leaks a little per page (contexts not
+            # closed on timeout paths, zombie renderer processes, etc.). Killing
+            # orphans between scrapers bounds the leak to one scraper's worth.
+            _kill_orphan_browsers()
+
             wall_results.append(result)
             wall_total += result["rows"]
             status = "OK" if result["rows"] > 0 else result["outcome"]

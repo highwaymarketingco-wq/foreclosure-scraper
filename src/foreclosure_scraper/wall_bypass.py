@@ -309,10 +309,15 @@ async def _pydoll_fetch(
     finally:
         # Clean up the browser process.  Use close() since we called
         # start() directly (not __aenter__), so __aexit__ may not work.
+        # CRITICAL: catch BaseException, not Exception — asyncio.CancelledError
+        # (raised when the outer wait_for times out) is a BaseException in
+        # Python 3.8+, so `except Exception` would let it propagate past the
+        # close() call, leaking the browser process. This was the root cause
+        # of the slow memory leak that crashed the VM on long runs.
         if browser is not None:
             try:
                 await browser.close()
-            except Exception:
+            except BaseException:
                 pass
 
 
@@ -454,10 +459,14 @@ async def _nodriver_fetch(
         )
         return ""
     finally:
+        # CRITICAL: catch BaseException, not Exception — asyncio.CancelledError
+        # (from outer wait_for timeout) is a BaseException in Python 3.8+.
+        # `except Exception` would skip browser.stop(), leaking the Chrome
+        # process. This was the root cause of the slow memory leak on long runs.
         if browser is not None:
             try:
                 browser.stop()
-            except Exception:
+            except BaseException:
                 pass
 
 
