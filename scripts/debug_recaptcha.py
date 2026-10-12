@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Debug Lincoln county tax SPA — accept disclaimer, intercept API calls."""
+"""Debug Lincoln county tax SPA — trigger search to get delinquent data."""
 import asyncio
 import json
 from playwright.async_api import async_playwright
@@ -9,23 +9,24 @@ async def main():
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-gpu"])
         page = await browser.new_page()
         
-        # Intercept all API calls
+        # Intercept API calls
         api_calls = []
         async def on_response(response):
             url = response.url
             ct = response.headers.get('content-type', '')
             if 'json' in ct or 'xml' in ct or 'text' in ct:
-                if any(x in url.lower() for x in ['api', 'ajax', 'search', 'list', 'delinquent', 'query', 'service', 'handler', 'ashx']):
-                    try:
-                        body = await response.text()
-                        api_calls.append({
-                            'url': url[:300],
-                            'status': response.status,
-                            'ct': ct,
-                            'body_preview': body[:1000]
-                        })
-                    except:
-                        api_calls.append({'url': url[:300], 'status': response.status})
+                if 'lincolncountytax' in url or 'cloudfront' in url:
+                    if any(x in url.lower() for x in ['api', 'ajax', 'search', 'list', 'delinquent', 'query', 'service', 'handler', 'ashx', 'wildfire']):
+                        try:
+                            body = await response.text()
+                            api_calls.append({
+                                'url': url[:300],
+                                'status': response.status,
+                                'ct': ct,
+                                'body_preview': body[:2000]
+                            })
+                        except:
+                            api_calls.append({'url': url[:300], 'status': response.status})
         
         page.on("response", on_response)
         
@@ -34,59 +35,59 @@ async def main():
         await page.goto(url, timeout=30000)
         await page.wait_for_load_state("networkidle", timeout=20000)
         
-        # Accept the disclaimer
-        accept_btn = page.locator("button:has-text('Accept'), input:has-text('Accept'), a:has-text('Accept')")
+        # Accept disclaimer
+        accept_btn = page.locator("button:has-text('Accept')")
         if await accept_btn.count() > 0:
-            print("Found Accept button, clicking...")
+            print("Clicking Accept...")
             await accept_btn.first.click()
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
             await page.wait_for_load_state("networkidle", timeout=15000)
+        
+        # Wait for SPA
+        await asyncio.sleep(3)
+        
+        # Find search input and type a wildcard
+        search_input = page.locator("input[placeholder*='looking']")
+        if await search_input.count() > 0:
+            print("Found search input, typing 'a'...")
+            await search_input.first.click()
+            await asyncio.sleep(1)
+            await search_input.first.fill("a")
+            await asyncio.sleep(3)
+            await page.wait_for_load_state("networkidle", timeout=15000)
+            
+            # Check if reCAPTCHA challenge appeared
+            challenge = page.locator("iframe[title*='recaptcha challenge']")
+            if await challenge.count() > 0:
+                print("reCAPTCHA challenge appeared!")
+            else:
+                print("No reCAPTCHA challenge")
+            
+            # Check table
+            tables = await page.query_selector_all("table")
+            for i, table in enumerate(tables):
+                rows = await table.query_selector_all("tr")
+                print(f"Table {i}: {len(rows)} rows")
+                for j, row in enumerate(rows[:5]):
+                    cells = await row.query_selector_all("td, th")
+                    cell_texts = [await c.inner_text() for c in cells]
+                    print(f"  Row {j}: {cell_texts}")
         else:
-            print("No Accept button found")
-            # Try other selectors
-            btns = await page.query_selector_all("button, a.btn, input[type='button'], input[type='submit']")
-            for btn in btns:
-                text = await btn.inner_text() if await btn.is_visible() else "hidden"
-                print(f"  Button: {text[:100]}")
-        
-        # Wait for SPA to load
-        await asyncio.sleep(5)
-        
-        # Look for tables
-        tables = await page.query_selector_all("table")
-        print(f"Tables found: {len(tables)}")
-        for i, table in enumerate(tables):
-            rows = await table.query_selector_all("tr")
-            print(f"  Table {i}: {len(rows)} rows")
-            if len(rows) > 0:
-                first_row = await rows[0].inner_text()
-                print(f"    First row: {first_row[:200]}")
-                if len(rows) > 1:
-                    second_row = await rows[1].inner_text()
-                    print(f"    Second row: {second_row[:200]}")
-        
-        # Look for any data elements
-        data_rows = await page.query_selector_all("[ng-repeat], .data-row, .search-result, .list-item, tr.data-row")
-        print(f"Data rows found: {len(data_rows)}")
-        
-        # Check for any search form or filter
-        inputs = await page.query_selector_all("input[type='text'], input[type='search'], select")
-        print(f"Input fields: {len(inputs)}")
-        for inp in inputs:
-            name = await inp.get_attribute('name') or ''
-            placeholder = await inp.get_attribute('placeholder') or ''
-            print(f"  Input: name={name} placeholder={placeholder}")
+            print("No search input found")
+            # Try pressing Enter or clicking a search button
+            search_btn = page.locator("button:has-text('Search'), a:has-text('Search')")
+            if await search_btn.count() > 0:
+                print("Clicking Search button...")
+                await search_btn.first.click()
+                await asyncio.sleep(5)
+                await page.wait_for_load_state("networkidle", timeout=15000)
         
         # Print API calls
         print(f"\n=== API CALLS ({len(api_calls)}) ===")
         for call in api_calls:
             print(f"  [{call.get('status', '?')}] {call['url']}")
             if 'body_preview' in call:
-                print(f"    Body: {call['body_preview'][:300]}")
-        
-        # Get body text
-        body_text = await page.inner_text("body")
-        print(f"\nBody text (last 1500):\n{body_text[-1500:]}")
+                print(f"    Body: {call['body_preview'][:500]}")
         
         await browser.close()
 
