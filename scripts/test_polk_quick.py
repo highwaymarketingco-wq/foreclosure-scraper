@@ -59,9 +59,8 @@ async def main():
                 await asyncio.sleep(2)
                 content = await page.get_content()
                 low = content.lower()
-                if ("taxdetail" in low or "oddrow" in low or "evenrow" in low
-                        or "gvhdr" in low or "too many records" in low
-                        or "no records" in low):
+                if ("taxdetail" in low or "gvhdr" in low
+                        or "too many records" in low or "no records" in low):
                     found = True
                     break
             
