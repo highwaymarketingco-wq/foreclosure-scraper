@@ -118,11 +118,11 @@ async def test_curl_cffi():
     try:
         import nodriver as uc
 
-        browser = await uc.start(
-            headless=False,
-            browser_args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
-            sandbox=False,
-        )
+        config = uc.Config()
+        config.headless = False
+        config.browser_args = ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
+        config.sandbox = False
+        browser = await uc.Browser.create(config)
         page = await browser.get(spa_urls[0])
         await asyncio.sleep(15)  # Wait for SPA to load
 

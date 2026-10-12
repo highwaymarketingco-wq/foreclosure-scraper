@@ -73,11 +73,11 @@ async def test_nc_sos_ucc_nodriver():
         url = "https://www.sosnc.gov/online_services/search/by_title/_u_cc"
         print(f"Fetching: {url}")
 
-        browser = await uc.start(
-            headless=False,
-            browser_args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
-            sandbox=False,
-        )
+        config = uc.Config()
+        config.headless = False
+        config.browser_args = ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
+        config.sandbox = False
+        browser = await uc.Browser.create(config)
         page = await browser.get(url)
         await asyncio.sleep(15)
 

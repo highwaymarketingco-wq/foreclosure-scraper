@@ -37,11 +37,11 @@ async def main():
         return
 
     print("Starting nodriver browser...")
-    browser = await uc.start(
-        headless=False,
-        browser_args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
-        sandbox=False,
-    )
+    config = uc.Config()
+    config.headless = False
+    config.browser_args = ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
+    config.sandbox = False
+    browser = await uc.Browser.create(config)
 
     page = await browser.get("about:blank")
 
