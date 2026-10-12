@@ -29,12 +29,19 @@ _URL = "https://portal-nc.tylertech.cloud/Portal"
 
 
 class NcTylerTechEstatesScraper(BaseScraper):
-    """NC TylerTech portal estates — picture CAPTCHA."""
+    """NC TylerTech portal estates — DISABLED.
+
+    nc_ecourts_estates already covers this exact portal
+    (portal-nc.tylertech.cloud/Portal/Home/Dashboard/29) with a working
+    SmartSearch implementation that returns real estate rows. This scraper
+    was a redundant, broken imitation. Disabled to avoid wasting 45s per run.
+    """
 
     slug = "counties_nc.nc_tylertech_estates"
     name = "NC TylerTech Estates"
     category = "probate"
     timeout_s = 600.0
+    disabled = True
 
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
