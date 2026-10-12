@@ -89,7 +89,7 @@ async def _search_via_nodriver(browser, letter: str) -> str:
     All form interactions done via a single evaluate() call since nodriver
     doesn't have Playwright's select_option/fill helpers."""
     page = await browser.get(_SEARCH_FORM_URL)
-    await asyncio.sleep(6)  # wait for Cloudflare + page render
+    await asyncio.sleep(10)  # wait for Cloudflare + page render
 
     # Fill the entire form via JS and submit
     js = """
@@ -123,8 +123,14 @@ async def _search_via_nodriver(browser, letter: str) -> str:
     })()
     """
     result = await page.evaluate(js, await_promise=True)
-    await asyncio.sleep(5)  # wait for results page to load
-
+    # Wait for navigation/results to load — Cloudflare challenge + form POST
+    # can take 10+ seconds. Poll for content change.
+    for _ in range(20):
+        await asyncio.sleep(2)
+        content = await page.get_content()
+        # Results page should be >5K chars or contain taxdetail links
+        if len(content) > 5000 or "taxdetail" in content.lower():
+            break
     return await page.get_content()
 
 URL = "https://www.polknc.gov/upcoming_auction.php"
