@@ -78,6 +78,11 @@ SPECIAL_TIMEOUTS = {
 SKIP_SOURCES = {
     "counties_sc.sc_qpublic",  # Oracle Cloud IP banned by schneidercorp.com
     "national.people_search",  # All people-search sites 403 on Oracle Cloud IP
+    "counties_sc.sc_tax_walled",  # Tax payment portals, not delinquent tax sales
+    "counties_nc.nc_sos_ucc",  # URL redirects to unrelated content
+    "national.sc_sos_entity",  # reCAPTCHA-walled, URL 404
+    "counties_nc.cherokee_rod",  # Intentionally dead code, URL 404s
+    "counties_sc.sc_propwire",  # Paid service, opted out
 }
 
 # The 37 Type-A walled source IDs from docs/walls_register.json
