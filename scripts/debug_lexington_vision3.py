@@ -97,7 +97,7 @@ async def solve_with_gemini(page, challenge_frame, attempt=0):
         print("  NO GEMINI KEY available")
         return False
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={key}"
 
     instruction = f"""Look at this screenshot of a reCAPTCHA challenge. The prompt text says: "{prompt_text}"
 
