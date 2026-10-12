@@ -207,13 +207,19 @@ a decisive answer as `latest` until its TTL runs out.
 
 ## (e) Today's numbers (board of 350,013 listings, ledgers as of 2026-10-09)
 
-231,920 listings in the export: 72,360 `wall` and 159,560 `uncovered`.
+**Updated 2026-10-12: LiensNC is excluded by owner decision** (construction lien-agent filings,
+not a distress signal -- not tax liens despite the signal name). `export_wall_punchlist.py` drops
+`counties_generic.liensnc` and `liensnc` by default via `--exclude-source` now, wired into the
+sweep's own auto-chain, so every future export already leaves it out; nobody has to remember to
+pass the flag. The numbers below are post-exclusion, the real current punch list.
+
+187,532 listings in the export: 27,972 `wall` and 159,560 `uncovered`.
 
 Walled listings by signal:
 
 | signal | listings |
 |---|---|
-| `lien_registry_wall` | 61,520 |
+| `lien_registry_wall` | 17,132 |
 | `court_wall` | 5,741 |
 | `divorce` | 5,099 |
 
@@ -221,9 +227,8 @@ By walled lane:
 
 | wall_path | listings |
 |---|---|
-| `liensnc_login` | 44,392 |
 | `sc_lien_registries` | 8,599 |
-| `avalon_tax` | 8,529 |
+| `avalon_tax` | 8,533 |
 | `divorce_sc_wall` | 5,099 |
 | `sc_publicindex` | 3,506 |
 | `nc_est` | 1,965 |
@@ -231,16 +236,12 @@ By walled lane:
 | `sc_notice_body` | 115 |
 
 By state of the label: 1,274 `recorded` (the court-wall labels the HOT/WARM sweep wrote on
-2026-10-09), 71,086 `not_yet_labelled`, 0 `unconfirmed_blocked` (no polite check was blocked in the
+2026-10-09), 26,698 `not_yet_labelled`, 0 `unconfirmed_blocked` (no polite check was blocked in the
 current ledgers; 1,927 tax answers that failed on a 503 or an error page are retries, not walls).
 
-Top counties for walled listings: NC Rutherford 8,803, NC Wake 5,480, NC Mecklenburg 4,679,
-SC Spartanburg 3,641, SC Charleston 3,284, NC Brunswick 3,134, SC Horry 1,672, NC Durham 1,635,
-SC Pickens 1,456, NC Johnston 1,455 (1,848 NC rows carry no county).
-
-Note on the largest lane: the 44,392 LiensNC rows are "appointments of lien agent" for
-construction projects, not tax liens (see `lien_registry_wall.py`). Ask the owner whether they are
-worth checking at all before spending effort there.
+Top counties for walled listings: NC Rutherford 8,580, SC Spartanburg 3,641, SC Charleston 3,284,
+SC Horry 1,672, SC Pickens 1,456, SC Anderson 1,334, SC Beaufort 1,221, SC Oconee 1,015,
+SC Cherokee 1,013, SC Laurens 1,004.
 
 ## (f) What this pipeline will and will not do
 
@@ -318,7 +319,7 @@ written atomically (temp file + rename) only after both punch-list files are com
      "json": "<abs path>/data/handoff/wall_punchlist.json",
      "csv": "<abs path>/data/handoff/wall_punchlist.csv",
      "punchlist_sha256": "<sha256 of wall_punchlist.json>",
-     "listings": 231920, "by_category": {"uncovered": 159560, "wall": 72360},
+     "listings": 187532, "by_category": {"uncovered": 159560, "wall": 27972},
      "board_rows": 350013}
 
 How to consume it: poll the file (or watch it) for a change; read it; if `punchlist_sha256` equals
