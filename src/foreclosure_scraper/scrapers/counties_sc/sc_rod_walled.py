@@ -143,33 +143,22 @@ class ScRodWalledScraper(BaseScraper):
 
         # Generic approach: look for date inputs, fill them, click search
         date_from_selectors = [
+            "input[name='fromdate']",
             "input[name*='from']",
             "input[name*='From']",
             "input[name*='start']",
-            "input[name*='Start']",
-            "input[id*='from']",
-            "input[id*='From']",
-            "input[placeholder*='From']",
-            "input[placeholder*='from']",
-            "input[placeholder*='Start']",
-            "#dateFrom",
-            "#fromDate",
+            "input[placeholder*='MM/DD/YYYY']",
         ]
         date_to_selectors = [
+            "input[name='todate']",
             "input[name*='to']",
             "input[name*='To']",
             "input[name*='end']",
-            "input[name*='End']",
-            "input[id*='to']",
-            "input[id*='To']",
-            "input[placeholder*='To']",
-            "input[placeholder*='to']",
-            "input[placeholder*='End']",
-            "#dateTo",
-            "#toDate",
         ]
         search_btn_selectors = [
+            "button[type='submit']:has-text('Search')",
             "button:has-text('Search')",
+            "button[type='submit']:has-text('90 Days')",
             "input[type='submit'][value*='Search']",
             "a:has-text('Search')",
             "button:has-text('search')",
