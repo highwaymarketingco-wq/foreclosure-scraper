@@ -99,8 +99,15 @@ class NcRodCaptchaScraper(BaseScraper):
             return results
 
         async with async_playwright() as p:
+            # headless=False: confirmed live 2026-10-12 -- the Courthouse
+            # Computer Systems platform (Stokes/Iredell/Greene/Harnett/
+            # Randolph/Craven, 6 of these 9 counties) 403s headless
+            # Chromium even on a correct, live URL and 200s the identical
+            # request headful. Same bot-detection pattern already proven
+            # and fixed for polk_tax.py -- requires a real display
+            # (DISPLAY=:99 / Xvfb on the VM, same as Polk/Avalon/Morganton).
             browser = await p.chromium.launch(
-                headless=True,
+                headless=False,
                 args=["--no-sandbox", "--disable-gpu"],
             )
 
