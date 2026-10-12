@@ -304,24 +304,60 @@ class NcSosUccScraper(BaseScraper):
     disabled = False
     disabled_reason = ""
 
-    async def fetch(self) -> Iterable[Listing]:
-        """Fetch UCC filings via scrapling stealth render."""
+    async def fetch(self) -> list[Listing]:
+        """Fetch UCC filings via scrapling stealth render.
+
+        Scrapling solves Cloudflare Turnstile automatically (confirmed
+        2026-10-12: Status 200, 40K chars on VM V4 test).
+        """
         html = await _fetch_ucc_page(days_back=90)
         if not html:
             log.warning("nc_sos_ucc.empty_html")
-            return
-        results = _parse_results(html)
-        log.info("nc_sos_ucc.parsed", count=len(results))
-        for r in results:
-            if not _is_fixture(r.get("collateral", "")):
+            self.last_outcome = OUTCOME_BLOCKED
+            self.last_reason = "Stealth render returned empty (Cloudflare or timeout)"
+            return []
+
+        rows = _parse_results(html)
+        if not rows:
+            log.info("nc_sos_ucc.no_results",
+                     hint="Cloudflare may have blocked, or search form changed")
+            return []
+
+        out: list[Listing] = []
+        fixture_count = 0
+        for r in rows:
+            collateral = r.get("collateral", "")
+            if not _is_fixture(collateral):
                 continue
-            yield Listing(
+            fixture_count += 1
+
+            filing_date = _parse_date(r.get("filing_date", ""))
+
+            li = Listing(
                 source=self.slug,
                 source_url=_UCC_SEARCH_URL,
-                listing_type=ListingType.LIEN_CLAIM,
-                case_number=r.get("filing_number", ""),
-                defendant=f"{r.get('debtor_name', '')} — secured: {r.get('secured_party', '')}",
+                listing_type=ListingType.DISTRESSED,
+                property_kind=PropertyKind.UNKNOWN,
+                state="NC",
+                defendant=r.get("debtor", ""),
+                plaintiff=r.get("secured_party", ""),
+                case_number=r.get("filing_number"),
+                sale_date=filing_date,
+                description=f"UCC fixture filing: {collateral[:200]}" if collateral else None,
+                raw={
+                    "filing_number": r.get("filing_number"),
+                    "debtor": r.get("debtor"),
+                    "secured_party": r.get("secured_party"),
+                    "filing_date": r.get("filing_date"),
+                    "collateral": collateral,
+                    "source": "nc_sos_ucc",
+                },
             )
+            out.append(li)
+
+        log.info("nc_sos_ucc.done",
+                 total_parsed=len(rows), fixture_filings=fixture_count)
+        return out
 
     async def _disabled_fetch(self) -> Iterable[Listing]:
         html = await _fetch_ucc_page(days_back=90)
