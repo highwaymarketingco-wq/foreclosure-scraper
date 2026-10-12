@@ -27,6 +27,28 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
+
+def _signal_block(detail: str) -> None:
+    """Mark the shared per-run block holder so base_scraper.safe_run promotes
+    this run's empty result to BLOCKED instead of ZERO_RESULT. This scraper's
+    API calls run inside Playwright's page.evaluate(fetch(...)), which never
+    goes through the shared httpx client — so the normal block-signal path
+    (http_client.py's transport appending on 401/403/406/429) never fires for
+    it. Without this, a CloudFront/WAF 403 on every search term was silently
+    swallowed by the `except Exception: break` below and reported as a clean
+    zero (confirmed live 2026-10-12: direct curl to the same CloudFront
+    endpoint returns a 403 "Request blocked" page, yet the scraper's run
+    logged OUTCOME_ZERO / "ran clean but returned 0 rows"). Same fix pattern
+    already used by nc_ecourts_divorce.py / nc_ecourts_estates.py."""
+    try:
+        from ...http_client import _block_holder  # type: ignore
+        holder = _block_holder.get()
+        if holder is not None:
+            holder.append((403, detail))
+    except Exception:  # noqa: BLE001
+        pass
+
+
 # Only Lincoln County — other Catalis domains are DNS-dead
 _COUNTY_SITES = {
     "lincoln": {
@@ -160,7 +182,18 @@ class NcAvalonTaxScraper(BaseScraper):
                     if not response:
                         break
 
-                    data = json.loads(response)
+                    try:
+                        data = json.loads(response)
+                    except json.JSONDecodeError:
+                        # CloudFront/WAF returns an HTML error page (403, 503,
+                        # etc.) instead of JSON when the request is blocked.
+                        # That is NOT the same as "API returned {}" — surface
+                        # it as a block, not a clean zero.
+                        snippet = response[:200].replace("\n", " ")
+                        log.warning("nc_avalon.blocked", county=county, term=term,
+                                    skip=skip, body=snippet)
+                        _signal_block(f"CloudFront/WAF non-JSON response: {snippet}")
+                        break
                     records = data.get("Records", [])
                     total_records = data.get("TotalRecords", 0)
 
