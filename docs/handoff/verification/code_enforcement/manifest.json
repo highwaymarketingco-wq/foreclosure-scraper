@@ -1,49 +1,58 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 37,
-  "refuted": 12,
-  "rows": 50,
-  "stale": 1,
+  "confirmed": 131,
+  "refuted": 48,
+  "rows": 196,
+  "stale": 17,
   "unconfirmed": 0,
   "wall": 0
  },
- "generated_at": "2026-10-06T20:33:57Z",
+ "generated_at": "2026-10-12T08:23:49Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
- "host": "SMB-LTSEO05",
+ "host": "foreclosure-engine",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-10-06T20:15:14Z",
-  "host": "SMB-LTSEO05",
-  "keys_file": false,
-  "recheck": true,
+  "at": "2026-10-12T08:23:49Z",
+  "county": null,
+  "host": "foreclosure-engine",
+  "max_rows": 200,
+  "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services1.arcgis.com": 4
+    "gis.buncombecounty.org": 488,
+    "services1.arcgis.com": 4,
+    "tax.buncombenc.gov": 507,
+    "vt.ncsbe.gov": 228,
+    "www.courtlistener.com": 268
    }
   },
   "result": {
-   "checked": 13,
-   "refuted": 12,
-   "stale": 1
+   "checked": 146,
+   "confirmed": 94,
+   "refuted": 36,
+   "stale": 16
   },
-  "seconds": 5,
-  "verdicts": [
-   "refuted",
-   "stale"
-  ]
+  "seconds": 2703,
+  "selection": {
+   "applies": 196,
+   "due_new": 146,
+   "not_due_ttl": 50
+  },
+  "source": null,
+  "tier": null
  },
- "rows": 50,
+ "rows": 196,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 74399,
+   "bytes": 282111,
    "file": "000.json",
-   "rows": 50,
-   "sha256": "853fa41387a288b721724acee51d33078270f4b7d5a4de23883efce91bd642c1"
+   "rows": 196,
+   "sha256": "c0a35d791ba0e09a68bcfa184cbe8edb74ad2b18cd374cfafad3ddad4ca1d850"
   }
  ],
  "signal": "code_enforcement",

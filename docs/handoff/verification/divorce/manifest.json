@@ -1,0 +1,58 @@
+{
+ "buckets": 1,
+ "counts": {
+  "confirmed": 0,
+  "refuted": 0,
+  "rows": 198,
+  "stale": 0,
+  "unconfirmed": 0,
+  "wall": 198
+ },
+ "generated_at": "2026-10-12T08:23:49Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "foreclosure-engine",
+ "kind": "verification_ledger_manifest",
+ "last_run": {
+  "at": "2026-10-12T08:23:49Z",
+  "county": null,
+  "host": "foreclosure-engine",
+  "max_rows": 200,
+  "recheck_only": false,
+  "requests": {
+   "errors": {},
+   "requests": {
+    "gis.buncombecounty.org": 488,
+    "services1.arcgis.com": 4,
+    "tax.buncombenc.gov": 507,
+    "vt.ncsbe.gov": 228,
+    "www.courtlistener.com": 268
+   }
+  },
+  "result": {
+   "checked": 200,
+   "wall": 200
+  },
+  "seconds": 2703,
+  "selection": {
+   "applies": 5105,
+   "due_new": 5105,
+   "same_property_queued": 1
+  },
+  "source": null,
+  "tier": null
+ },
+ "rows": 198,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 176883,
+   "file": "000.json",
+   "rows": 198,
+   "sha256": "11bb56da4b6b00ef149af5a6f3acae5f72a67c2daacb00f1b1511c66846e7587"
+  }
+ ],
+ "signal": "divorce",
+ "version": 1
+}

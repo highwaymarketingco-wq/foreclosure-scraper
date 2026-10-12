@@ -8,33 +8,39 @@
   "unconfirmed": 19,
   "wall": 0
  },
- "generated_at": "2026-10-06T20:33:57Z",
+ "generated_at": "2026-10-12T08:23:51Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
- "host": "SMB-LTSEO05",
+ "host": "foreclosure-engine",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-10-06T20:15:37Z",
-  "host": "SMB-LTSEO05",
-  "keys_file": false,
-  "recheck": true,
+  "at": "2026-10-12T08:23:51Z",
+  "county": null,
+  "host": "foreclosure-engine",
+  "max_rows": 200,
+  "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "gisweb.hendersoncountync.gov": 3,
-    "services1.arcgis.com": 3
+    "gis.buncombecounty.org": 488,
+    "services1.arcgis.com": 4,
+    "tax.buncombenc.gov": 507,
+    "vt.ncsbe.gov": 228,
+    "www.courtlistener.com": 268
    }
   },
   "result": {
-   "checked": 6,
-   "refuted": 1,
-   "stale": 2,
-   "unconfirmed": 3
+   "budget_stop": 1
   },
-  "seconds": 7,
-  "verdicts": [
-   "refuted",
-   "stale"
-  ]
+  "seconds": 2703,
+  "selection": {
+   "applies": 52,
+   "due_new": 2,
+   "due_version": 44,
+   "not_due_retry": 3,
+   "not_due_ttl": 3
+  },
+  "source": null,
+  "tier": null
  },
  "rows": 50,
  "schema": 1,

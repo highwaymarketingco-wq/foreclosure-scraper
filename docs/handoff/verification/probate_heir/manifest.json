@@ -8,30 +8,39 @@
   "unconfirmed": 36,
   "wall": 0
  },
- "generated_at": "2026-10-07T18:13:20Z",
+ "generated_at": "2026-10-12T08:23:49Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
- "host": "SMB-LTSEO05",
+ "host": "foreclosure-engine",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-10-07T18:13:20Z",
-  "host": "SMB-LTSEO05",
-  "keys_file": true,
-  "recheck": true,
+  "at": "2026-10-12T08:23:49Z",
+  "county": null,
+  "host": "foreclosure-engine",
+  "max_rows": 200,
+  "recheck_only": false,
   "requests": {
-   "errors": {
-    "registerofdeeds.buncombenc.gov": 1
-   },
+   "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 1,
-    "registerofdeeds.buncombenc.gov": 2
+    "gis.buncombecounty.org": 488,
+    "services1.arcgis.com": 4,
+    "tax.buncombenc.gov": 507,
+    "vt.ncsbe.gov": 228,
+    "www.courtlistener.com": 268
    }
   },
   "result": {
-   "checked": 1,
-   "unconfirmed": 1
+   "budget_stop": 1
   },
-  "seconds": 63,
-  "verdicts": []
+  "seconds": 2703,
+  "selection": {
+   "applies": 451,
+   "due_new": 403,
+   "due_version": 47,
+   "not_due_retry": 1,
+   "same_property_queued": 1
+  },
+  "source": null,
+  "tier": null
  },
  "rows": 55,
  "schema": 1,
