@@ -154,101 +154,96 @@ class ScRodWalledScraper(BaseScraper):
         # Beaufort BrowserView: has date pickers and a Search button
         # Jasper/Clarendon: Courthouse Computer Systems / Acclaim portals
 
-        # First, try clicking a "90 Days" quick button (Beaufort has these)
-        for sel in ["button:has-text('90 Days')", "a:has-text('90 Days')",
-                     "button:has-text('30 Days')", "a:has-text('30 Days')"]:
+        # First, try clicking a "90 Days" quick button via JS (Beaufort has these)
+        quick_clicked = await page.evaluate("""() => {
+            const btns = document.querySelectorAll('button, a, input[type="submit"]');
+            for (const b of btns) {
+                const t = (b.innerText || b.value || '').trim();
+                if (t === '90 Days' || t === '30 Days' || t === '7 Days') {
+                    b.click();
+                    return t;
+                }
+            }
+            return null;
+        }""")
+        if quick_clicked:
+            log.info("sc_rod_walled.quick_btn", county=county, selector=quick_clicked)
+            await asyncio.sleep(5)
             try:
-                el = page.locator(sel).first
-                if await el.count() > 0:
-                    await el.click()
-                    log.info("sc_rod_walled.quick_btn", county=county, selector=sel)
-                    await asyncio.sleep(5)
-                    try:
-                        await page.wait_for_load_state("networkidle", timeout=15000)
-                    except Exception:
-                        pass
-                    # Skip manual form fill — quick button handles dates
-                    content = await page.content()
-                    return self._parse_results(content, page.url, county, state)
+                await page.wait_for_load_state("networkidle", timeout=15000)
             except Exception:
-                continue
+                pass
+            content = await page.content()
+            return self._parse_results(content, page.url, county, state)
 
-        # Generic approach: look for date inputs, fill them, click search
-        date_from_selectors = [
-            "input[name='fromdate']",
-            "input[name*='from']",
-            "input[name*='From']",
-            "input[name*='start']",
-            "input[placeholder*='MM/DD/YYYY']",
-        ]
-        date_to_selectors = [
-            "input[name='todate']",
-            "input[name*='to']",
-            "input[name*='To']",
-            "input[name*='end']",
-        ]
-        search_btn_selectors = [
-            "button[type='submit']:has-text('Search')",
-            "button:has-text('Search')",
-            "button[type='submit']:has-text('90 Days')",
-            "input[type='submit'][value*='Search']",
-            "a:has-text('Search')",
-            "button:has-text('search')",
-            "#searchBtn",
-            "#btnSearch",
-            ".search-button",
-        ]
+        # Fill date inputs via JS (Angular inputs may not be Playwright-visible)
+        filled = await page.evaluate("""(args) => {
+            const [cutoff, end] = args;
+            let fromSet = false, toSet = false;
+            // Set fromdate
+            const fromEl = document.querySelector('input[name="fromdate"]')
+                || document.querySelector('input[name*="from" i]');
+            if (fromEl) {
+                fromEl.value = cutoff;
+                fromEl.dispatchEvent(new Event('input', {bubbles: true}));
+                fromEl.dispatchEvent(new Event('change', {bubbles: true}));
+                fromSet = true;
+            }
+            // Set todate
+            const toEl = document.querySelector('input[name="todate"]')
+                || document.querySelector('input[name*="to" i]');
+            if (toEl) {
+                toEl.value = end;
+                toEl.dispatchEvent(new Event('input', {bubbles: true}));
+                toEl.dispatchEvent(new Event('change', {bubbles: true}));
+                toSet = true;
+            }
+            return {fromSet, toSet};
+        }""", [cutoff, end_date])
 
-        # Fill date from
-        filled_from = False
-        for sel in date_from_selectors:
-            try:
-                el = page.locator(sel).first
-                if await el.count() > 0:
-                    await el.fill(cutoff)
-                    filled_from = True
-                    break
-            except Exception:
-                continue
-
-        # Fill date to
-        filled_to = False
-        for sel in date_to_selectors:
-            try:
-                el = page.locator(sel).first
-                if await el.count() > 0:
-                    await el.fill(end_date)
-                    filled_to = True
-                    break
-            except Exception:
-                continue
-
-        if not filled_from and not filled_to:
+        if filled.get("fromSet") or filled.get("toSet"):
+            log.info("sc_rod_walled.dates_filled", county=county, **filled)
+            # Click search button via JS
+            search_clicked = await page.evaluate("""() => {
+                const btns = document.querySelectorAll('button[type="submit"], input[type="submit"], button');
+                for (const b of btns) {
+                    const t = (b.innerText || b.value || '').trim().toLowerCase();
+                    if (t === 'search') {
+                        b.click();
+                        return true;
+                    }
+                }
+                return false;
+            }""")
+            if search_clicked:
+                await asyncio.sleep(5)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception:
+                    pass
+                content = await page.content()
+                return self._parse_results(content, page.url, county, state)
+        else:
             log.info("sc_rod_walled.no_date_inputs", county=county)
-            # Try to just click search with defaults
 
-        # Click search
-        searched = False
-        for sel in search_btn_selectors:
+        # Try to just click search with defaults
+        search_clicked = await page.evaluate("""() => {
+            const btns = document.querySelectorAll('button[type="submit"], input[type="submit"], button');
+            for (const b of btns) {
+                const t = (b.innerText || b.value || '').trim().toLowerCase();
+                if (t === 'search') {
+                    b.click();
+                    return true;
+                }
+            }
+            return false;
+        }""")
+        if search_clicked:
+            await asyncio.sleep(5)
             try:
-                el = page.locator(sel).first
-                if await el.count() > 0:
-                    await el.click()
-                    searched = True
-                    break
+                await page.wait_for_load_state("networkidle", timeout=15000)
             except Exception:
-                continue
-
-        if not searched:
-            log.warning("sc_rod_walled.no_search_btn", county=county)
-            return results
-
-        # Wait for results
-        await asyncio.sleep(5)
-        try:
-            await page.wait_for_load_state("networkidle", timeout=20000)
-        except Exception:
-            pass
+                pass
 
         # Parse results from table or grid
         content = await page.content()
