@@ -252,6 +252,8 @@ async def speech_to_text(filepath, audio_data):
                 "model": (None, "whisper-large-v3"),
                 "language": (None, "en"),
                 "response_format": (None, "json"),
+                "temperature": (None, "0"),
+                "prompt": (None, "The following audio contains a sequence of numbers and letters. Please transcribe them exactly."),
             }
             
             async with httpx.AsyncClient(timeout=30) as client:
@@ -394,9 +396,23 @@ async def main():
 
         print("Found challenge frame")
 
-        # Try audio solver up to 5 times
-        for attempt in range(5):
+        # Try audio solver up to 8 times
+        for attempt in range(8):
             print(f"\n=== Audio attempt {attempt+1} ===")
+            
+            # Re-find challenge frame each time (it detaches after failed verify)
+            challenge_frame = None
+            for frame in page.frames:
+                if "recaptcha/api2/bframe" in frame.url:
+                    challenge_frame = frame
+                    break
+            
+            if not challenge_frame:
+                print("  No challenge frame — may have auto-solved or closed")
+                resp = await get_recaptcha_response(page)
+                if resp:
+                    print(f"  SOLVED! Token: {resp[:60]}...")
+                break
             
             solved = await solve_audio_challenge(page, challenge_frame)
             if solved:
@@ -429,16 +445,23 @@ async def main():
                 break
             
             # Reload challenge for next attempt
-            if attempt < 4:
+            if attempt < 7:
                 print("Reloading challenge...")
-                try:
-                    await challenge_frame.evaluate("""() => {
-                        const btn = document.getElementById('recaptcha-reload-button')
-                            || document.querySelector('.rc-button-reload');
-                        if (btn) btn.click();
-                    }""")
-                except BaseException:
-                    pass
+                # Re-find frame again before reloading
+                challenge_frame = None
+                for frame in page.frames:
+                    if "recaptcha/api2/bframe" in frame.url:
+                        challenge_frame = frame
+                        break
+                if challenge_frame:
+                    try:
+                        await challenge_frame.evaluate("""() => {
+                            const btn = document.getElementById('recaptcha-reload-button')
+                                || document.querySelector('.rc-button-reload');
+                            if (btn) btn.click();
+                        }""")
+                    except BaseException as e:
+                        print(f"  Reload error: {e}")
                 await asyncio.sleep(3)
 
         await browser.close()
