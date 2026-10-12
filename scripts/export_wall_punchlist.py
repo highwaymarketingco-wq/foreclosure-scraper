@@ -185,7 +185,8 @@ def peak_rss_mb() -> float:
 
 
 def export(board: Path, ledger_directory: Path, out_dir: Path, summary_path: Optional[Path],
-           include_uncovered: bool = True, verifiers: Optional[list] = None) -> dict:
+           include_uncovered: bool = True, verifiers: Optional[list] = None,
+           exclude_sources: frozenset[str] = frozenset()) -> dict:
     verifiers = verifiers if verifiers is not None else discover()
     ledgers, bad = load_all(ledger_directory)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -208,6 +209,8 @@ def export(board: Path, ledger_directory: Path, out_dir: Path, summary_path: Opt
         jf.write("[")
         for row in _rows(board, verifiers):
             board_rows += 1
+            if exclude_sources and str(getattr(row, "source", "") or "") in exclude_sources:
+                continue
             items, covered = classify(row, verifiers, ledgers)
             if not covered and include_uncovered:
                 items = [_uncovered_item(row)]
@@ -291,11 +294,15 @@ def main(argv=None) -> int:
     ap.add_argument("--out-dir", default=str(REPO / "data" / "handoff"))
     ap.add_argument("--summary", default=str(REPO / "docs" / "handoff" / "wall_punchlist_summary.json"))
     ap.add_argument("--no-uncovered", action="store_true")
+    ap.add_argument("--exclude-source", action="append", default=[],
+                    help="board source(s) to leave out entirely (repeatable); owner decision "
+                         "2026-10-12: LiensNC (counties_generic.liensnc, liensnc) is construction "
+                         "lien-agent filings, not a distress signal -- it is not a punch-list item")
     ap.add_argument("--ready-marker", action="store_true",
                     help="after a complete export, write <out-dir>/wall_punchlist.ready")
     a = ap.parse_args(argv)
     s = export(Path(a.board), Path(a.ledger_dir), Path(a.out_dir), Path(a.summary) if a.summary else None,
-               include_uncovered=not a.no_uncovered)
+               include_uncovered=not a.no_uncovered, exclude_sources=frozenset(a.exclude_source))
     print(json.dumps({k: s[k] for k in ("board_rows", "listings", "by_category")}, sort_keys=True))
     print(json.dumps(s["wall"], indent=1))
     if a.ready_marker:

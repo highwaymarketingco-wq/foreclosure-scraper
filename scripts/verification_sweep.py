@@ -434,7 +434,10 @@ def export_punchlist(board: Path, ldir: Path) -> int:
         return 0
     import subprocess
     cmd = [sys.executable, str(REPO / "scripts" / "export_wall_punchlist.py"),
-           "--board", str(board), "--ledger-dir", str(ldir), "--ready-marker"]
+           "--board", str(board), "--ledger-dir", str(ldir), "--ready-marker",
+           # owner decision 2026-10-12: LiensNC is construction lien-agent filings, not a distress
+           # signal, so it is never a punch-list candidate.
+           "--exclude-source", "counties_generic.liensnc", "--exclude-source", "liensnc"]
     if Path(ldir).resolve() != L.LEDGER_DIR.resolve():
         # a sweep on another ledger directory (a test, a dry copy) never overwrites the real
         # punch list, marker or committed summary: its export goes beside that directory
