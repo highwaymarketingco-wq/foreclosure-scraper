@@ -50,7 +50,7 @@ class NcUnclaimedScraper(BaseScraper):
         return results
 
     async def _fetch_with_playwright(self) -> list[Listing]:
-        """Use Playwright to render the SPA. Turnstile auto-solves in managed mode."""
+        """Use Playwright to render the SPA, capture Turnstile token, call API directly."""
         results: list[Listing] = []
         try:
             from playwright.async_api import async_playwright
@@ -58,114 +58,118 @@ class NcUnclaimedScraper(BaseScraper):
             log.error("nc_unclaimed.no_playwright")
             return results
 
+        import asyncio
+        import httpx
+
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(
                 headless=True,
-                args=["--no-sandbox", "--disable-gpu"],
+                args=[
+                    "--no-sandbox",
+                    "--disable-gpu",
+                    "--disable-blink-features=AutomationControlled",
+                ],
             )
-            page = await browser.new_page()
+            ctx = await browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                ),
+                viewport={"width": 1280, "height": 800},
+            )
+            page = await ctx.new_page()
 
-            # Capture API responses
-            api_responses: list[dict] = []
-
-            async def handle_response(response):
-                if "/SWS/properties" in response.url and response.status == 200:
-                    try:
-                        data = await response.json()
-                        api_responses.append(data)
-                    except Exception:
-                        pass
-
-            page.on("response", handle_response)
+            # Capture console messages for debugging
+            page.on("console", lambda msg: log.debug("nc_unclaimed.console",
+                                                     level=msg.type, text=msg.text[:200]))
 
             await page.goto(_URL, timeout=60000)
 
-            # Turnstile managed mode auto-solves — just wait for SPA to settle.
-            # Give the Angular app time to bootstrap and Turnstile to clear.
+            # Wait for Angular to bootstrap and Turnstile to load
+            await asyncio.sleep(8)
+
+            # Wait for turnstile object to be available
             try:
-                await page.wait_for_load_state("networkidle", timeout=30000)
+                await page.wait_for_function(
+                    "() => typeof turnstile !== 'undefined'",
+                    timeout=15000,
+                )
             except Exception:
-                pass  # networkidle may not fire if Turnstile keeps a connection open
+                log.warning("nc_unclaimed.no_turnstile_obj")
+                await browser.close()
+                return results
 
-            # Wait a bit more for Angular to render the search form
-            import asyncio
-            await asyncio.sleep(5)
-
-            # Debug: log page state
-            try:
-                page_url = page.url
-                page_title = await page.title()
-                # Count visible inputs
-                input_count = await page.locator("input").count()
-                button_count = await page.locator("button").count()
-                log.info("nc_unclaimed.page_state",
-                         url=page_url, title=page_title,
-                         inputs=input_count, buttons=button_count)
-                # Log all input names/ids
-                inputs_info = await page.evaluate("""() => {
-                    return Array.from(document.querySelectorAll('input')).map(i => ({
-                        name: i.name, id: i.id, type: i.type,
-                        placeholder: i.placeholder,
-                        class: i.className
-                    }))
-                }""")
-                log.info("nc_unclaimed.inputs", inputs=inputs_info)
-                # Log all button texts
-                buttons_info = await page.evaluate("""() => {
-                    return Array.from(document.querySelectorAll('button')).map(b => ({
-                        text: b.innerText, type: b.type, class: b.className
-                    }))
-                }""")
-                log.info("nc_unclaimed.buttons", buttons=buttons_info)
-            except Exception as exc:
-                log.warning("nc_unclaimed.debug_failed", error=str(exc)[:160])
-
-            # Search for each surname
-            for surname in _SEARCH_NAMES:
+            # Execute Turnstile and get token
+            token = None
+            for attempt in range(3):
                 try:
-                    # Wait for search form — exact selectors from page DOM
-                    last_name_input = page.locator("input[name='lastName'], #lastName")
-                    if await last_name_input.count() > 0:
-                        await last_name_input.first.fill(surname)
-
-                        # Wait for Turnstile token to populate before clicking search
-                        # Turnstile managed mode auto-solves — wait for the hidden field
-                        try:
-                            await page.wait_for_function(
-                                """() => {
-                                    const el = document.querySelector('[name=\"cf-turnstile-response\"]');
-                                    return el && el.value && el.value.length > 10;
-                                }""",
-                                timeout=20000,
-                            )
-                            log.info("nc_unclaimed.turnstile_solved", surname=surname)
-                        except Exception:
-                            log.warning("nc_unclaimed.turnstile_timeout", surname=surname)
-
-                        # Click search button (id=btn-turnstile, text=SEARCH)
-                        search_btn = page.locator("#btn-turnstile, button:has-text('SEARCH')")
-                        if await search_btn.count() > 0:
-                            await search_btn.first.click()
-                            # Wait for API response
-                            import asyncio
-                            await asyncio.sleep(3)
-                            try:
-                                await page.wait_for_load_state("networkidle", timeout=15000)
-                            except Exception:
-                                pass
-
-                    # Parse captured API response
-                    for resp in api_responses:
-                        results.extend(self._parse_api_response(resp, surname))
-
-                    api_responses.clear()
-
-                    log.info("nc_unclaimed.surname_done",
-                             surname=surname, found=len(results))
-
+                    token = await page.evaluate("""() => {
+                        // Try to get existing token
+                        let t = turnstile.getResponse();
+                        if (t && t.length > 10) return t;
+                        // Try to execute
+                        const widgets = document.querySelectorAll('[id^="cf-chl-widget"]');
+                        if (widgets.length > 0) {
+                            turnstile.execute(widgets[0].id);
+                        }
+                        return null;
+                    }""")
+                    if token and len(token) > 10:
+                        break
+                    # Wait for callback
+                    await asyncio.sleep(5)
+                    token = await page.evaluate("() => { try { return turnstile.getResponse(); } catch(e) { return null; } }")
+                    if token and len(token) > 10:
+                        break
                 except Exception as exc:
-                    log.warning("nc_unclaimed.surname_error",
-                                surname=surname, error=str(exc)[:160])
+                    log.warning("nc_unclaimed.turnstile_exec_failed",
+                                attempt=attempt + 1, error=str(exc)[:160])
+                    await asyncio.sleep(3)
+
+            if not token or len(token) < 10:
+                log.warning("nc_unclaimed.no_token")
+                await browser.close()
+                return results
+
+            log.info("nc_unclaimed.token_captured", token_len=len(token))
+
+            # Now make direct API calls with the token
+            async with httpx.AsyncClient() as client:
+                for surname in _SEARCH_NAMES:
+                    try:
+                        resp = await client.post(
+                            _API,
+                            json={
+                                "lastName": surname,
+                                "firstName": "",
+                                "city": "",
+                                "searchZipCode": "",
+                                "propertyID": "",
+                                "cf-turnstile-response": token,
+                            },
+                            headers={
+                                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+                                "Origin": "https://unclaimed.nccash.gov",
+                                "Referer": "https://unclaimed.nccash.gov/app/claim-search",
+                                "Content-Type": "application/json",
+                            },
+                            timeout=30,
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            found = self._parse_api_response(data, surname)
+                            results.extend(found)
+                            log.info("nc_unclaimed.surname_done",
+                                     surname=surname, found=len(found),
+                                     status=resp.status_code)
+                        else:
+                            log.warning("nc_unclaimed.api_error",
+                                        surname=surname,
+                                        status=resp.status_code,
+                                        body=resp.text[:200])
+                    except Exception as exc:
+                        log.warning("nc_unclaimed.surname_error",
+                                    surname=surname, error=str(exc)[:160])
 
             await browser.close()
 
