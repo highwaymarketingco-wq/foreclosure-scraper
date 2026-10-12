@@ -61,9 +61,9 @@ class CityOfUnionScraper(BaseScraper):
 
                     await page.goto(url, timeout=45000)
 
-                    # Check for Cloudflare / JS challenge — retry up to 3 times
+                    # Check for Cloudflare / JS challenge — retry up to 5 times
                     cf_solved = False
-                    for attempt in range(3):
+                    for attempt in range(5):
                         await page.wait_for_load_state("domcontentloaded", timeout=20000)
                         try:
                             await page.wait_for_load_state("networkidle", timeout=15000)
@@ -77,7 +77,12 @@ class CityOfUnionScraper(BaseScraper):
                             "cf-challenge",
                             "Checking your browser",
                         ]):
-                            log.info("city_of_union.cf_still_blocking", url=url, attempt=attempt+1)
+                            log.info("city_of_union.cf_waiting", url=url, attempt=attempt+1)
+                            if attempt >= 2:
+                                try:
+                                    await page.reload(wait_until="domcontentloaded", timeout=30000)
+                                except Exception:
+                                    pass
                             await page.wait_for_timeout(8000)
                             continue
 

@@ -54,33 +54,30 @@ class MorgantonNcScraper(BaseScraper):
                 try:
                     log.info("morganton_nc.fetching", url=url)
                     page = await browser.new_page()
-                    await page.goto(url, timeout=45000)
+                    await page.goto(url, timeout=60000)
 
-                    # Solve Cloudflare Turnstile/WAF — retry up to 5 times
+                    # Cloudflare JS challenge — patchright headless=False should
+                    # auto-pass it. Just WAIT for it to resolve.
+                    # Don't call WAF solver (it looks for canvas/Turnstile which
+                    # this site doesn't use).
                     cf_solved = False
                     for attempt in range(5):
-                        try:
-                            from ...enrichment_waf_oss import solve_waf_via_browser
-                            await solve_waf_via_browser(page)
-                        except Exception as exc:
-                            log.warning("morganton_nc.waf_error",
-                                        url=url, error=str(exc)[:160])
-
-                        # Check if Cloudflare is still blocking
+                        # Wait for CF challenge to auto-resolve
+                        await page.wait_for_timeout(8000)
                         html = await page.content()
+
                         if "Performing security verification" in html or "Just a moment" in html:
-                            log.info("morganton_nc.cf_still_blocking", url=url, attempt=attempt+1)
-                            # Try reloading the page — sometimes triggers pass
-                            try:
-                                await page.reload(wait_until="domcontentloaded", timeout=30000)
-                                await page.wait_for_timeout(10000)
-                            except Exception:
-                                pass
+                            log.info("morganton_nc.cf_waiting", url=url, attempt=attempt+1)
+                            # Try reloading — sometimes helps trigger the pass
+                            if attempt >= 2:
+                                try:
+                                    await page.reload(wait_until="domcontentloaded", timeout=30000)
+                                except Exception:
+                                    pass
                             continue
 
                         cf_solved = True
-                        log.info("morganton_nc.waf_solved", url=url, attempt=attempt+1)
-                        await page.wait_for_load_state("networkidle", timeout=20000)
+                        log.info("morganton_nc.cf_solved", url=url, attempt=attempt+1)
                         break
 
                     if not cf_solved:
