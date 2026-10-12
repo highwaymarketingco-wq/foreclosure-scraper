@@ -39,37 +39,12 @@ class NcTylerTechEstatesScraper(BaseScraper):
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
-        from ...wall_bypass import fetch_with_nodriver, fetch_through_walls
-
         try:
             log.info("nc_tylertech.fetching")
 
-            # TylerTech portal blocks curl-cffi and httpx (403 on both tiers).
-            # Go straight to nodriver (undetected Chrome).
-            html = await fetch_with_nodriver(_URL, timeout_s=60)
-
-            if not html or len(html) < 500:
-                # Try full escalation as fallback
-                html = await fetch_through_walls(_URL, render_first=True)
-
-            if not html or len(html) < 500:
-                log.warning("nc_tylertech.empty")
-                return results
-
-            # Check for picture CAPTCHA
-            if "captcha" in html.lower() or "select all" in html.lower():
-                log.info("nc_tylertech.picture_captcha_detected")
-
-                # Try using Playwright + Gemini Vision to solve picture CAPTCHA
-                try:
-                    results.extend(await self._solve_with_playwright())
-                except Exception as exc:
-                    log.warning("nc_tylertech.captcha_solve_failed",
-                                error=str(exc)[:200])
-                return results
-
-            # If we got through, parse results
-            results.extend(self._parse_html(html))
+            # TylerTech portal has AWS WAF. nodriver and curl-cffi both get 403.
+            # Go straight to Playwright + WAF solver (proven path).
+            results.extend(await self._solve_with_playwright())
 
             log.info("nc_tylertech.done", found=len(results))
 
@@ -83,6 +58,7 @@ class NcTylerTechEstatesScraper(BaseScraper):
 
         Uses the same proven solver as nc_ecourts_estates: Gemini vision
         identifies tiles in the 3x3 grid, Anthropic Claude as fallback.
+        After WAF is solved, navigates to estate search and submits query.
         """
         results: list[Listing] = []
         try:
@@ -97,7 +73,7 @@ class NcTylerTechEstatesScraper(BaseScraper):
                 args=["--no-sandbox", "--disable-gpu"],
             )
             page = await browser.new_page()
-            await page.goto(_URL, timeout=30000)
+            await page.goto(_URL, timeout=45000)
 
             # Use the proven WAF solver from enrichment_waf_oss
             try:
@@ -106,9 +82,12 @@ class NcTylerTechEstatesScraper(BaseScraper):
                 if solved:
                     log.info("nc_tylertech.waf_solved")
                     # Wait for page to settle after WAF solve
-                    await page.wait_for_load_state("networkidle", timeout=15000)
-                    html = await page.content()
-                    results.extend(self._parse_html(html))
+                    await page.wait_for_load_state("networkidle", timeout=20000)
+
+                    # Now we need to navigate to estate search.
+                    # TylerTech portal has a search form — try to find and
+                    # submit it for estate cases.
+                    results.extend(await self._search_estates(page))
                 else:
                     log.warning("nc_tylertech.waf_solve_failed")
             except Exception as exc:
@@ -119,6 +98,73 @@ class NcTylerTechEstatesScraper(BaseScraper):
                 results.extend(self._parse_html(html))
 
             await browser.close()
+
+        return results
+
+    async def _search_estates(self, page) -> list[Listing]:
+        """Navigate the TylerTech portal to search for estate cases."""
+        results: list[Listing] = []
+        try:
+            html = await page.content()
+
+            # Look for estate/probate search links or tabs
+            # TylerTech portals typically have navigation links
+            estate_links = page.locator("a:has-text('Estate'), a:has-text('Probate'), a:has-text('estate'), a:has-text('probate')")
+            if await estate_links.count() > 0:
+                await estate_links.first.click()
+                await page.wait_for_load_state("networkidle", timeout=20000)
+                html = await page.content()
+
+            # Look for search form — try to fill date range and submit
+            # Estate searches typically need a date range or case type
+            date_from = page.locator("input[name*='date'], input[name*='Date'], input[name*='from'], input[name*='From'], #dateFrom, #fromDate")
+            date_to = page.locator("input[name*='to'], input[name*='To'], #dateTo, #toDate")
+
+            if await date_from.count() > 0:
+                # Set date range to last 2 years
+                from datetime import datetime, timedelta
+                end = datetime.now()
+                start = end - timedelta(days=730)
+                await date_from.first.fill(start.strftime("%m/%d/%Y"))
+                if await date_to.count() > 0:
+                    await date_to.first.fill(end.strftime("%m/%d/%Y"))
+
+            # Look for case type selector and choose Estate
+            case_type = page.locator("select[name*='case'], select[name*='Case'], select[name*='type'], select[name*='Type']")
+            if await case_type.count() > 0:
+                try:
+                    await case_type.first.select_option(label=page.locator("select option:has-text('Estate'), select option:has-text('Probate')").first)
+                except Exception:
+                    pass  # May not be a select or may not have estate option
+
+            # Click search button
+            search_btn = page.locator("button:has-text('Search'), input[type='submit'], button:has-text('search'), a:has-text('Search')")
+            if await search_btn.count() > 0:
+                await search_btn.first.click()
+                await page.wait_for_load_state("networkidle", timeout=30000)
+                html = await page.content()
+
+            results.extend(self._parse_html(html))
+
+            # Check for pagination
+            next_btn = page.locator("a:has-text('Next'), a:has-text('next'), li.next a")
+            page_num = 0
+            while await next_btn.count() > 0 and page_num < 50:
+                page_num += 1
+                try:
+                    await next_btn.first.click()
+                    await page.wait_for_load_state("networkidle", timeout=15000)
+                    html = await page.content()
+                    new_results = self._parse_html(html)
+                    if not new_results:
+                        break
+                    results.extend(new_results)
+                    next_btn = page.locator("a:has-text('Next'), a:has-text('next'), li.next a")
+                except Exception:
+                    break
+
+        except Exception as exc:
+            log.warning("nc_tylertech.search_error", error=str(exc)[:160])
 
         return results
 
