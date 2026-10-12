@@ -72,24 +72,42 @@ async def login(page):
         return False
     print(f"Password filled (len={len(pw_val)})")
 
-    # Click login
+    # Click login — try multiple methods
     login_btn = await page.query_selector("#LoginBtn")
     if not login_btn:
         login_btn = await page.query_selector("button[type='submit']")
     if not login_btn:
         login_btn = await page.query_selector("input[type='submit']")
     if not login_btn:
-        print("ERROR: Cannot find login button")
-        return False
+        # Fallback: find any button with "Login" or "Log In" text
+        btns = await page.query_selector_all("button, input[type='submit'], a.btn")
+        for btn in btns:
+            tag = await btn.evaluate("el => el.tagName")
+            text = await btn.inner_text() if tag != "INPUT" else await btn.get_attribute("value") or ""
+            if text and "login" in text.lower():
+                login_btn = btn
+                break
 
-    await login_btn.click()
-    print("Login clicked, waiting...")
-    await asyncio.sleep(10)
+    if login_btn:
+        await login_btn.click()
+    else:
+        # Last resort: press Enter in password field
+        await password_field.press("Enter")
+    print("Login submitted, waiting...")
+    await asyncio.sleep(15)
 
     # Check if logged in
     if "Login" in page.url:
         print(f"ERROR: Still on login page: {page.url}")
         await page.screenshot(path="/tmp/cherokee_login_fail.png")
+        # Dump the error message
+        error_el = await page.query_selector(".text-danger, .field-validation-error, .validation-summary-errors, [class*='error']")
+        if error_el:
+            error_text = await error_el.inner_text()
+            print(f"  Error text: {error_text}")
+        # Dump page text for debugging
+        page_text = await page.evaluate("() => document.body.innerText.substring(0, 2000)")
+        print(f"  Page text: {page_text[:500]}")
         return False
 
     print(f"Logged in! URL: {page.url}")
