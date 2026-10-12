@@ -373,31 +373,53 @@ async def main():
         except BaseException as e:
             print(f"Checkbox click error: {e}")
 
-        await asyncio.sleep(5)
+        await asyncio.sleep(8)
 
         # Check if auto-solved
         resp = await get_recaptcha_response(page)
         if resp:
             print(f"Auto-solved! Token: {resp[:60]}...")
-            await browser.close()
-            return
+            # Skip captcha, do the search directly
+            challenge_frame = None
+        else:
+            # Find challenge frame
+            challenge_frame = None
+            for frame in page.frames:
+                if "recaptcha/api2/bframe" in frame.url:
+                    challenge_frame = frame
+                    break
 
-        # Find challenge frame
-        challenge_frame = None
-        for frame in page.frames:
-            if "recaptcha/api2/bframe" in frame.url:
-                challenge_frame = frame
-                break
-
-        if not challenge_frame:
+        if not challenge_frame and not resp:
             print("No challenge frame found — may have auto-solved")
             await browser.close()
             return
 
-        print("Found challenge frame")
+        if resp:
+            print("reCAPTCHA auto-solved — proceeding to search")
+        else:
+            print("Found challenge frame")
 
-        # Try audio solver up to 8 times
-        for attempt in range(8):
+        # If auto-solved, skip directly to search
+        if resp:
+            print("reCAPTCHA auto-solved — performing probate search")
+            try:
+                await page.fill("#DateFrom", "01/01/2024")
+                await page.fill("#DateTo", "12/31/2026")
+                await asyncio.sleep(1)
+                await page.click("button[type='submit'], input[type='submit'], #searchBtn")
+                await asyncio.sleep(10)
+                html = await page.content()
+                print(f"Page length: {len(html)}")
+                with open("/tmp/lex_results.html", "w") as f:
+                    f.write(html)
+                print("Results saved to /tmp/lex_results.html")
+            except Exception as e:
+                print(f"Search error: {e}")
+            await browser.close()
+            return
+
+        # Try audio solver up to 3 times (each failure burns the session)
+        for attempt in range(3):
             print(f"\n=== Audio attempt {attempt+1} ===")
             
             # Re-find challenge frame each time (it detaches after failed verify)
