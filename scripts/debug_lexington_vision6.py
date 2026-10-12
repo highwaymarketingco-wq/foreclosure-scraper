@@ -459,7 +459,15 @@ async def main():
                 except BaseException:
                     pass
                 # Only reload if we're truly stuck (not transitioning)
-                print("  Challenge empty after 15s — reloading")
+                # First, try clicking verify — empty tiles + verify = submit
+                await click_verify_only(challenge_frame)
+                await asyncio.sleep(8)
+                resp = await get_recaptcha_response(page)
+                if resp:
+                    print(f"Solved after verify! Token: {resp[:60]}...")
+                    solved = True
+                    break
+                print("  Challenge empty after verify — reloading")
                 await reload_challenge(challenge_frame)
                 await asyncio.sleep(5)
                 continue
