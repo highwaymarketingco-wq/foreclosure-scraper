@@ -73,11 +73,9 @@ async def test_nc_sos_ucc_nodriver():
         url = "https://www.sosnc.gov/online_services/search/by_title/_u_cc"
         print(f"Fetching: {url}")
 
-        config = uc.Config()
-        config.headless = False
-        config.browser_args = ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
-        config.sandbox = False
-        browser = await uc.Browser.create(config)
+        config = uc.Config(sandbox=False, headless=False)
+        config.add_argument("--disable-gpu")
+        browser = await uc.start(config)
         page = await browser.get(url)
         await asyncio.sleep(15)
 
@@ -106,7 +104,7 @@ async def test_sc_sos_entity_patchright():
     try:
         from patchright.async_api import async_playwright
 
-        url = "https://businessfilings.sc.gov/businessfiling"
+        url = "https://businessfilings.sc.gov/BusinessFiling/Entity/Search"
         print(f"Fetching: {url}")
 
         async with async_playwright() as pw:

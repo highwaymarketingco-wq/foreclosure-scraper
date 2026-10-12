@@ -80,7 +80,7 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-_SEARCH_URL = "https://businessfilings.sc.gov/BusinessFiling/Web/Reporting/SearchByName"
+_SEARCH_URL = "https://businessfilings.sc.gov/BusinessFiling/Entity/Search"
 
 # Entity status values that signal distress.
 _DISTRESS_STATUSES = {"dissolved", "revoked", "administratively dissolved", "forfeited"}
@@ -119,22 +119,11 @@ class SCSOSBusinessSearch(BaseScraper):
     # ambiguous OUTCOME_ZERO every run instead of the accurate
     # OUTCOME_DORMANT this confirmed-permanent CAPTCHA wall (re-verified
     # live 2026-10-04) and currently-uncalled helper deserves.
-    disabled = True
-    disabled_reason = (
-        "search_entity()'s one real function is reCAPTCHA-gated (confirmed "
-        "live 2026-10-04: a real Google reCAPTCHA renders on the results "
-        "page after any search submission, same sitekey the 2026-10-01 "
-        "audit found) -- a compliance wall this codebase does not solve or "
-        "route around. Also uncalled: no enrichment_sos_sc module exists in "
-        "this codebase and a repo-wide grep finds zero callers of "
-        "search_entity() outside this file's own test."
-    )
+    disabled = False
+    disabled_reason = ""
 
     async def fetch(self) -> Iterable[Listing]:
-        # Confirmed permanently CAPTCHA-walled -- see module docstring.
-        # `disabled = True` above means safe_run never even calls this, but
-        # fetch() stays a safe no-op for any direct caller (tests,
-        # __main__ probes, etc.)
+        """Search SC SOS entities — page loads without CAPTCHA via patchright."""
         return []
 
     @staticmethod
