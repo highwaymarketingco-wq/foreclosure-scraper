@@ -64,7 +64,24 @@ class DcIpBlockScraper(BaseScraper):
                         base_url, impersonate=True, timeout=15.0)
 
                 if not html or len(html) < 500:
-                    # Tier 3: wall_bypass (pydoll + nodriver)
+                    # Tier 3: Playwright (real browser, may bypass IP filter)
+                    try:
+                        from playwright.async_api import async_playwright
+                        async with async_playwright() as p:
+                            browser = await p.chromium.launch(
+                                headless=True,
+                                args=["--no-sandbox", "--disable-gpu"],
+                            )
+                            pg = await browser.new_page()
+                            await pg.goto(base_url, timeout=30000)
+                            html = await pg.content()
+                            await browser.close()
+                    except Exception as exc:
+                        log.warning("dc_ip_block.playwright_failed",
+                                    county=county, error=str(exc)[:120])
+
+                if not html or len(html) < 500:
+                    # Tier 4: wall_bypass (pydoll + nodriver)
                     from ...wall_bypass import fetch_with_nodriver
                     html = await fetch_with_nodriver(base_url, timeout_s=30)
 
