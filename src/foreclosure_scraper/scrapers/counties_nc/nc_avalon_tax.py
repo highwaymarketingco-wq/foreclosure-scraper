@@ -72,77 +72,56 @@ class NcAvalonTaxScraper(BaseScraper):
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
-        from playwright.async_api import async_playwright
+        from ...browser_utils import start_browser
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-gpu"],
-            )
+        browser = await start_browser(headless=True)
 
-            for county, cfg in _COUNTY_SITES.items():
-                try:
-                    base_url = cfg["url"]
-                    search_url = f"{base_url}/List/Delinquent"
+        for county, cfg in _COUNTY_SITES.items():
+            try:
+                base_url = cfg["url"]
 
-                    log.info("nc_avalon.fetching", county=county)
+                log.info("nc_avalon.fetching", county=county)
 
-                    page = await browser.new_page()
-                    try:
-                        await page.goto(search_url, timeout=45000)
-                        await page.wait_for_load_state("networkidle", timeout=20000)
+                page = await browser.get(base_url)
+                await asyncio.sleep(8)  # Wait for SPA to load
 
-                        # Accept disclaimer
-                        accept_btn = page.locator("button:has-text('Accept')")
-                        if await accept_btn.count() > 0:
-                            await accept_btn.first.click()
-                            await asyncio.sleep(2)
+                # Discover guid from page if not known
+                guid = cfg.get("guid")
+                if not guid:
+                    html = await page.get_content()
+                    m = re.search(
+                        r"cloudfront\.net/(?:views|css|data)/([a-f0-9-]{36})",
+                        html,
+                    )
+                    if m:
+                        guid = m.group(1)
+                        log.info("nc_avalon.guid_found", county=county, guid=guid)
+                    else:
+                        log.warning("nc_avalon.no_guid", county=county)
+                        continue
 
-                        # Close tips modal
-                        close_btn = page.locator("button:has-text('Close')")
-                        if await close_btn.count() > 0:
-                            await close_btn.first.click()
-                            await asyncio.sleep(1)
-                        await page.keyboard.press("Escape")
-                        await asyncio.sleep(1)
+                # Query the Wildfire API for delinquent records
+                # nodriver bypasses CloudFront WAF (Playwright gets 403)
+                county_results = await self._fetch_via_api(page, base_url, guid, county, cfg["state"])
+                results.extend(county_results)
 
-                        # Discover guid from page if not known
-                        guid = cfg.get("guid")
-                        if not guid:
-                            html = await page.content()
-                            m = re.search(
-                                r"cloudfront\.net/(?:views|css|data)/([a-f0-9-]{36})",
-                                html,
-                            )
-                            if m:
-                                guid = m.group(1)
-                                log.info("nc_avalon.guid_found", county=county, guid=guid)
-                            else:
-                                log.warning("nc_avalon.no_guid", county=county)
-                                continue
+                log.info("nc_avalon.county_done", county=county, found=len(county_results))
 
-                        # Query the Wildfire API for delinquent records
-                        # Try different search terms to find delinquent records
-                        # The API returns all records, we filter by isDelinquent
-                        county_results = await self._fetch_via_api(page, base_url, guid, county, cfg["state"])
-                        results.extend(county_results)
+            except Exception as exc:
+                log.warning("nc_avalon.county_error", county=county, error=str(exc)[:200])
 
-                        log.info("nc_avalon.county_done", county=county, found=len(county_results))
-
-                    finally:
-                        await page.close()
-
-                except Exception as exc:
-                    log.warning("nc_avalon.county_error", county=county, error=str(exc)[:200])
-
-            await browser.close()
-
+        browser.stop()
         return results
 
     async def _fetch_via_api(
         self, page, base_url: str, guid: str, county: str, state: str
     ) -> list[Listing]:
-        """Query the Wildfire Records API and filter for delinquent records."""
+        """Query the Wildfire Records API and filter for delinquent records.
+
+        Uses nodriver's page.evaluate with an async IIFE pattern (nodriver
+        wraps the code in an async function body, so top-level await works
+        inside an IIFE but not at the bare top level).
+        """
         results: list[Listing] = []
         api_url = f"{_CLOUDFRONT_BASE}/data/{guid}/Wildfire/Records"
 
@@ -161,25 +140,22 @@ class NcAvalonTaxScraper(BaseScraper):
 
             while True:
                 try:
-                    response = await page.evaluate(
-                        """async (params) => {
-                            const resp = await fetch(params.url, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    value: params.term,
-                                    skip: params.skip,
-                                    direct: false
-                                })
-                            });
-                            return await resp.text();
-                        }""",
-                        {"url": api_url, "term": term, "skip": skip},
+                    # nodriver evaluate: use async IIFE, inline params (no arg passing)
+                    js = (
+                        "(async () => {\n"
+                        f"  const resp = await fetch({json.dumps(api_url)}, {{\n"
+                        "    method: 'POST',\n"
+                        "    headers: {'Content-Type': 'application/json'},\n"
+                        f"    body: JSON.stringify({{value: {json.dumps(term)}, skip: {skip}, direct: false}})\n"
+                        "  });\n"
+                        "  const text = await resp.text();\n"
+                        "  return text;\n"
+                        "})()"
                     )
 
-                    if not response:
+                    response = await page.evaluate(js, await_promise=True)
+
+                    if not response or not isinstance(response, str):
                         break
 
                     try:
@@ -187,8 +163,6 @@ class NcAvalonTaxScraper(BaseScraper):
                     except json.JSONDecodeError:
                         # CloudFront/WAF returns an HTML error page (403, 503,
                         # etc.) instead of JSON when the request is blocked.
-                        # That is NOT the same as "API returned {}" — surface
-                        # it as a block, not a clean zero.
                         snippet = response[:200].replace("\n", " ")
                         log.warning("nc_avalon.blocked", county=county, term=term,
                                     skip=skip, body=snippet)
