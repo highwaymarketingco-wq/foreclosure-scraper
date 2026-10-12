@@ -72,6 +72,13 @@ SPECIAL_TIMEOUTS = {
     "public_notices.echovita_obituaries": 600.0,
 }
 
+# Sources permanently blocked by infrastructure (not code-fixable).
+# Skip these to avoid wasting time and spawning browser processes that
+# pile up and cause OOM.
+SKIP_SOURCES = {
+    "counties_sc.sc_qpublic",  # Oracle Cloud IP banned by schneidercorp.com
+}
+
 # The 37 Type-A walled source IDs from docs/walls_register.json
 # and the scraper slugs that map to them.
 WALLED_SOURCE_MAP = {
@@ -347,6 +354,17 @@ async def main():
         wall_total = 0
         for cls in scraper_classes:
             slug = getattr(cls, "slug", "?")
+            # Skip permanently blocked sources (infrastructure block)
+            if slug in SKIP_SOURCES:
+                print(f"  [{wall_id:25s}] {slug}... SKIPPED (infrastructure block)")
+                wall_results.append({
+                    "slug": slug,
+                    "rows": 0,
+                    "outcome": "BLOCKED",
+                    "reason": "Infrastructure block — skipped by SKIP_SOURCES",
+                    "elapsed_s": 0.0,
+                })
+                continue
             # Skip already-completed scrapers (resumable manifest)
             if slug in completed_slugs:
                 # Load existing result
