@@ -168,19 +168,18 @@ class ScRodWalledScraper(BaseScraper):
         }""")
         if quick_clicked:
             log.info("sc_rod_walled.quick_btn", county=county, selector=quick_clicked)
-            await asyncio.sleep(5)
+            await asyncio.sleep(8)
             try:
                 await page.wait_for_load_state("networkidle", timeout=15000)
             except Exception:
                 pass
-            content = await page.content()
-            return self._parse_results(content, page.url, county, state)
+            # Parse results via JS — SPA may not have table rows
+            return await self._extract_results_js(page, base_url, county, state)
 
         # Fill date inputs via JS (Angular inputs may not be Playwright-visible)
         filled = await page.evaluate("""(args) => {
             const [cutoff, end] = args;
             let fromSet = false, toSet = false;
-            // Set fromdate
             const fromEl = document.querySelector('input[name="fromdate"]')
                 || document.querySelector('input[name*="from" i]');
             if (fromEl) {
@@ -189,7 +188,6 @@ class ScRodWalledScraper(BaseScraper):
                 fromEl.dispatchEvent(new Event('change', {bubbles: true}));
                 fromSet = true;
             }
-            // Set todate
             const toEl = document.querySelector('input[name="todate"]')
                 || document.querySelector('input[name*="to" i]');
             if (toEl) {
@@ -203,15 +201,11 @@ class ScRodWalledScraper(BaseScraper):
 
         if filled.get("fromSet") or filled.get("toSet"):
             log.info("sc_rod_walled.dates_filled", county=county, **filled)
-            # Click search button via JS
             search_clicked = await page.evaluate("""() => {
                 const btns = document.querySelectorAll('button[type="submit"], input[type="submit"], button');
                 for (const b of btns) {
                     const t = (b.innerText || b.value || '').trim().toLowerCase();
-                    if (t === 'search') {
-                        b.click();
-                        return true;
-                    }
+                    if (t === 'search') { b.click(); return true; }
                 }
                 return false;
             }""")
@@ -221,8 +215,7 @@ class ScRodWalledScraper(BaseScraper):
                     await page.wait_for_load_state("networkidle", timeout=15000)
                 except Exception:
                     pass
-                content = await page.content()
-                return self._parse_results(content, page.url, county, state)
+                return await self._extract_results_js(page, base_url, county, state)
         else:
             log.info("sc_rod_walled.no_date_inputs", county=county)
 
@@ -231,10 +224,7 @@ class ScRodWalledScraper(BaseScraper):
             const btns = document.querySelectorAll('button[type="submit"], input[type="submit"], button');
             for (const b of btns) {
                 const t = (b.innerText || b.value || '').trim().toLowerCase();
-                if (t === 'search') {
-                    b.click();
-                    return true;
-                }
+                if (t === 'search') { b.click(); return true; }
             }
             return false;
         }""")
@@ -246,8 +236,82 @@ class ScRodWalledScraper(BaseScraper):
                 pass
 
         # Parse results from table or grid
-        content = await page.content()
-        return self._parse_results(content, page.url, county, state)
+        return await self._extract_results_js(page, base_url, county, state)
+
+    async def _extract_results_js(
+        self, page, base_url: str, county: str, state: str,
+    ) -> list[Listing]:
+        """Extract search results from SPA via JavaScript evaluation."""
+        results: list[Listing] = []
+
+        # First try standard HTML tables
+        rows_data = await page.evaluate("""() => {
+            const rows = [];
+            // Standard table rows
+            const trs = document.querySelectorAll('table tr, .results tr, .grid tr');
+            for (const tr of trs) {
+                const cells = Array.from(tr.querySelectorAll('td'));
+                if (cells.length >= 3) {
+                    rows.push(cells.map(c => c.innerText.trim()));
+                }
+            }
+            // Angular/ng-repeat rows
+            const ngRows = document.querySelectorAll('[ng-repeat] tr, .data-row, .result-item, .search-result');
+            for (const tr of ngRows) {
+                const cells = Array.from(tr.querySelectorAll('td, div.cell, span.cell'));
+                if (cells.length >= 3) {
+                    rows.push(cells.map(c => c.innerText.trim()));
+                }
+            }
+            // Generic grid rows (Beaufort BrowserViewDMP uses divs)
+            const gridRows = document.querySelectorAll('.grid-row, .row-item, .data-grid .row, [class*="grid-row"]');
+            for (const tr of gridRows) {
+                const cells = Array.from(tr.querySelectorAll('div, span, td'));
+                if (cells.length >= 3) {
+                    rows.push(cells.map(c => c.innerText.trim()));
+                }
+            }
+            return rows;
+        }""")
+
+        if rows_data:
+            log.info("sc_rod_walled.results_found", county=county, count=len(rows_data))
+            for cells in rows_data:
+                if len(cells) < 3:
+                    continue
+                book_page = cells[0]
+                filing_date = cells[1] if len(cells) > 1 else ""
+                doc_type = cells[2] if len(cells) > 2 else ""
+                grantor = cells[3] if len(cells) > 3 else ""
+                grantee = cells[4] if len(cells) > 4 else ""
+                if not book_page:
+                    continue
+                results.append(Listing(
+                    source=self.slug,
+                    source_url=base_url,
+                    listing_type=ListingType.UNKNOWN,
+                    property_kind=PropertyKind.UNKNOWN,
+                    county=county.title(),
+                    state=state,
+                    case_number=book_page,
+                    owner_name=grantee,
+                    plaintiff=grantor,
+                    raw={
+                        "county": county,
+                        "doc_type": doc_type,
+                        "filing_date": filing_date,
+                        "grantor": grantor,
+                        "grantee": grantee,
+                        "book_page": book_page,
+                    },
+                ))
+            return results
+
+        # Fallback: dump page text content to see what's there
+        page_text = await page.evaluate("() => document.body.innerText.substring(0, 2000)")
+        log.info("sc_rod_walled.page_text", county=county, text=page_text[:500])
+
+        return results
 
     def _parse_results(self, content: str, base_url: str,
                        county: str, state: str) -> list[Listing]:
