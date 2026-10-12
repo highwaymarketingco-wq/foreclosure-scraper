@@ -195,20 +195,51 @@ class PolkTaxAuction(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out = list(await self._fetch_auction())
+        out.extend(await self._fetch_delinquent_search())
         return out
 
     async def _fetch_delinquent_search(self) -> Iterable[Listing]:
-        """DISABLED 2026-10-12 — Cloudflare bot-detection block on
-        cms.revize.com is not bypassed by nodriver, patchright, or curl-cffi
-        from the Oracle VM. 5/5 attempts either got a partial 3K-char form
-        page (no CSS/JS) or a full "Just a moment..." Cloudflare challenge
-        page (28K chars). Never got the complete form page with working
-        JS. An earlier test appeared to work (115 rows from 3 surnames) but
-        was a lucky one-off pass through Cloudflare — 5 subsequent attempts
-        all failed. This is the same class of block as QPublic and
-        nc_cchs_deeds: Oracle Cloud IP reputation. Method kept for reference
-        but not called from fetch()."""
-        return []
+        """The county's own delinquent-tax name search.
+
+        Cloudflare WAF-rule block on cms.revize.com: headless=True gets
+        hard-blocked ("Sorry, you have been blocked"), headless=False
+        through Xvfb passes every time. Diagnostic 2026-10-12 confirmed
+        this is headless-detection, NOT IP reputation — the Oracle VM's
+        IP is fine, it's the headless Chromium fingerprint that triggers
+        the WAF rule. Use headless=False always for this source.
+        """
+        from ...browser_utils import start_browser
+
+        out: list[Listing] = []
+        seen_ids: set[str] = set()
+        term_errors = 0
+
+        browser = await start_browser(headless=False)
+        try:
+            for term in _SEARCH_TERMS:
+                try:
+                    html = await _search_via_nodriver(browser, term)
+                except Exception:
+                    term_errors += 1
+                    continue
+                out.extend(self._parse_search_html(html, seen_ids))
+        finally:
+            try:
+                browser.stop()
+            except BaseException:
+                pass
+
+        if not out and term_errors == len(_SEARCH_TERMS):
+            try:
+                from ...http_client import _block_holder  # type: ignore
+                holder = _block_holder.get()
+                if holder is not None:
+                    holder.append((0, "polk_tax delinquent search: all surname "
+                                       "searches errored — see logs"))
+            except Exception:  # noqa: BLE001
+                pass
+
+        return out
 
     @staticmethod
     def _parse_search_html(html: str, seen_ids: set[str]) -> list[Listing]:
