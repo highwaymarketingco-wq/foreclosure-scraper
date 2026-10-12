@@ -3,13 +3,26 @@
 Sites and gate types:
 - rodrecords.wake.gov — Google CAPTCHA on entry
 - rodrecords.durhamcountync.gov — Google CAPTCHA
-- rodrecords.brunswickcountync.gov — math question (use math_captcha.py)
+- brunswick-live.inttek.net — math question (use math_captcha.py). URL FIXED
+  2026-10-12: the old rodrecords.brunswickcountync.gov is a hard NXDOMAIN
+  (confirmed from two separate networks), not a reachable-but-captcha'd
+  site -- the county migrated platforms. Live-confirmed 2026-10-12 via
+  brunswickcountync.gov/990/Register-of-Deeds -> "Online Record Search" ->
+  brunswick-live.inttek.net, which shows the exact same math-question gate
+  this file already expects ("Four Minus One Equals ___"). The real
+  post-login search path on this Inttek platform is NOT verified (the math
+  gate itself was not cleared while finding this) -- search_path below is
+  a guess based on the old assumption and may need correcting once someone
+  gets past the gate.
 - rod.iredellcountync.gov — Google CAPTCHA
 - rod.cravencountync.gov — math question
 - rod.greenecountync.gov — Google CAPTCHA
 - rod.harnettcountync.gov — Google CAPTCHA
 - rod.randolphcountync.gov — math question
-- rod.stokescountync.gov — Google CAPTCHA
+- rod.stokescountync.gov — Google CAPTCHA (DNS timeout seen 2026-10-12 testing
+  from one network; unconfirmed whether the hostname itself is bad like
+  Brunswick's was or just a transient resolver hiccup -- re-check before
+  assuming it's also a stale URL)
 
 Strategy:
 1. Launch Playwright browser (headless on VM).
@@ -37,7 +50,7 @@ log = structlog.get_logger()
 _COUNTY_SITES = {
     "wake": {"url": "https://rodrecords.wake.gov", "gate": "recaptcha", "search_path": "/search/deeds"},
     "durham": {"url": "https://rodrecords.durhamcountync.gov", "gate": "recaptcha", "search_path": "/search/deeds"},
-    "brunswick": {"url": "https://rodrecords.brunswickcountync.gov", "gate": "math", "search_path": "/search"},
+    "brunswick": {"url": "https://brunswick-live.inttek.net", "gate": "math", "search_path": "/search"},
     "iredell": {"url": "https://rod.iredellcountync.gov", "gate": "recaptcha", "search_path": "/search"},
     "craven": {"url": "https://rod.cravencountync.gov", "gate": "math", "search_path": "/search"},
     "greene": {"url": "https://rod.greenecountync.gov", "gate": "recaptcha", "search_path": "/search"},
