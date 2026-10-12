@@ -1,27 +1,11 @@
-"""York County SC — Tax Collection / Delinquent Tax properties.
+"""York County SC — Tax Sale Properties via ArcGIS REST API.
 
-York County posts delinquent tax information at
-yorkcountysc.gov/216.  The page lists properties with delinquent taxes
-heading to the annual tax sale.
+York County publishes tax sale properties through an ArcGIS Experience Builder
+dashboard backed by a public FeatureServer. This scraper queries the FeatureServer
+API directly, getting all 850+ properties with full attribute data (owner,
+parcel, address, assessed value, legal description, etc.) in a single request.
 
-Free, public, no login.
-
-AUDITED 2026-10-01: the document-link fallback below used to emit a BARE
-placeholder Listing (a link + a label, no owner/parcel/address/amount at
-all) for any matched document, never actually fetching or parsing it. Live
-right now (no real per-parcel list published; York's season runs Oct-Jan),
-the only matching document is "OVERAGE-CLAIM-LIST" -- which is also an exact
-duplicate of what counties_sc.york_overage_claims.py already fetches and
-parses properly. So this scraper's live output was one noise row that both
-told the operator nothing (no fields) and doubled up a different source's
-real data. Fixed two ways: (1) overage-claim documents are excluded here --
-that's york_overage_claims.py's job -- so only an actual delinquent TAX SALE
-list is matched; (2) a matched document is now downloaded and parsed with
-pdfplumber for real per-parcel rows (owner/parcel/address/amount), the same
-table-extraction approach sc_tax_delinquent.py already uses elsewhere in this
-codebase, instead of being recorded as a content-free link. If a matched PDF
-yields no table rows, nothing is emitted (no fabricated placeholder) and the
-PDF-fail is logged for visibility instead.
+Free, public, no login, no CAPTCHA — the ArcGIS REST API is open.
 
 Slug: counties_sc.york_delinquent_tax
 Category: county_tax
@@ -29,39 +13,25 @@ ListingType: TAX_SALE
 """
 from __future__ import annotations
 
-import io
-import re
+import math
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
-from ._sc_tax_table import is_usable_row
 
 log = structlog.get_logger()
 
-PAGE_URL = "https://www.yorkcountysc.gov/216/Tax-Collection"
-
-
-async def _fetch_through_cf(url: str) -> str:
-    """Fetch York County page through Cloudflare using real-browser render.
-
-    The standard get_text(wall_bypass=True) escalation calls
-    fetch_through_walls(render_first=False), which skips the StealthyFetcher
-    tier — the one tier that can solve CF JS challenges. This helper
-    calls it directly with render_first=True to use a real browser.
-    """
-    try:
-        from ...wall_bypass import fetch_through_walls
-        text = await fetch_through_walls(url, render_first=True, timeout_s=45)
-        if text and len(text) > 200:
-            return text
-    except Exception as exc:
-        log.warning("york_tax.cf_render_fail", error=str(exc)[:160])
-    return ""
+# ArcGIS FeatureServer for York County Tax Sale Properties 2025
+# Discovered from the Experience Builder app config:
+#   https://experience.arcgis.com/experience/ef9243d9330c4891ba724689f2eb1502
+FS_URL = (
+    "https://services1.arcgis.com/2AGLxyiJoNiVHKwq"
+    "/arcgis/rest/services/Tax_Sale_Properties_2025_View/FeatureServer/0"
+)
 
 
 class YorkDelinquentTax(BaseScraper):
@@ -75,185 +45,180 @@ class YorkDelinquentTax(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        try:
-            html = await get_text(PAGE_URL, wall_bypass=True, impersonate=True, timeout=40.0)
-        except Exception as exc:
-            log.warning("york_tax.fetch_fail", error=str(exc)[:160])
-            html = ""
+        now = datetime.utcnow()
 
-        # If get_text returned empty or a CF block/challenge page, try
-        # real-browser render fallback before giving up.  curl-cffi often
-        # returns HTTP 200 with Cloudflare's "Just a moment..." challenge
-        # HTML — the old check only looked for "blocked"/"attention
-        # required" and silently swallowed the challenge page.
-        def _is_cf_wall(text: str) -> bool:
-            t = (text or "").lower()
-            return (
-                "just a moment" in t
-                or "checking your browser" in t
-                or "cf-browser-verification" in t
-                or "cf-challenge" in t
-                or ("cloudflare" in t and ("blocked" in t or "attention required" in t))
-                or "turnstile" in t
+        # Query all records from the FeatureServer
+        # maxRecordCount is 2000, total is ~853, so one batch suffices
+        all_features: list[dict] = []
+        offset = 0
+        page_size = 2000
+
+        with httpx.Client(timeout=60.0) as client:
+            while True:
+                params = {
+                    "where": "1=1",
+                    "outFields": "*",
+                    "returnGeometry": "false",
+                    "f": "json",
+                    "resultRecordCount": page_size,
+                    "resultOffset": offset,
+                    "orderByFields": "OBJECTID",
+                }
+                r = client.get(f"{FS_URL}/query", params=params)
+                if r.status_code != 200:
+                    log.warning(
+                        "york_tax.arcgis_http_fail",
+                        status=r.status_code,
+                        body=r.text[:200],
+                    )
+                    return out
+
+                data = r.json()
+                features = data.get("features", [])
+                if not features:
+                    break
+
+                all_features.extend(features)
+                log.info(
+                    "york_tax.arcgis_page",
+                    offset=offset,
+                    page_count=len(features),
+                    total_so_far=len(all_features),
+                )
+
+                # Check if there are more records
+                if not data.get("exceededTransferLimit"):
+                    break
+                offset += len(features)
+                if offset >= 10000:  # safety cap
+                    break
+
+        log.info("york_tax.arcgis_total", count=len(all_features))
+
+        for feat in all_features:
+            attrs = feat.get("attributes", {})
+
+            # Build owner name from Owner1/Owner2/Owner3
+            owner_parts = [
+                attrs.get("Owner1", ""),
+                attrs.get("Owner2", ""),
+                attrs.get("Owner3", ""),
+            ]
+            owner = " ".join(p for p in owner_parts if p and p.strip()).strip()
+            if not owner:
+                owner = attrs.get("NAME", "") or attrs.get("ownernames", "") or None
+
+            parcel_id = attrs.get("ParcelID") or attrs.get("TAXMAPID") or None
+            address = attrs.get("PropertyAddress") or attrs.get("fulladdress") or None
+            if address:
+                address = address.strip()
+
+            # Assessed value
+            assessed_val = attrs.get("AprTotVal") or attrs.get("TaxTotVal") or None
+
+            # Sale price (last sale, not tax sale opening bid)
+            sale_price = attrs.get("SalePrice") or None
+
+            # Legal description
+            legal = attrs.get("LegalDescription") or ""
+            land_use = attrs.get("LandUseDesc") or ""
+
+            # Build description
+            desc_parts = []
+            if legal:
+                desc_parts.append(f"Legal: {legal.strip()}")
+            if land_use:
+                desc_parts.append(f"Land use: {land_use.strip()}")
+            if attrs.get("Subdivision"):
+                desc_parts.append(f"Subdivision: {attrs['Subdivision']}")
+            if attrs.get("deededacres"):
+                desc_parts.append(f"Acres: {attrs['deededacres']}")
+            if attrs.get("FinishedSQFT"):
+                desc_parts.append(f"SqFt: {attrs['FinishedSQFT']}")
+            if attrs.get("YearBuilt"):
+                desc_parts.append(f"Year built: {attrs['YearBuilt']}")
+            description = " | ".join(desc_parts) if desc_parts else None
+
+            # GIS report URL
+            gis_url = attrs.get("URL") or None
+
+            # Mail address (for skip tracing)
+            mail_addr = None
+            mail_parts = [
+                attrs.get("MailAddr1", ""),
+                attrs.get("MailApt", ""),
+                attrs.get("MailCity", ""),
+                attrs.get("MailState", ""),
+                attrs.get("MailZip", ""),
+            ]
+            mail_addr = " ".join(str(p) for p in mail_parts if p).strip() or None
+
+            # Previous owner
+            prev_owner = attrs.get("PreviousOwner") or None
+
+            # Homestead
+            homestead = attrs.get("Homestead") or ""
+
+            raw = {
+                "york_delinquent_tax": {
+                    "parcel_id": parcel_id,
+                    "owner": owner,
+                    "property_address": address,
+                    "assessed_value": assessed_val,
+                    "apr_land_val": attrs.get("AprLandVal"),
+                    "apr_bldg_val": attrs.get("AprBldgVal"),
+                    "tax_land_val": attrs.get("TaxLandVal"),
+                    "tax_bldg_val": attrs.get("TaxBldgVal"),
+                    "sale_price": sale_price,
+                    "date_sold": attrs.get("DateSold"),
+                    "legal_description": legal.strip() if legal else None,
+                    "land_use": land_use or None,
+                    "subdivision": attrs.get("Subdivision"),
+                    "deededacres": attrs.get("deededacres"),
+                    "gis_size_ac": attrs.get("GISSizeAC"),
+                    "finished_sqft": attrs.get("FinishedSQFT"),
+                    "year_built": attrs.get("YearBuilt"),
+                    "bldg_type": attrs.get("BldgTypeDesc"),
+                    "improved_status": attrs.get("ImprovedStatus"),
+                    "neighborhood": attrs.get("NeighborhoodDesc"),
+                    "mail_address": mail_addr,
+                    "previous_owner": prev_owner,
+                    "homestead": homestead or None,
+                    "district": attrs.get("DISTRICT"),
+                    "tax_year": attrs.get("TAX_YEAR"),
+                    "sold": attrs.get("SOLD"),
+                    "gis_url": gis_url,
+                    "map_number": attrs.get("MAP__"),
+                    "transfer_book": attrs.get("TransferBook"),
+                    "transfer_page": attrs.get("TransferPage"),
+                    "plat_book": attrs.get("PlatBook"),
+                    "plat_page": attrs.get("PlatPage"),
+                    "fire_tax_dist": attrs.get("FireTaxDist"),
+                    "school_tax_dist": attrs.get("SchSpeTaxDist"),
+                    "muni_tax_dist": attrs.get("MuniTaxDist"),
+                    "total_ag_credit": attrs.get("TotalAgCredit"),
+                }
+            }
+
+            out.append(
+                Listing(
+                    source=self.slug,
+                    source_url=gis_url or FS_URL,
+                    listing_type=ListingType.TAX_SALE,
+                    property_kind=PropertyKind.UNKNOWN,
+                    state="SC",
+                    county="York",
+                    parcel_id=parcel_id,
+                    defendant=owner,
+                    street_address=address,
+                    assessed_value=float(assessed_val) if assessed_val else None,
+                    opening_bid=float(sale_price) if sale_price else None,
+                    description=description,
+                    first_seen=now,
+                    last_seen=now,
+                    raw=raw,
+                )
             )
 
-        if not html or len(html) < 200 or _is_cf_wall(html):
-            log.warning("york_tax.cloudflare_blocked", url=PAGE_URL, html_len=len(html))
-            html = await _fetch_through_cf(PAGE_URL)
-            if not html or len(html) < 200:
-                return out
-            if _is_cf_wall(html):
-                log.warning("york_tax.cloudflare_still_blocked_after_render")
-                return out
-            log.info("york_tax.cf_render_succeeded", html_len=len(html))
-
-        # York County uses CivicPlus CMS — look for property listings in tables
-        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
-        for row in rows:
-            cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
-            if len(cells) < 2:
-                continue
-            clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
-            if any(h in c.lower() for c in clean[:2] for h in ("owner", "name", "tms", "map", "parcel", "#")):
-                continue
-
-            parcel = None
-            for c in clean:
-                m = re.search(r"\b(\d{3}[-\s]?\d{2}[-\s]?\d{2}[-\s]?[\d.]+)\b", c)
-                if m:
-                    parcel = m.group(1)
-                    break
-
-            owner = clean[0] if clean else None
-            addr = None
-            for c in clean[1:]:
-                if re.search(r"\d+\s+\w+", c):
-                    addr = c
-                    break
-
-            # Shared junk-row gate: header/office-hours rows and rows with no TMS
-            # never become leads. See _sc_tax_table for why this is here and not
-            # left to _active_only() in main.py.
-            if not is_usable_row(clean, parcel):
-                continue
-            out.append(Listing(
-                source="counties_sc.york_delinquent_tax",
-                source_url=PAGE_URL,
-                listing_type=ListingType.TAX_SALE,
-                property_kind=PropertyKind.UNKNOWN,
-                state="SC",
-                county="York",
-                parcel_id=parcel,
-                defendant=owner,
-                street_address=addr,
-                description=" | ".join(clean[:6]) if clean else None,
-                first_seen=datetime.utcnow(),
-                last_seen=datetime.utcnow(),
-                raw={"york_delinquent_tax": {"cells": clean[:10]}},
-            ))
-
-        # Look for document links to an actual delinquent TAX SALE list. York
-        # publishes every document through the CivicPlus DocumentCenter, whose
-        # URLs carry NO ".pdf" extension (/DocumentCenter/View/<id>/<Slug>).
-        # AUDITED 2026-10-01: "overage" is excluded here -- that is
-        # counties_sc.york_overage_claims.py's own document, parsed properly
-        # there; matching it here only produced a content-free duplicate.
-        if not out:
-            candidates = re.findall(
-                r'href="(/DocumentCenter/View/\d+/[^"?#]+|[^"]*\.pdf[^"]*)"',
-                html, re.I)
-            seen: set[str] = set()
-            for doc_url in candidates:
-                label = re.sub(r"[-_]+", " ", doc_url.rsplit("/", 1)[-1]).strip()
-                if "overage" in label.lower():
-                    continue  # york_overage_claims.py's document, not this one's
-                # Keep actual rosters ("2026 Delinquent Tax Sale List") and
-                # skip the standing procedure sheets, installment guidelines
-                # and bidder forms on the same page.
-                if not re.search(r"\blist\b", label, re.I):
-                    continue
-                if not re.search(r"delinquent|tax|sale", label, re.I):
-                    continue
-                if doc_url in seen:
-                    continue
-                seen.add(doc_url)
-                full_url = doc_url if doc_url.startswith("http") else f"https://www.yorkcountysc.gov{doc_url}"
-                out.extend(await self._parse_list_pdf(full_url, label))
-                if len(out) >= 2000:
-                    break
-
         log.info("york_tax.done", count=len(out))
-        return out
-
-    async def _parse_list_pdf(self, url: str, label: str) -> list[Listing]:
-        """Download and table-parse a matched delinquent tax-sale list PDF.
-        Returns [] (never a content-free placeholder) if it can't be read as a
-        real table -- same posture as counties_sc.sc_tax_delinquent.py's PDF
-        reader."""
-        try:
-            from curl_cffi import requests as _cffi
-            r = _cffi.get(url, impersonate="chrome", timeout=60.0)
-            if r.status_code != 200:
-                log.warning("york_tax.pdf_http_fail", url=url, status=r.status_code)
-                return []
-            resp_content = r.content
-            import pdfplumber
-        except Exception as exc:  # noqa: BLE001
-            log.warning("york_tax.pdf_fetch_fail", url=url, error=str(exc)[:160])
-            return []
-
-        out: list[Listing] = []
-        now = datetime.utcnow()
-        try:
-            with pdfplumber.open(io.BytesIO(resp_content)) as pdf:
-                for page in pdf.pages:
-                    for tbl in page.extract_tables() or []:
-                        if not tbl or len(tbl) < 2:
-                            continue
-                        header = [str(c or "").lower() for c in tbl[0]]
-                        if not any("owner" in h or "name" in h or "tms" in h
-                                   or "map" in h or "parcel" in h for h in header):
-                            continue
-                        addr_col = next((i for i, h in enumerate(header) if "addr" in h or "descript" in h), None)
-                        owner_col = next((i for i, h in enumerate(header)
-                                          if "owner" in h or "name" in h or "taxpayer" in h), None)
-                        parcel_col = next((i for i, h in enumerate(header)
-                                           if "parcel" in h or "tms" in h or "map" in h), None)
-                        amt_col = next((i for i, h in enumerate(header) if "amount" in h or "due" in h), None)
-                        for row in tbl[1:]:
-                            if not row or all(not c for c in row):
-                                continue
-                            owner = str(row[owner_col] or "").strip() if owner_col is not None else ""
-                            parcel = str(row[parcel_col] or "").strip() if parcel_col is not None else ""
-                            addr = str(row[addr_col] or "").strip() if addr_col is not None else ""
-                            amt_text = str(row[amt_col] or "").strip() if amt_col is not None else ""
-                            if not owner and not parcel:
-                                continue
-                            amount = None
-                            am = re.search(r"\$?\s*([\d,]+\.?\d*)", amt_text)
-                            if am:
-                                try:
-                                    amount = float(am.group(1).replace(",", ""))
-                                except ValueError:
-                                    pass
-                            out.append(Listing(
-                                source=self.slug,
-                                source_url=url,
-                                listing_type=ListingType.TAX_SALE,
-                                property_kind=PropertyKind.UNKNOWN,
-                                state="SC",
-                                county="York",
-                                parcel_id=parcel or None,
-                                defendant=owner or None,
-                                street_address=addr or None,
-                                opening_bid=amount,
-                                description=f"York delinquent tax sale list ({label}): {owner or '?'}",
-                                first_seen=now, last_seen=now,
-                                raw={"york_delinquent_tax": {"source_pdf": url, "amount_due": amount}},
-                            ))
-        except Exception as exc:  # noqa: BLE001
-            log.warning("york_tax.pdf_parse_fail", url=url, error=str(exc)[:160])
-            return []
-        if not out:
-            log.warning("york_tax.pdf_no_table_rows", url=url)
         return out
