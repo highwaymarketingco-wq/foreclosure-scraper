@@ -55,6 +55,7 @@ parcel/address-level detail is wanted here.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime
 from typing import Iterable
@@ -81,33 +82,45 @@ _ROW_RE = re.compile(
 )
 
 
-async def _search_via_browser(browser, letter: str) -> str:
-    """Load the search form in a real Playwright page, fill it, submit, and
-    return the result HTML. No CAPTCHA, no solver module — the host just
-    needs an engine that executes its JS (confirmed: curl-cffi Chrome
-    impersonation still 403s here; a plain rendered page does not)."""
-    page = await browser.new_page()
-    try:
-        await page.goto(_SEARCH_FORM_URL, timeout=30000)
-        await page.wait_for_load_state("networkidle", timeout=15000)
+async def _search_via_nodriver(browser, letter: str) -> str:
+    """Load the search form via nodriver, fill it with JS, submit, and
+    return the result HTML. nodriver bypasses Cloudflare bot-detection
+    that blocks both curl-cffi and plain Playwright (confirmed 2026-10-12).
+    All form interactions done via a single evaluate() call since nodriver
+    doesn't have Playwright's select_option/fill helpers."""
+    page = await browser.get(_SEARCH_FORM_URL)
+    await asyncio.sleep(6)  # wait for Cloudflare + page render
 
-        # "Both" record type (empty-value radio) so property + vehicle both show;
-        # we filter to Property rows after parsing.
-        await page.evaluate(
-            """() => {
-                const radios = document.querySelectorAll('input[name="ReportGroupDescription"]');
-                for (const r of radios) if (r.value === '') r.checked = true;
-            }"""
-        )
-        await page.select_option("select[name='TaxYear']", _CURRENT_TAX_YEAR)
-        await page.select_option("select[name='BalanceDue']", ">0")
-        await page.select_option("select[name='SearchColumn']", "Name")
-        await page.fill("input[name='SearchText']", letter)
-        await page.click("input[type='submit']")
-        await page.wait_for_load_state("networkidle", timeout=15000)
-        return await page.content()
-    finally:
-        await page.close()
+    # Fill the entire form via JS and submit
+    js = """
+    (async () => {
+        // Radio: "Both" (empty value) so property + vehicle both show
+        const radios = document.querySelectorAll('input[name="ReportGroupDescription"]');
+        for (const r of radios) { if (r.value === '') r.checked = true; }
+
+        // Select dropdowns
+        const setSelect = (name, val) => {
+            const sel = document.querySelector(`select[name="${name}"]`);
+            if (sel) { sel.value = val; sel.dispatchEvent(new Event('change', {bubbles: true})); }
+        };
+        setSelect('TaxYear', '""" + _CURRENT_TAX_YEAR + """');
+        setSelect('BalanceDue', '>0');
+        setSelect('SearchColumn', 'Name');
+
+        // Text input
+        const txt = document.querySelector('input[name="SearchText"]');
+        if (txt) { txt.value = '""" + letter + """'; txt.dispatchEvent(new Event('input', {bubbles: true})); }
+
+        // Submit the form
+        const form = document.querySelector('form');
+        if (form) { form.submit(); }
+        return 'submitted';
+    })()
+    """
+    result = await page.evaluate(js, await_promise=True)
+    await asyncio.sleep(5)  # wait for results page to load
+
+    return await page.get_content()
 
 URL = "https://www.polknc.gov/upcoming_auction.php"
 HEADERS = {
@@ -159,42 +172,33 @@ class PolkTaxAuction(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out = list(await self._fetch_auction())
-        # _fetch_delinquent_search is built and verified (see module
-        # docstring, "CURRENTLY DISABLED PENDING STEALTH FETCH") but not
-        # called yet -- plain headless Playwright gets Cloudflare-blocked
-        # here the same as curl-cffi. Wire it back in once Hermes's stealth
-        # tier (pydoll/nodriver) clears this specific bot-management rule.
+        out.extend(await self._fetch_delinquent_search())
         return out
 
     async def _fetch_delinquent_search(self) -> Iterable[Listing]:
         """The county's own delinquent-tax name search (added 2026-10-12).
-        See module docstring: real data, no CAPTCHA, needs a real rendered
-        page (curl-cffi impersonation alone still 403s) — handled via
-        Playwright in _search_via_browser()."""
-        from playwright.async_api import async_playwright
+        Uses nodriver (start_browser) to bypass Cloudflare bot-detection —
+        confirmed working 2026-10-12 (plain Playwright gets 403)."""
+        from ...browser_utils import start_browser
 
         out: list[Listing] = []
         seen_ids: set[str] = set()
         letter_errors = 0
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-gpu"],
-            )
+        browser = await start_browser(headless=True)
+        try:
+            for letter in _SEARCH_LETTERS:
+                try:
+                    html = await _search_via_nodriver(browser, letter)
+                except Exception:
+                    letter_errors += 1
+                    continue
+                out.extend(self._parse_search_html(html, seen_ids))
+        finally:
             try:
-                for letter in _SEARCH_LETTERS:
-                    try:
-                        html = await _search_via_browser(browser, letter)
-                    except Exception:
-                        # One letter failing (timeout, transient hiccup) shouldn't
-                        # drop the other 25 — move on, the Avalon scraper's silent
-                        # swallow-and-report-zero bug is exactly what this avoids.
-                        letter_errors += 1
-                        continue
-                    out.extend(self._parse_search_html(html, seen_ids))
-            finally:
-                await browser.close()
+                browser.stop()
+            except BaseException:
+                pass
 
         if not out and letter_errors == len(_SEARCH_LETTERS):
             # Every single letter errored -- this is not a genuine "no
