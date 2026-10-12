@@ -59,13 +59,35 @@ class CityOfUnionScraper(BaseScraper):
                     page = await browser.new_page()
                     log.info("city_of_union.fetching", url=url)
 
-                    await page.goto(url, timeout=30000)
-                    # Wait for JS challenge to resolve
-                    await page.wait_for_load_state("domcontentloaded", timeout=20000)
-                    try:
-                        await page.wait_for_load_state("networkidle", timeout=15000)
-                    except Exception:
-                        pass
+                    await page.goto(url, timeout=45000)
+
+                    # Check for Cloudflare / JS challenge — retry up to 3 times
+                    cf_solved = False
+                    for attempt in range(3):
+                        await page.wait_for_load_state("domcontentloaded", timeout=20000)
+                        try:
+                            await page.wait_for_load_state("networkidle", timeout=15000)
+                        except Exception:
+                            pass
+
+                        html = await page.content()
+                        if any(kw in html for kw in [
+                            "Performing security verification",
+                            "Just a moment",
+                            "cf-challenge",
+                            "Checking your browser",
+                        ]):
+                            log.info("city_of_union.cf_still_blocking", url=url, attempt=attempt+1)
+                            await page.wait_for_timeout(8000)
+                            continue
+
+                        cf_solved = True
+                        break
+
+                    if not cf_solved:
+                        log.warning("city_of_union.cf_failed", url=url)
+                        await page.close()
+                        continue
 
                     html = await page.content()
                     if not html or len(html) < 500:

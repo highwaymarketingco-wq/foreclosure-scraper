@@ -56,18 +56,32 @@ class MorgantonNcScraper(BaseScraper):
                     page = await browser.new_page()
                     await page.goto(url, timeout=45000)
 
-                    # Solve Cloudflare Turnstile/WAF
-                    try:
-                        from ...enrichment_waf_oss import solve_waf_via_browser
-                        solved = await solve_waf_via_browser(page)
-                        if solved:
-                            log.info("morganton_nc.waf_solved", url=url)
-                            await page.wait_for_load_state(
-                                "networkidle", timeout=20000
-                            )
-                    except Exception as exc:
-                        log.warning("morganton_nc.waf_error",
-                                    url=url, error=str(exc)[:160])
+                    # Solve Cloudflare Turnstile/WAF — retry up to 3 times
+                    cf_solved = False
+                    for attempt in range(3):
+                        try:
+                            from ...enrichment_waf_oss import solve_waf_via_browser
+                            await solve_waf_via_browser(page)
+                        except Exception as exc:
+                            log.warning("morganton_nc.waf_error",
+                                        url=url, error=str(exc)[:160])
+
+                        # Check if Cloudflare is still blocking
+                        html = await page.content()
+                        if "Performing security verification" in html or "Just a moment" in html:
+                            log.info("morganton_nc.cf_still_blocking", url=url, attempt=attempt+1)
+                            await page.wait_for_timeout(8000)
+                            continue
+
+                        cf_solved = True
+                        log.info("morganton_nc.waf_solved", url=url, attempt=attempt+1)
+                        await page.wait_for_load_state("networkidle", timeout=20000)
+                        break
+
+                    if not cf_solved:
+                        log.warning("morganton_nc.cf_failed", url=url)
+                        await page.close()
+                        continue
 
                     html = await page.content()
                     await page.close()
