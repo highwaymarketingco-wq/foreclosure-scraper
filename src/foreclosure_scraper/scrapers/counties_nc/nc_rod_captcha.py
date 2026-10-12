@@ -98,19 +98,18 @@ class NcRodCaptchaScraper(BaseScraper):
                             log.warning("nc_rod_captcha.recaptcha_failed", county=county, error=str(exc)[:160])
 
                     if not gate_cleared:
-                        log.info("nc_rod_captcha.gate_failed_try_bypass", county=county)
-                        from ...wall_bypass import fetch_through_walls
-                        html = await fetch_through_walls(
-                            f"{entry_url}{cfg['search_path']}",
-                            render_first=False,
-                        )
-                        if html and len(html) > 500:
-                            results.extend(self._parse_html(html, county, entry_url))
+                        log.info("nc_rod_captcha.gate_failed_try_waf", county=county)
+                        try:
+                            from ...enrichment_waf_oss import solve_waf_via_browser
+                            gate_cleared = await solve_waf_via_browser(page)
+                        except Exception as exc:
+                            log.warning("nc_rod_captcha.waf_failed", county=county, error=str(exc)[:160])
+                        if gate_cleared:
+                            await page.wait_for_load_state("domcontentloaded", timeout=15000)
+                        else:
+                            log.warning("nc_rod_captcha.gate_blocked", county=county)
                             await page.close()
                             continue
-                        log.warning("nc_rod_captcha.gate_blocked", county=county)
-                        await page.close()
-                        continue
 
                     search_url = f"{entry_url}{cfg['search_path']}"
                     await page.goto(search_url, timeout=30000)
@@ -159,7 +158,7 @@ class NcRodCaptchaScraper(BaseScraper):
                     if page:
                         try:
                             await page.close()
-                        except Exception:
+                        except BaseException:
                             pass
 
             await browser.close()

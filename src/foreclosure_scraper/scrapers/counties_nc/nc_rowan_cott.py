@@ -3,7 +3,7 @@
 rod.rowancountync.gov/external uses a Cott Systems eSearch challenge page
 before allowing access to the deed search.
 
-Strategy: Use nodriver to render through the challenge, then search for
+Strategy: Use Playwright to render through the challenge, then search for
 deeds by date range and parse results.
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ _URL = "https://rod.rowancountync.gov/external"
 
 
 class NcRowanCottScraper(BaseScraper):
-    """Rowan County NC deeds — Cott eSearch via nodriver."""
+    """Rowan County NC deeds — Cott eSearch via Playwright."""
 
     slug = "counties_nc.nc_rowan_cott"
     name = "Rowan NC Deeds (Cott)"
@@ -34,60 +34,141 @@ class NcRowanCottScraper(BaseScraper):
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
-        from ...wall_bypass import fetch_with_nodriver, fetch_through_walls
-
         try:
-            log.info("nc_rowan_cott.fetching")
-            # Cott eSearch challenge needs real browser rendering
-            html = await fetch_with_nodriver(_URL, timeout_s=45)
+            from playwright.async_api import async_playwright
+        except ImportError:
+            log.error("nc_rowan_cott.no_playwright")
+            return results
 
-            if not html or len(html) < 500:
-                html = await fetch_through_walls(_URL, render_first=True)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-gpu"],
+            )
+            page = None
+            try:
+                page = await browser.new_page()
+                log.info("nc_rowan_cott.fetching")
 
-            if not html or len(html) < 500:
-                log.warning("nc_rowan_cott.empty")
-                return results
+                await page.goto(_URL, timeout=30000)
+                await page.wait_for_load_state("domcontentloaded", timeout=20000)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception:
+                    pass
 
-            soup = BeautifulSoup(html, "html.parser")
+                # Check for WAF/challenge
+                content = await page.content()
+                if ("challenge" in content.lower() or
+                    "turnstile" in content.lower() or
+                    "aws-waf" in content.lower()):
+                    log.info("nc_rowan_cott.waf_detected")
+                    try:
+                        from ...enrichment_waf_oss import solve_waf_via_browser
+                        solved = await solve_waf_via_browser(page)
+                        if solved:
+                            await page.wait_for_load_state("domcontentloaded", timeout=15000)
+                            content = await page.content()
+                    except Exception as exc:
+                        log.warning("nc_rowan_cott.waf_failed", error=str(exc)[:160])
 
-            # Parse Cott eSearch results
-            rows = soup.select("table tr, .search-results tr, .grid tr")
-            for row in rows[1:]:
-                cells = row.find_all("td")
-                if len(cells) < 3:
-                    continue
+                if not content or len(content) < 500:
+                    log.warning("nc_rowan_cott.empty")
+                    await page.close()
+                    await browser.close()
+                    return results
 
-                book_page = cells[0].get_text(strip=True)
-                filing_date = cells[1].get_text(strip=True) if len(cells) > 1 else ""
-                doc_type = cells[2].get_text(strip=True) if len(cells) > 2 else ""
-                grantor = cells[3].get_text(strip=True) if len(cells) > 3 else ""
-                grantee = cells[4].get_text(strip=True) if len(cells) > 4 else ""
+                # Try to interact with search form
+                cutoff = (datetime.now() - timedelta(days=90)).strftime("%m/%d/%Y")
+                end_str = datetime.now().strftime("%m/%d/%Y")
 
-                if not book_page:
-                    continue
+                for selector in [
+                    "input[name*='from'], input[name*='start'], input[name*='begdate']",
+                    "input[name*='to'], input[name*='end'], input[name*='enddate']",
+                ]:
+                    try:
+                        inputs = await page.query_selector_all(selector)
+                        if len(inputs) >= 2:
+                            await inputs[0].fill(cutoff)
+                            await inputs[1].fill(end_str)
+                            break
+                    except Exception:
+                        pass
 
-                results.append(Listing(
-                    source=self.slug,
-                    source_url=_URL,
-                    listing_type=ListingType.UNKNOWN,
-                    property_kind=PropertyKind.UNKNOWN,
-                    county="Rowan",
-                    state="NC",
-                    case_number=book_page,
-                    owner_name=grantee,
-                    plaintiff=grantor,
-                    raw={
-                        "doc_type": doc_type,
-                        "filing_date": filing_date,
-                        "grantor": grantor,
-                        "grantee": grantee,
-                        "book_page": book_page,
-                    },
-                ))
+                for btn_sel in [
+                    "button[type='submit']",
+                    "input[type='submit']",
+                    "a:has-text('Search')",
+                    "#btnSearch",
+                ]:
+                    try:
+                        btn = await page.query_selector(btn_sel)
+                        if btn:
+                            await btn.click()
+                            break
+                    except Exception:
+                        pass
 
-            log.info("nc_rowan_cott.done", found=len(results))
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception:
+                    pass
 
-        except Exception as exc:
-            log.warning("nc_rowan_cott.error", error=str(exc)[:200])
+                html = await page.content()
+                results.extend(self._parse_html(html))
+
+                log.info("nc_rowan_cott.done", found=len(results))
+
+            except Exception as exc:
+                log.warning("nc_rowan_cott.error", error=str(exc)[:200])
+            finally:
+                if page:
+                    try:
+                        await page.close()
+                    except BaseException:
+                        pass
+
+            await browser.close()
+
+        return results
+
+    def _parse_html(self, html: str) -> list[Listing]:
+        """Parse Cott eSearch results from HTML."""
+        results: list[Listing] = []
+        soup = BeautifulSoup(html, "html.parser")
+
+        rows = soup.select("table tr, .search-results tr, .grid tr")
+        for row in rows[1:]:
+            cells = row.find_all("td")
+            if len(cells) < 3:
+                continue
+
+            book_page = cells[0].get_text(strip=True)
+            filing_date = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+            doc_type = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+            grantor = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+            grantee = cells[4].get_text(strip=True) if len(cells) > 4 else ""
+
+            if not book_page:
+                continue
+
+            results.append(Listing(
+                source=self.slug,
+                source_url=_URL,
+                listing_type=ListingType.UNKNOWN,
+                property_kind=PropertyKind.UNKNOWN,
+                county="Rowan",
+                state="NC",
+                case_number=book_page,
+                owner_name=grantee,
+                plaintiff=grantor,
+                raw={
+                    "doc_type": doc_type,
+                    "filing_date": filing_date,
+                    "grantor": grantor,
+                    "grantee": grantee,
+                    "book_page": book_page,
+                },
+            ))
 
         return results

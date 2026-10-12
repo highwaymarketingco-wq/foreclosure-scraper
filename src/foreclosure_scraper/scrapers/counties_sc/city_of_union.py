@@ -3,9 +3,9 @@
 cityofunion.net uses a JavaScript client challenge that requires a real
 browser to evaluate JS and produce a valid session cookie.
 
-Strategy: Use nodriver (undetected Chrome) to render the page, which
-automatically evaluates the JS challenge and gets through. Then parse
-the page content for property/foreclosure listings.
+Strategy: Use Playwright to render the page, which automatically
+evaluates the JS challenge. Then parse the page content for
+property/foreclosure listings.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ _URLS = [
 
 
 class CityOfUnionScraper(BaseScraper):
-    """City of Union SC — JS Client Challenge via nodriver."""
+    """City of Union SC — JS Client Challenge via Playwright."""
 
     slug = "counties_sc.city_of_union"
     name = "City of Union SC"
@@ -38,70 +38,95 @@ class CityOfUnionScraper(BaseScraper):
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
-        from ...wall_bypass import fetch_through_walls, fetch_with_nodriver
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            log.error("city_of_union.no_playwright")
+            return results
 
-        for url in _URLS:
-            try:
-                log.info("city_of_union.fetching", url=url)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-gpu"],
+            )
 
-                html = await fetch_with_nodriver(url, timeout_s=45)
+            for url in _URLS:
+                page = None
+                try:
+                    page = await browser.new_page()
+                    log.info("city_of_union.fetching", url=url)
 
-                if not html or len(html) < 500:
-                    html = await fetch_through_walls(url, render_first=True)
+                    await page.goto(url, timeout=30000)
+                    # Wait for JS challenge to resolve
+                    await page.wait_for_load_state("domcontentloaded", timeout=20000)
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=15000)
+                    except Exception:
+                        pass
 
-                if not html or len(html) < 500:
-                    log.warning("city_of_union.empty", url=url)
-                    continue
-
-                soup = BeautifulSoup(html, "html.parser")
-
-                text = soup.get_text().lower()
-                if any(kw in text for kw in [
-                    "foreclosure", "tax sale", "delinquent", "condemned",
-                    "surplus", "auction", "sheriff sale"
-                ]):
-                    addr_pattern = re.compile(
-                        r"\b(\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+"
-                        r"(?:St|Street|Ave|Avenue|Blvd|Drive|Dr|Rd|Road|"
-                        r"Lane|Ln|Way|Place|Pl|Ct|Court))\b"
-                    )
-                    page_text = soup.get_text()
-                    for match in addr_pattern.finditer(page_text):
-                        addr = match.group(1)
-                        results.append(Listing(
-                            source=self.slug,
-                            source_url=url,
-                            listing_type=ListingType.UNKNOWN,
-                            property_kind=PropertyKind.UNKNOWN,
-                            street_address=addr,
-                            city="Union",
-                            county="Union",
-                            state="SC",
-                            raw={"extracted_from_text": True},
-                        ))
-
-                rows = soup.select("table tr")
-                for row in rows[1:]:
-                    cells = row.find_all("td")
-                    if len(cells) < 2:
+                    html = await page.content()
+                    if not html or len(html) < 500:
+                        log.warning("city_of_union.empty", url=url)
+                        await page.close()
                         continue
-                    addr = cells[0].get_text(strip=True)
-                    if addr and len(addr) > 5:
-                        results.append(Listing(
-                            source=self.slug,
-                            source_url=url,
-                            listing_type=ListingType.UNKNOWN,
-                            property_kind=PropertyKind.UNKNOWN,
-                            street_address=addr,
-                            city="Union",
-                            county="Union",
-                            state="SC",
-                            raw={"from_table": True},
-                        ))
 
-                log.info("city_of_union.page_done", url=url, found=len(results))
+                    soup = BeautifulSoup(html, "html.parser")
 
-            except Exception as exc:
-                log.warning("city_of_union.page_error", url=url, error=str(exc)[:200])
+                    text = soup.get_text().lower()
+                    if any(kw in text for kw in [
+                        "foreclosure", "tax sale", "delinquent", "condemned",
+                        "surplus", "auction", "sheriff sale"
+                    ]):
+                        addr_pattern = re.compile(
+                            r"\b(\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+"
+                            r"(?:St|Street|Ave|Avenue|Blvd|Drive|Dr|Rd|Road|"
+                            r"Lane|Ln|Way|Place|Pl|Ct|Court))\b"
+                        )
+                        page_text = soup.get_text()
+                        for match in addr_pattern.finditer(page_text):
+                            addr = match.group(1)
+                            results.append(Listing(
+                                source=self.slug,
+                                source_url=url,
+                                listing_type=ListingType.UNKNOWN,
+                                property_kind=PropertyKind.UNKNOWN,
+                                street_address=addr,
+                                city="Union",
+                                county="Union",
+                                state="SC",
+                                raw={"extracted_from_text": True},
+                            ))
+
+                    rows = soup.select("table tr")
+                    for row in rows[1:]:
+                        cells = row.find_all("td")
+                        if len(cells) < 2:
+                            continue
+                        addr = cells[0].get_text(strip=True)
+                        if addr and len(addr) > 5:
+                            results.append(Listing(
+                                source=self.slug,
+                                source_url=url,
+                                listing_type=ListingType.UNKNOWN,
+                                property_kind=PropertyKind.UNKNOWN,
+                                street_address=addr,
+                                city="Union",
+                                county="Union",
+                                state="SC",
+                                raw={"from_table": True},
+                            ))
+
+                    log.info("city_of_union.page_done", url=url, found=len(results))
+
+                except Exception as exc:
+                    log.warning("city_of_union.page_error", url=url, error=str(exc)[:200])
+                finally:
+                    if page:
+                        try:
+                            await page.close()
+                        except BaseException:
+                            pass
+
+            await browser.close()
 
         return results
