@@ -245,6 +245,7 @@ async def solve_waf_via_browser(page) -> bool:
     # run with answers all correct. 20 covers worst observed without
     # exhausting the 4-min StealthyFetcher timeout (20 × ~4s = 80s).
     MAX_PUZZLES = 20
+    attempt = 0
 
     # Self-imposed wall-clock budget (see MAX_TOTAL_SOLVE_SECONDS docstring
     # above this module's imports) so a run of bad luck (rate-limited keys,
@@ -377,6 +378,14 @@ async def solve_waf_via_browser(page) -> bool:
             return True
 
         log.info("waf.another_puzzle", attempt=attempt)
+
+    # If we broke out because no canvas appeared, the page may have already
+    # loaded past the WAF (token cookie set, challenge cleared). Check before
+    # declaring failure.
+    html = await page.content()
+    if "awswaf" not in html.lower() and "gokuProps" not in html:
+        log.info("waf.solved_no_canvas", attempts_checked=attempt - 1)
+        return True
 
     log.warning("waf.max_puzzles_exceeded")
     return False
