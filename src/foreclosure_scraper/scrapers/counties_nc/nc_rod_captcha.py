@@ -19,10 +19,17 @@ Sites and gate types:
 - rod.greenecountync.gov — Google CAPTCHA
 - rod.harnettcountync.gov — Google CAPTCHA
 - rod.randolphcountync.gov — math question
-- rod.stokescountync.gov — Google CAPTCHA (DNS timeout seen 2026-10-12 testing
-  from one network; unconfirmed whether the hostname itself is bad like
-  Brunswick's was or just a transient resolver hiccup -- re-check before
-  assuming it's also a stale URL)
+- us6.courthousecomputersystems.com/StokesNC/ — Google reCAPTCHA. URL FIXED
+  2026-10-12: same pattern as Brunswick -- old rod.stokescountync.gov never
+  resolved (DNS timeout/failure confirmed from two separate networks), the
+  county migrated to a different vendor (Courthouse Computer Systems, not
+  Avenu/Inttek like Brunswick). Live-confirmed 2026-10-12 via
+  co.stokes.nc.us/departments/register_of_deeds.php -> "Search Property
+  Records" -> us6.courthousecomputersystems.com/StokesNC/, which shows a
+  real Google reCAPTCHA ("I'm not a robot") behind a terms-of-use
+  disclaimer -- the gate type this file already expects. Did not attempt
+  the reCAPTCHA itself (not this file's lane); the real post-disclaimer
+  search_path is unverified.
 
 Strategy:
 1. Launch Playwright browser (headless on VM).
@@ -56,7 +63,7 @@ _COUNTY_SITES = {
     "greene": {"url": "https://rod.greenecountync.gov", "gate": "recaptcha", "search_path": "/search"},
     "harnett": {"url": "https://rod.harnettcountync.gov", "gate": "recaptcha", "search_path": "/search"},
     "randolph": {"url": "https://rod.randolphcountync.gov", "gate": "math", "search_path": "/search"},
-    "stokes": {"url": "https://rod.stokescountync.gov", "gate": "recaptcha", "search_path": "/search"},
+    "stokes": {"url": "https://us6.courthousecomputersystems.com/StokesNC", "gate": "recaptcha", "search_path": "/search"},
 }
 
 
