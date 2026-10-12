@@ -53,7 +53,12 @@ class NcUnclaimedScraper(BaseScraper):
         """Use Playwright to render the SPA, capture Turnstile token, call API directly."""
         results: list[Listing] = []
         try:
-            from playwright.async_api import async_playwright
+            try:
+                from patchright.async_api import async_playwright
+                _USE_PATCHRIGHT = True
+            except ImportError:
+                from playwright.async_api import async_playwright
+                _USE_PATCHRIGHT = False
         except ImportError:
             log.error("nc_unclaimed.no_playwright")
             return results
@@ -65,6 +70,9 @@ class NcUnclaimedScraper(BaseScraper):
         # Use non-headless if Xvfb is available (Turnstile requires interaction)
         xvfb = os.environ.get("DISPLAY", "")
         headless = not bool(xvfb)
+
+        if _USE_PATCHRIGHT:
+            log.info("nc_unclaimed.using_patchright")
 
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(
