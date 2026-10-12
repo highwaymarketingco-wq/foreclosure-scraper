@@ -70,7 +70,16 @@ _SEARCH_BASE = "https://cms.revize.com/revize/apps/polkcounty"
 _SEARCH_FORM_URL = f"{_SEARCH_BASE}/searchtaxrecord.php"
 _SEARCH_POST_URL = f"{_SEARCH_BASE}/searchingtaxrecord.php"
 _CURRENT_TAX_YEAR = "2026"
-_SEARCH_LETTERS = "abcdefghijklmnopqrstuvwxyz"
+_SEARCH_TERMS = [
+    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller",
+    "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez",
+    "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin",
+    "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark",
+    "Ramirez", "Lewis", "Robinson", "Walker", "Young", "Allen", "King",
+    "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores", "Green",
+    "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell", "Mitchell",
+    "Carter", "Roberts", "Polk", "Carrow", "Jackson", "Henderson",
+]
 
 _ROW_RE = re.compile(
     r'<tr class="(?:odd|even)Row">\s*<td>(?P<name>[^<]*?)\s*</td>\s*'
@@ -111,13 +120,14 @@ async def _search_via_nodriver(browser, letter: str) -> str:
         const txt = document.querySelector('input[name="SearchText"]');
         if (txt) { txt.value = '""" + letter + """'; txt.dispatchEvent(new Event('input', {bubbles: true})); }
 
-        // Submit the form — click the submit button instead of form.submit()
-        // since form.submit() may bypass event handlers
-        const submitBtn = document.querySelector('input[type="submit"]');
-        if (submitBtn) { submitBtn.click(); }
-        else { 
-            const form = document.querySelector('form');
-            if (form) { form.submit(); }
+        // Submit the form — requestSubmit() triggers the form's submit
+        // handler and causes real navigation (confirmed working on VM).
+        // form.submit() bypasses event handlers; submitBtn.click() doesn't
+        // navigate reliably in nodriver.
+        const form = document.querySelector('form');
+        if (form) {
+            if (form.requestSubmit) { form.requestSubmit(); }
+            else { form.submit(); }
         }
         return 'submitted';
     })()
@@ -198,7 +208,7 @@ class PolkTaxAuction(BaseScraper):
 
         browser = await start_browser(headless=False)
         try:
-            for letter in _SEARCH_LETTERS:
+            for letter in _SEARCH_TERMS:
                 try:
                     html = await _search_via_nodriver(browser, letter)
                 except Exception:
@@ -211,7 +221,7 @@ class PolkTaxAuction(BaseScraper):
             except BaseException:
                 pass
 
-        if not out and letter_errors == len(_SEARCH_LETTERS):
+        if not out and letter_errors == len(_SEARCH_TERMS):
             # Every single letter errored -- this is not a genuine "no
             # delinquent records" outcome, surface it as a block rather than
             # let safe_run read it as a clean zero (same class of bug the
