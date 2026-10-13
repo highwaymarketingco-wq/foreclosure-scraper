@@ -41,6 +41,23 @@ def _patch_client(monkeypatch, handler):
 
     monkeypatch.setattr(httpx, "AsyncClient", factory)
 
+    # york_overage_claims.fetch() tries curl_cffi (a real, synchronous, non-httpx network
+    # call -- Chrome-TLS-fingerprint impersonation to defeat Cloudflare) BEFORE its httpx
+    # fallback. Found 2026-10-13 running the full suite: that real call succeeded against
+    # the live site during this "unit" test (fetched a real 119-row PDF), so the httpx mock
+    # above was never even reached and `seen` stayed empty. Force curl_cffi to fail so every
+    # module in MODULES deterministically exercises the httpx path this test can observe --
+    # the other 4 modules don't import curl_cffi at all, so this is a no-op for them.
+    try:
+        from curl_cffi import requests as cc_requests
+
+        def _curl_cffi_always_fails(*a, **kw):
+            raise RuntimeError("curl_cffi disabled in tests -- see _patch_client")
+
+        monkeypatch.setattr(cc_requests, "get", _curl_cffi_always_fails)
+    except ImportError:
+        pass
+
 
 @pytest.mark.parametrize("name", MODULES)
 def test_every_request_carries_a_complete_browser_user_agent(monkeypatch, name):
