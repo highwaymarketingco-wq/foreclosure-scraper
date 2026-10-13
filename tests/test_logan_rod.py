@@ -1,7 +1,13 @@
 """Logan 'The Lookup' ROD adapter parser + NC scraper classification."""
 from __future__ import annotations
 
+import asyncio
+import base64
 from datetime import datetime
+from urllib.parse import parse_qs
+
+import httpx
+import pytest
 
 from foreclosure_scraper.rod import logan
 from foreclosure_scraper.scrapers.counties_nc.nc_rod_logan import (
@@ -298,10 +304,199 @@ def test_multi_row_instrument_takes_xref_and_image_key_once_not_duplicated():
 
 def test_to_listing_surfaces_xref_and_image_key_with_session_caveat():
     """End-to-end: the published Listing's raw['rod'] must carry both new
-    fields, wired through nc_rod_logan.py's _to_listing."""
+    fields, wired through nc_rod_logan.py's _to_listing. No fetch happened
+    here (plain _parse_records), so 'image' surfaces as None, not missing."""
     docs = logan._parse_records(_FIXTURE_WITH_DOCS, "NC", "Transylvania")
     li = _to_listing(docs[0], "counties_nc.nc_rod_logan", "http://x")
     assert li is not None
     assert li.raw["rod"]["image_key"] == "b1b8057d90d945b06f28a7319d59820e"
     assert li.raw["rod"]["xref"] == "D/T 650 325 (1)"
     assert li.raw["rod"]["xref_instrument_no"] == "2013001844"
+    assert li.raw["rod"]["image"] is None
+
+
+def test_to_listing_surfaces_an_already_fetched_image():
+    """When rod/logan.py's own session already fetched the image (what
+    discover_recent_nods(fetch_images=True) does -- covered end-to-end
+    below), _to_listing must carry it through unchanged."""
+    docs = logan._parse_records(_FIXTURE_WITH_DOCS, "NC", "Transylvania")
+    docs[0].raw["logan"]["image"] = {
+        "mime": "application/pdf", "bytes": 4,
+        "data_uri": "data:application/pdf;base64,AAAA",
+    }
+    li = _to_listing(docs[0], "counties_nc.nc_rod_logan", "http://x")
+    assert li.raw["rod"]["image"] == {
+        "mime": "application/pdf", "bytes": 4,
+        "data_uri": "data:application/pdf;base64,AAAA",
+    }
+
+
+# --------------------------------------------------------------------------- _fetch_doc_image
+#
+# Live-verified 2026-10-13 against search.transylvaniadeeds.com,
+# search.mcdowelldeeds.com and search.mitchelldeeds.com: within the SAME
+# still-open session that swept the rows, view_image.php?key=...&type=pdf
+# returns real application/pdf bytes (20 KB-180 KB, every distress doc type
+# tried -- S/TR, TR/D, TD). A FRESH session (no prior requests) gets either a
+# 500 with an empty body, or a 200 with a tiny "Image not found" placeholder,
+# for the identical key. These tests cover _fetch_doc_image's handling of
+# both outcomes plus its defensive guards.
+
+_FAKE_PDF = b"%PDF-1.4 not a real pdf, just test bytes\n%%EOF"
+
+
+def _mock_client(handler) -> httpx.AsyncClient:
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+def test_fetch_doc_image_returns_bytes_on_a_live_key():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert parse_qs(request.url.query.decode())["key"] == ["abc123"]
+        return httpx.Response(200, content=_FAKE_PDF,
+                              headers={"content-type": "application/pdf"})
+
+    async def run():
+        async with _mock_client(handler) as c:
+            return await logan._fetch_doc_image(c, "https://search.transylvaniadeeds.com", "abc123")
+
+    got = asyncio.run(run())
+    assert got == (_FAKE_PDF, "application/pdf")
+
+
+def test_fetch_doc_image_rejects_the_dead_key_placeholder():
+    """A fresh/dead session doesn't 404 -- it 200s with a tiny HTML stub. The
+    content-type gate must reject it rather than embed junk as a 'PDF'."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"Image not found", headers={"content-type": "text/html"})
+
+    async def run():
+        async with _mock_client(handler) as c:
+            return await logan._fetch_doc_image(c, "https://x", "deadkey")
+
+    assert asyncio.run(run()) is None
+
+
+def test_fetch_doc_image_rejects_non_200():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, content=b"")
+
+    async def run():
+        async with _mock_client(handler) as c:
+            return await logan._fetch_doc_image(c, "https://x", "k")
+
+    assert asyncio.run(run()) is None
+
+
+def test_fetch_doc_image_rejects_an_oversized_body(monkeypatch):
+    monkeypatch.setattr(logan, "_MAX_IMAGE_BYTES", 10)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=_FAKE_PDF, headers={"content-type": "application/pdf"})
+
+    async def run():
+        async with _mock_client(handler) as c:
+            return await logan._fetch_doc_image(c, "https://x", "k")
+
+    assert asyncio.run(run()) is None
+
+
+def test_fetch_doc_image_never_raises_on_a_network_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom")
+
+    async def run():
+        async with _mock_client(handler) as c:
+            return await logan._fetch_doc_image(c, "https://x", "k")
+
+    assert asyncio.run(run()) is None
+
+
+# --------------------------------------------------------------------------- discover_recent_nods(fetch_images=True)
+
+def _sweep_and_image_handler(sweep_html: str, key_to_pdf: dict[str, bytes], token: str = "4242"):
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith("/index.php") and request.method == "GET":
+            return httpx.Response(200, text="<html></html>")
+        if path.endswith("/index.php") and request.method == "POST":
+            return httpx.Response(200, text=f"go to content.php?{token}")
+        if path.endswith("/content.php"):
+            return httpx.Response(200, text=sweep_html)
+        if path.endswith("/view_image.php"):
+            key = parse_qs(request.url.query.decode()).get("key", [""])[0]
+            data = key_to_pdf.get(key)
+            if data is None:
+                return httpx.Response(500, content=b"")
+            return httpx.Response(200, content=data, headers={"content-type": "application/pdf"})
+        return httpx.Response(404)
+    return handler
+
+
+@pytest.fixture()
+def fake_logan_session(monkeypatch):
+    """Point rod.logan's `client()` at an httpx.MockTransport so
+    discover_recent_nods runs its real GET/POST/sweep/image-fetch flow
+    against canned responses instead of the network."""
+    def install(handler):
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def fake_client(*_a, **_kw):
+            async with _mock_client(handler) as c:
+                yield c
+        monkeypatch.setattr(logan, "client", fake_client)
+    return install
+
+
+def test_discover_recent_nods_fetch_images_embeds_the_pdf_from_the_same_session(fake_logan_session):
+    key = "b1b8057d90d945b06f28a7319d59820e"
+    fake_logan_session(_sweep_and_image_handler(_FIXTURE_WITH_DOCS, {key: _FAKE_PDF}))
+    docs = asyncio.run(logan.discover_recent_nods("NC", "Transylvania", fetch_images=True))
+    assert len(docs) == 1
+    img = docs[0].raw["logan"]["image"]
+    assert img["mime"] == "application/pdf"
+    assert img["bytes"] == len(_FAKE_PDF)
+    assert img["data_uri"] == f"data:application/pdf;base64,{base64.b64encode(_FAKE_PDF).decode('ascii')}"
+    # round-trips back to the exact bytes the "county" served
+    header, b64 = img["data_uri"].split(",", 1)
+    assert base64.b64decode(b64) == _FAKE_PDF
+
+
+def test_discover_recent_nods_default_does_not_fetch_images(fake_logan_session):
+    key = "b1b8057d90d945b06f28a7319d59820e"
+    calls = {"image": 0}
+    inner = _sweep_and_image_handler(_FIXTURE_WITH_DOCS, {key: _FAKE_PDF})
+
+    def counting_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/view_image.php"):
+            calls["image"] += 1
+        return inner(request)
+    fake_logan_session(counting_handler)
+    docs = asyncio.run(logan.discover_recent_nods("NC", "Transylvania"))  # fetch_images defaults False
+    assert len(docs) == 1
+    assert "image" not in docs[0].raw["logan"]
+    assert calls["image"] == 0
+
+
+def test_discover_recent_nods_fetch_images_is_best_effort_on_a_dead_key(fake_logan_session):
+    """A key the image endpoint can't serve (wrong/expired) must not fail the
+    sweep -- the row still comes back, just without an 'image'."""
+    fake_logan_session(_sweep_and_image_handler(_FIXTURE_WITH_DOCS, {}))  # no key matches -> 500
+    docs = asyncio.run(logan.discover_recent_nods("NC", "Transylvania", fetch_images=True))
+    assert len(docs) == 1
+    assert "image" not in docs[0].raw["logan"]
+
+
+def test_discover_recent_nods_fetch_images_respects_the_per_sweep_cap(fake_logan_session, monkeypatch):
+    monkeypatch.setattr(logan, "_MAX_IMAGES_PER_SWEEP", 1)
+    keys = ["aaaa1111", "bbbb2222"]
+    fx = "".join(
+        _row(f"202600{i}", "08/05/2026", "CRP 1 1", "FCL", "PD:X", "GRANTOR", f"OWNER {i}")
+        + f"<td><a href='view_image.php?key={keys[i]}&type=pdf'>PDF</a></td>\n"
+        for i in range(2)
+    )
+    fake_logan_session(_sweep_and_image_handler(fx, {k: _FAKE_PDF for k in keys}))
+    docs = asyncio.run(logan.discover_recent_nods("NC", "Transylvania", fetch_images=True))
+    assert len(docs) == 2
+    with_image = [d for d in docs if "image" in d.raw["logan"]]
+    assert len(with_image) == 1, "the cap must stop after exactly one extra fetch"

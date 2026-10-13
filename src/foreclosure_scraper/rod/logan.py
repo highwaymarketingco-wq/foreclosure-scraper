@@ -40,9 +40,11 @@ SC ROD landscape (verified 2026-06-22, both httpx + real browser):
 """
 from __future__ import annotations
 
+import base64
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import Optional
 
 import structlog
 
@@ -78,17 +80,54 @@ _ROW_CELL_RE = re.compile(r'<td class="summary"[^>]*>(.*?)</td>', re.S)
 #             context, free, already in the fetched HTML.
 #   Image? -- a free `view_image.php?key=<hex>&type=pdf` link to the actual
 #             recorded document image. The key is scoped to the PHPSESSID
-#             that rendered it (live-verified: a fresh session's client gets
-#             a 0-byte "bad download" body for the same key) so it is NOT a
-#             durable URL a later, separate OCR pass can fetch -- stamping it
-#             into the generic `raw['documents']`/_DOC_FIELDS convention
-#             would just waste a guaranteed-failing request. Kept as
-#             provenance only (same `image_key` name rod/doc_images.py's
-#             LoganImageSession already uses for the D/T-only equity sweep);
-#             a same-session fetch-and-OCR pass for non-D/T distress docs
-#             would need that session-aware machinery, not a URL string.
+#             that rendered it (live-verified 2026-10-13 against all three
+#             working counties: a FRESH session's client gets a 500/0-byte
+#             body, or a 23-byte "Image not found" placeholder, for the same
+#             key) so it is NOT a durable URL a later, separate pass can
+#             fetch -- stamping it alone into the generic `raw['documents']`/
+#             _DOC_FIELDS convention would just waste a guaranteed-failing
+#             request. The key IS still fetchable, though, with the SAME
+#             still-open session that swept it (live-verified 2026-10-13:
+#             real `application/pdf` bytes, every doc type tried --
+#             S/TR, TR/D, TD, not just the D/T rows rod/doc_images.py's
+#             LoganImageSession already fetches for the equity sweep) --
+#             see `_fetch_doc_image` + `discover_recent_nods(fetch_images=
+#             True)` below, which does exactly that and embeds the result as
+#             a data: URI (session-scoped binary captured now or never, same
+#             convention scrapers.national.jail_bookings uses for its
+#             session/vendor-scoped mugshot bytes) in `raw['logan']['image']`.
 _XREF_RE = re.compile(r"loadDetailsScreen\('(\d+)'\);?\"[^>]*>(.*?)</a>", re.S)
 _KEY_RE = re.compile(r"key=([0-9a-f]+)&(?:amp;)?type=pdf")
+
+#: `view_image.php` PDFs here run well under this (live-verified 23 KB-180 KB
+#: across Transylvania/McDowell/Mitchell, 2026-10-13); cap defensively so one
+#: abnormally large recorded TIFF/PDF can never balloon a published Listing.
+_MAX_IMAGE_BYTES = 2 * 1024 * 1024
+#: Bound the extra requests one sweep call makes -- the Logan counties wired
+#: here are small (3-18 distress rows per 60-day window, live-verified), but
+#: a future county/window combination returning far more rows must not turn
+#: one scraper run into hundreds of extra document fetches.
+_MAX_IMAGES_PER_SWEEP = 40
+
+
+async def _fetch_doc_image(c, host: str, key: str) -> Optional[tuple[bytes, str]]:
+    """One `view_image.php` PDF using the CALLER's still-open client/session --
+    the key is scoped to the PHPSESSID that rendered it (see the `Image?`
+    comment above), so this must run before that client closes. Best-effort:
+    None on any failure, wrong content-type, or an oversized body -- never
+    raises, never blocks the sweep that produced the key."""
+    try:
+        r = await c.get(f"{host}/view_image.php?key={key}&type=pdf")
+    except Exception:  # noqa: BLE001
+        return None
+    if r.status_code != 200 or not r.content:
+        return None
+    ct = (r.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if not (ct == "application/pdf" or ct.startswith("image/")):
+        return None  # the dead-key placeholder is a tiny text/html stub
+    if len(r.content) > _MAX_IMAGE_BYTES:
+        return None
+    return r.content, ct
 
 
 def _clean(s: str) -> str:
@@ -255,8 +294,17 @@ def _parse_records(html: str, state: str, county: str) -> list[RodDoc]:
 
 
 async def discover_recent_nods(state: str, county: str, days_back: int = 45,
-                               max_docs: int = 400) -> list[RodDoc]:
-    """Sweep recent Logan recordings for distress instrument types."""
+                               max_docs: int = 400, *,
+                               fetch_images: bool = False) -> list[RodDoc]:
+    """Sweep recent Logan recordings for distress instrument types.
+
+    `fetch_images=True` additionally downloads each row's free `view_image.php`
+    PDF, using THIS SAME still-open session (the key dies with it -- see
+    `_fetch_doc_image`), and embeds the bytes as a data: URI in
+    `raw['logan']['image']`. Best-effort per row: a fetch that fails, or a row
+    with no image key, just carries no `image` -- the sweep itself never fails
+    because of it.
+    """
     host = LOGAN_COUNTIES.get((state, county))
     if not host:
         return []
@@ -280,6 +328,24 @@ async def discover_recent_nods(state: str, county: str, days_back: int = 45,
                 log.warning("logan.search_error", county=county, head=r.text[:80])
                 return []
             docs = _parse_records(r.text, state, county)
+            if fetch_images:
+                fetched = 0
+                for d in docs:
+                    if fetched >= _MAX_IMAGES_PER_SWEEP:
+                        break
+                    logan_raw = d.raw.get("logan") or {}
+                    key = logan_raw.get("image_key")
+                    if not key:
+                        continue
+                    fetched += 1
+                    got = await _fetch_doc_image(c, host, key)
+                    if got:
+                        data, ct = got
+                        logan_raw["image"] = {
+                            "mime": ct, "bytes": len(data),
+                            "data_uri": f"data:{ct};base64,"
+                                       f"{base64.b64encode(data).decode('ascii')}",
+                        }
     except Exception:
         log.warning("logan.discover_failed", state=state, county=county)
         return []

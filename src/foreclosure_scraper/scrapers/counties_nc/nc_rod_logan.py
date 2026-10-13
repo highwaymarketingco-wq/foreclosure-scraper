@@ -11,9 +11,16 @@ Closes the NC ROD gap for the Logan counties whose pick-list loads
 Each lead carries grantor (defendant), instrument#, and the legal description;
 the address waterfall + parcel inventory resolve a situs from the owner name.
 (Spartanburg uses different codes + a broken loader -> not wired here yet.)
+
+Each row also carries the free recorded-document PDF itself (raw['rod']
+['image']), fetched during the same sweep session that discovers the row --
+see rod.logan.discover_recent_nods(fetch_images=True) and the long comment on
+raw['rod']['image_key'] below for why a bare URL can never work here.
+Set FORECLOSURE_NC_ROD_LOGAN_IMAGES=0 to skip the extra per-row fetch.
 """
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime
 from typing import Iterable
@@ -21,6 +28,10 @@ from typing import Iterable
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
 from ...rod import logan
+
+#: Escape hatch for the extra per-row document-image fetch below -- the sweep
+#: itself (and every other field) is unaffected when this is off.
+_FETCH_IMAGES = os.environ.get("FORECLOSURE_NC_ROD_LOGAN_IMAGES", "1") != "0"
 
 try:  # reuse the shared business-name filter when importable
     from ...enrichment_address_backfill import _BUSINESS_STOPWORDS
@@ -161,14 +172,26 @@ def _to_listing(doc, slug: str, source_url: str) -> Listing | None:
                          # document exists for EVERY row (Logan's "Image?"
                          # column) but its key is scoped to the scrape
                          # session that rendered it -- NOT a durable URL a
-                         # later pass can fetch (live-verified: a fresh
-                         # session gets a 0-byte body for the same key). Kept
-                         # as provenance only, not stamped into the generic
-                         # raw['documents'] convention (would just waste a
-                         # guaranteed-failing fetch). A real fetch needs the
-                         # same session-aware pattern rod/doc_images.py's
-                         # LoganImageSession already uses for D/T documents.
-                         "image_key": logan_raw.get("image_key")},
+                         # later pass can fetch (live-verified 2026-10-13: a
+                         # fresh session gets a 500/0-byte or "Image not
+                         # found" placeholder body for the same key). Kept
+                         # for provenance/debugging even though it is dead
+                         # outside this run.
+                         "image_key": logan_raw.get("image_key"),
+                         # The ACTUAL recorded-document PDF, fetched during
+                         # THIS SAME sweep (rod.logan.discover_recent_nods(
+                         # fetch_images=True), reusing the still-open session
+                         # above -- live-verified 2026-10-13 to return real
+                         # application/pdf bytes for every distress doc type
+                         # tried, not just D/T). The key dies with the
+                         # session, so a URL in raw['documents'] would be a
+                         # guaranteed-failing fetch for any later pass; this
+                         # embeds the bytes themselves as a data: URI instead
+                         # (same convention scrapers.national.jail_bookings
+                         # uses for a session/vendor-scoped image that must
+                         # be captured now or never). {mime, bytes, data_uri}
+                         # or None when the fetch failed / no image exists.
+                         "image": logan_raw.get("image")},
                  "logan_rod": True}
     if kind == "probate":
         raw["relationship_signal"] = {"kind": "probate", "keyword": doc.doc_type,
@@ -200,7 +223,9 @@ class NCRodLogan(BaseScraper):
         out = self.partial
         for (state, county), host in logan.LOGAN_COUNTIES.items():
             src = f"{host}/index.php"
-            for d in await logan.discover_recent_nods(state, county, days_back=_LOOKBACK_DAYS):
+            docs = await logan.discover_recent_nods(
+                state, county, days_back=_LOOKBACK_DAYS, fetch_images=_FETCH_IMAGES)
+            for d in docs:
                 li = _to_listing(d, self.slug, src)
                 if li:
                     out.append(li)
