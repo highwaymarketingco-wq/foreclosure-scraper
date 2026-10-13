@@ -639,3 +639,43 @@ from the narrow 18-county flip footprint (`config.SCOPE_DENY_COUNTIES`) but is e
 admissible for a lead type like `PROBATE_NOTICE` via `config.in_scope_distressed()` --
 confirmed by reading that function's own docstring, which names Greenville by name as an
 example of exactly this.
+
+**Catch-up documentation, 2026-10-13.** `test_source_docs_current.py::test_every_registered_
+scraper_appears_in_the_register` (its own docstring: the register drifts silently when a
+source is built and never gets written down) caught 14 registered scrapers with no mention in
+either register file. Most are Hermes-built, walled sources from recent sessions -- noted here
+with their URL and wall so the drift stops, not written up at the depth of the entries above:
+
+- `counties_nc.dc_ip_block`: Rutherford/Lee County NC tax sites that refuse connections from
+  datacenter IPs outright (Oracle cloud); works from a residential connection.
+- `counties_nc.nc_avalon_tax`: `lincolncountytax.com` and sibling Catalis Avalon (Wildfire) SPA
+  tax sites, read via their own CloudFront data API
+  (`POST https://d1ebsyxxbc7tep.cloudfront.net/data/{guid}/Wildfire/Records`) -- the same family
+  of site Rutherford's own `avalon_tax.py` verifier reads (see that file).
+- `counties_nc.nc_cchs_deeds`: NC Courthouse Computer Systems deed search (`gastonnc.
+  courthousecomputersystems.com` and siblings), Cloudflare "Just a moment"-walled.
+- `counties_nc.nc_rod_captcha`: 9 NC Register-of-Deeds counties on a math/reCAPTCHA-gated
+  platform -- all 9 URLs were stale and rewritten 2026-10-13 earlier this session (see the
+  Avalon/greenville_probate work above in this same session for the headless-vs-headful finding
+  on this platform: 6 of 9 403 headless, 200 headful).
+- `counties_nc.nc_rowan_cott`: `rod.rowancountync.gov/external`, a Cott Systems eSearch
+  challenge page in front of the deed search.
+- `counties_nc.nc_tylertech_estates`: `portal-nc.tylertech.cloud/Portal`, picture-CAPTCHA-gated
+  estate search.
+- `counties_sc.lexington_probate`: `www.lex-co.com/ProbateSearch/estates`, reCAPTCHA V2
+  explicit-render; an unsolved request gets HTTP 401.
+- `counties_sc.sc_qpublic`: Schneider qPublic (`qpublic.schneidercorp.com`) assessor/property
+  cards for several SC counties, Cloudflare "verify you're human"-walled.
+- `counties_sc.sc_rod_walled`: Beaufort/Jasper/Clarendon SC Register-of-Deeds sites -- Beaufort
+  is an open Angular SPA with no WAF, Jasper and Clarendon are Cloudflare-403.
+- `counties_sc.sc_tax_walled`: Charleston/Dorchester/Georgetown SC tax sites, each behind its
+  own CAPTCHA (Cloudflare Turnstile or Google reCAPTCHA, site-dependent).
+- `national.nc_unclaimed`: `unclaimed.nccash.gov`, NC's unclaimed-property database, Cloudflare
+  Turnstile-walled.
+- `national.people_search`: TruePeopleSearch / FastPeopleSearch, both Cloudflare-walled; used to
+  enrich an owner/defendant name with a free contact phone when reachable.
+- `counties_nc.morganton_nc`, `counties_sc.city_of_union`: BOTH confirmed dead and set
+  `disabled = True` earlier this same session (see the Avalon/greenville_probate work above) --
+  condemned-properties/tax-foreclosure pages gone, code-enforcement page has no case data, and
+  (city_of_union) the whole site was rebuilt with nothing left in its place. Registered here for
+  completeness; neither scraper currently runs.

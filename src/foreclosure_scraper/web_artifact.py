@@ -2596,6 +2596,30 @@ RAW_KEEP = {
     # aggregator, see sc_probate_net.py). Same raw={"greenville_probate": {...}} shape as
     # every other scraper block registered in this dict by its own block-name key.
     "greenville_probate": "*",
+    # 2026-10-13 full-suite sweep (found while validating greenville_probate above): these flat
+    # raw keys from 7 other scrapers were never registered, so every one has been silently
+    # dropping part or all of its raw block at every publish since it was built. None nest under
+    # a single block-name key the way most scrapers in this dict do -- registered individually,
+    # matching how each scraper actually writes them.
+    "amount": "*", "surname_searched": "*",                      # national.nc_unclaimed
+    "amount_due": "*", "bill_number": "*", "owner_id": "*",       # counties_nc.nc_avalon_tax
+    "payment_status": "*", "year": "*",                           # (county/grantee/grantor/doc_type/
+                                                                    # book_page below are shared names
+                                                                    # written by several of these too)
+    "county": "*", "doc_type": "*", "grantor": "*", "grantee": "*", "book_page": "*",
+    #   ^ counties_nc.nc_avalon_tax, nc_cchs_deeds, nc_rod_captcha, nc_rowan_cott (register-of-
+    #     deeds grantor/grantee/book-page scrapers; nc_rowan_cott doesn't write county itself)
+    "decedent": "*",                      # counties_sc.lexington_probate, nc_tylertech_estates
+    "ip_block_resolved": "*",             # counties_nc.dc_ip_block
+    "extracted_from_text": "*", "from_table": "*",   # counties_nc.morganton_nc, counties_sc.city_of_union
+                                                       # (both scrapers are `disabled` -- see their own
+                                                       # disabled_reason -- so these never actually fire
+                                                       # in production today, but the sweep still wants
+                                                       # every raw key a scraper's code can write
+                                                       # registered, disabled or not)
+    "polk_tax_search": "*",               # counties_nc.polk_tax's second data path (the live tax-
+                                           # search-API rows; "polk_tax" above is its older HTML-table
+                                           # path's own, already-registered block key)
     "sc_public_index": "*", "sc_ust_registry": "*", "seeclickfix": "*",
     "servicelink": "*", "shapiro_ingle_pbi": "*", "shelby_star": "*",
     "sheriff_sale": "*", "sitemap_walker": "*", "spartanburg_flc": "*",
