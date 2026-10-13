@@ -31,6 +31,10 @@ TTL_DAYS = 90
 SOURCE = "d1ebsyxxbc7tep.cloudfront.net (Wildfire/Avalon)"
 GOVERNS: tuple[str, ...] = ("tax_lien", "tax_sale")
 WALL = False
+#: the ledger is public; a delinquent-tax owner's name is theirs to redact, not publish
+#: (found 2026-10-13: 547 real Rutherford owner names had leaked into the committed, public
+#: tax_lien ledger because this verifier never set this -- every other tax_lien verifier does)
+ROW_SUMMARY_EXCLUDE = ("owner_name",)
 # `unconfirmed` reasons that are about the SOURCE being unreachable, not about the row: re-asked
 # after hours (registry.Verifier.is_transient), not after the 7-day retry.
 TRANSIENT_REASONS = ("fetch_failed", "source_refusing")

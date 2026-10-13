@@ -218,7 +218,15 @@ async def run_checks(plan: dict, ledgers: dict, fetcher, *, budget_s: float, sav
             nonlocal since_save
             entry = led.record(row, res, ttl_days=v.ttl_days, governs=v.governs_of(res.to_dict()),
                                keys=v.ledger_keys(row))
-            for f in getattr(v.module, "ROW_SUMMARY_EXCLUDE", ()) or ():
+            # owner_name is redacted by DEFAULT (the ledger is pushed to a PUBLIC repo), not only
+            # when a verifier module remembers to opt in via ROW_SUMMARY_EXCLUDE -- found
+            # 2026-10-13: avalon_tax.py and divorce_sc_wall.py both forgot it, leaking 547 and 198
+            # real owner names respectively (every other verifier's own ROW_SUMMARY_EXCLUDE =
+            # ("owner_name",) line happened to cover the same default, which is why this went
+            # unnoticed -- 28 of 32 verifiers independently reaching the same exclusion is itself
+            # the sign the default belongs here, not in each new module). A verifier adds MORE
+            # fields to drop via its own ROW_SUMMARY_EXCLUDE; none needs owner_name published.
+            for f in {"owner_name"} | set(getattr(v.module, "ROW_SUMMARY_EXCLUDE", ()) or ()):
                 (entry.get("row") or {}).pop(f, None)     # e.g. jail_booking: no owner_name
             tally[res.verdict] += 1
             tally["checked"] += 1

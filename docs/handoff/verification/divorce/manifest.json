@@ -8,9 +8,9 @@
   "unconfirmed": 0,
   "wall": 198
  },
- "generated_at": "2026-10-12T08:23:49Z",
+ "generated_at": "2026-10-13T18:08:34Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
- "host": "foreclosure-engine",
+ "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
   "at": "2026-10-12T08:23:49Z",
@@ -47,10 +47,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 176883,
+   "bytes": 169762,
    "file": "000.json",
    "rows": 198,
-   "sha256": "11bb56da4b6b00ef149af5a6f3acae5f72a67c2daacb00f1b1511c66846e7587"
+   "sha256": "e7bedfafa65c3033004f7896f1c2d4957f2aaaf60b41bfeb76ffae2cf80cbabe"
   }
  ],
  "signal": "divorce",

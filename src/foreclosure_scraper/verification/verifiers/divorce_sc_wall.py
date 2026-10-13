@@ -26,6 +26,10 @@ TTL_DAYS = 365         # nothing changes until the wall does; re-labelled yearly
 SOURCE = "publicindex.sccourts.org"
 GOVERNS: tuple[str, ...] = ()
 WALL = True
+#: the ledger is public; a divorce party's name is theirs to redact, not publish (found
+#: 2026-10-13 alongside the same gap in avalon_tax.py: all 198 entries in the committed,
+#: public divorce ledger had leaked a real owner_name because this verifier never set this)
+ROW_SUMMARY_EXCLUDE = ("owner_name",)
 
 _NAME = __name__.rsplit(".", 1)[-1]
 REASON = ("SC Public Index restricts bulk/automated querying in its terms of use; not queried "
