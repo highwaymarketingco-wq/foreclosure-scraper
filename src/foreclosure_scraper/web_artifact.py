@@ -2591,6 +2591,11 @@ RAW_KEEP = {
     "rutherford_tax": "*", "saluda_delinquent_tax": "*", "sc_coastal_roster": "*",
     "sc_county_roster": "*", "sc_delinquent_tax": "*", "sc_des_brownfield": "*",
     "sc_dor_delinquent": "*", "sc_flc": "*", "sc_probate_net": "*",
+    # counties_sc.greenville_probate added 2026-10-13: Greenville County's own appsas400
+    # probate portal (not southcarolinaprobate.net -- Greenville doesn't feed that
+    # aggregator, see sc_probate_net.py). Same raw={"greenville_probate": {...}} shape as
+    # every other scraper block registered in this dict by its own block-name key.
+    "greenville_probate": "*",
     "sc_public_index": "*", "sc_ust_registry": "*", "seeclickfix": "*",
     "servicelink": "*", "shapiro_ingle_pbi": "*", "shelby_star": "*",
     "sheriff_sale": "*", "sitemap_walker": "*", "spartanburg_flc": "*",

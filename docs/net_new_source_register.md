@@ -614,3 +614,28 @@ scripts and were never re-scraped by a run. They now refresh on the Mac:
   `docs/handoff/stealth_leads.json`. Lien-agent appointments are
   construction-start filings, not distress: context-only in `distress_score`.
   `national.liensnc` (the old public-search attempt) stays disabled.
+
+`counties_sc.greenville_probate` (2026-10-13). Greenville County SC runs its own free,
+public probate search at `https://www.greenvillecounty.org/appsas400/Probate/` and does
+NOT feed southcarolinaprobate.net (`counties_sc.sc_probate_net`'s own aggregator legit-
+empties for Greenville -- confirmed live). A HERMES status report had claimed Greenville
+probate has "no online portal... manual pull only"; false, live-verified by direct curl.
+Mechanics, confirmed live, not a VIEWSTATE postback like sc_probate_net's own site (a
+first draft assumed that and got 0 results against the real site): a plain
+query-string GET to `SearchResults.aspx` (`LastName`/`FirstName`/`MiddleName`/
+`PartyType=EST`/`CaseNumber`, always all five, blank or not -- a bare GET with none of
+them returns the entire 450k+ unfiltered case index) redirects once to an opaque
+`?q=<token>` URL that carries the real, single-page, unpaginated results grid. Each hit's
+`SearchDetails.aspx?CaseNumber=...` detail page is a label/value table (decedent Name/
+Address/Date of Death/File Date/Closed Date/etc., plus a repeating Personal
+Representative party block) -- Address is real and sometimes populated (several live
+modern cases had a full mailing address), unlike sc_probate_net's own address-less
+convention. Sweeps the same common-surname list sc_probate_net.py uses; keeps estates
+with no Closed Date (kept regardless of age) or a File Date/Date of Death inside
+`GREENVILLE_PROBATE_MAX_AGE_DAYS` (default 365). Registered in `main.DATELESS_OK_SOURCES`
+(a probate filing has no sale date) and `block_binding.PERSON_BLOCKS` (an address-less-
+by-default person record, same convention as `sc_probate_net`). Greenville SC is excluded
+from the narrow 18-county flip footprint (`config.SCOPE_DENY_COUNTIES`) but is explicitly
+admissible for a lead type like `PROBATE_NOTICE` via `config.in_scope_distressed()` --
+confirmed by reading that function's own docstring, which names Greenville by name as an
+example of exactly this.
