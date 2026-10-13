@@ -128,9 +128,19 @@ async def test_headless_waf_block_is_detected_and_headed_retry_is_used(
     """The exact 2026-09-27 finding: uc.start(headless=True) never raises, so
     the old exception-based fallback never fired. The fix must detect the
     block from location.href and restart headed -- proven here by using TWO
-    distinct fake browsers and asserting nodriver.start was called with
-    headless=True THEN headless=False, and that real rows come back (from
-    the headed browser only)."""
+    distinct fake browsers and asserting nodriver.start was asked for headless
+    THEN headed, and that real rows come back (from the headed browser only).
+
+    UPDATED 2026-10-13: browser_utils.start_browser no longer forwards its
+    `headless` arg straight to nodriver.start -- per be42b5f9 ("fix: use
+    --headless=new for snap Chromium 155+ compat", 2026-10-11, MEASURED:
+    snap Chromium 155 rejects the old --headless flag and crashes before the
+    WebSocket is available, BLOCKing every walled scraper), nodriver.start is
+    now always called with headless=False and real headlessness is signalled
+    via browser_args=["--headless=new"] instead. That is a real, already-
+    verified, cross-scraper fix (not something to undo from here), so what
+    this test must assert on is now the presence/absence of that browser arg,
+    not the (always-False) `headless` kwarg itself."""
     headless_page = _fake_page(location_href="chrome-error://chromewebdata/")
     headless_browser = _fake_browser(headless_page)
     headed_page = _fake_page(location_href="https://publicindex.sccourts.org/x")
@@ -138,17 +148,18 @@ async def test_headless_waf_block_is_detected_and_headed_retry_is_used(
 
     starts: list[bool] = []
 
-    async def fake_start(headless=True, **_kw):
-        starts.append(headless)
-        return headless_browser if headless else headed_browser
+    async def fake_start(headless=False, browser_args=None, **_kw):
+        requested_headless = "--headless=new" in (browser_args or [])
+        starts.append(requested_headless)
+        return headless_browser if requested_headless else headed_browser
 
     monkeypatch.setattr(nodriver, "start", fake_start)
 
     result = await m._nodriver_search_county("spartanburg")
 
     assert starts == [True, False], (
-        "must try headless first, detect the WAF block, then start headed -- "
-        f"got {starts!r}")
+        "must try headless (--headless=new browser arg) first, detect the "
+        f"WAF block, then start headed (no --headless=new) -- got {starts!r}")
     headless_browser.stop.assert_called_once()  # blocked browser closed before retry
     headed_browser.stop.assert_called_once()    # final cleanup (outer finally)
     assert [r["case_number"] for r in result] == ["2026CP4200001"], (
@@ -159,14 +170,19 @@ async def test_headless_waf_block_is_detected_and_headed_retry_is_used(
 async def test_headless_success_never_triggers_a_headed_restart(
         monkeypatch, _single_prefix_and_fast_sleep):
     """The detection must not false-positive on a normal, working headless
-    page -- only chrome-error:// on location.href should trigger a restart."""
+    page -- only chrome-error:// on location.href should trigger a restart.
+
+    UPDATED 2026-10-13: see test_headless_waf_block_is_detected_and_headed_
+    retry_is_used above -- post be42b5f9, nodriver.start always gets
+    headless=False, so "was headless requested" is read off the
+    --headless=new browser arg instead."""
     page = _fake_page(location_href="https://publicindex.sccourts.org/x")
     browser = _fake_browser(page)
 
     starts: list[bool] = []
 
-    async def fake_start(headless=True, **_kw):
-        starts.append(headless)
+    async def fake_start(headless=False, browser_args=None, **_kw):
+        starts.append("--headless=new" in (browser_args or []))
         return browser
 
     monkeypatch.setattr(nodriver, "start", fake_start)
