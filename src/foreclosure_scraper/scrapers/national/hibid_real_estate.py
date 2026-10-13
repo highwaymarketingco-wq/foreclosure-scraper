@@ -29,6 +29,18 @@ Field notes (verified 2026-08-17):
     unauthenticated callers, so it is NOT a real price — ignored.
 
 Free, no auth, no Apify.
+
+ADDED 2026-10-13 (source-completeness audit, Pattern B): the search-result
+card/API row only ever carried one photo's worth of data (none, in fact --
+the row had no image field requested at all), while every real listing's own
+detail page shows a full auctioneer-provided gallery. Live-confirmed against
+real NC/SC lots today: the SAME ``lotSearch`` query already used here can
+request a ``pictures { fullSizeLocation }`` sub-selection (and a top-level
+``pictureCount``) with NO extra per-listing request -- it is already part of
+the one GraphQL round trip. Real galleries are large (14-52 photos on live
+NC/SC real-estate lots checked 2026-10-13, e.g. lot 311452472 / 1217 Daniels
+Rd Lincolnton NC = 38 photos), so capped here at 8 (consistent with the
+freddie_homesteps.py reference pattern) rather than emitted in full.
 """
 from __future__ import annotations
 
@@ -49,6 +61,7 @@ STATES = ("NC", "SC")
 PAGE_LENGTH = 100
 PAGES_CAP = 10  # 100*10 = 1000 lots/state headroom; real-estate volumes are far lower
 BOGUS_BID = 123.45  # sentinel HiBid returns for bidAmount to unauth callers
+MAX_PHOTOS = 8  # cap, consistent with freddie_homesteps.py's reference pattern
 
 # We request only the subset of the schema we use (GraphQL allows field subsets).
 _QUERY = """
@@ -68,6 +81,8 @@ query LotSearch($pageNumber: Int!, $pageLength: Int!, $category: CategoryId, $st
         bidAmount
         estimate
         category { id categoryName }
+        pictureCount
+        pictures { fullSizeLocation }
         auction {
           id
           eventName
@@ -251,6 +266,22 @@ async def _fetch_state(state: str) -> list[Listing]:
     return out
 
 
+def _real_photos(lot: dict) -> list[str]:
+    """The lot's real auctioneer-provided gallery -- `pictures[].fullSizeLocation`,
+    already present in the same lotSearch response (no extra request). Deduped,
+    order preserved, capped at MAX_PHOTOS (live galleries run far larger -- up
+    to 52 confirmed 2026-10-13 -- so this is a deliberate cap, not the full set)."""
+    out: list[str] = []
+    for pic in (lot.get("pictures") or []):
+        url = (pic or {}).get("fullSizeLocation") or ""
+        url = url.strip()
+        if url and url not in out:
+            out.append(url)
+        if len(out) >= MAX_PHOTOS:
+            break
+    return out
+
+
 def _build_listing(state: str, lot: dict) -> Listing | None:
     lead = (lot.get("lead") or "").strip()
     desc = (lot.get("description") or "").strip()
@@ -310,8 +341,9 @@ def _build_listing(state: str, lot: dict) -> Listing | None:
         pass
 
     source_url = f"https://hibid.com/lot/{lot_id}"
+    photos = _real_photos(lot)
 
-    return Listing(
+    li = Listing(
         source="national.hibid_real_estate",
         source_url=source_url,
         listing_type=ListingType.AUCTION,
@@ -338,6 +370,9 @@ def _build_listing(state: str, lot: dict) -> Listing | None:
             "lead": lead[:200] or None,
         }},
     )
+    if photos:
+        li.raw["images"] = {"real": photos}
+    return li
 
 
 class HibidRealEstate(BaseScraper):

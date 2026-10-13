@@ -44,6 +44,22 @@ MAX_PAGES = 10
 # reasonable; this is sampling-depth value-add, not a basic-coverage gap.
 DETAIL_FETCH_CAP_PER_COUNTY = 10
 
+# FOUND 2026-10-13 (source-completeness audit, Pattern B): every JSON-LD
+# block on a detail page (Residence / Product / RealEstateListing+Product /
+# BreadcrumbList -- confirmed live, all 4 of them, on 3 separate current
+# listings) carries only the ONE main photo; widening the JSON-LD selector
+# finds nothing extra. The REAL gallery (18-48 photos on the 3 listings
+# checked) lives in a completely separate, non-JSON-LD blob: a
+# <script type="application/json" id="__SERVER_STATE__"> SSR state dump at
+# propertyDetailPage.propertyData.imageDocumentIds (a flat list of numeric
+# document IDs). Confirmed live via curl_cffi impersonation: a non-main
+# document ID from that list resolves to a genuine distinct image/jpeg at
+# the same CDN host+path pattern already used for the one captured photo
+# (settings.servers.Image + "/resizedimages/394/0/h/80/1-<id>"). Capped at
+# a sane count (matches national/freddie_homesteps.py's precedent) rather
+# than keeping all 18-48 -- this is a lead-gen board, not a photo viewer.
+GALLERY_PHOTO_CAP = 8
+
 NC_COUNTIES = [
     "buncombe", "henderson", "cleveland", "gaston", "rutherford", "polk",
     "transylvania", "mcdowell", "lincoln", "mitchell", "burke", "brunswick",
@@ -247,13 +263,55 @@ def _extract_json_objects(html: str, marker: str) -> list[dict]:
     return out
 
 
+def _extract_gallery_photos(html: str) -> list[str]:
+    """Pull the FULL photo gallery off a listing's detail page.
+
+    See GALLERY_PHOTO_CAP's module-level comment for the live confirmation:
+    every JSON-LD block on the page carries only the single main photo --
+    the real gallery lives in the <script type="application/json"
+    id="__SERVER_STATE__"> SSR state blob instead, NOT in JSON-LD at all."""
+    tree = HTMLParser(html)
+    node = tree.css_first('script#__SERVER_STATE__')
+    if node is None:
+        return []
+    text = node.text()
+    if not text:
+        return []
+    try:
+        state = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return []
+    if not isinstance(state, dict):
+        return []
+    property_data = (
+        (state.get("propertyDetailPage") or {}).get("propertyData") or {}
+    )
+    doc_ids = property_data.get("imageDocumentIds")
+    if not isinstance(doc_ids, list) or not doc_ids:
+        return []
+    server = (
+        (state.get("settings") or {}).get("servers") or {}
+    ).get("Image") or "https://assets.landandfarm.com"
+    out: list[str] = []
+    seen: set[str] = set()
+    for doc_id in doc_ids:
+        url = f"{server}/resizedimages/394/0/h/80/1-{doc_id}"
+        if url not in seen:
+            seen.add(url)
+            out.append(url)
+        if len(out) >= GALLERY_PHOTO_CAP:
+            break
+    return out
+
+
 def _parse_detail_extras(html: str) -> dict:
     """Pull the richer fields off a listing's own detail page: a real agent
     phone (seller.telephone -- the search page never carries this, see
     DETAIL_FETCH_CAP_PER_COUNTY's module-level comment), the full
-    untruncated description, datePosted, and the structured
-    additionalProperty list (Acreage/Activities/Lot Description/Present
-    Use/Proposed Use)."""
+    untruncated description, datePosted, the structured additionalProperty
+    list (Acreage/Activities/Lot Description/Present Use/Proposed Use), and
+    the full photo gallery (see GALLERY_PHOTO_CAP's comment -- lives outside
+    JSON-LD, so this is independent of the loop below ever matching)."""
     extras: dict = {}
     for obj in _extract_json_objects(html, "#listingdetailpage"):
         if "RealEstateListing" not in str(obj.get("@type", "")):
@@ -277,6 +335,12 @@ def _parse_detail_extras(html: str) -> dict:
             if parsed:
                 extras["additional_properties"] = parsed
         break
+    try:
+        photos = _extract_gallery_photos(html)
+    except Exception:
+        photos = []
+    if photos:
+        extras["photos"] = photos
     return extras
 
 
@@ -303,6 +367,14 @@ def _apply_detail_extras(li: Listing, extras: dict) -> None:
         ns["additional_properties"] = extras["additional_properties"]
     if extras.get("full_description") and len(extras["full_description"]) > len(li.description or ""):
         li.description = extras["full_description"][:2000]
+    photos = extras.get("photos")
+    if photos:
+        have = li.raw.setdefault("images", {}).setdefault("real", [])
+        for p in photos:
+            if p not in have:
+                have.append(p)
+        if len(have) > GALLERY_PHOTO_CAP:
+            del have[GALLERY_PHOTO_CAP:]
 
 
 async def _fetch_county(

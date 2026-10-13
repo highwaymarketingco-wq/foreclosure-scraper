@@ -18,11 +18,14 @@ no extra render cost. Wired as a best-effort, per-county-capped enrichment
 from __future__ import annotations
 
 import asyncio
+import json
 
 from foreclosure_scraper.scrapers.national.landandfarm import (
+    GALLERY_PHOTO_CAP,
     _apply_detail_extras,
     _extract_acres,
     _extract_county,
+    _extract_gallery_photos,
     _fetch_detail_extras,
     _parse_detail_extras,
     _parse_item,
@@ -59,6 +62,163 @@ _DETAIL_HTML = """
 </script>
 </body></html>
 """
+
+
+# ---------------------------------------------------------------------------
+# Gallery fix (source-completeness audit, 2026-10-13): live-confirmed on 3
+# real current listings that EVERY JSON-LD block on a detail page (Residence
+# / Product / RealEstateListing+Product / BreadcrumbList) carries only the
+# single main photo. The real 18-48-photo gallery lives in a separate,
+# non-JSON-LD <script type="application/json" id="__SERVER_STATE__"> SSR
+# state blob at propertyDetailPage.propertyData.imageDocumentIds. This is a
+# trimmed-but-real fixture (12 of the 38 real document IDs) live-captured
+# 2026-10-13 from the same Pisgah Highlands listing as _DETAIL_HTML above.
+# ---------------------------------------------------------------------------
+_SERVER_STATE_JSON = json.dumps({
+    "propertyDetailPage": {
+        "propertyData": {
+            "mainPhotoDocumentId": 5527661172,
+            "imageDocumentIds": [
+                5527661172, 5527661173, 5527661174, 5527661177, 5527661175,
+                5527661176, 5527661178, 5527661179, 5527661180, 5527661181,
+                5527661188, 5527661189,
+            ],
+        }
+    },
+    "settings": {"servers": {"Image": "https://assets.landandfarm.com"}},
+})
+
+_DETAIL_HTML_WITH_GALLERY = (
+    _DETAIL_HTML.replace("</body></html>", "")
+    + f'<script type="application/json" id="__SERVER_STATE__">{_SERVER_STATE_JSON}</script>'
+    + "</body></html>"
+)
+
+_EXPECTED_GALLERY_URLS = [
+    f"https://assets.landandfarm.com/resizedimages/394/0/h/80/1-{doc_id}"
+    for doc_id in (
+        5527661172, 5527661173, 5527661174, 5527661177, 5527661175,
+        5527661176, 5527661178, 5527661179,
+    )
+]
+
+
+def test_extract_gallery_photos_from_real_server_state():
+    """All real photos captured (capped at GALLERY_PHOTO_CAP), in order."""
+    photos = _extract_gallery_photos(_DETAIL_HTML_WITH_GALLERY)
+    assert len(photos) == GALLERY_PHOTO_CAP == 8
+    assert photos == _EXPECTED_GALLERY_URLS
+    # the first URL must match the exact format already used for the single
+    # photo captured by `_parse_item` from the search-page JSON-LD, so the
+    # two sources dedupe cleanly against each other.
+    assert photos[0] == "https://assets.landandfarm.com/resizedimages/394/0/h/80/1-5527661172"
+
+
+def test_extract_gallery_photos_dedupes_repeated_document_ids():
+    dup_state = json.dumps({
+        "propertyDetailPage": {"propertyData": {
+            "imageDocumentIds": [111, 111, 222, 111, 333],
+        }},
+        "settings": {"servers": {"Image": "https://assets.landandfarm.com"}},
+    })
+    html = (
+        "<html><body>"
+        f'<script type="application/json" id="__SERVER_STATE__">{dup_state}</script>'
+        "</body></html>"
+    )
+    photos = _extract_gallery_photos(html)
+    assert photos == [
+        "https://assets.landandfarm.com/resizedimages/394/0/h/80/1-111",
+        "https://assets.landandfarm.com/resizedimages/394/0/h/80/1-222",
+        "https://assets.landandfarm.com/resizedimages/394/0/h/80/1-333",
+    ]
+    assert len(photos) == len(set(photos))
+
+
+def test_extract_gallery_photos_empty_when_server_state_missing():
+    """A page with only the single original JSON-LD block (no
+    __SERVER_STATE__ at all) must not regress -- just no extra photos."""
+    assert _extract_gallery_photos(_DETAIL_HTML) == []
+
+
+def test_extract_gallery_photos_empty_on_malformed_server_state():
+    """A malformed __SERVER_STATE__ blob must never raise."""
+    html = (
+        "<html><body>"
+        '<script type="application/json" id="__SERVER_STATE__">{not valid json!!</script>'
+        "</body></html>"
+    )
+    assert _extract_gallery_photos(html) == []
+
+
+def test_extract_gallery_photos_empty_when_image_document_ids_absent():
+    html = (
+        "<html><body>"
+        '<script type="application/json" id="__SERVER_STATE__">{"propertyDetailPage": {"propertyData": {}}}</script>'
+        "</body></html>"
+    )
+    assert _extract_gallery_photos(html) == []
+
+
+def test_parse_detail_extras_includes_gallery_photos():
+    extras = _parse_detail_extras(_DETAIL_HTML_WITH_GALLERY)
+    assert extras["photos"] == _EXPECTED_GALLERY_URLS
+    # pre-existing fields must still be parsed correctly alongside it
+    assert extras["agent_phone"] == "(828) 555-0756"
+
+
+def test_parse_detail_extras_malformed_server_state_does_not_break_other_fields():
+    """A malformed gallery blob must never take down the phone/date/
+    description extraction that already worked."""
+    html = (
+        _DETAIL_HTML.replace("</body></html>", "")
+        + '<script type="application/json" id="__SERVER_STATE__">{broken</script>'
+        + "</body></html>"
+    )
+    extras = _parse_detail_extras(html)
+    assert extras["agent_phone"] == "(828) 555-0756"
+    assert "photos" not in extras
+
+
+def test_apply_detail_extras_merges_gallery_into_raw_images():
+    li = _base_listing()
+    li.raw["images"] = {"real": ["https://assets.landandfarm.com/resizedimages/394/0/h/80/1-5527661172"]}
+    extras = _parse_detail_extras(_DETAIL_HTML_WITH_GALLERY)
+    _apply_detail_extras(li, extras)
+    have = li.raw["images"]["real"]
+    # the pre-existing single photo (same URL the gallery's first entry
+    # resolves to) must not be duplicated, and the total must respect the cap.
+    assert have.count("https://assets.landandfarm.com/resizedimages/394/0/h/80/1-5527661172") == 1
+    assert len(have) == GALLERY_PHOTO_CAP == 8
+    assert have == _EXPECTED_GALLERY_URLS
+
+
+def test_apply_detail_extras_gallery_noop_when_no_photos_key():
+    li = _base_listing()
+    li.raw["images"] = {"real": ["https://x/img.jpg"]}
+    _apply_detail_extras(li, {"agent_phone": "(555) 111-2222"})
+    assert li.raw["images"]["real"] == ["https://x/img.jpg"]
+
+
+def test_full_pipeline_survives_malformed_gallery_block():
+    """End-to-end: a malformed __SERVER_STATE__ must never break the main
+    listing build (_parse_item) or the rest of the enrichment pipeline."""
+    item = {
+        "url": "https://www.landandfarm.com/property/x-123/",
+        "name": "10 Acres, Asheville, NC",
+        "description": "Nice land",
+        "image": "https://assets.landandfarm.com/resizedimages/394/0/h/80/1-999/",
+    }
+    li = _parse_item(item, "national.landandfarm")
+    assert li is not None
+    broken_html = (
+        '<html><body><script type="application/json" id="__SERVER_STATE__">'
+        "{totally not json</script></body></html>"
+    )
+    extras = _parse_detail_extras(broken_html)
+    _apply_detail_extras(li, extras)  # must not raise
+    assert li.street_address is None  # untouched core field, listing intact
+    assert li.raw["landandfarm"]["title"] == "10 Acres, Asheville, NC"
 
 
 def test_parse_detail_extras_pulls_phone_date_and_properties():

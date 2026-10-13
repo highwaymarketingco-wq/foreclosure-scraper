@@ -51,9 +51,11 @@ two different id schemes for the same propertyUuid).
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime, timezone
 from typing import Iterable
 
+import httpx
 import structlog
 
 from ...base_scraper import BaseScraper
@@ -91,6 +93,110 @@ REO_LISTING_TYPES = "5"
 # Hard cap on pages per state. HomePath nationwide has ~27k listings; NC+SC
 # combined are ~500-800, so 20 pages (2000 listings) is a generous ceiling.
 PAGES_CAP = 20
+
+# --- per-listing gallery + agent-contact enrichment -------------------------
+#
+# ADDED 2026-10-13 (source-completeness audit, Pattern B): identical gap to
+# the sibling national.fannie_homepath (same fix, same day, same underlying
+# API -- see that module's matching comment for the full live-confirmation
+# detail). The search-result JSON teaser this scraper parses (`_to_listing`
+# above) only ever carries ONE photo (`primHiResImageUrl`) and no agent
+# contact. Fannie's own per-property detail endpoint -- the SAME open,
+# unauthenticated JSON-XHR endpoint enrichment_homepath_uuid.py already calls
+# for uuid-liveness checks, no login/CAPTCHA -- carries a full `propertyPics`
+# gallery and a `brokerCompanies[].contacts[]` listing-agent name/phone/email
+# in the clear. Confirmed live 2026-10-13 with plain httpx on 3 real current
+# NC/SC REO rows: 30, 15 and 15 gallery images each, plus a real agent name/
+# phone/email on all three.
+#
+# Duplicated here rather than imported from the sibling -- this module's own
+# docstring already states the design intent (independent of fannie_homepath's
+# internals, sharing only the confirmed-stable host/URL/response shape); a
+# shared import would couple the two scrapers' failure modes together.
+DETAIL_API = "https://homepath.fanniemae.com/cfl/property-inventory/property"
+MAX_GALLERY_PHOTOS = 8
+#: Share of timeout_s the per-listing detail-page enrichment pass may use.
+#: With the REO-only `listingTypes=5` filter (added 2026-10-08) each state's
+#: search fetch terminates after its first page (NC 56 / SC 22 rows live
+#: 2026-10-13, both under PAGE_SIZE) -- the search phase itself no longer
+#: needs most of timeout_s, so the budget below is generous. The per-host
+#: throttle (http_client's _MIN_INTERVAL_S + jitter, ~0.8-1.5s/request,
+#: shared process-wide with the sibling national.fannie_homepath scraper if
+#: it hits this same host concurrently) is the real floor: ~78 combined
+#: NC+SC rows -> at least ~65s, comfortably inside this share even if both
+#: homepath scrapers' enrichment passes overlap.
+DETAIL_BUDGET_SHARE = 0.7
+
+
+def _parse_gallery_and_agent(data: dict) -> tuple[list[str], dict]:
+    """Extract the real photo gallery + listing-agent contact from a
+    `/cfl/property-inventory/property/{uuid}` detail response (see
+    DETAIL_API's comment above for what's confirmed live there)."""
+    photos: list[str] = []
+    for pic in data.get("propertyPics") or []:
+        url = pic.get("imageUrl") if isinstance(pic, dict) else None
+        if url and isinstance(url, str) and url.startswith("http") and url not in photos:
+            photos.append(url)
+    agent: dict = {}
+    for bc in data.get("brokerCompanies") or []:
+        if not isinstance(bc, dict):
+            continue
+        for contact in bc.get("contacts") or []:
+            if not isinstance(contact, dict):
+                continue
+            name = contact.get("fullName")
+            phone = contact.get("phoneNumber") or contact.get("mobileNumber")
+            email = contact.get("email")
+            if name or phone or email:
+                if name:
+                    agent["name"] = name
+                if phone:
+                    agent["phone"] = phone
+                if email:
+                    agent["email"] = email
+                break
+        if agent:
+            break
+    return photos[:MAX_GALLERY_PHOTOS], agent
+
+
+async def _enrich_galleries(
+    c: httpx.AsyncClient, listings: list[Listing], deadline: float
+) -> None:
+    """Per-listing detail-page enrichment (full photo gallery + agent
+    contact -- see the DETAIL_API comment above). Mutates each Listing's
+    `raw` in place; a listing with no resolvable uuid, a failed fetch, or a
+    budget cutoff simply keeps the single photo it already has -- this never
+    blocks or drops a row."""
+    for n, li in enumerate(listings):
+        if time.monotonic() > deadline:
+            log.info("homepath_json.gallery_budget_spent", fetched=n,
+                      skipped=len(listings) - n)
+            break
+        uuid = (li.raw.get("homepath_json") or {}).get("property_uuid")
+        if not uuid:
+            continue
+        try:
+            r = await c.get(f"{DETAIL_API}/{uuid}", headers=HEADERS, follow_redirects=True)
+        except Exception as exc:
+            log.warning("homepath_json.detail_fetch_failed", uuid=uuid,
+                        error=str(exc)[:160])
+            continue
+        if r.status_code != 200:
+            continue
+        try:
+            data = r.json()
+        except Exception:
+            continue
+        photos, agent = _parse_gallery_and_agent(data)
+        if photos:
+            have = li.raw.setdefault("images", {}).setdefault("real", [])
+            for p in photos:
+                if p not in have:
+                    have.append(p)
+            del have[MAX_GALLERY_PHOTOS:]
+        if agent:
+            li.raw.setdefault("homepath_json", {})["agent"] = agent
 
 _PROP_KIND_MAP = {
     "Single Family": PropertyKind.SINGLE_FAMILY,
@@ -366,6 +472,7 @@ class HomePathJSON(BaseScraper):
         # base_scraper.safe_run()'s existing timeout-salvage path has real
         # rows to ship if timeout_s fires mid-sweep.
         out = self.partial
+        start = time.monotonic()
         tasks = [_fetch_state(state, self.slug, out) for state in STATES]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         # NOTE: each _fetch_state call already appended its rows into `out`
@@ -380,4 +487,15 @@ class HomePathJSON(BaseScraper):
                     state=STATES[i], error=str(result)[:200],
                 )
         log.info("homepath_json.done", total=len(out))
+
+        # Per-listing gallery/agent enrichment (see _enrich_galleries above).
+        # Runs AFTER every search-phase row is already in `out` (== self.partial),
+        # so a budget cutoff here only means some rows keep their single
+        # teaser photo -- it can never cost a row that's already been fetched.
+        try:
+            deadline = start + self.timeout_s * DETAIL_BUDGET_SHARE
+            async with client(timeout=30.0) as c:
+                await _enrich_galleries(c, out, deadline)
+        except Exception as exc:
+            log.warning("homepath_json.gallery_pass_failed", error=str(exc)[:200])
         return out

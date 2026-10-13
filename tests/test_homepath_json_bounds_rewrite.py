@@ -169,6 +169,14 @@ def test_fetch_does_not_double_count_rows_from_partial_sink_plus_extend(monkeypa
         return rows
 
     monkeypatch.setattr(m, "_fetch_state", fake_fetch_state)
+    # fetch() now also runs a post-search gallery/agent enrichment pass
+    # (2026-10-13, source-completeness audit Pattern B) that opens its own
+    # client() and GETs the per-property detail endpoint -- stub it out so
+    # this test (about double-counting in the search phase) doesn't make a
+    # real network call for the fake "NC-1"/"SC-1" uuids above.
+    monkeypatch.setattr(
+        m, "_enrich_galleries", lambda c, listings, deadline: asyncio.sleep(0)
+    )
 
     scraper = m.HomePathJSON()
     out = asyncio.run(asyncio.wait_for(scraper.fetch(), timeout=5.0))

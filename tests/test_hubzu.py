@@ -7,10 +7,23 @@ captured -- the same miss class already fixed today in
 national.gsa_surplus / servicelink_auction / tranzon_auctions (raw["images"]
 = {"real": [...]}). Everything else (address, bid, beds/baths/sqft,
 lat/lng, sale/auction-end date) was already correctly wired.
+
+ADDED 2026-10-13 (source-completeness audit, Pattern B): live-verified the
+search tuple's single `imageUrl` is only the gallery's first/default image --
+the free, no-auth `getNewPdpDetails/<propertyId>` endpoint (propertyId = the
+leading digits of `listingId`) carries the real gallery. See module
+docstring addendum in hubzu.py for the live samples that confirmed this
+(photoCount 2/5/5/15 each matched the detail endpoint's real image count).
 """
 from __future__ import annotations
 
-from foreclosure_scraper.scrapers.national.hubzu import _parse_item, _photo_url
+from foreclosure_scraper.scrapers.national.hubzu import (
+    GALLERY_CAP,
+    _gallery_photos,
+    _parse_item,
+    _photo_url,
+    _property_id,
+)
 
 # A trimmed but real shape, captured live 2026-10-01 against
 # https://www.hubzu.com/portal/auctions?state=NC&pageSize=200
@@ -112,3 +125,126 @@ def test_no_occupancy_status_is_none_not_empty_string():
     li = _parse_item(_REAL_ITEM, "NC")
     assert li is not None
     assert li.raw["hubzu"]["occupancy_status"] is None
+
+
+# ---------------------------------------------------------------------------
+# Full-gallery enrichment (2026-10-13, Pattern B fix): the search tuple's
+# listingId -> getNewPdpDetails propertyId mapping, and parsing that detail
+# endpoint's own imageDetails[] into the real gallery.
+# ---------------------------------------------------------------------------
+
+def test_property_id_strips_auction_round_suffix():
+    # Live current shape (2026-10-13): "<propertyId>AUCN<round>".
+    assert _property_id("9321811956AUCN7") == "9321811956"
+    assert _property_id("501753045164AUCN2") == "501753045164"
+
+
+def test_property_id_accepts_bare_numeric_id():
+    # Older/legacy shape with no suffix (e.g. this file's own _REAL_ITEM).
+    assert _property_id("9321811956") == "9321811956"
+
+
+def test_property_id_handles_missing_or_junk():
+    assert _property_id(None) is None
+    assert _property_id("") is None
+    assert _property_id("AUCN7") is None
+
+
+# A trimmed but real shape, captured live 2026-10-13 against
+# https://www.hubzu.com/portal/property/getNewPdpDetails/9321811956 -- the
+# same listing as _REAL_ITEM above (photoCount="5" there matches the 5
+# imageDetails entries here exactly).
+_REAL_DETAIL_RESPONSE = {
+    "propertyDetails": {
+        "propertyId": "9321811956",
+        "imageDetails": [
+            {
+                "imageDisplaySequence": "1",
+                "imageStoragePath": "//image-prod.hubzu.com/2026/8/9321811956/9321811956_20260829092145825_2.JPEG",
+                "defaultImage": True,
+            },
+            {
+                "imageDisplaySequence": "2",
+                "imageStoragePath": "//image1-prod.hubzu.com/2026/8/9321811956/9321811956_20260829092144570_1.JPEG",
+                "defaultImage": False,
+            },
+            {
+                "imageDisplaySequence": "3",
+                "imageStoragePath": "//image2-prod.hubzu.com/2026/8/9321811956/9321811956_20260829092147144_3.JPEG",
+                "defaultImage": False,
+            },
+            {
+                "imageDisplaySequence": "4",
+                "imageStoragePath": "//image-prod.hubzu.com/2026/8/9321811956/9321811956_20260829092148091_4.JPEG",
+                "defaultImage": False,
+            },
+            {
+                "imageDisplaySequence": "5",
+                "imageStoragePath": "//image1-prod.hubzu.com/2026/8/9321811956/9321811956_20260829092149065_5.JPEG",
+                "defaultImage": False,
+            },
+        ],
+    }
+}
+
+
+def test_gallery_photos_extracts_and_normalizes_all_images():
+    photos = _gallery_photos(_REAL_DETAIL_RESPONSE)
+    assert photos == [
+        "https://image-prod.hubzu.com/2026/8/9321811956/9321811956_20260829092145825_2.JPEG",
+        "https://image1-prod.hubzu.com/2026/8/9321811956/9321811956_20260829092144570_1.JPEG",
+        "https://image2-prod.hubzu.com/2026/8/9321811956/9321811956_20260829092147144_3.JPEG",
+        "https://image-prod.hubzu.com/2026/8/9321811956/9321811956_20260829092148091_4.JPEG",
+        "https://image1-prod.hubzu.com/2026/8/9321811956/9321811956_20260829092149065_5.JPEG",
+    ]
+
+
+def test_gallery_photos_dedupes_repeated_urls():
+    detail = {
+        "propertyDetails": {
+            "imageDetails": [
+                {"imageStoragePath": "//image-prod.hubzu.com/a.jpg"},
+                {"imageStoragePath": "//image-prod.hubzu.com/a.jpg"},
+                {"imageStoragePath": "//image-prod.hubzu.com/b.jpg"},
+            ]
+        }
+    }
+    assert _gallery_photos(detail) == [
+        "https://image-prod.hubzu.com/a.jpg",
+        "https://image-prod.hubzu.com/b.jpg",
+    ]
+
+
+def test_gallery_photos_caps_at_gallery_cap():
+    # Live-sampled 2026-10-13: one listing (501753045164) genuinely carried 15
+    # real photos -- confirm the cap still applies rather than keeping all 15.
+    detail = {
+        "propertyDetails": {
+            "imageDetails": [
+                {"imageStoragePath": f"//image-prod.hubzu.com/{n}.jpg"}
+                for n in range(15)
+            ]
+        }
+    }
+    photos = _gallery_photos(detail)
+    assert len(photos) == GALLERY_CAP == 8
+    assert photos[0] == "https://image-prod.hubzu.com/0.jpg"
+
+
+def test_gallery_photos_skips_blank_or_malformed_entries():
+    detail = {
+        "propertyDetails": {
+            "imageDetails": [
+                {"imageStoragePath": ""},
+                "not-a-dict",
+                {"imageStoragePath": "//image-prod.hubzu.com/real.jpg"},
+            ]
+        }
+    }
+    assert _gallery_photos(detail) == ["https://image-prod.hubzu.com/real.jpg"]
+
+
+def test_gallery_photos_handles_empty_or_missing_image_details():
+    assert _gallery_photos({"propertyDetails": {"imageDetails": []}}) == []
+    assert _gallery_photos({"propertyDetails": {}}) == []
+    assert _gallery_photos({}) == []

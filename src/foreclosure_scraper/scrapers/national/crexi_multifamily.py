@@ -53,11 +53,33 @@ Listing typing:
   property_kind is always MULTI_FAMILY.
 
 Free, no auth, no Apify, no CAPTCHA/login defeat.
+
+ADDED 2026-10-13 (source-completeness audit, Pattern B): the slug-only
+capture above never looked at a photo at all (not even one from a card/
+JSON-LD teaser -- there's no such teaser on this Angular SPA's search
+response). Live-confirmed against 3 real NC multifamily detail pages
+(ids 2346159 / 2734804 / 2198267) that each one's own rendered detail page
+carries a real multi-photo gallery (39 / 100 / 43 unique images
+respectively) at ``https://crexi.com/images/format=auto,width=W,height=H/
+assets/<this-listing-id>/<hash>.<ext>`` -- no login/paywall. The SAME CDN
+also serves the "similar properties" sidebar's thumbnails and agent/user-
+account headshots on that same page, under a *different* numeric id in the
+path, so extraction must scope strictly to this listing's own id (see
+``_extract_gallery_photos``).
+Cost tradeoff: a detail page needs the identical ~20-90s Cloudflare-walled
+stealth render as a search page (no cheap-httpx shortcut like
+freddie_homesteps' plain-GET detail pages), so enriching every listing this
+scraper can produce in one run (up to ~240) is flatly impractical. A small,
+separately time-and-count-budgeted enrichment pass (see
+``DETAIL_PHOTO_CAP`` / ``DETAIL_PHOTO_BUDGET_S``) fetches real photos for a
+handful of listings per state; every other listing keeps today's behavior
+(no ``images`` key) rather than the run stalling or losing listings.
 """
 from __future__ import annotations
 
 import os
 import re
+import time
 from datetime import datetime
 from typing import Iterable
 
@@ -89,6 +111,19 @@ PAGES_CAP = 2
 
 # Re-render attempts per page when Crexi serves an empty grid / redirect.
 ATTEMPTS_PER_PAGE = 2
+
+# Photo-gallery detail-page enrichment budget (see module docstring and
+# fetch()). Each detail render costs the same ~20-90s stealth fetch as a
+# search-grid page (live-timed 2026-10-13: 14s / 14s / 71s across 3 live
+# samples), so this is deliberately small -- a bounded handful of listings
+# per state, inside a separate time ceiling, not "every listing." Override
+# via env for a deeper enrichment pass if ever needed.
+DETAIL_PHOTO_CAP = int(os.environ.get("CREXI_MULTIFAMILY_PHOTO_CAP", "6"))
+DETAIL_PHOTO_BUDGET_S = float(
+    os.environ.get("CREXI_MULTIFAMILY_PHOTO_BUDGET_S", "240")
+)
+# Max real photos to keep per listing, matching freddie_homesteps.py's cap.
+GALLERY_CAP = 8
 
 # /properties/<id>/<slug>
 DETAIL_RE = re.compile(r"/properties/(\d+)/([a-z0-9][a-z0-9-]*)")
@@ -296,6 +331,75 @@ def _is_listing_page(final_url: str) -> bool:
     return "/search/" not in (final_url or "")
 
 
+# A rendered detail page's real photo-gallery CDN URL, e.g.
+#   https://crexi.com/images/format=auto,width=3000,height=2000/assets/
+#   2346159/5efd8b736c264db681ac424e395d1c8f.JPG
+# The same srcset repeats each photo at several widths (300/900/1200/1500/
+# 3000 observed live) -- group(1) captures the width so the biggest variant
+# per photo can be kept; group(2) is the numeric asset/listing id the photo
+# belongs to (NOT necessarily this listing -- the same page also serves the
+# "similar properties" sidebar's thumbnails under other listings' ids, and
+# agent/user-account headshots under /user-accounts/<id>/, off the same CDN
+# host); group(3) is the photo's own content hash + extension, which is
+# stable across crop sizes and is what we dedupe on.
+_GALLERY_RE = re.compile(
+    r"https://crexi\.com/images/format=auto,width=(\d+),height=\d+"
+    r"[^\"'\s)]*?/assets/(\d+)/([a-f0-9]{16,40}\.[A-Za-z]{3,4})"
+)
+
+
+def _extract_gallery_photos(html: str, pid: str, cap: int = GALLERY_CAP) -> list[str]:
+    """This listing's own real photo gallery from its rendered detail page.
+
+    Scoped strictly to ``/assets/{pid}/`` (live-confirmed 2026-10-13: a
+    single detail page references up to a dozen *different* numeric asset
+    ids -- this listing's own gallery plus the "similar properties" sidebar
+    -- all off the identical CDN host/path shape, so matching the pattern
+    without the id filter would silently attribute other listings' photos
+    to this one). Multiple crop-size URLs sharing the same hash are the same
+    photo; keep only the highest-resolution ("widest") variant, sorted
+    widest-first so the cap keeps the best images.
+    """
+    best: dict[str, tuple[int, str]] = {}
+    for m in _GALLERY_RE.finditer(html):
+        width_s, asset_id, filename = m.group(1), m.group(2), m.group(3)
+        if asset_id != pid:
+            continue
+        key = filename.lower()
+        try:
+            width = int(width_s)
+        except ValueError:
+            continue
+        if key not in best or width > best[key][0]:
+            best[key] = (width, m.group(0))
+    ordered = sorted(best.values(), key=lambda t: -t[0])
+    return [url for _, url in ordered[:cap]]
+
+
+async def _fetch_detail_photos(pid: str, detail_url: str) -> list[str]:
+    """Render ``detail_url`` and pull out this listing's own gallery.
+
+    Any failure (fetch error, Cloudflare redirect, empty/short body, bad
+    parse) degrades to an empty list -- the caller already has a usable
+    listing from the search-grid slug; a failed photo fetch must never drop
+    it or raise.
+    """
+    try:
+        html, final = await _render(detail_url)
+    except Exception as exc:
+        log.warning("crexi_multifamily.photo_render_failed", pid=pid,
+                    error=str(exc)[:160])
+        return []
+    if not html or not _is_listing_page(final):
+        return []
+    try:
+        return _extract_gallery_photos(html, pid)
+    except Exception as exc:
+        log.warning("crexi_multifamily.photo_parse_failed", pid=pid,
+                    error=str(exc)[:160])
+        return []
+
+
 async def _fetch_state(state: str, state_prefix: str,
                        pages_cap: int) -> dict[str, Listing]:
     out: dict[str, Listing] = {}
@@ -346,9 +450,14 @@ class CrexiMultifamily(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     requires_render = True
-    # 2 states x PAGES_CAP pages x up-to-ATTEMPTS renders at ~90s each, plus
-    # headroom. The common path (first attempt succeeds) is ~4 renders.
-    timeout_s = 600.0
+    # 2 states x PAGES_CAP pages x up-to-ATTEMPTS renders at ~90s each for the
+    # search grid (common path ~4 renders, ~360s), PLUS the bounded photo-
+    # gallery enrichment pass added 2026-10-13 (up to DETAIL_PHOTO_BUDGET_S =
+    # 240s more, each render costing the same ~20-90s stealth fetch as a
+    # search page). Bumped from 600s to 900s to give the enrichment pass real
+    # room without routinely tripping the soft timeout on the common path; if
+    # it ever does, self.partial still ships whatever was banked so far.
+    timeout_s = 900.0
 
     async def fetch(self) -> Iterable[Listing]:
         pages_cap = int(
@@ -368,6 +477,45 @@ class CrexiMultifamily(BaseScraper):
             self.partial[:] = list(merged.values())
             log.info("crexi_multifamily.state_done", state=state,
                      count=len(rows))
+
+        # Bounded photo-gallery enrichment (see module docstring + the
+        # DETAIL_PHOTO_CAP/DETAIL_PHOTO_BUDGET_S constants): a small handful
+        # of listings per state get a real detail-page render for photos;
+        # everything else keeps the pre-fix behavior (no "images" key) so a
+        # listing is never dropped or the run stalled chasing every gallery.
+        photo_deadline = time.monotonic() + DETAIL_PHOTO_BUDGET_S
+        for state, _prefix in STATES:
+            state_listings = [li for li in merged.values() if li.state == state]
+            enriched = 0
+            for li in state_listings[:DETAIL_PHOTO_CAP]:
+                if time.monotonic() > photo_deadline:
+                    log.info("crexi_multifamily.photo_budget_spent",
+                             state=state, enriched=enriched)
+                    break
+                pid = (li.raw.get("loopnet") or {}).get("crexi_id")
+                if not pid or not li.source_url:
+                    continue
+                try:
+                    photos = await _fetch_detail_photos(pid, li.source_url)
+                except Exception as exc:
+                    # Belt-and-suspenders: _fetch_detail_photos already
+                    # catches its own render/parse failures internally, but
+                    # this listing must survive even if that helper itself
+                    # has a bug -- a photo-enrichment failure is never
+                    # allowed to take down the whole run.
+                    log.warning("crexi_multifamily.photo_enrich_failed",
+                                pid=pid, error=str(exc)[:160])
+                    continue
+                if photos:
+                    li.raw["images"] = {"real": photos}
+                    enriched += 1
+                # Re-bank so a soft-timeout mid-enrichment ships any photos
+                # already attached, not just the pre-enrichment rows.
+                self.partial[:] = list(merged.values())
+            log.info("crexi_multifamily.photo_enrichment_done", state=state,
+                     attempted=min(len(state_listings), DETAIL_PHOTO_CAP),
+                     enriched=enriched)
+
         out = list(merged.values())
         log.info("crexi_multifamily.done", total=len(out))
         return out
