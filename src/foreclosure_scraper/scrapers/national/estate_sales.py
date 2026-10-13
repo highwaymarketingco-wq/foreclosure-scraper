@@ -28,9 +28,10 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from datetime import datetime
 from typing import Iterable
-from urllib.parse import urljoin, quote_plus
+from urllib.parse import urljoin, quote_plus, urlparse
 
 import httpx
 import structlog
@@ -582,6 +583,159 @@ def _parse_estatesales_net_card(card, source_url: str,
     )
 
 
+# --- estatesales.net detail-page photo gallery -----------------------------
+#
+# ADDED 2026-10-13 (source-completeness audit, Pattern B): this scraper never
+# captured a single photo -- not "kept one and dropped the rest" (the pattern
+# the audit describes for freddie_homesteps/govdeals/etc.), genuinely ZERO.
+# The schema.org SaleEvent JSON-LD block on the search-results card does
+# carry an "image" field, but it is always a single cover photo (confirmed
+# live against 20 real cards on a current Asheville-zip search: every one
+# had exactly 0 or 1 image), and the current code never even reads it.
+#
+# Live-verified 2026-10-13 against 3 real, currently-active listings (one
+# cross-state radius-search bleed, one in-footprint Gastonia NC sale, one
+# brand-new listing with no photos yet) that each listing's own detail page
+# -- already captured as source_url, never fetched -- server-renders the
+# FULL photo gallery into a plain (non-escaped) JSON blob:
+# <script id="estatesales-net-state" type="application/json">, an Angular
+# NGRX state-transfer dump. Inside it, the sale's own entity carries
+# `pictures` (list of {pictureOrder, url, thumbnailUrl, ...}), `mainPicture`
+# (== pictures[0]) and `pictureCount`. Measured real totals: 148 and 90
+# unique photos on the two populated listings, 0 on the brand-new one (items
+# not yet photographed -- must degrade to no gallery, not an error). No
+# login, no CAPTCHA, no WAF bypass -- a plain unauthenticated GET already
+# returns this, same as the search page it is next to.
+#
+# These are REAL photos of the sale's own items (the organizer's photography,
+# not necessarily the house itself), ordered by the organizer's own
+# `pictureOrder` -- pictures[0]/mainPicture is their chosen lead/cover photo.
+# Real totals run into the hundreds, far past any sane per-row cap, so only
+# the first 8 (in the organizer's own order) are kept -- same cap as the
+# freddie_homesteps reference pattern this fix mirrors.
+_GALLERY_PHOTO_CAP = 8
+
+
+def _find_picture_entity(obj, depth: int = 0) -> dict | None:
+    """Recursively find the dict carrying both `pictures` (a list) and
+    `pictureCount` -- the sale entity's own fingerprint inside the NGRX
+    state dump, independent of whatever feature-slice/key name wraps it
+    (an Angular implementation detail that could rename across site
+    versions; this is also why the state is parsed structurally instead of
+    regex-scraping picturescdn.estatesales.net URLs out of the raw HTML,
+    which would silently include stale/unrelated CDN links from other page
+    chrome).
+
+    Confirmed live: the search-results page ALSO has this same
+    estatesales-net-state script and ALSO has `pictureCount` per card, but
+    never the full `pictures` list (only the detail page loads that) -- so
+    this fingerprint naturally never matches on a search page, even if a
+    listing's source_url ever ended up pointing at one instead of its own
+    detail page.
+    """
+    if depth > 14:
+        return None
+    if isinstance(obj, dict):
+        if isinstance(obj.get("pictures"), list) and "pictureCount" in obj:
+            return obj
+        for v in obj.values():
+            found = _find_picture_entity(v, depth + 1)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _find_picture_entity(v, depth + 1)
+            if found is not None:
+                return found
+    return None
+
+
+def _parse_detail_gallery(html: str) -> list[str]:
+    """Extract the real photo gallery from an estatesales.net listing's own
+    detail page HTML. Returns [] (never raises) when the page has no
+    gallery, is malformed, or doesn't match the expected shape at all --
+    a parse miss here must never take down the listing it was enriching."""
+    try:
+        tree = HTMLParser(html)
+        node = tree.css_first("script#estatesales-net-state")
+        if node is None:
+            return []
+        text = node.text()
+        if not text:
+            return []
+        data = json.loads(text)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return []
+
+    entity = _find_picture_entity(data)
+    if entity is None:
+        return []
+    pictures = entity.get("pictures") or []
+
+    ordered = sorted(
+        (p for p in pictures if isinstance(p, dict)),
+        key=lambda p: p.get("pictureOrder", 0),
+    )
+    out: list[str] = []
+    for p in ordered:
+        url = p.get("url") or p.get("thumbnailUrl")
+        if url and url not in out:
+            out.append(url)
+        if len(out) >= _GALLERY_PHOTO_CAP:
+            break
+    return out
+
+
+def _is_estatesales_net_detail_url(url: str | None) -> bool:
+    """True only for a per-listing detail URL (e.g.
+    /NC/Asheville/28801/5104050), never a bare zip/city search page (e.g.
+    /NC/Asheville/) -- the fallback `source_url = source_url` path in
+    _saleevent_to_listing can hand back the SEARCH page's own URL when a
+    SaleEvent node has no "url" field, and re-fetching that would waste a
+    request for a gallery fetch that can never match (see
+    _find_picture_entity's docstring: the search page never carries the
+    full `pictures` list, so it would just return [] anyway -- this check
+    only saves the wasted round-trip)."""
+    if not url:
+        return False
+    try:
+        path = urlparse(url).path
+    except ValueError:
+        return False
+    segments = [s for s in path.split("/") if s]
+    return len(segments) >= 3
+
+
+async def _enrich_estatesales_net_gallery(li: Listing) -> None:
+    """Fetch this one listing's own detail page and attach its real photo
+    gallery to raw["images"]["real"]. Never raises: a failed or unreachable
+    detail-page fetch must never break the main listing, which already
+    shipped (via EstateSales.fetch()'s partial-salvage) before this runs."""
+    if not _is_estatesales_net_detail_url(li.source_url):
+        return
+    try:
+        html = await _fetch_text(li.source_url, timeout=20.0)
+    except Exception as exc:
+        log.warning("estate_sales.gallery_fetch_failed", url=li.source_url,
+                    error=str(exc)[:160])
+        return
+    try:
+        photos = _parse_detail_gallery(html)
+    except Exception as exc:
+        log.warning("estate_sales.gallery_parse_failed", url=li.source_url,
+                    error=str(exc)[:160])
+        return
+    if photos:
+        li.raw.setdefault("images", {})["real"] = photos
+
+
+#: Share of timeout_s the per-listing detail-page gallery fetches may use.
+#: List-page rows are handed to self.partial (ships even on a soft timeout)
+#: before any of these run, so a cutoff here only means fewer galleries
+#: filled in, never a dropped listing.
+DETAIL_BUDGET_SHARE = 0.6
+
+
 # --- estatesale.com --------------------------------------------------------
 
 def _parse_estatesale_com(html: str, source_url: str,
@@ -802,6 +956,7 @@ class EstateSales(BaseScraper):
     timeout_s = 180.0
 
     async def fetch(self) -> Iterable[Listing]:
+        start = time.monotonic()
         out: list[Listing] = []
         for zip_code, city, state, county in SEARCH_ZIPS:
             try:
@@ -834,5 +989,28 @@ class EstateSales(BaseScraper):
                 continue
             seen.add(li.source_url)
             deduped.append(li)
+
+        # Ship the list-page rows as the salvage set BEFORE attempting any
+        # per-listing detail-page gallery fetch below, so a soft-timeout
+        # mid-enrichment still ships every row already found here (see
+        # base_scraper.safe_run's partial-salvage path; same ordering as
+        # freddie_homesteps's sink-before-detail-fetch pattern).
+        self.partial = deduped
+
+        # Per-listing detail-page photo gallery (2026-10-13 source-
+        # completeness audit, Pattern B) -- see _parse_detail_gallery's
+        # docstring. One extra request per estatesales.net listing
+        # (~34 live 2026-10-13 across the whole footprint), time-budgeted
+        # so a slow day fills in fewer galleries instead of dropping rows.
+        deadline = start + self.timeout_s * DETAIL_BUDGET_SHARE
+        for n, li in enumerate(deduped):
+            source_site = (li.raw.get("estate_sales") or {}).get("source_site")
+            if source_site != "estatesales.net":
+                continue
+            if time.monotonic() > deadline:
+                log.info("estate_sales.gallery_budget_spent", done=n,
+                         remaining=len(deduped) - n)
+                break
+            await _enrich_estatesales_net_gallery(li)
 
         return deduped
