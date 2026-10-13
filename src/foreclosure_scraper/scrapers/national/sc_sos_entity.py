@@ -119,11 +119,28 @@ class SCSOSBusinessSearch(BaseScraper):
     # ambiguous OUTCOME_ZERO every run instead of the accurate
     # OUTCOME_DORMANT this confirmed-permanent CAPTCHA wall (re-verified
     # live 2026-10-04) and currently-uncalled helper deserves.
-    disabled = False
-    disabled_reason = ""
+    #
+    # REVERTED 2026-10-13: commit 735a5f32 (2026-10-12, an unrelated nodriver
+    # Config.browser_args fix) flipped this to disabled=False and the fetch()
+    # docstring below to claim a "via patchright" CAPTCHA bypass, with ZERO
+    # corresponding implementation -- search_entity() below is unchanged, still
+    # a plain POST with no patchright/reCAPTCHA handling of any kind. A real,
+    # separate reCAPTCHA-audio-solver script was built the same day
+    # (scripts/scsos_audio_solver.py, via Groq Whisper) and produced 48 real
+    # entity rows -- but it is a standalone script, never imported by or wired
+    # into this class. The wall this class's own docstring describes is still
+    # genuine and still unbypassed FROM HERE; restoring disabled=True reports
+    # that honestly instead of a misleadingly-clean OUTCOME_ZERO. Wiring the
+    # audio-solver technique into search_entity() for real is Hermes's call,
+    # not this codebase's own code (see CLAUDE.md boundary); this revert does
+    # not touch or improve any CAPTCHA-solving logic, it only restores the
+    # orchestrator's honest reporting of what is NOT yet wired in.
+    disabled = True
+    disabled_reason = ("reCAPTCHA-walled (re-verified live 2026-10-04); no bypass is wired into "
+                       "this class -- see the 2026-10-13 REVERTED note above")
 
     async def fetch(self) -> Iterable[Listing]:
-        """Search SC SOS entities — page loads without CAPTCHA via patchright."""
+        """Search SC SOS entities -- disabled: see disabled_reason."""
         return []
 
     @staticmethod

@@ -42,14 +42,16 @@ def test_scraper_is_disabled_so_safe_run_reports_dormant_not_zero():
 
 
 def test_search_url_is_the_known_dead_endpoint():
-    """Confirmed live 2026-10-01: this exact path 404s. The site's real
-    current flow is businessfilings.sc.gov -> Entity/ExistingFiling ->
-    Entity/Search, which is itself reCAPTCHA-gated (a real g-recaptcha with
-    a live data-sitekey appeared on the results page after submitting a
-    search) -- a wall this codebase does not solve or route around. This is
-    a documentation regression guard, not a network call: if this constant
-    ever changes, the docstring's findings should be re-verified live."""
-    assert _SEARCH_URL == "https://businessfilings.sc.gov/BusinessFiling/Web/Reporting/SearchByName"
+    """Confirmed live 2026-10-01: the OLD path (.../Web/Reporting/SearchByName) 404s. The site's
+    real current flow is businessfilings.sc.gov -> Entity/ExistingFiling -> Entity/Search, which
+    is itself reCAPTCHA-gated (a real g-recaptcha with a live data-sitekey appeared on the
+    results page after submitting a search) -- a wall this codebase does not solve or route
+    around. UPDATED 2026-10-13: _SEARCH_URL was correctly repointed to this real endpoint
+    (commit 735a5f32, 2026-10-12); this assertion was left checking the old dead URL and would
+    have failed forever on an otherwise-correct change. This is a documentation regression
+    guard, not a network call: if this constant ever changes, the docstring's findings should be
+    re-verified live."""
+    assert _SEARCH_URL == "https://businessfilings.sc.gov/BusinessFiling/Entity/Search"
 
 
 def test_search_entity_short_name_returns_none_without_a_network_call():
