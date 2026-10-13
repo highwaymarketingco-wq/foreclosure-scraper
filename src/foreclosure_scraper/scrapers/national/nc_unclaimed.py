@@ -7,10 +7,30 @@ with a Turnstile token.
 Strategy: Playwright renders the SPA. Turnstile in managed mode auto-solves
 without user interaction — we just wait for the page to settle. The Angular
 app makes XHR calls to /SWS/properties — we intercept those responses.
+
+FOUND 2026-10-13 (source-completeness audit, triggered by the owner finding
+cherokee_rod.py silently missing real data): this scraper never searched a
+real board name. `_SEARCH_NAMES` was a hardcoded list of 10 generic American
+surnames ("Smith", "Johnson", ...), searched the same way on every run
+regardless of which owners/defendants are actually on the board -- the exact
+stub-data bug already found and fixed in the sibling national.people_search
+on 2026-10-12 ("REAL NAMES, NOT A STUB"), never applied here. The API
+searches by `lastName` only (confirmed by the POST body below, unchanged),
+so the fix pulls real SURNAMES off the board's own owner/defendant names
+(via the same bounded `board_stream.iter_board_rows()` people_search.py
+uses, so this never materializes the whole board) instead of a fixed list.
+A small ledger (`docs/handoff/nc_unclaimed_searched.json`) tracks which
+surnames a run has already searched, so repeat runs cover new board names
+instead of re-sampling the same ones -- the Turnstile solve is the
+expensive part of a run (one per run, not per surname), so this doesn't
+change the cost model, just what gets searched with it.
 """
 from __future__ import annotations
 
+import json
 import re
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import structlog
@@ -24,11 +44,88 @@ log = structlog.get_logger()
 _URL = "https://unclaimed.nccash.gov/app/claim-search"
 _API = "https://unclaimed.nccash.gov/SWS/properties"
 
-# Common NC surnames for unclaimed property search
-_SEARCH_NAMES = [
-    "Smith", "Johnson", "Williams", "Brown", "Jones",
-    "Davis", "Miller", "Wilson", "Moore", "Taylor",
-]
+# Bail out of surname selection once we have this many -- a per-run sample,
+# not a full-board sweep (same bound/reasoning as people_search.py).
+_MAX_SURNAMES = 15
+
+_ENTITY_RE = re.compile(
+    r"\b(LLC|L\.L\.C\.|INC|INCORPORATED|CORP|CORPORATION|CO\b|COMPANY|"
+    r"LP\b|LLP\b|TRUST|ESTATE OF|BANK|TAX COLLECTOR|COUNTY|CITY OF|"
+    r"HOMEOWNERS|ASSOCIATION|HOA\b|CHURCH|MINISTR|TEMPLE|CHAPEL|"
+    r"CONGREGATION|SCHOOL|ACADEMY|UNIVERSITY|FOUNDATION|MINISTRIES)",
+    re.I,
+)
+_SEARCHED_LEDGER_PATH = Path("docs/handoff/nc_unclaimed_searched.json")
+
+
+def _surname_of(name: str | None) -> str | None:
+    """A cleaned surname for the `lastName` search param, or None (entity,
+    blank, or too short to be worth a search). Handles both "Last, First"
+    (this codebase's county-record convention) and "First Last" (the more
+    common plain-English order) -- a comma means the first segment already
+    IS the surname; otherwise the last whitespace-separated token is."""
+    if not name:
+        return None
+    name = name.strip()
+    if not name or _ENTITY_RE.search(name):
+        return None
+    if "," in name:
+        surname = name.split(",", 1)[0].strip()
+    else:
+        parts = name.split()
+        surname = parts[-1].strip() if parts else ""
+    surname = re.sub(r"[^A-Za-z'\-]", "", surname)
+    return surname if len(surname) >= 2 else None
+
+
+def _load_searched_ledger() -> dict:
+    if _SEARCHED_LEDGER_PATH.exists():
+        try:
+            return json.loads(_SEARCHED_LEDGER_PATH.read_text())
+        except Exception:  # noqa: BLE001
+            pass
+    return {"schema": 1, "kind": "nc_unclaimed_searched", "surnames": {}}
+
+
+def _save_searched_ledger(ledger: dict) -> None:
+    ledger["generated_at"] = datetime.now(timezone.utc).isoformat()
+    _SEARCHED_LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _SEARCHED_LEDGER_PATH.write_text(json.dumps(ledger, indent=2, sort_keys=True))
+
+
+def _candidate_surnames(limit: int = _MAX_SURNAMES) -> list[str]:
+    """Up to `limit` real, not-yet-searched surnames off the board's own
+    owner/defendant names, via a bounded stream (never loads the whole
+    board). Falls back to a handful of common NC surnames only if the board
+    stream yields nothing at all (e.g. a fresh checkout with no board yet),
+    so this scraper is never a hard zero."""
+    from ...board_stream import iter_board_rows
+
+    ledger = _load_searched_ledger()
+    seen: set[str] = set()
+    out: list[str] = []
+    try:
+        for row in iter_board_rows():
+            if len(out) >= limit:
+                break
+            for field in ("owner_name", "defendant"):
+                surname = _surname_of(row.get(field) if isinstance(row, dict) else None)
+                if not surname:
+                    continue
+                key = surname.lower()
+                if key in seen or key in ledger.get("surnames", {}):
+                    continue
+                seen.add(key)
+                out.append(surname)
+                if len(out) >= limit:
+                    break
+    except Exception as exc:  # noqa: BLE001
+        log.warning("nc_unclaimed.candidate_scan_error", error=str(exc)[:200])
+    if not out:
+        # Board stream genuinely empty (fresh checkout) -- fall back so a
+        # first run still exercises the real search path end to end.
+        out = ["Smith", "Johnson", "Williams", "Brown", "Jones"][:limit]
+    return out
 
 
 class NcUnclaimedScraper(BaseScraper):
@@ -178,8 +275,10 @@ class NcUnclaimedScraper(BaseScraper):
             log.info("nc_unclaimed.token_captured", token_len=len(token))
 
             # Now make direct API calls with the token
+            surnames = _candidate_surnames()
+            searched_ledger = _load_searched_ledger()
             async with httpx.AsyncClient() as client:
-                for surname in _SEARCH_NAMES:
+                for surname in surnames:
                     try:
                         resp = await client.post(
                             _API,
@@ -206,16 +305,29 @@ class NcUnclaimedScraper(BaseScraper):
                             log.info("nc_unclaimed.surname_done",
                                      surname=surname, found=len(found),
                                      status=resp.status_code)
+                            searched_ledger["surnames"][surname.lower()] = {
+                                "checked_at": datetime.now(timezone.utc).date().isoformat(),
+                                "found": len(found),
+                            }
                         else:
                             log.warning("nc_unclaimed.api_error",
                                         surname=surname,
                                         status=resp.status_code,
                                         body=resp.text[:200])
+                            searched_ledger["surnames"][surname.lower()] = {
+                                "checked_at": datetime.now(timezone.utc).date().isoformat(),
+                                "status": resp.status_code,
+                            }
                     except Exception as exc:
                         log.warning("nc_unclaimed.surname_error",
                                     surname=surname, error=str(exc)[:160])
+                        searched_ledger["surnames"][surname.lower()] = {
+                            "checked_at": datetime.now(timezone.utc).date().isoformat(),
+                            "error": str(exc)[:160],
+                        }
 
             await browser.close()
+            _save_searched_ledger(searched_ledger)
 
         return results
 
