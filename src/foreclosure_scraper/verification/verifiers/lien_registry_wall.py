@@ -18,11 +18,18 @@ nobody could verify. Each of these has a reason no verifier may fetch:
         browser (existing code, not extended). Card sc_lien_registries.
   counties_sc.sc_state_tax_lien   319 rows. The SCDOR top-delinquent grid is a rendered page read
         in the stealth browser. Card sc_lien_registries.
-  counties_nc.rutherford_tax, counties_nc.rutherford_wildfire_tax   8,544 rows. Rutherford's tax
-        bill search and its data host answer HTTP 403 to the cloud address (and show a CAPTCHA to
-        a browser): card avalon_tax. The county's only free list, the TR-452 workbook the first
-        source reads, has been the "as of 2026-02-01" file since February (the link carries the
-        2026-02-01 stamp, read 2026-10-09): re-reading it would repeat the scrape, not check it.
+  counties_nc.rutherford_tax, counties_nc.rutherford_wildfire_tax -- WAS walled here (card
+        avalon_tax: the data host answered HTTP 403 to the cloud address, and the county's only
+        free list, the TR-452 workbook, had been stuck on an "as of 2026-02-01" stamp since
+        February). REMOVED 2026-10-13: verification/verifiers/avalon_tax.py is now a real, live,
+        non-wall verifier for exactly these two sources (POSTs the CloudFront data host directly;
+        see its own module docstring for the breaking-the-wall writeup and the 2026-10-13 false-
+        "stale" bug it fixed). Keeping Rutherford here too would have meant a tax_lien row with
+        a live verifier ALSO carrying a permanent, unverifiable "wall" verdict on the same signal
+        -- exactly what test_never_overlaps_a_live_tax_verifier_on_the_same_row exists to catch.
+        The avalon_tax card in docs/walls_register.json still covers OTHER NC counties on the
+        same tax-search platform (Lincoln, McDowell, Cleveland, Burke, Caldwell) that have no live
+        verifier yet; only Rutherford's claim on that card is retired here.
 
 VERDICT: always `wall`, GOVERNS nothing (a wall changes no score). TTL 365: relabelled yearly or
 when the wall changes. The human-assisted checker never displaces a verdict a person wrote.
@@ -44,7 +51,8 @@ ROW_SUMMARY_EXCLUDE = ("owner_name", "street_address")
 
 LIENSNC_SOURCES = frozenset({"counties_generic.liensnc", "liensnc"})
 SC_REGISTRY_SOURCES = frozenset({"counties_sc.sc_dew_lien_registry", "counties_sc.sc_state_tax_lien"})
-RUTHERFORD_SOURCES = frozenset({"counties_nc.rutherford_tax", "counties_nc.rutherford_wildfire_tax"})
+#: Rutherford REMOVED 2026-10-13 -- avalon_tax.py is now a live, non-wall verifier for these two
+#: sources (see the module docstring above). No longer part of this wall.
 TAX_TYPES = frozenset({"tax_lien", "tax_sale"})
 
 _NAME = __name__.rsplit(".", 1)[-1]
@@ -54,8 +62,6 @@ _WHY = {
                      "(and the filing is a construction-project notice, not a tax lien)",
     "sc_lien_registries": "SC DEW / SCDOR lien registries: the search service accepts its key only from "
                           "the rendered page (plain request: Invalid Security Key)",
-    "avalon_tax": "Rutherford County tax bill search: data host 403 to the cloud address, CAPTCHA in a "
-                  "browser; the county's free list is a frozen 2026-02-01 file",
 }
 
 
@@ -77,8 +83,6 @@ def card_of(row: Any) -> Optional[str]:
         return "liensnc_login"
     if src in SC_REGISTRY_SOURCES:
         return "sc_lien_registries"
-    if src in RUTHERFORD_SOURCES:
-        return "avalon_tax"
     return None
 
 
