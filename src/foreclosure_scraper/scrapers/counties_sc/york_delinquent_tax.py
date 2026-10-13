@@ -95,6 +95,7 @@ class YorkDelinquentTax(BaseScraper):
 
         log.info("york_tax.arcgis_total", count=len(all_features))
 
+        skipped_no_parcel = 0
         for feat in all_features:
             attrs = feat.get("attributes", {})
 
@@ -109,6 +110,18 @@ class YorkDelinquentTax(BaseScraper):
                 owner = attrs.get("NAME", "") or attrs.get("ownernames", "") or None
 
             parcel_id = attrs.get("ParcelID") or attrs.get("TAXMAPID") or None
+            if not parcel_id:
+                # A tax-sale row with no parcel/TMS cannot be underwritten, joined to
+                # the assessor, or routed to a county -- the same rationale the
+                # shared _sc_tax_table.is_usable_row() gate uses for this parser's
+                # HTML-table-parsing siblings (darlington/fairfield/saluda/lancaster/
+                # newberry). This scraper reads ArcGIS attributes rather than parsed
+                # table cells, so there's no row text for is_usable_row to check --
+                # but "no parcel" is the one part of that gate that still applies
+                # directly, and skipping here keeps an unroutable row from ever
+                # becoming a Listing instead of relying on a downstream filter.
+                skipped_no_parcel += 1
+                continue
             address = attrs.get("PropertyAddress") or attrs.get("fulladdress") or None
             if address:
                 address = address.strip()
@@ -220,5 +233,5 @@ class YorkDelinquentTax(BaseScraper):
                 )
             )
 
-        log.info("york_tax.done", count=len(out))
+        log.info("york_tax.done", count=len(out), skipped_no_parcel=skipped_no_parcel)
         return out
