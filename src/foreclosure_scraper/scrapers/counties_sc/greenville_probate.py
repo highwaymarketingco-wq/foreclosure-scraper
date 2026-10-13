@@ -289,8 +289,12 @@ def _build_listing(summary: dict, detail: dict) -> Listing:
             "case_subtype": detail.get("case_subtype"),
             "file_date": detail.get("file_date"),
             "date_of_death": detail.get("date_of_death"),
+            "date_of_birth": detail.get("date_of_birth") or None,
+            "sex": detail.get("sex") or None,
             "pr_appointed_date": detail.get("pr_appointed_date"),
             "closed_date": detail.get("closed_date") or None,
+            "creditor_claims_expiration": detail.get(
+                "expiration_of_estate_creditor_claims_period") or None,
             "status": status,
             "personal_representative": pr or None,
             "parties": detail.get("parties") or None,
