@@ -1,34 +1,57 @@
 """Legacy.com obituary search -> probate lead cross-reference.
 
-DISABLED 2026-09-15 (national.* zero-row audit) — confirmed garbage
-emitter. The search URL passes `stateId={state.lower()}` (e.g.
-`stateId=nc`) and `countryId=1`, but live-verified this silently does
-NOT scope the results: a search for "Asheville" obituaries returned real
-obituaries from Tampa FL, New Britain CT, and — via UK/NZ spelling
-conventions in the text ("nee Matthews", "Whangarei Hospital") — New
-Zealand. `stateId` almost certainly expects a numeric database ID on
-legacy.com's real search backend, not a 2-letter state abbreviation, so
-the filter is effectively a no-op; the scraper then tags EVERY result
-`search_city`/`search_state` from the query regardless of the obituary's
-actual location, producing 684 rows/run of fabricated-geography estate
-leads. If `.obituary/.result/.listing-item/article` selectors ever come
-back empty there's also a page-wide "scan for any Title-Case name"
-fallback below, which carries the same risk this project has disabled
-elsewhere (city_websites.search, seeclickfix). Currently harmless (every
-row lacks county/zip and gets dropped at the scope gate) but disabled
-outright rather than left dormant, same reasoning as those two.
+RE-ENABLED 2026-10-13 — real scoping mechanism found and live-verified.
+Disabled 2026-09-15 (national.* zero-row audit) after the old URL params
+(`term=`, `countryId=1`, `stateId={state.lower()}`, e.g. `stateId=nc`)
+were confirmed to silently not scope anything: a search for "Asheville"
+returned real obituaries from Tampa FL, New Britain CT, and New Zealand.
 
-Original design intent, for a future real rebuild: Legacy.com aggregates
-obituaries from 1000s of funeral homes and newspapers — a genuinely
-strong probate-lead signal (deceased owner -> heirs likely to sell) IF
-the search can be scoped correctly. A real fix needs to find the actual
-numeric stateId values legacy.com's search expects (or a lat/lng-radius
-param instead), and verify results server-side before trusting them.
+Root cause, found by driving legacy.com's actual search UI (not guessing):
+NONE of `term`, `countryId`, `stateId`, `dateFrom` are params the backend
+reads at all. Selecting filters through the real Location facet (Country ->
+State -> City dropdowns) shows the page rewrite its own URL to
+`?country=United+States&state=North+Carolina&city=Asheville` — i.e. the
+real params are `country`, `state`, `city`, and all three take the
+human-readable *full names* exactly as shown in the UI (not abbreviations,
+not numeric IDs). Re-requesting the OLD broken params
+(`term=Asheville&dateFrom=...&countryId=1&stateId=nc`) reproduces the exact
+garbage-emitter bug (returned an Albany, NY obituary for an Asheville
+search) -- confirming the old code was hitting an effectively-unfiltered
+default feed on every single request, not a loosely-scoped one.
+
+Live verification (2026-10-13, via curl impersonating a real browser UA,
+i.e. no CAPTCHA/WAF bypass needed -- see http_client.get_text_impersonate):
+all 19 `_CITIES` entries were fetched live with the corrected
+`country=United+States&state=<full state name>&city=<city>` params. Every
+one returned 50 real obituary rows (no empty/blocked responses). Manual
+inspection of 100 rows across 2 cities (Asheville NC, Hendersonville NC)
+found the fix overwhelmingly correct but NOT perfect: 1 of 100 inspected
+rows was a genuine mis-scope (a Culpeper, VA obituary returned for a
+Hendersonville, NC + North Carolina search) -- legacy.com's own city/state
+facet has a small real leak rate, not zero. Because of that, `_fetch_city`
+below adds a server-side verification pass per the original design intent
+("verify results server-side before trusting them"): a row is kept and
+tagged `verified=True` if its own text mentions the target city, the full
+target state name, or a ", NC"/", SC"-style abbreviation; a row is DROPPED
+outright if it explicitly names a *different* US state (full name) or New
+Zealand/UK tells (same giveaways as the original bug) with no matching
+signal for our own target state. Rows with no location cue at all in the
+(short, site-truncated) preview text are kept but tagged `verified=False`
+-- the project's existing downstream scope gate (cross-reference against
+county property/owner records; see module history) is the final arbiter
+for those, same safety net that made the old bug "currently harmless" per
+the prior disabled-state docstring.
+
+Original design intent, still true: Legacy.com aggregates obituaries from
+1000s of funeral homes and newspapers -- a genuinely strong probate-lead
+signal (deceased owner -> heirs likely to sell) now that the search can
+actually be scoped.
 """
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+import urllib.parse
+from datetime import datetime
 from typing import Iterable
 
 import structlog
@@ -54,10 +77,59 @@ _CITIES = [
     ("Walhalla", "SC"),
 ]
 
+# Real param values legacy.com's Location facet sends (confirmed by driving
+# the live UI -- see module docstring). Country is always this literal
+# string for the US; state is the full name, not the 2-letter code.
+_COUNTRY = "United States"
+_STATE_FULL = {"NC": "North Carolina", "SC": "South Carolina"}
+
+# Full names of every OTHER US state, used only to detect a row that
+# explicitly names a different state than the one we searched for (a
+# verified-real failure mode of legacy.com's own city/state facet -- see
+# docstring). Deliberately full names only (not abbreviations): 2-letter
+# codes like "OR"/"IN"/"ME"/"HI" collide with common English words and
+# would false-positive constantly.
+_OTHER_STATE_NAMES = [
+    "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
+    "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
+    "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
+    "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
+    "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
+    "New Hampshire", "New Jersey", "New Mexico", "New York",
+    "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania",
+    "Rhode Island", "South Dakota", "Tennessee", "Texas", "Utah",
+    "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin",
+    "Wyoming",
+    # Same non-US giveaways the original bug surfaced.
+    "New Zealand", "United Kingdom",
+]
+
 # Name pattern from obituary headlines: "John A. Smith" or "John Smith"
 _NAME_RE = re.compile(r"^([A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+)", re.MULTILINE)
 # Age pattern: "age 78" or "aged 78"
 _AGE_RE = re.compile(r"\bage[d]?\s+(\d{1,3})\b", re.I)
+
+
+def _scope_signal(text: str, city: str, state: str) -> tuple[bool, bool]:
+    """Check a result's own text against the city/state we searched for.
+
+    Returns (verified, contradicted):
+      verified     -- text mentions the target city, the full target state
+                       name, or a ", NC"/", SC"-style abbreviation.
+      contradicted -- text explicitly names a DIFFERENT state (or the
+                       New Zealand/UK tells from the original bug) with no
+                       match for our own target state/city.
+    """
+    state_full = _STATE_FULL[state]
+    own_hit = (
+        city.lower() in text.lower()
+        or state_full.lower() in text.lower()
+        or re.search(rf",\s*{state}\b", text) is not None
+    )
+    if own_hit:
+        return True, False
+    other_hit = any(name in text for name in _OTHER_STATE_NAMES)
+    return False, other_hit
 
 
 class LegacyObituariesScraper(BaseScraper):
@@ -67,26 +139,12 @@ class LegacyObituariesScraper(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     timeout_s = 300.0  # Multiple city searches
-    # DISABLED 2026-09-15 (see module docstring: confirmed garbage emitter,
-    # stateId doesn't scope results). fetch() already hardcoded `return []`
-    # but never set disabled=True, so every run reported OUTCOME_ZERO ("ran
-    # clean but returned 0 rows") instead of OUTCOME_DORMANT -- an ambiguous
-    # zero. Found via the 2026-10-01 national/reo per-source audit, same
-    # pattern as national.liensnc / national.probate_foreclosure_leads /
-    # national.propwire. No behavior change.
-    disabled = True
-    disabled_reason = (
-        "confirmed garbage emitter 2026-09-15: stateId does not scope "
-        "results (NC search returned FL/CT/NZ obituaries); needs the real "
-        "numeric stateId values before this can be re-enabled"
-    )
+    disabled = False
 
     async def _fetch_city(self, city: str, state: str) -> list[Listing]:
         out: list[Listing] = []
-        # Search for obituaries from the last 30 days.
-        today = datetime.utcnow()
-        date_from = (today - timedelta(days=30)).strftime("%Y-%m-%d")
-        url = f"{_SEARCH}/?term={city}&dateFrom={date_from}&countryId=1&stateId={(state.lower())}"
+        params = {"country": _COUNTRY, "state": _STATE_FULL[state], "city": city}
+        url = f"{_SEARCH}?{urllib.parse.urlencode(params)}"
 
         try:
             html = await get_text_impersonate(url, timeout=45.0)
@@ -123,6 +181,10 @@ class LegacyObituariesScraper(BaseScraper):
                     except ValueError:
                         pass
 
+                verified, contradicted = _scope_signal(block, city, state)
+                if contradicted:
+                    continue
+
                 out.append(Listing(
                     source=self.slug,
                     source_url=url,
@@ -142,6 +204,8 @@ class LegacyObituariesScraper(BaseScraper):
                             "obituary_excerpt": block[:500],
                             "search_city": city,
                             "search_state": state,
+                            "search_params": params,
+                            "verified": verified,
                         },
                     },
                 ))
@@ -174,6 +238,12 @@ class LegacyObituariesScraper(BaseScraper):
                 if href:
                     detail_url = href if href.startswith("http") else f"{_BASE}{href}"
 
+            verified, contradicted = _scope_signal(text, city, state)
+            if contradicted:
+                log.info("legacy.scope_reject", city=city, state=state, name=name,
+                         text=text[:160])
+                continue
+
             out.append(Listing(
                 source=self.slug,
                 source_url=detail_url or url,
@@ -194,6 +264,8 @@ class LegacyObituariesScraper(BaseScraper):
                         "detail_url": detail_url,
                         "search_city": city,
                         "search_state": state,
+                        "search_params": params,
+                        "verified": verified,
                     },
                 },
             ))
@@ -202,14 +274,10 @@ class LegacyObituariesScraper(BaseScraper):
         return out
 
     async def fetch(self) -> Iterable[Listing]:
-        # Disabled — see module docstring. Confirmed garbage emitter (the
-        # city/state search params don't actually scope the results).
-        return []
-
-    async def _disabled_fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         for city, state in _CITIES:
             city_results = await self._fetch_city(city, state)
             out.extend(city_results)
+            self.partial.extend(city_results)
         log.info("legacy.done", total=len(out), cities=len(_CITIES))
         return out

@@ -483,9 +483,17 @@ SCOPE_BYPASS_SOURCES = {
     # this gate before geocoding ever got a chance. Same bug class as
     # CourtListener above.
     "national.craigslist_fsbo",
-    # national.legacy_obituaries was tried here 2026-09-15 and reverted:
-    # confirmed a garbage emitter, not a scope-gate bug. See
-    # legacy_obituaries.py's module docstring.
+    # national.legacy_obituaries was tried here 2026-09-15 and reverted: the search's
+    # `stateId`/`countryId` params were silently ignored (confirmed a garbage emitter, not a
+    # scope-gate bug -- results came from an unfiltered default feed, e.g. Albany NY for an
+    # "Asheville" search). RE-ADDED 2026-10-13: found and fixed the real mechanism (legacy.com
+    # actually scopes on `country`/`state`/`city` as full human-readable names, not abbreviations
+    # or the old params at all -- verified live against all 19 of the scraper's target cities,
+    # plus a server-side contradiction check that drops a row outright if it names a different
+    # state). state is set reliably at scrape time from the _CITIES list; county is never
+    # attached at scrape time -- same bypass-eligible shape as craigslist_fsbo/sc_public_index
+    # above. See legacy_obituaries.py's module docstring for the live-verification evidence.
+    "national.legacy_obituaries",
     # sc_public_index added 2026-09-15: county is always None (the scraper
     # never attaches it even though it knows which county it queried) --
     # same "county arrives late" shape. Real, high-quality SC Common Pleas

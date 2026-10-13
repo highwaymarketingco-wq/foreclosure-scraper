@@ -89,6 +89,18 @@ def test_courtlistener_adversary_bypasses_scope():
     assert _in_scope(li) is True
 
 
+def test_legacy_obituaries_bypasses_scope():
+    """RE-ADDED 2026-10-13: the scraper's own disabled->fixed rewrite found the real
+    country/state/city scoping mechanism and added a server-side contradiction check (see
+    legacy_obituaries.py). state is set reliably from the scraper's own _CITIES list; county
+    is never attached at scrape time -- same bypass-eligible shape as the other sources here."""
+    li = _li(
+        source="national.legacy_obituaries",
+        state="NC", county=None, zip_code=None,
+    )
+    assert _in_scope(li) is True
+
+
 def test_non_cl_listing_with_no_county_still_filtered():
     """The bypass must NOT leak to other sources — a HomeHarvest listing
     with state but no county is genuinely out of scope and should be
@@ -131,9 +143,12 @@ def test_scope_bypass_set_deliberately_scoped():
       - sc_public_index (2026-09-15): the scraper never attaches county
         even though it knows which one it queried; 9,464 distinct real SC
         Common Pleas party names verified live for Charleston alone.
-      - legacy_obituaries was tried and DELIBERATELY NOT added — confirmed
-        a garbage emitter (city/state search params don't actually scope
-        results), not a scope-gate bug. See legacy_obituaries.py.
+      - legacy_obituaries was tried 2026-09-15 and DELIBERATELY NOT added then —
+        confirmed a garbage emitter (the old stateId/countryId params were
+        silently ignored). RE-ADDED 2026-10-13 after finding the real
+        country/state/city scoping mechanism and verifying it live against
+        all 19 target cities, plus a server-side contradiction check. See
+        legacy_obituaries.py's module docstring.
       - courtlistener.recap (2026-09-15): found in a board-wide scope-
         violation sweep. No live scraper produces this slug anymore
         (orphaned pre-rename name for courtlistener_bankruptcy); 730 of
@@ -150,6 +165,7 @@ def test_scope_bypass_set_deliberately_scoped():
         "national.courtlistener_civil",
         "national.courtlistener_adversary",
         "national.craigslist_fsbo",
+        "national.legacy_obituaries",
         "national.sc_public_index",
         "courtlistener.recap",
         "national.fdic_failed_banks",
