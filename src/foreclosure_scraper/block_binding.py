@@ -107,7 +107,7 @@ PERSON_BLOCKS = frozenset({
     "owner_mailing", "owner_phone", "owner_email", "skip_trace", "sos_agent", "owner_cluster",
     "builder_distress", "liensnc_related", "divorce", "jail_booking", "jail_booking_new",
     "incarceration", "incarceration_check", "bop_check", "bop_federal", "obituary", "probate",
-    "sc_probate_notice", "sc_probate_net", "mcdowell_probate", "heir_estate", "heir_candidates",
+    "sc_probate_notice", "sc_probate_net", "greenville_probate", "mcdowell_probate", "heir_estate", "heir_candidates",
     "bankruptcy", "courtlistener", "courtlistener_adversary", "bankruptcy_stay",
     "bankruptcy_tax_combo", "sc_state_tax_lien", "resolved_from_name", "rod", "marriage_license",
     "co_defendant_signal", "owner_mismatch", "name_resolution", "notice_contact",

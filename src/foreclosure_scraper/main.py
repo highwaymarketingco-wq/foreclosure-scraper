@@ -753,6 +753,7 @@ DATELESS_OK_SOURCES = {
     # delinquency itself is a standing condition, same as the SC sources above.
     "counties_sc.florence_delinquent_tax",       # Florence delinquent-tax sale list
     "counties_sc.sc_probate_net",                # southcarolinaprobate.net estate/marriage filings
+    "counties_sc.greenville_probate",            # Greenville County appsas400 probate filings (no sale date)
     "counties_nc.gaston_surplus_properties",     # Gaston county-owned surplus (accepting offers)
     "counties_nc.nc_ecourts_estates",            # NC eCourts estate filings (no sale date)
     "counties_nc.nc_ecourts_divorce",            # NC eCourts divorce filings (no sale date)
