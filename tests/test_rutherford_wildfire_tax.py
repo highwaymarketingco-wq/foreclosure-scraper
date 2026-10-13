@@ -181,3 +181,66 @@ def test_nul_bytes_in_owner_names_are_scrubbed():
 
 def test_empty_input_is_not_an_error():
     assert m._records_to_listings([], "u") == []
+
+
+# --------------------------------------------------------------------------- #
+# LineItems / payment history (found 2026-10-13, source-completeness audit:
+# _slim()'s own docstring named these as real fields that exist on every bill
+# and were simply discarded; see _slim_line_items)
+# --------------------------------------------------------------------------- #
+
+def test_line_items_breakdown_lands_on_the_right_year():
+    """Real fixture: parcel 232588's 2025 bill is the sum of 5 line items across 3
+    taxing units (county tax, a fire district's own tax, solid waste fee, RA fee,
+    advertisement cost) -- confirmed against the fixture's own raw LineItems."""
+    by = {li.parcel_id: li for li in _parsed()}
+    years_detail = by["232588"].raw["rutherford_wildfire"]["years_detail"]
+    yd_2025 = next(y for y in years_detail if y["year"] == 2025)
+    items = yd_2025["line_items"]
+    assert len(items) == 5
+    by_type = {x["levy_type"]: x for x in items}
+    assert by_type["TAX"]["taxing_unit"] in ("RUTHERFORD COUNTY", "BILLS CREEK SERV DISTRICT")
+    assert by_type["RAFEE"] == {
+        "levy_type": "RAFEE", "levy_type_description": "Rutherford County RA Fee",
+        "taxing_unit": "RUTHERFORD COUNTY", "amount": 45.0, "amount_due": 45.0,
+    }
+    assert round(sum(x["amount"] for x in items), 2) == 2042.12  # 45 + 284.67 + 1520.45 + 190 + 2
+
+
+def test_has_payment_history_false_on_a_fully_unpaid_bill():
+    """The real fixture's only sample has an empty FilePaymentHistory/PaymentLog
+    (a fully-unpaid bill) -- confirms the flag reads False, not just absent/None."""
+    by = {li.parcel_id: li for li in _parsed()}
+    assert by["232588"].raw["rutherford_wildfire"]["has_payment_history"] is False
+
+
+def test_has_payment_history_true_when_file_payment_history_is_populated():
+    rec = dict(_RECORDS[0])
+    rec["FilePaymentHistory"] = {"Payments": [{"Amount": 50.0, "Date": "2026-01-01"}]}
+    out = m._records_to_listings([rec], "u")
+    assert out[0].raw["rutherford_wildfire"]["has_payment_history"] is True
+
+
+def test_slim_preserves_raw_line_item_shape_for_the_cache_round_trip():
+    """_slim() must NOT pre-transform LineItems into the final levy_type/amount shape --
+    it's a field SUBSET like every other key it keeps, and _records_to_listings (which
+    always reads from this cache in production, see fetch()'s rollup()/cache_hit paths)
+    does the real transformation itself via _slim_line_items. Round-tripping a slimmed
+    record through JSON (simulating the on-disk cache) must produce identical output to
+    passing the raw record directly."""
+    import json
+    direct = m._records_to_listings(_RECORDS, "u")
+    cached = [json.loads(json.dumps(m._slim(r))) for r in _RECORDS]
+    via_cache = m._records_to_listings(cached, "u")
+    direct_by = {li.parcel_id: li.raw["rutherford_wildfire"] for li in direct}
+    cache_by = {li.parcel_id: li.raw["rutherford_wildfire"] for li in via_cache}
+    assert direct_by.keys() == cache_by.keys()
+    for parcel in direct_by:
+        assert direct_by[parcel]["years_detail"] == cache_by[parcel]["years_detail"]
+        assert direct_by[parcel]["has_payment_history"] == cache_by[parcel]["has_payment_history"]
+
+
+def test_slim_line_items_handles_missing_or_malformed_line_items():
+    assert m._slim_line_items({}) == []
+    assert m._slim_line_items({"LineItems": None}) == []
+    assert m._slim_line_items({"LineItems": ["not a dict"]}) == []

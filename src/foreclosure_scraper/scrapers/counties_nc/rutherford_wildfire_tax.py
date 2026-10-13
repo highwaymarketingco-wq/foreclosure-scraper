@@ -352,22 +352,29 @@ def _records_to_listings(records: Iterable[dict], source_url: str,
         a = agg.setdefault(parcel, {
             "owed": 0.0, "years": set(), "bills": [], "flags": set(),
             "newest": None, "newest_year": -1, "by_year": {},
+            "has_payment_history": False,
         })
         a["owed"] += owed
         if isinstance(year, int):
             a["years"].add(year)
             yd = a["by_year"].setdefault(year, {
                 "year": year, "amount_due": 0.0, "original_due": 0.0,
-                "bills": [], "flags": set()})
+                "bills": [], "flags": set(), "line_items": []})
             yd["amount_due"] += owed
             yd["original_due"] += _money((rec.get("Values") or {}).get("OriginalAmountDue")) or 0.0
             if _clean(rec.get("Bill")):
                 yd["bills"].append(_clean(rec.get("Bill")))
             yd["flags"].update(_flag_labels(rec))
+            # The LevyType/Amount/TaxingUnit breakdown of what this year's bill is actually
+            # made of (county tax, fire-district tax, solid-waste fee, advertisement cost,
+            # etc, each with its own taxing unit) -- found 2026-10-13, see _slim_line_items.
+            yd["line_items"].extend(_slim_line_items(rec))
         bill = _clean(rec.get("Bill"))
         if bill:
             a["bills"].append(bill)
         a["flags"].update(_flag_labels(rec))
+        if rec.get("FilePaymentHistory") or (rec.get("Payment") or {}).get("PaymentLog"):
+            a["has_payment_history"] = True
         # Keep the newest year's record as the attribute donor (freshest owner,
         # value and situs).
         yr = year if isinstance(year, int) else -1
@@ -423,7 +430,12 @@ def _records_to_listings(records: Iterable[dict], source_url: str,
              "amount_due": round(a["by_year"][y]["amount_due"], 2),
              "original_due": round(a["by_year"][y]["original_due"], 2),
              "bills": sorted(set(a["by_year"][y]["bills"])),
-             "flags": sorted(a["by_year"][y]["flags"])}
+             "flags": sorted(a["by_year"][y]["flags"]),
+             # One entry per bill's own levy (county tax, fire-district tax, solid-waste
+             # fee, advertisement cost, ...), each with its own taxing unit and amount --
+             # not deduped against other bills in the same year, each is a real separate
+             # charge. Found 2026-10-13 (source-completeness audit); see _slim_line_items.
+             "line_items": a["by_year"][y]["line_items"]}
             for y in years if y in a["by_year"]
         ]
         bits = [owner or "Unknown owner",
@@ -480,6 +492,17 @@ def _records_to_listings(records: Iterable[dict], source_url: str,
                 "advertised": advertised,
                 "outside_law_firm": outside_firm,
                 "delinquent_flag": any(_FLAG_DELINQUENT in f for f in flags),
+                # Found 2026-10-13 (source-completeness audit): a true/false signal only --
+                # whether ANY bill on this parcel carries filed payment history or a payment
+                # log (a partial-payment pattern, a real distress signal). The real fixture
+                # this fix was built against (tests/fixtures/rutherford_wildfire_records_
+                # page1.json) only shows FilePaymentHistory/PaymentLog empty on a fully-unpaid
+                # bill -- no populated real sample exists yet to know what a non-empty one
+                # looks like, so only this boolean is surfaced for now rather than guessing
+                # at a richer field shape. _slim() DOES preserve the raw FilePaymentHistory/
+                # PaymentLog content in the on-disk cache (BILLS_PATH, data/rutherford_
+                # wildfire_bills.jsonl) for whenever a real populated example turns up.
+                "has_payment_history": a["has_payment_history"],
                 "owner_mailing": _mailing(rec),
                 "situs_raw": situs_raw,
                 "situs_vacant_lot": vacant_lot,
@@ -603,10 +626,47 @@ async def _post_page(c, url: str, body: dict, token: str | None) -> dict:
 # resumable state
 # --------------------------------------------------------------------------- #
 
+def _slim_line_items(rec: dict) -> list[dict]:
+    """The LevyType/Amount/TaxingUnit breakdown of one bill, stripped of the vendor's
+    CreateDate/ChangeDate/RunID/CountyCode noise. Real, confirmed shape (tests/fixtures/
+    rutherford_wildfire_records_page1.json, a real captured response): a bill is the SUM of
+    several line items billed to different taxing units for different reasons -- e.g. a
+    $2,159.45 total bill was $1,520.45 county tax + $284.67 fire-district tax + $190 solid-
+    waste fee + $45 RA fee + $2 advertisement cost, 5 separate line items, 3 different
+    taxing units. `_slim()` used to drop this entirely with no reasoning beyond disk size.
+
+    Takes the RAW (PascalCase) record shape. Called from two places that both hold a raw-
+    shaped record: `_slim()` (fresh from the API) and `_records_to_listings()` (either a
+    fresh record OR one round-tripped through `_slim()`'s own JSON cache -- `_slim()` is a
+    field SUBSET, not a reshape, so `rec["LineItems"]` is still raw-shaped either way)."""
+    out = []
+    for li in rec.get("LineItems") or []:
+        if not isinstance(li, dict):
+            continue
+        out.append({
+            "levy_type": li.get("LevyType"),
+            "levy_type_description": li.get("LevyTypeDescription"),
+            "taxing_unit": li.get("TaxingUnit"),
+            "amount": li.get("LevyAmount"),
+            "amount_due": li.get("LevyAmountDue"),
+        })
+    return out
+
+
 def _slim(rec: dict) -> dict:
-    """Keep only what ``_records_to_listings`` reads. A raw bill carries LineItems,
-    payment history and a dozen vendor fields (~5 KB); this is ~0.7 KB."""
+    """Keep what ``_records_to_listings`` reads, plus LineItems/payment history (added
+    2026-10-13, source-completeness audit: these were named in this function's own comment
+    as real fields that exist on every bill and are simply discarded -- no vendor-noise
+    reasoning, just never wired in). A raw bill still carries a dozen other vendor-internal
+    fields (CreateDate/ChangeDate/RunID/Hash/Version/AuthenticationValues/...) this function
+    continues to drop -- this isn't "keep everything", it's "stop dropping the two fields
+    this function's own docstring already named as real and useful". LineItems is kept in
+    its RAW shape here (not pre-slimmed into the final output shape) so this function stays
+    a pure field SUBSET like every other key below -- `_records_to_listings` does the actual
+    LevyType->levy_type transformation itself, the same way whether it's reading a fresh
+    record or one that round-tripped through this cache."""
     v = rec.get("Values") or {}
+    payment = rec.get("Payment") or {}
     return {
         "AbstractType": rec.get("AbstractType"),
         "ParcelNumber": rec.get("ParcelNumber"),
@@ -627,6 +687,18 @@ def _slim(rec: dict) -> dict:
         "Values": {"AmountDue": v.get("AmountDue"),
                    "OriginalAmountDue": v.get("OriginalAmountDue"),
                    "RealValue": v.get("RealValue")},
+        "LineItems": [{"LevyType": li.get("LevyType"),
+                       "LevyTypeDescription": li.get("LevyTypeDescription"),
+                       "TaxingUnit": li.get("TaxingUnit"),
+                       "LevyAmount": li.get("LevyAmount"),
+                       "LevyAmountDue": li.get("LevyAmountDue")}
+                      for li in (rec.get("LineItems") or []) if isinstance(li, dict)],
+        # Confirmed live (same fixture): empty {} on a fully-unpaid bill -- forwarded as-is
+        # rather than guessed at for a partially-paid one, which this project has not yet
+        # captured a real sample of.
+        "FilePaymentHistory": rec.get("FilePaymentHistory") or None,
+        "Payment": {"PaymentLog": payment.get("PaymentLog") or None,
+                    "AllowPartialPayment": payment.get("AllowPartialPayment")},
     }
 
 
