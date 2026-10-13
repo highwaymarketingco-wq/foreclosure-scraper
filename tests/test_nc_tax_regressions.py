@@ -30,7 +30,25 @@ FIXTURES = Path(__file__).parent / "fixtures"
 # --- polk_tax ---------------------------------------------------------------
 
 def _polk_rows(html: str) -> list:
-    """Run the scraper's parse over fixture HTML without touching the network."""
+    """Run the scraper's AUCTION-PAGE parse over fixture HTML without
+    touching the network.
+
+    ``PolkTaxAuction.fetch()`` now runs two independent sources (added
+    2026-10-12): the auction page this helper feeds via ``html``, plus
+    ``_fetch_delinquent_search()`` -- a second, real lead source that opens
+    a live (non-headless) browser and does live name searches against the
+    county's Cloudflare-protected cms.revize.com search site. That second
+    source ignores ``html`` entirely (it isn't HTML-driven at all) and
+    returns whatever is really on the live site right now -- which is
+    exactly why these auction-page regression tests started coming back
+    with ~1,674 unrelated ``polk_tax_search`` rows appended after real
+    parcels instead of just the fixture's row(s): nothing here was
+    isolating the test from that second code path, not a bug in the parser
+    itself. Stub `_fetch_delinquent_search` out so this helper keeps doing
+    what it's named for -- unit-testing the auction-page row/date/cancelled
+    parsing against synthetic HTML -- without a live browser launch inside
+    a unit test.
+    """
     import asyncio
 
     class _Resp:
@@ -49,12 +67,19 @@ def _polk_rows(html: str) -> list:
 
     import foreclosure_scraper.scrapers.counties_nc.polk_tax as mod
 
-    original = mod.client
+    original_client = mod.client
+    original_delinquent_search = PolkTaxAuction._fetch_delinquent_search
     mod.client = lambda **kw: _Client()
+
+    async def _no_delinquent_search(self):
+        return []
+
+    PolkTaxAuction._fetch_delinquent_search = _no_delinquent_search
     try:
         return list(asyncio.run(PolkTaxAuction().fetch()))
     finally:
-        mod.client = original
+        mod.client = original_client
+        PolkTaxAuction._fetch_delinquent_search = original_delinquent_search
 
 
 def test_polk_parses_tbd_opening_bid():
