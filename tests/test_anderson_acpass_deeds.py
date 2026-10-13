@@ -28,6 +28,7 @@ from foreclosure_scraper.scrapers.counties_sc.anderson_acpass_deeds import (
     _parse_cursor,
     _parse_detail,
     _parse_search_rows,
+    _resolve_image_pdf,
     _subject_names,
 )
 
@@ -164,6 +165,26 @@ View Images
 Legal Disclaimer
 """
 
+# Trimmed excerpt of the REAL "View Images" viewer SHELL page (Real Vision
+# Software 8.0, pgms/rvimain.pgm?RQSTYP=IMAGEV...), captured live 2026-10-13.
+# It is NOT the document -- the real scanned-instrument PDF is the <iframe>'s
+# src, served scheme/host upper-case and wrapped onto its own line before
+# `src=`.
+VIEW_IMAGES_SHELL = """
+<html>
+<head>
+<title>Real Vision Software, 8.0 </title>
+</head>
+<body BGCOLOR="#3a6ea5">
+<div>
+<iframe name="bottom" width=100% height=85%
+ src="HTTPS://ACPASS.ANDERSONCOUNTYSC.ORG:443/OPTICAL/PDF05118.PDF">
+</iframe>
+</div>
+</body>
+</html>
+"""
+
 
 def test_codes_are_the_two_scoped_instrument_types():
     assert CODES == {"020": "POA", "195": "COURT ORDER"}
@@ -230,6 +251,54 @@ def test_parse_detail_poa():
     assert {"name": "EXAMPLE, TERESA LANE", "role": "GRANTEE"} in detail["parties"]
 
 
+class _ViewerFakeResp:
+    def __init__(self, status_code: int, text: str):
+        self.status_code = status_code
+        self.text = text
+
+
+class _ViewerFakeClient:
+    """Returns one canned response regardless of URL -- enough to unit-test
+    `_resolve_image_pdf` in isolation (the real GET is exercised by the live
+    probe recorded in the commit, not by this offline test)."""
+
+    def __init__(self, resp: _ViewerFakeResp):
+        self._resp = resp
+
+    async def get(self, url, **kw):
+        return self._resp
+
+
+def test_resolve_image_pdf_extracts_and_lowercases_scheme():
+    """The viewer shell's <iframe src> is the real document. Confirmed live
+    2026-10-13 on 3/3 sampled instruments: a plain GET, no login/CAPTCHA, 200
+    application/pdf. The shell emits the scheme upper-case; only the scheme
+    is normalized, the host/path are passed through unchanged."""
+    c = _ViewerFakeClient(_ViewerFakeResp(200, VIEW_IMAGES_SHELL))
+    pdf_url = asyncio.run(_resolve_image_pdf(
+        c, "https://acpass.andersoncountysc.org/pgms/rvimain.pgm?RQSTYP=IMAGEV&RQSDTA=AAAA7WG8"))
+    assert pdf_url == "https://ACPASS.ANDERSONCOUNTYSC.ORG:443/OPTICAL/PDF05118.PDF"
+
+
+def test_resolve_image_pdf_none_on_non_200():
+    c = _ViewerFakeClient(_ViewerFakeResp(500, ""))
+    assert asyncio.run(_resolve_image_pdf(c, "https://acpass.andersoncountysc.org/pgms/rvimain.pgm")) is None
+
+
+def test_resolve_image_pdf_none_without_iframe():
+    """Shell markup changed / vendor hiccup -- best-effort None, not a raise."""
+    c = _ViewerFakeClient(_ViewerFakeResp(200, "<html><body>no image here</body></html>"))
+    assert asyncio.run(_resolve_image_pdf(c, "https://acpass.andersoncountysc.org/pgms/rvimain.pgm")) is None
+
+
+def test_resolve_image_pdf_none_on_connection_error():
+    class _RaisingClient:
+        async def get(self, url, **kw):
+            raise OSError("connection reset")
+
+    assert asyncio.run(_resolve_image_pdf(_RaisingClient(), "https://acpass.andersoncountysc.org/pgms/rvimain.pgm")) is None
+
+
 def test_subject_names_excludes_institutional_parties():
     parties = [
         {"name": "SAMPLE, CORA", "role": "GRANTEE"},
@@ -254,6 +323,31 @@ def test_build_listing_heir_order_is_estate_lead():
     assert "SAMPLE, CORA" in li.owner_name
     assert li.raw["anderson_acpass"]["type_code"] == "195"
     assert li.raw["anderson_acpass"]["image_url"]
+
+
+def test_build_listing_stamps_resolved_pdf_as_document():
+    """Once the "View Images" link is resolved to the real PDF (fetch()'s
+    job), _build_listing must attach it where enrichment_doc_ocr.py actually
+    looks: flat raw['documents']/['document_url'] (document_links.py's
+    stamp_documents convention), not just the nested anderson_acpass block."""
+    rows = _parse_search_rows(COURT_ORDER_PAGE)
+    detail = _parse_detail(COURT_ORDER_DETAIL)
+    pdf_url = "https://acpass.andersoncountysc.org/OPTICAL/PDF05118.PDF"
+    detail["image_pdf_url"] = pdf_url
+    li = _build_listing("counties_sc.anderson_acpass_deeds", "195", "COURT ORDER", rows[0], detail)
+    assert li.raw["anderson_acpass"]["image_pdf_url"] == pdf_url
+    assert li.raw["documents"] == [pdf_url]
+    assert li.raw["document_url"] == pdf_url
+
+
+def test_build_listing_without_resolved_pdf_leaves_documents_unset():
+    """No resolved PDF (vendor hiccup, budget exhausted, etc.) -- documents
+    stays unset rather than stamping a viewer shell URL that isn't a PDF."""
+    rows = _parse_search_rows(COURT_ORDER_PAGE)
+    detail = _parse_detail(COURT_ORDER_DETAIL)  # has image_url (shell), no image_pdf_url
+    li = _build_listing("counties_sc.anderson_acpass_deeds", "195", "COURT ORDER", rows[0], detail)
+    assert li.raw["anderson_acpass"]["image_pdf_url"] is None
+    assert "documents" not in li.raw
 
 
 def test_build_listing_non_heir_court_order_is_unknown():
@@ -360,3 +454,70 @@ def test_timeout_ships_rows_already_built(monkeypatch):
     assert s.last_outcome == OUTCOME_PARTIAL
     assert len(rows) == 3
     assert all(li.raw["anderson_acpass"]["type_code"] == "195" for li in rows)
+
+
+# --- "View Images" -> real PDF, end to end through fetch() -----------------
+# Made-up rows/instrument keys; HTML shapes are trimmed real markup (see
+# COURT_ORDER_DETAIL / VIEW_IMAGES_SHELL above). No network.
+
+_DETAIL_HTML_WITH_IMAGE = (
+    "HISTORY DETAIL\n"
+    "DESCRIPTION\n"
+    "ORDER DETERMINING HEIRS\n"
+    '<a href="/pgms/rvimain.pgm?RQSTYP=IMAGEV&RQSDTA=AAAA0001&DELTYP=P&HOST=acpass.andersoncountysc.org&">IMAGES</a>\n'
+    "View Images\n"
+)
+_RESOLVED_PDF_URL = "https://ACPASS.ANDERSONCOUNTYSC.ORG:443/OPTICAL/PDF09999.PDF"
+_VIEWER_SHELL_FOR_FETCH_TEST = (
+    '<html><body><iframe name="bottom" width=100% height=85%\n'
+    f' src="{_RESOLVED_PDF_URL}"></iframe></body></html>'
+)
+
+
+class _ImageAwareFakeClient:
+    """Detail GET returns a page carrying a "View Images" link; the second
+    hop (the viewer shell GET) returns the shell whose <iframe> holds the
+    real PDF -- exactly the two-GET shape `fetch()` now does per row."""
+
+    async def get(self, url, **kw):
+        if "rvimain.pgm" in url:
+            return _ViewerFakeResp(200, _VIEWER_SHELL_FOR_FETCH_TEST)
+        return _ViewerFakeResp(200, _DETAIL_HTML_WITH_IMAGE)
+
+
+@asynccontextmanager
+async def _fake_client_with_image(**kw):
+    yield _ImageAwareFakeClient()
+
+
+def test_fetch_resolves_view_images_and_stamps_document(monkeypatch):
+    """End-to-end: fetch() must actually follow "View Images" (not just
+    capture the shell link) and hand the real PDF to the document_links
+    convention enrichment_doc_ocr.py reads."""
+    async def fake_fetch(c, code, from_str, to_str):
+        return _fake_rows(code, 1) if code == "195" else []
+
+    monkeypatch.setattr(_mod, "client", _fake_client_with_image)
+    monkeypatch.setattr(_mod, "_fetch_type_code", fake_fetch)
+    rows = asyncio.run(AndersonAcpassDeeds().fetch())
+    assert len(rows) == 1
+    li = rows[0]
+    assert li.raw["anderson_acpass"]["image_pdf_url"] == _RESOLVED_PDF_URL
+    assert li.raw["documents"] == [_RESOLVED_PDF_URL]
+    assert li.raw["document_url"] == _RESOLVED_PDF_URL
+
+
+def test_fetch_image_budget_exhaustion_skips_resolve_cleanly(monkeypatch):
+    """image_budget hitting 0 must not touch the real network -- it should
+    just leave image_pdf_url unset, same as a vendor hiccup."""
+    async def fake_fetch(c, code, from_str, to_str):
+        return _fake_rows(code, 1) if code == "195" else []
+
+    monkeypatch.setattr(_mod, "client", _fake_client_with_image)
+    monkeypatch.setattr(_mod, "_fetch_type_code", fake_fetch)
+    monkeypatch.setattr(_mod, "_MAX_IMAGE_FETCHES", 0)
+    rows = asyncio.run(AndersonAcpassDeeds().fetch())
+    assert len(rows) == 1
+    li = rows[0]
+    assert li.raw["anderson_acpass"]["image_pdf_url"] is None
+    assert "documents" not in li.raw

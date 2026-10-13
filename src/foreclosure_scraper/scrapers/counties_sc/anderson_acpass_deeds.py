@@ -27,9 +27,27 @@ and re-confirmed live 2026-10-01 against the real host:
 - Detail: ``GET deddetail1.cgi?instryearnbr=L{year}{instr}`` — Inst #, File
   Date, Type, Book/Page (Amount is always blank at Anderson — confirmed
   across 8 sampled types including this one), a GRANTOR/GRANTEE party list,
-  a free-text DESCRIPTION, and a "View Images" link (captured as a
-  reference URL only; not fetched — downloading/OCR-ing the scanned image
-  is a separate, larger project, see ``enrichment_doc_ocr.py``'s own scope).
+  a free-text DESCRIPTION, and a "View Images" link.
+- "View Images" is a Real Vision Software viewer SHELL page
+  (``pgms/rvimain.pgm?RQSTYP=IMAGEV&RQSDTA=...``), not the document itself —
+  it embeds the real scanned instrument PDF in
+  ``<iframe src="https://.../OPTICAL/PDFnnnnn.PDF">``. Live-reconfirmed
+  2026-10-13 on 3/3 sampled COURT ORDER instruments: a plain GET on both
+  hops, no login/CAPTCHA/Referer needed, 200 ``application/pdf`` (125-230
+  KB). UNLIKE ``rod.logan``'s ``view_image.php?key=...`` (session-scoped --
+  dies outside the sweep that rendered it, so that module embeds bytes as a
+  data: URI), the ``/OPTICAL/*.PDF`` link here is NOT session-bound: a
+  brand-new client with zero prior requests to the host gets the same 200
+  ``application/pdf`` (confirmed in a separate process) as long as it sends
+  a real-browser User-Agent -- a bare ``python-httpx`` UA gets 403'd, which
+  is exactly what ``http_client.DEFAULT_HEADERS`` already sends on every
+  call through the shared ``client()``. So the URL is safe to hand off as a
+  plain link for a LATER pass: this module follows the viewer hop itself
+  (one extra GET per row, budget-capped by ``_MAX_IMAGE_FETCHES``) and hands
+  the real PDF URL to ``document_links.stamp_documents`` so
+  ``enrichment_doc_ocr.py`` fetches + OCRs it same as any other scraper's
+  document link. The scanned-image OCR itself stays out of this module's
+  scope, same as before.
 
 Two instrument-type codes captured here (of the 144 total; see the doc above
 for the full audited list — most codes return 0 rows for the distress types
@@ -65,6 +83,7 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
@@ -103,6 +122,10 @@ _MAX_PAGES_PER_CODE = 40
 # whole run so a surprise high-volume code can't turn this into an
 # hours-long crawl.
 _MAX_DETAIL_FETCHES = 400
+# Resolving "View Images" to the real PDF is a SECOND GET per row (on top of
+# the detail GET above) — capped independently so it can't silently double
+# the run's total request count past what _MAX_DETAIL_FETCHES already bounds.
+_MAX_IMAGE_FETCHES = 400
 
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -114,6 +137,13 @@ _TYPE_RE = re.compile(r'<div align="center">([^<]+)</div>')
 _DATE_RE = re.compile(r"(\d{1,2}/\d{1,2}/\d{4})")
 _BOOKPAGE_RE = re.compile(r"(\d{4,6})(?:&nbsp;)+\s*(\d{3,6})")
 _DESC_RE = re.compile(r"<strong>([^<]+)</strong>")
+
+# The "View Images" viewer shell's <iframe> holding the real scanned PDF.
+# Real markup (confirmed live 2026-10-13) wraps attributes across a newline
+# before `src=`, which `[^>]` already matches (it excludes only `>`), and
+# emits the scheme/host upper-case (``HTTPS://ACPASS...``) -- re.I covers
+# matching; the scheme is lower-cased separately in `_resolve_image_pdf`.
+_IMAGE_IFRAME_RE = re.compile(r'<iframe[^>]+src="(https?://[^"]+\.pdf)"', re.I)
 
 # The "More" button's hidden paging form. Real markup has a malformed
 # attribute (confirmed live) — `value=240000520"` is missing its OPENING
@@ -217,6 +247,28 @@ def _parse_detail(html: str) -> dict:
     return info
 
 
+async def _resolve_image_pdf(c, viewer_url: str) -> str | None:
+    """Follow a "View Images" viewer URL (``pgms/rvimain.pgm?RQSTYP=IMAGEV...``)
+    to the real scanned-instrument PDF it embeds in an ``<iframe>``. Live-
+    confirmed 2026-10-13: a plain GET, no login/CAPTCHA/Referer needed, 200
+    ``application/pdf`` on 3/3 sampled instruments. Best-effort like the rest
+    of this module -- returns None on any failure (wrong host down, shell
+    markup changed, no iframe found) rather than raising, so one bad row
+    never breaks the sweep."""
+    try:
+        resp = await c.get(viewer_url)
+    except Exception:
+        return None
+    if resp.status_code != 200:
+        return None
+    m = _IMAGE_IFRAME_RE.search(resp.text)
+    if not m:
+        return None
+    url = m.group(1)
+    scheme, sep, rest = url.partition("://")
+    return f"{scheme.lower()}{sep}{rest}" if sep else url
+
+
 def _subject_names(parties: list[dict], role_priority: tuple[str, ...]) -> list[str]:
     """Unique, non-institutional party names, preferring earlier roles in
     ``role_priority``."""
@@ -246,8 +298,9 @@ def _build_listing(slug: str, code: str, label: str, row: dict, detail: dict) ->
         )
 
     owner_name = "; ".join(names[:3]) if names else None
+    image_pdf_url = detail.get("image_pdf_url")
 
-    return Listing(
+    li = Listing(
         source=slug,
         source_url=row["detail_url"],
         listing_type=listing_type,
@@ -270,9 +323,17 @@ def _build_listing(slug: str, code: str, label: str, row: dict, detail: dict) ->
                 "page": row.get("page"),
                 "parties": parties,
                 "image_url": detail.get("image_url"),
+                "image_pdf_url": image_pdf_url,
             },
         },
     )
+    if image_pdf_url:
+        # Flat raw['documents']/['document_url'] (already RAW_KEEP'd + already
+        # scanned by doc_inventory.OCR_DOC_FIELDS) is how enrichment_doc_ocr.py
+        # finds a lead's document across every scraper -- the same convention
+        # other counties_sc scrapers use (meares_auctions, terry_howe_auctions).
+        stamp_documents(li, [image_pdf_url])
+    return li
 
 
 async def _fetch_type_code(c, code: str, from_str: str, to_str: str) -> list[dict]:
@@ -331,6 +392,7 @@ class AndersonAcpassDeeds(BaseScraper):
         today = datetime.utcnow()
         to_str = today.strftime("%m/%d/%Y")
         detail_budget = _MAX_DETAIL_FETCHES
+        image_budget = _MAX_IMAGE_FETCHES
 
         async with client(timeout=30.0, headers={"User-Agent": _UA}) as c:
             for code, label in CODES.items():
@@ -352,6 +414,11 @@ class AndersonAcpassDeeds(BaseScraper):
                                 detail = _parse_detail(dr.text)
                         except Exception:
                             pass
+                        if detail.get("image_url") and image_budget > 0:
+                            image_budget -= 1
+                            pdf_url = await _resolve_image_pdf(c, detail["image_url"])
+                            if pdf_url:
+                                detail["image_pdf_url"] = pdf_url
                     out.append(_build_listing(self.slug, code, label, row, detail))
 
         log.info("anderson_acpass.done", total=len(out))
