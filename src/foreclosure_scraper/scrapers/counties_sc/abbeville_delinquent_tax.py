@@ -18,6 +18,23 @@ page structurally could never produce. Found via the 2026-10-01 counties_sc
 per-source extraction audit. Do not re-enable without a different, real
 per-parcel source at this URL.
 
+RE-VERIFIED 2026-10-13 (session-wide "confirmed dead" re-check, prompted by
+this same session finding other sources wrongly marked dead): PAGE_URL
+live-fetched again (HTTP 200) -- body is unchanged in substance: office
+contact info for Jake Devore + the same FAQ block + one "Online Taxes"
+button to https://abbevillecountysc.com/online-pay/, still zero <tr> rows
+and zero owner/parcel/amount data. Went further than the one URL this time:
+followed the "Online Taxes" button to /online-pay/ (itself just nav
+chrome, no search widget, explicitly for CURRENT property/vehicle tax via
+PayStar at https://taxes.paystar.io/app/customer/abbeville-county-taxes,
+and states outright "delinquent taxes cannot be paid online or over the
+phone") and separately checked the county Treasurer page
+(abbevillecountysc.com/treasurer/), which is the one that actually links
+PayStar. Neither page is a delinquent-property list. Confirmed the
+superseding qpaybill host is still live today (abbevilletreasurer.
+qpaybill.com -> HTTP 200). disabled_reason still accurate; disabled=True
+left as-is.
+
 Slug: counties_sc.abbeville_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -43,7 +60,8 @@ class AbbevilleDelinquentTax(BaseScraper):
     name = "Abbeville County SC Delinquent Tax"
     disabled = True
     disabled_reason = ("target page has no delinquent-property list (office/FAQ page only) - "
-                       "superseded by counties_sc.qpaybill_delinquent_roll (Abbeville) - confirmed 2026-10-01")
+                       "superseded by counties_sc.qpaybill_delinquent_roll (Abbeville) - confirmed 2026-10-01, "
+                       "re-confirmed 2026-10-13 (live GET, still office/FAQ only)")
     category = "county_tax"
     timeout_s = 60.0
     expected_min_count = 0

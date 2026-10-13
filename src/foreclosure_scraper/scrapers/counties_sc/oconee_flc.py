@@ -29,6 +29,23 @@ correctly in run reports (DORMANT, not an ambiguous silent zero) instead of
 the ad hoc `return []` the 2026-09-15 fix used.
 
 Free, public, no login.
+
+RE-CONFIRMED LIVE 2026-10-13 (session-wide audit of "confirmed dead" claims):
+fetched PAGE_URL (oconeesc.com/treasurer-home) again -- still exactly the
+office-contact page described above (fees, DMV/DNR decal timelines, mission
+statement, Treasurer's name, and the office address "415 S. Pine St.
+Walhalla, SC 29691" repeated per contact block); still no FLC list, no
+parcel IDs, no bid amounts. Also confirmed the superseding claim itself:
+sibling scrapers counties_sc.oconee_forfeited_land and
+counties_sc.oconee_flc_assignment have no `disabled` override (BaseScraper
+defaults disabled=False), so both are live/enabled today, and the ArcGIS
+FeatureServer they both read
+(services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/
+Assignment_Availability/FeatureServer) was queried directly and returned
+real current parcel rows (e.g. TMS 161-00-04-015 / Owner "LEDFORD ELLA F
+MITCHELL & MITC", TMS 257-00-03-008 / Owner "CERTAIN JERRY CHRISTOPHER").
+Disabled_reason still holds without any change needed.
+
 Slug: counties_sc.oconee_flc
 Category: county_tax
 ListingType: TAX_SALE
@@ -53,7 +70,9 @@ class OconeeFLC(BaseScraper):
     disabled = True
     disabled_reason = ("free-text address/parcel scraping of a contact page can't tell the "
                        "courthouse's own address from a real listing - superseded by sibling "
-                       "counties_sc.oconee_forfeited_land / oconee_flc_assignment (ArcGIS) - confirmed 2026-10-01")
+                       "counties_sc.oconee_forfeited_land / oconee_flc_assignment (ArcGIS) - confirmed 2026-10-01 "
+                       "- re-confirmed live 2026-10-13: PAGE_URL still a pure contact page, both siblings still "
+                       "enabled and their ArcGIS FeatureServer still returns real parcel rows")
     category = "county_tax"
     timeout_s = 90.0
     expected_min_count = 0

@@ -31,6 +31,30 @@ would not fix that (its own URL is still dead), and the sc_catalis 403 is
 an existing, correctly-handled compliance wall on a DIFFERENT module, not a
 bug in this one. Left disabled.
 
+RE-VERIFIED 2026-10-13 (session-wide "confirmed dead" re-check, prompted by
+this same session finding other sources wrongly marked dead -- so this was
+re-checked by live fetch, not by trusting the note above): the situation
+has CHANGED and the "redirects to homepage" description above is no longer
+what happens. A plain GET to PAGE_URL today returns HTTP 403 with
+`cf-mitigated: challenge` and a Cloudflare "Just a moment..." interstitial
+(Turnstile/JS challenge), not a 301/redirect to chestercountysc.gov/. This
+is site-wide, not path-specific -- the bare homepage and
+/government/treasurer both return the identical 403 challenge page. So the
+whole chestercountysc.gov domain is now behind a Cloudflare bot-challenge,
+which this audit did NOT attempt to solve or bypass (per instructions: a
+WAF/CAPTCHA wall is a stop condition, not something to script around from
+here). A human or a Hermes-assisted session with a real, cookie-persisting
+browser (solving the Turnstile challenge once, then reusing the clearance
+cookie) would be the only way to see what -- if anything -- is now on this
+page; it cannot be confirmed to still be a dead link vs. real content
+behind the gate. Separately, for honesty: chestercountysctax.com (the
+sc_catalis_delinquent_roll.py superseding source for Chester) answered
+live with HTTP 200 just now, i.e. unlike 2026-10-03 it is NOT currently
+403-blocked -- that module may be worth a live re-check for Chester, but
+that file is out of scope for this audit and was not touched. disabled=True
+left as-is; disabled_reason corrected below to describe the WAF wall
+instead of the stale "redirect" description.
+
 Slug: counties_sc.chester_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -56,8 +80,10 @@ class ChesterDelinquentTax(BaseScraper):
     slug = "counties_sc.chester_delinquent_tax"
     name = "Chester County SC Delinquent Tax Sale"
     disabled = True
-    disabled_reason = ("PAGE_URL now redirects to the county homepage (dead CMS-migration link) - "
-                       "superseded by counties_sc.sc_catalis_delinquent_roll (Chester) - confirmed 2026-10-01")
+    disabled_reason = ("site-wide Cloudflare bot-challenge (HTTP 403, cf-mitigated: challenge) as of "
+                       "2026-10-13, was a dead CMS-migration redirect-to-homepage on 2026-10-01/10-03 - "
+                       "requires solving a WAF challenge to reach, not attempted here - "
+                       "superseded by counties_sc.sc_catalis_delinquent_roll (Chester)")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

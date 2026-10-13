@@ -21,6 +21,19 @@ label, not a list. qpaybill's Newberry tenant ("newberrytreasurer") is still
 delivering real current rows (live-swept prefix "A": 27 rows, e.g. ABNEY
 ROBERT &, UPPER LN, $564.24 unpaid 2025).
 
+RE-VERIFIED LIVE 2026-10-13: still holds. Rendered PAGE_URL in a real browser
+and read the actual DOM text: Delinquent Tax Collector contact card plus
+"Click the link below for general Tax Sale information" pointing at a PDF --
+no per-parcel table. Also checked the parent /delinquent-tax page and its
+site-nav submenu as the "did the list move somewhere else" check: the
+submenu under Delinquent Tax has exactly two entries, "Setoff Debt
+Collection" and "Tax Sales" (this page) -- no separate parcel-list page
+exists anywhere on newberrycounty.gov. The parent page does show a live 2026
+sale announcement (Nov 9, 2026 sale, pre-registration 10/21-11/6/26) but
+states properties are "advertised... in The Newberry Observer" (a newspaper),
+not published online as a table. newberrytreasurer.qpaybill.com (the
+superseding source) confirmed still live today: 200.
+
 Slug: counties_sc.newberry_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -48,7 +61,8 @@ class NewberryDelinquentTax(BaseScraper):
     name = "Newberry County SC Delinquent Tax Sale"
     disabled = True
     disabled_reason = ("target page links only a general-procedures PDF, no per-parcel table - "
-                       "superseded by counties_sc.qpaybill_delinquent_roll (Newberry) - confirmed 2026-10-01")
+                       "superseded by counties_sc.qpaybill_delinquent_roll (Newberry) - "
+                       "confirmed 2026-10-01, re-confirmed live 2026-10-04 and 2026-10-13")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

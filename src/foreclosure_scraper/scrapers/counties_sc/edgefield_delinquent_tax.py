@@ -14,6 +14,16 @@ via the county's own "Online Tax Payment Center" link). Found via the
 2026-10-01 counties_sc per-source extraction audit. Do not re-enable without
 a different, real per-parcel source at this URL.
 
+RE-VERIFIED LIVE 2026-10-13: still holds. Direct curl of PAGE_URL (200, 287KB)
+has 0 `<table>`/`<tr>` tags and the only "Pay Your Property Taxes Here" link
+still points to edgefieldcountysc.qpaybill.com/Taxes/TaxesDefaultType4.aspx
+(200, still live) -- the exact portal qpaybill_delinquent_roll.py already
+sweeps via QPAYBILL_SUBS["Edgefield"]. Also checked the sibling
+/tax-collector/ page (linked from the treasurer nav) as a second avenue: also
+200, also 0 tables, same office-contact/hours copy, states tax sales are held
+"the 1st Monday in December" with no online per-parcel list -- bidders are
+told to contact the office directly. No new URL or data source found.
+
 Slug: counties_sc.edgefield_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -40,7 +50,8 @@ class EdgefieldDelinquentTax(BaseScraper):
     name = "Edgefield County SC Delinquent Tax Sale"
     disabled = True
     disabled_reason = ("target page is office-contact info only, no table - "
-                       "superseded by counties_sc.qpaybill_delinquent_roll (Edgefield) - confirmed 2026-10-01")
+                       "superseded by counties_sc.qpaybill_delinquent_roll (Edgefield) - "
+                       "confirmed 2026-10-01, re-confirmed live 2026-10-13")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

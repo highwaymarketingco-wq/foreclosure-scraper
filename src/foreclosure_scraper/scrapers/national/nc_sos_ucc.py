@@ -55,6 +55,37 @@ ADDITIONAL, active Cloudflare JS "Just a moment..." challenge that did not
 let even a genuine (non-headless) browser through after ~18s of waiting --
 strictly worse than the 2026-10-01 finding (a redirect to unrelated
 content), not better. The disable conclusion is reconfirmed, not weakened.
+
+RE-CONFIRMED 2026-10-13 (cross-session false-stale re-audit): live
+plain-curl spot-check of all three named URLs today, right now --
+- .../online_services/search/by_title/_u_cc -> HTTP 403, Cloudflare
+  "Just a moment..." managed-challenge page (title "Just a moment...",
+  challenges.cloudflare.com CSP, cType:'managed').
+- .../online_services/search/by_title/_uniform_commercial_code -> same,
+  HTTP 403, same Cloudflare challenge markup.
+- .../online_services/search/by_title/_Uniform_Commercial_Code_Results ->
+  same, HTTP 403, same Cloudflare challenge markup.
+- .../online_services/uniform_commercial_code -> HTTP 200 but 1 redirect
+  straight to /Identity/Account/Login?ReturnUrl=... (login wall), exactly
+  as this file's disabled_reason already states.
+All four behaviors reproduce byte-for-byte (including response size) on
+the alternate hostname b2b.sosnc.gov, which is the account/business-filing
+side of the SAME application (same /Identity/Account/Login, same
+/online_services/* paths) -- not a second, independent system.
+
+Also checked per this audit's instructions whether NC runs a UCC search
+anywhere OTHER than sosnc.gov (a separate SOS "business search" domain, or
+a paid vendor like CSC/Wolters Kluwer/UCC Direct, the way some states do):
+no. NC Secretary of State's own UCC Search Tips page
+(sosnc.gov/divisions/general_counsel/search_tips_sos_ucc_data_base, loads
+fine, HTTP 200 -- it's an informational page, not the search itself)
+confirms sosnc.gov's own database is the (one and only) official UCC
+index, with "Standard RA9" and "Non-standard RA9" search modes -- there is
+no second official system. The only other hit (secstates.com) is a
+third-party directory page with no filing data of its own; it just links
+back to the same official sosnc.gov search. Confirmed: this is the one
+real UCC search for NC, and it is still walled today. disabled=True
+unchanged.
 """
 from __future__ import annotations
 
@@ -309,7 +340,12 @@ class NcSosUccScraper(BaseScraper):
         "results endpoint _Uniform_Commercial_Code_Results returns 403 Cloudflare. "
         "The /uniform_commercial_code path requires account login. Confirmed dead "
         "2026-10-12 via scrapling (Cloudflare solved, page loaded, form submitted, "
-        "no UCC results). Re-confirmed original 2026-10-01 finding."
+        "no UCC results). Re-confirmed original 2026-10-01 finding. Re-confirmed "
+        "2026-10-13: live curl on all 3 named URLs reproduces the same Cloudflare "
+        "challenge (403) / login-redirect, identically on alternate hostname "
+        "b2b.sosnc.gov (same app, not a second system); checked and found no "
+        "separate NC UCC search anywhere else (no other SOS portal, no paid "
+        "vendor like CSC/UCC Direct)."
     )
 
     async def fetch(self) -> list[Listing]:

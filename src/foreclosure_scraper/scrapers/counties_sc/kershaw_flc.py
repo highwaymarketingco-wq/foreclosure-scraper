@@ -67,6 +67,27 @@ rather than a source worth building a heavier (e.g. qPublic-ToS-exempt)
 workaround for.
 
 Free, public, no login -- when (if) the county republishes a real FLC list.
+
+RE-CHECKED LIVE 2026-10-13 (session-wide audit of "confirmed dead" claims,
+prompted by this same session finding other counties' dead-source notes were
+wrong): fetched PAGE_URL again, plus the homepage, the Treasurer/
+delinquent-matters page, and even ``/robots.txt`` -- EVERY ONE of them now
+returns HTTP 403 "Access Denied" from an Akamai edge (``server: AkamaiGHost``,
+the classic Akamai Bot Manager block page, internal rewrite target literally
+``$(SERVE_403)``), identically via both a scripted WebFetch and a plain curl
+with a real desktop Chrome User-Agent. ``robots.txt`` 403ing too is the tell:
+that path is conventionally never gated, so this is a DOMAIN-WIDE bot/WAF
+wall today, not the page-specific 404 the 2026-10-02 note above describes.
+Per this project's compliance stance (a WAF challenge is a wall, not a
+technical gap to bypass), the page's actual content could not be
+re-confirmed either way today -- so the specific "404, reorganized, no
+redirect" mechanism above should NOT be treated as re-verified; only the
+net conclusion (no accessible free FLC list via kershaw.sc.gov right now)
+still holds, now for a different and more clearly compliance-gated reason.
+Did not attempt any bypass. No alternate URL search was possible for the
+same reason (every kershaw.sc.gov path tried is walled); the nearest
+covered signal is still counties_sc.qpaybill_delinquent_roll (Kershaw).
+
 Slug: counties_sc.kershaw_flc
 Category: county_tax
 ListingType: TAX_SALE
@@ -82,10 +103,13 @@ from ...models import Listing
 
 log = structlog.get_logger()
 
-# Dead (404, confirmed live 2026-10-02): the county's site reorganized and
-# never redirected this path. Kept only as provenance for what this scraper
-# used to read -- do NOT re-enable fetch() against it without re-verifying
-# live first (DEAD means dead the day it was probed, not forever).
+# Dead/unreachable (confirmed live 2026-10-02 as a 404; re-checked live
+# 2026-10-13 and found the entire domain, including /robots.txt, now 403s
+# from an Akamai WAF/bot-management edge -- a domain-wide wall, not a
+# page-specific 404; see the module docstring's 2026-10-13 note). Kept only
+# as provenance for what this scraper used to read -- do NOT re-enable
+# fetch() against it without re-verifying live first (DEAD means dead the
+# day it was probed, not forever).
 PAGE_URL = "https://www.kershaw.sc.gov/treasurer/forfeited-land-commission"
 
 
@@ -93,14 +117,17 @@ class KershawFLC(BaseScraper):
     slug = "counties_sc.kershaw_flc"
     name = "Kershaw County SC Forfeited Land Commission"
     disabled = True
-    disabled_reason = ("PAGE_URL 404s (county site reorganized, no redirect) - re-searched live "
+    disabled_reason = ("Entire kershaw.sc.gov domain (PAGE_URL, homepage, Treasurer/"
+                       "delinquent-matters, even /robots.txt) 403s from an Akamai WAF/bot-management "
+                       "edge today, not the page-specific 404 originally reported - re-searched live "
                        "2026-10-02 for a replacement (Treasurer/delinquent-matters page, Auditor, "
                        "Boards and Commissions, Bids and RFPs, the county's ArcGIS open-data parcel "
                        "layer with no owner field, general web search) and found no current free FLC "
                        "inventory anywhere - the one lead (qPublic owner-name search) is gated behind "
                        "a click-through Terms of Service, a compliance wall per CLAUDE.md, not a "
                        "technical gap - nearest covered signal is counties_sc.qpaybill_delinquent_roll "
-                       "(Kershaw pre-sale delinquent roll, a different lane) - confirmed 2026-10-02")
+                       "(Kershaw pre-sale delinquent roll, a different lane) - mechanism re-checked "
+                       "and corrected 2026-10-13 (see module docstring), net conclusion unchanged")
     category = "county_tax"
     timeout_s = 90.0
     expected_min_count = 0

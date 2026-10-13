@@ -24,6 +24,20 @@ own echoed requestUrl, not real page content. counties_sc.
 greenwood_corebtpay_delinquent_tax (the real per-parcel source) is still the
 live tenant for Greenwood.
 
+RE-VERIFIED LIVE 2026-10-13: still holds. This time rendered PAGE_URL in a
+real browser (not just curl, since this is a Wix SPA) and read the actual
+rendered DOM text: Treasurer office address/hours/contact, FOIA/fee-collection
+boilerplate, and a "Quick Links" list (Pay Taxes online, Tax Collector, Annual
+Budgets, etc.) -- no delinquent-parcel list or table anywhere in the rendered
+page. Also followed the rendered "Tax Collector" quick link
+(greenwoodcounty-sc.gov/tax-collector) as a second avenue: that page loads
+empty/blank in the browser (no usable content at all), so it is not a
+substitute source either. QPAYBILL_SUBS has no Greenwood entry (confirmed by grep of
+qpaybill_delinquent_roll.py), consistent with the existing note that
+corebtpay, not qPayBill, is Greenwood's real tenant. Confirmed
+greenwoodco.corebtpay.com/egov/apps/bill/pay.egov (the exact SITE_URL
+greenwood_corebtpay_delinquent_tax.py uses) is live today: 200.
+
 Slug: counties_sc.greenwood_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -50,7 +64,8 @@ class GreenwoodDelinquentTax(BaseScraper):
     name = "Greenwood County SC Delinquent Tax Sale"
     disabled = True
     disabled_reason = ("target page is Treasurer office info only, no delinquent list - "
-                       "superseded by counties_sc.greenwood_corebtpay_delinquent_tax - confirmed 2026-10-01")
+                       "superseded by counties_sc.greenwood_corebtpay_delinquent_tax - "
+                       "confirmed 2026-10-01, re-confirmed live 2026-10-04 and 2026-10-13")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

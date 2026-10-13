@@ -326,6 +326,20 @@ class LandsOfAmerica(BaseScraper):
     # That's consistent with an Akamai Sensor challenge (designed
     # specifically to detect headless/automation signatures) and with this
     # being a genuine compliance wall, not a stale finding -- no change.
+    #
+    # RE-CONFIRMED 2026-10-13 (cross-session false-stale re-audit): live
+    # spot-check of both URLs named above, via two independent plain-HTTP
+    # methods (curl and a separate WebFetch call, no stealth browser --
+    # i.e. not even trying the harder StealthyFetcher path this scraper
+    # actually uses). Both methods, both counties, got HTTP 403 with an
+    # Akamai edge "Access Denied" body (errors.edgesuite.net reference
+    # ID), zero listing content -- e.g. Buncombe NC:
+    # https://www.land.com/Buncombe-County-NC/all-land/ -> 403, body
+    # "You don't have permission to access ... Reference #...edgesuite...".
+    # Same result for Spartanburg SC. Sibling landwatch.com/landandfarm.com
+    # also 403 plain-curl (expected -- both still require a real/stealth
+    # browser per this file's own fetch path; that's not a regression).
+    # Wall still live today; disabled=True unchanged.
     disabled = True
     disabled_reason = (
         "land.com serves a real Akamai Sensor interactive challenge "
@@ -333,7 +347,9 @@ class LandsOfAmerica(BaseScraper):
         "2026-10-01 on 2 counties/states; a wall per CLAUDE.md, not a "
         "stealth-harder target. Siblings landwatch.com/landandfarm.com "
         "(national.landwatch, national.landandfarm) are NOT walled and "
-        "remain active."
+        "remain active. Re-confirmed 2026-10-13: curl + WebFetch on both "
+        "counties still get HTTP 403 Akamai Access Denied, zero listing "
+        "content."
     )
 
     async def fetch(self) -> Iterable[Listing]:

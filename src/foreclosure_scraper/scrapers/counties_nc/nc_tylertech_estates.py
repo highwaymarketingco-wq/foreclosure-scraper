@@ -42,6 +42,12 @@ class NcTylerTechEstatesScraper(BaseScraper):
     category = "probate"
     timeout_s = 600.0
     disabled = True
+    # Re-verified 2026-10-13: counties_nc.nc_ecourts_estates (disabled=False) targets the exact
+    # same portal/dashboard URL (Dashboard/29) with a real, working fetch_waf_token-based
+    # implementation -- confirmed by reading it directly, not assumed. This class stays
+    # disabled, not because the site died, but because it is a genuinely redundant duplicate.
+    disabled_reason = ("redundant with counties_nc.nc_ecourts_estates, which covers this exact "
+                       "TylerTech portal (Dashboard/29) with a working implementation")
 
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []

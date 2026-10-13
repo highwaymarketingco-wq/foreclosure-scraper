@@ -38,6 +38,20 @@ session's 10 audited sources), flagged separately rather than guessed at or
 silently left uncorrected after an earlier, less careful same-day check of
 this file wrongly logged it as delivering.
 
+RE-VERIFIED 2026-10-13 (session-wide "confirmed dead" re-check, prompted by
+this same session finding other sources wrongly marked dead): PAGE_URL
+live-fetched again (HTTP 200) -- still exactly 1 <table> on the page
+(office-hours widget), parse_rows() guards still correct. Went further
+than the one URL this time: also checked the county's separate
+"departments/tax_collector.php" page (not this scraper's PAGE_URL) in case
+the delinquent list had moved there -- same result, 1 table (office-hours
+again), and its only tax-related link is the identical "Tax Search, View &
+Pay" button to https://darlingtontreasurer.qpaybill.com/Taxes/
+TaxesDefaultType4.aspx (the qpaybill portal this module's docstring already
+names as the real source). No PDF, GovDeals, or other delinquent-list link
+found on either page. disabled_reason still accurate; disabled=True left
+as-is.
+
 Slug: counties_sc.darlington_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -141,7 +155,9 @@ class DarlingtonDelinquentTax(BaseScraper):
     name = "Darlington County SC Delinquent Tax Sale"
     disabled = True
     disabled_reason = ("target page carries only an office-hours table, never a delinquent list - "
-                       "superseded by counties_sc.qpaybill_delinquent_roll (Darlington) - confirmed 2026-10-01")
+                       "superseded by counties_sc.qpaybill_delinquent_roll (Darlington) - confirmed 2026-10-01, "
+                       "re-confirmed 2026-10-13 (live GET, still office-hours-only; tax_collector.php dept "
+                       "page checked too, same result)")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

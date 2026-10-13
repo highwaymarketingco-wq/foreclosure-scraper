@@ -13,6 +13,15 @@ owner mailing address included). Found via the 2026-10-01 counties_sc
 per-source extraction audit. Do not re-enable without a different, real
 per-parcel source at this URL.
 
+RE-VERIFIED LIVE 2026-10-13: still holds. Direct curl of PAGE_URL (200,
+47.7KB) has 0 `<table>` tags; the page is treasurer bio/contact/office-hours
+copy with a "Search & Pay Taxes Online" link to https://www.fairfieldsctax.com/#/
+(200, still live) -- confirmed by reading sc_catalis_delinquent_roll.py that
+fairfieldsctax.com is literally the Catalis tenant CATALIS_COUNTIES["Fairfield"]
+already points at (line 142), so the superseding scraper targets the exact
+same portal this page links out to. No other delinquent-tax page or table
+found on fairfieldsc.com.
+
 Slug: counties_sc.fairfield_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -40,7 +49,8 @@ class FairfieldDelinquentTax(BaseScraper):
     name = "Fairfield County SC Delinquent Tax Sale"
     disabled = True
     disabled_reason = ("target page is office-contact info only, no table - "
-                       "superseded by counties_sc.sc_catalis_delinquent_roll (Fairfield) - confirmed 2026-10-01")
+                       "superseded by counties_sc.sc_catalis_delinquent_roll (Fairfield) - "
+                       "confirmed 2026-10-01, re-confirmed live 2026-10-13")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

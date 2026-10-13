@@ -92,6 +92,26 @@ dead sources, documented not forced).  Do not re-enable without either a
 genuinely current Proxibid catalog id, or a real scraper against
 AUTHORITATIVE_SOURCE_URL below once it carries real rows.
 
+RE-CONFIRMED LIVE 2026-10-13 (session-wide audit of "confirmed dead"
+claims): re-fetched CATALOG_URL -- page still reads "Auction closed." at
+the top, and the same lots still show resolved 2017 outcomes (e.g. lot
+37459634, "Young, Richard L", Stuart Point Road, "Sold for USD 2,050.00";
+other lots "PASSED"). No newer Beaufort Proxibid catalog found (search).
+Checked Meares' current platform directly (bid.mpa-sc.com and
+mpa-sc.com/real-estate-auctions, both live): neither lists any Beaufort or
+FLC auction today. Checked the Beaufort County Treasurer's own CURRENT
+site (beaufortcountytreasurer.com, confirmed live 200): no Forfeited Land
+Commission link anywhere in its nav, footer, or Research & Data page, and
+its own Help Center link points to the same treasurerhelp.zendesk.com
+AUTHORITATIVE_SOURCE_URL domain cited below. Could NOT re-fetch
+AUTHORITATIVE_SOURCE_URL's exact text today -- it now returns a Cloudflare
+bot-challenge block (``cf-mitigated: challenge``) to both a scripted
+WebFetch and a real-browser-UA curl, the same kind of WAF wall this
+project doesn't bypass -- so the precise "no properties available" quote
+could not be literally re-confirmed today, only corroborated indirectly via
+every other current, reachable source above. Net conclusion (no current
+free Beaufort FLC inventory anywhere) still holds.
+
 Slug: counties_sc.beaufort_flc
 Category: county_tax
 ListingType: TAX_SALE
@@ -188,7 +208,11 @@ class BeaufortFLC(BaseScraper):
         "Proxibid catalog found (Proxibid + web search); county's own "
         "current page (AUTHORITATIVE_SOURCE_URL) states 'There are "
         "currently no properties available for bidding at this time' - "
-        "confirmed 2026-10-03"
+        "confirmed 2026-10-03 - re-checked live 2026-10-13: CATALOG_URL "
+        "still closed/stale, Meares' current platform (bid.mpa-sc.com) and "
+        "the live Beaufort treasurer site both show no FLC inventory; "
+        "AUTHORITATIVE_SOURCE_URL itself now Cloudflare-challenge-blocked "
+        "so its exact text could not be re-fetched today (see docstring)"
     )
     category = "county_tax"
     timeout_s = 60.0

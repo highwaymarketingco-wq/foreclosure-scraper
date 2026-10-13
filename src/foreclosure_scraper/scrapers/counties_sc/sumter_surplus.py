@@ -31,6 +31,43 @@ property sales directly at
 sumtercountysc.gov/online_services/property/surplus_sales.php as an inline
 HTML table. Free, public, no login. Slug: counties_sc.sumter_surplus.
 Category: county_tax. ListingType: TAX_SALE.
+
+RE-VERIFIED LIVE 2026-10-13 (cross-session disabled-reason audit -- prior
+session had found other "confirmed dead" scrapers in this repo to actually
+be live, so every disabled_reason got a fresh real fetch instead of being
+trusted from the comment). Re-fetched the county page directly: still zero
+inline listing data, still exactly the same 5 nav rows link out to the same
+GovDeals seller IDs (348, 400 x2, 3939, 3361) via the legacy
+`index.cfm?fa=Main.AdvSearchResults&myseller=<id>` path. Those legacy URLs
+now 301-redirect to `govdeals.com/search?accountId=<id>` (GovDeals rebuilt
+its frontend as an Angular SPA at some point after this module's original
+authoring -- the raw HTML shell carries no listing data either way, it is
+all client-side rendered from a backend API).
+
+Went one level deeper than the 2026-10-04 pass: queried the real
+maestro.lqdt1.com search API directly (the same API national.govdeals
+calls) scoped to each of the 4 Sumter accountIds with no category
+restriction. Confirmed live, right now:
+  - accountId 348 (Sumter Co. Surplus Property): 1 active listing, but it
+    is a 1995 International 4900 FIRE TRUCK (categoryDescription "Fire
+    Trucks") -- a vehicle, not real property. national.govdeals correctly
+    excludes this (scoped server-side to categoryIds 84/95A only), so this
+    is a correct exclusion, not a missed row.
+  - accountId 400 (Vehicles/Heavy Equip. + Sheriff's seized property): 0
+    active listings.
+  - accountId 3939 (Forfeited Land Commission real property -- the one
+    seller ID that WOULD matter to this project): 0 active listings.
+  - accountId 3361 (Detention Center items): 0 active listings.
+Also re-ran national.govdeals' own real SC sweep (categoryIds 84 + 95A,
+stateDesc South Carolina, no seller restriction): 1 row in category 84
+(an unrelated Anderson, SC property), 0 in 95A. No Sumter rows in either.
+
+Conclusion: disabled_reason below is CONFIRMED STILL ACCURATE as of
+2026-10-13. The county page is a real, permanent link-out migration (not a
+code bug), and national.govdeals already has unrestricted SC-wide coverage
+of the one seller ID (3939/FLC) that could ever carry real property for
+this project -- it is just that Sumter genuinely has nothing posted right
+now. No code change made.
 """
 from __future__ import annotations
 
@@ -60,7 +97,9 @@ class SumterSurplusSales(BaseScraper):
     disabled_reason = ("page migrated to pure GovDeals link-outs (sellers 348/400/3939/3361), "
                        "no inline listing data left to parse; national.govdeals already "
                        "sweeps SC real-estate categories 84/95A state-wide with no seller "
-                       "restriction, confirmed live 2026-10-04")
+                       "restriction, confirmed live 2026-10-04, re-confirmed live 2026-10-13 "
+                       "(direct maestro API query of all 4 Sumter accountIds: 0 real-estate "
+                       "rows, only 1 unrelated fire-truck listing under seller 348)")
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []

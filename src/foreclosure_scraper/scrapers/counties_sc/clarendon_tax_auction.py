@@ -47,6 +47,19 @@ qpaybill_delinquent_roll.py run against Clarendon alone returned 1,217 real
 parcels (owner/parcel/situs populated) within its normal budget.
 
 Free, public, no login.
+
+RE-CONFIRMED LIVE 2026-10-13 (session-wide audit of "confirmed dead"
+claims): re-fetched PAGE_URL -- the homepage still surfaces only the same
+"2026 TAX SALE REGISTRATION" news post and its linked PDF
+(2026-tax-sale-registration.pdf, already identified 2026-10-03 as a scanned
+registration/instruction packet, not a parcel list) among tax-sale-adjacent
+links; no "Forfeited Land Commission," "FLC," or "tax auction" link appears
+anywhere on the page today. No new content for the keyword-follower to
+mis-grab. Did not re-run counties_sc.qpaybill_delinquent_roll (out of scope
+for this file-only recheck); nothing found today contradicts the
+2026-10-03 confirmation that it is live and returning real Clarendon
+parcels. Disabled_reason still holds without any change needed.
+
 Slug: counties_sc.clarendon_tax_auction
 Category: county_tax
 ListingType: TAX_SALE
@@ -71,7 +84,9 @@ class ClarendonTaxAuction(BaseScraper):
     disabled = True
     disabled_reason = ("keyword-link-follower grabbed the county's unrelated procurement/RFP "
                        "portal and meeting-agenda PDFs as fake tax listings - superseded by "
-                       "counties_sc.qpaybill_delinquent_roll (Clarendon) - confirmed 2026-10-01")
+                       "counties_sc.qpaybill_delinquent_roll (Clarendon) - confirmed 2026-10-01 "
+                       "- re-confirmed live 2026-10-13: homepage still shows only the same "
+                       "non-parcel registration PDF, nothing new to capture")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0

@@ -27,6 +27,44 @@ accurate OUTCOME_DORMANT instead).
 
 If the firm ever republishes (new domain or restored site), revert this
 commit to get the working stealth/parser logic back.
+
+RE-VERIFIED LIVE 2026-10-13 (cross-session disabled-reason audit -- prior
+session had found other "confirmed dead" scrapers in this repo to actually
+be live, so every disabled_reason got a fresh real fetch instead of being
+trusted from the comment). Re-fetched both URLs directly:
+  - /foreclosure-sales/ -> HTTP 200, same abovedomains.com parking template
+    (title "kornlawfirm.com", body text "This domain may be for sale.").
+  - /sales/ -> HTTP 200, byte-for-byte the same parking template.
+  - bare kornlawfirm.com -> same parking template.
+No redirect on any of the three (unlike the 2026-05-13 finding, which saw
+a redirect to a domain-ad service) -- it is now a static "for sale" page
+served directly, not even bothering to redirect through an ad network.
+
+Also did a real web search (not just reasoning from the old comment) for a
+successor site, merger, or alternate publication venue for this firm's SC
+trustee-sale notices:
+  - A FindLaw listing (last updated 2017, so dated) shows "Korn Law Firm,
+    P.A." at 1300 Pickens St, Columbia SC, with 3 named attorneys and
+    kornlawfirm.com as its own site at the time -- consistent with the
+    domain having genuinely belonged to this firm before parking.
+  - An Avvo profile shows a "Peter Korn" foreclosure attorney in Saluda,
+    SC (unclear if same practice as the Columbia firm).
+  - SC Lawyers Weekly reported a 2021 public reprimand of Peter D. Korn
+    (sole owner of a firm representing lenders in foreclosure/default
+    matters) for billing/trust-account issues -- unrelated to this
+    scraper's dead-domain finding but relevant color on the firm's
+    standing.
+  - No search result names a new domain, a merger/acquisition, or any
+    aggregator/firm now publishing this firm's sale notices. Grepped this
+    codebase too: no other scraper or module reads Korn data from
+    anywhere else -- the only other "korn" hits in the repo are unrelated
+    docstring comparisons citing this module as an example, plus the
+    kornlawfirm.com domain already listed in link_validator.py's
+    known-dead-domains set.
+
+Conclusion: disabled_reason below is CONFIRMED STILL ACCURATE as of
+2026-10-13. No successor site found; `disabled = True` stays. No code
+change made.
 """
 from __future__ import annotations
 
@@ -203,7 +241,9 @@ class Korn(BaseScraper):
     disabled = True
     disabled_reason = ("kornlawfirm.com domain parked (dead since 2026-05-13, "
                         "re-verified live 2026-10-04: plain 'domain for sale' page, "
-                        "no successor site found)")
+                        "no successor site found; re-confirmed live 2026-10-13: still "
+                        "parked (now no redirect at all), web search found no new "
+                        "domain/merger/aggregator for this firm's SC sale notices)")
 
     async def fetch(self) -> Iterable[Listing]:
         # Domain dead since 2026-05-13 — skip network entirely. `disabled =

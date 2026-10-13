@@ -18,6 +18,19 @@ page could never carry even if it had a list). Found via the 2026-10-01
 counties_sc per-source extraction audit. Do not re-enable without a different,
 real per-parcel source at this URL.
 
+RE-VERIFIED 2026-10-13 (session-wide "confirmed dead" re-check, prompted by
+this same session finding other sources wrongly marked dead): the old
+PAGE_URL (/309/Tax-Foreclosures) now 301-redirects to
+/309/Delinquent-Tax-Sale (HTTP 200 there) -- PAGE_URL updated below to the
+live slug. Still zero <tr> rows and no list markup: the page is narrative
+text about the Nov 2, 2026 sale plus three linked PDFs (Bidder Instructions,
+Disclaimer, Commercial-Solicitation-announcement). Downloaded and read all
+three PDFs in full -- they are procedural/legal boilerplate (bidding rules,
+disclaimer, Family Privacy Protection Act notice), none contains a
+parcel/owner list. No other delinquent-tax URL found on the page (only a
+generic qpublic parcel-map link). disabled_reason still accurate;
+disabled=True left as-is.
+
 Slug: counties_sc.aiken_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
@@ -37,7 +50,10 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-PAGE_URL = "https://sc-aikencounty.civicplus.com/309/Tax-Foreclosures"
+#: Was /309/Tax-Foreclosures; that slug now 301-redirects here (confirmed
+#: live 2026-10-13). Updated to the canonical URL -- still no data table,
+#: see RE-VERIFIED note above.
+PAGE_URL = "https://sc-aikencounty.civicplus.com/309/Delinquent-Tax-Sale"
 
 
 class AikenDelinquentTax(BaseScraper):
@@ -45,7 +61,9 @@ class AikenDelinquentTax(BaseScraper):
     name = "Aiken County SC Delinquent Tax Sale"
     disabled = True
     disabled_reason = ("target page has zero table rows (no delinquent-property list) - "
-                       "superseded by counties_sc.sc_catalis_delinquent_roll (Aiken) - confirmed 2026-10-01")
+                       "superseded by counties_sc.sc_catalis_delinquent_roll (Aiken) - confirmed 2026-10-01, "
+                       "re-confirmed 2026-10-13 (URL now redirects to /309/Delinquent-Tax-Sale, still no rows; "
+                       "3 linked PDFs checked, none contain a parcel list)")
     category = "county_tax"
     timeout_s = 120.0
     expected_min_count = 0
