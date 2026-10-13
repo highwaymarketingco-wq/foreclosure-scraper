@@ -50,6 +50,18 @@ violations, not one listing per complaint.
 Free, public, anonymous ArcGIS REST (services1.arcgis.com), no auth, no CAPTCHA.
 Dateless (a violation has no sale date) -> routed via DATELESS_OK_SOURCES.
 Gate with FORECLOSURE_HENDERSON_CODE=0.
+
+EXTRACTION-COMPLETENESS AUDIT 2026-10-13: the layer's own metadata reports
+`hasAttachments: True`, and live-sampling 20 real objectids off the current feed
+confirmed 13 of them carry real case photos (`FeatureServer/1/queryAttachments`,
+mostly inspector JPEGs plus at least one case with a PDF notice-of-violation
+mixed in alongside its photos) that this scraper never fetched -- every row
+shipped with no real photo for the Vision enrichment pass, which only reads
+raw['images']['real'] (same gap class as counties_nc.asheville_helene, fixed
+earlier in this audit). Fixed via one batched queryAttachments call per fetch
+(comma-separated objectIds, chunked, image/* content-type only -- the stray PDF
+confirms the filter is load-bearing here, not just defensive) rather than one
+request per feature/case.
 """
 from __future__ import annotations
 
@@ -110,6 +122,47 @@ _SEVERE = re.compile(
 
 _PAGE = 1000
 
+#: Attachment fetch — mirrors the counties_nc.asheville_helene convention exactly.
+_ATTACH_URL = f"{LAYER}/queryAttachments"
+#: Per-property photo cap (matches the asheville_helene/terry_howe_auctions convention).
+_MAX_PHOTOS = 8
+#: objectIds per queryAttachments call -- keeps the URL comfortably under typical
+#: server/proxy query-string limits even at a busy-day's open-case volume.
+_ATTACH_CHUNK = 150
+
+
+async def _fetch_attachments(c, object_ids: list[int]) -> dict[int, list[str]]:
+    """Batch-resolve OBJECTID -> real case-photo URLs via queryAttachments.
+    Never raises; a failed/partial chunk just yields no photos for those ids."""
+    out: dict[int, list[str]] = {}
+    for i in range(0, len(object_ids), _ATTACH_CHUNK):
+        chunk = object_ids[i:i + _ATTACH_CHUNK]
+        try:
+            r = await c.get(_ATTACH_URL, params={
+                "objectIds": ",".join(str(x) for x in chunk), "f": "json"})
+            if r.status_code != 200:
+                continue
+            groups = (r.json() or {}).get("attachmentGroups") or []
+        except Exception as exc:  # noqa: BLE001
+            log.warning("henderson_code.attachments_fail", error=str(exc)[:150])
+            continue
+        for g in groups:
+            oid = g.get("parentObjectId")
+            if oid is None:
+                continue
+            urls = []
+            for info in g.get("attachmentInfos") or []:
+                ct = (info.get("contentType") or "").lower()
+                aid = info.get("id")
+                if aid is None or not ct.startswith("image/"):
+                    continue
+                urls.append(f"{LAYER}/{oid}/attachments/{aid}")
+                if len(urls) >= _MAX_PHOTOS:
+                    break
+            if urls:
+                out[oid] = urls
+    return out
+
 
 def _clean(v: Any) -> str | None:
     if v in (None, "", " "):
@@ -157,10 +210,12 @@ def _group_key(attrs: dict) -> tuple[str, str] | None:
 
 
 def build_listing(feats: list[dict], history: dict[str, dict] | None = None,
-                  now: datetime | None = None) -> Listing | None:
+                  now: datetime | None = None,
+                  photos_by_oid: dict[int, list[str]] | None = None) -> Listing | None:
     """Fold every open case at one property into a single Listing."""
     now = now or datetime.utcnow()
     history = history or {}
+    photos_by_oid = photos_by_oid or {}
     if not feats:
         return None
 
@@ -234,6 +289,23 @@ def build_listing(feats: list[dict], history: dict[str, dict] | None = None,
     if severe:
         # Dumping / junk / minimum-housing cases describe physical condition.
         raw["distressed"] = True
+
+    # Real inspector/complaint photos, pooled across every open case at this
+    # property (a parcel with 2 open cases can carry photos under either
+    # case's OBJECTID) and deduped, same raw['images']['real'] shape the Vision
+    # enrichment pass (and counties_nc.asheville_helene) already reads.
+    photos: list[str] = []
+    seen: set[str] = set()
+    for a in attrs:
+        oid = a.get("OBJECTID")
+        if oid is None:
+            continue
+        for url in photos_by_oid.get(oid, []):
+            if url not in seen:
+                seen.add(url)
+                photos.append(url)
+    if photos:
+        raw["images"] = {"real": photos[:_MAX_PHOTOS]}
 
     headline = types[0] if types else "ordinance violation"
     desc = (f"Open code violation ({headline}) in Henderson County, NC"
@@ -321,10 +393,21 @@ class HendersonCodeViolations(BaseScraper):
                         for f in feats if (f.get("attributes") or {}).get("PIN")]
             history = await fetch_history(http, raw_pins)
 
+            object_ids = [a["OBJECTID"] for ft in feats
+                          if (a := (ft.get("attributes") or {})).get("OBJECTID") is not None]
+            try:
+                photos_by_oid = await _fetch_attachments(http, object_ids)
+            except Exception as exc:  # noqa: BLE001 - photos are a bonus, never fail the run
+                log.warning("henderson_code.attachments_fail", error=str(exc)[:150])
+                photos_by_oid = {}
+            log.info("henderson_code.attachments", features=len(feats),
+                     with_photos=len(photos_by_oid))
+
         now = datetime.utcnow()
         out: list[Listing] = []
         for feat_group in groups.values():
-            li = build_listing(feat_group, history=history, now=now)
+            li = build_listing(feat_group, history=history, now=now,
+                               photos_by_oid=photos_by_oid)
             if li:
                 out.append(li)
         log.info("henderson_code.parsed", open_cases=len(feats), parcels=len(groups),

@@ -6,6 +6,12 @@ county's own data carries and a parcel with two open cases), so the grouping,
 PIN normalization, open/closed classification, and repeat-offender counter are
 all exercised on real shapes.
 
+EXTRACTION-COMPLETENESS AUDIT 2026-10-13: adds coverage for the queryAttachments
+fetch (real case photos) using synthetic attachmentGroups payloads shaped
+exactly like the live layer's response (confirmed 2026-10-13: 13/20 sampled
+live objectids carried real JPEG/PNG photos, one with a PDF notice mixed in
+alongside its photos).
+
 RUN_LIVE=1 adds an opt-in smoke test against the live layer.
 """
 from __future__ import annotations
@@ -21,7 +27,7 @@ from foreclosure_scraper import arcgis_webmap as agw
 from foreclosure_scraper.models import ListingType
 from foreclosure_scraper.scrapers.counties_nc import henderson_code_violations as mod
 
-from tests._arcgis_fakes import FakeHttp
+from tests._arcgis_fakes import FakeHttp, FakeResponse
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -369,6 +375,144 @@ def test_query_error_propagates_as_an_exception():
     http = FakeHttp({}, pages=[{"error": {"code": 400, "message": "Invalid field: PIN"}}])
     with pytest.raises(agw.ArcGisError):
         _run(http)
+
+
+# --------------------------------------------------------------------------- #
+# attachments / real photos
+# --------------------------------------------------------------------------- #
+
+def _attach_http(attach_payload, history=None) -> FakeHttp:
+    """Three /query-shaped calls in order: open cases, case history, attachments."""
+    pages = [json.loads((FIX / "henderson_code_violations_open.json").read_text())]
+    pages.append(history if history is not None
+                 else {"objectIdFieldName": "OBJECTID", "features": []})
+    pages.append(attach_payload)
+    return FakeHttp({}, pages=pages)
+
+
+def test_fetch_attachments_batches_builds_urls_and_drops_non_images():
+    """queryAttachments is one batched call, filtered to image/* content types."""
+    attach_payload = {"attachmentGroups": [
+        {"parentObjectId": 6291, "attachmentInfos": [
+            {"id": 500, "contentType": "image/jpeg", "name": "vehicle_graveyard.jpg"},
+            {"id": 501, "contentType": "application/pdf", "name": "notice.pdf"},
+        ]},
+    ]}
+    http = FakeHttp({}, pages=[attach_payload])
+    out = asyncio.run(mod._fetch_attachments(http, [6291, 9999]))
+    assert list(out.keys()) == [6291]              # 9999 has no attachmentGroup
+    assert out[6291] == [f"{mod.LAYER}/6291/attachments/500"]  # PDF dropped
+    assert len(http.calls) == 1                     # one batched call, not per-id
+    verb, url, params = http.calls[0]
+    assert url == mod._ATTACH_URL
+    assert params["objectIds"] == "6291,9999"
+
+
+def test_fetch_attachments_caps_photos_per_feature():
+    many = {"attachmentGroups": [{"parentObjectId": 1, "attachmentInfos": [
+        {"id": i, "contentType": "image/jpeg"} for i in range(20)]}]}
+    http = FakeHttp({}, pages=[many])
+    out = asyncio.run(mod._fetch_attachments(http, [1]))
+    assert len(out[1]) == mod._MAX_PHOTOS
+
+
+def test_fetch_attachments_chunks_object_ids_to_bound_query_strings():
+    ids = list(range(1, 301))  # 300 ids, chunk size 150 -> 2 calls
+    http = FakeHttp({}, pages=[{"attachmentGroups": []}, {"attachmentGroups": []}])
+    asyncio.run(mod._fetch_attachments(http, ids))
+    assert len(http.calls) == 2
+    assert len(http.calls[0][2]["objectIds"].split(",")) == mod._ATTACH_CHUNK
+
+
+def test_fetch_attachments_failure_yields_no_photos_not_a_crash():
+    http = FakeHttp({mod._ATTACH_URL: FakeResponse({}, status_code=500)})
+    out = asyncio.run(mod._fetch_attachments(http, [1, 2]))
+    assert out == {}
+
+
+def test_build_listing_dedupes_identical_photo_urls_across_cases():
+    """Two cases at one property can each resolve to the SAME attachment URL
+    (e.g. a shared/duplicated upload); the pool must not double it."""
+    feats = [
+        {"attributes": {"OBJECTID": 1, "caseID": "1", "PIN": "1234567890",
+                        "address": "5 MAIN ST", "violationType": "Nuisance",
+                        "dispositionStatus": "Notice of Violation Issued",
+                        "dateReceived": 1_770_000_000_000}},
+        {"attributes": {"OBJECTID": 2, "caseID": "2", "PIN": "1234567890",
+                        "address": "5 MAIN ST", "violationType": "Nuisance",
+                        "dispositionStatus": "15 Day Notice Issued",
+                        "dateReceived": 1_770_000_000_001}},
+    ]
+    shared = f"{mod.LAYER}/1/attachments/50"
+    other = f"{mod.LAYER}/2/attachments/51"
+    li = mod.build_listing(feats, photos_by_oid={1: [shared], 2: [shared, other]})
+    assert li.raw["images"]["real"] == [shared, other]
+
+
+def test_attachments_wire_onto_the_matching_property_only():
+    """6291 (PIN 9651402108) gets a real photo; every other property in the
+    fixture has no attachmentGroup and must ship with no 'images' key at all."""
+    attach_payload = {"attachmentGroups": [
+        {"parentObjectId": 6291, "attachmentInfos": [
+            {"id": 500, "contentType": "image/jpeg", "name": "vehicle_graveyard.jpg"},
+        ]},
+    ]}
+    rows = _run(_attach_http(attach_payload))
+    with_photo = next(li for li in rows if li.parcel_id == "9651402108")
+    assert with_photo.raw["images"]["real"] == [f"{mod.LAYER}/6291/attachments/500"]
+    others = [li for li in rows if li.parcel_id != "9651402108"]
+    assert others and all("images" not in li.raw for li in others)
+
+
+def test_non_image_attachments_never_create_an_images_key():
+    """204 Gull Ave / PIN 9577984987 (OBJECTID 3186) has only a PDF attached --
+    a real case shape (NOV letters are routinely attached alongside, or instead
+    of, photos). It must ship with no 'images' key, not an empty one."""
+    attach_payload = {"attachmentGroups": [
+        {"parentObjectId": 3186, "attachmentInfos": [
+            {"id": 600, "contentType": "application/pdf", "name": "notice.pdf"},
+        ]},
+    ]}
+    rows = _run(_attach_http(attach_payload))
+    li = next(l for l in rows if l.parcel_id == "9577984987")
+    assert "images" not in li.raw
+
+
+def test_photos_pool_across_every_open_case_at_one_property():
+    """PIN 9548060064 carries TWO open cases (OBJECTID 5667 and 4798, both
+    Nuisance at 111 E Fox Ridge Dr) -- a photo attached under either case's
+    OBJECTID must land on the one property listing."""
+    attach_payload = {"attachmentGroups": [
+        {"parentObjectId": 5667, "attachmentInfos": [
+            {"id": 701, "contentType": "image/jpeg", "name": "a.jpg"}]},
+        {"parentObjectId": 4798, "attachmentInfos": [
+            {"id": 702, "contentType": "image/png", "name": "b.png"}]},
+    ]}
+    rows = _run(_attach_http(attach_payload))
+    li = next(l for l in rows if l.parcel_id == "9548060064")
+    assert li.raw["code_enforcement"]["open_violations"] == 2   # confirms it's the 2-case parcel
+    assert sorted(li.raw["images"]["real"]) == sorted([
+        f"{mod.LAYER}/5667/attachments/701", f"{mod.LAYER}/4798/attachments/702"])
+
+
+def test_failed_attachments_call_never_breaks_the_main_listing_fetch():
+    """Photos are a bonus; a broken/500 attachments endpoint must not cost a
+    single real lead."""
+    http = FakeHttp({mod._ATTACH_URL: FakeResponse({}, status_code=500)}, pages=[
+        json.loads((FIX / "henderson_code_violations_open.json").read_text()),
+        {"objectIdFieldName": "OBJECTID", "features": []},
+    ])
+    rows = _run(http)
+    assert rows                                   # real leads still ship
+    assert all("images" not in li.raw for li in rows)
+
+
+def test_env_gate_skips_attachments_fetch_too(monkeypatch):
+    monkeypatch.setenv(mod.ENV_OFF, "0")
+    http = _attach_http({"attachmentGroups": [{"parentObjectId": 6291, "attachmentInfos": [
+        {"id": 500, "contentType": "image/jpeg"}]}]})
+    assert _run(http) == []
+    assert http.calls == []
 
 
 # --------------------------------------------------------------------------- #
