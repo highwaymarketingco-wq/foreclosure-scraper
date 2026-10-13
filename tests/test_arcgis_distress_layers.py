@@ -380,3 +380,265 @@ def test_an_ssn_like_column_never_reaches_the_raw_block():
                         "LOCATE": "TEST", "TCSSN1": "000-00-0000"},
                        _layer("greenville_unpaid_tax_parcels"))
     assert "TCSSN1" not in li.raw["arcgis_distress"]
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-13 source-completeness audit, Pattern A: ArcGIS attachments
+# (hasAttachments/queryAttachments). Live-checked all 26 layers in this file;
+# only transylvania_damage_assessment and burke_storm_damage carry real
+# per-feature photos. lincoln_county_owned (hasAttachments:true but the
+# "attachments" are 14 repeating map-legend category icons, not photos) and
+# burke_county_owned (hasAttachments:true but 100% application/pdf deed
+# scans) were live-checked and confirmed NOT wired -- see Layer.
+# has_attachments docstring for the full live evidence.
+# ---------------------------------------------------------------------------
+
+def _stub_client(handler):
+    stub = MagicMock()
+    stub.get = handler
+    return stub
+
+
+def test_has_attachments_flag_is_scoped_to_the_two_live_confirmed_layers():
+    """Pins the 2026-10-13 live result so a future edit can't silently widen (or
+    narrow) which layers fetch attachments without a deliberate, re-verified change."""
+    flagged = {lay.slug for lay in M.LAYERS if lay.has_attachments}
+    assert flagged == {"transylvania_damage_assessment", "burke_storm_damage"}
+
+
+def test_lincoln_and_burke_county_owned_are_not_flagged():
+    """The two live false positives (icons / PDFs, not photos) must stay off."""
+    for slug in ("lincoln_county_owned", "burke_county_owned"):
+        assert _layer(slug).has_attachments is False, slug
+
+
+def test_to_listing_attaches_real_photos_when_given():
+    lay = _layer("transylvania_damage_assessment")
+    li = M._to_listing({"pin": "8597-54-8900-000", "house_number": "178",
+                        "road_name": "Deavor Rd", "severity_level": "3"},
+                       lay, photos=["https://example.test/1/attachments/1",
+                                     "https://example.test/1/attachments/2"])
+    assert li.raw["images"] == {"real": ["https://example.test/1/attachments/1",
+                                          "https://example.test/1/attachments/2"]}
+
+
+def test_to_listing_without_photos_has_no_images_key():
+    lay = _layer("transylvania_damage_assessment")
+    li = M._to_listing({"pin": "8597-54-8900-000", "house_number": "178",
+                        "road_name": "Deavor Rd"}, lay)
+    assert "images" not in li.raw
+
+
+def test_to_listing_empty_photos_list_has_no_images_key():
+    """An attachments call that resolved but found nothing real (e.g. every
+    attachment was a non-image) must not stamp a hollow images block."""
+    lay = _layer("transylvania_damage_assessment")
+    li = M._to_listing({"pin": "8597-54-8900-000", "house_number": "178",
+                        "road_name": "Deavor Rd"}, lay, photos=[])
+    assert "images" not in li.raw
+
+
+def test_fetch_attachments_builds_urls_and_filters_non_images():
+    """Matches the asheville_helene.py convention exactly: only image/* content
+    types are kept, built as {layer_url}/{objectid}/attachments/{attachmentId}."""
+    async def get(url, **kw):
+        assert url.endswith("/queryAttachments")
+        return _resp(200, {"attachmentGroups": [
+            {"parentObjectId": 1, "attachmentInfos": [
+                {"id": 10, "contentType": "image/jpeg"},
+                {"id": 11, "contentType": "application/pdf"},  # must be dropped
+            ]},
+            {"parentObjectId": 2, "attachmentInfos": [
+                {"id": 20, "contentType": "IMAGE/JPEG"},  # case-insensitive match
+            ]},
+        ]})
+
+    c = _stub_client(get)
+    out = asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", [1, 2]))
+    assert out == {
+        1: ["https://example.test/FeatureServer/0/1/attachments/10"],
+        2: ["https://example.test/FeatureServer/0/2/attachments/20"],
+    }
+
+
+def test_fetch_attachments_caps_photos_per_feature():
+    infos = [{"id": i, "contentType": "image/jpeg"} for i in range(20)]
+
+    async def get(url, **kw):
+        return _resp(200, {"attachmentGroups": [
+            {"parentObjectId": 1, "attachmentInfos": infos}]})
+
+    c = _stub_client(get)
+    out = asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", [1]))
+    assert len(out[1]) == M._MAX_PHOTOS
+
+
+def test_fetch_attachments_chunks_object_ids():
+    seen_chunks = []
+
+    async def get(url, **kw):
+        ids = kw["params"]["objectIds"].split(",")
+        seen_chunks.append(ids)
+        return _resp(200, {"attachmentGroups": []})
+
+    c = _stub_client(get)
+    many_ids = list(range(1, M._ATTACH_CHUNK * 2 + 5))
+    asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", many_ids))
+    assert len(seen_chunks) == 3
+    assert all(len(chunk) <= M._ATTACH_CHUNK for chunk in seen_chunks)
+    assert sum(len(chunk) for chunk in seen_chunks) == len(many_ids)
+
+
+def test_fetch_attachments_returns_empty_for_no_object_ids():
+    calls = []
+
+    async def get(url, **kw):
+        calls.append(url)
+        return _resp(200, {"attachmentGroups": []})
+
+    c = _stub_client(get)
+    out = asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", []))
+    assert out == {}
+    assert calls == []  # no network call at all when there is nothing to look up
+
+
+def test_fetch_attachments_never_raises_on_http_error_status():
+    async def get(url, **kw):
+        return _resp(500)
+
+    c = _stub_client(get)
+    out = asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", [1, 2]))
+    assert out == {}
+
+
+def test_fetch_attachments_never_raises_on_transport_exception():
+    async def get(url, **kw):
+        raise ConnectionError("boom")
+
+    c = _stub_client(get)
+    out = asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", [1, 2]))
+    assert out == {}
+
+
+def test_fetch_layer_wires_real_photos_without_leaking_objectid_into_raw(monkeypatch):
+    """End-to-end through _fetch_layer: the objectid added to outFields purely to
+    key the attachment lookup must reach raw['images'] but never raw['arcgis_distress']
+    (that block is documented as explicit-outFields-only -- see _raw_block)."""
+    lay = _layer("transylvania_damage_assessment")
+
+    async def get(url, **kw):
+        if url.endswith("/queryAttachments"):
+            assert kw["params"]["objectIds"] == "121"
+            return _resp(200, {"attachmentGroups": [
+                {"parentObjectId": 121, "attachmentInfos": [
+                    {"id": 1, "contentType": "image/jpeg"}]}]})
+        assert "objectid" in kw["params"]["outFields"].split(",")
+        return _resp(200, {"features": [{"attributes": {
+            "pin": "8597-54-8900-000", "house_number": "178", "road_name": "Deavor Rd",
+            "severity_level": "3", "objectid": 121}}]})
+
+    c = _stub_client(get)
+    listings = asyncio.run(M._fetch_layer(c, lay))
+    assert len(listings) == 1
+    li = listings[0]
+    assert li.raw["images"] == {"real": [f"{lay.url}/121/attachments/1"]}
+    assert "objectid" not in li.raw["arcgis_distress"]
+    assert "OBJECTID" not in li.raw["arcgis_distress"]
+
+
+def test_fetch_layer_handles_uppercase_objectid_field_name(monkeypatch):
+    """Burke's layer declares OBJECTID (uppercase); the case-insensitive lookup
+    this change added must still find it and key the photo lookup correctly."""
+    lay = _layer("burke_storm_damage")
+
+    async def get(url, **kw):
+        if url.endswith("/queryAttachments"):
+            return _resp(200, {"attachmentGroups": [
+                {"parentObjectId": 1, "attachmentInfos": [
+                    {"id": 7, "contentType": "image/jpeg"}]}]})
+        return _resp(200, {"features": [{"attributes": {
+            "REID": 1, "dmg_loc": "101 Woodsway Ln", "OBJECTID": 1}}]})
+
+    c = _stub_client(get)
+    listings = asyncio.run(M._fetch_layer(c, lay))
+    assert len(listings) == 1
+    assert listings[0].raw["images"]["real"] == [f"{lay.url}/1/attachments/7"]
+
+
+def test_fetch_layer_without_has_attachments_never_calls_queryattachments():
+    """The other 24 layers in this file must see zero behavior change: no
+    objectid added to outFields, no queryAttachments call at all."""
+    lay = _layer("buncombe_unpaid_bills")
+    calls = []
+
+    async def get(url, **kw):
+        calls.append(url)
+        assert "objectid" not in kw["params"].get("outFields", "").split(",")
+        return _resp(200, {"features": [{"attributes": {
+            "pin": "1", "owner1_last_name": "SMITH", "house_num": "1",
+            "street_name": "MAIN ST", "real_value": 1000}}]})
+
+    c = _stub_client(get)
+    listings = asyncio.run(M._fetch_layer(c, lay))
+    assert len(listings) == 1
+    assert "images" not in listings[0].raw
+    assert not any(u.endswith("/queryAttachments") for u in calls)
+
+
+def test_fetch_layer_survives_a_total_queryattachments_failure():
+    """A broken attachments call for a has_attachments layer must never break
+    that layer's own main listing fetch -- the row still lands, just without photos."""
+    lay = _layer("burke_storm_damage")
+
+    async def get(url, **kw):
+        if url.endswith("/queryAttachments"):
+            raise ConnectionError("attachments endpoint is down")
+        return _resp(200, {"features": [{"attributes": {
+            "REID": 1, "dmg_loc": "101 Woodsway Ln", "OBJECTID": 1}}]})
+
+    c = _stub_client(get)
+    listings = asyncio.run(M._fetch_layer(c, lay))
+    assert len(listings) == 1
+    assert "images" not in listings[0].raw
+
+
+def test_attachments_failure_on_both_flagged_layers_does_not_sink_the_whole_batch(monkeypatch):
+    """The exact contract the task required: a broken attachments call on
+    transylvania_damage_assessment and burke_storm_damage (both failing outright,
+    one via HTTP 500 and one via a raised exception) must never discard the other
+    24 layers' good rows. Runs the real ArcgisDistressLayers().fetch() -- the full
+    batch, LayerHarvest guard included -- not just _fetch_layer in isolation."""
+    attach_calls = []
+
+    async def get(url, **kw):
+        if url.endswith("/queryAttachments"):
+            attach_calls.append(url)
+            if "ProOLvsmwpY1RmFG" in url:   # transylvania
+                return _resp(500)
+            if "axQ4OCSpcxALIQsV" in url and "119" in url:   # burke_storm_damage
+                raise ConnectionError("attachments endpoint is down")
+            return _resp(200, {"attachmentGroups": []})
+        if "Unpaid%20Property%20Bills%20from%202025" in url:
+            # A healthy, unrelated layer's real row -- must survive intact.
+            return _resp(200, {"features": [{"attributes": {
+                "pin": "1", "owner1_last_name": "SMITH", "house_num": "1",
+                "street_name": "MAIN ST", "real_value": 1000}}]})
+        if "ProOLvsmwpY1RmFG" in url:
+            return _resp(200, {"features": [{"attributes": {
+                "pin": "8597-54-8900-000", "house_number": "178",
+                "road_name": "Deavor Rd", "objectid": 1}}]})
+        if "axQ4OCSpcxALIQsV" in url and "119" in url:
+            return _resp(200, {"features": [{"attributes": {
+                "REID": 1, "dmg_loc": "101 Woodsway Ln", "OBJECTID": 1}}]})
+        return _resp(200, {"features": []})
+
+    monkeypatch.setattr(M, "client", _client(get))
+    listings = asyncio.run(M.ArcgisDistressLayers().fetch())
+    assert len(attach_calls) == 2
+    by_slug = {li.source.rsplit(".", 1)[-1]: li for li in listings}
+    assert by_slug["buncombe_unpaid_bills"].owner_name == "SMITH"
+    assert "images" not in by_slug["buncombe_unpaid_bills"].raw
+    assert by_slug["transylvania_damage_assessment"].street_address == "178 Deavor Rd"
+    assert "images" not in by_slug["transylvania_damage_assessment"].raw
+    assert by_slug["burke_storm_damage"].street_address == "101 Woodsway Ln"
+    assert "images" not in by_slug["burke_storm_damage"].raw

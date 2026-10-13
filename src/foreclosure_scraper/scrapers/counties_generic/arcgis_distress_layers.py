@@ -64,6 +64,11 @@ from ...sensitive_fields import drop_sensitive
 log = structlog.get_logger()
 
 _PAGE = 1000
+#: Per-feature photo cap and objectIds-per-call chunk size for Layer.has_attachments
+#: layers -- same values asheville_helene.py uses for the identical queryAttachments
+#: pattern.
+_MAX_PHOTOS = 8
+_ATTACH_CHUNK = 150
 
 
 class Layer(NamedTuple):
@@ -160,6 +165,27 @@ class Layer(NamedTuple):
     #: raw['distressed'] and raw['condition_cama'] {source, condition, condition_code,
     #: distressed}, the shape enrichment_cama_condition writes, never raw['condemned'].
     condition_rating: bool = False
+    #: SOURCE-COMPLETENESS AUDIT 2026-10-13 (docs/source_completeness_audit_2026-10-13.md,
+    #: Pattern A): this module queries outFields but never ArcGIS attachments
+    #: (hasAttachments/queryAttachments), a separate capability from the attribute table --
+    #: same gap class fixed in counties_nc/asheville_helene.py and, the same day, in
+    #: counties_nc/henderson_code_violations.py. Live-checked all 26 layers in this file
+    #: (?f=json hasAttachments, then a real queryAttachments sample against live objectids
+    #: for every True): only these two layers carry real per-feature photos --
+    #: transylvania_damage_assessment (10/10 sampled objectids, image/jpeg field-inspection
+    #: photos) and burke_storm_damage (5/5 sampled objectids, 2-4 image/jpeg photos each).
+    #: Two more reported hasAttachments:true but are confirmed FALSE POSITIVES, not wired:
+    #: lincoln_county_owned's "attachments" are 14 repeating map-legend category icons
+    #: (Airport.png/Office.png/Solid Waste.png/... -- the same ~14 files reused across 169
+    #: sampled rows, keyed by land-use category, not a per-property photo), and
+    #: burke_county_owned's are 100% application/pdf (deed scans + county parcel-list
+    #: handouts, zero image/* across an 11-row full sample) -- the image-content-type filter
+    #: this flag's fetch applies would exclude every one of those anyway, confirmed live
+    #: rather than assumed. Explicit opt-in (default False), same design as `condemned`/
+    #: `condition_rating` above, rather than an automatic per-run hasAttachments check,
+    #: specifically BECAUSE hasAttachments:true proved an unreliable signal of a real photo
+    #: on this very file: two of the four True layers found live were icons/PDFs, not photos.
+    has_attachments: bool = False
 
 
 LAYERS: tuple[Layer, ...] = (
@@ -325,6 +351,10 @@ LAYERS: tuple[Layer, ...] = (
         parcel="pin", situs_parts=("house_number", "road_name"),
         detail="severity_level", process="storm_damage",
         source_page="https://www.transylvaniacounty.org/",
+        # 2026-10-13 source-completeness audit: live-confirmed real field-inspection JPEGs
+        # via queryAttachments (10/10 sampled objectids carried a photo) -- see Layer.
+        # has_attachments docstring.
+        has_attachments=True,
     ),
     Layer(
         slug="burke_storm_damage",
@@ -343,6 +373,10 @@ LAYERS: tuple[Layer, ...] = (
         parcel="REID", situs="dmg_loc", lat_field="latitude", lon_field="longitude",
         detail="damage_cat_cal", process="storm_damage",
         source_page="https://www.burkenc.org/",
+        # 2026-10-13 source-completeness audit: live-confirmed real damage-assessment JPEGs
+        # via queryAttachments (5/5 sampled objectids carried 2-4 photos each) -- see Layer.
+        # has_attachments docstring.
+        has_attachments=True,
     ),
     Layer(
         # New Hanover (Wilmington) DEMOLITION permits — teardown / condemned-structure
@@ -888,7 +922,7 @@ def _raw_block(a: dict, lay: Layer) -> dict:
     return blk
 
 
-def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
+def _to_listing(a: dict, lay: Layer, photos: Optional[list[str]] = None) -> Optional[Listing]:
     situs = _clean(a.get(lay.situs)) if lay.situs else None
     if not situs and lay.situs_parts:
         bits = []
@@ -948,6 +982,11 @@ def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
         raw["distressed"] = True
         raw["condition_cama"] = {"source": lay.slug, "condition": detail, "condition_code": detail,
                                  "distressed": True}
+    if photos:
+        # Layer.has_attachments only -- real per-feature ArcGIS attachment photos,
+        # same raw["images"]["real"] convention as counties_nc/asheville_helene.py
+        # (2026-10-13 source-completeness audit, Pattern A).
+        raw["images"] = {"real": photos}
     if lay.mailing_parts:
         mail_bits = [_clean(a.get(p)) for p in lay.mailing_parts]
         mailing = " ".join(b for b in mail_bits if b) or None
@@ -984,13 +1023,60 @@ def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
     )
 
 
+async def _fetch_attachments(c, url: str, object_ids: list[int]) -> dict[int, list[str]]:
+    """Batch-resolve objectid -> real attachment-photo URLs via queryAttachments, chunked
+    (comma-separated objectIds per call rather than one request per feature) and filtered to
+    image/* content types, matching the counties_nc/asheville_helene.py convention exactly.
+    Layer.has_attachments ONLY -- see that field's docstring for why this is gated per-layer
+    rather than run automatically off the live hasAttachments flag.
+
+    Never raises: a failed/partial chunk just yields no photos for those ids, and a total
+    failure here must never take down the other 25 layers' listing fetch in the same run."""
+    out: dict[int, list[str]] = {}
+    if not object_ids:
+        return out
+    for i in range(0, len(object_ids), _ATTACH_CHUNK):
+        chunk = object_ids[i:i + _ATTACH_CHUNK]
+        try:
+            r = await c.get(url + "/queryAttachments", params={
+                "objectIds": ",".join(str(x) for x in chunk), "f": "json"}, timeout=45.0)
+            if r.status_code != 200:
+                continue
+            groups = (r.json() or {}).get("attachmentGroups") or []
+        except Exception as exc:  # noqa: BLE001 - photos are a bonus, never fail the harvest
+            log.warning("arcgis_distress.attachments_fail", url=url, error=str(exc)[:150])
+            continue
+        for g in groups:
+            oid = g.get("parentObjectId")
+            if oid is None:
+                continue
+            urls = []
+            for info in g.get("attachmentInfos") or []:
+                ct = (info.get("contentType") or "").lower()
+                aid = info.get("id")
+                if aid is None or not ct.startswith("image/"):
+                    continue
+                urls.append(f"{url}/{oid}/attachments/{aid}")
+                if len(urls) >= _MAX_PHOTOS:
+                    break
+            if urls:
+                out[oid] = urls
+    return out
+
+
 async def _fetch_layer(c, lay: Layer) -> list[Listing]:
     out: list[Listing] = []
     offset = 0
+    all_attrs: list[dict] = []
+    # ArcGIS outFields matching is case-insensitive on the request, but the response key
+    # keeps the layer's OWN declared case (confirmed live: Transylvania's is "objectid",
+    # Burke's "OBJECTID") -- requesting the lowercase form works for either and the
+    # case-insensitive lookups below handle whichever case comes back.
+    out_fields = ",".join(lay.fields) + (",objectid" if lay.has_attachments else "")
     while True:
         r = await c.get(lay.url + "/query", params={
             "where": lay.where,
-            "outFields": ",".join(lay.fields),     # explicit, never "*"
+            "outFields": out_fields,     # explicit, never "*"
             "returnGeometry": "false",
             "resultOffset": offset,
             "resultRecordCount": _PAGE,
@@ -1003,13 +1089,35 @@ async def _fetch_layer(c, lay: Layer) -> list[Listing]:
         if "error" in d:
             raise RuntimeError(f"{lay.slug}: {str(d['error'])[:120]}")
         feats = d.get("features") or []
-        for f in feats:
-            li = _to_listing(f.get("attributes") or {}, lay)
-            if li:
-                out.append(li)
+        all_attrs.extend(f.get("attributes") or {} for f in feats)
         if len(feats) < _PAGE or not d.get("exceededTransferLimit"):
             break
         offset += _PAGE
+
+    photos_by_oid: dict[int, list[str]] = {}
+    if lay.has_attachments:
+        oids = [v for a in all_attrs
+                for k, v in a.items() if k.lower() == "objectid" and v is not None]
+        try:
+            photos_by_oid = await _fetch_attachments(c, lay.url, oids)
+        except Exception as exc:  # noqa: BLE001 - never let a photo failure sink the layer
+            log.warning("arcgis_distress.attachments_fail", layer=lay.slug, error=str(exc)[:150])
+        log.info("arcgis_distress.attachments", layer=lay.slug,
+                 features=len(all_attrs), with_photos=len(photos_by_oid))
+
+    for a in all_attrs:
+        oid = None
+        if lay.has_attachments:
+            # Pop rather than read: "objectid" was added to outFields only to key the photo
+            # lookup above and was never part of Layer.fields, so it must not leak into
+            # raw["arcgis_distress"] (see _raw_block, which emits every key still in `a`).
+            for k in list(a.keys()):
+                if k.lower() == "objectid":
+                    oid = a.pop(k)
+                    break
+        li = _to_listing(a, lay, photos=photos_by_oid.get(oid) if oid is not None else None)
+        if li:
+            out.append(li)
     log.info("arcgis_distress.layer_done", layer=lay.slug,
              county=lay.county, leads=len(out))
     return out
