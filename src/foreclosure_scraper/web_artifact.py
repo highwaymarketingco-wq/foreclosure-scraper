@@ -2606,6 +2606,13 @@ RAW_KEEP = {
     "payment_status": "*", "year": "*",                           # (county/grantee/grantor/doc_type/
                                                                     # book_page below are shared names
                                                                     # written by several of these too)
+    # 2026-10-13 source-completeness audit: nc_avalon_tax's _record_to_listing added these --
+    # same Catalis/Avalon Wildfire fields rutherford_wildfire_tax.py already captures (nested
+    # under its own "*"-registered block-name key there; flat here since nc_avalon_tax has
+    # never nested its raw dict under a block-name key, see its "county"/"amount_due" above).
+    # "owner_mailing" and "flags" are also new on this scraper but already registered
+    # elsewhere in this dict ("*") -- not re-added here to avoid a duplicate dict key.
+    "original_amount_due": "*", "id_hash": "*", "has_payment_history": "*", "line_items": "*",
     "county": "*", "doc_type": "*", "grantor": "*", "grantee": "*", "book_page": "*",
     #   ^ counties_nc.nc_avalon_tax, nc_cchs_deeds, nc_rod_captcha, nc_rowan_cott (register-of-
     #     deeds grantor/grantee/book-page scrapers; nc_rowan_cott doesn't write county itself)

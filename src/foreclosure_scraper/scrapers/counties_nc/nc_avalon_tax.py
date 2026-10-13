@@ -9,6 +9,31 @@ Each record has an `isDelinquent` boolean — we filter for delinquent records.
 
 Counties: Lincoln (only county with a working domain on this platform).
 Other Catalis domains (rutherfordcountytax.com, etc.) are DNS-dead.
+
+FOUND 2026-10-13 (source-completeness audit, same Catalis/Avalon Wildfire
+platform as the sibling counties_nc.rutherford_wildfire_tax -- confirmed real
+schema from tests/fixtures/rutherford_wildfire_records_page1.json, a genuine
+captured payload): this file had two real gaps.
+
+1. No real-estate filter at all. The request body sends no `facets` to
+   restrict to Property-type bills, and nothing checked `AbstractType` client
+   side either -- so a personal-property (vehicle) or business-property tax
+   bill (AbstractType IND/BUS) could reach the board as a fake real-estate
+   lead. The sibling file both sends a Type facet AND still filters
+   AbstractType == "REI" client side; this file did neither. Fixed with a
+   client-side AbstractType check only (_is_real_estate) -- CloudFront is
+   currently blocking live calls to this endpoint (confirmed from both the Mac
+   and the Oracle VM), so an unverified change to the request body's facets
+   shape was not worth the risk; a client-side filter can only remove false
+   positives, never cause a new miss.
+2. `Values`/`Payment`/`IDs`/`OwnerAddress`/`Flags`/`LineItems`/`Description` on
+   every record were read for one key each (or not read at all) and the rest
+   silently dropped: mailing address, legal description, assessed value,
+   DELINQUENT/OUTSIDE LAW FIRM/ADVERTISED flags, the levy/fee breakdown, and
+   payment-history / original-amount-due signals. Fixed by extracting the
+   per-record parse into _record_to_listing() (also makes it unit-testable
+   without a live nodriver page) and capturing all of them, matching the
+   field names and shapes already proven correct in rutherford_wildfire_tax.py.
 """
 from __future__ import annotations
 
@@ -59,6 +84,140 @@ _COUNTY_SITES = {
 }
 
 _CLOUDFRONT_BASE = "https://d1ebsyxxbc7tep.cloudfront.net"
+
+
+def _clean(v: Any) -> str | None:
+    s = (str(v) if v is not None else "").replace("\x00", "").strip()
+    return s or None
+
+
+def _money(v: Any) -> float | None:
+    try:
+        f = round(float(v), 2)
+    except (TypeError, ValueError):
+        return None
+    return f if f > 0 else None
+
+
+def _is_real_estate(rec: dict) -> bool:
+    """REI = real estate; IND/BUS = personal/business property tax bills ride
+    the same API with no server-side type facet in this request shape (unlike
+    rutherford_wildfire_tax.py, which both sends a Type facet AND still checks
+    this client side). Mirrors that file's AbstractType check exactly."""
+    return (rec.get("AbstractType") or "").strip().upper() == "REI"
+
+
+def _flag_labels(rec: dict) -> list[str]:
+    """Human flag labels, from Flags[].Description with FlagsString as backup."""
+    out: list[str] = []
+    for f in rec.get("Flags") or []:
+        if isinstance(f, dict):
+            d = _clean(f.get("Description"))
+            if d:
+                out.append(d.upper())
+    if not out:
+        out = [t.strip().upper() for t in (rec.get("FlagsString") or "").split(",")
+               if t.strip()]
+    return out
+
+
+def _mailing(rec: dict) -> dict[str, str | None] | None:
+    a = rec.get("OwnerAddress") or {}
+    if not isinstance(a, dict):
+        return None
+    out = {
+        "addr": _clean(a.get("Line1")),
+        "city": _clean(a.get("City")),
+        "state": _clean(a.get("State")),
+        "zip": _clean(a.get("Zip")),
+    }
+    return out if out["addr"] or out["city"] else None
+
+
+def _slim_line_items(rec: dict) -> list[dict]:
+    """Same Wildfire/Catalis platform as rutherford_wildfire_tax.py -- same
+    raw LineItems shape, same 5-key subset."""
+    items = rec.get("LineItems")
+    if not isinstance(items, list):
+        return []
+    out: list[dict] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        out.append({
+            "levy_type": item.get("LevyType"),
+            "levy_type_description": item.get("LevyTypeDescription"),
+            "taxing_unit": item.get("TaxingUnit"),
+            "amount": item.get("LevyAmount"),
+            "amount_due": item.get("LevyAmountDue"),
+        })
+    return out
+
+
+def _record_to_listing(
+    rec: dict, county: str, state: str, base_url: str, slug: str
+) -> Listing | None:
+    """Pure record -> Listing mapping, split out of _fetch_via_api so the
+    parse is unit-testable without a live nodriver page. Returns None for a
+    non-real-estate bill or a bill that's neither delinquent nor owing."""
+    if not _is_real_estate(rec):
+        return None
+
+    values = rec.get("Values") or {}
+    amount_due = values.get("AmountDue", 0)
+    if not rec.get("isDelinquent", False) and not (amount_due and amount_due > 0):
+        return None
+
+    owner = rec.get("OwnerName1", "") or ""
+    owner2 = rec.get("OwnerName2", "")
+    if owner2:
+        owner = f"{owner} / {owner2}"
+
+    situs = rec.get("SitusAddress") or {}
+    addr = situs.get("Line1", "") or ""
+    city = situs.get("City", "") or ""
+    zip_code = situs.get("Zip", "") or ""
+
+    payment = rec.get("Payment") or {}
+    payment_status = payment.get("Status", "")
+    has_payment_history = bool(rec.get("FilePaymentHistory") or payment.get("PaymentLog"))
+
+    parcel = rec.get("ParcelNumber", "") or ""
+    bill_num = ""
+    ids = rec.get("IDs") or {}
+    if ids.get("ID1"):
+        bill_num = ids["ID1"].get("Value", "")
+
+    return Listing(
+        source=slug,
+        source_url=base_url,
+        listing_type=ListingType.TAX_LIEN,
+        property_kind=PropertyKind.UNKNOWN,
+        street_address=addr,
+        city=city,
+        state=state,
+        zip_code=zip_code,
+        county=county.title(),
+        parcel_id=parcel,
+        owner_name=owner,
+        tax_value=amount_due if amount_due else None,
+        market_value=_money(values.get("RealValue")),
+        legal_description=_clean(rec.get("Description")),
+        raw={
+            "county": county,
+            "amount_due": amount_due,
+            "original_amount_due": _money(values.get("OriginalAmountDue")),
+            "bill_number": bill_num,
+            "id_hash": _clean(rec.get("IDHash")),
+            "payment_status": payment_status,
+            "has_payment_history": has_payment_history,
+            "year": rec.get("Year"),
+            "owner_id": rec.get("OwnerID"),
+            "owner_mailing": _mailing(rec),
+            "flags": _flag_labels(rec),
+            "line_items": _slim_line_items(rec),
+        },
+    )
 
 
 class NcAvalonTaxScraper(BaseScraper):
@@ -180,60 +339,11 @@ class NcAvalonTaxScraper(BaseScraper):
                             continue
                         seen_ids.add(billing_id)
 
-                        if not rec.get("isDelinquent", False):
-                            # Also check AmountDue > 0 — taxes owed but not yet delinquent
-                            values = rec.get("Values", {})
-                            amount_due = values.get("AmountDue", 0)
-                            if not amount_due or amount_due <= 0:
-                                continue
-
+                        listing = _record_to_listing(rec, county, state, base_url, self.slug)
+                        if listing is None:
+                            continue
                         total_delinquent += 1
-
-                        # Extract fields
-                        owner = rec.get("OwnerName1", "")
-                        owner2 = rec.get("OwnerName2", "")
-                        if owner2:
-                            owner = f"{owner} / {owner2}"
-
-                        addr_obj = rec.get("SitusAddress", {})
-                        addr = addr_obj.get("Line1", "")
-                        city = addr_obj.get("City", "") or ""
-                        zip_code = addr_obj.get("Zip", "") or ""
-
-                        values = rec.get("Values", {})
-                        amount_due = values.get("AmountDue", 0)
-
-                        payment = rec.get("Payment", {})
-                        payment_status = payment.get("Status", "")
-
-                        parcel = rec.get("ParcelNumber", "")
-                        bill_num = ""
-                        ids = rec.get("IDs", {})
-                        if ids.get("ID1"):
-                            bill_num = ids["ID1"].get("Value", "")
-
-                        results.append(Listing(
-                            source=self.slug,
-                            source_url=base_url,
-                            listing_type=ListingType.TAX_LIEN,
-                            property_kind=PropertyKind.UNKNOWN,
-                            street_address=addr,
-                            city=city,
-                            state=state,
-                            zip_code=zip_code,
-                            county=county.title(),
-                            parcel_id=parcel,
-                            owner_name=owner,
-                            tax_value=amount_due if amount_due else None,
-                            raw={
-                                "county": county,
-                                "amount_due": amount_due,
-                                "bill_number": bill_num,
-                                "payment_status": payment_status,
-                                "year": rec.get("Year"),
-                                "owner_id": rec.get("OwnerID"),
-                            },
-                        ))
+                        results.append(listing)
 
                     skip += len(records)
 
