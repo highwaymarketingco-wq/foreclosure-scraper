@@ -1,11 +1,24 @@
-"""City of Union SC — JS "Client Challenge" bot shield.
+"""City of Union SC — DISABLED 2026-10-13, site rebuilt, no data pages left.
 
-cityofunion.net uses a JavaScript client challenge that requires a real
-browser to evaluate JS and produce a valid session cookie.
+DEEP-DIVE 2026-10-13: all 3 original URLs confirmed dead (live "Page Not
+Found" on each, checked directly). The whole site was rebuilt on a
+different platform (Apptegy -- a news/events-focused municipal CMS) since
+this file was written. Checked the real current site's full nav for any
+replacement: no tax, finance, building-codes, or code-enforcement page
+exists anywhere -- confirmed by reading every real nav link on the live
+homepage (payments/employment/bids/news/events only) AND a Google
+site:cityofunion.net search for code enforcement / building codes / tax
+delinquent, which returned zero results.
 
-Strategy: Use Playwright to render the page, which automatically
-evaluates the JS challenge. Then parse the page content for
-property/foreclosure listings.
+Unlike the Morganton case (where one real page survived, just with no
+data on it), City of Union's rebuild dropped the department content
+pages entirely -- there is nothing on this domain to point a scraper at
+right now, not even a dead end with a maybe-real URL to guess at.
+
+Not a wall worth clearing (no CAPTCHA/WAF involved in this finding at
+all -- every URL checked was a plain 404 or absent from the live nav).
+If the city ever republishes department pages, this would need a fresh
+URL hunt from scratch -- nothing here points to where.
 """
 from __future__ import annotations
 
@@ -28,12 +41,20 @@ _URLS = [
 
 
 class CityOfUnionScraper(BaseScraper):
-    """City of Union SC — JS Client Challenge via Playwright."""
+    """City of Union SC — site rebuilt, no department/data pages exist currently."""
 
     slug = "counties_sc.city_of_union"
     name = "City of Union SC"
     category = "municipal"
     timeout_s = 300.0
+    disabled = True
+    disabled_reason = (
+        "confirmed 2026-10-13: all 3 original URLs are dead 404s, the city "
+        "rebuilt its site on Apptegy (news/events platform), and no "
+        "tax/building-codes/code-enforcement page exists anywhere on the "
+        "current site -- confirmed via full nav read + a zero-result Google "
+        "site: search. Not a CAPTCHA/WAF wall; the content is simply gone."
+    )
 
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []

@@ -1,9 +1,38 @@
-"""Morganton NC city site — Cloudflare Turnstile on every page.
+"""Morganton NC city site — DISABLED 2026-10-13, no public data left to scrape.
 
-morgantonnc.gov uses Cloudflare Turnstile challenge.
+DEEP-DIVE 2026-10-13: the site restructured entirely since this file was
+written -- the old `/government/...` path family is gone. Checked all 3
+original URLs against the live site, and then the real replacement for
+the one that still exists:
 
-Strategy: Use Playwright with enrichment_waf_oss solver to bypass
-Turnstile. The site has code enforcement and condemned property lists.
+- condemned-properties: NO SUCH PAGE EXISTS ANYWHERE on the current site
+  (confirmed via in-site link search + a Google site: search that found
+  nothing but unrelated historical mentions of an old condemned jail
+  building). Not a stale URL -- the city does not appear to publish a
+  condemned-properties list at all currently.
+- tax-foreclosures: ALSO does not exist. Confirmed via the Finance
+  department's real Tax Division page (morgantonnc.gov/finance/page/
+  tax-division) -- it only covers the city property tax rate, nothing
+  about foreclosure. Tax foreclosure in NC is a COUNTY function (Burke
+  County), not a city one -- there was likely never a real standing page
+  here.
+- code-enforcement: a real current page DOES exist --
+  morgantonnc.gov/development-design-services/page/code-enforcement
+  (confirmed genuinely Cloudflare-gated: bare curl 403s even on this
+  correct URL; confirmed headless=False loads it (200) vs headless=True
+  (403), same pattern as polk_tax.py/nc_rod_captcha.py) -- BUT the page
+  itself has ZERO tables and no violations/case list of any kind, just
+  department info and a staff directory (confirmed:
+  document.querySelectorAll('table').length === 0 on the live page).
+  Clearing Cloudflare here would load a real page with nothing to parse.
+
+Net result: all three original targets are dead ends, two because the
+page is gone, one because the page exists but was never a data source.
+Disabled rather than left to spin up a browser, clear a real Cloudflare
+gate, and return 0 rows every single run for no reason -- same category
+as nc_sos_ucc (confirmed no public source left, not a wall worth
+clearing). If Morganton ever publishes a real violations/condemned list
+again, it would need to be found fresh -- nothing here points to where.
 """
 from __future__ import annotations
 
@@ -18,19 +47,25 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 _URLS = [
-    "https://www.morgantonnc.gov/government/code-enforcement/condemned-properties",
-    "https://www.morgantonnc.gov/government/code-enforcement",
-    "https://www.morgantonnc.gov/government/tax/tax-foreclosures",
+    "https://www.morgantonnc.gov/development-design-services/page/code-enforcement",
 ]
 
 
 class MorgantonNcScraper(BaseScraper):
-    """Morganton NC — Cloudflare Turnstile via Playwright+WAF solver."""
+    """Morganton NC — no public violations/condemned-properties data exists currently."""
 
     slug = "counties_nc.morganton_nc"
     name = "Morganton NC"
     category = "code_enforcement"
     timeout_s = 300.0
+    disabled = True
+    disabled_reason = (
+        "confirmed 2026-10-13: condemned-properties and tax-foreclosures pages "
+        "no longer exist on the city site (not stale URLs -- genuinely gone); "
+        "code-enforcement has a real, live, correctly-Cloudflare-gated page but "
+        "zero tables/data of any kind on it, just department contact info. "
+        "No public violations list currently published by the city."
+    )
 
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
