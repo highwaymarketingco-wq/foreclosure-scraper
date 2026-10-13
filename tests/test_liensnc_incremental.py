@@ -262,6 +262,12 @@ def test_scraper_raises_a_clear_error_when_login_fails_and_nothing_is_pending(tm
 
     monkeypatch.setattr(lh, "run_cycle", fake_cycle)
     monkeypatch.delenv("FORECLOSURE_ROLE", raising=False)
+    monkeypatch.delenv("LIENSNC_HANDOFF", raising=False)
+    # This test's whole point is the "not disabled" path, so it must not depend on whatever
+    # the real OFF switch (data/liensnc/OFF) happens to be on the machine running it -- found
+    # 2026-10-13: the owner's own standing kill-switch file made this fail locally with
+    # outcome DORMANT instead of ERROR, with no code bug involved at all.
+    monkeypatch.setattr(mod, "_OFF_FILE", tmp_path / "OFF")
     s = mod.LiensNCIncrementalScraper()
     out = asyncio.run(s.safe_run())
     assert out == [] and s.last_outcome == "ERROR" and "login_failed" in s.last_reason
@@ -484,10 +490,15 @@ def test_address_cluster_and_pin_guard():
     assert lh.to_listing({"entry_number": ""}) is None
 
 
-def test_scraper_is_mac_only_and_off_on_the_vm(monkeypatch):
+def test_scraper_is_mac_only_and_off_on_the_vm(monkeypatch, tmp_path):
     from foreclosure_scraper.scrapers.counties_generic import liensnc as mod
     from foreclosure_scraper.source_split import needs_mac
 
+    # The final assertion exercises the "neither switch is on" path, so it must not depend on
+    # whatever the real data/liensnc/OFF kill-switch file happens to be on the machine running
+    # this test -- found 2026-10-13: the owner's own standing OFF file (a real, intentional
+    # operator switch, not a bug) made this fail locally with no code defect involved.
+    monkeypatch.setattr(mod, "_OFF_FILE", tmp_path / "OFF")
     monkeypatch.setenv("FORECLOSURE_ROLE", "vm")
     s = mod.LiensNCIncrementalScraper()
     assert s.slug == "counties_generic.liensnc" and needs_mac(s)
