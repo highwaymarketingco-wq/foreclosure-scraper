@@ -123,27 +123,35 @@ async def _search_by_name(
     """Search instruments by party name. Returns list of instrument dicts.
     
     Dates in MM/DD/YYYY format.
+    Uses GET to /InstrumentGrid/Search which returns JSON with a "search"
+    object containing a "Names" array of instrument records.
+    
+    SearchCriteria values:
+      1=Grantors, 2=Grantees, 3=Grantors & Grantees,
+      4=Instrument#, 5=Recorded Date, 6=Book & Page,
+      7=Instrument Type, 8=Property
     """
     headers = {
         "User-Agent": _UA,
-        "Accept": "application/json, text/html",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Referer": _GRID_URL,
-        "X-Requested-With": "XMLHttpRequest",
-        "Origin": _BASE,
     }
     
-    # Step 1: POST search — returns JSON with redirect URL
-    r = await client.post(
-        _SEARCH_URL,
-        data={
-            "Name": name,
-            "SearchCriteria": "0",
-            "SearchType": "S",
-            "StartDate": start_date,
-            "EndDate": end_date,
-        },
-        headers=headers,
-    )
+    params = {
+        "Name": name,
+        "SearchCriteria": "3",  # Grantors & Grantees
+        "SearchType": "S",
+    }
+    if start_date:
+        params["StartDate"] = start_date
+    if end_date:
+        params["EndDate"] = end_date
+    
+    r = await client.get(_SEARCH_URL, params=params, headers=headers)
+    
+    if r.status_code != 200:
+        log.warning("cherokee_rod.search_fail", status=r.status_code)
+        return []
     
     try:
         j = r.json()
@@ -151,73 +159,15 @@ async def _search_by_name(
         log.warning("cherokee_rod.search_not_json", status=r.status_code, size=len(r.text))
         return []
     
-    search_url = j.get("search", "")
-    status = j.get("status", "")
-    
-    if not search_url:
-        log.warning("cherokee_rod.no_search_url", status=status, response=j)
+    if j.get("status") != "Success":
+        log.warning("cherokee_rod.search_bad_status", status=j.get("status"))
         return []
     
-    # Step 2: GET the results page — it contains the Kendo grid
-    full_url = search_url if search_url.startswith("http") else f"{_BASE}{search_url}"
-    r2 = await client.get(full_url, headers={
-        "User-Agent": _UA,
-        "Accept": "text/html",
-        "Referer": _GRID_URL,
-    })
-    
-    if r2.status_code != 200:
-        log.warning("cherokee_rod.results_page_fail", status=r2.status_code)
-        return []
-    
-    # The Kendo grid loads data via AJAX. Find the transport read URL.
-    tree = HTMLParser(r2.text)
-    
-    # Extract inline data from Kendo grid initialization
-    # The grid may have inline data or require a separate AJAX call
-    # Look for the dataSource configuration
-    ds_match = re.search(
-        r'dataSource\s*[:=]\s*(?:new\s+kendo\.data\.DataSource\s*\()?\{.*?"data"\s*:\s*(\[.*?\])',
-        r2.text,
-        re.DOTALL,
-    )
-    
-    results = []
-    
-    if ds_match:
-        try:
-            data = json.loads(ds_match.group(1))
-            results = data if isinstance(data, list) else []
-        except json.JSONDecodeError:
-            pass
-    
-    # If no inline data, try parsing from the HTML table
-    if not results:
-        table = tree.css_first("table.k-grid table, .k-grid-content table, table")
-        if table:
-            rows = table.css("tr")
-            header_cells = []
-            for row in rows:
-                cells = row.css("th")
-                if cells and not header_cells:
-                    header_cells = [c.text().strip() for c in cells]
-                    continue
-                cells = row.css("td")
-                if cells:
-                    row_data = {}
-                    for i, cell in enumerate(cells):
-                        key = header_cells[i] if i < len(header_cells) else f"col_{i}"
-                        row_data[key] = cell.text().strip()
-                    if row_data:
-                        results.append(row_data)
-    
-    # Also look for instrument details links
-    for a in tree.css("a"):
-        href = a.attributes.get("href", "") or ""
-        if "Details" in href and "InstrumentID" in href:
-            iid = re.search(r"InstrumentID=([^&]+)", href)
-            if iid:
-                results.append({"InstrumentID": iid.group(1), "link": href})
+    search_obj = j.get("search", {})
+    if isinstance(search_obj, dict):
+        results = search_obj.get("Names", [])
+    else:
+        results = []
     
     log.info("cherokee_rod.search_results", name=name, count=len(results))
     return results
@@ -294,7 +244,7 @@ class CherokeeSCROD(BaseScraper):
         search_name = f"{last}, {first}" if first else last
 
         async with httpx.AsyncClient(
-            follow_redirects=True, timeout=30.0
+            follow_redirects=True, timeout=60.0
         ) as c:
             if not await _login(c):
                 return None
@@ -314,7 +264,13 @@ class CherokeeSCROD(BaseScraper):
             filings: list[dict] = []
 
             for item in results:
-                text = " ".join(str(v) for v in item.values()).upper()
+                # Build text from key fields for keyword matching
+                kind = (item.get("Kind") or "").upper()
+                index_name = (item.get("IndexName") or "").upper()
+                direct = (item.get("DirectName") or "").upper()
+                indirect = (item.get("IndirectName") or "").upper()
+                text = f"{kind} {index_name} {direct} {indirect}"
+
                 doc_type = None
                 for dt in _LIEN_DOCTYPES:
                     if dt in text:
@@ -327,18 +283,29 @@ class CherokeeSCROD(BaseScraper):
                         has_lien = True
                     if "SATISFACTION" in text or "RELEASE" in text:
                         has_satisfaction = True
-                    filings.append({
-                        "doc_type": doc_type,
-                        "instrument_id": item.get("InstrumentID", ""),
-                        "excerpt": text[:300],
-                    })
+
+                filing = {
+                    "doc_type": doc_type or kind,
+                    "instrument_id": item.get("InstrumentID", ""),
+                    "instrument_date": item.get("InstrumentDateAsString", ""),
+                    "book": item.get("Book", ""),
+                    "volume": item.get("Volume", ""),
+                    "page": item.get("Page", ""),
+                    "kind": kind,
+                    "direct_name": item.get("DirectName", ""),
+                    "indirect_name": item.get("IndirectName", ""),
+                    "consideration": item.get("Consideration", ""),
+                    "description": item.get("Description", ""),
+                    "act": item.get("Act", ""),
+                }
+                filings.append(filing)
 
             # Fetch details for first few instruments
             detailed_filings = []
             for f in filings[:10]:
                 iid = f.get("instrument_id", "")
                 if iid:
-                    details = await _get_details(c, iid)
+                    details = await _get_details(c, str(iid))
                     if details:
                         f["details"] = details
                 detailed_filings.append(f)
@@ -355,63 +322,69 @@ class CherokeeSCROD(BaseScraper):
 
     @staticmethod
     async def search_parcel(parcel_id: str) -> dict | None:
-        """Search Cherokee County SC ROD by parcel ID."""
+        """Search Cherokee County SC ROD by parcel ID.
+        
+        Uses SearchCriteria=8 (Property) to search by parcel.
+        """
         if not parcel_id or len(parcel_id.strip()) < 3:
             return None
 
         async with httpx.AsyncClient(
-            follow_redirects=True, timeout=30.0
+            follow_redirects=True, timeout=60.0
         ) as c:
             if not await _login(c):
                 return None
 
             headers = {
                 "User-Agent": _UA,
-                "Accept": "application/json, text/html",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Referer": _GRID_URL,
-                "X-Requested-With": "XMLHttpRequest",
-                "Origin": _BASE,
             }
 
-            r = await c.post(
-                _SEARCH_URL,
-                data={
-                    "ParcelId": parcel_id,
-                    "SearchCriteria": "0",
-                    "SearchType": "S",
-                },
-                headers=headers,
-            )
+            # SearchCriteria=8 is "Property" search
+            r = await c.get(_SEARCH_URL, params={
+                "ParcelId": parcel_id,
+                "SearchCriteria": "8",
+                "SearchType": "S",
+            }, headers=headers)
 
             try:
                 j = r.json()
-                search_url = j.get("search", "")
-                if search_url:
-                    full_url = (
-                        search_url
-                        if search_url.startswith("http")
-                        else f"{_BASE}{search_url}"
-                    )
-                    r2 = await c.get(full_url, headers={
-                        "User-Agent": _UA,
-                        "Accept": "text/html",
-                    })
-                    tree = HTMLParser(r2.text)
-                    results = []
-                    for a in tree.css("a"):
-                        href = a.attributes.get("href", "") or ""
-                        if "Details" in href and "InstrumentID" in href:
-                            iid = re.search(r"InstrumentID=([^&]+)", href)
-                            if iid:
-                                results.append({"InstrumentID": iid.group(1)})
-                    log.info("cherokee_rod.parcel_search", parcel=parcel_id, count=len(results))
-                    return {
-                        "parcel_id": parcel_id,
-                        "instrument_count": len(results),
-                        "instruments": results[:50],
-                        "url": _GRID_URL,
-                    }
-            except Exception as exc:
-                log.warning("cherokee_rod.parcel_search_fail", error=str(exc)[:160])
+            except Exception:
+                log.warning("cherokee_rod.parcel_not_json", status=r.status_code)
+                return None
 
-            return None
+            if j.get("status") != "Success":
+                log.warning("cherokee_rod.parcel_bad_status", status=j.get("status"))
+                return None
+
+            search_obj = j.get("search", {})
+            if isinstance(search_obj, dict):
+                results = search_obj.get("Names", [])
+            else:
+                results = []
+
+            log.info("cherokee_rod.parcel_search", parcel=parcel_id, count=len(results))
+
+            if not results:
+                return None
+
+            return {
+                "parcel_id": parcel_id,
+                "instrument_count": len(results),
+                "instruments": [
+                    {
+                        "instrument_id": r.get("InstrumentID", ""),
+                        "kind": r.get("Kind", ""),
+                        "date": r.get("InstrumentDateAsString", ""),
+                        "direct_name": r.get("DirectName", ""),
+                        "indirect_name": r.get("IndirectName", ""),
+                        "consideration": r.get("Consideration", ""),
+                        "book": r.get("Book", ""),
+                        "volume": r.get("Volume", ""),
+                        "page": r.get("Page", ""),
+                    }
+                    for r in results[:50]
+                ],
+                "url": _GRID_URL,
+            }
