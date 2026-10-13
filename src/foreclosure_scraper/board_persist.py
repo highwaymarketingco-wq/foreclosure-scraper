@@ -813,6 +813,7 @@ def merge_prior_board(
         match_idx: int | None = None
         rec_sigs = ()
         refused_parcel = False
+        refused_url_conflict = False
         alias_fold = None
         if isinstance(rec, dict) and (alias_table or alias_short):
             canon, how = parcel_alias.canonical_prior(rec, alias_table, alias_short,
@@ -846,10 +847,19 @@ def merge_prior_board(
                         continue
                     # A shared URL key alone (a county roll's URL is every one of its rows' key) is the
                     # same record only when the rows name the same county and owner (dedupe's rule;
-                    # audit 2026-10-09 regressions W2)
-                    if (sig[0] == "k" and str(sig[1]).startswith("url:")
+                    # audit 2026-10-09 regressions W2). The identity-less row_keys() fallback
+                    # ('rk', 'row:<fingerprint>', verification.core._fingerprint) is just as weak --
+                    # its fingerprint is NOT keyed by owner_name either (_IDENTITY_FIELDS omits it),
+                    # so two rows that share a source/URL but name different owners can ALSO share
+                    # that signature alone; without this they bypassed the conflict check entirely
+                    # and folded (set iteration over rec_sigs can hit 'rk' before 'k').
+                    if (sig[0] in ("k", "rk") and str(sig[1]).startswith(("url:", "row:"))
                             and url_key_conflict(rec, fresh_deduped[i])):
-                        stats["refused_url_key_conflict"] = stats.get("refused_url_key_conflict", 0) + 1
+                        # Flagged, not counted here: rec_sigs is a set, so the SAME (rec, i) pair
+                        # can be revisited under both its 'k' and 'rk' weak signatures -- counting
+                        # on the spot would double-count one refused row. Counted once below,
+                        # same pattern as refused_parcel/refused_different_parcel.
+                        refused_url_conflict = True
                         continue
                     if _different_valid_parcels(rec, fresh_deduped[i]):
                         refused_parcel = True
@@ -885,6 +895,8 @@ def merge_prior_board(
 
         if refused_parcel and match_idx is None:
             stats["refused_different_parcel"] += 1
+        if refused_url_conflict and match_idx is None:
+            stats["refused_url_key_conflict"] = stats.get("refused_url_key_conflict", 0) + 1
         if match_idx is not None:
             streamed_for_drop_rate += 1
             try:
