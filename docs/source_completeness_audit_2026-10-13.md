@@ -182,6 +182,36 @@ bullet below). Live-checked, not assumed:
   ALSO gated by a real Google reCAPTCHA v2 ("Please complete the CAPTCHA to enter this site",
   sitekey `6LfblzYqAAAAAFNl9g-RwU5zbI97HFqwWbhoD4Rb") — confirmed live 2026-10-14 with nodriver
   already past the Cloudflare challenge. Genuinely walled; not automated.
+
+**CORRECTION 2026-10-14 (cont. x2)** — the reCAPTCHA above stays genuinely walled (the owner
+personally solved it live, in-session; solving it is never automated), but everything DOWNSTREAM
+of that human clear is now BUILT, not just documented. Jasper runs a different CCS product than
+`rod/cchs.py`'s classic-ASP app used elsewhere in this codebase (Burke/Cleveland/Lincoln/
+Madison/Henderson NC) — a newer ASP.NET MVC + DevExpress ASPxGridView app, net-new, now read by
+`rod/ccs_devexpress.py`. Live-verified, through that human-cleared session: the From/To Date
+search fields do NOT filter on the document's own recorded date (an internal verification/index
+timestamp instead — a 2017 mortgage surfaced inside a 2026-only window because a 2026
+satisfaction cross-references it); a full 1985-2026 sweep is reachable (10,479 records / 9,307
+documents) but took ~55-60s server-side for one query, so routine runs use a 90-day window
+instead; the Doc Types picker lets the search be scoped server-side to 6 live-confirmed distress
+Kind codes (DETH/DETH-DB/LIEN/ML/TXLN/LPEN — this county's dictionary has NO foreclosure/trustee
+Kind at all, SC foreclosures record as a plain DEED here), cutting a 90-day sweep from 6,903
+records/461 pages down to 65 records/5 pages; pagination is driven through the page's own real
+"Next Page" control rather than hand-rolling DevExpress's opaque stateful callback protocol. The
+session-reuse question this pass was also asked to answer: the served page JS itself sets a
+12-hour `timeoutLength` and only pings its own keep-alive endpoint every 6 hours — architectural
+evidence of a session built to survive far longer than one scraper run, corroborated live: with
+that heartbeat call deliberately blocked, the same human-cleared session answered a real
+authenticated search with live grid data after 22+ minutes of this pass's own continuous use
+(not a zero-request idle gap like the Wake precedent's — see `rod/ccs_devexpress.py`'s module
+docstring for the exact measured gap and the honest distinction from Wake's method).
+`_fetch_jasper()` now drives this module over an nodriver tab
+exactly like `_fetch_clarendon()` drives Clarendon — it still only clears Cloudflare itself, and
+still skips with the existing wall note when the reCAPTCHA modal is what's left blocking it. 40
+tests in `tests/test_sc_rod_walled.py`, built from real rows captured in that live session
+(a real IRS tax lien, a real mechanics lien, real HOA liens, real death certificates). The ONLY
+remaining gap is the manual reCAPTCHA clear itself — same boundary as every other real CAPTCHA
+in this codebase.
 **CORRECTION 2026-10-14 (cont.)** — `counties_sc/sc_rod_cott.py` (Union) was also WRONGLY listed
 here, on the strength of its own docstring's unverified "pay-per-view" claim, which contradicted
 the shared `rod/doc_images.py` module's own `COUNTY_IMAGE_STATUS[("SC","Union")] = ("free", ...)`
