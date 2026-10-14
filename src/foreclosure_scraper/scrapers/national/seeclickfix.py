@@ -33,6 +33,20 @@ Issues tagged "code violation"/"abandoned property"/"blight"/"vacant"/
 "graffiti" are real motivated-seller distress signals. API docs:
 https://developer.seeclickfix.com/ — free, no key needed for basic
 queries (rate-limited ~100 req/min).
+
+FIXED 2026-10-14 (source-completeness audit, "photo field" flag): every
+issue carries a `media` object the old code never read at all. Live-
+verified across 453 real rows (5 footprint cities, 3 pages each) / 202
+distress-keyword-matched rows: `media.image_full` (a real resident-
+uploaded photo, full-size) is populated on 99/202 (49%) of distress rows
+-- a real photo of the junk/blight/abandoned property, not boilerplate.
+The remaining rows carry only `media.representative_image_url`, which on
+every row with no real upload is a generic per-CATEGORY stock icon (e.g.
+".../assets/categories/tree-<hash>.png") -- same icon for every "Tree
+Hazard" issue regardless of address, so it is NOT per-row data and is
+deliberately NOT captured. `image_full` / `image_square_100x100` /
+`video_url` are the real per-issue fields and are now captured when
+truthy.
 """
 from __future__ import annotations
 
@@ -173,6 +187,12 @@ class SeeClickFixScraper(BaseScraper):
                     lat = iss.get("lat")
                     lng = iss.get("lng")
                     issue_url = iss.get("html_url") or iss.get("url") or ""
+                    # FOUND 2026-10-14: a real resident-uploaded photo (not the
+                    # generic per-category stock icon -- see module docstring).
+                    media = iss.get("media") or {}
+                    photo_url = media.get("image_full") or None
+                    photo_thumb_url = media.get("image_square_100x100") or None
+                    video_url = media.get("video_url") or None
                     out.append(Listing(
                         source=self.slug,
                         source_url=issue_url or _API,
@@ -206,6 +226,13 @@ class SeeClickFixScraper(BaseScraper):
                                 # property owner; the public board never carries a complainant.
                                 "url": issue_url,
                                 "place_url": c["place_url"],
+                                # FOUND 2026-10-14 (source-completeness audit): real
+                                # per-issue media, when a resident actually attached one --
+                                # the generic per-category stock icon is deliberately
+                                # excluded (see module docstring).
+                                "photo_url": photo_url,
+                                "photo_thumbnail_url": photo_thumb_url,
+                                "video_url": video_url,
                             },
                         },
                     ))

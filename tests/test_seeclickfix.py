@@ -120,6 +120,135 @@ def test_scraper_is_registered_and_discoverable():
     assert issubclass(m.SeeClickFixScraper, BaseScraper)
 
 
+# ---------------------------------------------------------------------------
+# Source-completeness audit 2026-10-14: "photo field" flag. Live-verified
+# against 453 real rows (5 footprint cities) / 202 distress-keyword rows:
+# `media.image_full` (a real resident-uploaded photo) populated on 99/202
+# (49%); the rest carry only `media.representative_image_url`, a generic
+# per-category stock icon (same icon for every issue of that category,
+# confirmed by re-fetching across unrelated rows) that is NOT per-row data
+# and stays uncaptured by design.
+# ---------------------------------------------------------------------------
+
+class _FakeResp:
+    def __init__(self, payload):
+        self._payload = payload
+        self.status_code = 200
+
+    def json(self):
+        return self._payload
+
+
+class _FakeHttpClient:
+    def __init__(self, pages):
+        self._pages = pages
+        self._i = 0
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def get(self, url, params=None):
+        page = self._pages[self._i] if self._i < len(self._pages) else {"issues": []}
+        self._i += 1
+        return _FakeResp(page)
+
+
+_REAL_ISSUE_WITH_PHOTO = {
+    # Shape live-verified 2026-10-14 against place_url=spartanburg.
+    "id": 22478671,
+    "summary": "Junk in Yard",
+    "description": "trash and junk piled in the side yard",
+    "address": "123 Elm St, Spartanburg, SC",
+    "lat": 34.9, "lng": -81.9,
+    "created_at": "2026-08-11T10:25:06-04:00",
+    "updated_at": "2026-08-11T10:25:06-04:00",
+    "html_url": "https://seeclickfix.com/issues/22478671",
+    "media": {
+        "video_url": None,
+        "image_full": (
+            "https://seeclickfix.com/rails/active_storage/representations/"
+            "redirect/eyJ.../2decddc0-6621-40b9-a808-f5f0722b89f8.jpg"
+        ),
+        "image_square_100x100": (
+            "https://seeclickfix.com/rails/active_storage/representations/"
+            "redirect/eyJ.../thumb_2decddc0.jpg"
+        ),
+        "representative_image_url": (
+            "https://seeclickfix.com/rails/active_storage/representations/"
+            "redirect/eyJ.../2decddc0-6621-40b9-a808-f5f0722b89f8.jpg"
+        ),
+    },
+}
+
+_REAL_ISSUE_NO_PHOTO = {
+    "id": 22961415,
+    "summary": "Overgrown vacant lot",
+    "description": "abandoned and overgrown",
+    "address": "456 Oak St, Spartanburg, SC",
+    "lat": 34.9, "lng": -81.9,
+    "created_at": "2026-08-01T00:00:00-04:00",
+    "updated_at": "2026-08-01T00:00:00-04:00",
+    "html_url": "https://seeclickfix.com/issues/22961415",
+    "media": {
+        "video_url": None,
+        "image_full": None,
+        "image_square_100x100": None,
+        # Generic per-category stock icon -- same URL for every "Tree"-type
+        # issue regardless of address; not per-row data (see module docstring).
+        "representative_image_url": (
+            "https://seeclickfix.com/assets/categories/tree-"
+            "dde3541ec612fcdf09413e99a627d32c887f9dd5599e78f23f5b67319970b4bc.png"
+        ),
+    },
+}
+
+
+def test_captures_real_resident_uploaded_photo(monkeypatch):
+    fake = _FakeHttpClient([{"issues": [_REAL_ISSUE_WITH_PHOTO]}])
+    monkeypatch.setattr(m, "client", lambda timeout=30.0: fake)
+    c = next(c for c in m._CITIES if c["city"] == "Spartanburg")
+    out = asyncio.run(m.SeeClickFixScraper()._fetch_city(c))
+    assert len(out) == 1
+    scf = out[0].raw["seeclickfix"]
+    assert scf["photo_url"] == _REAL_ISSUE_WITH_PHOTO["media"]["image_full"]
+    assert scf["photo_thumbnail_url"] == (
+        _REAL_ISSUE_WITH_PHOTO["media"]["image_square_100x100"]
+    )
+    assert scf["video_url"] is None
+
+
+def test_does_not_mistake_the_generic_category_icon_for_a_real_photo(monkeypatch):
+    fake = _FakeHttpClient([{"issues": [_REAL_ISSUE_NO_PHOTO]}])
+    monkeypatch.setattr(m, "client", lambda timeout=30.0: fake)
+    c = next(c for c in m._CITIES if c["city"] == "Spartanburg")
+    out = asyncio.run(m.SeeClickFixScraper()._fetch_city(c))
+    assert len(out) == 1
+    scf = out[0].raw["seeclickfix"]
+    assert scf["photo_url"] is None
+    assert scf["photo_thumbnail_url"] is None
+    # The generic stock-icon URL must never leak into photo_url.
+    assert "assets/categories" not in str(scf["photo_url"])
+
+
+def test_missing_media_block_does_not_crash(monkeypatch):
+    """Defensive: `iss.get("media") or {}` must not raise when a row has no
+    `media` key at all (rather than an empty/null one)."""
+    issue = dict(_REAL_ISSUE_NO_PHOTO)
+    del issue["media"]
+    fake = _FakeHttpClient([{"issues": [issue]}])
+    monkeypatch.setattr(m, "client", lambda timeout=30.0: fake)
+    c = next(c for c in m._CITIES if c["city"] == "Spartanburg")
+    out = asyncio.run(m.SeeClickFixScraper()._fetch_city(c))
+    assert len(out) == 1
+    scf = out[0].raw["seeclickfix"]
+    assert scf["photo_url"] is None
+    assert scf["photo_thumbnail_url"] is None
+    assert scf["video_url"] is None
+
+
 def test_live_spartanburg_fetch_returns_correctly_scoped_real_rows():
     """Live network call against the real API, scoped to one city (not the
     full 20-city sweep) -- confirms the place_url fix actually works end to
