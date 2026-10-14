@@ -22,6 +22,7 @@ from foreclosure_scraper.scrapers.national.nc_upset_bids import (
     COUNTY_UPSET_PAGES,
     KANIA_AJAX_TEMPLATE,
     NCUpsetBids,
+    _kania_row_to_listings,
     _min_upset_bid,
     extract_data_request_url,
     feed_stats,
@@ -164,6 +165,51 @@ def test_bid_economics_are_first_class(kania_rows):
         assert li.foreclosure_process == "tax"
         assert li.source == "national.nc_upset_bids"
         assert set(li.raw) == {"upset_bid"}
+
+
+def test_salestatus_blank_on_every_row_in_the_live_fixture(kania_rows):
+    """Live-checked 2026-10-14 against the real Kania feed (189 rows): the
+    column exists on every row but is "" on all of them right now. Guards
+    that the blank case resolves to None, not "" leaking into raw."""
+    assert kania_rows
+    for li in kania_rows:
+        # Omitted entirely when blank (same convention as our_file /
+        # property_type via _upset_raw's `extra` filter), not a "" value.
+        assert li.raw["upset_bid"].get("sale_status_published") is None
+
+
+def test_salestatus_is_captured_when_kania_populates_it():
+    """`salestatus` sat on every Kania row (docstring's own "Row keys" list)
+    but was read-then-dropped here, even though the sibling
+    `law_firms.kania` (the same feed) already carries it forward. Real
+    value shape ("Sale Closed-Property Sold") confirmed live 2026-10-01
+    against a sibling NC county Ninja Tables grid using the identical
+    column (tests/test_cleveland_tax_foreclosure_salestatus.py) -- Kania's
+    own column is blank today but uses the same Ninja Tables convention."""
+    value = {
+        "county": "Alexander",
+        "address": "123 Test Rd, Taylorsville",
+        "parcel": "0001234",
+        "saledatetime": "10/13/2026 11:00:00 AM",
+        "openingbid": "$22,400.00",
+        "currentbid": "$51,000.00",
+        "closedate": "10/23/2026",
+        "propertytype": "Residential Home",
+        "courtfile": "25CV001557-010",
+        "ourfile": "24097",
+        "salestatus": "Sale Closed-Property Sold",
+        "___id___": 99999,
+    }
+    out = _kania_row_to_listings(
+        value, slug="national.nc_upset_bids", now=datetime(2026, 8, 2),
+        all_rows=False,
+    )
+    assert len(out) == 1
+    li = out[0]
+    assert li.raw["upset_bid"]["sale_status_published"] == "Sale Closed-Property Sold"
+    # This scraper's own upset-posture status is untouched by the published
+    # text — it still derives auction_status from deadline/sale_date.
+    assert li.auction_status == "upset_bid_period"
 
 
 def test_status_reflects_whether_the_window_is_still_open(feed):

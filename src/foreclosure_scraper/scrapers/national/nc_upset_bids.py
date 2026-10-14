@@ -33,7 +33,11 @@ bypass of any kind):
    and every published column lives under ``value``. Counting counties at the
    top level returns 0, which is the trap that hid this feed.
    Row keys: county address parcel saledatetime openingbid currentbid
-   closedate propertytype courtfile ourfile salestatus.
+   closedate propertytype courtfile ourfile salestatus. ``salestatus`` is
+   captured into ``raw["upset_bid"]["sale_status_published"]`` (fixed
+   2026-10-14 -- it was read by the sibling ``law_firms.kania`` for this
+   exact feed but never by this module; live-checked, blank on all 189
+   current rows, kept for whenever Kania does populate it).
 
 2. County-published upset lists. Rutherford runs two pages under
    ``/foreclosure_information/``: an in-house (county-prosecuted) HTML table,
@@ -459,6 +463,14 @@ def _kania_row_to_listings(value: dict, *, slug: str, now: datetime,
 
     court_file = _strip_tags(value.get("courtfile")) or None
     our_file = _strip_tags(value.get("ourfile")) or None
+    # Kania's own posted status for the row (distinct from `status` below,
+    # which this scraper derives from deadline/sale_date). Live-checked
+    # 2026-10-14: blank on all 189 current rows, but the sibling
+    # `law_firms.kania` (same feed) already carries it forward for exactly
+    # this reason — Kania does populate it on some rows and it was being
+    # read-then-dropped here. Captured for parity/forward-compat; never
+    # overrides this scraper's own `auction_status`.
+    sale_status_published = _strip_tags(value.get("salestatus")) or None
     prop_type = _strip_tags(value.get("propertytype"))
     kind = _KIND_BY_TYPE.get(prop_type.lower(), PropertyKind.UNKNOWN)
     status = _status_for(deadline, sale_date, now)
@@ -510,7 +522,8 @@ def _kania_row_to_listings(value: dict, *, slug: str, now: datetime,
                     now=now, withheld_sale_date=withheld is not None,
                     extra={"our_file": our_file,
                            "property_type": prop_type or None,
-                           "row_id": value.get("___id___")},
+                           "row_id": value.get("___id___"),
+                           "sale_status_published": sale_status_published},
                 ),
             },
         ))
