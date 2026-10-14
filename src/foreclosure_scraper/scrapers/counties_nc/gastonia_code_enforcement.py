@@ -164,6 +164,30 @@ mid-crawl timeout under this addition as expected until it is.
 
 Free, public, anonymous. No CAPTCHA, no login, no WAF. Gate with
 FORECLOSURE_GASTONIA_CODE=0.
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern A -- ArcGIS
+FeatureServer attachments): the audit's affected-file list named this
+module alongside the real ArcGIS-attachments gaps fixed on
+asheville_helene.py / henderson_code_violations.py, but that mischaracterizes
+this source. The case data here never comes from an ArcGIS FeatureServer
+`outFields` query at all -- it is CityView's own `LocatorResultsPolygon`/
+`StatusReference` ASP.NET endpoints (see module docstring above), which have
+no `hasAttachments`/`queryAttachments` concept to check. The one ArcGIS
+layer this module touches, Gaston County's own parcel layer (`PARCEL_LAYER`),
+is a secondary PIN/owner join, not the case source, and live-checking it
+anyway (`.../PublicGIS/Parcels/FeatureServer/11?f=json`) returns
+`hasAttachments: false` regardless.
+
+CityView's native equivalent of an attachment -- the `#documentsContainer`
+div already present on every `StatusReference` detail page this scraper
+fetches for `fetch_case_description()` -- was live-sampled across 30+ real
+open cases spanning the full 2026 case-number range (944-2485) and every
+`_SEVERE` category (Housing, Public Nuisance, Commercial Maintenance): the
+container rendered empty on all of them, with no AJAX call populating it
+later. No fix applied; nothing to fetch today. If Gastonia's CityView
+instance ever starts attaching inspection photos to cases, they would
+surface in that same container and `fetch_case_description()` is the
+natural place to pick them up alongside the description text.
 """
 from __future__ import annotations
 

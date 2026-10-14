@@ -21,6 +21,18 @@ WHAT IS READ
 
 DATELESS: slug counties_nc.wake_code_cases goes in main.DATELESS_OK_SOURCES.
 Gate: FORECLOSURE_WAKE_CODE=0.
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern A -- ArcGIS
+FeatureServer attachments): the 2026-10-13 audit flagged this file as never
+checking `hasAttachments`/`queryAttachments` on the codecases_90days_test
+layer, the same gap class fixed on asheville_helene.py and
+henderson_code_violations.py. Live-checked directly against
+`.../codecases_90days_test/FeatureServer/0?f=json`: `hasAttachments: false`.
+Confirmed with a direct `queryAttachments` call against real objectids (1,
+2): the server rejects it outright -- `{"error":{"code":400,"message":"",
+"details":["Layer does not support attachments."]}}` -- not an empty-but-
+enabled layer, the capability does not exist on this service at all. No fix
+applied; nothing to fetch.
 """
 from __future__ import annotations
 

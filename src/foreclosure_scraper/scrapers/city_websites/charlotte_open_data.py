@@ -62,6 +62,18 @@ Free, public, no login.
 Slug: city_websites.charlotte_open_data
 Category: city
 ListingType: DISTRESSED
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern A -- ArcGIS
+FeatureServer/MapServer attachments): the 2026-10-13 audit flagged this file
+as never checking `hasAttachments`/`queryAttachments` on the CodeEnforcement-
+CasesAll layer, the same gap class fixed on asheville_helene.py and
+henderson_code_violations.py. Live-checked directly against
+`.../HNS/CodeEnforcementCasesAll/MapServer/0?f=json`: `hasAttachments: false`.
+Confirmed with a direct `queryAttachments` call against real open-case
+objectids (3135, 23299): the server rejects it outright --
+`{"error":{"code":400,"message":"This layer/table is NOT attachments
+enabled","details":[]}}` -- not an empty-but-enabled layer, the capability
+does not exist on this service at all. No fix applied; nothing to fetch.
 """
 from __future__ import annotations
 

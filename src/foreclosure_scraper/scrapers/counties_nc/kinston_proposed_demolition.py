@@ -29,6 +29,21 @@ DATELESS: ships under the ``counties_generic.arcgis_distress.`` prefix that
 ``main.DATELESS_OK_SOURCES`` already admits (see ``_layer_kit``).
 PRIVACY: explicit outFields, ``drop_sensitive`` on every attribute bag.
 Gate: ``FORECLOSURE_KINSTON_DEMOLITION=0``.
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern A -- ArcGIS
+FeatureServer attachments): the 2026-10-13 audit flagged this file as never
+checking ``hasAttachments``/``queryAttachments`` on the 2026 Proposed
+Demolition layer, the same gap class fixed on asheville_helene.py and
+henderson_code_violations.py. Live-checked directly against
+``.../2026_Proposed_Demolition_Map_WFL1/FeatureServer/0?f=json``:
+``hasAttachments: false``. Confirmed with a direct ``queryAttachments`` call
+against real objectids (1, 2): the server rejects it outright --
+``{"error":{"code":400,"message":"","details":["Layer does not support
+attachments."]}}`` -- not an empty-but-enabled layer, the capability does
+not exist on this service at all. No fix applied; nothing to fetch (a
+condemned-structure demolition list is exactly where real inspection photos
+would be most valuable, so this is a genuine miss by the source, not by
+this scraper).
 """
 from __future__ import annotations
 
