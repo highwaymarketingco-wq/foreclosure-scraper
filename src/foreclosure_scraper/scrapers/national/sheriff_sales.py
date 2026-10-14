@@ -13,9 +13,18 @@ Sources (free, no auth):
 These sites publish plain HTML tables / PDFs of upcoming sales. We parse
 the HTML tables defensively — county sites change layout frequently and
 without notice, so every field is best-effort: a missing column degrades
-to None rather than crashing the whole run. PDFs (when the listing page
-links to one) are noted in raw but not OCR'd here — the doc-OCR
-enrichment handles those downstream.
+to None rather than crashing the whole run. A linked PDF/image is never
+parsed as HTML here, but when its path carries a sale-relevant keyword
+(see `_SALE_KEYWORDS`) its URL IS captured and handed to
+`document_links.stamp_documents` (raw["documents"] / raw["document_url"]),
+the same convention `anderson_acpass_deeds.py` uses — so the doc-OCR
+enrichment (`enrichment_doc_ocr.py`) actually has a real input to fetch
+and OCR downstream, instead of the link being silently discarded with no
+trace anywhere (FIXED 2026-10-13, source-completeness audit Pattern D —
+see `_fetch_county`'s link-collection loop for the live-verified detail).
+This attach is page-level, not per-row: it only fires when a county fetch
+returns exactly one listing, to avoid guessing which PDF belongs to which
+row when a page ever carries more than one real posting.
 
 Robots.txt is checked per host; if disallowed, that county is skipped
 (fail-closed compliance — never query a robots-banned path).
@@ -127,6 +136,7 @@ import structlog
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -237,6 +247,20 @@ _SALE_CONTEXT_RE = re.compile(
 #: File extensions that are never worth HTML-parsing as a sub-page (a PDF
 #: fed through HTMLParser produces no real rows, just wasted fetches).
 _NON_HTML_EXT = (".pdf", ".jpg", ".jpeg", ".png", ".gif", ".doc", ".docx", ".xls", ".xlsx")
+
+#: Path keywords that mark a link (HTML sub-page OR a non-HTML document, e.g.
+#: a notice-of-sale PDF) as sale-relevant. Deliberately excludes "sheriff" --
+#: see the module docstring's 2026-10-01 false-positive writeup: every page
+#: under a county sheriff's own site has "sheriff" in its PATH PREFIX (e.g.
+#: Charleston's unrelated .../departments/sheriff/files/det-stats.pdf), so
+#: that keyword alone would match nearly every PDF the department publishes,
+#: not just sale notices. Live-confirmed 2026-10-13 against real pages: this
+#: list matches Cleveland's real "Public Auction" PDF (path contains
+#: "auction") and Charleston's real per-case sale PDFs (paths contain "sale"
+#: via the "pending-sales" directory and/or "SALE-" filename prefix) while
+#: excluding Charleston's 11 unrelated department PDFs (org charts, mission
+#: statements, juvenile forms) and Brunswick's unrelated firearms-return form.
+_SALE_KEYWORDS = ("sale", "auction", "foreclosure", "pending", "civil")
 
 #: Content-container selectors to try for `_join_single_posting_container`,
 #: in priority order. `div.entry-content` is Brunswick's real live wrapper
@@ -798,10 +822,27 @@ async def _fetch_county(
     # FULL href, but every page on e.g. sheriffclevelandcounty.com contains
     # "sheriff" as a substring of its own hostname -- that matched literally
     # every link on the site (see module docstring). Check the PATH only
-    # (host stripped) and skip non-HTML files (a PDF fed through HTMLParser
-    # yields nothing real and is a wasted fetch).
+    # (host stripped) and skip non-HTML files as a sub-PAGE to crawl (a PDF
+    # fed through HTMLParser yields nothing real and is a wasted fetch) --
+    # but a sale-relevant PDF/image href is still worth RECORDING (see
+    # doc_urls below), just never fetched/parsed as HTML.
+    #
+    # FIXED 2026-10-13 (source-completeness audit, Pattern D): this used to
+    # `continue` on a non-HTML link with zero trace anywhere -- the module
+    # docstring claimed such PDFs were "noted in raw but not OCR'd here", but
+    # no code path ever wrote the URL into any raw dict. Live-confirmed on
+    # 2026-10-13: Cleveland County's real nav links a "Public Auction" PDF
+    # (.../uploads/2025/05/No-Public-Auction-8.5-x-11-in.pdf, 200
+    # application/pdf via a plain GET, no login/CAPTCHA) and Charleston
+    # County's pending-sales page carries real per-case notice PDFs (e.g.
+    # .../pending-sales/SALE-24-7705.pdf, also a plain 200). Both are now
+    # collected into doc_urls and stamped onto the listing(s) parsed off this
+    # same page via document_links.stamp_documents, so enrichment_doc_ocr.py
+    # actually has a real input to OCR -- making the docstring's claim true
+    # instead of silently discarding the only trace of the document.
     tree = HTMLParser(html)
     sub_urls: list[str] = [url]
+    doc_urls: list[str] = []
     for a in tree.css("a[href]"):
         href = a.attributes.get("href", "")
         if not href:
@@ -812,9 +853,10 @@ async def _fetch_county(
         except Exception:
             continue
         if path_lower.endswith(_NON_HTML_EXT):
+            if any(kw in path_lower for kw in _SALE_KEYWORDS) and full not in doc_urls:
+                doc_urls.append(full)
             continue
-        if any(kw in path_lower for kw in
-               ("sale", "auction", "foreclosure", "pending", "civil")):
+        if any(kw in path_lower for kw in _SALE_KEYWORDS):
             if full not in sub_urls:
                 sub_urls.append(full)
 
@@ -853,6 +895,22 @@ async def _fetch_county(
         if listings:
             log.info("sheriff_sales.page_done", county=county,
                      url=page_url, count=len(listings))
+
+    # Attach any sale-relevant PDF/image links found on the main page (see
+    # doc_urls above) to the listing(s) parsed off this county. When exactly
+    # one real posting came back -- the common, live-observed case for these
+    # 3 sites (docstring: real SHERIFF_SALE volume is deliberately small) --
+    # every collected doc_url is unambiguously that posting's. With MORE than
+    # one listing off the same page, there is no reliable way to tell which
+    # PDF belongs to which row without risking the exact misattribution class
+    # of bug `_join_single_posting_container`/the dedup fix above guard
+    # against, so this deliberately does NOT guess -- an unmatched PDF is
+    # left unstamped rather than attached to every listing on the page.
+    if doc_urls and len(out) == 1:
+        added = stamp_documents(out[0], doc_urls)
+        if added:
+            log.info("sheriff_sales.doc_links_stamped", county=county,
+                     count=added)
 
     log.info("sheriff_sales.county_done", county=county, state=state,
              total=len(out))
