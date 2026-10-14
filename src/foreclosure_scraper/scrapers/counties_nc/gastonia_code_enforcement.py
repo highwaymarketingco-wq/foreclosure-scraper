@@ -137,6 +137,31 @@ already knows how to read, per the Henderson/Lincoln precedent) so a
 Vegetation/Weeds- or Zoning/Land-Use-only property still ships on the board
 truthfully (`has_open` stays true) but withholds PROPERTY credit.
 
+2026-10-13 fix (source-completeness audit, Pattern D): the 2026-10-03 note above
+says each case's free-text `Description` was pulled "from the `StatusReference`
+detail page" to sample the category vocabulary -- that was done manually,
+once, to design `_SEVERE_RE`, and never wired into production. Live-reverified
+2026-10-13 against the real endpoint: `LocationMarkers` itself DOES carry a
+`Description` key in its schema (same free request, zero extra cost) -- but
+`LocatorResultsPolygon` never populates it; every marker in a fresh live
+sample came back `"Description": null`. The real narrative only exists on each
+case's own `StatusReference?referenceNumber=...` detail page (the `LinkUri`
+every marker already carries) -- confirmed live with real open cases, e.g.
+CEPNU20262422: "Neighbor called about junk and debris around the house. Also
+reported high grass." (plain HTML, a single `#description` node; some real
+cases, e.g. CEPNU20262400, have a genuinely empty description). So this is
+case (b): a real additional per-case request, not a free field already in
+hand. `fetch_case_description()` now fetches it for each property's head case
+(one extra request per emitted property, not per historical case) and stores
+it as a plain raw field, `code_enforcement.description` -- no automated
+severity reclassification from the text; `_SEVERE_RE`'s category-based rule
+stays the one already live-validated above. Gated by its own env var
+(`FORECLOSURE_GASTONIA_CODE_DESCRIPTIONS=0` to skip) since it adds roughly one
+sequential, per-host-throttled request per open property on top of the
+existing crawl -- not yet measured end-to-end on a full-city run, so
+`timeout_s` below is a judgment-call bump, not a measured figure; treat a
+mid-crawl timeout under this addition as expected until it is.
+
 Free, public, anonymous. No CAPTCHA, no login, no WAF. Gate with
 FORECLOSURE_GASTONIA_CODE=0.
 """
@@ -150,6 +175,7 @@ from typing import Any, Iterable
 
 import httpx
 import structlog
+from selectolax.parser import HTMLParser
 
 from ... import arcgis_webmap as agw
 from ...base_scraper import BaseScraper
@@ -159,6 +185,10 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 ENV_OFF = "FORECLOSURE_GASTONIA_CODE"
+#: Per-property detail-page Description fetch (2026-10-13 fix) -- one extra
+#: request per open property on top of the existing crawl. On by default;
+#: set =0 to skip if a time-boxed run needs to stay inside the old budget.
+ENV_DESC_OFF = "FORECLOSURE_GASTONIA_CODE_DESCRIPTIONS"
 
 BASE = "https://devsvcs.gastonianc.gov"
 LOCATOR_URL = f"{BASE}/CodeEnforcement/Locator?category=CE"
@@ -328,6 +358,46 @@ async def resolve_parcels(http: httpx.AsyncClient, pids: list[str]) -> dict[str,
     return idx
 
 
+#: Detail-page selector for the free-text case narrative (live-verified
+#: 2026-10-13: a single, unique `#description` node on every real
+#: `StatusReference` page sampled).
+_DESC_SELECTOR = "#description"
+
+
+async def fetch_case_description(http: httpx.AsyncClient, detail_url: str | None) -> str | None:
+    """Fetch one case's free-text narrative off its own `StatusReference` page.
+
+    Live-verified 2026-10-13: the `LocationMarkers` schema this scraper already
+    parses carries a `Description` key -- but `LocatorResultsPolygon` never
+    populates it (every marker in a fresh live sample came back `Description:
+    null`). The real text ("Neighbor called about junk and debris around the
+    house. Also reported high grass.", a real open case) only lives on this
+    per-case detail page, reached via the `LinkUri` every marker already
+    carries -- a genuinely separate request, not a free field already in hand.
+    Some real cases have a genuinely empty description; that is not a parse
+    failure. Best-effort: a failed/missing fetch costs only this one field,
+    never the listing (same convention as
+    henderson_code_violations._fetch_attachments).
+    """
+    if not detail_url:
+        return None
+    try:
+        resp = await http.get(detail_url, headers={"Referer": LOCATOR_URL})
+        resp.raise_for_status()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("gastonia_code.description_fetch_fail", url=str(detail_url)[:150],
+                    error=str(exc)[:200])
+        return None
+    try:
+        node = HTMLParser(resp.text).css_first(_DESC_SELECTOR)
+        text = node.text(strip=True) if node else None
+    except Exception as exc:  # noqa: BLE001
+        log.warning("gastonia_code.description_parse_fail", url=str(detail_url)[:150],
+                    error=str(exc)[:200])
+        return None
+    return text or None
+
+
 def build_listing(markers: list[dict], parcels: dict[str, dict] | None = None,
                   now: datetime | None = None) -> Listing | None:
     """Fold every case at one property into a single Listing. None if every
@@ -456,7 +526,13 @@ class GastoniaCodeEnforcement(BaseScraper):
     # timeout_s left generous above the measured run; BaseScraper.safe_run()
     # ships whatever is in self.partial if a future run (more total cases,
     # slower network) still isn't enough.
-    timeout_s = 900.0
+    # 2026-10-13: timeout bumped (was 900.0) for the new per-property
+    # Description fetch below -- roughly one extra sequential,
+    # per-host-throttled request per open property (~1,487 live 2026-09-30) on
+    # top of the already-measured 69-request/446s polygon+parcel crawl. Not
+    # yet measured end-to-end with this addition; BaseScraper.safe_run() still
+    # ships whatever is in self.partial if this isn't enough.
+    timeout_s = 2700.0
     requires_apify = False
     optional = True
 
@@ -464,6 +540,7 @@ class GastoniaCodeEnforcement(BaseScraper):
         if os.environ.get(ENV_OFF, "1") == "0":
             log.info("gastonia_code.disabled")
             return []
+        fetch_descriptions = os.environ.get(ENV_DESC_OFF, "1") != "0"
         now = datetime.utcnow()
         seen_refs: set[str] = set()
         total_markers = 0
@@ -496,6 +573,15 @@ class GastoniaCodeEnforcement(BaseScraper):
                 for feat_group in groups.values():
                     li = build_listing(feat_group, parcels, now=now)
                     if li:
+                        if fetch_descriptions:
+                            head_ref = li.case_number
+                            link_uri = next(
+                                (m.get("LinkUri") for m in feat_group
+                                 if m.get("ReferenceNumber") == head_ref and m.get("LinkUri")),
+                                None)
+                            desc = await fetch_case_description(http, link_uri)
+                            if desc:
+                                li.raw["code_enforcement"]["description"] = desc
                         self.partial.append(li)
 
             await _query_bbox(http, CITY_XMIN, CITY_XMAX, CITY_YMIN, CITY_YMAX,

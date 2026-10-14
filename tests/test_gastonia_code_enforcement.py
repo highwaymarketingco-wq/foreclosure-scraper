@@ -412,6 +412,164 @@ def test_code_enforcement_signal_is_scored_when_vacancy_adjacent():
 
 
 # --------------------------------------------------------------------------- #
+# Description fetch (2026-10-13 fix, source-completeness audit Pattern D):
+# `LocationMarkers` carries a `Description` key in its own schema but
+# `LocatorResultsPolygon` never populates it (live-verified 2026-10-13: a
+# fresh 1000-row sample came back `Description: null` on every single one).
+# The real narrative only lives on each case's own `StatusReference` detail
+# page. The two HTML fragments below are trimmed but structurally verbatim
+# excerpts of real pages fetched live 2026-10-13 (the surrounding ~17.9KB of
+# CityView boilerplate is cut; the `#description` block itself is untouched).
+# --------------------------------------------------------------------------- #
+
+#: Real detail-page fragment for CEPNU20262422 (a real open Public Nuisance
+#: case sampled live 2026-10-13) -- populated narrative.
+_DETAIL_HTML_WITH_TEXT = """
+<html><body>
+<div id="blkdescription" class="cv-clear displayField" >
+<div class="left1">
+   <label id="l_description" for="description">Description:</label>
+</div>
+<div class="right1">
+<div class="cv-input-wrapper">
+<div id="description" class="inputText" data-cy="inp-description">Neighbor called about junk and debris around the house. Also reported high grass. </div>
+</div>
+</div>
+</div>
+</body></html>
+"""
+
+#: Real detail-page fragment for CEPNU20262400 (the same case as PNU_OPEN
+#: above) -- sampled live 2026-10-13, a genuinely EMPTY description. Not every
+#: real case has narrative text; this must come back None, not an error.
+_DETAIL_HTML_EMPTY = """
+<html><body>
+<div id="blkdescription" class="cv-clear displayField" >
+<div class="left1">
+   <label id="l_description" for="description">Description:</label>
+</div>
+<div class="right1">
+<div class="cv-input-wrapper">
+<div id="description" class="inputText" data-cy="inp-description"></div>
+</div>
+</div>
+</div>
+</body></html>
+"""
+
+_DETAIL_URL = ("https://devsvcs.gastonianc.gov/CodeEnforcement/StatusReference"
+               "?referenceNumber=CEPNU20262422")
+
+
+def test_fetch_case_description_extracts_the_real_narrative_text():
+    import asyncio
+
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/CodeEnforcement/StatusReference"
+        return httpx.Response(200, text=_DETAIL_HTML_WITH_TEXT)
+
+    async def _run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            return await mod.fetch_case_description(http, _DETAIL_URL)
+
+    text = asyncio.run(_run())
+    assert text == "Neighbor called about junk and debris around the house. Also reported high grass."
+
+
+def test_fetch_case_description_returns_none_for_a_genuinely_empty_description():
+    """Real case CEPNU20262400 (same as PNU_OPEN above) has no narrative text
+    on its real detail page -- an empty field is not a parse failure."""
+    import asyncio
+
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=_DETAIL_HTML_EMPTY)
+
+    async def _run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            return await mod.fetch_case_description(http, _DETAIL_URL)
+
+    assert asyncio.run(_run()) is None
+
+
+def test_fetch_case_description_returns_none_without_a_detail_url():
+    import asyncio
+
+    import httpx
+
+    async def _run():
+        async with httpx.AsyncClient() as http:
+            return await mod.fetch_case_description(http, None)
+
+    assert asyncio.run(_run()) is None
+
+
+def test_fetch_case_description_is_best_effort_on_an_http_error():
+    """A failed detail-page fetch must cost only the description field, never
+    raise -- same convention as resolve_parcels' best-effort join."""
+    import asyncio
+
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="server error")
+
+    async def _run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            return await mod.fetch_case_description(http, _DETAIL_URL)
+
+    assert asyncio.run(_run()) is None
+
+
+def test_fetch_case_description_returns_none_on_a_page_with_no_description_node():
+    import asyncio
+
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="<html><body>no description field here</body></html>")
+
+    async def _run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            return await mod.fetch_case_description(http, _DETAIL_URL)
+
+    assert asyncio.run(_run()) is None
+
+
+def test_description_lands_in_the_same_raw_code_enforcement_block():
+    """Integration shape of what `fetch()`'s `_on_leaf` now does: build the
+    listing synchronously (unchanged), then fetch and attach the head case's
+    description onto the SAME `raw['code_enforcement']` dict the audit says
+    it was never wired into -- not a new top-level raw key (already covered
+    by web_artifact.py's `"code_enforcement": "*"` wildcard registration)."""
+    import asyncio
+
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=_DETAIL_HTML_WITH_TEXT)
+
+    async def _run():
+        li = mod.build_listing([PNU_OPEN])
+        link_uri = PNU_OPEN["LinkUri"]
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            desc = await mod.fetch_case_description(http, link_uri)
+        if desc:
+            li.raw["code_enforcement"]["description"] = desc
+        return li
+
+    li = asyncio.run(_run())
+    ce = li.raw["code_enforcement"]
+    assert ce["description"] == "Neighbor called about junk and debris around the house. Also reported high grass."
+    # Everything else about the existing shape is untouched.
+    assert ce["severe"] is True
+    assert ce["vacancy_adjacent"] is True
+
+
+# --------------------------------------------------------------------------- #
 # live smoke
 # --------------------------------------------------------------------------- #
 
