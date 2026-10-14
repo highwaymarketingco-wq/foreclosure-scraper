@@ -62,8 +62,34 @@ render-based rewrite flagged above. Live-verified against the real site
     approach (scan name+description for distress language) instead of
     chasing that token, same posture as the rest of this module.
 
-Free, public (no login) via a real browser render. Akamai blocks
-impersonation; it does not block a genuine Chromium session.
+RE-VERIFIED 2026-10-13 (source-completeness audit, Pattern B follow-up),
+NOT FIXED -- the Akamai wall has gotten WORSE since the 2026-10-04 fix, to
+the point the detail-page question above is moot right now: this module's
+own `_render()` -- the exact search-results-page StealthyFetcher config
+that was live-confirmed clean on 2026-10-04 (Asheville NC, Greenville SC,
+Gaffney SC, no CAPTCHA, no block) -- now gets a hard 403 on that SAME
+search-results page. Reproduced from two independent networks (this Mac
+and the Oracle VM at 129.146.23.144, which had made zero prior requests to
+loopnet.com today), with and without `real_chrome=True`: one attempt even
+came back as an Akamai "sec-bc" behavioral-challenge shell (consistent
+with Bot Manager, not a one-off fluke) before escalating to a flat 403 on
+every later attempt. `curl_cffi` impersonation (already known-blocked,
+that's WHY this module uses a render) still 403s too, from both networks.
+Net effect: the search-results fetch this entire scraper depends on may
+itself now be walled in production -- a plain genuine-Chromium render no
+longer clears it the way it did 9 days ago. That is a SEPARATE, more
+urgent regression than the detail-page gallery/broker-contact gap two
+paragraphs up (which is still correctly left unwired: there is no
+candidate-listing URL to fetch a detail page FOR if the search page
+itself returns nothing). Per the owner's standing "don't fight a wall"
+rule, did not keep hammering the host trying to re-crack it past this
+point -- flagging for whoever next touches this module to check the most
+recent scheduled run's actual row count/BLOCKED status before assuming
+`requires_render = True` is still sufficient here.
+
+Free, public (no login) via a real browser render -- AS OF 2026-10-04.
+Akamai blocked impersonation but not a genuine Chromium session THEN; see
+the 2026-10-13 note above for why that may no longer hold.
 """
 from __future__ import annotations
 
