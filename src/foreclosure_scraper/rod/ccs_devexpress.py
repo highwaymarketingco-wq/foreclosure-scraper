@@ -362,6 +362,145 @@ Iredell session is NOT a short, Wake-style session -- it comfortably
 survives a bounded scraper run once cleared, PROVIDED that run drives the
 SAME tab in place (see the fresh-tab/navigation finding above for why
 that proviso is load-bearing here specifically).
+
+CRAVEN/GREENE/HARNETT/RANDOLPH/STOKES (NC) -- added 2026-10-14, SAME session,
+the last batch of the "needs a human-cleared session" list -- owner
+personally solved all 5 reCAPTCHAs live, each already sitting in its own
+already-cleared browser-pane tab. Confirmed the SAME CCS DevExpress platform
+as Jasper/Iredell (identical `#subapp_LRSearch_0`/`#DocTypes`/`#gridTrad`/
+`#btnAdvancedSearch` markup) on all 5 -- this really is "mostly config", but
+each county's own OWN `#DocTypes` dictionary and `#gridTrad` layout was
+re-read live, not assumed, per county, and surfaced TWO more real platform
+bugs (both fixed below, generically, not per-county) plus one genuinely new
+party-cell shape (Harnett's own):
+
+- **Craven** (`us5.courthousecomputersystems.com/CravenNC2`): 169-code
+  dictionary (book type "All Doc Types"), distress subset `BKCY`/`FCL`/
+  `FCL-CONDO`/`JGMT`/`LIEN`/`LIS/P`/`S/TR` -- same 6 Iredell codes plus a
+  condo-specific FCL variant Iredell's own dictionary doesn't have. No
+  death-certificate equivalent, same confirmed-absent gap as Iredell. Grid:
+  Iredell-style split `Grantor`/`Grantee` columns (`header_map` resolves
+  clean). Live 90-day sweep (07/16-10/14/2026), 6 codes: 298 records / 42
+  documents. Real sample: a multi-row NCDOT condemnation JGMT instrument
+  (Book 3889/Page 660) where EVERY party on EVERY row reads institutional
+  (DEPARTMENT OF TRANSPORTATION / a church / a law firm) -- correctly
+  yields zero leads via the shared institutional-party filter, not a parse
+  failure. Document image confirmed live (DocNo 10159050): `GET
+  .../CravenNC2/Image/ShowDocImage?DocNum=10159050&BookNum=3888&
+  PageNum=838&Kind=S%2FTR&...` -> 200, same URL shape as Iredell's.
+- **Greene** (`greenenc.courthousecomputersystems.com`): only 81 codes in
+  the WHOLE dictionary (no book-type split at all) -- genuinely narrower
+  than every other county on this platform. Distress subset `FCL`/`S/TR`/
+  `JGMT`/`BNKRPT`/`ML` -- NO `LIEN` code and NO lis-pendens-equivalent code
+  anywhere in the dictionary (a real, confirmed-absent gap, same honesty
+  convention as Iredell's missing death-certificate code), but `ML`
+  (mechanics lien) already lands in the shared `lien` bucket via the
+  existing `_LIEN_CODES` set -- no code change needed for that one. `BNKRPT`
+  is a genuinely different spelling of Jasper/Iredell's `BKCY` for the SAME
+  concept -- merged into the existing bankruptcy bucket, not a new one.
+  Grid: same split Grantor/Grantee layout as Craven/Iredell. Live 90-day
+  sweep: 47 records / 8 documents. Real sample: WHITEMAN, JUSTIN (grantor)
+  vs. ROCKET MORTGAGE/MASELLI ANTHONY/JOHNSON GENEVIEVE (grantees), Book
+  793/Page 618, S/TR -- a real individual pre-foreclosure lead. Document
+  image confirmed live (DocNo 10001108) -> 200.
+- **Harnett** (`us6.courthousecomputersystems.com/HarnettNC`): 585-code
+  dictionary -- by far the largest, dominated by legacy `-PRE` suffix
+  variants (older, pre-automation spellings, not used in this pass's live
+  codes tuple at all). Distress subset, using only the CURRENT (non-`-PRE`)
+  spellings: `FORECLOSE`/`FORECLOSURE`/`S-TR`/`BKCY`/`JUDGMENT`/`LIEN` --
+  genuinely different literal spellings from every other county on this
+  platform (full words, not Jasper/Iredell's short codes; hyphen not slash
+  for substitute-trustee), confirmed live via the picker, not guessed by
+  analogy. No lis-pendens-equivalent code found. TWO real, live-caught
+  structural bugs here, both genuinely new (not seen on Jasper/Iredell/
+  Craven/Greene/Randolph/Stokes), both fixed in THIS module rather than
+  worked around in the caller:
+    1. Harnett's own combined-party-cell convention uses bracketed
+       single-letter role tokens -- `"[R]\tNAME"` / `"[E]\tNAME"` -- the
+       SAME one-column "role\\tname" shape as Jasper's `_party_from_cell`
+       already parses, just a different literal spelling of the two roles
+       (confirmed NOT institution-vs-individual-coded -- the same real
+       party flips between `[R]`/`[E]` across an instrument's own sibling
+       index rows, exactly like Jasper's `or`/`ee` flips). `_party_from_cell`
+       now normalizes through `_ROLE_ALIASES` (strips brackets, lowercases,
+       maps `r`->`or`/`e`->`ee`) instead of hand-rolling a THIRD cell
+       parser for what is structurally the identical shape.
+    2. Harnett's rendered `<tr>` nests a SECOND, hidden inner table INSIDE
+       each combined party `<td>` (its own role-alone and name-alone
+       sub-cells, confirmed live by reading `td.cellIndex` on the sub-cells:
+       they report `0`/`1`, i.e. indices into their OWN inner row, not the
+       outer grid row). `_SEARCH_JS`'s row reader previously built each
+       row's cell array with `tr.querySelectorAll('td')`, which recurses
+       into ANY nested table and flattened those 2 extra sub-cells into the
+       array, silently shifting every column after the first party column
+       by 2 (the real outer `Cell_Party2` cell, confirmed live at
+       `cellIndex=11`, read back as array index 13) -- `header_map`-driven
+       resolution was therefore reading the WRONG cell for Party2 onward.
+       Switched to `tr.cells` (the native `HTMLTableRowElement.cells`
+       property, direct `<td>`/`<th>` children ONLY, confirmed live to give
+       the clean, header_map-matching 14-cell row) -- a no-op for every
+       other county re-verified this pass, none of which nest tables this
+       way.
+  Live 90-day sweep, corrected parser: 714 records / 102 documents. Real
+  sample, Book 4353/Page 1497 (S-TR): PATTERSON, CLYDE L. and SMITH, ALAN
+  LEE JR. (real individual co-borrowers) vs. KELLY, REGINALD B. (the
+  substitute trustee) and SUBSTITUTE TRUSTEE SERVICES, INC. -- real
+  pre-foreclosure leads. Document image confirmed live (DocNo 2026014503,
+  Kind `S-TR`) -> 200.
+- **Randolph** (`us5.courthousecomputersystems.com/RandolphNC2`): 332-code
+  dictionary. Distress subset `FCL`/`S/TR`/`JGMT`/`LIEN`/`LIS/P`/`BKCY`/
+  `BANKRUPTCY` -- same Iredell-style short codes PLUS a full-word
+  `BANKRUPTCY` spelling alongside `BKCY` (both present in the dictionary;
+  kept both rather than assuming one is dead). Grid: split Grantor/Grantee
+  plus a genuine `MapID` parcel column (resolved automatically through the
+  existing `_FIELD_ALIASES["Parcel"]` list -- no code change needed). Live
+  90-day sweep: 375 records / 94 documents. Real sample: MILLS, DONAVAUN
+  LAMAR (grantor) vs. ALBERTELLI LAW PARTNERS/RURAL HOUSING SERVICE/USDA
+  (grantees), Book 3023/Page 859, S/TR, "APPOINTMENT OF SUBSTITUTE TRUSTEE"
+  -- a real individual pre-foreclosure lead with a USDA-guaranteed loan.
+  Document image confirmed live (DocNo 20223498) -> 200.
+- **Stokes** (`us6.courthousecomputersystems.com/StokesNC`): 201-code
+  dictionary with real, live-confirmed DUPLICATE spellings for the same
+  concept (`BKCY` AND `BCKY`; `JGMT` AND `JDMT`) -- an indexing-era typo,
+  not two different document kinds (not separately verified which of each
+  pair is "correct"; only the clean modern spelling of each was tested
+  live and used). Substitute-trustee has NO slash or hyphen spelling at
+  all here -- only `"S TR"` (a literal space). Live-confirmed over a wider
+  2023-2026 window that `FCL`/`BKCY`/`S TR` DO have real recent activity;
+  `JGMT`/`LIEN`/`LIS\\P` exist in the picker but returned ZERO rows in
+  every window tried this pass (kept in the codes tuple anyway, same
+  "code exists, no example surfaced yet" honesty convention as Jasper's own
+  LPEN). Grid: clean split Grantor/Grantee, no nested-table issue. Live
+  90-day sweep (final 6-code set): 144 records / 25 documents. Real
+  sample: BURNETT, RICHARD (grantor) vs. CAUDLE LAW FIRM, P.A./LAKEVIEW
+  LOAN SERVICING LLC/SUBSTITUTE TRUSTEE SERVICES, INC. (grantees), Book
+  798/Page 561, "S TR". Document image confirmed live (DocNo 2026003727,
+  Kind `S TR`) -> 200.
+
+TWO MORE GENERIC PLATFORM BUGS caught live on this batch (both fixed in
+`_SEARCH_JS` below, not per-county -- confirmed harmless/no-op on Jasper's
+and Iredell's own already-tested flows):
+  1. `isLoading()` matched any element whose text is literally "Loading..."
+     -- this platform revision (confirmed on Craven, presumed shared
+     infrastructure across this whole batch) keeps TWO such elements
+     PERMANENTLY in the DOM at zero size (`#lp_TL`/`#gridTrad_TL`,
+     `offsetWidth`/`offsetHeight` both 0 even mid-search), so the old check
+     was always true and every search here hit `search_timeout` --
+     live-confirmed real results were already sitting in the grid the
+     whole time it kept "waiting". Added an `offsetWidth > 0 &&
+     offsetHeight > 0` guard so only a genuinely VISIBLE loading overlay
+     counts.
+  2. The Advanced tab's own From/To Date fields (`#AdvancedFromDate`/
+     `#AdvancedToDate`) carry the IDENTICAL visible label text ("From
+     Date"/"To Date") as the Standard tab's `#FromDate`/`#ToDate` -- live-
+     confirmed on Craven that `inputAfterLabel()`'s first-DOM-match lookup
+     silently filled the STANDARD tab's fields (never read by
+     `#btnAdvancedSearch`) while the real Advanced fields stayed at their
+     server-side default (effectively the entire multi-decade archive --
+     confirmed live: a 6-code "90-day" search this way returned 1995-dated
+     rows and a flat 10000/5678-record cap). `_SEARCH_JS` now reads
+     `#AdvancedFromDate`/`#AdvancedToDate` BY ID FIRST, falling back to the
+     label lookup only when those ids don't exist.
 """
 from __future__ import annotations
 
@@ -383,6 +522,13 @@ log = structlog.get_logger()
 CCS_DEVEXPRESS_COUNTIES: dict[tuple[str, str], tuple[str, str]] = {
     ("SC", "Jasper"): ("us6", "JasperSC"),
     ("NC", "Iredell"): ("iredellnc", ""),
+    # Craven/Greene/Harnett/Randolph/Stokes added 2026-10-14, final batch --
+    # see module docstring's "CRAVEN/GREENE/HARNETT/RANDOLPH/STOKES" section.
+    ("NC", "Craven"): ("us5", "CravenNC2"),
+    ("NC", "Greene"): ("greenenc", ""),
+    ("NC", "Harnett"): ("us6", "HarnettNC"),
+    ("NC", "Randolph"): ("us5", "RandolphNC2"),
+    ("NC", "Stokes"): ("us6", "StokesNC"),
 }
 
 
@@ -415,7 +561,12 @@ _LIEN_CODES = {"LIEN", "ML", "TXLN"}
 #: "LIS/P" is Iredell's own spelling of the same concept, added 2026-10-14
 #: -- live-confirmed from its own #DocTypes picker echo (see module
 #: docstring's "IREDELL" section), not guessed from Jasper's "LPEN".
-_LIS_PENDENS_CODES = {"LPEN", "LPEN-DB", "LIS/P"}
+#: "LIS\\P" (a literal backslash, Stokes' own spelling, added 2026-10-14 --
+#: see module docstring's 5-county batch section) is a THIRD spelling of
+#: the same concept, not a different one; no live example surfaced for it
+#: this pass (code-only-confirmed, same honesty convention as Jasper's own
+#: LPEN), kept rather than dropped.
+_LIS_PENDENS_CODES = {"LPEN", "LPEN-DB", "LIS/P", "LIS\\P"}
 
 #: Budget caps, same spirit as this file's siblings (Clarendon's
 #: CLARENDON_LOOKBACK_DAYS=45 / rod.cchs's discover_recent_nods
@@ -449,6 +600,73 @@ IREDELL_LOOKBACK_DAYS = 90
 IREDELL_MAX_PAGES = 25
 IREDELL_MAX_DOCS = 400
 
+#: Craven/Greene/Harnett/Randolph/Stokes -- final batch, 2026-10-14, see
+#: module docstring's "CRAVEN/GREENE/HARNETT/RANDOLPH/STOKES" section for
+#: the full live evidence (dictionary size, real sample rows, the two
+#: generic platform-bug fixes, Harnett's own two structural differences)
+#: each of these codes tuples is drawn from. Each county's own vocabulary
+#: was read live from its own #DocTypes picker, not assumed from Jasper's,
+#: Iredell's, or each other's.
+CRAVEN_DISTRESS_DOC_CODES = ("BKCY", "FCL", "FCL-CONDO", "JGMT", "LIEN", "LIS/P", "S/TR")
+CRAVEN_LOOKBACK_DAYS = 90
+#: Live 90-day/7-code sweep: 298 records / 42 documents / 20 pages at
+#: 15/page -- headroom kept consistent with Iredell's own margin.
+CRAVEN_MAX_PAGES = 25
+CRAVEN_MAX_DOCS = 400
+
+#: Greene's own dictionary (81 codes total, no book-type split at all) has
+#: NO "LIEN" code and NO lis-pendens-equivalent code anywhere -- a real,
+#: confirmed-absent gap (see module docstring), not silently dropped.
+#: "BNKRPT" is Greene's own spelling of Jasper/Iredell's "BKCY" (merged into
+#: the shared bankruptcy bucket below, not a new one); "ML" (mechanics
+#: lien) already lands in the shared `_LIEN_CODES` set with no change
+#: needed here.
+GREENE_DISTRESS_DOC_CODES = ("FCL", "S/TR", "JGMT", "BNKRPT", "ML")
+GREENE_LOOKBACK_DAYS = 90
+#: Live 90-day/5-code sweep: 47 records / 8 documents / 4 pages -- Greene
+#: is genuinely the lowest-volume county on this platform so far.
+GREENE_MAX_PAGES = 10
+GREENE_MAX_DOCS = 400
+
+#: Harnett's own dictionary (585 codes, by far the largest -- dominated by
+#: legacy "-PRE"-suffixed spellings not used here) has genuinely different
+#: CURRENT spellings from every other county on this platform: full words,
+#: not short codes, and a hyphen (not slash) for substitute-trustee. No
+#: lis-pendens-equivalent code found. See module docstring for Harnett's
+#: own two real structural bugs (bracketed "[R]"/"[E]" role tokens, nested
+#: sub-table cells) this batch fixed in `_party_from_cell`/`_SEARCH_JS`.
+HARNETT_DISTRESS_DOC_CODES = ("FORECLOSE", "FORECLOSURE", "S-TR", "BKCY", "JUDGMENT", "LIEN")
+HARNETT_LOOKBACK_DAYS = 90
+#: Live 90-day/6-code sweep: 714 records / 102 documents / 48 pages at
+#: 15/page -- Harnett is the busiest county on this platform so far by a
+#: wide margin, budgeted with real headroom rather than Iredell's margin.
+HARNETT_MAX_PAGES = 60
+HARNETT_MAX_DOCS = 500
+
+#: Randolph's own dictionary (332 codes) carries BOTH a short "BKCY" code
+#: AND a full-word "BANKRUPTCY" spelling for the same concept (both kept,
+#: neither assumed dead) alongside Iredell's own short-code style for
+#: everything else.
+RANDOLPH_DISTRESS_DOC_CODES = ("FCL", "S/TR", "JGMT", "LIEN", "LIS/P", "BKCY", "BANKRUPTCY")
+RANDOLPH_LOOKBACK_DAYS = 90
+#: Live 90-day/7-code sweep: 375 records / 94 documents / 25 pages.
+RANDOLPH_MAX_PAGES = 30
+RANDOLPH_MAX_DOCS = 400
+
+#: Stokes' own dictionary (201 codes) has real duplicate-spelling pairs for
+#: the same concept ("BKCY"/"BCKY", "JGMT"/"JDMT" -- an indexing-era typo,
+#: not two different kinds; only the clean modern spelling of each was
+#: live-tested and used) and NO slash/hyphen spelling for substitute-
+#: trustee at all -- only a literal space, "S TR". `JGMT`/`LIEN`/`LIS\\P`
+#: are code-only-confirmed (zero live rows in every window tried this
+#: pass, see module docstring) but kept, same honesty convention as
+#: Jasper's own LPEN.
+STOKES_DISTRESS_DOC_CODES = ("S TR", "FCL", "BKCY", "JGMT", "LIEN", "LIS\\P")
+STOKES_LOOKBACK_DAYS = 90
+#: Live 90-day/6-code sweep: 144 records / 25 documents / 10 pages.
+STOKES_MAX_PAGES = 15
+STOKES_MAX_DOCS = 400
+
 
 #: Header class-name field aliases -- `_SEARCH_JS` below builds a real,
 #: live `header_map` (field name -> column index) from `#gridTrad`'s own
@@ -479,10 +697,23 @@ _FALLBACK_INDEXES = {
 #: dictionary 2026-10-14 -- Jasper's SC dictionary has NO equivalent
 #: (Master-in-Equity deeds record there as a plain DEED, see above), so
 #: these stay unused for Jasper and are additive, not a replacement.
-_FORECLOSURE_CODES = {"FCL"}
-_PRE_FORECLOSURE_CODES = {"S/TR"}
-_JUDGMENT_CODES = {"JGMT"}
-_BANKRUPTCY_CODES = {"BKCY"}
+#: "FCL-CONDO" (Craven), "FORECLOSE"/"FORECLOSURE" (Harnett, full-word
+#: spellings, added 2026-10-14) -- same concept, different literal
+#: spelling, merged not duplicated (see module docstring's 5-county batch
+#: section).
+_FORECLOSURE_CODES = {"FCL", "FCL-CONDO", "FORECLOSE", "FORECLOSURE"}
+#: "S-TR" (Harnett, hyphen) / "S TR" (Stokes, a literal space) -- same
+#: substitute-trustee concept as Jasper/Iredell's "S/TR", different
+#: separator only, added 2026-10-14.
+_PRE_FORECLOSURE_CODES = {"S/TR", "S-TR", "S TR"}
+#: "JUDGMENT" (Harnett's own full-word spelling, added 2026-10-14) -- same
+#: concept as Jasper/Iredell's "JGMT".
+_JUDGMENT_CODES = {"JGMT", "JUDGMENT"}
+#: "BNKRPT" (Greene, added 2026-10-14) -- same concept as Jasper/Iredell's
+#: "BKCY", different spelling. Stokes' own "BCKY" (a live-confirmed
+#: duplicate/typo spelling of "BKCY", see module docstring) was NOT added
+#: here -- not separately live-tested this pass, only "BKCY" itself was.
+_BANKRUPTCY_CODES = {"BKCY", "BNKRPT"}
 
 
 def classify_kind_code(kind: str | None) -> str | None:
@@ -535,15 +766,30 @@ def classify_kind_code(kind: str | None) -> str | None:
 # `_FIELD_ALIASES`/`header_map` below for how this parser now handles BOTH
 # without hand-maintaining a third county's fixed indices by guesswork.
 
+#: Role-token aliases for `_party_from_cell` -- Jasper's own literal tokens
+#: ("or"/"ee") are the base case; Harnett's own combined-party-cell
+#: convention (confirmed live 2026-10-14, see module docstring's "CRAVEN/
+#: GREENE/HARNETT/RANDOLPH/STOKES" section) uses bracketed single-letter
+#: tokens ("[R]"/"[E]") for the SAME structural shape (one column holding
+#: "role\\tname", multiple grantor/grantee permutation rows per real
+#: instrument, the same real party flipping roles across sibling rows) --
+#: not a new party-cell shape, just a different literal spelling of the
+#: same two roles, same merge-not-duplicate approach as
+#: `classify_kind_code()`'s multi-spelling code sets above.
+_ROLE_ALIASES = {"or": "or", "ee": "ee", "r": "or", "e": "ee"}
+
+
 def _party_from_cell(cell: str) -> tuple[str, str] | None:
     """('or'|'ee', name) from a combined "role\\tname" grid cell (Jasper's
     own party-column convention -- ONE column holds both the party's role
-    and name), or None."""
+    and name; Harnett's own "[R]"/"[E]" bracketed tokens are the SAME
+    shape, see `_ROLE_ALIASES`), or None."""
     if not cell or "\t" not in cell:
         return None
     role, _, name = cell.partition("\t")
-    role, name = role.strip().lower(), name.strip()
-    if role not in ("or", "ee") or not name:
+    role, name = role.strip().strip("[]").lower(), name.strip()
+    role = _ROLE_ALIASES.get(role)
+    if role is None or not name:
         return None
     return role, name
 
@@ -700,8 +946,19 @@ _SEARCH_JS = r"""
 (async () => {
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     function isLoading(d) {
+        // offsetWidth/offsetHeight guard added 2026-10-14 (Craven/Greene/
+        // Harnett/Randolph/Stokes batch, see module docstring) -- this
+        // platform revision keeps a permanently-present, zero-size
+        // "Loading..." template span in the DOM at all times (live-
+        // confirmed on Craven: #lp_TL/#gridTrad_TL, textContent matches but
+        // offsetWidth/offsetHeight are both 0 even mid-search), which made
+        // the textContent-only check always true and every search here
+        // hit search_timeout while real results already sat in the grid. A
+        // genuinely VISIBLE loading overlay (the only kind Jasper/Iredell
+        // ever showed) still matches.
         return Array.from(d.querySelectorAll('*'))
-            .some(e => e.children.length === 0 && e.textContent.trim() === 'Loading...');
+            .some(e => e.children.length === 0 && e.textContent.trim() === 'Loading...'
+                && e.offsetWidth > 0 && e.offsetHeight > 0);
     }
 
     let ifr = document.getElementById('subapp_LRSearch_0');
@@ -746,8 +1003,20 @@ _SEARCH_JS = r"""
         const lbl = labels.find(l => l.textContent.trim() === text);
         return lbl ? lbl.parentElement.querySelector('input[type=text], input:not([type])') : null;
     }
-    const fromEl = inputAfterLabel('From Date');
-    const toEl = inputAfterLabel('To Date');
+    // #AdvancedFromDate/#AdvancedToDate checked FIRST, by id -- live-
+    // confirmed 2026-10-14 (Craven, see module docstring) that the
+    // Standard tab's OWN #FromDate/#ToDate fields carry the IDENTICAL
+    // visible label text ("From Date"/"To Date") and sit earlier in DOM
+    // order, so inputAfterLabel()'s first-match lookup silently filled the
+    // wrong (Standard, never read by #btnAdvancedSearch) fields every
+    // time on this platform revision -- the real Advanced fields stayed
+    // at their server-side default (effectively the entire multi-decade
+    // archive: a 6-code "90-day" search this way returned 1995-dated rows
+    // and a flat 10000/5678-record cap, live-confirmed). Falls back to
+    // the label lookup only when the Advanced-specific ids don't exist, so
+    // Jasper/Iredell's own already-tested behavior is unchanged.
+    const fromEl = doc.getElementById('AdvancedFromDate') || inputAfterLabel('From Date');
+    const toEl = doc.getElementById('AdvancedToDate') || inputAfterLabel('To Date');
     const lastEl = inputAfterLabel('Last Name/Firm Name');
     const docTypesEl = doc.getElementById('DocTypes');
     if (!fromEl || !toEl || !docTypesEl) {
@@ -790,7 +1059,19 @@ _SEARCH_JS = r"""
         if (!grid) return null;
         const rows = Array.from(grid.querySelectorAll('tr'))
             .filter(tr => tr.id && tr.id.includes('DXDataRow'))
-            .map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim()));
+            // `tr.cells` (the native HTMLTableRowElement property -- direct
+            // <td>/<th> children ONLY), NOT `tr.querySelectorAll('td')` --
+            // live-confirmed 2026-10-14 (Harnett, see module docstring)
+            // that this county's own combined-party cell nests a SECOND,
+            // hidden inner table inside that one <td> (its own role-alone/
+            // name-alone sub-cells), so a recursive querySelectorAll
+            // flattened those 2 extra sub-cells into the array and desynced
+            // every column index from Party2 onward (the real outer
+            // Cell_Party2 td, confirmed live at cellIndex=11, read back as
+            // array index 13). `tr.cells` is a no-op change for every
+            // other county re-verified this pass (Jasper/Iredell/Craven/
+            // Greene/Randolph/Stokes), none of which nest tables this way.
+            .map(tr => Array.from(tr.cells).map(td => td.innerText.trim()));
         const totalRec = doc.getElementById('total_records');
         const totalDoc = doc.getElementById('total_documents');
         return {

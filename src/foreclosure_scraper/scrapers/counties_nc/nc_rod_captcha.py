@@ -933,6 +933,29 @@ _SS_PAGE_OF_RE = re.compile(r"Showing page\s+\d+\s+of\s+(\d+)", re.I)
 #: `_fetch_jasper` does, with Iredell's own base URL/doc codes.
 _IREDELL_BASE = ccs_devexpress.base_url("NC", "Iredell") or "https://iredellnc.courthousecomputersystems.com"
 
+#: Craven/Greene/Harnett/Randolph/Stokes -- final batch on this same CCS
+#: DevExpress platform, added 2026-10-14 (see rod/ccs_devexpress.py module
+#: docstring's "CRAVEN/GREENE/HARNETT/RANDOLPH/STOKES" section for the full
+#: live evidence). lower-case `_COUNTY_SITES` key -> (proper-case county
+#: name as `ccs_devexpress.CCS_DEVEXPRESS_COUNTIES` spells it, days_back,
+#: max_pages, max_docs, doc_codes) -- fed straight into
+#: `_fetch_ccs_devexpress_county` below so these 5 counties share ONE
+#: generic fetch/convert path instead of 5 hand-maintained near-duplicates
+#: of Iredell's own bespoke `_fetch_iredell`/`_iredell_doc_to_listing`
+#: (left untouched, already shipped, already tested).
+_CCS_DEVEXPRESS_COUNTIES_NC: dict[str, tuple[str, int, int, int, tuple[str, ...]]] = {
+    "craven": ("Craven", ccs_devexpress.CRAVEN_LOOKBACK_DAYS, ccs_devexpress.CRAVEN_MAX_PAGES,
+               ccs_devexpress.CRAVEN_MAX_DOCS, ccs_devexpress.CRAVEN_DISTRESS_DOC_CODES),
+    "greene": ("Greene", ccs_devexpress.GREENE_LOOKBACK_DAYS, ccs_devexpress.GREENE_MAX_PAGES,
+               ccs_devexpress.GREENE_MAX_DOCS, ccs_devexpress.GREENE_DISTRESS_DOC_CODES),
+    "harnett": ("Harnett", ccs_devexpress.HARNETT_LOOKBACK_DAYS, ccs_devexpress.HARNETT_MAX_PAGES,
+                ccs_devexpress.HARNETT_MAX_DOCS, ccs_devexpress.HARNETT_DISTRESS_DOC_CODES),
+    "randolph": ("Randolph", ccs_devexpress.RANDOLPH_LOOKBACK_DAYS, ccs_devexpress.RANDOLPH_MAX_PAGES,
+                 ccs_devexpress.RANDOLPH_MAX_DOCS, ccs_devexpress.RANDOLPH_DISTRESS_DOC_CODES),
+    "stokes": ("Stokes", ccs_devexpress.STOKES_LOOKBACK_DAYS, ccs_devexpress.STOKES_MAX_PAGES,
+               ccs_devexpress.STOKES_MAX_DOCS, ccs_devexpress.STOKES_DISTRESS_DOC_CODES),
+}
+
 
 def _wake_extract_docids(html: str) -> list[str]:
     """data-documentid for each li.ss-search-row, in the SAME document order
@@ -1205,6 +1228,30 @@ class NcRodCaptchaScraper(BaseScraper):
                         # same convention sc_rod_walled.py's own
                         # `_fetch_jasper` already uses for the same platform.
                         county_results = await self._fetch_iredell(page, entry_url)
+                        results.extend(county_results)
+                        await page.close()
+                        log.info("nc_rod_captcha.county_done", county=county, found=len(county_results))
+                        continue
+
+                    if county in _CCS_DEVEXPRESS_COUNTIES_NC:
+                        # Craven/Greene/Harnett/Randolph/Stokes -- the final
+                        # batch on this same CCS DevExpress platform, added
+                        # 2026-10-14 (see rod/ccs_devexpress.py module
+                        # docstring's "CRAVEN/GREENE/HARNETT/RANDOLPH/STOKES"
+                        # section). Same shape as Iredell just above for
+                        # exactly the same reason: solve_recaptcha_v2 never
+                        # actually clears this real reCAPTCHA v2, so
+                        # gate_cleared only reaches here on an already
+                        # human-cleared session, and (live-reverified on
+                        # Craven, presumed shared across this batch) the
+                        # clearance does not survive a fresh navigation/tab --
+                        # `_fetch_<county>` drives THIS SAME already-loaded
+                        # `page` in place, never page.goto()-ing anywhere
+                        # else. Routed through one shared, county-
+                        # parameterized helper (`_fetch_ccs_devexpress_county`)
+                        # instead of 5 hand-maintained near-duplicates.
+                        county_results = await self._fetch_ccs_devexpress_county(
+                            page, entry_url, *_CCS_DEVEXPRESS_COUNTIES_NC[county])
                         results.extend(county_results)
                         await page.close()
                         log.info("nc_rod_captcha.county_done", county=county, found=len(county_results))
@@ -2067,6 +2114,148 @@ class NcRodCaptchaScraper(BaseScraper):
             first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
             raw=raw,
         )
+
+    # -- Craven/Greene/Harnett/Randolph/Stokes: SAME CCS DevExpress platform,
+    # final batch, 2026-10-14 (see rod/ccs_devexpress.py module docstring's
+    # "CRAVEN/GREENE/HARNETT/RANDOLPH/STOKES" section). Routed through ONE
+    # shared, county-parameterized pair of methods instead of 5 near-
+    # duplicate copies of _fetch_iredell/_iredell_doc_to_listing above --
+    # the mapping/defendant-picking/image-URL logic those two already
+    # encode is verbatim-identical for every county on this platform
+    # (confirmed live per county, not assumed: see module docstring for
+    # each county's own doc-type dictionary and sample rows). Iredell
+    # itself is left on its own bespoke methods, already shipped and
+    # already tested, rather than retrofitted onto this shared path.
+
+    async def _fetch_ccs_devexpress_county(
+        self, page: Any, entry_url: str, county_cap: str,
+        days_back: int, max_pages: int, max_docs: int,
+        doc_codes: tuple[str, ...],
+    ) -> list[Listing]:
+        """Generic CCS DevExpress NC-county fetch -- same shape as
+        `_fetch_iredell` above, parameterized by county so the 5 counties
+        in `_CCS_DEVEXPRESS_COUNTIES_NC` share one implementation. reCAPTCHA
+        already cleared by a human before this runs (see the `county in
+        _CCS_DEVEXPRESS_COUNTIES_NC` branch in `fetch()` above); drives THIS
+        SAME already-loaded `page` in place, never navigating away, same
+        operational reason as Iredell's own clearance not surviving a fresh
+        tab (live-reverified on Craven this pass)."""
+        out: list[Listing] = []
+        try:
+            docs = await ccs_devexpress.discover_recent_distress_via_browser(
+                page, "NC", county_cap, days_back=days_back, max_pages=max_pages,
+                max_docs=max_docs, doc_codes=doc_codes,
+            )
+        except Exception as exc:
+            log.warning("nc_rod_captcha.ccs_sweep_failed", county=county_cap.lower(), error=str(exc)[:200])
+            return out
+        source_url = f"{entry_url}/Image/ImageIndex"
+        for doc in docs:
+            li = self._ccs_doc_to_listing(doc, county_cap, source_url)
+            if li is not None:
+                out.append(li)
+        return out
+
+    def _ccs_doc_to_listing(self, doc: Any, county_cap: str, source_url: str) -> Listing | None:
+        """Generic version of `_iredell_doc_to_listing` above, parameterized
+        by county name -- see that method's own docstring for the shared
+        mapping/defendant-picking/image-URL-shape convention this reuses
+        verbatim. Confirmed (not assumed) identical for Craven/Greene/
+        Harnett/Randolph/Stokes this pass: each county's own real sample
+        rows (see rod/ccs_devexpress.py module docstring) resolve through
+        the SAME `_IREDELL_LISTING_TYPE` bucket table and the SAME
+        `_iredell_defendant` institutional-party filter without any
+        county-specific special-casing needed here."""
+        kind = ccs_devexpress.classify_kind_code(doc.doc_type)
+        if kind is None:
+            return None
+        lt = _IREDELL_LISTING_TYPE.get(kind)
+        if lt is None:
+            return None
+        defendant = _iredell_defendant(doc.grantor, doc.grantee)
+        if not defendant or _brunswick_is_institutional(defendant):
+            return None
+        rec = doc.recorded_date.strftime("%Y-%m-%d") if doc.recorded_date else "unknown date"
+        desc = (f"{doc.doc_type} recorded {rec}: {defendant}"
+                f"{' (' + doc.notes + ')' if doc.notes else ''}")
+        raw: dict[str, Any] = dict(doc.raw or {})
+        raw["rod"] = {"doc_type": doc.doc_type, "grantor": doc.grantor, "grantee": doc.grantee,
+                      "book": doc.book, "page": doc.page, "instrument": doc.instrument_no,
+                      "recorded": rec}
+        # Per-document image -- the SAME /Image/ShowDocImage controller
+        # action Jasper's/Iredell's own raw[...]_doc_image blocks already
+        # target, live-confirmed by actually opening one PER COUNTY this
+        # pass (see module docstring): needs the SAME reCAPTCHA+session-
+        # cleared tab as the search itself, so stamped under its own
+        # per-county raw key rather than raw['documents']/['document_url'],
+        # same convention as jasper_doc_image/iredell_doc_image.
+        book, page = (doc.book or "").strip(), (doc.page or "").strip()
+        base = ccs_devexpress.base_url("NC", county_cap)
+        if book and page and doc.instrument_no and base:
+            county_lower = county_cap.lower()
+            date_q = doc.recorded_date.strftime("%m/%d/%Y") if doc.recorded_date else ""
+            image_url = (f"{base}/Image/ShowDocImage?DocNum={doc.instrument_no}"
+                         f"&BookNum={book}&PageNum={page}&Kind={quote(doc.doc_type or '', safe='')}"
+                         f"&Date={quote(date_q, safe='')}&Referrer=r&BookType=&SeqNum=0"
+                         f"&TIF2PDF=true&SearchTabID=0&HideDetails=false")
+            raw[f"{county_lower}_doc_image"] = {
+                "method": "GET", "url": image_url,
+                "requires": f"{county_lower}_recaptcha_and_session_cleared_tab",
+                "note": "cold GET is expected to redirect to the reCAPTCHA "
+                        "gate (same session-gated /ProcessedImages/ pattern "
+                        "as Jasper's/Iredell's own doc_image keys, see "
+                        "rod.ccs_devexpress module docstring) -- only "
+                        "fetchable from the SAME already-cleared tab. Not "
+                        "stamped into raw['documents']/['document_url'] for "
+                        "this reason.",
+            }
+        return Listing(
+            source=self.slug, source_url=source_url,
+            listing_type=lt, property_kind=PropertyKind.UNKNOWN,
+            state="NC", county=county_cap,
+            parcel_id=doc.parcel_id,
+            defendant=defendant,
+            case_number=(doc.instrument_no or "").strip() or None,
+            legal_description=(doc.notes or "").strip() or None,
+            description=desc,
+            first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+            raw=raw,
+        )
+
+    async def _fetch_craven(self, page: Any, entry_url: str) -> list[Listing]:
+        cfg = _CCS_DEVEXPRESS_COUNTIES_NC["craven"]
+        return await self._fetch_ccs_devexpress_county(page, entry_url, *cfg)
+
+    def _craven_doc_to_listing(self, doc: Any, source_url: str) -> Listing | None:
+        return self._ccs_doc_to_listing(doc, "Craven", source_url)
+
+    async def _fetch_greene(self, page: Any, entry_url: str) -> list[Listing]:
+        cfg = _CCS_DEVEXPRESS_COUNTIES_NC["greene"]
+        return await self._fetch_ccs_devexpress_county(page, entry_url, *cfg)
+
+    def _greene_doc_to_listing(self, doc: Any, source_url: str) -> Listing | None:
+        return self._ccs_doc_to_listing(doc, "Greene", source_url)
+
+    async def _fetch_harnett(self, page: Any, entry_url: str) -> list[Listing]:
+        cfg = _CCS_DEVEXPRESS_COUNTIES_NC["harnett"]
+        return await self._fetch_ccs_devexpress_county(page, entry_url, *cfg)
+
+    def _harnett_doc_to_listing(self, doc: Any, source_url: str) -> Listing | None:
+        return self._ccs_doc_to_listing(doc, "Harnett", source_url)
+
+    async def _fetch_randolph(self, page: Any, entry_url: str) -> list[Listing]:
+        cfg = _CCS_DEVEXPRESS_COUNTIES_NC["randolph"]
+        return await self._fetch_ccs_devexpress_county(page, entry_url, *cfg)
+
+    def _randolph_doc_to_listing(self, doc: Any, source_url: str) -> Listing | None:
+        return self._ccs_doc_to_listing(doc, "Randolph", source_url)
+
+    async def _fetch_stokes(self, page: Any, entry_url: str) -> list[Listing]:
+        cfg = _CCS_DEVEXPRESS_COUNTIES_NC["stokes"]
+        return await self._fetch_ccs_devexpress_county(page, entry_url, *cfg)
+
+    def _stokes_doc_to_listing(self, doc: Any, source_url: str) -> Listing | None:
+        return self._ccs_doc_to_listing(doc, "Stokes", source_url)
 
     def _parse_html(self, html: str, county: str, base_url: str) -> list[Listing]:
         """Parse deed search results from HTML."""

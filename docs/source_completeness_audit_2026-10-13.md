@@ -473,18 +473,18 @@ See `scrapers/counties_nc/nc_rod_captcha.py`'s own module docstring (2026-10-14 
 (cont. x5) correction blocks) and `tests/test_nc_rod_captcha.py` for the full writeup and real
 schema-accurate fixtures built from this live pull.
 
-- `counties_nc/nc_rod_captcha.py` — **5 of 9 counties remain genuinely walled** (Craven, Greene,
-  Harnett, Randolph, Stokes); Durham and Brunswick **removed from this list** (fixed in the
-  corrections above). Iredell **removed from this list, same caveat as Wake below**: see the
-  2026-10-14 (cont. x6) correction further down. Wake **removed from this list**: the reCAPTCHA itself is still genuinely
-  walled for an UNATTENDED run (never automated, by design) — but the real search, parser, and
-  one-hop related-documents follow-through are now fully built and live-verified, ready to run off
-  a human-cleared session (see the correction immediately above for the full writeup, including the
-  live-measured session-reuse window and two further flagged, documented gaps — one now fixed, one
-  confirmed genuinely not fixable at this level, see the 2026-10-14 (cont. x4) correction just
-  above). Durham's own coverage also improved materially in that same correction: real pagination
-  (20 of 96 pages per run, not page 1 only) and the shared multi-tract header fix both apply to it
-  too, since Durham and Wake share the same `rod/nc_tyler.py` parser.
+- `counties_nc/nc_rod_captcha.py` — **0 of 9 counties remain genuinely walled for an operator-
+  assisted run** (Durham/Brunswick fixed outright; Wake/Iredell/Craven/Greene/Harnett/Randolph/
+  Stokes all **removed from this list, same caveat on every one of them**: a real Google reCAPTCHA
+  v2 checkbox is still genuinely walled for an UNATTENDED run — `solve_recaptcha_v2` never actually
+  clears it, never automated, by design — but once a human clears it live, the search/parser/
+  classify path behind that session is now fully built for all 7, not just documented). Durham and
+  Brunswick fixed in the corrections above. Wake and Iredell: see the 2026-10-14 (cont. x4) and
+  (cont. x6) corrections. Craven/Greene/Harnett/Randolph/Stokes — the final batch — see the
+  2026-10-14 (cont. x7) correction just below. Durham's own coverage also improved materially in
+  the Wake correction: real pagination (20 of 96 pages per run, not page 1 only) and the shared
+  multi-tract header fix both apply to it too, since Durham and Wake share the same
+  `rod/nc_tyler.py` parser.
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)
 - `public_notices/nc_notices_counties.py` vs `ncpublicnotices.py` (same site — does the
   interstitial actually gate it or not? One module says yes, the other's code says no.)
@@ -532,6 +532,53 @@ since the shared module no longer hard-codes Jasper's own column positions or do
 — no cleared session exists yet for any of them, so none were wired this pass. The ONLY remaining
 gap for Iredell itself is the manual reCAPTCHA clear, same boundary as every other real CAPTCHA in
 this codebase.
+
+**CORRECTION 2026-10-14 (cont. x7)** — `counties_nc/nc_rod_captcha.py`'s Craven/Greene/Harnett/
+Randolph/Stokes entries: the FINAL batch of this list. Same pattern as Iredell's own (cont. x6)
+correction above — the owner personally solved all 5 real reCAPTCHAs live, each in its own
+already-cleared browser tab, and everything downstream of that human clear is now BUILT for all 5,
+not just documented; the reCAPTCHA itself stays genuinely walled for an UNATTENDED run. All 5
+confirmed live on the SAME CCS DevExpress platform as Jasper/Iredell. Each county's own
+`#DocTypes` dictionary and `#gridTrad` layout was read live, per county, not assumed from Iredell's
+or each other's: Craven (169 codes: `BKCY`/`FCL`/`FCL-CONDO`/`JGMT`/`LIEN`/`LIS/P`/`S/TR`, Iredell's
+split-column grid), Greene (only 81 codes total — genuinely narrower, NO `LIEN` and NO
+lis-pendens-equivalent code at all, a real confirmed-absent gap), Harnett (585 codes, by far the
+largest, and genuinely different CURRENT spellings — full words not short codes, `FORECLOSE`/
+`FORECLOSURE`/`S-TR`/`BKCY`/`JUDGMENT`/`LIEN`), Randolph (332 codes, carries both `BKCY` and a
+full-word `BANKRUPTCY` for the same concept), Stokes (201 codes, with real live duplicate-typo
+spellings for the same concept — `BKCY`/`BCKY`, `JGMT`/`JDMT` — and no slash/hyphen spelling for
+substitute-trustee at all, only a literal space `"S TR"`). `classify_kind_code()`'s bucket sets
+extended again (not replaced) to merge these new spellings in, same one-shared-table approach as
+Iredell's own `LPEN`/`LIS/P` merge.
+
+Two MORE genuinely new platform bugs surfaced on this batch (both fixed in `rod/ccs_devexpress.py`
+generically, confirmed harmless on Jasper's/Iredell's own already-tested flows): (1) this platform
+revision keeps two permanently-present, zero-size "Loading..." template elements in the DOM at all
+times, which made the old `isLoading()` text-only check always true and every search here hit
+`search_timeout` while real results already sat in the grid — fixed with an `offsetWidth`/
+`offsetHeight` visibility guard; (2) the Advanced tab's own From/To Date fields share IDENTICAL
+visible label text with the Standard tab's fields, so the old label-based lookup silently filled
+the wrong (Standard, never submitted) fields — live-confirmed this made a "90-day" search return
+1995-dated rows and a flat ~10,000-record cap — fixed by reading `#AdvancedFromDate`/
+`#AdvancedToDate` by id first. Harnett's own grid additionally surfaced a THIRD, genuinely new
+party-cell shape: bracketed single-letter role tokens (`"[R]"`/`"[E]"`, the SAME one-column
+"role\tname" shape Jasper's own `or`/`ee` tokens use, just spelled differently — confirmed NOT
+institution-coded, the same real party flips tokens across an instrument's own sibling rows) PLUS a
+nested inner table hidden inside each combined-party `<td>` that desynced every column after the
+first party column when read via a recursive `querySelectorAll('td')` — fixed by normalizing role
+tokens through a small alias table and by switching the row reader to `tr.cells` (direct children
+only). Both fixes are no-ops for every other county re-verified this pass. Document images
+confirmed live on all 5 (same `/Image/ShowDocImage` session-gated pattern as Jasper's/Iredell's own
+`..._doc_image` raw keys). Real sample rows (one real individual lead each, plus one Craven
+condemnation-JGMT row where every party reads institutional, correctly yielding no lead) and the
+full per-county writeup live in `rod/ccs_devexpress.py`'s own module docstring's "CRAVEN/GREENE/
+HARNETT/RANDOLPH/STOKES" section. All 5 wired through ONE shared, county-parameterized fetch/
+convert path (`_fetch_ccs_devexpress_county`/`_ccs_doc_to_listing`) rather than 5 near-duplicate
+copies of Iredell's own bespoke methods. 40 new tests in `tests/test_nc_rod_captcha.py`, built from
+real rows captured in each county's own live session; 105/105 relevant tests pass (65 NC + 40 SC,
+zero regressions). The ONLY remaining gap on any of these 9 counties is the manual reCAPTCHA clear
+itself, same boundary as every other real CAPTCHA in this codebase — **this closes out the
+"Needs YOU logged in" list for `nc_rod_captcha.py` entirely.**
 
 **CORRECTION 2026-10-14 (cont.)** — `counties_sc/sc_qpublic.py` was also WRONGLY listed here: no
 login or CAPTCHA was ever found. Live-checked, not assumed, and it's a bigger problem than "the

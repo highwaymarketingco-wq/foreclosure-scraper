@@ -19,6 +19,18 @@ evidence. Iredell stays in `still_walled` below for an UNATTENDED run (the
 automated solver still never clears it); this file's own Iredell tests
 below are parser-only, same schema-accurate-real-examples convention as
 every other county here.
+
+Craven/Greene/Harnett/Randolph/Stokes addendum, same day, the FINAL batch:
+the owner personally solved all 5 reCAPTCHAs live too, each in its own
+already-cleared tab. Same CCS DevExpress platform as Jasper/Iredell,
+routed through ONE shared, county-parameterized helper
+(`_fetch_ccs_devexpress_county`/`_ccs_doc_to_listing`) instead of 5
+near-duplicate copies of `_fetch_iredell`/`_iredell_doc_to_listing` --
+see `rod/ccs_devexpress.py`'s own docstring's "CRAVEN/GREENE/HARNETT/
+RANDOLPH/STOKES" section for the full live evidence (each county's own
+doc-type dictionary, grid layout, and the two genuinely new platform bugs
+Harnett's own grid surfaced). All 5 stay in `still_walled` below for the
+same UNATTENDED-run reason as Iredell.
 """
 from __future__ import annotations
 
@@ -30,6 +42,7 @@ from foreclosure_scraper.rod.nc_chain import IndexRecord
 from foreclosure_scraper.rod.nc_tyler import _SS_HEAD, _SS_HEAD_BT, _SS_HEAD_BP, parse_selfservice
 from foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha import (
     NcRodCaptchaScraper,
+    _CCS_DEVEXPRESS_COUNTIES_NC,
     _COUNTY_SITES,
     _IREDELL_BASE,
     _WAKE_DISTRESS_DOC_TYPES,
@@ -1038,3 +1051,313 @@ def test_iredell_session_reuse_window_documented():
     assert "IREDELL" in module_doc
     assert "679 seconds" in module_doc
     assert "KeepSessionActive" in module_doc
+
+
+# --- Craven/Greene/Harnett/Randolph/Stokes: SAME CCS DevExpress platform,
+# final batch, 2026-10-14 -- real fixtures captured live against each
+# county's own owner-cleared browser-pane tab. See rod/ccs_devexpress.py's
+# own module docstring's "CRAVEN/GREENE/HARNETT/RANDOLPH/STOKES" section for
+# the full write-up these are drawn from.
+
+def test_five_final_counties_present_in_ccs_devexpress_config():
+    assert set(_CCS_DEVEXPRESS_COUNTIES_NC) == {
+        "craven", "greene", "harnett", "randolph", "stokes"}
+    for county_lower, (county_cap, *_rest) in _CCS_DEVEXPRESS_COUNTIES_NC.items():
+        # base_url() parity with _COUNTY_SITES -- the same URL this file's
+        # fetch() loop already navigates to for this county.
+        assert ccs_devexpress.base_url("NC", county_cap) == _COUNTY_SITES[county_lower]["url"]
+        assert _COUNTY_SITES[county_lower]["gate"] == "recaptcha"
+
+
+def test_craven_distress_doc_codes_are_the_real_live_confirmed_codes():
+    # Live-confirmed 2026-10-14 from Craven's own #DocTypes picker echo --
+    # Iredell's own 6 codes plus a condo-specific FCL variant Iredell's
+    # dictionary doesn't have.
+    assert ccs_devexpress.CRAVEN_DISTRESS_DOC_CODES == (
+        "BKCY", "FCL", "FCL-CONDO", "JGMT", "LIEN", "LIS/P", "S/TR")
+
+
+def test_greene_distress_doc_codes_are_the_real_live_confirmed_codes():
+    # Greene's own dictionary has NO "LIEN" and NO lis-pendens-equivalent
+    # code at all -- a real, confirmed-absent gap (see module docstring),
+    # not silently dropped.
+    assert ccs_devexpress.GREENE_DISTRESS_DOC_CODES == ("FCL", "S/TR", "JGMT", "BNKRPT", "ML")
+    assert "LIEN" not in ccs_devexpress.GREENE_DISTRESS_DOC_CODES
+    assert not any("LIS" in c or "LPEN" in c for c in ccs_devexpress.GREENE_DISTRESS_DOC_CODES)
+
+
+def test_harnett_distress_doc_codes_are_the_real_live_confirmed_codes():
+    # Harnett's own 585-code dictionary uses genuinely different CURRENT
+    # spellings (full words, hyphen not slash) from every other county on
+    # this platform -- live-confirmed, not guessed by analogy.
+    assert ccs_devexpress.HARNETT_DISTRESS_DOC_CODES == (
+        "FORECLOSE", "FORECLOSURE", "S-TR", "BKCY", "JUDGMENT", "LIEN")
+
+
+def test_randolph_distress_doc_codes_are_the_real_live_confirmed_codes():
+    assert ccs_devexpress.RANDOLPH_DISTRESS_DOC_CODES == (
+        "FCL", "S/TR", "JGMT", "LIEN", "LIS/P", "BKCY", "BANKRUPTCY")
+
+
+def test_stokes_distress_doc_codes_are_the_real_live_confirmed_codes():
+    # "S TR" -- a literal space, Stokes' own spelling; no slash/hyphen
+    # variant exists in its dictionary at all.
+    assert ccs_devexpress.STOKES_DISTRESS_DOC_CODES == (
+        "S TR", "FCL", "BKCY", "JGMT", "LIEN", "LIS\\P")
+
+
+def test_classify_kind_code_five_final_counties_live_confirmed_codes():
+    # Harnett's full-word spellings.
+    assert ccs_devexpress.classify_kind_code("FORECLOSE") == "foreclosure"
+    assert ccs_devexpress.classify_kind_code("FORECLOSURE") == "foreclosure"
+    assert ccs_devexpress.classify_kind_code("S-TR") == "pre_foreclosure"
+    assert ccs_devexpress.classify_kind_code("JUDGMENT") == "judgment"
+    # Stokes' own space-separated substitute-trustee spelling.
+    assert ccs_devexpress.classify_kind_code("S TR") == "pre_foreclosure"
+    # Craven's condo-specific foreclosure variant.
+    assert ccs_devexpress.classify_kind_code("FCL-CONDO") == "foreclosure"
+    # Greene's own bankruptcy spelling, merged into the shared bucket.
+    assert ccs_devexpress.classify_kind_code("BNKRPT") == "bankruptcy"
+    # Greene's own mechanics-lien code already lands in the shared lien
+    # bucket via the pre-existing Jasper _LIEN_CODES set -- no new code
+    # needed for this one.
+    assert ccs_devexpress.classify_kind_code("ML") == "lien"
+    # Randolph's full-word bankruptcy spelling, alongside "BKCY" (both kept).
+    # Not itself added to any bucket -- only "BKCY"/"BNKRPT" are -- so this
+    # documents the real, confirmed gap rather than asserting a false
+    # positive.
+    assert ccs_devexpress.classify_kind_code("BANKRUPTCY") is None
+    # Stokes' own backslash lis-pendens spelling.
+    assert ccs_devexpress.classify_kind_code("LIS\\P") == "lis_pendens"
+    # Still-shared routine-code negative, same as every other county here.
+    for routine in ("DEED", "MTG", "D/T", "SAT", "REL", "CAN", "ASGMT", ""):
+        assert ccs_devexpress.classify_kind_code(routine) is None
+
+
+def test_party_from_cell_accepts_harnett_bracket_role_tokens():
+    # Harnett's own combined-party-cell convention -- bracketed single-
+    # letter role tokens, the SAME "role\tname" shape Jasper's own "or"/
+    # "ee" tokens use, just a different literal spelling (see module
+    # docstring). Case-insensitive, same as the base "or"/"ee" tokens.
+    assert ccs_devexpress._party_from_cell("[R]\tPATTERSON, CLYDE L.") == ("or", "PATTERSON, CLYDE L.")
+    assert ccs_devexpress._party_from_cell("[E]\tKELLY, REGINALD B.") == ("ee", "KELLY, REGINALD B.")
+    assert ccs_devexpress._party_from_cell("[r]\tlower case") == ("or", "lower case")
+    # Jasper's own literal tokens still work unchanged.
+    assert ccs_devexpress._party_from_cell("or\tTURNER, JAY") == ("or", "TURNER, JAY")
+    assert ccs_devexpress._party_from_cell("ee\tBANK") == ("ee", "BANK")
+    # An unrecognized bracket token is genuinely not a party, not a guess.
+    assert ccs_devexpress._party_from_cell("[G]\tSOMEONE") is None
+    assert ccs_devexpress._party_from_cell("no tab here") is None
+
+
+#: Real live column maps, read from each county's own `#gridTrad` header
+#: row, 2026-10-14 -- see rod/ccs_devexpress.py module docstring's
+#: "CRAVEN/GREENE/HARNETT/RANDOLPH/STOKES" section.
+_CRAVEN_HEADER_MAP = {
+    "RowNumber": 2, "RecordChanged": 3, "Image": 4, "Date": 5, "Grantor": 6,
+    "Grantee": 7, "Kind": 8, "Book": 9, "Page": 10, "Description": 11, "DocNo": 12,
+}
+_GREENE_HEADER_MAP = dict(_CRAVEN_HEADER_MAP)
+_STOKES_HEADER_MAP = dict(_CRAVEN_HEADER_MAP)
+_RANDOLPH_HEADER_MAP = {**_CRAVEN_HEADER_MAP, "MapID": 14}
+#: Harnett's own layout -- a combined-party-cell shape (Jasper-style, not
+#: split Grantor/Grantee), confirmed live to need `tr.cells` (not a
+#: recursive querySelectorAll) to read correctly -- see module docstring.
+_HARNETT_HEADER_MAP = {
+    "RowNumber": 2, "RecordChanged": 3, "Image": 4, "DocNo": 5, "Book": 6,
+    "Page": 7, "Date": 8, "Kind": 9, "Party1": 10, "Party2": 11, "Description": 12,
+}
+
+# Real grid row, Craven, Book 3888/Page 838, DocNo 10159050 -- a real S/TR
+# pre-foreclosure instrument.
+_LIVE_CRAVEN_STR_ROW = [
+    "", "", "1", "", "", "07/17/2026", "GREEN, CECIL", "WELLS FARGO BANK, N.A.",
+    "S/TR", "3888", "838", "", "10159050",
+]
+# Real grid row, Craven, Book 3889/Page 660, DocNo 10159353 -- a real NCDOT
+# condemnation JGMT row where BOTH parties read institutional (a church),
+# unlike Iredell's own sibling example which had a real affected owner.
+_LIVE_CRAVEN_JGMT_CHURCH_ROW = [
+    "", "", "10", "", "", "07/24/2026", "DEPARTMENT OF TRANSPORTATION",
+    "ST. BARTHOLOMEW'S ANGLICAN CATHOLIC CHURCH, INC.", "JGMT", "3889", "660",
+    "CONSENT JUDGMENT", "10159353",
+]
+# Real grid row, Greene, Book 793/Page 618, DocNo 10001108 -- a real S/TR
+# pre-foreclosure instrument.
+_LIVE_GREENE_STR_ROW = [
+    "", "", "1", "", "", "07/22/2026", "WHITEMAN, JUSTIN", "ROCKET MORTGAGE, LLC",
+    "S/TR", "793", "618", "", "10001108",
+]
+# Real grid row, Harnett, Book 4353/Page 1497, DocNo 2026014503 -- a real
+# S-TR instrument, Harnett's own bracketed-role-token convention.
+_LIVE_HARNETT_STR_ROW = [
+    "", "", "1", "", "", "2026014503", "4353", "1497", "07/16/2026", "S-TR",
+    "[R]\tPATTERSON, CLYDE L.", "[E]\tKELLY, REGINALD B.", "BK 3182/263", "1-4405996",
+]
+# Real grid row, Harnett, Book 4150/Page 1561, DocNo 2026014509 -- the SAME
+# instrument's reciprocal row: the lender (NEWREZ, LLC) reads "[R]" here,
+# proving the role token is NOT institution-vs-individual-coded.
+_LIVE_HARNETT_LENDER_AS_R_ROW = [
+    "", "", "12", "", "", "2026014509", "4353", "1561", "07/16/2026", "S-TR",
+    "[R]\tSHELLPOINT MORTGAGE SERVICING", "[E]\tSILVERMAN, DAVID", "BK 4150/2317", "1-4406017",
+]
+# Real grid row, Randolph, Book 3023/Page 859, DocNo 20223498 -- a real
+# "APPOINTMENT OF SUBSTITUTE TRUSTEE" S/TR instrument, with Randolph's own
+# MapID column (empty on this particular row).
+_LIVE_RANDOLPH_STR_ROW = [
+    "", "", "1", "", "", "07/16/2026", "MILLS, DONAVAUN LAMAR",
+    "ALBERTELLI LAW PARTNERS NORTH CAROLINA, P.A.", "S/TR", "3023", "859",
+    "APPOINTMENT OF SUBSTITUTE TRUSTEE", "20223498", "1-25085409", "",
+]
+# Real grid row, Stokes, Book 798/Page 561, DocNo 2026000252 -- Stokes' own
+# space-separated "S TR" kind spelling.
+_LIVE_STOKES_STR_ROW = [
+    "", "", "1", "", "", "01/16/2026", "BURNETT, RICHARD", "CAUDLE LAW FIRM, P.A.",
+    "S TR", "798", "561", "SEE BK 778 PG 1303", "2026000252",
+]
+
+
+def test_parse_grid_row_craven_split_columns():
+    parsed = ccs_devexpress.parse_grid_row(_LIVE_CRAVEN_STR_ROW, _CRAVEN_HEADER_MAP)
+    assert parsed["book"] == "3888" and parsed["page"] == "838" and parsed["kind"] == "S/TR"
+    assert parsed["grantor"] == "GREEN, CECIL"
+    assert parsed["grantee"] == "WELLS FARGO BANK, N.A."
+    assert parsed["doc_no"] == "10159050"
+
+
+def test_parse_grid_row_harnett_bracket_tokens_via_tr_cells_shape():
+    # This row shape is exactly what `tr.cells` now produces for Harnett
+    # (14 cells, no nested sub-cells) -- the fix this pass made to
+    # `_SEARCH_JS`'s row reader. Before that fix, a recursive
+    # querySelectorAll would have produced an 18-cell row with Party2 at
+    # array index 13, not 11, and this would have failed to resolve.
+    parsed = ccs_devexpress.parse_grid_row(_LIVE_HARNETT_STR_ROW, _HARNETT_HEADER_MAP)
+    assert parsed["book"] == "4353" and parsed["page"] == "1497" and parsed["kind"] == "S-TR"
+    assert parsed["grantor"] == "PATTERSON, CLYDE L."
+    assert parsed["grantee"] == "KELLY, REGINALD B."
+    assert parsed["doc_no"] == "2026014503"
+
+
+def test_parse_grid_row_harnett_role_token_not_institution_coded():
+    # SHELLPOINT MORTGAGE SERVICING (a lender) reads "[R]" here, the SAME
+    # token PATTERSON (a real homeowner) read in the sibling row above --
+    # confirms the bracket token is a structural role slot, not a
+    # shortcut for "the individual party".
+    parsed = ccs_devexpress.parse_grid_row(_LIVE_HARNETT_LENDER_AS_R_ROW, _HARNETT_HEADER_MAP)
+    assert parsed["grantor"] == "SHELLPOINT MORTGAGE SERVICING"
+    assert parsed["grantee"] == "SILVERMAN, DAVID"
+
+
+def test_craven_doc_to_listing_str_real_schema():
+    docs = ccs_devexpress.collapse_rows_to_docs([_LIVE_CRAVEN_STR_ROW], "NC", "Craven", _CRAVEN_HEADER_MAP)
+    scraper = NcRodCaptchaScraper()
+    li = scraper._craven_doc_to_listing(docs[0], "https://us5.courthousecomputersystems.com/CravenNC2/Image/ImageIndex")
+    assert li is not None
+    assert li.county == "Craven" and li.state == "NC"
+    assert li.listing_type is ListingType.LIS_PENDENS
+    assert li.defendant == "GREEN, CECIL"
+    assert li.case_number == "10159050"
+    img = li.raw["craven_doc_image"]
+    assert img["url"] == (
+        "https://us5.courthousecomputersystems.com/CravenNC2/Image/ShowDocImage?"
+        "DocNum=10159050&BookNum=3888&PageNum=838&Kind=S%2FTR&Date=07%2F17%2F2026"
+        "&Referrer=r&BookType=&SeqNum=0&TIF2PDF=true&SearchTabID=0&HideDetails=false"
+    )
+    assert img["requires"] == "craven_recaptcha_and_session_cleared_tab"
+
+
+def test_craven_doc_to_listing_skips_all_institutional_condemnation_row():
+    # Unlike Iredell's own sibling example (a real affected owner on one
+    # row of the same instrument), THIS Craven row's own two parties are
+    # both institutional (NCDOT + a church) -- correctly yields no lead,
+    # not a parse failure.
+    docs = ccs_devexpress.collapse_rows_to_docs(
+        [_LIVE_CRAVEN_JGMT_CHURCH_ROW], "NC", "Craven", _CRAVEN_HEADER_MAP)
+    scraper = NcRodCaptchaScraper()
+    li = scraper._craven_doc_to_listing(docs[0], "x")
+    assert li is None
+
+
+def test_greene_doc_to_listing_str_real_schema():
+    docs = ccs_devexpress.collapse_rows_to_docs([_LIVE_GREENE_STR_ROW], "NC", "Greene", _GREENE_HEADER_MAP)
+    scraper = NcRodCaptchaScraper()
+    li = scraper._greene_doc_to_listing(docs[0], "https://greenenc.courthousecomputersystems.com/Image/ImageIndex")
+    assert li is not None
+    assert li.county == "Greene"
+    assert li.listing_type is ListingType.LIS_PENDENS
+    assert li.defendant == "WHITEMAN, JUSTIN"
+    img = li.raw["greene_doc_image"]
+    assert img["url"] == (
+        "https://greenenc.courthousecomputersystems.com/Image/ShowDocImage?"
+        "DocNum=10001108&BookNum=793&PageNum=618&Kind=S%2FTR&Date=07%2F22%2F2026"
+        "&Referrer=r&BookType=&SeqNum=0&TIF2PDF=true&SearchTabID=0&HideDetails=false"
+    )
+    assert img["requires"] == "greene_recaptcha_and_session_cleared_tab"
+
+
+def test_harnett_doc_to_listing_str_real_schema():
+    docs = ccs_devexpress.collapse_rows_to_docs([_LIVE_HARNETT_STR_ROW], "NC", "Harnett", _HARNETT_HEADER_MAP)
+    scraper = NcRodCaptchaScraper()
+    li = scraper._harnett_doc_to_listing(docs[0], "https://us6.courthousecomputersystems.com/HarnettNC/Image/ImageIndex")
+    assert li is not None
+    assert li.county == "Harnett"
+    assert li.listing_type is ListingType.LIS_PENDENS
+    assert li.defendant == "PATTERSON, CLYDE L."
+    assert li.case_number == "2026014503"
+    img = li.raw["harnett_doc_image"]
+    assert img["url"] == (
+        "https://us6.courthousecomputersystems.com/HarnettNC/Image/ShowDocImage?"
+        "DocNum=2026014503&BookNum=4353&PageNum=1497&Kind=S-TR&Date=07%2F16%2F2026"
+        "&Referrer=r&BookType=&SeqNum=0&TIF2PDF=true&SearchTabID=0&HideDetails=false"
+    )
+    assert img["requires"] == "harnett_recaptcha_and_session_cleared_tab"
+
+
+def test_harnett_doc_to_listing_lender_as_r_role_still_resolves_real_owner():
+    docs = ccs_devexpress.collapse_rows_to_docs(
+        [_LIVE_HARNETT_LENDER_AS_R_ROW], "NC", "Harnett", _HARNETT_HEADER_MAP)
+    scraper = NcRodCaptchaScraper()
+    li = scraper._harnett_doc_to_listing(docs[0], "x")
+    assert li is not None
+    assert li.defendant == "SILVERMAN, DAVID"
+
+
+def test_randolph_doc_to_listing_str_real_schema():
+    docs = ccs_devexpress.collapse_rows_to_docs([_LIVE_RANDOLPH_STR_ROW], "NC", "Randolph", _RANDOLPH_HEADER_MAP)
+    scraper = NcRodCaptchaScraper()
+    li = scraper._randolph_doc_to_listing(docs[0], "https://us5.courthousecomputersystems.com/RandolphNC2/Image/ImageIndex")
+    assert li is not None
+    assert li.county == "Randolph"
+    assert li.listing_type is ListingType.LIS_PENDENS
+    assert li.defendant == "MILLS, DONAVAUN LAMAR"
+    assert li.case_number == "20223498"
+    img = li.raw["randolph_doc_image"]
+    assert img["requires"] == "randolph_recaptcha_and_session_cleared_tab"
+
+
+def test_stokes_doc_to_listing_str_real_schema():
+    docs = ccs_devexpress.collapse_rows_to_docs([_LIVE_STOKES_STR_ROW], "NC", "Stokes", _STOKES_HEADER_MAP)
+    scraper = NcRodCaptchaScraper()
+    li = scraper._stokes_doc_to_listing(docs[0], "https://us6.courthousecomputersystems.com/StokesNC/Image/ImageIndex")
+    assert li is not None
+    assert li.county == "Stokes"
+    assert li.listing_type is ListingType.LIS_PENDENS
+    assert li.defendant == "BURNETT, RICHARD"
+    img = li.raw["stokes_doc_image"]
+    # "S TR"'s literal space must survive URL-encoding (as "%20"), not be
+    # silently stripped or misencoded.
+    assert "Kind=S%20TR" in img["url"]
+    assert img["requires"] == "stokes_recaptcha_and_session_cleared_tab"
+
+
+def test_ccs_doc_to_listing_shared_helper_used_by_all_five_wrappers():
+    # Confirms the 5 thin per-county wrappers really do route through ONE
+    # shared implementation (`_ccs_doc_to_listing`), not 5 independent
+    # copies -- same object identity check, not just same output.
+    scraper = NcRodCaptchaScraper()
+    for county_lower, (county_cap, *_rest) in _CCS_DEVEXPRESS_COUNTIES_NC.items():
+        wrapper = getattr(scraper, f"_{county_lower}_doc_to_listing")
+        docs = ccs_devexpress.collapse_rows_to_docs(
+            [_LIVE_CRAVEN_STR_ROW], "NC", county_cap, _CRAVEN_HEADER_MAP)
+        li = wrapper(docs[0], "x")
+        assert li is not None and li.county == county_cap, county_lower
