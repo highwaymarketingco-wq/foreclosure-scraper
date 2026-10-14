@@ -50,6 +50,7 @@ source: "national.cash_buyer_deeds"
 """
 from __future__ import annotations
 
+import base64
 import re
 from datetime import datetime, timedelta
 from typing import Iterable
@@ -206,7 +207,27 @@ async def _cott_recent(state: str, county: str, days: int) -> list[RodDoc]:
 async def _logan_recent(state: str, county: str, days: int) -> list[RodDoc]:
     """Logan 'The Lookup' — sweep recent recordings for ALL distress codes
     plus deed codes. Logan's date-range search requires specific instrument
-    codes; we include deed-type codes to capture warranty deeds + DOTs."""
+    codes; we include deed-type codes to capture warranty deeds + DOTs.
+
+    2026-10-13 (source-completeness audit, Pattern C re-check): this
+    scraper's whole purpose is to identify cash buyers from INDEX metadata
+    (grantor/grantee/consideration/excise stamp) -- the three Logan
+    counties here (McDowell, Transylvania, Mitchell) are all registered
+    "free" in rod/doc_images.py's COUNTY_IMAGE_STATUS, and
+    rod.logan._parse_records already captures each row's free
+    `view_image.php?key=...` image key into `raw['logan']['image_key']`
+    (added 2026-10-13, same session as rod.logan's own
+    `discover_recent_nods(fetch_images=True)`). That key is scoped to the
+    PHPSESSID that rendered it (rod.logan's own module docstring) -- dead
+    to any later, separate request -- so it must be resolved to real bytes
+    HERE, inside this same still-open session, exactly like
+    `discover_recent_nods(fetch_images=True)` already does for its
+    narrower distress-only sweep. Previously this function returned the
+    parsed docs as-is and the session closed before anything downstream
+    could use image_key, silently discarding a free, already-identified
+    document image every run. Budget-capped to the CASH-BUYER subset of
+    this sweep's own docs (not every row) so a high-volume county/window
+    can't multiply this scraper's request count unboundedly."""
     host = logan.LOGAN_COUNTIES.get((state, county))
     if not host:
         return []
@@ -233,7 +254,25 @@ async def _logan_recent(state: str, county: str, days: int) -> list[RodDoc]:
                              headers={"Content-Type": "application/x-www-form-urlencoded"})
             if r.status_code != 200:
                 return []
-            return logan._parse_records(r.text, state, county)
+            docs = logan._parse_records(r.text, state, county)
+            candidates = _identify_cash_buyers(docs)
+            fetched = 0
+            for d in candidates:
+                if fetched >= logan._MAX_IMAGES_PER_SWEEP:
+                    break
+                logan_raw = d.raw.get("logan") or {}
+                key = logan_raw.get("image_key")
+                if not key:
+                    continue
+                fetched += 1
+                got = await logan._fetch_doc_image(c, host, key)
+                if got:
+                    data, ct = got
+                    logan_raw["image"] = {
+                        "mime": ct, "bytes": len(data),
+                        "data_uri": f"data:{ct};base64,{base64.b64encode(data).decode('ascii')}",
+                    }
+            return docs
     except Exception:
         return []
 
@@ -407,6 +446,13 @@ def _deed_to_listing(deed: RodDoc, source_url: str) -> Listing | None:
 
     address = _extract_address(deed.notes)
 
+    # Logan counties only (McDowell/Transylvania/Mitchell): the free recorded
+    # deed image _logan_recent already resolved inline (see its own
+    # docstring), embedded as a data: URI since the fetch key dies outside
+    # the session that rendered it. Nests inside the already-"*"-registered
+    # "cash_buyer_deeds" raw block, so no new RAW_KEEP entry is needed.
+    document_image = ((deed.raw or {}).get("logan") or {}).get("image")
+
     description_parts = []
     if grantee:
         description_parts.append(f"Grantee: {grantee}")
@@ -453,6 +499,7 @@ def _deed_to_listing(deed: RodDoc, source_url: str) -> Listing | None:
                 "is_cash_buyer": True,
                 "instrument_no": deed.instrument_no,
                 "parcel_id": deed.parcel_id,
+                "document_image": document_image,
             },
         },
     )
