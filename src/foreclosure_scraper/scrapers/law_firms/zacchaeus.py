@@ -70,6 +70,29 @@ another +10-day guess FROM the real deadline date rather than from a
 true sale date at all. Now sets raw["upset_bid"] with source="published"
 whenever a real upset_dt is parsed, so the generic enrichment skips this
 row and the real, site-published deadline survives untouched.
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern D -- is there a
+plain API behind the Notice-of-Sale button after all?): confirmed, with one
+short-lived headless browser session, NOT a WASM app -- the page loads
+_framework/blazor.server.js and POSTs /_blazor/negotiate, i.e. genuine Blazor
+**Server** running a stateful SignalR circuit. Clicking "Notice" on a live
+row fires ZERO new HTTP requests (network log identical before/after); the
+notice text renders in an in-page modal pushed entirely over the already-open
+circuit. There is no discrete URL, PDF, or download anywhere in this flow --
+the "document" is plain text delivered over a stateful WebSocket, not a
+static resource -- so a direct httpx/requests fetch cannot reach it at any
+URL, confirming the 2026-10-01 finding rather than overturning it. One new
+fact worth flagging for whoever picks this up: the notice text itself
+contains the real NC case number (e.g. "24CV002697-620") and the defendant /
+property-owner name (e.g. "SHIRLEY B. HALE"), neither of which this grid
+exposes anywhere else (see "no case-number column" above) -- real lead value,
+not just boilerplate. That raises the payoff of eventually closing this gap,
+but not its cost: capturing it would mean clicking into every row's Notice
+button individually (~200+ modal opens per run, one at a time) on top of the
+existing 21-page pager loop, a materially heavier live-browser task than
+today's per-page paging. Left as a documented, confirmed-real,
+not-cheaply-closed gap -- a good candidate for a dedicated follow-up scoped
+around owner-name + case-number capture specifically, not attempted here.
 """
 from __future__ import annotations
 
