@@ -19,6 +19,27 @@ state, ZIP, lat/lng, beds/baths/sqft, and the listing ID are all present.
 Strategy: scrape BOTH paths. Search view for total coverage (~1,228 NC/SC
 listings), city pages for enriched detail (beds/baths/sqft/lat/lon). Merge
 by listing ID. When a listing appears in both, the city-page data wins.
+
+AUDITED, NOT FIXED 2026-10-13 (source-completeness audit, Pattern B): both
+`_parse_search_row` and `_parse_jsonld_node` keep only ONE photo (a single
+regex/JSON-LD `image` match) even though `source_url` (the
+`/address/<slug>/<id>_lid` detail page) is built for every row -- the same
+"built a detail URL, never fetched it" shape as the other Pattern B sources.
+Live-reverified before touching anything: this host's whole-site AWS-ELB
+block (see `ForeclosureDotCom`'s class docstring -- "VPN or proxy", first
+seen 2026-09-23, rechecked 2026-10-08) still answers the identical 403 to
+EVERY URL, confirmed again on 2026-10-13 via `get_text_impersonate()`
+(the project's strongest non-render fetch tier) against both the homepage
+and a live `/address/.../_lid` DETAIL page directly -- not just the
+search/city list URLs this module already knew were blocked. So the detail
+page that would carry the real gallery is exactly as unreachable as the
+list pages already are; wiring a detail-page fetch here would add requests
+against a wall that already stops every other call in `fetch()`, not
+recover any new data. Left as single-photo-from-the-list-page, same call
+`loopnet.py` makes for its own live-reverified wall (see that module's
+docstring) -- not forced per the owner's standing "don't fight a wall" rule.
+Re-check this if the AWS-ELB block ever lifts; the fix pattern to copy at
+that point is `landandfarm.py`'s `_fetch_detail_extras`/`_apply_detail_extras`.
 """
 from __future__ import annotations
 
@@ -159,7 +180,10 @@ def _parse_search_row(html_chunk: str, state: str, slug_name: str) -> Listing | 
     # Extract property type
     prop_type = "Single-Family" if "Single-Family" in html_chunk else None
 
-    # Extract photo URL
+    # Extract photo URL. Single photo only -- the detail page `source_url`
+    # below would carry the rest of the gallery, but it's unreachable (see
+    # the module docstring's 2026-10-13 Pattern B note: the whole-site
+    # AWS-ELB block covers detail pages too, re-confirmed, not just search).
     img_m = re.search(r'src="(//[^"]+listingphoto[^"]+)"', html_chunk)
     photo = "https:" + img_m.group(1) if img_m else None
 
@@ -194,6 +218,10 @@ def _parse_jsonld_node(node: dict, state: str, slug_name: str) -> Listing | None
     url = item.get("url") or ""
     lid_match = LID_RE.search(url)
     listing_id = lid_match.group(1) if lid_match else None
+    # Single photo from this page's own JSON-LD -- `url` (= source_url
+    # below) would carry the rest of the gallery on its detail page, but
+    # that page is unreachable (same re-confirmed whole-site block, see the
+    # module docstring's 2026-10-13 Pattern B note).
     img = item.get("image") or ""
     if isinstance(img, str) and img.startswith("//"):
         img = "https:" + img
@@ -436,6 +464,11 @@ class ForeclosureDotCom(BaseScraper):
     # with one ordinary request each from the Mac: 403 from the AWS load balancer ("awselb/2.0")
     # on the NC search URL and on the homepage, the "VPN or proxy" block page. It is a wall,
     # not a moved URL; the run now stops at the first block instead of asking 37 URLs.
+    # Rechecked again 2026-10-13 (source-completeness audit, Pattern B: see module docstring)
+    # specifically against a live `/address/.../_lid` DETAIL page (not just search/homepage,
+    # which were already known blocked) via get_text_impersonate() -- identical 403. The block
+    # is whole-site, not search-view-specific, so a detail-page photo-gallery fetch has nothing
+    # to recover right now.
 
     async def fetch(self) -> Iterable[Listing]:
         # REWRITTEN 2026-10-04 (see _fetch_search's docstring for the full
