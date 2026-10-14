@@ -26,6 +26,7 @@ from foreclosure_scraper.scrapers.public_notices.funeral_home_rss import (
     _date_from_title,
     _iter_entries,
     _name_from_title,
+    _summary_fields,
 )
 
 # --- real trimmed captures, one <item> each, 2026-09-27 -------------------
@@ -66,6 +67,33 @@ DYCHES = """<?xml version="1.0" encoding="UTF-8"?>
 \t\t<guid isPermaLink="false">https://dychesfuneralhome.com/?p=1145</guid>
 \t\t<description><![CDATA[Sean Arlen Testwell ,25 of Aiken passed away on September 17, 2026. A Celebration of Life will be held at 11 AM on Saturday, Sept 26, at First Baptist [&#8230;]]]></description>
 \t\t<content:encoded><![CDATA[<p><strong>Sean Arlen Testwell ,25 of Aiken passed away on September 17, 2026.</strong></p>]]></content:encoded>
+\t</item>
+</channel>
+</rss>"""
+
+# Real shape (captured live 2026-10-14, names/filenames sanitized following the
+# DYCHES fixture above's own convention): dychesfuneralhome.com's <content:encoded>
+# embeds the decedent's own uploaded photo as a plain WordPress <img>, filename
+# correlated to the decedent's initials (real item: "Sean Arlen Clancy" ->
+# .../SAC-300x300.jpg) -- confirmed live across 9 of 10 current items, the one
+# gap this fixture covers (MISSING PHOTO ENCLOSURE, final audit batch).
+DYCHES_WITH_PHOTO = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+\txmlns:content="http://purl.org/rss/1.0/modules/content/"
+\txmlns:dc="http://purl.org/dc/elements/1.1/"
+\t>
+<channel>
+\t<title>Funeral Home and Crematory in Barnwell SC</title>
+\t<link>https://dychesfuneralhome.com</link>
+\t<item>
+\t\t<title>Sean Arlen Testwell</title>
+\t\t<link>https://dychesfuneralhome.com/sean-arlen-testwell/</link>
+\t\t<dc:creator><![CDATA[316458pwpadmin]]></dc:creator>
+\t\t<pubDate>Wed, 23 Sep 2026 19:30:56 +0000</pubDate>
+\t\t<category><![CDATA[Obituaries]]></category>
+\t\t<guid isPermaLink="false">https://dychesfuneralhome.com/?p=1145</guid>
+\t\t<description><![CDATA[Sean Arlen Testwell ,25 of Aiken passed away on September 17, 2026.]]></description>
+\t\t<content:encoded><![CDATA[<img fetchpriority="high" decoding="async" class="alignnone size-medium wp-image-1146" src="https://dychesfuneralhome.com/wp-content/uploads/2026/09/SAT-300x300.jpg" alt="" width="300" height="300" srcset="https://dychesfuneralhome.com/wp-content/uploads/2026/09/SAT-300x300.jpg 300w, https://dychesfuneralhome.com/wp-content/uploads/2026/09/SAT-150x150.jpg 150w" sizes="(max-width: 300px) 100vw, 300px" />\n<p><strong>Sean Arlen Testwell ,25 of Aiken passed away on September 17, 2026.</strong></p>]]></content:encoded>
 \t</item>
 </channel>
 </rss>"""
@@ -140,6 +168,46 @@ def test_dyches_barnwell_sc_wordpress_obituaries_category():
     assert "Aiken" in summary
     assert extra == {}  # plain WordPress has no obits: namespace at all
     assert HOMES["dychesfuneralhome.com"] == ("Barnwell", "SC", "frazer")
+
+
+def test_dyches_item_with_no_img_tag_yields_no_photo_url():
+    # The baseline DYCHES fixture's <content:encoded> has no <img> at all
+    # (live-confirmed 2026-10-14: about 1 of every 10 real dyches items has
+    # no photo) -- must resolve to no photo_url key, not a crash or "".
+    entries = list(_iter_entries(DYCHES, "frazer"))
+    _name, _link, _pub, summary, _td, _extra = entries[0]
+    assert "photo_url" not in _summary_fields(summary)
+
+
+def test_dyches_item_with_img_tag_captures_the_photo_url():
+    # MISSING PHOTO ENCLOSURE fix (final audit batch, live-confirmed
+    # 2026-10-14): the decedent's own uploaded photo, embedded as a plain
+    # <img> inside <content:encoded>, was silently destroyed by the
+    # summary's HTML tag-strip along with every other tag. None of this
+    # module's 11 hosts use a standalone RSS <enclosure>/media: tag (all
+    # checked live) -- this plain-WordPress <img> shape is the real one.
+    entries = list(_iter_entries(DYCHES_WITH_PHOTO, "frazer"))
+    name, _link, _pub, summary, _td, _extra = entries[0]
+    assert name == "Sean Arlen Testwell"
+    fields = _summary_fields(summary)
+    assert fields["photo_url"] == (
+        "https://dychesfuneralhome.com/wp-content/uploads/2026/09/SAT-300x300.jpg"
+    )
+    # The age/summary text extraction the photo fix sits alongside still
+    # works on the same item.
+    assert "Aiken" in fields["summary"]
+
+
+def test_frazer_and_ltobits_hosts_have_no_photo_in_the_body():
+    # Confirmed live 2026-10-14 across all 10 reachable hosts: the 9 Frazer
+    # feeds' <description> is pure boilerplate text (module docstring's
+    # existing age/survivors finding) with no <img> anywhere, and the one
+    # ltobits host (grocefuneralhome.com) has none either -- the photo
+    # extraction added above must no-op on both, not invent a false match.
+    for fixture, kind in ((LAMBFH, "frazer"), (EDWARDSCARES, "frazer")):
+        entries = list(_iter_entries(fixture, kind))
+        _name, _link, _pub, summary, _td, _extra = entries[0]
+        assert "photo_url" not in _summary_fields(summary)
 
 
 def test_name_from_title_handles_trailing_period_suffix():

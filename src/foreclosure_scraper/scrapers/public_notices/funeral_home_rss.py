@@ -176,6 +176,19 @@ discarded the finished hosts' rows too. Now the hosts are read concurrently
 deadline (``host_deadline_s``) inside ``timeout_s``, and each finished host's
 rows go into ``self.partial`` at once, so a timeout still ships them. Run time
 is the slowest host (at most 45 s), not the sum.
+
+MISSING PHOTO ENCLOSURE (2026-10-14, final audit batch). None of the 11 hosts
+use a standalone RSS ``<enclosure>`` or ``media:content``/``media:thumbnail``
+tag (checked live against all 10 that resolved that day). But
+dychesfuneralhome.com -- the one plain-WordPress "Obituaries"-category host
+(see round 2 above) -- embeds the decedent's own uploaded photo as a plain
+``<img>`` inside ``<content:encoded>`` on 9 of its 10 live items, filename
+correlated to the decedent (e.g. "Sean Arlen Clancy" -> .../SAC-300x300.jpg),
+and it was being silently destroyed by ``_summary_fields()``'s HTML tag-strip
+along with every other tag. Now read from the raw html before stripping and
+kept as ``raw['obituary']['photo_url']``; a no-op (same as the age/survivors
+regexes already are) on the 9 Frazer hosts and the ltobits host, none of
+which carry an image anywhere in the body.
 """
 from __future__ import annotations
 
@@ -249,6 +262,10 @@ _SURVIVORS_RE = re.compile(
 # Frazer titles append the death/publish date after a pipe: "Full Name | MM/DD/YYYY".
 _TITLE_DATE_RE = re.compile(r"\|\s*(\d{1,2}/\d{1,2}/\d{2,4})")
 _TAGSTRIP_RE = re.compile(r"<[^>]+>")
+#: The decedent's own uploaded photo, when the post body embeds one as a plain
+#: <img>. Must run on the RAW summary/content HTML, before _TAGSTRIP_RE below
+#: destroys the src.
+_IMG_SRC_RE = re.compile(r'<img\b[^>]*?\bsrc=["\']([^"\']+)["\']', re.I)
 
 
 def _unescape(s: str) -> str:
@@ -285,15 +302,35 @@ def _date_from_title(title: str) -> str | None:
 
 def _summary_fields(summary_html: str) -> dict:
     """Parse the obituary body (RSS <description>/<content:encoded>) for the
-    summary text + age + survivors. HTML/entities are stripped first."""
+    summary text + age + survivors + photo. HTML/entities are stripped for
+    the text fields, but the photo must be read from the RAW html first --
+    MISSING PHOTO ENCLOSURE (live-confirmed 2026-10-14, final audit batch).
+    None of this module's 11 hosts use a standalone RSS <enclosure> or
+    media:content/thumbnail tag (checked all 10 that resolved live), but
+    dychesfuneralhome.com (the one plain-WordPress "Obituaries"-category
+    feed in HOMES -- see module docstring, round-2 notes) embeds the
+    decedent's own uploaded photo as a plain <img> inside <content:encoded>
+    on 9 of its 10 live items, and it was being silently destroyed by the
+    tag-strip below along with every other tag. Confirmed per-decedent (not
+    a shared/generic image): "Sean Arlen Clancy" -> .../SAC-300x300.jpg,
+    "Virginia 'Suzie' Jackson Elmore" -> .../SUZIE-OBIT-PIC-237x300.jpg. The
+    9 Frazer hosts' <description> is pure boilerplate text with no <img> at
+    all (same finding as the existing age/survivors note below) and the
+    ltobits host has none either, so this naturally no-ops on both -- same
+    behavior as the age/survivors regexes already have there."""
     if not summary_html:
         return {}
+    img_m = _IMG_SRC_RE.search(summary_html)
     # _unescape first (extracts CDATA + decodes entities), then strip tags, so a
     # stdlib-path <![CDATA[...]]> wrapper doesn't leave a "]]>" artifact behind.
     text = re.sub(r"\s+", " ", _TAGSTRIP_RE.sub(" ", _unescape(summary_html))).strip()
     if not text:
         return {}
     out: dict = {"summary": text[:800]}
+    if img_m:
+        photo_url = _unescape(img_m.group(1))
+        if photo_url:
+            out["photo_url"] = photo_url
     am = _AGE_RE.search(text)
     if am:
         try:
