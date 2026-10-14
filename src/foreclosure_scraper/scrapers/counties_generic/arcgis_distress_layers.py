@@ -45,6 +45,26 @@ PRIVACY
     THE COMPLAINT (Lincoln NAME/PHONE/EMAIL, Pickens poc*). A complainant is not
     a distressed owner, and their phone number is not ours to collect. Field
     lists below are explicit and exclude them; `outFields` is never a wildcard.
+
+PATTERN A RE-VERIFICATION 2026-10-13 (independent second pass)
+    Commit 0a470aad wired transylvania_damage_assessment and burke_storm_damage
+    (see Layer.has_attachments docstring) and claimed every other layer in this
+    file was checked and came back negative. Rather than take that on faith,
+    every one of the other 24 layers (all of LAYERS except those two) was
+    independently re-queried live tonight: `?f=json` for hasAttachments, same
+    as before. 22 came back hasAttachments:false, unchanged from the claim.
+    The 2 that came back true -- lincoln_county_owned and burke_county_owned --
+    were independently re-sampled with a real queryAttachments call across
+    their full row set (169 and 11 objectids respectively) rather than trusting
+    the prior write-up: lincoln_county_owned's attachments are exactly 14
+    distinct land-use icon PNGs (Airport.png/College.png/Conservation.png/EMS/
+    Education/Law Enforcement/Library/Office/Parking/Recreation/Solid Waste/
+    Tax/Utility/Vacant.png) reused across all 169 rows, one per feature's
+    category, not a per-property photo; burke_county_owned's 22 sampled
+    attachments across its full 11 rows are 100% application/pdf (deed scans
+    and "County Owned Parcels N.pdf" handouts), zero image/*. Both confirm the
+    prior finding exactly -- no new real-photo layer turned up, nothing newly
+    wired, and this closes out Pattern A for this file.
 """
 from __future__ import annotations
 
