@@ -35,6 +35,28 @@ Oracle-datacenter-IP-range block rather than a block on the site generally.
 Left in SKIP_SOURCES for now (this fix only addresses the stub-names bug,
 not the network path) — flagged separately for Hermes to test from a
 non-Oracle egress before re-enabling.
+
+MULTI-CANDIDATE CAPTURE (fixed 2026-10-14). Live-verified both sites return
+many distinct people per name search, and the old `cards[0]`-only code
+captured none of them correctly:
+  - fastpeoplesearch needs the wall_bypass browser tier to clear Cloudflare
+    (curl-cffi impersonation still 403s as of this check), and that tier
+    (wall_bypass.fetch_with_pydoll / fetch_with_nodriver) returns flattened
+    visible TEXT, not HTML (see wall_bypass._html_to_text) — so the old
+    BeautifulSoup `.select(".card", ...)` call always found zero elements
+    and every search silently recorded "no_match", even when the page body
+    plainly listed 9-10 free candidates.
+  - truepeoplesearch's curl-cffi tier still returns real HTML with `.card`
+    elements, but `cards[0]` was the "Search Neighbors" form widget, not a
+    person — the real results are the `.card-summary` cards further down
+    (confirmed live: 10 real candidates on a "John Smith" search, excluding
+    a hidden `.d-none` duplicate of the first one).
+Fix: parse ALL matching cards (DOM path, per-site `card_selector`, skipping
+hidden duplicates and non-person chrome by requiring an "Age NN" marker),
+and fall back to a regex pass over the flattened text (DOM path finds
+nothing — the realistic case) that anchors on the "<Name> Age <NN> •
+<City>, <ST> ... View Free Details" shape of a real, free result card;
+sponsored/paid cards lack that shape and are excluded by construction.
 """
 from __future__ import annotations
 
@@ -57,10 +79,19 @@ _SITES = {
     "truepeoplesearch": {
         "url": "https://www.truepeoplesearch.com",
         "search_path": "/results?name=",
+        # Live-verified 2026-10-14: real person cards. cards[0] used to be
+        # the "Search Neighbors" form widget — not a person.
+        "card_selector": ".card-summary",
     },
     "fastpeoplesearch": {
         "url": "https://www.fastpeoplesearch.com",
         "search_path": "/name/",
+        # Generic fallback — live-verified 2026-10-14 this site is reached
+        # through the browser wall_bypass tier, which returns flattened
+        # text (no tags at all), so this selector matches zero elements in
+        # practice and `_matches_from_text` does the real work. Left here
+        # in case a plain/impersonate fetch ever returns real tagged HTML.
+        "card_selector": ".card, .result-card, .person-card, .search-result, .listing",
     },
 }
 
@@ -68,6 +99,91 @@ _SITES = {
 # per-run sample pass, not a full-board sweep. Re-run picks up names that
 # weren't already resolved in the ledger (see _load_ledger/_already_checked).
 _MAX_CANDIDATES = 40
+
+# Cap distinct candidate matches kept per name per site — defensive, not
+# hit in live testing (max seen was 10).
+_MAX_MATCHES_PER_SITE = 20
+
+_AGE_RE = re.compile(r"Age\s*(\d{1,3})")
+_STREET_ADDR_RE = re.compile(
+    r"(\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+"
+    r"(?:St|Street|Ave|Avenue|Blvd|Dr|Rd|Road|"
+    r"Lane|Ln|Way|Pl|Ct))",
+)
+_PHONE_RE = re.compile(r"\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}")
+_NAME_BEFORE_AGE_RE = re.compile(r"^(.*?)\s+Age\s*\d{1,3}")
+
+# Flattened-text fallback card shape, live-confirmed against real
+# fastpeoplesearch output 2026-10-14. Each free (non-sponsored) result
+# reads "<Name> Age <NN> • <City>, <ST> Past Addresses: ... Relatives:
+# ... AKA: ... View Free Details" in the flattened text; sponsored/paid
+# cards ("<Name> <City>, <ST> Age <NN> View Details Sponsored By ...") lack
+# the Past Addresses/Relatives/AKA/"View Free Details" markers and never
+# match, so they're excluded by construction.
+#
+# `name` is pinned to exactly 2 capitalized tokens immediately before
+# "Age" — live-verified this correctly bounds every real card, including
+# the first one on a results page, which directly follows a run of
+# capitalized city names (the popular-cities list) with no tag boundary
+# to mark where the boilerplate ends and the real name starts; a looser
+# token count re-introduces that over-match. Tradeoff: a 3+-token legal
+# name would be truncated to its last two tokens. Acceptable — this ledger
+# is a best-effort, human-reviewed enrichment side-channel, never written
+# to board rows (see module docstring).
+_TEXT_CARD_RE = re.compile(
+    r"(?P<name>[A-Z][A-Za-z.'-]+\s+[A-Z][A-Za-z.'-]+)\s+Age\s+(?P<age>\d{1,3})"
+    r"\s*[•·]\s*(?P<city>[A-Za-z.'\s-]+?,\s*[A-Z]{2})\s+"
+    r"Past Addresses:\s*(?P<past>.*?)\s+Relatives:\s*(?P<relatives>.*?)\s+"
+    r"AKA:\s*(?P<aka>.*?)\s+View Free Details"
+)
+
+
+def _matches_from_text(text: str, limit: int = _MAX_MATCHES_PER_SITE) -> list[dict]:
+    """Every free (non-sponsored) candidate card found in flattened text —
+    the realistic path once a search needs the wall_bypass browser tier
+    (see module docstring)."""
+    out: list[dict] = []
+    for m in _TEXT_CARD_RE.finditer(text):
+        out.append({
+            "name": m.group("name").strip(),
+            "age": m.group("age"),
+            "city": m.group("city").strip(),
+            "address": None,
+            "phone": None,
+            "full_text": m.group(0)[:500],
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _matches_from_cards(cards: list, limit: int = _MAX_MATCHES_PER_SITE) -> list[dict]:
+    """Every real person-result card in a parsed DOM — skips hidden
+    duplicates (`.d-none`) and non-person chrome (search form, filters,
+    ads, alerts) by requiring an "Age NN" marker in the card's own text."""
+    out: list[dict] = []
+    for card in cards:
+        classes = card.get("class") or []
+        if "d-none" in classes:
+            continue
+        text = card.get_text(separator=" ", strip=True)
+        age_match = _AGE_RE.search(text)
+        if not age_match:
+            continue
+        name_match = _NAME_BEFORE_AGE_RE.match(text)
+        addr_match = _STREET_ADDR_RE.search(text)
+        phone_match = _PHONE_RE.search(text)
+        out.append({
+            "name": name_match.group(1).strip() if name_match else None,
+            "age": age_match.group(1),
+            "city": None,
+            "address": addr_match.group(1) if addr_match else None,
+            "phone": phone_match.group(0) if phone_match else None,
+            "full_text": text[:500],
+        })
+        if len(out) >= limit:
+            break
+    return out
 
 _ENTITY_RE = re.compile(
     r"\b(LLC|L\.L\.C\.|INC|INCORPORATED|CORP|CORPORATION|CO\b|COMPANY|"
@@ -193,32 +309,28 @@ class PeopleSearchScraper(BaseScraper):
                         continue
 
                     soup = BeautifulSoup(html, "html.parser")
-                    cards = soup.select(
-                        ".card, .result-card, .person-card, "
-                        ".search-result, .listing"
-                    )
+                    cards = soup.select(cfg["card_selector"])
 
-                    if not cards:
+                    # DOM path first (real tagged HTML, e.g. truepeoplesearch
+                    # via curl-cffi); fall back to the flattened-text regex
+                    # path when no cards parse out (the realistic case for a
+                    # site reached only through the wall_bypass browser
+                    # tier, which returns visible text with no tags at all
+                    # — see module docstring).
+                    matches = _matches_from_cards(cards) if cards else []
+                    if not matches:
+                        matches = _matches_from_text(
+                            soup.get_text(separator=" ", strip=True)
+                        )
+
+                    if not matches:
                         entry["sites"][site_name] = {"status": "no_match"}
                         continue
 
-                    card = cards[0]
-                    text = card.get_text(separator=" | ", strip=True)
-                    addr_match = re.search(
-                        r"(\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+"
-                        r"(?:St|Street|Ave|Avenue|Blvd|Dr|Rd|Road|"
-                        r"Lane|Ln|Way|Pl|Ct))",
-                        text,
-                    )
-                    age_match = re.search(r"Age\s*(\d+)", text, re.I)
-                    phone_match = re.search(r"\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", text)
-
                     entry["sites"][site_name] = {
                         "status": "found",
-                        "address": addr_match.group(1) if addr_match else None,
-                        "age": age_match.group(1) if age_match else None,
-                        "phone": phone_match.group(0) if phone_match else None,
-                        "full_text": text[:500],
+                        "match_count": len(matches),
+                        "matches": matches,
                     }
                     found_any = True
 
