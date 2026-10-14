@@ -213,8 +213,38 @@ needs no login and nothing further is queued here for it.
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)
 - `public_notices/nc_notices_counties.py` vs `ncpublicnotices.py` (same site — does the
   interstitial actually gate it or not? One module says yes, the other's code says no.)
-- `counties_sc/sc_qpublic.py` (worth confirming the search form even works at all — the code
-  never submits a query)
+
+**CORRECTION 2026-10-14 (cont.)** — `counties_sc/sc_qpublic.py` was also WRONGLY listed here: no
+login or CAPTCHA was ever found. Live-checked, not assumed, and it's a bigger problem than "the
+code never submits a query" suggested:
+  * `_COUNTY_PAGES`'s URL scheme was simply invalid. Every entry used
+    `Application.aspx?App={County}SC&Page=search` — live-fetched via
+    `get_text(wall_bypass=True)`, this returns a generic Schneider "qPublic - An error has
+    occurred" response for every county tried (Berkeley, Beaufort, Colleton), a backend
+    application error unrelated to Cloudflare (no challenge markers; pydoll renders real content,
+    it's just the error page). `Page=search` is not a real query param on this platform at all.
+  * Correcting the alias to `App={County}CountySC` (cross-checked against the sibling
+    `kershaw_flc` docstring's own `App=KershawCountySC` reference and the already-known-good
+    Oconee app in `assessor_cards/qpublic_render.py`) DOES resolve real per-county landing pages
+    for Kershaw/Oconee/Colleton — Cloudflare clears cleanly via wall_bypass, confirming that half
+    of the old docstring. But `App=BerkeleyCountySC`/`App=BeaufortCountySC` still 500 the same
+    way, so even this fix isn't a uniform formula across the other 25 counties in the dict.
+  * More fundamentally: on the apps that DO resolve, both real query mechanisms (owner/address/
+    parcel Search, Sales Search) are stateful ASP.NET WebForms POST pages — confirmed live via raw
+    HTML capture of Kershaw's Search (PageTypeID=2/PageID=15084) and Sales Search (PageID=15087)
+    pages (`__VIEWSTATE`/`__EVENTTARGET` hidden fields + a postback search button). A plain GET —
+    all `get_text(wall_bypass=True)` and every `wall_bypass.py` tier can do — cannot submit this
+    form; a `KeyValue=` GET shortcut to the Results route (PageTypeID=3/PageID=15085) loads the
+    real page but the results grid stays empty (zero `<table>` rows, zero occurrences of the
+    search term anywhere in the body).
+  * Net: not fixable within this project's `get_text(wall_bypass=True)` GET-only convention. The
+    legitimate use of this data source (resolve ONE already-known address/parcel to a property
+    card) is already covered by `assessor_cards/qpublic_render.py` for 4 counties via a real
+    driven browser session; extending that to blind discovery across the rest of this county list
+    is a separate, much larger project. **Removed from this list** (no login needed) and disabled
+    via `disabled=True`/`disabled_reason` in the scraper itself instead (same pattern as
+    `counties_sc/oconee_flc.py` / `clarendon_tax_auction.py` / `kershaw_flc.py`) — see
+    `tests/test_sc_qpublic.py`.
 
 ## Needs a live check, no login required (Claude can do this directly)
 
