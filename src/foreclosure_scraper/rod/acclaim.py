@@ -8,7 +8,13 @@ index is reachable BROWSERLESS and FREE — no CAPTCHA, no anti-forgery token:
 
 Each row carries DirectName (grantor), IndirectName (grantee), DocType,
 RecordDate (/Date(epoch)/), InstrumentNumber, BookType, BookPage, ParcelNumber,
-Comments (legal description).
+Comments (legal description), AND TransactionItemId -- an internal document
+id that resolves to the free, no-login scanned-document PDF; see
+`document_pdf_url` below for how and the live-verification evidence. This was
+previously (source_completeness_audit_2026-10-13.md) mis-flagged as
+"Needs YOU logged in" on the assumption that the image only opens via a
+click-driven session flow -- it does not; the id is already in this grid
+response and the PDF endpoint is reachable cold.
 
 SC foreclosure is JUDICIAL (lis pendens lives in the courts — already covered by
 sc_public_index_lis_pendens), so the ROD distress signal here is PROBATE
@@ -58,10 +64,50 @@ def _parse_date(s: str | None) -> datetime | None:
         return None
 
 
-def _row_to_doc(row: dict, state: str, county: str) -> RodDoc:
+def document_pdf_url(base: str, transaction_item_id: object) -> str | None:
+    """The free, no-login, no-session full scanned-document PDF for one
+    AcclaimWeb grid row's internal id.
+
+    Every `GridResults` row already carries `TransactionItemId` -- an internal
+    document id, NOT the public `InstrumentNumber` -- that is otherwise only
+    reachable by clicking the row open in the UI (which primes server-side
+    session state before `search/Details/` will render). `Image/
+    DocumentPdfAllPages/{id}` sidesteps that entirely: live-verified
+    2026-10-14 against 15 fresh real documents (on top of the one instrument
+    already viewed by hand in-browser earlier the same session) spanning
+    every distress doc type this scraper classifies (D/DIST, D/DEATH, LIEN,
+    L/MECH, M/MH LIEN AFF, L/MECH AFFIDAVIT) plus PLAT/DEED/M-SAT controls --
+    a bare GET with NO prior search, NO cookies, and NO `StartImageRetrieval`
+    priming call returns 200 `application/pdf` with real, differently-sized
+    PDF bytes every time. (`Image/DocumentImage1/{id}` -- the OTHER endpoint
+    the portal exposes -- is NOT a byte endpoint: cold it 500s with "Value cannot be
+    null. Parameter name: source", and even preceded by `StartImageRetrieval`
+    it returns an HTML viewer SHELL page, not an image -- that one genuinely
+    needs the real browser's JS runtime, so it is not used here.)
+
+    None when the row carries no `TransactionItemId` (shouldn't happen on a
+    real grid row, but the caller's HTTP response is never fully trusted)."""
+    tid = transaction_item_id
+    if tid is None or (isinstance(tid, str) and not tid.strip()):
+        return None
+    try:
+        tid_int = int(float(tid))
+    except (TypeError, ValueError):
+        return None
+    if tid_int <= 0:
+        return None
+    return f"{base.rstrip('/')}/Image/DocumentPdfAllPages/{tid_int}"
+
+
+def _row_to_doc(row: dict, state: str, county: str, base: str | None = None) -> RodDoc:
     bp = (row.get("BookPage") or "").split("/")
     book = bp[0].strip() if bp and bp[0].strip() else None
     page = bp[1].strip() if len(bp) > 1 and bp[1].strip() else None
+    raw: dict = {"acclaim": row, "book_type": row.get("BookType")}
+    if base:
+        url = document_pdf_url(base, row.get("TransactionItemId"))
+        if url:
+            raw["document_pdf_url"] = url
     return RodDoc(
         county=county, state=state,
         doc_type=(row.get("DocType") or "").strip(),
@@ -72,7 +118,7 @@ def _row_to_doc(row: dict, state: str, county: str) -> RodDoc:
         instrument_no=(row.get("InstrumentNumber") or "").strip() or None,
         parcel_id=(row.get("ParcelNumber") or "").strip() or None,
         notes=(row.get("Comments") or "").strip() or None,
-        raw={"acclaim": row, "book_type": row.get("BookType")},
+        raw=raw,
     )
 
 
@@ -134,7 +180,7 @@ async def discover_recent_nods(state: str, county: str, days_back: int = 45,
                         continue
                     if inst:
                         seen.add(inst)
-                    out.append(_row_to_doc(row, state, county))
+                    out.append(_row_to_doc(row, state, county, base))
                     if len(out) >= max_docs:
                         break
                 cur = chunk_from - timedelta(days=1)

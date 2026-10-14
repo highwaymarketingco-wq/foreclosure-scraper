@@ -9,6 +9,12 @@ courts, already covered):
 
 Each lead carries grantor (owner), parcel_id, instrument#, and legal description;
 the address waterfall resolves the situs from the parcel via county GIS.
+
+Also stamps the free, no-login scanned-document PDF (rod.acclaim.document_pdf_url)
+into raw['documents']/raw['document_url'] via document_links.stamp_documents, so
+enrichment_doc_ocr.py picks it up same as any other scraper's document link. No
+extra request: the PDF URL is built off the TransactionItemId already present on
+every row discover_recent_nods fetches.
 """
 from __future__ import annotations
 
@@ -16,6 +22,7 @@ from datetime import datetime
 from typing import Iterable
 
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...models import Listing, ListingType, PropertyKind
 from ...rod import acclaim
 
@@ -50,7 +57,7 @@ def _to_listing(doc, slug: str, source_url: str) -> Listing | None:
     if kind == "probate":
         raw["relationship_signal"] = {"kind": "probate", "keyword": doc.doc_type,
                                       "tagged_at": datetime.utcnow().isoformat() + "Z"}
-    return Listing(
+    li = Listing(
         source=slug, source_url=source_url,
         listing_type=lt, property_kind=PropertyKind.UNKNOWN,
         state=doc.state, county=doc.county,
@@ -62,6 +69,16 @@ def _to_listing(doc, slug: str, source_url: str) -> Listing | None:
         first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
         raw=raw,
     )
+    # The free, no-login scanned-document PDF for this recording -- built by
+    # rod.acclaim._row_to_doc straight off the GridResults row's own
+    # TransactionItemId (no extra request; see acclaim.document_pdf_url's
+    # docstring for the live verification). Flat raw['documents']/
+    # ['document_url'] is the same convention anderson_acpass_deeds.py and
+    # sheriff_sales.py use so enrichment_doc_ocr.py finds it automatically.
+    pdf_url = (doc.raw or {}).get("document_pdf_url")
+    if pdf_url:
+        stamp_documents(li, [pdf_url])
+    return li
 
 
 class SCRodAcclaim(BaseScraper):

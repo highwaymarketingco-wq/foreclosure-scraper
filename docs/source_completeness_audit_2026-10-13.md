@@ -54,9 +54,13 @@ photo gallery).
 The exact Cherokee shape, repeated across nearly every ROD vendor this codebase reads.
 
 Affected: `counties_nc/nc_rod_captcha.py` (9 counties, 2 vendor platforms),
-`counties_nc/nc_rowan_cott.py`, `counties_nc/nc_cchs_deeds.py`, `counties_sc/sc_rod_acclaim.py`
-(same AcclaimWeb vendor as Cherokee itself), `counties_sc/sc_rod_walled.py` (Clarendon runs the
-literal same AcclaimWeb software), `national/cash_buyer_deeds.py`.
+`counties_nc/nc_rowan_cott.py`, `counties_nc/nc_cchs_deeds.py`,
+~~`counties_sc/sc_rod_acclaim.py`~~ (same AcclaimWeb vendor as Cherokee itself — **FIXED
+2026-10-14**, see correction note under "Needs YOU logged in" below: no login was ever needed,
+and the per-document scanned PDF is now wired into `raw['document_url']`/`raw['documents']`),
+`counties_sc/sc_rod_walled.py` (Clarendon runs the literal same AcclaimWeb software, but Clarendon's
+own deployment has not itself been live-checked — do not assume the Pickens finding transfers
+without confirming it), `national/cash_buyer_deeds.py`.
 One is worse than "never looked at" — **a real in-repo contradiction**:
 `counties_sc/sc_rod_cott.py`'s own docstring claims Union's document images are "pay-per-view,"
 but the shared `rod/doc_images.py` module explicitly registers Union as confirmed **free**
@@ -130,8 +134,24 @@ These require a real login/CAPTCHA session — same boundary as always, Claude w
 part. Queued for the same workflow used on Cherokee: you log in, Claude confirms what's real
 via the browser pane.
 
-- `counties_sc/sc_rod_acclaim.py` (Pickens/Harris AcclaimWeb — same vendor as Cherokee)
-- `counties_sc/sc_rod_walled.py` (Beaufort/Jasper/Clarendon — Clarendon is the same AcclaimWeb)
+**CORRECTION 2026-10-14** — `counties_sc/sc_rod_acclaim.py` (Pickens/Harris AcclaimWeb) was
+WRONGLY listed here. The owner logged into Pickens' AcclaimWeb live, in the browser pane, and
+found there is no account on this deployment at all — not for the base search (already known
+free) and not for the per-document "Document Details" popup/image viewer either (confirmed via
+the site's own `Search/Settings` page, which is a bare preference toggle, not an account). The
+popup's real scanned PDF is served by `Image/DocumentPdfAllPages/{TransactionItemId}`, and
+`TransactionItemId` turned out to already be sitting in every row of the `Search/GridResults`
+JSON response `discover_recent_nods` was already fetching — no browser, no extra request, no
+session priming needed. Live-verified cold (fresh client, zero prior requests) against 15 fresh
+documents spanning every distress doc type this scraper classifies. Fixed in
+`rod/acclaim.py` (`document_pdf_url`) + `scrapers/counties_sc/sc_rod_acclaim.py` (stamps the URL
+into `raw['document_url']`/`raw['documents']` via `document_links.stamp_documents`); see
+`tests/test_acclaim_rod.py`. **Removed from this list** — it needs no login and nothing further
+is queued here for it.
+
+- `counties_sc/sc_rod_walled.py` (Beaufort/Jasper/Clarendon — Clarendon is the same AcclaimWeb
+  software as Pickens, so the login-free finding above is likely to transfer, but Clarendon's
+  own deployment has NOT been live-checked — do not assume without confirming)
 - `counties_sc/sc_rod_cott.py` (Union — the free/pay-per-view contradiction above needs settling)
 - `counties_nc/nc_rod_captcha.py` (9 counties — already has real login/CAPTCHA mechanics built)
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)
