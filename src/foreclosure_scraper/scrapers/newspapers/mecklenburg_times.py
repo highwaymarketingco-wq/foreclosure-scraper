@@ -33,6 +33,24 @@ CAUTION: after four proof runs inside about two minutes (about 12 GETs) the host
 answering 403; this module treats a 403 as BLOCKED and stops, and is meant to run once a
 day. Do not loop it.
 Gate with FORECLOSURE_MECKTIMES=0.
+
+LIVE RE-VERIFY 2026-10-13 (HERMES source-completeness audit, Pattern D -- the same
+RSS-vs-detail-page gap found and fixed on the 3 sibling TownNews papers in this same
+batch: index_journal.py / journal_scene.py / post_and_courier.py, via the shared
+``_townnews.fetch_full_text()`` helper): mecktimes.com is NOT TownNews/TNCMS -- its
+pages are WordPress (``wp`` dataLayer, GMPG profile link in `<head>`), so that shared
+helper's `[itemprop="description"]` selector does not apply here even in principle; this
+module's own detail URL (``public-notice/search-detail?indexgroup=...&detail=...``) is a
+different site entirely. Confirmed live this batch that the detail page is itself walled
+regardless of selector: a direct ``httpx`` GET of a real detail link pulled from today's
+live feed answered HTTP 403, and escalating to a real Chrome TLS/JA3 fingerprint
+(``get_text(..., impersonate=True)``) was ALSO answered with 403 -- i.e. not a plain
+fingerprint block the impersonation tier can clear, consistent with a WAF/bot-detection
+rule in front of that path specifically (the feed endpoint itself still answers 200 under
+normal, paced use). No login prompt or CAPTCHA widget was reachable to confirm which WAF,
+only the 403. Left unfetched: this module still ships the RSS-only Listing exactly as
+before (preview_truncated=True in raw["public_notice"]), the same "stop on it, don't force
+it" call the module already makes for the feed's own 429/403 handling above.
 """
 from __future__ import annotations
 

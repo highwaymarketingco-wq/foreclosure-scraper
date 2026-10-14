@@ -47,6 +47,20 @@ cross-reference):
 2. **The same `l=50` volume cap batch 1 found and fixed on the 3 sibling
    TownNews papers, not yet backported here.** Confirmed live 2026-10-04 this
    feed is the same TownNews platform and also honors `l=100`. Bumped.
+
+FOUND 2026-10-13 (HERMES source-completeness audit, Pattern D): this module
+stored each item's RSS `<link>` but never fetched it, relying only on the
+feed's ~250-300-char `<description>` truncation. Live-confirmed 2026-10-13:
+this postandcourier.com section's TNCMS detail page server-renders the FULL
+notice in `[itemprop="description"]` -- a real Dorchester C/A 2026CP1801986
+summons sampled this batch carried the full SUMMONS AND NOTICES body there,
+including the property address ("120 MILL POND COURT SUMMERVILLE, SC 29485")
+and TMS parcel number, neither of which survive the RSS feed's ~274-char cut.
+Same selector newspapers.daily_courier.py already uses on its own TNCMS
+section. Wired via the shared `_townnews.fetch_full_text()`/
+`DetailFetchBudget` added the same day (also used by index_journal.py/
+post_and_courier.py). Pure best-effort enrichment: a failed/blocked detail
+fetch leaves the RSS snippet as the only text, the Listing is never dropped.
 """
 from __future__ import annotations
 
@@ -58,7 +72,7 @@ import structlog
 from ...base_scraper import BaseScraper
 from ...http_client import get_text
 from ...models import Listing, ListingType
-from ._townnews import parse_rss_items
+from ._townnews import DetailFetchBudget, parse_rss_items
 
 log = structlog.get_logger()
 
@@ -78,11 +92,15 @@ class JournalSceneForeclosures(BaseScraper):
     category = "newspaper_legal"
     requires_apify = False
     expected_min_count = 0
-    timeout_s = 60.0
+    #: Bumped from 60s (2026-10-04 batch) to give the 2026-10-13 full-text
+    #: detail-page enrichment room to run; a soft timeout mid-enrichment still
+    #: ships every row built so far via self.partial.
+    timeout_s = 150.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         seen_urls: set[str] = set()
+        budget = DetailFetchBudget()
         for url in FEED_URLS:
             try:
                 xml = await get_text(url, timeout=30.0)
@@ -117,6 +135,8 @@ class JournalSceneForeclosures(BaseScraper):
                 # distressed scope instead).
                 if li.listing_type == ListingType.FORECLOSURE_SALE:
                     li.listing_type = ListingType.LIS_PENDENS
+                await budget.enrich(li)
                 out.append(li)
+                self.partial.append(li)      # a soft timeout still ships what was read
         log.info("journal_scene.fetch_done", count=len(out))
         return out

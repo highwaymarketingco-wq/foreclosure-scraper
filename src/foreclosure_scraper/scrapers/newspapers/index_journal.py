@@ -41,6 +41,21 @@ cross-reference):
    platform/section shape as every sibling paper already confirmed to honor
    `l=100` -- bumped for consistency/future-proofing, same reasoning
    batch 1 applied to carolina_coast.py's low-volume feed.
+
+FOUND 2026-10-13 (HERMES source-completeness audit, Pattern D): this module
+stored each item's RSS `<link>` but never fetched it, relying only on the
+feed's ~250-550-char `<description>` truncation. Live-confirmed 2026-10-13
+that indexjournal.com's TNCMS detail page server-renders the FULL notice in
+`[itemprop="description"]` -- the exact selector newspapers.daily_courier.py
+already uses on its own TNCMS section -- e.g. one sampled detail page (a DSS
+family-court notice, same template every legal ad on this site uses) carried
+~1.7 KB there vs. the meta description's ~270-char cut. Wired via the shared
+`_townnews.fetch_full_text()`/`DetailFetchBudget` added the same day (also
+used by journal_scene.py/post_and_courier.py); mecklenburg_times.py uses a
+different, non-TownNews CMS that answered a Cloudflare 403 to every live
+probe this batch and was left unfetched. Pure best-effort enrichment: a
+failed/blocked detail fetch leaves the RSS snippet as the only text, the
+Listing is never dropped.
 """
 from __future__ import annotations
 
@@ -52,7 +67,7 @@ import structlog
 from ...base_scraper import BaseScraper
 from ...http_client import get_text
 from ...models import Listing, ListingType
-from ._townnews import parse_rss_items
+from ._townnews import DetailFetchBudget, parse_rss_items
 
 log = structlog.get_logger()
 
@@ -71,11 +86,15 @@ class IndexJournalForeclosures(BaseScraper):
     category = "newspaper_legal"
     requires_apify = False
     expected_min_count = 0   # quiet weeks = data reality, not failure
-    timeout_s = 60.0
+    #: Bumped from 60s (2026-10-04 batch) to give the 2026-10-13 full-text
+    #: detail-page enrichment room to run; a soft timeout mid-enrichment still
+    #: ships every row built so far via self.partial.
+    timeout_s = 150.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         seen_urls: set[str] = set()
+        budget = DetailFetchBudget()
         for url in FEED_URLS:
             try:
                 xml = await get_text(url, timeout=30.0)
@@ -110,6 +129,8 @@ class IndexJournalForeclosures(BaseScraper):
                 # distressed scope instead).
                 if li.listing_type == ListingType.FORECLOSURE_SALE:
                     li.listing_type = ListingType.LIS_PENDENS
+                await budget.enrich(li)
                 out.append(li)
+                self.partial.append(li)      # a soft timeout still ships what was read
         log.info("index_journal.fetch_done", count=len(out))
         return out

@@ -23,6 +23,7 @@ import asyncio
 
 from foreclosure_scraper import main
 from foreclosure_scraper.models import ListingType
+from foreclosure_scraper.scrapers.newspapers import _townnews as townnews_mod
 from foreclosure_scraper.scrapers.newspapers import journal_scene as mod
 
 # Real captured shape (The Journal Scene, Dorchester SC, "foreclosure" query,
@@ -99,3 +100,57 @@ def test_scraper_registered():
     from foreclosure_scraper.scrapers._registry import all_scrapers
 
     assert "newspapers.journal_scene" in {s.slug for s in all_scrapers()}
+
+
+# --- full-text detail-page enrichment (FOUND/FIXED 2026-10-13, HERMES -------
+# source-completeness audit, Pattern D): this scraper stored each item's RSS
+# <link> but never fetched it, relying only on the ~250-300-char RSS
+# <description>. The detail page's itemprop="description" element server-
+# renders the FULL notice (live-confirmed 2026-10-13 on this postandcourier.com
+# section -- see _townnews.py's module docstring). Invented notice text, same
+# TNCMS shape as the real sampled Dorchester C/A summons whose full body
+# carried the property address and TMS parcel number that the RSS
+# description's ~274-char cut never reaches.
+FULL_TEXT_DETAIL_HTML = """<html><body>
+<div itemprop="description">
+<p>STATE OF SOUTH CAROLINA COUNTY OF DORCHESTER IN THE COURT OF COMMON PLEAS
+C/A No. 2026CP1801986 SUMMONS AND NOTICES (NON-JURY MORTGAGE FORECLOSURE).
+US BANK TRUST NA, Plaintiff, vs. JANE Q DOE, Defendant(s). The mortgaged
+premises is located at 120 Example Pond Court, Summerville, SC 29485, TMS
+No. 999-99-99-999, as more fully described in the Complaint on file with
+the Dorchester County Clerk of Court.</p>
+</div>
+</body></html>"""
+
+
+def test_full_notice_text_from_detail_page_flows_into_raw(monkeypatch):
+    async def fake_feed_get_text(url, timeout=30.0):
+        return NOTICE_OF_SALE_RSS
+
+    async def fake_detail_get_text(url, timeout=20.0):
+        return FULL_TEXT_DETAIL_HTML
+
+    monkeypatch.setattr(mod, "get_text", fake_feed_get_text)
+    monkeypatch.setattr(townnews_mod, "get_text", fake_detail_get_text)
+    out = asyncio.run(mod.JournalSceneForeclosures().fetch())
+    assert len(out) == 1
+    block = out[0].raw["townnews_legal"]
+    assert "full_text" in block
+    assert len(block["full_text"]) > len(block["desc"])
+    assert "120 Example Pond Court, Summerville, SC 29485" in block["full_text"]
+
+
+def test_detail_fetch_failure_still_ships_the_rss_only_row(monkeypatch):
+    """Best-effort enrichment: a blocked/failed detail fetch must never drop
+    the row that the RSS parse already built."""
+    async def fake_feed_get_text(url, timeout=30.0):
+        return NOTICE_OF_SALE_RSS
+
+    async def fake_detail_get_text(url, timeout=20.0):
+        raise ConnectionError("simulated block")
+
+    monkeypatch.setattr(mod, "get_text", fake_feed_get_text)
+    monkeypatch.setattr(townnews_mod, "get_text", fake_detail_get_text)
+    out = asyncio.run(mod.JournalSceneForeclosures().fetch())
+    assert len(out) == 1
+    assert "full_text" not in out[0].raw["townnews_legal"]

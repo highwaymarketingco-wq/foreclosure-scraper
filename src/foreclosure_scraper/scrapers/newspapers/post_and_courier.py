@@ -56,6 +56,22 @@ TownNews-based papers — this is that re-verification):
 2. **The same `l=50` volume cap batch 1 found and fixed on the 3 sibling
    TownNews papers, not yet backported here.** Confirmed live 2026-10-04 this
    feed is the same TownNews platform and also honors `l=100`. Bumped.
+
+FOUND 2026-10-13 (HERMES source-completeness audit, Pattern D): this module
+stored each item's RSS `<link>` but never fetched it, relying only on the
+feed's ~250-550-char `<description>` truncation. The shared `_townnews.py`
+docstring already records a live 2026-10-13 confirmation that this exact
+site/section (`postandcourier.com/classifieds_new/...`, the section this
+file queries) server-renders the FULL notice in the detail page's
+`[itemprop="description"]` element -- the same selector
+newspapers.daily_courier.py already uses on its own TNCMS section. A fresh
+re-verification attempt this batch hit the same aggressive 429 rate-limiting
+this host's own docstring (point 2 above) and daily_courier.py's docstring
+both already document -- consistent with, not contrary to, the existing
+confirmation. Wired via the shared `_townnews.fetch_full_text()`/
+`DetailFetchBudget` added the same day (also used by index_journal.py/
+journal_scene.py). Pure best-effort enrichment: a failed/blocked detail
+fetch leaves the RSS snippet as the only text, the Listing is never dropped.
 """
 from __future__ import annotations
 
@@ -67,7 +83,7 @@ import structlog
 from ...base_scraper import BaseScraper
 from ...http_client import get_text
 from ...models import Listing, ListingType
-from ._townnews import parse_rss_items
+from ._townnews import DetailFetchBudget, parse_rss_items
 
 log = structlog.get_logger()
 
@@ -96,11 +112,15 @@ class PostAndCourierForeclosures(BaseScraper):
     # the RSS endpoint 404ing / returning no <item> elements at all (which the
     # block-signal + outcome classifier surface separately).
     expected_min_count = 0
-    timeout_s = 60.0
+    #: Bumped from 60s (2026-10-04 batch) to give the 2026-10-13 full-text
+    #: detail-page enrichment room to run; a soft timeout mid-enrichment still
+    #: ships every row built so far via self.partial.
+    timeout_s = 150.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         seen_urls: set[str] = set()
+        budget = DetailFetchBudget()
         for url in FEED_URLS:
             try:
                 xml = await get_text(url, timeout=30.0)
@@ -135,6 +155,8 @@ class PostAndCourierForeclosures(BaseScraper):
                 # unrestricted distressed scope instead).
                 if li.listing_type == ListingType.FORECLOSURE_SALE:
                     li.listing_type = ListingType.LIS_PENDENS
+                await budget.enrich(li)
                 out.append(li)
+                self.partial.append(li)      # a soft timeout still ships what was read
         log.info("post_and_courier.fetch_done", count=len(out))
         return out

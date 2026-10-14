@@ -6,9 +6,10 @@ keyword filter (`&q=foreclosure`) returns ONLY the foreclosure / trustee-sale /
 mortgage-foreclosure legal notices — published days-to-weeks BEFORE the auction,
 which is exactly the pre-auction signal we want.
 
-Why RSS and not the HTML detail page: the TownNews ad detail body is rendered
-client-side (the server HTML ships an empty `.asset-body` div). The notice text
-we need is, however, fully present in two server-side places:
+Why RSS and not the HTML detail page -- CORRECTED 2026-10-13 (HERMES source-
+completeness audit, Pattern D): the `.asset-body` div IS empty/client-rendered
+as this docstring long claimed, but that was never the only server-side text on
+the detail page. The notice text is fully present in THREE server-side places:
 
   1. the RSS `<title>` — TownNews uses the FIRST line of the legal ad as the
      title, so for trustee-SALE notices it carries the case number AND the
@@ -16,10 +17,22 @@ we need is, however, fully present in two server-side places:
      SALE OF REAL PROPERTY 26SP000053-150 294 CAPE LOOKOUT DR HARKERS ISLAND,
      NC ..."); for SC mortgage-foreclosure summonses it carries the county +
      C/A number.
-  2. the RSS `<description>` — the opening ~250 chars of the body, which adds
-     the parties (plaintiff / defendant).
+  2. the RSS `<description>` — the opening ~250-550 chars of the body, which
+     adds the parties (plaintiff / defendant).
+  3. the detail page's `[itemprop="description"]` element — a schema.org
+     microdata node TNCMS renders SERVER-SIDE (confirmed by its presence in
+     the raw httpx response body, no JS), carrying the FULL notice (1.5-6 KB)
+     that the RSS description truncates. newspapers.daily_courier.py (a
+     sibling TNCMS paper) already proved this element exists and is fetchable;
+     live-confirmed 2026-10-13 the SAME selector also server-renders the full
+     text on indexjournal.com and postandcourier.com (both the classifieds_new
+     and journal-scene sections) -- same platform, same selector, no theme
+     difference. `fetch_full_text()` below fetches it as a best-effort
+     enrichment on top of the RSS-only parse this module has always done; the
+     RSS-derived Listing is never dropped or blocked on this fetch failing.
 
-Both are static server-rendered XML — no JS, no login, no WAF. Compliant.
+All of the above are static server-rendered HTML/XML — no JS, no login, no
+WAF. Compliant.
 
 This module is import-safe (no `BaseScraper` subclass), so the registry's
 auto-discovery skips it (the registry only picks up concrete subclasses, and
@@ -27,12 +40,17 @@ underscore-prefixed module names are excluded anyway).
 """
 from __future__ import annotations
 
+import asyncio
 import html
+import os
 import re
 from datetime import datetime
 from typing import Iterable
 
 from dateutil import parser as dateparser
+from selectolax.parser import HTMLParser
+
+from ...http_client import get_text
 
 from ...models import Listing, ListingType, PropertyKind
 from ...validation import NC_COUNTIES, SC_COUNTIES
@@ -516,3 +534,88 @@ def parse_rss_items(
             )
         )
     return out
+
+
+# --- full-text detail-page enrichment (added 2026-10-13) -------------------
+# See the module docstring point 3: the RSS <description> this module has
+# always parsed is truncated to ~250-550 chars, but every sibling TNCMS paper
+# server-renders the FULL notice body in the detail page's
+# `[itemprop="description"]` element. This is pure, best-effort enrichment on
+# top of the RSS-only Listing already built above — it never raises and a
+# failed/blocked/short fetch simply leaves the RSS snippet as the only text,
+# exactly like the detail-fetch fixes landed the same day on
+# counties_nc/polk_tax.py and counties_sc/horry_probate.py.
+
+#: Seconds between detail-page fetches (politeness; these TNCMS sites 429/403
+#: aggressively under back-to-back requests per every sibling scraper's own
+#: docstring). get_text()'s transport already paces per-host at ~0.8 s; this
+#: adds a slower, scraper-level cadence on top for the extra GET per listing.
+DETAIL_FETCH_DELAY_S = float(os.environ.get("TOWNNEWS_DETAIL_DELAY_S", "1.5"))
+#: Hard cap on detail fetches per run — bounds worst-case runtime on a busy
+#: feed day instead of fetching every matching row.
+DETAIL_FETCH_MAX_DEFAULT = 20
+
+
+async def fetch_full_text(url: str, *, timeout: float = 20.0) -> str | None:
+    """Best-effort fetch of one TNCMS ad detail page's full server-rendered
+    notice text (the `[itemprop="description"]` element) -- the same selector
+    newspapers.daily_courier.py already uses on its own TNCMS section, live-
+    confirmed 2026-10-13 to also work unchanged on indexjournal.com and
+    postandcourier.com. Never raises: any network error, non-200, or missing
+    element returns None so the caller keeps the RSS snippet."""
+    try:
+        resp_html = await get_text(url, timeout=timeout)
+    except Exception:  # noqa: BLE001 - enrichment must never break the caller
+        return None
+    try:
+        tree = HTMLParser(resp_html or "")
+        node = tree.css_first('[itemprop="description"]')
+        if node is None:
+            return None
+        txt = re.sub(r"\s+", " ", node.text(separator=" ")).strip()
+        return txt or None
+    except Exception:  # noqa: BLE001 - a parse bug must not break the caller
+        return None
+
+
+class DetailFetchBudget:
+    """Per-run state for `fetch_full_text()` enrichment, shared by every
+    TNCMS scraper that calls it (index_journal.py / journal_scene.py /
+    post_and_courier.py).
+
+    Caps the number of detail fetches per run (`max_fetches`), paces them
+    (`delay_s`), and trips a circuit breaker after 3 consecutive failures so
+    a run that hits a 403/429 wall stops asking instead of working through
+    every remaining row the same way — the exact "stop instead of asking
+    again" reasoning these scrapers' own listing-fetch loops already use.
+    `enrich()` never raises and never touches a Listing beyond adding
+    raw['townnews_legal']['full_text'] when the fetch succeeds and is longer
+    than the RSS preview already there.
+    """
+
+    def __init__(self, *, max_fetches: int = DETAIL_FETCH_MAX_DEFAULT,
+                 delay_s: float | None = None):
+        self.remaining = max_fetches
+        self.consecutive_failures = 0
+        self.delay_s = DETAIL_FETCH_DELAY_S if delay_s is None else delay_s
+        self._started = False
+
+    @property
+    def blocked(self) -> bool:
+        return self.consecutive_failures >= 3
+
+    async def enrich(self, li: Listing) -> None:
+        if self.remaining <= 0 or self.blocked:
+            return
+        self.remaining -= 1
+        if self._started:
+            await asyncio.sleep(self.delay_s)
+        self._started = True
+        full_text = await fetch_full_text(li.source_url)
+        if not full_text:
+            self.consecutive_failures += 1
+            return
+        self.consecutive_failures = 0
+        block = li.raw.get("townnews_legal")
+        if isinstance(block, dict) and len(full_text) > len(block.get("desc") or ""):
+            block["full_text"] = full_text[:8000]

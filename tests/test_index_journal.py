@@ -29,6 +29,7 @@ import asyncio
 
 from foreclosure_scraper import main
 from foreclosure_scraper.models import ListingType
+from foreclosure_scraper.scrapers.newspapers import _townnews as townnews_mod
 from foreclosure_scraper.scrapers.newspapers import index_journal as mod
 
 # Real-shaped RSS item (Index-Journal, Greenwood SC, "master in equity"
@@ -106,3 +107,58 @@ def test_scraper_registered():
     from foreclosure_scraper.scrapers._registry import all_scrapers
 
     assert "newspapers.index_journal" in {s.slug for s in all_scrapers()}
+
+
+# --- full-text detail-page enrichment (FOUND/FIXED 2026-10-13, HERMES -------
+# source-completeness audit, Pattern D): this scraper stored each item's RSS
+# <link> but never fetched it, relying only on the ~250-550-char RSS
+# <description>. The detail page's itemprop="description" element server-
+# renders the FULL notice (live-confirmed 2026-10-13 on indexjournal.com --
+# see _townnews.py's module docstring). Invented notice text, same TNCMS
+# shape as the real sampled detail page (a DSS family-court notice whose full
+# body ran ~1.7 KB vs. the meta description's ~270-char cut).
+FULL_TEXT_DETAIL_HTML = """<html><body>
+<div itemprop="description">
+<p>NOTICE OF SALE C/A No. 2025CP2409987 BY VIRTUE of the decree heretofore
+granted in the case of: U.S. BANK TRUST NA v. JOHN Q PUBLIC, the undersigned
+Master In Equity for Greenwood County will sell at public auction to the
+highest bidder the following described real estate: 123 Example Lane,
+Greenwood, SC 29646, more particularly described in Deed Book 456 at Page
+78, Greenwood County RMC Office, together with all improvements thereon.
+TERMS OF SALE: cash or certified funds, five percent due at the time of
+sale, balance due upon confirmation of sale by the Court.</p>
+</div>
+</body></html>"""
+
+
+def test_full_notice_text_from_detail_page_flows_into_raw(monkeypatch):
+    async def fake_feed_get_text(url, timeout=30.0):
+        return NOTICE_OF_SALE_RSS
+
+    async def fake_detail_get_text(url, timeout=20.0):
+        return FULL_TEXT_DETAIL_HTML
+
+    monkeypatch.setattr(mod, "get_text", fake_feed_get_text)
+    monkeypatch.setattr(townnews_mod, "get_text", fake_detail_get_text)
+    out = asyncio.run(mod.IndexJournalForeclosures().fetch())
+    assert len(out) == 1
+    block = out[0].raw["townnews_legal"]
+    assert "full_text" in block
+    assert len(block["full_text"]) > len(block["desc"])
+    assert "123 Example Lane, Greenwood, SC 29646" in block["full_text"]
+
+
+def test_detail_fetch_failure_still_ships_the_rss_only_row(monkeypatch):
+    """Best-effort enrichment: a blocked/failed detail fetch must never drop
+    the row that the RSS parse already built."""
+    async def fake_feed_get_text(url, timeout=30.0):
+        return NOTICE_OF_SALE_RSS
+
+    async def fake_detail_get_text(url, timeout=20.0):
+        raise ConnectionError("simulated block")
+
+    monkeypatch.setattr(mod, "get_text", fake_feed_get_text)
+    monkeypatch.setattr(townnews_mod, "get_text", fake_detail_get_text)
+    out = asyncio.run(mod.IndexJournalForeclosures().fetch())
+    assert len(out) == 1
+    assert "full_text" not in out[0].raw["townnews_legal"]
