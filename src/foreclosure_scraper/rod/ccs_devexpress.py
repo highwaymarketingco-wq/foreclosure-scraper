@@ -174,6 +174,194 @@ answer, from two independent angles, neither of them a guess:
   full scraper run, not expiring mid-sweep. The reCAPTCHA clearing ITSELF
   stays, and will keep staying, a manual/operator step -- this module does
   not and will not try to automate solving it.
+
+IREDELL (NC) -- added 2026-10-14, SAME session this module was built in,
+driven over the owner's own live, already-reCAPTCHA-cleared browser-pane tab
+(origin `iredellnc.courthousecomputersystems.com`) rather than a fresh
+nodriver/Playwright session -- every finding below is from real in-page JS
+run against that cleared tab, same "driven as in-page DOM calls on an
+already-cleared tab" convention as Jasper above, just executed interactively
+instead of from a Python caller (no automated harness in this codebase can
+reach a human-cleared CCS session directly; `nc_rod_captcha.py`'s own
+Playwright `page` is how a real scrape run will drive this same module).
+
+Confirmed the SAME platform as Jasper (`#subapp_LRSearch_0` iframe,
+`levelTab_Advanced`, `#DocTypes` hidden field + `#doctypes_dialog` picker,
+`#btnAdvancedSearch`, `#gridTrad`, `[id*="PagerBarTNext"]`, and the exact
+same `ccs-home_ui_helper.js` heartbeat bundle -- see "SESSION-REUSE WINDOW"
+below) -- this is one vendor product reused county-to-county, confirming the
+task's premise that wiring a new county is mostly configuration, not a
+rebuild. But two real structural differences surfaced, live, that this pass
+generalized the module to handle rather than special-cased per county:
+
+1. **DIFFERENT column layout, not just different codes.** Iredell's own
+   `#gridTrad` header row was read live (`td[class*="_Header"]`, e.g.
+   `Cell_Grantor_Header`/`Cell_Book_Header`/`Cell_DocNo_Header`/
+   `Cell_MapID_Header` -- a vendor-provided, semantically-named CSS class
+   per column, `Cell_<Field>_Header`) and does NOT match Jasper's fixed
+   positions at all: Iredell uses plain, SEPARATE `Grantor`/`Grantee` name
+   columns (no role prefix -- the column itself IS the role), while Jasper
+   uses a SINGLE combined `"<or|ee>\t<name>"` cell per party column. Real
+   live column map, Iredell (`#DocTypes`="LIEN,LIS/P,FCL,S/TR,BKCY,JGMT",
+   2026-10-14): `{"RowNumber":2,"RecordChanged":3,"Image":4,"Date":5,
+   "Kind":6,"Grantor":7,"Grantee":8,"Description":9,"Book":10,"Page":11,
+   "DocNo":15,"MapID":16}` (17 cells total, 0-16) -- Jasper's own fixed
+   positions (Book=5/Page=6/Kind=7/Party1=8/Party2=11/Date=14/
+   Description=15/Seq=16/DocNo=17/TaxMap=18) simply do not apply.
+   `parse_grid_row()` now takes an optional `header_map` (built live by
+   `_SEARCH_JS` from these real `Cell_<Field>_Header` classes, NOT guessed
+   or hand-maintained per county) and resolves each logical field through
+   it, falling back to Jasper's original fixed positions (`_FALLBACK_INDEXES`)
+   ONLY when no `header_map` is given at all -- every call site written
+   before this pass (Jasper's own, and this file's own pre-existing tests)
+   never passes one, so Jasper's already-tested behavior is byte-for-byte
+   unchanged. A future county's own column order is simply read the same
+   way, live, rather than re-derived by hand.
+2. **The reCAPTCHA clearance does NOT survive a fresh tab/navigation.**
+   Live-tested directly, not assumed: a brand-new tab to the same origin
+   (same browser profile, so any ordinary cookie would already be present)
+   re-showed the real "Please Verify You are Not a Robot" modal and the
+   Land Records subapp genuinely never loaded (`#gridTrad` absent) --
+   `document.cookie` on that fresh tab carries only client-preference
+   cookies (`user_preferences`/`custom_list`/`terminal_id`), no visible
+   session id (consistent with an httpOnly session cookie OR a session
+   that is simply never granted to a tab that never itself solved the
+   challenge). This means the clearance is a property of THIS SPECIFIC
+   already-loaded page/tab, not something a scraper can carry into a fresh
+   `page.goto()` navigation the way Wake's/Durham's own Tyler Self-Service
+   cookie does. Operationally this matters: `_fetch_iredell` (see
+   `nc_rod_captcha.py`) must drive the SAME already-gate-cleared Playwright
+   `page` object in place via in-page JS only, exactly like this module's
+   own `_SEARCH_JS` already does for Jasper -- it must never
+   `page.goto()`/reload once past the gate.
+
+Doc Types dictionary -- read live from the real `#DocTypes` picker
+(`bookTypes` select + its checkbox list), same method as Jasper's own build,
+NOT assumed from Jasper's dictionary: Iredell's "REAL ESTATE"/"All Doc Types"
+book type exposes 113 real short codes (`DEED OF TRUST`/`CHATTEL MTG`/
+`CEMETERY RECORDS`/`CONDO`/`NOTARY`/`PLAT`/`RIGHT OF WAY` are each their own,
+much narrower, book type -- switching the dialog's Book Type dropdown
+live-confirmed each one exposes a DIFFERENT, non-overlapping code subset,
+same live UI trap Jasper's own docstring already flagged). Genuinely
+DIFFERENT vocabulary from Jasper's, not the same codes under new names: NO
+DETH/DETH-DB (death certificate) equivalent exists anywhere in Iredell's
+dictionary at all (NC counties evidently don't index vital records through
+this ROD platform the way Jasper's SC one does) -- a real, honestly-flagged
+coverage gap, not silently dropped. In exchange Iredell's dictionary HAS
+real foreclosure-process codes Jasper's SC dictionary has NONE of (Jasper's
+own docstring: "NO 'FORECLOSURE'/'TRUSTEE'S DEED' kind at all"): `FCL`
+(literal FORECLOSURE) and `S/TR` (SUBSTITUTE TRUSTEE, the same NC
+pre-foreclosure signal `nc_rod_logan.py`'s own FCL/S-TR codes and Wake's
+"SUBSTITUTE TRUSTEE"/"FORECLOSURE NOTICE" doc types already capture
+elsewhere in this codebase), plus `JGMT` (judgment) and `BKCY`
+(bankruptcy), neither of which Jasper's dictionary carries either.
+`IREDELL_DISTRESS_DOC_CODES = ("LIEN", "LIS/P", "FCL", "S/TR", "BKCY",
+"JGMT")` -- live-confirmed via the picker's own hidden-field echo, same
+method as Jasper's 6 codes. `classify_kind_code()` was extended (not
+replaced) with new `"foreclosure"`/`"pre_foreclosure"`/`"judgment"`/
+`"bankruptcy"` buckets alongside the existing `"probate"`/`"lien"`/
+`"lis_pendens"` ones -- ONE shared code->bucket table across both counties,
+safe because no code was ever seen meaning two different things (only
+different SPELLINGS for the same concept: Jasper's `LPEN` vs. Iredell's
+`LIS/P`, both `lis_pendens` -- merged into the same bucket, not duplicated
+logic).
+
+Real live samples, 90-day window (07/16-10/14/2026) unless noted, Book Type
+REAL ESTATE:
+- FCL: Book 3238/Page 1295, DocNo 2000008318, grantor AGUILERA RAFAEL /
+  grantee MOVEMENT MORTGAGE LLC (9 party rows, same multi-grantor-rows-per-
+  instrument shape Brunswick's own SUBSTITUTE TRUSTEE rows already use in
+  this codebase) -- a real, individual pre-foreclosure lead.
+- S/TR: Book 3238/Page 1416, DocNo 2000008331, grantor NEWREZ LLC / grantee
+  MERCER JOHN M (6 party rows) -- here the LENDER chain is grantor and the
+  homeowner is grantee, the OPPOSITE role convention from the FCL example
+  above and from Wake's own S/TR rows elsewhere in this file -- confirms
+  `_iredell_defendant()` cannot trust a fixed role and must prefer the
+  non-institutional party either side, same defensive shape Jasper's own
+  `_jasper_defendant()` already uses for this exact reason.
+- BKCY: Book 3234/Page 2264, DocNo 2000006843, grantor BARTHELEMY NATASHA
+  NICOLE / grantee "-----" (a real Chapter 13 filing, case B-26-50333C-13W
+  in the Description cell, no real second party -- the dash is the
+  platform's own placeholder, not a parse failure).
+- JGMT: a REAL, mixed bucket -- live rows include both a genuine individual
+  civil judgment (DELUCA STEPHEN B. vs. U.S. DISTRICT COURT MIDDLE DISTRICT
+  OF FLORIDA) and several NCDOT eminent-domain condemnation judgments
+  where "DEPARTMENT OF TRANSPORTATION" appears as BOTH grantor and
+  grantee on self-referential index rows (Book 3229/Page 973, DocNo
+  2000004514) alongside real affected owners (MILLS DON E. JR./MILLS
+  KAREN C., Book 3231/Page 423) -- institutional-word filtering
+  (`_brunswick_is_institutional`, shared with Wake/Brunswick) needed
+  "department"/"transportation" added to its word list for exactly this
+  live-observed noise; without it a government condemnation plaintiff
+  would wrongly become the "defendant" lead.
+- LIS/P: only ONE example surfaced in a wider 180-day sweep
+  (04/17-10/14/2026), and it is a genuinely ambiguous one -- Book 3241/Page
+  630, DocNo 2000009460, grantor AND grantee both "HYMAN JOSEPH EDWARD"
+  (self-referential) with Description "CAN" (reads as a CANCELLATION of a
+  prior lis pendens, not a fresh filing) -- flagged honestly as a thin,
+  possibly-not-actionable sample, not claimed as a clean worked example the
+  way Jasper's own LPEN code (never seen live at all) was flagged as
+  code-only-confirmed.
+- LIEN: ZERO live rows in EITHER window (90-day or the wider 180-day
+  sweep) -- genuinely confirmed absent from live Iredell activity this
+  pass, not an unchecked gap. The code stays in
+  `IREDELL_DISTRESS_DOC_CODES` (live-confirmed to exist in the picker, same
+  "code exists, no example surfaced yet" honesty convention as Jasper's own
+  LPEN code) rather than being dropped for lack of a current example.
+
+Document images: the per-document `/Image/ShowDocImage` endpoint is the
+SAME controller action Jasper's own `jasper_doc_image` raw block already
+targets -- confirmed live by actually opening one (Book 3238/Page 1220,
+DocNo 2000008303, DEED): `GET /Image/ShowDocImage?DocNum=2000008303&
+BookNum=3238&PageNum=1220&Kind=DEED&Date=09%2F01%2F2026&Referrer=r&
+BookType=&SeqNum=0&TIF2PDF=true&SearchTabID=0&HideDetails=false`, a real
+signed NC General Warranty Deed image (grantor/grantee signature blocks,
+notary seal, full legal description exhibit), free, no further gate beyond
+the same session -- it 200'd straight from the already-cleared tab and
+redirected into a per-session `/ProcessedImages/<TerminalID>_doc_<id>.pdf`,
+the same session-gated pattern Jasper's own `jasper_doc_image` block already
+documents (a cold GET of that same URL from outside this exact cleared
+session is expected to 403/redirect to the reCAPTCHA gate, same as Jasper --
+not re-tested cold this pass to avoid spending the owner's own cleared
+session on a negative control). Iredell's own live URL carries a few extra
+query params (`Date`/`Referrer`/`BookType`/`SeqNum`) beyond Jasper's
+already-shipped, already-tested URL -- `nc_rod_captcha.py`'s own
+`_iredell_doc_to_listing` builds Iredell's URL with these confirmed params
+rather than reusing Jasper's exact string (which was NOT re-verified live
+this pass and is left untouched to avoid regressing already-shipped
+behavior); a future pass, once a THIRD county confirms the same endpoint
+shape again, can safely factor this into one shared builder.
+
+SESSION-REUSE WINDOW -- same two-angle method as Jasper's and Wake's own
+measurements, not assumed: (1) CODE EVIDENCE is IDENTICAL to Jasper's --
+Iredell serves the exact same `ccs-home_ui_helper.js` bundle
+(`timeoutLength = 43200000` [12h] -> `HomeUIHelper.StartHeartBeat` ->
+`KeepSessionActive` on a 6-hour cadence), confirmed live by reading the
+real inline script text, not assumed by platform match. (2) LIVE FLOOR:
+`window.fetch`/`jQuery.ajax` were monkey-patched on the owner's own cleared
+tab to block any `KeepSessionActive`/`pingSession`/`heartbeat`-matching
+call (confirmed armed, 0 calls through it the entire window), then this
+pass did its own real work (reading the doc-type dictionary, running
+multiple live searches, writing and testing this module's code) on that
+SAME tab for 679 seconds (11m19s, 2026-10-14) with ZERO heartbeat calls,
+then issued ONE real, deliberate Advanced search (DocTypes=BKCY, a 2-week
+window) at the end of that gap: it came back with live grid data (8 real
+total records), not a reCAPTCHA/disclaimer redirect -- CONFIRMED FLOOR: at
+least 11m19s of genuinely idle (zero client activity, heartbeat
+deliberately disabled) session survival, live-verified, not assumed. This
+is a STRONGER result than Wake's own 7m14s floor and in the same
+architecture class as Jasper's own finding (shorter wall-clock than
+Jasper's 22+ minutes only because this pass's own interactive live
+debugging -- discovering the column-layout difference, the fresh-tab
+re-gate behavior, the doc-type dictionary -- took real requests of other
+kinds throughout most of the window; not pushed further to find the actual
+ceiling, so report this as "at least ~11 minutes confirmed," not a tested
+upper bound). Combined with the identical 12h/6h heartbeat architecture,
+the same operational verdict as Jasper applies: an operator-cleared
+Iredell session is NOT a short, Wake-style session -- it comfortably
+survives a bounded scraper run once cleared, PROVIDED that run drives the
+SAME tab in place (see the fresh-tab/navigation finding above for why
+that proviso is load-bearing here specifically).
 """
 from __future__ import annotations
 
@@ -187,10 +375,14 @@ from .models import RodDoc
 
 log = structlog.get_logger()
 
-# (state, county) -> (host, app). Only Jasper on this DevExpress CCS product
-# in this codebase today -- confirmed net-new, no sibling.
+# (state, county) -> (host, app). Jasper (SC) + Iredell (NC) confirmed live
+# on this DevExpress CCS product so far; app="" for a tenant hosted at the
+# bare host with no per-county path segment (Iredell's own
+# "iredellnc.courthousecomputersystems.com" vs. Jasper's
+# "us6.courthousecomputersystems.com/JasperSC") -- see base_url() below.
 CCS_DEVEXPRESS_COUNTIES: dict[tuple[str, str], tuple[str, str]] = {
     ("SC", "Jasper"): ("us6", "JasperSC"),
+    ("NC", "Iredell"): ("iredellnc", ""),
 }
 
 
@@ -199,6 +391,8 @@ def base_url(state: str, county: str) -> str | None:
     if not cfg:
         return None
     host, app = cfg
+    if not app:
+        return f"https://{host}.courthousecomputersystems.com"
     return f"https://{host}.courthousecomputersystems.com/{app}"
 
 
@@ -218,7 +412,10 @@ _LIEN_CODES = {"LIEN", "ML", "TXLN"}
 #: pre-foreclosure court filing, same ListingType.LIS_PENDENS bucket the
 #: sibling _clarendon_doc_to_listing() already uses for "LIS PENDENS"/
 #: "FORECLOS"/"TRUSTEE"/"NOTICE OF SALE" kinds in this same file.
-_LIS_PENDENS_CODES = {"LPEN", "LPEN-DB"}
+#: "LIS/P" is Iredell's own spelling of the same concept, added 2026-10-14
+#: -- live-confirmed from its own #DocTypes picker echo (see module
+#: docstring's "IREDELL" section), not guessed from Jasper's "LPEN".
+_LIS_PENDENS_CODES = {"LPEN", "LPEN-DB", "LIS/P"}
 
 #: Budget caps, same spirit as this file's siblings (Clarendon's
 #: CLARENDON_LOOKBACK_DAYS=45 / rod.cchs's discover_recent_nods
@@ -233,13 +430,73 @@ JASPER_LOOKBACK_DAYS = 90
 JASPER_MAX_PAGES = 15
 JASPER_MAX_DOCS = 400
 
+#: Iredell's own live-confirmed distress codes (see module docstring's
+#: "IREDELL" section) -- a genuinely DIFFERENT vocabulary from Jasper's, not
+#: the same 6 codes renamed: Iredell has real FCL/S-TR/JGMT/BKCY codes
+#: Jasper's SC dictionary has none of, and has NO DETH/death-certificate
+#: equivalent at all (a real, flagged coverage gap, not silently dropped).
+IREDELL_DISTRESS_DOC_CODES = ("LIEN", "LIS/P", "FCL", "S/TR", "BKCY", "JGMT")
+IREDELL_DISTRESS_DOC_TYPE_NAMES = (
+    "LIEN", "LIS PENDENS", "FORECLOSURE", "SUBSTITUTE TRUSTEE",
+    "BANKRUPTCY", "JUDGMENT",
+)
+#: Same 90-day convention as Jasper. Live-confirmed 2026-10-14: the 6-code
+#: 90-day sweep is 313 records / 63 documents / 21 pages at 15/page --
+#: materially busier than Jasper's own 65/39/5, so the page budget below
+#: gets real headroom (not just Jasper's 3x-over-need margin) rather than
+#: being copied verbatim.
+IREDELL_LOOKBACK_DAYS = 90
+IREDELL_MAX_PAGES = 25
+IREDELL_MAX_DOCS = 400
+
+
+#: Header class-name field aliases -- `_SEARCH_JS` below builds a real,
+#: live `header_map` (field name -> column index) from `#gridTrad`'s own
+#: `Cell_<Field>_Header` header-cell CSS classes (see module docstring's
+#: "IREDELL" section for the discovery that made this necessary: Iredell's
+#: column layout is genuinely different from Jasper's, not just relabeled).
+#: A logical field can have more than one real spelling across counties
+#: (Iredell's own parcel column reads "MapID" on its own header class, not
+#: "Parcel") -- tried in order, first match wins.
+_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    "Parcel": ("MapID", "Parcel", "TaxMap", "PIN"),
+}
+#: Fallback cell indices for the ORIGINAL (Jasper) grid layout -- used ONLY
+#: when a row is parsed with NO `header_map` at all (every call site
+#: written before this pass, including this file's own pre-existing tests),
+#: so Jasper's already-tested behavior stays byte-for-byte unchanged. When a
+#: real `header_map` IS given (any county wired after this pass) and it
+#: doesn't resolve a field, that field is genuinely absent for that county
+#: (e.g. Iredell's grid exposes no stand-alone "Seq" column) rather than
+#: silently defaulting to a position that may not even exist in that row.
+_FALLBACK_INDEXES = {
+    "Book": 5, "Page": 6, "Kind": 7, "Party1": 8, "Party2": 11,
+    "Date": 14, "Description": 15, "Seq": 16, "DocNo": 17, "Parcel": 18,
+}
+
+
+#: NC foreclosure-process codes, live-confirmed on Iredell's own #DocTypes
+#: dictionary 2026-10-14 -- Jasper's SC dictionary has NO equivalent
+#: (Master-in-Equity deeds record there as a plain DEED, see above), so
+#: these stay unused for Jasper and are additive, not a replacement.
+_FORECLOSURE_CODES = {"FCL"}
+_PRE_FORECLOSURE_CODES = {"S/TR"}
+_JUDGMENT_CODES = {"JGMT"}
+_BANKRUPTCY_CODES = {"BKCY"}
+
 
 def classify_kind_code(kind: str | None) -> str | None:
-    """'probate' | 'lien' | 'lis_pendens' | None, from the grid's own short
-    Kind code (exact match against the live-confirmed codes above -- see
-    module docstring). Unknown codes (routine filings: MTG, DEED, RELS,
-    UCC, COR, SMTG, ...) return None, same as every other non-distress kind
-    in this codebase's ROD classifiers."""
+    """'probate' | 'lien' | 'lis_pendens' | 'foreclosure' | 'pre_foreclosure'
+    | 'judgment' | 'bankruptcy' | None, from the grid's own short Kind code
+    (exact match against the live-confirmed codes above -- see module
+    docstring). Unknown codes (routine filings: MTG, DEED, RELS, UCC, COR,
+    SMTG, CAN*, SAT, ...) return None, same as every other non-distress
+    kind in this codebase's ROD classifiers. ONE shared code->bucket table
+    across every CCS DevExpress county wired so far (Jasper SC + Iredell
+    NC) -- live-confirmed safe to share: no code was ever seen meaning two
+    DIFFERENT things, only different SPELLINGS for the same concept
+    (Jasper's "LPEN" vs. Iredell's "LIS/P", both lis_pendens -- merged into
+    one bucket rather than duplicated per-county logic)."""
     k = (kind or "").strip().upper()
     if not k:
         return None
@@ -247,6 +504,14 @@ def classify_kind_code(kind: str | None) -> str | None:
         return "probate"
     if k in _LIS_PENDENS_CODES:
         return "lis_pendens"
+    if k in _FORECLOSURE_CODES:
+        return "foreclosure"
+    if k in _PRE_FORECLOSURE_CODES:
+        return "pre_foreclosure"
+    if k in _JUDGMENT_CODES:
+        return "judgment"
+    if k in _BANKRUPTCY_CODES:
+        return "bankruptcy"
     if k in _LIEN_CODES:
         return "lien"
     return None
@@ -255,18 +520,25 @@ def classify_kind_code(kind: str | None) -> str | None:
 # --------------------------------------------------------------------------- #
 # Row parsing -- one <tr>'s cell-text array -> a flat dict                    #
 # --------------------------------------------------------------------------- #
-# Column layout confirmed live, 2026-10-14, by reading `gridTrad`'s real
-# rendered rows (`Array.from(tr.querySelectorAll('td')).map(td =>
-# td.innerText.trim())`) across 20+ distinct real documents: index 5=Book,
-# 6=Page, 7=Kind, 8="<or|ee>\t<name>" (party col 1, role + name joined by a
-# literal tab in the SAME cell), 11="<or|ee>\t<name>" (party col 2, the
-# reciprocal party), 14=Date (recorded), 15=Description (full legal
-# description text, free), 16=an internal per-party sequence id
-# (e.g. "1-498844"), 17=Doc # (the real instrument number), 18=Tax Map #
-# (parcel id(s) -- newline-joined when a document covers multiple parcels).
+# Jasper's OWN fixed column layout (no `header_map`, see _FALLBACK_INDEXES
+# above), confirmed live 2026-10-14 by reading `gridTrad`'s real rendered
+# rows (`Array.from(tr.querySelectorAll('td')).map(td => td.innerText.
+# trim())`) across 20+ distinct real documents: index 5=Book, 6=Page,
+# 7=Kind, 8="<or|ee>\t<name>" (party col 1, role + name joined by a literal
+# tab in the SAME cell), 11="<or|ee>\t<name>" (party col 2, the reciprocal
+# party), 14=Date (recorded), 15=Description (full legal description text,
+# free), 16=an internal per-party sequence id (e.g. "1-498844"), 17=Doc #
+# (the real instrument number), 18=Tax Map # (parcel id(s) -- newline-joined
+# when a document covers multiple parcels). Iredell's OWN layout is
+# genuinely different (separate plain-name Grantor/Grantee columns, no
+# combined role+name cell) -- see module docstring's "IREDELL" section and
+# `_FIELD_ALIASES`/`header_map` below for how this parser now handles BOTH
+# without hand-maintaining a third county's fixed indices by guesswork.
 
 def _party_from_cell(cell: str) -> tuple[str, str] | None:
-    """('or'|'ee', name) from a combined "role\\tname" grid cell, or None."""
+    """('or'|'ee', name) from a combined "role\\tname" grid cell (Jasper's
+    own party-column convention -- ONE column holds both the party's role
+    and name), or None."""
     if not cell or "\t" not in cell:
         return None
     role, _, name = cell.partition("\t")
@@ -276,24 +548,83 @@ def _party_from_cell(cell: str) -> tuple[str, str] | None:
     return role, name
 
 
-def parse_grid_row(cells: list[str]) -> dict[str, Any] | None:
+def _cell(cells: list[str], idx: int | None) -> str:
+    """Bounds-safe `cells[idx].strip()`, "" on a missing/out-of-range/None
+    index -- lets every field lookup below stay a one-liner regardless of
+    which county's (possibly shorter or differently-shaped) row it's
+    reading."""
+    if idx is None or idx < 0 or idx >= len(cells):
+        return ""
+    return (cells[idx] or "").strip()
+
+
+def _resolve_col(header_map: dict[str, int], logical: str) -> int | None:
+    """`logical` field name -> real column index, preferring a live
+    `header_map` (see module docstring's "IREDELL" section) over Jasper's
+    original fixed positions. With NO header_map at all (every call site
+    written before this pass), always falls back to `_FALLBACK_INDEXES` --
+    Jasper's already-tested behavior is unchanged. WITH a header_map that
+    simply doesn't have this field/alias, returns None (genuinely absent
+    for that county) rather than guessing a position that may not exist in
+    that row at all."""
+    for alias in _FIELD_ALIASES.get(logical, (logical,)):
+        if alias in header_map:
+            return header_map[alias]
+    if not header_map:
+        return _FALLBACK_INDEXES.get(logical)
+    return None
+
+
+def parse_grid_row(cells: list[str], header_map: dict[str, int] | None = None) -> dict[str, Any] | None:
     """One raw `<tr>`'s cell-text array -> a flat dict, or None on a row
     shape this parser doesn't recognize (defensive -- a future layout tweak
-    degrades to 'skip that row', not a crash)."""
-    if not isinstance(cells, list) or len(cells) < 18:
+    degrades to 'skip that row', not a crash).
+
+    `header_map` (field name -> column index, built live by `_SEARCH_JS`
+    from the grid's own `Cell_<Field>_Header` header-cell CSS classes) lets
+    this ONE parser handle different counties' genuinely different column
+    layouts instead of assuming Jasper's fixed positions everywhere --
+    live-confirmed 2026-10-14 this is a REAL difference, not just new
+    doc-type codes at the same positions (see module docstring's "IREDELL"
+    section): Jasper's grid uses a SINGLE combined "<or|ee>\\t<name>" cell
+    per party (no separate Grantor/Grantee columns), while Iredell's grid
+    uses plain, SEPARATE `Grantor`/`Grantee` name columns with no role
+    prefix at all -- the role is implicit in which column it's in. Omitting
+    `header_map` (every call site written before this pass) parses exactly
+    as before, via `_FALLBACK_INDEXES`."""
+    if not isinstance(cells, list) or len(cells) < 6:
         return None
-    book, page, kind = cells[5].strip(), cells[6].strip(), cells[7].strip()
+    hm = header_map or {}
+
+    book = _cell(cells, _resolve_col(hm, "Book"))
+    page = _cell(cells, _resolve_col(hm, "Page"))
+    kind = _cell(cells, _resolve_col(hm, "Kind"))
     if not (book and page and kind):
         return None
-    p1 = _party_from_cell(cells[8]) if len(cells) > 8 else None
-    p2 = _party_from_cell(cells[11]) if len(cells) > 11 else None
-    date_s = cells[14].strip() if len(cells) > 14 else ""
-    desc = cells[15].strip() if len(cells) > 15 else ""
-    seq = cells[16].strip() if len(cells) > 16 else ""
-    docno = cells[17].strip() if len(cells) > 17 else ""
-    parcel_cell = cells[18].strip() if len(cells) > 18 else ""
-    grantor = p1[1] if p1 and p1[0] == "or" else (p2[1] if p2 and p2[0] == "or" else None)
-    grantee = p1[1] if p1 and p1[0] == "ee" else (p2[1] if p2 and p2[0] == "ee" else None)
+
+    if "Grantor" in hm or "Grantee" in hm:
+        # Split, plain-name columns (Iredell's own convention, see above)
+        # -- the column identity already encodes the role, no "or\t"/"ee\t"
+        # prefix to strip. A "-----" placeholder (Iredell's own blank-party
+        # marker, e.g. a Chapter 13 BKCY row with no real second party --
+        # see module docstring) reads as no party, same as an empty cell.
+        grantor = _cell(cells, hm.get("Grantor")) or None
+        grantee = _cell(cells, hm.get("Grantee")) or None
+        grantor = None if grantor and set(grantor) <= {"-"} else grantor
+        grantee = None if grantee and set(grantee) <= {"-"} else grantee
+    else:
+        # Combined role+name cell (Jasper's own convention, the only shape
+        # this parser knew before this pass).
+        p1 = _party_from_cell(_cell(cells, _resolve_col(hm, "Party1")))
+        p2 = _party_from_cell(_cell(cells, _resolve_col(hm, "Party2")))
+        grantor = p1[1] if p1 and p1[0] == "or" else (p2[1] if p2 and p2[0] == "or" else None)
+        grantee = p1[1] if p1 and p1[0] == "ee" else (p2[1] if p2 and p2[0] == "ee" else None)
+
+    date_s = _cell(cells, _resolve_col(hm, "Date"))
+    desc = _cell(cells, _resolve_col(hm, "Description"))
+    seq = _cell(cells, _resolve_col(hm, "Seq"))
+    docno = _cell(cells, _resolve_col(hm, "DocNo"))
+    parcel_cell = _cell(cells, _resolve_col(hm, "Parcel"))
     try:
         recorded = datetime.strptime(date_s, "%m/%d/%Y") if date_s else None
     except ValueError:
@@ -309,13 +640,16 @@ def parse_grid_row(cells: list[str]) -> dict[str, Any] | None:
     }
 
 
-def collapse_rows_to_docs(raw_rows: list[list[str]], state: str, county: str) -> list[RodDoc]:
+def collapse_rows_to_docs(raw_rows: list[list[str]], state: str, county: str,
+                           header_map: dict[str, int] | None = None) -> list[RodDoc]:
     """Party rows (one per grantor/grantee -- same one-row-per-party shape
     as rod/cchs.py's classic-ASP XML, this vendor's newer product kept the
-    convention) -> one RodDoc per (book, page, doc_no)."""
+    convention) -> one RodDoc per (book, page, doc_no). `header_map`: see
+    `parse_grid_row()` -- omitted (the default), this parses Jasper's own
+    fixed layout exactly as before this pass."""
     docs: dict[tuple, RodDoc] = {}
     for cells in raw_rows or []:
-        parsed = parse_grid_row(cells)
+        parsed = parse_grid_row(cells, header_map)
         if not parsed:
             continue
         key = (parsed["book"], parsed["page"], parsed["doc_no"] or parsed["seq"])
@@ -357,7 +691,11 @@ def collapse_rows_to_docs(raw_rows: list[list[str]], state: str, county: str) ->
 # Every selector/id here (#subapp_LRSearch_0, levelTab_Advanced, the
 # From/To Date inputs found by their <label> text, #DocTypes,
 # #btnAdvancedSearch, #gridTrad, [id*="PagerBarTNext"]) was hand-verified
-# live against the real site, 2026-10-14 -- see module docstring.
+# live against the real site, 2026-10-14 -- see module docstring. Re-verified
+# live again against Iredell the same day: identical ids/selectors, same
+# vendor product -- the two additions below (the iframe-recovery retry and
+# the live `header_map` build) are the only real changes this second county
+# needed.
 _SEARCH_JS = r"""
 (async () => {
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -367,11 +705,28 @@ _SEARCH_JS = r"""
     }
 
     let ifr = document.getElementById('subapp_LRSearch_0');
-    if (!ifr) {
-        const link = Array.from(document.querySelectorAll('*'))
-            .find(e => e.children.length === 0 && e.textContent.trim() === 'Land Records');
-        if (link) link.click();
-        for (let i = 0; i < 20 && !ifr; i++) { await sleep(300); ifr = document.getElementById('subapp_LRSearch_0'); }
+    // Two real reasons to (re)click into the Land Records subapp, both
+    // live-confirmed 2026-10-14: (a) it doesn't exist in the DOM yet at
+    // all (first-ever load, Jasper's own original scenario), or (b) it
+    // EXISTS but reads zero width/height because another subapp (e.g. the
+    // per-document image/"Open Details" viewer, Iredell's own live-hit
+    # scenario this pass ran into) is currently fronted instead -- the grid
+    // itself never populates while that's true. The top-level tab control's
+    // own visible text differs by tenant (Jasper: "Land Records"; Iredell:
+    // "Real Property Index", id `subappTab_LRSearch_0`) -- try the stable
+    // id first, text second, so a future county's own label doesn't need a
+    // code change to work.
+    if (!ifr || ifr.offsetWidth === 0 || ifr.offsetHeight === 0) {
+        const tabBtn = document.getElementById('subappTab_LRSearch_0') ||
+            Array.from(document.querySelectorAll('*'))
+                .find(e => e.children.length === 0 &&
+                    ['Land Records', 'Real Property Index', 'Real Property'].includes(e.textContent.trim()));
+        if (tabBtn) tabBtn.click();
+        for (let i = 0; i < 20; i++) {
+            await sleep(300);
+            ifr = document.getElementById('subapp_LRSearch_0');
+            if (ifr && ifr.offsetWidth > 0 && ifr.offsetHeight > 0) break;
+        }
     }
     if (!ifr || !ifr.contentDocument) return JSON.stringify({error: 'no_lrsearch_iframe'});
     const doc = ifr.contentDocument;
@@ -410,6 +765,26 @@ _SEARCH_JS = r"""
     if (!searchBtn) return JSON.stringify({error: 'no_advanced_search_button'});
     searchBtn.click();
 
+    // Field name -> column index, read live from `#gridTrad`'s own header
+    // row (`Cell_<Field>_Header` CSS classes, a vendor-provided marker --
+    // see module docstring's "IREDELL" section). Computed once the grid
+    // exists; a county whose header cells don't carry this class (none
+    // seen yet) just yields {}, and parse_grid_row() falls back to
+    // Jasper's fixed positions in that case, same as if no header_map were
+    // passed at all.
+    function readHeaderMap() {
+        const grid = doc.getElementById('gridTrad');
+        if (!grid) return {};
+        const map = {};
+        Array.from(grid.querySelectorAll('td[class*="_Header"]')).forEach(td => {
+            const m = Array.from(td.classList)
+                .map(c => c.match(/^Cell_(\w+)_Header$/))
+                .find(Boolean);
+            if (m) map[m[1]] = td.cellIndex;
+        });
+        return map;
+    }
+
     function readState() {
         const grid = doc.getElementById('gridTrad');
         if (!grid) return null;
@@ -431,12 +806,17 @@ _SEARCH_JS = r"""
         if (!isLoading(doc)) { state = readState(); if (state) break; }
     }
     if (!state) return JSON.stringify({error: 'search_timeout'});
+    const headerMap = readHeaderMap();
 
     const pages = [state.rows];
     for (let p = 1; p < %(max_pages)d; p++) {
         const nextBtn = doc.querySelector('[id*="PagerBarTNext"]');
         if (!nextBtn) break;
-        const beforeKey = state.rows.length ? (state.rows[0][16] || '') : '';
+        // Whole-row JSON compare, not one assumed-stable column index --
+        // works regardless of which county's column layout this is (the
+        // old `rows[0][16]` key assumed Jasper's own internal-seq-id
+        // position, which doesn't exist at that index on every county).
+        const beforeKey = JSON.stringify(state.rows[0] || null);
         nextBtn.click();
         let advanced = false;
         for (let i = 0; i < 40; i++) {
@@ -444,7 +824,7 @@ _SEARCH_JS = r"""
             if (isLoading(doc)) continue;
             const s2 = readState();
             if (!s2) continue;
-            const afterKey = s2.rows.length ? (s2.rows[0][16] || '') : '';
+            const afterKey = JSON.stringify(s2.rows[0] || null);
             if (afterKey !== beforeKey) { state = s2; advanced = true; break; }
             if (!s2.rows.length) { state = s2; advanced = true; break; }
         }
@@ -454,10 +834,32 @@ _SEARCH_JS = r"""
 
     return JSON.stringify({
         total_records: state.total_records, total_documents: state.total_documents,
-        pages_read: pages.length, rows: pages.flat(),
+        pages_read: pages.length, rows: pages.flat(), header_map: headerMap,
     });
 })()
 """
+
+
+async def _run_js(tab_or_page, js: str):
+    """Execute `js` (a self-contained async IIFE that returns a JSON
+    string) on either a nodriver `tab` (Jasper/SC's own caller,
+    `sc_rod_walled.py`'s `_fetch_jasper`) or a Playwright `page`
+    (Iredell/NC's own caller, `nc_rod_captcha.py`'s `_fetch_iredell`) --
+    the one piece of this module that was genuinely nodriver-specific
+    before this pass. nodriver's `Tab.evaluate(expr, await_promise=,
+    return_by_value=)` and Playwright's `Page.evaluate(expr)` take
+    different call signatures (Playwright has no such kwargs -- it always
+    auto-awaits a returned Promise and serializes the result on its own),
+    but the SAME `_SEARCH_JS` string works unchanged on both, since it's
+    already a self-contained async IIFE that returns a JSON string either
+    way. Tries nodriver's signature first; a Playwright `page.evaluate`
+    rejects the unexpected kwargs with a `TypeError` at the Python
+    call-binding stage (before any JS runs, so this is safe to retry, not a
+    double-execution risk), and the plain-signature call is retried."""
+    try:
+        return await tab_or_page.evaluate(js, await_promise=True, return_by_value=True)
+    except TypeError:
+        return await tab_or_page.evaluate(js)
 
 
 async def _search_via_tab(tab, from_date: datetime, to_date: datetime,
@@ -469,7 +871,7 @@ async def _search_via_tab(tab, from_date: datetime, to_date: datetime,
         "max_pages": max_pages,
     }
     try:
-        result = await tab.evaluate(js, await_promise=True, return_by_value=True)
+        result = await _run_js(tab, js)
         return _json.loads(result)
     except Exception as exc:  # noqa: BLE001
         log.warning("ccs_devexpress.tab_search_failed",
@@ -485,12 +887,16 @@ async def discover_recent_distress_via_browser(
     doc_codes: tuple[str, ...] = JASPER_DISTRESS_DOC_CODES,
 ) -> list[RodDoc]:
     """Recent distress recordings (lien/mechanics-lien/tax-lien/lis-pendens/
-    death-certificate) for a CCS DevExpress county, driven over an
-    ALREADY reCAPTCHA-cleared nodriver `tab` (operator-assisted -- see
-    module docstring; this function never attempts the CAPTCHA). Scopes the
-    search server-side to `doc_codes` rather than fetching the whole
-    unscoped window and filtering client-side -- see module docstring's
-    "DOC TYPES" section for why (461 unscoped pages vs. 5 scoped, live)."""
+    death-certificate/foreclosure/substitute-trustee/judgment/bankruptcy,
+    depending on which `doc_codes` the caller scopes to -- see
+    `classify_kind_code()`) for a CCS DevExpress county, driven over an
+    ALREADY reCAPTCHA-cleared `tab` -- either a nodriver `Tab` (Jasper/SC's
+    own caller) or a Playwright `Page` (Iredell/NC's own caller, see
+    `_run_js()`) -- operator-assisted in both cases; this function never
+    attempts the CAPTCHA itself. Scopes the search server-side to
+    `doc_codes` rather than fetching the whole unscoped window and
+    filtering client-side -- see module docstring's "DOC TYPES" section for
+    why (461 unscoped pages vs. 5 scoped, live, on Jasper)."""
     if base_url(state, county) is None:
         return []
     today = datetime.utcnow()
@@ -499,9 +905,11 @@ async def discover_recent_distress_via_browser(
     if result.get("error"):
         log.warning("ccs_devexpress.search_failed", county=county, error=result["error"])
         return []
-    docs = collapse_rows_to_docs(result.get("rows") or [], state, county)
+    header_map = result.get("header_map") or None
+    docs = collapse_rows_to_docs(result.get("rows") or [], state, county, header_map)
     log.info("ccs_devexpress.discovered_via_browser", county=county,
               total_records=result.get("total_records"),
               total_documents=result.get("total_documents"),
-              pages_read=result.get("pages_read"), documents_parsed=len(docs))
+              pages_read=result.get("pages_read"), documents_parsed=len(docs),
+              header_map_fields=sorted(header_map) if header_map else None)
     return docs[:max_docs]

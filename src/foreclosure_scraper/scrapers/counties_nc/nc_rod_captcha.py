@@ -503,6 +503,36 @@ flagged, not "fixed" with a change that cannot work at the search-results
 level -- the data the task asked for genuinely is not in the markup
 `parse_selfservice()` is given.
 
+**CORRECTION 2026-10-14 (cont. x6) -- Iredell: the owner personally solved
+the real reCAPTCHA live, and everything downstream of that human-cleared
+session is now built, not just documented.** Iredell runs the SAME
+Courthouse Computer Systems "DevExpress" product Jasper (SC,
+`sc_rod_walled.py`/`rod/ccs_devexpress.py`) already uses -- confirmed live,
+not assumed from the platform-match pattern that got this file's own
+Durham entry wrong in 2026-10-12 (same `#subapp_LRSearch_0` iframe,
+`#DocTypes`/`#doctypes_dialog`, `#btnAdvancedSearch`, `#gridTrad`, and the
+identical `ccs-home_ui_helper.js` heartbeat bundle). `_fetch_iredell`
+(below) drives `rod.ccs_devexpress.discover_recent_distress_via_browser`
+exactly the way `sc_rod_walled.py`'s own `_fetch_jasper` does, over
+Iredell's own base URL/doc codes -- see that module's own docstring's
+"IREDELL" section for the FULL live evidence this pass gathered (doc-type
+dictionary, real sample rows per bucket, the session-reuse measurement,
+and -- the one operationally load-bearing difference from Wake above --
+why Iredell's own clearance does NOT survive a fresh navigation/tab, so
+`_fetch_iredell` drives the SAME already-cleared `page` in place via
+in-page JS only and never re-navigates). Still genuinely walled for an
+UNATTENDED run (`solve_recaptcha_v2` never actually clears this real
+reCAPTCHA v2, same as Wake's own) -- this pass does not and will not
+change that; only what happens once a human already has stays new here.
+`rod/ccs_devexpress.py` itself was generalized this pass (a live,
+`header_map`-driven column resolver, built because Iredell's own grid
+column layout turned out genuinely different from Jasper's, not just
+relabeled -- see that module's docstring) rather than given a
+Iredell-only hand-rolled parser, so the next CCS county (Craven, Greene,
+Harnett, Randolph, or Stokes, all still queued -- see `_COUNTY_SITES`
+below) is now much closer to "new county config + a live doc-type/column
+check" than "rebuild the parser."
+
 Strategy:
 1. Launch Playwright browser (headful -- required; see the `headless=False`
    note on the browser launch call below).
@@ -535,13 +565,14 @@ import asyncio
 import re
 from datetime import datetime, timedelta
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 import structlog
 from bs4 import BeautifulSoup
 
 from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_OK
 from ...models import Listing, ListingType, PropertyKind
+from ...rod import ccs_devexpress
 
 log = structlog.get_logger()
 
@@ -645,6 +676,13 @@ _BRUNSWICK_INSTITUTION_WORDS = {
     "capital", "loan", "national", "savings", "bancorp", "holdings",
     "lending", "fsb", "nationstar", "systems", "registration", "electronic",
     "collateral",
+    # Added for Iredell's own live JGMT rows, 2026-10-14 (see
+    # `_iredell_doc_to_listing`/module docstring's "IREDELL" section):
+    # NCDOT eminent-domain condemnation judgments index "DEPARTMENT OF
+    # TRANSPORTATION" as BOTH grantor and grantee on self-referential rows
+    # alongside the real affected owner -- without this, the state
+    # condemnation plaintiff could wrongly become the "defendant" lead.
+    "department", "transportation",
 }
 
 
@@ -885,6 +923,16 @@ _WAKE_MAX_RELATED_FETCHES = 25
 #: rather than a near-duplicate per county.
 _SS_PAGE_OF_RE = re.compile(r"Showing page\s+\d+\s+of\s+(\d+)", re.I)
 
+#: Iredell -- Courthouse Computer Systems "DevExpress" product, SAME vendor
+#: platform as SC's Jasper county (`rod/ccs_devexpress.py`, built for Jasper
+#: first, generalized this pass for Iredell's own, genuinely different
+#: column layout -- see that module's docstring's "IREDELL" section for the
+#: full live evidence this pass gathered, driven directly against the
+#: owner's own reCAPTCHA-cleared browser-pane tab). `_fetch_iredell` below
+#: calls into that shared module exactly the way `sc_rod_walled.py`'s own
+#: `_fetch_jasper` does, with Iredell's own base URL/doc codes.
+_IREDELL_BASE = ccs_devexpress.base_url("NC", "Iredell") or "https://iredellnc.courthousecomputersystems.com"
+
 
 def _wake_extract_docids(html: str) -> list[str]:
     """data-documentid for each li.ss-search-row, in the SAME document order
@@ -930,6 +978,76 @@ def _wake_parse_related_documents(html: str, base_url: str = "") -> list[dict]:
             "grantees": _names(panels[1] if len(panels) > 1 else None),
         })
     return out
+
+
+# -- Iredell: Courthouse Computer Systems "DevExpress" (rod/ccs_devexpress.py) --
+
+#: kind bucket (rod.ccs_devexpress.classify_kind_code's return value) ->
+#: ListingType. "probate" is deliberately absent: Iredell's own #DocTypes
+#: dictionary has NO death-certificate-equivalent code (see
+#: rod/ccs_devexpress.py module docstring's "IREDELL" section), so
+#: classify_kind_code can never actually return "probate" for a doc_type
+#: drawn from IREDELL_DISTRESS_DOC_CODES -- left out rather than mapped to
+#: a ListingType that would never be reached, so this table only claims
+#: buckets this county can really produce.
+_IREDELL_LISTING_TYPE: dict[str, ListingType] = {
+    "lis_pendens": ListingType.LIS_PENDENS,
+    # FCL/S-TR are both NC pre-/in-process foreclosure signals -- same
+    # LIS_PENDENS bucket Wake's own SUBSTITUTE TRUSTEE/FORECLOSURE NOTICE
+    # doc types and Clarendon's own FORECLOS/TRUSTEE/NOTICE OF SALE kinds
+    # already use elsewhere in this codebase, not a new type.
+    "foreclosure": ListingType.LIS_PENDENS,
+    "pre_foreclosure": ListingType.LIS_PENDENS,
+    "bankruptcy": ListingType.BANKRUPTCY,
+    # LIEN_CLAIM (not TAX_LIEN, Jasper's own catch-all): a generic LIEN or
+    # a civil JGMT both read, on Iredell's own live rows, as the
+    # contractor/HOA/judgment-creditor class of claim LIEN_CLAIM's own
+    # docstring describes, not a government property-tax lien.
+    "lien": ListingType.LIEN_CLAIM,
+    "judgment": ListingType.LIEN_CLAIM,
+}
+
+
+def _iredell_defendant(grantor: str | None, grantee: str | None) -> str | None:
+    """The real individual -- homeowner, debtor, or judgment party -- for
+    an Iredell row. UNLIKE Jasper's own single fixed "claimant is grantor,
+    owner is grantee" convention (rod.ccs_devexpress._jasper_defendant()),
+    Iredell's own live rows showed BOTH orientations depending on doc kind:
+    FCL has the homeowner as grantor / lender as grantee (the SAME
+    convention Wake's own SUBSTITUTE TRUSTEE rows use elsewhere in this
+    file), while S/TR has the OPPOSITE -- lender as grantor, homeowner as
+    grantee (live examples: Book 3238/Page 1295 FCL, AGUILERA RAFAEL
+    grantor / MOVEMENT MORTGAGE LLC grantee; Book 3238/Page 1416 S/TR,
+    NEWREZ LLC grantor / MERCER JOHN M. grantee -- see
+    rod/ccs_devexpress.py module docstring's "IREDELL" section). This
+    never trusts either role fixed, same defensive shape
+    `_jasper_defendant` already uses for the identical reason. Reuses
+    `_brunswick_is_institutional` (shared with Wake/Brunswick, extended
+    this pass with "department"/"transportation" for Iredell's own
+    NCDOT-condemnation JGMT noise -- see that set's own comment)."""
+    g, e = (grantor or "").strip() or None, (grantee or "").strip() or None
+    if not e:
+        return g
+    if not g:
+        return e
+    g_inst, e_inst = _brunswick_is_institutional(g), _brunswick_is_institutional(e)
+    if g_inst and not e_inst:
+        return e
+    if e_inst and not g_inst:
+        return g
+    if g_inst and e_inst:
+        # Both sides read institutional -- a real, live-confirmed case:
+        # NCDOT eminent-domain condemnation judgments index "DEPARTMENT OF
+        # TRANSPORTATION" as BOTH grantor and grantee on some rows (Book
+        # 3229/Page 973, DocNo 2000004514). No real individual lead here --
+        # the caller (`_iredell_doc_to_listing`) skips the Listing
+        # entirely rather than shipping a government agency as the
+        # "defendant".
+        return None
+    # Neither reads institutional -- both individuals (e.g. a judgment
+    # between two people). Prefer grantor, the more common "party against
+    # whom the record runs" convention across this file's other counties.
+    return g
 
 
 _COUNTY_SITES = {
@@ -1065,6 +1183,28 @@ class NcRodCaptchaScraper(BaseScraper):
                         # below reuses rod.nc_tyler.parse_selfservice(), same as
                         # Durham, instead of a third hand-rolled parser.
                         county_results = await self._fetch_wake(page, entry_url, cfg["search_path"])
+                        results.extend(county_results)
+                        await page.close()
+                        log.info("nc_rod_captcha.county_done", county=county, found=len(county_results))
+                        continue
+
+                    if county == "iredell":
+                        # Same shape as Wake just above: solve_recaptcha_v2 is
+                        # live-reverified to never actually clear this genuine
+                        # reCAPTCHA v2 gate (module docstring), so gate_cleared
+                        # only reaches here when the Playwright BrowserContext
+                        # was already carrying a human-cleared session. UNLIKE
+                        # Wake's own Tyler "Self-Service" platform, this one's
+                        # clearance does NOT survive a fresh navigation/tab
+                        # (live-confirmed 2026-10-14, see
+                        # rod/ccs_devexpress.py module docstring's "IREDELL"
+                        # section) -- `_fetch_iredell` therefore drives THIS
+                        # SAME already-loaded `page` in place via in-page JS
+                        # only (rod.ccs_devexpress.discover_recent_distress_
+                        # via_browser), never page.goto()-ing anywhere else,
+                        # same convention sc_rod_walled.py's own
+                        # `_fetch_jasper` already uses for the same platform.
+                        county_results = await self._fetch_iredell(page, entry_url)
                         results.extend(county_results)
                         await page.close()
                         log.info("nc_rod_captcha.county_done", county=county, found=len(county_results))
@@ -1826,6 +1966,107 @@ class NcRodCaptchaScraper(BaseScraper):
         except Exception:
             return []
         return _wake_parse_related_documents(html, detail_url)
+
+    async def _fetch_iredell(self, page: Any, entry_url: str) -> list[Listing]:
+        """Iredell ROD: SAME Courthouse Computer Systems "DevExpress"
+        platform as SC's Jasper county (rod/ccs_devexpress.py, built for
+        Jasper first, generalized this pass for Iredell's own genuinely
+        different column layout -- see that module's docstring's
+        "IREDELL" section for the full live evidence). reCAPTCHA already
+        cleared by a human before this method runs (see the `county ==
+        "iredell"` branch in `fetch()` above for why this drives the SAME
+        already-loaded `page` in place rather than navigating anywhere --
+        Iredell's own clearance does NOT survive a fresh navigation/tab,
+        live-confirmed 2026-10-14, unlike Wake's Tyler Self-Service
+        cookie)."""
+        out: list[Listing] = []
+        try:
+            docs = await ccs_devexpress.discover_recent_distress_via_browser(
+                page, "NC", "Iredell",
+                days_back=ccs_devexpress.IREDELL_LOOKBACK_DAYS,
+                max_pages=ccs_devexpress.IREDELL_MAX_PAGES,
+                max_docs=ccs_devexpress.IREDELL_MAX_DOCS,
+                doc_codes=ccs_devexpress.IREDELL_DISTRESS_DOC_CODES,
+            )
+        except Exception as exc:
+            log.warning("nc_rod_captcha.iredell_sweep_failed", error=str(exc)[:200])
+            return out
+        source_url = f"{entry_url}/Image/ImageIndex"
+        for doc in docs:
+            li = self._iredell_doc_to_listing(doc, source_url)
+            if li is not None:
+                out.append(li)
+        return out
+
+    def _iredell_doc_to_listing(self, doc: Any, source_url: str) -> Listing | None:
+        """Build one Listing from a rod.ccs_devexpress.RodDoc parsed off
+        Iredell's own real search grid. See rod/ccs_devexpress.py's module
+        docstring's "IREDELL" section for the full live evidence (real doc
+        examples per bucket, the doc-type dictionary, the image-URL
+        params) this mapping is drawn from."""
+        kind = ccs_devexpress.classify_kind_code(doc.doc_type)
+        if kind is None:
+            return None
+        lt = _IREDELL_LISTING_TYPE.get(kind)
+        if lt is None:
+            return None
+        defendant = _iredell_defendant(doc.grantor, doc.grantee)
+        # Defensive, same as _iredell_defendant's own "both institutional"
+        # branch -- also catches the one-party case (e.g. a BKCY row whose
+        # ONLY party happens to itself read institutional, which
+        # _iredell_defendant's "not e"/"not g" shortcuts don't separately
+        # re-check) so an institutional name can never slip through as a
+        # "defendant" lead.
+        if not defendant or _brunswick_is_institutional(defendant):
+            return None
+        rec = doc.recorded_date.strftime("%Y-%m-%d") if doc.recorded_date else "unknown date"
+        desc = (f"{doc.doc_type} recorded {rec}: {defendant}"
+                f"{' (' + doc.notes + ')' if doc.notes else ''}")
+        raw: dict[str, Any] = dict(doc.raw or {})
+        raw["rod"] = {"doc_type": doc.doc_type, "grantor": doc.grantor, "grantee": doc.grantee,
+                      "book": doc.book, "page": doc.page, "instrument": doc.instrument_no,
+                      "recorded": rec}
+        # The per-document image (/Image/ShowDocImage -- the SAME
+        # controller action Jasper's own raw['jasper_doc_image'] block
+        # already targets on the SC side of this vendor platform, live-
+        # confirmed by actually opening one, see rod/ccs_devexpress.py
+        # module docstring's "IREDELL" section for the real captured URL
+        # this is built from) needs the SAME reCAPTCHA+session-cleared tab
+        # as the search itself; a cold GET is expected to redirect back to
+        # the gate, same documented gap as Jasper's own. The full legal
+        # description text is NOT behind this gate -- already free in
+        # doc.notes (the grid's own Description column) and lands in
+        # legal_description below with no extra fetch.
+        book, page = (doc.book or "").strip(), (doc.page or "").strip()
+        if book and page and doc.instrument_no:
+            date_q = doc.recorded_date.strftime("%m/%d/%Y") if doc.recorded_date else ""
+            image_url = (f"{_IREDELL_BASE}/Image/ShowDocImage?DocNum={doc.instrument_no}"
+                         f"&BookNum={book}&PageNum={page}&Kind={quote(doc.doc_type or '', safe='')}"
+                         f"&Date={quote(date_q, safe='')}&Referrer=r&BookType=&SeqNum=0"
+                         f"&TIF2PDF=true&SearchTabID=0&HideDetails=false")
+            raw["iredell_doc_image"] = {
+                "method": "GET", "url": image_url,
+                "requires": "iredell_recaptcha_and_session_cleared_tab",
+                "note": "cold GET is expected to redirect to the reCAPTCHA "
+                        "gate (same session-gated /ProcessedImages/ pattern "
+                        "as Jasper's own jasper_doc_image, see "
+                        "rod.ccs_devexpress module docstring) -- only "
+                        "fetchable from the SAME already-cleared tab. Not "
+                        "stamped into raw['documents']/['document_url'] for "
+                        "this reason, same convention as jasper_doc_image.",
+            }
+        return Listing(
+            source=self.slug, source_url=source_url,
+            listing_type=lt, property_kind=PropertyKind.UNKNOWN,
+            state="NC", county="Iredell",
+            parcel_id=doc.parcel_id,
+            defendant=defendant,
+            case_number=(doc.instrument_no or "").strip() or None,
+            legal_description=(doc.notes or "").strip() or None,
+            description=desc,
+            first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+            raw=raw,
+        )
 
     def _parse_html(self, html: str, county: str, base_url: str) -> list[Listing]:
         """Parse deed search results from HTML."""

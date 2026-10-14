@@ -473,9 +473,10 @@ See `scrapers/counties_nc/nc_rod_captcha.py`'s own module docstring (2026-10-14 
 (cont. x5) correction blocks) and `tests/test_nc_rod_captcha.py` for the full writeup and real
 schema-accurate fixtures built from this live pull.
 
-- `counties_nc/nc_rod_captcha.py` — **6 of 9 counties remain genuinely walled** (Iredell, Craven,
-  Greene, Harnett, Randolph, Stokes); Durham and Brunswick **removed from this list** (fixed in the
-  corrections above). Wake **removed from this list**: the reCAPTCHA itself is still genuinely
+- `counties_nc/nc_rod_captcha.py` — **5 of 9 counties remain genuinely walled** (Craven, Greene,
+  Harnett, Randolph, Stokes); Durham and Brunswick **removed from this list** (fixed in the
+  corrections above). Iredell **removed from this list, same caveat as Wake below**: see the
+  2026-10-14 (cont. x6) correction further down. Wake **removed from this list**: the reCAPTCHA itself is still genuinely
   walled for an UNATTENDED run (never automated, by design) — but the real search, parser, and
   one-hop related-documents follow-through are now fully built and live-verified, ready to run off
   a human-cleared session (see the correction immediately above for the full writeup, including the
@@ -487,6 +488,50 @@ schema-accurate fixtures built from this live pull.
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)
 - `public_notices/nc_notices_counties.py` vs `ncpublicnotices.py` (same site — does the
   interstitial actually gate it or not? One module says yes, the other's code says no.)
+
+**CORRECTION 2026-10-14 (cont. x6)** — `counties_nc/nc_rod_captcha.py`'s Iredell entry: same
+pattern as Jasper's own (cont. x2) correction above and Wake's own (cont. x3)/(cont. x4) — the
+reCAPTCHA itself stays genuinely walled for an UNATTENDED run (never automated, by design), but
+the owner personally solved it live, in-session, and everything DOWNSTREAM of that human clear is
+now BUILT, not just documented. Iredell turned out to run the SAME Courthouse Computer Systems
+"DevExpress" product as SC's Jasper county (`rod/ccs_devexpress.py`, built for Jasper first) —
+confirmed live (identical `#subapp_LRSearch_0` iframe, `#DocTypes` picker, `#gridTrad`, and the
+identical `ccs-home_ui_helper.js` heartbeat bundle), not assumed by the platform-match pattern
+that got this same file's own Durham entry wrong in 2026-10-12. Two real differences from Jasper
+needed the shared module generalized, not a second hand-rolled parser: (1) Iredell's own grid
+column layout is genuinely DIFFERENT from Jasper's (separate plain-name Grantor/Grantee columns,
+not Jasper's combined role+name cell) — `rod/ccs_devexpress.py`'s `parse_grid_row()` now reads a
+live, DOM-built `header_map` (from `#gridTrad`'s own `Cell_<Field>_Header` CSS classes) instead of
+assuming Jasper's fixed positions, falling back to those fixed positions only when no header_map
+is given at all, so Jasper's own already-tested behavior is unchanged; (2) Iredell's own reCAPTCHA
+clearance does NOT survive a fresh tab/navigation (live-tested: a brand-new tab re-showed the real
+CAPTCHA modal and the search grid never loaded), unlike Wake's own Tyler Self-Service cookie —
+`_fetch_iredell` therefore drives the SAME already-cleared Playwright `page` in place via in-page
+JS only, never navigating away, the same convention `_fetch_jasper` already uses for the identical
+platform. Iredell's own `#DocTypes` dictionary (113 live-confirmed codes) is genuinely DIFFERENT
+vocabulary from Jasper's 6 codes, not the same ones renamed: NO death-certificate-equivalent code
+exists at all (a real, flagged gap), but it DOES have real `FCL` (FORECLOSURE)/`S/TR` (SUBSTITUTE
+TRUSTEE)/`JGMT` (judgment)/`BKCY` (bankruptcy) codes Jasper's own SC dictionary has none of.
+`classify_kind_code()` was extended (not replaced) with `foreclosure`/`pre_foreclosure`/
+`judgment`/`bankruptcy` buckets, one shared code→bucket table across both counties. A real live
+gotcha caught and fixed: NCDOT eminent-domain condemnation `JGMT` rows index "DEPARTMENT OF
+TRANSPORTATION" as BOTH grantor and grantee on some rows — `_iredell_defendant`/
+`_iredell_doc_to_listing` now skip these (no real individual lead) rather than shipping a
+government agency as the "defendant", while a real affected owner on the SAME condemnation case
+(a different row) is correctly kept. Session-reuse, measured the same two-angle way as Jasper's
+and Wake's own: the served JS is IDENTICAL architecture to Jasper's (12-hour `timeoutLength`,
+6-hour heartbeat cadence), and live, with that heartbeat deliberately blocked, the same
+human-cleared tab answered a real deliberate search with live grid data after **679 seconds
+(11m19s) of zero client activity** — a stronger floor than Wake's own 7m14s. 13 new tests in
+`tests/test_nc_rod_captcha.py`, built from real rows captured in that live session (a real
+pre-foreclosure FCL, a substitute-trustee S/TR with the OPPOSITE grantor/grantee role convention
+from the FCL example, a real Chapter 13 bankruptcy, and the real NCDOT self-referential judgment
+noise case). The other 5 queued CCS counties (Craven, Greene, Harnett, Randolph, Stokes) are now
+materially closer to "new county config entry + a live doc-type/column check" than a rebuild,
+since the shared module no longer hard-codes Jasper's own column positions or doc-type vocabulary
+— no cleared session exists yet for any of them, so none were wired this pass. The ONLY remaining
+gap for Iredell itself is the manual reCAPTCHA clear, same boundary as every other real CAPTCHA in
+this codebase.
 
 **CORRECTION 2026-10-14 (cont.)** — `counties_sc/sc_qpublic.py` was also WRONGLY listed here: no
 login or CAPTCHA was ever found. Live-checked, not assumed, and it's a bigger problem than "the

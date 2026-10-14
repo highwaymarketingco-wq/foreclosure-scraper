@@ -9,16 +9,31 @@ fell into (see below). Durham turned out to need no login or CAPTCHA at all, sam
 false-flag pattern as 5 other files in that audit list resolved earlier the same
 night; it's parser-only here (no live network), using schema-accurate examples
 pulled from the live site 2026-10-14.
+
+Iredell addendum, same day: the owner personally solved its real reCAPTCHA
+live, and the search/parse/classify path behind that human-cleared session
+is now fully built (`_fetch_iredell`, driving the shared
+`rod/ccs_devexpress.py` module the same way `sc_rod_walled.py`'s own Jasper
+county already does) -- see that module's own docstring for the full live
+evidence. Iredell stays in `still_walled` below for an UNATTENDED run (the
+automated solver still never clears it); this file's own Iredell tests
+below are parser-only, same schema-accurate-real-examples convention as
+every other county here.
 """
 from __future__ import annotations
 
+from datetime import datetime
+
 from foreclosure_scraper.models import ListingType, PropertyKind
+from foreclosure_scraper.rod import ccs_devexpress
 from foreclosure_scraper.rod.nc_chain import IndexRecord
 from foreclosure_scraper.rod.nc_tyler import _SS_HEAD, _SS_HEAD_BT, _SS_HEAD_BP, parse_selfservice
 from foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha import (
     NcRodCaptchaScraper,
     _COUNTY_SITES,
+    _IREDELL_BASE,
     _WAKE_DISTRESS_DOC_TYPES,
+    _iredell_defendant,
     _wake_extract_docids,
     _wake_parse_related_documents,
 )
@@ -796,3 +811,230 @@ def test_wake_session_reuse_window_documented():
     ).__doc__ or ""
     assert "SESSION-REUSE" in module_doc
     assert "pingSession" in module_doc
+
+
+# --- Iredell: SAME CCS DevExpress platform as SC's Jasper (rod/ccs_devexpress.py) --
+# Real fixtures captured live 2026-10-14, driven directly against the owner's
+# own reCAPTCHA-cleared browser-pane tab (origin
+# iredellnc.courthousecomputersystems.com) -- same live-evidence convention
+# as every other county's fixtures in this file. See
+# rod/ccs_devexpress.py's own module docstring's "IREDELL" section for the
+# full write-up these are drawn from.
+
+def test_iredell_still_walled_for_automated_runs():
+    assert _COUNTY_SITES["iredell"]["url"] == "https://iredellnc.courthousecomputersystems.com"
+    # The automated solver still never clears this real reCAPTCHA v2 -- this
+    # pass wires up what happens once a human already has, same boundary
+    # Wake's own entry already documents.
+    assert _COUNTY_SITES["iredell"]["gate"] == "recaptcha"
+
+
+def test_iredell_base_url_matches_county_sites():
+    assert ccs_devexpress.base_url("NC", "Iredell") == _IREDELL_BASE
+    assert _IREDELL_BASE == _COUNTY_SITES["iredell"]["url"]
+
+
+def test_iredell_distress_doc_codes_are_the_real_live_confirmed_codes():
+    # Live-confirmed 2026-10-14 from Iredell's own #DocTypes picker echo --
+    # a genuinely DIFFERENT vocabulary from Jasper's 6 codes, not the same
+    # ones renamed (see rod/ccs_devexpress.py module docstring).
+    assert ccs_devexpress.IREDELL_DISTRESS_DOC_CODES == (
+        "LIEN", "LIS/P", "FCL", "S/TR", "BKCY", "JGMT")
+
+
+def test_classify_kind_code_iredell_live_confirmed_codes():
+    assert ccs_devexpress.classify_kind_code("FCL") == "foreclosure"
+    assert ccs_devexpress.classify_kind_code("S/TR") == "pre_foreclosure"
+    assert ccs_devexpress.classify_kind_code("JGMT") == "judgment"
+    assert ccs_devexpress.classify_kind_code("BKCY") == "bankruptcy"
+    assert ccs_devexpress.classify_kind_code("LIS/P") == "lis_pendens"
+    assert ccs_devexpress.classify_kind_code("LIEN") == "lien"
+    # Jasper's own LPEN spelling of the same lis_pendens concept still
+    # classifies correctly -- ONE shared table, not two separate ones.
+    assert ccs_devexpress.classify_kind_code("LPEN") == "lis_pendens"
+    # Iredell's dictionary has real codes Jasper's never had -- confirms
+    # these are genuinely additive, not a Jasper-only table silently
+    # reused. Routine filings (same spirit as Jasper's own routine-code
+    # test) stay None.
+    for routine in ("DEED", "MTG", "D/T", "SAT", "REL", "CAN", "ASGMT", ""):
+        assert ccs_devexpress.classify_kind_code(routine) is None
+
+
+#: Real live column map, read from Iredell's own `#gridTrad` header row
+#: (`td[class*="_Header"]` -> `Cell_<Field>_Header` CSS classes), 2026-10-14
+#: -- see rod/ccs_devexpress.py module docstring's "IREDELL" section.
+#: Genuinely different column SET/order from Jasper's own fixed positions,
+#: not just new codes at the same positions.
+_IREDELL_HEADER_MAP = {
+    "RowNumber": 2, "RecordChanged": 3, "Image": 4, "Date": 5, "Kind": 6,
+    "Grantor": 7, "Grantee": 8, "Description": 9, "Book": 10, "Page": 11,
+    "DocNo": 15, "MapID": 16,
+}
+# Real grid row, Book 3238/Page 1295, DocNo 2000008318, a real pre-
+# foreclosure FCL instrument (9 total grantor party rows on the real
+# document -- only the first is kept here, same trimmed-for-test-size
+# convention as this file's other fixtures).
+_LIVE_IREDELL_FCL_ROW = [
+    "", "", "1", "", "", "09/01/2026", "FCL", "AGUILERA, RAFAEL",
+    "MOVEMENT MORTGAGE, LLC", "", "3238", "1295", "2965/1942", "0.00",
+    "1-5626053", "2000008318", "",
+]
+# Real grid row, Book 3238/Page 1416, DocNo 2000008331 -- S/TR carries the
+# OPPOSITE role convention from the FCL row above (lender is grantor,
+# homeowner is grantee) -- see module docstring.
+_LIVE_IREDELL_STR_ROW = [
+    "", "", "10", "", "", "09/01/2026", "S/TR", "NEWREZ LLC",
+    "MERCER, JOHN M.", "", "3238", "1416", "1696/1536", "0.00",
+    "1-5626087", "2000008331", "",
+]
+# Real grid row, Book 3234/Page 2264, DocNo 2000006843 -- a real Chapter 13
+# bankruptcy filing. "-----" is the platform's own blank-second-party
+# placeholder (confirmed live, not a parse failure) -- the real case number
+# lands in the Description cell.
+_LIVE_IREDELL_BKCY_ROW = [
+    "", "", "1", "", "", "08/14/2026", "BKCY", "BARTHELEMY, NATASHA NICOLE",
+    "-----", "B-26-50333C-13W", "3234", "2264", "", "0.00",
+    "1-5621120", "2000006843", "",
+]
+# Real grid row, Book 3229/Page 973, DocNo 2000004514 -- a NCDOT eminent-
+# domain condemnation JGMT indexed with "DEPARTMENT OF TRANSPORTATION" as
+# BOTH grantor and grantee (self-referential, real live noise, not a typo).
+_LIVE_IREDELL_SELF_REF_JGMT_ROW = [
+    "", "", "1", "", "", "07/22/2026", "JGMT", "DEPARTMENT OF TRANSPORTATION",
+    "DEPARTMENT OF TRANSPORTATION", "23CVS000446-480", "3229", "973", "",
+    "0.00", "1-5289447", "2000004514", "",
+]
+# Real grid row, Book 3231/Page 423, DocNo 2000005291 -- the SAME NCDOT
+# condemnation case, but a row pairing the agency against a real affected
+# owner.
+_LIVE_IREDELL_JGMT_WITH_OWNER_ROW = [
+    "", "", "11", "", "", "07/30/2026", "JGMT", "DEPARTMENT OF TRANSPORTATION",
+    "MILLS, DON E. JR.", "CASE# 23CV001449-480", "3231", "423", "",
+    "0.00", "1-5615408", "2000005291", "",
+]
+
+
+def test_parse_grid_row_iredell_uses_header_map_not_jasper_positions():
+    # Jasper's own fixed Book/Page positions (5/6) would read "" / "" on
+    # this row shape -- only the live header_map gets this right.
+    parsed = ccs_devexpress.parse_grid_row(_LIVE_IREDELL_FCL_ROW, _IREDELL_HEADER_MAP)
+    assert parsed["book"] == "3238" and parsed["page"] == "1295"
+    assert parsed["kind"] == "FCL"
+    assert parsed["grantor"] == "AGUILERA, RAFAEL"
+    assert parsed["grantee"] == "MOVEMENT MORTGAGE, LLC"
+    assert parsed["recorded_date"] == datetime(2026, 9, 1)
+    assert parsed["doc_no"] == "2000008318"
+    # Iredell exposes no stand-alone Seq column -- genuinely absent, not a
+    # wrong Jasper-position guess.
+    assert parsed["seq"] is None
+
+
+def test_parse_grid_row_iredell_bkcy_placeholder_party_reads_as_none():
+    parsed = ccs_devexpress.parse_grid_row(_LIVE_IREDELL_BKCY_ROW, _IREDELL_HEADER_MAP)
+    assert parsed["grantor"] == "BARTHELEMY, NATASHA NICOLE"
+    assert parsed["grantee"] is None  # "-----" placeholder, not a real party
+    assert parsed["description"] == "B-26-50333C-13W"
+
+
+def test_parse_grid_row_with_no_header_map_still_parses_jasper_layout():
+    # Backward-compat: every call site written before this pass never
+    # passes a header_map -- must keep parsing Jasper's own fixed layout
+    # exactly as before. Reuses this file's own sibling suite's real Jasper
+    # fixture shape inline rather than importing test_sc_rod_walled.py.
+    jasper_deth_row = [
+        "", "", "1", "", "", "1228", "95", "DETH", "or\tTURNER, JAY", "or",
+        "TURNER, JAY", "ee", "ee", "", "07/17/2026", "", "1-494540",
+        "202600005464", "", "", "", "", "",
+    ]
+    parsed = ccs_devexpress.parse_grid_row(jasper_deth_row)
+    assert parsed["book"] == "1228" and parsed["page"] == "95" and parsed["kind"] == "DETH"
+    assert parsed["grantor"] == "TURNER, JAY"
+    assert parsed["doc_no"] == "202600005464"
+
+
+def test_iredell_defendant_prefers_non_institutional_regardless_of_role():
+    # FCL: homeowner is grantor (Wake's own convention).
+    assert _iredell_defendant("AGUILERA, RAFAEL", "MOVEMENT MORTGAGE, LLC") == "AGUILERA, RAFAEL"
+    # S/TR: the OPPOSITE -- homeowner is grantee. Neither role is trusted
+    # fixed; the institutional check picks the real person either way.
+    assert _iredell_defendant("NEWREZ LLC", "MERCER, JOHN M.") == "MERCER, JOHN M."
+    # BKCY: no real second party at all.
+    assert _iredell_defendant("BARTHELEMY, NATASHA NICOLE", None) == "BARTHELEMY, NATASHA NICOLE"
+
+
+def test_iredell_defendant_skips_self_referential_institutional_row():
+    # The real NCDOT-vs-NCDOT JGMT noise -- both sides institutional, no
+    # real individual lead.
+    assert _iredell_defendant("DEPARTMENT OF TRANSPORTATION", "DEPARTMENT OF TRANSPORTATION") is None
+    # The SAME condemnation case against a real affected owner correctly
+    # resolves to the person, not the agency.
+    assert _iredell_defendant("DEPARTMENT OF TRANSPORTATION", "MILLS, DON E. JR.") == "MILLS, DON E. JR."
+
+
+def test_iredell_doc_to_listing_fcl_real_schema():
+    docs = ccs_devexpress.collapse_rows_to_docs(
+        [_LIVE_IREDELL_FCL_ROW], "NC", "Iredell", _IREDELL_HEADER_MAP)
+    assert len(docs) == 1
+    scraper = NcRodCaptchaScraper()
+    li = scraper._iredell_doc_to_listing(docs[0], f"{_IREDELL_BASE}/Image/ImageIndex")
+    assert li is not None
+    assert li.county == "Iredell" and li.state == "NC"
+    assert li.listing_type is ListingType.LIS_PENDENS
+    assert li.property_kind is PropertyKind.UNKNOWN
+    assert li.defendant == "AGUILERA, RAFAEL"
+    assert li.case_number == "2000008318"
+    assert li.description.startswith("FCL recorded 2026-09-01")
+    assert li.raw["rod"]["book"] == "3238" and li.raw["rod"]["page"] == "1295"
+    # Shared wrapper key, already registered in web_artifact.py's RAW_KEEP
+    # for Jasper -- reused verbatim, no new key needed for this part.
+    assert "ccs_devexpress_rod" in li.raw
+    # NEW raw key this pass adds -- flagged in this session's own report
+    # ("NEW RAW KEYS TO REGISTER"), same convention as jasper_doc_image.
+    img = li.raw["iredell_doc_image"]
+    assert img["url"] == (
+        f"{_IREDELL_BASE}/Image/ShowDocImage?DocNum=2000008318&BookNum=3238"
+        "&PageNum=1295&Kind=FCL&Date=09%2F01%2F2026&Referrer=r&BookType="
+        "&SeqNum=0&TIF2PDF=true&SearchTabID=0&HideDetails=false"
+    )
+    assert img["requires"] == "iredell_recaptcha_and_session_cleared_tab"
+
+
+def test_iredell_doc_to_listing_bkcy_real_schema():
+    docs = ccs_devexpress.collapse_rows_to_docs(
+        [_LIVE_IREDELL_BKCY_ROW], "NC", "Iredell", _IREDELL_HEADER_MAP)
+    scraper = NcRodCaptchaScraper()
+    li = scraper._iredell_doc_to_listing(docs[0], f"{_IREDELL_BASE}/Image/ImageIndex")
+    assert li is not None
+    assert li.listing_type is ListingType.BANKRUPTCY
+    assert li.defendant == "BARTHELEMY, NATASHA NICOLE"
+    assert li.legal_description == "B-26-50333C-13W"
+
+
+def test_iredell_doc_to_listing_skips_self_referential_dot_judgment():
+    docs = ccs_devexpress.collapse_rows_to_docs(
+        [_LIVE_IREDELL_SELF_REF_JGMT_ROW], "NC", "Iredell", _IREDELL_HEADER_MAP)
+    scraper = NcRodCaptchaScraper()
+    li = scraper._iredell_doc_to_listing(docs[0], f"{_IREDELL_BASE}/Image/ImageIndex")
+    assert li is None
+
+
+def test_iredell_doc_to_listing_judgment_with_real_owner_is_kept():
+    docs = ccs_devexpress.collapse_rows_to_docs(
+        [_LIVE_IREDELL_JGMT_WITH_OWNER_ROW], "NC", "Iredell", _IREDELL_HEADER_MAP)
+    scraper = NcRodCaptchaScraper()
+    li = scraper._iredell_doc_to_listing(docs[0], f"{_IREDELL_BASE}/Image/ImageIndex")
+    assert li is not None
+    assert li.listing_type is ListingType.LIEN_CLAIM
+    assert li.defendant == "MILLS, DON E. JR."
+
+
+def test_iredell_session_reuse_window_documented():
+    # Same central operational question as Wake's own test above, answered
+    # with real evidence in rod/ccs_devexpress.py's module docstring (not
+    # this file's own -- the deep evidence lives with the shared module).
+    module_doc = __import__(
+        "foreclosure_scraper.rod.ccs_devexpress", fromlist=["x"]
+    ).__doc__ or ""
+    assert "IREDELL" in module_doc
+    assert "679 seconds" in module_doc
+    assert "KeepSessionActive" in module_doc
