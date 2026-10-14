@@ -54,15 +54,70 @@ AUDITED, NOT FIXED (scoped out, documented rather than silently skipped):
     extraction code is simply fed no data to extract). There is also no
     embedded JS state blob with pricing on the list page. The price now
     only appears to show on the per-LISTING DETAIL page, which this
-    scraper does not fetch (only the two state list pages). Also found on
-    the detail page: real, per-property PDFs under
-    ``propertyDocuments/{id}/PURCHASE_AGREEMENT/`` and
-    ``.../LOCAL_DISCLOSURE/`` (plus boilerplate ``globalDocuments/`` PDFs
-    shared across every listing, not property-specific). Wiring either of
-    these means fetching ~100+ individual detail pages per run through
-    Scrapling's full stealth browser (several seconds each) -- a real
-    architecture/runtime-cost change, not a field left unwired by mistake,
-    so left as a flagged follow-up rather than rushed into this batch.
+    scraper does not fetch (only the two state list pages).
+
+FIXED 2026-10-13 (source-completeness audit, Pattern D): the detail page
+also carries real, per-property PURCHASE_AGREEMENT and LOCAL_DISCLOSURE PDFs
+(plus boilerplate ``globalDocuments/`` PDFs shared across every listing,
+NOT property-specific -- live-confirmed these are a DIFFERENT field,
+``applicable_global_documents``, sitting alongside the real one; see below).
+The earlier framing -- "wiring this means ~100+ individual detail pages per
+run through Scrapling's full stealth browser" -- turned out to be the wrong
+cost model:
+
+  * The detail page is a server-rendered page (not a client-hydrated SPA
+    shell like the two list pages this scraper already renders): its HTML
+    embeds a plain ``<script>window.INITIAL_STATE = {...}</script>`` JS
+    object literal, no hydration/JS execution needed to read it. A real
+    per-property document, when the listing has one, lives at
+    ``shellState.listing.documents[].file_descriptor.urls.cdn|download``,
+    a bare ``https://adc-tenbox-prod.imgix.net/resi/propertyDocuments/
+    {id}/{PURCHASE_AGREEMENT|LOCAL_DISCLOSURE}/....pdf`` -- live-verified
+    3/3 sampled real detail IDs (2026-10-13): one (2197585) carried both
+    document types (confirmed 200 ``application/pdf`` on a bare,
+    unauthenticated ``httpx`` GET on the PDF URL itself -- no session/
+    cookie needed there, only on the detail-page HTML, see below); the
+    other two had an empty ``documents: []`` (not every listing has one
+    uploaded -- auction-stage listings without a signed purchase
+    agreement yet, confirmed by diffing against the sibling
+    ``applicable_global_documents`` field, which both of those DID carry
+    -- the boilerplate PSA template every listing ships with, deliberately
+    excluded here by requiring the URL path to contain
+    ``/propertyDocuments/``, never ``/globalDocuments/``).
+  * The detail page IS behind the same Incapsula WAF as the list pages,
+    but -- unlike the list pages, which need JS hydration a WAF challenge
+    can't satisfy without a real browser -- Incapsula's challenge here is
+    satisfied by a plain HTTP round-trip: a fresh client's FIRST request
+    (to anything on the host) is walled with an ~850-byte "Incapsula
+    incident ID" interstitial, but that response's ``Set-Cookie`` is
+    enough -- a SECOND request in the SAME client session (cookie jar
+    carried over, no JS executed, no browser launched) gets the real page
+    every time sampled (5/5 across 3 distinct live detail IDs, repeated
+    warm-up+fetch runs). curl-cffi (already a project dependency, used
+    elsewhere via ``wall_bypass.py`` / ``http_client.get_text_impersonate``
+    for its Chrome TLS/JA3 fingerprint) with a session that persists
+    across one warm-up GET + N detail-page GETs is sufficient --
+    ``http_client.get_text_impersonate``/``_impersonate_fetch`` were not
+    reused here because they open a FRESH session per call (confirmed
+    live: 0/6 fresh-session single-shot attempts got through), which is
+    exactly the one thing that does not work against this specific WAF
+    behavior; this module keeps its own small warm-up-session helper
+    instead (see ``_warm_incapsula_session`` / ``_capture_property_documents``).
+  * So this is a per-row **plain HTTP fetch via a lightweight TLS-
+    impersonation client, no browser process at all** -- a fundamentally
+    cheaper operation than the "~100+ full stealth-browser renders"
+    framing above assumed. Still budget-capped and paced
+    (``DOC_FETCH_CAP`` / ``DOC_FETCH_PACE_S``, env-tunable) per the same
+    discipline ``anderson_acpass_deeds.py``'s ``_MAX_IMAGE_FETCHES`` and
+    ``dorchester_billtrax_delinquent_tax.py``'s ``PDF_RESOLVE_CAP`` use,
+    so a single run can't silently balloon into hundreds of unconditional
+    extra requests -- just a much smaller one than a browser-render budget
+    would have needed. Found URLs are handed to
+    ``document_links.stamp_documents`` (the same convention those two
+    modules and ``sheriff_sales.py`` use), so ``enrichment_doc_ocr.py``
+    gets a real, durable (no SAS/token expiry observed on the CDN URL
+    itself -- confirmed by a bare unauthenticated fetch succeeding with no
+    prior session) input.
 
 FIXED 2026-10-04 (REO-liveness audit): every row was hardcoded
 ``ListingType.AUCTION`` -- ``_ltype_from_status`` existed but was never
@@ -108,6 +163,7 @@ Free, no auth required.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -118,6 +174,7 @@ import structlog
 
 from ..._upstate_city_to_county import KNOWN_CITIES, upstate_county_for
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -544,6 +601,186 @@ async def _fetch_reo_ids(state: str, url: str, pages_cap: int) -> set[str]:
     return ids
 
 
+# ---------------------------------------------------------------------------
+# Per-property document capture (FIXED 2026-10-13, source-completeness audit
+# Pattern D) -- see module docstring for the live-verification detail.
+# ---------------------------------------------------------------------------
+
+# Budget cap + pacing for the detail-page document-capture pass, PER STATE
+# (so NC and SC each get their own budget rather than one state starving the
+# other). Env-tunable, mirroring anderson_acpass_deeds.py's
+# _MAX_IMAGE_FETCHES / dorchester_billtrax_delinquent_tax.py's
+# PDF_RESOLVE_CAP. Each unit here is a plain curl-cffi GET (no browser) --
+# NOT comparable in cost to a Scrapling stealth-browser render, which is why
+# this cap is sized differently than those modules' render-pass budgets.
+DOC_FETCH_CAP = int(os.environ.get("AUCTION_DOT_COM_DOC_FETCH_CAP", "60"))
+# Gentle pace between detail-page fetches -- same host as the list-page
+# renders already hit, so the same courtesy applies even though this tier
+# doesn't go through http_client's shared per-host throttle.
+DOC_FETCH_PACE_S = float(os.environ.get("AUCTION_DOT_COM_DOC_FETCH_PACE_S", "0.4"))
+# How many times to retry the warm-up GET before giving up on the whole
+# capture pass for a state -- live-measured: the FIRST request in a fresh
+# session is walled roughly as often as not, but a session that's ever
+# gotten one clean (non-Incapsula) response stays good for every request
+# after it (5/5 sampled). A handful of retries comfortably covers the
+# unlucky case without looping forever against a hard outage.
+DOC_WARMUP_RETRIES = 4
+
+# The real per-property documents array, live-verified 2026-10-13 sitting at
+# shellState.listing.documents in the detail page's embedded
+# `window.INITIAL_STATE = {...}` JS object literal -- see module docstring.
+# Matches the literal JSON key `"documents":[` (the quote directly before
+# "documents" is what excludes the sibling `"applicable_global_documents":[`
+# boilerplate-PSA field below -- that key's quote sits before "applicable",
+# not before "documents", so this pattern can never match it).
+_DOC_ARRAY_RE = re.compile(r'"documents":\[')
+# Only the real per-property CDN path -- belt-and-suspenders against ever
+# picking up a globalDocuments/ (boilerplate, shared-across-every-listing)
+# URL even if a future markup change ever widened what _DOC_ARRAY_RE matches.
+_PROPERTY_DOC_URL_RE = re.compile(r"/propertyDocuments/", re.I)
+_INCAPSULA_MARKER = "Incapsula incident"
+
+
+def _extract_balanced_json_array(html: str, start_pattern: re.Pattern) -> list:
+    """Extract one JSON array given a regex matching up to (and including)
+    its opening ``[`` -- brace/bracket-counting with string-awareness (a
+    bare depth count would be fooled by a ``[`` or ``]`` inside a quoted
+    string, e.g. a filename). Returns [] on no match / bad JSON / anything
+    that doesn't parse as a list. Deliberately scoped to just this one
+    array rather than parsing the whole (600KB+) INITIAL_STATE blob, which
+    this module has no other use for."""
+    m = start_pattern.search(html)
+    if not m:
+        return []
+    start = m.end() - 1  # position of the opening '['
+    depth = 0
+    in_str = False
+    esc = False
+    end = None
+    for i in range(start, len(html)):
+        c = html[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "[":
+            depth += 1
+        elif c == "]":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+    if end is None:
+        return []
+    try:
+        data = json.loads(html[start:end])
+    except (json.JSONDecodeError, ValueError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _property_document_urls(html: str) -> list[str]:
+    """Real per-property document URLs (PURCHASE_AGREEMENT / LOCAL_DISCLOSURE
+    / any other type auction.com uploads) off one rendered detail page --
+    live-verified 2026-10-13, see module docstring. Empty list when the page
+    has no documents array, a malformed one, or only the boilerplate
+    globalDocuments/ PSA template (filtered out by _PROPERTY_DOC_URL_RE)."""
+    out: list[str] = []
+    for doc in _extract_balanced_json_array(html, _DOC_ARRAY_RE):
+        if not isinstance(doc, dict):
+            continue
+        urls = (doc.get("file_descriptor") or {}).get("urls") or {}
+        if not isinstance(urls, dict):
+            continue
+        url = urls.get("cdn") or urls.get("download")
+        if isinstance(url, str) and url and _PROPERTY_DOC_URL_RE.search(url):
+            out.append(url)
+    return out
+
+
+async def _warm_incapsula_session(session) -> bool:
+    """auction.com's Incapsula WAF walls a session's first request about as
+    often as not, but issues a pass cookie on that same walled response --
+    every request after it in the SAME session (cookie jar carried over, no
+    JS executed) gets the real page (live-verified 2026-10-13, 5/5 sampled
+    across 3 distinct detail IDs). ``session`` is a curl_cffi
+    ``AsyncSession``; never raises -- returns False on exhausted retries so
+    the caller can skip the whole capture pass for this state cleanly."""
+    for attempt in range(DOC_WARMUP_RETRIES):
+        try:
+            r = await session.get(
+                "https://www.auction.com/", impersonate="chrome124", timeout=20,
+            )
+        except Exception as exc:
+            log.debug("auction_dot_com.doc_warmup_error", attempt=attempt,
+                      error=str(exc)[:160])
+        else:
+            if r.status_code == 200 and _INCAPSULA_MARKER not in r.text:
+                return True
+        await asyncio.sleep(1.5)
+    return False
+
+
+async def _fetch_property_doc_urls(session, detail_url: str) -> list[str]:
+    """One listing's detail page -> its real per-property document URLs
+    (empty list on any failure, a wall, or genuinely zero documents --
+    best-effort, must never raise into the caller's budget loop)."""
+    try:
+        r = await session.get(detail_url, impersonate="chrome124", timeout=25)
+    except Exception as exc:
+        log.debug("auction_dot_com.doc_fetch_error", url=detail_url,
+                  error=str(exc)[:160])
+        return []
+    if r.status_code != 200 or _INCAPSULA_MARKER in r.text:
+        return []
+    return _property_document_urls(r.text)
+
+
+async def _capture_property_documents(state: str, listings: list[Listing]) -> int:
+    """Budget-capped, paced pass over ``listings`` (mutated in place):
+    fetch each one's detail page via a curl-cffi Chrome-impersonation
+    session (no browser -- see module docstring) and, where it carries a
+    real per-property document, stamp its URL(s) onto ``li.raw`` via
+    ``document_links.stamp_documents`` so ``enrichment_doc_ocr.py`` picks
+    it up like any other scraper's document. Best-effort throughout: a
+    warm-up failure or any per-row error costs nothing beyond those rows
+    staying unstamped -- this must never turn a clean listings fetch into
+    a failed run. Returns how many listings got a document stamped."""
+    if not listings or DOC_FETCH_CAP <= 0:
+        return 0
+    try:
+        from curl_cffi.requests import AsyncSession  # local import: optional dep
+    except ImportError:
+        log.warning("auction_dot_com.doc_capture_no_curl_cffi")
+        return 0
+
+    stamped = 0
+    budget = min(len(listings), DOC_FETCH_CAP)
+    try:
+        async with AsyncSession() as session:
+            if not await _warm_incapsula_session(session):
+                log.warning("auction_dot_com.doc_capture_warmup_failed", state=state)
+                return 0
+            for li in listings[:budget]:
+                urls = await _fetch_property_doc_urls(session, li.source_url)
+                if urls:
+                    stamp_documents(li, urls)
+                    stamped += 1
+                await asyncio.sleep(DOC_FETCH_PACE_S)
+    except Exception as exc:
+        log.warning("auction_dot_com.doc_capture_failed", state=state,
+                    error=str(exc)[:200])
+    log.info("auction_dot_com.doc_capture_done", state=state,
+             attempted=budget, stamped=stamped)
+    return stamped
+
+
 class AuctionDotCom(BaseScraper):
     slug = "national.auction_dot_com"
     name = "Auction.com"
@@ -570,14 +807,26 @@ class AuctionDotCom(BaseScraper):
     # Bumped with headroom; the early-stop-on-no-new-ids behavior both
     # passes share (see _fetch_state / _fetch_reo_ids) keeps the common
     # case well under this in practice.
-    timeout_s = 600.0
+    # FIX 2026-10-13 (source-completeness audit, Pattern D): fetch() now
+    # also runs a per-state document-capture pass (_capture_property_documents)
+    # after the REO cross-reference -- up to DOC_FETCH_CAP plain curl-cffi
+    # GETs per state (no browser; see module docstring), well under a
+    # second each but still real added wall-clock on top of the two render
+    # passes above. Bumped with headroom for the worst case (both states
+    # using their full budget); the budget cap plus per-request pacing
+    # keeps the common case well under this.
+    timeout_s = 750.0
 
     async def fetch(self) -> Iterable[Listing]:
         pages_cap = int(
             os.environ.get("AUCTION_DOT_COM_PAGES", str(PAGES_CAP))
         )
         reo_urls = dict(REO_URLS)
-        out: list[Listing] = []
+        # Rows go into self.partial as they are built, so a soft timeout
+        # ships whatever states/passes completed before the cutoff instead
+        # of discarding the whole run (same convention as
+        # anderson_acpass_deeds.py / dorchester_billtrax_delinquent_tax.py).
+        out = self.partial
         for state, url in URLS:
             try:
                 listings = await _fetch_state(state, url, pages_cap)
@@ -612,4 +861,15 @@ class AuctionDotCom(BaseScraper):
                     matched += 1
             log.info("auction_dot_com.reo_crossref_done", state=state,
                      reo_ids=len(reo_ids), matched=matched)
-        return out
+
+            # Per-property PURCHASE_AGREEMENT/LOCAL_DISCLOSURE PDF capture
+            # (see module docstring, FIXED 2026-10-13). Mutates `listings`
+            # (same Listing objects already in `out`) in place; best-effort
+            # and budget-capped, so a failure/wall here never costs the
+            # listings themselves.
+            try:
+                await _capture_property_documents(state, listings)
+            except Exception as exc:
+                log.warning("auction_dot_com.doc_capture_unexpected_error",
+                            state=state, error=str(exc)[:200])
+        return list(out)
