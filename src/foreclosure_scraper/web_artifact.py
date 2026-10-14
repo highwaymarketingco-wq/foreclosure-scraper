@@ -2624,6 +2624,9 @@ RAW_KEEP = {
     "brunswick_detail": "*",              # counties_nc.nc_rod_captcha (Brunswick): nested detail
                                            # block (status/subdivision/xref/detail_url) -- same
                                            # pattern as rowan_detail, 2026-10-14, commit 0f47c4b4
+    "wake_detail": "*",                   # counties_nc.nc_rod_captcha (Wake): nested detail block
+                                           # (related_documents, one-hop follow-through) -- same
+                                           # pattern as rowan_detail/brunswick_detail, commit 08e29a17
     "cott_image_fetch": "*",              # counties_sc.sc_rod_cott (Union): free-document recipe
                                            # (dual-Referer Thumbnails+Image fetch, can't use the generic
                                            # GET-only doc_inventory fetch) -- 2026-10-14, commit 1f3c9e3b
