@@ -5,12 +5,15 @@ SOURCE
     gisccapps.charlestoncounty.org ENERGOV/energov_history MapServer/0 ("ENERGOV HISTORY POINTS"):
     386,391 rows on 2026-10-07, every module of the county's permitting system, updated daily.
     Two slices are distress:
-      * CodeManagement, CASETYPE 'Building Services': building-code cases (1,871 since 2010;
-        727 cases of every type in 2025). Planning and Zoning, Environmental Management (yard and
-        trash), Stormwater and Short Term Rental cases are NOT read.
-      * PermitManagement, WORKCLASS 'Demolition' / 'Demolition - Commercial' (3,222 since 2010,
-        about 525 a year; CASETYPE Building (R), Zoning Permit, Manufactured Home, Building (C)).
-    Default window: the last 730 days (FORECLOSURE_CHARLESTON_ENERGOV_DAYS).
+      * CodeManagement, CASETYPE 'Building Services': building-code cases (1,873 all-time as of
+        2026-10-14, 2010-11-04 to present; 727 cases of every type in 2025). Planning and Zoning,
+        Environmental Management (yard and trash), Stormwater and Short Term Rental cases are NOT
+        read.
+      * PermitManagement, WORKCLASS 'Demolition' / 'Demolition - Commercial' (3,228 all-time as of
+        2026-10-14, about 525 a year; CASETYPE Building (R), Zoning Permit, Manufactured Home,
+        Building (C)).
+    No date floor by default -- see DATE COVERAGE below. FORECLOSURE_CHARLESTON_ENERGOV_DAYS still
+    narrows it for an explicit sample run.
 
 THE JOIN
     The layer has no address and no parcel: SPATIALID is an address-point GUID that matches no
@@ -26,6 +29,20 @@ WHAT A ROW MEANS
     treated as open for 365 days from its date (raw code_enforcement block, stale_after) and
     then ages out; a demolition permit is an owner's or buyer's application, not a
     condemnation, so it carries no condemned flag (New Hanover demolition-permit precedent).
+
+DATE COVERAGE (fixed 2026-10-14, date-coverage audit): this is a current-state roll, not an
+event stream -- every CASENUMBER the county has ever opened in these two slices is still a
+real, queryable record (the layer is 386k+ rows, updated daily, 16 years deep), so the old
+`FORECLOSURE_CHARLESTON_ENERGOV_DAYS=730` WHERE-clause floor was discarding ~93% of the code-
+case history and ~71% of the demolition-permit history (live-verified 2026-10-14: 125/1,873
+code cases and 944/3,228 demolition permits fell inside the old 730-day window). An old,
+unresolved code case or a demolition permit pulled years ago on a structure still standing is
+exactly the "zombie property" signal this engine wants most, so the fetch no longer pre-
+filters by date; `OPEN_DAYS`'s existing 365-day `stale_after` heuristic (unchanged) is what
+decides downstream whether an old CODE case should still read as open, same as before. The
+default is now `since=None` (no floor); `FORECLOSURE_CHARLESTON_ENERGOV_DAYS` still narrows it
+for an explicit sample run. `_MAX_RECORDS_PER_SLICE` is a volume safety cap (not a relevance
+filter) on the now-unbounded WHERE clause, well above the measured all-time counts above.
 
 DATELESS: no sale date; slug counties_sc.charleston_energov_history goes in
 main.DATELESS_OK_SOURCES. Gate: FORECLOSURE_CHARLESTON_ENERGOV=0.
@@ -61,15 +78,20 @@ HIST_FIELDS = ("OBJECTID", "MODULENAME", "CASENUMBER", "CASETYPE", "WORKCLASS", 
 ADDR_FIELDS = ("PID", "WHOLE_ADDRESS", "UNIT", "POSTAL_TOWN", "POSTAL_CODE")
 CODE_TYPES = ("Building Services",)
 OPEN_DAYS = 365
+#: Volume safety cap per slice (not a date/relevance filter) -- see the module docstring's
+#: DATE COVERAGE note. Measured all-time: 1,873 code cases + 3,228 demolition permits.
+_MAX_RECORDS_PER_SLICE = 50_000
 
 
-def where_clauses(since: datetime) -> dict[str, str]:
-    d = f"APPLICATIONDATE >= DATE '{since:%Y-%m-%d}'"
+def where_clauses(since: Optional[datetime]) -> dict[str, str]:
+    """`since=None` (the default run) pulls both slices' full all-time history."""
     types = ",".join(f"'{t}'" for t in CODE_TYPES)
-    return {
-        "code": f"MODULENAME='CodeManagement' AND CASETYPE IN ({types}) AND {d}",
-        "demolition": f"MODULENAME='PermitManagement' AND WORKCLASS LIKE 'Demolition%' AND {d}",
-    }
+    code = f"MODULENAME='CodeManagement' AND CASETYPE IN ({types})"
+    demo = "MODULENAME='PermitManagement' AND WORKCLASS LIKE 'Demolition%'"
+    if since is not None:
+        d = f"APPLICATIONDATE >= DATE '{since:%Y-%m-%d}'"
+        code, demo = f"{code} AND {d}", f"{demo} AND {d}"
+    return {"code": code, "demolition": demo}
 
 
 def _ms(v) -> Optional[datetime]:
@@ -190,17 +212,22 @@ class CharlestonEnergovHistory(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         if os.environ.get(ENV_OFF) == "0":
             return []
-        try:
-            days = int(os.environ.get(ENV_DAYS) or 730)
-        except ValueError:
-            days = 730
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        #: unset (the default) -> no date floor, the full all-time history of both
+        #: slices; set -> the old narrower-sample behavior, for an explicit quick run.
+        since: Optional[datetime] = None
+        days_raw = os.environ.get(ENV_DAYS)
+        if days_raw:
+            try:
+                days = int(days_raw)
+                since = datetime.now(timezone.utc) - timedelta(days=days) if days > 0 else None
+            except ValueError:
+                since = None
         cases: list[dict] = []
         async with client(timeout=90.0) as c:
             for kind, where in where_clauses(since).items():
                 feats = await agw.query_features(c, HISTORY, out_fields=",".join(HIST_FIELDS),
                                                  where=where, return_geometry=True, out_sr=4326,
-                                                 page=1000)
+                                                 page=1000, max_records=_MAX_RECORDS_PER_SLICE)
                 cases.extend(unique_cases(feats, kind))
             addrs = await match_points(c, ADDRESSES, [x["pt"] for x in cases], ADDR_FIELDS,
                                        distance_m=3.0)

@@ -1,27 +1,58 @@
 """Demolition permits in the four largest NC metros that publish them: Mecklenburg (Charlotte and
 its towns), Greensboro, Durham and Cary.
 
-SOURCES (all open, read 2026-10-07; counts are the last 730 days unless noted)
-  mecklenburg  meckgis.mecklenburgcountync.gov AccelaAllPermits FeatureServer/0, 222,105 permits
+SOURCES (Greensboro/Durham/Cary read live 2026-10-07; Mecklenburg RE-VERIFIED 2026-10-14 after its
+GIS backend moved -- see the dated note below. Counts are ALL-TIME now; the 730-day window that
+used to gate the fetch itself is gone, see "DATE COVERAGE" below)
+  mecklenburg  meckgis.mecklenburgcountync.gov BuildingPermits FeatureServer/0, 482,384 permits
                county-wide (Charlotte, Huntersville, Matthews, Cornelius, Mint Hill, ...), updated
-               daily; type_of_work 'Demolition' 1,760 all-time, 1,486 issued in the window.
-               owner_phone / owner_email exist on the layer and are never requested.
+               daily. 2026-10-14: the old `AccelaAllPermits` service and all its field names
+               (`type_of_work`, `issue_date`, `permit_number`, `project_address`, `owner_name`,
+               `owner_address`, ...) are GONE -- a straight 404, not a date problem -- replaced by
+               this `BuildingPermits` service with an unrelated field schema (`worktype`,
+               `issuedate`, `permitnum`, `projadd`, `ownname`, ...). Worse, the county's OWN
+               classification of "this is a demolition permit" changed shape at the same time it
+               must have migrated: `worktype='Demolish'` is a LEGACY tag used only through
+               2017-03-09 (8,591 rows, 1991-2017); every demolition since then is tagged with an
+               empty worktype and is only identifiable by `permitdesc LIKE '%Demolish/Move Off%'`
+               (5,401 rows, 2017-04 to present, continuous through today). The two patterns barely
+               overlap in time, so the WHERE clause now OR's them: 13,992 matching rows all-time
+               (vs. 0 before this fix -- the dead URL meant this feed returned nothing at all,
+               LayerHarvest's tolerate list silently absorbing the 404 every run). No owner-mailing
+               STREET field survives the migration (owncity/ownstate/ownzipcode do; no street-line
+               field exists on the new schema), so Mecklenburg's owner_mailing block is now
+               city/state/zip only, never a full street line -- a real but unavoidable data-quality
+               step down, not something this fix can restore.
   greensboro   gis.greensboro-nc.gov OpenGateCity/OpenData_HRES_DS MapServer/2 (BI_Permits),
-               124,985 permits; ApplicationType 'Total Demolish' 3,023 all-time, 149 in the window.
+               124,985 permits; ApplicationType 'Total Demolish' 3,023 all-time (1997-08-04 to
+               present), 148 in the old 730-day window (95% excluded by the old cap).
                ('Interior/Exterior Demolition', 888, is a renovation and is not read.)
   durham       webgis2.durhamnc.gov PublicServices/Inspections MapServer/10 "Demolition Permits",
-               2,923 rows, 323 in the window (RESI 272). No address on the layer: PID is the
-               parcel cache's key (5 of 5 sampled hit), so the situs and owner come from the join.
+               2,923 rows (2007-10 to present), 325 in the old 730-day window (89% excluded). No
+               address on the layer: PID is the parcel cache's key (5 of 5 sampled hit), so the
+               situs and owner come from the join.
   cary         data.townofcary.org OpenDataSoft "permit-applications", 87,184 permits;
-               'BLDG - DEMOLISH - SNGL FAM HOME (B645)' 388 + 'BLDG NON RES DEMOLITION (B649)' 54
-               all-time, about 140 in the window.
+               'BLDG - DEMOLISH - SNGL FAM HOME (B645)' + 'BLDG NON RES DEMOLITION (B649)' 442
+               all-time, 138 in the old 730-day window (69% excluded).
 
 WHAT A ROW MEANS
-    A property with a demolition permit applied for or issued in the window (default 730 days,
-    FORECLOSURE_DEMOLITION_DAYS), cancelled and withdrawn permits dropped. A demolition permit is
-    the owner's (or a buyer's) application, not a city order, so it carries raw["demolition_permit"]
-    and no condemned flag, as new_hanover_demolition_permits does. Owner and owner mailing are
-    kept where the permit carries them (Mecklenburg, Greensboro, Cary: property-record fields).
+    A property with a demolition permit applied for or issued, ever (see DATE COVERAGE), cancelled
+    and withdrawn permits dropped. A demolition permit is the owner's (or a buyer's) application,
+    not a city order, so it carries raw["demolition_permit"] and no condemned flag, as
+    new_hanover_demolition_permits does. Owner and owner mailing are kept where the permit carries
+    them (Mecklenburg, Greensboro, Cary: property-record fields).
+
+DATE COVERAGE (fixed 2026-10-14, date-coverage audit): FORECLOSURE_DEMOLITION_DAYS used to default
+to 730 and was applied as a hard WHERE-clause floor on every feed's issue date, discarding a
+demolition record the moment it turned two years old -- for Greensboro that silently dropped 95%
+of its full, genuinely date-agnostic history. A years-old demolition permit on a structure still
+standing is one of the strongest "zombie property" signals this engine has, so the WHERE clause no
+longer carries a date floor by default: every feed is read ALL-TIME (`since=None`), bounded instead
+by `_MAX_RECORDS_PER_FEED` (an explicit volume safety cap, matching this codebase's convention for
+an unbounded WHERE clause -- see e.g. greenville_hard_distress._MAX_RECORDS -- set well above every
+feed's measured all-time count with headroom for growth, not a narrower re-introduction of the same
+bug). FORECLOSURE_DEMOLITION_DAYS still exists for an operator who explicitly wants a narrower
+window (a quick/cheap sample run); set it to opt back into date-filtering.
 
 DATELESS: no sale date; slug counties_nc.nc_metro_demolition_permits goes in
 main.DATELESS_OK_SOURCES. Gate: FORECLOSURE_DEMOLITION_PERMITS=0. A dead feed fails only itself
@@ -63,17 +94,26 @@ class Feed(NamedTuple):
 
 
 FEEDS: tuple[Feed, ...] = (
+    # 2026-10-14: AccelaAllPermits/FeatureServer/0 (the service this Feed pointed at since
+    # 2026-10-07) now 404s -- the county migrated to this BuildingPermits service with an
+    # unrelated field schema. See the module docstring's dated note for the worktype/permitdesc
+    # classification split (legacy "Demolish" tag through 2017-03, "Demolish/Move Off" phrasing
+    # since) and for why there is no owner-mailing street field on the new schema.
     Feed("mecklenburg", "Mecklenburg", None,
-         "https://meckgis.mecklenburgcountync.gov/server/rest/services/AccelaAllPermits/FeatureServer/0",
+         "https://meckgis.mecklenburgcountync.gov/server/rest/services/BuildingPermits/FeatureServer/0",
          "https://www.mecknc.gov/LUESA/CodeEnforcement",
-         ("permit_number", "permit_type", "type_of_work", "permit_status", "issue_date",
-          "project_address", "cama_parcel_number", "tax_jurisdiction", "zip_code",
-          "owner_name", "owner_address", "owner_city", "owner_state", "owner_zip_code"),
-         {"permit": "permit_number", "status": "permit_status", "date": "issue_date",
-          "address": "project_address", "parcel": "cama_parcel_number", "zip": "zip_code",
-          "city": "tax_jurisdiction", "owner": "owner_name",
-          "mail": ("owner_address", "owner_city", "owner_state", "owner_zip_code"),
-          "mail_state": "owner_state", "type": "type_of_work"}),
+         ("permitnum", "permitdesc", "worktype", "permitstat", "issuedate",
+          "projadd", "parcelnum", "taxjuris", "zipcode",
+          "ownname", "owncity", "ownstate", "ownzipcode"),
+         {"permit": "permitnum", "status": "permitstat", "date": "issuedate",
+          "address": "projadd", "parcel": "parcelnum", "zip": "zipcode",
+          "city": "taxjuris", "owner": "ownname",
+          "mail": ("owncity", "ownstate", "ownzipcode"),
+          "mail_state": "ownstate",
+          # worktype carries the legacy 'Demolish' tag (through 2017-03) but is blank on
+          # every current-era row -- permitdesc's free text is the only description a
+          # post-2017 row has (see arcgis_where's mecklenburg branch).
+          "type": ("worktype", "permitdesc")}),
     Feed("greensboro", "Guilford", "Greensboro",
          "https://gis.greensboro-nc.gov/arcgis/rest/services/OpenGateCity/OpenData_HRES_DS/MapServer/2",
          "https://www.greensboro-nc.gov/departments/engineering-inspections",
@@ -109,18 +149,26 @@ FEEDS: tuple[Feed, ...] = (
 CARY_TYPES = ("BLDG - DEMOLISH - SNGL FAM HOME (B645)", "BLDG NON RES DEMOLITION (B649)")
 
 
-def arcgis_where(feed: Feed, since: datetime) -> str:
-    d = since.strftime("%Y-%m-%d")
+def arcgis_where(feed: Feed, since: Optional[datetime]) -> str:
+    """`since=None` (the default run) pulls the feed's full all-time history -- see the
+    module docstring's DATE COVERAGE note. `since` set narrows to a sample window, same
+    shape as before 2026-10-14."""
     if feed.name == "mecklenburg":
-        return f"type_of_work='Demolition' AND issue_date >= DATE '{d}'"
+        # Two non-overlapping classifications of the same thing, see the module docstring:
+        # the legacy exact tag (through 2017-03) and the phrase the county's system has used
+        # for every demolition since (2017-04 to present).
+        base = "(worktype='Demolish' OR permitdesc LIKE '%Demolish/Move Off%')"
+        return base if since is None else f"{base} AND issuedate >= DATE '{since:%Y-%m-%d}'"
     if feed.name == "greensboro":
-        return f"ApplicationType LIKE 'Total Demolish%' AND IssuedDate >= DATE '{d}'"
-    return f"ISSUE_DATE >= DATE '{d}'"
+        base = "ApplicationType LIKE 'Total Demolish%'"
+        return base if since is None else f"{base} AND IssuedDate >= DATE '{since:%Y-%m-%d}'"
+    return "1=1" if since is None else f"ISSUE_DATE >= DATE '{since:%Y-%m-%d}'"
 
 
-def cary_where(since: datetime) -> str:
+def cary_where(since: Optional[datetime]) -> str:
     types = ",".join(f'"{t}"' for t in CARY_TYPES)
-    return f"permittypedesc in ({types}) and applieddate >= date'{since:%Y-%m-%d}'"
+    base = f"permittypedesc in ({types})"
+    return base if since is None else f"{base} and applieddate >= date'{since:%Y-%m-%d}'"
 
 
 def _date(v) -> Optional[datetime]:
@@ -139,7 +187,17 @@ def _date(v) -> Optional[datetime]:
 
 def _get(a: dict, feed: Feed, role: str):
     f = feed.m.get(role)
-    return clean(a.get(f)) if isinstance(f, str) else None
+    if isinstance(f, str):
+        return clean(a.get(f))
+    if isinstance(f, tuple):
+        # a fallback CHAIN for one role (unlike "mail", which is a set of parts to join
+        # elsewhere): first non-blank wins. Mecklenburg's post-migration "type" role needs
+        # this -- `worktype` is blank on every current-era row, see the module docstring.
+        for cand in f:
+            v = clean(a.get(cand))
+            if v:
+                return v
+    return None
 
 
 #: validation._validate_parcel_id nulls a parcel id shorter than this.
@@ -232,6 +290,14 @@ async def _cary_rows(c, feed: Feed, since: datetime) -> list[dict]:
             return out
 
 
+#: Volume safety cap per feed (not a date filter): well above every feed's measured
+#: all-time count (mecklenburg 13,992, greensboro 3,023, durham 2,923, cary 442 as of
+#: 2026-10-14) with room to grow, so a WHERE clause with no date floor still can't pull an
+#: unbounded amount if a feed's volume changes unexpectedly. Matches this codebase's
+#: existing convention for an all-time/dateless query (see e.g. greenville_hard_distress).
+_MAX_RECORDS_PER_FEED = 50_000
+
+
 class NCMetroDemolitionPermits(BaseScraper):
     slug = SLUG
     name = "NC metro demolition permits (Mecklenburg, Greensboro, Durham, Cary)"
@@ -241,11 +307,16 @@ class NCMetroDemolitionPermits(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         if os.environ.get(ENV_OFF) == "0":
             return []
-        try:
-            days = int(os.environ.get(ENV_DAYS) or 730)
-        except ValueError:
-            days = 730
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        #: unset (the default) -> no date floor at all, every feed's full all-time
+        #: history; set -> the old narrower-sample behavior, for an explicit quick run.
+        since: Optional[datetime] = None
+        days_raw = os.environ.get(ENV_DAYS)
+        if days_raw:
+            try:
+                days = int(days_raw)
+                since = datetime.now(timezone.utc) - timedelta(days=days) if days > 0 else None
+            except ValueError:
+                since = None
         guard = LayerHarvest(self.slug, [f.name for f in FEEDS],
                              tolerate=[f.name for f in FEEDS], attempts=2)
         out: list[Listing] = []
@@ -258,9 +329,10 @@ class NCMetroDemolitionPermits(BaseScraper):
         return out
 
     @staticmethod
-    def _one(c, feed: Feed, since: datetime):
+    def _one(c, feed: Feed, since: Optional[datetime]):
         async def _run() -> list[dict]:
             if feed.name == "cary":
                 return await _cary_rows(c, feed, since)
-            return await fetch_attrs(c, feed.url, feed.fields, where=arcgis_where(feed, since))
+            return await fetch_attrs(c, feed.url, feed.fields, where=arcgis_where(feed, since),
+                                     max_records=_MAX_RECORDS_PER_FEED)
         return _run

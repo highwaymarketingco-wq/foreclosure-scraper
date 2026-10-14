@@ -118,10 +118,23 @@ TAX_SALE_KEYWORDS = re.compile(
 # auction" out of page boilerplate (live-confirmed on Gaston and Cherokee
 # County pages, 2026-10-01 audit). See also counties.sitemap_walker, which had
 # the identical bug in its own copy of this pattern.
+#
+# 2026-10-14 (date-coverage audit, target #5): the middle character class had no
+# apostrophe, so a street name with one -- "Grace's Farm Rd", common on rural NC roads --
+# never matched AT ALL, and Pattern 2 (the free-text fallback) is driven by iterating
+# ADDR_RE's own matches, so the whole property was silently dropped even when its parcel
+# and dollar bid were both sitting right next to it and would have parsed fine. Live-
+# confirmed: Wayne County's own live tax-foreclosure notice ("Tract 1: Located at: 302
+# Grace's Farm Rd., La Grange, NC Parcel: 3546118609 ... OPENING BID: $10,303.43") matched
+# PARCEL_RE and MONEY_RE but zero properties came out of `_parse_tax_sale_page` because
+# ADDR_RE found no address to anchor on. Both apostrophe forms (straight ' and the curly
+# U+2019 CivicPlus actually renders) are added to both character classes; this is additive
+# only -- every existing fabrication-prevention case (test_addr_re_does_not_match_inside_an_
+# unrelated_word) is unchanged since neither forbidden match ever contained an apostrophe.
 ADDR_RE = re.compile(
-    r"(\d{2,6}\s+[A-Z][\w\s.]{2,30}(?:Street|St|Avenue|Ave|Road|Rd|Lane|Ln|"
+    r"(\d{2,6}\s+[A-Z][\w\s.'’]{2,30}(?:Street|St|Avenue|Ave|Road|Rd|Lane|Ln|"
     r"Drive|Dr|Boulevard|Blvd|Place|Pl|Court|Ct|Way|Trail|Trl|"
-    r"Circle|Cir|Highway|Hwy)\b[\w\s.]*?)(?:\s|$|,|\n|\.)",
+    r"Circle|Cir|Highway|Hwy)\b[\w\s.'’]*?)(?:\s|$|,|\n|\.)",
     re.IGNORECASE
 )
 

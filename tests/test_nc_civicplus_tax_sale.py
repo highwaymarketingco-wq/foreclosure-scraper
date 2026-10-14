@@ -135,6 +135,50 @@ def test_addr_re_still_matches_a_real_address():
     assert "728 Rainbow Ave" in m.group(1)
 
 
+# ===========================================================================
+# DATE-COVERAGE AUDIT, TARGET #5, 2026-10-14 (docs/date_coverage_audit_2026-10-14.md)
+#
+# ADDR_RE's middle character class had no apostrophe, so a street name with one --
+# "Grace's Farm Rd", a real Wayne County road -- never matched AT ALL, and Pattern 2 (the
+# free-text fallback in _parse_tax_sale_page) iterates ADDR_RE's OWN matches to find a
+# property, so the whole lead was silently dropped even though PARCEL_RE and MONEY_RE both
+# matched fine right next to it. Live-confirmed 2026-10-14: Wayne County's own live tax-
+# foreclosure notice page (waynegov.com/CivicAlerts.aspx?AID=1058) produced ZERO listings
+# before this fix and exactly the one real pending sale after it.
+# ===========================================================================
+
+# Trimmed, field-faithful reproduction of the live Wayne County notice (CivicAlerts.aspx,
+# read 2026-10-14) -- a prose paragraph, not a table or <li> list, so this falls through
+# Tier 0a/0b to Pattern 2 (the free-text ADDR_RE-anchored fallback).
+WAYNE_HTML = (
+    "<p>The following properties will be offered for sale and sold for cash to the last "
+    "and highest bidder at public auction on Wednesday, October 21, 2026 at 10:00 AM. "
+    "The sale will be held at the Wayne County Courthouse in Goldsboro, NC. "
+    "THE INFORMATION PROVIDED HEREIN IS AN ESTIMATE OF LOCATION AND PARCEL SIZE FOR "
+    "INFORMATIONAL PURPOSES ONLY AND IS NOT GUARANTEED OR WARRANTED. "
+    "Tract 1: Located at: 302 Grace’s Farm Rd., La Grange, NC Parcel: 3546118609 "
+    "File Number: 26CV000314-950 OPENING BID: $10,303.43</p>"
+)
+
+
+def test_addr_re_matches_a_street_name_with_an_apostrophe():
+    m = ADDR_RE.search("Tract 1: Located at: 302 Grace’s Farm Rd., La Grange, NC")
+    assert m is not None
+    assert "302 Grace’s Farm Rd" in m.group(1)
+    # the existing fabrication guards are untouched -- neither forbidden match has an
+    # apostrophe in it, so adding one to the character class changes nothing about them.
+    assert ADDR_RE.search("00 will be due at the time of auction") is None
+
+
+def test_full_page_parse_recovers_the_wayne_county_lead_an_apostrophe_used_to_drop():
+    out = _parse_tax_sale_page(WAYNE_HTML, "Wayne", "http://x")
+    assert len(out) == 1
+    li = out[0]
+    assert "302 Grace’s Farm Rd" in li.street_address
+    assert li.parcel_id == "3546118609"
+    assert li.raw["nc_civicplus_tax_sale"]["current_bid"] == 10303.43
+
+
 def test_registered():
     from foreclosure_scraper.scrapers._registry import all_scrapers
     assert "counties_nc.nc_civicplus_tax_sale" in {s.slug for s in all_scrapers()}

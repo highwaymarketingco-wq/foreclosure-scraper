@@ -35,10 +35,35 @@ and vehicles do not, and are dropped (the research note: "Onslow mixes personal 
 WHAT IS EMITTED
     One TAX_LIEN lead per PARCEL, the unpaid years summed. NC's delinquency date for tax year
     Y is January 6 of Y+1, so the latest delinquent year is (this year - 1); a 2026 bill
-    issued this summer is current, not delinquent, and is never requested. Three delinquent
-    years are read by default (ITS_TAX_YEARS_BACK). Balance (TotalDue) already includes
-    interest. No mailing address is on the list rows; the parcel joins the NC OneMap cache
-    (`parno`) for mail and value.
+    issued this summer is current, not delinquent, and is never requested. Balance (TotalDue)
+    already includes interest. No mailing address is on the list rows; the parcel joins the
+    NC OneMap cache (`parno`) for mail and value.
+
+DATE COVERAGE (fixed 2026-10-14, date-coverage audit): this is a CURRENT-STATE ROLL, not an
+event stream -- the portal answers `UnpaidBillsOnly` for any `TaxYear` asked, each year a
+SEPARATE billed amount (unlike the NCGS 105-369 single-annual-PDF family elsewhere in this
+codebase, whose balance is already cumulative), so a parcel delinquent 4+ years had its
+older years' balance and `years_delinquent` count silently dropped by the old
+`ITS_TAX_YEARS_BACK=3` default -- understating exactly the severity signal the scoring model
+should reward most. Live-verified real depth, 2026-10-14 (a portal answers 0 for a year with
+no outstanding bills, so this is the portal's own ceiling, not a guess):
+    Onslow   real unpaid bills back to 2010 (16 years), one blip (2015 answers 0 -- genuinely
+             no bills remain open that old, not a portal limit: 2014 and 2010 both answer
+             nonzero either side of it).
+    Graham   real unpaid bills back to 2015 (11 years), monotonic, no blips.
+    Harnett  (one of the 2026-10-09 "full_model" build): spot-checked 2025/2020/2015/2010, all
+             four nonzero (5,872 / 1,320 / 181 / 1,502 records) -- this vendor's deeper history
+             is not an Onslow/Graham-only thing.
+`YEARS_BACK` (env `ITS_TAX_YEARS_BACK`) is raised from 3 to 20 -- comfortably past every
+depth measured above, for every portal on this vendor, not just the two named in the audit.
+It is a safety CEILING, not a target: `fetch()` also stops reading further back once TWO
+CONSECUTIVE years both come back with zero rows (`_CONSECUTIVE_EMPTY_STOP`), so a portal with
+a shallower real history (most of the 2026-10-09 "full_model" counties have not been read
+this deep) does not pay for years that were never going to answer anything, and the single
+Onslow-style one-year blip never triggers an early stop. The existing per-county
+`COUNTY_BUDGET_S` wall-clock budget and `MAX_PAGES_PER_YEAR` page cap are unchanged and still
+bound the worst case (a county that genuinely has 20 years of large rolls) the same way they
+always have -- this fix widens WHICH years are asked for, not how much any one year may cost.
 
 Slug: counties_nc.nc_its_public_tax
 Category: county_tax
@@ -70,7 +95,13 @@ _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 
 PAGE_ROWS = 100
 PACE_S = float(os.getenv("ITS_TAX_PACE_S", "1.5"))
-YEARS_BACK = int(os.getenv("ITS_TAX_YEARS_BACK", "3"))
+#: A safety CEILING, not a target -- see the module docstring's DATE COVERAGE note.
+#: Onslow/Graham's real measured depth is 16/11 years; 20 leaves headroom for every portal
+#: on this vendor without reading decades of guaranteed-empty years by default.
+YEARS_BACK = int(os.getenv("ITS_TAX_YEARS_BACK", "20"))
+#: Stop reading further back once this many years IN A ROW came back with zero rows (not
+#: just one -- Onslow's own real history has a single-year gap, see the docstring).
+_CONSECUTIVE_EMPTY_STOP = 2
 MAX_PAGES_PER_YEAR = 400          # a stall guard: Onslow's 2025 is 75 pages
 #: seconds one county may spend (all years); a county past it keeps what it read and is reported
 #: as truncated in the block (`years_read`), never silently complete
@@ -549,6 +580,7 @@ class NcItsPublicTax(BaseScraper):
                     await asyncio.sleep(PACE_S)
                     bills: list[dict] = []
                     years = delinquent_years(back=1 if self.limit else None)
+                    consecutive_empty = 0
                     for y in years:
                         got, st = await fetch_year(client, portal, y, max_rows=self.limit,
                                                    deadline=deadline)
@@ -558,6 +590,12 @@ class NcItsPublicTax(BaseScraper):
                         log.info("its_tax.year_done", county=county, **st)
                         self.partial.extend(aggregate(county, portal, got))
                         if self.limit or st["truncated"]:
+                            break
+                        # YEARS_BACK is a ceiling (see module docstring); stop asking for
+                        # years further back once two IN A ROW answered nothing -- a single
+                        # empty year (Onslow's real 2015) must not trip this early.
+                        consecutive_empty = 0 if st["rows"] else consecutive_empty + 1
+                        if consecutive_empty >= _CONSECUTIVE_EMPTY_STOP:
                             break
                         await asyncio.sleep(PACE_S)
                 except Exception as exc:  # noqa: BLE001

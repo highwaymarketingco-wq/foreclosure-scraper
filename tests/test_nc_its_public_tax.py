@@ -489,3 +489,82 @@ def test_the_county_deadline_truncates_and_says_so(_fast):
 
     bills, stats = asyncio.run(go())
     assert stats["truncated"] is True and stats["pages"] == 1 and len(bills) == 1
+
+
+# =================================================================================================
+# date-coverage audit fix, 2026-10-14 (docs/date_coverage_audit_2026-10-14.md, target #2):
+# ITS_TAX_YEARS_BACK defaulted to 3, so a parcel delinquent 4+ years had its older years' balance
+# and years_delinquent count silently dropped even though the portal answers any TaxYear asked (the
+# per-year fetch_year loop already existed, see live-verified depth in the module docstring -- Onslow
+# real to 2010, Graham to 2015, a full_model county (Harnett) nonzero at 2010 too). YEARS_BACK is
+# raised 3 -> 20, with a new "two consecutive empty years" early stop so a shallower portal doesn't
+# pay for guaranteed-empty years, and a single-year blip (Onslow's own real 2015) never trips it.
+# =================================================================================================
+
+def test_years_back_default_is_raised_well_past_the_old_3_year_cap():
+    assert m.YEARS_BACK == 20
+
+
+def _row_for_year(year, bill, acct="900"):
+    return _row(year, bill, "ROE JANE",
+               f"{bill:06d}<br/>801-154<br />1008 1ST ST SURF CITY NC 28445<br />0.150 AC",
+               "100.00", "50.00", acct=acct)
+
+
+def test_a_single_blip_year_does_not_stop_the_crawl_but_two_in_a_row_does(monkeypatch, _fast):
+    """6 years, newest-first: row, row, EMPTY, row, EMPTY, EMPTY. The lone empty year (index 2,
+    the Onslow-2015 shape) must not stop the crawl -- the row two years further back (index 3)
+    still gets read. The crawl stops only once two empties land back to back (index 4, 5)."""
+    monkeypatch.setattr(m, "YEARS_BACK", 6)
+    years = m.delinquent_years(back=6)
+    assert len(years) == 6
+    pages_by_year = {
+        str(years[0]): [[_row_for_year(years[0], 1)]],
+        str(years[1]): [[_row_for_year(years[1], 2)]],
+        str(years[2]): [[]],
+        str(years[3]): [[_row_for_year(years[3], 3)]],
+        str(years[4]): [[]],
+        str(years[5]): [[]],
+    }
+    seen: list = []
+
+    class Fake(httpx.AsyncClient):
+        def __init__(self, *a, **kw):
+            kw["transport"] = _transport(pages_by_year, seen)
+            super().__init__(*a, **kw)
+
+    monkeypatch.setenv("ITS_TAX_COUNTIES", "Onslow")
+    monkeypatch.setattr(httpx, "AsyncClient", Fake)
+    s = m.NcItsPublicTax()
+    out = asyncio.run(s.fetch())
+
+    # all 6 years were asked for (the blip at index 2 did not cut the crawl short)...
+    read_years_requested = [p for meth, p in seen if p.endswith("Partial")]
+    assert len(read_years_requested) == 6
+    # ...but the 2 real bills (years[0], years[1]) and the 1 after the blip (years[3]) all
+    # aggregate onto the one parcel, each a separate delinquent year.
+    assert len(out) == 1
+    assert out[0].raw["nc_its_public_tax"]["years_delinquent"] == 3
+    assert out[0].raw["nc_its_public_tax"]["oldest_year"] == years[3]
+
+
+def test_a_decade_old_bill_now_flows_through_where_the_old_3_year_cap_would_have_missed_it():
+    """The actual business impact: with YEARS_BACK raised, a parcel delinquent for 10
+    STRAIGHT years aggregates its full depth and balance. Feeding the SAME 10 years' bills
+    through the old back=3 window (simulating pre-fix behavior) recovers only the 3 newest --
+    the other 7 years' balance (and the true years_delinquent count) would have been invisible."""
+    latest = m.delinquent_years(back=1)[0]
+    bills_10y = [m.parse_row(_row_for_year(latest - i, 100 + i), ONSLOW.cities) for i in range(10)]
+
+    full = m.aggregate("Onslow", ONSLOW, bills_10y)
+    assert len(full) == 1
+    assert full[0].raw["nc_its_public_tax"]["years_delinquent"] == 10
+    assert full[0].raw["nc_its_public_tax"]["oldest_year"] == latest - 9
+    assert full[0].raw["nc_its_public_tax"]["total_due"] == 500.0   # 10 bills x $50.00
+
+    old_cap_years = set(m.delinquent_years(back=3))
+    old_cap_bills = [b for b in bills_10y if b["year"] in old_cap_years]
+    capped = m.aggregate("Onslow", ONSLOW, old_cap_bills)
+    assert len(capped) == 1
+    assert capped[0].raw["nc_its_public_tax"]["years_delinquent"] == 3      # not 10
+    assert capped[0].raw["nc_its_public_tax"]["total_due"] == 150.0        # not 500.0

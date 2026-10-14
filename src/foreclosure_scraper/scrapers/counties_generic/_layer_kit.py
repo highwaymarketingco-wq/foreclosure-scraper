@@ -65,10 +65,14 @@ def owner_mailing(owner: Optional[str], parts: Iterable[Any], mail_state: Any,
 
 
 async def fetch_attrs(http, layer_url: str, fields: Iterable[str], where: str = "1=1",
-                      page: int = 1000) -> list[dict]:
-    """Every row of one layer (paged), attribute dicts only, sensitive columns dropped."""
+                      page: int = 1000, max_records: Optional[int] = None) -> list[dict]:
+    """Every row of one layer (paged), attribute dicts only, sensitive columns dropped.
+
+    `max_records` is a safety cap (not a date/relevance filter) for a caller whose WHERE
+    clause has no date window of its own -- query_features already paginates to full
+    exhaustion, so without a cap a layer growing unexpectedly would be pulled whole."""
     rows = await agw.query_attributes(http, layer_url, out_fields=",".join(fields),
-                                      where=where, page=page)
+                                      where=where, page=page, max_records=max_records)
     return [drop_sensitive(a) for a in rows]
 
 
