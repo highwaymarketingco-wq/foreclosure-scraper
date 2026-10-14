@@ -228,6 +228,51 @@ now genuinely solvable; wiring Brunswick's actual lead capture through the
 two gates above is a follow-up, flagged here rather than silently implied
 by "Brunswick is now solvable."
 
+**CORRECTION 2026-10-14 (cont. x2) -- Brunswick is now WIRED, not just
+solvable.** `fetch()`'s `gate == "math"` branch now calls `_fetch_brunswick`
+right after `solve_math_captcha` returns `True`, which clicks the "I have
+read, and agree with the License above" disclaimer link (NOT the "I do NOT
+agree" link listed first in the DOM -- a substring match on "agree with the
+License" matches both, confirmed live by hitting exactly that bug once
+during this verification and landing on a real "You have Logged Off this
+system" page), clicks "Combined Real Property / MAPS" from the real site
+menu, then searches and paginates two distress-relevant Document Types the
+real dropdown offers (NC non-judicial foreclosures record as "SUBSTITUTE
+TRUSTEE" then "NOTICE OF FORECLOSURE" -- there is no "TRUSTEE DEED"/
+"FORECLOSURE DEED" option; the eventual sale deed records as a plain
+"DEED", indistinguishable here from any other sale, a real flagged gap).
+Live-verified end-to-end 2026-10-14 via httpx replaying the real site (no
+Chromium run locally, same memory-pressure reasoning as the CAPTCHA
+verification above -- the Playwright glue code itself mirrors this proven
+httpx flow one-for-one but was NOT executed live in THIS session; see
+`_fetch_brunswick`'s own docstring): a brand-new, cookie-less httpx client
+(no prior requests at all) fetched a real 2-page
+"BRUNSWICK-property-B5631-P1335.pdf" and a real Document Details page from
+the signed `s=` tokens alone, confirming they are durable, stateless URLs
+(this entire site never sets a cookie anywhere in the chain) -- safe to
+stamp via `document_links.stamp_documents`, unlike Durham's cookie-gated
+PDF route or Rowan/Logan's session-scoped image keys. A 90-day window
+returned 271 SUBSTITUTE TRUSTEE and 82 NOTICE OF FORECLOSURE records; with
+"Sort by Recording Date" checked the result set is ASCENDING (page 1 =
+oldest, 07/22/2026 in a 07/16-10/14 window; the LAST page = newest,
+10/13/2026), so `_fetch_brunswick` jumps straight to the last page (always
+directly linked, even on a truncated 28-page pagination row) and walks
+backward via a `#prev_page` button, a budget-capped number of pages
+(`_BRUNSWICK_MAX_PAGES`) -- genuinely the freshest leads first, still only
+partial coverage of the full window (documented, not silently implied
+complete, same honesty convention as Durham's page-1-only gap above).
+Real, live-pulled examples (book 5596 page 1287, a real SUBSTITUTE TRUSTEE
+instrument): 3 grantor index rows for ONE instrument -- "VEGA, ESTEBAN
+EMILIO" and "MILLS, BRANDI" (real co-owners, kept) plus "ROCKET MORTGAGE,
+LLC" (the original lender, ALSO indexed as a "grantor" in this chain --
+filtered out by an institutional-name check, `_brunswick_is_institutional`,
+the same purpose as nc_rod_logan.py's own copy). `_brunswick_parse_page`
+groups the one-index-row-per-grantor-name records back into a single
+Listing per (book, page). See `_fetch_brunswick`/`_brunswick_parse_page`/
+`_brunswick_record_to_listing`'s own docstrings for the full per-step
+writeup, and `tests/test_nc_rod_captcha.py` for real schema-accurate
+fixtures built from this live pull.
+
 Strategy:
 1. Launch Playwright browser (headful -- required; see the `headless=False`
    note on the browser launch call below).
@@ -246,13 +291,13 @@ Strategy:
    returns `False` -- same as the other 7 -- when it isn't, rather than the
    old silent wrong "success".
 5. Once through, search for deeds by date range.
-6. Parse results (Durham via its own row parser; the rest via `_parse_html`,
-   which only matches `<table>` markup and would need rework if any of the
-   remaining 7-always-walled counties (or Brunswick, on a run where OCR
-   doesn't clear it) ever actually clears its gate -- none of them use a
-   `<table>` either, per the live HTML pulled 2026-10-14; Brunswick's own
-   post-gate markup has not been captured/parsed here yet, a follow-up item
-   now that the gate itself can clear).
+6. Parse results: Durham via its own row parser (`_durham_record_to_listing`
+   / `parse_selfservice`), Brunswick via its own (`_fetch_brunswick` /
+   `_brunswick_parse_page` / `_brunswick_record_to_listing` -- see the
+   2026-10-14 (cont. x2) correction above), everything else via the generic
+   `_parse_html`, which only matches `<table>` markup and would need rework
+   if any of the 7-always-walled counties ever actually clears its gate --
+   none of them use a `<table>` either, per the live HTML pulled 2026-10-14.
 """
 from __future__ import annotations
 
@@ -260,6 +305,7 @@ import asyncio
 import re
 from datetime import datetime, timedelta
 from typing import Any
+from urllib.parse import urljoin
 
 import structlog
 from bs4 import BeautifulSoup
@@ -268,6 +314,159 @@ from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_OK
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
+
+# ---------------------------------------------------------------------------
+# Brunswick (inttek.net "RecordingPRO") -- Combined Real Property search.
+# Live-verified end-to-end 2026-10-14 via httpx replaying the real site (no
+# browser, same memory-pressure reasoning math_captcha.py's own live
+# verification used): math CAPTCHA -> disclaimer accept -> "Combined Real
+# Property / MAPS" menu item -> RealEstateForm search -> real paginated
+# results, including fetching a real 2-page "BRUNSWICK-property-B5631-
+# P1335.pdf" document and a real Document Details page with a BRAND NEW,
+# cookie-less httpx client (no prior requests at all) -- confirming the
+# "Download PDF" (`pdf-popup-download-all.ntk?s=...`) and "View Detail"
+# (`re_detail.ntk?s=...`) links are durable, stateless, signed-token URLs,
+# NOT a server-side session gate like Durham's `JSESSIONID` cookie or
+# Rowan/Logan's session-scoped image keys. This whole site, in fact, never
+# sets a cookie anywhere in the chain (confirmed: an `httpx.Client` after the
+# full CAPTCHA+disclaimer+search flow still has `{}` in `.cookies`) -- every
+# "session" is carried by the signed `s=` query token alone.
+#
+# This also surfaced a real platform quirk worth flagging: pagination state
+# is NOT encoded in the `s=` token (confirmed by running a SECOND,
+# DIFFERENT search from the same box between fetching a results page and
+# clicking its own "page 2" link -- the later search silently became the
+# "current" one, and the page-2 click landed on page 2 of the WRONG search).
+# Re-run immediately with no interleaved search, it works correctly ("Page 2
+# of 9"). This looks like server-side state keyed to the requesting
+# IP/connection rather than the token itself -- a real constraint for two
+# concurrent scrapers sharing an egress IP, but not a problem for this
+# single sequential Playwright page, which never interleaves two searches.
+#
+# "Combined Real Property" is NOT a distress-only index -- a 90-day window
+# returned 10,896 records of every instrument type (deeds, mortgages,
+# satisfactions, UCC filings, powers of attorney, etc.). The real Document
+# Type dropdown (live-captured 2026-10-14, 49 options) has no "TRUSTEE
+# DEED"/"FORECLOSURE DEED" option at all -- NC non-judicial foreclosures
+# record as "SUBSTITUTE TRUSTEE" (the trustee-appointment filing that always
+# precedes a sale, same pre-foreclosure signal nc_rod_logan.py's FCL/S-TR
+# codes capture) and "NOTICE OF FORECLOSURE"; the eventual sale deed records
+# as a plain "DEED", indistinguishable here from any ordinary sale -- a
+# real, flagged gap, not silently claimed covered. Filtering the search to
+# just these 2 doc types (one search each) cut the 90-day volume to 271 and
+# 82 records respectively -- a live-confirmed, scrapeable number instead of
+# the unfiltered firehose.
+#
+# Each instrument with MULTIPLE grantors (e.g. co-owned property) gets ONE
+# INDEX ROW PER GRANTOR NAME, all sharing the same Book/Page and an
+# identical Grantee list -- live-confirmed on a real 3-grantor SUBSTITUTE
+# TRUSTEE instrument (book 5596 page 1287: "VEGA, ESTEBAN EMILIO" / "MILLS,
+# BRANDI" / "ROCKET MORTGAGE, LLC" as three separate Grantor rows). Grouped
+# back into ONE Listing per (book, page) below so co-owners (and the
+# original lender, who also shows up as a "grantor" in this chain) don't
+# become duplicate or false-positive leads -- the lender is filtered out by
+# an institutional-name check (same purpose as nc_rod_logan.py's
+# `_is_institutional`, kept as Brunswick's own small copy rather than
+# importing a sibling scraper's private helpers).
+#
+# This platform ALSO live-confirmed something the generic 90-day-window
+# convention used elsewhere in this file gets backwards here: with "Sort by
+# Recording Date" checked, page 1 holds the OLDEST records in the window
+# (07/22/2026 in a 07/16-10/14 window) and the LAST page holds the NEWEST
+# (10/13/2026, one day before this verification) -- i.e. ascending, not
+# descending. The pagination row always links the last page number directly
+# even when far away (confirmed on a real 28-page result: "1 ..... 14 15 16
+# ... 28" -- "28" is a real clickable link from page 1), and a dedicated
+# `#prev_page` button walks backward one page at a time from there. So
+# instead of Durham's "page 1 only, oldest end of the window" partial
+# coverage, Brunswick jumps straight to the last page and walks backward --
+# genuinely the freshest leads first, still only a few pages deep (budget
+# below), not the full window.
+_BRUNSWICK_LOOKBACK_DAYS = 90
+#: Pages fetched per doc type, walking backward from the newest page -- a
+#: budget cap in the same spirit as nc_rowan_cott.py's _MAX_DETAIL_FETCHES.
+#: 271 SUBSTITUTE TRUSTEE / 82 NOTICE OF FORECLOSURE records over 90 days
+#: (10/page) means this is genuinely partial coverage of the window, newest
+#: first -- documented here, not silently implied complete.
+_BRUNSWICK_MAX_PAGES = 5
+_BRUNSWICK_DOC_TYPES = ("SUBSTITUTE TRUSTEE", "NOTICE OF FORECLOSURE")
+_BRUNSWICK_PAGE_OF_RE = re.compile(r"Page\s+\d+\s+of\s+(\d+)")
+_BRUNSWICK_PDF_HREF_RE = re.compile(r"pdf-popup-download-all\.ntk", re.I)
+_BRUNSWICK_DETAIL_HREF_RE = re.compile(r"re_detail\.ntk", re.I)
+
+try:  # reuse the shared business-name filter when importable, same fallback
+      # pattern nc_rod_logan.py uses for the same import
+    from ...enrichment_address_backfill import _BUSINESS_STOPWORDS as _BRUNSWICK_BUSINESS_STOPWORDS
+except Exception:  # pragma: no cover - defensive fallback, never raise on import
+    _BRUNSWICK_BUSINESS_STOPWORDS = {
+        "llc", "inc", "corp", "corporation", "company", "co", "ltd", "lp",
+        "llp", "trust", "trustee", "estate", "of", "the", "and",
+    }
+#: Institutional/lender/servicer keywords seen live on Brunswick's own
+#: Grantor/Grantee rows (DHI MORTGAGE, FAIRWAY INDEPENDENT MORTGAGE, MORTGAGE
+#: ELECTRONIC REGISTRATION SYSTEMS / MERS, CARRINGTON MORTGAGE SERVICES,
+#: PRESIDENTIAL BANK FSB, ROCKET MORTGAGE, BB&T COLLATERAL SERVICE) -- a
+#: Brunswick-specific complement to nc_rod_logan.py's own copy, not a shared
+#: import (same reasoning nc_rod_logan.py gives for its own copy: these
+#: scrapers are independent and each keeps its own small list).
+_BRUNSWICK_INSTITUTION_WORDS = {
+    "bank", "mortgage", "mtg", "services", "service", "servicing", "servicer",
+    "financial", "finance", "federal", "credit", "association", "assn",
+    "capital", "loan", "national", "savings", "bancorp", "holdings",
+    "lending", "fsb", "nationstar", "systems", "registration", "electronic",
+    "collateral",
+}
+
+
+def _brunswick_is_institutional(name: str | None) -> bool:
+    """True if a Grantor/Grantee name reads as a lender/trustee/servicer,
+    not the actual distressed homeowner. Defensive: empty/None -> True.
+    A trailing "/TR" (every substitute-trustee entity AND the individual
+    attorneys acting as one, e.g. "STEPHENS, H. KENNETH II /TR", live-
+    confirmed 2026-10-14) marks a non-owner even when the name itself has no
+    institutional keyword."""
+    s = (name or "").strip()
+    if not s:
+        return True
+    if s.rstrip().lower().endswith("/tr"):
+        return True
+    toks = set(re.sub(r"[^a-z\s]", " ", s.lower()).split())
+    return bool(toks & _BRUNSWICK_BUSINESS_STOPWORDS) or bool(toks & _BRUNSWICK_INSTITUTION_WORDS)
+
+
+def _brunswick_dedupe(names: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for n in names:
+        key = n.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(n)
+    return out
+
+
+def _brunswick_names_in_cell(td: Any) -> list[str]:
+    """Every name inside a Grantor/Grantee result cell. Live markup nests
+    ONE name per row in a small inner `<table>` (first row labelled
+    "Grantor:"/"Grantee:", any further names on blank-labelled rows below
+    it) -- confirmed live 2026-10-14 on a 5-name Grantee cell. A cell with
+    no nested table (a single plain name) falls back to its own text, minus
+    the "Grantor:"/"Grantee:" label."""
+    inner = td.find("table")
+    if inner is None:
+        text = td.get_text(" ", strip=True)
+        text = re.sub(r"^(?:Grantor|Grantee):\s*", "", text)
+        return [text] if text else []
+    names: list[str] = []
+    for tr in inner.find_all("tr", recursive=False):
+        cells = tr.find_all("td", recursive=False)
+        if not cells:
+            continue
+        name = cells[-1].get_text(" ", strip=True)
+        if name:
+            names.append(name)
+    return names
 
 _COUNTY_SITES = {
     "wake": {"url": "https://rodrecords.wake.gov/web", "gate": "recaptcha", "search_path": "/user/disclaimer"},
@@ -345,6 +544,22 @@ class NcRodCaptchaScraper(BaseScraper):
                             gate_cleared = await solve_math_captcha(page)
                         except Exception as exc:
                             log.warning("nc_rod_captcha.math_failed", county=county, error=str(exc)[:160])
+
+                        if gate_cleared and county == "brunswick":
+                            # Brunswick's gate is a 3-step chain -- math CAPTCHA
+                            # (just cleared above) -> disclaimer accept link ->
+                            # the real "Combined Real Property / MAPS" search UI
+                            # -- see module docstring's 2026-10-14 (cont. x2)
+                            # correction for the full live-verified writeup. The
+                            # generic search_url/_parse_html path below assumes a
+                            # <table> this platform never uses (live-confirmed),
+                            # so Brunswick gets its own flow, same as Durham's
+                            # _fetch_durham.
+                            county_results = await self._fetch_brunswick(page, entry_url)
+                            results.extend(county_results)
+                            await page.close()
+                            log.info("nc_rod_captcha.county_done", county=county, found=len(county_results))
+                            continue
 
                     elif gate == "recaptcha":
                         try:
@@ -529,6 +744,344 @@ class NcRodCaptchaScraper(BaseScraper):
                 "book_page": book_page,
             },
         )
+
+    async def _fetch_brunswick(self, page: Any, entry_url: str) -> list[Listing]:
+        """Brunswick ROD: math CAPTCHA already cleared by the caller (see
+        `fetch()`'s `gate == "math"` branch) -- this picks up right after,
+        clicks through the disclaimer, enters the real "Combined Real
+        Property / MAPS" search, and walks the newest-first pages of 2
+        distress-relevant doc types. See this module's Brunswick constants
+        block above for the full live-verified writeup (2026-10-14, via
+        httpx replaying the real site)."""
+        results: list[Listing] = []
+
+        # Step 1: disclaimer accept. TWO links exist here -- "I do NOT
+        # agree with the License above" (listed FIRST in the live DOM) and
+        # "I have read, and agree with the License above" (listed second).
+        # A substring match on "agree with the License" matches BOTH (this
+        # module's own live verification hit exactly that bug once: it
+        # landed on a real "You have Logged Off this system" page instead).
+        # The full phrase below is unambiguous -- it is not a substring of
+        # the NOT-agree link's text.
+        try:
+            accept_link = page.locator("a", has_text="I have read, and agree with the License above")
+            await accept_link.first.click()
+            await page.wait_for_load_state("domcontentloaded", timeout=15000)
+        except Exception as exc:
+            log.warning("nc_rod_captcha.brunswick_disclaimer_failed", error=str(exc)[:160])
+            return results
+
+        # Step 2: the real site menu ("Please select the type of search you
+        # want to perform") -- Combined Real Property/MAPS, Births, Deaths,
+        # Marriages, Notary, Book/Page Direct (live-captured 2026-10-14).
+        try:
+            combined_link = page.locator("a", has_text="Combined Real Property / MAPS")
+            await combined_link.first.click()
+            await page.wait_for_load_state("domcontentloaded", timeout=15000)
+        except Exception as exc:
+            log.warning("nc_rod_captcha.brunswick_menu_failed", error=str(exc)[:160])
+            return results
+
+        cutoff = datetime.now() - timedelta(days=_BRUNSWICK_LOOKBACK_DAYS)
+        date_from = cutoff.strftime("%m/%d/%Y")
+        date_to = datetime.now().strftime("%m/%d/%Y")
+
+        for di, doc_type in enumerate(_BRUNSWICK_DOC_TYPES):
+            try:
+                await page.fill("#form_date_from", date_from)
+                await page.fill("#form_date_to", date_to)
+                # "Sort by Recording Date" -- live-confirmed 2026-10-14 this
+                # makes the result set ASCENDING by filing date (page 1 =
+                # oldest in the window), which is why this method jumps to
+                # the LAST page below instead of reading forward from 1.
+                await page.check("#form_sort")
+                await page.select_option("select[name='form_doc_type']", doc_type)
+                search_btn = page.locator("input[name='do_search2']").first
+                await search_btn.click()
+                await page.wait_for_load_state("domcontentloaded", timeout=20000)
+            except Exception as exc:
+                log.warning("nc_rod_captcha.brunswick_search_failed", doc_type=doc_type, error=str(exc)[:160])
+                continue
+
+            search_url = page.url
+            try:
+                html = await page.content()
+            except Exception as exc:
+                log.warning("nc_rod_captcha.brunswick_no_content", doc_type=doc_type, error=str(exc)[:160])
+                continue
+            m = _BRUNSWICK_PAGE_OF_RE.search(html)
+            total_pages = int(m.group(1)) if m else 1
+            log.info("nc_rod_captcha.brunswick_search_done", doc_type=doc_type, total_pages=total_pages)
+
+            # Jump straight to the last (newest) page -- live-confirmed the
+            # pagination row always links it directly, even truncated (e.g.
+            # "1 ..... 14 15 16 ... 28" on a real 28-page result). Exact
+            # text match (Playwright's :text-is()), not a substring --
+            # "28" as `has_text` would also match any link whose text merely
+            # CONTAINS "28" (e.g. a "128"-numbered page, or unrelated chrome
+            # text elsewhere on the page).
+            if total_pages > 1:
+                try:
+                    last_link = page.locator(f"a:text-is('{total_pages}')").first
+                    await last_link.click()
+                    await page.wait_for_load_state("domcontentloaded", timeout=20000)
+                except Exception as exc:
+                    log.warning("nc_rod_captcha.brunswick_lastpage_failed", doc_type=doc_type, error=str(exc)[:160])
+
+            pages_fetched = 0
+            while pages_fetched < _BRUNSWICK_MAX_PAGES:
+                try:
+                    html = await page.content()
+                except Exception as exc:
+                    log.warning("nc_rod_captcha.brunswick_page_content_failed", error=str(exc)[:160])
+                    break
+                page_results = self._brunswick_parse_page(html, page.url or search_url, doc_type)
+                results.extend(page_results)
+                pages_fetched += 1
+                log.info("nc_rod_captcha.brunswick_page_parsed", doc_type=doc_type,
+                         page_num=pages_fetched, found=len(page_results))
+                if pages_fetched >= _BRUNSWICK_MAX_PAGES:
+                    break
+                prev_btn = await page.query_selector("#prev_page")
+                if not prev_btn:
+                    break
+                try:
+                    await prev_btn.click()
+                    await page.wait_for_load_state("domcontentloaded", timeout=20000)
+                except Exception as exc:
+                    log.warning("nc_rod_captcha.brunswick_prevpage_failed", error=str(exc)[:160])
+                    break
+
+            # Return to the blank search form before the next doc type --
+            # live-confirmed "Return to search page" is present on every
+            # results page (first page and last page both checked).
+            if di < len(_BRUNSWICK_DOC_TYPES) - 1:
+                try:
+                    back_link = page.locator("a", has_text="Return to search page")
+                    await back_link.first.click()
+                    await page.wait_for_load_state("domcontentloaded", timeout=15000)
+                except Exception as exc:
+                    log.warning("nc_rod_captcha.brunswick_return_failed", error=str(exc)[:160])
+                    break
+
+        return results
+
+    def _brunswick_parse_page(self, html: str, source_url: str, doc_type_filter: str) -> list[Listing]:
+        """Parse one page of Brunswick's real Combined Real Property results.
+        Each instrument is 4 DIRECT (non-nested) `<tr>` rows inside the
+        results `<table>` -- live-confirmed 2026-10-14 by diffing
+        `find_all("tr")` (recursive, pollutes the flat list with each
+        Grantor/Grantee cell's OWN inner name-table rows) against
+        `find_all("tr", recursive=False)` (clean, exactly 4 rows/record):
+          1. "Filing Date: .../Book: .../Page: .../Status: ..."
+          2. "Type: .../Desc: .../Subdivision: ..." (Desc/Subdivision blank
+             when not applicable)
+          3. "Grantor: NAME" (+ a "Download PDF" link, confirmed live to be
+             a durable, cookie-less, signed-token URL -- see module
+             docstring)
+          4. "Grantee: NAME [NAME2 NAME3 ...]" (+ "View Image"/"View Detail"
+             links; "View Detail" is ALSO durable, live-confirmed the same
+             way, but not fetched here -- see module docstring on scope)
+        A single instrument with multiple grantors gets one such 4-row
+        group PER GRANTOR, all sharing the same Book/Page -- grouped back
+        together by (book, page) below.
+        """
+        soup = BeautifulSoup(html, "html.parser")
+        results_table = None
+        for t in soup.find_all("table"):
+            # <td> is a direct child of <tr>, not of <table> -- walk the
+            # table's direct-child <tr>s first, then each one's direct
+            # <td>s. Each "Filing Date:" label sits inside a <b> tag
+            # alongside the actual date as plain sibling text (e.g.
+            # "<td><b>Filing Date:</b> 07/16/2026</td>") -- more than one
+            # child node, so BeautifulSoup's `.string` is always None here
+            # and a `string=` predicate search never matches. get_text()
+            # instead.
+            found = False
+            for tr in t.find_all("tr", recursive=False):
+                for td in tr.find_all("td", recursive=False):
+                    if td.get_text(" ", strip=True).startswith("Filing Date:"):
+                        found = True
+                        break
+                if found:
+                    break
+            if found:
+                results_table = t
+                break
+        if results_table is None:
+            return []
+
+        rows = results_table.find_all("tr", recursive=False)
+        groups: dict[tuple[str, str], dict] = {}
+        order: list[tuple[str, str]] = []
+        i, n = 0, len(rows)
+        while i < n:
+            tds = rows[i].find_all("td", recursive=False)
+            first = tds[0].get_text(" ", strip=True) if tds else ""
+            if not first.startswith("Filing Date:"):
+                i += 1
+                continue
+
+            filing_date = first.split(":", 1)[1].strip()
+            book = page_num = status = ""
+            for td in tds[1:]:
+                t_text = td.get_text(" ", strip=True)
+                if t_text.startswith("Book:"):
+                    book = t_text.split(":", 1)[1].strip()
+                elif t_text.startswith("Page:"):
+                    page_num = t_text.split(":", 1)[1].strip()
+                elif t_text.startswith("Status:"):
+                    status = t_text.split(":", 1)[1].strip()
+            i += 1
+            if not book and not page_num:
+                continue
+
+            doc_type = desc = subdivision = ""
+            if i < n:
+                tds2 = rows[i].find_all("td", recursive=False)
+                first2 = tds2[0].get_text(" ", strip=True) if tds2 else ""
+                if first2.startswith("Type:"):
+                    doc_type = first2.split(":", 1)[1].strip()
+                    for td in tds2[1:]:
+                        t_text = td.get_text(" ", strip=True)
+                        if t_text.startswith("Desc:"):
+                            desc = t_text.split(":", 1)[1].strip()
+                        elif t_text.startswith("Subdivision:"):
+                            subdivision = t_text.split(":", 1)[1].strip()
+                    i += 1
+
+            grantors: list[str] = []
+            pdf_url = None
+            if i < n:
+                tds3 = rows[i].find_all("td", recursive=False)
+                first3 = tds3[0].get_text(" ", strip=True) if tds3 else ""
+                if first3.startswith("Grantor:"):
+                    grantors = _brunswick_names_in_cell(tds3[0])
+                    if len(tds3) > 1:
+                        link = tds3[1].find("a", href=_BRUNSWICK_PDF_HREF_RE)
+                        if link and link.get("href"):
+                            pdf_url = urljoin(source_url, link.get("href"))
+                    i += 1
+
+            grantees: list[str] = []
+            detail_url = None
+            if i < n:
+                tds4 = rows[i].find_all("td", recursive=False)
+                first4 = tds4[0].get_text(" ", strip=True) if tds4 else ""
+                if first4.startswith("Grantee:"):
+                    grantees = _brunswick_names_in_cell(tds4[0])
+                    if len(tds4) > 1:
+                        link = tds4[1].find("a", href=_BRUNSWICK_DETAIL_HREF_RE)
+                        if link and link.get("href"):
+                            detail_url = urljoin(source_url, link.get("href"))
+                    i += 1
+
+            key = (book, page_num)
+            if key not in groups:
+                groups[key] = {
+                    "filing_date": filing_date, "book": book, "page": page_num,
+                    "status": status, "doc_type": doc_type, "desc": desc,
+                    "subdivision": subdivision, "grantors": [], "grantees": [],
+                    "pdf_url": None, "detail_url": None,
+                }
+                order.append(key)
+            g = groups[key]
+            for name in grantors:
+                if name and name not in g["grantors"]:
+                    g["grantors"].append(name)
+            if not g["grantees"] and grantees:
+                g["grantees"] = grantees
+            if not g["pdf_url"] and pdf_url:
+                g["pdf_url"] = pdf_url
+            if not g["detail_url"] and detail_url:
+                g["detail_url"] = detail_url
+
+        listings: list[Listing] = []
+        for key in order:
+            li = self._brunswick_record_to_listing(groups[key], source_url, doc_type_filter)
+            if li is not None:
+                listings.append(li)
+        return listings
+
+    def _brunswick_record_to_listing(self, rec: dict, source_url: str, doc_type_filter: str) -> Listing | None:
+        """Build one Listing per (book, page) group from `_brunswick_parse_page`.
+        The homeowner being foreclosed on is named as a GRANTOR here (NOT the
+        grantee, unlike this file's generic deed convention) -- live-confirmed
+        on real SUBSTITUTE TRUSTEE / NOTICE OF FORECLOSURE rows, e.g. book 5596
+        page 1287's grantors "VEGA, ESTEBAN EMILIO" / "MILLS, BRANDI" (real
+        people, kept) / "ROCKET MORTGAGE, LLC" (the original lender, also
+        indexed as a "grantor" in this chain -- filtered out). Grantees are the
+        lender/trustee/servicer/MERS chain -- kept as `plaintiff`, with any
+        "/TR"-suffixed name also surfaced as `trustee`."""
+        book, page_num = rec.get("book") or "", rec.get("page") or ""
+        if not book and not page_num:
+            return None
+        book_page = ", ".join(p for p in (f"B: {book}" if book else "", f"P: {page_num}" if page_num else "") if p)
+
+        raw_grantors = rec.get("grantors") or []
+        raw_grantees = rec.get("grantees") or []
+        defendants = _brunswick_dedupe([g for g in raw_grantors if not _brunswick_is_institutional(g)])
+        plaintiffs = _brunswick_dedupe(raw_grantees)
+        trustees = _brunswick_dedupe([g for g in raw_grantees if g.rstrip().lower().endswith("/tr")])
+
+        desc_parts = [p for p in (rec.get("desc") or None, rec.get("subdivision") or None) if p]
+        legal_description = "; ".join(desc_parts) or None
+        doc_type = rec.get("doc_type") or doc_type_filter
+        filing_date = rec.get("filing_date") or "unknown date"
+
+        raw: dict = {
+            "county": "brunswick",
+            "doc_type": doc_type,
+            "filing_date": rec.get("filing_date") or "",
+            "grantor": ", ".join(raw_grantors),
+            "grantee": ", ".join(raw_grantees),
+            "book_page": book_page,
+            # ONE new block-name key covers everything Brunswick adds beyond
+            # the shared county/doc_type/grantor/grantee/book_page names
+            # this file already writes (and has registered) for Durham/the
+            # generic _parse_html path -- see this session's final report
+            # ("NEW RAW KEYS TO REGISTER"), same pattern as nc_rowan_cott.py's
+            # "rowan_detail".
+            "brunswick_detail": {
+                "status": rec.get("status") or None,
+                "subdivision": rec.get("subdivision") or None,
+                # the original instrument this one references (e.g. the
+                # Deed of Trust a Notice of Foreclosure/Substitute Trustee
+                # filing concerns), straight from the site's own "Desc:"
+                # field -- free ownership-chain context, same idea as
+                # nc_rod_logan.py's raw["rod"]["xref"].
+                "xref": rec.get("desc") or None,
+                "detail_url": rec.get("detail_url"),
+            },
+        }
+
+        li = Listing(
+            source=self.slug,
+            source_url=source_url,
+            listing_type=ListingType.LIS_PENDENS,
+            property_kind=PropertyKind.UNKNOWN,
+            county="Brunswick",
+            state="NC",
+            case_number=book_page or None,
+            defendant="; ".join(defendants) or None,
+            plaintiff="; ".join(plaintiffs) or None,
+            trustee="; ".join(trustees) or None,
+            legal_description=legal_description,
+            description=f"{doc_type} recorded {filing_date}",
+            first_seen=datetime.utcnow(),
+            last_seen=datetime.utcnow(),
+            raw=raw,
+        )
+
+        pdf_url = rec.get("pdf_url")
+        if pdf_url:
+            try:
+                from ...document_links import stamp_documents
+                stamp_documents(li, [pdf_url])
+            except Exception as exc:
+                log.warning("nc_rod_captcha.brunswick_stamp_failed", error=str(exc)[:160])
+
+        return li
 
     def _parse_html(self, html: str, county: str, base_url: str) -> list[Listing]:
         """Parse deed search results from HTML."""

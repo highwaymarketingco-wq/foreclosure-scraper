@@ -286,12 +286,40 @@ false-positive case, legitimate text-based questions still working, and the OCR 
 mocked Gemini call built on the real live word-image evidence above) and
 `scrapers/counties_nc/nc_rod_captcha.py`'s own updated module docstring for the full writeup.
 
+**CORRECTION 2026-10-14 (cont. x2)** — Brunswick's remaining queued work (the disclaimer-accept
+step and a search/result parser, flagged just below as not yet built) is now done and live-wired,
+not just the CAPTCHA layer. `_fetch_brunswick` (new in `nc_rod_captcha.py`) clicks the real
+disclaimer-accept link (disambiguated from the "I do NOT agree" link listed first in the DOM — an
+earlier version of this same verification hit that exact bug and landed on a "You have Logged Off
+this system" page), clicks into "Combined Real Property / MAPS", and searches+paginates two
+distress-relevant Document Types the real dropdown offers: "SUBSTITUTE TRUSTEE" (271 records in a
+90-day window) and "NOTICE OF FORECLOSURE" (82) — there is no "TRUSTEE DEED"/"FORECLOSURE DEED"
+option on this platform; the eventual sale deed records as a plain "DEED", indistinguishable here
+from any other sale, a real flagged gap, not silently claimed covered. Live-verified end-to-end
+2026-10-14 via httpx replaying the real site (same memory-pressure reasoning as the CAPTCHA
+verification — no Chromium run locally; the Playwright glue code mirrors this proven flow but was
+not itself executed live this session): a brand-new, cookie-less httpx client with zero prior
+requests fetched a real 2-page `BRUNSWICK-property-B5631-P1335.pdf` and a real Document Details
+page from the signed `s=` tokens alone — this entire site never sets a cookie anywhere in the
+chain, so these "Download PDF"/"View Detail" links are durable, stateless URLs, unlike Durham's
+cookie-gated PDF route or Rowan/Logan's session-scoped image keys, and are safely stamped via
+`document_links.stamp_documents`. A real live example (book 5596 page 1287, a SUBSTITUTE TRUSTEE
+instrument): 4 grantor index rows for ONE instrument — "VEGA, ESTEBAN EMILIO" and "MILLS, BRANDI"
+(real co-owners, kept) plus "ROCKET MORTGAGE, LLC" / "ROCKET MTG, LLC" (the original lender, also
+indexed as a "grantor" in this chain — filtered out by an institutional-name check). With "Sort by
+Recording Date" checked this platform sorts ASCENDING (page 1 = oldest, 07/22/2026 in a
+07/16–10/14 window; the LAST page = newest, 10/13/2026), so `_fetch_brunswick` jumps straight to
+the always-directly-linked last page and walks backward a budget-capped number of pages — newest
+leads first, still partial coverage of the full window (documented, not claimed complete). See
+`nc_rod_captcha.py`'s own module docstring and `tests/test_nc_rod_captcha.py` (6 new tests, real
+schema-accurate fixtures built from this live pull) for the full writeup.
+
 - `counties_nc/nc_rod_captcha.py` — **7 of 9 counties remain genuinely walled** (Wake, Iredell,
   Craven, Greene, Harnett, Randolph, Stokes); Durham **removed from this list** (fixed above,
-  needs no login). Brunswick **partially removed**: its CAPTCHA gate is now genuinely solvable
-  (see correction above), but actual lead capture needs the disclaimer-accept step and a
-  search/result parser still to be built — left queued here for that remaining work, not because
-  the CAPTCHA itself is still blocking it.
+  needs no login). Brunswick **removed from this list**: CAPTCHA, disclaimer-accept, search, and
+  result parsing are all now live-wired and verified end-to-end (see correction immediately
+  above) — real leads captured for 2 distress doc types, newest-page-first, budget-capped partial
+  coverage of each 90-day window (not full pagination — a genuine, documented gap, not a blocker).
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)
 - `public_notices/nc_notices_counties.py` vs `ncpublicnotices.py` (same site — does the
   interstitial actually gate it or not? One module says yes, the other's code says no.)

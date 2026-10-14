@@ -198,3 +198,214 @@ def test_durham_contradiction_with_nc_tyler_documented():
     # (2026-10-07) that Durham has no CAPTCHA; this file guessed otherwise anyway.
     assert "nc_tyler" in module_doc
     assert "2026-10-07" in module_doc
+
+
+def test_brunswick_now_wired_documented():
+    module_doc = __import__(
+        "foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha", fromlist=["x"]
+    ).__doc__ or ""
+    # the 2026-10-14 (cont. x2) correction: Brunswick's disclaimer-accept +
+    # search + parser are now actually wired into fetch(), not just the
+    # CAPTCHA layer the earlier correction fixed.
+    assert "now WIRED" in module_doc
+    assert "_fetch_brunswick" in module_doc
+    assert "SUBSTITUTE TRUSTEE" in module_doc
+
+
+# --- Brunswick: _fetch_brunswick's real search+parse flow, real schema from --
+# --- the live site 2026-10-14 (httpx replaying the real session, no --------
+# --- Chromium run -- see module docstring) ----------------------------------
+#
+# Real markup pulled from a live "SUBSTITUTE TRUSTEE" search, 90-day window:
+# book 5596 page 1287 is ONE real instrument with 4 grantor index rows (VEGA,
+# MILLS, ROCKET MORTGAGE LLC, ROCKET MTG LLC -- the lender's own legal name
+# AND its abbreviation each got their own row), all sharing the same Grantee
+# list. The HTML below is the real per-record markup shape (table/tr/td
+# nesting, the nested one-name-per-row Grantor/Grantee table, the real
+# "Download PDF" href) with the verbose inline CSS this platform ships
+# trimmed for test-file size -- names, book/page, doc type, dates and URLs
+# are all real, live-pulled values, not fabricated.
+
+_BRUNSWICK_SUBTRUSTEE_MULTI_GRANTOR_HTML = """
+<table border="0" align="center">
+<tr><td class="Data" colspan="4"><b>Filing Date:</b> 07/16/2026</td>
+<td class="Data"><b>Book:</b> 5596</td><td class="Data"><b>Page:</b> 1287</td>
+<td class="Data"><b>Status:</b> WARRANTED</td><td class="Data"></td></tr>
+<tr><td class="Data"><b>Type:</b> SUBSTITUTE TRUSTEE</td>
+<td class="Data"><b>Desc:</b> RE BK 4494 PG 634</td><td class="Data"></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantor:</b></td><td><font size="-1">VEGA, ESTEBAN EMILIO</font></td></tr>
+</table><br/></td>
+<td class="Data" colspan="1"><a href="./pdf-popup-download-all.ntk?s=REALTOKEN1" onclick="NewWindow(this.href,'880','550','Popup',0);return false">Download PDF</a></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantee:</b></td><td><font size="-1">DHI MORTGAGE COMPANY, LTD</font></td></tr>
+<tr><td></td><td><font size="-1">DHI MTG CO, LTD</font></td></tr>
+<tr><td></td><td><font size="-1">LLG TRUSTEE LLC /TR</font></td></tr>
+<tr><td></td><td><font size="-1">MORTGAGE ELECTRONIC REGISTRATION SYSTEMS, INC.</font></td></tr>
+</table></td>
+<td class="Data" colspan="1"><a href="local-popup-group-view-image.ntk?s=IMGTOKEN1" onclick="NewWindow(this.href,'880','550','Popup',0);return false">View Image</a><br/>
+<a href="./re_detail.ntk?s=DETAILTOKEN1" onclick="NewWindow(this.href,'880','550','Popup',0);return false">View Detail</a><br/></td></tr>
+
+<tr><td class="Data" colspan="4"><b>Filing Date:</b> 07/16/2026</td>
+<td class="Data"><b>Book:</b> 5596</td><td class="Data"><b>Page:</b> 1287</td>
+<td class="Data"><b>Status:</b> WARRANTED</td><td class="Data"></td></tr>
+<tr><td class="Data"><b>Type:</b> SUBSTITUTE TRUSTEE</td>
+<td class="Data"><b>Desc:</b> RE BK 4494 PG 634</td><td class="Data"></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantor:</b></td><td><font size="-1">MILLS, BRANDI</font></td></tr>
+</table><br/></td>
+<td class="Data" colspan="1"><a href="./pdf-popup-download-all.ntk?s=REALTOKEN2" onclick="NewWindow(this.href,'880','550','Popup',0);return false">Download PDF</a></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantee:</b></td><td><font size="-1">DHI MORTGAGE COMPANY, LTD</font></td></tr>
+<tr><td></td><td><font size="-1">LLG TRUSTEE LLC /TR</font></td></tr>
+</table></td>
+<td class="Data" colspan="1"><a href="local-popup-group-view-image.ntk?s=IMGTOKEN2">View Image</a><br/></td></tr>
+
+<tr><td class="Data" colspan="4"><b>Filing Date:</b> 07/16/2026</td>
+<td class="Data"><b>Book:</b> 5596</td><td class="Data"><b>Page:</b> 1287</td>
+<td class="Data"><b>Status:</b> WARRANTED</td><td class="Data"></td></tr>
+<tr><td class="Data"><b>Type:</b> SUBSTITUTE TRUSTEE</td>
+<td class="Data"><b>Desc:</b> RE BK 4494 PG 634</td><td class="Data"></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantor:</b></td><td><font size="-1">ROCKET MORTGAGE, LLC</font></td></tr>
+</table><br/></td>
+<td class="Data" colspan="1"><a href="./pdf-popup-download-all.ntk?s=REALTOKEN3">Download PDF</a></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantee:</b></td><td><font size="-1">DHI MORTGAGE COMPANY, LTD</font></td></tr>
+</table></td><td class="Data" colspan="1"></td></tr>
+
+<tr><td class="Data" colspan="4"><b>Filing Date:</b> 07/16/2026</td>
+<td class="Data"><b>Book:</b> 5596</td><td class="Data"><b>Page:</b> 1287</td>
+<td class="Data"><b>Status:</b> WARRANTED</td><td class="Data"></td></tr>
+<tr><td class="Data"><b>Type:</b> SUBSTITUTE TRUSTEE</td>
+<td class="Data"><b>Desc:</b> RE BK 4494 PG 634</td><td class="Data"></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantor:</b></td><td><font size="-1">ROCKET MTG, LLC</font></td></tr>
+</table><br/></td>
+<td class="Data" colspan="1"></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantee:</b></td><td><font size="-1">DHI MORTGAGE COMPANY, LTD</font></td></tr>
+</table></td><td class="Data" colspan="1"></td></tr>
+</table>
+"""
+
+# A second real instrument, book 5597 page 176: BOTH grantors are
+# institutional ("FIRST BANK", "BLUE TIDE HOMES, INC." -- a builder/investor
+# foreclosure, no human owner name on the grantor side) -- the real case
+# that forces `defendant` to come back None rather than a guessed lender
+# name, same reasoning nc_rod_logan.py's own resolver documents.
+_BRUNSWICK_ALL_INSTITUTIONAL_GRANTOR_HTML = """
+<table border="0" align="center">
+<tr><td class="Data" colspan="4"><b>Filing Date:</b> 07/16/2026</td>
+<td class="Data"><b>Book:</b> 5597</td><td class="Data"><b>Page:</b> 176</td>
+<td class="Data"><b>Status:</b> WARRANTED</td><td class="Data"></td></tr>
+<tr><td class="Data"><b>Type:</b> SUBSTITUTE TRUSTEE</td>
+<td class="Data"><b>Desc:</b> RE BK 5139 PG 767</td><td class="Data"></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantor:</b></td><td><font size="-1">FIRST BANK</font></td></tr>
+</table><br/></td>
+<td class="Data" colspan="1"><a href="./pdf-popup-download-all.ntk?s=REALTOKEN4">Download PDF</a></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantee:</b></td><td><font size="-1">FOYLES, KIRSTEN E. /TR</font></td></tr>
+<tr><td></td><td><font size="-1">GOTTSEGEN, ADAM M. /TR</font></td></tr>
+</table></td><td class="Data" colspan="1"></td></tr>
+
+<tr><td class="Data" colspan="4"><b>Filing Date:</b> 07/16/2026</td>
+<td class="Data"><b>Book:</b> 5597</td><td class="Data"><b>Page:</b> 176</td>
+<td class="Data"><b>Status:</b> WARRANTED</td><td class="Data"></td></tr>
+<tr><td class="Data"><b>Type:</b> SUBSTITUTE TRUSTEE</td>
+<td class="Data"><b>Desc:</b> RE BK 5139 PG 767</td><td class="Data"></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantor:</b></td><td><font size="-1">BLUE TIDE HOMES, INC.</font></td></tr>
+</table><br/></td>
+<td class="Data" colspan="1"></td></tr>
+<tr><td class="Data" colspan="3"><table cellpadding="0" cellspacing="0">
+<tr><td><b>Grantee:</b></td><td><font size="-1">FOYLES, KIRSTEN E. /TR</font></td></tr>
+</table></td><td class="Data" colspan="1"></td></tr>
+</table>
+"""
+
+
+def test_brunswick_parse_page_groups_multi_grantor_rows_into_one_listing():
+    scraper = NcRodCaptchaScraper()
+    listings = scraper._brunswick_parse_page(
+        _BRUNSWICK_SUBTRUSTEE_MULTI_GRANTOR_HTML,
+        "https://brunswick-live.inttek.net/index.ntk?s=x",
+        "SUBSTITUTE TRUSTEE",
+    )
+    # 4 grantor index rows for ONE real instrument -> exactly ONE Listing,
+    # not 4 duplicate leads.
+    assert len(listings) == 1
+    li = listings[0]
+    assert li.county == "Brunswick" and li.state == "NC"
+    assert li.listing_type is ListingType.LIS_PENDENS
+    assert li.property_kind is PropertyKind.UNKNOWN
+    assert li.case_number == "B: 5596, P: 1287"
+    # VEGA and MILLS are real people, kept; ROCKET MORTGAGE/ROCKET MTG (the
+    # original lender, also indexed as a "grantor" in this chain) filtered
+    # out by the institutional-name check.
+    assert li.defendant == "VEGA, ESTEBAN EMILIO; MILLS, BRANDI"
+    assert "ROCKET" not in (li.defendant or "")
+    assert "LLG TRUSTEE LLC /TR" in li.plaintiff
+    assert li.trustee == "LLG TRUSTEE LLC /TR"
+    assert li.legal_description == "RE BK 4494 PG 634"
+    assert li.raw["county"] == "brunswick"
+    assert li.raw["doc_type"] == "SUBSTITUTE TRUSTEE"
+    assert li.raw["book_page"] == "B: 5596, P: 1287"
+    assert li.raw["brunswick_detail"]["status"] == "WARRANTED"
+    assert li.raw["brunswick_detail"]["xref"] == "RE BK 4494 PG 634"
+    assert li.raw["brunswick_detail"]["detail_url"].endswith("re_detail.ntk?s=DETAILTOKEN1")
+
+
+def test_brunswick_record_stamps_real_pdf_document_link():
+    scraper = NcRodCaptchaScraper()
+    listings = scraper._brunswick_parse_page(
+        _BRUNSWICK_SUBTRUSTEE_MULTI_GRANTOR_HTML,
+        "https://brunswick-live.inttek.net/index.ntk?s=x",
+        "SUBSTITUTE TRUSTEE",
+    )
+    li = listings[0]
+    # The FIRST grantor row's "Download PDF" link wins (REALTOKEN1) --
+    # live-confirmed these pdf-popup-download-all.ntk links are durable,
+    # cookie-less, stateless URLs (fetched for real with a brand-new httpx
+    # client and no prior requests), safe to stamp unlike Durham's
+    # cookie-gated route or Rowan/Logan's session-scoped image keys.
+    assert li.raw["document_url"].endswith("pdf-popup-download-all.ntk?s=REALTOKEN1")
+    assert li.raw["documents"] == [li.raw["document_url"]]
+
+
+def test_brunswick_parse_page_defendant_none_when_all_grantors_institutional():
+    scraper = NcRodCaptchaScraper()
+    listings = scraper._brunswick_parse_page(
+        _BRUNSWICK_ALL_INSTITUTIONAL_GRANTOR_HTML,
+        "https://brunswick-live.inttek.net/index.ntk?s=x",
+        "SUBSTITUTE TRUSTEE",
+    )
+    assert len(listings) == 1
+    li = listings[0]
+    assert li.case_number == "B: 5597, P: 176"
+    # FIRST BANK + BLUE TIDE HOMES, INC. are both institutional (a builder/
+    # investor foreclosure, no human owner on the grantor side) -- real
+    # result from a live SUBSTITUTE TRUSTEE pull, not a guessed lender name.
+    assert li.defendant is None
+    assert li.plaintiff == "FOYLES, KIRSTEN E. /TR; GOTTSEGEN, ADAM M. /TR"
+    assert li.trustee == li.plaintiff
+    assert li.raw["grantor"] == "FIRST BANK, BLUE TIDE HOMES, INC."
+
+
+def test_brunswick_is_institutional_filters_lenders_and_tr_suffix():
+    from foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha import _brunswick_is_institutional
+    assert _brunswick_is_institutional("ROCKET MORTGAGE, LLC") is True
+    assert _brunswick_is_institutional("MORTGAGE ELECTRONIC REGISTRATION SYSTEMS, INC.") is True
+    # a real individual acting AS substitute trustee (an attorney, live-
+    # pulled 2026-10-14) -- no institutional keyword in the name itself, but
+    # the "/TR" suffix alone marks a non-owner.
+    assert _brunswick_is_institutional("STEPHENS, H. KENNETH II /TR") is True
+    assert _brunswick_is_institutional("VEGA, ESTEBAN EMILIO") is False
+    assert _brunswick_is_institutional("") is True
+    assert _brunswick_is_institutional(None) is True
+
+
+def test_brunswick_parse_page_no_results_table_returns_empty():
+    scraper = NcRodCaptchaScraper()
+    assert scraper._brunswick_parse_page("<html><body>no results</body></html>", "http://x", "SUBSTITUTE TRUSTEE") == []
