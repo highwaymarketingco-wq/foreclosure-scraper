@@ -32,8 +32,12 @@ same roll, included to prove the real-estate filter actually excludes it.
 """
 from __future__ import annotations
 
+import asyncio
+
 from foreclosure_scraper.models import ListingType, PropertyKind
 from foreclosure_scraper.scrapers.counties_sc.dorchester_billtrax_delinquent_tax import (
+    PDF_GETURL_PATH,
+    PDF_TOKEN_PATH,
     SITE_URL,
     UTILITY_ID,
     _aggregate,
@@ -41,6 +45,8 @@ from foreclosure_scraper.scrapers.counties_sc.dorchester_billtrax_delinquent_tax
     _field_map,
     _is_real_estate,
     _notice_pdf_view_url,
+    _pdf_resolve_candidates,
+    _resolve_notice_pdf_url,
 )
 
 # --- verbatim Bill[] field lists, as the API returns them under
@@ -290,9 +296,17 @@ def test_real_notice_pdf_surfaced_on_listing_and_per_bill():
     assert detail["bills"][0]["container_name"] == "dorchester-proptax-2025"
     assert detail["bills"][0]["sticker_no"] == "27404"
     # Deliberately not promoted to a top-level _DOC_FIELDS key -- see module
-    # docstring: plain httpx can't resolve the JS-driven redirect.
+    # docstring's "UPDATE 2026-10-13" paragraph: notice_pdf_view_url needs a JS
+    # runtime; notice_pdf_resolved_url (below) is plain-httpx-fetchable but only
+    # for ~20 minutes, so neither is safe for a later, separately-scheduled OCR
+    # pass to read.
     assert "document_url" not in listings[0].raw
     assert "pdf_url" not in listings[0].raw
+    # No resolve pass ran in this test (bills built directly, not via fetch()),
+    # so the resolved fields are present but unset.
+    assert detail["notice_pdf_resolved_url"] is None
+    assert detail["bills"][0]["notice_pdf_resolved_url"] is None
+    assert detail["bills"][0]["notice_pdf_resolved_at"] is None
 
 
 def test_placeholder_pdf_bill_carries_no_notice_url():
@@ -315,3 +329,153 @@ def test_parcel_level_notice_url_picks_first_real_one_across_years():
         "notice_pdf_view_url"] is not None
     assert parcels["135-00-00-118-777"].raw["billtrax_dorchester_delinquent_tax"][
         "notice_pdf_view_url"] is None
+
+
+# ---------------------------------------------------------------------------
+# LIVE-VERIFIED 2026-10-13: PdfName/ContainerName can be turned into an actual,
+# fetchable PDF URL through TWO MORE plain POSTs (GeneratePdfToken -> geturl),
+# the same dataService.post()/RequestData/"ar" shape this module already uses --
+# no curl-cffi impersonation, no browser. See module docstring's "UPDATE
+# 2026-10-13" paragraph for the live-verified request/response shapes below
+# (account 021-00-00-016-777, bill dc_R-2025-03500609_delq.pdf / container
+# dorchester-proptax-2025, confirmed to return a real `application/pdf`).
+# ---------------------------------------------------------------------------
+
+def test_resolve_notice_pdf_url_two_step_dance(monkeypatch):
+    """_resolve_notice_pdf_url must POST PDF_TOKEN_PATH first, feed its `token`
+    into a second POST to PDF_GETURL_PATH (echoing PdfName/ContainerName back,
+    matching the real component's `{...i, token: n.token}`), and return the
+    `Url` field -- exactly the shape measured live 2026-10-13."""
+    calls = []
+
+    async def fake_post(client, path, body):
+        calls.append((path, dict(body)))
+        if path == PDF_TOKEN_PATH:
+            assert body == {"PdfName": "dc_R-2025-03500609_delq.pdf",
+                             "ContainerName": "dorchester-proptax-2025"}
+            return {"token": "live-token-abc", "HasErrors": False}
+        if path == PDF_GETURL_PATH:
+            assert body == {"PdfName": "dc_R-2025-03500609_delq.pdf",
+                             "ContainerName": "dorchester-proptax-2025",
+                             "token": "live-token-abc"}
+            return {"Url": "https://billtraxblob.blob.core.windows.net/"
+                           "dorchester-proptax-2025/dc_R-2025-03500609_delq.pdf"
+                           "?sv=2019-02-02&sr=b&sig=X&st=2026-10-14T00%3A05%3A40Z"
+                           "&se=2026-10-14T00%3A25%3A40Z&sp=r",
+                    "HasErrors": False}
+        raise AssertionError(f"unexpected path {path}")
+
+    import foreclosure_scraper.scrapers.counties_sc.dorchester_billtrax_delinquent_tax as mod
+    monkeypatch.setattr(mod, "_post", fake_post)
+
+    url = asyncio.run(_resolve_notice_pdf_url(
+        None, "dc_R-2025-03500609_delq.pdf", "dorchester-proptax-2025"))
+    assert url == ("https://billtraxblob.blob.core.windows.net/dorchester-proptax-2025/"
+                   "dc_R-2025-03500609_delq.pdf?sv=2019-02-02&sr=b&sig=X&st=2026-10-14T00"
+                   "%3A05%3A40Z&se=2026-10-14T00%3A25%3A40Z&sp=r")
+    assert [c[0] for c in calls] == [PDF_TOKEN_PATH, PDF_GETURL_PATH]
+
+
+def test_resolve_notice_pdf_url_returns_none_on_missing_token(monkeypatch):
+    """A HasErrors=false response with no `token` key must not blow up or be
+    treated as success -- just no resolved URL."""
+    async def fake_post(client, path, body):
+        return {"HasErrors": False}
+
+    import foreclosure_scraper.scrapers.counties_sc.dorchester_billtrax_delinquent_tax as mod
+    monkeypatch.setattr(mod, "_post", fake_post)
+
+    url = asyncio.run(_resolve_notice_pdf_url(None, "x.pdf", "cont"))
+    assert url is None
+
+
+def test_resolve_notice_pdf_url_never_raises_on_failure(monkeypatch):
+    """A 403/HasErrors/network blip on either call is a best-effort miss, not an
+    exception the caller's capped loop has to guard against."""
+    async def raising_post(client, path, body):
+        raise RuntimeError("HTTP 403 for " + path)
+
+    import foreclosure_scraper.scrapers.counties_sc.dorchester_billtrax_delinquent_tax as mod
+    monkeypatch.setattr(mod, "_post", raising_post)
+
+    url = asyncio.run(_resolve_notice_pdf_url(None, "x.pdf", "cont"))
+    assert url is None
+
+
+def test_pdf_resolve_candidates_filters_and_sorts_by_balance_desc():
+    """Only real-estate, nonzero-balance, non-placeholder-PDF bills are candidates,
+    highest TotalDueNow first -- so a capped budget spends itself on the bills
+    most likely to matter to a human calling leads."""
+    bills = _bills_from(
+        _bp(CREEL_REAL_NOTICE_BILL),       # real estate, $312.42, real PDF
+        _bp(LONG_2025_BILL),               # real estate, $1797.77, PLACEHOLDER pdf
+        _bp(CAROLINA_PERSONAL_PROPERTY_BILL),  # not real estate at all
+        _bp(SMITH_PAID_OFF_BILL),          # real estate, $0 balance
+    )
+    # Give LONG a real PDF too so both real-estate/nonzero bills qualify, to
+    # check the balance-descending sort (LONG's balance is higher than CREEL's).
+    long_with_pdf = dict(bills[1])
+    long_with_pdf["PdfName"] = "dc_R-2025-03500776_delq.pdf"
+    long_with_pdf["ContainerName"] = "dorchester-proptax-2025"
+    bills[1] = long_with_pdf
+
+    cands = _pdf_resolve_candidates(bills)
+    assert [c.get("AccountNumber") for c in cands] == [
+        "135-00-00-118-777",   # $1797.77 -- highest
+        "118-00-00-147-001",   # $312.42
+    ]
+
+
+def test_pdf_resolve_candidates_empty_when_nothing_qualifies():
+    bills = _bills_from(
+        _bp(LONG_2025_BILL),               # placeholder PDF
+        _bp(CAROLINA_PERSONAL_PROPERTY_BILL),  # not real estate
+        _bp(SMITH_PAID_OFF_BILL),          # zero balance
+    )
+    assert _pdf_resolve_candidates(bills) == []
+
+
+def test_aggregate_applies_resolved_map_to_matching_bill_and_parcel():
+    """_aggregate's `resolved` parameter must land on the per-bill entry whose
+    (pdf_name, container_name) matches, and mirror onto the parcel-level
+    notice_pdf_resolved_url/_at, the same way notice_pdf_view_url already does."""
+    bills = _bills_from(_bp(CREEL_REAL_NOTICE_BILL))
+    resolved = {
+        ("mobile_R-2024-10076383-00.pdf", "dorchester-proptax-2025"):
+            ("https://billtraxblob.blob.core.windows.net/dorchester-proptax-2025/"
+             "mobile_R-2024-10076383-00.pdf?sv=X&sig=Y", "2026-10-13T12:00:00Z"),
+    }
+    listings = _aggregate(bills, resolved=resolved)
+    assert len(listings) == 1
+    detail = listings[0].raw["billtrax_dorchester_delinquent_tax"]
+    assert detail["notice_pdf_resolved_url"] == resolved[
+        ("mobile_R-2024-10076383-00.pdf", "dorchester-proptax-2025")][0]
+    assert detail["notice_pdf_resolved_at"] == "2026-10-13T12:00:00Z"
+    assert detail["bills"][0]["notice_pdf_resolved_url"] == detail["notice_pdf_resolved_url"]
+    assert detail["bills"][0]["notice_pdf_resolved_at"] == "2026-10-13T12:00:00Z"
+    # Still not promoted to a top-level _DOC_FIELDS key even when resolved.
+    assert "document_url" not in listings[0].raw
+
+
+def test_aggregate_resolved_map_ignored_when_no_match():
+    """A `resolved` map that doesn't contain this bill's (pdf_name, container_name)
+    key must leave the resolved fields unset -- no accidental cross-bill bleed."""
+    bills = _bills_from(_bp(CREEL_REAL_NOTICE_BILL))
+    resolved = {("some-other-bill.pdf", "some-other-container"): ("https://x", "t")}
+    listings = _aggregate(bills, resolved=resolved)
+    detail = listings[0].raw["billtrax_dorchester_delinquent_tax"]
+    assert detail["notice_pdf_resolved_url"] is None
+    assert detail["notice_pdf_resolved_at"] is None
+
+
+def test_aggregate_default_resolved_none_matches_empty_map():
+    """Calling _aggregate with no `resolved` argument at all (the shape every
+    pre-existing call site in fetch() uses for its incremental self.partial
+    snapshots) must behave identically to passing an empty map."""
+    bills = _bills_from(_bp(CREEL_REAL_NOTICE_BILL))
+    detail_default = _aggregate(bills)[0].raw["billtrax_dorchester_delinquent_tax"]
+    detail_empty = _aggregate(bills, resolved={})[0].raw["billtrax_dorchester_delinquent_tax"]
+    for key in ("notice_pdf_resolved_url", "notice_pdf_resolved_at"):
+        assert detail_default[key] is None
+        assert detail_empty[key] is None
+    assert detail_default["bills"][0]["notice_pdf_resolved_url"] is None

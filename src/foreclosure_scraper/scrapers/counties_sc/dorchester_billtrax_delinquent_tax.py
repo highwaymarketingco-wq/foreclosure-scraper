@@ -150,6 +150,51 @@ PER-BILL NOTICE PDF (AUDITED 2026-10-03)
     shell, not the PDF -- harmless, but useless, so there is no point feeding it in).
     Only built when PdfName is a real, non-placeholder filename.
 
+    UPDATE 2026-10-13 -- the "no browser needed" / "CANNOT resolve" split above turned
+    out to be about the WRONG hop. The /view/bill/pdfbill Angular route (what a browser
+    navigates to) is genuinely JS-driven and genuinely unreachable by plain httpx -- that
+    part holds. But that route's own component is itself just a thin wrapper: downloading
+    runtime.js's webpack chunk-id->hash map and grep'ing every one of its ~63 lazy chunks
+    (none of this is in the main bundle, which is why the 2026-10-03 pass -- static
+    analysis only, no browser -- never found it) turned up the component's actual code in
+    chunk 3523.<hash>.js:
+        getPdf() { const i = {PdfName: this.pdfName, ContainerName: this.container};
+          this.settingsService.GeneratePdfToken(i).subscribe(n => {
+            const a = {...i, token: n.token};
+            this.settingsService.GetPdfUrl(a).subscribe(c => window.location.href = c.Url) }) }
+    and GeneratePdfToken/GetPdfUrl are themselves just two more calls through the SAME
+    dataService.post() CommonService shape (FormData "RequestData" + the "ar" header)
+    this module already uses for getbyidquickpay/search -- confirmed by grepping that
+    chunk's own dataService class for the literal "RequestData"/"ar" strings. So the
+    actual backend contract is two plain, public POSTs:
+        1. POST /crm/api/Bills/GeneratePdfToken {"PdfName": ..., "ContainerName": ...}
+                                                 -> {"token": ..., "HasErrors": false}
+        2. POST /crm/api/Bills/geturl {"PdfName": ..., "ContainerName": ..., "token": ...}
+                                       -> {"Url": "https://billtraxblob.blob.core.windows
+                                           .net/<container>/<pdfName>?sv=...&sig=...&st=
+                                           ...&se=...&sp=r", "HasErrors": false}
+    LIVE-VERIFIED 2026-10-13 against real production bills (not a fixture) through
+    `_post` -- the exact same helper this module already uses, no curl-cffi impersonation
+    and no browser needed: 3/3 sampled real (non-placeholder) nonzero-balance real-estate
+    bills resolved to a `Url` whose GET came back 200 `application/pdf` with real PDF
+    bytes (`%PDF-` magic). So plain httpx CAN get the actual document after all -- the
+    2026-10-03 docstring text above was correct about the Angular route, just one hop
+    short of the fix.
+
+    What this changes: `_resolve_notice_pdf_url` performs that two-call dance for a
+    capped, time-budgeted sample of the highest-balance real/nonzero bills each run (see
+    PDF_RESOLVE_CAP -- resolving EVERY real notice across the ~22k-row roll would be
+    thousands of extra POST pairs, and the vendor's own "...WithRateLimit" endpoint name
+    is already a signal not to push volume there) and stores the result as
+    `notice_pdf_resolved_url` / `notice_pdf_resolved_at`. That Url is still NOT fed into
+    enrichment_doc_ocr.py's `_DOC_FIELDS` -- not because httpx can't fetch it (it can),
+    but because the returned SAS link measured live st/se exactly 20 minutes apart: a
+    link resolved at scrape time will almost always be expired by the time a later,
+    separately-scheduled OCR pass reads raw['document_url']. `notice_pdf_view_url` (the
+    deterministic Angular route) remains the durable, open-it-whenever human link; the
+    newly-added `notice_pdf_resolved_url` is a scrape-time bonus -- real PDF bytes,
+    right now, for whichever bills the budget reached -- not a replacement for it.
+
 Free, public, no login, no CAPTCHA.
 Slug: counties_sc.dorchester_billtrax_delinquent_tax
 Category: county_tax
@@ -321,6 +366,74 @@ def _notice_pdf_view_url(pdf_name: str | None, container_name: str | None) -> st
     return f"{SITE_URL.rstrip('/')}/view/bill/pdfbill?{_urlquote(b64)}"
 
 
+#: The two backend calls the "pdfbill" route's (lazy-loaded) Angular component makes to
+#: turn a PdfName/ContainerName into a real document URL -- see module docstring's
+#: "UPDATE 2026-10-13" paragraph for how these were found (static analysis of a lazy
+#: webpack chunk, not a browser) and live-verified.
+PDF_TOKEN_PATH = "/crm/api/Bills/GeneratePdfToken"
+PDF_GETURL_PATH = "/crm/api/Bills/geturl"
+
+#: Cap + time-budget on the live PDF-resolve pass below, mirroring
+#: national/landwatch.py's DETAIL_FETCH_CAP_PER_COUNTY and counties_nc/polk_tax.py's
+#: _DETAIL_FETCH_CAP / _DETAIL_BUDGET_SHARE. Resolving is 2 extra POSTs per bill; the
+#: 2026-10-03 docstring measured 61% of nonzero-balance real-estate bills on a 57-row
+#: sample carrying a real notice, which scales to thousands across the whole ~22k-row
+#: roll -- so this is deliberately a SAMPLE (highest balance first, see
+#: _pdf_resolve_candidates), not an attempt at every one, each run.
+PDF_RESOLVE_CAP = int(os.getenv("BILLTRAX_DORCHESTER_PDF_RESOLVE_CAP", "40"))
+PDF_RESOLVE_BUDGET_SHARE = float(os.getenv("BILLTRAX_DORCHESTER_PDF_RESOLVE_BUDGET_SHARE", "0.15"))
+#: Gentle pace between resolve attempts -- same "...WithRateLimit" vendor-name caution
+#: that set _PACE_S for the page-search endpoint; these are a different endpoint family
+#: but the same host, so the same courtesy applies.
+PDF_RESOLVE_PACE_S = float(os.getenv("BILLTRAX_DORCHESTER_PDF_RESOLVE_PACE_S", "0.5"))
+
+
+async def _resolve_notice_pdf_url(
+    client: httpx.AsyncClient, pdf_name: str, container_name: str,
+) -> str | None:
+    """Live-resolve one bill's notice PDF to an actual, fetchable Azure Blob SAS URL --
+    the two-call dance documented in the module docstring's "UPDATE 2026-10-13"
+    paragraph, through the same `_post` helper already used for getbyidquickpay/search
+    (no curl-cffi impersonation, no browser). Returns None on ANY failure: this is a
+    best-effort, capped/budgeted enrichment (PDF_RESOLVE_CAP) that must never raise into
+    the caller's loop or cost the underlying listing."""
+    try:
+        tok = await _post(client, PDF_TOKEN_PATH,
+                           {"PdfName": pdf_name, "ContainerName": container_name})
+        token = tok.get("token")
+        if not token:
+            return None
+        res = await _post(client, PDF_GETURL_PATH,
+                           {"PdfName": pdf_name, "ContainerName": container_name,
+                            "token": token})
+        return res.get("Url") or None
+    except Exception as exc:  # noqa: BLE001 - best-effort; must never raise into the caller
+        log.debug("dorchester_billtrax.pdf_resolve_failed", pdf_name=pdf_name[:80],
+                  error=str(exc)[:160])
+        return None
+
+
+def _pdf_resolve_candidates(bills: Iterable[dict]) -> list[dict]:
+    """Real-estate, currently-owed bills carrying a real (non-placeholder) notice PDF,
+    highest current balance first -- so a capped/budgeted resolve pass spends itself on
+    the bills most likely to matter to a human calling leads, not whichever happened to
+    page in first."""
+    cands = []
+    for b in bills:
+        acct = (b.get("AccountNumber") or "").strip()
+        if not _is_real_estate(acct):
+            continue
+        if (_num(b.get("TotalDueNow")) or 0) <= 0:
+            continue
+        pdf_name = (b.get("PdfName") or "").strip()
+        container_name = (b.get("ContainerName") or "").strip()
+        if not pdf_name or not container_name or pdf_name.lower() in _PLACEHOLDER_PDF_NAMES:
+            continue
+        cands.append(b)
+    cands.sort(key=lambda b: _num(b.get("TotalDueNow")) or 0, reverse=True)
+    return cands
+
+
 async def _fetch_page(client: httpx.AsyncClient, template: dict, page: int,
                        page_size: int = PAGE_SIZE) -> tuple[list[dict], int]:
     """One search window: records [page*page_size, (page+1)*page_size). Returns
@@ -433,11 +546,20 @@ async def _fetch_range_with_recovery(
     return bills, total, skipped
 
 
-def _aggregate(bills: Iterable[dict]) -> list[Listing]:
+def _aggregate(
+    bills: Iterable[dict],
+    resolved: dict[tuple[str, str], tuple[str, str]] | None = None,
+) -> list[Listing]:
     """One Listing per real-estate parcel, balances summed across bill-years -- the same
     shape as sc_catalis_delinquent_roll.aggregate_bills, for the same reason: a parcel
     delinquent for N years arrives as N bills sharing one AccountNumber, and the board
-    merges same-parcel rows on the parcel key anyway."""
+    merges same-parcel rows on the parcel key anyway.
+
+    `resolved` is the output of fetch()'s capped live PDF-resolve pass: a
+    {(pdf_name, container_name): (url, resolved_at_iso)} map for whichever bills that
+    budgeted pass reached (see PDF_RESOLVE_CAP) -- empty/None for the incremental
+    self.partial calls fetch() makes while still paging, since that pass only runs once
+    after paging completes."""
     by_parcel: dict[str, list[dict]] = {}
     skipped_non_real_estate = 0
     skipped_zero_balance = 0
@@ -463,6 +585,8 @@ def _aggregate(bills: Iterable[dict]) -> list[Listing]:
         for b in group:
             pdf_name = b.get("PdfName")
             container_name = b.get("ContainerName")
+            resolved_entry = (resolved or {}).get(
+                ((pdf_name or "").strip(), (container_name or "").strip()))
             per_bill.append({
                 "bill_number": b.get("BillNumber"),
                 "year": _bill_year(b.get("BillNumber")),
@@ -476,6 +600,11 @@ def _aggregate(bills: Iterable[dict]) -> list[Listing]:
                 "pdf_name": pdf_name or None,
                 "container_name": container_name or None,
                 "notice_pdf_view_url": _notice_pdf_view_url(pdf_name, container_name),
+                # Live-resolved, right-now-fetchable Azure Blob SAS URL -- see module
+                # docstring's "UPDATE 2026-10-13" paragraph. Only set for whichever
+                # bills fetch()'s capped/budgeted resolve pass reached; None otherwise.
+                "notice_pdf_resolved_url": resolved_entry[0] if resolved_entry else None,
+                "notice_pdf_resolved_at": resolved_entry[1] if resolved_entry else None,
             })
         years = sorted({p["year"] for p in per_bill if p["year"]})
         total_due = round(sum(p["total_due_now"] or 0 for p in per_bill), 2) or None
@@ -484,6 +613,10 @@ def _aggregate(bills: Iterable[dict]) -> list[Listing]:
         notice_url = next(
             (p["notice_pdf_view_url"] for p in per_bill if p["notice_pdf_view_url"]),
             None)
+        notice_resolved_url, notice_resolved_at = next(
+            ((p["notice_pdf_resolved_url"], p["notice_pdf_resolved_at"])
+             for p in per_bill if p["notice_pdf_resolved_url"]),
+            (None, None))
 
         raw = {
             "billtrax_dorchester_delinquent_tax": {
@@ -498,11 +631,16 @@ def _aggregate(bills: Iterable[dict]) -> list[Listing]:
                 "is_two_year_plus": len(completed_delinquent_years(years, "SC", "Dorchester")) >= 2,
                 "total_due": total_due,
                 "property_id": latest.get("_PropertyId"),
-                # Deliberately NOT a top-level raw["document_url"]/etc key --
-                # enrichment_doc_ocr.py's _DOC_FIELDS scan fetches with plain
-                # httpx, which cannot resolve this JS-driven redirect (see
-                # module docstring's "PER-BILL NOTICE PDF" section).
+                # Deliberately NOT a top-level raw["document_url"]/etc key. Neither URL
+                # below is a safe _DOC_FIELDS input, for two DIFFERENT reasons (see
+                # module docstring's "UPDATE 2026-10-13" paragraph): notice_pdf_view_url
+                # needs a JS runtime enrichment_doc_ocr's plain-httpx fetch doesn't have;
+                # notice_pdf_resolved_url needs none, but is a ~20-minute Azure SAS link
+                # resolved at SCRAPE time, so it will almost always be dead by the time a
+                # later, separately-scheduled OCR pass reads it.
                 "notice_pdf_view_url": notice_url,
+                "notice_pdf_resolved_url": notice_resolved_url,
+                "notice_pdf_resolved_at": notice_resolved_at,
             },
         }
         if total_due:
@@ -607,7 +745,42 @@ class DorchesterBillTraxDelinquentTax(BaseScraper):
                     break
                 await asyncio.sleep(_PACE_S)
 
-        listings = _aggregate(all_bills)
+            # Capped, budgeted live PDF-resolve pass -- still inside the `async with`
+            # block (needs `client`), runs once the roll is fully paged, never while a
+            # page is still outstanding. Best-effort only: _resolve_notice_pdf_url never
+            # raises, so a bad bill or a slow/blocked host here costs nothing more than
+            # that one resolve, never the listings themselves (see its docstring).
+            resolved: dict[tuple[str, str], tuple[str, str]] = {}
+            candidates = _pdf_resolve_candidates(all_bills)
+            if candidates:
+                resolve_deadline = time.monotonic() + self.timeout_s * PDF_RESOLVE_BUDGET_SHARE
+                resolved_count = 0
+                for b in candidates:
+                    if resolved_count >= PDF_RESOLVE_CAP:
+                        log.info("dorchester_billtrax.pdf_resolve_cap_reached",
+                                 cap=PDF_RESOLVE_CAP, candidates=len(candidates))
+                        break
+                    if time.monotonic() > resolve_deadline:
+                        log.info("dorchester_billtrax.pdf_resolve_budget_spent",
+                                 resolved=resolved_count,
+                                 remaining=len(candidates) - resolved_count)
+                        break
+                    pdf_name = (b.get("PdfName") or "").strip()
+                    container_name = (b.get("ContainerName") or "").strip()
+                    key = (pdf_name, container_name)
+                    if key in resolved:
+                        continue
+                    resolved_count += 1
+                    url = await _resolve_notice_pdf_url(client, pdf_name, container_name)
+                    if url:
+                        resolved[key] = (
+                            url, datetime.utcnow().isoformat(timespec="seconds") + "Z")
+                    await asyncio.sleep(PDF_RESOLVE_PACE_S)
+                log.info("dorchester_billtrax.pdf_resolve_done",
+                         attempted=resolved_count, resolved=len(resolved),
+                         candidates=len(candidates))
+
+        listings = _aggregate(all_bills, resolved=resolved)
         incomplete_reason = None
         if all_skipped:
             incomplete_reason = (
