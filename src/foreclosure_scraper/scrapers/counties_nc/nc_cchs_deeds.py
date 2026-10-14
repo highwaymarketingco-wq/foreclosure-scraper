@@ -7,6 +7,65 @@ The enrichment_gaston_rod module proves curl_cffi can reach these sites
 with Chrome TLS impersonation. We use the same approach here.
 
 Counties: Gaston, Alleghany, Caldwell, Franklin, Hertford, Gates
+
+2026-10-13 source-completeness audit (Pattern C re-check) — live-verified,
+TWO separate findings, neither an owner-login issue:
+
+1. ``_fetch_page``'s search URL (``{base}/search/?doctype=DEED&fromdate=...
+   &todate=...``) is NOT A REAL ROUTE on any of the 6 real hosts — it was
+   never verified against the live app. This is the SAME DevExpress
+   "LRSearch" MVC app enrichment_gaston_rod.py's own docstring already names
+   ("a CourthouseComputerSystems MVC / DevExpress app"), not the classic-ASP
+   SearchService.asp app rod/cchs.py's 5 different counties (Burke/
+   Cleveland/Lincoln/Madison/Henderson) use — this module has never shared
+   code or a verified endpoint with either of those. So every run of this
+   scraper has returned 0 rows for ALL 6 counties, for a different reason
+   than the module name suggests: not (only) Cloudflare, but a guessed URL
+   that 404s even when Cloudflare lets a request through.
+
+2. Live-verified (browser + curl_cffi, both independently) the 6 real hosts
+   split into two genuinely different categories:
+     * gastonnc, alleghanync — blocked by a Cloudflare JS/managed challenge
+       at the ROOT page, confirmed with BOTH a real rendering browser
+       (never clears in 20+s) AND curl_cffi Chrome-impersonation (403 on
+       the "Just a moment..." challenge page). This is the genuine
+       Cloudflare wall the module name describes — _fetch_page's existing
+       Playwright + enrichment_waf_oss fallback is the right tool for it
+       (same approach nc_rowan_cott.py and sc_rod_walled.py use), just
+       never reached because the URL above fails first.
+     * caldwellnc, franklinnc, hertfordnc, gatesnc — curl_cffi clears the
+       root page cleanly (200, real HTML) and the real search lives at
+       ``POST /LRSearch/ExecuteSearch`` on a 3-step session-seeded flow
+       (GET / -> GET /LRSearch/LRIndex?searchTabID=0 -> POST ExecuteSearch),
+       the exact same shape enrichment_gaston_rod.py already proves works
+       for a NAME search on this app family. A live-captured real
+       ``AdvancedFromDate``/``AdvancedToDate`` date-range body (browser
+       network capture, no name filled in) is the right shape for what
+       this scraper wants — BUT every live attempt against it (5 separate
+       POSTs, date windows from 3 to 29 days) came back Cloudflare 524
+       ("A timeout occurred" — the origin itself never answered in time),
+       including a request left to hang 40+s with no response at all. This
+       reproduced on every attempt regardless of window size, so it reads
+       as a genuine backend reliability limit of the no-name "Advanced"
+       search path on this app, not a parameter-guessing problem on this
+       end. enrichment_gaston_rod.py's own (fast, reliable, DEFAULT-ON
+       production) NAME search on the identical endpoint strongly suggests
+       the backend can't (or won't) run this query shape with no name
+       filter in reasonable time — a real site-side limitation, not
+       something a better request fixes.
+
+Given #2 could not be verified end-to-end even once in this session despite
+using the real, correct endpoint (as opposed to a plausible-looking guess),
+the fetch mechanism is intentionally left UNCHANGED here rather than ship an
+unverified rewrite — same precedent as this file's own sibling
+cash_buyer_deeds.py._cott_recent (Polk): "NOT fixed this batch rather than
+ship an unverified guess; left as a confirmed, scoped gap for a follow-up
+session instead of a mysterious silent zero." A future session with a
+confirmed-working date-range request against ExecuteSearch (or a narrower
+scope, like per-owner-name lookups the way enrichment_gaston_rod.py already
+does) should replace _fetch_page's search_url construction entirely for
+caldwell/franklin/hertford/gates, and keep the Playwright+WAF-solver path for
+gaston/alleghany.
 """
 from __future__ import annotations
 
@@ -58,6 +117,15 @@ class NcCchsDeedsScraper(BaseScraper):
         for county, cfg in _COUNTY_SITES.items():
             try:
                 base = _BASE.format(subdomain=cfg["subdomain"])
+                # KNOWN WRONG, left unchanged this session (see module
+                # docstring, 2026-10-13 audit): this path does not exist on
+                # the real DevExpress "LRSearch" app any of these 6 hosts
+                # run; the real search is POST {base}/LRSearch/ExecuteSearch
+                # on a 3-step session-seeded flow, live-verified reachable
+                # for caldwell/franklin/hertford/gates but reproducibly
+                # Cloudflare-524-timing-out on every attempt with no name
+                # filter -- not confidently fixable this session, so not
+                # rewritten rather than ship an unverified guess.
                 search_url = f"{base}/search/?doctype=DEED&fromdate={cutoff}&todate={end_date}"
 
                 log.info("nc_cchs.fetching", county=county)
