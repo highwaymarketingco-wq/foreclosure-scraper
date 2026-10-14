@@ -2621,6 +2621,9 @@ RAW_KEEP = {
                                            # 2026-10-14 Pattern C fix, commit c6c4e3a5
     "acclaim_rod": "*",                   # counties_sc.sc_rod_acclaim (Pickens): marker flag, commit
                                            # 1e18d7e6 -- registered here, was missed in that commit
+    "cott_image_fetch": "*",              # counties_sc.sc_rod_cott (Union): free-document recipe
+                                           # (dual-Referer Thumbnails+Image fetch, can't use the generic
+                                           # GET-only doc_inventory fetch) -- 2026-10-14, commit 1f3c9e3b
     "beaufort_rod": "*", "beaufort_pdf_fetch": "*", "clarendon_pdf_fetch": "*",
                                            # counties_sc.sc_rod_walled: Beaufort/Clarendon free-document
                                            # recipes (POST-only PDF endpoints, can't use the generic
