@@ -43,6 +43,17 @@ No key, no login, no CAPTCHA/WAF; ``services1.arcgis.com`` serves no robots.txt.
 Fields are enumerated explicitly (never ``outFields=*``) and paging uses
 ``resultOffset``/``resultRecordCount`` with an explicit ``orderByFields`` so the
 page window is deterministic.
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern A -- ArcGIS
+FeatureServer attachments): the audit flagged this file as never checking
+`hasAttachments`/`queryAttachments`, the same gap class fixed on
+asheville_helene.py. Live-checked both layers' own metadata directly
+(`Assignment_FLC/FeatureServer/0?f=json` and `/1?f=json`): both report
+`hasAttachments: false`. Confirmed with a direct `queryAttachments` call
+against a real OBJECTID on layer 1 (FLC): the server rejects it outright --
+`{"error":{"code":400,"details":["Layer does not support attachments."]}}` --
+not an empty-but-enabled layer, the capability does not exist on this service
+at all. No fix applied; nothing to fetch.
 """
 from __future__ import annotations
 

@@ -98,6 +98,19 @@ NEGATIVE FINDING, Dirty Deeds Tier A #14 (docs/dirty_deeds_synthesis_2026-09-10.
     Cnt_PARCEL>1 (or equivalent) on an INDIVIDUAL owner's name rather than an
     LLC, that would be the first real instance and would justify the
     detector the synthesis asks for.
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern A -- ArcGIS
+FeatureServer attachments): the audit flagged this file as never checking
+`hasAttachments`/`queryAttachments`, the same gap class fixed on
+asheville_helene.py. Live-checked all ten layers' own metadata directly
+(`<service>/FeatureServer/0?f=json` for every service in ``LAYERS``,
+delinquent_2020 through DELQ_TAX_WEEK1_2026): every one reports
+`hasAttachments: false`. Confirmed with a direct `queryAttachments` call
+against a real FID/OBJECTID on dqnt_2024, delinquent_2020, WeekOne2027 and
+DELQ_TAX_WEEK1_2026: each rejects it outright -- `{"error":{"code":400,
+"details":["Layer does not support attachments."]}}` -- not an empty-but-
+enabled layer, the capability does not exist on any of these services. No
+fix applied; nothing to fetch.
 """
 from __future__ import annotations
 
