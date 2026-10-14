@@ -2619,6 +2619,12 @@ RAW_KEEP = {
     "rowan_detail": "*",                  # counties_nc.nc_rowan_cott: Document Details click-through
                                            # (index_type, ref, images_count, returned_to, detail_url) --
                                            # 2026-10-14 Pattern C fix, commit c6c4e3a5
+    "acclaim_rod": "*",                   # counties_sc.sc_rod_acclaim (Pickens): marker flag, commit
+                                           # 1e18d7e6 -- registered here, was missed in that commit
+    "beaufort_rod": "*", "beaufort_pdf_fetch": "*", "clarendon_pdf_fetch": "*",
+                                           # counties_sc.sc_rod_walled: Beaufort/Clarendon free-document
+                                           # recipes (POST-only PDF endpoints, can't use the generic
+                                           # GET-only doc_inventory fetch) -- 2026-10-14, commit 7335c362
     "decedent": "*",                      # counties_sc.lexington_probate, nc_tylertech_estates
     "ip_block_resolved": "*",             # counties_nc.dc_ip_block
     "extracted_from_text": "*", "from_table": "*",   # counties_nc.morganton_nc, counties_sc.city_of_union
