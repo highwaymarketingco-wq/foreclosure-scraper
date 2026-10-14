@@ -45,13 +45,130 @@ Sites and gate types (all confirmed live 2026-10-12 unless noted):
 - us6.courthousecomputersystems.com/StokesNC — real Google reCAPTCHA,
   confirmed by screenshot, behind a terms-of-use disclaimer.
 
+LIVE RE-VERIFIED 2026-10-14 (source-completeness audit's "Needs YOU logged in"
+list, final item -- see docs/source_completeness_audit_2026-10-13.md). Every
+one of the above claims was re-checked against the live site, not trusted on
+the 2-day-old docstring, per the sibling discovery earlier the same night that
+5 other "needs login" files in that same list turned out to need no login at
+all. Of these 9, 8 reconfirmed exactly as above -- Wake, Iredell, Craven,
+Greene, Harnett, Randolph, Stokes all still show a real Google reCAPTCHA
+widget live (confirmed via Playwright DOM query for an actual
+`iframe[src*=recaptcha]`/`div.g-recaptcha`, not a string-grep on the page's
+raw HTML -- see the Durham correction below for why the stronger check
+matters), and Brunswick's math gate is still live. These 8 are left alone,
+genuinely walled, same boundary this audit night already drew at Jasper
+(`sc_rod_walled.py`, commit 7335c362): a real CAPTCHA this codebase cannot
+automate.
+
+- **Durham was WRONG and is now FIXED.** The 2026-10-12 entry's own words
+  were "very likely the same reCAPTCHA [as Wake], not individually
+  screenshotted" -- an inference by platform match, never actually checked.
+  Worse: this was already WRONG the day it was written, and the correct
+  answer was sitting in this same codebase. `rod/nc_tyler.py` (a
+  name-search ROD enricher for existing leads, unrelated purpose, written
+  2026-10-07) says in its own docstring: "Durham's disclaimer page loads
+  Google's reCAPTCHA script but showed no challenge on 2026-10-07." Five
+  days later this file's docstring guessed the opposite for the exact same
+  site, without checking -- a real in-repo contradiction, the same class of
+  bug this audit night already caught once in `sc_rod_cott.py` (Union
+  "pay-per-view" vs. `rod/doc_images.py`'s own "free" registry). Live-
+  verified 2026-10-14: a plain string search of Durham's raw HTML DOES
+  contain "g-recaptcha" (it ships in this Tyler "Self-Service" tenant's
+  shared JS bundle site-wide), which is exactly the false signal that made
+  the 2026-10-12 guess plausible -- but a real DOM query
+  (`page.query_selector("iframe[src*=recaptcha]")`) on both the disclaimer
+  page AND the search page returns nothing. The actual gate is just the
+  "I Accept" disclaimer button every Tyler Self-Service tenant has (id
+  `submitDisclaimerAccept`) -- no CAPTCHA at all. Clicking it fires a
+  client-side JS redirect, not a normal navigation, so a `networkidle` wait
+  immediately after the click still sees the disclaimer page; it needs a
+  real pause (confirmed live: <4s is enough) before the redirect lands on
+  `/web/`. From there `/web/search/DOCSEARCH5S1` is directly reachable and
+  returns real, live recording-date-filtered results with zero gate -- a
+  14-day window live-pulled 1,243 real documents (5 tagged FORECLOSURE,
+  264 DEED OF TRUST, etc.) on 2026-10-14. This tenant's result rows are
+  **not** `<table>` markup at all -- a jQuery-Mobile `ui-listview` of
+  `<li class="ss-search-row">` elements -- so the shared `_parse_html()`
+  below (which only looks for `table tr`) would find zero rows even with
+  the gate cleared. Durham gets its own flow (`_fetch_durham`), but NOT a
+  second hand-rolled parser: `rod/nc_tyler.py` already has a tested one for
+  this exact markup (`parse_selfservice`, built for its own name-search use
+  case) -- reused here via `_durham_record_to_listing` rather than
+  duplicated. Row capture itself is page-1-only (Tyler's ~100-row default
+  page size) of the 90-day window,
+  newest-first -- NOT full pagination (a 90-day window runs into the
+  thousands of rows; out of scope for this pass, flagged here same as every
+  other partial-coverage note in this codebase rather than silently claimed
+  complete).
+
+  Each row's primary document image IS viewable free, no login, no cart,
+  INSIDE an authenticated browser session: the detail page
+  (`/web/document/{documentid}`) embeds a PDF.js viewer whose iframe
+  `data-href` is a `/web/document-image-pdf/...` route that returned a real
+  `200 application/pdf` (live-verified on 2 real documents, 110KB/4-page and
+  similar) when fetched through `page.request` -- i.e. still carrying the
+  Playwright page's cookies. Deliberately **NOT** stamped via
+  `document_links.stamp_documents`, after first implementing exactly that
+  and then catching the mistake live: a bare `curl` (no cookies at all)
+  against that same URL gets a `302` to `/web/user/disclaimer` with a fresh
+  `Set-Cookie: JSESSIONID=...`, and adding a matching `Referer` header
+  (the fix that worked for Union/Cott's image route earlier tonight) does
+  NOT help -- this route checks a live server-side session, not the
+  Referer. `enrichment_doc_ocr.py`'s `_fetch_doc` fetches every stamped
+  `document_url` with a plain stateless `httpx.AsyncClient`, no cookie jar
+  carried over from this scraper's Playwright run, so a stamped link here
+  would silently 302 to the disclaimer HTML and fail OCR invisibly --
+  exactly the "looks wired, produces nothing downstream" failure mode this
+  codebase has hit before (e.g. the column-source silent-death pattern).
+  Left as a flagged, documented gap rather than shipped as a working
+  document link it isn't: the index-row data above (doc type, grantor,
+  grantee, book/page, filing date) is the confirmed-working deliverable;
+  the per-document image would need either a from-scratch rework of
+  `enrichment_doc_ocr.py` to carry a session (out of scope here, cross-cuts
+  every other scraper that module reads) or this scraper downloading the
+  PDF bytes itself while the session is live and storing them some other
+  way than a `raw` URL field (a bigger schema change, also out of scope).
+
+- **Brunswick's math gate is confirmed live but NOT actually solvable by
+  this codebase's `math_captcha.py` as written**, which matters because
+  `solve_math_captcha()` returns `True` (claims success) while silently
+  failing -- a real bug worth flagging even though it doesn't change
+  Brunswick's walled status. Live-tested 2026-10-14: the specific arithmetic
+  question ("Four Minus One Equals ___" per the 2026-10-12 screenshot) is
+  rendered as a CAPTCHA **image** (`getpng.php?a=N&b=M`), not as visible
+  text anywhere on the page -- `math_captcha.solve_math_question()` only
+  ever reads `page.inner_text("body")`, so it has nothing to OCR and no
+  real question to parse. Instead it spuriously pattern-matches the
+  Register of Deeds office's own phone number in the page footer
+  ("(910) 253-2690") as if it were the arithmetic expression "253-2690",
+  "solves" it to -2437, fills the answer field, submits, and reports
+  `solved=True` -- but the resulting page is byte-for-byte the same
+  disclaimer/login page as before the submit (confirmed by diffing
+  `inner_text()` before/after), i.e. the gate was never actually cleared.
+  Left alone: genuinely walled (an image-rendered math CAPTCHA, which is a
+  materially different and harder problem than the text-based one this
+  module was built for), not patched as part of this pass since fixing
+  `math_captcha.py` itself is a separate, broader change outside this file
+  and outside this audit's current scope -- flagged for whoever picks it up
+  next instead of silently papering over the false-positive return value.
+
 Strategy:
-1. Launch Playwright browser (headless on VM).
+1. Launch Playwright browser (headful -- required; see the `headless=False`
+   note on the browser launch call below).
 2. Navigate to the entry/disclaimer page.
-3. If math captcha: use math_captcha.solve_math_captcha(page)
-4. If reCAPTCHA V2: use enrichment_recaptcha_audio.solve_recaptcha_v2(page)
+3. Durham (`gate == "none"`): click the disclaimer Accept button, no CAPTCHA
+   -- see `_fetch_durham`.
+4. Otherwise: if math captcha, try math_captcha.solve_math_captcha(page); if
+   reCAPTCHA V2, try enrichment_recaptcha_audio.solve_recaptcha_v2(page).
+   Both are live-reverified 2026-10-14 to never actually get past Brunswick/
+   Wake/Iredell/Craven/Greene/Harnett/Randolph/Stokes's real gates (see
+   above) -- these 8 are expected to always fall through to the WAF-bypass
+   attempt and then `continue` past, genuinely blocked, by design.
 5. Once through, search for deeds by date range.
-6. Parse results.
+6. Parse results (Durham via its own row parser; the rest via `_parse_html`,
+   which only matches `<table>` markup and would need rework if any of the
+   remaining 8 ever actually clears its gate -- none of them use a `<table>`
+   either, per the live HTML pulled 2026-10-14).
 """
 from __future__ import annotations
 
@@ -70,7 +187,9 @@ log = structlog.get_logger()
 
 _COUNTY_SITES = {
     "wake": {"url": "https://rodrecords.wake.gov/web", "gate": "recaptcha", "search_path": "/user/disclaimer"},
-    "durham": {"url": "https://rodweb.dconc.gov/web", "gate": "recaptcha", "search_path": "/user/disclaimer"},
+    # gate "none": live-reverified 2026-10-14 -- no CAPTCHA at all, just a
+    # disclaimer click-through. See module docstring's Durham correction.
+    "durham": {"url": "https://rodweb.dconc.gov/web", "gate": "none", "search_path": "/search/DOCSEARCH5S1"},
     "brunswick": {"url": "https://brunswick-live.inttek.net", "gate": "math", "search_path": "/search"},
     "iredell": {"url": "https://iredellnc.courthousecomputersystems.com", "gate": "recaptcha", "search_path": "/search"},
     "craven": {"url": "https://us5.courthousecomputersystems.com/CravenNC2", "gate": "recaptcha", "search_path": "/search"},
@@ -122,6 +241,18 @@ class NcRodCaptchaScraper(BaseScraper):
                     await page.wait_for_load_state("networkidle", timeout=10000)
 
                     gate = cfg["gate"]
+
+                    if gate == "none":
+                        # Durham: no CAPTCHA, just the disclaimer Accept button --
+                        # see module docstring's 2026-10-14 correction. Completely
+                        # different DOM (no <table>), so it gets its own parser
+                        # instead of the generic search-fill + _parse_html below.
+                        county_results = await self._fetch_durham(page, entry_url, cfg["search_path"])
+                        results.extend(county_results)
+                        await page.close()
+                        log.info("nc_rod_captcha.county_done", county=county, found=len(county_results))
+                        continue
+
                     gate_cleared = False
 
                     if gate == "math":
@@ -205,6 +336,115 @@ class NcRodCaptchaScraper(BaseScraper):
             await browser.close()
 
         return results
+
+    async def _fetch_durham(self, page: Any, entry_url: str, search_path: str) -> list[Listing]:
+        """Durham ROD: disclaimer click-through only, no CAPTCHA (confirmed live
+        2026-10-14 -- see module docstring's Durham correction for the full
+        evidence, including why the 2026-10-12 "very likely the same reCAPTCHA"
+        guess was wrong). Tyler "Self-Service" platform, same as Wake, but this
+        tenant never actually renders a recaptcha widget.
+        """
+        results: list[Listing] = []
+
+        try:
+            accept_btn = await page.wait_for_selector("#submitDisclaimerAccept", timeout=10000)
+            await accept_btn.click(force=True)
+            # The Accept click fires a client-side JS redirect, not a normal
+            # navigation -- a `networkidle` wait immediately after the click
+            # still sees the disclaimer page (confirmed live). Give the
+            # redirect time to land on /web/ before moving on.
+            await page.wait_for_timeout(4000)
+        except Exception as exc:
+            log.warning("nc_rod_captcha.durham_disclaimer_failed", error=str(exc)[:160])
+            return results
+
+        search_url = f"{entry_url}{search_path}"
+        try:
+            await page.goto(search_url, timeout=30000)
+            await page.wait_for_load_state("networkidle", timeout=15000)
+
+            cutoff = datetime.now() - timedelta(days=90)
+            start_str = cutoff.strftime("%m/%d/%Y")
+            end_str = datetime.now().strftime("%m/%d/%Y")
+
+            start_input = await page.wait_for_selector(
+                "#field_RecordingDateID_DOT_StartDate", timeout=10000)
+            end_input = await page.query_selector("#field_RecordingDateID_DOT_EndDate")
+            await start_input.fill(start_str)
+            await end_input.fill(end_str)
+
+            search_btn = await page.query_selector("#searchButton")
+            if not search_btn:
+                log.warning("nc_rod_captcha.durham_no_search_button")
+                return results
+            await search_btn.click()
+            await page.wait_for_timeout(5000)
+            await page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception as exc:
+            log.warning("nc_rod_captcha.durham_search_failed", error=str(exc)[:160])
+            return results
+
+        # NOTE: page 1 only (Tyler's ~100-row default page size), newest-first,
+        # of a 90-day window -- not full pagination. A 90-day window runs into
+        # the thousands of rows on this platform; see module docstring.
+        html = await page.content()
+        from ...rod.nc_tyler import parse_selfservice
+        try:
+            records = parse_selfservice(html)
+        except Exception as exc:
+            log.warning("nc_rod_captcha.durham_parse_failed", error=str(exc)[:160])
+            return results
+        log.info("nc_rod_captcha.durham_rows", count=len(records))
+
+        for record in records:
+            li = self._durham_record_to_listing(record, search_url)
+            if li is not None:
+                results.append(li)
+
+        return results
+
+    def _durham_record_to_listing(self, record: Any, source_url: str) -> Listing | None:
+        """Build a Listing from one `rod.nc_tyler.parse_selfservice` IndexRecord.
+        Reuses that already-tested parser (same `rod/nc_tyler.py` module that
+        already correctly found, on 2026-10-07, that Durham's disclaimer page
+        "loads Google's reCAPTCHA script but showed no challenge" -- a finding
+        this file's own 2026-10-12 entry contradicted and got wrong, see the
+        module docstring's Durham correction) instead of hand-rolling a second
+        parser for the exact same HTML shape. Mirrors the shared `_parse_html`'s
+        raw-key shape (county/doc_type/filing_date/grantor/grantee/book_page)
+        so no new raw keys need registering in web_artifact.py."""
+        doc_number = (record.instrument_no or "").strip()
+        if not doc_number:
+            return None
+
+        book_page = " ".join(
+            p for p in (
+                f"BT: {record.index_code}" if record.index_code else "",
+                f"B: {record.book}" if record.book else "",
+                f"P: {record.page}" if record.page else "",
+            ) if p
+        )
+
+        return Listing(
+            source=self.slug,
+            source_url=source_url,
+            listing_type=ListingType.UNKNOWN,
+            property_kind=PropertyKind.UNKNOWN,
+            county="Durham",
+            state="NC",
+            case_number=doc_number,
+            owner_name=", ".join(record.grantees) or None,
+            plaintiff=", ".join(record.grantors) or None,
+            legal_description=record.description or None,
+            raw={
+                "county": "durham",
+                "doc_type": record.doc_type or "",
+                "filing_date": record.recorded or "",
+                "grantor": ", ".join(record.grantors),
+                "grantee": ", ".join(record.grantees),
+                "book_page": book_page,
+            },
+        )
 
     def _parse_html(self, html: str, county: str, base_url: str) -> list[Listing]:
         """Parse deed search results from HTML."""

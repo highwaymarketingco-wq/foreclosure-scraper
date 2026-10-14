@@ -209,7 +209,46 @@ reasoning as `raw['beaufort_pdf_fetch']`/`raw['clarendon_pdf_fetch']` above). Se
 `tests/test_cott_recordroom.py` + `tests/test_rod_doc_images.py`. **Removed from this list** — it
 needs no login and nothing further is queued here for it.
 
-- `counties_nc/nc_rod_captcha.py` (9 counties — already has real login/CAPTCHA mechanics built)
+**CORRECTION 2026-10-14 (cont.)** — `counties_nc/nc_rod_captcha.py` was also partially WRONG
+here, on Durham only (the other 8 counties below were re-verified live and are confirmed
+correct). The 2026-10-12 rewrite guessed Durham's gate was "very likely the same reCAPTCHA [as
+Wake]" by platform match, never individually checked — and this was already wrong the day it
+was written, since a DIFFERENT module in this same codebase (`rod/nc_tyler.py`, a name-search ROD
+enricher for existing leads, written 2026-10-07) already recorded in its own docstring that
+"Durham's disclaimer page loads Google's reCAPTCHA script but showed no challenge." A real
+in-repo contradiction, same class as the Union "pay-per-view" one above, just never
+cross-checked. Live-verified 2026-10-14 (a Playwright DOM query for an actual
+`iframe[src*=recaptcha]`, not a string-grep — the literal string "g-recaptcha" genuinely IS
+present in Durham's shared JS bundle, which is exactly what made the wrong guess plausible):
+zero CAPTCHA, just the "I Accept" disclaimer button every Tyler Self-Service tenant has.
+`/web/search/DOCSEARCH5S1` is then directly reachable and returns real results with zero gate —
+a 14-day pull live-tagged 1,243 real documents (5 FORECLOSURE, 264 DEED OF TRUST) on 2026-10-14.
+Fixed in `scrapers/counties_nc/nc_rod_captcha.py` (`_fetch_durham`, reusing `rod/nc_tyler.py`'s
+already-tested `parse_selfservice` row parser rather than duplicating it, via new
+`_durham_record_to_listing`); see `tests/test_nc_rod_captcha.py`. Per-document image capture was
+explicitly NOT added despite being viewable free inside an authenticated session: a cold request
+against that same PDF route 302s to the disclaimer page with a fresh `JSESSIONID` cookie, and the
+generic `enrich_doc_ocr.py` pass fetches every `document_url` with a stateless client carrying no
+session — stamping it would silently ship a dead link, so it is flagged as a documented gap
+instead rather than a working capability it isn't (a genuine server-side session gate, unlike the
+header-only Referer gates `raw['beaufort_pdf_fetch']`/`raw['clarendon_pdf_fetch']`/
+`raw['cott_image_fetch']` above worked around).
+
+The other 8 counties in this file were re-verified live 2026-10-14, not carried over from the
+2026-10-12 docstring unchecked, and all 8 reconfirmed genuinely walled: Wake, Iredell, Craven,
+Greene, Harnett, Randolph, Stokes all show a real Google reCAPTCHA widget live (confirmed by DOM
+query, not grep); Brunswick's math gate is also still live, though it turned out to be a
+DIFFERENT and worse problem than expected — the question is rendered as a CAPTCHA image
+(`getpng.php?a=N&b=M`), not readable text, so this codebase's own `math_captcha.py` cannot solve
+it at all: it silently pattern-matches the Register of Deeds office's own phone number in the
+page footer instead, reports `solved=True`, and submits a wrong answer that never actually clears
+the gate (confirmed by diffing the page before/after the submit) — a real false-positive bug in
+`math_captcha.py` worth flagging for whoever next touches that module, even though it does not
+change Brunswick's walled status here.
+
+- `counties_nc/nc_rod_captcha.py` — **8 of 9 counties remain genuinely walled** (Wake, Brunswick,
+  Iredell, Craven, Greene, Harnett, Randolph, Stokes); Durham **removed from this list** — fixed
+  above, needs no login.
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)
 - `public_notices/nc_notices_counties.py` vs `ncpublicnotices.py` (same site — does the
   interstitial actually gate it or not? One module says yes, the other's code says no.)
