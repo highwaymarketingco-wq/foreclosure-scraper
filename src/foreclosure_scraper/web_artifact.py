@@ -2627,6 +2627,12 @@ RAW_KEEP = {
     "wake_detail": "*",                   # counties_nc.nc_rod_captcha (Wake): nested detail block
                                            # (related_documents, one-hop follow-through) -- same
                                            # pattern as rowan_detail/brunswick_detail, commit 08e29a17
+    "jasper_doc_image": "*", "ccs_devexpress_rod": "*",
+                                           # counties_sc.sc_rod_walled (Jasper): CCS DevExpress ROD
+                                           # free-document recipe + search marker -- doc image kept
+                                           # out of document_links' denylist-excluded stamp_documents
+                                           # path (ProcessedImages/ URLs), same as Clarendon -- commit
+                                           # 069ee8e8
     "cott_image_fetch": "*",              # counties_sc.sc_rod_cott (Union): free-document recipe
                                            # (dual-Referer Thumbnails+Image fetch, can't use the generic
                                            # GET-only doc_inventory fetch) -- 2026-10-14, commit 1f3c9e3b
