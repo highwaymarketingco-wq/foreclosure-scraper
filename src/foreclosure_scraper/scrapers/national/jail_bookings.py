@@ -34,6 +34,37 @@ Each system returns current in-custody inmates. We extract:
   - Primary charge description
   - Release status (in-custody flag + scheduled release date where published)
 
+FIXED 2026-10-14 (source-completeness audit, "mugshot inconsistency across
+vendors" flag). Before this fix, 2 of 5 vendors (Zuercher's inline base64, the
+modern P2C/Buncombe ImageId URL) carried a real mugshot through to
+raw['jail_booking']['mugshot'], and the other 3 silently carried none, even
+though 2 of those 3 genuinely publish one:
+  - Citizen Connect (Henderson NC): every booking card's HTML already embeds
+    a per-inmate `<img class='booking-mugshot' src='https://ssmugshots.blob.
+    core.windows.net/images/<agency>-<nameid>-<bookingid>-...-Mugshot-1.jpg'>`
+    -- live-verified 179/180 real photo URLs across the full roster (1 row
+    fell back to the vendor's own literal "NoMugshot.jpg", which is filtered
+    out rather than kept as if it were a photo). Free: the URL is already in
+    the fetched HTML, no extra request.
+  - Tyler New World (Gaston NC): the grid's own "Photo" column (previously
+    discarded -- `_strip_tags` on an `<img>`-only cell strips it to "") is a
+    real, directly-fetchable `/Inmate/Photo/<id>?type=Search` path -- live-
+    verified on 2 ids returning distinct real JPEGs (25,879 / 32,308 bytes),
+    no session or auth needed. Free: also just a URL, no extra request.
+  - CentralSquare P2C jqGrid (Cleveland NC): THE ONE REAL EXCEPTION. This
+    legacy ASP.NET WebForms system has no direct per-row image URL at all --
+    live-verified the only way to reach a mugshot is to replay the grid's own
+    "select row" postback (GET page for __VIEWSTATE, POST the grid query to
+    seed server-side session state, POST the postback with the row's `invid`,
+    then GET the now-session-scoped `Mug.aspx`) and that produces a real,
+    distinct JPEG per row (confirmed on 5 rows, 5 different byte counts).
+    That is 2+ extra requests PER INMATE against one small county host for
+    ~300 rows every run -- the same "rude and slow" math the Tyler detail
+    page already solved below by deferring to on-demand hydration. The fetch
+    helper (`_fetch_p2c_jqgrid_mugshot`) is built and exposed for that same
+    selective-hydration pattern (only rows that actually matched an owner),
+    not called eagerly from `_fetch_p2c_jqgrid`.
+
 NOT covered — Spartanburg SC: the Sheriff's Office "Bookings Search"
 (spartanburgsheriff.org/258/Bookings-Search) 302s to
 http://mugshots.spartanburgsheriff.org/, a legacy PHP roster
@@ -55,11 +86,13 @@ robots.txt on the host anyway and fail-closed if disallowed.
 from __future__ import annotations
 
 import asyncio
+import base64
 import html
 import math
 import re
 from datetime import datetime, timezone
 from typing import Iterable
+from urllib.parse import urljoin
 
 import structlog
 
@@ -372,6 +405,82 @@ async def _fetch_p2c_jqgrid(base: str) -> list[dict]:
     return out
 
 
+async def _fetch_p2c_jqgrid_mugshot(base: str, book_id: str) -> str | None:
+    """Fetch ONE inmate's mugshot from a classic CentralSquare P2C jqGrid system.
+
+    Unlike every other vendor in this file, this system has no direct per-row
+    image URL -- the photo is revealed only by replaying the live grid's own
+    "select row" ASP.NET WebForms postback in a session that has already
+    loaded that row, then GETting the now session-scoped Mug.aspx. Confirmed
+    live 2026-10-14 on Cleveland NC: 5 different rows produced 5 real,
+    differently-sized JPEGs this way.
+
+    That is a GET (fresh __VIEWSTATE) + a POST (seed the session with the
+    same full, sorted grid query `_fetch_p2c_jqgrid` already runs, so this
+    book_id's position in it is reproducible) + a POST (the postback,
+    selecting that position) + a GET (the photo) -- 4 requests for ONE photo.
+    Doing that for an entire ~300-row roster every run would multiply this
+    scraper's request volume against one small county host by ~300x, the
+    same "rude and slow" math Tyler's `_fetch_tyler_detail` below already
+    exists to avoid. So this is NOT called from `_fetch_p2c_jqgrid` --
+    it is exposed standalone for selective, matched-row-only hydration
+    (same pattern as `_hydrate_tyler_hits` in enrichment_jail_bookings.py).
+
+    Returns a `data:image/jpeg;base64,...` URI (consistent with how the
+    Zuercher vendor's own inline base64 mugshot is stored), or None.
+    """
+    from curl_cffi.requests import AsyncSession
+
+    try:
+        async with AsyncSession(impersonate="chrome", verify=False) as s:
+            r = await s.get(f"{base}/jailinmates.aspx", timeout=20)
+            body = r.text or ""
+
+            def _hidden(name: str) -> str:
+                m = re.search(rf'id="{name}"[^>]*value="([^"]*)"', body)
+                return m.group(1) if m else ""
+
+            viewstate = _hidden("__VIEWSTATE")
+            viewstategen = _hidden("__VIEWSTATEGENERATOR")
+            eventvalidation = _hidden("__EVENTVALIDATION")
+            if not viewstate:
+                return None
+
+            gr = await s.post(
+                f"{base}/jqHandler.ashx?op=s",
+                data={
+                    "t": "ii", "_search": "false", "rows": "2000",
+                    "page": "1", "sidx": "disp_name", "sord": "asc",
+                },
+                timeout=30,
+            )
+            rows = (gr.json() or {}).get("rows") or []
+            invid = next(
+                (rw.get("invid") for rw in rows
+                 if str(rw.get("book_id") or "") == str(book_id)),
+                None,
+            )
+            if not invid:
+                return None
+
+            data = {
+                "__VIEWSTATE": viewstate,
+                "__VIEWSTATEGENERATOR": viewstategen,
+                "__EVENTVALIDATION": eventvalidation,
+                "ctl00$MasterPage$mainContent$CenterColumnContent$hfRecordIndex": str(invid),
+                "ctl00$MasterPage$mainContent$CenterColumnContent$btnInmateDetail": "",
+            }
+            await s.post(f"{base}/jailinmates.aspx", data=data, timeout=30)
+            mug = await s.get(f"{base}/Mug.aspx", timeout=20)
+            if mug.status_code != 200 or not mug.content:
+                return None
+            return "data:image/jpeg;base64," + base64.b64encode(mug.content).decode("ascii")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("jail_scraper.p2c_jqgrid_mugshot_fail", base=base,
+                    book_id=book_id, error=str(exc)[:120])
+        return None
+
+
 async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
     """Fetch current in-custody roster from modern CentralSquare P2C (policetocitizen.com).
 
@@ -511,6 +620,13 @@ _CC_CHARGE_RE = re.compile(
 _CC_TOTAL_RE = re.compile(r"Total Inmates:.*?>(\d+)<", re.S)
 _CC_SHOWING_RE = re.compile(r"Showing\s+\d+-(\d+)\s+of\s+(\d+)\s+inmates")
 _CC_PAGE_SIZE = 20
+# FOUND 2026-10-14: every card already embeds a real per-inmate mugshot
+# <img>, previously never read (see module docstring). The vendor's own
+# fallback for a booking with no uploaded photo is a literal, shared
+# "NoMugshot.jpg" asset -- NOT per-row data, so it's detected and dropped
+# rather than kept as if it were a real photo (live-verified 179 real /
+# 1 fallback across Henderson's full roster).
+_CC_MUGSHOT_RE = re.compile(r"""class=['"]booking-mugshot[^'"]*['"]\s*\n?\s*src=['"]([^'"]+)['"]""")
 
 
 def _parse_citizen_connect_cards(html_text: str) -> list[dict]:
@@ -532,6 +648,10 @@ def _parse_citizen_connect_cards(html_text: str) -> list[dict]:
         # "36 years / W / M" -> "36"
         age = (fields.get("Demographics", "").split(" years")[0].strip()
                or None)
+        mm = _CC_MUGSHOT_RE.search(card)
+        mugshot_src = mm.group(1) if mm else None
+        if mugshot_src and "nomugshot" in mugshot_src.lower():
+            mugshot_src = None
         out.append({
             "last": last, "first": first,
             "middle": _space_middle(flat_name) or None,
@@ -543,6 +663,7 @@ def _parse_citizen_connect_cards(html_text: str) -> list[dict]:
             # This feed is the CURRENT-confinements list, so every row is a
             # person still in custody; the vendor publishes no release column.
             "release_status": "in_custody",
+            "mugshot_url": mugshot_src,
             # Forward the full label:value card dict (Demographics, Booked,
             # Facility, etc.) — the parser reads few of these but they carry
             # extra skip-trace signal.
@@ -616,9 +737,18 @@ _TNW_SHOWING_RE = re.compile(
     r"Showing\s*(\d+)\s*to\s*(\d+)\s*of\s*(\d+)", re.S)
 _TNW_FIELD_RE = re.compile(r'<span id=([A-Za-z]+)>(.*?)</span>', re.S)
 _TNW_MAX_PAGES = 30
+# FOUND 2026-10-14: the grid's own "Photo" column was always discarded --
+# `_TNW_CELL_RE` matches `class="Photo"` same as any other cell, but
+# `_strip_tags` on a cell that is ONLY an `<img>` (no text) strips it to ""
+# before this regex ever runs, so the field quietly became useless. This
+# captures the real `src` directly off the row, live-verified on 2 ids as
+# distinct, directly-fetchable real JPEGs (25,879 / 32,308 bytes), no
+# session or auth needed -- unlike the jqGrid vendor below, this is a plain
+# URL with zero extra request cost.
+_TNW_PHOTO_RE = re.compile(r'<td class="Photo"><img src="([^"]+)"', re.S)
 
 
-def _parse_tyler_rows(html_text: str) -> list[dict]:
+def _parse_tyler_rows(html_text: str, base: str = "") -> list[dict]:
     """Parse the in-custody grid of a Tyler New World InmateInquiry page."""
     out: list[dict] = []
     for rowm in _TNW_ROW_RE.finditer(html_text or ""):
@@ -634,11 +764,17 @@ def _parse_tyler_rows(html_text: str) -> list[dict]:
         if not in_custody:
             continue
         det = _TNW_DETAIL_RE.search(row)
+        photo_m = _TNW_PHOTO_RE.search(row)
+        mugshot_url = (
+            urljoin(base, html.unescape(photo_m.group(1))) if photo_m and base
+            else (html.unescape(photo_m.group(1)) if photo_m else None)
+        )
         sched = cells.get("ScheduledReleaseDate") or None
         out.append({
             "last": last, "first": first,
             "middle": _comma_middle(html.unescape(cells["Name"])) or None,
             "dob": cells.get("DateOfBirth") or None,
+            "mugshot_url": mugshot_url,
             "arrest_date": None,   # booking date lives on the detail page
             "charge": "",          # charges live on the detail page
             "release_status": (f"scheduled_release {sched}" if sched
@@ -711,7 +847,7 @@ async def _fetch_tyler_inmate_inquiry(base: str, detail_limit: int = 0) -> list[
             while page <= _TNW_MAX_PAGES:
                 r = await s.get(f"{base}?InCustody=True&Page={page}", timeout=60)
                 body = r.text or ""
-                recs = _parse_tyler_rows(body)
+                recs = _parse_tyler_rows(body, base=base)
                 if not recs:
                     break
                 out.extend(recs)
