@@ -189,3 +189,110 @@ async def discover_recent_nods(state: str, county: str, days_back: int = 45,
         return out
     log.info("acclaim.discovered", county=county, scanned=scanned, distress=len(out))
     return out
+
+
+# ---------------------------------------------------------------------------
+# Cloudflare-walled AcclaimWeb deployments (e.g. Clarendon County SC) — same
+# vendor, same free/no-login search+document API as discover_recent_nods
+# above, but the edge itself (not the AcclaimWeb app) blocks plain httpx/
+# curl-cffi with a real managed-challenge/Turnstile 403 on the search POSTs
+# (a bare GET of the landing page passes fine; it is the POST that is
+# gated). Live-verified 2026-10-14: nodriver (wall_bypass/browser_utils'
+# existing Cloudflare tier), retried in HEADED mode, clears the challenge;
+# once cleared, the exact same search/GridResults + Image/
+# DocumentPdfAllPages/{TransactionItemId} calls this module makes over httpx
+# work identically when issued as in-page `fetch()` calls from that same
+# browser tab (cookies ride along automatically) -- confirmed against 4 live
+# distress documents (LIEN/MTG, MECH LIEN/MTG) + 2 controls, all 200
+# application/pdf with correct %PDF-1.4 bytes.
+#
+# The caller (a scraper that already owns a Cloudflare-cleared nodriver tab)
+# passes it in here; this module never starts a browser itself.
+async def _search_chunk_via_tab(tab, base: str, frm: datetime, to: datetime) -> list[dict]:
+    """Same as _search_chunk, but issued as in-page fetch() calls on an
+    already-Cloudflare-cleared nodriver tab instead of an httpx client."""
+    import json as _json
+
+    js = """
+    (async () => {
+        const p1 = new URLSearchParams({
+            DocTypes: 'all', 'DocTypesDisplay-input': 'All', DocTypesDisplay: '',
+            DateRangeList: ' ', RecordDateFrom: %r,
+            DefaultFromDate: '1/1/1828', RecordDateTo: %r, btnSearch: 'Search'
+        });
+        const r1 = await fetch(%r, {
+            method: 'POST', credentials: 'same-origin',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: p1.toString(),
+        });
+        const t1 = await r1.text();
+        if (t1.includes('ShowError') || t1.toLowerCase().includes('exceeded')) {
+            return JSON.stringify({over_cap: true});
+        }
+        const p2 = new URLSearchParams({page: '1', size: '2000', pageSize: '2000'});
+        const r2 = await fetch(%r, {
+            method: 'POST', credentials: 'same-origin',
+            headers: {'X-Requested-With': 'XMLHttpRequest',
+                      'Content-Type': 'application/x-www-form-urlencoded'},
+            body: p2.toString(),
+        });
+        const t2 = await r2.text();
+        return JSON.stringify({status: r2.status, body: t2});
+    })()
+    """ % (_fmt(frm), _fmt(to),
+           f"{base}/search/SearchTypeDocType?Length=6",
+           f"{base}/Search/GridResults")
+
+    try:
+        result = await tab.evaluate(js, await_promise=True, return_by_value=True)
+        outer = _json.loads(result)
+    except Exception as exc:
+        log.warning("acclaim.tab_search_failed", error=f"{type(exc).__name__}: {exc}"[:160])
+        return []
+    if outer.get("over_cap"):
+        log.warning("acclaim.window_over_cap", frm=_fmt(frm), to=_fmt(to))
+        return []
+    if outer.get("status") != 200:
+        return []
+    try:
+        return _json.loads(outer["body"]).get("data") or []
+    except (ValueError, KeyError):
+        return []
+
+
+async def discover_recent_nods_via_browser(
+    tab, state: str, county: str, base: str,
+    days_back: int = 45, max_docs: int = 400,
+) -> list[RodDoc]:
+    """Same sweep as discover_recent_nods, for a Cloudflare-walled AcclaimWeb
+    deployment -- driven over an already-Cloudflare-cleared nodriver `tab`
+    instead of a bare httpx client. See the module-level note above this
+    function for the live-verification evidence."""
+    today = datetime.utcnow()
+    earliest = today - timedelta(days=max(1, days_back))
+    out: list[RodDoc] = []
+    seen: set[str] = set()
+    scanned = 0
+    cur = today
+    first = True
+    while cur > earliest and len(out) < max_docs:
+        if not first:
+            await asyncio.sleep(1.0)
+        first = False
+        chunk_from = max(earliest, cur - timedelta(days=_CHUNK_DAYS))
+        rows = await _search_chunk_via_tab(tab, base, chunk_from, cur)
+        scanned += len(rows)
+        for row in rows:
+            if not is_distress(row.get("DocType")):
+                continue
+            inst = (row.get("InstrumentNumber") or "").strip()
+            if inst and inst in seen:
+                continue
+            if inst:
+                seen.add(inst)
+            out.append(_row_to_doc(row, state, county, base))
+            if len(out) >= max_docs:
+                break
+        cur = chunk_from - timedelta(days=1)
+    log.info("acclaim.discovered_via_browser", county=county, scanned=scanned, distress=len(out))
+    return out

@@ -58,9 +58,14 @@ Affected: `counties_nc/nc_rod_captcha.py` (9 counties, 2 vendor platforms),
 ~~`counties_sc/sc_rod_acclaim.py`~~ (same AcclaimWeb vendor as Cherokee itself — **FIXED
 2026-10-14**, see correction note under "Needs YOU logged in" below: no login was ever needed,
 and the per-document scanned PDF is now wired into `raw['document_url']`/`raw['documents']`),
-`counties_sc/sc_rod_walled.py` (Clarendon runs the literal same AcclaimWeb software, but Clarendon's
-own deployment has not itself been live-checked — do not assume the Pickens finding transfers
-without confirming it), `national/cash_buyer_deeds.py`.
+~~`counties_sc/sc_rod_walled.py`~~ (Beaufort + Clarendon — **FIXED 2026-10-14**, see correction
+note under "Needs YOU logged in" below: Beaufort needed no login either (its old generic
+Playwright table-scraper just never matched its ag-Grid SPA); Clarendon's own AcclaimWeb
+deployment WAS live-checked this time (the prior flag above was right not to assume it) and the
+Pickens finding does transfer — no login, just Cloudflare, cleared with this codebase's existing
+nodriver tier. Jasper (third county in this file) is a genuinely different case: Cloudflare PLUS
+an independent Google reCAPTCHA v2 gate on the search feature itself — left queued below, not
+fixed), `national/cash_buyer_deeds.py`.
 One is worse than "never looked at" — **a real in-repo contradiction**:
 `counties_sc/sc_rod_cott.py`'s own docstring claims Union's document images are "pay-per-view,"
 but the shared `rod/doc_images.py` module explicitly registers Union as confirmed **free**
@@ -149,9 +154,33 @@ into `raw['document_url']`/`raw['documents']` via `document_links.stamp_document
 `tests/test_acclaim_rod.py`. **Removed from this list** — it needs no login and nothing further
 is queued here for it.
 
-- `counties_sc/sc_rod_walled.py` (Beaufort/Jasper/Clarendon — Clarendon is the same AcclaimWeb
-  software as Pickens, so the login-free finding above is likely to transfer, but Clarendon's
-  own deployment has NOT been live-checked — do not assume without confirming)
+**CORRECTION 2026-10-14 (cont.)** — `counties_sc/sc_rod_walled.py` was also WRONGLY listed here
+for Beaufort AND Clarendon (Jasper is a genuinely different, still-walled case — see its own
+bullet below). Live-checked, not assumed:
+  * **Beaufort** — no WAF, and its own `api/search/clientinfo` confirms `authentication":"0"`,
+    `useRecaptchaV3":null`, `encryptData":"0"` — no login, no CAPTCHA, no field encryption. The
+    real gap was the old generic Playwright table-scraper never matching Beaufort's ag-Grid
+    Angular SPA; fixed by calling the vendor's own free JSON API directly
+    (`rod/beaufort_dmp.py`) — no browser needed at all now.
+  * **Clarendon** — the login-free AcclaimWeb finding above DOES transfer (same vendor, same free
+    `Image/DocumentPdfAllPages/{TransactionItemId}` PDF, live-verified against 4 real distress
+    documents + 2 controls): the only wall is Cloudflare at the edge, and this codebase's
+    existing nodriver tier (`wall_bypass.py`/`browser_utils.py`) already clears it. Fixed in
+    `rod/acclaim.py` (`discover_recent_nods_via_browser`, the same search/PDF logic as Pickens
+    issued as in-page `fetch()` calls from a Cloudflare-cleared tab) +
+    `scrapers/counties_sc/sc_rod_walled.py`. Unlike Pickens, the PDF endpoint ITSELF stays behind
+    Cloudflare (a cold GET 403s), so it is recorded under `raw['clarendon_pdf_fetch']` rather than
+    stamped into `raw['document_url']`/`raw['documents']`, which the generic GET-only
+    `enrich_doc_ocr.py` pass would 403 against. See `tests/test_sc_rod_walled.py`.
+  * **Removed from this list for Beaufort and Clarendon** — neither needs a login. Jasper stays
+    queued (see its own bullet below): it is a different vendor (Courthouse Computer Systems)
+    behind a different, genuinely-unautomated wall.
+
+- `counties_sc/sc_rod_walled.py` — **Jasper only now** (Beaufort/Clarendon fixed above). Cloudflare
+  at the edge is clearable the same way as Clarendon, but the Land Records search tab itself is
+  ALSO gated by a real Google reCAPTCHA v2 ("Please complete the CAPTCHA to enter this site",
+  sitekey `6LfblzYqAAAAAFNl9g-RwU5zbI97HFqwWbhoD4Rb") — confirmed live 2026-10-14 with nodriver
+  already past the Cloudflare challenge. Genuinely walled; not automated.
 - `counties_sc/sc_rod_cott.py` (Union — the free/pay-per-view contradiction above needs settling)
 - `counties_nc/nc_rod_captcha.py` (9 counties — already has real login/CAPTCHA mechanics built)
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)

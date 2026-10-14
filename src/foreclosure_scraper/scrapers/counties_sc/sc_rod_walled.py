@@ -1,47 +1,87 @@
 """SC Register of Deeds walled sites — Beaufort, Jasper, Clarendon.
 
-Beaufort: rod.beaufortcountysc.gov/BrowserViewDMP/ — Angular SPA, no WAF.
-Jasper: us6.courthousecomputersystems.com/jasperSC — Cloudflare 403, needs WAF solver.
-Clarendon: acclaimprod.clarendoncountygov.org/acclaimweb — Cloudflare 403, needs WAF solver.
+Live-reverified 2026-10-14 (the prior Playwright/generic-SPA-table-scraping
+implementation was replaced; see each county's section below). This file was
+flagged by docs/source_completeness_audit_2026-10-13.md as needing the
+owner's own login for all three counties, on the strength of the sibling
+`sc_rod_acclaim.py` (Pickens AcclaimWeb) finding. That assumption does NOT
+hold uniformly here -- the three counties turned out to need three different
+answers:
 
-Aiken, Kershaw, Hampton: DNS dead — removed.
+Beaufort: "BrowserViewDMP" (New Vision Systems), NO WAF, and -- confirmed
+  live via this deployment's OWN api/search/clientinfo, not assumed from the
+  shared vendor code -- NO login, NO reCAPTCHA, NO field encryption either
+  (`authentication":"0"`, `"useRecaptchaV3":null`, `"encryptData":"0"`). The
+  real gap was that this file's old generic Playwright table-scraper never
+  matched Beaufort's ag-Grid Angular SPA (not plain `<table><tr>` rows) AND
+  never touched the per-document PDF at all. Both fixed by calling the
+  vendor's own free JSON API directly (rod/beaufort_dmp.py) -- no browser
+  needed for Beaufort at all now.
+
+Jasper: Cloudflare at the edge -- but ALSO a real, independent Google
+  reCAPTCHA v2 gate ("Please complete the CAPTCHA to enter this site",
+  g-recaptcha sitekey 6LfblzYqAAAAAFNl9g-RwU5zbI97HFqwWbhoD4Rb) on the
+  Land Records search tab itself, confirmed live 2026-10-14 with nodriver
+  already past Cloudflare's own edge challenge (clicking "Add New Tab" ->
+  "Land Records" surfaces the CAPTCHA modal before any search form
+  appears). This is a second, independent wall from a different vendor
+  (Courthouse Computer Systems) than Clarendon's Cloudflare-only AcclaimWeb.
+  GENUINELY WALLED -- solving a real CAPTCHA is out of scope here, same as
+  every other genuinely-walled source in this codebase. No code changes;
+  kept queued under the audit doc's "Needs YOU logged in" section.
+
+Clarendon: Cloudflare ONLY -- no second app-level CAPTCHA was ever hit, and
+  it is the SAME AcclaimWeb vendor + free document API as Pickens
+  (sc_rod_acclaim.py / rod/acclaim.py). This codebase's existing nodriver
+  wall-bypass tier (wall_bypass.py / browser_utils.py -- already used by
+  e.g. sc_public_index.py, chester_delinquent_tax.py) clears Clarendon's
+  challenge; once cleared, the exact same search/GridResults +
+  Image/DocumentPdfAllPages/{TransactionItemId} calls Pickens uses work
+  identically as in-page fetch() calls issued from that cleared tab (see
+  rod/acclaim.discover_recent_nods_via_browser). Live-verified against 4
+  real distress documents + 2 controls, all real %PDF-1.4 bytes. The PDF
+  endpoint itself is ALSO behind the same Cloudflare wall (unlike Pickens,
+  where it is open to anyone) -- it is NOT stamped into
+  raw['documents']/['document_url'] the generic, GET-only enrich_doc_ocr.py
+  pass would try to fetch cold and simply 403 against; it is recorded
+  instead under raw['clarendon_pdf_fetch'] with an explicit note that it
+  needs this same Cloudflare-cleared session, not a bare GET.
 """
 from __future__ import annotations
 
 import asyncio
-import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 import structlog
-from bs4 import BeautifulSoup
 
-from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_OK
+from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
+from ...rod import acclaim, beaufort_dmp
 
 log = structlog.get_logger()
 
-_COUNTY_SITES = {
-    "beaufort": {
-        "url": "https://rod.beaufortcountysc.gov/BrowserViewDMP/",
-        "state": "SC",
-        "walled": False,
-    },
-    "jasper": {
-        "url": "https://us6.courthousecomputersystems.com/jasperSC",
-        "state": "SC",
-        "walled": True,
-    },
-    "clarendon": {
-        "url": "https://acclaimprod.clarendoncountygov.org/acclaimweb",
-        "state": "SC",
-        "walled": True,
-    },
-}
+CLARENDON_BASE = "https://acclaimprod.clarendoncountygov.org/acclaimweb"
+CLARENDON_LOOKBACK_DAYS = 45
+
+# Jasper: Courthouse Computer Systems, Cloudflare + a real Google reCAPTCHA v2
+# gate on the search feature itself. See the module docstring for the live
+# evidence. Kept here (rather than deleted) so the wall is self-documenting
+# in the code, the same convention this codebase uses for every other
+# confirmed-genuine wall.
+JASPER_BASE = "https://us6.courthousecomputersystems.com/jasperSC"
+JASPER_WALL_NOTE = (
+    "Cloudflare edge cleared by nodriver, but the Land Records search tab "
+    "itself is gated by a real Google reCAPTCHA v2 ('Please complete the "
+    "CAPTCHA to enter this site', sitekey 6LfblzYqAAAAAFNl9g-RwU5zbI97HFqwWbhoD4Rb) "
+    "-- confirmed live 2026-10-14. Genuinely walled; not automated."
+)
 
 
 class ScRodWalledScraper(BaseScraper):
-    """SC ROD sites — Beaufort (direct), Jasper/Clarendon (Cloudflare)."""
+    """SC ROD sites — Beaufort (free JSON API, no browser), Clarendon
+    (Cloudflare, cleared via this codebase's existing nodriver tier),
+    Jasper (genuinely walled — Cloudflare + a real reCAPTCHA v2 gate)."""
 
     slug = "counties_sc.sc_rod_walled"
     name = "SC ROD Walled Sites"
@@ -51,312 +91,195 @@ class ScRodWalledScraper(BaseScraper):
     async def fetch(self) -> list[Listing]:
         results: list[Listing] = []
 
-        try:
-            from playwright.async_api import async_playwright
-        except ImportError:
-            log.error("sc_rod_walled.no_playwright")
-            return results
+        beaufort = await self._fetch_beaufort()
+        results.extend(beaufort)
+        log.info("sc_rod_walled.county_done", county="beaufort", found=len(beaufort))
 
-        cutoff = (datetime.now() - timedelta(days=90)).strftime("%m/%d/%Y")
-        end_date = datetime.now().strftime("%m/%d/%Y")
+        log.info("sc_rod_walled.county_skipped_genuine_wall", county="jasper",
+                 note=JASPER_WALL_NOTE)
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-gpu"],
-            )
-
-            for county, cfg in _COUNTY_SITES.items():
-                page = None
-                try:
-                    page = await browser.new_page()
-                    base_url = cfg["url"]
-
-                    log.info("sc_rod_walled.fetching", county=county, url=base_url)
-
-                    # Beaufort: ignore SSL cert (expired cert)
-                    if county == "beaufort":
-                        context = await browser.new_context(
-                            ignore_https_errors=True,
-                        )
-                        page = await context.new_page()
-
-                    await page.goto(base_url, timeout=45000)
-                    await page.wait_for_load_state("domcontentloaded", timeout=20000)
-
-                    # Check for WAF / Cloudflare challenge
-                    content = await page.content()
-                    if (cfg.get("walled") or
-                        "challenge" in content.lower() or
-                        "turnstile" in content.lower() or
-                        "aws-waf" in content.lower() or
-                        "captcha" in content.lower()):
-                        log.info("sc_rod_walled.waf_detected", county=county)
-                        try:
-                            from ...enrichment_waf_oss import solve_waf_via_browser
-                            solved = await solve_waf_via_browser(page)
-                            if solved:
-                                await page.wait_for_load_state("domcontentloaded", timeout=15000)
-                                content = await page.content()
-                        except Exception as exc:
-                            log.warning("sc_rod_walled.waf_failed", county=county, error=str(exc)[:160])
-
-                    if not content or len(content) < 500:
-                        log.warning("sc_rod_walled.empty", county=county)
-                        continue
-
-                    # These are all Angular/SPA search portals
-                    # Try to interact with the search form
-                    county_results = await self._search_records(
-                        page, base_url, county, cfg["state"], cutoff, end_date
-                    )
-                    results.extend(county_results)
-                    log.info("sc_rod_walled.county_done", county=county, found=len(county_results))
-
-                except Exception as exc:
-                    log.warning("sc_rod_walled.county_error", county=county, error=str(exc)[:200])
-                finally:
-                    if page:
-                        try:
-                            await page.close()
-                        except BaseException:
-                            pass
-
-            await browser.close()
+        clarendon = await self._fetch_clarendon()
+        results.extend(clarendon)
+        log.info("sc_rod_walled.county_done", county="clarendon", found=len(clarendon))
 
         return results
 
-    async def _search_records(
-        self, page, base_url: str, county: str, state: str,
-        cutoff: str, end_date: str,
-    ) -> list[Listing]:
-        """Search for deed records in the SPA and parse results."""
-        results: list[Listing] = []
-        import json
+    # -- Beaufort: free JSON API, no browser at all -------------------------
 
-        # Wait for SPA to load
-        await asyncio.sleep(3)
-
-        # Debug: log page state
+    async def _fetch_beaufort(self) -> list[Listing]:
+        out: list[Listing] = []
         try:
-            inputs_info = await page.evaluate("""() => {
-                return Array.from(document.querySelectorAll('input, button, a.btn')).map(i => ({
-                    tag: i.tagName, name: i.name, id: i.id, type: i.type,
-                    text: i.innerText || i.value || '', placeholder: i.placeholder
-                }))
-            }""")
-            log.info("sc_rod_walled.page_state", county=county,
-                      url=page.url, elements=inputs_info)
+            docs = await beaufort_dmp.discover_recent_distress(state="SC", county="Beaufort")
         except Exception as exc:
-            log.warning("sc_rod_walled.debug_failed", county=county, error=str(exc)[:160])
+            log.warning("sc_rod_walled.beaufort_failed", error=str(exc)[:200])
+            return out
+        for doc in docs:
+            li = _beaufort_doc_to_listing(doc, self.slug,
+                                           f"{beaufort_dmp.BASE}/api/search")
+            if li:
+                out.append(li)
+        return out
 
-        # Try to find and fill date range / search form
-        # Beaufort BrowserView: has date pickers and a Search button
-        # Jasper/Clarendon: Courthouse Computer Systems / Acclaim portals
+    # -- Clarendon: Cloudflare, cleared via existing nodriver tier -----------
 
-        # First, try clicking a "90 Days" quick button via JS (Beaufort has these)
-        quick_clicked = await page.evaluate("""() => {
-            const btns = document.querySelectorAll('button, a, input[type="submit"]');
-            for (const b of btns) {
-                const t = (b.innerText || b.value || '').trim();
-                if (t === '90 Days' || t === '30 Days' || t === '7 Days') {
-                    b.click();
-                    return t;
-                }
-            }
-            return null;
-        }""")
-        if quick_clicked:
-            log.info("sc_rod_walled.quick_btn", county=county, selector=quick_clicked)
-            await asyncio.sleep(8)
+    async def _fetch_clarendon(self) -> list[Listing]:
+        out: list[Listing] = []
+        browser = None
+        try:
+            from ...wall_bypass import _html_to_text, _is_cloudflare_challenge
+            from ...browser_utils import start_browser
+        except ImportError:
+            log.error("sc_rod_walled.clarendon_no_wall_bypass")
+            return out
+
+        for headless in (False, True):  # headed first: measured more reliable live
             try:
-                await page.wait_for_load_state("networkidle", timeout=15000)
-            except Exception:
-                pass
-            # Parse results via JS — SPA may not have table rows
-            return await self._extract_results_js(page, base_url, county, state)
-
-        # Fill date inputs via JS (Angular inputs may not be Playwright-visible)
-        filled = await page.evaluate("""(args) => {
-            const [cutoff, end] = args;
-            let fromSet = false, toSet = false;
-            const fromEl = document.querySelector('input[name="fromdate"]')
-                || document.querySelector('input[name*="from" i]');
-            if (fromEl) {
-                fromEl.value = cutoff;
-                fromEl.dispatchEvent(new Event('input', {bubbles: true}));
-                fromEl.dispatchEvent(new Event('change', {bubbles: true}));
-                fromSet = true;
-            }
-            const toEl = document.querySelector('input[name="todate"]')
-                || document.querySelector('input[name*="to" i]');
-            if (toEl) {
-                toEl.value = end;
-                toEl.dispatchEvent(new Event('input', {bubbles: true}));
-                toEl.dispatchEvent(new Event('change', {bubbles: true}));
-                toSet = true;
-            }
-            return {fromSet, toSet};
-        }""", [cutoff, end_date])
-
-        if filled.get("fromSet") or filled.get("toSet"):
-            log.info("sc_rod_walled.dates_filled", county=county, **filled)
-            search_clicked = await page.evaluate("""() => {
-                const btns = document.querySelectorAll('button[type="submit"], input[type="submit"], button');
-                for (const b of btns) {
-                    const t = (b.innerText || b.value || '').trim().toLowerCase();
-                    if (t === 'search') { b.click(); return true; }
-                }
-                return false;
-            }""")
-            if search_clicked:
-                await asyncio.sleep(5)
+                browser = await start_browser(
+                    headless=headless,
+                    browser_args=[
+                        "--no-sandbox", "--disable-gpu", "--window-size=1920,1080",
+                        "--disable-blink-features=AutomationControlled",
+                    ],
+                )
+                tab = await browser.get(f"{CLARENDON_BASE}/search/SearchTypeDocType")
+                await tab.wait(3)
+                cleared = False
+                for _ in range(10):
+                    content = await tab.get_content()
+                    if not _is_cloudflare_challenge(_html_to_text(content)):
+                        cleared = True
+                        break
+                    await asyncio.sleep(2)
+                if cleared:
+                    break
                 try:
-                    await page.wait_for_load_state("networkidle", timeout=15000)
-                except Exception:
+                    browser.stop()
+                except BaseException:
                     pass
-                return await self._extract_results_js(page, base_url, county, state)
-        else:
-            log.info("sc_rod_walled.no_date_inputs", county=county)
+                browser = None
+            except Exception as exc:
+                log.warning("sc_rod_walled.clarendon_browser_failed",
+                            headless=headless, error=str(exc)[:200])
+                if browser is not None:
+                    try:
+                        browser.stop()
+                    except BaseException:
+                        pass
+                    browser = None
 
-        # Try to just click search with defaults
-        search_clicked = await page.evaluate("""() => {
-            const btns = document.querySelectorAll('button[type="submit"], input[type="submit"], button');
-            for (const b of btns) {
-                const t = (b.innerText || b.value || '').trim().toLowerCase();
-                if (t === 'search') { b.click(); return true; }
-            }
-            return false;
-        }""")
-        if search_clicked:
-            await asyncio.sleep(5)
+        if browser is None:
+            log.warning("sc_rod_walled.clarendon_wall_not_cleared")
+            return out
+
+        try:
+            docs = await acclaim.discover_recent_nods_via_browser(
+                tab, "SC", "Clarendon", CLARENDON_BASE,
+                days_back=CLARENDON_LOOKBACK_DAYS,
+            )
+            for doc in docs:
+                li = _clarendon_doc_to_listing(doc, self.slug,
+                                               f"{CLARENDON_BASE}/search/SearchTypeDocType")
+                if li:
+                    out.append(li)
+        except Exception as exc:
+            log.warning("sc_rod_walled.clarendon_sweep_failed", error=str(exc)[:200])
+        finally:
             try:
-                await page.wait_for_load_state("networkidle", timeout=15000)
-            except Exception:
+                browser.stop()
+            except BaseException:
                 pass
+        return out
 
-        # Parse results from table or grid
-        return await self._extract_results_js(page, base_url, county, state)
 
-    async def _extract_results_js(
-        self, page, base_url: str, county: str, state: str,
-    ) -> list[Listing]:
-        """Extract search results from SPA via JavaScript evaluation."""
-        results: list[Listing] = []
+# ---------------------------------------------------------------------------
+# Listing building
+# ---------------------------------------------------------------------------
 
-        # First try standard HTML tables
-        rows_data = await page.evaluate("""() => {
-            const rows = [];
-            // Standard table rows
-            const trs = document.querySelectorAll('table tr, .results tr, .grid tr');
-            for (const tr of trs) {
-                const cells = Array.from(tr.querySelectorAll('td'));
-                if (cells.length >= 3) {
-                    rows.push(cells.map(c => c.innerText.trim()));
-                }
-            }
-            // Angular/ng-repeat rows
-            const ngRows = document.querySelectorAll('[ng-repeat] tr, .data-row, .result-item, .search-result');
-            for (const tr of ngRows) {
-                const cells = Array.from(tr.querySelectorAll('td, div.cell, span.cell'));
-                if (cells.length >= 3) {
-                    rows.push(cells.map(c => c.innerText.trim()));
-                }
-            }
-            // Generic grid rows (Beaufort BrowserViewDMP uses divs)
-            const gridRows = document.querySelectorAll('.grid-row, .row-item, .data-grid .row, [class*="grid-row"]');
-            for (const tr of gridRows) {
-                const cells = Array.from(tr.querySelectorAll('div, span, td'));
-                if (cells.length >= 3) {
-                    rows.push(cells.map(c => c.innerText.trim()));
-                }
-            }
-            return rows;
-        }""")
+_BEAUFORT_LISTING_TYPE: dict[str, ListingType] = {
+    "lien": ListingType.TAX_LIEN,
+    "mechanics_lien": ListingType.TAX_LIEN,
+    "tax_lien": ListingType.TAX_LIEN,
+    "probate_deed": ListingType.PROBATE_NOTICE,
+    "bankruptcy": ListingType.BANKRUPTCY,
+}
 
-        if rows_data:
-            log.info("sc_rod_walled.results_found", county=county, count=len(rows_data))
-            for cells in rows_data:
-                if len(cells) < 3:
-                    continue
-                book_page = cells[0]
-                filing_date = cells[1] if len(cells) > 1 else ""
-                doc_type = cells[2] if len(cells) > 2 else ""
-                grantor = cells[3] if len(cells) > 3 else ""
-                grantee = cells[4] if len(cells) > 4 else ""
-                if not book_page:
-                    continue
-                results.append(Listing(
-                    source=self.slug,
-                    source_url=base_url,
-                    listing_type=ListingType.UNKNOWN,
-                    property_kind=PropertyKind.UNKNOWN,
-                    county=county.title(),
-                    state=state,
-                    case_number=book_page,
-                    owner_name=grantee,
-                    plaintiff=grantor,
-                    raw={
-                        "county": county,
-                        "doc_type": doc_type,
-                        "filing_date": filing_date,
-                        "grantor": grantor,
-                        "grantee": grantee,
-                        "book_page": book_page,
-                    },
-                ))
-            return results
 
-        # Fallback: dump page text content to see what's there
-        page_text = await page.evaluate("() => document.body.innerText.substring(0, 2000)")
-        log.info("sc_rod_walled.page_text", county=county, text=page_text[:500])
+def _beaufort_doc_to_listing(doc, slug: str, source_url: str) -> Listing | None:
+    bucket, _kind = beaufort_dmp.DISTRESS_CODES.get(doc.doc_type, (None, None))
+    lt = _BEAUFORT_LISTING_TYPE.get(bucket)
+    if lt is None:
+        return None
+    rec = doc.recorded_date.strftime("%Y-%m-%d") if doc.recorded_date else "unknown date"
+    desc = (f"{doc.doc_type} recorded {rec}: {(doc.grantor or '?').strip()}"
+            f"{' (' + doc.notes + ')' if doc.notes else ''}")
+    raw: dict[str, Any] = dict(doc.raw or {})
+    raw["rod"] = {"doc_type": doc.doc_type, "grantor": doc.grantor, "grantee": doc.grantee,
+                  "book": doc.book, "page": doc.page, "instrument": doc.instrument_no,
+                  "recorded": rec}
+    if bucket == "probate_deed":
+        raw["relationship_signal"] = {"kind": "probate", "keyword": doc.doc_type,
+                                      "tagged_at": datetime.utcnow().isoformat() + "Z"}
+    return Listing(
+        source=slug, source_url=source_url,
+        listing_type=lt, property_kind=PropertyKind.UNKNOWN,
+        state=doc.state, county=doc.county,
+        defendant=(doc.grantor or "").strip() or None,
+        case_number=(doc.instrument_no or "").strip() or None,
+        legal_description=(doc.notes or "").strip() or None,
+        description=desc,
+        first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+        raw=raw,
+    )
 
-        return results
 
-    def _parse_results(self, content: str, base_url: str,
-                       county: str, state: str) -> list[Listing]:
-        """Parse search results HTML into listings."""
-        results: list[Listing] = []
-        soup = BeautifulSoup(content, "html.parser")
-
-        # Try various result table selectors
-        rows = soup.select(
-            "table tr, .results tr, .grid tr, .search-result, "
-            ".data-row, .result-item, [ng-repeat] tr"
-        )
-
-        for row in rows[1:]:  # skip header
-            cells = row.find_all("td")
-            if len(cells) < 3:
-                continue
-
-            book_page = cells[0].get_text(strip=True)
-            filing_date = cells[1].get_text(strip=True) if len(cells) > 1 else ""
-            doc_type = cells[2].get_text(strip=True) if len(cells) > 2 else ""
-            grantor = cells[3].get_text(strip=True) if len(cells) > 3 else ""
-            grantee = cells[4].get_text(strip=True) if len(cells) > 4 else ""
-
-            if not book_page:
-                continue
-
-            results.append(Listing(
-                source=self.slug,
-                source_url=base_url,
-                listing_type=ListingType.UNKNOWN,
-                property_kind=PropertyKind.UNKNOWN,
-                county=county.title(),
-                state=state,
-                case_number=book_page,
-                owner_name=grantee,
-                plaintiff=grantor,
-                raw={
-                    "county": county,
-                    "doc_type": doc_type,
-                    "filing_date": filing_date,
-                    "grantor": grantor,
-                    "grantee": grantee,
-                    "book_page": book_page,
-                },
-            ))
-
-        return results
+def _clarendon_doc_to_listing(doc, slug: str, source_url: str) -> Listing | None:
+    s = (doc.doc_type or "").upper()
+    if "DIST" in s or "DEATH" in s:
+        lt = ListingType.PROBATE_NOTICE
+        kind = "probate"
+    elif "LIEN" in s or "MECH" in s:
+        lt = ListingType.TAX_LIEN
+        kind = "lien"
+    elif "FORECLOS" in s or "TRUSTEE" in s or "LIS PENDENS" in s or "NOTICE OF SALE" in s:
+        lt = ListingType.LIS_PENDENS
+        kind = "foreclosure"
+    else:
+        return None
+    rec = doc.recorded_date.strftime("%Y-%m-%d") if doc.recorded_date else "unknown date"
+    desc = (f"{doc.doc_type} recorded {rec}: {(doc.grantor or '?').strip()}"
+            f"{' (' + doc.notes + ')' if doc.notes else ''}")
+    raw: dict[str, Any] = {"rod": {"doc_type": doc.doc_type, "grantor": doc.grantor,
+                                   "grantee": doc.grantee, "book": doc.book, "page": doc.page,
+                                   "instrument": doc.instrument_no, "recorded": rec},
+                           "acclaim_rod": True}
+    if kind == "probate":
+        raw["relationship_signal"] = {"kind": "probate", "keyword": doc.doc_type,
+                                      "tagged_at": datetime.utcnow().isoformat() + "Z"}
+    # The free scanned-document PDF exists at this URL (same AcclaimWeb
+    # pattern as Pickens) but -- unlike Pickens -- it sits behind Clarendon's
+    # own Cloudflare wall: a cold GET (what enrich_doc_ocr.py's generic,
+    # httpx-only fetch does) gets a 403 challenge page, not the PDF. Recorded
+    # honestly as a browser-gated recipe, NOT stamped into
+    # raw['documents']/['document_url'] (document_links.stamp_documents),
+    # which would silently feed that generic pass a Cloudflare interstitial.
+    pdf_url = (doc.raw or {}).get("document_pdf_url")
+    if pdf_url:
+        raw["clarendon_pdf_fetch"] = {
+            "method": "GET", "url": pdf_url,
+            "requires": "cloudflare_cleared_session",
+            "note": "cold httpx/curl-cffi 403s; only fetchable from a nodriver "
+                    "tab that already cleared this county's Cloudflare challenge "
+                    "(see rod.acclaim.discover_recent_nods_via_browser).",
+        }
+    return Listing(
+        source=slug, source_url=source_url,
+        listing_type=lt, property_kind=PropertyKind.UNKNOWN,
+        state=doc.state, county=doc.county,
+        parcel_id=doc.parcel_id,
+        defendant=(doc.grantor or "").strip() or None,
+        case_number=(doc.instrument_no or "").strip() or None,
+        legal_description=(doc.notes or "").strip() or None,
+        description=desc,
+        first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+        raw=raw,
+    )
