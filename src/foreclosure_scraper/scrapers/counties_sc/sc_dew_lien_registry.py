@@ -260,6 +260,16 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
     # renders as a link, not a per-row fact -- correctly left uncaptured.
     last_updated = _parse_date(row.get("LienLastUpdated"))
     periods = (row.get("LiendPeriods") or "").strip() or None
+    # 2026-10-14 source-completeness audit flagged "LienDocument" as an
+    # uncaptured field. Re-verified live on a FRESH 5,860-row real
+    # name-search fallback pull (LastName=JOHNSON, the path the 2026-10-04
+    # comment above checked for LienLastUpdated/LiendPeriods but not this
+    # field): LienDocument is null on 5,860/5,860 rows -- extending the
+    # above bulk-export finding (null on 8,000/8,000) to the fallback path
+    # too. Also checked while live-verifying: NoticeId, LienPartialRelease,
+    # and LienPayoffAmt exist in the schema and are ALSO null on all 5,860
+    # rows -- not a parsing gap on any of the four, the service genuinely
+    # never populates them on either access path. Nothing to wire in.
 
     street, city, addr_state, zipc, county = _split_address(row.get("EmployerAddress"))
     state = (addr_state or "SC").upper()

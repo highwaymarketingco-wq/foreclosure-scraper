@@ -179,3 +179,24 @@ def test_no_last_updated_leaves_the_field_absent():
     d = li.raw["sc_dew_lien_registry"]
     assert d["date_last_updated"] is None
     assert d["lien_periods"] is None
+
+
+def test_lien_document_still_not_mistaken_for_data():
+    """2026-10-14 source-completeness audit flagged `LienDocument` as an
+    uncaptured field. Live-reverified against a fresh 5,860-row real
+    name-search fallback pull (LastName=JOHNSON) on 2026-10-14: null on
+    5,860/5,860 rows, same as the bulk-export path's already-documented
+    8,000/8,000. NoticeId/LienPartialRelease/LienPayoffAmt were checked too
+    (present in the schema, also null on all 5,860) -- genuinely not data on
+    either access path, not a parsing gap. Pins that nothing in _to_listing
+    reads any of the four, so a future accidental wire-up doesn't go
+    unnoticed."""
+    row = _row("Chester")
+    row["LienDocument"] = "SHOULD-NOT-APPEAR"
+    row["NoticeId"] = "SHOULD-NOT-APPEAR"
+    row["LienPartialRelease"] = "SHOULD-NOT-APPEAR"
+    row["LienPayoffAmt"] = "999.99"
+    li = _to_listing(row, _SLUG)
+    assert li is not None
+    assert "SHOULD-NOT-APPEAR" not in str(li.raw["sc_dew_lien_registry"])
+    assert "999.99" not in str(li.raw["sc_dew_lien_registry"])
