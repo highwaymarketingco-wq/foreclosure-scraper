@@ -2621,6 +2621,9 @@ RAW_KEEP = {
                                            # 2026-10-14 Pattern C fix, commit c6c4e3a5
     "acclaim_rod": "*",                   # counties_sc.sc_rod_acclaim (Pickens): marker flag, commit
                                            # 1e18d7e6 -- registered here, was missed in that commit
+    "brunswick_detail": "*",              # counties_nc.nc_rod_captcha (Brunswick): nested detail
+                                           # block (status/subdivision/xref/detail_url) -- same
+                                           # pattern as rowan_detail, 2026-10-14, commit 0f47c4b4
     "cott_image_fetch": "*",              # counties_sc.sc_rod_cott (Union): free-document recipe
                                            # (dual-Referer Thumbnails+Image fetch, can't use the generic
                                            # GET-only doc_inventory fetch) -- 2026-10-14, commit 1f3c9e3b
