@@ -2635,6 +2635,11 @@ RAW_KEEP = {
                                            # 069ee8e8
     "iredell_doc_image": "*",             # counties_nc.nc_rod_captcha (Iredell): same CCS DevExpress
                                            # free-document recipe as jasper_doc_image -- commit 3c07b883
+    "craven_doc_image": "*", "greene_doc_image": "*", "harnett_doc_image": "*",
+    "randolph_doc_image": "*", "stokes_doc_image": "*",
+                                           # counties_nc.nc_rod_captcha: same CCS DevExpress free-
+                                           # document recipe as jasper_doc_image/iredell_doc_image --
+                                           # final 5 of 9 originally-walled counties, commit aa9fdf85
     "cott_image_fetch": "*",              # counties_sc.sc_rod_cott (Union): free-document recipe
                                            # (dual-Referer Thumbnails+Image fetch, can't use the generic
                                            # GET-only doc_inventory fetch) -- 2026-10-14, commit 1f3c9e3b
