@@ -14,8 +14,9 @@ assessed value + tax-bill detail link, no CAPTCHA anywhere in the flow. This
 was previously missed entirely — the scraper only read the thin auction
 page above.
 
-CURRENTLY DISABLED PENDING STEALTH FETCH (2026-10-12) -- read before
-re-enabling. First build attempt here tried, in order: (1) plain httpx GET
+STEALTH FETCH FOR THE SEARCH FORM (2026-10-12, re-enabled 2026-10-12 --
+see git log, `03f4617d`) -- read before touching `_search_via_nodriver`.
+First build attempt here tried, in order: (1) plain httpx GET
 to the search form page itself -- 403, Cloudflare's generic "blocked" page,
 from both this VM and a residential IP; (2) curl-cffi Chrome TLS/JA3
 impersonation (the tier http_client._impersonate_fetch uses elsewhere),
@@ -33,38 +34,61 @@ detection-evasion territory as this repo's `wall_bypass.py`/
 scraper intentionally does NOT reach for -- not this codebase's CAPTCHA/WAF-
 bypass boundary (see CLAUDE.md), it is Hermes's lane, not mine.
 
-Everything needed to finish this is already mapped and verified below:
-exact form field names (`ReportGroupDescription`/`TaxYear`/`BalanceDue`/
+Everything needed to run this is mapped and verified below: exact form
+field names (`ReportGroupDescription`/`TaxYear`/`BalanceDue`/
 `SearchColumn`/`SearchText`), the exact POST target
 (`searchingtaxrecord.php`), confirmed real output (55 unpaid records for a
 single-surname search), and a working regex parser for the result rows
-(`_ROW_RE`, already unit-tested against real captured HTML). The only
-missing piece is swapping `_search_via_browser`'s plain
-`p.chromium.launch(...)` for whatever stealth tier clears this specific
-Cloudflare bot-management rule -- `_fetch_delinquent_search` is wired to
-call it the moment that swap is made. Until then, `fetch()` calls only
-`_fetch_auction()` (unchanged, still works) so this doesn't burn a 180s
-timeout + 26 browser launches on a guaranteed block every run.
+(`_ROW_RE`, already unit-tested against real captured HTML). nodriver via
+`_search_via_nodriver` (headless=False) is what clears the Cloudflare
+bot-management rule that blocks a plain/impersonated request to the FORM
+page -- `fetch()` calls both `_fetch_auction()` and
+`_fetch_delinquent_search()`.
 
-SCOPE ONCE UNBLOCKED: searches each letter a-z against the current tax
-year, unpaid only, and parses the LIST view (owner name, type, description,
-tax year, detail link). The per-record detail page (taxdetail.php?id=N) has
-the real parcel number + mailing address + exact amount due, confirmed
-live, but isn't fetched per-row in this first pass -- a follow-up if
-parcel/address-level detail is wanted here.
+SCOPE: searches each surname term against the current tax year, unpaid
+only, and parses the LIST view (owner name, type, description, tax year,
+detail link). The per-record detail page (taxdetail.php?id=N) IS now
+fetched per row (added 2026-10-13, source-completeness audit Pattern D):
+unlike the search FORM above, a plain GET to taxdetail.php?id=N needs no
+browser at all -- confirmed live via curl-cffi Chrome TLS/JA3 impersonation
+only (`get_text_impersonate`), the same cheap static-content tier
+`http_client.py` already uses elsewhere; the WAF rule that blocks the form
+apparently doesn't cover this endpoint. Real fields confirmed live and
+parsed: status, total due, full owner name (incl. "ET UX"/co-owner and
+"C/O ..." lines the list view truncates), owner ID, tax receipt number,
+bill number, parcel number, full mailing address, district, assessed
+value, base amount, and charges. Confirmed-live edge cases the parser
+must reject rather than parse as data: id=0 ("No Tax Record was
+requested. Try Searching again !!!"), a negative/non-numeric/nonexistent
+id (the site echoes back its own unrendered SQL verbatim -- literally
+"select count(*) recordcount from tax_data where id=...", a bug on the
+county's end, not something to be exploited further here) and an
+intermittent Cloudflare "Just a moment" challenge even on this endpoint
+(a transient HTTP 403; `get_text_impersonate`'s own retry clears it on a
+later attempt most of the time -- confirmed by hand: id=5000 403'd once,
+then 200'd twice in a row seconds later). Detail fetches are budget- and
+count-capped (`_DETAIL_FETCH_CAP` / `_DETAIL_BUDGET_SHARE` below,
+mirroring `national/landwatch.py`'s `DETAIL_FETCH_CAP_PER_COUNTY` and
+`national/estate_sales.py`'s time-budget pattern) and `_fetch_detail`
+never raises -- pure enrichment; the listing itself already comes from
+the list/search page and must survive a slow or failed detail fetch.
 """
 from __future__ import annotations
 
 import asyncio
 import re
+import time
 from datetime import datetime
 from typing import Iterable
 
+import structlog
 from dateutil import parser as dateparser
 
 from ...base_scraper import BaseScraper
-from ...http_client import client
+from ...http_client import client, get_text_impersonate
 from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
 
 _SEARCH_BASE = "https://cms.revize.com/revize/apps/polkcounty"
 _SEARCH_FORM_URL = f"{_SEARCH_BASE}/searchtaxrecord.php"
@@ -89,6 +113,173 @@ _ROW_RE = re.compile(
     r"taxdetail\.php\?id=(?P<id>\d+)",
     re.S,
 )
+
+# --- per-row detail page (taxdetail.php?id=N) -------------------------------
+# Confirmed live 2026-10-13: a plain GET with a curl-cffi Chrome TLS/JA3
+# fingerprint (no browser) returns the real record. See module docstring for
+# the full live-verification notes and the two confirmed "not real data"
+# shapes (`_DETAIL_INVALID_MARKERS`) this parser must reject.
+_DETAIL_INVALID_MARKERS = (
+    "select count(*) recordcount",       # id has no matching row (or is non-numeric/negative)
+    "no tax record was requested",       # id=0 / blank id
+)
+
+# Safety caps on the per-row detail-fetch pass -- mirrors
+# national/landwatch.py's DETAIL_FETCH_CAP_PER_COUNTY (hard count ceiling)
+# combined with national/estate_sales.py's time-budget pattern (so a slow
+# run fills in fewer rows instead of blowing the scraper's own timeout_s).
+# 55 unpaid PROPERTY-type records were confirmed for a SINGLE surname
+# search; with 54 surname terms deduped by detail_id, the real per-run
+# total is unknown but likely well above that -- the cap is a backstop,
+# the time budget is what actually governs on a normal run.
+_DETAIL_FETCH_CAP = 150
+_DETAIL_BUDGET_SHARE = 0.3  # fraction of timeout_s, measured from the start
+                            # of _fetch_delinquent_search, reserved for detail
+                            # fetches (the nodriver search above it is the
+                            # slow, variable part of this scraper's budget)
+
+_DETAIL_FIELD_RE = {
+    "status": re.compile(r"<td>Status:</td>\s*<td>\s*([^<]*?)\s*</td>", re.I),
+    "total_due": re.compile(r"Total Due:\s*</td>\s*<td>\s*\$?\s*([\d,]+\.\d{2})\s*</td>", re.I),
+    "collection_status": re.compile(r"Collection Status:\s*</td>\s*<td>\s*([^<]*?)\s*</td>", re.I),
+    "owner_name_full": re.compile(r"Owner Name:\s*</td>\s*<td>\s*([^<]*?)\s*</td>", re.I),
+    "owner_id": re.compile(r"Owner ID:\s*</td>\s*<td>\s*([^<]*?)\s*</td>", re.I),
+    "tax_receipt_number": re.compile(r"Tax Receipt Number:\s*</td>\s*<td>\s*([^<]*?)\s*</td>", re.I),
+    "bill_number": re.compile(r"Bill Number:\s*</td>\s*<td>\s*([^<]*?)\s*</td>", re.I),
+    "parcel_number": re.compile(r"Parcel Number:\s*</td>\s*<td>\s*([^<]*?)\s*</td>", re.I),
+    "district": re.compile(r"District:\s*</td>\s*<td>\s*([^<]*?)\s*</td>", re.I),
+    "detail_type": re.compile(r">Type:\s*</td>\s*<td>\s*([^<]*?)\s*</td>", re.I),
+    "detail_description": re.compile(r"Description:\s*</td>\s*<td>\s*([^<]*?)\s*</td>", re.I),
+    "assessed_value": re.compile(r"Assessed Value:\s*</td>\s*<td>\s*([\d,]+(?:\.\d+)?)\s*</td>", re.I),
+    "base_amount": re.compile(r"Base Amount:\s*</td>\s*<td>\s*\$?\s*([\d,]+\.\d{2})\s*</td>", re.I),
+    "charges": re.compile(r"Charges:\s*</td>\s*<td>\s*\$?\s*([\d,]+\.\d{2})\s*</td>", re.I),
+}
+# Mailing Address cell holds 2+ lines separated by <br> (street/PO box, then
+# city/state/zip, occasionally a leading "C/O ..." line) -- captured as the
+# whole cell then split, not a fixed 2-group pattern, so it survives both
+# shapes confirmed live ("PO BOX 1120 <br>SALUDA, NC 28773" and
+# "938 GREEN CREEK DR <br>COLUMBUS, NC 28722").
+_DETAIL_MAILING_RE = re.compile(r"Mailing Address:\s*</td>\s*<td>(.*?)</td>", re.I | re.S)
+_DETAIL_BR_RE = re.compile(r"<br\s*/?>", re.I)
+_DETAIL_MAIL_STATE_RE = re.compile(r",\s*([A-Z]{2})\s*\d{5}")
+_MONEY_FIELDS = {"total_due", "base_amount", "charges", "assessed_value"}
+
+
+def _parse_detail_html(html: str) -> dict:
+    """Parse one taxdetail.php?id=N response into a flat field dict.
+
+    Returns {} for anything that isn't a real record -- a Cloudflare
+    challenge that slipped past get_text_impersonate's retry, id=0's "No Tax
+    Record was requested" notice, or the literal unrendered-SQL fallback the
+    site answers with for a negative/non-numeric/nonexistent id (both
+    confirmed live 2026-10-13, see module docstring). Never raises: a
+    label the live page didn't happen to have this time just means that key
+    is absent from the result, not a parse failure.
+    """
+    if not html:
+        return {}
+    low = html.lower()
+    if any(marker in low for marker in _DETAIL_INVALID_MARKERS):
+        return {}
+    if "owner name:" not in low:
+        return {}  # unrecognized shape -- don't guess at a record that isn't there
+    flat = re.sub(r"<!--.*?-->", "", html, flags=re.S)
+
+    out: dict = {}
+    for key, rx in _DETAIL_FIELD_RE.items():
+        m = rx.search(flat)
+        if not m:
+            continue
+        val = re.sub(r"\s+", " ", m.group(1)).strip()
+        if not val:
+            continue
+        if key in _MONEY_FIELDS:
+            try:
+                out[key] = float(val.replace(",", ""))
+            except ValueError:
+                out[key] = val  # keep the raw string rather than drop a real value
+        else:
+            out[key] = val
+
+    m = _DETAIL_MAILING_RE.search(flat)
+    if m:
+        lines = [re.sub(r"\s+", " ", ln).strip() for ln in _DETAIL_BR_RE.split(m.group(1))]
+        lines = [ln for ln in lines if ln]
+        if lines:
+            out["mailing_address"] = ", ".join(lines)
+            sm = _DETAIL_MAIL_STATE_RE.search(lines[-1])
+            if sm:
+                out["mailing_state"] = sm.group(1)
+    return out
+
+
+async def _fetch_detail(detail_id: str) -> dict:
+    """Best-effort fetch + parse of one Polk tax-detail page.
+
+    Pure enrichment -- never raises. The underlying Listing already comes
+    from the list/search page (`_parse_search_html`), so a failed or slow
+    detail fetch must never break or drop it.
+    """
+    url = f"{_SEARCH_BASE}/taxdetail.php?id={detail_id}"
+    try:
+        html = await get_text_impersonate(url, timeout=20.0)
+    except Exception as exc:  # noqa: BLE001 - deliberately broad, see docstring
+        log.debug("polk_tax.detail_fetch_failed", detail_id=detail_id, error=str(exc)[:160])
+        return {}
+    try:
+        return _parse_detail_html(html)
+    except Exception as exc:  # noqa: BLE001 - a parse bug must not drop the listing either
+        log.debug("polk_tax.detail_parse_failed", detail_id=detail_id, error=str(exc)[:160])
+        return {}
+
+
+def _apply_detail(li: Listing, extras: dict) -> None:
+    """Merge a parsed detail-page dict into its Listing. Pure enrichment:
+    only fills fields the list page left empty / adds the nested detail
+    block, never raises."""
+    if not extras:
+        return
+
+    detail = {k: v for k, v in extras.items()
+              if k not in ("mailing_address", "mailing_state", "owner_name_full")}
+    if detail:
+        ns = li.raw.setdefault("polk_tax_search", {})
+        ns["detail"] = detail
+
+    parcel = extras.get("parcel_number")
+    if parcel and not li.parcel_id:
+        li.parcel_id = parcel
+
+    assessed = extras.get("assessed_value")
+    if isinstance(assessed, (int, float)) and assessed > 0 and not li.assessed_value:
+        li.assessed_value = float(assessed)
+
+    owner_full = extras.get("owner_name_full")
+    if owner_full:
+        li.owner_name = owner_full  # the detail page is the single-record ground truth
+
+    total_due = extras.get("total_due")
+    if isinstance(total_due, (int, float)) and total_due > 0:
+        li.description = f"{li.description or 'Polk County delinquent tax record'} — ${total_due:,.2f} owed"
+
+    mailing = extras.get("mailing_address")
+    if mailing:
+        mail_state = extras.get("mailing_state")
+        # situs (the property's own street address) isn't known at this
+        # source -- the list/search view never carries one and `description`
+        # is sometimes a mobile-home description, not an address, so it
+        # can't be trusted as situs either. absentee defaults False the same
+        # way counties_generic._layer_kit.owner_mailing does when situs is
+        # unknown (bool(None and ...) is always False) rather than guessing.
+        li.raw["owner_mailing"] = {
+            "owner": owner_full or li.owner_name,
+            "mailing": mailing,
+            "situs": None,
+            "mail_state": mail_state,
+            "absentee": False,
+            "out_of_state": bool(mail_state and mail_state != "NC"),
+            "source": "polk_tax_detail",
+        }
 
 
 async def _search_via_nodriver(browser, letter: str) -> str:
@@ -213,11 +404,16 @@ class PolkTaxAuction(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out = list(await self._fetch_auction())
+        # Bank the auction rows immediately so a soft-timeout during the
+        # (often slow) delinquent-search path below still ships them — see
+        # base_scraper.safe_run's partial-salvage path.
+        self.partial = list(out)
         out.extend(await self._fetch_delinquent_search())
         return out
 
     async def _fetch_delinquent_search(self) -> Iterable[Listing]:
-        """The county's own delinquent-tax name search.
+        """The county's own delinquent-tax name search, plus a per-row
+        detail-page enrichment pass (added 2026-10-13).
 
         Cloudflare WAF-rule block on cms.revize.com: headless=True gets
         hard-blocked ("Sorry, you have been blocked"), headless=False
@@ -225,9 +421,14 @@ class PolkTaxAuction(BaseScraper):
         this is headless-detection, NOT IP reputation — the Oracle VM's
         IP is fine, it's the headless Chromium fingerprint that triggers
         the WAF rule. Use headless=False always for this source.
+
+        The per-row detail fetch (taxdetail.php?id=N) is a different story:
+        no browser needed there at all, see module docstring and
+        `_fetch_detail`.
         """
         from ...browser_utils import start_browser
 
+        start = time.monotonic()
         out: list[Listing] = []
         seen_ids: set[str] = set()
         term_errors = 0
@@ -272,6 +473,33 @@ class PolkTaxAuction(BaseScraper):
             except Exception:  # noqa: BLE001
                 pass
 
+        # Bank the list/search rows as the salvage set BEFORE the per-row
+        # detail-page pass below, so a soft-timeout mid-enrichment still
+        # ships every listing already parsed above (same ordering as
+        # national/estate_sales.py's gallery-fetch pass).
+        self.partial = list(self.partial or []) + out
+
+        deadline = start + self.timeout_s * _DETAIL_BUDGET_SHARE
+        done = 0
+        for li in out:
+            if done >= _DETAIL_FETCH_CAP:
+                log.info("polk_tax.detail_fetch_cap_reached", cap=_DETAIL_FETCH_CAP,
+                          total=len(out))
+                break
+            if time.monotonic() > deadline:
+                log.info("polk_tax.detail_fetch_budget_spent", done=done,
+                          remaining=len(out) - done)
+                break
+            rid = (li.raw.get("polk_tax_search") or {}).get("detail_id")
+            if not rid:
+                continue
+            done += 1
+            try:
+                extras = await _fetch_detail(rid)
+                _apply_detail(li, extras)
+            except Exception as exc:  # noqa: BLE001 - enrichment must never drop the listing
+                log.debug("polk_tax.detail_enrich_failed", detail_id=rid, error=str(exc)[:160])
+
         return out
 
     @staticmethod
@@ -308,9 +536,10 @@ class PolkTaxAuction(BaseScraper):
                             "description": desc,
                             "type": rtype,
                             # Real parcel/mailing-address/exact-amount data lives on the
-                            # detail page -- not fetched per-row this pass, see module
-                            # docstring. detail_url above is enough for a human or a
-                            # later enrichment pass to pull it.
+                            # detail page (source_url above) and IS fetched per-row, budget
+                            # permitting -- see _fetch_delinquent_search's detail-fetch pass
+                            # and _apply_detail, which fill raw["polk_tax_search"]["detail"]
+                            # and raw["owner_mailing"] on this same Listing object below.
                         }
                     },
                 )
