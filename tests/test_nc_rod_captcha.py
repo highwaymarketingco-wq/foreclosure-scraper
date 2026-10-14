@@ -14,9 +14,13 @@ from __future__ import annotations
 
 from foreclosure_scraper.models import ListingType, PropertyKind
 from foreclosure_scraper.rod.nc_chain import IndexRecord
+from foreclosure_scraper.rod.nc_tyler import _SS_HEAD, parse_selfservice
 from foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha import (
     NcRodCaptchaScraper,
     _COUNTY_SITES,
+    _WAKE_DISTRESS_DOC_TYPES,
+    _wake_extract_docids,
+    _wake_parse_related_documents,
 )
 
 
@@ -409,3 +413,235 @@ def test_brunswick_is_institutional_filters_lenders_and_tr_suffix():
 def test_brunswick_parse_page_no_results_table_returns_empty():
     scraper = NcRodCaptchaScraper()
     assert scraper._brunswick_parse_page("<html><body>no results</body></html>", "http://x", "SUBSTITUTE TRUSTEE") == []
+
+
+# --- Wake: same Tyler "Self-Service" platform as Durham, confirmed live --
+# --- 2026-10-14 AFTER the owner personally solved the real reCAPTCHA ------
+# --- checkbox. Real schema from that live session -------------------------
+#
+# Config ground truth: Wake's search_path was wrong before this pass (pointed
+# at the disclaimer gate page itself, "/user/disclaimer") -- corrected to the
+# real Tyler Self-Service search route, live-confirmed the same way Durham's
+# DOCSEARCH5S1 was.
+
+def test_wake_search_path_is_the_live_route():
+    assert _COUNTY_SITES["wake"]["url"] == "https://rodrecords.wake.gov/web"
+    assert _COUNTY_SITES["wake"]["search_path"] == "/search/DOCSEARCH341S2"
+    # Wake's own reCAPTCHA is still genuinely walled for an unattended run --
+    # this pass does NOT change that (no CAPTCHA automation), only wires up
+    # what happens once a human has already cleared it.
+    assert _COUNTY_SITES["wake"]["gate"] == "recaptcha"
+
+
+def test_wake_distress_doc_types_are_the_real_live_facet_values():
+    # Live Document Type facet counts, 14-day window, 2026-10-14: 43
+    # "SUBSTITUTE TRUSTEE" + 7 "FORECLOSURE NOTICE" out of 46 real Document
+    # Types total (DEED 985, DEED OF TRUST 1045, SATISFACTION 1087,
+    # ASSIGNMENT 309, etc. -- routine filings, not distress, same judgment
+    # call nc_rod_logan.py's own _classify() already makes for a plain DOT).
+    assert _WAKE_DISTRESS_DOC_TYPES == ("SUBSTITUTE TRUSTEE", "FORECLOSURE NOTICE")
+
+
+# A real single-book/page row (the common, parseable case): instrument
+# 2026082901, FORECLOSURE NOTICE, live-pulled 2026-10-14 from a 90-day
+# "SUBSTITUTE TRUSTEE, FORECLOSURE NOTICE" search (Jul16-Oct14 2026, 256
+# total real results). Trimmed verbose inline whitespace for test-file size,
+# same convention as the Brunswick fixtures above -- doc id, instrument
+# number, book/page, date, doc-type pair, names, and legal are all real,
+# live-pulled values, not fabricated. The "SEE"/doc-type-pair shape (an
+# administratively-corrected record shows the OLD struck-through value
+# first) is real and live-confirmed on this exact record.
+_WAKE_FORECLOSURE_NOTICE_HTML = """
+<li class="ss-search-row ui-li-static ui-body-inherit" data-href="/web/document/DOC899S1222?search=DOCSEARCH341S2" id="searchRowDOC899S1222" data-documentid="DOC899S1222" tabindex="0">
+<div class="selfServiceSearchRowLeft"><div class="ss-facet-avatar ss-facet-avatar-S">S</div></div>
+<div class="selfServiceSearchRowRight">
+<h1>
+2026082901
+&nbsp;&bull;&nbsp;
+B: 020291 P: 01139
+&nbsp;&bull;&nbsp;
+07/22/2026 04:41 PM
+</h1>
+<div class="searchResultFourColumn"><ul class="selfServiceSearchResultColumn five-line-block-with-text">
+<li>Document Type (2)</li>
+<li class="selfServiceSearchResultCollapsed"><b><span style="text-decoration: line-through;">SEE</span></b></li>
+<li class="selfServiceSearchFullResult"><b>FORECLOSURE NOTICE</b></li>
+</ul></div>
+<div class="searchResultFourColumn"><ul class="selfServiceSearchResultColumn five-line-block-with-text">
+<li>Grantor/Party 1 (4)</li>
+<li class="selfServiceSearchResultCollapsed"><b>LEE MAURICE LORANZO</b></li>
+<li class="selfServiceSearchFullResult"><b>LEE TRACY</b></li>
+<li class="selfServiceSearchFullResult"><b>WIGGINS ELLEN /AIF</b></li>
+<li class="selfServiceSearchFullResult"><b>LLG TRUSTEE LLC /TR BY A IN F</b></li>
+</ul></div>
+<div class="searchResultFourColumn"><ul class="selfServiceSearchResultColumn five-line-block-with-text">
+<li>Grantee/Party 2 (2)</li>
+<li class="selfServiceSearchResultCollapsed"><b>R&amp;R FUNDING GROUP, INC /TRDG</b></li>
+<li class="selfServiceSearchFullResult"><b>AMERICAN BUILDERS MORTGAGE</b></li>
+</ul></div>
+<div class="searchResultFourColumn"><ul class="selfServiceSearchResultColumn five-line-block-with-text">
+<li>Legal </li>
+<li class="selfServiceSearchResultCollapsed"><b> 11058-1787</b></li>
+</ul></div>
+</div>
+</li>
+"""
+
+# The EXACT real <h1> text (innerText, captured live via a DOM read) of a
+# multi-tract SUBSTITUTE TRUSTEE record whose header the shared
+# rod.nc_tyler._SS_HEAD regex cannot parse at all -- see module docstring's
+# third live-confirmed gap. Kept as a bare string (not full row HTML) since
+# the point here is the header regex itself, already proven against real text.
+_WAKE_MULTI_BOOKPAGE_HEADER_TEXT = (
+    "2026086748  •  B: 020299 P: 01082   B: 020299 P: 01083  •  07/31/2026 08:50 AM"
+)
+
+
+def test_wake_extract_docids_matches_row_order():
+    assert _wake_extract_docids(_WAKE_FORECLOSURE_NOTICE_HTML) == ["DOC899S1222"]
+
+
+def test_wake_record_to_listing_foreclosure_notice_real_schema():
+    records = parse_selfservice(_WAKE_FORECLOSURE_NOTICE_HTML)
+    assert len(records) == 1
+    record = records[0]
+    # the shared parser takes the FIRST Document Type value -- the stale
+    # struck-through "SEE", not the real live type. _wake_record_to_listing
+    # must never trust this for classification (see next test).
+    assert record.doc_type == "SEE"
+    assert record.instrument_no == "2026082901"
+    assert record.book == "020291" and record.page == "01139"
+
+    scraper = NcRodCaptchaScraper()
+    li = scraper._wake_record_to_listing(
+        record, "https://rodrecords.wake.gov/web/search/DOCSEARCH341S2",
+        "FORECLOSURE NOTICE", "DOC899S1222",
+    )
+    assert li is not None
+    assert li.county == "Wake" and li.state == "NC"
+    assert li.listing_type is ListingType.LIS_PENDENS
+    assert li.property_kind is PropertyKind.UNKNOWN
+    assert li.case_number == "2026082901"
+    # LEE MAURICE LORANZO / LEE TRACY / WIGGINS ELLEN (acting /AIF -- not
+    # auto-excluded, same convention as elsewhere in this file: only an
+    # institutional keyword or a literal "/TR" suffix excludes a party) are
+    # real people, kept; LLG TRUSTEE LLC /TR BY A IN F is filtered out
+    # (institutional keyword "trustee"/"llc").
+    assert li.defendant == "LEE MAURICE LORANZO; LEE TRACY; WIGGINS ELLEN /AIF"
+    assert "LLG TRUSTEE" not in (li.defendant or "")
+    assert li.plaintiff == "R&R FUNDING GROUP, INC /TRDG; AMERICAN BUILDERS MORTGAGE"
+    assert li.trustee is None  # neither real grantee here carries a "/TR" suffix
+    assert li.legal_description == "11058-1787"
+    # classification trusted the KNOWN search doc type, not the stale "SEE".
+    assert li.description.startswith("FORECLOSURE NOTICE recorded")
+    assert li.raw["county"] == "wake"
+    assert li.raw["doc_type"] == "SEE"  # kept verbatim for provenance only
+    assert li.raw["book_page"] == "B: 020291 P: 01139"
+    assert li.raw["wake_detail"]["docid"] == "DOC899S1222"
+    assert li.raw["wake_detail"]["searched_doc_type"] == "FORECLOSURE NOTICE"
+    assert li.raw["wake_detail"]["related_documents"] is None
+
+
+def test_wake_record_to_listing_skips_missing_instrument_number():
+    blank = IndexRecord(recorded="2026-10-14", instrument_no=None, doc_type="SUBSTITUTE TRUSTEE")
+    scraper = NcRodCaptchaScraper()
+    assert scraper._wake_record_to_listing(blank, "http://x", "SUBSTITUTE TRUSTEE", "DOC1") is None
+    blank2 = IndexRecord(recorded="2026-10-14", instrument_no="", doc_type="SUBSTITUTE TRUSTEE")
+    assert scraper._wake_record_to_listing(blank2, "http://x", "SUBSTITUTE TRUSTEE", "DOC1") is None
+
+
+def test_wake_multi_bookpage_header_not_parsed_by_shared_regex():
+    # The real, live-confirmed gap this module docstring flags: a multi-tract
+    # SUBSTITUTE TRUSTEE header (TWO "B: x P: y" pairs, no bullet between
+    # them) fails the shared _SS_HEAD regex entirely -- not a partial match,
+    # a real behavioral gap that silently drops this live record today (both
+    # here and on Durham, which shares the same parser).
+    assert _SS_HEAD.match(_WAKE_MULTI_BOOKPAGE_HEADER_TEXT) is None
+
+
+def test_wake_multi_bookpage_record_is_dropped_not_fabricated():
+    # End-to-end: parse_selfservice() on a full row carrying that exact real
+    # header text produces an IndexRecord with no instrument number (even
+    # though grantor/grantee/doc_type/legal all parse fine), and
+    # _wake_record_to_listing correctly refuses to fabricate a lead for it
+    # rather than emitting one with a blank case_number.
+    html = _WAKE_FORECLOSURE_NOTICE_HTML.replace(
+        "DOC899S1222", "DOC901S6792",
+    ).replace(
+        "2026082901\n&nbsp;&bull;&nbsp;\nB: 020291 P: 01139\n&nbsp;&bull;&nbsp;\n07/22/2026 04:41 PM",
+        _WAKE_MULTI_BOOKPAGE_HEADER_TEXT,
+    )
+    records = parse_selfservice(html)
+    assert len(records) == 1
+    assert records[0].instrument_no is None
+    assert records[0].book is None and records[0].page is None
+    # grantor/grantee/doc_type/legal still parsed fine -- only the header failed.
+    assert records[0].grantors == ["LEE MAURICE LORANZO", "LEE TRACY", "WIGGINS ELLEN /AIF",
+                                    "LLG TRUSTEE LLC /TR BY A IN F"]
+
+    scraper = NcRodCaptchaScraper()
+    li = scraper._wake_record_to_listing(records[0], "http://x", "SUBSTITUTE TRUSTEE", "DOC901S6792")
+    assert li is None
+
+
+# Real Related Documents markup (the task's own "one hop" ask), live-pulled
+# 2026-10-14 straight from the real relatedDocuments XHR response for
+# instrument 2026111052 ("NOTICE OF CORRECTION"): 1 related DEED from
+# 09/06/1960, the actual original instrument the correction concerns.
+_WAKE_RELATED_DOCUMENTS_HTML = """
+<ul class="ui-grid-b ss-utility-box-vertical ss-listview ui-listview ui-listview-inset">
+<li data-role="list-divider" class="ui-bar-a ui-li-divider ui-first-child" role="heading">Related Documents - 1 Total Results</li>
+<li class="ui-li-static ui-body-inherit ui-last-child related-doc-list">
+<div id="relatedDataCollapsible" data-role="collapsible-set">
+<div class="ss-row related-table-row " data-docid="DOCC106562174" data-role="collapsible">
+<legend class="ui-grid-c"><table width="100%"><tr>
+<td class="related-doc-type truncate" width="33%">DEED</td>
+<td class="related-doc-recording-date elipsis" width="33%">09/06/1960</td>
+<td class="related-doc-external-id truncate" width="33%">
+<a class="document-link" href="DOCC106562174?isRelatedDocument=true&amp;search=DOCSEARCH341S2" onclick="goToDocument(event)">001422-00299</a>
+</td>
+</tr></table></legend>
+<div class="related-data-panel">
+<div style="width:50%; float:left" class="truncate"> MAYNARD A C<br/>  MAYNARD ANNIE S<br/> </div>
+<div style="width:50%; float:left" class="truncate">MARTIN LILLIAN E<br/>MARTIN C E<br/></div>
+<br style="clear: left;"/>
+</div>
+</div>
+</div>
+</li>
+</ul>
+"""
+
+
+def test_wake_parse_related_documents_real_schema():
+    related = _wake_parse_related_documents(
+        _WAKE_RELATED_DOCUMENTS_HTML,
+        base_url="https://rodrecords.wake.gov/web/document/DOC905S8387?search=DOCSEARCH341S2",
+    )
+    assert len(related) == 1
+    r = related[0]
+    assert r["doc_id"] == "DOCC106562174"
+    assert r["doc_type"] == "DEED"
+    assert r["recording_date"] == "09/06/1960"
+    assert r["external_id"] == "001422-00299"
+    assert r["document_url"] == (
+        "https://rodrecords.wake.gov/web/document/"
+        "DOCC106562174?isRelatedDocument=true&search=DOCSEARCH341S2"
+    )
+    assert r["grantors"] == ["MAYNARD A C", "MAYNARD ANNIE S"]
+    assert r["grantees"] == ["MARTIN LILLIAN E", "MARTIN C E"]
+
+
+def test_wake_parse_related_documents_no_related_returns_empty():
+    assert _wake_parse_related_documents("<html><body>no related docs</body></html>") == []
+
+
+def test_wake_session_reuse_window_documented():
+    # The task's own central operational question -- how long a human-
+    # cleared session stays usable for an automated client -- must be
+    # answered with real evidence in the module docstring, not left unsaid.
+    module_doc = __import__(
+        "foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha", fromlist=["x"]
+    ).__doc__ or ""
+    assert "SESSION-REUSE" in module_doc
+    assert "pingSession" in module_doc

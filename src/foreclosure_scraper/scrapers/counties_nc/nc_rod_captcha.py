@@ -273,6 +273,157 @@ Listing per (book, page). See `_fetch_brunswick`/`_brunswick_parse_page`/
 writeup, and `tests/test_nc_rod_captcha.py` for real schema-accurate
 fixtures built from this live pull.
 
+**CORRECTION 2026-10-14 (cont. x3) -- Wake is now WIRED past the human-cleared
+CAPTCHA, and its SESSION-REUSE WINDOW is now measured, not assumed.** The
+reCAPTCHA checkbox itself is confirmed genuinely real (the owner personally
+solved it live) -- same hard boundary every other real CAPTCHA in this file
+respects, never automated, and this correction does not change that. What
+changes: everything downstream of that human-cleared session is now built.
+Same Tyler "Self-Service" platform as Durham -- confirmed by reading the real
+live DOM (`outerHTML` of real search rows), not inferred by platform match
+the way the 2026-10-12 entry got Durham wrong: identical
+`li.ss-search-row`/`ul.selfServiceSearchResultColumn` markup and identical
+`#field_RecordingDateID_DOT_StartDate`/`#field_RecordingDateID_DOT_EndDate`/
+`#searchButton` field ids (Wake's own search id is `DOCSEARCH341S2` vs
+Durham's `DOCSEARCH5S1` -- same app, different tenant instance). `_fetch_wake`
+therefore reuses `rod.nc_tyler.parse_selfservice()` verbatim, same as Durham,
+not a third hand-rolled parser. `_COUNTY_SITES["wake"]["search_path"]` was
+also simply wrong before this pass -- it pointed at `/user/disclaimer` (the
+gate page itself, never a search route) -- corrected to the real
+`/search/DOCSEARCH341S2`.
+
+Unlike Durham's single unfiltered page-1 pull (fine there -- lower volume,
+already-established no-CAPTCHA case), Wake's own
+`#field_selfservice_documentTypes` field lets the search be scoped UP FRONT
+to Wake's real distress Document Types, same convention as Brunswick's own
+2-doc-type search. Live Document Type facet counts (14-day window,
+2026-10-14) show Wake's version of nc_rod_logan.py's "S/TR"/"FCL"
+pre-foreclosure codes are literally spelled "SUBSTITUTE TRUSTEE" (43 in 14
+days) and "FORECLOSURE NOTICE" (7 in 14 days) among 44 other real Document
+Types seen live (DEED 985, DEED OF TRUST 1045, SATISFACTION 1087, ASSIGNMENT
+309, etc. -- routine filings, not distress, same judgment call Logan's own
+`_classify()` already makes for a plain DOT origination). A live two-type
+90-day search (Jul 16-Oct 14 2026) returned 256 real total results across 11
+pages of ~25/page -- SUBSTITUTE TRUSTEE alone was 222 across 9 pages
+(`Showing page 1 of 9 for 222 Total Results`, read live) -- small enough to
+walk in full within `_WAKE_MAX_PAGES`, unlike Brunswick's much larger
+per-type volume that needed a last-page-jump-and-walk-backward trick. Each
+type is searched SEPARATELY (not combined in one query) specifically so each
+page's own KNOWN `doc_type_filter` stays trustworthy for classification --
+see the next paragraph for why.
+
+Getting the filter to actually take live-surfaced a real platform gotcha:
+`#field_selfservice_documentTypes` is a true tag/token field, not a plain
+text filter. Live-confirmed TWICE that a plain `.fill()` / direct `.value`
+property-setter assignment (with proper `input`/`change` events dispatched)
+is silently ignored by the server-side search -- the reported result set
+never changed from whatever the PREVIOUS real search was. Only an actual
+typed keystroke sequence followed by a real Enter commits the text into a
+removable chip (watched "SUBSTITUTE TRUSTEE" turn into an `x`-removable chip
+live, and the results summary line change to "...and Document types in
+SUBSTITUTE TRUSTEE" only after that Enter) -- `_fetch_wake` types + presses
+Enter for exactly this reason.
+
+A second real, live-confirmed gotcha this scraper works around rather than
+silently mis-classifying: an administratively-corrected record renders TWO
+Document Type values, the OLD one struck through first
+(`<span style="text-decoration: line-through;">SEE</span>`) then the live one
+second (instrument 2026086748, live: "SEE" / "SUBSTITUTE TRUSTEE").
+`parse_selfservice()` (correctly, for Durham, which never hit this live)
+takes the FIRST value, so a corrected Wake row would silently classify as
+"SEE" if trusted. `_wake_record_to_listing` never uses `record.doc_type` for
+classification for exactly this reason -- it always trusts the KNOWN
+per-search `doc_type_filter` instead (kept in `raw["doc_type"]` for
+provenance only).
+
+A THIRD real, live-confirmed gap, the most consequential for lead
+completeness: the shared `_SS_HEAD` regex (`rod/nc_tyler.py`, used by Durham
+too) only captures ONE Book/Page pair per header. A multi-tract SUBSTITUTE
+TRUSTEE instrument renders TWO "B: x P: y" pairs with no bullet between them
+(live, instrument 2026086748: "2026086748  •  B: 020299 P: 01082   B:
+020299 P: 01083  •  07/31/2026 08:50 AM") -- confirmed live by running
+that EXACT captured text through `_SS_HEAD.match()`: returns `None`, so
+`recorded`/`instrument_no`/`book`/`page` all come back `None` (grantor/
+grantee/doc_type/description still parse fine -- only the header fails).
+Both `_wake_record_to_listing` and `_durham_record_to_listing` require a
+non-empty `instrument_no`, so a real lead like this one is SILENTLY DROPPED
+today, on both Wake and Durham -- flagged here, not patched, since fixing the
+shared regex is a Durham-affecting change outside this pass's scope.
+`tests/test_nc_rod_captcha.py` asserts this exact behavior directly against
+the real captured text rather than hiding it.
+
+Related Documents are wired in, one hop deep, as the owner specifically
+asked to confirm: each document's own detail page
+(`/web/document/{docid}?search={search_id}`) auto-fires a real XHR
+(`GET /web/document/relatedDocuments/{docid}?queryId=...&search=...`) --
+live-confirmed by fetching it directly (`credentials: "same-origin"`,
+carrying the real session) for instrument 2026111052 ("NOTICE OF
+CORRECTION"): 1 related DEED from 09/06/1960, book/page "001422-00299", its
+own 2 grantor + 2 grantee names, the ORIGINAL instrument the correction
+concerns. `queryId` itself is per-search-session and not exposed as a simple
+reachable global (checked live, not found on `window`) -- `_fetch_wake_related`
+therefore navigates to the document's own detail page and reads the SAME
+panel a human sees, rather than hand-building the relatedDocuments URL, and
+is budget-capped (`_WAKE_MAX_RELATED_FETCHES`, same spirit as
+nc_rowan_cott.py's `_MAX_DETAIL_FETCHES`) to the newest leads found. Related
+rows are index metadata (type/date/book-page/parties), not a document image,
+so never passed to `document_links.stamp_documents` -- stored as structured
+data under `raw["wake_detail"]["related_documents"]` instead. Per-document
+PDF images themselves (`/web/document-image-pdf/{docid}/{queryId}/
+{docnum}-{index}.pdf`) are live-confirmed to need that SAME session -- a
+cookie-less `curl` against a real URL pulled from this exact session got a
+`302` to `/web/user/disclaimer` -- identical gap to Durham's own cookie-gated
+PDF route (see above), and deliberately NOT stamped for the same reason.
+
+**SESSION-REUSE WINDOW -- the operational question this pass was
+specifically asked to answer, tested empirically, not assumed either way.**
+The real Tyler Self-Service client ships its own `GET /web/session/
+pingSession` heartbeat -- observed firing automatically roughly every
+10-20s while a tab just sits open, alongside a `POST /web/subscription/
+getSubscriptionTime` call -- specifically to keep the server-side session
+alive. That the platform bothers polling this often is itself strong
+architectural evidence of a real, finite, activity-extendable idle timeout
+on the order of minutes (no system defends a multi-hour timeout by pinging
+every 10-20 seconds; that cadence is characteristic of a moderate,
+enterprise-typical 15-30 minute idle window). Tested directly, not inferred
+from the ping cadence alone: monkey-patched `window.fetch`/`jQuery.ajax` in
+the live, human-cleared tab to silently BLOCK any further `pingSession`/
+`getSubscriptionTime` call (confirmed the block actually fired), then made
+ZERO further requests of any kind for a clean, measured 7 minutes 14 seconds
+(18:26:27Z to 18:33:41Z, 2026-10-14) before issuing ONE real, deliberate
+authenticated request -- `window.fetch` directly (bypassing the patched
+wrapper) to both `/web/session/pingSession` AND a full
+`/web/searchResults/DOCSEARCH341S2?page=1` fetch. Both returned `200`, not a
+redirect to `/web/user/disclaimer`: `pingSession` answered `"true"`, and the
+searchResults fetch returned a real 546KB page of actual `ss-search-row`/
+`ss-facet-entry` markup, not disclaimer/login HTML. CONFIRMED FLOOR: at least
+7m14s of genuinely idle (zero client activity, heartbeat deliberately
+disabled) session survival, live-verified, not assumed. This was NOT pushed
+further to find the actual ceiling (would cost real additional idle wall-
+clock time this pass did not spend chasing), so the exact upper bound
+remains unmeasured -- report it as "at least ~7 minutes confirmed," not as a
+tested multi-hour number.
+
+**What this means operationally:** a 7+-minute confirmed floor, combined
+with the platform's own ~10-20s self-heartbeat architecture (strong evidence
+the real idle window is considerably longer than 7 minutes, likely in the
+same 15-30+ minute range typical of this class of enterprise session
+manager), supports the "operator clears the checkbox once, this scraper's
+own Playwright session then drives a real, bounded LIVE batch of
+searches/fetches off that same cookie" pattern -- NOT a one-shot token that
+dies the instant the clearing browser closes, and a materially different
+(more capable) shape than `docs/HERMES.md` §11's existing manual lane
+(Cherokee/LiensNC: operator saves a page, an offline parser ingests it, no
+live session reuse at all). `_fetch_wake`'s own two-search-plus-pagination-
+plus-related-docs run is itself well within a 7+-minute live window for the
+confirmed real volume (256 leads/11 pages + a budget-capped related-docs
+hop). For extra headroom on a longer/slower run, `_fetch_wake` could also
+just call `/web/session/pingSession` on a timer itself, the same way the
+real site's own JS does -- trivial to add, costs nothing, not done here
+since it was not needed to clear the measured floor above. The reCAPTCHA
+clearing itself stays, and will keep staying, a manual/operator step -- this
+codebase does not and will not try to automate solving it.
+
 Strategy:
 1. Launch Playwright browser (headful -- required; see the `headless=False`
    note on the browser launch call below).
@@ -468,8 +619,210 @@ def _brunswick_names_in_cell(td: Any) -> list[str]:
             names.append(name)
     return names
 
+
+# ---------------------------------------------------------------------------
+# Wake (Tyler "Self-Service", same tenant family as Durham) -- live-verified
+# 2026-10-14 AFTER the owner personally solved the real Google reCAPTCHA
+# checkbox on Wake's disclaimer page (the same hard boundary this whole file
+# respects for every other county here -- the CAPTCHA itself is never
+# automated). Everything below was exercised through that human-cleared
+# browser session: identical markup (`li.ss-search-row` /
+# `ul.selfServiceSearchResultColumn`) and identical field ids
+# (`#field_RecordingDateID_DOT_StartDate`/`_EndDate`, `#searchButton`) to
+# Durham's own Tyler "Self-Service" tenant (DOCSEARCH341S2 here vs Durham's
+# DOCSEARCH5S1) -- confirmed by pulling the real DOM (`outerHTML`) of live
+# search rows, not by platform-match inference the way the 2026-10-12 entry
+# got Durham wrong (see module docstring). `_fetch_wake` therefore reuses
+# `rod.nc_tyler.parse_selfservice()` verbatim, same as `_fetch_durham`, no
+# third hand-rolled row parser.
+#
+# UNLIKE Durham (one unfiltered page-1 date-range pull -- fine there because
+# Durham's own 2026-10-07 docstring already established "no challenge" and
+# it's a lower-volume county), Wake's own `field_selfservice_documentTypes`
+# input is a real tag/token field, live-confirmed to need an actual commit
+# keystroke: typing text alone (even via a direct `.value` property-setter
+# dispatch, tried and failed live) does NOT filter the search -- only after
+# pressing Enter does the typed text become a removable chip
+# (`<span>SUBSTITUTE TRUSTEE <a class="...">x</a></span>`) and the results
+# summary line changes to "...and Document types in SUBSTITUTE TRUSTEE".
+# Wake's own live Document Type facet counts (14-day window, 2026-10-14) show
+# this county's version of nc_rod_logan.py's "S/TR"/"FCL" pre-foreclosure
+# codes are literally spelled "SUBSTITUTE TRUSTEE" (43 in 14 days) and
+# "FORECLOSURE NOTICE" (7 in 14 days) -- the other 44 real Document Types
+# seen live (DEED 985, DEED OF TRUST 1045, SATISFACTION 1087, ASSIGNMENT 309,
+# etc.) are routine filings, not distress signals, same judgment call
+# nc_rod_logan.py's own `_classify()` already makes (a plain DEED OF TRUST
+# origination is not itself distress). Scoping the search to these 2 types up
+# front (one search per type, Brunswick's own convention, not Durham's
+# unfiltered-page-1 one) keeps Wake's own 90-day pull small and complete
+# instead of Durham's thousands-of-rows-page-1-only gap: a live two-type
+# 90-day search (Jul 16 - Oct 14 2026) returned exactly 256 total real
+# results across 11 pages of ~25/page -- SUBSTITUTE TRUSTEE alone was 222
+# across 9 pages, confirmed live by reading `Showing page 1 of 9 for 222
+# Total Results`. Each type is searched SEPARATELY (not combined in one
+# query) specifically to keep each page's own `doc_type_filter` trustworthy
+# for classification -- see the next paragraph for why `record.doc_type`
+# itself cannot be trusted alone.
+#
+# Real, live-pulled gotcha this scraper works around: a record whose
+# Document Type was administratively corrected renders TWO values in the
+# "Document Type" column, the OLD one struck through first
+# (`<span style="text-decoration: line-through;">SEE</span>`) then the live
+# one second (confirmed live, instrument 2026086748: "SEE" / "SUBSTITUTE
+# TRUSTEE"). `rod.nc_tyler.parse_selfservice()` (correctly, for Durham, which
+# never hit this live) takes `cols[...][0]` -- the FIRST value -- so on a
+# corrected Wake row that would silently read back "SEE", not the real type.
+# `_wake_record_to_listing` below never trusts `record.doc_type` for
+# classification for exactly this reason: it always uses the KNOWN per-search
+# `doc_type_filter` (the type this page was searched for, same shape as
+# `_brunswick_record_to_listing`'s `doc_type = rec.get("doc_type") or
+# doc_type_filter` fallback, just made the primary source here instead of a
+# fallback) -- `record.doc_type` is kept in `raw` for provenance only.
+#
+# A second real, live-confirmed gap: Wake's search-RESULT row (unlike
+# Durham's) caps each Grantor/Grantee column's VISIBLE names at 5
+# (`ul.selfServiceSearchResultColumn.five-line-block-with-text` -- a CSS/DOM
+# cap, not a rendering artifact) even when the column header's own count says
+# more exist (live-confirmed: "Grantor/Party 1 (7)" with only 5 `<li>` name
+# nodes actually in the DOM for instrument 2026086748 -- VERNON VERNON J /
+# VERNON TERRI L / NEWREZ LLC /TRDG A IN F / NEW PENN FINANCIAL, LLC /
+# SHELLPOINT MORTGAGE SERVICING /A IN F, 2 more real parties not rendered
+# here at all). The remaining names only exist on that document's own detail
+# page, not fetched here -- a real, flagged partial-capture gap on any record
+# with >5 grantors or >5 grantees, same honesty convention as every other
+# partial-coverage note in this file (Durham's page-1-only, Brunswick's
+# page-budget cap).
+#
+# A THIRD real, live-confirmed gap, and the most consequential one for lead
+# completeness: `rod.nc_tyler.parse_selfservice()`'s shared `_SS_HEAD` regex
+# -- used by Durham too, not something this pass rewrites -- only captures
+# ONE Book/Page pair per header. A SUBSTITUTE TRUSTEE instrument that
+# references MULTIPLE original tracts renders TWO (or more) "B: x P: y"
+# pairs in the same `<h1>` with no middle bullet between them (live-pulled,
+# instrument 2026086748: "2026086748  •  B: 020299 P: 01082   B: 020299 P:
+# 01083  •  07/31/2026 08:50 AM") -- confirmed live by running that EXACT
+# captured text through `_SS_HEAD.match()`: it returns `None`, so
+# `recorded`/`instrument_no`/`book`/`page` all come back `None` on that row
+# (grantor/grantee/doc_type/description still parse fine -- only the header
+# line fails). `_wake_record_to_listing` (and `_durham_record_to_listing`,
+# same shared behavior) both require a non-empty `instrument_no` and return
+# `None` otherwise, so a real multi-tract SUBSTITUTE TRUSTEE lead like this
+# one is SILENTLY DROPPED today, on both Wake and Durham, not just
+# mis-parsed -- flagged here rather than patched, since fixing the shared
+# regex is a Durham-affecting change outside this pass's scope (same
+# "flagged, not silently claimed complete" convention as every other gap in
+# this file). `tests/test_nc_rod_captcha.py` asserts this exact live-pulled
+# behavior directly rather than hiding it.
+#
+# Related Documents (one hop, as asked): each document's own detail page
+# (`/web/document/{docid}?search={search_id}`) auto-fires a real XHR
+# (`GET /web/document/relatedDocuments/{docid}?queryId={...}&search={search_id}`)
+# that live-confirmed returns real related-instrument rows (one real example,
+# instrument 2026111052 "NOTICE OF CORRECTION": 1 related DEED from
+# 09/06/1960, book/page "001422-00299", its own grantor/grantee names) --
+# the ORIGINAL instrument a correction/trustee/foreclosure filing concerns,
+# genuinely useful chain-of-title context the task asked to confirm was being
+# captured. The `queryId` itself is per-search-session and not exposed as a
+# simple global anywhere reachable without deeper reverse-engineering (tried
+# live, not found on `window`) -- `_fetch_wake_related` therefore just
+# navigates to the document's own detail page and reads the SAME panel a
+# human would see, rather than hand-building the relatedDocuments URL, and is
+# budget-capped (`_WAKE_MAX_RELATED_FETCHES`) to the newest leads found, same
+# spirit as nc_rowan_cott.py's `_MAX_DETAIL_FETCHES`. Related-document ROWS
+# here are index metadata (type/date/book-page/parties), not a document
+# image/PDF -- never passed to `document_links.stamp_documents` (nothing to
+# stamp), just embedded as structured data under `raw["wake_detail"]
+# ["related_documents"]`.
+#
+# Per-document PDF images (`/web/document-image-pdf/{docid}/{queryId}/
+# {docnum}-{index}.pdf`) are live-confirmed to need the SAME live session as
+# everything else here (a cookie-less `curl` against a real URL pulled from
+# this exact session got a `302` to `/web/user/disclaimer`) -- identical gap
+# to Durham's own cookie-gated PDF route (see module docstring), and
+# deliberately NOT stamped here for the same reason: `enrichment_doc_ocr.py`
+# fetches stamped URLs with a stateless `httpx.AsyncClient` with no cookie
+# jar from this scraper's Playwright run, so a stamped link here would
+# silently 302 to the disclaimer HTML and fail OCR invisibly.
+#
+# SESSION-REUSE WINDOW (the operational question this pass was specifically
+# asked to answer): see the module docstring's own "Wake session-reuse"
+# section for the full live-measured writeup and evidence. Short version:
+# the reCAPTCHA clearing itself stays a manual, operator-driven step -- this
+# file does not and will not try to automate solving it -- but the session it
+# produces is NOT a one-shot token. The live Tyler Self-Service client ships
+# its own `GET /web/session/pingSession` heartbeat (observed firing roughly
+# every 10-20s while a tab sits open) specifically to keep the server-side
+# session alive, which is itself strong evidence the underlying session has a
+# real, finite idle timeout the platform expects a client to actively defer --
+# not a single-use artifact that dies the instant the browser that cleared it
+# closes.
+_WAKE_LOOKBACK_DAYS = 90
+#: Pages read per doc type (~25 rows/page) -- live 90-day counts were 222
+#: (SUBSTITUTE TRUSTEE, 9 pages) and well under that for FORECLOSURE NOTICE;
+#: capped higher for headroom. Still documented as partial-if-exceeded, same
+#: honesty convention as every other page budget in this file.
+_WAKE_MAX_PAGES = 12
+_WAKE_DISTRESS_DOC_TYPES = ("SUBSTITUTE TRUSTEE", "FORECLOSURE NOTICE")
+#: Budget cap on the one-hop related-documents follow-through (one extra page
+#: load per document) -- same spirit as nc_rowan_cott.py's
+#: _MAX_DETAIL_FETCHES, applied to the newest leads built first.
+_WAKE_MAX_RELATED_FETCHES = 25
+_WAKE_PAGE_OF_RE = re.compile(r"Showing page\s+\d+\s+of\s+(\d+)", re.I)
+
+
+def _wake_extract_docids(html: str) -> list[str]:
+    """data-documentid for each li.ss-search-row, in the SAME document order
+    `rod.nc_tyler.parse_selfservice()` itself walks (both iterate
+    `soup.select("li.ss-search-row")`) -- used to pair each parsed
+    IndexRecord with the real docid that shared parser never captures, so
+    `_fetch_wake` can build each document's own detail-page URL for the
+    one-hop related-documents follow-through below."""
+    soup = BeautifulSoup(html or "", "html.parser")
+    return [li.get("data-documentid") or "" for li in soup.select("li.ss-search-row")]
+
+
+def _wake_parse_related_documents(html: str, base_url: str = "") -> list[dict]:
+    """Parse Wake's real Related Documents panel (live markup, confirmed
+    2026-10-14 -- see module docstring's Wake constants block) -- one dict
+    per related instrument: doc_type, recording_date, external_id (the
+    book/page-style id the UI shows, e.g. "001422-00299"), document_url (the
+    in-app link to THAT related document's own detail page -- index-level
+    navigation, NOT a document image/PDF, so never passed to
+    `document_links.stamp_documents`), grantors, grantees. Empty list on no
+    related documents / unparseable HTML, never raises."""
+    soup = BeautifulSoup(html or "", "html.parser")
+    out: list[dict] = []
+
+    def _names(div: Any) -> list[str]:
+        if div is None:
+            return []
+        return [n.strip() for n in div.get_text("\n").split("\n") if n.strip()]
+
+    for row in soup.select("div.related-table-row"):
+        doc_type_el = row.select_one(".related-doc-type")
+        date_el = row.select_one(".related-doc-recording-date")
+        link = row.select_one("a.document-link")
+        panels = row.select(".related-data-panel > div")
+        href = link.get("href") if link else None
+        out.append({
+            "doc_id": row.get("data-docid") or None,
+            "doc_type": doc_type_el.get_text(strip=True) if doc_type_el else None,
+            "recording_date": date_el.get_text(strip=True) if date_el else None,
+            "external_id": link.get_text(strip=True) if link else None,
+            "document_url": urljoin(base_url, href) if href else None,
+            "grantors": _names(panels[0] if len(panels) > 0 else None),
+            "grantees": _names(panels[1] if len(panels) > 1 else None),
+        })
+    return out
+
+
 _COUNTY_SITES = {
-    "wake": {"url": "https://rodrecords.wake.gov/web", "gate": "recaptcha", "search_path": "/user/disclaimer"},
+    # search_path corrected 2026-10-14 from "/user/disclaimer" (the gate page
+    # itself) to the real Tyler Self-Service search route -- live-confirmed
+    # the exact same way Durham's DOCSEARCH5S1 was: Wake's own search form
+    # posts to/reads from /web/search/DOCSEARCH341S2 (same "Self-Service"
+    # platform, a different per-tenant search id). See _fetch_wake below.
+    "wake": {"url": "https://rodrecords.wake.gov/web", "gate": "recaptcha", "search_path": "/search/DOCSEARCH341S2"},
     # gate "none": live-reverified 2026-10-14 -- no CAPTCHA at all, just a
     # disclaimer click-through. See module docstring's Durham correction.
     "durham": {"url": "https://rodweb.dconc.gov/web", "gate": "none", "search_path": "/search/DOCSEARCH5S1"},
@@ -581,6 +934,25 @@ class NcRodCaptchaScraper(BaseScraper):
                             log.warning("nc_rod_captcha.gate_blocked", county=county)
                             await page.close()
                             continue
+
+                    if county == "wake":
+                        # Wake's real gate is a genuine Google reCAPTCHA checkbox --
+                        # solve_recaptcha_v2 is live-reverified (module docstring)
+                        # to never actually clear it, so gate_cleared only reaches
+                        # here for Wake when the Playwright BrowserContext this
+                        # scraper is driving was already carrying a human-cleared
+                        # session (e.g. a persisted storage_state an operator
+                        # captured after solving the checkbox themselves -- see
+                        # the module docstring's "Wake session-reuse" finding for
+                        # how long that session stays good for). Same Tyler
+                        # "Self-Service" platform as Durham -- its own method
+                        # below reuses rod.nc_tyler.parse_selfservice(), same as
+                        # Durham, instead of a third hand-rolled parser.
+                        county_results = await self._fetch_wake(page, entry_url, cfg["search_path"])
+                        results.extend(county_results)
+                        await page.close()
+                        log.info("nc_rod_captcha.county_done", county=county, found=len(county_results))
+                        continue
 
                     search_url = f"{entry_url}{cfg['search_path']}"
                     await page.goto(search_url, timeout=30000)
@@ -1082,6 +1454,236 @@ class NcRodCaptchaScraper(BaseScraper):
                 log.warning("nc_rod_captcha.brunswick_stamp_failed", error=str(exc)[:160])
 
         return li
+
+    # -- Wake (Tyler "Self-Service", same platform family as Durham) --------
+
+    async def _fetch_wake(self, page: Any, entry_url: str, search_path: str) -> list[Listing]:
+        """Wake ROD: reCAPTCHA already cleared by a human before this method
+        runs (see the Wake constants block above for the full live-verified
+        writeup). Runs ONE search per real distress Document Type
+        (_WAKE_DISTRESS_DOC_TYPES), not one combined query, so each page's own
+        KNOWN doc type can be trusted for classification instead of each
+        row's own parsed `doc_type` (which can read back a stale "SEE" on an
+        administratively-corrected record -- see module docstring). Reuses
+        `rod.nc_tyler.parse_selfservice()` for row parsing, same real markup
+        as Durham, no third hand-rolled parser."""
+        results: list[Listing] = []
+        search_id = search_path.rsplit("/", 1)[-1]
+        search_url = f"{entry_url}{search_path}"
+
+        cutoff = datetime.now() - timedelta(days=_WAKE_LOOKBACK_DAYS)
+        start_str = cutoff.strftime("%m/%d/%Y")
+        end_str = datetime.now().strftime("%m/%d/%Y")
+
+        from ...rod.nc_tyler import parse_selfservice
+
+        for doc_type in _WAKE_DISTRESS_DOC_TYPES:
+            try:
+                # Fresh navigation to the search route: live-confirmed this
+                # Self-Service search id is a STATEFUL server-side context
+                # (it restores whatever the last search on it was, not a
+                # blank form) -- "Clear Selections" resets it before this
+                # iteration's own date range + doc type are set, so a doc
+                # type chip from a PRIOR iteration of this same loop can
+                # never leak into the next search. Best-effort: a missing/
+                # failed Clear Selections control still lets the fields
+                # below get explicitly (re)filled, same defensive shape as
+                # the generic county path's own selector loops.
+                await page.goto(search_url, timeout=30000)
+                await page.wait_for_load_state("networkidle", timeout=15000)
+                try:
+                    clear_btn = page.locator("a, button", has_text="Clear Selections").first
+                    await clear_btn.click(timeout=5000)
+                    await page.wait_for_timeout(500)
+                except Exception:
+                    pass
+
+                start_input = await page.wait_for_selector(
+                    "#field_RecordingDateID_DOT_StartDate", timeout=10000)
+                end_input = await page.query_selector("#field_RecordingDateID_DOT_EndDate")
+                await start_input.fill(start_str)
+                await end_input.fill(end_str)
+
+                # Document Types is a real tag/token field -- live-confirmed a
+                # plain .fill()/.value assignment is silently ignored by the
+                # actual search (the server-reported result set never
+                # changed), and the typed text only becomes a real, searched
+                # chip after an explicit Enter commits it (watched it turn
+                # into a removable "x SUBSTITUTE TRUSTEE" chip live, and the
+                # results summary line change to "...and Document types in
+                # SUBSTITUTE TRUSTEE" only after that Enter).
+                doc_type_input = await page.wait_for_selector(
+                    "#field_selfservice_documentTypes", timeout=10000)
+                await doc_type_input.click()
+                await doc_type_input.type(doc_type)
+                await doc_type_input.press("Enter")
+
+                search_btn = await page.query_selector("#searchButton")
+                if not search_btn:
+                    log.warning("nc_rod_captcha.wake_no_search_button", doc_type=doc_type)
+                    continue
+                await search_btn.click()
+                await page.wait_for_timeout(4000)
+                await page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception as exc:
+                log.warning("nc_rod_captcha.wake_search_failed", doc_type=doc_type, error=str(exc)[:160])
+                continue
+
+            try:
+                html = await page.content()
+            except Exception as exc:
+                log.warning("nc_rod_captcha.wake_no_content", doc_type=doc_type, error=str(exc)[:160])
+                continue
+            m = _WAKE_PAGE_OF_RE.search(html)
+            total_pages = int(m.group(1)) if m else 1
+            log.info("nc_rod_captcha.wake_search_done", doc_type=doc_type, total_pages=total_pages)
+
+            type_results: list[Listing] = []
+            for pg_num in range(1, min(total_pages, _WAKE_MAX_PAGES) + 1):
+                if pg_num > 1:
+                    try:
+                        await page.goto(f"{entry_url}/searchResults/{search_id}?page={pg_num}", timeout=20000)
+                        await page.wait_for_load_state("networkidle", timeout=15000)
+                        html = await page.content()
+                    except Exception as exc:
+                        log.warning("nc_rod_captcha.wake_page_failed", doc_type=doc_type,
+                                    page_num=pg_num, error=str(exc)[:160])
+                        break
+
+                try:
+                    records = parse_selfservice(html)
+                except Exception as exc:
+                    log.warning("nc_rod_captcha.wake_parse_failed", doc_type=doc_type,
+                                page_num=pg_num, error=str(exc)[:160])
+                    continue
+                docids = _wake_extract_docids(html)
+                for i, record in enumerate(records):
+                    docid = docids[i] if i < len(docids) else None
+                    li = self._wake_record_to_listing(record, search_url, doc_type, docid)
+                    if li is not None:
+                        type_results.append(li)
+
+            log.info("nc_rod_captcha.wake_type_done", doc_type=doc_type, found=len(type_results))
+            results.extend(type_results)
+
+        # One-hop related-documents follow-through (see module docstring),
+        # budget-capped to the newest leads built above -- one extra page
+        # load per document, so this is bounded even though the full 2-type
+        # 90-day pull itself (~256 live) is not.
+        for li in results[:_WAKE_MAX_RELATED_FETCHES]:
+            detail = (li.raw or {}).get("wake_detail") if isinstance(li.raw, dict) else None
+            docid = detail.get("docid") if isinstance(detail, dict) else None
+            if not docid:
+                continue
+            related = await self._fetch_wake_related(page, entry_url, search_id, docid)
+            if related:
+                detail["related_documents"] = related
+
+        return results
+
+    def _wake_record_to_listing(self, record: Any, source_url: str, doc_type_filter: str,
+                                 docid: str | None) -> Listing | None:
+        """Build one Listing from a parse_selfservice() IndexRecord pulled
+        from a Wake search known to be scoped to `doc_type_filter`
+        (SUBSTITUTE TRUSTEE or FORECLOSURE NOTICE). Classifies like
+        nc_rod_logan.py's own pre-foreclosure codes -- both Wake types are
+        the same real-world signal as Logan's S/TR + FCL -- LIS_PENDENS, pre_
+        foreclosure. Always trusts `doc_type_filter` (the KNOWN type this
+        search was scoped to) over the row's own parsed `record.doc_type` for
+        classification -- a corrected record's `record.doc_type` can read
+        back the stale struck-through value ("SEE") instead of the real one,
+        see module docstring. The homeowner is named as a GRANTOR here, the
+        same real pattern this scraper's own live pull confirmed on Wake
+        (instrument 2026086748: grantors "VERNON VERNON J"/"VERNON TERRI L."
+        plus the lender/trustee chain) and that Brunswick's own SUBSTITUTE
+        TRUSTEE rows already established for this same codebase. Reuses
+        `_brunswick_is_institutional`/`_brunswick_dedupe` rather than a third
+        near-identical word list -- both already live in this same module
+        (not a cross-file private import, unlike why Brunswick itself keeps
+        its own copy instead of importing nc_rod_logan.py's)."""
+        doc_number = (record.instrument_no or "").strip()
+        if not doc_number:
+            return None
+
+        book_page = " ".join(
+            p for p in (
+                f"BT: {record.index_code}" if record.index_code else "",
+                f"B: {record.book}" if record.book else "",
+                f"P: {record.page}" if record.page else "",
+            ) if p
+        )
+
+        grantors = record.grantors or []
+        grantees = record.grantees or []
+        defendants = _brunswick_dedupe([g for g in grantors if not _brunswick_is_institutional(g)])
+        plaintiffs = _brunswick_dedupe(grantees)
+        trustees = _brunswick_dedupe([g for g in grantees if g.rstrip().lower().endswith("/tr")])
+
+        raw: dict = {
+            "county": "wake",
+            "doc_type": record.doc_type or "",
+            "filing_date": record.recorded or "",
+            "grantor": ", ".join(grantors),
+            "grantee": ", ".join(grantees),
+            "book_page": book_page,
+            # ONE new block-name key covers everything Wake adds beyond the
+            # shared county/doc_type/grantor/grantee/book_page names this
+            # file already writes (and has registered) for Durham/Brunswick/
+            # the generic _parse_html path -- see this session's final report
+            # ("NEW RAW KEYS TO REGISTER"), same pattern as nc_rowan_cott.py's
+            # "rowan_detail" / Brunswick's "brunswick_detail".
+            "wake_detail": {
+                "docid": docid,
+                # the search's own KNOWN type -- authoritative for
+                # classification above, see this method's own docstring.
+                "searched_doc_type": doc_type_filter,
+                # filled in by _fetch_wake after this Listing is built, if
+                # the one-hop related-documents budget allows it; None here
+                # means "not attempted" (budget/no docid), [] means
+                # "attempted, found none" -- stays None until then.
+                "related_documents": None,
+            },
+        }
+
+        return Listing(
+            source=self.slug,
+            source_url=source_url,
+            listing_type=ListingType.LIS_PENDENS,
+            property_kind=PropertyKind.UNKNOWN,
+            county="Wake",
+            state="NC",
+            case_number=doc_number,
+            defendant="; ".join(defendants) or None,
+            plaintiff="; ".join(plaintiffs) or None,
+            trustee="; ".join(trustees) or None,
+            legal_description=(record.description or None),
+            description=f"{doc_type_filter} recorded {record.recorded or 'unknown date'}",
+            first_seen=datetime.utcnow(),
+            last_seen=datetime.utcnow(),
+            raw=raw,
+        )
+
+    async def _fetch_wake_related(self, page: Any, entry_url: str, search_id: str,
+                                   docid: str) -> list[dict]:
+        """One hop: navigate to this document's own detail page and read the
+        SAME Related Documents panel a human sees there -- live-confirmed it
+        auto-populates via the page's own XHR
+        (`GET /web/document/relatedDocuments/{docid}?queryId=...&search=...`)
+        on load (see module docstring for the real live example). Returns []
+        on any failure/timeout/no related documents -- never raises, so one
+        bad document never aborts the rest of the budget-capped loop in
+        `_fetch_wake`."""
+        detail_url = f"{entry_url}/document/{docid}?search={search_id}"
+        try:
+            await page.goto(detail_url, timeout=20000)
+            await page.wait_for_selector(".related-doc-list", timeout=8000)
+        except Exception:
+            return []
+        try:
+            html = await page.content()
+        except Exception:
+            return []
+        return _wake_parse_related_documents(html, detail_url)
 
     def _parse_html(self, html: str, county: str, base_url: str) -> list[Listing]:
         """Parse deed search results from HTML."""

@@ -314,12 +314,87 @@ leads first, still partial coverage of the full window (documented, not claimed 
 `nc_rod_captcha.py`'s own module docstring and `tests/test_nc_rod_captcha.py` (6 new tests, real
 schema-accurate fixtures built from this live pull) for the full writeup.
 
-- `counties_nc/nc_rod_captcha.py` — **7 of 9 counties remain genuinely walled** (Wake, Iredell,
-  Craven, Greene, Harnett, Randolph, Stokes); Durham **removed from this list** (fixed above,
-  needs no login). Brunswick **removed from this list**: CAPTCHA, disclaimer-accept, search, and
-  result parsing are all now live-wired and verified end-to-end (see correction immediately
-  above) — real leads captured for 2 distress doc types, newest-page-first, budget-capped partial
-  coverage of each 90-day window (not full pagination — a genuine, documented gap, not a blocker).
+**CORRECTION 2026-10-14 (cont. x3)** — Wake's own reCAPTCHA checkbox was confirmed genuinely real
+(the owner personally solved it live) — same hard boundary this file has drawn at every other real
+CAPTCHA (never automated). Everything downstream of that human-cleared session is now wired, not
+just confirmed-walled: same Tyler "Self-Service" platform as Durham (identical
+`li.ss-search-row`/`ul.selfServiceSearchResultColumn` markup and identical
+`#field_RecordingDateID_DOT_StartDate`/`#searchButton` field ids, live-confirmed by reading the
+real DOM, not inferred by platform match the way the 2026-10-12 entry got Durham wrong) — so
+`_fetch_wake` reuses `rod/nc_tyler.py`'s already-tested `parse_selfservice()` row parser verbatim,
+same as Durham, not a third hand-rolled one. `_COUNTY_SITES["wake"]["search_path"]` was also wrong
+before this pass (pointed at `/user/disclaimer`, the gate page itself, not a search route) —
+corrected to the real `/search/DOCSEARCH341S2`.
+
+Unlike Durham's unfiltered page-1 pull, Wake's own `#field_selfservice_documentTypes` field lets
+the search be scoped up front to Wake's real distress Document Types — live-captured facet counts
+(14-day window) show these are literally spelled "SUBSTITUTE TRUSTEE" (43) and "FORECLOSURE
+NOTICE" (7), the same real-world pre-foreclosure signal as `nc_rod_logan.py`'s own S/TR + FCL
+codes; everything else seen live (DEED 985, DEED OF TRUST 1045, SATISFACTION 1087, ASSIGNMENT 309,
+etc.) is a routine filing, not distress, same judgment call Logan's own classifier already makes.
+A live two-type 90-day search (Jul 16–Oct 14 2026) returned 256 real total results across 11 pages
+— small enough to walk in full, unlike Brunswick's much larger per-type volume. Getting the search
+to actually filter surfaced a real platform gotcha: the Document Types field is a true tag/token
+input — live-confirmed a plain `.fill()`/property-setter value assignment is silently ignored by
+the server-side search (the result set never changed); only an actual typed keystroke sequence
+followed by Enter commits it into a real, searched chip. `_wake_record_to_listing` classifies both
+types as `LIS_PENDENS` (pre-foreclosure) and reuses `_brunswick_is_institutional`/
+`_brunswick_dedupe` (same file, not a cross-module import) to separate the real owner(s) — named as
+GRANTOR on these record types, same pattern Brunswick's own SUBSTITUTE TRUSTEE rows already
+established — from the lender/trustee chain. Real live example: instrument 2026086748, grantors
+"VERNON VERNON J"/"VERNON TERRI L." (kept) plus NEWREZ/NEW PENN FINANCIAL/SHELLPOINT (filtered).
+
+Two further real, live-confirmed, explicitly flagged (not silently papered-over) gaps surfaced
+along the way: (1) Wake's own search-result row caps each Grantor/Grantee column at 5 VISIBLE
+names even when the column header's own count says more exist (live: "Grantor/Party 1 (7)" with
+only 5 `<li>` names actually in the DOM) — the rest only exist on that document's own detail page,
+not fetched here; (2) a multi-tract instrument's header (two "B: x P: y" pairs, no bullet between
+them) fails `rod/nc_tyler.py`'s shared `_SS_HEAD` regex entirely — live-confirmed by running the
+exact captured text through it — so `instrument_no`/`book`/`page`/`recorded` all come back `None`
+on that row and the record is silently dropped today, on BOTH Wake and Durham (same shared parser,
+not patched here since it's a Durham-affecting change outside this pass's scope).
+
+Related Documents are wired in, one hop, as asked: each document's own detail page
+(`/web/document/{docid}?search={search_id}`) auto-fires a real XHR
+(`GET /web/document/relatedDocuments/{docid}?queryId=...&search=...`) that live-confirmed returns
+real related-instrument rows — live example, instrument 2026111052 ("NOTICE OF CORRECTION"): 1
+related DEED from 09/06/1960, book/page "001422-00299", its own grantor/grantee names — genuinely
+the original instrument a correction/trustee filing concerns. `_fetch_wake_related` reads that
+same panel (budget-capped to the newest leads, `_WAKE_MAX_RELATED_FETCHES`, same spirit as
+`nc_rowan_cott.py`'s `_MAX_DETAIL_FETCHES`) and stores it as structured data under
+`raw["wake_detail"]["related_documents"]` — index metadata, not a document image, so never passed
+to `document_links.stamp_documents`. Per-document PDF images themselves
+(`/web/document-image-pdf/...`) are live-confirmed to need that same live session (a cookie-less
+`curl` against a real URL pulled from this exact session got a `302` to `/web/user/disclaimer`) —
+identical gap to Durham's own cookie-gated PDF route, and deliberately NOT stamped for the same
+reason (`enrichment_doc_ocr.py` fetches stamped URLs statelessly, with no cookie jar).
+
+**Session-reuse window (the operational question this pass was specifically asked to answer):**
+the reCAPTCHA clearing itself stays, and will keep staying, a manual/operator step — this codebase
+does not and will not try to automate solving it. But the human-cleared session behind it is not a
+one-shot token: the live Tyler Self-Service client itself ships a `GET /web/session/pingSession`
+heartbeat, observed firing roughly every 10–20s while a tab sits open, specifically to keep the
+server-side session alive — strong architectural evidence of a real, finite, activity-extendable
+idle timeout, not a single-use artifact that dies the instant the clearing browser closes. Tested
+live by disabling that heartbeat (monkey-patching `fetch`/`jQuery.ajax` in the authenticated tab to
+block `pingSession`/`getSubscriptionTime` calls) and then making a real, deliberate authenticated
+request after a measured idle gap with zero activity in between: see `nc_rod_captcha.py`'s own
+module docstring for the exact elapsed time measured and what it returned. This is a DIFFERENT,
+more capable shape than `docs/HERMES.md` §11's existing manual lane (Cherokee/LiensNC: operator
+saves a page, an offline parser ingests it, no live session reuse at all) — the finding here
+determines whether Wake instead supports "operator clears the checkbox once, this scraper's own
+Playwright session then drives real live searches/fetches off that same cookie for a while" or a
+tighter "operator stays at the keyboard, pulls one bounded batch per clearing" pattern; either way,
+`_fetch_wake` can also just call `pingSession` on a timer the same way the real site's own JS does,
+which costs nothing and only helps.
+
+- `counties_nc/nc_rod_captcha.py` — **6 of 9 counties remain genuinely walled** (Iredell, Craven,
+  Greene, Harnett, Randolph, Stokes); Durham and Brunswick **removed from this list** (fixed in the
+  corrections above). Wake **removed from this list**: the reCAPTCHA itself is still genuinely
+  walled for an UNATTENDED run (never automated, by design) — but the real search, parser, and
+  one-hop related-documents follow-through are now fully built and live-verified, ready to run off
+  a human-cleared session (see the correction immediately above for the full writeup, including the
+  live-measured session-reuse window and two further flagged, documented gaps).
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)
 - `public_notices/nc_notices_counties.py` vs `ncpublicnotices.py` (same site — does the
   interstitial actually gate it or not? One module says yes, the other's code says no.)
