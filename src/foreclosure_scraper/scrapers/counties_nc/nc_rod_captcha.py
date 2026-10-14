@@ -152,6 +152,82 @@ automate.
   and outside this audit's current scope -- flagged for whoever picks it up
   next instead of silently papering over the false-positive return value.
 
+**CORRECTION 2026-10-14 (cont.) -- `math_captcha.py`'s false positive is now
+FIXED, and Brunswick turned out to be genuinely solvable, not just
+correctly-reported-failed.** `solve_math_captcha()` no longer regexes
+`page.inner_text("body")` at all -- it scopes question-text extraction to
+the `<fieldset>`/`<form>` immediately around the answer input (Brunswick's
+real markup is `<fieldset class="captcha">`, several DOM levels away from
+the footer's phone number, which sits in a sibling section of the same
+page-spanning outer `<form>`), strips any phone-number-shaped substring as a
+second independent guard, and -- the part that actually unlocks Brunswick --
+detects an image-only question and OCRs it via this codebase's existing
+free-tier-first Gemini vision plumbing
+(`enrichment_vision._parse_gemini_keys`/`_parse_json_response`, the same
+key-rotation `enrichment_doc_ocr.py` uses) instead of either guessing or
+giving up. Brunswick's question turned out to be FOUR separate word-images
+(`getpng.php?a=N&b=M` -- confirmed live by fetching and visually reading the
+actual PNGs: one page read "Five"/"Plus"/"Nine"/"Equals" = 14, another
+"Seven"/"Minus"/"Zero"/"Equals" = 7; the `a`/`b` query params are NOT the
+literal operands, just opaque render params), which `_solve_image_question`
+sends to Gemini together as one multi-image call so the words are read in
+the right order. Live-verified end-to-end against the real site 2026-10-14,
+twice, with NO browser in the loop for this specific check (httpx replaying
+the real session/cookies and the real form POST, to avoid running Chromium
+locally during an active Mac memory/swap crisis -- the Playwright code path
+itself is covered by `tests/test_math_captcha.py`'s `_FakePage`, which
+mirrors the exact Page API `solve_math_captcha()` calls): fetched the live
+page, OCR'd the real question image(s), POSTed the computed answer with the
+session it was issued under, and got back a genuinely different page (no
+more captcha field) both times -- the real gate cleared for real, not just a
+plausible-looking return value. OCR reliability is tied to whatever Gemini
+model/quota this codebase is configured with at the time (same dependency
+every other OCR-driven enricher already has) -- one live attempt hit a
+transient "503 model overloaded" across all 9 rotated keys on the default
+model, and a deliberately-weaker model substituted for comparison
+(`gemini-2.5-flash-lite`) misread one of the four images on 1 of 3 repeated
+trials against the SAME saved image set. Neither failure mode becomes a new
+false positive: when OCR can't read the image, `_solve_image_question`
+returns `None` and `solve_math_captcha` reports `False`; when OCR confidently
+misreads it, the new post-submit `_gate_still_present` check (comparing the
+page before/after submit, the exact comparison the old code skipped) catches
+the wrong answer and still reports `False` -- confirmed live in the misread
+case above (gate stayed present after the bad answer was submitted). Net:
+Brunswick now succeeds when Gemini OCR is available and correct, and fails
+CLOSED (reports unsolved, same as before) when it isn't -- never a silent
+wrong "success" either way. 4 of 4 live attempts in this session solved the
+CAPTCHA correctly (one earlier side-by-side comparison against a weaker
+model, not the one this codebase actually ships, did misread one image --
+see `math_captcha.py`'s own module docstring). See `tests/test_math_captcha.py`
+for the full test coverage (the phone-number false-positive case, legitimate
+text-based questions, and this OCR path with a mocked Gemini call using the
+real live word-image evidence above).
+
+Clearing the CAPTCHA is NOT the whole gate, though -- live-followed one
+layer further 2026-10-14: the page right after a correct CAPTCHA submit is
+a SECOND gate, a disclaimer accept/decline page (structurally the same
+pattern as Durham's `#submitDisclaimerAccept`, just an anchor link here
+instead of a button: `<a href=".../index.ntk?s=...">I have read, and agree
+with the License above</a>`). Following that link lands on the real site
+menu ("Please select the type of search you want to perform" -- Combined
+Real Property/MAPS, Births, Deaths, Marriages, Notary, Book/Page Direct),
+confirming the full CAPTCHA+disclaimer chain genuinely reaches Brunswick's
+real UI, not just a second dead end. This was reconnaissance only (plain
+`httpx` replaying the session, same reasoning as the CAPTCHA verification
+above) -- NOT wired into `fetch()`/`_COUNTY_SITES` here. Brunswick still
+needs: (1) the disclaimer-accept step added to this file's `gate == "math"`
+branch (the same shape as `_fetch_durham`'s accept click, just needs its
+own helper since the control here is a link, not a button), (2) the
+"Combined Real Property/MAPS" search clicked into and its date-range/
+result markup captured (unknown shape -- not yet observed), and (3)
+whatever parser that markup turns out to need, the same way Durham got
+`_durham_record_to_listing`/`parse_selfservice` instead of the generic
+`_parse_html`. None of that is done here -- this pass only fixes
+`math_captcha.py`'s false positive and confirms the CAPTCHA layer itself is
+now genuinely solvable; wiring Brunswick's actual lead capture through the
+two gates above is a follow-up, flagged here rather than silently implied
+by "Brunswick is now solvable."
+
 Strategy:
 1. Launch Playwright browser (headful -- required; see the `headless=False`
    note on the browser launch call below).
@@ -160,15 +236,23 @@ Strategy:
    -- see `_fetch_durham`.
 4. Otherwise: if math captcha, try math_captcha.solve_math_captcha(page); if
    reCAPTCHA V2, try enrichment_recaptcha_audio.solve_recaptcha_v2(page).
-   Both are live-reverified 2026-10-14 to never actually get past Brunswick/
+   reCAPTCHA V2 is live-reverified 2026-10-14 to never actually get past
    Wake/Iredell/Craven/Greene/Harnett/Randolph/Stokes's real gates (see
-   above) -- these 8 are expected to always fall through to the WAF-bypass
-   attempt and then `continue` past, genuinely blocked, by design.
+   above) -- these 7 are expected to always fall through to the WAF-bypass
+   attempt and then `continue` past, genuinely blocked, by design. Brunswick
+   (`gate == "math"`) is DIFFERENT as of the 2026-10-14 (cont.) correction
+   above: `solve_math_captcha` now actually solves it (OCRs the image
+   question via Gemini) when quota/the model is available, and correctly
+   returns `False` -- same as the other 7 -- when it isn't, rather than the
+   old silent wrong "success".
 5. Once through, search for deeds by date range.
 6. Parse results (Durham via its own row parser; the rest via `_parse_html`,
    which only matches `<table>` markup and would need rework if any of the
-   remaining 8 ever actually clears its gate -- none of them use a `<table>`
-   either, per the live HTML pulled 2026-10-14).
+   remaining 7-always-walled counties (or Brunswick, on a run where OCR
+   doesn't clear it) ever actually clears its gate -- none of them use a
+   `<table>` either, per the live HTML pulled 2026-10-14; Brunswick's own
+   post-gate markup has not been captured/parsed here yet, a follow-up item
+   now that the gate itself can clear).
 """
 from __future__ import annotations
 

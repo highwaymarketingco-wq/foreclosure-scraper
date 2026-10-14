@@ -172,6 +172,24 @@ def test_brunswick_math_captcha_false_positive_documented():
     assert "getpng.php" in module_doc
 
 
+def test_brunswick_fix_correction_documented():
+    module_doc = __import__(
+        "foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha", fromlist=["x"]
+    ).__doc__ or ""
+    # The false positive narrative above is kept (historical record, same
+    # append-only pattern as every other correction in this file) but must
+    # now be followed by the fix: math_captcha.py no longer guesses, and
+    # Brunswick's CAPTCHA is live-confirmed genuinely solvable via OCR.
+    assert "now FIXED" in module_doc
+    assert "_gate_still_present" in module_doc
+    assert "test_math_captcha.py" in module_doc
+    # Honesty about scope: the CAPTCHA clearing live was followed one layer
+    # further to a disclaimer gate and the real site menu, but Brunswick's
+    # actual search/result capture was deliberately NOT wired up here.
+    assert "disclaimer" in module_doc.lower()
+    assert "NOT wired into" in module_doc
+
+
 def test_durham_contradiction_with_nc_tyler_documented():
     module_doc = __import__(
         "foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha", fromlist=["x"]

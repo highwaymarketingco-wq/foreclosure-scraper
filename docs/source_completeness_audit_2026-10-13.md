@@ -246,9 +246,52 @@ the gate (confirmed by diffing the page before/after the submit) — a real fals
 `math_captcha.py` worth flagging for whoever next touches that module, even though it does not
 change Brunswick's walled status here.
 
-- `counties_nc/nc_rod_captcha.py` — **8 of 9 counties remain genuinely walled** (Wake, Brunswick,
-  Iredell, Craven, Greene, Harnett, Randolph, Stokes); Durham **removed from this list** — fixed
-  above, needs no login.
+**CORRECTION 2026-10-14 (cont.)** — `math_captcha.py`'s false positive flagged just above is now
+FIXED, and Brunswick turned out to be partially resolvable, not just correctly-reported-walled.
+`solve_math_captcha()` no longer regexes the whole page body: it scopes question-text extraction
+to the `<fieldset>`/`<form>` immediately around the answer input (keeping the office's footer
+phone number, several DOM levels away in a sibling section of the same page-spanning outer
+`<form>`, out of the match entirely), strips any phone-number-shaped substring as a second
+independent guard, and — the part that actually unlocks Brunswick — detects an image-only
+question and OCRs it via this codebase's existing free-tier-first Gemini vision plumbing
+(`enrichment_vision._parse_gemini_keys`/`_parse_json_response`, reused rather than duplicated).
+Brunswick's question turned out to be FOUR separate word-images (confirmed live by fetching and
+visually reading the actual PNGs: one page read "Five"/"Plus"/"Nine"/"Equals" = 14, another
+"Seven"/"Minus"/"Zero"/"Equals" = 7 — the `a`/`b` query params in `getpng.php?a=N&b=M` are NOT the
+literal operands, just opaque render params). Live-verified end-to-end 2026-10-14, 4 of 4
+attempts: fetched the live page, OCR'd the real question image(s), POSTed the computed answer
+with the session it was issued under, and got back a genuinely different page each time — no
+browser was used for this specific check (httpx replaying the real session/cookies, to avoid
+running Chromium locally during an active Mac memory/swap crisis; the Playwright code path itself
+is covered by `tests/test_math_captcha.py`'s `_FakePage`, which mirrors the exact Page API
+`solve_math_captcha()` calls). Critically, when OCR is unavailable or wrong, this does NOT become
+a new false positive: a deliberately-weaker model substituted for comparison
+(`gemini-2.5-flash-lite`) misread one image on 1 of 3 repeated trials against a saved image set,
+and the new post-submit `_gate_still_present` check (comparing the page before/after submit — the
+exact comparison the old code skipped) correctly caught it and still reported `False`.
+
+Clearing the CAPTCHA is not the whole gate, though. Following one layer further live: the page
+right after a correct CAPTCHA submit is a SECOND gate, a disclaimer accept/decline link
+(structurally the same pattern as Durham's `#submitDisclaimerAccept` above, just an anchor link
+instead of a button). Following it lands on Brunswick's real site menu ("Please select the type
+of search you want to perform" — Combined Real Property/MAPS, Births, Deaths, Marriages, Notary,
+Book/Page Direct), confirming the full chain genuinely reaches real UI, not another dead end —
+but that was reconnaissance only. Brunswick still needs (1) the disclaimer-accept step added to
+`nc_rod_captcha.py`'s `gate == "math"` branch, (2) the "Combined Real Property/MAPS" search
+clicked into and its date-range/result markup captured (unverified shape), and (3) whatever
+parser that markup needs — none of that is done here. Fixed in `math_captcha.py`
+(`_analyze_captcha_html`, `_solve_question_text`, `_solve_image_question`,
+`_gate_still_present`); see `tests/test_math_captcha.py` (22 tests: the phone-number
+false-positive case, legitimate text-based questions still working, and the OCR path with a
+mocked Gemini call built on the real live word-image evidence above) and
+`scrapers/counties_nc/nc_rod_captcha.py`'s own updated module docstring for the full writeup.
+
+- `counties_nc/nc_rod_captcha.py` — **7 of 9 counties remain genuinely walled** (Wake, Iredell,
+  Craven, Greene, Harnett, Randolph, Stokes); Durham **removed from this list** (fixed above,
+  needs no login). Brunswick **partially removed**: its CAPTCHA gate is now genuinely solvable
+  (see correction above), but actual lead capture needs the disclaimer-accept step and a
+  search/result parser still to be built — left queued here for that remaining work, not because
+  the CAPTCHA itself is still blocking it.
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)
 - `public_notices/nc_notices_counties.py` vs `ncpublicnotices.py` (same site — does the
   interstitial actually gate it or not? One module says yes, the other's code says no.)
