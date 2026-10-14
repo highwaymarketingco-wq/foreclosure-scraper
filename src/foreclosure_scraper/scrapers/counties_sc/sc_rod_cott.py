@@ -4,7 +4,10 @@ Closes the SC ROD gap for Cott RecordRoom counties (Union; reusable for others).
 SC foreclosure is judicial (lis pendens lives in the courts — sc_public_index_*),
 so the ROD distress signal here is PROBATE (deed of distribution / death /
 distribution statement = inherited-property leads, names included) + LIENS.
-Free, browserless (rod/cott_recordroom.py).
+Free, browserless (rod/cott_recordroom.py) -- the per-document scanned IMAGE is
+free too (CORRECTED 2026-10-14; see rod/cott_recordroom.py's module docstring
+for the live-verification evidence and raw['cott_image_fetch'] below for how
+_to_listing surfaces the fetch recipe).
 """
 from __future__ import annotations
 
@@ -53,6 +56,21 @@ def _to_listing(doc, slug: str, source_url: str) -> Listing | None:
         if extra.get("consideration_amount") is not None:
             rod_block["consideration_amount"] = extra["consideration_amount"]
     raw: dict = {"rod": rod_block, "cott_rod": True}
+    # 2026-10-14 (source-completeness audit): the document IMAGE is free, no
+    # login, no payment (rod/cott_recordroom.py's module docstring has the full
+    # live-verification evidence) -- previously flagged as a real in-repo
+    # contradiction (this scraper's own docstring said "Free, browserless" while
+    # the shared module said "pay-per-view", and owner_dot_documents() had no
+    # branch for this vendor at all). Resolving it needs two more requests
+    # (Thumbnails -> the real Image URL, with a Referer check tied to this
+    # IndexId) that a plain GET can't do, so -- same call as beaufort_pdf_fetch/
+    # clarendon_pdf_fetch in sc_rod_walled.py -- this is staged under its own
+    # raw key rather than document_links.stamp_documents's raw['document_url']/
+    # raw['documents']: enrich_doc_ocr.py's generic fetch is GET-only with no
+    # Referer, so stamping it there would feed that pass the login-route
+    # redirect's HTML page instead of the scanned image.
+    if isinstance(extra, dict) and extra.get("image_fetch"):
+        raw["cott_image_fetch"] = extra["image_fetch"]
     if kind == "probate":
         raw["relationship_signal"] = {"kind": "probate", "keyword": doc.doc_type,
                                       "tagged_at": datetime.utcnow().isoformat() + "Z"}

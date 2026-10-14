@@ -25,7 +25,19 @@ Vendor landscape, live-verified 2026-08-03/04 (see COUNTY_IMAGE_STATUS)
 * Harris AcclaimWeb (Pickens) - index is free and already scraped, but the
   image route is not reachable browserless and the app exposes live
   /Cart + /ShoppingCart controllers. NOT confirmed free -> not built.
-* Cott RecordRoom (Union) - StealthyFetcher.
+* Cott RecordRoom (Union) - plain httpx, no browser. CORRECTED 2026-10-14: this
+  bullet previously said "StealthyFetcher" and `owner_dot_documents` had no
+  `vendor == "cott"` branch at all despite the county being registered below as
+  "free" -- a real in-repo contradiction with this module's OWN registry, only
+  caught by a source-completeness audit, not by running the code (it silently
+  returned `[]`). Live-verified free/no-login/no-payment against 3 real Union
+  documents (a death certificate, a $540k deed, a $42k mortgage): the UI's
+  own "View Document" route (`Imaging/Document/KeyFromImage`) IS login-walled,
+  but the Details page's own viewer uses a different, genuinely free route
+  (`Imaging/Document/Thumbnails` -> the page's embedded `Imaging/Document/
+  Image` URL, fetched with a matching `Referer`) -- see
+  rod/cott_recordroom.py's module docstring for the full evidence and
+  `_cott_owner_dots` below for the per-owner DOT search this module needed.
 * Kofile (Oconee) - StealthyFetcher (see rod/kofile.py).
 
 Everything here is best-effort and returns [] on any failure, so a county going
@@ -44,6 +56,7 @@ import structlog
 
 from ..http_client import client
 from .cchs import CCHS_COUNTIES, _UA, _base, _field
+from . import cott_recordroom as _cott_rr
 from .models import RodDoc
 
 log = structlog.get_logger(__name__)
@@ -84,7 +97,9 @@ COUNTY_IMAGE_STATUS: dict[tuple[str, str], tuple[str, str]] = {
     ("NC", "Mitchell"): ("free", "Logan search.mitchelldeeds.com — StealthyFetcher"),
     ("NC", "Lincoln"): ("free", "CCHS us4 — StealthyFetcher"),
     ("NC", "Henderson"): ("free", "CCHS us4 — StealthyFetcher"),
-    ("SC", "Union"): ("free", "Cott RecordRoom — StealthyFetcher"),
+    ("SC", "Union"): ("free", "Cott RecordRoom Imaging/Document/Thumbnails -> "
+                       "Imaging/Document/Image w/ matching Referer -> 200 image/png "
+                       "(plain httpx, no browser; live-verified 2026-10-14)"),
     ("SC", "Oconee"): ("free", "Kofile oconee.sc.publicsearch.us — StealthyFetcher"),
     ("NC", "Buncombe"): ("paywalled", "Aumentum HTML5Viewer: 'Please confirm your purchase' / 'will print and charge'"),
     ("NC", "Mecklenburg"): ("paywalled", "meckrod.manatron.com robots Disallow: / AND Aumentum cart flow"),
@@ -383,6 +398,58 @@ async def _cchs_owner_dots(state: str, county: str, owner: str,
 
 
 # --------------------------------------------------------------------------- #
+# Vendor: Cott RecordRoom (Union) — per-lead name search + free PNG            #
+# --------------------------------------------------------------------------- #
+async def _cott_owner_dots(state: str, county: str, owner: str,
+                           max_candidates: int) -> list[tuple[bytes, str, RodDoc]]:
+    """CORRECTED 2026-10-14: this vendor was registered in DOC_IMAGE_COUNTIES
+    as "free" with no branch here at all (the audit's exact in-repo
+    contradiction) — see rod/cott_recordroom.py's module docstring for the
+    live-verification evidence that the document image really is free.
+
+    Reuses rod/sc_recordroom.py's `search_by_name` (already built + live-
+    verified "guest access, no CAPTCHA, login or challenge" for this same
+    vendor) to find this owner's Deed-of-Trust/mortgage candidates — each row
+    already carries `raw['index_id']` (the Cott RecordRoom `IndexId`), which
+    is all `rod.cott_recordroom.fetch_document_image` needs to resolve + fetch
+    the free scanned page.
+    """
+    slug = _cott_rr.COTT_RR_COUNTIES.get((state, county))
+    if not slug or not owner:
+        return []
+    last, first = name_parts(owner)
+    if not last:
+        return []
+    from .sc_recordroom import search_by_name  # local import: this module stays the only one importing CCHS/Logan eagerly
+    try:
+        docs = await search_by_name(state, county, owner, max_docs=100)
+    except Exception:  # noqa: BLE001 - best-effort, retry next run
+        return []
+    cands = rank_dot_docs(docs, last, first)[:max(1, max_candidates)]
+    if not cands:
+        return []
+    base = f"{_cott_rr.COTT_RR_HOST}/{slug}"
+    out: list[tuple[bytes, str, RodDoc]] = []
+    try:
+        async with client(timeout=45.0) as c:
+            await c.get(f"{base}/guest/Search/records")
+            for doc in cands:
+                index_id = (doc.raw or {}).get("index_id")
+                if not index_id:
+                    continue
+                got = await _cott_rr.fetch_document_image(c, base, index_id)
+                if not got:
+                    continue
+                data, mime = got
+                ready = to_ocr_ready(data, mime)
+                if ready:
+                    out.append((ready[0], ready[1], doc))
+    except Exception:  # noqa: BLE001 - best-effort, retry next run
+        return out
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Vendor: Logan (Transylvania) — county-wide D/T sweep, joined by owner name    #
 # --------------------------------------------------------------------------- #
 # Per-lead name search on the newer Logan build needs the browser pick-list, so
@@ -604,6 +671,8 @@ async def owner_dot_documents(state: str, county: str, owner: str, *,
         return []
     if vendor == "cchs":
         return await _cchs_owner_dots(state, county, owner, max_candidates)
+    if vendor == "cott":
+        return await _cott_owner_dots(state, county, owner, max_candidates)
     if vendor == "logan":
         if not logan_index or logan_session is None or not logan_session.live:
             return []

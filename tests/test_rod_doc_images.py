@@ -10,6 +10,7 @@ Fixtures are REAL responses saved live 2026-08-03/04:
 
 No network: every test reads a fixture or a literal robots body.
 """
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -251,3 +252,127 @@ async def test_owner_dot_documents_returns_empty_for_unregistered_county():
     assert await di.owner_dot_documents("SC", "Spartanburg", "SMITH, JOHN") == []
     assert await di.owner_dot_documents("NC", "Buncombe", "SMITH, JOHN") == []
     assert await di.owner_dot_documents("NC", "Burke", "") == []
+
+
+# --- Cott RecordRoom (Union) owner search (added 2026-10-14) -----------------
+# CORRECTED 2026-10-14: ("SC", "Union") was registered in DOC_IMAGE_COUNTIES
+# as "free" with no vendor=="cott" branch in owner_dot_documents at all -- the
+# audit's exact in-repo contradiction. Live-verified free/no-login against 3
+# real Union documents (see rod/cott_recordroom.py's module docstring); these
+# tests exercise the new branch with the network layer monkeypatched out.
+def test_union_is_registered_for_cott():
+    assert di.DOC_IMAGE_COUNTIES[("SC", "Union")] == "cott"
+    assert di.COUNTY_IMAGE_STATUS[("SC", "Union")][0] == "free"
+
+
+@pytest.mark.asyncio
+async def test_owner_dot_documents_union_empty_owner_short_circuits():
+    assert await di.owner_dot_documents("SC", "Union", "") == []
+
+
+@pytest.mark.asyncio
+async def test_cott_owner_dots_finds_dot_fetches_image_and_skips_non_dot(monkeypatch):
+    """GOUDELOCK, GEORGIA / $42,000 MTG — the real live-verified Union
+    document from rod/cott_recordroom.py's test suite (IndexId 51371162).
+    search_by_name returns a mix of DOT and non-DOT rows for the owner; only
+    the MTG must reach fetch_document_image, keyed off raw['index_id']."""
+    from foreclosure_scraper.rod.models import RodDoc
+    from foreclosure_scraper.rod import sc_recordroom, cott_recordroom
+
+    mtg = RodDoc(county="Union", state="SC", doc_type="MORTGAGES",
+                 grantor="GOUDELOCK, GEORGIA L.", grantee="FOUNDERS FEDERAL CREDIT UNION",
+                 recorded_date=datetime(2026, 10, 13),
+                 raw={"platform": "cott_recordroom_names", "index_id": 51371162})
+    deed = RodDoc(county="Union", state="SC", doc_type="DEED",
+                  grantor="SMITH, JOHN", grantee="GOUDELOCK, GEORGIA L.",
+                  raw={"platform": "cott_recordroom_names", "index_id": 51371999})
+
+    async def fake_search_by_name(state, county, name, max_docs=50):
+        assert (state, county) == ("SC", "Union")
+        return [deed, mtg]
+
+    calls = []
+
+    async def fake_fetch_document_image(c, base, index_id, **kw):
+        calls.append((base, index_id))
+        assert base == f"{cott_recordroom.COTT_RR_HOST}/unionsc"
+        if index_id == 51371162:
+            return b"\x89PNG...", "image/png"
+        return None
+
+    class _FakeClientCM:
+        async def __aenter__(self):
+            class _C:
+                async def get(self, *a, **kw):
+                    class _R:
+                        status_code = 200
+                    return _R()
+            return _C()
+
+        async def __aexit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(sc_recordroom, "search_by_name", fake_search_by_name)
+    monkeypatch.setattr(cott_recordroom, "fetch_document_image", fake_fetch_document_image)
+    monkeypatch.setattr(di, "client", lambda **kw: _FakeClientCM())
+
+    out = await di.owner_dot_documents("SC", "Union", "GOUDELOCK, GEORGIA", max_candidates=3)
+    assert len(out) == 1
+    data, mime, doc = out[0]
+    assert data == b"\x89PNG..." and mime == "image/png"
+    assert doc is mtg
+    assert calls == [(f"{cott_recordroom.COTT_RR_HOST}/unionsc", 51371162)]
+
+
+@pytest.mark.asyncio
+async def test_cott_owner_dots_no_dot_candidates_short_circuits_before_any_fetch(monkeypatch):
+    from foreclosure_scraper.rod.models import RodDoc
+    from foreclosure_scraper.rod import sc_recordroom, cott_recordroom
+
+    deed_only = RodDoc(county="Union", state="SC", doc_type="DEED",
+                       grantor="SMITH, JOHN", grantee="DOE, JANE",
+                       raw={"index_id": 51370000})
+
+    async def fake_search_by_name(state, county, name, max_docs=50):
+        return [deed_only]
+
+    async def fake_fetch_document_image(c, base, index_id, **kw):
+        raise AssertionError("must not be called when no DOT candidates exist")
+
+    monkeypatch.setattr(sc_recordroom, "search_by_name", fake_search_by_name)
+    monkeypatch.setattr(cott_recordroom, "fetch_document_image", fake_fetch_document_image)
+
+    assert await di.owner_dot_documents("SC", "Union", "DOE, JANE") == []
+
+
+@pytest.mark.asyncio
+async def test_cott_owner_dots_skips_candidate_with_no_index_id(monkeypatch):
+    from foreclosure_scraper.rod.models import RodDoc
+    from foreclosure_scraper.rod import sc_recordroom, cott_recordroom
+
+    mtg_no_id = RodDoc(county="Union", state="SC", doc_type="MTG",
+                       grantor="DOE, JANE", grantee="SOME BANK", raw={})
+
+    async def fake_search_by_name(state, county, name, max_docs=50):
+        return [mtg_no_id]
+
+    async def fake_fetch_document_image(c, base, index_id, **kw):
+        raise AssertionError("must not be called without an index_id")
+
+    class _FakeClientCM:
+        async def __aenter__(self):
+            class _C:
+                async def get(self, *a, **kw):
+                    class _R:
+                        status_code = 200
+                    return _R()
+            return _C()
+
+        async def __aexit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(sc_recordroom, "search_by_name", fake_search_by_name)
+    monkeypatch.setattr(cott_recordroom, "fetch_document_image", fake_fetch_document_image)
+    monkeypatch.setattr(di, "client", lambda **kw: _FakeClientCM())
+
+    assert await di.owner_dot_documents("SC", "Union", "DOE, JANE") == []

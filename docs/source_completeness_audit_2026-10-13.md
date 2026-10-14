@@ -66,12 +66,13 @@ Pickens finding does transfer — no login, just Cloudflare, cleared with this c
 nodriver tier. Jasper (third county in this file) is a genuinely different case: Cloudflare PLUS
 an independent Google reCAPTCHA v2 gate on the search feature itself — left queued below, not
 fixed), `national/cash_buyer_deeds.py`.
-One is worse than "never looked at" — **a real in-repo contradiction**:
-`counties_sc/sc_rod_cott.py`'s own docstring claims Union's document images are "pay-per-view,"
+One was worse than "never looked at" — **a real in-repo contradiction**, now **SETTLED AND FIXED
+2026-10-14** (see correction note under "Needs YOU logged in" below):
+~~`counties_sc/sc_rod_cott.py`'s own docstring claims Union's document images are "pay-per-view,"
 but the shared `rod/doc_images.py` module explicitly registers Union as confirmed **free**
 (`COUNTY_IMAGE_STATUS[("SC","Union")] = ("free", ...)`) — and the function meant to fetch them,
 `owner_dot_documents()`, has no code branch for `vendor == "cott"` at all, so it silently
-returns `[]` even where the infrastructure already knows the image is free and reachable.
+returns `[]` even where the infrastructure already knows the image is free and reachable.~~
 
 ### Pattern D — "List vs. detail" self-admitted gaps (the code already knows)
 Highest-confidence flags: the author already identified the gap in a comment and left it.
@@ -181,7 +182,33 @@ bullet below). Live-checked, not assumed:
   ALSO gated by a real Google reCAPTCHA v2 ("Please complete the CAPTCHA to enter this site",
   sitekey `6LfblzYqAAAAAFNl9g-RwU5zbI97HFqwWbhoD4Rb") — confirmed live 2026-10-14 with nodriver
   already past the Cloudflare challenge. Genuinely walled; not automated.
-- `counties_sc/sc_rod_cott.py` (Union — the free/pay-per-view contradiction above needs settling)
+**CORRECTION 2026-10-14 (cont.)** — `counties_sc/sc_rod_cott.py` (Union) was also WRONGLY listed
+here, on the strength of its own docstring's unverified "pay-per-view" claim, which contradicted
+the shared `rod/doc_images.py` module's own `COUNTY_IMAGE_STATUS[("SC","Union")] = ("free", ...)`
+registration. Live-checked, not assumed — the Pickens/Beaufort/Clarendon pattern (a login-walled
+UI route sits beside a different, genuinely free one) does transfer, though to a THIRD distinct
+shape again: the free route needs a correct `Referer` header on TWO requests, not one.
+Live-verified against 3 real Union documents spanning every category this adapter classifies (a
+DEATH CERTIFICATE/probate recording, a $540,000 DEED, and a $42,000 MTG/deed-of-trust): the UI's
+own "View Document" route (`Imaging/Document/KeyFromImage?IndexId=`) DOES 302 to
+`Portal/Account/LoginRoute` on a cold request — the one fact that made "pay-per-view" plausible —
+but the Details page's own viewer resolves the real scanned PNG through a different, genuinely
+free, no-login, no-payment, no-browser two-step (`Imaging/Document/Thumbnails` -> the page's own
+embedded `Imaging/Document/Image` URL), each request carrying a `Referer: .../Guest/Search/
+Records/Details?IndexId=<the same IndexId>`. A Referer naming a different/nonexistent IndexId
+fails the same way on both requests, so this is a real, mandatory anti-hotlinking gate, not an
+account wall. Fixed in `rod/cott_recordroom.py` (`image_fetch_recipe`/`document_image_url`/
+`fetch_document_image`, plus `IndexId`/`HasFiledImage`/`ScanPages` now captured on every swept
+row) + `rod/doc_images.py` (`owner_dot_documents`'s missing `vendor == "cott"` branch, via new
+`_cott_owner_dots`, reusing `rod/sc_recordroom.py`'s existing by-name search) +
+`scrapers/counties_sc/sc_rod_cott.py` (`_to_listing` stamps the fetch recipe into
+`raw['cott_image_fetch']` — a dedicated key, not `document_links.stamp_documents`'s
+`raw['document_url']`/`raw['documents']`, since resolving it needs that Referer-bearing
+Thumbnails request first, which the generic GET-only `enrich_doc_ocr.py` pass can't do — same
+reasoning as `raw['beaufort_pdf_fetch']`/`raw['clarendon_pdf_fetch']` above). See
+`tests/test_cott_recordroom.py` + `tests/test_rod_doc_images.py`. **Removed from this list** — it
+needs no login and nothing further is queued here for it.
+
 - `counties_nc/nc_rod_captcha.py` (9 counties — already has real login/CAPTCHA mechanics built)
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)
 - `public_notices/nc_notices_counties.py` vs `ncpublicnotices.py` (same site — does the
