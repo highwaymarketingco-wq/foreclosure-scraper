@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from foreclosure_scraper.models import ListingType, PropertyKind
 from foreclosure_scraper.rod.nc_chain import IndexRecord
-from foreclosure_scraper.rod.nc_tyler import _SS_HEAD, parse_selfservice
+from foreclosure_scraper.rod.nc_tyler import _SS_HEAD, _SS_HEAD_BT, _SS_HEAD_BP, parse_selfservice
 from foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha import (
     NcRodCaptchaScraper,
     _COUNTY_SITES,
@@ -145,6 +145,139 @@ def test_durham_record_to_listing_book_page_omits_missing_parts():
     scraper = NcRodCaptchaScraper()
     li = scraper._durham_record_to_listing(record, "http://x")
     assert li.raw["book_page"] == "BT: OPR"
+
+
+# --- Durham pagination fix (2026-10-14 (cont. x4)): page-1-only -> real ----------
+# --- multi-page walk capped at _DURHAM_MAX_PAGES, same convention as Wake's ------
+# --- own _WAKE_MAX_PAGES walk. Live-verified via httpx replaying the real --------
+# --- session (same "avoid a Chromium run during an active Mac memory/swap --------
+# --- crisis" reasoning the Brunswick correction above already used): a 90-day ----
+# --- window is 96 pages of ~100 rows/page (~9,500 rows, newest-first, growing ----
+# --- as new documents are filed) -- walking the 20 newest pages (2,000 rows) -----
+# --- returned 2,000 DISTINCT instrument numbers with zero overlap between --------
+# --- consecutive pages, confirming pagination genuinely advances rather than -----
+# --- re-reading page 1. ------------------------------------------------------
+
+def test_durham_max_pages_is_a_real_bounded_cap():
+    from foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha import _DURHAM_MAX_PAGES
+    # a real cap, not the old "1" (page-1-only) and not unbounded either --
+    # same "generous but documented as partial" convention as _WAKE_MAX_PAGES
+    # (12) and _BRUNSWICK_MAX_PAGES (5).
+    assert 1 < _DURHAM_MAX_PAGES < 96
+
+
+# The exact real "Showing page X of Y for Z Total Results" markup (live-pulled
+# 2026-10-14 from a real 90-day search) the shared _SS_PAGE_OF_RE regex reads to
+# learn how many pages exist -- the same regex (renamed from the Wake-only
+# `_WAKE_PAGE_OF_RE` since Durham and Wake are the same platform/tenant family
+# and render identical pagination-summary text) both `_fetch_durham` and
+# `_fetch_wake` now share.
+_DURHAM_PAGE_OF_HTML = """
+<div class="selfServiceSearchResultHeaderLeft">
+Showing page 1
+of 96
+for 9502
+Total Results
+</div>
+"""
+
+
+def test_ss_page_of_re_matches_real_durham_pagination_markup():
+    from foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha import _SS_PAGE_OF_RE
+    m = _SS_PAGE_OF_RE.search(_DURHAM_PAGE_OF_HTML)
+    assert m is not None and int(m.group(1)) == 96
+
+
+def test_durham_pagination_fix_documented():
+    module_doc = __import__(
+        "foreclosure_scraper.scrapers.counties_nc.nc_rod_captcha", fromlist=["x"]
+    ).__doc__ or ""
+    assert "_DURHAM_MAX_PAGES" in module_doc
+    assert "96 pages" in module_doc or "95 pages" in module_doc
+
+
+# --- Durham/Wake Grantor/Grantee column cap: genuinely the SITE's own search- ---
+# --- results HTML, not a parser bug (2026-10-14 live finding). Confirmed by --
+# --- a real live example: Durham instrument 2026190164 (docid DOC291S618, a --
+# --- real DEED, book 10639 page 799) declares "Grantor/Party 1 (12)" in its --
+# --- own column header but the search-results row itself renders only 5 ------
+# --- <li> name items in the DOM -- not hidden by CSS, genuinely absent from ---
+# --- the HTML `parse_selfservice()` is given (confirmed by counting the real -
+# --- li.find_all("li", recursive=False) nodes directly, same technique the --
+# --- parser itself uses). The full 12-name list IS present one hop deeper, --
+# --- on the document's own detail page (`/web/document/DOC291S618?search=...`,
+# --- live-fetched 2026-10-14: a "Names" section lists all 12 grantors in -----
+# --- full) -- so this is the same class of gap as Durham's cookie-gated PDF --
+# --- route and Wake's related-documents hop: NOT fixable by changing how ------
+# --- parse_selfservice() reads the search-results markup, because the data --
+# --- it would need genuinely is not there. Left honestly flagged rather than -
+# --- "fixed" with a change that cannot work at the search-results level -----
+# --- (same posture the task asked for). A live scan of the newest 2,000 -----
+# --- Durham rows (20 pages) found 151 rows (~7.6%) whose declared count -----
+# --- exceeded the 5 actually rendered -- not a rare edge case.
+_DURHAM_MULTI_PARTY_TRUNCATED_HTML = """
+<li class="ss-search-row" data-documentid="DOC291S618" data-href="/web/document/DOC291S618?search=DOCSEARCH5S1" id="searchRowDOC291S618">
+<div class="selfServiceSearchRowLeft"><div class="ss-facet-avatar ss-facet-avatar-D">D</div></div>
+<div class="selfServiceSearchRowRight">
+<h1>
+2026190164
+&nbsp;&bull;&nbsp;
+BT: OPR B: 10639 P: 799
+&nbsp;&bull;&nbsp;
+10/12/2026 01:40 PM
+</h1>
+<div class="searchResultFourColumn"><ul class="selfServiceSearchResultColumn five-line-block-with-text">
+<li>Document Type </li>
+<li class="selfServiceSearchResultCollapsed"><b>DEED</b></li>
+</ul></div>
+<div class="searchResultFourColumn"><ul class="selfServiceSearchResultColumn five-line-block-with-text">
+<li>Grantor/Party 1 (12)</li>
+<li class="selfServiceSearchResultCollapsed"><b>KNOTT GERALD</b></li>
+<li class="selfServiceSearchFullResult"><b>KNOTT GERALD W.</b></li>
+<li class="selfServiceSearchFullResult"><b>RHEW JILL</b></li>
+<li class="selfServiceSearchFullResult"><b>RHEW JILL K</b></li>
+<li class="selfServiceSearchFullResult"><b>RHEW MICHAEL</b></li>
+</ul></div>
+<div class="searchResultFourColumn"><ul class="selfServiceSearchResultColumn five-line-block-with-text">
+<li>Grantee/Party 2 </li>
+<li class="selfServiceSearchResultCollapsed"><b>KNOTT JOSHUA</b></li>
+</ul></div>
+<div class="searchResultFourColumn"><ul class="selfServiceSearchResultColumn five-line-block-with-text">
+<li>Legal </li>
+<li class="selfServiceSearchResultCollapsed"><b> PB 214/65-66, PB 215/67-68, SEE DOCUMENT</b></li>
+</ul></div>
+</div>
+</li>
+"""
+
+
+def test_durham_grantor_cap_is_the_sites_own_html_not_a_parser_bug():
+    # The header declares 12 real grantors; the DOM this exact live row ships
+    # contains only 5 <li> name items -- parse_selfservice() correctly reads
+    # every item that is actually present (it does not stop early at 5 on its
+    # own: `cols[label] = [... for x in items[1:] ...]` has no slice/cap at
+    # all). Counting the raw <li> nodes directly confirms the 5-item ceiling
+    # is already baked into the HTML this fixture carries, not applied by the
+    # parser.
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(_DURHAM_MULTI_PARTY_TRUNCATED_HTML, "lxml")
+    grantor_ul = next(
+        ul for ul in soup.select("ul.selfServiceSearchResultColumn")
+        if "grantor" in ul.find_all("li", recursive=False)[0].get_text(" ", strip=True).lower()
+    )
+    raw_items = grantor_ul.find_all("li", recursive=False)
+    assert "(12)" in raw_items[0].get_text(" ", strip=True)
+    assert len(raw_items) - 1 == 5          # the site's own markup: 5 names, not 12
+
+    records = parse_selfservice(_DURHAM_MULTI_PARTY_TRUNCATED_HTML)
+    assert len(records) == 1
+    # the parser faithfully reports exactly what the site rendered -- 5 names,
+    # not fewer (no parser-side off-by-one) and not fabricated up to 12.
+    assert records[0].grantors == [
+        "KNOTT GERALD", "KNOTT GERALD W.", "RHEW JILL", "RHEW JILL K", "RHEW MICHAEL",
+    ]
+    assert records[0].instrument_no == "2026190164"
+    assert records[0].book == "10639" and records[0].page == "799"
 
 
 # --- Evidence this file documents for the 8 counties left genuinely walled -------
@@ -550,21 +683,36 @@ def test_wake_record_to_listing_skips_missing_instrument_number():
     assert scraper._wake_record_to_listing(blank2, "http://x", "SUBSTITUTE TRUSTEE", "DOC1") is None
 
 
-def test_wake_multi_bookpage_header_not_parsed_by_shared_regex():
-    # The real, live-confirmed gap this module docstring flags: a multi-tract
-    # SUBSTITUTE TRUSTEE header (TWO "B: x P: y" pairs, no bullet between
-    # them) fails the shared _SS_HEAD regex entirely -- not a partial match,
-    # a real behavioral gap that silently drops this live record today (both
-    # here and on Durham, which shares the same parser).
-    assert _SS_HEAD.match(_WAKE_MULTI_BOOKPAGE_HEADER_TEXT) is None
+def test_wake_multi_bookpage_header_now_parsed_by_shared_regex():
+    # 2026-10-14 (cont. x5) FIX: a multi-tract SUBSTITUTE TRUSTEE header (TWO
+    # "B: x P: y" pairs, no bullet between them) used to fail the shared
+    # _SS_HEAD regex entirely -- not a partial match, a real gap that
+    # silently dropped this live record on both Wake and Durham (which share
+    # this parser). _SS_HEAD now splits on the two bullets first and pulls
+    # BT:/B:/P: out of the middle blob with their own sub-patterns
+    # (_SS_HEAD_BT/_SS_HEAD_BP), so instrument_no/date no longer depend on
+    # how many book/page pairs the middle section holds.
+    m = _SS_HEAD.match(_WAKE_MULTI_BOOKPAGE_HEADER_TEXT)
+    assert m is not None
+    assert m.group(1) == "2026086748"
+    assert m.group(3) == "07/31/2026"
+    # the FIRST B:/P: pair is the record's primary book/page -- the second
+    # tract's pair is not separately modeled (same scope the task asked for:
+    # "at minimum the primary one, without silently dropping instrument_no/
+    # date").
+    bt = _SS_HEAD_BT.search(m.group(2))
+    bp = _SS_HEAD_BP.search(m.group(2))
+    assert bt is None
+    assert bp.group(1) == "020299" and bp.group(2) == "01082"
 
 
-def test_wake_multi_bookpage_record_is_dropped_not_fabricated():
+def test_wake_multi_bookpage_record_is_captured_not_dropped():
     # End-to-end: parse_selfservice() on a full row carrying that exact real
-    # header text produces an IndexRecord with no instrument number (even
-    # though grantor/grantee/doc_type/legal all parse fine), and
-    # _wake_record_to_listing correctly refuses to fabricate a lead for it
-    # rather than emitting one with a blank case_number.
+    # multi-tract header text now produces a complete IndexRecord --
+    # instrument number, recorded date and primary book/page all populated
+    # (previously all None, because the whole header match failed) -- and
+    # _wake_record_to_listing builds a real lead from it instead of
+    # refusing it for a blank case_number.
     html = _WAKE_FORECLOSURE_NOTICE_HTML.replace(
         "DOC899S1222", "DOC901S6792",
     ).replace(
@@ -573,15 +721,18 @@ def test_wake_multi_bookpage_record_is_dropped_not_fabricated():
     )
     records = parse_selfservice(html)
     assert len(records) == 1
-    assert records[0].instrument_no is None
-    assert records[0].book is None and records[0].page is None
-    # grantor/grantee/doc_type/legal still parsed fine -- only the header failed.
+    assert records[0].instrument_no == "2026086748"
+    assert records[0].recorded == "2026-07-31"
+    assert records[0].book == "020299" and records[0].page == "01082"
+    # grantor/grantee/doc_type/legal parsed fine before this fix and still do.
     assert records[0].grantors == ["LEE MAURICE LORANZO", "LEE TRACY", "WIGGINS ELLEN /AIF",
                                     "LLG TRUSTEE LLC /TR BY A IN F"]
 
     scraper = NcRodCaptchaScraper()
     li = scraper._wake_record_to_listing(records[0], "http://x", "SUBSTITUTE TRUSTEE", "DOC901S6792")
-    assert li is None
+    assert li is not None
+    assert li.case_number == "2026086748"
+    assert li.raw["book_page"] == "B: 020299 P: 01082"
 
 
 # Real Related Documents markup (the task's own "one hop" ask), live-pulled

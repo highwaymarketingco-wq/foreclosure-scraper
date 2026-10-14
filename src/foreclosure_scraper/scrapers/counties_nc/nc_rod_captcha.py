@@ -94,12 +94,11 @@ automate.
   second hand-rolled parser: `rod/nc_tyler.py` already has a tested one for
   this exact markup (`parse_selfservice`, built for its own name-search use
   case) -- reused here via `_durham_record_to_listing` rather than
-  duplicated. Row capture itself is page-1-only (Tyler's ~100-row default
-  page size) of the 90-day window,
-  newest-first -- NOT full pagination (a 90-day window runs into the
-  thousands of rows; out of scope for this pass, flagged here same as every
+  duplicated. Row capture itself was page-1-only (Tyler's ~100-row default
+  page size) of the 90-day window, newest-first -- NOT full pagination (a
+  90-day window runs into the thousands of rows; flagged here same as every
   other partial-coverage note in this codebase rather than silently claimed
-  complete).
+  complete). **FIXED 2026-10-14 (cont. x4), see below.**
 
   Each row's primary document image IS viewable free, no login, no cart,
   INSIDE an authenticated browser session: the detail page
@@ -346,11 +345,9 @@ that EXACT captured text through `_SS_HEAD.match()`: returns `None`, so
 `recorded`/`instrument_no`/`book`/`page` all come back `None` (grantor/
 grantee/doc_type/description still parse fine -- only the header fails).
 Both `_wake_record_to_listing` and `_durham_record_to_listing` require a
-non-empty `instrument_no`, so a real lead like this one is SILENTLY DROPPED
-today, on both Wake and Durham -- flagged here, not patched, since fixing the
-shared regex is a Durham-affecting change outside this pass's scope.
-`tests/test_nc_rod_captcha.py` asserts this exact behavior directly against
-the real captured text rather than hiding it.
+non-empty `instrument_no`, so a real lead like this one was SILENTLY DROPPED
+on both Wake and Durham. **FIXED 2026-10-14 (cont. x5), see below.**
+`tests/test_nc_rod_captcha.py` was updated to assert the new fixed behavior.
 
 Related Documents are wired in, one hop deep, as the owner specifically
 asked to confirm: each document's own detail page
@@ -423,6 +420,88 @@ real site's own JS does -- trivial to add, costs nothing, not done here
 since it was not needed to clear the measured floor above. The reCAPTCHA
 clearing itself stays, and will keep staying, a manual/operator step -- this
 codebase does not and will not try to automate solving it.
+
+**CORRECTION 2026-10-14 (cont. x4) -- Durham's "page 1 only" gap is now
+FIXED: real pagination, not full pagination -- a deliberate, documented
+budget cap, same spirit as every other page budget in this file.** Live-
+reverified via httpx replaying the real session (same "no Chromium during an
+active Mac memory/swap crisis" reasoning the Brunswick correction above
+already used, not re-litigated here): a 90-day unfiltered window is **96 pages**
+at ~100 rows/page (~9,502 total rows, newest-first), confirmed by the
+real `searchPost` JSON reply (`{"totalPages":96,...}`) and independently by
+the rendered `Showing page 1 of 96 for 9502 Total Results` summary on
+`/web/searchResults/DOCSEARCH5S1?page=1`. Walking the real site 20 pages deep
+(`_DURHAM_MAX_PAGES`) pulled **2,000 real rows with 2,000 DISTINCT instrument
+numbers and zero overlap between any two consecutive pages** (e.g. page 1's
+newest instrument was 2026190413, page 2's newest was 2026190313, page 3's
+2026190213, page 4's 2026190113 -- each page genuinely a new, non-repeating
+100-row slice, not page 1 re-read 20 times). `_fetch_durham` now reads the
+same `Showing page X of Y` summary `_fetch_wake` already reads (renamed to
+the shared `_SS_PAGE_OF_RE`, since Durham and Wake are the same platform/
+tenant family and render identical text) off the already-loaded page-1 DOM,
+then walks pages 2..min(totalPages, 20) via the SAME direct
+`searchResults/<search_id>?page=k` navigation `_fetch_wake` already uses in
+production -- not a new mechanism. 20 pages (2,000 rows, a ~20x improvement
+over the old page-1-only behavior) is still genuinely partial coverage of a
+96-page window (~21%), proportionally similar to how much partial coverage
+Brunswick's own `_BRUNSWICK_MAX_PAGES` already accepts (~18%) -- documented
+here, not silently implied complete, same honesty convention as every other
+page budget in this file. The Playwright navigation loop itself (`page.goto`
++ `wait_for_load_state` + `page.content()` per page) was not re-run live in
+THIS session for the same memory-pressure reason -- it mirrors `_fetch_wake`'s
+own already-shipped, already-live-proven pagination loop one-for-one (same
+URL shape, same wait, same parse call), and the underlying HTTP contract
+(search-context cookie + `searchResults?page=k` returning real
+`ss-search-row` markup plus the `Showing page X of Y` summary) is exactly what
+the httpx verification above confirmed live.
+
+**CORRECTION 2026-10-14 (cont. x5) -- the shared `_SS_HEAD` multi-tract gap
+is now FIXED.** `rod/nc_tyler.py`'s `_SS_HEAD` regex no longer requires a
+single fixed BT:/B:/P: slot sequence between the header's two bullets --
+it now captures the whole middle section as a blob and pulls `BT:`/`B:`+`P:`
+out of it with their own sub-patterns (`_SS_HEAD_BT`/`_SS_HEAD_BP`), so
+`instrument_no`/`recorded` no longer depend on how many book/page pairs that
+middle section holds. Re-run live against the EXACT real multi-tract text
+this file already had on record (instrument 2026086748: "2026086748  •  B:
+020299 P: 01082   B: 020299 P: 01083  •  07/31/2026 08:50 AM"): the header
+now matches, `instrument_no` is `"2026086748"`, `recorded` is `"2026-07-31"`,
+and `book`/`page` are the FIRST pair (`020299`/`01082`) -- the primary tract;
+the second tract's own pair is not separately modeled, same scope the task
+asked for ("at minimum the primary one, without silently dropping
+instrument_no/date"). Ordinary single-pair headers (Durham's own `BT: OPR B:
+10616 P: 073` shape, Wake's plain `B: 020291 P: 01139` shape) still parse
+identically to before -- re-verified against both real fixtures already in
+`tests/test_nc_rod_captcha.py`. This real lead -- previously SILENTLY DROPPED
+on both Wake and Durham (both share this parser) because `instrument_no` came
+back `None` -- is now captured. `tests/test_nc_rod_captcha.py` was updated
+(not just added to) to assert the NEW fixed behavior instead of the old
+documented-gap behavior, per this pass's own instructions.
+
+**NOT fixed, and genuinely cannot be fixed at this level: the Grantor/
+Grantee column's 5-name visible cap** (see the gap documented just above
+`_fetch_wake`'s own constants block, and re-confirmed live 2026-10-14 on
+Durham too, not just Wake: instrument 2026190164, a real DEED, book 10639
+page 799, declares "Grantor/Party 1 (12)" in its own column header but the
+search-results row's DOM genuinely contains only 5 `<li>` name nodes -- not a
+parser stopping early; `parse_selfservice()` has no slice/cap of its own and
+faithfully returns every item actually present). A live scan of the newest
+2,000 Durham rows (the same 20-page pull above) found 151 rows (~7.6%) whose
+declared party count exceeded the 5 actually rendered -- not a rare edge
+case. Live-confirmed this pass, not just inferred: the missing names ARE
+recoverable, but only one hop deeper, on that same document's own detail page
+(`/web/document/DOC291S618?search=DOCSEARCH5S1`, fetched live 2026-10-14) --
+its "Names" section lists all 12 real grantors in full (KNOTT GERALD, KNOTT
+GERALD W., RHEW JILL, RHEW JILL K, RHEW MICHAEL, RHEW MICHAEL TODD, PATRICK
+JACOB CANNON, PATRICK JACOB, KNOTT JOSHUA, KNOTT JOSHUA D, MILLIGAN ALLISON
+BLAIR KNOTT, KNOTT ALLISON BLAIR). Getting the full list for every truncated
+row would mean a detail-page visit per row -- neither `_fetch_durham` (no
+detail-page hop at all today) nor `_fetch_wake`'s existing one-hop
+related-documents visit (a different purpose: OTHER instruments a document
+references, not this SAME document's own full party list, and itself
+budget-capped to `_WAKE_MAX_RELATED_FETCHES`) does this today. Left honestly
+flagged, not "fixed" with a change that cannot work at the search-results
+level -- the data the task asked for genuinely is not in the markup
+`parse_selfservice()` is given.
 
 Strategy:
 1. Launch Playwright browser (headful -- required; see the `headless=False`
@@ -680,39 +759,60 @@ def _brunswick_names_in_cell(td: Any) -> list[str]:
 # fallback) -- `record.doc_type` is kept in `raw` for provenance only.
 #
 # A second real, live-confirmed gap: Wake's search-RESULT row (unlike
-# Durham's) caps each Grantor/Grantee column's VISIBLE names at 5
+# Durham's -- or so this file assumed until the 2026-10-14 re-check below)
+# caps each Grantor/Grantee column's VISIBLE names at 5
 # (`ul.selfServiceSearchResultColumn.five-line-block-with-text` -- a CSS/DOM
 # cap, not a rendering artifact) even when the column header's own count says
 # more exist (live-confirmed: "Grantor/Party 1 (7)" with only 5 `<li>` name
 # nodes actually in the DOM for instrument 2026086748 -- VERNON VERNON J /
 # VERNON TERRI L / NEWREZ LLC /TRDG A IN F / NEW PENN FINANCIAL, LLC /
 # SHELLPOINT MORTGAGE SERVICING /A IN F, 2 more real parties not rendered
-# here at all). The remaining names only exist on that document's own detail
-# page, not fetched here -- a real, flagged partial-capture gap on any record
-# with >5 grantors or >5 grantees, same honesty convention as every other
-# partial-coverage note in this file (Durham's page-1-only, Brunswick's
-# page-budget cap).
+# here at all). GENUINELY NOT FIXABLE at this level, re-confirmed 2026-10-14:
+# Durham has the EXACT SAME 5-name cap (not Wake-only after all -- live scan
+# of the newest 2,000 Durham rows found 151, ~7.6%, with a declared party
+# count above 5; one real example kept as a test fixture, instrument
+# 2026190164, "Grantor/Party 1 (12)" with only 5 `<li>` nodes in the DOM), and
+# the missing names ARE confirmed to exist one hop deeper -- that document's
+# own detail page (`/web/document/DOC291S618?search=DOCSEARCH5S1`, fetched
+# live) lists all 12 real grantors in its "Names" section. Not patched here:
+# neither `_fetch_durham` nor `_fetch_wake`'s own one-hop related-documents
+# visit (a different purpose -- OTHER instruments a document references, not
+# this SAME document's own full party list) fetches every row's own detail
+# page just for this, and doing so for every truncated row would need a new
+# per-row detail-page hop this pass does not add -- a real, flagged
+# partial-capture gap on any record with >5 grantors or >5 grantees, same
+# honesty convention as every other partial-coverage note in this file
+# (Durham's own page-budget cap, Brunswick's page-budget cap).
 #
 # A THIRD real, live-confirmed gap, and the most consequential one for lead
 # completeness: `rod.nc_tyler.parse_selfservice()`'s shared `_SS_HEAD` regex
-# -- used by Durham too, not something this pass rewrites -- only captures
-# ONE Book/Page pair per header. A SUBSTITUTE TRUSTEE instrument that
+# -- used by Durham too, not something this pass rewrites -- used to only
+# capture ONE Book/Page pair per header. A SUBSTITUTE TRUSTEE instrument that
 # references MULTIPLE original tracts renders TWO (or more) "B: x P: y"
 # pairs in the same `<h1>` with no middle bullet between them (live-pulled,
 # instrument 2026086748: "2026086748  •  B: 020299 P: 01082   B: 020299 P:
 # 01083  •  07/31/2026 08:50 AM") -- confirmed live by running that EXACT
-# captured text through `_SS_HEAD.match()`: it returns `None`, so
-# `recorded`/`instrument_no`/`book`/`page` all come back `None` on that row
-# (grantor/grantee/doc_type/description still parse fine -- only the header
-# line fails). `_wake_record_to_listing` (and `_durham_record_to_listing`,
+# captured text through the OLD `_SS_HEAD.match()`: it returned `None`, so
+# `recorded`/`instrument_no`/`book`/`page` all came back `None` on that row
+# (grantor/grantee/doc_type/description still parsed fine -- only the header
+# line failed). `_wake_record_to_listing` (and `_durham_record_to_listing`,
 # same shared behavior) both require a non-empty `instrument_no` and return
 # `None` otherwise, so a real multi-tract SUBSTITUTE TRUSTEE lead like this
-# one is SILENTLY DROPPED today, on both Wake and Durham, not just
-# mis-parsed -- flagged here rather than patched, since fixing the shared
-# regex is a Durham-affecting change outside this pass's scope (same
-# "flagged, not silently claimed complete" convention as every other gap in
-# this file). `tests/test_nc_rod_captcha.py` asserts this exact live-pulled
-# behavior directly rather than hiding it.
+# one was SILENTLY DROPPED on both Wake and Durham, not just mis-parsed.
+#
+# **FIXED 2026-10-14**: `_SS_HEAD` now splits the header on its two bullets
+# first (instrument_no • middle blob • date), then pulls `BT:`/`B:`+`P:` out
+# of the middle blob with their own sub-patterns (`_SS_HEAD_BT`/
+# `_SS_HEAD_BP`) instead of requiring one fixed slot sequence -- so
+# instrument_no/date no longer depend on how many book/page pairs the middle
+# section holds. Re-run live against the SAME captured multi-tract text
+# above: `instrument_no` is now `"2026086748"`, `recorded` is
+# `"2026-07-31"`, and `book`/`page` are the FIRST pair (`020299`/`01082`,
+# the primary tract -- the second tract's pair is not separately modeled).
+# Ordinary single-pair headers (Durham's `BT: OPR B: 10616 P: 073`, Wake's
+# plain `B: 020291 P: 01139`) still parse identically to before.
+# `tests/test_nc_rod_captcha.py` was updated to assert the new fixed
+# behavior rather than the old documented-gap behavior.
 #
 # Related Documents (one hop, as asked): each document's own detail page
 # (`/web/document/{docid}?search={search_id}`) auto-fires a real XHR
@@ -756,6 +856,18 @@ def _brunswick_names_in_cell(td: Any) -> list[str]:
 # real, finite idle timeout the platform expects a client to actively defer --
 # not a single-use artifact that dies the instant the browser that cleared it
 # closes.
+#: Durham pagination budget (2026-10-14 (cont. x4) fix -- see module
+#: docstring). Live-verified: an unfiltered 90-day window is 95 pages of
+#: ~100 rows/page (~9,500 rows total, newest-first) -- walking it in full
+#: every run is neither bounded nor polite. 20 pages (~2,000 rows, the
+#: newest ~19 days' worth at the observed ~106 rows/day rate) is a ~20x
+#: improvement over the old page-1-only behavior while staying a real,
+#: documented budget cap, the same proportion of partial coverage (~21%)
+#: Brunswick's own _BRUNSWICK_MAX_PAGES already accepts (~18%) -- not
+#: silently implied complete past this cap, same honesty convention as
+#: every other page budget in this file.
+_DURHAM_MAX_PAGES = 20
+
 _WAKE_LOOKBACK_DAYS = 90
 #: Pages read per doc type (~25 rows/page) -- live 90-day counts were 222
 #: (SUBSTITUTE TRUSTEE, 9 pages) and well under that for FORECLOSURE NOTICE;
@@ -767,7 +879,11 @@ _WAKE_DISTRESS_DOC_TYPES = ("SUBSTITUTE TRUSTEE", "FORECLOSURE NOTICE")
 #: load per document) -- same spirit as nc_rowan_cott.py's
 #: _MAX_DETAIL_FETCHES, applied to the newest leads built first.
 _WAKE_MAX_RELATED_FETCHES = 25
-_WAKE_PAGE_OF_RE = re.compile(r"Showing page\s+\d+\s+of\s+(\d+)", re.I)
+#: Shared Tyler "Self-Service" pagination-summary regex -- Durham and Wake are
+#: the same platform/tenant family and render the identical "Showing page X
+#: of Y" text (live-confirmed on both 2026-10-14), so one regex covers both
+#: rather than a near-duplicate per county.
+_SS_PAGE_OF_RE = re.compile(r"Showing page\s+\d+\s+of\s+(\d+)", re.I)
 
 
 def _wake_extract_docids(html: str) -> list[str]:
@@ -1055,19 +1171,45 @@ class NcRodCaptchaScraper(BaseScraper):
             log.warning("nc_rod_captcha.durham_search_failed", error=str(exc)[:160])
             return results
 
-        # NOTE: page 1 only (Tyler's ~100-row default page size), newest-first,
-        # of a 90-day window -- not full pagination. A 90-day window runs into
-        # the thousands of rows on this platform; see module docstring.
+        # Real pagination (2026-10-14 (cont. x4) fix -- see module docstring
+        # and `_DURHAM_MAX_PAGES`). Page 1's own full page load (above) already
+        # carries the "Showing page X of Y" summary the same way Wake's does
+        # (same Tyler "Self-Service" platform/tenant family, live-confirmed
+        # identical text) -- read it once here, then walk pages 2..N the SAME
+        # way `_fetch_wake` does: a direct `searchResults/<search_id>?page=k`
+        # navigation per page, not a second search submit.
+        search_id = search_path.rsplit("/", 1)[-1]
         html = await page.content()
-        from ...rod.nc_tyler import parse_selfservice
-        try:
-            records = parse_selfservice(html)
-        except Exception as exc:
-            log.warning("nc_rod_captcha.durham_parse_failed", error=str(exc)[:160])
-            return results
-        log.info("nc_rod_captcha.durham_rows", count=len(records))
+        m = _SS_PAGE_OF_RE.search(html)
+        total_pages = int(m.group(1)) if m else 1
+        pages_to_fetch = min(total_pages, _DURHAM_MAX_PAGES)
+        log.info("nc_rod_captcha.durham_search_done", total_pages=total_pages, pages_to_fetch=pages_to_fetch)
 
-        for record in records:
+        from ...rod.nc_tyler import parse_selfservice
+        all_records = []
+        try:
+            all_records.extend(parse_selfservice(html))
+        except Exception as exc:
+            log.warning("nc_rod_captcha.durham_parse_failed", page_num=1, error=str(exc)[:160])
+
+        for pg_num in range(2, pages_to_fetch + 1):
+            try:
+                await page.goto(f"{entry_url}/searchResults/{search_id}?page={pg_num}", timeout=20000)
+                await page.wait_for_load_state("networkidle", timeout=15000)
+                page_html = await page.content()
+            except Exception as exc:
+                log.warning("nc_rod_captcha.durham_page_failed", page_num=pg_num, error=str(exc)[:160])
+                break
+            try:
+                all_records.extend(parse_selfservice(page_html))
+            except Exception as exc:
+                log.warning("nc_rod_captcha.durham_parse_failed", page_num=pg_num, error=str(exc)[:160])
+                continue
+
+        log.info("nc_rod_captcha.durham_rows", count=len(all_records),
+                  truncated=total_pages > _DURHAM_MAX_PAGES)
+
+        for record in all_records:
             li = self._durham_record_to_listing(record, search_url)
             if li is not None:
                 results.append(li)
@@ -1534,7 +1676,7 @@ class NcRodCaptchaScraper(BaseScraper):
             except Exception as exc:
                 log.warning("nc_rod_captcha.wake_no_content", doc_type=doc_type, error=str(exc)[:160])
                 continue
-            m = _WAKE_PAGE_OF_RE.search(html)
+            m = _SS_PAGE_OF_RE.search(html)
             total_pages = int(m.group(1)) if m else 1
             log.info("nc_rod_captcha.wake_search_done", doc_type=doc_type, total_pages=total_pages)
 

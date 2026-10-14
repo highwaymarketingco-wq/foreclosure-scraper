@@ -107,7 +107,25 @@ def parse_search_post(text: str) -> tuple[Optional[int], dict]:
     return pages, (j.get("validationMessages") or {})
 
 
-_SS_HEAD = re.compile(r"^\s*(\S+)\s*•\s*(?:BT:\s*(\S+))?\s*(?:B:\s*(\S+))?\s*(?:P:\s*(\S+))?\s*•\s*(\d{1,2}/\d{1,2}/\d{4})")
+# Header shape: '<instrument_no> • <metadata> • <date> <time>', e.g.
+# '2026186084 • BT: OPR B: 10616 P: 073 • 08/28/2026 04:09 PM'. The middle
+# <metadata> section is captured as a BLOB (group 2) rather than fixed
+# BT:/B:/P: slots, because a real multi-tract instrument renders TWO
+# "B: x P: y" pairs in that section with no bullet between them (live,
+# Wake instrument 2026086748: "B: 020299 P: 01082   B: 020299 P: 01083") --
+# confirmed 2026-10-14 this fails the OLD fixed-slot regex entirely (no
+# match at all), silently dropping instrument_no/book/page/recorded for a
+# real lead on both Wake and Durham (which share this parser). Splitting on
+# the two '•' bullets first, then pulling BT:/B:/P: out of the middle blob
+# with their own sub-patterns below, makes instrument_no/date immune to
+# however many book/page pairs the middle section holds -- the FIRST B:/P:
+# pair becomes the record's book/page (the primary tract; a multi-tract
+# instrument's secondary pairs are not separately modeled, same scope the
+# task asked for -- "at minimum the primary one, without silently dropping
+# instrument_no/date").
+_SS_HEAD = re.compile(r"^\s*(\S+)\s*•\s*(.*?)\s*•\s*(\d{1,2}/\d{1,2}/\d{4})")
+_SS_HEAD_BT = re.compile(r"BT:\s*(\S+)")
+_SS_HEAD_BP = re.compile(r"B:\s*(\S+)\s*P:\s*(\S+)")
 
 
 def parse_selfservice(html: str) -> list[IndexRecord]:
@@ -116,6 +134,9 @@ def parse_selfservice(html: str) -> list[IndexRecord]:
     for li in s.select("li.ss-search-row"):
         h1 = li.find("h1")
         m = _SS_HEAD.match(_txt(h1))
+        middle = (m.group(2) or "") if m else ""
+        bt = _SS_HEAD_BT.search(middle)
+        bp = _SS_HEAD_BP.search(middle)
         cols: dict[str, list[str]] = {}
         for ul in li.select("ul.selfServiceSearchResultColumn"):
             items = ul.find_all("li", recursive=False)
@@ -125,8 +146,9 @@ def parse_selfservice(html: str) -> list[IndexRecord]:
             cols[label] = [_txt(x) for x in items[1:] if _txt(x)]
         legal = cols.get("legal") or []
         out.append(IndexRecord(
-            recorded=mdy_to_iso(m.group(5)) if m else None, instrument_no=m.group(1) if m else None,
-            index_code=(m.group(2) if m else None), book=(m.group(3) if m else None), page=(m.group(4) if m else None),
+            recorded=mdy_to_iso(m.group(3)) if m else None, instrument_no=m.group(1) if m else None,
+            index_code=(bt.group(1) if bt else None), book=(bp.group(1) if bp else None),
+            page=(bp.group(2) if bp else None),
             doc_type=(cols.get("document type") or [""])[0],
             grantors=cols.get("grantor/party 1") or [], grantees=cols.get("grantee/party 2") or [],
             description="; ".join(legal[:3]) or None))

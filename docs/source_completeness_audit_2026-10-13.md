@@ -232,7 +232,11 @@ generic `enrich_doc_ocr.py` pass fetches every `document_url` with a stateless c
 session — stamping it would silently ship a dead link, so it is flagged as a documented gap
 instead rather than a working capability it isn't (a genuine server-side session gate, unlike the
 header-only Referer gates `raw['beaufort_pdf_fetch']`/`raw['clarendon_pdf_fetch']`/
-`raw['cott_image_fetch']` above worked around).
+`raw['cott_image_fetch']` above worked around). That 14-day/1,243-document pull was itself still
+page-1-only, not full pagination — **fixed 2026-10-14 (cont. x4), see the Wake section below**
+(Durham and Wake share the same `rod/nc_tyler.py` parser, so the pagination fix, the shared
+multi-tract header fix, and the confirmed-not-fixable Grantor/Grantee 5-name cap all apply to
+Durham too, not just Wake).
 
 The other 8 counties in this file were re-verified live 2026-10-14, not carried over from the
 2026-10-12 docstring unchecked, and all 8 reconfirmed genuinely walled: Wake, Iredell, Craven,
@@ -351,8 +355,9 @@ only 5 `<li>` names actually in the DOM) — the rest only exist on that documen
 not fetched here; (2) a multi-tract instrument's header (two "B: x P: y" pairs, no bullet between
 them) fails `rod/nc_tyler.py`'s shared `_SS_HEAD` regex entirely — live-confirmed by running the
 exact captured text through it — so `instrument_no`/`book`/`page`/`recorded` all come back `None`
-on that row and the record is silently dropped today, on BOTH Wake and Durham (same shared parser,
-not patched here since it's a Durham-affecting change outside this pass's scope).
+on that row and the record is silently dropped today, on BOTH Wake and Durham (same shared parser).
+**Both gaps re-examined and resolved one way or the other 2026-10-14 (cont. x4) below — (2) is now
+fixed; (1) is confirmed genuinely not fixable at the search-results level.**
 
 Related Documents are wired in, one hop, as asked: each document's own detail page
 (`/web/document/{docid}?search={search_id}`) auto-fires a real XHR
@@ -388,13 +393,67 @@ tighter "operator stays at the keyboard, pulls one bounded batch per clearing" p
 `_fetch_wake` can also just call `pingSession` on a timer the same way the real site's own JS does,
 which costs nothing and only helps.
 
+**CORRECTION 2026-10-14 (cont. x4)** — the owner specifically pressed on completeness this same
+night and three further real, confirmed gaps came out of it, all in this same file (two of the
+three are the ones flagged just above). All three were live-verified against the real sites, not
+just read from code and assumed.
+
+1. **Durham's "page 1 only" gap is now FIXED.** The 14-day/1,243-document pull cited above was
+   never full pagination — `_fetch_durham` read page 1 of Tyler's ~100-row page size and stopped,
+   run after run, on a platform whose own 90-day window turned out live-verified to be **96 pages
+   (~9,502 rows total, newest-first)**, confirmed both by the real `searchPost` JSON reply
+   (`{"totalPages":96,...}`) and by the rendered `Showing page 1 of 96 for 9502 Total Results`
+   summary. `_fetch_durham` now walks pages 2..min(totalPages, `_DURHAM_MAX_PAGES`=20) the same way
+   `_fetch_wake` already walks its own pages (a direct `searchResults/<search_id>?page=k`
+   navigation per page, not a second search submit, and the same `Showing page X of Y` regex,
+   renamed from Wake-only `_WAKE_PAGE_OF_RE` to the shared `_SS_PAGE_OF_RE` since Durham and Wake
+   are the same platform/tenant family). Live-verified via httpx replaying the real session (no
+   Chromium run locally, same memory-pressure reasoning used elsewhere in this file): walking the
+   newest 20 pages pulled **2,000 real rows with 2,000 DISTINCT instrument numbers and zero overlap
+   between any two consecutive pages** — genuine advancement, not page 1 re-read 20 times. 20 pages
+   is still a deliberate, documented partial-coverage budget (~21% of the 96-page window), the same
+   proportion of honesty this file already accepts for Brunswick's own page budget (~18%) — not
+   silently implied complete.
+2. **The shared `rod/nc_tyler.py` `_SS_HEAD` multi-tract gap (flagged just above) is now FIXED.**
+   The regex no longer requires one fixed BT:/B:/P: slot sequence between the header's two bullets
+   — it captures the middle section as a blob and pulls `BT:`/`B:`+`P:` out of it with their own
+   sub-patterns, so `instrument_no`/`recorded` no longer depend on how many book/page pairs that
+   middle section holds. Re-run live against the exact real multi-tract text already on record
+   (instrument 2026086748): `instrument_no` is now `"2026086748"`, `recorded` is `"2026-07-31"`,
+   and `book`/`page` are the FIRST pair (the primary tract — the second tract's pair is not
+   separately modeled, matching the scope asked for). Ordinary single-pair headers (Durham's and
+   Wake's own real fixtures) still parse identically to before. This real lead, previously silently
+   dropped on both Wake and Durham, is now captured on both (same shared parser).
+3. **The Grantor/Grantee 5-name cap (flagged just above) is confirmed GENUINELY NOT FIXABLE at the
+   search-results level — not a parser bug.** Re-checked live on Durham too, not just Wake: a real
+   DEED (instrument 2026190164, book 10639 page 799) declares "Grantor/Party 1 (12)" in its own
+   column header, but the search-results row's DOM itself contains only 5 `<li>` name nodes —
+   `parse_selfservice()` has no slice/cap of its own (`cols[label] = [... for x in items[1:] ...]`
+   takes every item present) and faithfully returns exactly what the site rendered. A live scan of
+   the newest 2,000 Durham rows found 151 (~7.6%) with a declared count above 5 — not a rare edge
+   case. The missing names ARE confirmed to exist one hop deeper: that same document's own detail
+   page (`/web/document/DOC291S618?search=DOCSEARCH5S1`, fetched live) lists all 12 real grantors in
+   full. Getting the complete list for every truncated row would need a new per-row detail-page
+   fetch neither `_fetch_durham` nor `_fetch_wake` does today (Wake's existing one-hop
+   related-documents visit is a different purpose — OTHER instruments a document references, not
+   this SAME document's own party list) — left honestly flagged rather than "fixed" with a change
+   that cannot work at the search-results level.
+
+See `scrapers/counties_nc/nc_rod_captcha.py`'s own module docstring (2026-10-14 (cont. x4) and
+(cont. x5) correction blocks) and `tests/test_nc_rod_captcha.py` for the full writeup and real
+schema-accurate fixtures built from this live pull.
+
 - `counties_nc/nc_rod_captcha.py` — **6 of 9 counties remain genuinely walled** (Iredell, Craven,
   Greene, Harnett, Randolph, Stokes); Durham and Brunswick **removed from this list** (fixed in the
   corrections above). Wake **removed from this list**: the reCAPTCHA itself is still genuinely
   walled for an UNATTENDED run (never automated, by design) — but the real search, parser, and
   one-hop related-documents follow-through are now fully built and live-verified, ready to run off
   a human-cleared session (see the correction immediately above for the full writeup, including the
-  live-measured session-reuse window and two further flagged, documented gaps).
+  live-measured session-reuse window and two further flagged, documented gaps — one now fixed, one
+  confirmed genuinely not fixable at this level, see the 2026-10-14 (cont. x4) correction just
+  above). Durham's own coverage also improved materially in that same correction: real pagination
+  (20 of 96 pages per run, not page 1 only) and the shared multi-tract header fix both apply to it
+  too, since Durham and Wake share the same `rod/nc_tyler.py` parser.
 - `national/sc_sos_entity.py` (build spec already given to Hermes earlier this session)
 - `public_notices/nc_notices_counties.py` vs `ncpublicnotices.py` (same site — does the
   interstitial actually gate it or not? One module says yes, the other's code says no.)
