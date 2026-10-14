@@ -80,6 +80,22 @@ STALENESS -- INVESTIGATED 2026-10-02, NOT A CODE BUG, NO FIX APPLIED HERE:
     which is an OPERATIONAL re-verification cadence (a periodic spot-check pass,
     or watching for the city to publish a newer-dated layer), not a one-time code
     change. See docs/HANDOFF.md for the open item.
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern A -- ArcGIS
+FeatureServer attachments): the 2026-10-13 audit flagged this file as never
+checking `hasAttachments`/`queryAttachments` on the VACANT_STRUCTURES_7_24_24
+layer, the same gap class fixed on asheville_helene.py and
+henderson_code_violations.py. Live-checked directly against
+`.../VACANT_STRUCTURES_7_24_24/FeatureServer/0?f=json`:
+`hasAttachments: false`. Confirmed with a direct `queryAttachments` call
+against real FIDs (1, 2): the server rejects it outright --
+`{"error":{"code":400,"message":"","details":["Layer does not support
+attachments."]}}` -- not an empty-but-enabled layer, the capability does not
+exist on this service at all. No fix applied; nothing to fetch (a code
+officer's own vacant-structure photos, if the city ever attaches them here,
+would be exactly the kind of documentation this register's own text fields
+already hint at -- BOARDED_UP, CONDEMNED -- so this is a genuine miss by the
+source, not by this scraper).
 """
 from __future__ import annotations
 

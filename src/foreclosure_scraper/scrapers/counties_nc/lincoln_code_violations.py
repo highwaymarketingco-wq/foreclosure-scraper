@@ -40,6 +40,20 @@ found). This is a server misconfiguration on the county's own domain,
 not a reason to distrust the endpoint -- fetches here use a LOCAL
 httpx.AsyncClient with verify=False scoped to ONLY this one call, not a
 change to the shared `http_client.client()` every other scraper uses.
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern A -- ArcGIS
+FeatureServer/MapServer attachments): the 2026-10-13 audit flagged this file
+as never checking `hasAttachments`/`queryAttachments` on the TRACKiT "Code
+Violations Archive" layer, the same gap class fixed on asheville_helene.py
+and henderson_code_violations.py. Live-checked directly (verify=False, same
+TLS note as above) against `.../TRACKiT/MapServer/8?f=json`:
+`hasAttachments: false` in the layer's own metadata. A direct
+`queryAttachments` call against real open-case objectids (3786, 3787) did
+not return an attachment payload at all -- this older on-prem ArcGIS Server
+(currentVersion 10.71) just serves the same layer-metadata document back for
+that sub-path (not even routed as a distinct operation), consistent with the
+metadata's own `hasAttachments: false` rather than contradicting it. No fix
+applied; nothing to fetch.
 """
 from __future__ import annotations
 

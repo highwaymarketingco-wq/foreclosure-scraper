@@ -32,6 +32,23 @@ DATELESS
 
 PRIVACY: explicit outFields (property-record columns only), ``drop_sensitive`` on every
 attribute bag. Gate: ``FORECLOSURE_ROCKY_MOUNT_BLIGHT=0``.
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern A -- ArcGIS
+FeatureServer attachments): the 2026-10-13 audit flagged this file as never
+checking ``hasAttachments``/``queryAttachments`` on its six survey layers,
+the same gap class fixed on asheville_helene.py and
+henderson_code_violations.py. Live-checked all six layers' own metadata
+(``.../<layer>/FeatureServer/<n>?f=json``): every one reports
+``hasAttachments: false``. Confirmed with a direct ``queryAttachments`` call
+against real objectids on the Edgecombe dilapidated layer: the server
+rejects it outright -- ``{"error":{"code":400,"message":"",
+"details":["Layer does not support attachments."]}}`` -- not an
+empty-but-enabled layer, the capability does not exist on this consultant-
+published service at all (and the other five layers share the same
+publisher/service pattern). No fix applied; nothing to fetch -- a 2025
+condition survey is exactly where real photos of a "dilapidated"/
+"deteriorated" call would carry weight, so this is a genuine miss by the
+source, not by this scraper.
 """
 from __future__ import annotations
 
