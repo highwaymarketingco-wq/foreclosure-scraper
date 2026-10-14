@@ -33,6 +33,16 @@ next run stops at the first page already in the store, so that band of deaths is
 The caught-up stop already ends a normal run early, so the default cap is now 40 pages a state
 (about a week of postings); a run that is caught up costs what it did, a run after a gap reads at most
 56 more pages (about 2 s each).
+
+PHOTO CHECK (2026-10-14, final audit batch) -- NOT A REAL GAP, confirmed live. Every listing-card
+thumbnail is a generic numbered placeholder (`/assets/images/default/<N>.jpg`, a stock silhouette
+set, not a decedent photo) -- checked 144 cards across NC+SC pages 1-3, zero exceptions. Obituary
+detail pages carry no schema.org Person `image` field (no LD+JSON block at all on 7 pages sampled)
+and their own card thumbnail is the same generic default. The detail page's `og:image` IS populated,
+but it is an auto-generated social-share banner (stock flower-field background + decedent name/dates
+text overlay + the Echovita logo, confirmed by rendering one) -- zero decedent-identifying content,
+same for every obituary. There is no real photo published anywhere in this source's reachable pages
+to capture.
 """
 from __future__ import annotations
 
