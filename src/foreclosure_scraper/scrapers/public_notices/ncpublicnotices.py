@@ -57,12 +57,15 @@ from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
 from ..newspapers.column_legal_notices import _notice_email
 from .nc_notices_counties import (
+    _ADDR_RE as _NCC_ADDR_RE,
     _CASE_RE as _NCC_CASE_RE,
     _CASE_SPACED_RE as _NCC_CASE_SPACED_RE,
     _FLIP_FOOTPRINT_NAMES as _NCC_FLIP_FOOTPRINT_NAMES,
     _PLAINTIFF_RE as _NCC_PLAINTIFF_RE,
+    _plausible_address as _ncc_plausible_address,
     _sale_date as _ncc_sale_date,
     _tidy_name as _ncc_tidy_name,
+    fetch_notice_detail,
 )
 
 log = structlog.get_logger()
@@ -78,9 +81,11 @@ DEBUG_DUMP_DIR = pathlib.Path(
 )
 DEBUG_DUMP_ENABLED = os.environ.get("NCNOTICES_DEBUG_DUMP", "1") == "1"
 
-# Probate detail-body enrichment is bounded so a big run never blows the
-# scraper's timeout_s walking hundreds of detail pages. Only probate rows
-# (which carry the PR / Date-of-Death we want) are followed, newest-first.
+# Detail-body enrichment is bounded so a big run never blows the scraper's
+# timeout_s walking hundreds of detail pages. Runs for EVERY category now
+# (foreclosure/divorce/probate), newest-first within each query's results --
+# see _enrich_notice_details()'s docstring for why this was probate-only
+# until 2026-10-13 and why that was a bug, not a deliberate scope choice.
 # Set NCNOTICES_DETAIL_FETCH=0 to disable entirely.
 DETAIL_FETCH_ENABLED = os.environ.get("NCNOTICES_DETAIL_FETCH", "1") == "1"
 MAX_DETAIL_FETCH = int(os.environ.get("NCNOTICES_MAX_DETAIL_FETCH", "40"))
@@ -221,110 +226,112 @@ def _matches_category(text: str, category: str) -> bool:
 
 
 _DETAIL_ID_RE = re.compile(r"[?&]ID=(\d+)", re.I)
-# The detail page hides the notice body behind an "I Agree, View Notice"
-# terms-of-use button + a reCAPTCHA. When that gate is up we DON'T solve it
-# (the site's Terms of Use prohibit automated collection of the notice body,
-# and the reCAPTCHA is the enforcement) — we detect the gate and skip. PR /
-# Date-of-Death are only extracted when the body renders ungated.
-_DETAIL_GATE_TOKENS = (
-    "complete the captcha",
-    "complete the recaptcha",
-    "must complete the",
-    "i agree, view notice",
-)
+# The actual detail-fetch mechanics (click past the Terms-of-Use button,
+# give Cloudflare Turnstile a chance to auto-verify, detect the two
+# observed failure modes) live in the sibling nc_notices_counties.py's
+# fetch_notice_detail() -- shared so both modules treat the gate the same
+# way. See that module's docstring for the 2026-10-13 live-verification
+# history (the gate is Turnstile, not Google reCAPTCHA; a resolved token
+# still doesn't guarantee a populated body).
 
 
-async def _fetch_probate_detail(fetcher, detail_url: str) -> dict | None:
-    """Best-effort, NON-FATAL fetch of a probate notice's detail body to
-    pull Personal Representative + Date of Death (ported from
-    spartan_weekly_legals.py). Returns a dict of the captured fields, or
-    None when the body is captcha/terms-gated (production default) or the
-    fetch fails. Never raises and never solves the captcha."""
-    try:
-        async def reveal(page):
-            try:
-                await page.wait_for_load_state("networkidle", timeout=15000)
-            except Exception:
-                pass
-            # Click "I Agree, View Notice" if present — only reveals the body
-            # on notices that AREN'T captcha-gated; gated notices stay hidden.
-            for sel in (
-                "#ctl00_ContentPlaceHolder1_PublicNoticeDetailsBody1_btnViewNotice",
-                "input[id$='btnViewNotice']",
-            ):
-                try:
-                    await page.click(sel, timeout=5000)
-                    break
-                except Exception:
-                    continue
-            try:
-                await page.wait_for_load_state("networkidle", timeout=10000)
-            except Exception:
-                pass
+async def _enrich_notice_details(listings: list[Listing]) -> None:
+    """Walk listings of ANY category that carry a real Details.aspx?ID=
+    URL and backfill whatever the real detail body yields beyond the
+    truncated search snippet. Mutates listings in place.
 
-        result = await fetcher.async_fetch(
-            detail_url, headless=True, network_idle=True, timeout=60000,
-            page_action=reveal,
-        )
-        body = getattr(result, "body", b"")
-        html = (body.decode("utf-8", errors="replace")
-                if isinstance(body, bytes) else str(body or ""))
-        if not html:
-            return None
-        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
-        low = text.lower()
-        # Gate detection — if the captcha/terms wall is up, the body never
-        # rendered. Bail cleanly (compliant: we do not bypass the captcha).
-        if any(tok in low for tok in _DETAIL_GATE_TOKENS):
-            return None
-        pr = _PROBATE_PR.search(text)
-        dod = _PROBATE_DOD.search(text)
-        # Attorney/PR phone from the full detail body (a reachable case contact).
-        # Reuses the Column extractor so parcel-PIN / case-number digit runs
-        # can't leak in as a phantom phone.
-        contact = _notice_email(text)
-        phone = contact.get("phone")
-        if not (pr or dod or phone):
-            return None
-        return {
-            "personal_representative": pr.group(1).strip() if pr else None,
-            "pr_address": pr.group(2).strip() if pr else None,
-            "date_of_death": dod.group(1).strip() if dod else None,
-            "phone": phone,
-            "notice_body": text[:2000],
-        }
-    except Exception as exc:
-        log.debug("ncnotices.detail_fetch_fail", url=detail_url[:120], error=str(exc)[:160])
-        return None
+    FOUND 2026-10-13 (docs/source_completeness_audit_2026-10-13.md): this
+    used to be ``_enrich_probate_details`` and ran ONLY for
+    category == "probate", even though the underlying fetch
+    (fetch_notice_detail) has nothing probate-specific about it -- it is
+    the exact same click-past-the-interstitial mechanism either way, and
+    live re-verification that day found it behaves identically (same two
+    failure modes, same frequency) for foreclosure rows as for probate
+    rows. So the probate-only gate was silently dropping the one thing the
+    module docstring says foreclosure/divorce notices most need recovered:
+    an address or case number that fell past the ~ truncated snippet.
+    Fixed by running this for every category and extracting the fields
+    each one actually needs from whatever text comes back.
 
-
-async def _enrich_probate_details(fetcher, listings: list[Listing]) -> None:
-    """Walk probate listings that carry a real Details.aspx?ID= URL and merge
-    the detail-page PR / Date-of-Death into raw['probate']. Bounded by
-    MAX_DETAIL_FETCH; all per-row failures are swallowed so enrichment never
-    breaks the scrape. Mutates listings in place."""
+    Bounded by MAX_DETAIL_FETCH; all per-row failures are swallowed so
+    enrichment never breaks the scrape -- it can only ever add fields."""
     fetched = 0
     for li in listings:
         if fetched >= MAX_DETAIL_FETCH:
             break
         url = li.source_url or ""
-        m = _DETAIL_ID_RE.search(url)
-        if not m or "Details.aspx" not in url:
+        if not _DETAIL_ID_RE.search(url) or "Details.aspx" not in url:
             continue
         fetched += 1
-        info = await _fetch_probate_detail(fetcher, url)
-        if not info:
+        text = await fetch_notice_detail(url)
+        if not text:
             continue
-        raw = li.raw if isinstance(li.raw, dict) else {}
-        probate = dict(raw.get("probate") or {})
-        for k, v in info.items():
-            if v and not probate.get(k):
-                probate[k] = v
-        if probate:
-            raw["probate"] = probate
+
+        if li.listing_type is ListingType.PROBATE_NOTICE:
+            pr = _PROBATE_PR.search(text)
+            dod = _PROBATE_DOD.search(text)
+            # Attorney/PR phone from the full detail body (a reachable case
+            # contact). Reuses the Column extractor so parcel-PIN /
+            # case-number digit runs can't leak in as a phantom phone.
+            contact = _notice_email(text)
+            phone = contact.get("phone")
+            if not (pr or dod or phone):
+                continue
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            probate = dict(raw.get("probate") or {})
+            for k, v in (
+                ("personal_representative", pr.group(1).strip() if pr else None),
+                ("pr_address", pr.group(2).strip() if pr else None),
+                ("date_of_death", dod.group(1).strip() if dod else None),
+                ("phone", phone),
+                ("notice_body", text[:2000]),
+            ):
+                if v and not probate.get(k):
+                    probate[k] = v
+            if probate:
+                raw["probate"] = probate
+                li.raw = raw
+            continue
+
+        # Foreclosure / divorce / everything else: backfill whatever the
+        # truncated search snippet didn't have, reusing the exact field
+        # extractors already imported above for the snippet parse in
+        # _parse_results_html(), now run against the real detail body.
+        changed = False
+        if not li.street_address:
+            addr_m = _NCC_ADDR_RE.search(text)
+            if addr_m:
+                candidate = addr_m.group(1).strip()
+                if _ncc_plausible_address(candidate):
+                    li.street_address = candidate
+                    changed = True
+        if not li.case_number:
+            case_m = _NCC_CASE_RE.search(text) or _NCC_CASE_SPACED_RE.search(text)
+            if case_m:
+                li.case_number = case_m.group(1)
+                changed = True
+        if not li.sale_date:
+            sale_dt = _ncc_sale_date(text)
+            if sale_dt:
+                li.sale_date = sale_dt
+                changed = True
+        if not li.plaintiff:
+            plaintiff_m = _NCC_PLAINTIFF_RE.search(text)
+            if plaintiff_m:
+                li.plaintiff = _ncc_tidy_name(plaintiff_m.group(1))
+                changed = True
+        contact = _notice_email(text)
+        phone = contact.get("phone")
+        if phone or changed:
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            blob = dict(raw.get("ncnotices") or {})
+            blob["detail_body_fetched"] = True
+            if phone and not blob.get("phone"):
+                blob["phone"] = phone
+            raw["ncnotices"] = blob
             li.raw = raw
     if fetched:
-        log.info("ncnotices.probate_detail_done", attempted=fetched)
+        log.info("ncnotices.detail_enrich_done", attempted=fetched)
 
 
 async def _search_one(query: str, category: str) -> list[Listing]:
@@ -593,11 +600,13 @@ async def _search_one(query: str, category: str) -> list[Listing]:
         )
         # Short-circuit on success
         if listings:
-            # Probate enrichment: follow each notice's Details.aspx?ID= link
-            # for the PR + Date of Death (the list body is server-truncated).
-            # Best-effort + bounded + non-fatal; gated notices are skipped.
-            if category == "probate" and DETAIL_FETCH_ENABLED:
-                await _enrich_probate_details(StealthyFetcher, listings)
+            # Detail enrichment (every category, see _enrich_notice_details'
+            # docstring for why this isn't probate-only anymore): follow each
+            # notice's Details.aspx?ID= link for whatever the search snippet
+            # truncated away. Best-effort + bounded + non-fatal; gated/failed
+            # fetches are skipped, never bypassed.
+            if DETAIL_FETCH_ENABLED:
+                await _enrich_notice_details(listings)
             return listings
         # Short-circuit on substantial HTML — means the URL loaded a real
         # page, just no results for this query. Trying alternate URLs won't

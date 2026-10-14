@@ -334,3 +334,135 @@ def test_parse_dedupes_by_named_party():
     """
     out = _parse_results_html(html, query="notice to creditors", category="probate")
     assert len(out) == 1
+
+
+# ---- detail-body enrichment now runs for every category, not just probate -
+# FOUND 2026-10-13 (docs/source_completeness_audit_2026-10-13.md): this used
+# to be _enrich_probate_details(), gated to category == "probate" even
+# though the underlying fetch has nothing probate-specific about it. Live
+# re-verification that day found it behaves identically for foreclosure rows
+# (same Cloudflare-Turnstile gate, same two failure modes, same frequency) --
+# so the probate-only gate was a bug, not a deliberate scope choice. Fixed by
+# generalizing to _enrich_notice_details(), which these tests cover.
+
+import asyncio
+from datetime import UTC, datetime
+
+from foreclosure_scraper.models import Listing, PropertyKind
+import foreclosure_scraper.scrapers.public_notices.ncpublicnotices as _ncp
+
+_DETAIL_SLUG = "public_notices.ncnotices"
+
+
+def _detail_listing(listing_type, notice_id: str = "55555", **overrides) -> Listing:
+    fields = dict(
+        source=_DETAIL_SLUG,
+        source_url=f"https://www.ncnotices.com/Details.aspx?ID={notice_id}",
+        listing_type=listing_type,
+        property_kind=PropertyKind.UNKNOWN,
+        state="NC",
+        county="Buncombe",
+        street_address=None,
+        case_number=None,
+        sale_date=None,
+        plaintiff=None,
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+        raw={},
+    )
+    fields.update(overrides)
+    return Listing(**fields)
+
+
+def test_enrich_notice_details_backfills_a_foreclosure_row(monkeypatch):
+    """The exact gap the audit flagged: a foreclosure row whose address fell
+    past the search-snippet truncation must get the detail-fetch shot at
+    recovery, the same as a probate row always did."""
+    li = _detail_listing(ListingType.FORECLOSURE_SALE)
+
+    async def _fake_fetch(url):
+        return ("UNDER AND BY VIRTUE of the power of sale the property at 42 "
+                "Lakeview Drive will be sold at public auction on October 1, "
+                "2026. Case 26SP000900-440.")
+
+    monkeypatch.setattr(_ncp, "fetch_notice_detail", _fake_fetch)
+    asyncio.run(_ncp._enrich_notice_details([li]))
+    assert li.street_address == "42 Lakeview Drive"
+    assert li.case_number == "26SP000900-440"
+    assert li.sale_date is not None and li.sale_date.date().isoformat() == "2026-10-01"
+    assert li.raw.get("ncnotices", {}).get("detail_body_fetched") is True
+
+
+def test_enrich_notice_details_still_extracts_probate_pr_and_dod(monkeypatch):
+    """Backward-compat: the probate PR/DOD extraction this function used to
+    be named for must keep working after the generalization."""
+    li = _detail_listing(ListingType.PROBATE_NOTICE)
+
+    async def _fake_fetch(url):
+        return ("Personal Representative Jane Q Smith 123 Main St Asheville "
+                "NC 28801 Date of Death: January 5, 2026")
+
+    monkeypatch.setattr(_ncp, "fetch_notice_detail", _fake_fetch)
+    asyncio.run(_ncp._enrich_notice_details([li]))
+    assert li.raw["probate"]["personal_representative"] == "Jane Q Smith"
+    assert li.raw["probate"]["date_of_death"] == "January 5, 2026"
+
+
+def test_enrich_notice_details_skips_non_detail_urls():
+    """A linkless card's synthetic fragment URL (BASE#notice-...) is not a
+    real Details.aspx link -- must be skipped, not fetched."""
+    li = _detail_listing(
+        ListingType.DIVORCE_NOTICE,
+        source_url="https://www.ncnotices.com/#notice-divorce-abc123",
+    )
+    # No fetch_notice_detail monkeypatch -- if the URL-shape guard didn't
+    # skip this row, the real (network-calling) function would run here.
+    asyncio.run(_ncp._enrich_notice_details([li]))
+    assert li.street_address is None
+
+
+def test_enrich_notice_details_respects_the_cap(monkeypatch):
+    monkeypatch.setattr(_ncp, "MAX_DETAIL_FETCH", 2)
+    listings = [
+        _detail_listing(ListingType.FORECLOSURE_SALE, notice_id=str(70000 + i))
+        for i in range(5)
+    ]
+    calls: list[str] = []
+
+    async def _fake_fetch(url):
+        calls.append(url)
+        return None
+
+    monkeypatch.setattr(_ncp, "fetch_notice_detail", _fake_fetch)
+    asyncio.run(_ncp._enrich_notice_details(listings))
+    assert len(calls) == 2
+
+
+def test_enrich_notice_details_does_not_overwrite_existing_fields(monkeypatch):
+    li = _detail_listing(
+        ListingType.FORECLOSURE_SALE,
+        street_address="999 Already Known Dr",
+        case_number="26SP000111-440",
+    )
+
+    async def _fake_fetch(url):
+        return "42 Different Lane will be sold. Case 26SP999999-440."
+
+    monkeypatch.setattr(_ncp, "fetch_notice_detail", _fake_fetch)
+    asyncio.run(_ncp._enrich_notice_details([li]))
+    assert li.street_address == "999 Already Known Dr"
+    assert li.case_number == "26SP000111-440"
+
+
+def test_enrich_notice_details_returns_none_adds_nothing(monkeypatch):
+    """fetch_notice_detail() returning None (gated/failed) must leave the
+    listing exactly as the snippet parse produced it."""
+    li = _detail_listing(ListingType.FORECLOSURE_SALE)
+
+    async def _fake_fetch(url):
+        return None
+
+    monkeypatch.setattr(_ncp, "fetch_notice_detail", _fake_fetch)
+    asyncio.run(_ncp._enrich_notice_details([li]))
+    assert li.street_address is None
+    assert li.raw == {}

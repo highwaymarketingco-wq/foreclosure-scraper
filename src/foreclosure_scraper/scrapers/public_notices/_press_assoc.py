@@ -13,9 +13,17 @@ Every result row is one ``<table class="nested">`` holding:
   * a sibling ``<td colspan>`` holding the TRUNCATED preview body, which ends in
     "... click 'view' to open the full text."
 
-The full body lives on Details.aspx behind an "I Agree" + reCAPTCHA gate on
-both sites, so the preview (~300 chars) is all we parse. That is enough for the
-notice's caption, case number, party name and subject county.
+The full body lives on Details.aspx behind an "I Agree" Terms-of-Use
+click-through + a Cloudflare Turnstile challenge on both sites (NOT Google
+reCAPTCHA -- g-recaptcha never appears; corrected 2026-10-13, see
+nc_notices_counties.py's module docstring for the live-verification that
+found the earlier "reCAPTCHA" citation here was wrong). The NC side now
+makes a bounded, best-effort attempt to fetch past the click-through (see
+nc_notices_counties.py's fetch_notice_detail()); this module itself stays
+pure HTML->dict parsing of the preview only. The preview (~300 chars) is
+enough for the notice's caption, case number, party name and subject
+county; the property address, parcel and sale date usually sit past the
+truncation and now get that one bounded detail-fetch shot at recovery.
 
 Everything here is pure HTML->dict: no browser, no network, so it unit-tests
 against a saved fixture. The per-site modules own the render/driving logic

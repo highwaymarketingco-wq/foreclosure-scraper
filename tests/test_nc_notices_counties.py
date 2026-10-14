@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import asyncio
 import pathlib
+import sys
+import types
+from datetime import UTC, datetime
 
 import pytest
 
-from foreclosure_scraper.models import ListingType
+from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 from foreclosure_scraper.scrapers.public_notices import _press_assoc as pa
 from foreclosure_scraper.scrapers.public_notices import nc_notices_counties as M
 
@@ -298,6 +301,13 @@ def test_address_parcel_and_sale_date_parse_when_present():
 
 # --------------------------------------------------------------- fetch -----
 
+async def _no_op_backfill(listings):
+    """Stand-in for _enrich_missing_addresses in tests that exercise the
+    full fetch() pipeline with a faked render -- the real backfill makes a
+    live network/browser call per row, which has no place in a unit test."""
+    return None
+
+
 def test_fetch_dedupes_by_notice_id_across_pages(monkeypatch):
     """The same notice appears under more than one keyword; a lead must be
     emitted once."""
@@ -307,6 +317,7 @@ def test_fetch_dedupes_by_notice_id_across_pages(monkeypatch):
         return [html, html, html]
 
     monkeypatch.setattr(M, "_render_queries", _fake_render)
+    monkeypatch.setattr(M, "_enrich_missing_addresses", _no_op_backfill)
     out = asyncio.run(M.NCNoticesCounties().fetch())
     assert len(out) == 6   # 7 fixture rows, 1 out-of-footprint
     assert len({li.source_url for li in out}) == 6
@@ -327,3 +338,269 @@ def test_scraper_is_registered_and_shaped_like_its_siblings():
     assert cls.category == "public_notices"
     assert cls.timeout_s >= 600      # 11 county postbacks + 4 paged queries
     assert cls.expected_min_count == 0
+
+
+# ------------------------------------------- detail fetch (shared helper) --
+# Live-verified 2026-10-13 against ncnotices.com (docs/source_completeness_
+# audit_2026-10-13.md): the gate is Cloudflare Turnstile (NOT Google
+# reCAPTCHA -- g-recaptcha never appears), and even a resolved Turnstile
+# token doesn't guarantee the server's postback actually populates the
+# notice body -- a generic "Sorry, there was a problem loading..." error
+# with an empty content span is a real, observed outcome, indistinguishable
+# in practice from the explicit challenge. fetch_notice_detail() treats both
+# the same way: return None, no retry, no bypass. These tests fake the
+# Playwright page exactly like tests/test_sos_agent_handoff.py already does
+# for a different scrapling-driven scraper in this codebase.
+
+class _FakeDetailPage:
+    """Stands in for the page passed to fetch_notice_detail()'s page_action.
+
+    `token_ready` controls how many evaluate() polls report the Turnstile
+    response field still pending (0 = already resolved before the first
+    poll, matching a silent auto-verify)."""
+
+    def __init__(self, final_html: str, token_ready: int = 0):
+        self.final_html = final_html
+        self.token_ready = token_ready
+        self._polls = 0
+        self.clicked: list[str] = []
+
+    async def wait_for_load_state(self, *a, **k):
+        return None
+
+    async def wait_for_timeout(self, *a, **k):
+        return None
+
+    async def evaluate(self, js):
+        self._polls += 1
+        return self._polls <= self.token_ready  # True == still pending
+
+    async def click(self, sel, timeout=None):
+        self.clicked.append(sel)
+
+    async def content(self):
+        return self.final_html
+
+
+def _install_fake_scrapling(monkeypatch, page):
+    async def async_fetch(url, page_action=None, **kw):
+        if page_action:
+            await page_action(page)
+        return None
+
+    mod = types.ModuleType("scrapling.fetchers")
+    mod.StealthyFetcher = types.SimpleNamespace(async_fetch=async_fetch)
+    monkeypatch.setitem(sys.modules, "scrapling", types.ModuleType("scrapling"))
+    monkeypatch.setitem(sys.modules, "scrapling.fetchers", mod)
+
+
+def test_fetch_notice_detail_returns_none_when_challenge_still_visible(monkeypatch):
+    html = ('<div class="cf-turnstile" id="recaptcha"></div>'
+            '<span class="pnlError">You must complete the challenge in order '
+            'to continue.</span>')
+    _install_fake_scrapling(monkeypatch, _FakeDetailPage(html))
+    text = asyncio.run(
+        M.fetch_notice_detail("https://www.ncnotices.com/Details.aspx?ID=1"))
+    assert text is None
+
+
+def test_fetch_notice_detail_returns_none_on_generic_postback_error(monkeypatch):
+    """Live-verified 2026-10-13: a resolved Turnstile token does not
+    guarantee real content -- the server can still render this generic
+    error with an empty lblContentText. Same fail-safe treatment as an
+    explicit gate."""
+    html = ('<span id="ctl00_ContentPlaceHolder1_PublicNoticeDetailsBody1_'
+            'lblMessage" class="pnlError">Sorry, there was a problem loading '
+            'the search results page.</span>'
+            '<span id="ctl00_ContentPlaceHolder1_PublicNoticeDetailsBody1_'
+            'lblContentText"></span>')
+    _install_fake_scrapling(monkeypatch, _FakeDetailPage(html, token_ready=2))
+    text = asyncio.run(
+        M.fetch_notice_detail("https://www.ncnotices.com/Details.aspx?ID=2"))
+    assert text is None
+
+
+def test_fetch_notice_detail_returns_real_text_when_postback_succeeds(monkeypatch):
+    html = ('<div id="right_content"><span id="lblContentText">123 Sycamore '
+            'Lane, parcel 1697-32-4455, sale on September 9, 2026'
+            '</span></div>')
+    page = _FakeDetailPage(html, token_ready=1)
+    _install_fake_scrapling(monkeypatch, page)
+    text = asyncio.run(
+        M.fetch_notice_detail("https://www.ncnotices.com/Details.aspx?ID=3"))
+    assert text is not None
+    assert "123 Sycamore Lane" in text
+    assert page.clicked   # the click actually happened before content() was read
+
+
+def test_fetch_notice_detail_returns_none_when_fetch_raises(monkeypatch):
+    async def _boom(url, page_action=None, **kw):
+        raise RuntimeError("Timeout 60000ms exceeded")
+
+    mod = types.ModuleType("scrapling.fetchers")
+    mod.StealthyFetcher = types.SimpleNamespace(async_fetch=_boom)
+    monkeypatch.setitem(sys.modules, "scrapling", types.ModuleType("scrapling"))
+    monkeypatch.setitem(sys.modules, "scrapling.fetchers", mod)
+    text = asyncio.run(
+        M.fetch_notice_detail("https://www.ncnotices.com/Details.aspx?ID=4"))
+    assert text is None
+
+
+# ------------------------------------------- bounded address backfill ------
+
+def _foreclosure_listing(notice_id: str = "900001", **overrides) -> Listing:
+    fields = dict(
+        source=_SLUG,
+        source_url=M._DETAIL_URL.format(notice_id),
+        listing_type=ListingType.FORECLOSURE_SALE,
+        property_kind=PropertyKind.UNKNOWN,
+        state="NC",
+        county="Buncombe",
+        street_address=None,
+        case_number=None,
+        sale_date=None,
+        parcel_id=None,
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+        raw={"public_notice": {"site": "ncnotices.com"}},
+    )
+    fields.update(overrides)
+    return Listing(**fields)
+
+
+def test_enrich_missing_addresses_backfills_from_detail_text(monkeypatch):
+    li = _foreclosure_listing()
+
+    async def _fake_fetch(url):
+        return ("UNDER AND BY VIRTUE of the power of sale the property at 118 "
+                "Sycamore Lane (PIN 1697-32-4455) will be sold at public "
+                "auction on September 9, 2026. Case 26SP000128-440.")
+
+    monkeypatch.setattr(M, "fetch_notice_detail", _fake_fetch)
+    asyncio.run(M._enrich_missing_addresses([li]))
+    assert li.street_address == "118 Sycamore Lane"
+    assert li.parcel_id == "1697-32-4455"
+    assert li.sale_date is not None and li.sale_date.date().isoformat() == "2026-09-09"
+    assert li.case_number == "26SP000128-440"
+    assert li.raw["public_notice"]["detail_body_fetched"] is True
+
+
+def test_enrich_missing_addresses_skips_rows_that_already_have_an_address(monkeypatch):
+    li = _foreclosure_listing(street_address="999 Already Known Dr")
+    calls: list[str] = []
+
+    async def _fake_fetch(url):
+        calls.append(url)
+        return "should never be reached"
+
+    monkeypatch.setattr(M, "fetch_notice_detail", _fake_fetch)
+    asyncio.run(M._enrich_missing_addresses([li]))
+    assert calls == []
+    assert li.street_address == "999 Already Known Dr"
+
+
+def test_enrich_missing_addresses_skips_probate(monkeypatch):
+    """An estate notice legitimately names no property -- don't spend a
+    bounded request looking for one (see the module docstring)."""
+    li = Listing(
+        source=_SLUG,
+        source_url=M._DETAIL_URL.format("900002"),
+        listing_type=ListingType.PROBATE_NOTICE,
+        property_kind=PropertyKind.UNKNOWN,
+        state="NC",
+        county="Buncombe",
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+        raw={},
+    )
+    calls: list[str] = []
+
+    async def _fake_fetch(url):
+        calls.append(url)
+        return "text"
+
+    monkeypatch.setattr(M, "fetch_notice_detail", _fake_fetch)
+    asyncio.run(M._enrich_missing_addresses([li]))
+    assert calls == []
+
+
+def test_enrich_missing_addresses_respects_the_cap(monkeypatch):
+    monkeypatch.setattr(M, "_MAX_DETAIL_FETCH", 2)
+    listings = [_foreclosure_listing(notice_id=str(900100 + i)) for i in range(5)]
+    calls: list[str] = []
+
+    async def _fake_fetch(url):
+        calls.append(url)
+        return None
+
+    monkeypatch.setattr(M, "fetch_notice_detail", _fake_fetch)
+    asyncio.run(M._enrich_missing_addresses(listings))
+    assert len(calls) == 2
+
+
+def test_enrich_missing_addresses_propagates_an_unexpected_failure(monkeypatch):
+    """fetch_notice_detail() is designed to never raise (it catches its own
+    failures and returns None) -- but if something unexpected still does
+    raise here, _enrich_missing_addresses does NOT swallow it itself. That
+    safety net lives one level up, in fetch()'s own try/except (see
+    test_fetch_survives_a_broken_backfill below) -- documented here so the
+    division of responsibility is explicit rather than assumed."""
+    li = _foreclosure_listing()
+
+    async def _raises(url):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(M, "fetch_notice_detail", _raises)
+    with pytest.raises(RuntimeError):
+        asyncio.run(M._enrich_missing_addresses([li]))
+
+
+def test_fetch_survives_a_broken_backfill(monkeypatch):
+    html = _FIXTURE.read_text()
+
+    async def _fake_render():
+        return [html]
+
+    async def _broken_backfill(listings):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(M, "_render_queries", _fake_render)
+    monkeypatch.setattr(M, "_enrich_missing_addresses", _broken_backfill)
+    out = asyncio.run(M.NCNoticesCounties().fetch())
+    assert len(out) == 6   # the run still completes and returns its leads
+
+
+def test_fetch_wires_in_the_detail_backfill_when_enabled(monkeypatch):
+    html = _FIXTURE.read_text()
+
+    async def _fake_render():
+        return [html]
+
+    calls: list[int] = []
+
+    async def _fake_backfill(listings):
+        calls.append(len(listings))
+
+    monkeypatch.setattr(M, "_render_queries", _fake_render)
+    monkeypatch.setattr(M, "_enrich_missing_addresses", _fake_backfill)
+    monkeypatch.setattr(M, "_DETAIL_FETCH_ENABLED", True)
+    out = asyncio.run(M.NCNoticesCounties().fetch())
+    assert calls == [len(out)]
+
+
+def test_fetch_skips_the_detail_backfill_when_disabled(monkeypatch):
+    html = _FIXTURE.read_text()
+
+    async def _fake_render():
+        return [html]
+
+    calls: list[int] = []
+
+    async def _fake_backfill(listings):
+        calls.append(len(listings))
+
+    monkeypatch.setattr(M, "_render_queries", _fake_render)
+    monkeypatch.setattr(M, "_enrich_missing_addresses", _fake_backfill)
+    monkeypatch.setattr(M, "_DETAIL_FETCH_ENABLED", False)
+    asyncio.run(M.NCNoticesCounties().fetch())
+    assert calls == []

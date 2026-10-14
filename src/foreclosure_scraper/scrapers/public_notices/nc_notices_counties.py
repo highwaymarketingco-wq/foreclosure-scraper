@@ -32,17 +32,45 @@ click ``btnGo``, bump ``ddlPerPage`` to its max (50), then walk ``btnNext``
 until the page cap. Match mode (``rdoType``: All Words / Any Words / Exact
 Phrase) is also a postback, so queries are ordered to toggle it exactly once.
 
-WALL — the full notice body is NOT available
---------------------------------------------
-``Details.aspx`` is gated behind an "I Agree" interstitial plus reCAPTCHA
-(verified 2026-07-31: the detail HTML contains g-recaptcha). We do not fetch,
-solve, or work around it. Everything below parses the ~300-char grid preview
-only. Consequence, stated plainly: the preview reliably carries the notice
-caption, the case number, the subject county and the party name, but the
-property ADDRESS, PARCEL/PIN and SALE DATE nearly always sit past the
-truncation point. Those fields are parsed best-effort and are usually None;
-these rows are name+case leads for the resolver to turn into properties, not
-address-complete listings.
+WALL — mostly not fetched; the mechanism was mis-described, now corrected
+---------------------------------------------------------------------------
+The 2026-07-31 version of this note said ``Details.aspx`` is "gated behind
+an 'I Agree' interstitial plus reCAPTCHA (the detail HTML contains
+g-recaptcha)" and that we never fetch it. That technical citation was
+WRONG: ``g-recaptcha`` never appears anywhere on the page. The real widget
+is Cloudflare Turnstile (``class="cf-turnstile"``, confusingly
+``id="recaptcha"`` in the vendor's own markup).
+
+Live-reverified 2026-10-13 (docs/source_completeness_audit_2026-10-13.md)
+against real notice IDs this scraper captured that same day, across
+probate, foreclosure, tax-foreclosure and title/heirs rows: the "I Agree,
+View Notice" button is a Terms-of-Use click-through, not a CAPTCHA solve,
+and Turnstile frequently auto-verifies invisibly (no checkbox, no
+challenge UI) within a few seconds. BUT even with a resolved Turnstile
+token in hand *before* the click, the server-side postback that is
+supposed to populate the real notice body (``lblContentText``) came back
+with a generic, visibly-rendered server error ("Sorry, there was a problem
+loading the search results page.") in every one of 14 live attempts that
+day, spread across all four categories tested -- no category-based
+difference observed. So the old docstring's PRACTICAL conclusion (don't
+expect the full body) still holds; the reasoning it gave was just wrong.
+
+``fetch_notice_detail()`` below is the shared, bounded, best-effort helper
+(also reused by the sibling ``ncpublicnotices.py``) that attempts this
+anyway: it costs one extra request, never raises, and always degrades
+cleanly to preview-only fields when it can't get real content -- there is
+no category for which attempting it is riskier than skipping it. It is
+wired into ``fetch()`` as a bounded backfill
+(``NCNOTICES_COUNTY_MAX_DETAIL_FETCH``, default 25) only for rows still
+missing ``street_address`` after the preview parse (probate rows are
+exempt -- an estate notice legitimately names no property). The ~300-char
+grid preview remains the PRIMARY source for every row; the detail fetch
+only ever adds fields the preview lacked, on the fraction of rows where the
+postback happens to succeed. Consequence, stated plainly: the preview
+reliably carries the notice caption, the case number, the subject county
+and the party name, but the property ADDRESS, PARCEL/PIN and SALE DATE
+nearly always sit past the truncation point and now get one bounded,
+best-effort shot at recovery per run.
 
 Seasonality note: the NCGS 105-369 tax-lien advertisements ("ADVERTISEMENT OF
 TAX LIENS ON REAL PROPERTY") are an annual filing published ~March-June, so the
@@ -122,6 +150,13 @@ _FLIP_FOOTPRINT_NAMES = frozenset(c.name for c in _FLIP_FOOTPRINT_NC)
 _DAYS = os.environ.get("NCNOTICES_COUNTY_DAYS", "30")
 _MAX_PAGES = int(os.environ.get("NCNOTICES_COUNTY_MAX_PAGES", "6"))
 _YEAR_DAYS = "365"
+
+# Bounded, best-effort Details.aspx backfill for rows still missing a
+# street_address after the preview parse -- see fetch_notice_detail() and
+# the module docstring's WALL section. Set NCNOTICES_COUNTY_DETAIL_FETCH=0
+# to disable entirely.
+_DETAIL_FETCH_ENABLED = os.environ.get("NCNOTICES_COUNTY_DETAIL_FETCH", "1") == "1"
+_MAX_DETAIL_FETCH = int(os.environ.get("NCNOTICES_COUNTY_MAX_DETAIL_FETCH", "25"))
 
 # (keyword, match mode, page cap, lookback days). AND-mode queries run first so
 # the match-mode radio (itself a postback) is toggled exactly once for the
@@ -492,6 +527,152 @@ def _to_listing(notice: dict, slug: str) -> Listing | None:
     )
 
 
+# ---- detail-page fetch (shared with the sibling ncpublicnotices.py) ------
+# See the module docstring's WALL section for the live-verification history.
+# Both failure modes observed 2026-10-13 are checked and treated the same
+# way (return None, no retry, no bypass attempt):
+#   - the Cloudflare Turnstile challenge is still visibly unresolved, or
+#   - the challenge resolved but the server's own postback still errored
+#     ("Sorry, there was a problem loading...") and the notice-body span
+#     rendered empty regardless of category.
+_DETAIL_GATE_TOKENS: tuple[str, ...] = (
+    "complete the captcha",
+    "complete the recaptcha",
+    "must complete the",
+    "i agree, view notice",
+    "sorry, there was a problem loading",
+)
+
+
+async def fetch_notice_detail(detail_url: str) -> str | None:
+    """Best-effort, NON-FATAL fetch of one Details.aspx page's revealed body.
+
+    Category-agnostic: clicks the "I Agree, View Notice" Terms-of-Use
+    button that gates EVERY notice on this site regardless of what kind it
+    is, gives an invisible Cloudflare Turnstile check a few seconds to
+    auto-verify client-side before submitting (clicking too early races it
+    and reliably produces the server-side postback error below), then
+    returns the plain-text page body for the caller to grep for whatever
+    fields it wants -- or None when the gate is still up, the postback
+    errored, or the fetch failed outright. Never raises. Never solves a
+    CAPTCHA/challenge; it only waits for one that may resolve on its own.
+    """
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        log.warning("nc_notices_counties.scrapling_missing")
+        return None
+
+    revealed: dict[str, str] = {"html": ""}
+
+    async def reveal(page) -> None:
+        try:
+            await page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            pass
+        for _ in range(8):
+            try:
+                pending = await page.evaluate(
+                    "() => { const el = document.querySelector("
+                    "\"[id^='cf-chl-widget'][id$='_response']\"); "
+                    "return !(el && el.value && el.value.length > 0); }"
+                )
+            except Exception:
+                break
+            if not pending:
+                break
+            try:
+                await page.wait_for_timeout(1000)
+            except Exception:
+                break
+        for sel in (
+            "#ctl00_ContentPlaceHolder1_PublicNoticeDetailsBody1_btnViewNotice",
+            "input[id$='btnViewNotice']",
+        ):
+            try:
+                await page.click(sel, timeout=5000)
+                break
+            except Exception:
+                continue
+        try:
+            await page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
+        try:
+            await page.wait_for_timeout(1200)
+        except Exception:
+            pass
+        try:
+            revealed["html"] = await page.content()
+        except Exception:
+            revealed["html"] = ""
+
+    try:
+        await StealthyFetcher.async_fetch(
+            detail_url, headless=True, network_idle=True, timeout=60000,
+            page_action=reveal,
+        )
+    except Exception as exc:
+        log.debug("nc_notices_counties.detail_fetch_fail",
+                  url=detail_url[:120], error=str(exc)[:160])
+        return None
+
+    html = revealed["html"]
+    if not html:
+        return None
+    text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
+    low = text.lower()
+    if any(tok in low for tok in _DETAIL_GATE_TOKENS):
+        return None
+    return text
+
+
+async def _enrich_missing_addresses(listings: list[Listing]) -> None:
+    """Bounded backfill: for listings still missing street_address after
+    the preview parse (excluding probate, where no address is expected --
+    see the module docstring), fetch the real Details.aspx body and
+    re-apply this module's own field regexes against it. Bounded by
+    _MAX_DETAIL_FETCH so a big run can't blow the timeout; every per-row
+    failure is swallowed -- this only ever adds fields, never removes or
+    breaks anything. Mutates listings in place."""
+    fetched = 0
+    for li in listings:
+        if fetched >= _MAX_DETAIL_FETCH:
+            break
+        if li.street_address or li.listing_type == ListingType.PROBATE_NOTICE:
+            continue
+        if not li.source_url or "Details.aspx" not in li.source_url:
+            continue
+        fetched += 1
+        text = await fetch_notice_detail(li.source_url)
+        if not text:
+            continue
+        addr_m = _ADDR_RE.search(text)
+        if addr_m:
+            candidate = pa.clean_text(addr_m.group(1))
+            if _plausible_address(candidate):
+                li.street_address = candidate
+        if not li.parcel_id:
+            parcel_m = _PARCEL_RE.search(text)
+            if parcel_m:
+                li.parcel_id = parcel_m.group(1)
+        if not li.sale_date:
+            sale_dt = _sale_date(text)
+            if sale_dt:
+                li.sale_date = sale_dt
+        if not li.case_number:
+            case_m = _CASE_RE.search(text) or _CASE_SPACED_RE.search(text)
+            if case_m:
+                li.case_number = case_m.group(1)
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        pn = dict(raw.get("public_notice") or {})
+        pn["detail_body_fetched"] = True
+        raw["public_notice"] = pn
+        li.raw = raw
+    if fetched:
+        log.info("nc_notices_counties.detail_backfill_done", attempted=fetched)
+
+
 async def _render_queries() -> list[str]:
     """Drive the advanced search once and return every captured results page.
 
@@ -693,6 +874,12 @@ class NCNoticesCounties(BaseScraper):
                     continue
                 if listing:
                     out.append(listing)
+        if _DETAIL_FETCH_ENABLED and out:
+            try:
+                await _enrich_missing_addresses(out)
+            except Exception as exc:   # best-effort backfill must not kill the run
+                log.warning("nc_notices_counties.detail_backfill_fail",
+                            error=str(exc)[:160])
         log.info("nc_notices_counties.done",
                  pages=len(pages), notices=len(seen), leads=len(out))
         return out

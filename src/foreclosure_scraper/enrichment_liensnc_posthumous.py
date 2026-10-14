@@ -35,8 +35,10 @@ TWO MECHANISMS, not one, because live-checking this against the board
      ZERO matches on the live board today -- there is no state-scoped
      candidate to join against. It will start producing hits the day an NC
      source attaches a real date_of_death (ncpublicnotices.py's
-     _enrich_probate_details() already extracts one per-decedent, into the
-     same raw['probate']['date_of_death'] key, but that lane produced no
+     _enrich_notice_details() -- renamed 2026-10-13 from
+     _enrich_probate_details() when it was generalized to run for every
+     category, not just probate -- already extracts one per-decedent, into
+     the same raw['probate']['date_of_death'] key, but that lane produced no
      dated rows on this run). Kept rather than dropped: the join is free,
      correct, and wired for a signal source this board does not have YET.
 

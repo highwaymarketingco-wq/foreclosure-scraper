@@ -82,10 +82,16 @@ session. Per ``CLAUDE.md``'s compliance rule this is a real wall (CAPTCHA +
 click-through ToS), not a ``robots.txt`` non-wall -- so per that rule we do
 NOT fetch past it, agree to the ToS, or solve the challenge. This mirrors the
 identical gate already documented and respected on ncnotices.com's
-``Details.aspx`` (see ``_press_assoc.py`` and ``ncpublicnotices.py``'s
-``_DETAIL_GATE_TOKENS``) -- same vendor, same gate, same answer. We still
-link to it (``source_url``): it is a real, reachable public URL a human can
-open and pass the CAPTCHA themselves; we just never fetch past it ourselves.
+``Details.aspx`` (see ``_press_assoc.py`` and ``nc_notices_counties.py``'s
+``_DETAIL_GATE_TOKENS`` / ``fetch_notice_detail()``) -- same vendor, same
+gate. The NC side DOES fetch past the click-through there (live-verified
+2026-10-13: it's a Terms-of-Use click-through, not the CAPTCHA itself, and
+Turnstile often auto-verifies invisibly) but still detects and backs off
+the real challenge the same way this module does when one appears -- see
+that module's docstring before assuming this SC wall has had the same
+live re-verification; it has not. We still link to Details.aspx here
+(``source_url``): it is a real, reachable public URL a human can open and
+pass the CAPTCHA themselves; we just never fetch past it ourselves on SC.
 
 CONSEQUENCE FOR FIELD COVERAGE: the search-results grid only ever shows a
 ~300-400 char TRUNCATED preview of each notice (ending "...click 'view' to
