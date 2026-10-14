@@ -2616,6 +2616,9 @@ RAW_KEEP = {
     "county": "*", "doc_type": "*", "grantor": "*", "grantee": "*", "book_page": "*",
     #   ^ counties_nc.nc_avalon_tax, nc_cchs_deeds, nc_rod_captcha, nc_rowan_cott (register-of-
     #     deeds grantor/grantee/book-page scrapers; nc_rowan_cott doesn't write county itself)
+    "rowan_detail": "*",                  # counties_nc.nc_rowan_cott: Document Details click-through
+                                           # (index_type, ref, images_count, returned_to, detail_url) --
+                                           # 2026-10-14 Pattern C fix, commit c6c4e3a5
     "decedent": "*",                      # counties_sc.lexington_probate, nc_tylertech_estates
     "ip_block_resolved": "*",             # counties_nc.dc_ip_block
     "extracted_from_text": "*", "from_table": "*",   # counties_nc.morganton_nc, counties_sc.city_of_union
