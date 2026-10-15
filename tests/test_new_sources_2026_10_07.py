@@ -58,7 +58,7 @@ def test_kit_owner_mailing_flags_absentee_and_out_of_state():
 
 
 def test_kit_fetch_drops_sensitive_columns(monkeypatch):
-    async def fake_query(http, url, out_fields, where, page):
+    async def fake_query(http, url, out_fields, where, page, max_records=None):
         return [{"PIN": "1", "OWNER_SSN": "000-00-0000", "TCDLC1": "X1", "CLASSNAME": "RES"}]
 
     monkeypatch.setattr(KIT.agw, "query_attributes", fake_query)
