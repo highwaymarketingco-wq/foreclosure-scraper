@@ -124,14 +124,15 @@ def test_charleston_cases_dedupe_group_and_age():
 # ----------------------------------------------------------------------------- demolitions
 
 def test_demolition_feeds_drop_dead_permits_keep_expired_and_mailing():
+    # Field names match the BuildingPermits service mecklenburg migrated to 2026-10-14 --
+    # the old AccelaAllPermits names (permit_number, permit_status, project_address, ...)
+    # are gone along with that service. No owner street/phone field survives the migration.
     feed = next(f for f in DP.FEEDS if f.name == "mecklenburg")
     rows = [
-        {"permit_number": "D1", "permit_status": "Permit Expired", "issue_date": 1767225600000,
-         "project_address": "9 FAKE ST", "cama_parcel_number": "11111111", "tax_jurisdiction": "CHARLOTTE",
-         "owner_name": "PRETEND LLC", "owner_address": "1 ELSEWHERE AVE", "owner_city": "ATLANTA",
-         "owner_state": "GA", "owner_zip_code": "30301", "owner_phone": "5555555555"},
-        {"permit_number": "D2", "permit_status": "Cancelled", "project_address": "10 FAKE ST",
-         "cama_parcel_number": "22222222"},
+        {"permitnum": "D1", "permitstat": "Permit Expired", "issuedate": 1767225600000,
+         "projadd": "9 FAKE ST", "parcelnum": "11111111", "taxjuris": "CHARLOTTE",
+         "ownname": "PRETEND LLC", "owncity": "ATLANTA", "ownstate": "GA", "ownzipcode": "30301"},
+        {"permitnum": "D2", "permitstat": "Cancelled", "projadd": "10 FAKE ST", "parcelnum": "22222222"},
     ]
     groups = DP.group_permits(feed, rows)
     assert len(groups) == 1
@@ -143,9 +144,13 @@ def test_demolition_feeds_drop_dead_permits_keep_expired_and_mailing():
 
 
 def test_demolition_where_clauses():
+    # mecklenburg's post-migration WHERE ORs the legacy exact tag (through 2017-03) with the
+    # free-text phrase every demolition since has used -- see arcgis_where's own comment.
     since = datetime(2024, 10, 7)
     feeds = {f.name: f for f in DP.FEEDS}
-    assert "type_of_work='Demolition'" in DP.arcgis_where(feeds["mecklenburg"], since)
+    meck_where = DP.arcgis_where(feeds["mecklenburg"], since)
+    assert "worktype='Demolish'" in meck_where and "permitdesc LIKE '%Demolish/Move Off%'" in meck_where
+    assert "issuedate >= DATE '2024-10-07'" in meck_where
     assert "Total Demolish" in DP.arcgis_where(feeds["greensboro"], since)
     assert DP.cary_where(since).endswith("applieddate >= date'2024-10-07'")
 

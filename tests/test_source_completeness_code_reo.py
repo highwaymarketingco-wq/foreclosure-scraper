@@ -66,10 +66,11 @@ def test_durham_demolition_uses_the_pin_not_the_short_pid():
 
 
 def test_other_feeds_keep_their_own_parcel_column():
+    # Field names match the BuildingPermits service mecklenburg migrated to 2026-10-14.
     feed = next(f for f in DP.FEEDS if f.name == "mecklenburg")
-    li = DP.to_listing(DP.group_permits(feed, [{"permit_number": "D9", "permit_status": "Issued",
-                                                "project_address": "9 FAKE ST",
-                                                "cama_parcel_number": "11111111"}])[0], now=NOW)
+    li = DP.to_listing(DP.group_permits(feed, [{"permitnum": "D9", "permitstat": "Issued",
+                                                "projadd": "9 FAKE ST",
+                                                "parcelnum": "11111111"}])[0], now=NOW)
     assert li.parcel_id == "11111111"
     assert "county_parcel_id" not in li.raw["demolition_permit"]
 
