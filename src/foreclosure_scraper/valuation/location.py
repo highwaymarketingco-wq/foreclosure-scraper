@@ -1,11 +1,20 @@
 """US Census ACS 5-year API location enrichment.
 
 Per-listing ZIP → median HH income, median home value, owner-occupancy %, etc.
-Free, no API key required for basic usage. Cached in memory per run.
+Cached in memory per run.
+
+2026-10-15: the docstring used to say "free, no API key required for basic
+usage" -- no longer true (found during the overnight VM run: every one of
+this run's ~88 unique-ZIP calls got a 200 "missing_key.html" page instead of
+real data, same CENSUS_API_KEY gate enrichment_census_rent.py/enrichment_
+census_demographics.py already use). Gated the same way those two modules
+are: skip the call entirely (no key, no request) rather than firing a call
+every run that can only ever fail.
 """
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Any
 
 import structlog
@@ -38,9 +47,16 @@ async def lookup_zip(zip_code: str) -> dict[str, Any] | None:
     if z in _CACHE:
         return _CACHE[z]
 
+    key = os.environ.get("CENSUS_API_KEY", "").strip()
+    if not key:
+        log.debug("location.no_api_key", hint="Get free key at https://api.census.gov/data/key_signup.html")
+        _CACHE[z] = None
+        return None
+
     params = {
         "get": ",".join(VARS.keys()),
         "for": f"zip code tabulation area:{z}",
+        "key": key,
     }
     try:
         async with client(timeout=15.0, follow_redirects=True) as c:
