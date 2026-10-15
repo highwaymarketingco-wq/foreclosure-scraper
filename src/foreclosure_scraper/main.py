@@ -794,6 +794,15 @@ DATELESS_OK_SOURCES = {
     "counties_sc.greenville_mie_adverts",         # past-sale rows ship as DISTRESSED (judgment-debt value doesn't go stale); upcoming-sale rows still get denied for Greenville by the SCOPE gate regardless
     "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
     "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
+    # 2026-10-14 (date-coverage audit pass2, item #5 verification): found while adding these three
+    # to board_persist.AGE_EXEMPT_SOURCES -- none of them was in this whitelist, and NONE of the
+    # three ever sets sale_date (confirmed by reading every Listing() call site in each file), so
+    # _active_only() was dropping EVERY row from all three sources before it ever reached the
+    # board, independent of the retention fix. Without this, the AGE_EXEMPT_SOURCES addition for
+    # these three is a no-op -- the row never gets far enough to need retaining.
+    "counties_nc.wnc_rod_foreclosure_starts",    # pre-sale substitution-of-trustee lane; no sale date yet
+    "counties_nc.nc_rod_captcha",                # CCS DevExpress NOD/NOS sweep; no sale type captured at all
+    "counties_sc.sc_rod_walled",                 # Beaufort/Clarendon/Jasper ROD lien/probate/foreclosure-start sweep
     # 2026-05 expansion — new sources added in this PR. Without these
     # entries, _active_only would drop their listings whenever sale_date
     # is missing (which is most of the time for monthly/annual cadence).

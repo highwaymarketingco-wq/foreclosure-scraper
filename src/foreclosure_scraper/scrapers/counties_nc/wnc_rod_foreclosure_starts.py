@@ -137,6 +137,15 @@ def _to_listing(slug: str, county: str, state: str, key: tuple,
         defendant="; ".join(sorted(set(borrowers))[:4]),
         owner_name="; ".join(sorted(set(borrowers))[:4]),
         filing_date=rec_dt,
+        # 2026-10-14 (date-coverage audit pass2, item #5 verification): a "trustees_deed" row is
+        # a COMPLETED sale (the property is now REO) -- the recording date IS the sale date, same
+        # convention nc_rod_substitute_trustee.py's post-sale lane uses. This scraper's slug is
+        # being added to board_persist.AGE_EXEMPT_SOURCES alongside this fix; without a real
+        # sale_date here, board_persist._is_terminal_dict() (which runs BEFORE any
+        # AGE_EXEMPT_SOURCES check) could never fire on a sold row, and it would sit on the board
+        # forever instead of aging out as settled history. A "substitution_of_trustee" row (the
+        # foreclosure just STARTED) is never dated -- the real sale hasn't happened yet.
+        sale_date=rec_dt if kind == "trustees_deed" else None,
         description=(f"{label} recorded {recorded} ({book}). "
                      f"NC power-of-sale foreclosure {stage}."),
         first_seen=now, last_seen=now,

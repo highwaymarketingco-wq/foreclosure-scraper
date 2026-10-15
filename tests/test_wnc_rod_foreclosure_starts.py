@@ -48,6 +48,29 @@ def test_multiple_borrowers_on_one_instrument_are_all_kept():
     assert "SMITH JOHN" in li.defendant
     assert "SMITH JANE" in li.defendant
     assert li.listing_type == ListingType.LIS_PENDENS
+    # 2026-10-14 (date-coverage audit pass2, item #5 verification): a pre-sale substitution
+    # of trustee has no real sale date yet -- must stay None, never a guess.
+    assert li.sale_date is None
+
+
+def test_trustees_deed_carries_a_real_sale_date():
+    """A trustees_deed row is a COMPLETED sale -- the recording date IS the sale date (same
+    convention nc_rod_substitute_trustee.py's post-sale lane uses). Added 2026-10-14 alongside
+    this source's addition to board_persist.AGE_EXEMPT_SOURCES: without a real sale_date here,
+    the unconditional terminal-sale check in board_persist._is_terminal_dict() could never fire
+    on a sold/REO row, so it would sit on the board forever instead of aging out as settled
+    history once TERMINAL_SALE_GRACE_DAYS passes."""
+    rows = [
+        _party("09/11/2026", "RB 1161 815", "TR/D", "GRANTOR", "SMITH JOHN", "trustees_deed"),
+        _party("09/11/2026", "RB 1161 815", "TR/D", "GRANTEE", "ACME INVESTOR LLC", "trustees_deed"),
+    ]
+    groups = _dedupe(rows)
+    key, parties = next(iter(groups.items()))
+    li = _to_listing("counties_nc.wnc_rod_foreclosure_starts", "haywood", "NC", key, parties)
+    assert li is not None
+    assert li.listing_type == ListingType.REO
+    from datetime import datetime
+    assert li.sale_date == datetime(2026, 9, 11)
 
 
 def test_dedupe_merges_the_same_instrument_fetched_across_two_entity_batches():

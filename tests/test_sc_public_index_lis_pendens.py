@@ -64,6 +64,34 @@ def test_parser_uses_case_decoded_county_when_disagrees():
     assert li.case_number == "2026-CP-11-99999"
 
 
+def test_raw_block_uses_date_filed_key_not_filed_date():
+    """2026-10-14 (date-coverage audit pass2, item #3): the raw['sc_public_index'] block must key
+    the filed date as 'date_filed' -- the SAME key every other writer of this block uses (the
+    protected Charleston reference national/sc_public_index.py and this file's own sibling
+    counties_sc/sc_public_index.py). The reversed 'filed_date' key this file used to write meant
+    board_persist.sc_upstate_open_hold()'s idle-days check would silently fall back to
+    first_seen instead of reading the real filed date."""
+    html = """
+    <table id="ContentPlaceHolder1_SearchResults">
+      <tr><th>Case Number</th><th>Filed Date</th><th>Case Status</th>
+          <th>Subtype</th><th>Party Type</th><th>Name</th></tr>
+      <tr class="standardRow">
+        <td title="LENDER VS Smith John"><a>2026CP4299999</a></td>
+        <td>05/01/2026</td>
+        <td>Active</td>
+        <td>Foreclosure 420</td>
+        <td>Defendant</td>
+        <td>Smith John</td>
+      </tr>
+    </table>
+    """
+    listings = _parse_results(html, "Spartanburg")
+    assert len(listings) == 1
+    block = listings[0].raw["sc_public_index"]
+    assert block.get("date_filed") == "2026-05-01T00:00:00"
+    assert "filed_date" not in block
+
+
 def test_parser_uses_queried_county_when_case_decode_fails():
     """If the case# is malformed or decodes to no known county, fall back
     to the iteration county (the URL we hit must be a real SC county)."""

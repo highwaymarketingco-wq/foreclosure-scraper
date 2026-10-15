@@ -31,6 +31,13 @@ def test_built_dateless_sources_are_whitelisted():
         # date at all -- only an auction_status of "upset_bid_period" (NC's
         # statutory 10-day post-sale window). Same shape as nc_upset_bids below.
         "national.williams",
+        # 2026-10-14 (date-coverage audit pass2, item #5 verification): found while adding
+        # these three to board_persist.AGE_EXEMPT_SOURCES -- none was whitelisted here, and none
+        # of the three ever sets sale_date (every Listing() call site in each file reviewed), so
+        # EVERY row from all three was being silently dropped before reaching the board at all.
+        "counties_nc.wnc_rod_foreclosure_starts",
+        "counties_nc.nc_rod_captcha",
+        "counties_sc.sc_rod_walled",
     }
     missing = required - DATELESS_OK_SOURCES
     assert not missing, f"dateless sources dropped from DATELESS_OK_SOURCES (leads will 0-out): {missing}"
@@ -53,6 +60,25 @@ def test_horry_flc_dateless_row_survives_active_only():
         raw={},
     )
     assert _active_only(li, horizon_days=120, now=datetime(2026, 9, 29)) is True
+
+
+def test_nc_rod_captcha_dateless_row_survives_active_only():
+    """counties_nc.nc_rod_captcha never sets sale_date at all (confirmed by reading every
+    Listing() call site, 2026-10-14 pass2 audit verification): it only sweeps SUBSTITUTE
+    TRUSTEE / NOTICE OF FORECLOSURE recordings, never the eventual sale deed. Before this fix,
+    every single row this source ever produced was silently dropped here before reaching the
+    board."""
+    li = Listing(
+        source="counties_nc.nc_rod_captcha",
+        source_url="https://example.com/rod",
+        listing_type=ListingType.LIS_PENDENS,
+        state="NC",
+        county="Wake",
+        street_address="1 Main St",
+        sale_date=None,
+        raw={},
+    )
+    assert _active_only(li, horizon_days=120, now=datetime(2026, 10, 14)) is True
 
 
 def test_williams_upset_bid_row_survives_active_only():

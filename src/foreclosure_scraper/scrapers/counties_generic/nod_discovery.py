@@ -53,12 +53,23 @@ ROD_TARGETS: tuple[tuple[str, str, callable], ...] = (
 )
 
 # Typical NC non-judicial-foreclosure timeline: NOH/NOS recorded → sale 30–90 days later.
-# We project a placeholder sale_date 90 days out so the listing surfaces in
-# the upcoming-sales dashboard but is clearly marked as estimated in `description`.
+# 2026-10-14 (date-coverage audit pass2, prerequisite fix): this used to be projected straight
+# onto Listing.sale_date (recorded_date + NC_NOD_TO_SALE_DAYS) so the row would surface in the
+# upcoming-sales view. That field is trusted elsewhere as an AUTHORITATIVE sale date --
+# board_persist._is_terminal_dict() unconditionally drops any prior-only row whose sale_date is
+# more than TERMINAL_SALE_GRACE_DAYS (365d) in the past, BEFORE any AGE_EXEMPT_SOURCES check runs
+# -- so every row from this source was force-dropped at recorded_date + 90 + 365 ≈ 455 days
+# regardless of whether the underlying case was still alive, and would have silently defeated
+# this source's addition to AGE_EXEMPT_SOURCES (board_persist.py) the same day it landed. Kept as
+# an ESTIMATE in raw['nod']['estimated_sale_date'] only (see _to_listing below) -- never on the
+# authoritative Listing.sale_date field -- matching nc_rod_substitute_trustee.py's own convention
+# for a PRE-sale recording (sale_date=None; the real sale hasn't happened and isn't known yet).
 NC_NOD_TO_SALE_DAYS = 90
 
 
 def _project_sale_date(recorded: datetime | None) -> datetime | None:
+    """A best-effort ESTIMATE only (raw['nod']['estimated_sale_date']) -- never assign this to
+    Listing.sale_date; see the NC_NOD_TO_SALE_DAYS comment above for why."""
     if recorded is None:
         return None
     return recorded + timedelta(days=NC_NOD_TO_SALE_DAYS)
@@ -97,6 +108,10 @@ def _build_source_url(d: RodDoc) -> str:
 
 def _to_listing(d: RodDoc, slug: str) -> Listing:
     now = datetime.utcnow()
+    estimated = _project_sale_date(d.recorded_date)
+    nod_raw = d.to_dict()
+    # Estimate only -- non-authoritative, never Listing.sale_date (see NC_NOD_TO_SALE_DAYS above).
+    nod_raw["estimated_sale_date"] = estimated.isoformat() if estimated else None
     return Listing(
         source=slug,
         source_url=_build_source_url(d) or "https://example.invalid/",
@@ -107,11 +122,11 @@ def _to_listing(d: RodDoc, slug: str) -> Listing:
         case_number=_build_case_number(d),
         defendant=d.grantor,
         plaintiff=d.grantee,
-        sale_date=_project_sale_date(d.recorded_date),
+        sale_date=None,  # recorded_date + 90d is a guess, not a real sale date -- see above
         description=_build_description(d),
         first_seen=now,
         last_seen=now,
-        raw={"nod": d.to_dict()},
+        raw={"nod": nod_raw},
     )
 
 

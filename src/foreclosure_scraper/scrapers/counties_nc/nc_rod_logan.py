@@ -203,6 +203,16 @@ def _to_listing(doc, slug: str, source_url: str) -> Listing | None:
         defendant=_resolve_defendant(doc),
         case_number=(doc.instrument_no or "").strip() or None,
         legal_description=(doc.notes or "").strip() or None,
+        # 2026-10-14 (date-coverage audit pass2, item #5 verification): a "foreclosure_deed"
+        # (TR/D, TD, C/TR/D, SHF/D) row is a COMPLETED sale -- the recording date IS the sale
+        # date (same convention nc_rod_substitute_trustee.py's own post-sale lane uses). This
+        # scraper's whole slug is being added to board_persist.AGE_EXEMPT_SOURCES alongside this
+        # fix; without a real sale_date here, board_persist._is_terminal_dict() (which runs
+        # BEFORE any AGE_EXEMPT_SOURCES check) could never fire on a sold/REO row, and it would
+        # have sat on the board forever instead of aging out as settled history like every other
+        # completed sale. A "pre_foreclosure"/"probate"/"lien" row is never dated here --
+        # nothing recorded yet tells us a future sale date.
+        sale_date=doc.recorded_date if kind == "foreclosure_deed" else None,
         description=desc,
         first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
         raw=raw,

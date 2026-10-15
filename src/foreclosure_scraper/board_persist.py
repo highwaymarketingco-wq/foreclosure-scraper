@@ -188,7 +188,31 @@ PRIOR_MERGE_MAX_DROP_RATE = float(
 
 #: Sources whose rows are recorded FILINGS fed by an incremental hand-off (only new filings arrive each
 #: cycle): a prior row that is absent from a run is not "pulled", so these never age toward the miss limit.
-AGE_EXEMPT_SOURCES = frozenset({"liensnc"})
+#: 2026-10-14 (date-coverage audit pass2, item #5): added the ROD/NOD pre-foreclosure recording-sweep
+#: family -- a Notice of Default / Notice of Sale / Substitution-of-Trustee / Lis Pendens recording
+#: carries no case-status field of any kind (the ROD index records what was FILED, never what happened
+#: to the case afterward), so the liensnc model ("a recorded filing is history, not a listing that can
+#: be 'pulled'") is the only fix shape available -- same reasoning, just held longer rather than tracked
+#: true open/closed. Checked via the SAME any-dotted-part match liensnc already relies on (the source
+#: string is split on "." and any element matching a frozenset member exempts the row), so each entry
+#: below is the scraper's own distinguishing slug component, not a full dotted path. Two of these
+#: (nc_rod_logan's "foreclosure_deed" lane, wnc_rod_foreclosure_starts's "trustees_deed" lane) record a
+#: COMPLETED sale and are still correctly aged out: _is_terminal_dict() runs unconditionally before this
+#: check, and 2026-10-14 also gave both lanes a real sale_date (they had none before -- see those two
+#: files' own history) so that unconditional terminal rule still fires on them after
+#: TERMINAL_SALE_GRACE_DAYS, exemption or not.
+AGE_EXEMPT_SOURCES = frozenset({
+    "liensnc",
+    "nc_rod_substitute_trustee",
+    "wnc_rod_foreclosure_starts",
+    "nc_rod_captcha",
+    "nc_rod_logan",
+    "sc_rod_acclaim",
+    "sc_rod_cott",
+    "sc_rod_walled",
+    "cherokee_rod",      # currently dormant: counties_sc.cherokee_rod.fetch() returns [] (no-op today)
+    "nod_discovery",      # see counties_generic/nod_discovery.py's 2026-10-14 fabricated-sale_date fix
+})
 
 #: Court lanes searched by a FILED-DATE WINDOW (owner decision 2026-10-09): the window limits how far
 #: back each run searches, not how long a known open case stays. A prior row of these sources in these
@@ -245,6 +269,124 @@ def open_case_hold(rec: dict, now: datetime) -> bool:
     if not seen:
         return True
     return (now - max(seen)).days <= OPEN_CASE_MAX_IDLE_DAYS
+
+
+#: CourtListener family (owner decision 2026-10-14, date-coverage audit pass2 item #2): a federal
+#: bankruptcy/civil/adversary docket is a case this scraper only re-discovers through a 90-day FILED-
+#: date window (courtlistener_bankruptcy.LOOKBACK_DAYS and its siblings) -- once a case's filed_date
+#: ages past that window it is never re-queried. CourtListener itself reports the court's own
+#: date_terminated INLINE on every hit, null while the case stays open: the cleanest ongoing-case
+#: signal in this codebase, needing no vocabulary regex the way Charleston's did. A prior row of these
+#: three sources is held open (no miss counted) exactly while its own raw block's date_terminated is
+#: empty; once the court records a termination date the row is no longer exempt and ages/drops like any
+#: other prior-only row -- a Chapter 13 plan that quietly runs 3-5 years with no new filing stays on the
+#: board the whole time, but a case the court actually closes still leaves on schedule.
+COURTLISTENER_OPEN_SOURCES = frozenset({
+    "national.courtlistener_bankruptcy",
+    "national.courtlistener_civil",
+    "national.courtlistener_adversary",
+})
+#: Each source's own raw block name -- the three scrapers do NOT share one raw key.
+_COURTLISTENER_RAW_KEY = {
+    "national.courtlistener_bankruptcy": "courtlistener",
+    "national.courtlistener_civil": "courtlistener_civil",
+    "national.courtlistener_adversary": "courtlistener_adversary",
+}
+
+
+def courtlistener_open_hold(rec: dict) -> bool:
+    """Whether a prior-only CourtListener row (COURTLISTENER_OPEN_SOURCES) is a still-open federal
+    case. Pure: reads the row dict only."""
+    key = _COURTLISTENER_RAW_KEY.get(str(rec.get("source") or ""))
+    if key is None:
+        return False
+    raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
+    block = raw.get(key) if isinstance(raw.get(key), dict) else {}
+    return not str(block.get("date_terminated") or "").strip()
+
+
+#: NC eCourts judgment/lien family (pass2 audit item #1): counties_nc.nc_ecourts_lis_pendens (lis
+#: pendens / claim-of-lien / tax-lien causes) and its judgment_lien sub-slug (docketed money judgments,
+#: NCGS 1-234) only re-discover a hit through a 90-day ORDERED-date window
+#: (nc_ecourts_lis_pendens.LOOKBACK_DAYS) -- a lis pendens or judgment lien whose orderedDate ages past
+#: that window is never re-queried. _hit_to_listing already reads civilJudgmentStatus to filter dead
+#: (Canceled/Satisfied/Dismissed/Vacated/Withdrawn/Expired/Released) hits OUT at emission time, so a
+#: published row's own last-known status is the best signal this source has. Held open (no miss
+#: counted) while that status isn't one of those closed words and the judgment's orderedDate (or,
+#: lacking that, first_seen) is within OPEN_CASE_MAX_IDLE_DAYS.
+NC_ECOURTS_OPEN_SOURCES = frozenset({
+    "counties_nc.nc_ecourts_lis_pendens",
+    "counties_nc.nc_ecourts_lis_pendens.judgment_lien",
+})
+_NC_ECOURTS_CLOSED_RE = re.compile(r"cancel|satisf|dismiss|vacat|withdraw|expir|releas", re.I)
+
+
+def nc_ecourts_open_hold(rec: dict, now: datetime) -> bool:
+    """Whether a prior-only NC eCourts row (NC_ECOURTS_OPEN_SOURCES) is a still-open judgment/lien."""
+    if str(rec.get("source") or "") not in NC_ECOURTS_OPEN_SOURCES:
+        return False
+    raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
+    block = raw.get("nc_ecourts") if isinstance(raw.get("nc_ecourts"), dict) else {}
+    if _NC_ECOURTS_CLOSED_RE.search(str(block.get("civilJudgmentStatus") or "")):
+        return False
+    now = _naive(now) or now
+    filed = _case_day(block.get("orderedDate"))
+    if filed is None:
+        filed = _case_day(str(rec.get("first_seen") or "")[:10])
+    if filed is None:
+        return True
+    return (now - filed).days <= OPEN_CASE_MAX_IDLE_DAYS
+
+
+#: SC Upstate Public Index siblings of the protected Charleston reference (pass2 audit items #3/#4):
+#: counties_sc.sc_public_index_lis_pendens (CP Foreclosure-420 only, raw key sc_public_index, no
+#: disposition_date captured) and counties_sc.sc_public_index (CP + GS sweep of the same 7 counties,
+#: raw key 'court', captures disposition_date). Both window-search by filed date (LOOKBACK_DAYS 60 /
+#: 45) with no case-number re-check once a row ages out of it, so a case still working through
+#: Spartanburg/Anderson/Pickens/Oconee/Cherokee/Union/Laurens Common Pleas silently aged out exactly
+#: like the Charleston rows OPEN_CASE_SOURCES was built to stop.
+SC_UPSTATE_OPEN_SOURCES = frozenset({
+    "counties_sc.sc_public_index_lis_pendens",
+    "counties_sc.sc_public_index",
+})
+SC_UPSTATE_OPEN_COUNTIES = frozenset({
+    ("SC", "spartanburg"), ("SC", "anderson"), ("SC", "pickens"), ("SC", "oconee"),
+    ("SC", "cherokee"), ("SC", "union"), ("SC", "laurens"),
+})
+#: (raw block key, filed-date key) per source -- the two files key their raw block and filed date
+#: differently. sc_public_index_lis_pendens.py's own raw key used to be 'filed_date' (reversed word
+#: order from every other source's 'date_filed'); renamed alongside this fix (2026-10-14).
+_SC_UPSTATE_RAW = {
+    "counties_sc.sc_public_index_lis_pendens": ("sc_public_index", "date_filed"),
+    "counties_sc.sc_public_index": ("court", "filed_date"),
+}
+
+
+def sc_upstate_open_hold(rec: dict, now: datetime) -> bool:
+    """Whether a prior-only SC Upstate Public Index row (SC_UPSTATE_OPEN_SOURCES) is a still-open
+    case."""
+    src = str(rec.get("source") or "")
+    spec = _SC_UPSTATE_RAW.get(src)
+    if spec is None:
+        return False
+    cty = (str(rec.get("state") or "").upper(),
+           str(rec.get("county") or "").replace(" County", "").strip().lower())
+    if cty not in SC_UPSTATE_OPEN_COUNTIES:
+        return False
+    block_key, filed_key = spec
+    raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
+    block = raw.get(block_key) if isinstance(raw.get(block_key), dict) else {}
+    if _OPEN_CASE_CLOSED_RE.search(str(block.get("status") or "")):
+        return False
+    if _case_day(block.get("disposition_date")) is not None:
+        return False
+    now = _naive(now) or now
+    filed = _case_day(block.get(filed_key))
+    if filed is None:
+        filed = _case_day(str(rec.get("first_seen") or "")[:10])
+    if filed is None:
+        return True
+    return (now - filed).days <= OPEN_CASE_MAX_IDLE_DAYS
 
 
 def _naive(dt: Optional[datetime]) -> Optional[datetime]:
@@ -667,6 +809,9 @@ def merge_prior_board(
         "prior_only_kept": 0,
         "prior_only_kept_age_exempt": 0,
         "prior_only_kept_open_case": 0,
+        "prior_only_kept_courtlistener_open": 0,
+        "prior_only_kept_nc_ecourts_open": 0,
+        "prior_only_kept_sc_upstate_open": 0,
         "aged_out_terminal": 0,
         "aged_out_misses": 0,
         "carried_vision": 0,
@@ -761,7 +906,17 @@ def merge_prior_board(
             stats["prior_only_kept"] += 1
             stats["prior_only_kept_age_exempt"] += 1
             return
-        if open_case_hold(rec, now):
+        # Which open-case hold applies, if any (first match wins; the sources behind each check
+        # never overlap, so this is just resolution order, not a priority rule). See each
+        # function's own docstring above for the source/county/status-field it reads.
+        open_stat = (
+            "prior_only_kept_open_case" if open_case_hold(rec, now) else
+            "prior_only_kept_courtlistener_open" if courtlistener_open_hold(rec) else
+            "prior_only_kept_nc_ecourts_open" if nc_ecourts_open_hold(rec, now) else
+            "prior_only_kept_sc_upstate_open" if sc_upstate_open_hold(rec, now) else
+            None
+        )
+        if open_stat is not None:
             # a known open case the run's filed-date window no longer reaches: held, not aged
             raw.pop("pulled_sale", None)
             rec["raw"] = raw
@@ -774,7 +929,7 @@ def merge_prior_board(
                 stats["prior_drop_errors"] += 1
                 return
             stats["prior_only_kept"] += 1
-            stats["prior_only_kept_open_case"] += 1
+            stats[open_stat] += 1
             return
         prev_pulled = raw.get("pulled_sale") or {}
         consecutive = prev_pulled.get("consecutive_misses", 0) + 1

@@ -420,3 +420,85 @@ cheaper than any single item in Pass 1's list.
 Everything in the "FLAGGED — source limitation" bucket (`bankruptcy_rss_relief_from_stay.py`)
 is already covered in substance once item 1 above lands, and does not need its own
 fix.
+
+---
+
+## RESOLVED 2026-10-14 — prerequisite + all 15 FLAGGED items fixed
+
+All of the above shipped, including the prerequisite. Mechanism-level changes are entirely in
+`src/foreclosure_scraper/board_persist.py` (`AGE_EXEMPT_SOURCES` widened; three new sibling
+functions to `open_case_hold()` — `courtlistener_open_hold()`, `nc_ecourts_open_hold()`,
+`sc_upstate_open_hold()` — wired into `_age()` alongside it), per-source edits where noted, and
+new tests in `tests/test_open_case_hold_pass2.py` (+ small per-source test additions). No change
+to `src/foreclosure_scraper/web_artifact.py`; no new flat raw key needed registering (every field
+added landed inside an already-wildcard-registered block: `raw['nod']`, `raw['sc_public_index']`).
+
+**Prerequisite — `counties_generic/nod_discovery.py` fabricated `sale_date`: FIXED.**
+`sale_date` is now always `None` (matches `nc_rod_substitute_trustee.py`'s own pre-sale
+convention); the 90-day projection survives only as `raw['nod']['estimated_sale_date']`, a
+non-authoritative estimate `_is_terminal_dict()` never reads.
+
+1. **CourtListener trio: FIXED.** Added `national.courtlistener_bankruptcy` /
+   `_civil` / `_adversary` via `board_persist.courtlistener_open_hold()` — a bare
+   `date_terminated` null-check per source's own raw block (`courtlistener` /
+   `courtlistener_civil` / `courtlistener_adversary` — the three do NOT share one raw key, unlike
+   this doc's original item #2 text implied; verified by reading all three files in full).
+
+2. **`counties_nc/nc_ecourts_lis_pendens.py`: FIXED.** Added both
+   `counties_nc.nc_ecourts_lis_pendens` and its `.judgment_lien` sub-slug via
+   `board_persist.nc_ecourts_open_hold()`, reading `raw['nc_ecourts']['civilJudgmentStatus']`
+   with the same closed-status words `_hit_to_listing` already filters emission on, plus an
+   idle-days bound off `orderedDate` (falling back to `first_seen`).
+
+3. **`counties_sc/sc_public_index_lis_pendens.py`: FIXED.** Added via
+   `board_persist.sc_upstate_open_hold()` (county-gated to this source's real 7-county
+   footprint: Spartanburg/Anderson/Pickens/Oconee/Cherokee/Union/Laurens). Also fixed the
+   `filed_date`→`date_filed` key mismatch in the scraper itself (grepped first — no other code
+   read the old key) so the idle-days check reads the real filed date, not a `first_seen`
+   fallback.
+
+4. **`counties_sc/sc_public_index.py`: FIXED.** Added via the SAME `sc_upstate_open_hold()`
+   (one function covering both #3 and #4, keyed per-source: this file's raw block is `court`,
+   not `sc_public_index`, and it captures a real `disposition_date` #3's file doesn't — chose
+   the "second branch" option over a key-rename, per this doc's own lower-risk framing).
+
+5. **ROD/NOD family (9 files): FIXED — all nine added to `AGE_EXEMPT_SOURCES`.**
+   `nc_rod_substitute_trustee`, `wnc_rod_foreclosure_starts`, `nc_rod_captcha`, `nc_rod_logan`,
+   `sc_rod_acclaim`, `sc_rod_cott`, `sc_rod_walled`, `cherokee_rod`, `nod_discovery`.
+
+   **Two bugs beyond this doc's own characterization, found while verifying each file's actual
+   `Listing()` construction before exempting it (not trusting the "same shape" bulk grouping
+   above at face value):**
+   - `nc_rod_logan.py`'s `"foreclosure_deed"` lane (TR/D/TD/C-TR-D/SHF-D, a COMPLETED sale) and
+     `wnc_rod_foreclosure_starts.py`'s `"trustees_deed"` lane (same) never set `sale_date` at
+     all — only `nc_rod_substitute_trustee.py`'s post-sale lane did. Exempting either slug
+     wholesale (both lanes share one slug in both files, same as `nc_rod_substitute_trustee.py`)
+     would have let a completed sale sit on the board forever: `_is_terminal_dict()` runs
+     unconditionally before any `AGE_EXEMPT_SOURCES` check, but needs a real `sale_date` to ever
+     fire. Both lanes now set `sale_date = recorded_date`, matching the one lane that was
+     already correct.
+   - `wnc_rod_foreclosure_starts.py`, `nc_rod_captcha.py`, and `sc_rod_walled.py` were not in
+     `main.DATELESS_OK_SOURCES` at all, and NONE of their rows (confirmed by reading every
+     `Listing()` call site in all three files) ever carries a `sale_date` — meaning
+     `main._active_only()` was silently dropping EVERY row from all three sources before it
+     ever reached the board, independent of this retention fix entirely. Added to
+     `DATELESS_OK_SOURCES`; without this, item 5's fix would have been a no-op for 3 of the 9
+     files, the same "fix is silently defeated by an unrelated upstream gate" failure shape as
+     the `nod_discovery` prerequisite itself.
+   - `cherokee_rod.py`'s own `fetch()` currently `return []` unconditionally — it is a dormant
+     enrichment-lookup helper (`search_owner`/`search_parcel`), not a live discovery source
+     today. Its `AGE_EXEMPT_SOURCES` entry is correct and harmless but has NO live effect until
+     a future pass wires its `fetch()` to actually emit Listings. Left as-is (out of scope to
+     wire up a dormant scraper here) but flagged for whoever does that next.
+
+   **Not independently live-verified:** the SC Upstate Public Index status vocabulary (item
+   3/4's `_OPEN_CASE_CLOSED_RE` regex coverage against real "Case Status" text) — the site sits
+   behind an F5/Shape JS challenge requiring a real stealth browser session (per both
+   scrapers' own docstrings), which this pass deliberately did not spin up (resource
+   discipline: plain httpx only). The regex reused is the one already proven live for
+   Charleston; a future pass could confirm Spartanburg/Anderson/etc. use the same status words
+   by reading a few real rows off the board.
+
+**Nothing from the original 15 (+1 prerequisite) list is left open.** The two items above
+(cherokee_rod's dormant `fetch()`, and the un-verified SC status vocabulary) are the only
+loose ends, both called out explicitly rather than silently dropped.

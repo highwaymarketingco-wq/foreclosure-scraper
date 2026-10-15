@@ -431,7 +431,14 @@ def _parse_results(html: str, county: str) -> list[Listing]:
                 first_seen=filed_date or datetime.utcnow(),
                 last_seen=datetime.utcnow(),
                 raw={"sc_public_index": {
-                    "filed_date": filed_date.isoformat() if filed_date else None,
+                    # 2026-10-14 (date-coverage audit pass2, item #3): renamed from "filed_date"
+                    # to "date_filed" -- every other source writing this raw block (the protected
+                    # Charleston reference, national/sc_public_index.py, and this file's own
+                    # sibling counties_sc/sc_public_index.py) uses "date_filed"; the reversed word
+                    # order here meant board_persist.sc_upstate_open_hold()'s idle-days check
+                    # would have silently fallen back to first_seen instead of reading the real
+                    # filed date. No other code read the old key (grepped before renaming).
+                    "date_filed": filed_date.isoformat() if filed_date else None,
                     "status": status_txt,
                     "subtype": subtype,
                     "case_raw": case_raw,

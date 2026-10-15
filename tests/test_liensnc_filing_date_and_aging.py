@@ -50,5 +50,21 @@ def test_an_ordinary_prior_only_row_still_ages_out(tmp_path):
     assert "8 Maple St" not in {li.street_address for li in out} and stats["aged_out_misses"] == 1
 
 
-def test_the_exempt_set_is_exactly_liensnc():
-    assert AGE_EXEMPT_SOURCES == frozenset({"liensnc"})
+def test_the_exempt_set_is_liensnc_plus_the_rod_nod_family():
+    # 2026-10-14 (date-coverage audit pass2, item #5): deliberately widened from exactly
+    # {"liensnc"} to also cover the ROD/NOD pre-foreclosure recording-sweep family -- a
+    # recording with no case-status field of any kind, same "a filing is history, not
+    # something that gets un-filed" reasoning liensnc already has on record. This guard now
+    # pins the FULL intentional membership so a future addition is reviewed, not silent.
+    assert AGE_EXEMPT_SOURCES == frozenset({
+        "liensnc",
+        "nc_rod_substitute_trustee",
+        "wnc_rod_foreclosure_starts",
+        "nc_rod_captcha",
+        "nc_rod_logan",
+        "sc_rod_acclaim",
+        "sc_rod_cott",
+        "sc_rod_walled",
+        "cherokee_rod",
+        "nod_discovery",
+    })
