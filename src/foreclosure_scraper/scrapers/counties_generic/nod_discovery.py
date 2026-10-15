@@ -23,9 +23,10 @@ from typing import Iterable
 
 import structlog
 
-from ...base_scraper import BaseScraper
+from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_PARTIAL
 from ...models import Listing, ListingType, PropertyKind
 from ...rod import aumentum, cchs, cott, kofile
+from ...rod.cchs import CchsWall
 from ...rod.models import RodDoc
 
 log = structlog.get_logger()
@@ -148,6 +149,16 @@ class NODDiscovery(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         sem = asyncio.Semaphore(4)
+        # 2026-10-14 (silent-failure sweep follow-up item 1): see cash_buyer_deeds.py
+        # / nc_rod_substitute_trustee.py for the same CCHS-wall-visibility fix. This
+        # scraper's 3 CCHS targets (Burke/Lincoln/Cleveland) share one Cloudflare-
+        # fronted host; cchs.discover_recent_nods now raises CchsWall (not a bare
+        # exception) when it hits that wall, so it's countable separately here from
+        # a genuine zero-match county instead of silently folding into whatever the
+        # other (non-CCHS) targets below still contributed.
+        cchs_targets = {county for state, county, _fn in ROD_TARGETS
+                        if (state, county) in cchs.CCHS_COUNTIES}
+        cchs_walled: set[str] = set()
 
         async def one(state: str, county: str, fn) -> list[Listing]:
             async with sem:
@@ -158,6 +169,10 @@ class NODDiscovery(BaseScraper):
                         days_back=self.days_back,
                         max_docs=self.max_docs_per_county,
                     )
+                except CchsWall as exc:
+                    cchs_walled.add(county)
+                    bound.warning("nod.cchs_wall", error=str(exc)[:200])
+                    return []
                 except Exception as exc:  # noqa: BLE001
                     bound.warning("nod.county_error",
                                   error=str(exc), exc_type=type(exc).__name__)
@@ -175,4 +190,15 @@ class NODDiscovery(BaseScraper):
         for r in results:
             if isinstance(r, list):
                 out.extend(r)
+
+        if cchs_targets and cchs_walled == cchs_targets:
+            # Every CCHS target in this sweep was wall-blocked -- see module docstring.
+            self.last_outcome = OUTCOME_PARTIAL if out else OUTCOME_BLOCKED
+            self.last_reason = (
+                f"CCHS vendor wall-blocked for all {len(cchs_walled)} CCHS counties "
+                f"in this sweep ({'/'.join(sorted(cchs_targets))}) — other, non-CCHS "
+                f"targets in this run are unaffected")
+            log.warning("nod.cchs_all_walled", walled=sorted(cchs_walled),
+                        attempted=sorted(cchs_targets), total_rows=len(out))
+
         return out

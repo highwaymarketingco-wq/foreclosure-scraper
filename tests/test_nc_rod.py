@@ -7,8 +7,10 @@ vendor mapping, and the RodDoc -> Listing conversion logic.
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 
+from foreclosure_scraper.base_scraper import OUTCOME_BLOCKED, OUTCOME_PARTIAL
 from foreclosure_scraper.rod.models import RodDoc
 from foreclosure_scraper.scrapers.counties_nc.nc_rod_substitute_trustee import (
     SOURCES,
@@ -289,6 +291,99 @@ def test_former_owner_uses_vendor_kind_flag_not_just_name_text():
         },
     )
     assert _former_owner(doc) == "HOMEOWNER REAL PERSON"
+
+
+# ---- CCHS vendor-wide wall visibility (2026-10-14, silent-failure sweep follow-up item 1) ----
+
+def test_fetch_flags_partial_when_every_cchs_county_is_walled_but_others_ship_rows(monkeypatch):
+    """4 of this scraper's 7 counties (Burke/Cleveland/Lincoln/Henderson) are CCHS. If
+    the CCHS vendor's Cloudflare wall blocks all 4 while Buncombe/Polk/Rutherford still
+    produce real rows, the run must say so distinctly (OUTCOME_PARTIAL) instead of
+    looking like a smaller but otherwise-ordinary OK run."""
+    from foreclosure_scraper.rod import aumentum, cchs, cott
+    from foreclosure_scraper.rod.cchs import CchsWall
+
+    async def walled(*a, **kw):
+        raise CchsWall("us5.courthousecomputersystems.com search: HTTP 403")
+
+    async def some_docs(*a, **kw):
+        return [RodDoc(county="Buncombe", state="NC", doc_type="NOTICE OF SALE",
+                        recorded_date=datetime(2026, 5, 1), grantor="Smith John")]
+
+    async def none(*a, **kw):
+        return []
+
+    monkeypatch.setattr(cchs, "discover_recent_nods", walled)
+    monkeypatch.setattr(cchs, "discover_recent_sold_recordings", walled)
+    monkeypatch.setattr(aumentum, "discover_recent_nods", some_docs)
+    monkeypatch.setattr(aumentum, "discover_recent_sold_recordings", none)
+    monkeypatch.setattr(cott, "discover_recent_nods", none)
+    monkeypatch.setattr(cott, "discover_recent_sold_recordings", none)
+
+    s = NCRodSubstituteTrustee()
+    out = asyncio.run(s.fetch())
+    assert len(out) == 1  # Buncombe's row still shipped
+    assert s.last_outcome == OUTCOME_PARTIAL
+    assert "CCHS" in s.last_reason and "4" in s.last_reason
+    for county in ("Burke", "Cleveland", "Lincoln", "Henderson"):
+        assert county in s.last_reason
+
+
+def test_fetch_flags_blocked_when_every_cchs_county_is_walled_and_nothing_else_ships(monkeypatch):
+    """Same wall, but every other vendor also comes back empty this run -- the total is
+    zero, so the distinct signal must be OUTCOME_BLOCKED, not OUTCOME_PARTIAL (matching
+    the existing dorchester_billtrax_delinquent_tax.py convention: PARTIAL if something
+    shipped, BLOCKED if nothing did)."""
+    from foreclosure_scraper.rod import aumentum, cchs, cott
+    from foreclosure_scraper.rod.cchs import CchsWall
+
+    async def walled(*a, **kw):
+        raise CchsWall("us4.courthousecomputersystems.com search: HTTP 403")
+
+    async def none(*a, **kw):
+        return []
+
+    monkeypatch.setattr(cchs, "discover_recent_nods", walled)
+    monkeypatch.setattr(cchs, "discover_recent_sold_recordings", walled)
+    monkeypatch.setattr(aumentum, "discover_recent_nods", none)
+    monkeypatch.setattr(aumentum, "discover_recent_sold_recordings", none)
+    monkeypatch.setattr(cott, "discover_recent_nods", none)
+    monkeypatch.setattr(cott, "discover_recent_sold_recordings", none)
+
+    s = NCRodSubstituteTrustee()
+    out = asyncio.run(s.fetch())
+    assert out == []
+    assert s.last_outcome == OUTCOME_BLOCKED
+
+
+def test_fetch_does_not_flag_when_only_some_cchs_counties_are_walled(monkeypatch):
+    """A single CCHS county having a bad day is the ordinary per-county warning path,
+    not this new distinct signal -- it only fires when EVERY CCHS county in the sweep
+    is wall-blocked."""
+    from foreclosure_scraper.rod import aumentum, cchs, cott
+    from foreclosure_scraper.rod.cchs import CchsWall
+
+    calls = {"n": 0}
+
+    async def sometimes_walled(state, county, **kw):
+        calls["n"] += 1
+        if county == "Burke":
+            raise CchsWall("blocked")
+        return []
+
+    async def none(*a, **kw):
+        return []
+
+    monkeypatch.setattr(cchs, "discover_recent_nods", sometimes_walled)
+    monkeypatch.setattr(cchs, "discover_recent_sold_recordings", none)
+    monkeypatch.setattr(aumentum, "discover_recent_nods", none)
+    monkeypatch.setattr(aumentum, "discover_recent_sold_recordings", none)
+    monkeypatch.setattr(cott, "discover_recent_nods", none)
+    monkeypatch.setattr(cott, "discover_recent_sold_recordings", none)
+
+    s = NCRodSubstituteTrustee()
+    asyncio.run(s.fetch())
+    assert s.last_outcome != OUTCOME_PARTIAL and s.last_outcome != OUTCOME_BLOCKED
 
 
 # ---- scraper class metadata ----

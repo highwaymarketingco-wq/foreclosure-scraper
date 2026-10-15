@@ -38,9 +38,24 @@ def test_built_dateless_sources_are_whitelisted():
         "counties_nc.wnc_rod_foreclosure_starts",
         "counties_nc.nc_rod_captcha",
         "counties_sc.sc_rod_walled",
+        # 2026-10-15 (date-coverage audit pass3): same discovery shape -- neither scraper's
+        # Listing() ever sets sale_date (every call site reviewed), so without this entry
+        # EVERY row from both was being silently dropped before reaching the board at all.
+        "counties_nc.nc_rowan_cott",
+        "national.nc_unclaimed",
     }
     missing = required - DATELESS_OK_SOURCES
     assert not missing, f"dateless sources dropped from DATELESS_OK_SOURCES (leads will 0-out): {missing}"
+
+
+def test_nc_rowan_cott_and_nc_unclaimed_survive_active_only_with_no_sale_date():
+    """Direct behavioral pin (not just set membership): a fresh, dateless row from either
+    scraper must pass _active_only(), matching the real Listing() shape each file emits."""
+    for source in ("counties_nc.nc_rowan_cott", "national.nc_unclaimed"):
+        li = Listing(source=source, source_url="https://example.com/x",
+                     listing_type=ListingType.UNKNOWN, sale_date=None,
+                     first_seen=datetime(2026, 1, 1), last_seen=datetime(2026, 1, 1))
+        assert _active_only(li, horizon_days=60, now=datetime(2026, 10, 15)), source
 
 
 def test_horry_flc_dateless_row_survives_active_only():

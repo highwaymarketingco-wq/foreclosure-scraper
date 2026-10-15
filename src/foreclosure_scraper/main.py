@@ -1022,6 +1022,15 @@ DATELESS_OK_SOURCES = {
     # legal-record event with a FILE date, not a scheduled auction -- same
     # reasoning as every other court/probate source in this list.
     "counties_sc.anderson_acpass_deeds",
+    # 2026-10-15 (date-coverage audit pass3): Listing() never sets sale_date at all in either of
+    # these two scrapers, so without this entry _active_only() was deleting EVERY row they harvest,
+    # before the source could even reach the board -- the same shape as the Wayne/apostrophe and
+    # nod_discovery prerequisite bugs this codebase has already found and fixed elsewhere. Both are
+    # also newly added to board_persist.AGE_EXEMPT_SOURCES this same pass (the prerequisite alone
+    # gets a fresh scrape's rows ON the board; the retention fix keeps them there once the source
+    # stops re-finding the same filing).
+    "counties_nc.nc_rowan_cott",    # Rowan NC deed-index sweep (Cott eSearch) -- recorded filing, no sale date
+    "national.nc_unclaimed",        # NC unclaimed-property per-surname search -- standing claim, no sale date
 }
 
 
@@ -4270,6 +4279,14 @@ async def run_enrich_tail(st: TailState) -> dict:
             # scrape returned zero. Surface it visibly so on-call knows the
             # data is stale, not real-world dry.
             source_status[slug] = f"CARRYOVER ({carried_n} stale from prior run)"
+        elif n > 0 and outcome == "PARTIAL":
+            # 2026-10-14 (silent-failure sweep follow-up item 1): a real, nonzero
+            # total that still deserves a visible flag -- e.g. CCHS vendor-wide
+            # wall-blocked (cash_buyer_deeds / nc_rod_substitute_trustee /
+            # nod_discovery) while other, non-CCHS counties in the same scraper
+            # still shipped real rows. Not an ALARM (data IS flowing), but the old
+            # plain "OK (n)" buried exactly the signal this item exists to surface.
+            source_status[slug] = f"⚠️ PARTIAL ({n}) — {reason}"
         elif n > 0:
             source_status[slug] = f"OK ({n})"
         # n == 0 below — say EXACTLY what happened this run, not a static guess.

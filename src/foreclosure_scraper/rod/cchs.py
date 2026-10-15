@@ -226,41 +226,54 @@ def _parse_rows(xml: str, state: str, county: str, *, sold: bool) -> list[RodDoc
 
 async def _cchs_fetch(state: str, county: str, instrument_types: str, from_date: datetime,
                       today: datetime, max_docs: int, *, sold: bool) -> list[RodDoc]:
+    """Raises CchsWall (defined below, alongside the deed-index sweep's own wall
+    detection) when the host answers with a 403/challenge/CAPTCHA/login page —
+    see _get_search_text. Every OTHER failure (network blip, parse miss, a
+    genuinely dead host) is still swallowed to [] with a logged warning, exactly
+    as before 2026-10-14: only the wall case needs to be distinguishable from a
+    legitimate empty answer, per the silent-failure sweep's follow-up queue item
+    1 (cchs-dependent callers getting a visible BLOCKED signal instead of a
+    wall silently folding into a smaller-but-nonzero total)."""
     cfg = CCHS_COUNTIES.get((state, county))
     if not cfg:
         return []
     host, app, root = cfg
+    hostname = f"{host}.courthousecomputersystems.com"
     base = _base(host, app)
     xhr = {**_UA, "X-Requested-With": "XMLHttpRequest", "Referer": f"{base}/realestatesearch.asp"}
     try:
         async with client(timeout=40.0, headers=_UA) as c:
             # 1) session bootstrap — plain httpx is fine here, these always 200.
-            for u in (f"https://{host}.courthousecomputersystems.com/{root}/",
+            for u in (f"https://{hostname}/{root}/",
                       f"{base}/application.asp?resize=true", f"{base}/realestatesearch.asp"):
                 await c.get(u, follow_redirects=True)
         # 2) search — SearchService.asp is Cloudflare-fronted and blocks WHICHEVER
         # of plain-httpx / curl-cffi-impersonate its fingerprint rule currently
         # targets (live-confirmed flips between runs — see module docstring);
-        # get_text(..., impersonate=True) tries plain first and auto-escalates
-        # to the curl-cffi tier only on a block status code, so this clears
-        # either direction of the flip without hard-coding one tier.
+        # _get_search_text (get_text(..., impersonate=True) underneath) tries
+        # plain first and auto-escalates to the curl-cffi tier only on a block
+        # status code, so this clears either direction of the flip without
+        # hard-coding one tier, and raises CchsWall instead of a bare exception
+        # when BOTH tiers (or a soft 200 challenge page) come back blocked.
         q = {"cmd": "search", "last": "", "given": "", "searchtype": 3, "indextype": 3,
              "codetype": 3, "fromdate": from_date.strftime("%m/%d/%Y"),
              "todate": today.strftime("%m/%d/%Y"), "instrumenttypes": instrument_types,
              "description": "", "docnumber": "", "booknumber": "", "pagenumber": "",
              "resultstype": 1, "maxrecordcount": max_docs, "sortorder": 1,
              "sortfield": "docno", "rangetype": "doc"}
-        search_text = await get_text(
-            f"{base}/SearchService.asp?{urlencode(q)}", headers=xhr, timeout=40.0, impersonate=True)
+        search_text = await _get_search_text(
+            hostname, f"{base}/SearchService.asp?{urlencode(q)}", xhr, f"search county={county}")
         m = re.search(r"<recordcount>(\d+)</recordcount>", search_text, re.I)
         count = int(m.group(1)) if m else 0
         if count <= 0:
             return []
         # 3) getall
-        getall_text = await get_text(
-            f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}",
-            headers=xhr, timeout=40.0, impersonate=True)
+        getall_text = await _get_search_text(
+            hostname, f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}",
+            xhr, f"getall county={county}")
         return _parse_rows(getall_text, state, county, sold=sold)
+    except CchsWall:
+        raise
     except Exception as exc:  # noqa: BLE001
         log.warning("cchs.fetch_failed", host=host, county=county, sold=sold,
                     error=f"{type(exc).__name__}: {str(exc)[:160]}")

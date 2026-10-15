@@ -212,6 +212,46 @@ AGE_EXEMPT_SOURCES = frozenset({
     "sc_rod_walled",
     "cherokee_rod",      # currently dormant: counties_sc.cherokee_rod.fetch() returns [] (no-op today)
     "nod_discovery",      # see counties_generic/nod_discovery.py's 2026-10-14 fabricated-sale_date fix
+    # 2026-10-15 (date-coverage audit pass3): same ROD/NOD reasoning -- each of the below is a
+    # RECORDED/FILED permanent fact with no case-status field to branch on, discovered only through a
+    # rolling day-window that was never meant to be re-checked for "is this still true" (it isn't,
+    # a cash-buyer deed or a recorded lis-pendens notice doesn't un-happen). Confirmed via this same
+    # any-dotted-part grep: none of these 7 slug components existed anywhere in this file before.
+    "cash_buyer_deeds",        # national.cash_buyer_deeds -- NC ROD cash-buyer deed identification,
+                               # LOOKBACK_DAYS=30, same 10-county vendor machinery (aumentum/cchs/cott/
+                               # logan) as the already-exempted ROD/NOD family above; sale_date is the
+                               # real recorded_date (not fabricated), so the terminal-grace rule still
+                               # fires correctly once this source is also exempted.
+    "anderson_acpass_deeds",   # counties_sc.anderson_acpass_deeds -- Anderson SC ROD deed sweep,
+                               # same recorded-filing shape; already in main.DATELESS_OK_SOURCES.
+    "nc_rowan_cott",           # counties_nc.nc_rowan_cott -- Rowan NC deed-index sweep (Cott eSearch);
+                               # also newly added to main.DATELESS_OK_SOURCES this same pass (its
+                               # Listing() never set sale_date at all, so _active_only() was dropping
+                               # every row before this source could even reach the board).
+    "horry_probate",           # counties_sc.horry_probate -- Horry SC probate filings, pure 365-day
+                               # filed-date cutoff with no open/closed status field read anywhere
+                               # despite the scraper's own search API exposing one (see docstring);
+                               # an estate stays open far longer than 365 days.
+    "nc_heir_notices",         # public_notices.nc_heir_notices -- NC quiet-title/heir-naming court
+                               # notices (real case numbers), WINDOW_DAYS=180, no status field exists
+                               # to check; already in main.DATELESS_OK_SOURCES.
+    "publicnoticesc_estates",  # public_notices.publicnoticesc_estates -- SC statutory estate-opening
+                               # (Notice to Creditors) previews, 60-day default window; SC estates stay
+                               # open for months (creditor-claim + administration), and the real
+                               # disposition page is CAPTCHA-walled so no status-aware hold is possible;
+                               # already in main.DATELESS_OK_SOURCES.
+    "nc_unclaimed",            # national.nc_unclaimed -- NC unclaimed-property per-surname search;
+                               # also newly added to main.DATELESS_OK_SOURCES this same pass (same
+                               # never-set-sale_date gap as nc_rowan_cott above). No status field
+                               # exists to check (the search only ever returns currently-unclaimed
+                               # rows), matching the liensnc model exactly.
+    "nc_cchs_deeds",           # counties_nc.nc_cchs_deeds -- same ROD/NOD recorded-deed shape, but
+                               # currently dormant the same way cherokee_rod above is: this file's own
+                               # 2026-10-13 docstring documents a guessed/404 search URL plus a
+                               # genuine Cloudflare wall and backend 524 timeouts across all 6
+                               # counties, so it returns 0 rows today regardless of this entry.
+                               # Exempted preemptively so the retention gap isn't silently
+                               # reintroduced whenever its separate fetch bug gets fixed.
 })
 
 #: Court lanes searched by a FILED-DATE WINDOW (owner decision 2026-10-09): the window limits how far
@@ -317,6 +357,13 @@ def courtlistener_open_hold(rec: dict) -> bool:
 NC_ECOURTS_OPEN_SOURCES = frozenset({
     "counties_nc.nc_ecourts_lis_pendens",
     "counties_nc.nc_ecourts_lis_pendens.judgment_lien",
+    # 2026-10-15 (date-coverage audit pass3): counties_nc.nc_ecourts_divorce is the exact same shape
+    # as its sibling above -- same vendor/API, JUDGMENT_LOOKBACK_DAYS=120 on orderedDate, sale_date
+    # always None, and it already writes raw['nc_ecourts']['civilJudgmentStatus'] /
+    # raw['nc_ecourts']['orderedDate'] (confirmed by reading the file: same raw block name and field
+    # names this function already reads) -- it was simply never added to this frozenset when it was
+    # built for the lis-pendens sibling.
+    "counties_nc.nc_ecourts_divorce",
 })
 _NC_ECOURTS_CLOSED_RE = re.compile(r"cancel|satisf|dismiss|vacat|withdraw|expir|releas", re.I)
 

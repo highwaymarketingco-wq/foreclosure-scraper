@@ -78,10 +78,11 @@ from typing import Iterable
 
 import structlog
 
-from ...base_scraper import BaseScraper
+from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_PARTIAL
 from ...deed_index import Party, derive_loss
 from ...models import Listing, ListingType, PropertyKind
 from ...rod import aumentum, cchs, cott
+from ...rod.cchs import CchsWall
 from ...rod.inst_class import classify_instrument
 from ...rod.models import RodDoc
 
@@ -334,6 +335,16 @@ class NCRodSubstituteTrustee(BaseScraper):
         out = self.partial
         per_county_pre: dict[str, int] = {}
         per_county_post: dict[str, int] = {}
+        # 2026-10-14 (silent-failure sweep follow-up item 1): CCHS (Burke/Cleveland/
+        # Lincoln/Henderson) is a Cloudflare-fronted vendor shared by 4 of this
+        # scraper's 8 counties. A vendor-wide CCHS wall used to land in the same
+        # `except Exception` as a genuine zero-result county, so it never showed up
+        # as anything but a slightly smaller total. rod/cchs.py's _cchs_fetch now
+        # raises CchsWall specifically for that case, counted here per county
+        # (either sweep hitting the wall marks the county walled, since both sweeps
+        # hit the same Cloudflare-fronted SearchService.asp endpoint).
+        cchs_counties = {county for county, vendor, _label in SOURCES if vendor is cchs}
+        cchs_walled: set[str] = set()
         for county, vendor, vendor_label in SOURCES:
             # PRE-sale sweep (Notice of Sale, Substitute Trustee Deed
             # appointment, Lis Pendens) → LIS_PENDENS leads
@@ -343,6 +354,10 @@ class NCRodSubstituteTrustee(BaseScraper):
                     days_back=LOOKBACK_DAYS,
                     max_docs=MAX_DOCS_PER_COUNTY,
                 )
+            except CchsWall as exc:
+                cchs_walled.add(county)
+                log.warning("nc_rod.cchs_wall_pre", county=county, error=str(exc)[:200])
+                pre_docs = []
             except Exception as exc:  # noqa: BLE001
                 log.warning(
                     "nc_rod.vendor_pre_failed",
@@ -370,6 +385,10 @@ class NCRodSubstituteTrustee(BaseScraper):
                 # Aumentum + Cott + CCHS all have it as of 2026-05-07f; this is
                 # defensive against future module additions.
                 post_docs = []
+            except CchsWall as exc:
+                cchs_walled.add(county)
+                log.warning("nc_rod.cchs_wall_post", county=county, error=str(exc)[:200])
+                post_docs = []
             except Exception as exc:  # noqa: BLE001
                 log.warning(
                     "nc_rod.vendor_post_failed",
@@ -382,6 +401,18 @@ class NCRodSubstituteTrustee(BaseScraper):
                 if d.county and d.county != county:
                     d.county = county
                 out.append(_sold_doc_to_listing(d, vendor_label))
+
+        if cchs_counties and cchs_walled == cchs_counties:
+            # Every CCHS county in this sweep was wall-blocked on at least one of
+            # its two sweeps -- a distinct, countable signal instead of folding
+            # into whatever the other (non-CCHS) counties still contributed.
+            self.last_outcome = OUTCOME_PARTIAL if out else OUTCOME_BLOCKED
+            self.last_reason = (
+                f"CCHS vendor wall-blocked for all {len(cchs_walled)} CCHS counties "
+                f"in this sweep ({'/'.join(sorted(cchs_counties))}) — other, "
+                f"non-CCHS counties in this run are unaffected")
+            log.warning("nc_rod.cchs_all_walled", walled=sorted(cchs_walled),
+                        attempted=sorted(cchs_counties), total_rows=len(out))
 
         log.info(
             "nc_rod.done",

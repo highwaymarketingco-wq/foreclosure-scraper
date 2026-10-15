@@ -13,13 +13,17 @@ non-authoritative estimate inside raw['nod']. Made-up names/books; no fetched co
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 
+from foreclosure_scraper.base_scraper import OUTCOME_BLOCKED, OUTCOME_PARTIAL
 from foreclosure_scraper.board_persist import AGE_EXEMPT_SOURCES, merge_prior_board
 from foreclosure_scraper.scrapers.counties_generic.nod_discovery import (
     NC_NOD_TO_SALE_DAYS,
+    NODDiscovery,
     _to_listing,
 )
+from foreclosure_scraper.rod.cchs import CchsWall
 from foreclosure_scraper.rod.models import RodDoc
 
 from tests.test_board_persist import _li, _write_board
@@ -50,6 +54,77 @@ def test_estimate_survives_only_as_a_non_authoritative_raw_field():
 
 def test_slug_is_in_age_exempt_sources():
     assert "nod_discovery" in AGE_EXEMPT_SOURCES
+
+
+# ---- CCHS vendor-wide wall visibility (2026-10-14, silent-failure sweep follow-up item 1) ----
+# fetch() reads module-level ROD_TARGETS as a free variable each call (not bound at def
+# time), so swapping it here reaches the real fetch()/asyncio.gather loop and the real
+# all-walled aggregation logic directly.
+
+def test_fetch_flags_partial_when_every_cchs_target_is_walled_but_others_ship_rows(monkeypatch):
+    import foreclosure_scraper.scrapers.counties_generic.nod_discovery as nod_mod
+
+    async def walled(state, county, **kw):
+        raise CchsWall(f"{county} wall-blocked")
+
+    async def one_doc(state, county, **kw):
+        return [RodDoc(state=state, county=county, doc_type="LIS PENDENS",
+                        recorded_date=datetime(2026, 5, 1), grantor="X", grantee="Y")]
+
+    monkeypatch.setattr(nod_mod, "ROD_TARGETS", (
+        ("NC", "Burke", walled),
+        ("NC", "Lincoln", walled),
+        ("NC", "Cleveland", walled),
+        ("NC", "Buncombe", one_doc),   # aumentum, non-CCHS -- still ships a row
+    ))
+
+    s = nod_mod.NODDiscovery()
+    out = asyncio.run(s.fetch())
+    assert len(out) == 1
+    assert s.last_outcome == OUTCOME_PARTIAL
+    assert "3" in s.last_reason and "CCHS" in s.last_reason
+
+
+def test_fetch_flags_blocked_when_every_cchs_target_is_walled_and_nothing_else_ships(monkeypatch):
+    import foreclosure_scraper.scrapers.counties_generic.nod_discovery as nod_mod
+
+    async def walled(state, county, **kw):
+        raise CchsWall(f"{county} wall-blocked")
+
+    async def empty(state, county, **kw):
+        return []
+
+    monkeypatch.setattr(nod_mod, "ROD_TARGETS", (
+        ("NC", "Burke", walled),
+        ("NC", "Lincoln", walled),
+        ("NC", "Cleveland", walled),
+        ("NC", "Buncombe", empty),
+    ))
+
+    s = nod_mod.NODDiscovery()
+    out = asyncio.run(s.fetch())
+    assert out == []
+    assert s.last_outcome == OUTCOME_BLOCKED
+
+
+def test_fetch_does_not_flag_when_only_some_cchs_targets_are_walled(monkeypatch):
+    import foreclosure_scraper.scrapers.counties_generic.nod_discovery as nod_mod
+
+    async def walled(state, county, **kw):
+        raise CchsWall(f"{county} wall-blocked")
+
+    async def empty(state, county, **kw):
+        return []
+
+    monkeypatch.setattr(nod_mod, "ROD_TARGETS", (
+        ("NC", "Burke", walled),
+        ("NC", "Lincoln", empty),   # not walled: the all-CCHS-walled signal must not fire
+        ("NC", "Cleveland", empty),
+    ))
+
+    s = nod_mod.NODDiscovery()
+    asyncio.run(s.fetch())
+    assert s.last_outcome not in (OUTCOME_PARTIAL, OUTCOME_BLOCKED)
 
 
 def test_old_nod_row_survives_far_past_the_old_455_day_terminal_bug(tmp_path):

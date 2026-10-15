@@ -32,7 +32,11 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from datetime import datetime
 
+from foreclosure_scraper.base_scraper import OUTCOME_BLOCKED, OUTCOME_PARTIAL
+from foreclosure_scraper.rod.cchs import CchsWall
+from foreclosure_scraper.rod.models import RodDoc
 from foreclosure_scraper.scrapers.national import cash_buyer_deeds as cbd
 
 
@@ -177,3 +181,71 @@ def test_unregistered_county_returns_empty_without_any_request(monkeypatch):
     out = asyncio.run(cbd._cott_recent("NC", "NotACounty", 30))
     assert out == []
     assert calls["n"] == 0
+
+
+# ---- CCHS vendor-wide wall visibility (2026-10-14, silent-failure sweep follow-up item 1) ----
+# fetch() reads module-level VENDOR_DISPATCH as a free variable each call (not bound at def
+# time), so swapping it here reaches the real fetch() loop + the real all-walled aggregation
+# logic without needing to fake out every vendor's own HTTP layer.
+
+def test_fetch_flags_partial_when_every_cchs_county_is_walled_but_others_ship_rows(monkeypatch):
+    async def walled(state, county, days):
+        raise CchsWall(f"{county} wall-blocked")
+
+    async def one_doc(state, county, days):
+        return [RodDoc(county=county, state=state, doc_type="DEED",
+                        recorded_date=datetime(2026, 5, 1), grantor="X", grantee="Y")]
+
+    monkeypatch.setattr(cbd, "VENDOR_DISPATCH", (
+        ("Buncombe", "NC", one_doc),
+        ("Henderson", "NC", walled),
+        ("Cleveland", "NC", walled),
+        ("Burke", "NC", walled),
+        ("Lincoln", "NC", walled),
+    ))
+
+    s = cbd.CashBuyerDeeds()
+    out = asyncio.run(s.fetch())
+    assert len(out) == 1  # Buncombe's cash-buyer deed still shipped
+    assert s.last_outcome == OUTCOME_PARTIAL
+    assert "4" in s.last_reason and "CCHS" in s.last_reason
+
+
+def test_fetch_flags_blocked_when_every_cchs_county_is_walled_and_nothing_else_ships(monkeypatch):
+    async def walled(state, county, days):
+        raise CchsWall(f"{county} wall-blocked")
+
+    async def empty(state, county, days):
+        return []
+
+    monkeypatch.setattr(cbd, "VENDOR_DISPATCH", (
+        ("Buncombe", "NC", empty),
+        ("Henderson", "NC", walled),
+        ("Cleveland", "NC", walled),
+        ("Burke", "NC", walled),
+        ("Lincoln", "NC", walled),
+    ))
+
+    s = cbd.CashBuyerDeeds()
+    out = asyncio.run(s.fetch())
+    assert out == []
+    assert s.last_outcome == OUTCOME_BLOCKED
+
+
+def test_fetch_does_not_flag_when_only_some_cchs_counties_are_walled(monkeypatch):
+    async def walled(state, county, days):
+        raise CchsWall(f"{county} wall-blocked")
+
+    async def empty(state, county, days):
+        return []
+
+    monkeypatch.setattr(cbd, "VENDOR_DISPATCH", (
+        ("Henderson", "NC", walled),
+        ("Cleveland", "NC", empty),   # not walled: the all-CCHS-walled signal must not fire
+        ("Burke", "NC", empty),
+        ("Lincoln", "NC", empty),
+    ))
+
+    s = cbd.CashBuyerDeeds()
+    asyncio.run(s.fetch())
+    assert s.last_outcome not in (OUTCOME_PARTIAL, OUTCOME_BLOCKED)

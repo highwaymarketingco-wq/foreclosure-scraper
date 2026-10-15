@@ -110,7 +110,43 @@ def test_nc_ecourts_idle_over_a_year_is_not_held():
 
 
 def test_nc_ecourts_other_source_is_not_held():
-    assert not nc_ecourts_open_hold(_nce_rec(source="counties_nc.nc_ecourts_divorce"), NOW)
+    # 2026-10-15 (date-coverage audit pass3): this used to use "counties_nc.nc_ecourts_divorce" as
+    # its example of an unrelated, non-member source -- which pinned the exact gap pass3 found and
+    # fixed (divorce judgments carry the identical raw['nc_ecourts'] shape as lis_pendens but were
+    # never added to NC_ECOURTS_OPEN_SOURCES). Switched to a genuinely unrelated source; the fixed
+    # divorce behavior is pinned separately below.
+    assert not nc_ecourts_open_hold(_nce_rec(source="counties_sc.sc_public_index"), NOW)
+
+
+def test_nc_ecourts_divorce_open_judgment_is_held():
+    """Pass3 fix: counties_nc.nc_ecourts_divorce is the same shape as its lis-pendens sibling
+    (same vendor/API, same raw['nc_ecourts'] block, JUDGMENT_LOOKBACK_DAYS=120 instead of the
+    sibling's 90) and was simply never added to NC_ECOURTS_OPEN_SOURCES when it was built."""
+    assert nc_ecourts_open_hold(_nce_rec(source="counties_nc.nc_ecourts_divorce"), NOW)
+
+
+def test_nc_ecourts_divorce_dismissed_status_is_not_held():
+    assert not nc_ecourts_open_hold(
+        _nce_rec(source="counties_nc.nc_ecourts_divorce", status="Dismissed"), NOW)
+
+
+def test_nc_ecourts_divorce_merge_holds_open_and_ages_dismissed(tmp_path):
+    prior = [
+        _li(source="counties_nc.nc_ecourts_divorce", street_address="20 Sample St",
+            zip_code="28801", state="NC", county="Buncombe", first_seen=datetime(2026, 8, 1),
+            raw={"nc_ecourts": {"orderedDate": "2026-08-01T00:00:00", "civilJudgmentStatus": ""}}),
+        _li(source="counties_nc.nc_ecourts_divorce", street_address="22 Sample St",
+            zip_code="28801", state="NC", county="Buncombe", first_seen=datetime(2026, 8, 1),
+            raw={"nc_ecourts": {"orderedDate": "2026-08-01T00:00:00",
+                                "civilJudgmentStatus": "Dismissed"},
+                 "pulled_sale": {"consecutive_misses": 4}}),
+    ]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "20 Sample St" in by and "22 Sample St" not in by
+    assert stats["prior_only_kept_nc_ecourts_open"] == 1
 
 
 def test_nc_ecourts_merge_holds_open_and_ages_dismissed(tmp_path):
@@ -249,3 +285,131 @@ def test_rod_completed_sale_still_ages_out_via_terminal_check(tmp_path):
     by = {li.street_address: li for li in out}
     assert "10 Sample St" not in by
     assert stats["aged_out_terminal"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Pass3 (2026-10-15) additions to AGE_EXEMPT_SOURCES -- same liensnc/ROD-NOD model: each of these
+# 7 sources is a recorded/filed permanent fact (or, for horry_probate/publicnoticesc_estates, an
+# estate with no status field reachable) discovered only through a rolling day-window, with no
+# case-status field to branch on.
+# ---------------------------------------------------------------------------
+
+_PASS3_AGE_EXEMPT_FAMILY = (
+    "cash_buyer_deeds", "anderson_acpass_deeds", "nc_rowan_cott", "horry_probate",
+    "nc_heir_notices", "publicnoticesc_estates", "nc_unclaimed", "nc_cchs_deeds",
+)
+
+
+def test_all_seven_pass3_sources_are_age_exempt():
+    missing = {s for s in _PASS3_AGE_EXEMPT_FAMILY if s not in AGE_EXEMPT_SOURCES}
+    assert not missing, f"pass3 sources dropped from AGE_EXEMPT_SOURCES: {missing}"
+
+
+def test_cash_buyer_deed_row_survives_past_four_misses(tmp_path):
+    """A recorded cash-buyer deed (the grantee really did buy in cash; that doesn't become untrue
+    once the 30-day sweep window moves past it) must survive past the generic miss limit."""
+    prior = [_li(source="national.cash_buyer_deeds", street_address="10 Sample St",
+                 zip_code="28801", sale_date=NOW - timedelta(days=200),
+                 raw={"cash_buyer_deeds": {"county": "Buncombe", "is_cash_buyer": True}})]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "10 Sample St" in by
+    assert stats["prior_only_kept_age_exempt"] == 1
+
+
+def test_cash_buyer_deed_still_ages_out_via_terminal_check_past_a_year(tmp_path):
+    """Unlike nod_discovery's old fabricated-date bug, cash_buyer_deeds.sale_date is the REAL
+    recorded_date, so the unconditional terminal-sale-date rule must still fire past
+    TERMINAL_SALE_GRACE_DAYS regardless of the new AGE_EXEMPT_SOURCES entry."""
+    prior = [_li(source="national.cash_buyer_deeds", street_address="10 Sample St",
+                 zip_code="28801", sale_date=NOW - timedelta(days=400),
+                 raw={"cash_buyer_deeds": {"county": "Buncombe", "is_cash_buyer": True}})]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "10 Sample St" not in by
+    assert stats["aged_out_terminal"] == 1
+
+
+def test_horry_probate_filing_survives_past_four_misses(tmp_path):
+    """An open SC probate estate has no status field this scraper can read -- same liensnc model,
+    exempt by slug component alone."""
+    prior = [_li(source="counties_sc.horry_probate", street_address="10 Sample St",
+                 zip_code="28801", sale_date=None, county="Horry", state="SC",
+                 raw={"probate": {"case_number": "2026-ES-26-00123"}})]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "10 Sample St" in by
+    assert stats["prior_only_kept_age_exempt"] == 1
+
+
+def test_nc_heir_notices_row_survives_past_four_misses(tmp_path):
+    prior = [_li(source="public_notices.nc_heir_notices", street_address="10 Sample St",
+                 zip_code="28801", sale_date=None,
+                 raw={"heir_notice": {"case_number": "26-SP-123"}})]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "10 Sample St" in by
+    assert stats["prior_only_kept_age_exempt"] == 1
+
+
+def test_publicnoticesc_estates_row_survives_past_four_misses(tmp_path):
+    prior = [_li(source="public_notices.publicnoticesc_estates", street_address="10 Sample St",
+                 zip_code="28801", sale_date=None, county="Charleston", state="SC",
+                 raw={"estate_notice": {"case_number": "2026ES1000123"}})]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "10 Sample St" in by
+    assert stats["prior_only_kept_age_exempt"] == 1
+
+
+def test_anderson_acpass_deeds_row_survives_past_four_misses(tmp_path):
+    prior = [_li(source="counties_sc.anderson_acpass_deeds", street_address="10 Sample St",
+                 zip_code="28801", sale_date=None, county="Anderson", state="SC",
+                 raw={"acpass": {"instrument_type": "POA"}})]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "10 Sample St" in by
+    assert stats["prior_only_kept_age_exempt"] == 1
+
+
+def test_nc_rowan_cott_row_survives_past_four_misses(tmp_path):
+    """Pass3's other "two stacked bugs" file (with nc_unclaimed below): Listing() never sets
+    sale_date, and the slug was missing from both main.DATELESS_OK_SOURCES (fixed separately,
+    pinned in test_dateless_sources.py-style tests) and AGE_EXEMPT_SOURCES (pinned here)."""
+    prior = [_li(source="counties_nc.nc_rowan_cott", street_address="10 Sample St",
+                 zip_code="28801", sale_date=None, county="Rowan", state="NC",
+                 raw={"rowan_detail": {"index_type": "DEED"}})]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "10 Sample St" in by
+    assert stats["prior_only_kept_age_exempt"] == 1
+
+
+def test_nc_unclaimed_row_survives_past_four_misses(tmp_path):
+    """nc_unclaimed's own search ledger never re-searches a surname once searched, so a found
+    claim can never be re-matched by a fresh scrape -- AGE_EXEMPT is the only available fix, same
+    as liensnc (no status field exists either; the DB only ever returns currently-unclaimed rows
+    by construction)."""
+    prior = [_li(source="national.nc_unclaimed", street_address="10 Sample St",
+                 zip_code="28801", sale_date=None,
+                 raw={"nc_unclaimed": {"owner_name": "SMITH JOHN"}})]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "10 Sample St" in by
+    assert stats["prior_only_kept_age_exempt"] == 1

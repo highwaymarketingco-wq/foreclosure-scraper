@@ -26,7 +26,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -543,6 +543,67 @@ def test_a_transport_error_is_reported_not_swallowed_as_zero_rows(monkeypatch):
     _install(monkeypatch, route)
     res = _sweep()
     assert res.instruments == [] and "ConnectionError" in res.problems[0]
+
+
+# --- _cchs_fetch: a vendor-wide wall is now distinguishable from a real zero (2026-10-14,
+# silent-failure sweep follow-up item 1). Before this fix, _cchs_fetch caught EVERY exception
+# the same way (log + return []), so a Cloudflare wall on SearchService.asp looked identical
+# to "no new recordings this window" to every caller (cash_buyer_deeds.py,
+# nc_rod_substitute_trustee.py, nod_discovery.py). Now the search/getall calls go through the
+# same _get_search_text wall-detection the deed-index sweep already uses, and CchsWall is
+# re-raised instead of swallowed -- every OTHER exception (a transport error, a parse miss)
+# is still caught and turned into [], unchanged. ------------------------------------------------
+def test_cchs_fetch_raises_cchswall_instead_of_returning_empty_when_search_is_blocked(monkeypatch):
+    def route(url):
+        if "SearchService.asp" in url:
+            return _Resp(403, CLOUDFLARE_403)
+        return _Resp(200, BURKE_PAGE if url.endswith("realestatesearch.asp") else "<html>ok</html>")
+
+    _install(monkeypatch, route)
+    with pytest.raises(cchs.CchsWall, match="us5.courthousecomputersystems.com"):
+        asyncio.run(cchs._cchs_fetch(
+            "NC", "Burke", "FCL,LIS/P", datetime(2026, 9, 1), datetime(2026, 10, 1), 200, sold=False))
+
+
+def test_cchs_fetch_still_returns_empty_list_on_a_genuine_zero_result(monkeypatch):
+    """A real, unblocked zero-record answer must NOT raise -- only a wall does."""
+    def route(url):
+        if "SearchService.asp" in url:
+            return _Resp(200, _search_reply(0, 0))
+        return _Resp(200, BURKE_PAGE if url.endswith("realestatesearch.asp") else "<html>ok</html>")
+
+    _install(monkeypatch, route)
+    out = asyncio.run(cchs._cchs_fetch(
+        "NC", "Burke", "FCL,LIS/P", datetime(2026, 9, 1), datetime(2026, 10, 1), 200, sold=False))
+    assert out == []
+
+
+def test_cchs_fetch_still_swallows_a_non_wall_error_to_empty(monkeypatch):
+    """A transport-level problem that is NOT a 401/403/429/503/challenge keeps the pre-2026-10-14
+    behavior: caught, logged, []. Only CchsWall gets distinct treatment."""
+    def route(url):
+        raise ConnectionError("reset by peer")
+
+    _install(monkeypatch, route)
+    out = asyncio.run(cchs._cchs_fetch(
+        "NC", "Burke", "FCL,LIS/P", datetime(2026, 9, 1), datetime(2026, 10, 1), 200, sold=False))
+    assert out == []
+
+
+def test_discover_recent_nods_propagates_cchswall(monkeypatch):
+    """discover_recent_nods/discover_recent_sold_recordings have no try/except of their
+    own -- CchsWall from _cchs_fetch must reach the caller (nc_rod_substitute_trustee.py,
+    cash_buyer_deeds.py, nod_discovery.py all rely on this to count a wall separately)."""
+    def route(url):
+        if "SearchService.asp" in url:
+            return _Resp(403, CLOUDFLARE_403)
+        return _Resp(200, BURKE_PAGE if url.endswith("realestatesearch.asp") else "<html>ok</html>")
+
+    _install(monkeypatch, route)
+    with pytest.raises(cchs.CchsWall):
+        asyncio.run(cchs.discover_recent_nods("NC", "Burke"))
+    with pytest.raises(cchs.CchsWall):
+        asyncio.run(cchs.discover_recent_sold_recordings("NC", "Burke"))
 
 
 # --- what the F4 fix now feeds into the sold-recordings scraper --------------------------------

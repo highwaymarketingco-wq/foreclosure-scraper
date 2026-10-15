@@ -57,9 +57,10 @@ from typing import Iterable
 
 import structlog
 
-from ...base_scraper import BaseScraper
+from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_PARTIAL
 from ...models import Listing, ListingType, PropertyKind
 from ...rod import aumentum, cchs, cott, logan
+from ...rod.cchs import CchsWall
 from ...rod.models import RodDoc, normalize_doc_type, DOC_BUCKETS
 
 log = structlog.get_logger()
@@ -537,10 +538,29 @@ class CashBuyerDeeds(BaseScraper):
         # inside a 300 s soft timeout, and every timeout since 2026-09 shipped 0 rows although the
         # counties finished before the cut-off had produced theirs.
         out = self.partial
+        # 2026-10-14 (silent-failure sweep follow-up item 1): CCHS (Burke/Cleveland/
+        # Lincoln/Henderson) is a Cloudflare-fronted vendor shared by 4 of this
+        # scraper's 10 counties. Before this fix, a vendor-wide CCHS wall (the whole
+        # host answering 403/challenge, not merely "no new recordings") landed in the
+        # same `except Exception: continue` as a genuine zero-result county, so a
+        # fully-blocked CCHS leg silently shrank the total instead of being visible.
+        # _cchs_recent -> cchs._cchs_fetch now raises CchsWall specifically for that
+        # case (see rod/cchs.py), so it's counted here separately from any other
+        # failure/empty reason.
+        cchs_attempted = 0
+        cchs_walled = 0
         for county, state, vendor_fn in VENDOR_DISPATCH:
             src_url = _source_url(state, county)
+            is_cchs_county = (state, county) in cchs.CCHS_COUNTIES
+            if is_cchs_county:
+                cchs_attempted += 1
             try:
                 docs = await vendor_fn(state, county, LOOKBACK_DAYS)
+            except CchsWall as exc:
+                cchs_walled += 1
+                log.warning("cash_buyer_deeds.cchs_wall", county=county,
+                            error=str(exc)[:200])
+                continue
             except Exception as exc:
                 log.warning("cash_buyer_deeds.fetch_fail", county=county,
                             error=str(exc)[:200])
@@ -562,5 +582,18 @@ class CashBuyerDeeds(BaseScraper):
                 li = _deed_to_listing(deed, src_url)
                 if li:
                     out.append(li)
+
+        if cchs_attempted and cchs_walled == cchs_attempted:
+            # Every CCHS county in this sweep was wall-blocked -- a distinct,
+            # countable signal instead of folding into whatever the other (non-
+            # CCHS) counties still contributed. See rod/cchs.py's CchsWall and
+            # base_scraper's OUTCOME_PARTIAL/OUTCOME_BLOCKED.
+            self.last_outcome = OUTCOME_PARTIAL if out else OUTCOME_BLOCKED
+            self.last_reason = (
+                f"CCHS vendor wall-blocked for all {cchs_walled} CCHS counties in "
+                f"this sweep (Burke/Cleveland/Henderson/Lincoln) — other, non-CCHS "
+                f"counties in this run are unaffected")
+            log.warning("cash_buyer_deeds.cchs_all_walled", walled=cchs_walled,
+                        attempted=cchs_attempted, total_rows=len(out))
 
         return list(out)
