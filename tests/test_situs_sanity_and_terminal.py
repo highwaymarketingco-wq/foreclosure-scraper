@@ -124,6 +124,32 @@ def test_name_prefix_with_embedded_address_kept():
         assert _situs_is_junk(a) is False, f"should be kept: {a!r}"
 
 
+# =========================================================================== #
+# SILENT-FAILURE SWEEP, 2026-10-14 (docs/silent_failure_sweep_2026-10-14.md)   #
+#                                                                               #
+# _EMBEDDED_ADDR_RE's middle character class had no apostrophe, same bug      #
+# class as nc_civicplus_tax_sale's ADDR_RE fixed earlier the same day — but   #
+# here it is the IMPORT main.run() uses for the pipeline-wide SITUS SANITY    #
+# guard, so the failure mode is not "fewer rows from one source" but "a real  #
+# recoverable address gets wrongly nulled on any source". A name prefix that  #
+# carries a corporate-form word (LLC/INC/HOLDINGS/...) is disqualified from   #
+# the is_road_location() exemption and falls to the ENTITY_RE check, so it    #
+# depended entirely on _EMBEDDED_ADDR_RE to be recognised as recoverable.     #
+# Live-confirmed before the fix: situs_is_junk() returned True (wrongly       #
+# nulled) for a string with a plain, recoverable "456 Grace's Farm Rd" situs. #
+# =========================================================================== #
+
+def test_name_prefix_with_apostrophe_in_embedded_address_kept():
+    """Same shape as test_name_prefix_with_embedded_address_kept, but the
+    recoverable street name has a possessive apostrophe (straight AND the
+    curly U+2019 real feeds render), and the name prefix carries a corporate
+    word (HOLDINGS/LLC) so is_road_location()'s exemption can't save it —
+    only _EMBEDDED_ADDR_RE's own match keeps this from being nulled."""
+    for a in ("RIVERSIDE HOLDINGS LLC 456 GRACE'S FARM RD WAYNE",
+              "RIVERSIDE HOLDINGS LLC 456 Grace’s Farm Rd Wayne"):
+        assert _situs_is_junk(a) is False, f"should be kept: {a!r}"
+
+
 def test_empty_address_not_junk():
     assert _situs_is_junk(None) is False
     assert _situs_is_junk("") is False

@@ -51,8 +51,21 @@ _ENTITY_RE = re.compile(
     re.I,
 )
 #: An embedded "<house#> <words> <road-suffix>" anywhere => a recoverable situs.
+#
+# 2026-10-14 (silent-failure sweep, same bug class as nc_civicplus_tax_sale's ADDR_RE):
+# the middle character class had no apostrophe, so an embedded street name with one --
+# "456 Grace's Farm Rd", a real rural NC/SC road form -- never matched AT ALL. Unlike the
+# civicplus fix, this regex gates a SHARED pipeline-wide guard (main.run()'s SITUS SANITY
+# step imports situs_is_junk from here), so the failure is not "this source returns fewer
+# rows" but "a real, recoverable address gets its street_address wrongly NULLED": e.g.
+# "RIVERSIDE HOLDINGS LLC 456 Grace's Farm Rd Wayne" carries a CORP-form word (HOLDINGS/
+# LLC), which disqualifies it from the is_road_location() exemption below and makes it an
+# ENTITY_RE hit -- so without a matching _EMBEDDED_ADDR_RE, situs_is_junk() returned True
+# (junk) for a string that plainly has a usable address recoverable after the name prefix.
+# Both apostrophe forms (straight ' and the curly U+2019 several live sources render) are
+# added to the character class; additive only, same as the civicplus fix.
 _EMBEDDED_ADDR_RE = re.compile(
-    r"\d+\s+\w[\w .-]*\b(st|street|rd|road|ave|avenue|dr|drive|ln|lane|blvd|ct|"
+    r"\d+\s+\w[\w .'’-]*\b(st|street|rd|road|ave|avenue|dr|drive|ln|lane|blvd|ct|"
     r"court|cir|circle|way|pl|place|hwy|highway|pkwy|trl|trail|loop|run|path|pike)\b",
     re.I,
 )
