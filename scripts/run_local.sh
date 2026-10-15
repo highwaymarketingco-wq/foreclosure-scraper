@@ -209,11 +209,21 @@ uv run scrapling install >>"$LOG" 2>&1 || true
 # reliability fix short of an always-on host. caffeinate propagates the child's
 # exit code, so RC=$? below stays correct. (A closed lid on battery can still
 # sleep — a plugged-in machine with the lid open is the reliable setup.)
+# caffeinate is macOS-only (not on Linux PATH at all -- exit 127, confirmed live
+# 2026-10-14 trying to run this script on the Oracle VM). A cloud VM has no lid
+# to close and doesn't idle-sleep the way a laptop does, so the guard it provides
+# is a Mac-specific concern in the first place -- on Linux we just run the
+# pipeline directly, unwrapped.
 START=$(date +%s)
 # job_run adds a wall-clock backstop (FULLRUN_MAX_SECONDS, default 72 h) and records peak
 # RSS + swap-out delta in logs/job_events.jsonl (audit O9). caffeinate still propagates
-# the pipeline's exit code.
-job_run "${FULLRUN_MAX_SECONDS:-259200}" caffeinate -is uv run python -m foreclosure_scraper >>"$LOG" 2>&1
+# the pipeline's exit code (on macOS; the Linux branch has no caffeinate to propagate
+# through, job_run's own RC capture covers it the same way either branch).
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  job_run "${FULLRUN_MAX_SECONDS:-259200}" caffeinate -is uv run python -m foreclosure_scraper >>"$LOG" 2>&1
+else
+  job_run "${FULLRUN_MAX_SECONDS:-259200}" uv run python -m foreclosure_scraper >>"$LOG" 2>&1
+fi
 RC=$JOB_RUN_RC
 END=$(date +%s)
 
