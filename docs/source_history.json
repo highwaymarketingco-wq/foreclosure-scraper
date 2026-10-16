@@ -5,6 +5,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -14,7 +15,13 @@
       0,
       0,
       3162,
-      3168
+      3168,
+      3045
+    ]
+  },
+  "city_websites.raleigh_structure_fires": {
+    "counts": [
+      395
     ]
   },
   "city_websites.search": {
@@ -22,8 +29,8 @@
       "baseline": 150,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 2 consecutive runs (normally ~150/run) \u2014 source likely broken",
-      "streak": 2
+      "reason": "0 listings for 3 consecutive runs (normally ~150/run) \u2014 source likely broken",
+      "streak": 3
     },
     "counts": [
       144,
@@ -34,6 +41,7 @@
       150,
       147,
       183,
+      0,
       0,
       0
     ]
@@ -47,7 +55,8 @@
       126,
       127,
       266,
-      261
+      261,
+      1584
     ]
   },
   "counties.multi_year_delinquent_tax": {
@@ -58,7 +67,8 @@
       2131,
       2100,
       2065,
-      2065
+      2065,
+      2022
     ]
   },
   "counties.nod_discovery": {
@@ -72,7 +82,8 @@
       0,
       0,
       0,
-      0
+      0,
+      50
     ]
   },
   "counties.sitemap_walker": {
@@ -86,7 +97,8 @@
       30,
       30,
       30,
-      30
+      30,
+      67
     ]
   },
   "counties_generic.arcgis_distress_layers": {
@@ -97,7 +109,8 @@
       8794,
       8772,
       12594,
-      12528
+      12528,
+      13955
     ]
   },
   "counties_generic.epa_frs_sites": {
@@ -107,7 +120,8 @@
       269,
       268,
       269,
-      269
+      269,
+      3785
     ]
   },
   "counties_generic.state_contamination": {
@@ -117,13 +131,20 @@
       5572,
       5572,
       5573,
-      5573
+      5573,
+      53827
     ]
   },
   "counties_nc.albemarle_observer_tax_lists": {
     "counts": [
       4158,
-      4158
+      4158,
+      9333
+    ]
+  },
+  "counties_nc.asheville_code_enforcement": {
+    "counts": [
+      0
     ]
   },
   "counties_nc.asheville_helene": {
@@ -135,7 +156,8 @@
       652,
       652,
       652,
-      652
+      652,
+      735
     ]
   },
   "counties_nc.asheville_str_permits": {
@@ -147,7 +169,8 @@
       678,
       678,
       678,
-      678
+      678,
+      672
     ]
   },
   "counties_nc.brunswick_legal_notices": {
@@ -159,7 +182,8 @@
       2,
       2,
       5,
-      5
+      5,
+      0
     ]
   },
   "counties_nc.buncombe_delinquent_tax": {
@@ -171,7 +195,8 @@
       1181,
       1181,
       1181,
-      1181
+      1181,
+      1182
     ]
   },
   "counties_nc.buncombe_elderly": {
@@ -183,7 +208,8 @@
       4344,
       4344,
       4346,
-      4346
+      4346,
+      4322
     ]
   },
   "counties_nc.buncombe_tax": {
@@ -197,7 +223,8 @@
       35,
       37,
       39,
-      38
+      38,
+      24
     ]
   },
   "counties_nc.buncombe_tax_foreclosure": {
@@ -211,7 +238,8 @@
       0,
       4,
       4,
-      4
+      4,
+      0
     ]
   },
   "counties_nc.cleveland_tax": {
@@ -225,30 +253,31 @@
       14,
       17,
       16,
-      16
+      16,
+      9
     ]
   },
   "counties_nc.cleveland_tax_foreclosure": {
     "counts": [
       17,
       16,
-      16
+      16,
+      9
+    ]
+  },
+  "counties_nc.cumberland_delinquent_tax": {
+    "counts": [
+      0
     ]
   },
   "counties_nc.cumberland_tax_foreclosure": {
-    "alarm": {
-      "baseline": 5,
-      "current": 0,
-      "kind": "dead",
-      "reason": "0 listings for 3 consecutive runs (normally ~5/run) \u2014 source likely broken",
-      "streak": 3
-    },
     "counts": [
       5,
       5,
       0,
       0,
-      0
+      0,
+      6
     ]
   },
   "counties_nc.edgecombe_tax_foreclosure": {
@@ -257,11 +286,13 @@
       20,
       0,
       17,
+      17,
       17
     ]
   },
   "counties_nc.gaston_surplus_properties": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -278,18 +309,31 @@
       0,
       81,
       81,
-      81
+      81,
+      0
     ]
   },
   "counties_nc.gaston_vacant": {
     "counts": [
       21289,
       21770,
-      21767
+      21767,
+      0
+    ]
+  },
+  "counties_nc.gastonia_code_enforcement": {
+    "counts": [
+      1176
+    ]
+  },
+  "counties_nc.guilford_tax_foreclosures": {
+    "counts": [
+      918
     ]
   },
   "counties_nc.haywood_tax_foreclosures": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -305,7 +349,8 @@
       159,
       167,
       177,
-      177
+      177,
+      193
     ]
   },
   "counties_nc.henderson_foreclosure_parcels": {
@@ -316,7 +361,8 @@
       15,
       15,
       15,
-      15
+      15,
+      14
     ]
   },
   "counties_nc.henderson_tax": {
@@ -330,7 +376,8 @@
       15,
       15,
       15,
-      15
+      15,
+      0
     ]
   },
   "counties_nc.hendersonville_vacant_structures": {
@@ -341,11 +388,23 @@
       51,
       51,
       51,
-      51
+      51,
+      48
+    ]
+  },
+  "counties_nc.iredell_delinquent_tax": {
+    "counts": [
+      0
+    ]
+  },
+  "counties_nc.kinston_proposed_demolition": {
+    "counts": [
+      0
     ]
   },
   "counties_nc.lincoln_code_violations": {
     "counts": [
+      63,
       63,
       63,
       63,
@@ -357,21 +416,39 @@
     "counts": [
       14814,
       14766,
-      14748
+      14748,
+      0
     ]
   },
   "counties_nc.mcdowell_probate": {
     "counts": [
       414,
       414,
-      414
+      414,
+      0
     ]
   },
   "counties_nc.mcdowell_tax_foreclosure": {
     "counts": [
       2,
       2,
-      2
+      2,
+      1
+    ]
+  },
+  "counties_nc.mecklenburg_delinquent_tax": {
+    "counts": [
+      0
+    ]
+  },
+  "counties_nc.mecklenburg_tax_foreclosures": {
+    "counts": [
+      0
+    ]
+  },
+  "counties_nc.morganton_nc": {
+    "counts": [
+      0
     ]
   },
   "counties_nc.nc_bankruptcy_sales": {
@@ -380,11 +457,18 @@
       8,
       8,
       7,
-      7
+      7,
+      0
+    ]
+  },
+  "counties_nc.nc_cchs_deeds": {
+    "counts": [
+      0
     ]
   },
   "counties_nc.nc_civicplus_tax_sale": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -402,6 +486,7 @@
       5,
       5,
       5,
+      5,
       5
     ]
   },
@@ -412,7 +497,8 @@
       1440,
       1404,
       1404,
-      1404
+      1404,
+      0
     ]
   },
   "counties_nc.nc_county_pdf_delinquent_tax": {
@@ -424,7 +510,8 @@
       8922,
       8922,
       8922,
-      8922
+      8922,
+      0
     ]
   },
   "counties_nc.nc_county_tax_foreclosure": {
@@ -438,7 +525,8 @@
       86,
       86,
       86,
-      86
+      86,
+      0
     ]
   },
   "counties_nc.nc_deq_dsca": {
@@ -446,13 +534,14 @@
       "baseline": 4,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 2 consecutive runs (normally ~4/run) \u2014 source likely broken",
-      "streak": 2
+      "reason": "0 listings for 3 consecutive runs (normally ~4/run) \u2014 source likely broken",
+      "streak": 3
     },
     "counts": [
       4,
       4,
       4,
+      0,
       0,
       0
     ]
@@ -466,11 +555,13 @@
       197,
       75,
       207,
-      225
+      225,
+      0
     ]
   },
   "counties_nc.nc_ecourts_estates": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -492,7 +583,8 @@
       481,
       260,
       486,
-      519
+      519,
+      0
     ]
   },
   "counties_nc.nc_govdeals_real_property": {
@@ -504,7 +596,8 @@
       1,
       1,
       6,
-      6
+      6,
+      9
     ]
   },
   "counties_nc.nc_heir_estate_parcels": {
@@ -516,13 +609,20 @@
       873,
       682,
       870,
-      879
+      879,
+      24559
     ]
   },
   "counties_nc.nc_its_public_tax": {
     "counts": [
       2308,
-      2131
+      2131,
+      19554
+    ]
+  },
+  "counties_nc.nc_metro_demolition_permits": {
+    "counts": [
+      0
     ]
   },
   "counties_nc.nc_ptscloud_delinquent_tax": {
@@ -534,7 +634,13 @@
       0,
       5819,
       19543,
-      19523
+      19523,
+      19383
+    ]
+  },
+  "counties_nc.nc_rod_captcha": {
+    "counts": [
+      0
     ]
   },
   "counties_nc.nc_rod_logan": {
@@ -548,7 +654,8 @@
       0,
       18,
       0,
-      25
+      25,
+      0
     ]
   },
   "counties_nc.nc_rod_substitute_trustee": {
@@ -562,11 +669,23 @@
       0,
       0,
       0,
+      0,
+      82
+    ]
+  },
+  "counties_nc.nc_rowan_cott": {
+    "counts": [
       0
+    ]
+  },
+  "counties_nc.nc_tax_lien_ads": {
+    "counts": [
+      12910
     ]
   },
   "counties_nc.nchfa_reo": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -583,6 +702,7 @@
       1,
       1,
       1,
+      1,
       1
     ]
   },
@@ -591,8 +711,8 @@
       "baseline": 1,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 3 consecutive runs (normally ~1/run) \u2014 source likely broken",
-      "streak": 3
+      "reason": "0 listings for 4 consecutive runs (normally ~1/run) \u2014 source likely broken",
+      "streak": 4
     },
     "counts": [
       2,
@@ -604,14 +724,26 @@
       1,
       0,
       0,
+      0,
       0
+    ]
+  },
+  "counties_nc.rocky_mount_blight_survey": {
+    "counts": [
+      618
+    ]
+  },
+  "counties_nc.rowan_delinquent_tax": {
+    "counts": [
+      2699
     ]
   },
   "counties_nc.rutherford_foreclosure": {
     "counts": [
       20,
       5,
-      5
+      5,
+      21
     ]
   },
   "counties_nc.rutherford_tax": {
@@ -625,6 +757,7 @@
       9328,
       4171,
       9328,
+      9328,
       9328
     ]
   },
@@ -636,7 +769,8 @@
       0,
       0,
       3406,
-      3406
+      3406,
+      0
     ]
   },
   "counties_nc.stokes_delinquent_tax": {
@@ -645,7 +779,8 @@
       0,
       0,
       0,
-      0
+      0,
+      2
     ]
   },
   "counties_nc.swain_tax_foreclosures": {
@@ -654,21 +789,29 @@
       0,
       0,
       0,
-      0
+      0,
+      1
     ]
   },
   "counties_nc.transylvania_delinquent_tax": {
     "counts": [
       0,
       432,
-      0
+      0,
+      308
     ]
   },
   "counties_nc.transylvania_vacant": {
     "counts": [
       0,
       11107,
-      11105
+      11105,
+      11108
+    ]
+  },
+  "counties_nc.wake_code_cases": {
+    "counts": [
+      0
     ]
   },
   "counties_nc.wake_tax_foreclosure": {
@@ -676,6 +819,7 @@
       0,
       0,
       0,
+      4,
       4,
       4
     ]
@@ -687,11 +831,13 @@
       5,
       4,
       0,
-      5
+      5,
+      0
     ]
   },
   "counties_nc.wnc_tax_foreclosures": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -705,6 +851,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -714,7 +861,13 @@
       0,
       0,
       0,
+      0,
       0
+    ]
+  },
+  "counties_sc.anderson_acpass_deeds": {
+    "counts": [
+      9
     ]
   },
   "counties_sc.anderson_master_in_equity": {
@@ -728,11 +881,13 @@
       19,
       21,
       11,
-      11
+      11,
+      28
     ]
   },
   "counties_sc.anderson_sheriff": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -746,6 +901,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -755,13 +911,25 @@
       0,
       0,
       0,
+      0,
+      0
+    ]
+  },
+  "counties_sc.beaufort_flc": {
+    "counts": [
       0
     ]
   },
   "counties_sc.berkeley_paystar_tax": {
     "counts": [
       2310,
-      2474
+      2474,
+      25
+    ]
+  },
+  "counties_sc.calhoun_overage_claims": {
+    "counts": [
+      74
     ]
   },
   "counties_sc.charleston_delinquent_tax": {
@@ -773,7 +941,13 @@
       1760,
       1760,
       1760,
+      1760,
       1760
+    ]
+  },
+  "counties_sc.charleston_energov_history": {
+    "counts": [
+      0
     ]
   },
   "counties_sc.charleston_mie": {
@@ -786,13 +960,15 @@
       48,
       37,
       49,
-      49
+      49,
+      37
     ]
   },
   "counties_sc.charleston_tax_sale_xlsx": {
     "counts": [
       3625,
-      3625
+      3625,
+      3240
     ]
   },
   "counties_sc.cherokee_delinquent_tax": {
@@ -804,11 +980,13 @@
       528,
       528,
       528,
+      528,
       528
     ]
   },
   "counties_sc.cherokee_rod": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -822,6 +1000,12 @@
       0,
       0,
       0,
+      0,
+      0
+    ]
+  },
+  "counties_sc.city_of_union": {
+    "counts": [
       0
     ]
   },
@@ -831,11 +1015,13 @@
       0,
       23,
       0,
+      0,
       0
     ]
   },
   "counties_sc.colleton_tax_sale": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -852,13 +1038,15 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
   "counties_sc.dillon_delinquent_tax": {
     "counts": [
       987,
-      825
+      825,
+      843
     ]
   },
   "counties_sc.dillon_sheriff": {
@@ -866,19 +1054,26 @@
       "baseline": 1,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 2 consecutive runs (normally ~1/run) \u2014 source likely broken",
-      "streak": 2
+      "reason": "0 listings for 3 consecutive runs (normally ~1/run) \u2014 source likely broken",
+      "streak": 3
     },
     "counts": [
       1,
       1,
       1,
       0,
+      0,
       0
+    ]
+  },
+  "counties_sc.dorchester_billtrax_delinquent_tax": {
+    "counts": [
+      1306
     ]
   },
   "counties_sc.edgefield_delinquent_tax": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -892,7 +1087,13 @@
       0,
       0,
       0,
+      0,
       0
+    ]
+  },
+  "counties_sc.fairfield_overage_claims": {
+    "counts": [
+      60
     ]
   },
   "counties_sc.florence_delinquent_tax": {
@@ -901,7 +1102,8 @@
       0,
       0,
       1934,
-      1934
+      1934,
+      715
     ]
   },
   "counties_sc.georgetown_civicengage": {
@@ -913,19 +1115,27 @@
       418,
       417,
       417,
-      417
+      417,
+      354
     ]
   },
   "counties_sc.greenville_delinquent_tax": {
     "counts": [
       1937,
-      1835
+      1835,
+      861
     ]
   },
   "counties_sc.greenville_mie_adverts": {
     "counts": [
       400,
-      400
+      400,
+      0
+    ]
+  },
+  "counties_sc.greenville_probate": {
+    "counts": [
+      39
     ]
   },
   "counties_sc.greenville_tax_distress": {
@@ -936,11 +1146,18 @@
       0,
       0,
       2709,
-      2636
+      2636,
+      1944
+    ]
+  },
+  "counties_sc.greenwood_corebtpay_delinquent_tax": {
+    "counts": [
+      0
     ]
   },
   "counties_sc.greenwood_delinquent_tax": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -951,7 +1168,8 @@
   "counties_sc.horry_delinquent_xlsx": {
     "counts": [
       4952,
-      4952
+      4952,
+      0
     ]
   },
   "counties_sc.horry_flc": {
@@ -963,11 +1181,18 @@
       20,
       20,
       20,
+      20,
       20
+    ]
+  },
+  "counties_sc.horry_probate": {
+    "counts": [
+      0
     ]
   },
   "counties_sc.kershaw_flc": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -981,6 +1206,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -990,11 +1216,18 @@
       0,
       0,
       0,
+      0,
+      0
+    ]
+  },
+  "counties_sc.laurens_overage_claims": {
+    "counts": [
       0
     ]
   },
   "counties_sc.lexington_flc": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1008,6 +1241,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -1016,13 +1250,14 @@
       "baseline": 2,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 2 consecutive runs (normally ~2/run) \u2014 source likely broken",
-      "streak": 2
+      "reason": "0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely broken",
+      "streak": 3
     },
     "counts": [
       2,
       2,
       2,
+      0,
       0,
       0
     ]
@@ -1030,6 +1265,7 @@
   "counties_sc.meares_auctions": {
     "counts": [
       1,
+      0,
       0,
       0,
       0,
@@ -1042,6 +1278,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -1050,19 +1287,21 @@
       "baseline": 2,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 2 consecutive runs (normally ~2/run) \u2014 source likely broken",
-      "streak": 2
+      "reason": "0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely broken",
+      "streak": 3
     },
     "counts": [
       2,
       2,
       2,
       0,
+      0,
       0
     ]
   },
   "counties_sc.oconee_flc_assignment": {
     "counts": [
+      585,
       585,
       585,
       585,
@@ -1081,7 +1320,8 @@
       533,
       533,
       533,
-      533
+      533,
+      257
     ]
   },
   "counties_sc.oconee_tax_sale": {
@@ -1095,6 +1335,12 @@
       0,
       0,
       0,
+      0,
+      0
+    ]
+  },
+  "counties_sc.orangeburg_overage_claims": {
+    "counts": [
       0
     ]
   },
@@ -1106,7 +1352,8 @@
       2161,
       2161,
       2161,
-      2161
+      2161,
+      1403
     ]
   },
   "counties_sc.pickens_master_in_equity": {
@@ -1120,7 +1367,8 @@
       32,
       32,
       32,
-      32
+      32,
+      0
     ]
   },
   "counties_sc.pickens_tax_sale": {
@@ -1132,23 +1380,27 @@
       160,
       160,
       160,
-      160
+      160,
+      0
     ]
   },
   "counties_sc.qpaybill_delinquent_roll": {
     "counts": [
       0,
-      0
+      0,
+      21326
     ]
   },
   "counties_sc.richland_flc": {
     "counts": [
       3,
-      3
+      3,
+      0
     ]
   },
   "counties_sc.saluda_delinquent_tax": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1159,17 +1411,11 @@
   "counties_sc.sc_catalis_delinquent_roll": {
     "counts": [
       0,
+      0,
       0
     ]
   },
   "counties_sc.sc_coastal_rosters": {
-    "alarm": {
-      "baseline": 51,
-      "current": 3,
-      "drop_pct": 94,
-      "kind": "bleeding",
-      "reason": "down 94% (3 vs ~51 baseline) for 2 runs \u2014 partial failure"
-    },
     "counts": [
       55,
       51,
@@ -1179,7 +1425,8 @@
       4,
       0,
       4,
-      3
+      3,
+      0
     ]
   },
   "counties_sc.sc_county_rosters": {
@@ -1193,11 +1440,13 @@
       2,
       0,
       2,
-      2
+      2,
+      0
     ]
   },
   "counties_sc.sc_courtrosters": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1221,6 +1470,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -1230,11 +1480,13 @@
       71,
       71,
       64,
-      64
+      64,
+      0
     ]
   },
   "counties_sc.sc_dew_lien_registry": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1247,6 +1499,7 @@
   },
   "counties_sc.sc_dor_delinquent_taxpayers": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1265,6 +1518,7 @@
       0,
       0,
       29,
+      0,
       0
     ]
   },
@@ -1277,7 +1531,8 @@
       236,
       0,
       236,
-      236
+      236,
+      180
     ]
   },
   "counties_sc.sc_probate_notices": {
@@ -1287,7 +1542,8 @@
       0,
       655,
       0,
-      0
+      0,
+      522
     ]
   },
   "counties_sc.sc_public_index": {
@@ -1301,7 +1557,8 @@
       3698,
       3698,
       1665,
-      4315
+      4315,
+      0
     ]
   },
   "counties_sc.sc_public_index_lis_pendens": {
@@ -1315,7 +1572,8 @@
       153,
       348,
       373,
-      320
+      320,
+      0
     ]
   },
   "counties_sc.sc_public_notices": {
@@ -1329,7 +1587,8 @@
       150,
       150,
       1131,
-      363
+      363,
+      0
     ]
   },
   "counties_sc.sc_rod_acclaim": {
@@ -1343,7 +1602,8 @@
       98,
       91,
       90,
-      97
+      97,
+      0
     ]
   },
   "counties_sc.sc_rod_cott": {
@@ -1357,7 +1617,8 @@
       31,
       0,
       31,
-      31
+      31,
+      0
     ]
   },
   "counties_sc.sc_state_tax_lien": {
@@ -1371,17 +1632,11 @@
       80,
       80,
       80,
-      80
+      80,
+      0
     ]
   },
   "counties_sc.sc_tax_delinquent": {
-    "alarm": {
-      "baseline": 1334,
-      "current": 42,
-      "drop_pct": 97,
-      "kind": "bleeding",
-      "reason": "down 97% (42 vs ~1334 baseline) for 2 runs \u2014 partial failure"
-    },
     "counts": [
       0,
       0,
@@ -1392,7 +1647,13 @@
       1334,
       1334,
       42,
-      42
+      42,
+      0
+    ]
+  },
+  "counties_sc.sc_tax_walled": {
+    "counts": [
+      0
     ]
   },
   "counties_sc.sc_ust_registry": {
@@ -1402,7 +1663,8 @@
       3330,
       3331,
       3332,
-      3332
+      3332,
+      0
     ]
   },
   "counties_sc.spartan_weekly_legals": {
@@ -1410,8 +1672,8 @@
       "baseline": 111,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 3 consecutive runs (normally ~111/run) \u2014 source likely broken",
-      "streak": 3
+      "reason": "0 listings for 4 consecutive runs (normally ~111/run) \u2014 source likely broken",
+      "streak": 4
     },
     "counts": [
       138,
@@ -1420,6 +1682,7 @@
       85,
       0,
       134,
+      0,
       0,
       0,
       0
@@ -1433,7 +1696,8 @@
       91,
       92,
       92,
-      92
+      92,
+      84
     ]
   },
   "counties_sc.spartanburg_condemned": {
@@ -1445,7 +1709,8 @@
       1830,
       1830,
       1763,
-      1763
+      1763,
+      1754
     ]
   },
   "counties_sc.spartanburg_delinquent_tax": {
@@ -1457,7 +1722,8 @@
       2171,
       2171,
       1707,
-      2171
+      2171,
+      1770
     ]
   },
   "counties_sc.spartanburg_flc": {
@@ -1469,7 +1735,8 @@
       5,
       5,
       5,
-      5
+      5,
+      0
     ]
   },
   "counties_sc.spartanburg_master_in_equity": {
@@ -1483,7 +1750,8 @@
       19,
       32,
       0,
-      32
+      32,
+      0
     ]
   },
   "counties_sc.spartanburg_vacant": {
@@ -1495,7 +1763,8 @@
       4659,
       4659,
       4659,
-      4659
+      4659,
+      4440
     ]
   },
   "counties_sc.sumter_surplus": {
@@ -1503,23 +1772,32 @@
       "baseline": 2,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 2 consecutive runs (normally ~2/run) \u2014 source likely broken",
-      "streak": 2
+      "reason": "0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely broken",
+      "streak": 3
     },
     "counts": [
       2,
       2,
       2,
       0,
+      0,
       0
     ]
   },
   "counties_sc.terry_howe_auctions": {
+    "alarm": {
+      "baseline": 897,
+      "current": 0,
+      "kind": "dead",
+      "reason": "0 listings for 2 consecutive runs (normally ~897/run) \u2014 source likely broken",
+      "streak": 2
+    },
     "counts": [
       0,
       897,
       897,
       907,
+      0,
       0
     ]
   },
@@ -1533,11 +1811,13 @@
       23,
       23,
       23,
-      23
+      23,
+      0
     ]
   },
   "counties_sc.union_delinquent_tax": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1551,17 +1831,25 @@
       0,
       0,
       0,
-      0
+      0,
+      853
     ]
   },
   "counties_sc.york_overage_claims": {
     "counts": [
       108,
-      119
+      119,
+      115
+    ]
+  },
+  "counties_sc.york_tax_sale_parcels": {
+    "counts": [
+      0
     ]
   },
   "counties_sc.zombie_properties": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1571,6 +1859,7 @@
   },
   "courts.lis_pendens_discovery": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1592,11 +1881,13 @@
       26,
       0,
       26,
-      26
+      26,
+      0
     ]
   },
   "law_firms.aldridge_pite": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1620,6 +1911,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -1634,7 +1926,8 @@
       63,
       38,
       49,
-      49
+      49,
+      52
     ]
   },
   "law_firms.brock_scott": {
@@ -1648,7 +1941,8 @@
       78,
       71,
       66,
-      30
+      30,
+      0
     ]
   },
   "law_firms.finkel": {
@@ -1661,6 +1955,7 @@
       8,
       8,
       0,
+      8,
       8,
       8
     ]
@@ -1676,7 +1971,8 @@
       86,
       86,
       88,
-      85
+      85,
+      0
     ]
   },
   "law_firms.ingle_firm": {
@@ -1689,6 +1985,7 @@
       0,
       0,
       2,
+      1,
       1,
       1
     ]
@@ -1704,11 +2001,13 @@
       55,
       52,
       49,
-      50
+      50,
+      224
     ]
   },
   "law_firms.korn": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1732,6 +2031,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -1746,11 +2046,13 @@
       85,
       85,
       85,
-      85
+      85,
+      0
     ]
   },
   "law_firms.mewborn_deselms": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1772,7 +2074,8 @@
       25,
       27,
       15,
-      15
+      15,
+      31
     ]
   },
   "law_firms.shapiro_ingle_powerbi": {
@@ -1784,7 +2087,8 @@
       84,
       107,
       98,
-      98
+      98,
+      109
     ]
   },
   "law_firms.zacchaeus": {
@@ -1796,7 +2100,8 @@
       134,
       137,
       150,
-      150
+      150,
+      0
     ]
   },
   "national.auction_bank_reo": {
@@ -1806,7 +2111,8 @@
       2,
       0,
       7,
-      5
+      5,
+      3
     ]
   },
   "national.auction_dot_com": {
@@ -1820,17 +2126,16 @@
       117,
       0,
       0,
-      101
+      101,
+      0
+    ]
+  },
+  "national.bankruptcy_rss_relief_from_stay": {
+    "counts": [
+      14
     ]
   },
   "national.bid4assets": {
-    "alarm": {
-      "baseline": 4,
-      "current": 0,
-      "kind": "dead",
-      "reason": "0 listings for 3 consecutive runs (normally ~4/run) \u2014 source likely broken",
-      "streak": 3
-    },
     "counts": [
       4,
       4,
@@ -1841,7 +2146,8 @@
       4,
       0,
       0,
-      0
+      0,
+      12
     ]
   },
   "national.cash_buyer_deeds": {
@@ -1853,7 +2159,8 @@
       262,
       0,
       0,
-      239
+      239,
+      0
     ]
   },
   "national.courtlistener_adversary": {
@@ -1867,7 +2174,8 @@
       239,
       0,
       0,
-      253
+      253,
+      174
     ]
   },
   "national.courtlistener_bankruptcy": {
@@ -1881,7 +2189,8 @@
       3587,
       560,
       760,
-      4585
+      4585,
+      288
     ]
   },
   "national.courtlistener_civil": {
@@ -1895,7 +2204,8 @@
       0,
       0,
       0,
-      2
+      2,
+      7
     ]
   },
   "national.craigslist_fsbo": {
@@ -1907,12 +2217,14 @@
       288,
       0,
       252,
-      259
+      259,
+      264
     ]
   },
   "national.crexi_multifamily": {
     "counts": [
       226,
+      0,
       0,
       0,
       0,
@@ -1929,7 +2241,8 @@
       15,
       0,
       14,
-      14
+      14,
+      16
     ]
   },
   "national.distressed": {
@@ -1943,11 +2256,13 @@
       305,
       310,
       322,
-      322
+      322,
+      5091
     ]
   },
   "national.epa_superfund": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -1964,7 +2279,8 @@
       53,
       0,
       38,
-      36
+      36,
+      0
     ]
   },
   "national.fannie_homepath": {
@@ -1978,7 +2294,8 @@
       0,
       0,
       0,
-      8339
+      8339,
+      44
     ]
   },
   "national.fdic_failed_banks": {
@@ -1987,7 +2304,8 @@
       8,
       0,
       8,
-      8
+      8,
+      9
     ]
   },
   "national.fema_disasters": {
@@ -1996,7 +2314,8 @@
       0,
       0,
       412,
-      412
+      412,
+      177
     ]
   },
   "national.first_citizens_reo": {
@@ -2010,7 +2329,8 @@
       4,
       0,
       3,
-      3
+      3,
+      0
     ]
   },
   "national.foreclosure_dot_com": {
@@ -2024,6 +2344,7 @@
       0,
       5581,
       5562,
+      0,
       0
     ]
   },
@@ -2038,7 +2359,8 @@
       28,
       29,
       30,
-      28
+      28,
+      12
     ]
   },
   "national.govdeals": {
@@ -2047,11 +2369,13 @@
       0,
       0,
       2,
-      0
+      0,
+      2
     ]
   },
   "national.gsa_realproperty": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -2068,6 +2392,7 @@
       0,
       0,
       2,
+      2,
       2
     ]
   },
@@ -2077,7 +2402,8 @@
       17,
       16,
       12,
-      12
+      12,
+      15
     ]
   },
   "national.homeharvest": {
@@ -2091,7 +2417,8 @@
       19,
       20,
       23,
-      23
+      23,
+      43
     ]
   },
   "national.homepath_json": {
@@ -2100,7 +2427,8 @@
       22,
       20,
       32,
-      38
+      38,
+      41
     ]
   },
   "national.hubzu": {
@@ -2114,7 +2442,8 @@
       119,
       113,
       138,
-      136
+      136,
+      156
     ]
   },
   "national.hud_homestore": {
@@ -2128,7 +2457,8 @@
       41,
       33,
       27,
-      29
+      29,
+      22
     ]
   },
   "national.hud_reac_inspection": {
@@ -2141,7 +2471,8 @@
       852,
       866,
       866,
-      866
+      866,
+      0
     ]
   },
   "national.hud_section8_contracts": {
@@ -2154,7 +2485,8 @@
       250,
       250,
       250,
-      250
+      250,
+      32
     ]
   },
   "national.irs_judicial_sales": {
@@ -2163,7 +2495,8 @@
       0,
       0,
       0,
-      0
+      0,
+      1
     ]
   },
   "national.irs_treasury": {
@@ -2172,7 +2505,8 @@
       0,
       0,
       0,
-      0
+      0,
+      1
     ]
   },
   "national.jail_bookings": {
@@ -2184,7 +2518,8 @@
       2069,
       2604,
       2939,
-      2919
+      2919,
+      2359
     ]
   },
   "national.landandfarm": {
@@ -2196,11 +2531,13 @@
       650,
       25,
       650,
-      651
+      651,
+      0
     ]
   },
   "national.landsofamerica": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -2220,27 +2557,23 @@
       650,
       50,
       650,
-      650
+      650,
+      0
     ]
   },
   "national.legacy_obituaries": {
-    "alarm": {
-      "baseline": 684,
-      "current": 0,
-      "kind": "dead",
-      "reason": "0 listings for 2 consecutive runs (normally ~684/run) \u2014 source likely broken",
-      "streak": 2
-    },
     "counts": [
       0,
       703,
       665,
+      0,
       0,
       0
     ]
   },
   "national.liensnc": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -2254,6 +2587,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -2263,6 +2597,12 @@
       0,
       0,
       0,
+      0,
+      0
+    ]
+  },
+  "national.nc_unclaimed": {
+    "counts": [
       0
     ]
   },
@@ -2275,11 +2615,13 @@
       44,
       45,
       47,
-      47
+      47,
+      89
     ]
   },
   "national.opencorporates": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -2289,6 +2631,7 @@
   },
   "national.probate_foreclosure_leads": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -2312,6 +2655,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -2326,11 +2670,13 @@
       17,
       19,
       23,
-      22
+      22,
+      50
     ]
   },
   "national.sc_public_index": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -2344,6 +2690,7 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
@@ -2353,7 +2700,8 @@
       1484,
       0,
       0,
-      0
+      0,
+      4
     ]
   },
   "national.servicelink_auction": {
@@ -2365,7 +2713,8 @@
       45,
       37,
       40,
-      42
+      42,
+      10
     ]
   },
   "national.sheriff_sales": {
@@ -2377,14 +2726,16 @@
       6,
       6,
       6,
-      6
+      6,
+      0
     ]
   },
   "national.stealth_handoff": {
     "counts": [
       0,
       7270,
-      7270
+      7270,
+      37197
     ]
   },
   "national.tranzon": {
@@ -2392,13 +2743,14 @@
       "baseline": 1,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 2 consecutive runs (normally ~1/run) \u2014 source likely broken",
-      "streak": 2
+      "reason": "0 listings for 3 consecutive runs (normally ~1/run) \u2014 source likely broken",
+      "streak": 3
     },
     "counts": [
       1,
       1,
       1,
+      0,
       0,
       0
     ]
@@ -2408,8 +2760,8 @@
       "baseline": 4,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 3 consecutive runs (normally ~4/run) \u2014 source likely broken",
-      "streak": 3
+      "reason": "0 listings for 4 consecutive runs (normally ~4/run) \u2014 source likely broken",
+      "streak": 4
     },
     "counts": [
       23,
@@ -2421,6 +2773,7 @@
       2,
       0,
       0,
+      0,
       0
     ]
   },
@@ -2430,11 +2783,13 @@
       336,
       336,
       336,
-      336
+      336,
+      144
     ]
   },
   "national.usmarshals_realproperty": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -2448,11 +2803,13 @@
       0,
       0,
       0,
+      0,
       0
     ]
   },
   "national.williams": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -2465,8 +2822,8 @@
       "baseline": 65,
       "current": 0,
       "kind": "dead",
-      "reason": "0 listings for 2 consecutive runs (normally ~65/run) \u2014 source likely broken",
-      "streak": 2
+      "reason": "0 listings for 3 consecutive runs (normally ~65/run) \u2014 source likely broken",
+      "streak": 3
     },
     "counts": [
       4,
@@ -2477,6 +2834,7 @@
       0,
       74,
       19,
+      0,
       0,
       0
     ]
@@ -2492,7 +2850,8 @@
       82,
       0,
       82,
-      82
+      82,
+      0
     ]
   },
   "national.zillow_foreclosures": {
@@ -2506,19 +2865,22 @@
       407,
       0,
       426,
-      436
+      436,
+      0
     ]
   },
   "newspapers.aiken_standard": {
     "counts": [
       80,
-      45
+      45,
+      0
     ]
   },
   "newspapers.berkeley_independent": {
     "counts": [
       30,
-      38
+      38,
+      0
     ]
   },
   "newspapers.carolina_coast": {
@@ -2531,7 +2893,8 @@
       0,
       0,
       1,
-      4
+      4,
+      0
     ]
   },
   "newspapers.coastland_times": {
@@ -2543,7 +2906,13 @@
       2,
       2,
       2,
-      2
+      2,
+      0
+    ]
+  },
+  "newspapers.columbia_star": {
+    "counts": [
+      13
     ]
   },
   "newspapers.daily_courier": {
@@ -2557,6 +2926,7 @@
       0,
       0,
       1,
+      3,
       3
     ]
   },
@@ -2571,7 +2941,8 @@
       5,
       5,
       5,
-      5
+      5,
+      6
     ]
   },
   "newspapers.index_journal": {
@@ -2583,16 +2954,30 @@
       6,
       2,
       2,
-      10
+      10,
+      0
     ]
   },
   "newspapers.journal_scene": {
     "counts": [
       20,
-      54
+      54,
+      0
+    ]
+  },
+  "newspapers.mecklenburg_times": {
+    "counts": [
+      70
     ]
   },
   "newspapers.post_and_courier": {
+    "alarm": {
+      "baseline": 6,
+      "current": 0,
+      "kind": "dead",
+      "reason": "0 listings for 2 consecutive runs (normally ~6/run) \u2014 source likely broken",
+      "streak": 2
+    },
     "counts": [
       6,
       7,
@@ -2602,11 +2987,13 @@
       12,
       1,
       4,
+      0,
       0
     ]
   },
   "newspapers.shelby_star": {
     "counts": [
+      0,
       0,
       0,
       0,
@@ -2630,6 +3017,12 @@
       0,
       0,
       0,
+      0,
+      0
+    ]
+  },
+  "public_notices.echovita_obituaries": {
+    "counts": [
       0
     ]
   },
@@ -2642,7 +3035,8 @@
       50,
       50,
       50,
-      50
+      50,
+      0
     ]
   },
   "public_notices.gannett_obituaries": {
@@ -2654,7 +3048,13 @@
       146,
       125,
       139,
-      139
+      139,
+      149
+    ]
+  },
+  "public_notices.nc_heir_notices": {
+    "counts": [
+      0
     ]
   },
   "public_notices.nc_notices_counties": {
@@ -2665,7 +3065,8 @@
       608,
       0,
       605,
-      610
+      610,
+      0
     ]
   },
   "public_notices.ncnotices": {
@@ -2679,7 +3080,13 @@
       139,
       0,
       88,
-      107
+      107,
+      0
+    ]
+  },
+  "public_notices.obituary_feeds": {
+    "counts": [
+      20
     ]
   },
   "public_notices.publicnoticesc": {
@@ -2693,7 +3100,13 @@
       0,
       0,
       0,
-      0
+      0,
+      84
+    ]
+  },
+  "public_notices.publicnoticesc_estates": {
+    "counts": [
+      58
     ]
   },
   "reo.treasury_seized": {
@@ -2707,12 +3120,14 @@
       1,
       1,
       1,
+      3,
       3
     ]
   },
   "reo.usda_rd": {
     "counts": [
       0,
+      1,
       1,
       1,
       1,
@@ -2735,7 +3150,8 @@
       176,
       173,
       188,
-      189
+      189,
+      198
     ]
   }
 }
