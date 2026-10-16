@@ -1030,8 +1030,15 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
     out |= {c for c, (k, _g) in SCORER_GATES.items() if k and raw.get(k) not in _EMPTY}
     tax = tax_status_known(raw)
     if tax:
-        out |= {"multi_year_delinquent_tax", "repeat_tax_loss", "two_year_delinquent", "tax_aging_surfaced",
-                "bankruptcy_tax_combo"}
+        # multi_year_delinquent_tax split out (audit 2026-10-16): this broad "any tax-ish
+        # key landed" predicate marked it checked from unrelated keys (tax_aging_surfaced,
+        # two_year_delinquent, tax_owed, nc_ptscloud_delinquent_tax, qpaybill_roll, ...)
+        # on rows its own real producer (scrapers/counties_generic/multi_year_delinquent_
+        # tax.py, Buncombe/Oconee/Pickens only) never touched -- live-measured 150,198
+        # false-"checked" rows board-wide. Its own raw key is the only honest signal.
+        out |= {"repeat_tax_loss", "two_year_delinquent", "tax_aging_surfaced", "bankruptcy_tax_combo"}
+    if raw.get("multi_year_delinquent_tax") not in _EMPTY:
+        out.add("multi_year_delinquent_tax")
     # gis_fill.py screened this parcel in its county layer and the record is blank for the field: a dated
     # per-row 'screened, none found' verdict for the four fill columns it covers (roll_up counts it)
     from foreclosure_scraper import gis_fill as _gf

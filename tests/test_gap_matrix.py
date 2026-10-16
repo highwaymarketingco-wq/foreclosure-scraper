@@ -105,11 +105,28 @@ def test_checked_columns_from_wrappers_and_inputs():
     owner = gm.owner_columns(r)
     pos = gm.positive_columns(r, owner, {})
     chk = gm.checked_columns(r, pos, {"tax_lien": "refuted"})
-    assert {"multi_year_delinquent_tax", "two_year_delinquent", "divorce", "email", "incarceration",
+    # 2026-10-16: multi_year_delinquent_tax split out of the shared broad tax check --
+    # tax_owed alone (unrelated to its own real producer) no longer marks it checked.
+    assert {"two_year_delinquent", "divorce", "email", "incarceration",
             "deed_chain_break", "name_heirs", "owner_cluster", "owner_mismatch",
             "atty_tax_verified_confirmed"} <= chk
+    assert "multi_year_delinquent_tax" not in chk
     assert "bop_federal" not in chk
     assert "atty_tax_verified_confirmed" not in gm.checked_columns(r, pos, {"tax_lien": "unconfirmed"})
+
+
+def test_multi_year_delinquent_tax_checked_only_by_its_own_key():
+    """Its real producer (scrapers/counties_generic/multi_year_delinquent_tax.py) covers
+    exactly 3 counties (Buncombe NC, Oconee SC, Pickens SC); the generic tax_status_known()
+    predicate used to mark it checked from any unrelated tax key board-wide -- live-measured
+    150,198 false-"checked" rows outside those 3 counties (audit 2026-10-16)."""
+    hit = row(raw={"multi_year_delinquent_tax": {"years": [2023, 2024]}})
+    assert "multi_year_delinquent_tax" in gm.checked_columns(hit, set(), {})
+    miss = row(raw={"tax_owed": {"balance": 10}, "nc_ptscloud_delinquent_tax": {"years": 3}})
+    assert "multi_year_delinquent_tax" not in gm.checked_columns(miss, set(), {})
+    # the other 4 columns on the shared broad line are unaffected by this split
+    assert {"repeat_tax_loss", "two_year_delinquent", "tax_aging_surfaced",
+            "bankruptcy_tax_combo"} <= gm.checked_columns(miss, set(), {})
 
 
 def test_tax_status_known_ignores_state_income_lien():
