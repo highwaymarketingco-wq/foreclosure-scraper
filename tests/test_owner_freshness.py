@@ -361,3 +361,66 @@ def test_apply_gis_attrs_still_fills_a_blank_owner_like_before():
     flags = ga.apply_gis_attrs(li, {"OwnerAll": "NEW OWNER"})
     assert li.owner_name == "NEW OWNER"
     assert flags["owner_name"] == 1
+
+
+# ---- enrichment_arcgis.enrich(): cache-hit fast path now fills gis.last_sale (2026-10-16) ----
+#
+# enrichment_deed_chain.py's own docstring names gis.last_sale as its single biggest input
+# (46.1%), but the fast path above only ever copied market_value/tax_value/living_sqft/acreage
+# from a parcel_cache hit -- never sale_price/sale_date, even though parcel_cache.lookup's own
+# schema carries both. Live-measured 2026-10-16: board coverage of raw.gis.last_sale (17.8%)
+# ran well under that documented 46.1%, and a direct scan of every cached county's own SQLite
+# found 2.66M of 22.5M parcels (11.8%) with a real sale_price sitting right there, unread. Fixed
+# by copying it in the SAME cache-hit block -- zero extra network cost, since the data is
+# already local; the fix is pure dict-building, no live query involved at all.
+
+def test_cache_hit_fills_last_sale_from_the_local_cache_no_network(monkeypatch):
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup", lambda county, parcel_id, state=None: {
+        "owner": "A", "market_value": 1000, "sale_price": 610000.0, "sale_date": "2022-05-06"})
+
+    async def _boom(*a, **k):
+        raise AssertionError("live GIS query made despite a plain cache hit")
+    monkeypatch.setattr(arc, "_arcgis_query", _boom)
+
+    li = _li(owner="A", market_value=1000, parcel="2020000203", county="Charleston",
+             street_address="3399 Freeman Hill Rd")
+    asyncio.run(arc.enrich([li], concurrency=1))
+
+    assert li.raw["gis"]["last_sale"] == {"date": "2022-05-06", "amount": 610000.0}
+
+
+def test_cache_hit_last_sale_is_partial_when_only_one_field_is_present(monkeypatch):
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup", lambda county, parcel_id, state=None: {
+        "owner": "A", "market_value": 1000, "sale_date": "2019-01-01"})   # no sale_price
+
+    li = _li(owner="A", market_value=1000, parcel="9999999999", county="Charleston",
+             street_address="1 Test St")
+    asyncio.run(arc.enrich([li], concurrency=1))
+    assert li.raw["gis"]["last_sale"] == {"date": "2019-01-01"}
+
+
+def test_cache_hit_never_overwrites_an_already_present_last_sale(monkeypatch):
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup", lambda county, parcel_id, state=None: {
+        "owner": "A", "market_value": 1000, "sale_price": 999.0, "sale_date": "2030-01-01"})
+
+    li = _li(owner="A", market_value=1000, parcel="2020000203", county="Charleston",
+             street_address="3399 Freeman Hill Rd",
+             raw_extra={"gis": {"last_sale": {"date": "2022-05-06", "amount": 610000.0}}})
+    asyncio.run(arc.enrich([li], concurrency=1))
+
+    assert li.raw["gis"]["last_sale"] == {"date": "2022-05-06", "amount": 610000.0}
+
+
+def test_cache_hit_rejects_an_implausible_sale_amount(monkeypatch):
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup", lambda county, parcel_id, state=None: {
+        "owner": "A", "market_value": 1000, "sale_price": 99_000_000_000.0,
+        "sale_date": "2020-01-01"})
+
+    li = _li(owner="A", market_value=1000, parcel="8888888888", county="Charleston",
+             street_address="1 Test St")
+    asyncio.run(arc.enrich([li], concurrency=1))
+    assert li.raw["gis"]["last_sale"] == {"date": "2020-01-01"}   # amount dropped, date kept

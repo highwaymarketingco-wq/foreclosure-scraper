@@ -1544,6 +1544,30 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                     li.living_sqft = pcr["living_sqft"]
                 if not li.acreage and pcr.get("acreage"):
                     li.acreage = pcr["acreage"]
+                # enrichment_deed_chain.py's own docstring counts gis.last_sale as its single
+                # biggest input (46.1%) -- but this fast path never wrote it, only the live
+                # query below does (_apply_attrs's own last_sale block), so every cache HIT
+                # (the common case for an established county) silently skipped it. The cache
+                # already carries sale_price/sale_date (parcel_cache.lookup's own schema; no
+                # book/page there, unlike the live query) at zero extra cost -- found 2026-10-16
+                # while tracing why deed_chain's measured 17.8% board coverage ran well under
+                # the documented 46.1%. Same amount sanity guard _apply_attrs' live path uses.
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                gis_cache = li.raw.setdefault("gis", {})
+                if not gis_cache.get("last_sale"):
+                    last_sale: dict[str, Any] = {}
+                    sale_date = pcr.get("sale_date")
+                    if sale_date:
+                        last_sale["date"] = str(sale_date)
+                    try:
+                        amt = float(pcr.get("sale_price") or 0)
+                    except (TypeError, ValueError):
+                        amt = 0.0
+                    if 0 < amt <= _MAX_PLAUSIBLE_SALE:
+                        last_sale["amount"] = amt
+                    if last_sale:
+                        gis_cache["last_sale"] = last_sale
                 counts["cache_hit"] = counts.get("cache_hit", 0) + 1
                 # see _missing_cohort_flags: the cache has no vacant/absentee/owner_changed
                 # column, so a county where _cohort_flags actually works gets one live
