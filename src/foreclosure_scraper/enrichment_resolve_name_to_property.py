@@ -1228,6 +1228,19 @@ async def enrich_resolve_name_to_property(
                 if base not in field_cache:
                     field_cache[base] = await _resolve_fields(c, base)
                 owner_field, situs_field = field_cache[base]
+                # _endpoint_cfg seeds a generic county layer's cfg with
+                # owner_field/situs_field = None (resolved lazily, here, per base
+                # URL). cfg itself was never updated with what _resolve_fields
+                # just found -- every call below this point still read the
+                # original None straight off cfg, so _query_owner_scoped built a
+                # literal "UPPER(None) LIKE '...'" and queried it against every
+                # non-pinned NC county's own layer. Confirmed live 2026-10-16 on
+                # the VM run: Mecklenburg/Brunswick/Onslow/Lincoln (among others)
+                # were being sent exactly that query, a guaranteed zero-row
+                # no-op, despite _resolve_fields having found their real field
+                # (BOTH here AND in Mecklenburg's case -- addr_field=
+                # "situsaddress1" in NC_GIS confirms a usable layer exists).
+                cfg = {**cfg, "owner_field": owner_field, "situs_field": situs_field}
             if not owner_field:
                 stats["no_owner_field"] += 1
                 last_env = ("no_owner_field", {"endpoint": base})
