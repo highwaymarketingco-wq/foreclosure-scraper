@@ -47,6 +47,22 @@ Hazard" issue regardless of address, so it is NOT per-row data and is
 deliberately NOT captured. `image_full` / `image_square_100x100` /
 `video_url` are the real per-issue fields and are now captured when
 truthy.
+
+RE-VERIFIED 2026-10-15 (overnight completeness-sweep follow-up, item 3):
+the prior audit pass flagged this module's `_MAX_PAGES=15` (1,500-row/city
+cap) as unconfirmed live because the API read as Cloudflare-walled to plain
+httpx/curl at the time. Live-retested just now: both a bare `curl` and this
+project's own `http_client.client()` (plain httpx, no impersonation) get a
+clean 200 from `seeclickfix.com/api/v2/issues` -- the wall from the prior
+pass is not reproducing right now (SCF sits behind Cloudflare generally,
+e.g. a `cf-ray`/`cf-cache-status` header on every response, but is not
+currently blocking this project's requests; likely an earlier transient
+rate-limit or IP-reputation block, not a standing WAF rule). Live-pulled
+page-1 `metadata.pagination.entries` for all 20 footprint cities: the
+highest counts are Anderson SC 298, Spartanburg SC 403, Gastonia NC 103 --
+every city is well under the 1,500-row cap (max is 403/1,500 = 27%). No
+city is anywhere near hitting `_MAX_PAGES`, so the cap is a real, unused
+headroom number, not a silent truncation point. No code change needed.
 """
 from __future__ import annotations
 
