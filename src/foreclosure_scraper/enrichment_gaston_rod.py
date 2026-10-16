@@ -33,6 +33,25 @@ try:
 except Exception:  # pragma: no cover
     AsyncSession = None
 
+_WALL_TITLE = re.compile(
+    r"<title>[^<]*(?:Just a moment|Attention Required|Access Denied|log ?in|sign ?in)", re.I)
+_WALL_MARKER = re.compile(r"g-recaptcha|h-captcha|cf-browser-verification", re.I)
+
+
+class GastonWall(Exception):
+    """The host answered with a 403, a Cloudflare challenge or a login page. That
+    host is done for this run: never retry it and never burn the rest of the budget."""
+
+
+def _wall_reason(status: int, text: str) -> str | None:
+    if status in (401, 403, 407, 429, 503):
+        return f"HTTP {status}"
+    head = (text or "")[:6000]
+    if _WALL_TITLE.search(head) or _WALL_MARKER.search(head):
+        return "challenge, CAPTCHA or login page"
+    return None
+
+
 BASE = "https://gastonnc.courthousecomputersystems.com"
 LRINDEX = BASE + "/LRSearch/LRIndex?searchTabID=0"
 EXEC = BASE + "/LRSearch/ExecuteSearch"
@@ -111,16 +130,29 @@ def classify(rows: list[dict]) -> dict:
 
 
 async def _seed(session) -> bool:
+    """Seed the search context. Raises GastonWall on a Cloudflare challenge/block so the
+    caller can stop immediately instead of treating a 403 page as 'seeded successfully'."""
     try:
-        await session.get(BASE + "/", impersonate="chrome", timeout=20)
-        await session.get(LRINDEX, impersonate="chrome", timeout=20)
+        r1 = await session.get(BASE + "/", impersonate="chrome", timeout=20)
+        reason = _wall_reason(r1.status_code, r1.text)
+        if reason:
+            raise GastonWall(f"seed GET /: {reason}")
+        r2 = await session.get(LRINDEX, impersonate="chrome", timeout=20)
+        reason = _wall_reason(r2.status_code, r2.text)
+        if reason:
+            raise GastonWall(f"seed GET LRIndex: {reason}")
         return True
+    except GastonWall:
+        raise
     except Exception:
         return False
 
 
 async def search_instruments(session, last: str, first: str = "") -> list[dict]:
-    """Run ExecuteSearch for a name on an already-seeded session; returns parsed rows."""
+    """Run ExecuteSearch for a name on an already-seeded session; returns parsed rows.
+    Raises GastonWall if the session hits a Cloudflare challenge/block mid-run (distinct
+    from a genuine zero-match or a transient parse miss, neither of which should stop the
+    run)."""
     if not last:
         return []
     try:
@@ -128,6 +160,9 @@ async def search_instruments(session, last: str, first: str = "") -> list[dict]:
                                impersonate="chrome", timeout=45)
     except Exception:
         return []
+    reason = _wall_reason(r.status_code, r.text)
+    if reason:
+        raise GastonWall(f"ExecuteSearch: {reason}")
     if r.status_code != 200 or "Object reference" in (r.text or ""):
         return []
     return parse_rows(r.text)
@@ -158,11 +193,19 @@ async def enrich_gaston_rod(listings, max_lookups: int | None = None) -> dict:
     if not targets:
         return stats
     async with AsyncSession(verify=False) as s:
-        if not await _seed(s):
-            return {**stats, "error": "seed_failed"}
+        try:
+            if not await _seed(s):
+                return {**stats, "error": "seed_failed"}
+        except GastonWall as exc:
+            return {**stats, "error": "walled", "wall_reason": str(exc)}
         for li in targets:
             last, first = _name_parts(li.owner_name)
-            rows = await search_instruments(s, last, first)
+            try:
+                rows = await search_instruments(s, last, first)
+            except GastonWall as exc:
+                # Stop burning the rest of the run's budget on guaranteed-failing lookups;
+                # the rows already attempted stand as real results.
+                return {**stats, "error": "walled", "wall_reason": str(exc)}
             stats["searched"] += 1
             if not rows:
                 continue
