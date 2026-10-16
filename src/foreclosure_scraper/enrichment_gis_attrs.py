@@ -649,12 +649,17 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
         # these two skip gates exist specifically to avoid paying for on every run.
         owner_refresh_due = bool(li.parcel_id) and bool(li.owner_name) and \
             owner_freshness.is_owner_refreshable(li)
-        # FORCE re-attempts all (per docstring) — needed so coded fields like the exemption
-        # signal get read even on leads whose core attrs are already complete.
-        if not _force and (li.assessed_value or li.market_value) and li.owner_name and \
-                li.living_sqft and not owner_refresh_due:
-            stats["skipped_done"] += 1
-            return
+        # REMOVED 2026-10-16 (lot_size audit): a "core attrs complete" skip used to fire
+        # here too, before the real idempotency gate below ever ran -- value/owner/sqft
+        # are routinely filled by OTHER upstream enrichers (enrich_with_parcel_lookup,
+        # county tax/CAMA scrapers, the NC voter file) before this function ever runs, so
+        # most leads arrived "core complete" on their very first pass and were skipped
+        # forever -- never once making the single query below that would also have
+        # returned acreage/land_use/year_built for free in the same response. Confirmed
+        # live: 16,501 board rows had value+owner+sqft all set, zero acreage, and
+        # raw.gis.queried never set -- 99.6% of them in a county with a working live GIS
+        # layer. The idempotency gate right below (raw["gis"]["queried"]) is the correct
+        # one: it only skips a lead THIS function has actually queried at least once.
         if not _force and (raw.get("gis") or {}).get("queried") and not owner_refresh_due:
             stats["skipped_done"] += 1
             return
@@ -680,6 +685,14 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
                 if owner_cand and owner_freshness.should_refresh_owner_name(li, owner_cand):
                     owner_freshness.stamp_owner_name(li, owner_cand)
                     stats["filled_owner"] += 1
+                # Mirror into raw["gis"]["owner"] like the live-query path already does
+                # (line ~554) -- gap_matrix's atty_taxpayer_of_record scorer requires this
+                # exact key for a non-tax_lien/tax_sale row; a cache-filled owner_name alone
+                # is invisible to it (audit 2026-10-16).
+                if owner_cand:
+                    g = li.raw.setdefault("gis", {})
+                    if not g.get("owner"):
+                        g["owner"] = str(owner_cand).strip()
                 if not li.market_value and pc.get("market_value"):
                     li.market_value = pc["market_value"]; stats["filled_market"] += 1
                 if not li.tax_value and pc.get("tax_value"):

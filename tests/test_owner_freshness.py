@@ -254,7 +254,10 @@ def test_gaston_cache_hit_skips_the_catchup_once_flags_are_already_stamped(monke
              street_address="1 TEST ST", raw_extra={"gis": {"vacant": False, "absentee": False}})
     asyncio.run(arc.enrich([li], concurrency=1))
 
-    assert li.raw["gis"] == {"vacant": False, "absentee": False}   # untouched, no network
+    # Cohort flags untouched, no network -- the "owner" key appearing is the separate,
+    # expected owner-mirror fix (2026-10-16): same cache hit also stamps raw["gis"]["owner"].
+    assert li.raw["gis"]["vacant"] is False and li.raw["gis"]["absentee"] is False
+    assert li.raw["gis"]["owner"] == "A"
 
 
 def test_a_non_gaston_cache_hit_never_triggers_a_cohort_flag_catchup_query(monkeypatch):
@@ -307,20 +310,106 @@ def test_gis_attrs_parcel_cache_refreshes_stale_unstamped_owner_no_network(monke
     assert stats["filled_owner"] == 1
 
 
-def test_gis_attrs_skips_entirely_when_owner_already_fresh(monkeypatch):
-    """Performance guard: a lead whose owner was JUST stamped (today) must take the
-    original `skipped_done` fast exit -- no parcel_cache lookup, no live query."""
+def test_gis_attrs_skips_entirely_once_already_queried_and_owner_fresh(monkeypatch):
+    """Performance guard: a lead this function has ALREADY queried at least once
+    (raw.gis.queried) AND whose owner was JUST stamped (today) takes the fast exit --
+    no parcel_cache lookup, no live query. This is the one real idempotency gate
+    (see the 2026-10-16 lot_size fix below for the gate that was removed)."""
     import foreclosure_scraper.parcel_cache as pc_mod
 
     def _boom_lookup(*a, **k):
-        raise AssertionError("parcel_cache consulted despite an already-fresh owner stamp")
+        raise AssertionError("parcel_cache consulted despite an already-queried, fresh-owner lead")
     monkeypatch.setattr(pc_mod, "lookup", _boom_lookup)
+
+    li = _li(owner="SUSAN STANFILL, IAN HUGHES", market_value=189200, living_sqft=1200,
+             parcel="9654886969", owner_as_of=_iso_days_ago(0),
+             raw_extra={"gis": {"queried": True}})
+    stats = asyncio.run(ga.enrich_gis_attrs([li]))
+    assert stats["skipped_done"] == 1
+    assert li.owner_name == "SUSAN STANFILL, IAN HUGHES"
+
+
+def test_gis_attrs_core_complete_but_never_queried_does_not_take_the_old_fast_skip(monkeypatch):
+    """The 2026-10-16 lot_size bug fix, confirmed directly: a lead whose value/owner/sqft
+    were ALL already filled by some OTHER upstream enricher, but which this function has
+    never once queried (no raw.gis.queried), must NOT take a "core attrs complete" fast
+    exit anymore -- it has to reach the parcel-cache / live-query path below, since that
+    is the only way acreage/land_use/year_built can ever be filled for it. Before the fix,
+    such a lead was skipped forever and never recovered those fields."""
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup",
+                         lambda county, parcel_id, state=None: {"acreage": 0.75})
+    monkeypatch.setattr(pc_mod, "cache_is_stale", lambda county, state=None: False)
 
     li = _li(owner="SUSAN STANFILL, IAN HUGHES", market_value=189200, living_sqft=1200,
              parcel="9654886969", owner_as_of=_iso_days_ago(0))
     stats = asyncio.run(ga.enrich_gis_attrs([li]))
-    assert stats["skipped_done"] == 1
-    assert li.owner_name == "SUSAN STANFILL, IAN HUGHES"
+
+    assert stats["skipped_done"] == 0
+    assert li.acreage == 0.75
+
+
+# ---- raw["gis"]["owner"] mirror on a parcel-cache HIT (2026-10-16) --------------------
+#
+# Both modules' LIVE-query paths already mirror a resolved owner into raw["gis"]["owner"]
+# (gis_attrs ~line 554, arcgis ~line 1424) because gap_matrix's atty_taxpayer_of_record
+# scorer reads exactly that key for any non-tax_lien/tax_sale row -- a bare top-level
+# owner_name doesn't count there (a court-caption name on another listing type isn't
+# necessarily the taxpayer of record). But neither module's CACHE-hit fast path ever
+# wrote it, so a cache-filled owner was structurally invisible to that scorer even though
+# it's the same genuine, tax-roll-sourced name the live path would have produced. Same
+# bug family, same fix shape, as the already-shipped mailing/last_sale mirrors above.
+
+def test_gis_attrs_cache_hit_mirrors_owner_into_raw_gis(monkeypatch):
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup",
+                         lambda county, parcel_id, state=None: {"owner": "WILLARD ROBERT EUGENE"})
+    monkeypatch.setattr(pc_mod, "cache_is_stale", lambda county, state=None: False)
+
+    li = _li(owner=None, market_value=189200, living_sqft=1200, parcel="9654886969")
+    asyncio.run(ga.enrich_gis_attrs([li]))
+
+    assert li.owner_name == "WILLARD ROBERT EUGENE"
+    assert li.raw["gis"]["owner"] == "WILLARD ROBERT EUGENE"
+
+
+def test_gis_attrs_cache_hit_never_overwrites_an_existing_raw_gis_owner(monkeypatch):
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup",
+                         lambda county, parcel_id, state=None: {"owner": "CACHE NAME"})
+    monkeypatch.setattr(pc_mod, "cache_is_stale", lambda county, state=None: False)
+
+    li = _li(owner="CACHE NAME", market_value=189200, living_sqft=1200,
+             parcel="9654886969", owner_as_of=_iso_days_ago(0),
+             raw_extra={"gis": {"owner": "LIVE-QUERY NAME", "source": "live"}})
+    asyncio.run(ga.enrich_gis_attrs([li]))
+
+    assert li.raw["gis"]["owner"] == "LIVE-QUERY NAME"
+
+
+def test_arcgis_cache_hit_mirrors_owner_into_raw_gis(monkeypatch):
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup",
+                         lambda county, parcel_id, state=None: {"owner": "WILLARD ROBERT EUGENE"})
+
+    li = _li(owner=None, market_value=189200, parcel="9654886969")
+    asyncio.run(arc.enrich([li], concurrency=1))
+
+    assert li.owner_name == "WILLARD ROBERT EUGENE"
+    assert li.raw["gis"]["owner"] == "WILLARD ROBERT EUGENE"
+
+
+def test_arcgis_cache_hit_never_overwrites_an_existing_raw_gis_owner(monkeypatch):
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup",
+                         lambda county, parcel_id, state=None: {"owner": "CACHE NAME"})
+
+    li = _li(owner="CACHE NAME", market_value=189200, parcel="9654886969",
+             owner_as_of=_iso_days_ago(0),
+             raw_extra={"gis": {"owner": "LIVE-QUERY NAME", "source": "live"}})
+    asyncio.run(arc.enrich([li], concurrency=1))
+
+    assert li.raw["gis"]["owner"] == "LIVE-QUERY NAME"
 
 
 def test_gis_attrs_cache_miss_on_stale_owner_only_bails_without_live_query(monkeypatch):

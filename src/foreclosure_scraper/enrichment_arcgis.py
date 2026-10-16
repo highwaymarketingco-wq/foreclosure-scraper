@@ -1536,6 +1536,16 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                 owner_cand = pcr.get("owner")
                 if owner_cand and owner_freshness.should_refresh_owner_name(li, owner_cand):
                     owner_freshness.stamp_owner_name(li, owner_cand)
+                # Mirror into raw["gis"]["owner"] like the live-query path already does
+                # (line ~1424) -- gap_matrix's atty_taxpayer_of_record scorer requires this
+                # exact key for a non-tax_lien/tax_sale row; a cache-filled owner_name alone
+                # is invisible to it (audit 2026-10-16, same fix as enrichment_gis_attrs.py).
+                if owner_cand:
+                    if not isinstance(li.raw, dict):
+                        li.raw = {}
+                    g = li.raw.setdefault("gis", {})
+                    if not g.get("owner"):
+                        g["owner"] = str(owner_cand).strip()
                 if not li.market_value and pcr.get("market_value"):
                     li.market_value = pcr["market_value"]
                 if not li.tax_value and pcr.get("tax_value"):
