@@ -20,7 +20,29 @@ from . import parcel_cache
 log = structlog.get_logger(__name__)
 
 # land-class text that means "undeveloped / vacant lot" across the county schemas.
-_VACANT_RE = re.compile(r"\b(VACANT|UNDEVELOPED)\b", re.I)
+#
+# 2026-10-16: the full word was not enough. Scanned every cached county's actual distinct
+# land_use strings (288 containing "VAC" in some form) and found 169,077 rows across 99
+# (county, land_use) pairs whose assessor abbreviates "vacant" instead of spelling it --
+# Charleston alone: '905 - VAC-RES-LOT' 38,782 rows, '952 - VAC-COMM-LOT' 4,859 (the WHOLE
+# reason Charleston/Horry/Oconee/Lexington -- fully cached, land_use 99%+ populated -- showed
+# ZERO vacant_lot stamps on the board: every one of these rows was silently falling through).
+# Other counties' own conventions: 'AG LAND VAC', 'CLASS: RESIDENTIAL - VAC', '7.90-Vacnt
+# Ind-OP-SC', 'VACRES/LT-SMLTR/REAR'. \b(...)\b alone catches all of those (a hyphen, slash or
+# space is a word boundary) WITHOUT also matching the two real false-positive risks the same
+# scan turned up -- 'CRYOVAC BLVD (103.51 ACRES)' (a street name) and a mobile-home serial
+# number ending '...S#VAC012120' -- because in both, the letters immediately next to "VAC" are
+# ALSO word characters, so \b never fires there. VAC_CAMEL below is the second shape the scan
+# found that \b cannot see at all: assessor codes that glue "Vac" straight onto the category
+# with NO separator character ('ResVac', 'HOAVac', 'CommVac', 'AgVac', 'ManufVac', 'TCUVac',
+# 'MHVac') -- matched by exact case (Title-case "Vac" only, never bare "VAC") specifically so it
+# stays out of unrelated all-caps text that merely contains the three letters.
+_VACANT_RE = re.compile(r"\b(VACANT|VACNT|UNDEVELOPED|VACRES|VAC)\b", re.I)
+_VAC_CAMEL_RE = re.compile(r"[A-Za-z]Vac(?=[A-Z]|[^a-zA-Z]|$)")
+
+
+def _is_vacant_land_use(lu: str) -> bool:
+    return bool(_VACANT_RE.search(lu)) or bool(_VAC_CAMEL_RE.search(lu))
 
 
 def _has_cache(memo: dict, county: str, state: str | None) -> bool:
@@ -65,7 +87,7 @@ def enrich_vacant_landuse(listings: Iterable[Listing]) -> dict:
             if clean and not clean.isdigit():
                 li.land_use = clean.title() if clean.isupper() else clean
                 stats["land_use_filled"] = stats.get("land_use_filled", 0) + 1
-        if not _VACANT_RE.search(str(lu)):
+        if not _is_vacant_land_use(str(lu)):
             continue
         if not isinstance(li.raw, dict):
             li.raw = {}
