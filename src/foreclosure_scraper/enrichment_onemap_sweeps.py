@@ -90,7 +90,7 @@ SOURCE_PUV = "nc_onemap_presentval"
 ROLLBACK_YEARS_NC = 4              # G.S. 105-277.4(c): the year of disqualification plus three before
 
 _HEIR_FIELDS = "parno,altparno,cntyname,ownname,ownname2,siteadd"
-_PUV_FIELDS = "parno,altparno,cntyname"
+_PUV_FIELDS = "parno,altparno,cntyname,siteadd"
 
 
 class SweepError(RuntimeError):
@@ -268,6 +268,23 @@ def build_flag_index(rows: Iterable[dict]) -> dict[str, dict[str, int]]:
     return idx
 
 
+def build_flag_address_index(rows: Iterable[dict]) -> dict[str, dict[tuple, int]]:
+    """The present-use flag's own address fallback, same shape and same reason as
+    build_heir_address_index() (module docstring) -- measured live, the SAME near-zero parcel-id
+    overlap: Orange 1.5%, Cabarrus 0.1%, Wake/Nash 0.0%, against 203,232 real matches across 44
+    counties sitting in the existing index, 2026-10-16."""
+    idx: dict[str, dict[tuple, int]] = {}
+    for a in rows:
+        county = str(a.get("cntyname") or "").strip()
+        if not county:
+            continue
+        ak = _addr_key(a.get("siteadd"))
+        if not ak:
+            continue
+        idx.setdefault(county, {})[ak] = 1
+    return idx
+
+
 # ---------------------------------------------------------------------------------------------
 # cache
 # ---------------------------------------------------------------------------------------------
@@ -333,10 +350,11 @@ async def sweep_present_use(http: httpx.AsyncClient, today: Optional[date] = Non
     quoted = ",".join("'" + c.replace("'", "''") + "'" for c in use)
     rows = await _sweep(http, f"presentval = 'Y' AND cntyname IN ({quoted})", _PUV_FIELDS) if use else []
     idx = build_flag_index(rows)
+    addr_idx = build_flag_address_index(rows)
     doc = {"swept_on": (today or date.today()).isoformat(), "complete": True, "rows_read": len(rows),
            "counties_swept": use, "counties_skipped": skipped,
            "matches": {c: len(v) for c, v in sorted(idx.items())}, "index": idx,
-           "schema": SCHEMA_VERSION}
+           "address_index": addr_idx, "schema": SCHEMA_VERSION}
     save_cache("present_use", doc)
     return doc
 
@@ -382,18 +400,18 @@ def stamp_rollback(li: Any, county: str, swept_on: str) -> bool:
 def apply_indexes(listings: Iterable[Any], heir: Optional[dict], puv: Optional[dict]) -> dict:
     """Stamp the board rows from the two swept indexes. Pure (no network).
 
-    heir_estate matches by parcel id first; when that misses (or the row never had a parcel id
-    at all), it falls back to the row's own street address against heir's address_index -- the
+    Both columns match by parcel id first; when that misses (or the row never had a parcel id at
+    all), each falls back to the row's own street address against its own address_index -- the
     fix for the near-total parcel-id mismatch most counties outside the original parcel_cache
-    batch have against OneMap's parno/altparno (module docstring). rollback_exposure is parcel-id
-    only, unchanged: its present-use flag has no address index (out of scope for this fix, a
-    present_use-specific build of its own if ever needed).
+    batch have against OneMap's parno/altparno (module docstring).
     """
     stats = {"nc_rows_with_parcel": 0, "heir_estate_stamped": 0, "heir_estate_already": 0,
-             "heir_estate_stamped_by_address": 0, "rollback_stamped": 0, "rollback_already": 0}
+             "heir_estate_stamped_by_address": 0, "rollback_stamped": 0, "rollback_already": 0,
+             "rollback_stamped_by_address": 0}
     h_idx = (heir or {}).get("index") or {}
     h_addr_idx = (heir or {}).get("address_index") or {}
     p_idx = (puv or {}).get("index") or {}
+    p_addr_idx = (puv or {}).get("address_index") or {}
     h_on = (heir or {}).get("swept_on") or ""
     p_on = (puv or {}).get("swept_on") or ""
     p_ok = set((puv or {}).get("counties_swept") or [])
@@ -406,13 +424,13 @@ def apply_indexes(listings: Iterable[Any], heir: Optional[dict], puv: Optional[d
         pid = _normalize_parcel(getattr(li, "parcel_id", None))
         if pid:
             stats["nc_rows_with_parcel"] += 1
+        ak = _addr_key(getattr(li, "street_address", None))
+
         hit = (h_idx.get(county) or {}).get(pid) if pid else None
         by_address = False
-        if not hit:
-            ak = _addr_key(getattr(li, "street_address", None))
-            if ak:
-                hit = (h_addr_idx.get(county) or {}).get(ak)
-                by_address = bool(hit)
+        if not hit and ak:
+            hit = (h_addr_idx.get(county) or {}).get(ak)
+            by_address = bool(hit)
         if hit:
             if stamp_heir(li, hit, h_on):
                 stats["heir_estate_stamped"] += 1
@@ -420,8 +438,15 @@ def apply_indexes(listings: Iterable[Any], heir: Optional[dict], puv: Optional[d
                     stats["heir_estate_stamped_by_address"] += 1
             else:
                 stats["heir_estate_already"] += 1
-        if pid and county in p_ok and pid in (p_idx.get(county) or {}):
+        p_hit = bool(pid and county in p_ok and pid in (p_idx.get(county) or {}))
+        p_by_address = False
+        if not p_hit and county in p_ok and ak and ak in (p_addr_idx.get(county) or {}):
+            p_hit = True
+            p_by_address = True
+        if p_hit:
             if stamp_rollback(li, county, p_on):
+                if p_by_address:
+                    stats["rollback_stamped_by_address"] += 1
                 stats["rollback_stamped"] += 1
             else:
                 stats["rollback_already"] += 1

@@ -159,6 +159,39 @@ def test_parcel_id_match_wins_over_address_when_both_would_hit():
     assert row.raw["heir_estate"]["owner_of_record"] == "BY PARCEL"
 
 
+# ------------------------------------------- rollback_exposure gets the same fallback (10/16)
+
+def test_rollback_address_fallback_fires_when_the_parcel_id_lookup_misses():
+    puv = {"swept_on": "2026-10-09", "counties_swept": ["Wake"],
+          "index": {"Wake": {"9999999999": 1}},
+          "address_index": {"Wake": {("123", frozenset({"MAIN"})): 1}}}
+    row = li(county="Wake", parcel="0000000001", street_address="123 Main St")
+    st = M.apply_indexes([row], None, puv)
+    assert row.raw["rollback_exposure"]["basis"] == "present_use_flag"
+    assert st["rollback_stamped"] == 1 and st["rollback_stamped_by_address"] == 1
+
+
+def test_rollback_address_fallback_respects_the_swept_county_set():
+    """An address match in a county that was NOT reliably flagged (counties_swept) must not
+    stamp rollback_exposure -- the same discipline test_a_county_not_in_the_swept_set_gets_no_
+    rollback_flag already enforces for the parcel-id path."""
+    puv = {"swept_on": "x", "counties_swept": ["Alamance"],
+          "address_index": {"Wake": {("123", frozenset({"MAIN"})): 1}}}
+    row = li(county="Wake", parcel=None, street_address="123 Main St")
+    M.apply_indexes([row], None, puv)
+    assert row.raw is None
+
+
+def test_rollback_address_fallback_does_not_affect_heir_estate_stats():
+    heir = {"swept_on": "x", "index": {}, "address_index": {}}
+    puv = {"swept_on": "x", "counties_swept": ["Wake"], "index": {},
+          "address_index": {"Wake": {("123", frozenset({"MAIN"})): 1}}}
+    row = li(county="Wake", parcel=None, street_address="123 Main St")
+    st = M.apply_indexes([row], heir, puv)
+    assert "heir_estate" not in (row.raw or {})
+    assert st["heir_estate_stamped"] == 0 and st["rollback_stamped_by_address"] == 1
+
+
 def test_a_county_not_in_the_swept_set_gets_no_rollback_flag():
     puv = {"swept_on": "x", "counties_swept": ["Alamance"], "index": {"Surry": {"1": 1}}}
     row = li(county="Surry", parcel="1")
