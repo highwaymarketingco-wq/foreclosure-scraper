@@ -25,6 +25,13 @@ empty token (the default) ALSO admits unrated/None-grade BUILT leads, which is m
 of the missing-sqft inventory. Set ASSESSOR_CARD_GRADES="A,B" to restore the old
 high-grade-only behavior.
 
+FAIR SHARE (2026-10-16). _rank_key ranks an unrated lead below even an F-grade one, so
+ranking the WHOLE eligible pool and slicing to one global cap always spent the entire
+cap on counties with a large C-or-better population, leaving several adapter counties
+(mostly unrated inventory) at zero fills every run regardless of distress. The cap is
+now split into an equal per-county share (ASSESSOR_CARD_COUNTY_MAX, default 100) before
+ranking within each county — every adapter county gets guaranteed throughput.
+
 Wiring: runs AFTER the first calc/grade pass (so grade + distress_stack exist to
 rank on) and is followed by a re-calc/re-grade of the touched leads — a real card
 sqft clears the footprint-ESTIMATE flag, which lets ARV grade at HIGH confidence
@@ -60,6 +67,11 @@ _DEFAULT_GRADES = "A,B,C,"
 # Per-run hard cap (circuit breaker). qPublic is a per-parcel render, so this is
 # what keeps a run from ballooning. Widened gate => a few hundred, not unbounded.
 _DEFAULT_MAX = 300
+
+# Per-county ceiling within that cap (fair-share fix, 2026-10-16) -- keeps one county's
+# own render-count cost bounded the way it always was, same role as _DEFAULT_MAX itself,
+# just scoped to one county instead of the whole run.
+_DEFAULT_COUNTY_MAX = 100
 
 # Render-class counties (Cloudflare-solving browser per parcel, ~30s-3min each).
 # ASSESSOR_CARD_SKIP_RENDER=1 skips them for a fast JSON/HTML-only pass.
@@ -231,14 +243,33 @@ async def _aenrich(listings: list[Listing]) -> dict:
     if not adapters:
         return {}
     cap = int(os.environ.get("ASSESSOR_CARD_MAX", str(_DEFAULT_MAX)))
+    county_cap = int(os.environ.get("ASSESSOR_CARD_COUNTY_MAX", str(_DEFAULT_COUNTY_MAX)))
     skip_render = os.environ.get("ASSESSOR_CARD_SKIP_RENDER", "").lower() in ("1", "true", "yes")
     grades = _eligible_grades()
     eligible = [li for li in listings
                 if _is_card_eligible(li, grades, adapters, skip_render)]
-    # Rank by distress/grade so a tight cap spends its budget on the best leads.
-    eligible.sort(key=_rank_key, reverse=True)
-    targets = eligible[:cap]
-    stats = {"eligible": len(eligible), "cap": cap, "targets": len(targets),
+    # FAIR SHARE (audit 2026-10-16, same pattern already fixed in enrichment_dot_ocr.py).
+    # _rank_key sorts an unrated lead (grade=None) BELOW even an F-grade one, so a single
+    # global rank-and-slice always filled the cap entirely from counties with a large
+    # C-or-better population (Spartanburg/Greenville/Buncombe) -- 7-9 of this module's 16
+    # adapter counties (Cherokee, Georgetown, Union, Gaston, Lincoln, Polk, Cleveland,
+    # effectively Pickens/Oconee) got zero or near-zero fills every run no matter how
+    # distressed their own (mostly unrated) leads were. Give every county its own ranked
+    # sub-list and an equal share of the cap (bounded by county_cap); a share a county
+    # does not use is NOT carried to another county, same tradeoff dot_ocr already makes.
+    by_county: dict[tuple[str, str], list] = {}
+    for li in eligible:
+        by_county.setdefault(((li.state or "").strip(), (li.county or "").strip()), []).append(li)
+    for group in by_county.values():
+        group.sort(key=_rank_key, reverse=True)
+    share = max(1, min(county_cap, -(-cap // max(1, len(by_county)))))
+    targets: list = []
+    for group in by_county.values():
+        targets.extend(group[:share])
+    targets.sort(key=_rank_key, reverse=True)
+    targets = targets[:cap]
+    stats = {"eligible": len(eligible), "cap": cap, "county_share": share,
+             "counties": len(by_county), "targets": len(targets),
              "key_resolved": 0, "matched": 0, "filled_sqft": 0, "filled_price": 0}
     for li in targets:
         # Most B+ leads lack parcel_id but have lat/lng — resolve the county key

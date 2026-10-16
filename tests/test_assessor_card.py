@@ -1,6 +1,7 @@
 """Grade-gated on-demand assessor-card enricher — gate, fill-only-missing, parsing."""
 from __future__ import annotations
 
+import asyncio
 import os
 from types import SimpleNamespace
 
@@ -168,3 +169,46 @@ def test_rank_orders_grade_then_distress():
     assert ranked[0] is a            # grade rank wins first
     assert ranked[1] is c_hi         # then distress score
     assert ranked[2] is none_lo
+
+
+# ---- fair share across counties (2026-10-16 audit) -----------------------------------
+#
+# A single global rank-then-slice always spent the whole cap on counties with a large
+# C-or-better population (Spartanburg here), leaving an unrated-heavy county (Gaston-
+# shaped: Union/Pickens, all unrated in this test) at zero fills regardless of its own
+# leads' distress. _rank_key still orders WITHIN each county; fair share just stops one
+# county's A/B/C leads from crowding out every other county's share entirely.
+
+def test_every_adapter_county_gets_a_share_of_the_cap(monkeypatch):
+    monkeypatch.setenv("ASSESSOR_CARD_MAX", "6")
+    monkeypatch.setenv("ASSESSOR_CARD_COUNTY_MAX", "100")
+    called = []
+
+    async def _spy_fetch(li):
+        called.append(li.county)
+        return None
+    monkeypatch.setattr(eac, "_adapters", lambda: {
+        ("SC", "Spartanburg"): _spy_fetch, ("SC", "Union"): _spy_fetch,
+        ("SC", "Pickens"): _spy_fetch,
+    })
+
+    leads = ([_qp_lead(grade="A", county="Spartanburg", distress=i) for i in range(10)]
+             + [_qp_lead(grade=None, county="Union", distress=i) for i in range(10)]
+             + [_qp_lead(grade=None, county="Pickens", distress=i) for i in range(10)])
+    stats = asyncio.run(eac._aenrich(leads))
+
+    assert sorted(set(called)) == ["Pickens", "Spartanburg", "Union"]   # none shut out
+    assert stats["counties"] == 3
+    assert stats["county_share"] == 2            # ceil(6 / 3)
+    assert stats["targets"] == 6
+
+
+def test_a_tight_county_cap_still_lets_every_county_through():
+    """county_cap smaller than the even share still guarantees every county at least
+    one slot (max(1, ...)), rather than rounding a small county down to zero."""
+    by_county = {("SC", "A"): [_qp_lead(county="A")],
+                 ("SC", "B"): [_qp_lead(county="B")],
+                 ("SC", "C"): [_qp_lead(county="C")]}
+    cap, county_cap = 2, 1
+    share = max(1, min(county_cap, -(-cap // max(1, len(by_county)))))
+    assert share == 1   # every county still gets its one slot, even though 3 > cap
