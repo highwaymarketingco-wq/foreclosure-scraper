@@ -201,6 +201,90 @@ def test_arcgis_parcel_cache_miss_on_stale_owner_bails_without_live_query(monkey
     assert li.owner_name == "Brandon Bryant"
 
 
+# ---- enrichment_arcgis.enrich(): Gaston cohort-flag catch-up (2026-10-16) -------------
+#
+# _cohort_flags (vacant/absentee/owner_changed) can only ever fire from the live GIS
+# query, and the parcel-cache fast path above returns before that query runs whenever
+# the cache already covers owner+value -- so the cohort flags silently never land for
+# ANY row that takes the fast path, Gaston included (the one county whose out_fields
+# actually requests VacantImpro/CURR_STATE/PRVYRNAME1; confirmed nowhere else in this
+# file references those field names). _missing_cohort_flags() lets a Gaston row fall
+# through for ONE live catch-up query per row instead of returning -- verified here to
+# (a) actually make that query, (b) never repeat it once the flags are stamped, and
+# (c) never fire for any other county, which must stay true given this fast path exists
+# specifically to avoid the ~6.8h uncapped runtime a live query per lead caused once
+# before (2026-08-14, see the comment above enrich()).
+
+_GASTON_ATTRS = {
+    "VacantImpro": "Vacant", "CURR_STATE": "NC", "PRVYRNAME1": "A", "CURR_NAME1": "B",
+    "PHYSSTRADD": "1 TEST ST",
+}
+
+
+def test_gaston_cache_hit_with_no_cohort_flags_yet_still_makes_one_catchup_query(monkeypatch):
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup",
+                         lambda county, parcel_id, state=None: {"owner": "A", "market_value": 1000})
+
+    calls = {"n": 0}
+    async def _fake_query(*a, **k):
+        calls["n"] += 1
+        return [dict(_GASTON_ATTRS)]
+    monkeypatch.setattr(arc, "_arcgis_query", _fake_query)
+
+    li = _li(owner="A", market_value=1000, parcel="3555-57-7764", county="Gaston",
+             street_address="1 TEST ST")
+    asyncio.run(arc.enrich([li], concurrency=1))
+
+    assert calls["n"] == 1
+    assert li.raw["gis"]["vacant"] is True
+    assert li.raw["gis"]["absentee"] is False
+
+
+def test_gaston_cache_hit_skips_the_catchup_once_flags_are_already_stamped(monkeypatch):
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup",
+                         lambda county, parcel_id, state=None: {"owner": "A", "market_value": 1000})
+
+    async def _boom(*a, **k):
+        raise AssertionError("live GIS query made even though cohort flags were already stamped")
+    monkeypatch.setattr(arc, "_arcgis_query", _boom)
+
+    li = _li(owner="A", market_value=1000, parcel="3555-57-7764", county="Gaston",
+             street_address="1 TEST ST", raw_extra={"gis": {"vacant": False, "absentee": False}})
+    asyncio.run(arc.enrich([li], concurrency=1))
+
+    assert li.raw["gis"] == {"vacant": False, "absentee": False}   # untouched, no network
+
+
+def test_a_non_gaston_cache_hit_never_triggers_a_cohort_flag_catchup_query(monkeypatch):
+    """The safety property this whole fix depends on: zero behavior change outside
+    Gaston. _COHORT_FLAG_COUNTIES is checked BEFORE anything live-query-shaped runs."""
+    import foreclosure_scraper.parcel_cache as pc_mod
+    monkeypatch.setattr(pc_mod, "lookup",
+                         lambda county, parcel_id, state=None: {"owner": "A", "market_value": 1000})
+
+    async def _boom(*a, **k):
+        raise AssertionError("live GIS query made for a non-Gaston county despite a cache hit")
+    monkeypatch.setattr(arc, "_arcgis_query", _boom)
+    monkeypatch.setattr(arc, "_wfs_query", _boom)
+
+    li = _li(owner="A", market_value=1000, parcel="9654886969", county="Buncombe",
+             street_address="1 TEST ST")
+    asyncio.run(arc.enrich([li], concurrency=1))
+
+    assert "gis" not in li.raw or "vacant" not in li.raw.get("gis", {})
+
+
+def test_missing_cohort_flags_helper_is_scoped_to_gaston_and_the_vacant_key():
+    gaston_unstamped = _li(county="Gaston", raw_extra={})
+    gaston_stamped = _li(county="Gaston", raw_extra={"gis": {"vacant": True}})
+    other_county = _li(county="Buncombe", raw_extra={})
+    assert arc._missing_cohort_flags(gaston_unstamped) is True
+    assert arc._missing_cohort_flags(gaston_stamped) is False
+    assert arc._missing_cohort_flags(other_county) is False
+
+
 # ---- enrichment_gis_attrs.enrich_gis_attrs(): parcel-cache fast path refresh ----------
 
 def test_gis_attrs_parcel_cache_refreshes_stale_unstamped_owner_no_network(monkeypatch):

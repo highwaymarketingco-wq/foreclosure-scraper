@@ -920,6 +920,41 @@ def _cohort_flags(attrs: dict[str, Any]) -> dict[str, bool]:
     return out
 
 
+# Counties whose out_fields actually requests VacantImpro/CURR_STATE/PRVYRNAME1 -- grepped
+# 2026-10-16, exactly one hit, Gaston's own config above. A county added here without that
+# source field would just get {} from _cohort_flags every time, same as today.
+_COHORT_FLAG_COUNTIES = frozenset({"Gaston"})
+
+
+def _missing_cohort_flags(li: Listing) -> bool:
+    """True when `li` is in a county _cohort_flags can actually populate, and hasn't had it
+    run yet.
+
+    2026-10-16: enrich()'s parcel-cache fast path (below) returns before EVER calling
+    _apply_attrs/_cohort_flags whenever a lead's parcel_id already has owner+value filled (a
+    cache hit covers that) -- so the vacant/absentee/owner_changed cohorts, which the cache
+    does NOT carry (its own SQLite schema has no VacantImpro-equivalent column; checked
+    directly), silently never land for ANY row that takes the fast path. Confirmed live: the
+    exact row this was traced on (Gaston 107 Thomas St) proved VacantImpro='Improved' sits
+    right there in the live ArcGIS response and _cohort_flags computes the correct
+    {vacant: False, absentee: False, owner_changed: False} from it in isolation, yet the
+    real enrich() run on that same row short-circuited at the cache hit and _apply_attrs was
+    never even called -- confirmed via a trace that proved that function was never entered.
+
+    Gated to `_COHORT_FLAG_COUNTIES` (today just Gaston) and to rows that don't already carry
+    the flags, specifically so this is a one-time per-row catch-up live query, not a standing
+    tax -- once `_cohort_flags` has run for a row (flags stamped, even all-False), this goes
+    back to False and the fast path resumes normally on every later run. This must NOT be
+    loosened to "any county" or "every run": the fast path's whole reason to exist is a
+    previously-measured ~6.8h uncapped runtime across ~48k leads when every one of them paid
+    for a live query (2026-08-14)."""
+    county = (li.county or "").replace(" County", "").strip()
+    if county not in _COHORT_FLAG_COUNTIES:
+        return False
+    gis = li.raw.get("gis") if isinstance(li.raw, dict) else None
+    return not (isinstance(gis, dict) and "vacant" in gis)
+
+
 def _street_keywords(street: str) -> str:
     """Pull the most distinctive token from an address for LIKE matching."""
     # Drop leading number + directional + suffix; pick longest remaining word.
@@ -1510,8 +1545,13 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                 if not li.acreage and pcr.get("acreage"):
                     li.acreage = pcr["acreage"]
                 counts["cache_hit"] = counts.get("cache_hit", 0) + 1
-                return
-            if owner_refresh_due and li.market_value:
+                # see _missing_cohort_flags: the cache has no vacant/absentee/owner_changed
+                # column, so a county where _cohort_flags actually works gets one live
+                # catch-up query instead of returning here -- a one-time cost, not a standing
+                # one (the gate flips False once this row's flags are stamped).
+                if not _missing_cohort_flags(li):
+                    return
+            elif owner_refresh_due and li.market_value:
                 # Entered ONLY for a stale-owner recheck (owner+value both already
                 # present; a real cache MISS otherwise would have `pcr` falsy here too,
                 # but there is nothing more this phase needs for this lead) -- bail
@@ -1519,7 +1559,8 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                 # is not grounds to pay for a live network re-query just to re-verify
                 # an owner name; this lead's owner gets another free chance to refresh
                 # whenever its county's parcel_cache next carries a row for it.
-                return
+                if not _missing_cohort_flags(li):
+                    return
         # Normalize county: strip "County", trailing ", NC" or ", SC", whitespace
         county_clean = li.county.replace(" County", "").strip()
         for suffix in (", NC", ", SC", ",NC", ",SC"):
