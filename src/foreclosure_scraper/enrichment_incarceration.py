@@ -63,7 +63,7 @@ from typing import Optional
 import httpx
 import structlog
 
-from .config import in_scope
+from .config import in_scope_distressed
 from .models import Listing
 from .mailing_shape import mailing_dict
 from .signal_freshness import incarceration_active
@@ -351,9 +351,10 @@ def _select_targets(cands: list, max_queries: int, per_county_cap: int,
     """Pick this run's leads from (lead, name, last_checked) candidates.
 
     Within a county: never-checked leads first (board order), then the oldest
-    stamps. Across counties: round-robin, footprint counties (config.in_scope)
-    before the rest, each county capped at per_county_cap. The county order
-    rotates daily so the partial last pass does not always favour the same ones.
+    stamps. Across counties: round-robin, the 146-county distressed footprint
+    (config.in_scope_distressed) before the rest, each county capped at
+    per_county_cap. The county order rotates daily so the partial last pass
+    does not always favour the same ones.
     """
     groups: dict[tuple[str, str], list] = {}
     for li, _name, checked in cands:
@@ -365,7 +366,12 @@ def _select_targets(cands: list, max_queries: int, per_county_cap: int,
     keys = sorted(groups)
     spin = now.toordinal() % len(keys) if keys else 0
     keys = keys[spin:] + keys[:spin]
-    core = [k for k in keys if in_scope(k[1], k[0])]
+    # An incarcerated owner is a motivated-seller LEAD signal, not a flip-listing gate
+    # (this module's own docstring) -- config.py's own docstring says every such signal
+    # must use the 146-county in_scope_distressed(), not the 18-county flip-only
+    # in_scope(). The old in_scope() call meant this module's budget was almost entirely
+    # absorbed by 18 of 143 gap-listed counties every run (audit 2026-10-16).
+    core = [k for k in keys if in_scope_distressed(k[1], k[0])]
     rest = [k for k in keys if k not in core]
     picked = _round_robin(groups, core, max_queries, per_county_cap)
     if len(picked) < max_queries:

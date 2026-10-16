@@ -259,11 +259,29 @@ def test_cap_zero_means_no_cap():
 
 
 def test_footprint_counties_go_before_the_rest():
-    out_of_scope = [_lead(i, county="Mecklenburg", state="NC") for i in range(40)]
+    # 2026-10-16: _select_targets' "footprint" is now config.in_scope_distressed (146
+    # real NC+SC counties, a motivated-seller LEAD signal, not the 18-county flip-only
+    # in_scope() this test used before) -- Mecklenburg is IN that footprint now (it was
+    # only ever excluded from the narrower flip scope), so it no longer serves as an
+    # "out of scope" example. A non-NC/SC state is the only input in_scope_distressed
+    # genuinely rejects.
+    out_of_scope = [_lead(i, county="Fulton", state="GA") for i in range(40)]
     footprint = [_lead(i, county="Mitchell", state="NC") for i in range(3)]
     picked = _select_targets(_cands(out_of_scope + footprint), 5, 50, NOW)
     assert sum(1 for li in picked if li.county == "Mitchell County") == 3
     assert len(picked) == 5                              # leftover budget still used
+
+
+def test_any_real_nc_or_sc_county_counts_as_footprint_not_just_the_18_flip_counties():
+    """The actual bug this fix closes: Mecklenburg (outside the 18-county flip
+    footprint, but a real NC county) must now round-robin fairly alongside an
+    original flip-footprint county, not sit starved behind it as "the rest"."""
+    meck = [_lead(i, county="Mecklenburg", state="NC") for i in range(30)]
+    mitchell = [_lead(i, county="Mitchell", state="NC") for i in range(30)]
+    picked = _select_targets(_cands(meck + mitchell), 10, 50, NOW)
+    counties = [li.county for li in picked]
+    assert counties.count("Mecklenburg County") == 5
+    assert counties.count("Mitchell County") == 5
 
 
 def test_within_a_county_never_checked_precede_old_stamps_oldest_first():
