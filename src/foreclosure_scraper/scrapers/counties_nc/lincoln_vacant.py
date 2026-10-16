@@ -103,7 +103,11 @@ class LincolnVacant(BaseScraper):
     slug = "counties_nc.lincoln_vacant"
     name = "Lincoln County (NC) Vacant Parcels"
     category = "motivated_seller"
-    timeout_s = 120.0
+    # Real fetches measure 3.7-13s for the full ~14.7k-row paginated set (live-verified
+    # 2026-10-16); 120s should rarely bind. Raised as defense-in-depth after a transient
+    # ~123s timeout on 2026-10-15 lost the whole run (now mitigated by the self.partial
+    # salvage added the same audit, but a wider margin costs nothing on a fast source).
+    timeout_s = 240.0
     expected_min_count = 0
 
     async def fetch(self) -> Iterable[Listing]:
@@ -207,7 +211,7 @@ class LincolnVacant(BaseScraper):
                         if _s(a.get("QUALIFIEDCODE")):
                             raw["gis"]["last_sale"]["qualification"] = _s(a.get("QUALIFIEDCODE"))
 
-                    out.append(Listing(
+                    li = Listing(
                         source=self.slug,
                         source_url=(f"{QUERY_URL}?where=PARCELID%3D%27{parcel}%27&outFields=*&f=html"
                                     if parcel else f"{QUERY_URL}?where={_WHERE}&outFields=*&f=html"),
@@ -234,7 +238,14 @@ class LincolnVacant(BaseScraper):
                         first_seen=now,
                         last_seen=now,
                         raw=raw,
-                    ))
+                    )
+                    out.append(li)
+                    # Incremental salvage (audit 2026-10-16): this fetch never populated
+                    # self.partial, so base_scraper.safe_run()'s timeout handler -- which
+                    # only ever salvages rows already sitting there -- had nothing to recover.
+                    # A single ~123s timeout (over the 120s cap, see timeout_s below) threw
+                    # away this source's entire ~14.7k rows instead of the pages already read.
+                    self.partial.append(li)
                 offset += len(feats)
                 # Server caps each page below _PAGE; keep paging while it flags more.
                 if not more and len(feats) < _PAGE:

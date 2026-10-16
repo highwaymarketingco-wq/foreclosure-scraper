@@ -192,3 +192,20 @@ def test_in_state_mailing_carries_the_standard_keys():
     om = _run_fetch([{"attributes": ROW_NEW}])[0].raw["owner_mailing"]
     assert om["mailing"] == "7347 HENRY RD, VALE NC 28168"
     assert om["mail_state"] == "NC" and om["out_of_state"] is False
+
+
+def test_every_row_is_also_salvaged_into_self_partial():
+    """2026-10-16: fetch() never populated self.partial, so base_scraper.safe_run()'s
+    timeout handler -- which only ever salvages rows already sitting there -- had
+    nothing to recover. A real ~123s timeout on 2026-10-15 (over the 120s cap) lost
+    this source's entire ~14.7k-row run instead of just the unread pages."""
+    http = FakeHttp(pages=[{"features": [{"attributes": ROW_FULL}, {"attributes": ROW_SPARSE}]}])
+    original = m.httpx.AsyncClient
+    m.httpx.AsyncClient = lambda *a, **kw: _Ctx(http)  # noqa: E731
+    scraper = m.LincolnVacant()
+    try:
+        result = asyncio.run(scraper.fetch())
+    finally:
+        m.httpx.AsyncClient = original
+    assert len(result) == 2
+    assert scraper.partial == result   # every row that reached `out` also reached partial
