@@ -2422,6 +2422,8 @@ RAW_KEEP = {
     # of its payload before this line existed).
     "greenville_distress": "*",
     "bt_appraisal_card": "*",
+    "bt_parcel_info": "*",       # BT TaxPayer Portal: legal_description, deed_book/page/date,
+                                  # account_number, mailing_address (search-matched, not the PRC)
 
     # cross-cutting distress signals
     "absentee_owner": "*", "bank_name": "*", "case": "*",

@@ -138,6 +138,42 @@ def test_bt_cards_stamp_what_was_read_and_what_had_no_card(monkeypatch):
     assert [li for li in TE.bt_targets(rows, NOW + timedelta(days=1))] == [rows[2]]
 
 
+# --------------------------------------------------------------- BT parcel-info (legal/deed) panel
+def _bt_li(county="Warren", owner="GIBSON WALTER CLIFTON III", addr="437 Quail Ridge Road", raw=None):
+    return _li(county=county, owner_name=owner, street_address=addr, raw=raw)
+
+
+def test_bt_parcel_info_targets_unchecked_or_30_days_hot_first():
+    fresh = _bt_li(raw={"bt_parcel_info": {"status": "no_confident_match",
+                                           "checked_at": (NOW - timedelta(days=3)).isoformat()}})
+    old = _bt_li(raw={"bt_parcel_info": {"status": "no_confident_match",
+                                         "checked_at": (NOW - timedelta(days=40)).isoformat()}})
+    cold = _bt_li(raw=_tier("COLD"))
+    hot = _bt_li(raw=_tier("HOT"))
+    no_addr = _bt_li(addr=None)
+    other_county = _bt_li(county="Polk")
+    got = TE.bt_parcel_info_targets([fresh, old, cold, hot, no_addr, other_county], NOW)
+    assert got[0] is hot and set(map(id, got)) == {id(old), id(cold), id(hot)}
+
+
+def test_run_bt_parcel_info_stamps_what_was_read_and_what_had_no_match(monkeypatch):
+    import foreclosure_scraper.enrichment_bt_parcel_info as BTP
+
+    async def fake(rows):
+        rows = list(rows)
+        rows[0].raw["bt_parcel_info"] = {"legal_description": "LT A9", "parcel_number": "L2D74"}
+        rows[1].raw["bt_parcel_info"] = {"status": "no_confident_match"}
+        return {"matched": 1}                                      # rows[2]: an error, no block
+    monkeypatch.setattr(BTP, "enrich_bt_parcel_info", fake)
+    rows = [_bt_li(owner=f"GIBSON WALTER{i}") for i in range(3)]
+    s = asyncio.run(TE.run_bt_parcel_info(rows, 5, now=NOW))
+    assert s["selected"] == 3
+    assert rows[0].raw["bt_parcel_info"]["checked_at"] == NOW.isoformat()
+    assert rows[1].raw["bt_parcel_info"] == {"status": "no_confident_match", "checked_at": NOW.isoformat()}
+    assert "bt_parcel_info" not in rows[2].raw                      # retried next run
+    assert [li for li in TE.bt_parcel_info_targets(rows, NOW + timedelta(days=1))] == [rows[2]]
+
+
 # --------------------------------------------------------------------------- wetlands
 def test_wetlands_targets_and_shape_and_a_shared_point(monkeypatch):
     calls = []

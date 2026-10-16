@@ -30,6 +30,12 @@ scripts/reconcile_board.py runs them; the two NETWORK steps are stubbed there.
       bt_appraisal_card    the assessor's appraisal card in the 14 BT portal counties for rows
                            with no heated sqft: never checked or checked over 30 days ago, HOT and
                            WARM first, BT_CARD_MAX (300) a run, inside TAIL_BT_CARD_BUDGET_S (600)
+      bt_parcel_info       the SAME 14 counties' "Parcel Information" search panel (legal
+                           description, deed book/page/date, account number, owner mailing) --
+                           matched by owner name AND street address, never one alone
+                           (enrichment_bt_parcel_info._best_match); not the PRC, that vendor has
+                           no tax-payment data at all (see that module's docstring). Rows with no
+                           street address can't be safely matched and are not targeted.
   enrich_network_geo(listings)           NETWORK, in the post-board geographic group
       septic layer refresh  at most once in SEPTIC_REFRESH_DAYS (7), then applied
       wetlands              National Wetlands Inventory (USFWS, the public service on
@@ -314,6 +320,36 @@ async def run_bt_cards(listings: Iterable, budget_s: float, now: Optional[dateti
     return stats
 
 
+# ------------------------------------------------------------------------- bt parcel info panel
+def bt_parcel_info_targets(listings: Iterable, now: datetime) -> list:
+    from .enrichment_bt_parcel_info import _eligible
+    out = [li for li in listings if _eligible(li)
+           and _due(_raw(li).get("bt_parcel_info"), BT_RECHECK_DAYS, now)]
+    order = {"HOT": 0, "WARM": 1}
+    out.sort(key=lambda li: order.get(_tier(li), 2))
+    return out
+
+
+async def run_bt_parcel_info(listings: Iterable, budget_s: float,
+                             now: Optional[datetime] = None) -> dict:
+    from . import enrichment_bt_parcel_info as BTP
+    now = now or datetime.now(timezone.utc)
+    targets = bt_parcel_info_targets(listings, now)[:BTP.MAX_LISTINGS]
+    if not targets:
+        return {"eligible": 0}
+    stamp = now.isoformat()
+    try:
+        stats = await asyncio.wait_for(BTP.enrich_bt_parcel_info(targets), timeout=budget_s)
+    except asyncio.TimeoutError:
+        stats = {"time_capped": budget_s}
+    for li in targets:
+        blk = _raw(li).get("bt_parcel_info")
+        if isinstance(blk, dict) and not blk.get("checked_at"):
+            blk["checked_at"] = stamp
+    stats["selected"] = len(targets)
+    return stats
+
+
 # ----------------------------------------------------------------------------------- wetlands
 def wetlands_targets(listings: Iterable, now: datetime) -> list:
     out = []
@@ -416,7 +452,9 @@ def enrich_local_after_qa(listings) -> dict:
 
 
 async def enrich_network_pre_value(listings, *, budget_s: Optional[float] = None) -> dict:
-    """NETWORK tail step before the valuation loop: BT appraisal cards (sqft, value, last sale)."""
+    """NETWORK tail step before the valuation loop: BT appraisal cards (sqft, value, last sale)
+    and the same vendor's parcel-info panel (legal description, deed ref)."""
+    listings = list(listings)
     budget = budget_s if budget_s is not None else _env_s("TAIL_BT_CARD_BUDGET_S", 600)
     t0 = time.monotonic()
     try:
@@ -425,8 +463,20 @@ async def enrich_network_pre_value(listings, *, budget_s: Optional[float] = None
         log.error("tail_extras.bt_appraisal_card.failed", error=f"{type(exc).__name__}: {exc}"[:300])
         out = {"failed": f"{type(exc).__name__}: {exc}"[:200]}
     out["seconds"] = round(time.monotonic() - t0, 1)
+
+    budget2 = _env_s("TAIL_BT_PARCEL_INFO_BUDGET_S", 300)
+    t1 = time.monotonic()
+    try:
+        out2 = await run_bt_parcel_info(listings, budget2)
+    except Exception as exc:  # noqa: BLE001
+        log.error("tail_extras.bt_parcel_info.failed", error=f"{type(exc).__name__}: {exc}"[:300])
+        out2 = {"failed": f"{type(exc).__name__}: {exc}"[:200]}
+    out2["seconds"] = round(time.monotonic() - t1, 1)
+
     log.info("tail_extras.network_pre_value", **{k: v for k, v in out.items() if not isinstance(v, dict)})
-    return {"bt_appraisal_card": out}
+    log.info("tail_extras.network_pre_value.parcel_info",
+             **{k: v for k, v in out2.items() if not isinstance(v, dict)})
+    return {"bt_appraisal_card": out, "bt_parcel_info": out2}
 
 
 async def enrich_network_geo(listings, *, budget_s: Optional[float] = None) -> dict:
