@@ -1,47 +1,125 @@
 {
-  "generated_at": "2026-10-07T17:09:08.416579+00:00",
+  "generated_at": "2026-10-16T20:25:27.945803+00:00",
   "totals": {
-    "total_listings": 350013,
+    "total_listings": 437170,
     "by_state": {
-      "NC": 241524,
-      "SC": 109050
+      "NC": 318704,
+      "SC": 118722
     }
   },
   "sources": [
     {
-      "source": "counties_nc.edgecombe_tax_foreclosure",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 403 (blocked/forbidden) from www.edgecombecountync.gov (scraper swallowed the error)",
-      "severity": 4
-    },
-    {
-      "source": "counties_nc.polk_tax",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 5 consecutive runs (normally ~1/run) \u2014 source likely broken",
-      "severity": 4
-    },
-    {
-      "source": "counties_nc.rutherford_foreclosure",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 403 (blocked/forbidden) from www.rutherfordcountync.gov [impersonate] (scraper swallowed the error)",
-      "severity": 4
-    },
-    {
-      "source": "counties_nc.wnc_rod_foreclosure_starts",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~5/run) \u2014 source likely broken",
-      "severity": 4
-    },
-    {
-      "source": "counties_nc.wnc_tax_foreclosures",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 403 (blocked/forbidden) from www.averycountync.gov (scraper swallowed the error)",
-      "severity": 4
-    },
-    {
-      "source": "counties_sc.anderson_acpass_deeds",
+      "source": "counties_nc.brunswick_legal_notices",
       "count": 0,
       "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 240s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.cumberland_delinquent_tax",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: network timeout (ConnectTimeout)",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.gaston_surplus_properties",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 120s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.gaston_tax_foreclosures",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 120s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.haywood_tax_foreclosures",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 120s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.iredell_delinquent_tax",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.kinston_proposed_demolition",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: connection refused/dropped (ConnectError)",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.lincoln_vacant",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 120s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.mecklenburg_tax_foreclosures",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: connection refused/dropped (ConnectError)",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.nc_bankruptcy_sales",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 120s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.nc_county_csv_delinquent_tax",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 ERROR: PartialHarvest: counties_nc.nc_county_csv_delinquent_tax: partial harvest, lost New Hanover (0/1 declared layers alive; 0 rows discarded rather than shipped as a smaller harves",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.nc_county_pdf_delinquent_tax",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.nc_deq_dsca",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 3 consecutive runs (normally ~4/run) \u2014 source likely broken",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.nc_metro_demolition_permits",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.nc_rod_captcha",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 ERROR: TargetClosedError: BrowserType.launch: Target page, context or browser has been closed\nBrowser logs:\n\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.nc_rod_logan",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.nc_rowan_cott",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 300s",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.rutherford_wildfire_tax",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 403 (blocked/forbidden)",
+      "severity": 4
+    },
+    {
+      "source": "counties_nc.wake_code_cases",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 ERROR: ReadError: ",
       "severity": 4
     },
     {
@@ -51,99 +129,141 @@
       "severity": 4
     },
     {
-      "source": "counties_sc.dillon_sheriff",
+      "source": "counties_sc.charleston_energov_history",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 4 consecutive runs (normally ~1/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: connection refused/dropped (RemoteProtocolError)",
       "severity": 4
     },
     {
-      "source": "counties_sc.greenwood_corebtpay_delinquent_tax",
+      "source": "counties_sc.dillon_sheriff",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 1800s",
+      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 3 consecutive runs (normally ~1/run) \u2014 source likely broken",
+      "severity": 4
+    },
+    {
+      "source": "counties_sc.greenville_mie_adverts",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 420s",
+      "severity": 4
+    },
+    {
+      "source": "counties_sc.horry_delinquent_xlsx",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+      "severity": 4
+    },
+    {
+      "source": "counties_sc.horry_probate",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
       "severity": 4
     },
     {
       "source": "counties_sc.laurens_overage_claims",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 300s",
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 600s",
+      "severity": 4
+    },
+    {
+      "source": "counties_sc.lexington_flc",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 90s",
       "severity": 4
     },
     {
       "source": "counties_sc.mccormick_flc",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 4 consecutive runs (normally ~2/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely broken",
+      "severity": 4
+    },
+    {
+      "source": "counties_sc.meares_auctions",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
       "severity": 4
     },
     {
       "source": "counties_sc.oconee_flc",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 4 consecutive runs (normally ~2/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely broken",
       "severity": 4
     },
     {
       "source": "counties_sc.oconee_tax_sale",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: network timeout (ConnectTimeout)",
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 40s",
+      "severity": 4
+    },
+    {
+      "source": "counties_sc.orangeburg_overage_claims",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 90s",
+      "severity": 4
+    },
+    {
+      "source": "counties_sc.pickens_tax_sale",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 90s",
+      "severity": 4
+    },
+    {
+      "source": "counties_sc.richland_flc",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 60s",
       "severity": 4
     },
     {
       "source": "counties_sc.sc_flc",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 403 (blocked/forbidden) from www.spartanburgcounty.gov (scraper swallowed the error)",
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 600s",
       "severity": 4
     },
     {
-      "source": "counties_sc.sc_rod_cott",
+      "source": "counties_sc.sc_ust_registry",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 down 68% (10 vs ~31 baseline) for 2 runs \u2014 partial failure",
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
       "severity": 4
     },
     {
-      "source": "counties_sc.spartanburg_flc",
+      "source": "counties_sc.spartan_weekly_legals",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 403 (blocked/forbidden) from www.spartanburgcounty.gov (scraper swallowed the error)",
-      "severity": 4
-    },
-    {
-      "source": "counties_sc.spartanburg_master_in_equity",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 403 (blocked/forbidden) from www.spartanburgcounty.gov (scraper swallowed the error)",
+      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 4 consecutive runs (normally ~111/run) \u2014 source likely broken",
       "severity": 4
     },
     {
       "source": "counties_sc.sumter_surplus",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 4 consecutive runs (normally ~2/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely broken",
       "severity": 4
     },
     {
-      "source": "counties_sc.york_delinquent_tax",
+      "source": "counties_sc.terry_howe_auctions",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 403 (blocked/forbidden) from www.yorkcountysc.gov (scraper swallowed the error)",
+      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~897/run) \u2014 source likely broken",
+      "severity": 4
+    },
+    {
+      "source": "counties_sc.york_tax_sale_parcels",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 ERROR: ReadError: ",
+      "severity": 4
+    },
+    {
+      "source": "counties_sc.zombie_properties",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 120s",
       "severity": 4
     },
     {
       "source": "law_firms.alaw",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~26/run) \u2014 source likely broken",
-      "severity": 4
-    },
-    {
-      "source": "law_firms.finkel",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~8/run) \u2014 source likely broken",
-      "severity": 4
-    },
-    {
-      "source": "law_firms.ingle_firm",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~1/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
       "severity": 4
     },
     {
       "source": "national.cash_buyer_deeds",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~499/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 300s",
       "severity": 4
     },
     {
@@ -153,39 +273,27 @@
       "severity": 4
     },
     {
-      "source": "national.freddie_homesteps",
+      "source": "national.hud_reac_inspection",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~26/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
       "severity": 4
     },
     {
-      "source": "national.hud_homestore",
+      "source": "national.legacy_obituaries",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~33/run) \u2014 source likely broken",
-      "severity": 4
-    },
-    {
-      "source": "national.hud_section8_contracts",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 down 84% (40 vs ~250 baseline) for 2 runs \u2014 partial failure",
-      "severity": 4
-    },
-    {
-      "source": "national.seeclickfix",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 down 97% (21 vs ~745 baseline) for 2 runs \u2014 partial failure",
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 300s",
       "severity": 4
     },
     {
       "source": "national.sheriff_sales",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~6/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 120s",
       "severity": 4
     },
     {
       "source": "national.tranzon",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 4 consecutive runs (normally ~1/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 3 consecutive runs (normally ~1/run) \u2014 source likely broken",
       "severity": 4
     },
     {
@@ -195,75 +303,183 @@
       "severity": 4
     },
     {
-      "source": "newspapers.carolina_coast",
+      "source": "national.williams",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~4/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
       "severity": 4
     },
     {
-      "source": "newspapers.daily_courier",
+      "source": "newspapers.aiken_standard",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~2/run) \u2014 source likely broken",
+      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 429 (rate-limited) from www.postandcourier.com (scraper swallowed the error)",
+      "severity": 4
+    },
+    {
+      "source": "newspapers.berkeley_independent",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 429 (rate-limited) from www.postandcourier.com (scraper swallowed the error)",
+      "severity": 4
+    },
+    {
+      "source": "newspapers.carolina_coast",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 429 (rate-limited) from www.carolinacoastonline.com (scraper swallowed the error)",
       "severity": 4
     },
     {
       "source": "newspapers.index_journal",
       "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 429 (rate-limited) from www.indexjournal.com (scraper swallowed the error)",
+      "severity": 4
+    },
+    {
+      "source": "newspapers.journal_scene",
+      "count": 0,
+      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 429 (rate-limited) from www.postandcourier.com (scraper swallowed the error)",
+      "severity": 4
+    },
+    {
+      "source": "newspapers.post_and_courier",
+      "count": 0,
       "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~6/run) \u2014 source likely broken",
       "severity": 4
     },
     {
-      "source": "newspapers.shelby_star",
+      "source": "counties_sc.spartanburg_master_in_equity",
       "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 BLOCKED: HTTP 429 (rate-limited) from www.shelbystar.com (scraper swallowed the error)",
-      "severity": 4
-    },
-    {
-      "source": "public_notices.funeral_home_rss",
-      "count": 0,
-      "status": "\ud83d\udd34 ALARM \u2014 0 listings for 2 consecutive runs (normally ~50/run) \u2014 source likely broken",
-      "severity": 4
-    },
-    {
-      "source": "counties_sc.orangeburg_overage_claims",
-      "count": 0,
-      "status": "REGRESSED (expected \u2265 50)",
+      "status": "REGRESSED (expected \u2265 5)",
       "severity": 3
     },
     {
-      "source": "counties_nc.rutherford_tax",
-      "count": 0,
-      "status": "CARRYOVER (7329 stale from prior run)",
+      "source": "counties_nc.asheville_helene",
+      "count": 735,
+      "status": "CARRYOVER (735 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_nc.buncombe_delinquent_tax",
+      "count": 1182,
+      "status": "CARRYOVER (1182 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_nc.buncombe_elderly",
+      "count": 4322,
+      "status": "CARRYOVER (4322 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_nc.buncombe_tax",
+      "count": 24,
+      "status": "CARRYOVER (24 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_nc.cleveland_tax",
+      "count": 9,
+      "status": "CARRYOVER (9 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_nc.gastonia_code_enforcement",
+      "count": 1176,
+      "status": "CARRYOVER (1176 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_nc.henderson_code_violations",
+      "count": 193,
+      "status": "CARRYOVER (193 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_nc.henderson_foreclosure_parcels",
+      "count": 14,
+      "status": "CARRYOVER (14 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_nc.hendersonville_vacant_structures",
+      "count": 48,
+      "status": "CARRYOVER (48 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_sc.anderson_master_in_equity",
+      "count": 28,
+      "status": "CARRYOVER (28 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_sc.dillon_delinquent_tax",
+      "count": 843,
+      "status": "CARRYOVER (843 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_sc.dorchester_billtrax_delinquent_tax",
+      "count": 1306,
+      "status": "CARRYOVER (1306 stale from prior run)",
       "severity": 2
     },
     {
       "source": "counties_sc.georgetown_civicengage",
-      "count": 0,
-      "status": "CARRYOVER (355 stale from prior run)",
+      "count": 354,
+      "status": "CARRYOVER (354 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_sc.oconee_flc_assignment",
+      "count": 585,
+      "status": "CARRYOVER (585 stale from prior run)",
       "severity": 2
     },
     {
       "source": "counties_sc.oconee_forfeited_land",
-      "count": 0,
+      "count": 257,
       "status": "CARRYOVER (257 stale from prior run)",
       "severity": 2
     },
     {
+      "source": "counties_sc.pickens_delinquent_parcels",
+      "count": 1403,
+      "status": "CARRYOVER (1403 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_sc.spartanburg_city_condemned",
+      "count": 84,
+      "status": "CARRYOVER (84 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_sc.spartanburg_condemned",
+      "count": 1754,
+      "status": "CARRYOVER (1754 stale from prior run)",
+      "severity": 2
+    },
+    {
       "source": "counties_sc.spartanburg_delinquent_tax",
-      "count": 0,
-      "status": "CARRYOVER (1776 stale from prior run)",
+      "count": 1770,
+      "status": "CARRYOVER (1770 stale from prior run)",
+      "severity": 2
+    },
+    {
+      "source": "counties_sc.spartanburg_vacant",
+      "count": 4440,
+      "status": "CARRYOVER (4440 stale from prior run)",
       "severity": 2
     },
     {
       "source": "counties_sc.york_overage_claims",
-      "count": 0,
-      "status": "CARRYOVER (107 stale from prior run)",
+      "count": 115,
+      "status": "CARRYOVER (115 stale from prior run)",
       "severity": 2
     },
     {
-      "source": "law_firms.bell_carrington",
-      "count": 0,
-      "status": "CARRYOVER (12 stale from prior run)",
+      "source": "national.hud_section8_contracts",
+      "count": 32,
+      "status": "CARRYOVER (32 stale from prior run)",
       "severity": 2
     },
     {
@@ -274,56 +490,62 @@
     },
     {
       "source": "city_websites.charlotte_open_data",
-      "count": 0,
-      "status": "OK (3058)",
+      "count": 3045,
+      "status": "OK (3045)",
+      "severity": 0
+    },
+    {
+      "source": "city_websites.raleigh_structure_fires",
+      "count": 395,
+      "status": "OK (395)",
       "severity": 0
     },
     {
       "source": "counties.column_legal_notices",
-      "count": 0,
-      "status": "OK (1447)",
+      "count": 1584,
+      "status": "OK (1584)",
       "severity": 0
     },
     {
       "source": "counties.multi_year_delinquent_tax",
-      "count": 0,
-      "status": "OK (2036)",
+      "count": 2022,
+      "status": "OK (2022)",
       "severity": 0
     },
     {
       "source": "counties.nod_discovery",
-      "count": 0,
-      "status": "OK (48)",
+      "count": 50,
+      "status": "\u26a0\ufe0f PARTIAL (50) \u2014 CCHS vendor wall-blocked for all 3 CCHS counties in this sweep (Burke/Cleveland/Lincoln) \u2014 other, non-CCHS targets in this run are unaffected",
       "severity": 0
     },
     {
       "source": "counties.sitemap_walker",
-      "count": 0,
-      "status": "OK (253)",
+      "count": 67,
+      "status": "OK (67)",
       "severity": 0
     },
     {
       "source": "counties_generic.arcgis_distress_layers",
-      "count": 0,
-      "status": "OK (14563)",
+      "count": 13955,
+      "status": "OK (13955)",
       "severity": 0
     },
     {
       "source": "counties_generic.epa_frs_sites",
-      "count": 0,
-      "status": "OK (3714)",
+      "count": 3785,
+      "status": "OK (3785)",
       "severity": 0
     },
     {
       "source": "counties_generic.state_contamination",
-      "count": 0,
+      "count": 53827,
       "status": "OK (53827)",
       "severity": 0
     },
     {
       "source": "counties_nc.albemarle_observer_tax_lists",
-      "count": 0,
-      "status": "OK (7527)",
+      "count": 9333,
+      "status": "OK (9333)",
       "severity": 0
     },
     {
@@ -333,207 +555,129 @@
       "severity": 0
     },
     {
-      "source": "counties_nc.asheville_helene",
-      "count": 0,
-      "status": "OK (652)",
-      "severity": 0
-    },
-    {
       "source": "counties_nc.asheville_str_permits",
-      "count": 0,
+      "count": 672,
       "status": "OK (672)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.brunswick_legal_notices",
-      "count": 0,
-      "status": "OK (5)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.buncombe_delinquent_tax",
-      "count": 0,
-      "status": "OK (1181)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.buncombe_elderly",
-      "count": 0,
-      "status": "OK (4352)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.buncombe_tax",
-      "count": 0,
-      "status": "OK (38)",
       "severity": 0
     },
     {
       "source": "counties_nc.buncombe_tax_foreclosure",
       "count": 0,
-      "status": "OK (4)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.cleveland_tax",
-      "count": 0,
-      "status": "OK (17)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.cleveland_tax_foreclosure",
-      "count": 0,
-      "status": "OK (17)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.cumberland_tax_foreclosure",
-      "count": 0,
-      "status": "OK (8)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.gaston_surplus_properties",
-      "count": 0,
       "status": "EMPTY (verified)",
       "severity": 0
     },
     {
-      "source": "counties_nc.gaston_tax_foreclosures",
-      "count": 0,
-      "status": "OK (81)",
+      "source": "counties_nc.cleveland_tax_foreclosure",
+      "count": 9,
+      "status": "OK (9)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.cumberland_tax_foreclosure",
+      "count": 6,
+      "status": "OK (6)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.edgecombe_tax_foreclosure",
+      "count": 17,
+      "status": "OK (17)",
       "severity": 0
     },
     {
       "source": "counties_nc.gaston_vacant",
       "count": 0,
-      "status": "OK (21772)",
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
-      "source": "counties_nc.gastonia_code_enforcement",
-      "count": 0,
-      "status": "OK (1493)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.haywood_tax_foreclosures",
-      "count": 0,
-      "status": "OK (1)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.henderson_code_violations",
-      "count": 0,
-      "status": "OK (172)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.henderson_foreclosure_parcels",
-      "count": 0,
-      "status": "OK (15)",
+      "source": "counties_nc.guilford_tax_foreclosures",
+      "count": 918,
+      "status": "OK (918)",
       "severity": 0
     },
     {
       "source": "counties_nc.henderson_tax",
       "count": 0,
-      "status": "OK (15)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.hendersonville_vacant_structures",
-      "count": 0,
-      "status": "OK (51)",
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
       "source": "counties_nc.lincoln_code_violations",
-      "count": 0,
+      "count": 63,
       "status": "OK (63)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.lincoln_vacant",
-      "count": 0,
-      "status": "OK (14731)",
       "severity": 0
     },
     {
       "source": "counties_nc.mcdowell_probate",
       "count": 0,
-      "status": "OK (414)",
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
       "source": "counties_nc.mcdowell_tax_foreclosure",
-      "count": 0,
+      "count": 1,
       "status": "OK (1)",
       "severity": 0
     },
     {
-      "source": "counties_nc.nc_bankruptcy_sales",
+      "source": "counties_nc.mecklenburg_delinquent_tax",
       "count": 0,
-      "status": "OK (3)",
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.morganton_nc",
+      "count": 0,
+      "status": "DORMANT \u2014 disabled: confirmed 2026-10-13: condemned-properties and tax-foreclosures pages no longer exist on the city site (not stale URLs -- genuinely gone); code-enforcement has a real, live, correctly-Cloudflare-gated page but zero tables/data of any kind on it, just department contact info. No public violations list currently published by the city.",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.nc_cchs_deeds",
+      "count": 0,
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
       "source": "counties_nc.nc_coastal_tax_foreclosure",
-      "count": 0,
+      "count": 5,
       "status": "OK (5)",
       "severity": 0
     },
     {
-      "source": "counties_nc.nc_county_csv_delinquent_tax",
-      "count": 0,
-      "status": "OK (1404)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.nc_county_pdf_delinquent_tax",
-      "count": 0,
-      "status": "OK (8922)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.nc_deq_dsca",
-      "count": 0,
-      "status": "OK (57)",
-      "severity": 0
-    },
-    {
       "source": "counties_nc.nc_govdeals_real_property",
-      "count": 0,
-      "status": "OK (3)",
+      "count": 9,
+      "status": "OK (9)",
       "severity": 0
     },
     {
       "source": "counties_nc.nc_heir_estate_parcels",
-      "count": 0,
-      "status": "OK (2559)",
+      "count": 24559,
+      "status": "OK (24559)",
       "severity": 0
     },
     {
       "source": "counties_nc.nc_its_public_tax",
-      "count": 0,
-      "status": "OK (2224)",
+      "count": 19554,
+      "status": "\u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected before the cutoff",
       "severity": 0
     },
     {
       "source": "counties_nc.nc_ptscloud_delinquent_tax",
-      "count": 0,
-      "status": "OK (19623)",
-      "severity": 0
-    },
-    {
-      "source": "counties_nc.nc_rod_logan",
-      "count": 0,
-      "status": "OK (27)",
+      "count": 19383,
+      "status": "OK (19383)",
       "severity": 0
     },
     {
       "source": "counties_nc.nc_rod_substitute_trustee",
-      "count": 0,
-      "status": "OK (119)",
+      "count": 82,
+      "status": "\u26a0\ufe0f PARTIAL (82) \u2014 exceeded soft timeout 600s \u2014 shipped 82 rows collected before the cutoff",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.nc_tax_lien_ads",
+      "count": 12910,
+      "status": "OK (12910)",
       "severity": 0
     },
     {
@@ -544,62 +688,92 @@
     },
     {
       "source": "counties_nc.new_hanover_foreclosures",
-      "count": 0,
+      "count": 1,
       "status": "OK (1)",
       "severity": 0
     },
     {
-      "source": "counties_nc.rutherford_wildfire_tax",
-      "count": 0,
-      "status": "OK (3304)",
+      "source": "counties_nc.rocky_mount_blight_survey",
+      "count": 618,
+      "status": "OK (618)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.rowan_delinquent_tax",
+      "count": 2699,
+      "status": "OK (2699)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.rutherford_foreclosure",
+      "count": 21,
+      "status": "OK (21)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.rutherford_tax",
+      "count": 9328,
+      "status": "OK (9328)",
       "severity": 0
     },
     {
       "source": "counties_nc.stokes_delinquent_tax",
-      "count": 0,
-      "status": "OK (1)",
+      "count": 2,
+      "status": "OK (2)",
       "severity": 0
     },
     {
       "source": "counties_nc.swain_tax_foreclosures",
-      "count": 0,
+      "count": 1,
       "status": "OK (1)",
       "severity": 0
     },
     {
       "source": "counties_nc.transylvania_delinquent_tax",
-      "count": 0,
-      "status": "OK (241)",
+      "count": 308,
+      "status": "OK (308)",
       "severity": 0
     },
     {
       "source": "counties_nc.transylvania_vacant",
-      "count": 0,
-      "status": "OK (11109)",
+      "count": 11108,
+      "status": "OK (11108)",
       "severity": 0
     },
     {
       "source": "counties_nc.wake_tax_foreclosure",
-      "count": 0,
+      "count": 4,
       "status": "OK (4)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.wnc_rod_foreclosure_starts",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.wnc_tax_foreclosures",
+      "count": 0,
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
       "source": "counties_sc.abbeville_delinquent_tax",
       "count": 0,
-      "status": "DORMANT \u2014 disabled: target page has no delinquent-property list (office/FAQ page only) - superseded by counties_sc.qpaybill_delinquent_roll (Abbeville) - confirmed 2026-10-01",
+      "status": "DORMANT \u2014 disabled: target page has no delinquent-property list (office/FAQ page only) - superseded by counties_sc.qpaybill_delinquent_roll (Abbeville) - confirmed 2026-10-01, re-confirmed 2026-10-13 (live GET, still office/FAQ only)",
       "severity": 0
     },
     {
       "source": "counties_sc.aiken_delinquent_tax",
       "count": 0,
-      "status": "DORMANT \u2014 disabled: target page has zero table rows (no delinquent-property list) - superseded by counties_sc.sc_catalis_delinquent_roll (Aiken) - confirmed 2026-10-01",
+      "status": "DORMANT \u2014 disabled: target page has zero table rows (no delinquent-property list) - superseded by counties_sc.sc_catalis_delinquent_roll (Aiken) - confirmed 2026-10-01, re-confirmed 2026-10-13 (URL now redirects to /309/Delinquent-Tax-Sale, still no rows; 3 linked PDFs checked, none contain a parcel list)",
       "severity": 0
     },
     {
-      "source": "counties_sc.anderson_master_in_equity",
-      "count": 0,
-      "status": "OK (26)",
+      "source": "counties_sc.anderson_acpass_deeds",
+      "count": 9,
+      "status": "\u26a0\ufe0f PARTIAL (9) \u2014 exceeded soft timeout 480s \u2014 shipped 9 rows collected before the cutoff",
       "severity": 0
     },
     {
@@ -617,42 +791,42 @@
     {
       "source": "counties_sc.beaufort_flc",
       "count": 0,
-      "status": "DORMANT \u2014 disabled: CATALOG_URL is a closed 2017 Proxibid auction (page itself says 'Auction closed.'; sampled lots show 'PASSED'/'Sold for: USD ...' 9-year-old outcomes, not live inventory); no newer Beaufort FLC Proxibid catalog found (Proxibid + web search); county's own current page (AUTHORITATIVE_SOURCE_URL) states 'There are currently no properties available for bidding at this time' - confirmed 2026-10-03",
+      "status": "DORMANT \u2014 disabled: CATALOG_URL is a closed 2017 Proxibid auction (page itself says 'Auction closed.'; sampled lots show 'PASSED'/'Sold for: USD ...' 9-year-old outcomes, not live inventory); no newer Beaufort FLC Proxibid catalog found (Proxibid + web search); county's own current page (AUTHORITATIVE_SOURCE_URL) states 'There are currently no properties available for bidding at this time' - confirmed 2026-10-03 - re-checked live 2026-10-13: CATALOG_URL still closed/stale, Meares' current platform (bid.mpa-sc.com) and the live Beaufort treasurer site both show no FLC inventory; AUTHORITATIVE_SOURCE_URL itself now Cloudflare-challenge-blocked so its exact text could not be re-fetched today (see docstring)",
       "severity": 0
     },
     {
       "source": "counties_sc.berkeley_paystar_tax",
-      "count": 0,
-      "status": "OK (2229)",
+      "count": 25,
+      "status": "\u26a0\ufe0f PARTIAL (25) \u2014 exceeded soft timeout 900s \u2014 shipped 25 rows collected before the cutoff",
       "severity": 0
     },
     {
       "source": "counties_sc.calhoun_overage_claims",
-      "count": 0,
+      "count": 74,
       "status": "OK (74)",
       "severity": 0
     },
     {
       "source": "counties_sc.charleston_delinquent_tax",
-      "count": 0,
+      "count": 1760,
       "status": "OK (1760)",
       "severity": 0
     },
     {
       "source": "counties_sc.charleston_mie",
-      "count": 0,
-      "status": "OK (48)",
+      "count": 37,
+      "status": "OK (37)",
       "severity": 0
     },
     {
       "source": "counties_sc.charleston_tax_sale_xlsx",
-      "count": 0,
-      "status": "OK (3370)",
+      "count": 3240,
+      "status": "OK (3240)",
       "severity": 0
     },
     {
       "source": "counties_sc.cherokee_delinquent_tax",
-      "count": 0,
+      "count": 528,
       "status": "OK (528)",
       "severity": 0
     },
@@ -663,9 +837,15 @@
       "severity": 0
     },
     {
+      "source": "counties_sc.city_of_union",
+      "count": 0,
+      "status": "DORMANT \u2014 disabled: confirmed 2026-10-13: all 3 original URLs are dead 404s, the city rebuilt its site on Apptegy (news/events platform), and no tax/building-codes/code-enforcement page exists anywhere on the current site -- confirmed via full nav read + a zero-result Google site: search. Not a CAPTCHA/WAF wall; the content is simply gone.",
+      "severity": 0
+    },
+    {
       "source": "counties_sc.clarendon_tax_auction",
       "count": 0,
-      "status": "DORMANT \u2014 disabled: keyword-link-follower grabbed the county's unrelated procurement/RFP portal and meeting-agenda PDFs as fake tax listings - superseded by counties_sc.qpaybill_delinquent_roll (Clarendon) - confirmed 2026-10-01",
+      "status": "DORMANT \u2014 disabled: keyword-link-follower grabbed the county's unrelated procurement/RFP portal and meeting-agenda PDFs as fake tax listings - superseded by counties_sc.qpaybill_delinquent_roll (Clarendon) - confirmed 2026-10-01 - re-confirmed live 2026-10-13: homepage still shows only the same non-parcel registration PDF, nothing new to capture",
       "severity": 0
     },
     {
@@ -677,85 +857,73 @@
     {
       "source": "counties_sc.darlington_delinquent_tax",
       "count": 0,
-      "status": "DORMANT \u2014 disabled: target page carries only an office-hours table, never a delinquent list - superseded by counties_sc.qpaybill_delinquent_roll (Darlington) - confirmed 2026-10-01",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.dillon_delinquent_tax",
-      "count": 0,
-      "status": "OK (343)",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.dorchester_billtrax_delinquent_tax",
-      "count": 0,
-      "status": "OK (1167)",
+      "status": "DORMANT \u2014 disabled: target page carries only an office-hours table, never a delinquent list - superseded by counties_sc.qpaybill_delinquent_roll (Darlington) - confirmed 2026-10-01, re-confirmed 2026-10-13 (live GET, still office-hours-only; tax_collector.php dept page checked too, same result)",
       "severity": 0
     },
     {
       "source": "counties_sc.edgefield_delinquent_tax",
       "count": 0,
-      "status": "DORMANT \u2014 disabled: target page is office-contact info only, no table - superseded by counties_sc.qpaybill_delinquent_roll (Edgefield) - confirmed 2026-10-01",
+      "status": "DORMANT \u2014 disabled: target page is office-contact info only, no table - superseded by counties_sc.qpaybill_delinquent_roll (Edgefield) - confirmed 2026-10-01, re-confirmed live 2026-10-13",
       "severity": 0
     },
     {
       "source": "counties_sc.fairfield_delinquent_tax",
       "count": 0,
-      "status": "DORMANT \u2014 disabled: target page is office-contact info only, no table - superseded by counties_sc.sc_catalis_delinquent_roll (Fairfield) - confirmed 2026-10-01",
+      "status": "DORMANT \u2014 disabled: target page is office-contact info only, no table - superseded by counties_sc.sc_catalis_delinquent_roll (Fairfield) - confirmed 2026-10-01, re-confirmed live 2026-10-13",
       "severity": 0
     },
     {
       "source": "counties_sc.fairfield_overage_claims",
-      "count": 0,
+      "count": 60,
       "status": "OK (60)",
       "severity": 0
     },
     {
       "source": "counties_sc.florence_delinquent_tax",
-      "count": 0,
-      "status": "OK (978)",
+      "count": 715,
+      "status": "OK (715)",
       "severity": 0
     },
     {
       "source": "counties_sc.greenville_delinquent_tax",
-      "count": 0,
-      "status": "OK (1466)",
+      "count": 861,
+      "status": "OK (861)",
       "severity": 0
     },
     {
-      "source": "counties_sc.greenville_mie_adverts",
-      "count": 0,
-      "status": "OK (400)",
+      "source": "counties_sc.greenville_probate",
+      "count": 39,
+      "status": "\u26a0\ufe0f PARTIAL (39) \u2014 exceeded soft timeout 1800s \u2014 shipped 39 rows collected before the cutoff",
       "severity": 0
     },
     {
       "source": "counties_sc.greenville_tax_distress",
+      "count": 1944,
+      "status": "OK (1944)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.greenwood_corebtpay_delinquent_tax",
       "count": 0,
-      "status": "OK (2178)",
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
       "source": "counties_sc.greenwood_delinquent_tax",
       "count": 0,
-      "status": "DORMANT \u2014 disabled: target page is Treasurer office info only, no delinquent list - superseded by counties_sc.greenwood_corebtpay_delinquent_tax - confirmed 2026-10-01",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.horry_delinquent_xlsx",
-      "count": 0,
-      "status": "OK (842)",
+      "status": "DORMANT \u2014 disabled: target page is Treasurer office info only, no delinquent list - superseded by counties_sc.greenwood_corebtpay_delinquent_tax - confirmed 2026-10-01, re-confirmed live 2026-10-04 and 2026-10-13",
       "severity": 0
     },
     {
       "source": "counties_sc.horry_flc",
-      "count": 0,
+      "count": 20,
       "status": "OK (20)",
       "severity": 0
     },
     {
       "source": "counties_sc.kershaw_flc",
       "count": 0,
-      "status": "DORMANT \u2014 disabled: PAGE_URL 404s (county site reorganized, no redirect) - re-searched live 2026-10-02 for a replacement (Treasurer/delinquent-matters page, Auditor, Boards and Commissions, Bids and RFPs, the county's ArcGIS open-data parcel layer with no owner field, general web search) and found no current free FLC inventory anywhere - the one lead (qPublic owner-name search) is gated behind a click-through Terms of Service, a compliance wall per CLAUDE.md, not a technical gap - nearest covered signal is counties_sc.qpaybill_delinquent_roll (Kershaw pre-sale delinquent roll, a different lane) - confirmed 2026-10-02",
+      "status": "DORMANT \u2014 disabled: Entire kershaw.sc.gov domain (PAGE_URL, homepage, Treasurer/delinquent-matters, even /robots.txt) 403s from an Akamai WAF/bot-management edge today, not the page-specific 404 originally reported - re-searched live 2026-10-02 for a replacement (Treasurer/delinquent-matters page, Auditor, Boards and Commissions, Bids and RFPs, the county's ArcGIS open-data parcel layer with no owner field, general web search) and found no current free FLC inventory anywhere - the one lead (qPublic owner-name search) is gated behind a click-through Terms of Service, a compliance wall per CLAUDE.md, not a technical gap - nearest covered signal is counties_sc.qpaybill_delinquent_roll (Kershaw pre-sale delinquent roll, a different lane) - mechanism re-checked and corrected 2026-10-13 (see module docstring), net conclusion unchanged",
       "severity": 0
     },
     {
@@ -771,57 +939,21 @@
       "severity": 0
     },
     {
-      "source": "counties_sc.lexington_flc",
-      "count": 0,
-      "status": "EMPTY (verified)",
-      "severity": 0
-    },
-    {
       "source": "counties_sc.marlboro_delinquent_tax",
       "count": 0,
       "status": "DORMANT \u2014 disabled: PAGE_URL is a generic meetings/publications page (budget tables, not tax-sale data) - superseded by counties_sc.qpaybill_delinquent_roll (Marlboro) - confirmed 2026-10-01",
       "severity": 0
     },
     {
-      "source": "counties_sc.meares_auctions",
-      "count": 0,
-      "status": "EMPTY (verified)",
-      "severity": 0
-    },
-    {
       "source": "counties_sc.newberry_delinquent_tax",
       "count": 0,
-      "status": "DORMANT \u2014 disabled: target page links only a general-procedures PDF, no per-parcel table - superseded by counties_sc.qpaybill_delinquent_roll (Newberry) - confirmed 2026-10-01",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.oconee_flc_assignment",
-      "count": 0,
-      "status": "OK (585)",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.pickens_delinquent_parcels",
-      "count": 0,
-      "status": "OK (2161)",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.pickens_tax_sale",
-      "count": 0,
-      "status": "OK (160)",
+      "status": "DORMANT \u2014 disabled: target page links only a general-procedures PDF, no per-parcel table - superseded by counties_sc.qpaybill_delinquent_roll (Newberry) - confirmed 2026-10-01, re-confirmed live 2026-10-04 and 2026-10-13",
       "severity": 0
     },
     {
       "source": "counties_sc.qpaybill_delinquent_roll",
-      "count": 0,
-      "status": "OK (7118)",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.richland_flc",
-      "count": 0,
-      "status": "OK (3)",
+      "count": 21326,
+      "status": "OK (21326)",
       "severity": 0
     },
     {
@@ -833,7 +965,7 @@
     {
       "source": "counties_sc.sc_catalis_delinquent_roll",
       "count": 0,
-      "status": "OK (318)",
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
@@ -850,20 +982,26 @@
     },
     {
       "source": "counties_sc.sc_probate_net",
-      "count": 0,
-      "status": "OK (357)",
+      "count": 180,
+      "status": "\u26a0\ufe0f PARTIAL (180) \u2014 exceeded soft timeout 900s \u2014 shipped 180 rows collected before the cutoff",
       "severity": 0
     },
     {
       "source": "counties_sc.sc_probate_notices",
-      "count": 0,
-      "status": "OK (879)",
+      "count": 522,
+      "status": "\u26a0\ufe0f PARTIAL (522) \u2014 exceeded soft timeout 300s \u2014 shipped 522 rows collected before the cutoff",
       "severity": 0
     },
     {
       "source": "counties_sc.sc_rod_acclaim",
       "count": 0,
-      "status": "OK (121)",
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.sc_rod_cott",
+      "count": 0,
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
@@ -873,45 +1011,21 @@
       "severity": 0
     },
     {
-      "source": "counties_sc.sc_ust_registry",
+      "source": "counties_sc.sc_tax_walled",
       "count": 0,
-      "status": "OK (18407)",
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
-      "source": "counties_sc.spartan_weekly_legals",
+      "source": "counties_sc.spartanburg_flc",
       "count": 0,
-      "status": "OK (117)",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.spartanburg_city_condemned",
-      "count": 0,
-      "status": "OK (90)",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.spartanburg_condemned",
-      "count": 0,
-      "status": "OK (1764)",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.spartanburg_vacant",
-      "count": 0,
-      "status": "OK (4659)",
-      "severity": 0
-    },
-    {
-      "source": "counties_sc.terry_howe_auctions",
-      "count": 0,
-      "status": "OK (907)",
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
       "source": "counties_sc.terry_howe_flc",
       "count": 0,
-      "status": "OK (54)",
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
@@ -921,9 +1035,15 @@
       "severity": 0
     },
     {
-      "source": "counties_sc.zombie_properties",
+      "source": "counties_sc.york_delinquent_tax",
+      "count": 853,
+      "status": "OK (853)",
+      "severity": 0
+    },
+    {
+      "source": "courts.lis_pendens_discovery",
       "count": 0,
-      "status": "EMPTY (verified)",
+      "status": "(no status)",
       "severity": 0
     },
     {
@@ -933,69 +1053,93 @@
       "severity": 0
     },
     {
+      "source": "law_firms.bell_carrington",
+      "count": 52,
+      "status": "OK (52)",
+      "severity": 0
+    },
+    {
+      "source": "law_firms.finkel",
+      "count": 8,
+      "status": "OK (8)",
+      "severity": 0
+    },
+    {
+      "source": "law_firms.ingle_firm",
+      "count": 1,
+      "status": "OK (1)",
+      "severity": 0
+    },
+    {
       "source": "law_firms.kania",
-      "count": 0,
+      "count": 224,
       "status": "OK (224)",
       "severity": 0
     },
     {
       "source": "law_firms.rogers_townsend",
-      "count": 0,
-      "status": "OK (32)",
+      "count": 31,
+      "status": "OK (31)",
       "severity": 0
     },
     {
       "source": "law_firms.shapiro_ingle_powerbi",
-      "count": 0,
-      "status": "OK (102)",
+      "count": 109,
+      "status": "OK (109)",
       "severity": 0
     },
     {
       "source": "national.auction_bank_reo",
-      "count": 0,
-      "status": "OK (6)",
+      "count": 3,
+      "status": "OK (3)",
+      "severity": 0
+    },
+    {
+      "source": "national.bankruptcy_rss_relief_from_stay",
+      "count": 14,
+      "status": "OK (14)",
       "severity": 0
     },
     {
       "source": "national.bid4assets",
-      "count": 0,
-      "status": "OK (19)",
+      "count": 12,
+      "status": "OK (12)",
       "severity": 0
     },
     {
       "source": "national.courtlistener_adversary",
-      "count": 0,
-      "status": "OK (118)",
+      "count": 174,
+      "status": "OK (174)",
       "severity": 0
     },
     {
       "source": "national.courtlistener_bankruptcy",
-      "count": 0,
-      "status": "OK (2270)",
+      "count": 288,
+      "status": "OK (288)",
       "severity": 0
     },
     {
       "source": "national.courtlistener_civil",
-      "count": 0,
-      "status": "EMPTY (verified)",
+      "count": 7,
+      "status": "OK (7)",
       "severity": 0
     },
     {
       "source": "national.craigslist_fsbo",
-      "count": 0,
-      "status": "OK (247)",
+      "count": 264,
+      "status": "OK (264)",
       "severity": 0
     },
     {
       "source": "national.cws_marketing",
-      "count": 0,
+      "count": 16,
       "status": "OK (16)",
       "severity": 0
     },
     {
       "source": "national.distressed",
-      "count": 0,
-      "status": "OK (1358)",
+      "count": 5091,
+      "status": "\u26a0\ufe0f PARTIAL (5091) \u2014 exceeded soft timeout 1200s \u2014 shipped 5091 rows collected before the cutoff",
       "severity": 0
     },
     {
@@ -1006,25 +1150,31 @@
     },
     {
       "source": "national.fannie_homepath",
-      "count": 0,
-      "status": "OK (45)",
+      "count": 44,
+      "status": "OK (44)",
       "severity": 0
     },
     {
       "source": "national.fdic_failed_banks",
-      "count": 0,
+      "count": 9,
       "status": "OK (9)",
       "severity": 0
     },
     {
       "source": "national.fema_disasters",
-      "count": 0,
+      "count": 177,
       "status": "OK (177)",
       "severity": 0
     },
     {
+      "source": "national.freddie_homesteps",
+      "count": 12,
+      "status": "OK (12)",
+      "severity": 0
+    },
+    {
       "source": "national.govdeals",
-      "count": 0,
+      "count": 2,
       "status": "OK (2)",
       "severity": 0
     },
@@ -1036,62 +1186,56 @@
     },
     {
       "source": "national.gsa_surplus",
-      "count": 0,
+      "count": 2,
       "status": "OK (2)",
       "severity": 0
     },
     {
       "source": "national.hibid_real_estate",
-      "count": 0,
-      "status": "OK (17)",
+      "count": 15,
+      "status": "OK (15)",
       "severity": 0
     },
     {
       "source": "national.homeharvest",
-      "count": 0,
+      "count": 43,
       "status": "OK (43)",
       "severity": 0
     },
     {
       "source": "national.homepath_json",
-      "count": 0,
-      "status": "OK (1102)",
+      "count": 41,
+      "status": "OK (41)",
       "severity": 0
     },
     {
       "source": "national.hubzu",
-      "count": 0,
-      "status": "OK (136)",
+      "count": 156,
+      "status": "OK (156)",
       "severity": 0
     },
     {
-      "source": "national.hud_reac_inspection",
-      "count": 0,
-      "status": "OK (866)",
+      "source": "national.hud_homestore",
+      "count": 22,
+      "status": "OK (22)",
       "severity": 0
     },
     {
       "source": "national.irs_judicial_sales",
-      "count": 0,
+      "count": 1,
       "status": "OK (1)",
       "severity": 0
     },
     {
       "source": "national.irs_treasury",
-      "count": 0,
+      "count": 1,
       "status": "OK (1)",
       "severity": 0
     },
     {
       "source": "national.jail_bookings",
-      "count": 0,
-      "status": "OK (2380)",
-      "severity": 0
-    },
-    {
-      "source": "national.legacy_obituaries",
-      "count": 0,
-      "status": "DORMANT \u2014 disabled: confirmed garbage emitter 2026-09-15: stateId does not scope results (NC search returned FL/CT/NZ obituaries); needs the real numeric stateId values before this can be re-enabled",
+      "count": 2359,
+      "status": "OK (2359)",
       "severity": 0
     },
     {
@@ -1101,9 +1245,15 @@
       "severity": 0
     },
     {
-      "source": "national.nc_upset_bids",
+      "source": "national.nc_unclaimed",
       "count": 0,
-      "status": "OK (73)",
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.nc_upset_bids",
+      "count": 89,
+      "status": "OK (89)",
       "severity": 0
     },
     {
@@ -1126,32 +1276,32 @@
     },
     {
       "source": "national.realtor_foreclosures",
-      "count": 0,
+      "count": 50,
       "status": "OK (50)",
       "severity": 0
     },
     {
-      "source": "national.sc_sos_entity",
-      "count": 0,
-      "status": "DORMANT \u2014 disabled: search_entity()'s one real function is reCAPTCHA-gated (confirmed live 2026-10-04: a real Google reCAPTCHA renders on the results page after any search submission, same sitekey the 2026-10-01 audit found) -- a compliance wall this codebase does not solve or route around. Also uncalled: no enrichment_sos_sc module exists in this codebase and a repo-wide grep finds zero callers of search_entity() outside this file's own test.",
+      "source": "national.seeclickfix",
+      "count": 4,
+      "status": "OK (4)",
       "severity": 0
     },
     {
       "source": "national.servicelink_auction",
-      "count": 0,
-      "status": "OK (41)",
+      "count": 10,
+      "status": "OK (10)",
       "severity": 0
     },
     {
       "source": "national.stealth_handoff",
-      "count": 0,
-      "status": "OK (27917)",
+      "count": 37197,
+      "status": "OK (37197)",
       "severity": 0
     },
     {
       "source": "national.usda_properties",
-      "count": 0,
-      "status": "OK (336)",
+      "count": 144,
+      "status": "OK (144)",
       "severity": 0
     },
     {
@@ -1161,39 +1311,33 @@
       "severity": 0
     },
     {
-      "source": "national.williams",
-      "count": 0,
-      "status": "OK (6)",
+      "source": "newspapers.columbia_star",
+      "count": 13,
+      "status": "OK (13)",
       "severity": 0
     },
     {
-      "source": "newspapers.aiken_standard",
-      "count": 0,
-      "status": "OK (137)",
-      "severity": 0
-    },
-    {
-      "source": "newspapers.berkeley_independent",
-      "count": 0,
-      "status": "OK (76)",
+      "source": "newspapers.daily_courier",
+      "count": 3,
+      "status": "OK (3)",
       "severity": 0
     },
     {
       "source": "newspapers.hendersonville_lightning",
-      "count": 0,
-      "status": "OK (5)",
+      "count": 6,
+      "status": "OK (6)",
       "severity": 0
     },
     {
-      "source": "newspapers.journal_scene",
-      "count": 0,
-      "status": "OK (25)",
+      "source": "newspapers.mecklenburg_times",
+      "count": 70,
+      "status": "OK (70)",
       "severity": 0
     },
     {
-      "source": "newspapers.post_and_courier",
+      "source": "newspapers.shelby_star",
       "count": 0,
-      "status": "OK (4)",
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
@@ -1203,571 +1347,549 @@
       "severity": 0
     },
     {
-      "source": "public_notices.gannett_obituaries",
+      "source": "public_notices.echovita_obituaries",
       "count": 0,
-      "status": "OK (89)",
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "public_notices.funeral_home_rss",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "public_notices.gannett_obituaries",
+      "count": 149,
+      "status": "\u26a0\ufe0f PARTIAL (149) \u2014 exceeded soft timeout 300s \u2014 shipped 149 rows collected before the cutoff",
+      "severity": 0
+    },
+    {
+      "source": "public_notices.nc_heir_notices",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "public_notices.obituary_feeds",
+      "count": 20,
+      "status": "OK (20)",
       "severity": 0
     },
     {
       "source": "public_notices.publicnoticesc",
-      "count": 0,
-      "status": "OK (98)",
+      "count": 84,
+      "status": "\u26a0\ufe0f PARTIAL (84) \u2014 exceeded soft timeout 600s \u2014 shipped 84 rows collected before the cutoff",
+      "severity": 0
+    },
+    {
+      "source": "public_notices.publicnoticesc_estates",
+      "count": 58,
+      "status": "\u26a0\ufe0f PARTIAL (58) \u2014 exceeded soft timeout 900s \u2014 shipped 58 rows collected before the cutoff",
       "severity": 0
     },
     {
       "source": "reo.treasury_seized",
-      "count": 0,
+      "count": 3,
       "status": "OK (3)",
       "severity": 0
     },
     {
       "source": "reo.usda_rd",
-      "count": 0,
+      "count": 1,
       "status": "OK (1)",
       "severity": 0
     },
     {
       "source": "reo.vrm_va_reo",
-      "count": 0,
-      "status": "OK (190)",
+      "count": 198,
+      "status": "OK (198)",
       "severity": 0
     }
   ],
   "source_alarms": {
-    "counties_sc.pickens_master_in_equity": {
+    "counties_sc.spartan_weekly_legals": {
       "kind": "dead",
       "current": 0,
-      "baseline": 31,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~31/run) \u2014 source likely broken"
-    },
-    "counties_sc.sc_public_index": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 3698,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~3698/run) \u2014 source likely broken"
-    },
-    "newspapers.coastland_times": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 2,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~2/run) \u2014 source likely broken"
-    },
-    "counties_sc.sc_public_index_lis_pendens": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 272,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~272/run) \u2014 source likely broken"
-    },
-    "counties_nc.nc_ecourts_lis_pendens": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 428,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~428/run) \u2014 source likely broken"
-    },
-    "counties_sc.mccormick_flc": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 2,
+      "baseline": 111,
       "streak": 4,
-      "reason": "0 listings for 4 consecutive runs (normally ~2/run) \u2014 source likely broken"
+      "reason": "0 listings for 4 consecutive runs (normally ~111/run) \u2014 source likely broken"
     },
-    "national.landandfarm": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 650,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~650/run) \u2014 source likely broken"
-    },
-    "law_firms.zacchaeus": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 146,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~146/run) \u2014 source likely broken"
-    },
-    "national.sheriff_sales": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 6,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~6/run) \u2014 source likely broken"
-    },
-    "national.auction_dot_com": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 117,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~117/run) \u2014 source likely broken"
-    },
-    "national.zillow_bulk": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 82,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~82/run) \u2014 source likely broken"
-    },
-    "law_firms.hutchens": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 86,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~86/run) \u2014 source likely broken"
-    },
-    "counties_sc.sc_county_rosters": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 3,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~3/run) \u2014 source likely broken"
-    },
-    "counties_nc.nc_county_tax_foreclosure": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 86,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~86/run) \u2014 source likely broken"
-    },
-    "public_notices.funeral_home_rss": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 50,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~50/run) \u2014 source likely broken"
-    },
-    "national.trulia": {
+    "counties_nc.nc_deq_dsca": {
       "kind": "dead",
       "current": 0,
       "baseline": 4,
-      "streak": 5,
-      "reason": "0 listings for 5 consecutive runs (normally ~4/run) \u2014 source likely broken"
-    },
-    "public_notices.ncnotices": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 107,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~107/run) \u2014 source likely broken"
-    },
-    "law_firms.alaw": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 26,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~26/run) \u2014 source likely broken"
-    },
-    "law_firms.finkel": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 8,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~8/run) \u2014 source likely broken"
-    },
-    "newspapers.index_journal": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 6,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~6/run) \u2014 source likely broken"
-    },
-    "national.cash_buyer_deeds": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 499,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~499/run) \u2014 source likely broken"
-    },
-    "counties_sc.dillon_sheriff": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 1,
-      "streak": 4,
-      "reason": "0 listings for 4 consecutive runs (normally ~1/run) \u2014 source likely broken"
-    },
-    "national.tranzon": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 1,
-      "streak": 4,
-      "reason": "0 listings for 4 consecutive runs (normally ~1/run) \u2014 source likely broken"
-    },
-    "law_firms.ingle_firm": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 1,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~1/run) \u2014 source likely broken"
-    },
-    "city_websites.search": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 150,
-      "streak": 4,
-      "reason": "0 listings for 4 consecutive runs (normally ~150/run) \u2014 source likely broken"
-    },
-    "counties_sc.sc_state_tax_lien": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 80,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~80/run) \u2014 source likely broken"
-    },
-    "counties_nc.nc_ecourts_divorce": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 183,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~183/run) \u2014 source likely broken"
-    },
-    "law_firms.brock_scott": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 79,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~79/run) \u2014 source likely broken"
-    },
-    "newspapers.carolina_coast": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 4,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~4/run) \u2014 source likely broken"
-    },
-    "public_notices.nc_notices_counties": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 605,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~605/run) \u2014 source likely broken"
-    },
-    "counties_sc.sc_public_notices": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 150,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~150/run) \u2014 source likely broken"
-    },
-    "law_firms.mcmichael_taylor_gray": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 85,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~85/run) \u2014 source likely broken"
-    },
-    "national.estate_sales": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 37,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~37/run) \u2014 source likely broken"
-    },
-    "national.hud_section8_contracts": {
-      "kind": "bleeding",
-      "current": 40,
-      "baseline": 250,
-      "drop_pct": 84,
-      "reason": "down 84% (40 vs ~250 baseline) for 2 runs \u2014 partial failure"
-    },
-    "national.hud_homestore": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 33,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~33/run) \u2014 source likely broken"
-    },
-    "national.freddie_homesteps": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 26,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~26/run) \u2014 source likely broken"
-    },
-    "national.zillow_foreclosures": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 388,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~388/run) \u2014 source likely broken"
-    },
-    "counties_sc.sumter_surplus": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 2,
-      "streak": 4,
-      "reason": "0 listings for 4 consecutive runs (normally ~2/run) \u2014 source likely broken"
-    },
-    "national.seeclickfix": {
-      "kind": "bleeding",
-      "current": 21,
-      "baseline": 745,
-      "drop_pct": 97,
-      "reason": "down 97% (21 vs ~745 baseline) for 2 runs \u2014 partial failure"
-    },
-    "counties_sc.sc_rod_cott": {
-      "kind": "bleeding",
-      "current": 10,
-      "baseline": 31,
-      "drop_pct": 68,
-      "reason": "down 68% (10 vs ~31 baseline) for 2 runs \u2014 partial failure"
-    },
-    "counties_sc.oconee_flc": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 2,
-      "streak": 4,
-      "reason": "0 listings for 4 consecutive runs (normally ~2/run) \u2014 source likely broken"
-    },
-    "newspapers.daily_courier": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 2,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~2/run) \u2014 source likely broken"
-    },
-    "national.first_citizens_reo": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 4,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~4/run) \u2014 source likely broken"
-    },
-    "national.xome": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 65,
-      "streak": 4,
-      "reason": "0 listings for 4 consecutive runs (normally ~65/run) \u2014 source likely broken"
-    },
-    "counties_sc.sc_des_brownfields": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 68,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~68/run) \u2014 source likely broken"
-    },
-    "national.landwatch": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 650,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~650/run) \u2014 source likely broken"
-    },
-    "counties_nc.wnc_rod_foreclosure_starts": {
-      "kind": "dead",
-      "current": 0,
-      "baseline": 5,
-      "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~5/run) \u2014 source likely broken"
+      "streak": 3,
+      "reason": "0 listings for 3 consecutive runs (normally ~4/run) \u2014 source likely broken"
     },
     "counties_nc.polk_tax": {
       "kind": "dead",
       "current": 0,
       "baseline": 1,
-      "streak": 5,
-      "reason": "0 listings for 5 consecutive runs (normally ~1/run) \u2014 source likely broken"
+      "streak": 4,
+      "reason": "0 listings for 4 consecutive runs (normally ~1/run) \u2014 source likely broken"
     },
-    "counties_sc.sc_coastal_rosters": {
+    "newspapers.post_and_courier": {
       "kind": "dead",
       "current": 0,
-      "baseline": 28,
+      "baseline": 6,
       "streak": 2,
-      "reason": "0 listings for 2 consecutive runs (normally ~28/run) \u2014 source likely broken"
+      "reason": "0 listings for 2 consecutive runs (normally ~6/run) \u2014 source likely broken"
+    },
+    "counties_sc.sumter_surplus": {
+      "kind": "dead",
+      "current": 0,
+      "baseline": 2,
+      "streak": 3,
+      "reason": "0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely broken"
+    },
+    "counties_sc.terry_howe_auctions": {
+      "kind": "dead",
+      "current": 0,
+      "baseline": 897,
+      "streak": 2,
+      "reason": "0 listings for 2 consecutive runs (normally ~897/run) \u2014 source likely broken"
+    },
+    "counties_sc.mccormick_flc": {
+      "kind": "dead",
+      "current": 0,
+      "baseline": 2,
+      "streak": 3,
+      "reason": "0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely broken"
+    },
+    "counties_sc.oconee_flc": {
+      "kind": "dead",
+      "current": 0,
+      "baseline": 2,
+      "streak": 3,
+      "reason": "0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely broken"
+    },
+    "city_websites.search": {
+      "kind": "dead",
+      "current": 0,
+      "baseline": 150,
+      "streak": 3,
+      "reason": "0 listings for 3 consecutive runs (normally ~150/run) \u2014 source likely broken"
+    },
+    "counties_sc.dillon_sheriff": {
+      "kind": "dead",
+      "current": 0,
+      "baseline": 1,
+      "streak": 3,
+      "reason": "0 listings for 3 consecutive runs (normally ~1/run) \u2014 source likely broken"
+    },
+    "national.trulia": {
+      "kind": "dead",
+      "current": 0,
+      "baseline": 4,
+      "streak": 4,
+      "reason": "0 listings for 4 consecutive runs (normally ~4/run) \u2014 source likely broken"
+    },
+    "national.xome": {
+      "kind": "dead",
+      "current": 0,
+      "baseline": 65,
+      "streak": 3,
+      "reason": "0 listings for 3 consecutive runs (normally ~65/run) \u2014 source likely broken"
+    },
+    "national.tranzon": {
+      "kind": "dead",
+      "current": 0,
+      "baseline": 1,
+      "streak": 3,
+      "reason": "0 listings for 3 consecutive runs (normally ~1/run) \u2014 source likely broken"
+    },
+    "national.cash_buyer_deeds": {
+      "reason": "TIMEOUT: exceeded soft timeout 300s",
+      "severity": "TIMEOUT"
     },
     "national.foreclosure_dot_com": {
       "reason": "BLOCKED: HTTP 403 (blocked/forbidden) from www.foreclosure.com [impersonate] (scraper swallowed the error)",
       "severity": "BLOCKED"
     },
+    "national.hud_reac_inspection": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
+      "severity": "TIMEOUT"
+    },
+    "national.legacy_obituaries": {
+      "reason": "TIMEOUT: exceeded soft timeout 300s",
+      "severity": "TIMEOUT"
+    },
+    "national.sheriff_sales": {
+      "reason": "TIMEOUT: exceeded soft timeout 120s",
+      "severity": "TIMEOUT"
+    },
     "national.usmarshals_realproperty": {
       "reason": "TIMEOUT: exceeded soft timeout 180s",
       "severity": "TIMEOUT"
     },
-    "counties_sc.anderson_acpass_deeds": {
-      "reason": "TIMEOUT: exceeded soft timeout 240s",
+    "national.williams": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
+      "severity": "TIMEOUT"
+    },
+    "law_firms.alaw": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
       "severity": "TIMEOUT"
     },
     "counties_sc.anderson_sheriff": {
       "reason": "TIMEOUT: network timeout (ConnectTimeout)",
       "severity": "TIMEOUT"
     },
-    "counties_sc.greenwood_corebtpay_delinquent_tax": {
-      "reason": "TIMEOUT: exceeded soft timeout 1800s",
+    "counties_sc.charleston_energov_history": {
+      "reason": "BLOCKED: connection refused/dropped (RemoteProtocolError)",
+      "severity": "BLOCKED"
+    },
+    "counties_sc.greenville_mie_adverts": {
+      "reason": "TIMEOUT: exceeded soft timeout 420s",
+      "severity": "TIMEOUT"
+    },
+    "counties_sc.horry_delinquent_xlsx": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
+      "severity": "TIMEOUT"
+    },
+    "counties_sc.horry_probate": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
       "severity": "TIMEOUT"
     },
     "counties_sc.laurens_overage_claims": {
-      "reason": "TIMEOUT: exceeded soft timeout 300s",
+      "reason": "TIMEOUT: exceeded soft timeout 600s",
+      "severity": "TIMEOUT"
+    },
+    "counties_sc.lexington_flc": {
+      "reason": "TIMEOUT: exceeded soft timeout 90s",
+      "severity": "TIMEOUT"
+    },
+    "counties_sc.meares_auctions": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
       "severity": "TIMEOUT"
     },
     "counties_sc.oconee_tax_sale": {
-      "reason": "TIMEOUT: network timeout (ConnectTimeout)",
+      "reason": "TIMEOUT: exceeded soft timeout 40s",
+      "severity": "TIMEOUT"
+    },
+    "counties_sc.orangeburg_overage_claims": {
+      "reason": "TIMEOUT: exceeded soft timeout 90s",
+      "severity": "TIMEOUT"
+    },
+    "counties_sc.pickens_tax_sale": {
+      "reason": "TIMEOUT: exceeded soft timeout 90s",
+      "severity": "TIMEOUT"
+    },
+    "counties_sc.richland_flc": {
+      "reason": "TIMEOUT: exceeded soft timeout 60s",
       "severity": "TIMEOUT"
     },
     "counties_sc.sc_flc": {
-      "reason": "BLOCKED: HTTP 403 (blocked/forbidden) from www.spartanburgcounty.gov (scraper swallowed the error)",
+      "reason": "TIMEOUT: exceeded soft timeout 600s",
+      "severity": "TIMEOUT"
+    },
+    "counties_sc.sc_ust_registry": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
+      "severity": "TIMEOUT"
+    },
+    "counties_sc.york_tax_sale_parcels": {
+      "reason": "ERROR: ReadError: ",
+      "severity": "ERROR"
+    },
+    "counties_sc.zombie_properties": {
+      "reason": "TIMEOUT: exceeded soft timeout 120s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.brunswick_legal_notices": {
+      "reason": "TIMEOUT: exceeded soft timeout 240s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.cumberland_delinquent_tax": {
+      "reason": "TIMEOUT: network timeout (ConnectTimeout)",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.gaston_surplus_properties": {
+      "reason": "TIMEOUT: exceeded soft timeout 120s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.gaston_tax_foreclosures": {
+      "reason": "TIMEOUT: exceeded soft timeout 120s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.haywood_tax_foreclosures": {
+      "reason": "TIMEOUT: exceeded soft timeout 120s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.iredell_delinquent_tax": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.kinston_proposed_demolition": {
+      "reason": "BLOCKED: connection refused/dropped (ConnectError)",
       "severity": "BLOCKED"
     },
-    "counties_sc.spartanburg_flc": {
-      "reason": "BLOCKED: HTTP 403 (blocked/forbidden) from www.spartanburgcounty.gov (scraper swallowed the error)",
+    "counties_nc.lincoln_vacant": {
+      "reason": "TIMEOUT: exceeded soft timeout 120s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.mecklenburg_tax_foreclosures": {
+      "reason": "BLOCKED: connection refused/dropped (ConnectError)",
       "severity": "BLOCKED"
     },
-    "counties_sc.spartanburg_master_in_equity": {
-      "reason": "BLOCKED: HTTP 403 (blocked/forbidden) from www.spartanburgcounty.gov (scraper swallowed the error)",
+    "counties_nc.nc_bankruptcy_sales": {
+      "reason": "TIMEOUT: exceeded soft timeout 120s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.nc_county_csv_delinquent_tax": {
+      "reason": "ERROR: PartialHarvest: counties_nc.nc_county_csv_delinquent_tax: partial harvest, lost New Hanover (0/1 declared layers alive; 0 rows discarded rather than shipped as a smaller harves",
+      "severity": "ERROR"
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.nc_metro_demolition_permits": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.nc_rod_captcha": {
+      "reason": "ERROR: TargetClosedError: BrowserType.launch: Target page, context or browser has been closed\nBrowser logs:\n\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550",
+      "severity": "ERROR"
+    },
+    "counties_nc.nc_rod_logan": {
+      "reason": "TIMEOUT: exceeded soft timeout 180s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.nc_rowan_cott": {
+      "reason": "TIMEOUT: exceeded soft timeout 300s",
+      "severity": "TIMEOUT"
+    },
+    "counties_nc.rutherford_wildfire_tax": {
+      "reason": "BLOCKED: HTTP 403 (blocked/forbidden)",
       "severity": "BLOCKED"
     },
-    "counties_sc.york_delinquent_tax": {
-      "reason": "BLOCKED: HTTP 403 (blocked/forbidden) from www.yorkcountysc.gov (scraper swallowed the error)",
+    "counties_nc.wake_code_cases": {
+      "reason": "ERROR: ReadError: ",
+      "severity": "ERROR"
+    },
+    "newspapers.aiken_standard": {
+      "reason": "BLOCKED: HTTP 429 (rate-limited) from www.postandcourier.com (scraper swallowed the error)",
       "severity": "BLOCKED"
     },
-    "counties_nc.edgecombe_tax_foreclosure": {
-      "reason": "BLOCKED: HTTP 403 (blocked/forbidden) from www.edgecombecountync.gov (scraper swallowed the error)",
+    "newspapers.berkeley_independent": {
+      "reason": "BLOCKED: HTTP 429 (rate-limited) from www.postandcourier.com (scraper swallowed the error)",
       "severity": "BLOCKED"
     },
-    "counties_nc.rutherford_foreclosure": {
-      "reason": "BLOCKED: HTTP 403 (blocked/forbidden) from www.rutherfordcountync.gov [impersonate] (scraper swallowed the error)",
+    "newspapers.carolina_coast": {
+      "reason": "BLOCKED: HTTP 429 (rate-limited) from www.carolinacoastonline.com (scraper swallowed the error)",
       "severity": "BLOCKED"
     },
-    "counties_nc.wnc_tax_foreclosures": {
-      "reason": "BLOCKED: HTTP 403 (blocked/forbidden) from www.averycountync.gov (scraper swallowed the error)",
+    "newspapers.index_journal": {
+      "reason": "BLOCKED: HTTP 429 (rate-limited) from www.indexjournal.com (scraper swallowed the error)",
       "severity": "BLOCKED"
     },
-    "newspapers.shelby_star": {
-      "reason": "BLOCKED: HTTP 429 (rate-limited) from www.shelbystar.com (scraper swallowed the error)",
+    "newspapers.journal_scene": {
+      "reason": "BLOCKED: HTTP 429 (rate-limited) from www.postandcourier.com (scraper swallowed the error)",
       "severity": "BLOCKED"
     }
   },
-  "regressions": [],
+  "regressions": [
+    "counties_sc.berkeley_paystar_tax: got 25, expected \u2265 500"
+  ],
   "errors": [
-    "national.usmarshals_realproperty",
-    "counties_sc.greenwood_corebtpay_delinquent_tax",
-    "national.va_acquired",
-    "counties_sc.union_delinquent_tax",
-    "counties_sc.greenwood_delinquent_tax",
-    "counties_nc.polk_tax",
-    "counties_sc.york_delinquent_tax",
-    "counties_nc.rutherford_foreclosure",
-    "public_notices.funeral_home_rss",
-    "counties_sc.york_overage_claims",
     "national.cash_buyer_deeds",
-    "counties_nc.rutherford_tax",
-    "counties_sc.zombie_properties",
-    "counties_sc.kershaw_flc",
-    "counties_sc.lancaster_delinquent_tax",
-    "law_firms.alaw",
-    "counties_nc.asheville_code_enforcement",
-    "national.courtlistener_civil",
-    "counties_sc.laurens_delinquent_tax",
-    "law_firms.aldridge_pite",
-    "counties_sc.laurens_overage_claims",
-    "law_firms.bell_carrington",
-    "counties_sc.lexington_flc",
-    "law_firms.finkel",
     "national.epa_superfund",
-    "counties_sc.marlboro_delinquent_tax",
-    "law_firms.ingle_firm",
-    "counties_sc.mccormick_flc",
-    "counties_nc.wnc_rod_foreclosure_starts",
-    "counties_sc.meares_auctions",
-    "counties_nc.wnc_tax_foreclosures",
-    "counties_sc.newberry_delinquent_tax",
     "national.foreclosure_dot_com",
-    "counties_sc.oconee_flc",
+    "national.hud_reac_inspection",
+    "national.hud_section8_contracts",
+    "national.legacy_obituaries",
+    "national.liensnc",
+    "national.nc_unclaimed",
+    "national.opencorporates",
+    "national.probate_foreclosure_leads",
+    "national.propwire",
+    "national.sheriff_sales",
+    "national.tranzon",
+    "national.usmarshals_realproperty",
+    "national.va_acquired",
+    "national.williams",
+    "public_notices.echovita_obituaries",
+    "public_notices.funeral_home_rss",
+    "public_notices.nc_heir_notices",
+    "law_firms.alaw",
+    "law_firms.aldridge_pite",
     "counties_sc.abbeville_delinquent_tax",
-    "national.freddie_homesteps",
     "counties_sc.aiken_delinquent_tax",
-    "counties_sc.oconee_forfeited_land",
-    "counties_sc.anderson_acpass_deeds",
-    "counties_sc.oconee_tax_sale",
-    "counties_nc.edgecombe_tax_foreclosure",
-    "counties_sc.orangeburg_overage_claims",
+    "counties_sc.anderson_master_in_equity",
     "counties_sc.anderson_sheriff",
-    "counties_nc.gaston_surplus_properties",
     "counties_sc.bamberg_sheriff",
     "counties_sc.barnwell_sheriff",
-    "newspapers.carolina_coast",
     "counties_sc.beaufort_flc",
-    "counties_sc.saluda_delinquent_tax",
-    "newspapers.daily_courier",
-    "national.hud_homestore",
-    "counties_sc.sc_delinquent_tax_list",
-    "newspapers.index_journal",
-    "national.hud_section8_contracts",
-    "counties_sc.sc_dor_delinquent_taxpayers",
-    "counties_sc.sc_flc",
-    "newspapers.shelby_star",
+    "counties_sc.charleston_energov_history",
     "counties_sc.cherokee_rod",
-    "national.legacy_obituaries",
-    "newspapers.tryon_bulletin",
+    "counties_sc.city_of_union",
     "counties_sc.clarendon_tax_auction",
-    "national.liensnc",
-    "national.gsa_realproperty",
     "counties_sc.colleton_tax_sale",
     "counties_sc.darlington_delinquent_tax",
-    "national.opencorporates",
-    "counties_sc.sc_tax_delinquent",
-    "national.probate_foreclosure_leads",
+    "counties_sc.dillon_delinquent_tax",
     "counties_sc.dillon_sheriff",
-    "national.propwire",
-    "city_websites.asheville_min_housing",
+    "counties_sc.dorchester_billtrax_delinquent_tax",
     "counties_sc.edgefield_delinquent_tax",
-    "national.sc_sos_entity",
     "counties_sc.fairfield_delinquent_tax",
+    "counties_sc.georgetown_civicengage",
+    "counties_sc.greenville_mie_adverts",
+    "counties_sc.greenwood_corebtpay_delinquent_tax",
+    "counties_sc.greenwood_delinquent_tax",
+    "counties_sc.horry_delinquent_xlsx",
+    "counties_sc.horry_probate",
+    "counties_sc.kershaw_flc",
+    "counties_sc.lancaster_delinquent_tax",
+    "counties_sc.laurens_delinquent_tax",
+    "counties_sc.laurens_overage_claims",
+    "counties_sc.lexington_flc",
+    "counties_sc.marlboro_delinquent_tax",
+    "counties_sc.mccormick_flc",
+    "counties_sc.meares_auctions",
+    "counties_sc.newberry_delinquent_tax",
+    "counties_sc.oconee_flc",
+    "counties_sc.oconee_flc_assignment",
+    "counties_sc.oconee_forfeited_land",
+    "counties_sc.oconee_tax_sale",
+    "counties_sc.orangeburg_overage_claims",
+    "counties_sc.pickens_delinquent_parcels",
+    "counties_sc.pickens_tax_sale",
+    "counties_sc.richland_flc",
+    "counties_sc.saluda_delinquent_tax",
+    "counties_sc.sc_catalis_delinquent_roll",
+    "counties_sc.sc_delinquent_tax_list",
+    "counties_sc.sc_dor_delinquent_taxpayers",
+    "counties_sc.sc_flc",
+    "counties_sc.sc_rod_acclaim",
+    "counties_sc.sc_rod_cott",
+    "counties_sc.sc_tax_delinquent",
+    "counties_sc.sc_tax_walled",
+    "counties_sc.sc_ust_registry",
+    "counties_sc.spartan_weekly_legals",
+    "counties_sc.spartanburg_city_condemned",
+    "counties_sc.spartanburg_condemned",
     "counties_sc.spartanburg_delinquent_tax",
     "counties_sc.spartanburg_flc",
-    "national.sheriff_sales",
     "counties_sc.spartanburg_master_in_equity",
-    "counties_sc.georgetown_civicengage",
-    "national.tranzon",
+    "counties_sc.spartanburg_vacant",
     "counties_sc.sumter_surplus",
-    "counties_nc.nchfa_reo"
+    "counties_sc.terry_howe_auctions",
+    "counties_sc.terry_howe_flc",
+    "counties_sc.union_delinquent_tax",
+    "counties_sc.york_overage_claims",
+    "counties_sc.york_tax_sale_parcels",
+    "counties_sc.zombie_properties",
+    "counties_nc.asheville_code_enforcement",
+    "counties_nc.asheville_helene",
+    "counties_nc.brunswick_legal_notices",
+    "counties_nc.buncombe_delinquent_tax",
+    "counties_nc.buncombe_elderly",
+    "counties_nc.buncombe_tax",
+    "counties_nc.buncombe_tax_foreclosure",
+    "counties_nc.cleveland_tax",
+    "counties_nc.cumberland_delinquent_tax",
+    "counties_nc.gaston_surplus_properties",
+    "counties_nc.gaston_tax_foreclosures",
+    "counties_nc.gaston_vacant",
+    "counties_nc.gastonia_code_enforcement",
+    "counties_nc.haywood_tax_foreclosures",
+    "counties_nc.henderson_code_violations",
+    "counties_nc.henderson_foreclosure_parcels",
+    "counties_nc.henderson_tax",
+    "counties_nc.hendersonville_vacant_structures",
+    "counties_nc.iredell_delinquent_tax",
+    "counties_nc.kinston_proposed_demolition",
+    "counties_nc.lincoln_vacant",
+    "counties_nc.mcdowell_probate",
+    "counties_nc.mecklenburg_delinquent_tax",
+    "counties_nc.mecklenburg_tax_foreclosures",
+    "counties_nc.morganton_nc",
+    "counties_nc.nc_bankruptcy_sales",
+    "counties_nc.nc_cchs_deeds",
+    "counties_nc.nc_county_csv_delinquent_tax",
+    "counties_nc.nc_county_pdf_delinquent_tax",
+    "counties_nc.nc_deq_dsca",
+    "counties_nc.nc_metro_demolition_permits",
+    "counties_nc.nc_rod_captcha",
+    "counties_nc.nc_rod_logan",
+    "counties_nc.nc_rowan_cott",
+    "counties_nc.nchfa_reo",
+    "counties_nc.rutherford_wildfire_tax",
+    "counties_nc.wake_code_cases",
+    "counties_nc.wnc_rod_foreclosure_starts",
+    "counties_nc.wnc_tax_foreclosures",
+    "newspapers.aiken_standard",
+    "newspapers.berkeley_independent",
+    "newspapers.carolina_coast",
+    "newspapers.index_journal",
+    "newspapers.journal_scene",
+    "newspapers.post_and_courier",
+    "newspapers.shelby_star",
+    "newspapers.tryon_bulletin",
+    "national.gsa_realproperty",
+    "city_websites.asheville_min_housing"
   ],
   "enrichments": {
     "hud_reac_address": {
-      "matched": 657,
-      "geo_filled": 656,
-      "targets": 989
+      "matched": 1,
+      "geo_filled": 0,
+      "targets": 318
     },
     "lincoln_bulk": {
-      "eligible": 16644,
-      "matched": 16470,
-      "fields_filled": 126313,
-      "absentee": 971,
-      "vacant": 14874
+      "eligible": 1286,
+      "matched": 1110,
+      "fields_filled": 5033,
+      "absentee": 51,
+      "vacant": 264,
+      "pin_adopted": 182
     },
     "burke_spine": {
-      "eligible": 1184,
-      "matched": 574,
-      "fields_filled": 1389,
-      "reid": 574,
-      "vacant_land": 158,
-      "govt_owned": 32,
-      "absentee": 64
+      "eligible": 1134,
+      "matched": 533,
+      "fields_filled": 1144,
+      "reid": 533,
+      "vacant_land": 151,
+      "govt_owned": 33,
+      "absentee": 60
+    },
+    "gis_fill": {
+      "candidates": 200641,
+      "screened": 17571,
+      "not_in_layer": 1203,
+      "deed": 13049,
+      "legal": 10027,
+      "value": 5894,
+      "acres": 2627,
+      "none_deed": 3319,
+      "none_legal": 5928,
+      "requests": 554,
+      "budget_hit": true,
+      "parcel_from_account": 2375,
+      "found_by_like": 0,
+      "closed_layers": {}
     },
     "cama_condition": {
-      "eligible": 32850,
-      "matched": 393,
-      "stamped": 224,
-      "filled_year": 99,
-      "distressed": 0,
+      "eligible": 36941,
+      "matched": 894,
+      "stamped": 440,
+      "filled_year": 223,
+      "distressed": 2,
       "seeded_tier": 0,
       "counties": 6
     },
     "gis_derived": {
-      "scanned": 18532,
-      "last_sale": 898,
-      "deed_age": 884,
+      "scanned": 14426,
+      "last_sale": 512,
+      "deed_age": 499,
       "tax_status": 0,
-      "sale_consolidated": 15,
-      "owner_occupied": 2102
+      "sale_consolidated": 112,
+      "owner_occupied": 1171
     },
     "lis_pendens_resolver": {
-      "queried": 2467,
+      "queried": 2894,
       "address_filled": 0,
       "parcel_only": 0,
       "ambiguous": 0,
-      "no_match": 2467,
+      "no_match": 2894,
       "retagged_county": 0,
       "no_layer": 0,
       "fiduciary_skipped": 0
@@ -1776,89 +1898,134 @@
       "queried": 300,
       "annotated": 300,
       "no_match": 0,
-      "promoted": 158,
-      "promotion_gated": 550,
-      "skipped_cap": 20650
+      "promoted": 29,
+      "promotion_gated": 598,
+      "skipped_cap": 22304
     },
     "county_pin": {
-      "scanned": 358302,
-      "case_pinned": 24001,
-      "already_correct": 23960,
-      "retagged_county": 41,
-      "address_nulled": 41,
-      "no_case_decode": 334301
+      "scanned": 439846,
+      "case_pinned": 31354,
+      "already_correct": 31328,
+      "retagged_county": 26,
+      "address_nulled": 26,
+      "no_case_decode": 408492
     },
     "county_sales": {
       "counties": 11,
-      "matched": 28458,
-      "sqft": 69,
-      "year": 444,
-      "comps": 5200
+      "matched": 22467,
+      "sqft": 33,
+      "year": 25,
+      "comps": 4562
     },
     "incarceration": {
-      "queried": 148,
-      "matched": 5,
-      "matched_nc": 4,
-      "matched_sc": 1,
-      "stamped_miss": 145,
+      "queried": 149,
+      "matched": 6,
+      "matched_nc": 3,
+      "matched_sc": 3,
+      "stamped_miss": 144,
       "failed": 0,
-      "skipped_fresh": 129,
-      "candidates": 193325,
+      "skipped_fresh": 214,
+      "candidates": 238410,
       "selected": 150,
       "blocked_hosts": 0,
-      "stale_cleared": 3
+      "stale_cleared": 2
     },
     "jail_bookings": {
-      "matched": 104,
-      "stale_cleared": 7,
-      "rosters_unhealthy": [],
-      "hydrated": 1,
-      "cross_county": 3,
-      "reeval_confirmed": 238,
-      "reeval_left_roster": 42,
-      "reeval_conflict_cleared": 24,
-      "middle_corroborated": 97,
-      "middle_conflict_rejected": 9
+      "matched": 147,
+      "stale_cleared": 0,
+      "rosters_unhealthy": [
+        "Buncombe"
+      ],
+      "hydrated": 0,
+      "cross_county": 15,
+      "reeval_confirmed": 302,
+      "reeval_long_stay_kept": 17,
+      "reeval_already_ended": 22,
+      "reeval_left_roster": 18,
+      "middle_conflict_rejected": 25,
+      "reeval_conflict_cleared": 1,
+      "middle_corroborated": 144
     },
     "bop_federal": {
-      "queried": 140,
-      "matched": 10,
-      "stamped_miss": 140,
+      "queried": 138,
+      "matched": 16,
+      "stamped_miss": 134,
       "failed": 0,
-      "skipped_fresh": 217,
-      "candidates": 193550,
+      "skipped_fresh": 299,
+      "candidates": 238662,
       "selected": 150,
       "blocked": 0,
-      "stale_cleared": 6
+      "stale_cleared": 3
     },
     "foreclosure_docket_history": {
-      "observed": 15219,
+      "observed": 16207,
       "flagged": 0
     },
     "bankruptcy_stay": {
-      "stayed": 73,
-      "ch13": 57,
-      "ch7": 13,
-      "elevated_resume_risk": 13,
-      "lapsed": 3
+      "stayed": 75,
+      "ch13": 58,
+      "ch7": 16,
+      "elevated_resume_risk": 16,
+      "lapsed": 2
+    },
+    "comps_age": {
+      "fresh": 10495,
+      "carried": 69994,
+      "aged_out_rows": 1,
+      "aged_out_comps": 5
+    },
+    "comps_carry_forward": {
+      "needing": 0,
+      "carried": 0,
+      "note": "no previous board"
+    },
+    "doc_ocr": {
+      "targets": 231,
+      "ocr_ok": 115,
+      "backfilled": 69,
+      "skipped_budget": 104,
+      "no_provider": 0,
+      "docs_attempted": 127,
+      "ledger_not_due": 15,
+      "ledger_reapplied": 4,
+      "same_content_reused": 7,
+      "fetch_failed": 2,
+      "provider_failed": 0,
+      "unsupported": 0,
+      "no_fields": 1,
+      "timeouts": 3,
+      "old_reads_rejected": 2,
+      "aggregate_docs": 18,
+      "aggregate_leads": 11978,
+      "aggregate_stamps_to_verify": 16,
+      "agg_docs_read": 7,
+      "agg_backfilled": 0,
+      "agg_docs_not_needed": 11,
+      "agg_docs_not_due": 0,
+      "agg_stamps_replaced": 0,
+      "agg_stamps_cleared": 10,
+      "reads_of_another_lead": 13,
+      "leads_read": 97
     },
     "foreclosure_sold_comps": {
-      "active": 350574,
-      "pool": 171,
-      "matched": 71025,
-      "no_county_match": 224334,
-      "no_kind_match": 40053,
-      "no_match_at_all": 12576
+      "active": 437735,
+      "pool": 132,
+      "matched": 80831,
+      "no_county_match": 313818,
+      "no_kind_match": 24466,
+      "no_match_at_all": 13405
     },
     "sos_agent_handoff": {
       "file": "/home/ubuntu/foreclosure-scraper/docs/handoff/sos_agent_results.json",
       "status": "ok",
-      "entities": 329,
-      "resolved_entities": 254,
-      "attached": 222,
+      "entities": 1531,
+      "resolved_entities": 1001,
+      "attached": 5258,
       "cleared": 0,
+      "unbound_cleared": 111,
+      "unbound_kept": 28,
       "cleaned": 0,
-      "age_hours": 18.6
+      "age_hours": 29.9
     },
     "sos_agent": {
       "targets": 0,
@@ -1873,40 +2040,40 @@
       "misses": 0
     },
     "land_ratio": {
-      "tagged": 20287,
-      "vacant_land": 18287,
-      "land_heavy": 589
+      "tagged": 17673,
+      "vacant_land": 16449,
+      "land_heavy": 419
     },
     "multifamily_class": {
-      "scanned": 350574,
-      "reclassified": 522,
-      "already_mf": 1319,
+      "scanned": 437735,
+      "reclassified": 465,
+      "already_mf": 1371,
       "by_tier": {
-        "party": 192,
-        "description": 29,
-        "structure": 301
+        "party": 190,
+        "description": 31,
+        "structure": 244
       },
       "from_kind": {
-        "unknown": 498,
-        "single_family": 22,
-        "townhouse": 2
+        "single_family": 26,
+        "unknown": 435,
+        "townhouse": 4
       },
-      "skipped_not_overridable": 127,
+      "skipped_not_overridable": 132,
       "exceptions": 0
     },
     "commercial_landuse": {
-      "scanned": 32627,
-      "reclassified": 12,
+      "scanned": 33253,
+      "reclassified": 21,
       "environmental": 0,
-      "already": 5,
-      "hint_only": 181
+      "already": 13,
+      "hint_only": 180
     },
     "land_buildability": {
       "targets": 300,
-      "landlocked_candidate": 1,
-      "cemetery_hit": 2,
+      "landlocked_candidate": 5,
+      "cemetery_hit": 1,
       "errors": 0,
-      "undetermined": 6
+      "undetermined": 27
     },
     "recap_documents": {
       "queried": 1,
@@ -1914,119 +2081,953 @@
       "no_doc": 1
     },
     "judgment_amount": {
-      "scanned": 330012,
-      "matched": 0,
-      "already_set": 20562,
-      "no_text": 403,
-      "text_no_match": 329609,
-      "by_source_matched": {}
+      "scanned": 416058,
+      "matched": 1,
+      "already_set": 21677,
+      "no_text": 1947,
+      "text_no_match": 414110,
+      "by_source_matched": {
+        "newspapers.mecklenburg_times": 1
+      }
     },
     "judgment_amount_detail": {
-      "candidates": 43,
-      "fetched": 42,
+      "candidates": 61,
+      "fetched": 61,
       "matched": 0,
       "skipped_capped": 0,
       "matched_by_source": {}
     },
     "amount_owed": {
-      "judgment": 20562,
-      "opening_bid": 186,
-      "assessed_value": 133258,
-      "none": 196568
+      "judgment": 9999,
+      "opening_bid": 240,
+      "assessed_value": 138773,
+      "none": 277044,
+      "tax_owed": 11679
     },
     "validation": {
       "county_normalized": 0,
-      "county_nulled_cross_state": 62,
-      "parcel_nulled_too_short": 33815,
+      "county_nulled_cross_state": 77,
+      "parcel_nulled_too_short": 13964,
       "parcel_nulled_bad_pattern": 1,
-      "opening_bid_zeroed": 20,
+      "parcel_kept_county_native": 1350,
+      "parcel_restored_county_native": 798,
+      "opening_bid_zeroed": 0,
       "opening_bid_too_large": 0,
-      "tax_value_too_low": 1824,
-      "tax_value_too_large": 11,
-      "sqft_out_of_range": 120,
+      "tax_value_too_low": 401,
+      "tax_value_too_large": 1,
+      "sqft_out_of_range": 266,
       "year_built_out_of_range": 0,
-      "bedrooms_out_of_range": 1,
-      "bathrooms_out_of_range": 0,
-      "comps_dropped_price": 27,
-      "comps_dropped_kind_mismatch": 6117,
+      "bedrooms_out_of_range": 9,
+      "bathrooms_out_of_range": 8,
+      "comps_dropped_price": 66,
+      "comps_dropped_kind_mismatch": 3886,
       "validation_exceptions": 0
     },
     "promote_owner": {
-      "promoted": 232
+      "promoted": 8
     },
     "voter_phone": {
       "index_size": 682757,
-      "nc_targets": 158623,
-      "matched_addr": 858,
-      "matched_namecty": 9010,
-      "matched_fuzzy_addr": 31,
-      "matched_fuzzy_namecty": 5413,
-      "matched": 15312,
-      "regated": 0,
-      "corroborated": 13620,
-      "unverified": 0,
-      "contradicted": 1692,
-      "do_not_dial": 1692
+      "nc_targets": 210288,
+      "matched_addr": 596,
+      "matched_namecty": 1522,
+      "matched_fuzzy_addr": 26,
+      "matched_fuzzy_namecty": 1296,
+      "matched": 3440,
+      "regated": 18632,
+      "corroborated": 11148,
+      "unverified": 7493,
+      "contradicted": 3431,
+      "do_not_dial": 10924
     },
     "county_phone": {
-      "targets": 9883,
-      "filled": 512,
-      "alternates": 447,
-      "confirmed_existing": 3122,
+      "targets": 10484,
+      "filled": 561,
+      "alternates": 387,
+      "confirmed_existing": 3315,
       "by_source": {
         "buncombe_accela": {
-          "targets": 8990,
-          "matched": 5555,
-          "filled": 281,
-          "alternates": 255,
-          "confirmed_existing": 3014,
-          "base_match": 3870,
-          "index_keys": 144442
+          "targets": 9181,
+          "matched": 5666,
+          "filled": 386,
+          "alternates": 270,
+          "confirmed_existing": 3037,
+          "base_match": 3961,
+          "index_keys": 144366
         },
         "lincoln_taxpayer": {
-          "targets": 893,
-          "matched": 556,
-          "filled": 231,
-          "alternates": 192,
-          "confirmed_existing": 108,
+          "targets": 1303,
+          "matched": 718,
+          "filled": 175,
+          "alternates": 117,
+          "confirmed_existing": 278,
           "base_match": 0,
-          "index_keys": 546
+          "index_keys": 708
         }
       }
     },
     "line_type": {
-      "targets": 65058,
-      "landline": 5422,
-      "wireless": 4034,
-      "clec": 936,
-      "unknown": 54666,
-      "prefixes_looked_up": 8352
+      "targets": 54725,
+      "landline": 1596,
+      "wireless": 4170,
+      "clec": 886,
+      "unknown": 48073,
+      "prefixes_looked_up": 7757
     },
     "gaston_rod": {
-      "targets": 24093,
-      "searched": 24093,
+      "targets": 24487,
+      "searched": 24487,
       "with_instruments": 0,
       "with_mortgage": 0,
       "with_adverse": 0
     },
+    "generic_rod": {
+      "counties": 58,
+      "targets": 580,
+      "searched": 580,
+      "with_instruments": 346,
+      "with_mortgage": 223,
+      "with_adverse": 35,
+      "disabled_counties": 0,
+      "budget_exhausted": false,
+      "chain_share_capped": 58,
+      "screened_none_found": 116
+    },
+    "register_checks": {
+      "counties": 6,
+      "targets": 240,
+      "searched": 40,
+      "match": 6,
+      "no_match": 34,
+      "truncated_not_stamped": 0,
+      "unchecked_walled": 0,
+      "unchecked_capped": 0,
+      "unchecked_too_many": 0,
+      "unchecked_error": 0,
+      "disabled_counties": 0,
+      "sweep_not_stamped": 0,
+      "budget_exhausted": false,
+      "sweeps": [
+        {
+          "county": "Alamance",
+          "kind": "lien",
+          "windows_read": 70,
+          "instruments_new": 95,
+          "index_size": 95,
+          "window_from": "2024-10-25",
+          "window_to": "2026-10-16",
+          "types": 3,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "none_found": 2445,
+            "unmatchable": 40,
+            "found": 1,
+            "possible": 1
+          }
+        },
+        {
+          "county": "Alexander",
+          "kind": "lien",
+          "windows_read": 74,
+          "instruments_new": 27,
+          "index_size": 27,
+          "window_from": "2024-09-09",
+          "window_to": "2026-10-16",
+          "types": 6,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "none_found": 224,
+            "unmatchable": 3
+          }
+        },
+        {
+          "county": "Edgecombe",
+          "kind": "lien",
+          "windows_read": 71,
+          "instruments_new": 56,
+          "index_size": 56,
+          "window_from": "2024-10-02",
+          "window_to": "2026-10-16",
+          "types": 4,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "none_found": 866,
+            "unmatchable": 25,
+            "possible": 11,
+            "found": 3
+          }
+        },
+        {
+          "county": "Graham",
+          "kind": "lien",
+          "windows_read": 133,
+          "instruments_new": 21,
+          "index_size": 21,
+          "window_from": "2022-10-02",
+          "window_to": "2026-10-16",
+          "types": 5,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "none_found": 870,
+            "unmatchable": 3,
+            "possible": 4,
+            "found": 1
+          }
+        },
+        {
+          "county": "Nash",
+          "kind": "lien",
+          "windows_read": 132,
+          "instruments_new": 208,
+          "index_size": 208,
+          "window_from": "2022-10-25",
+          "window_to": "2026-10-16",
+          "types": 3,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "none_found": 1684,
+            "unmatchable": 44,
+            "found": 10,
+            "possible": 38
+          }
+        },
+        {
+          "county": "Onslow",
+          "kind": "lien",
+          "windows_read": 217,
+          "instruments_new": 863,
+          "index_size": 863,
+          "window_from": "2020-01-01",
+          "window_to": "2026-10-16",
+          "types": 4,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": false,
+          "stamped": {
+            "none_found": 4014,
+            "possible": 29,
+            "found": 35,
+            "unmatchable": 76
+          }
+        },
+        {
+          "county": "Pamlico",
+          "kind": "lien",
+          "windows_read": 71,
+          "instruments_new": 17,
+          "index_size": 17,
+          "window_from": "2024-10-02",
+          "window_to": "2026-10-16",
+          "types": 5,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "none_found": 560,
+            "unmatchable": 10
+          }
+        },
+        {
+          "county": "Pitt",
+          "kind": "lien",
+          "windows_read": 217,
+          "instruments_new": 103,
+          "index_size": 103,
+          "window_from": "2020-01-01",
+          "window_to": "2026-10-16",
+          "types": 1,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": false,
+          "stamped": {
+            "none_found": 4623,
+            "found": 28,
+            "unmatchable": 71,
+            "possible": 22
+          }
+        },
+        {
+          "county": "Polk",
+          "kind": "lien",
+          "windows_read": 206,
+          "instruments_new": 56,
+          "index_size": 56,
+          "window_from": "2020-06-10",
+          "window_to": "2026-10-16",
+          "types": 5,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "none_found": 2181,
+            "unmatchable": 10,
+            "found": 15,
+            "possible": 4
+          }
+        },
+        {
+          "county": "Onslow",
+          "kind": "marriage",
+          "windows_read": 217,
+          "instruments_new": 15730,
+          "index_size": 15730,
+          "window_from": "2020-01-01",
+          "window_to": "2026-10-16",
+          "types": 1,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": false,
+          "stamped": {
+            "no_match": 2702,
+            "found": 43,
+            "possible": 37,
+            "unmatchable": 1372
+          }
+        },
+        {
+          "county": "Alamance",
+          "kind": "marriage",
+          "windows_read": 58,
+          "instruments_new": 1778,
+          "index_size": 1778,
+          "window_from": "2025-03-11",
+          "window_to": "2026-10-16",
+          "types": 1,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "unmatchable": 991,
+            "no_match": 1478,
+            "found": 11,
+            "possible": 7
+          }
+        },
+        {
+          "county": "Pamlico",
+          "kind": "marriage",
+          "windows_read": 59,
+          "instruments_new": 104,
+          "index_size": 104,
+          "window_from": "2025-02-16",
+          "window_to": "2026-10-16",
+          "types": 1,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "no_match": 527,
+            "unmatchable": 43
+          }
+        },
+        {
+          "county": "Edgecombe",
+          "kind": "marriage",
+          "windows_read": 59,
+          "instruments_new": 312,
+          "index_size": 312,
+          "window_from": "2025-02-16",
+          "window_to": "2026-10-16",
+          "types": 1,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "no_match": 602,
+            "unmatchable": 301,
+            "found": 1,
+            "possible": 1
+          }
+        },
+        {
+          "county": "Alexander",
+          "kind": "marriage",
+          "windows_read": 61,
+          "instruments_new": 257,
+          "index_size": 257,
+          "window_from": "2025-01-24",
+          "window_to": "2026-10-16",
+          "types": 1,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "no_match": 176,
+            "unmatchable": 48,
+            "possible": 2,
+            "found": 1
+          }
+        },
+        {
+          "county": "Rutherford",
+          "kind": "lien",
+          "windows_read": 83,
+          "instruments_new": 47,
+          "index_size": 47,
+          "window_from": "2024-05-18",
+          "window_to": "2026-10-16",
+          "types": 10,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true,
+          "stamped": {
+            "none_found": 10655,
+            "found": 17,
+            "possible": 23,
+            "unmatchable": 18
+          }
+        },
+        {
+          "county": "Rutherford",
+          "kind": "marriage",
+          "windows_read": 217,
+          "instruments_new": 2760,
+          "index_size": 2760,
+          "window_from": "2020-01-01",
+          "window_to": "2026-10-16",
+          "types": 1,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": false,
+          "stamped": {
+            "no_match": 9487,
+            "unmatchable": 969,
+            "found": 188,
+            "possible": 69
+          }
+        }
+      ],
+      "sweep_lien_none_found": 28122,
+      "sweep_lien_found": 110,
+      "sweep_lien_unmatchable": 300,
+      "sweep_lien_possible": 132,
+      "sweep_marriage_no_match": 14972,
+      "sweep_marriage_found": 244,
+      "sweep_marriage_possible": 116,
+      "sweep_marriage_unmatchable": 3724
+    },
+    "nc_rod_render": {
+      "counties": 0,
+      "targets": 0,
+      "searched": 0,
+      "stamped": 0,
+      "with_instruments": 0,
+      "with_mortgage": 0,
+      "with_adverse": 0,
+      "errors": 0,
+      "disabled_counties": 20,
+      "walled_counties": [],
+      "capped_counties": [],
+      "budget_exhausted": false,
+      "marriage_targets": 0,
+      "marriage_searched": 0,
+      "marriage_found": 0,
+      "marriage_no_match": 0
+    },
+    "register_lien_sweep": {
+      "counties": [
+        {
+          "county": "Pickens",
+          "months_read": 79,
+          "months_cached": 0,
+          "instruments_new": 1394,
+          "index_size": 1394,
+          "window_from": "2020-04-01",
+          "window_to": "2026-10-16",
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true
+        },
+        {
+          "county": "Horry",
+          "months_read": 45,
+          "months_cached": 0,
+          "instruments_new": 26123,
+          "index_size": 26122,
+          "window_from": "2023-02-01",
+          "window_to": "2026-10-16",
+          "walled": null,
+          "error": null,
+          "budget_exhausted": true
+        }
+      ],
+      "targets": 11743,
+      "stamped": 11661,
+      "found": 520,
+      "possible": 208,
+      "none_found": 10933,
+      "unmatchable": 82,
+      "not_stamped": 0
+    },
+    "county_lien_sweep": {
+      "targets": 58458,
+      "not_stamped": 54385,
+      "counties": [
+        {
+          "county": "Beaufort",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_lrsearch_sweep",
+          "windows_read": 1,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 4,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Burke",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Caldwell",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Camden",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Caswell",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Chowan",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Cleveland",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Currituck",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Dare",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Duplin",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Franklin",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Gates",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Henderson",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Hertford",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Hyde",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Lincoln",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Madison",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Montgomery",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Orange",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 11,
+          "instruments_new": 327,
+          "index_size": 327,
+          "window_from": "2016-01-01",
+          "window_to": "2026-10-16",
+          "types": 7,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": false,
+          "stamped": {
+            "found": 44,
+            "possible": 17,
+            "none_found": 2801,
+            "no_match": 0,
+            "unmatchable": 33
+          }
+        },
+        {
+          "county": "Stanly",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 1,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 7,
+          "walled": null,
+          "error": "RuntimeError: search reply HTTP 405 without a record count",
+          "budget_exhausted": false
+        },
+        {
+          "county": "Surry",
+          "state": "NC",
+          "kind": "lien",
+          "platform": "ccs_classic_asp_sweep",
+          "windows_read": 11,
+          "instruments_new": 400,
+          "index_size": 400,
+          "window_from": "2016-01-01",
+          "window_to": "2026-10-16",
+          "types": 6,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": false,
+          "stamped": {
+            "found": 10,
+            "possible": 0,
+            "none_found": 1039,
+            "no_match": 0,
+            "unmatchable": 30
+          }
+        },
+        {
+          "county": "Oconee",
+          "state": "SC",
+          "kind": "lien",
+          "platform": "govos_publicsearch_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "challenge page",
+          "error": null,
+          "budget_exhausted": false
+        },
+        {
+          "county": "Sumter",
+          "state": "SC",
+          "kind": "lien",
+          "platform": "govos_countyfusion_sweep",
+          "windows_read": 59,
+          "instruments_new": 2406,
+          "index_size": 2406,
+          "window_from": "2016-01-01",
+          "window_to": "2026-10-16",
+          "types": 20,
+          "walled": null,
+          "error": null,
+          "budget_exhausted": false,
+          "stamped": {
+            "found": 129,
+            "possible": 62,
+            "none_found": 4073,
+            "no_match": 0,
+            "unmatchable": 4
+          }
+        },
+        {
+          "county": "Beaufort",
+          "state": "NC",
+          "kind": "marriage",
+          "platform": "ccs_lrsearch_marriage_sweep",
+          "windows_read": 0,
+          "instruments_new": 0,
+          "index_size": 0,
+          "window_from": null,
+          "window_to": null,
+          "types": 0,
+          "walled": "HTTP 403",
+          "error": null,
+          "budget_exhausted": false
+        }
+      ],
+      "started": "2026-10-16T14:41:58.496167+00:00",
+      "lien_found": 183,
+      "lien_possible": 79,
+      "lien_none_found": 7913,
+      "lien_no_match": 0,
+      "lien_unmatchable": 67
+    },
     "dot_ocr": {
-      "pending": 64976,
-      "targets": 400,
-      "searched": 393,
-      "image_ok": 0,
-      "loan_found": 0,
+      "pending": 66957,
+      "pending_before_ledger": 66957,
+      "ledger_not_due": 0,
+      "targets": 407,
+      "searched": 259,
+      "image_ok": 17,
+      "loan_found": 15,
       "rejected_not_note": 0,
       "budget_exhausted": true,
-      "gemini_quota_exhausted": false,
-      "fallback_ocr": 0,
+      "gemini_quota_exhausted": true,
+      "fallback_ocr": 9,
       "counties": {
+        "NC:McDowell": {
+          "leads": 37,
+          "image_ok": 0,
+          "loan_found": 0
+        },
+        "SC:Spartanburg": {
+          "leads": 37,
+          "image_ok": 0,
+          "loan_found": 0
+        },
+        "SC:Laurens": {
+          "leads": 37,
+          "image_ok": 0,
+          "loan_found": 0
+        },
+        "NC:Henderson": {
+          "leads": 37,
+          "image_ok": 0,
+          "loan_found": 0
+        },
+        "NC:Cleveland": {
+          "leads": 37,
+          "image_ok": 0,
+          "loan_found": 0
+        },
         "NC:Lincoln": {
-          "leads": 200,
+          "leads": 37,
           "image_ok": 0,
           "loan_found": 0
         },
         "NC:Burke": {
-          "leads": 200,
+          "leads": 37,
+          "image_ok": 0,
+          "loan_found": 0
+        },
+        "NC:Transylvania": {
+          "leads": 37,
+          "image_ok": 17,
+          "loan_found": 15,
+          "swept_docs": 2106
+        },
+        "SC:Union": {
+          "leads": 37,
+          "image_ok": 0,
+          "loan_found": 0
+        },
+        "SC:Oconee": {
+          "leads": 37,
+          "image_ok": 0,
+          "loan_found": 0
+        },
+        "NC:Mitchell": {
+          "leads": 37,
           "image_ok": 0,
           "loan_found": 0
         }
@@ -2038,364 +3039,913 @@
         "NC:Polk",
         "NC:Rutherford",
         "SC:Pickens"
-      ]
+      ],
+      "county_share": 37,
+      "left_for_next_run": 66698
     },
-    "sc_divorce": {
-      "pending": 17259,
-      "targets": 400,
-      "searched": 400,
-      "with_divorce": 115,
-      "cases_found": 238,
-      "errors": 0,
-      "budget_exhausted": false
+    "jail_bookings_tail": {
+      "matched": 8,
+      "stale_cleared": 0,
+      "rosters_unhealthy": [],
+      "hydrated": 0,
+      "cross_county": 8,
+      "reeval_confirmed": 440,
+      "reeval_left_roster": 13,
+      "reeval_long_stay_kept": 18,
+      "reeval_already_ended": 42,
+      "middle_conflict_rejected": 34,
+      "middle_corroborated": 2
     },
     "acpass": {
-      "targets": 39,
+      "targets": 54,
       "resolved": 0,
-      "blocked": 39,
+      "blocked": 54,
       "errors": 0
     },
     "tax_owed": {
-      "stamped": 116174,
-      "cross_referenced": 44,
-      "parcels_indexed": 81738
+      "stamped": 139565,
+      "cross_referenced": 62,
+      "parcels_indexed": 84412,
+      "cross_ref_keys_ambiguous": 117,
+      "cross_ref_dropped": 5,
+      "unbound": {
+        "rows_scrubbed": 10,
+        "blocks_removed": 7,
+        "tax_owed_removed": 7,
+        "derived_removed": 9,
+        "by_reason": {
+          "foreign_county": 2,
+          "other_parcel": 5,
+          "tax_owed_block_removed": 4,
+          "tax_owed_shared_balance": 3
+        },
+        "by_county": {
+          "SC:lexington": 3,
+          "SC:spartanburg": 2,
+          "NC:polk": 1,
+          "SC:horry": 1,
+          "NC:harnett": 1,
+          "NC:rutherford": 1,
+          "NC:buncombe": 1
+        }
+      }
     },
     "amount_owed_tax_owed_promotion": {
-      "promoted": 106741,
-      "unchanged": 243833,
-      "relabelled_judgment": 10752
+      "promoted": 129977,
+      "unchanged": 307758,
+      "relabelled_judgment": 0
     },
     "tax_aging": {
-      "surfaced": 100011,
-      "high_2yr_plus": 19626,
+      "surfaced": 124950,
+      "high_2yr_plus": 20751,
+      "not_yet_late": 175,
+      "not_yet_late_only": 32,
+      "big_old": 1465,
       "by_source": {
-        "nc_ptscloud": 21570,
-        "tax_owed": 78441
+        "nc_ptscloud": 20083,
+        "tax_owed": 104867
       }
     },
     "bankruptcy_tax_combo": {
-      "combo": 87,
-      "combo_large": 18,
-      "combo_long_open": 17
-    },
-    "tenure": {
-      "computed": 58932,
-      "long_tenure": 34564
+      "combo": 105,
+      "combo_large": 23,
+      "combo_long_open": 23,
+      "cleared": 336
     },
     "tax_relief": {
       "queried": 200,
-      "tagged": 1
+      "tagged": 0
     },
     "rollback_exposure": {
-      "targets": 11722,
-      "matched": 69,
-      "matched_buncombe": 69,
+      "targets": 12473,
+      "matched": 76,
+      "matched_buncombe": 76,
       "matched_anderson": 0,
-      "with_estimate": 69
+      "with_estimate": 76
+    },
+    "onemap_sweeps": {
+      "nc_rows_with_parcel": 165956,
+      "heir_estate_stamped": 4037,
+      "heir_estate_already": 24354,
+      "rollback_stamped": 2200,
+      "rollback_already": 74,
+      "screened": {
+        "heir_estate": [
+          "NC|Alamance",
+          "NC|Alexander",
+          "NC|Alleghany",
+          "NC|Anson",
+          "NC|Ashe",
+          "NC|Avery",
+          "NC|Beaufort",
+          "NC|Bertie",
+          "NC|Bladen",
+          "NC|Brunswick",
+          "NC|Buncombe",
+          "NC|Burke",
+          "NC|Cabarrus",
+          "NC|Caldwell",
+          "NC|Camden",
+          "NC|Carteret",
+          "NC|Caswell",
+          "NC|Catawba",
+          "NC|Chatham",
+          "NC|Cherokee",
+          "NC|Chowan",
+          "NC|Clay",
+          "NC|Cleveland",
+          "NC|Columbus",
+          "NC|Craven",
+          "NC|Cumberland",
+          "NC|Currituck",
+          "NC|Dare",
+          "NC|Davidson",
+          "NC|Davie",
+          "NC|Duplin",
+          "NC|Durham",
+          "NC|Edgecombe",
+          "NC|Forsyth",
+          "NC|Franklin",
+          "NC|Gaston",
+          "NC|Gates",
+          "NC|Graham",
+          "NC|Granville",
+          "NC|Greene",
+          "NC|Guilford",
+          "NC|Halifax",
+          "NC|Harnett",
+          "NC|Haywood",
+          "NC|Henderson",
+          "NC|Hertford",
+          "NC|Hoke",
+          "NC|Hyde",
+          "NC|Iredell",
+          "NC|Jackson",
+          "NC|Johnston",
+          "NC|Jones",
+          "NC|Lee",
+          "NC|Lenoir",
+          "NC|Lincoln",
+          "NC|Macon",
+          "NC|Madison",
+          "NC|Martin",
+          "NC|McDowell",
+          "NC|Mecklenburg",
+          "NC|Mitchell",
+          "NC|Montgomery",
+          "NC|Moore",
+          "NC|Nash",
+          "NC|New Hanover",
+          "NC|Northampton",
+          "NC|Onslow",
+          "NC|Orange",
+          "NC|Pamlico",
+          "NC|Pasquotank",
+          "NC|Pender",
+          "NC|Perquimans",
+          "NC|Person",
+          "NC|Pitt",
+          "NC|Polk",
+          "NC|Randolph",
+          "NC|Richmond",
+          "NC|Robeson",
+          "NC|Rockingham",
+          "NC|Rowan",
+          "NC|Rutherford",
+          "NC|Sampson",
+          "NC|Scotland",
+          "NC|Stanly",
+          "NC|Stokes",
+          "NC|Surry",
+          "NC|Swain",
+          "NC|Transylvania",
+          "NC|Tyrrell",
+          "NC|Union",
+          "NC|Vance",
+          "NC|Wake",
+          "NC|Warren",
+          "NC|Washington",
+          "NC|Watauga",
+          "NC|Wayne",
+          "NC|Wilkes",
+          "NC|Wilson",
+          "NC|Yadkin",
+          "NC|Yancey"
+        ],
+        "rollback_exposure": [
+          "NC|Alamance",
+          "NC|Ashe",
+          "NC|Beaufort",
+          "NC|Bladen",
+          "NC|Buncombe",
+          "NC|Burke",
+          "NC|Cabarrus",
+          "NC|Caldwell",
+          "NC|Catawba",
+          "NC|Chatham",
+          "NC|Cherokee",
+          "NC|Craven",
+          "NC|Cumberland",
+          "NC|Dare",
+          "NC|Davie",
+          "NC|Edgecombe",
+          "NC|Forsyth",
+          "NC|Gaston",
+          "NC|Gates",
+          "NC|Guilford",
+          "NC|Henderson",
+          "NC|Iredell",
+          "NC|Lenoir",
+          "NC|Macon",
+          "NC|Montgomery",
+          "NC|Nash",
+          "NC|New Hanover",
+          "NC|Onslow",
+          "NC|Orange",
+          "NC|Pasquotank",
+          "NC|Perquimans",
+          "NC|Person",
+          "NC|Pitt",
+          "NC|Randolph",
+          "NC|Rockingham",
+          "NC|Rutherford",
+          "NC|Sampson",
+          "NC|Scotland",
+          "NC|Stanly",
+          "NC|Stokes",
+          "NC|Swain",
+          "NC|Tyrrell",
+          "NC|Washington",
+          "NC|Wilkes"
+        ]
+      },
+      "errors": {},
+      "seconds": 283.6,
+      "heir_swept_on": "2026-10-16",
+      "puv_swept_on": "2026-10-16",
+      "heir_matches": 105978,
+      "puv_matches": 203232,
+      "puv_counties": 44,
+      "puv_skipped": {
+        "Carteret": "flag on most parcels",
+        "Caswell": "flag on most parcels",
+        "Johnston": "flag on most parcels",
+        "Rowan": "flag on most parcels",
+        "Wayne": "flag on most parcels",
+        "Wilson": "flag on most parcels",
+        "Yadkin": "flag on most parcels"
+      }
     },
     "life_events": {
-      "elderly_exemption": 3685,
-      "trust": 5292,
-      "multiple_heirs": 4261,
-      "estate_probate": 8546,
-      "life_estate": 1344,
-      "disabled_veteran_exemption": 861,
-      "disabled_exemption": 149,
+      "elderly_exemption": 3349,
+      "trust": 5802,
+      "multiple_heirs": 5634,
+      "life_estate": 1574,
+      "estate_probate": 26433,
+      "disabled_veteran_exemption": 798,
       "blind_exemption": 101,
-      "tagged": 24891
+      "disabled_exemption": 137,
+      "tagged": 44380
+    },
+    "probate_spartan": {
+      "rows_matched_against": 2866,
+      "match_stamped": 180,
+      "probate_promoted": 62,
+      "counties": {
+        "Calhoun": {
+          "complete": true,
+          "total": 3674,
+          "rows": 3674,
+          "requests": 38,
+          "fetched_on": "2026-10-16"
+        },
+        "Greenwood": {
+          "complete": true,
+          "total": 20489,
+          "rows": 20489,
+          "requests": 206,
+          "fetched_on": "2026-10-16"
+        },
+        "Newberry": {
+          "complete": true,
+          "total": 13373,
+          "rows": 13344,
+          "requests": 135,
+          "fetched_on": "2026-10-16"
+        }
+      },
+      "seconds": 767.6,
+      "screened": {
+        "probate": [
+          "SC|Calhoun",
+          "SC|Greenwood",
+          "SC|Newberry"
+        ]
+      }
     },
     "upset_bid": {
-      "scanned": 350574,
-      "tagged_in_window": 37,
-      "tag_cleared_outside_window": 8,
-      "no_sale_date": 194169,
-      "non_nc": 109050,
-      "published_skipped": 112,
-      "not_a_sale_date": 46919
+      "scanned": 437735,
+      "tagged_in_window": 87,
+      "tag_cleared_outside_window": 4,
+      "no_sale_date": 259807,
+      "non_nc": 118739,
+      "published_skipped": 146,
+      "not_a_sale_date": 58673,
+      "ecourts_order_date_window_removed": 1479
     },
     "process_timing": {
-      "labeled": 181000,
-      "sc_redemption_clocks": 3664
+      "labeled": 226976,
+      "sc_redemption_clocks": 6
     },
     "lien_stack": {
-      "indexed": 1264,
+      "indexed": 881,
       "matched": 0
     },
     "sc_cama": {
-      "matched": 15705,
-      "filled_value": 1276
+      "matched": 15580,
+      "filled_value": 70
     },
     "footprint_sqft": {
-      "estimated": 22941,
-      "no_footprint": 71599
+      "estimated": 3662,
+      "no_footprint": 80342
+    },
+    "tenure": {
+      "computed": 99560,
+      "long_tenure": 61325
     },
     "fhfa_value": {
-      "computed": 34097,
-      "candidates": 34529,
-      "targets": 166824
+      "computed": 37263,
+      "candidates": 37753,
+      "targets": 179102
+    },
+    "tail_extras_network_pre_value": {
+      "bt_appraisal_card": {
+        "eligible": 300,
+        "fetched": 300,
+        "parsed": 221,
+        "errors": 0,
+        "filled_sqft": 115,
+        "filled_sale": 133,
+        "filled_value": 8,
+        "not_a_card": 79,
+        "years": {
+          "carteret": "2026",
+          "mcdowell": "2027"
+        },
+        "selected": 300,
+        "seconds": 503.5
+      }
     },
     "dew_liens": {
-      "fetched": 5223,
-      "indexed": 770,
-      "matched": 7
+      "fetched": 5152,
+      "indexed": 811,
+      "matched": 1
     },
     "court_owner_verify": {
-      "checked": 4167,
-      "mismatch": 419,
-      "stripped": 419,
-      "stale_cleared": 68
+      "checked": 9325,
+      "mismatch": 1916,
+      "stripped": 1916,
+      "stale_cleared": 15,
+      "retyped_lien_claim": 3725,
+      "retyped_judgment_lien": 634,
+      "estate_bound": 88,
+      "estate_unbound": 47,
+      "estate_block_unbound": 13,
+      "bankruptcy_bound": 39,
+      "bankruptcy_unbound": 170
     },
     "entity_type": {
-      "individual": 218657,
-      "entity": 85265,
-      "trust": 3292,
-      "estate": 11775,
-      "government": 5373,
-      "unknown": 26212,
-      "tagged_rows": 350574
-    },
-    "assessor_card": {
-      "eligible": 13417,
-      "cap": 900,
-      "targets": 900,
-      "key_resolved": 0,
-      "matched": 289,
-      "filled_sqft": 105,
-      "filled_price": 139
-    },
-    "equity": {
-      "computed": 96952,
-      "amortized": 6033,
-      "withheld_bad_arv": 48064,
-      "withheld_no_arv": 611
-    },
-    "deed_chain": {
-      "stamped": 79581,
-      "total_records": 90296,
-      "with_chain": 79581,
-      "with_distress_transfers": 2103,
-      "with_chain_breaks": 2102
-    },
-    "title_risk": {
-      "senior": 1602,
-      "junior_risk": 1369,
-      "unknown": 4851,
-      "no_party": 94499,
-      "out_of_scope_type": 248253,
-      "rows": 350574
-    },
-    "vacant_landuse": {
-      "eligible": 76929,
-      "stamped": 1712
+      "individual": 264035,
+      "entity": 94395,
+      "trust": 3453,
+      "estate": 32609,
+      "government": 5569,
+      "unknown": 37674,
+      "tagged_rows": 437735
     },
     "verification": {
       "dir": "/home/ubuntu/foreclosure-scraper/docs/handoff/verification",
       "status": "ok",
       "signals": {
         "bankruptcy_stay": {
-          "entries": 100,
-          "attached": 23,
-          "refuted": 9,
-          "confirmed": 5,
-          "unconfirmed": 8,
-          "stale": 1
+          "entries": 285,
+          "attached": 100,
+          "unconfirmed": 48,
+          "confirmed": 46,
+          "refuted": 3,
+          "stale": 3
         },
         "code_enforcement": {
-          "entries": 50,
-          "attached": 52,
-          "refuted": 13,
-          "stale": 1,
-          "confirmed": 38
+          "entries": 196,
+          "attached": 199,
+          "refuted": 49,
+          "stale": 17,
+          "confirmed": 133
         },
         "comps": {
-          "entries": 40,
-          "attached": 44,
-          "confirmed": 42,
-          "refuted": 1,
-          "unconfirmed": 1
+          "entries": 240,
+          "attached": 274,
+          "confirmed": 249,
+          "unconfirmed": 14,
+          "stale": 8,
+          "refuted": 3
+        },
+        "court_wall": {
+          "entries": 1474,
+          "attached": 1593,
+          "wall": 1593
+        },
+        "divorce": {
+          "entries": 198,
+          "attached": 204,
+          "wall": 204
         },
         "elderly_disabled": {
-          "entries": 125,
-          "attached": 131,
-          "refuted": 32,
-          "confirmed": 90,
-          "unconfirmed": 9
+          "entries": 219,
+          "attached": 234,
+          "refuted": 101,
+          "unconfirmed": 27,
+          "stale": 1,
+          "confirmed": 105
         },
         "foreclosure_rod": {
           "entries": 106,
-          "attached": 54,
-          "confirmed": 15,
-          "unconfirmed": 34,
+          "attached": 49,
+          "unconfirmed": 28,
           "stale": 4,
-          "refuted": 1
+          "refuted": 1,
+          "confirmed": 16
+        },
+        "foreclosure_sale_list": {
+          "entries": 91,
+          "attached": 87,
+          "unconfirmed": 5,
+          "confirmed": 80,
+          "stale": 2
+        },
+        "heir_roll": {
+          "entries": 533,
+          "attached": 539,
+          "unconfirmed": 13,
+          "refuted": 10,
+          "stale": 1,
+          "confirmed": 515
         },
         "jail_booking": {
           "entries": 227,
-          "attached": 189,
-          "unconfirmed": 40,
-          "confirmed": 132,
-          "stale": 17
+          "attached": 183,
+          "unconfirmed": 38,
+          "confirmed": 130,
+          "stale": 15
+        },
+        "nc_ecourts_case": {
+          "entries": 1331,
+          "attached": 981,
+          "confirmed": 869,
+          "unconfirmed": 44,
+          "stale": 50,
+          "refuted": 18
         },
         "probate_heir": {
           "entries": 55,
-          "attached": 48,
-          "unconfirmed": 30,
-          "confirmed": 17,
+          "attached": 40,
+          "unconfirmed": 23,
+          "confirmed": 16,
           "refuted": 1
         },
         "tax_lien": {
-          "entries": 381,
-          "attached": 334,
-          "confirmed": 210,
-          "stale": 44,
-          "refuted": 44,
-          "unconfirmed": 36
+          "entries": 20256,
+          "attached": 18163,
+          "stale": 1549,
+          "confirmed": 11116,
+          "refuted": 751,
+          "unconfirmed": 4747
         },
         "vacant_structure": {
           "entries": 50,
-          "attached": 51,
+          "attached": 50,
           "refuted": 1,
-          "unconfirmed": 20,
           "confirmed": 28,
+          "unconfirmed": 19,
           "stale": 2
         }
       },
-      "rows": 854,
-      "records": 926,
-      "suppressing": 171,
+      "rows": 21925,
+      "records": 22696,
+      "suppressing": 2573,
       "unreadable": {}
     },
+    "tax_verified_restore": {
+      "confirmed": 11099,
+      "restored": 9913,
+      "replaced_balance": 3717,
+      "added_balance": 316,
+      "not_own_parcel_or_no_years": 1218,
+      "other_lien_kept": 63,
+      "stale_or_refuted": 2256,
+      "balance_removed": 1120,
+      "balance_from_check": 0,
+      "note_only": 1100,
+      "notes_cleared": 0
+    },
+    "identity": {
+      "unfuse": {
+        "unfused": 33,
+        "address_changed": 10,
+        "owner_changed": 11
+      },
+      "twins": {
+        "multi_address_groups": 725,
+        "fused_keys": 76,
+        "duplicates": 309,
+        "absorbed_aged": 116,
+        "address_taken": 7,
+        "merged_live": 193,
+        "rows_removed": 309,
+        "clusters": 302
+      },
+      "owners": {
+        "row": 7088,
+        "roll": 1091,
+        "undecided": 1136
+      }
+    },
+    "blocks_unbound_late": {
+      "rows_scrubbed": 19197,
+      "blocks_removed": 21245,
+      "by_reason": {
+        "other_parcel": 130,
+        "other_person": 12596,
+        "shared_copy": 5624,
+        "fallback_point": 2765,
+        "footprint_sqft_cleared": 2188,
+        "derived_from_removed": 38,
+        "other_address": 86,
+        "foreign_county": 6
+      },
+      "by_block": {
+        "skip_trace:other_person": 10727,
+        "retyped:shared_copy": 4358,
+        "footprint:fallback_point": 2220,
+        "owner_mailing:other_person": 748,
+        "owner_phone:other_person": 616,
+        "gis:shared_copy": 334,
+        "parcel_resolution:shared_copy": 270,
+        "sc_state_tax_lien:other_person": 255,
+        "bankruptcy_unbound_property:shared_copy": 170,
+        "gis:fallback_point": 161,
+        "images:fallback_point": 156,
+        "skip_trace:shared_copy": 139,
+        "sos_agent:other_person": 82,
+        "owner_email:other_person": 68,
+        "gis_attrs_full:fallback_point": 66,
+        "heir_estate:other_person": 66,
+        "detail_page:shared_copy": 61,
+        "sos_agent:shared_copy": 57,
+        "deed_chain:fallback_point": 56,
+        "estate_unbound:shared_copy": 47,
+        "gis_attrs_full:other_address": 39,
+        "bankruptcy:shared_copy": 36,
+        "gis_attrs_full:other_parcel": 34,
+        "incarceration_check:other_person": 31,
+        "owner_mailing:other_address": 31,
+        "county_deed_ref:other_parcel": 23,
+        "zillow:fallback_point": 23,
+        "condition_cama:fallback_point": 23,
+        "county_pin:shared_copy": 22,
+        "owner_mailing:other_parcel": 20,
+        "fhfa_value:derived_from_removed": 20,
+        "gis_attrs_full:shared_copy": 20,
+        "parcel_from_address:shared_copy": 19,
+        "skip_trace:other_parcel": 18,
+        "vision:fallback_point": 17,
+        "deed_chain:derived_from_removed": 17,
+        "divorce:shared_copy": 16,
+        "county_legal:other_parcel": 15,
+        "cama:fallback_point": 13,
+        "state_contamination:other_address": 12
+      },
+      "by_county": {
+        "NC:wake": 1926,
+        "NC:mecklenburg": 1680,
+        "SC:charleston": 1659,
+        "NC:brunswick": 1396,
+        "NC:gaston": 762,
+        "NC:newhanover": 739,
+        "NC:durham": 621,
+        "NC:buncombe": 547,
+        "NC:lincoln": 532,
+        "NC:onslow": 519,
+        "NC:forsyth": 401,
+        "SC:anderson": 362,
+        "NC:union": 361,
+        "NC:johnston": 338,
+        "NC:henderson": 303,
+        "SC:florence": 297,
+        "NC:harnett": 252,
+        "NC:cleveland": 231,
+        "NC:iredell": 229,
+        "SC:pickens": 226,
+        "NC:catawba": 222,
+        "NC:guilford": 214,
+        "NC:transylvania": 199,
+        "NC:haywood": 199,
+        "NC:pitt": 197
+      }
+    },
+    "bankruptcy_tax_combo_after_restore": {
+      "combo": 98,
+      "combo_large": 18,
+      "combo_long_open": 20,
+      "cleared": 9
+    },
+    "assessor_card": {
+      "eligible": 14523,
+      "cap": 900,
+      "targets": 900,
+      "key_resolved": 0,
+      "matched": 222,
+      "filled_sqft": 27,
+      "filled_price": 126
+    },
+    "equity": {
+      "computed": 102494,
+      "amortized": 6947,
+      "withheld_bad_arv": 50787,
+      "withheld_no_arv": 596
+    },
+    "valuation_regraded_after_equity": {
+      "count": 437426
+    },
+    "deed_chain": {
+      "stamped": 131390,
+      "total_records": 153146,
+      "with_chain": 131390,
+      "with_distress_transfers": 2588,
+      "with_chain_breaks": 2587
+    },
+    "title_risk": {
+      "senior": 1670,
+      "junior_risk": 1480,
+      "unknown": 5776,
+      "no_party": 95574,
+      "out_of_scope_type": 332926,
+      "rows": 437426
+    },
+    "vacant_landuse": {
+      "eligible": 136928,
+      "stamped": 11803,
+      "land_use_filled": 105467
+    },
+    "deed_latest": {
+      "chains": 603,
+      "rebound": 0,
+      "unbound": 43,
+      "bound": 116,
+      "deed_latest": 116,
+      "removed": 0
+    },
+    "dnc_scrub": {
+      "total_listings": 437426,
+      "listings_with_phone": 84429,
+      "scrubbed": 84429,
+      "phones": 84429,
+      "registered": 0,
+      "on_registry": 0,
+      "on_internal_dnc": 0,
+      "clear": 0,
+      "unverified": 71927,
+      "blocked": 12502,
+      "rescrubbed": 0,
+      "kept": 0,
+      "registry_files": 0,
+      "registry_numbers": 0,
+      "registry_complete": false,
+      "internal_list": false,
+      "internal_numbers": 0,
+      "agent_tagged": 174,
+      "walled_flagged": 0,
+      "seconds": 3.0
+    },
+    "tail_extras_local_pre_gate": {
+      "flood_zone": {
+        "mirrored": 146731,
+        "changed": 146731,
+        "flood_zone_only": 2,
+        "seconds": 0.8
+      },
+      "hud_fmr": {
+        "matched": 353203,
+        "changed": 328332,
+        "no_match": 84223,
+        "table_cached_at": "2026-08-20T12:58:53.102014",
+        "seconds": 2.2
+      },
+      "septic": {
+        "skipped": "no septic layer cache (the network step fetches it)",
+        "seconds": 0.0
+      }
+    },
+    "call_ready": {
+      "rows": 437426,
+      "by_lane_tier": {
+        "A/D": 7412,
+        "E/D": 124738,
+        "E/C": 5389,
+        "-/D": 254602,
+        "C/D": 41199,
+        "D/D": 1238,
+        "B/D": 2084,
+        "B/C": 3,
+        "A/B": 223,
+        "A/A": 454,
+        "D/C": 58,
+        "D/B": 11,
+        "D/A": 15
+      },
+      "errors": 0
+    },
     "distress_stack": {
-      "HOT": 100,
-      "WARM": 45579,
-      "COLD": 304100
+      "HOT": 161,
+      "WARM": 77556,
+      "COLD": 359004
     },
     "distress_stack_detail": {
-      "suspicious_parcel_ids": 77,
-      "lane_foreclosure": 1332,
-      "stale_capped": 495,
-      "stay_capped": 75,
+      "suspicious_parcel_ids": 82,
+      "lane_foreclosure": 263,
+      "stale_capped": 1362,
+      "stay_capped": 74,
       "scope_capped": 0,
       "errors": 0,
+      "tier_floor_tax_big_old": 283,
       "tiers": {
-        "HOT": 100,
-        "WARM": 45579,
-        "COLD": 304100
+        "HOT": 161,
+        "WARM": 77556,
+        "COLD": 359004
       }
     },
     "derived_signals": {
-      "discount_to_arv": 4715,
-      "lien_to_value": 96607,
-      "rows": 97290
+      "discount_to_arv": 7371,
+      "lien_to_value": 102157,
+      "rows": 102844
     },
     "owner_name_signal": {
-      "strong": 10762,
-      "medium": 4270,
-      "weak": 6320,
-      "institutional": 173,
-      "tagged": 21352,
-      "stale_cleared": 1298
+      "strong": 29151,
+      "medium": 5519,
+      "weak": 7468,
+      "institutional": 197,
+      "tagged": 42138,
+      "stale_cleared": 199
     },
     "co_defendant_signal": {
-      "checked": 2905,
-      "tagged": 133,
-      "junior_lienholder": 57,
-      "government_lienholder": 43,
-      "hoa": 30,
-      "estate": 19
+      "checked": 4190,
+      "tagged": 187,
+      "junior_lienholder": 82,
+      "government_lienholder": 66,
+      "hoa": 54,
+      "estate": 22
     },
     "hoa_plaintiff_signal": {
-      "checked": 4982,
-      "tagged": 58
+      "checked": 5419,
+      "tagged": 83
     },
     "owner_cluster": {
-      "clusters": 20088,
-      "tagged_rows": 57138,
-      "high_confidence_clusters": 18263,
-      "low_confidence_clusters": 1825,
-      "max_cluster_size": 131
+      "clusters": 25842,
+      "tagged_rows": 73372,
+      "high_confidence_clusters": 23725,
+      "low_confidence_clusters": 2117,
+      "max_cluster_size": 201
     },
     "liensnc_posthumous": {
-      "liensnc_rows": 46777,
+      "liensnc_rows": 58133,
       "date_mismatch": 0,
-      "owner_name_token": 103,
-      "tagged": 103
+      "owner_name_token": 108,
+      "tagged": 108
+    },
+    "obituary_match": {
+      "obituaries_indexed": 902,
+      "leads_checked": 436552,
+      "attached": 22,
+      "ambiguous": 15,
+      "store_size": 902,
+      "store_added": 77
+    },
+    "heir_candidates": {
+      "dead_owner_leads": 39992,
+      "with_candidates": 6963,
+      "candidates": 7129,
+      "by_source_kind": {
+        "probate_record_personal_representative": 377,
+        "county_record": 5073,
+        "probate_notice_personal_representative": 1625,
+        "obituary_survivor": 51,
+        "court_notice_named_heir": 3
+      },
+      "by_signal": {
+        "roll_heirs_estate": 36654,
+        "probate": 3398,
+        "obituary": 420,
+        "death_index": 16
+      },
+      "published_leads": 6828,
+      "published_names": 6957,
+      "private_file": "/home/ubuntu/foreclosure-scraper/data/heirs/heir_candidates.jsonl.gz",
+      "private_rows": 39992
     },
     "platted_lots": {
-      "checked": 350574,
-      "multi_lot": 594,
-      "acreage_mismatch": 284,
-      "tagged": 878
+      "checked": 437426,
+      "multi_lot": 843,
+      "acreage_mismatch": 817,
+      "tagged": 1660
     },
     "divorce_no_subsequent_deed": {
-      "divorce_notice_rows": 7228,
+      "divorce_notice_rows": 7244,
       "sc_skipped": 0,
-      "no_resolution_yet": 5686,
+      "no_resolution_yet": 5684,
       "same_person_artifact": 8,
-      "resolved_no_joint_owner": 47,
+      "resolved_no_joint_owner": 48,
       "tagged": 1
     },
     "notice_service_defect": {
-      "candidate_rows": 9,
+      "candidate_rows": 8,
       "sc_skipped": 0,
       "generic_party_skipped": 3,
       "no_evidence_yet": 0,
-      "same_row_hit": 6,
+      "same_row_hit": 5,
       "cross_board_hit": 0,
-      "tagged": 6
+      "tagged": 5
     },
     "fullmer_rank": {
-      "ranked": 350574,
+      "ranked": 437426,
       "buckets": {
-        "A (70+)": 14668,
-        "B (50-69)": 56144,
-        "C (30-49)": 83257,
-        "D (<30)": 196505
+        "A (70+)": 14440,
+        "B (50-69)": 64212,
+        "C (30-49)": 117845,
+        "D (<30)": 240929
       }
     },
+    "call_ready_final": {
+      "rows": 437426,
+      "by_lane_tier": {
+        "A/D": 7376,
+        "E/D": 124656,
+        "E/C": 5388,
+        "-/D": 254602,
+        "C/D": 40875,
+        "D/D": 1238,
+        "B/D": 2531,
+        "B/C": 3,
+        "A/B": 219,
+        "A/A": 454,
+        "D/C": 58,
+        "D/B": 11,
+        "D/A": 15
+      },
+      "errors": 0
+    },
     "derivation_flags": {
-      "free_and_clear": 1406,
-      "unreleased_mortgage": 4135,
-      "tired_landlord": 45,
-      "divorce": 7228,
+      "free_and_clear": 1461,
+      "unreleased_mortgage": 4188,
+      "tired_landlord": 44,
+      "divorce": 7244,
       "subordinate_lien_foreclosure": 7,
-      "rows": 12763,
-      "dropped_stale": 469
+      "rows": 12887,
+      "dropped_stale": 55
     },
     "strategy_fit": {
-      "tagged": 71274,
+      "tagged": 118410,
       "by_tag": {
-        "LAND_WHOLESALE": 67793,
-        "FIX_FLIP": 3481
+        "LAND_WHOLESALE": 114739,
+        "FIX_FLIP": 3671
       }
     },
     "eviction_market": {
-      "tagged": 124582,
-      "high": 52780
+      "tagged": 132265,
+      "high": 54667
     },
     "corroboration": {
-      "tagged": 350574,
-      "court_confirmed": 31162,
-      "government": 176668,
-      "aggregator_only": 4364,
-      "multi_source": 21624
+      "tagged": 437426,
+      "court_confirmed": 39686,
+      "government": 210163,
+      "aggregator_only": 7117,
+      "multi_source": 27355
     },
     "competition": {
-      "tagged": 300,
-      "high": 300,
-      "medium": 253574,
-      "low": 96700,
-      "widely_published": 300
+      "tagged": 320,
+      "high": 320,
+      "medium": 316354,
+      "low": 120752,
+      "widely_published": 320
     },
     "lead_signals": {
-      "scored": 350572,
-      "with_multi_stack": 12993,
-      "hot": 27,
-      "warm": 2629,
-      "cool": 162182,
-      "cold": 185734,
-      "max_stack": 4,
-      "max_intent": 83,
+      "scored": 437426,
+      "with_multi_stack": 21397,
+      "hot": 22,
+      "warm": 2591,
+      "cool": 219143,
+      "cold": 215670,
+      "max_stack": 3,
+      "max_intent": 76,
       "failed": 0
     },
     "buyer_match": {
@@ -2403,115 +3953,167 @@
       "by_category": {}
     },
     "data_quality": {
-      "synthetic_address": 26757,
-      "approximate_address": 15,
-      "low_arv_confidence": 273025,
-      "no_sqft": 172693,
-      "sqft_estimated": 72684,
-      "arv_outlier": 12694,
-      "no_address": 7744,
+      "synthetic_address": 38990,
+      "approximate_address": 5,
+      "low_arv_confidence": 354769,
+      "no_sqft": 205224,
+      "sqft_estimated": 70239,
+      "arv_outlier": 12250,
+      "no_address": 16751,
       "exceptions": 0,
-      "arv_sanity_flag": 166663,
-      "arv_withheld": 10750,
-      "arv_contradicted": 34261,
-      "arv_weak_evidence": 118599
+      "arv_sanity_flag": 177482,
+      "arv_weak_evidence": 126695,
+      "arv_contradicted": 35118,
+      "arv_withheld": 12522
     },
     "homepath_uuid": {
-      "checked": 570,
-      "live": 507,
-      "re_resolved": 6,
-      "unresolved": 57
+      "checked": 9,
+      "live": 9,
+      "re_resolved": 0,
+      "unresolved": 0
     },
     "reo_freshness": {
-      "pruned": 561,
+      "pruned": 265,
       "by_source": {
-        "national.fannie_homepath": 561
+        "national.homepath_json": 265
       },
       "landed": {
-        "matched": 9,
-        "added": 0,
+        "matched": 13,
+        "added": 9,
         "skipped_no_addr": 0,
-        "skipped_out_of_scope": 36
+        "skipped_out_of_scope": 81
       },
       "untagged": 0,
-      "added_tiers": null
+      "added_tiers": {
+        "HOT": 0,
+        "WARM": 0,
+        "COLD": 9
+      }
     },
     "board_quality": {
-      "stale_flagged": 105707,
-      "centroid_flagged": 95219,
-      "hot_downranked": 52,
-      "sale_date_passed_cleared": 35,
-      "bbox_nulled": 41,
-      "status_normalized": 69,
-      "sale_date_passed": 3897,
-      "past_sale_status_normalized": 12,
+      "centroid_flagged": 102858,
+      "stale_flagged": 120951,
+      "bbox_nulled": 27,
+      "hot_downranked": 38,
+      "sale_date_passed": 3942,
+      "past_sale_status_normalized": 21,
+      "stale_case_cleared": 50056,
+      "sale_date_passed_cleared": 27,
       "past_sale_verdict_withheld": 37,
-      "stale_case_cleared": 1,
-      "status_nulled": 583
+      "status_normalized": 945
     },
     "last_sale": {
-      "set": 41455,
-      "recorded": 24038,
-      "assessor_value": 16622,
-      "date_only": 795
+      "set": 44292,
+      "recorded": 27600,
+      "assessor_value": 16359,
+      "date_only": 333
     },
     "board_qa": {
-      "anchor_stamp:own_records_disagree": 5322,
-      "anchor_stamp_not_derived": 444,
-      "anchor_stamp_equity_withheld": 1782,
-      "anchor_stamp_distress_reranked": 1782,
-      "anchor_stamp:sub_hundred_precision": 572,
-      "anchor_stamp:assessor_row_across_parcels": 455,
-      "owner_mismatch_two_private_parties": 6253,
-      "arv_flag:arv_above_anchor_extreme": 7679,
-      "owner_record_mismatch": 9144,
-      "arv_sanity_flag": 166140,
-      "arv_withheld": 10736,
-      "arv_flag:anchor_not_independent": 134436,
-      "arv_flag:arv_land_sqft_mismatch": 27365,
-      "arv_flag:geo_imprecise_comps": 23874,
-      "arv_flag:stale_sale_floor": 5668,
-      "arv_flag:arv_above_anchor": 3097,
-      "no_sqft": 248928,
-      "arv_flag:floor_rejected_extreme": 3102,
-      "arv_below_asis": 3551,
-      "owner_mismatch_institutional": 2891,
-      "missing_last_sale": 20143,
-      "arv_outlier": 12677,
-      "arv_flag:floor_raise_large": 2005,
-      "arv_flag:arv_implies_implausible_roi": 1721,
-      "arv_flag:placeholder_opening_bid": 3354,
-      "arv_flag:arv_tier_refused_ceiling": 273,
-      "arv_above_asis": 357,
-      "arv_flag:county_values_disagree": 5566,
-      "arv_flag:rehab_not_deducted": 32249,
-      "no_owner": 24836,
-      "arv_flag:land_ppa_ceiling": 2708,
-      "arv_flag:arv_proxy_above_ceiling": 2933,
-      "anchor_shared_across_parcels": 6349,
-      "arv_flag:anchor_shared_across_parcels": 5905,
-      "arv_flag:land_comp_spread": 356,
-      "arv_flag:arv_above_plausible_max": 309,
-      "equity_withheld_arv_outlier": 2270,
-      "arv_outlier_distress_reranked": 2266,
-      "sale_date_passed": 4894,
-      "arv_flag:land_comps_disagree": 65,
-      "arv_flag:cama_class_mismatch": 626,
-      "arv_flag:arv_above_list_price": 455,
-      "arv_flag:bid_proxy_arv": 1745,
-      "arv_flag:land_comps_rejected": 32,
-      "arv_flag:ppsf_ceiling": 129,
-      "arv_flag:comp_kind_mismatch": 58,
-      "dup_address": 1991,
-      "gis_row_shared": 2850,
-      "gis_row_shared_rows": 11774
+      "anchor_stamp:own_records_disagree": 5362,
+      "anchor_stamp_not_derived": 557,
+      "anchor_stamp_equity_withheld": 1554,
+      "anchor_stamp_distress_reranked": 1554,
+      "anchor_stamp:assessor_row_across_parcels": 427,
+      "anchor_stamp:sub_hundred_precision": 546,
+      "owner_mismatch_two_private_parties": 5974,
+      "arv_flag:geo_imprecise_comps": 26383,
+      "owner_record_mismatch": 8558,
+      "arv_sanity_flag": 177252,
+      "arv_flag:arv_land_sqft_mismatch": 26442,
+      "arv_flag:stale_sale_floor": 5414,
+      "owner_mismatch_institutional": 2584,
+      "arv_flag:anchor_not_independent": 141301,
+      "arv_below_asis": 3640,
+      "arv_outlier": 12245,
+      "missing_last_sale": 61211,
+      "arv_flag:floor_raise_large": 2303,
+      "no_sqft": 330482,
+      "arv_flag:arv_tier_refused_ceiling": 299,
+      "arv_flag:county_values_disagree": 5737,
+      "arv_flag:arv_above_anchor": 3710,
+      "no_owner": 36262,
+      "arv_flag:arv_above_anchor_extreme": 8269,
+      "arv_withheld": 12495,
+      "arv_flag:arv_proxy_above_ceiling": 2918,
+      "arv_flag:rehab_not_deducted": 32728,
+      "arv_flag:land_ppa_ceiling": 2833,
+      "arv_flag:floor_rejected_extreme": 3226,
+      "anchor_shared_across_parcels": 6335,
+      "arv_flag:anchor_shared_across_parcels": 5778,
+      "arv_flag:land_comp_spread": 679,
+      "arv_flag:arv_above_plausible_max": 293,
+      "arv_above_asis": 444,
+      "arv_flag:low_value_parcel": 400,
+      "arv_flag:placeholder_opening_bid": 3378,
+      "arv_flag:ppsf_ceiling": 143,
+      "arv_flag:arv_implies_implausible_roi": 1736,
+      "equity_withheld_arv_outlier": 1733,
+      "arv_outlier_distress_reranked": 1731,
+      "sale_date_passed": 4933,
+      "arv_flag:land_comps_disagree": 74,
+      "arv_flag:arv_unexplained_outlier": 835,
+      "arv_flag:arv_above_list_price": 937,
+      "arv_flag:bid_proxy_arv": 2679,
+      "arv_flag:land_comps_rejected": 48,
+      "arv_flag:cama_class_mismatch": 557,
+      "arv_flag:comp_kind_mismatch": 54,
+      "dup_address": 3035,
+      "gis_row_shared": 3340,
+      "gis_row_shared_rows": 13004
+    },
+    "tail_extras_local_after_qa": {
+      "source_consistency": {
+        "zip_state_conflict:zip_range": 351,
+        "zip_state_conflict": 381,
+        "land_use_kind_conflict:structure_on_land_parcel": 13265,
+        "land_use_kind_conflict": 18234,
+        "land_use_kind_conflict:vacant_lot_priced_as_dwelling": 4969,
+        "address_city_conflict:other_city": 104,
+        "address_city_conflict": 304,
+        "zip_state_conflict:board_consensus": 30,
+        "address_city_recoverable": 4344,
+        "source_url_city_conflict": 37,
+        "address_city_conflict:to_county_name": 200,
+        "seconds": 5.8
+      },
+      "property_category": {
+        "categories": {
+          "foreclosure": 9538,
+          "preforeclosure": 162927,
+          "tax_delinquency": 211692,
+          "distressed_property": 53013
+        },
+        "subcategories": {
+          "tax_delinquent": 157013,
+          "distressed": 124089,
+          "foreclosure": 2223,
+          "tax_sale": 54679,
+          "auction_foreclosure": 11,
+          "probate_notice": 5711,
+          "bankruptcy": 1118,
+          "divorce_notice": 7244,
+          "uncategorized": 44606,
+          "lis_pendens": 7303,
+          "lien_claim": 7,
+          "auction": 373,
+          "reo": 863,
+          "estate_lead": 25485,
+          "elderly_disabled": 4104,
+          "early_distress": 2340,
+          "hoa_foreclosure": 1
+        },
+        "confidence": {
+          "high": 2407,
+          "medium": 227691,
+          "low": 207072
+        },
+        "rows": 437170,
+        "seconds": 22.8
+      }
     },
     "source_link": {
-      "record": 332117,
-      "search": 17896
-    },
-    "fema_disaster": {
-      "declarations": 2
+      "record": 410340,
+      "search": 26830
     },
     "usps_vacancy": {
       "flagged": 0,
@@ -2519,17 +4121,28 @@
       "moderate": 0,
       "total_zips": 0
     },
-    "jail_bookings_tail": {
-      "matched": 0,
-      "stale_cleared": 0,
-      "rosters_unhealthy": [],
-      "hydrated": 0,
-      "cross_county": 0,
-      "reeval_confirmed": 341,
-      "reeval_already_ended": 24,
-      "reeval_long_stay_restored": 17,
-      "middle_conflict_rejected": 32,
-      "reeval_left_roster": 2
+    "tail_extras_geo": {
+      "septic_refresh": {
+        "fetched": 80647,
+        "fetched_at": "2026-10-16T19:55:07.433642+00:00"
+      },
+      "septic": {
+        "targets": 9068,
+        "matched": 1343,
+        "changed": 1343,
+        "cleared": 53,
+        "adverse": 140,
+        "layer_fetched_at": "2026-10-16T19:55:07.433642+00:00"
+      },
+      "wetlands": {
+        "eligible": 117810,
+        "points": 5000,
+        "answered": 5000,
+        "with_wetlands": 931,
+        "rows_set": 49281,
+        "unanswered": 0
+      },
+      "seconds": 356.7
     }
   }
 }
