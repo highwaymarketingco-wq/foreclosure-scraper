@@ -148,7 +148,9 @@ _PARCEL_BAD_PATTERNS = (
 #: 1,704 rows in all (LiensNC 662, nc_its_public_tax 355, Rocky Mount survey 229, NC UST 167, ...).
 #: These ids ARE the parcel: nulling them published the row with no parcel id. NOT here, measured:
 #: Catawba (the county list's tax ACCOUNT number, 0 of 5,376 in the layer), Guilford / Beaufort /
-#: Madison PTS Cloud ids (0% in the layer), Buncombe STR permit ids and Burke storm-layer ids (0%);
+#: Madison / Henderson PTS Cloud ids (0% in the layer; Henderson re-measured 2026-10-16: 0 of 5
+#: sampled ids, incl. '106725', match any id in its 214,071-row cache — same verdict, not a gap in
+#: this comment's coverage), Buncombe STR permit ids and Burke storm-layer ids (0%);
 #: Pitt and Hyde PTS ids (Pitt 5-digit 95% in the layer but 4-digit 0%, Hyde 64-94%; the rows carry
 #: no house number to confirm, and the 13 Pitt rows that do all disagree); Polk map forms (97% in the
 #: layer, 11% another house);
