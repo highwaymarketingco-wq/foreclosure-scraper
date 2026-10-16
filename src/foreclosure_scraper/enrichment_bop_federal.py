@@ -54,7 +54,7 @@ from typing import Optional
 import httpx
 import structlog
 
-from .enrichment_incarceration import _name_parts, _owner_of
+from .enrichment_incarceration import _county_key, _name_parts, _owner_of
 from .models import Listing
 from .signal_freshness import is_prison_sourced
 
@@ -226,12 +226,43 @@ def _clear_stale_matches(listings: list[Listing]) -> int:
     return cleared
 
 
-def _select_targets(cands: list[tuple], max_queries: int) -> list[Listing]:
-    """Never-checked leads first (board order), then oldest stamps. One
-    national endpoint, so — unlike the per-state/county rotation in
-    enrichment_incarceration.py — there is no county grouping to round-robin."""
-    ordered = sorted(cands, key=lambda t: (t[2] is not None, t[2].timestamp() if t[2] else 0.0))
-    return [li for li, _name, _checked in ordered[:max_queries]]
+def _select_targets(cands: list[tuple], max_queries: int, now: datetime) -> list[Listing]:
+    """Round-robin by (state, county), same fairness fix as enrichment_incarceration.py's
+    own round-robin -- added 2026-10-16 after live measurement showed only 8 of 148
+    gap-listed counties had EVER had a single checked row. One shared national endpoint
+    means there is no PER-COUNTY rate limit to respect (unlike incarceration.py's
+    NC DAC / SC DOC, which is why this used to say round-robin didn't apply here) --
+    but the fairness problem is real regardless: "never-checked first, plain board
+    order" let whichever counties happen to sort first consume the whole budget every
+    run while most of the other 140 counties were never reached at all, out of a
+    candidate pool that grew from 163k to 238k+ rows over 10 days. The daily spin means
+    the same counties don't win that race every time either."""
+    groups: dict[tuple[str, str], list] = {}
+    for li, _name, checked in cands:
+        groups.setdefault(_county_key(li), []).append((checked, li))
+    for k, g in groups.items():
+        g.sort(key=lambda t: (t[0] is not None, t[0].timestamp() if t[0] else 0.0))
+        groups[k] = [li for _c, li in g]
+    keys = sorted(groups)
+    if not keys:
+        return []
+    spin = now.toordinal() % len(keys)
+    keys = keys[spin:] + keys[:spin]
+    out: list[Listing] = []
+    depth = 0
+    while len(out) < max_queries:
+        moved = False
+        for k in keys:
+            g = groups[k]
+            if depth < len(g):
+                out.append(g[depth])
+                moved = True
+                if len(out) >= max_queries:
+                    break
+        if not moved:
+            break
+        depth += 1
+    return out
 
 
 async def enrich_bop_federal(listings: list[Listing], max_queries: Optional[int] = None,
@@ -271,7 +302,7 @@ async def enrich_bop_federal(listings: list[Listing], max_queries: Optional[int]
             fresh += 1
             continue
         cands.append((li, name, checked))
-    targets = _select_targets(cands, max_queries)
+    targets = _select_targets(cands, max_queries, now)
     if not targets:
         log.info("bop.no_targets", skipped_fresh=fresh, stale_cleared=stale_cleared)
         return {"queried": 0, "matched": 0, "stale_cleared": stale_cleared}

@@ -369,3 +369,40 @@ async def test_enrich_clears_a_stale_match_and_requeries_the_new_person(monkeypa
     assert res["stale_cleared"] == 1
     assert srv.asked == [("SMITH", "JANE")]
     assert li.raw["bop_federal"]["matched_name"] == "JANE SMITH"
+
+
+# ---- round-robin fairness across counties (2026-10-16 audit) -------------------------
+#
+# _select_targets used to be "never-checked first, plain board order" with no county
+# grouping at all -- live-measured 2026-10-16: only 8 of 148 gap-listed counties had
+# EVER had a single checked row out of a candidate pool that grew from 163k to 238k+
+# rows over 10 days. One shared national endpoint means no PER-COUNTY rate limit is at
+# stake here (unlike enrichment_incarceration.py's NC DAC/SC DOC); the fix is purely
+# about fair coverage when the budget is far smaller than the candidate pool.
+
+@pytest.mark.asyncio
+async def test_a_tight_budget_still_reaches_every_county_not_just_the_first_in_board_order(monkeypatch):
+    srv = _Server().install(monkeypatch)
+    # Buncombe sorts first alphabetically and has far more candidates than the budget --
+    # under the old "board order, no grouping" selection it alone would have consumed
+    # the whole run every time.
+    leads = ([_li(last=f"BIG{_tag(i)}", first="OWNER", county="Buncombe") for i in range(20)]
+             + [_li(last=f"SML{_tag(i)}", first="OWNER", county="Henderson") for i in range(2)]
+             + [_li(last=f"TNY{_tag(i)}", first="OWNER", county="Polk") for i in range(2)])
+    await enrich_bop_federal(leads, max_queries=6)
+    asked_prefixes = {last[:3] for last, _first in srv.asked}
+    assert asked_prefixes == {"BIG", "SML", "TNY"}   # every county's prefix shows up
+
+
+@pytest.mark.asyncio
+async def test_the_daily_spin_changes_which_county_goes_first(monkeypatch):
+    from foreclosure_scraper.enrichment_bop_federal import _select_targets
+
+    leads = ([_li(last=f"A{_tag(i)}", first="OWNER", county="Alpha") for i in range(3)]
+             + [_li(last=f"B{_tag(i)}", first="OWNER", county="Beta") for i in range(3)])
+    cands = [(li, "OWNER X", None) for li in leads]
+    day0 = datetime(2026, 10, 16, tzinfo=timezone.utc)
+    day1 = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    first_county_day0 = _select_targets(cands, 1, day0)[0].county
+    first_county_day1 = _select_targets(cands, 1, day1)[0].county
+    assert first_county_day0 != first_county_day1
