@@ -71,9 +71,9 @@ if [[ "$(_self_sum)" != "$SELF_SUM" && "${VM_RUN_REEXEC:-0}" != "1" ]]; then
   VM_RUN_REEXEC=1 VM_RUN_STAMP="$STAMP" exec bash "$ROOT/deploy/oracle/vm_run.sh" "$@"
 fi
 vm_handoff_note "$LOG"
+CKPT_DIR="${FORECLOSURE_CHECKPOINT_DIR:-data/checkpoint}"
 
 # ---- preflights ----------------------------------------------------------------------------------
-CKPT_DIR="${FORECLOSURE_CHECKPOINT_DIR:-data/checkpoint}"
 PENDING=$(python3 -c 'import json,sys
 try: m = json.load(open(sys.argv[1]))
 except Exception: sys.exit(0)
@@ -89,6 +89,21 @@ if [[ -n "$PENDING" ]]; then
     exit 1
   fi
 fi
+
+# ---- pre-run gate ---------------------------------------------------------------------------------
+# scripts/prerun_gate.py (audit 2026-10-09, pipeline_gate) exists to catch exactly what has
+# repeatedly slipped through before an 18+ hour run started: a stale pin, a dirty tree, a red
+# test suite, ledgers gone stale, a board too big for the memory watchdog's line. It was never
+# actually wired into this script (confirmed 2026-10-16: grep for it here came back empty) — the
+# owner's 2026-10-08 "no VM run without the gate" mandate was never enforced, only intended. Runs
+# after the pending-checkpoint check above (no point paying for a ~4 minute gate when there's
+# already a simpler reason to refuse) and before the disk/swap/refdata preflights.
+echo "==> pre-run gate: scripts/prerun_gate.py" | tee -a "$LOG"
+if ! uv run python scripts/prerun_gate.py --pin "$PIN" --checkpoint "$CKPT_DIR" 2>&1 | tee -a "$LOG"; then
+  echo "==> pre-run gate FAILED — not starting (bypass with RUN_SKIP_GATE=1, not recommended)" | tee -a "$LOG"
+  [[ "${RUN_SKIP_GATE:-0}" != "1" ]] && exit 1
+fi
+
 WHY="full run: publish ${VM_PUBLISH_BASE_MB} + replaced board $(vm_board_bytes_mb) + in-run ${VM_RUN_GROWTH_MB} = $(vm_full_run_need_mb); vm_lib.sh"
 NEED_MB="${RUN_MIN_FREE_MB:-$(vm_full_run_need_mb)}"
 [[ -n "${RUN_MIN_FREE_MB:-}" ]] && WHY="RUN_MIN_FREE_MB override; computed $WHY"

@@ -30,9 +30,20 @@ REPO = Path(__file__).resolve().parent.parent
 ORACLE = REPO / "deploy" / "oracle"
 
 STUB_UV = r'''#!/bin/sh
-# stand-in for uv: records each call (and the stop switch the run saw), then acts per STUB_RUN
+# stand-in for uv: records each call (and the stop switch the run saw), then acts per STUB_RUN.
+# scripts/prerun_gate.py is a SEPARATE call from the main "-m foreclosure_scraper" / resume run
+# (vm_run.sh now runs it as a pre-run gate) -- it must not share STUB_RUN's switch, or a test
+# driving the main run via STUB_RUN=fail/sleep/etc. hits that same behavior one call early, on
+# the gate, before ever reaching the run it meant to test. Controlled separately by STUB_GATE
+# ("pass", the default, or "fail"), independent of STUB_RUN.
 echo "uv $* stop=${FULLRUN_STOP_BEFORE_PUBLISH:-unset}" >> "$STUB_LOG"
 [ "$1" = "sync" ] && exit 0
+if [ "$3" = "scripts/prerun_gate.py" ]; then
+  case "${STUB_GATE:-pass}" in
+    pass) exit 0 ;;
+    fail) echo "GATE FAILED: do not start the run"; exit 1 ;;
+  esac
+fi
 echo "head=$(git rev-parse HEAD)" >> "$STUB_LOG"
 case "${STUB_RUN:-stop}" in
   stop)    echo '{"leads": 7, "event": "orchestrator.stopped_before_publish", "level": "info"}'; exit 0 ;;
@@ -406,6 +417,42 @@ def test_a_board_waiting_to_be_published_is_never_overwritten_silently(vm):
     # any other phase (a dead run's dot_ocr) is not a pending publish
     (ck / "manifest.json").write_text(json.dumps({"phase": "dot_ocr", "count": 5}))
     assert run(vm, "vm_run.sh", "--stop-before-publish").returncode == 0
+
+
+def test_prerun_gate_pass_lets_the_run_proceed(vm):
+    r = run(vm, "vm_run.sh", "--stop-before-publish")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "scripts/prerun_gate.py" in stub_log(vm), "the gate must actually run, not be silently skipped"
+    assert "python -m foreclosure_scraper" in stub_log(vm)
+
+
+def test_prerun_gate_failure_blocks_the_run(vm):
+    r = run(vm, "vm_run.sh", "--stop-before-publish", STUB_GATE="fail")
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "pre-run gate FAILED" in run_log(vm)
+    assert "scripts/prerun_gate.py" in stub_log(vm)
+    assert "python -m foreclosure_scraper" not in stub_log(vm), "a failed gate must never let the run start"
+
+
+def test_run_skip_gate_bypasses_a_failing_gate(vm):
+    r = run(vm, "vm_run.sh", "--stop-before-publish", STUB_GATE="fail", RUN_SKIP_GATE="1")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "pre-run gate FAILED" in run_log(vm)
+    assert "python -m foreclosure_scraper" in stub_log(vm), "the explicit bypass must still let it run"
+
+
+def test_gate_runs_after_the_pending_checkpoint_check_not_before(vm):
+    """A pending-publish checkpoint is the cheaper, more obvious reason to refuse -- paying for the
+    gate's own ~4 minute test-suite check first would be wasted work when this alone already
+    refuses. See test_a_board_waiting_to_be_published_is_never_overwritten_silently for the same
+    invariant from the checkpoint side (zero python calls at all when it fires first)."""
+    ck = vm["root"] / "data" / "checkpoint"
+    ck.mkdir(parents=True)
+    (ck / "manifest.json").write_text(json.dumps({"phase": "pre_publish", "count": 1,
+                                                  "saved_at": "2026-10-07T09:00:00+00:00"}))
+    r = run(vm, "vm_run.sh", "--stop-before-publish", STUB_GATE="fail")
+    assert r.returncode == 1
+    assert "scripts/prerun_gate.py" not in stub_log(vm), "the checkpoint refusal must pre-empt the gate"
 
 
 def test_another_board_job_is_75(vm):
