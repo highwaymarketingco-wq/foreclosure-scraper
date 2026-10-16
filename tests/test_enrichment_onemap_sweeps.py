@@ -18,8 +18,9 @@ import foreclosure_scraper.enrichment_onemap_sweeps as M
 from foreclosure_scraper import screen_ledger as SL
 
 
-def li(county="Alamance", parcel="1234-56-7890", state="NC", raw=None):
-    return SimpleNamespace(county=county, parcel_id=parcel, state=state, raw=raw)
+def li(county="Alamance", parcel="1234-56-7890", state="NC", raw=None, street_address=None):
+    return SimpleNamespace(county=county, parcel_id=parcel, state=state, raw=raw,
+                           street_address=street_address)
 
 
 # --------------------------------------------------------------------------- the flag is trusted only where it is a flag
@@ -61,6 +62,29 @@ def test_the_index_is_keyed_by_county_and_normalized_parcel_and_altparcel():
     assert idx["Alamance"]["1234567890"]["m"] == "heirs"
 
 
+# ------------------------------------------------------- the address fallback (2026-10-16 fix)
+
+def test_the_address_index_is_keyed_by_house_number_and_street_name():
+    rows = [{"cntyname": "Wake", "siteadd": "123 MAIN ST", "ownname": "DOE JANE HEIRS"},
+            {"cntyname": "Wake", "siteadd": "", "ownname": "ROE JOHN ESTATE"},        # no address: not indexed
+            {"cntyname": "Wake", "ownname": "DOE JANE"}]                             # not a decedent: not indexed
+    idx = M.build_heir_address_index(rows)
+    assert set(idx) == {"Wake"}
+    [key] = idx["Wake"]
+    assert key == ("123", frozenset({"MAIN"}))
+    assert idx["Wake"][key]["m"] == "heirs"
+
+
+def test_addr_key_ignores_suffix_wording_and_unit_tails_like_address_key_does():
+    """_addr_key is address_key's (number, street) pair -- it inherits address_key's own
+    normalization (leading zeros, suffix spelling, unit tails), not a separate implementation."""
+    assert M._addr_key("000123 Main Street, Apt 4") == M._addr_key("123 MAIN ST")
+    assert M._addr_key("123 Main St") != M._addr_key("456 Main St")       # different house number
+    assert M._addr_key("123 Main St") != M._addr_key("123 Oak St")        # different street
+    assert M._addr_key(None) is None
+    assert M._addr_key("MAIN STREET") is None                             # no house number at all
+
+
 # --------------------------------------------------------------------------- stamping never overwrites a richer stamp
 
 def test_apply_indexes_flags_nc_rows_and_keeps_existing_stamps():
@@ -84,6 +108,55 @@ def test_apply_indexes_flags_nc_rows_and_keeps_existing_stamps():
     assert d.raw is None and e.raw is None and f.raw is None
     assert st["nc_rows_with_parcel"] == 4
     assert (st["rollback_stamped"], st["rollback_already"], st["heir_estate_stamped"]) == (2, 1, 1)
+    assert st["heir_estate_stamped_by_address"] == 0     # every match above was by parcel id
+
+
+def test_address_fallback_fires_when_the_parcel_id_lookup_misses():
+    """THE fix (2026-10-16): a row whose own parcel_id isn't the same identifier OneMap's
+    parno/altparno are (measured live: true for most counties outside the original parcel_cache
+    batch) still gets heir_estate, matched on its own street address instead."""
+    heir = {"swept_on": "2026-10-09",
+           "index": {"Wake": {"9999999999": {"o": "OTHER PARCEL HEIRS", "m": "heirs", "h": []}}},
+           "address_index": {"Wake": {("123", frozenset({"MAIN"})):
+                                      {"o": "DOE JANE HEIRS", "m": "heirs", "h": ["JOHN DOE"]}}}}
+    matched = li(county="Wake", parcel="0000000001", street_address="123 Main St")   # a DIFFERENT parcel id
+    st = M.apply_indexes([matched], heir, None)
+    assert matched.raw["heir_estate"]["owner_of_record"] == "DOE JANE HEIRS"
+    assert st["heir_estate_stamped"] == 1 and st["heir_estate_stamped_by_address"] == 1
+
+
+def test_address_fallback_also_fires_with_no_parcel_id_at_all():
+    heir = {"swept_on": "x", "index": {},
+           "address_index": {"Wake": {("123", frozenset({"MAIN"})):
+                                      {"o": "DOE JANE HEIRS", "m": "heirs", "h": []}}}}
+    row = li(county="Wake", parcel=None, street_address="123 Main St")
+    st = M.apply_indexes([row], heir, None)
+    assert row.raw["heir_estate"]["owner_of_record"] == "DOE JANE HEIRS"
+    assert st["nc_rows_with_parcel"] == 0          # never had a parcel id -- not counted as one
+
+
+def test_address_fallback_never_fires_on_a_different_street_or_house_number():
+    heir = {"swept_on": "x", "index": {},
+           "address_index": {"Wake": {("123", frozenset({"MAIN"})):
+                                      {"o": "DOE JANE HEIRS", "m": "heirs", "h": []}}}}
+    wrong_house = li(county="Wake", parcel=None, street_address="456 Main St")
+    wrong_street = li(county="Wake", parcel=None, street_address="123 Oak St")
+    no_address = li(county="Wake", parcel=None, street_address=None)
+    st = M.apply_indexes([wrong_house, wrong_street, no_address], heir, None)
+    assert wrong_house.raw is None and wrong_street.raw is None and no_address.raw is None
+    assert st["heir_estate_stamped"] == 0
+
+
+def test_parcel_id_match_wins_over_address_when_both_would_hit():
+    """The parcel lookup is tried FIRST; address is a fallback for when it misses, not an
+    alternate source of truth that could disagree with it."""
+    heir = {"swept_on": "x",
+           "index": {"Wake": {"1234567890": {"o": "BY PARCEL", "m": "heirs", "h": []}}},
+           "address_index": {"Wake": {("123", frozenset({"MAIN"})):
+                                      {"o": "BY ADDRESS", "m": "heirs", "h": []}}}}
+    row = li(county="Wake", parcel="1234-56-7890", street_address="123 Main St")
+    M.apply_indexes([row], heir, None)
+    assert row.raw["heir_estate"]["owner_of_record"] == "BY PARCEL"
 
 
 def test_a_county_not_in_the_swept_set_gets_no_rollback_flag():
@@ -133,14 +206,29 @@ def test_the_its_portals_screen_the_tax_columns_only_when_the_run_is_ok():
 
 def test_cache_round_trip_and_expiry(tmp_path, monkeypatch):
     monkeypatch.setattr(M, "CACHE_DIR", tmp_path)
-    doc = {"swept_on": "2026-10-01", "complete": True, "index": {}}
+    doc = {"swept_on": "2026-10-01", "complete": True, "index": {}, "schema": M.SCHEMA_VERSION}
     M.save_cache("heir_estate", doc)
     assert M.load_cache("heir_estate", date(2026, 10, 4)) == doc
     assert M.load_cache("heir_estate", date(2026, 10, 1) + timedelta(days=M.CACHE_TTL_DAYS + 1)) is None
     (tmp_path / "heir_estate.json").write_text("not json")
     assert M.load_cache("heir_estate", date(2026, 10, 2)) is None
-    M.save_cache("incomplete", {"swept_on": "2026-10-01", "complete": False})
+    M.save_cache("incomplete", {"swept_on": "2026-10-01", "complete": False, "schema": M.SCHEMA_VERSION})
     assert M.load_cache("incomplete", date(2026, 10, 2)) is None
+
+
+def test_an_old_schema_cache_is_never_reused(tmp_path, monkeypatch):
+    """A cache written before the siteadd field (and its address_index) existed must force one
+    fresh sweep, not run silently for up to CACHE_TTL_DAYS on data the new code can't use."""
+    monkeypatch.setattr(M, "CACHE_DIR", tmp_path)
+    today = date(2026, 10, 16)
+    M.save_cache("heir_estate", {"swept_on": today.isoformat(), "complete": True, "index": {}})
+    assert M.load_cache("heir_estate", today) is None               # no "schema" key at all
+    M.save_cache("heir_estate", {"swept_on": today.isoformat(), "complete": True, "index": {},
+                                 "schema": M.SCHEMA_VERSION - 1})
+    assert M.load_cache("heir_estate", today) is None                # the PREVIOUS schema version
+    M.save_cache("heir_estate", {"swept_on": today.isoformat(), "complete": True, "index": {},
+                                 "schema": M.SCHEMA_VERSION})
+    assert M.load_cache("heir_estate", today) is not None            # the current one is fine
 
 
 # --------------------------------------------------------------------------- paging

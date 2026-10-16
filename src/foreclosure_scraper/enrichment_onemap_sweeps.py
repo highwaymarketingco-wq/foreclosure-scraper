@@ -30,9 +30,24 @@ WHAT THIS DOES (no row is added; existing board rows are flagged, and each count
      carry `screened`: {column: ["NC|County", ...]}; screen_ledger turns them into the cube's "screened,
      none found" (a county with no parcel flagged is a clean negative, not a gap).
 
-The sweep result is cached under data/onemap_sweeps (CACHE_TTL_DAYS); a tail run reuses it. Kill switch:
-FORECLOSURE_ONEMAP_SWEEPS_OFF=1. Counts and parcel ids only; no private data is read (owner names are the
-public roll's and are not stored in the cache beyond the match kind).
+HEIR_ESTATE'S SECOND INDEX, BY ADDRESS (2026-10-16). OneMap's own `parno`/`altparno` are not always
+the same identifier the board's `parcel_id` carries for a county -- measured live: counties with
+long-established GIS-native parcel_cache coverage (Buncombe, Rutherford, McDowell) overlap 20-55%
+with the swept index, everything else overlaps near 0% (Wake 0.1%, Cabarrus 0.1%, Moore 0.0%,
+despite 2,886-3,941 real matches sitting in the index for those counties). A county whose board rows
+come from a non-GIS source (a court record, a tax account number, a county's own portal with its own
+numbering) simply isn't keyed the same way OneMap is. So the sweep also reads `siteadd` (situs
+address, the same field enrichment_arcgis.py already uses for OneMap situs) and apply_indexes() falls
+back to a (house number, street name) match (verification.core-style identity, never a bare string
+compare) when the parcel lookup misses. See [[project_onemap_heir_sweep_parcel_mismatch]] in memory
+for the full measurement this fix is based on.
+
+The sweep result is cached under data/onemap_sweeps (CACHE_TTL_DAYS); a tail run reuses it. SCHEMA_
+VERSION gates reuse of an old cache that predates a field-list change (like the address field above)
+-- load_cache() refuses a cached doc whose "schema" doesn't match, forcing one fresh sweep instead of
+silently running for up to CACHE_TTL_DAYS more on data that doesn't have what the new code needs. Kill
+switch: FORECLOSURE_ONEMAP_SWEEPS_OFF=1. Counts, parcel ids and situs addresses only; no private data
+is read (owner names are the public roll's and are not stored in the cache beyond the match kind).
 """
 from __future__ import annotations
 
@@ -51,6 +66,7 @@ from . import parcel_cache
 from .http_client import client
 from .models import Listing, _normalize_parcel
 from .validation import NC_COUNTIES
+from .verification.core import address_key
 
 log = structlog.get_logger()
 
@@ -58,6 +74,11 @@ ENV_OFF = "FORECLOSURE_ONEMAP_SWEEPS_OFF"
 URL = parcel_cache.NC_ONEMAP_URL
 CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "onemap_sweeps"
 CACHE_TTL_DAYS = int(os.environ.get("ONEMAP_SWEEPS_TTL_DAYS", "7"))
+#: bumped whenever a swept FIELD LIST changes (siteadd added 2026-10-16) so an old cache that
+#: predates the new field is never mistaken for one that has it -- load_cache() below refuses
+#: anything whose stored "schema" doesn't match, forcing one fresh sweep instead of silently
+#: running on stale-shaped data for up to CACHE_TTL_DAYS more.
+SCHEMA_VERSION = 2
 PACE_S = float(os.environ.get("ONEMAP_SWEEPS_PACE_S", "2.0"))
 PAGE = 2000
 MAX_PAGES = 400                     # a stall guard: the heir sweep is about 33 pages, present-use about 80
@@ -68,7 +89,7 @@ SOURCE_HEIR = "nc_onemap_sweep"
 SOURCE_PUV = "nc_onemap_presentval"
 ROLLBACK_YEARS_NC = 4              # G.S. 105-277.4(c): the year of disqualification plus three before
 
-_HEIR_FIELDS = "parno,altparno,cntyname,ownname,ownname2"
+_HEIR_FIELDS = "parno,altparno,cntyname,ownname,ownname2,siteadd"
 _PUV_FIELDS = "parno,altparno,cntyname"
 
 
@@ -205,6 +226,37 @@ def build_heir_index(rows: Iterable[dict]) -> dict[str, dict[str, dict]]:
     return idx
 
 
+def _addr_key(addr: Any) -> Optional[tuple]:
+    """(house number, street-name tokens) for use as a dict key -- the identity
+    verification.core.address_relation treats as 'match' (its only other allowance, suffix/
+    direction tail compatibility, is a PERMISSIVE extra; skipping it here means an index hit is
+    always a real address_relation match, never a false positive from a looser default). None
+    when there's no usable house number or street (a road name alone, a blank field) -- the same
+    'unknown, claim nothing' case address_relation itself returns None for."""
+    num, street, _tail = address_key(addr)
+    return (num, street) if num and street else None
+
+
+def build_heir_address_index(rows: Iterable[dict]) -> dict[str, dict[tuple, dict]]:
+    """{county: {(house number, street tokens): {o, m, h}}} from the SAME swept rows
+    build_heir_index() reads, keyed by situs address (siteadd) instead of parcel id -- the
+    fallback match for a county whose board rows carry a different identifier than OneMap's
+    parno/altparno (module docstring, HEIR_ESTATE'S SECOND INDEX). A row with no usable address
+    is simply not indexed, same as one with no usable parcel id in build_heir_index()."""
+    idx: dict[str, dict[tuple, dict]] = {}
+    for a in rows:
+        hit = classify_heir_row(a)
+        county = str(a.get("cntyname") or "").strip()
+        if not hit or not county:
+            continue
+        ak = _addr_key(a.get("siteadd"))
+        if not ak:
+            continue
+        rec = {"o": hit["owner"], "m": hit["match"], "h": hit["heir_names"]}
+        idx.setdefault(county, {})[ak] = rec
+    return idx
+
+
 def build_flag_index(rows: Iterable[dict]) -> dict[str, dict[str, int]]:
     idx: dict[str, dict[str, int]] = {}
     for a in rows:
@@ -231,6 +283,8 @@ def load_cache(name: str, today: Optional[date] = None) -> Optional[dict]:
         done = date.fromisoformat(str(d.get("swept_on")))
     except Exception:  # noqa: BLE001
         return None
+    if d.get("schema") != SCHEMA_VERSION:
+        return None
     return d if (today - done).days <= CACHE_TTL_DAYS and d.get("complete") else None
 
 
@@ -255,10 +309,11 @@ async def sweep_heir(http: httpx.AsyncClient, today: Optional[date] = None) -> d
         return cached
     rows = await _sweep(http, _HEIR_WHERE, _HEIR_FIELDS)
     idx = build_heir_index(rows)
+    addr_idx = build_heir_address_index(rows)
     # a finished statewide pass (no failed page) screened every county of the layer
     doc = {"swept_on": (today or date.today()).isoformat(), "complete": True, "rows_read": len(rows),
            "counties_swept": sorted(NC_COUNTIES), "matches": {c: len(v) for c, v in sorted(idx.items())},
-           "index": idx}
+           "index": idx, "address_index": addr_idx, "schema": SCHEMA_VERSION}
     save_cache("heir_estate", doc)
     return doc
 
@@ -280,7 +335,8 @@ async def sweep_present_use(http: httpx.AsyncClient, today: Optional[date] = Non
     idx = build_flag_index(rows)
     doc = {"swept_on": (today or date.today()).isoformat(), "complete": True, "rows_read": len(rows),
            "counties_swept": use, "counties_skipped": skipped,
-           "matches": {c: len(v) for c, v in sorted(idx.items())}, "index": idx}
+           "matches": {c: len(v) for c, v in sorted(idx.items())}, "index": idx,
+           "schema": SCHEMA_VERSION}
     save_cache("present_use", doc)
     return doc
 
@@ -324,10 +380,19 @@ def stamp_rollback(li: Any, county: str, swept_on: str) -> bool:
 
 
 def apply_indexes(listings: Iterable[Any], heir: Optional[dict], puv: Optional[dict]) -> dict:
-    """Stamp the board rows from the two swept indexes. Pure (no network)."""
+    """Stamp the board rows from the two swept indexes. Pure (no network).
+
+    heir_estate matches by parcel id first; when that misses (or the row never had a parcel id
+    at all), it falls back to the row's own street address against heir's address_index -- the
+    fix for the near-total parcel-id mismatch most counties outside the original parcel_cache
+    batch have against OneMap's parno/altparno (module docstring). rollback_exposure is parcel-id
+    only, unchanged: its present-use flag has no address index (out of scope for this fix, a
+    present_use-specific build of its own if ever needed).
+    """
     stats = {"nc_rows_with_parcel": 0, "heir_estate_stamped": 0, "heir_estate_already": 0,
-             "rollback_stamped": 0, "rollback_already": 0}
+             "heir_estate_stamped_by_address": 0, "rollback_stamped": 0, "rollback_already": 0}
     h_idx = (heir or {}).get("index") or {}
+    h_addr_idx = (heir or {}).get("address_index") or {}
     p_idx = (puv or {}).get("index") or {}
     h_on = (heir or {}).get("swept_on") or ""
     p_on = (puv or {}).get("swept_on") or ""
@@ -335,18 +400,27 @@ def apply_indexes(listings: Iterable[Any], heir: Optional[dict], puv: Optional[d
     for li in listings:
         if not _is_nc(li):
             continue
-        pid = _normalize_parcel(getattr(li, "parcel_id", None))
         county = _county_of(li)
-        if not pid or not county:
+        if not county:
             continue
-        stats["nc_rows_with_parcel"] += 1
-        hit = (h_idx.get(county) or {}).get(pid)
+        pid = _normalize_parcel(getattr(li, "parcel_id", None))
+        if pid:
+            stats["nc_rows_with_parcel"] += 1
+        hit = (h_idx.get(county) or {}).get(pid) if pid else None
+        by_address = False
+        if not hit:
+            ak = _addr_key(getattr(li, "street_address", None))
+            if ak:
+                hit = (h_addr_idx.get(county) or {}).get(ak)
+                by_address = bool(hit)
         if hit:
             if stamp_heir(li, hit, h_on):
                 stats["heir_estate_stamped"] += 1
+                if by_address:
+                    stats["heir_estate_stamped_by_address"] += 1
             else:
                 stats["heir_estate_already"] += 1
-        if county in p_ok and pid in (p_idx.get(county) or {}):
+        if pid and county in p_ok and pid in (p_idx.get(county) or {}):
             if stamp_rollback(li, county, p_on):
                 stats["rollback_stamped"] += 1
             else:
