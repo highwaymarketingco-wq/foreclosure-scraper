@@ -81,6 +81,7 @@ exclude:
   - path_to_100.md
   - path_to_100_deepdive.md
   - path_to_100_roadmap.md
+  - path_to_100_reconciled_2026-10-15.md
   - goliath_teardown.md
   - completeness_audit.md
   - gap_ledger.md
