@@ -242,7 +242,13 @@ def legal_description_present(rec: dict) -> bool:
     if isinstance(dl, dict) and dl.get("bound") and dl.get("legal_description"):
         return True
     mp = raw.get("mcdowell_probate")
-    return isinstance(mp, dict) and bool(mp.get("legal_description"))
+    if isinstance(mp, dict) and mp.get("legal_description"):
+        return True
+    # enrichment_bt_parcel_info.py (BT TaxPayer Portal, 2026-10-16) writes solely to this
+    # key -- nothing copies it into gis_attrs_full/county_legal/deed_latest/mcdowell_probate,
+    # so its fill was invisible to this scorer (audit 2026-10-16).
+    bt = raw.get("bt_parcel_info")
+    return isinstance(bt, dict) and bool(bt.get("legal_description"))
 
 
 def deed_ref_present(raw: dict) -> bool:
