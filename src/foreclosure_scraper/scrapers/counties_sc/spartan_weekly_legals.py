@@ -75,7 +75,9 @@ import time
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -353,10 +355,27 @@ class SpartanWeeklyLegals(BaseScraper):
         seen: set[str] = set()
         async with client(timeout=60.0) as c:
             for page in range(1, _MAX_PAGES + 1):
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport error
+                # or timeout -- found 2026-10-16: this bare call had zero retry cushioning (same
+                # gap already fixed tonight for the Column legal-notice API scrapers), so a
+                # single transient blip on page 1 silently ended the whole run with "ZERO_RESULT"
+                # instead of a visible failure -- indistinguishable from a genuinely empty week
+                # (expected_min_count=0 means the framework never flags it). Confirmed in the
+                # 2026-10-15 run's own log: page 1 failed this way, 0 of the normal ~111 leads
+                # landed, reported healthy. A real non-200/parse issue still breaks the loop below,
+                # unretried -- only a transport-level failure gets a second chance.
                 try:
-                    r = await c.get(_LIST.format(page=page))
-                except Exception:
-                    log.warning("spartan_weekly.page_fetch_failed", page=page)
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await c.get(_LIST.format(page=page))
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("spartan_weekly.page_fetch_failed", page=page,
+                               error=f"{type(exc).__name__}: {str(exc)[:160]}")
                     break
                 if r.status_code != 200:
                     break
