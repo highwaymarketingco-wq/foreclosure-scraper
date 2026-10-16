@@ -113,13 +113,18 @@ async def _gather_phases(phases: dict, default_s: int = 900):
     if not phases:
         return {}
 
-    budget = float(os.environ.get("ENRICH_PHASE_MAX_SECONDS", str(default_s)))
+    # Same escape hatch _await_capped already has (main.py:90): an explicit per-phase
+    # budget (default_s other than the 900s default) wins over the global env override --
+    # a caller that sizes its own budget (see the divorce fix, 2026-10-16) must not be
+    # silently capped back down to the global default.
+    _env = os.environ.get("ENRICH_PHASE_MAX_SECONDS")
+    budget = float(default_s) if (default_s != 900 or not _env) else float(_env)
 
     async def _wrap(name: str, coro):
         try:
             return name, await asyncio.wait_for(coro, timeout=budget)
         except asyncio.TimeoutError:
-            log.warning("enrich.time_capped", phase=name, budget_s=default_s)
+            log.warning("enrich.time_capped", phase=name, budget_s=budget)
         except Exception:
             log.error(f"{name}.failed", traceback=traceback.format_exc())
         return name, None
@@ -3316,7 +3321,13 @@ async def run_enrich_tail(st: TailState) -> dict:
         _divorce_phases["sc_divorce"] = enrich_sc_divorce(enriched)
     except Exception:
         log.error("sc_divorce.failed", traceback=traceback.format_exc())
-    _divorce_results = await _gather_phases(_divorce_phases)
+    # enrichment_sc_divorce.py sizes its own budget at FORECLOSURE_SC_DIVORCE_BUDGET_S
+    # (1800s default) -- the orchestrator's un-overridden 900s default was hard-cancelling
+    # it at exactly half that every run, before it ever logged its own completion (audit
+    # 2026-10-16; same "orchestrator cap < module's own budget" bug already fixed for
+    # dot_ocr/rod_chain/nc_rod_render, main.py:88-90). 1800 + the same ~120s margin
+    # convention those three use.
+    _divorce_results = await _gather_phases(_divorce_phases, default_s=1920)
     for _dv_name in ("nc_divorce", "sc_divorce"):
         _ds = _divorce_results.get(_dv_name)
         if _ds and "skipped" not in _ds:
