@@ -1,10 +1,20 @@
-"""Burke + Cleveland NC ROD lien-existence by owner name (CCHS SearchService.asp).
+"""Burke/Cleveland/Madison/Henderson/Lincoln NC ROD lien-existence by owner name (CCHS
+SearchService.asp). Burke and Cleveland were the original two; Madison/Henderson/Lincoln were
+added later (_COUNTIES is the current list).
 
-These two core Western-NC counties run the OLDER CourthouseComputerSystems interface (classic-ASP
+These core Western-NC counties run the OLDER CourthouseComputerSystems interface (classic-ASP
 SearchService.asp), already wired in rod/cchs.py (search_by_name) but never called by any enricher
-— so their lien data never reached the board. This thin enricher calls it for each Burke/Cleveland
-owner and attaches raw['rod'] in the SAME shape as the Gaston ROD enricher (so the dashboard filter
-+ CSV read rod_mortgage / rod_adverse uniformly). Default-ON; FORECLOSURE_CCHS_ROD=0 to disable.
+— so their lien data never reached the board. This thin enricher calls it for each owner and
+attaches raw['rod'] in the SAME shape as the Gaston ROD enricher (so the dashboard filter + CSV
+read rod_mortgage / rod_adverse uniformly). Default-ON; FORECLOSURE_CCHS_ROD=0 to disable.
+
+ROUND-ROBIN BY COUNTY (2026-10-16): _await_capped's 900s budget rarely covers every eligible
+lead across all 5 counties in one run, and `targets` used to scan in whatever order `listings`
+itself arrived in -- which always favors the same counties. Live-measured the day this was
+found: Henderson 28.8% checked, Burke 8.1%, Cleveland 7.5%, Lincoln 0.04% (8 of 18,436 -- Lincoln
+alone outnumbers the other 4 counties combined), Madison a flat 0%. Same fix as gis_fill.py's:
+rotate which county's group goes first by today's ordinal day, so a budget-capped run still
+starves someone, but a different county each day.
 
 cchs returns normalized RodDoc.doc_type (DEED/MORT/DT/LIEN/TAX_LIEN/SAT/LP/NOS/ASSIGN/CANC). We
 filter the returned docs to those whose grantor/grantee actually contains the owner's name (the
@@ -80,9 +90,26 @@ async def enrich_cchs_rod(listings, max_lookups: int | None = None) -> dict:
     now = datetime.now(timezone.utc)
     hot_days, base_days = refresh_windows("FORECLOSURE_CCHS_ROD", 7, 2)
     # Fast httpx -> cover ALL leads, re-fetch any whose ROD is stale (deal-aware) so new liens land.
-    targets = [li for li in listings
-               if li.state == "NC" and (li.county or "").strip() in _COUNTIES
-               and li.owner_name and is_stale(li, now, hot_days, base_days)]
+    eligible = [li for li in listings
+                if li.state == "NC" and (li.county or "").strip() in _COUNTIES
+                and li.owner_name and is_stale(li, now, hot_days, base_days)]
+    # Round-robin by county, same fix as gis_fill.py's (2026-10-16): _await_capped's 900s
+    # budget rarely covers every eligible lead across all 5 counties in one run, and a flat
+    # `listings`-order scan always hits the SAME counties first -- live-measured the day this
+    # was found: Henderson 28.8% checked, Burke 8.1%, Cleveland 7.5%, Lincoln 0.04% (8 of
+    # 18,436 -- Lincoln alone outnumbers the other 4 counties combined), Madison a flat 0%.
+    # Rotating which county's group goes first each day (not reordering individual leads
+    # within a county, which `is_stale`'s own urgency already favors) means a budget-capped
+    # run still starves someone, but a DIFFERENT county each day instead of Lincoln/Madison
+    # forever.
+    by_county: dict[str, list] = {}
+    for li in eligible:
+        by_county.setdefault((li.county or "").strip(), []).append(li)
+    county_order = sorted(by_county)
+    if county_order:
+        spin = now.toordinal() % len(county_order)
+        county_order = county_order[spin:] + county_order[:spin]
+    targets = [li for c in county_order for li in by_county[c]]
     if max_lookups:
         targets = targets[:max_lookups]
     stats = {"targets": len(targets), "searched": 0, "with_instruments": 0,
