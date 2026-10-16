@@ -48,7 +48,9 @@ import time
 from datetime import datetime
 from typing import Any, Iterable, Optional
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -255,17 +257,33 @@ def dedupe_key(parsed: dict) -> str:
 
 async def _query(c, search: str, from_ms: int, to_ms: int, depth: int = 0) -> list[dict]:
     """All items of one (query, window): the window is halved while the server says it holds
-    more than one page (the same rule column_legal_notices._query applies)."""
+    more than one page (the same rule column_legal_notices._query applies).
+
+    The POST is retried up to 3 times (short exponential-jitter backoff) on a transport error
+    or timeout. Found 2026-10-16: the ONLY production run since this scraper was built
+    (2026-10-09) had all 5 queries fail within a 50s span 19 minutes in (many scrapers opening
+    connections at once), each with an empty exception message -- http_client.client() sets
+    the transport's own retries=0 BY DESIGN ("callers already wrap their own AsyncRetrying"),
+    and this call never did, so the whole run's 973 notices / 90 leads silently became zero.
+    Same bug shape, same fix, as enrichment_parcel_from_geo._arc_query's 2026-09-28 NC OneMap
+    fix. A non-200 status still raises unretried below so safe_run can classify a real block."""
     body = {
         "search": search,
         "allFilters": [{"state": "North Carolina"}, {"publishedtimestamp": {"from": from_ms, "to": to_ms}}],
         "noneFilters": [], "sort": [{"publishedtimestamp": "desc"}], "pageSize": PAGE_SIZE, "isDemo": False,
     }
     try:
-        r = await c.post(API_URL, json=body,
-                         headers={"Content-Type": "application/json", "Accept": "application/json"})
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await c.post(API_URL, json=body,
+                                 headers={"Content-Type": "application/json", "Accept": "application/json"})
     except Exception as exc:  # noqa: BLE001
-        log.warning("nc_heir_notices.post_fail", query=search, error=str(exc)[:160])
+        log.warning("nc_heir_notices.post_fail", query=search, error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return []
     if r.status_code != 200:
         r.raise_for_status()

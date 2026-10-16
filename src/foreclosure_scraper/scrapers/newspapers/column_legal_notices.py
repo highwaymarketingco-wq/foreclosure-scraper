@@ -79,8 +79,10 @@ import time
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
 from dateutil import parser as dateparser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -1160,14 +1162,29 @@ async def _query_once(
     if county:
         body["allFilters"].insert(1, {"county": county})
 
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+    # timeout -- 2026-10-16: http_client.client() sets the transport's own retries=0 BY
+    # DESIGN ("callers already wrap their own AsyncRetrying"; see its docstring), and this
+    # call never did, so a single short-lived blip during a busy run start silently zeroes
+    # the whole source for the run (found via the sibling nc_heir_notices.py hitting exactly
+    # that on its only run so far). A non-200 status still raises unretried below so safe_run
+    # can classify a real block/server-error.
     try:
-        r = await c.post(
-            API_URL,
-            json=body,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-        )
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await c.post(
+                    API_URL,
+                    json=body,
+                    headers={"Content-Type": "application/json", "Accept": "application/json"},
+                )
     except Exception as exc:  # noqa: BLE001
-        log.warning("column.post_fail", county=county, type=noticetype, error=str(exc)[:160])
+        log.warning("column.post_fail", county=county, type=noticetype,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return [], None, 0
     if r.status_code != 200:
         log.warning("column.bad_status", county=county, type=noticetype, code=r.status_code)

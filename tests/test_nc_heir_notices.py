@@ -5,6 +5,10 @@ from __future__ import annotations
 import asyncio
 import time
 
+import httpx
+import pytest
+from tenacity import wait_exponential_jitter
+
 from foreclosure_scraper.models import ListingType
 from foreclosure_scraper.scrapers.public_notices import nc_heir_notices as m
 
@@ -150,3 +154,66 @@ def test_screen_ledger_credits_the_75_counties_for_both_columns():
     assert set(scr[0].columns) == {"heir_naming_publication", "quiet_title"}
     cov = scr[0].coverage()
     assert ("NC", "Johnston") in cov and ("NC", "Alleghany") not in cov and len(cov) == 75
+
+
+# ------------------------------------------------------------- the 2026-10-16 retry fix
+# The only production run since this scraper was built had every one of its 5 queries fail
+# with a transient transport error and never retry, silently zeroing the whole run's leads.
+
+class _Resp:
+    def __init__(self, status_code=200, body=None):
+        self.status_code = status_code
+        self._body = body or {"results": [], "page": {"total_results": 0}}
+
+    def json(self):
+        return self._body
+
+    def raise_for_status(self):
+        raise httpx.HTTPStatusError("bad status", request=None, response=self)
+
+
+@pytest.fixture(autouse=True)
+def _fast_backoff(monkeypatch):
+    """The real backoff is 1-8s per attempt; make the retry tests instant."""
+    monkeypatch.setattr(m, "wait_exponential_jitter", lambda **kw: wait_exponential_jitter(initial=0.001, max=0.002))
+
+
+def test_a_transient_connect_timeout_is_retried_and_then_succeeds(monkeypatch):
+    calls = {"n": 0}
+
+    class _C:
+        async def post(self, *a, **kw):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise httpx.ConnectTimeout("boom")
+            return _Resp(body={"results": [{"id": "ok"}], "page": {"total_results": 1}})
+
+    out = asyncio.run(m._query(_C(), "quiet title", 0, 1))
+    assert calls["n"] == 3
+    assert out == [{"id": "ok"}]
+
+
+def test_a_connect_timeout_that_never_clears_still_returns_empty_not_raise(monkeypatch):
+    calls = {"n": 0}
+
+    class _C:
+        async def post(self, *a, **kw):
+            calls["n"] += 1
+            raise httpx.ConnectTimeout("always boom")
+
+    out = asyncio.run(m._query(_C(), "quiet title", 0, 1))
+    assert calls["n"] == 3                      # stop_after_attempt(3), then gives up gracefully
+    assert out == []
+
+
+def test_a_real_404_is_not_retried_and_propagates(monkeypatch):
+    calls = {"n": 0}
+
+    class _C:
+        async def post(self, *a, **kw):
+            calls["n"] += 1
+            return _Resp(status_code=404)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        asyncio.run(m._query(_C(), "quiet title", 0, 1))
+    assert calls["n"] == 1                      # a real bad status is not a transport/timeout error
