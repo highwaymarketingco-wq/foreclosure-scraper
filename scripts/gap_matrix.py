@@ -283,7 +283,15 @@ def deed_ref_present(raw: dict) -> bool:
     if isinstance(dl, dict) and dl.get("bound") and dl.get("book") and dl.get("page"):
         return True
     mp = raw.get("mcdowell_probate")
-    return isinstance(mp, dict) and bool(mp.get("deed_book_page"))
+    if isinstance(mp, dict) and mp.get("deed_book_page"):
+        return True
+    # enrichment_bt_parcel_info.py (BT TaxPayer Portal, 2026-10-16) writes solely to this
+    # key -- same blind spot already fixed in legal_description_present() (zero current
+    # impact: live-measured 0 of 437,170 board rows have raw.bt_parcel_info yet, since
+    # that enricher hasn't produced a match in production so far -- but the key would be
+    # invisible here forever once it does, same as legal_description was).
+    bt = raw.get("bt_parcel_info")
+    return isinstance(bt, dict) and bool(bt.get("deed_book") and bt.get("deed_page"))
 
 
 def taxpayer_of_record_present(rec: dict) -> bool:

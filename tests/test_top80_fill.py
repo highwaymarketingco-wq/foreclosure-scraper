@@ -399,6 +399,10 @@ def test_gap_matrix_reads_the_fill():
     assert GM.legal_description_present({"raw": {"bt_parcel_info": {"legal_description": "LOT 4 TEST"}}})
     assert not GM.legal_description_present({"raw": {"bt_parcel_info": {"legal_description": ""}}})
     assert not GM.legal_description_present({"raw": {"bt_parcel_info": {"deed_book": "9"}}})
+    # same blind spot, same fix, for deed_ref_present() (audit 2026-10-16)
+    assert GM.deed_ref_present({"bt_parcel_info": {"deed_book": "118", "deed_page": "442"}})
+    assert not GM.deed_ref_present({"bt_parcel_info": {"deed_book": "118"}})            # page missing
+    assert not GM.deed_ref_present({"bt_parcel_info": {"legal_description": "LOT 4"}})  # wrong field
 
 
 def test_orangeburg_is_read_for_acres_and_its_gaps_are_stated():
