@@ -209,3 +209,43 @@ def test_a_lost_prefix_is_named_not_just_counted():
            "scrapers" / "counties_sc" / "sc_catalis_delinquent_roll.py").read_text()
     assert 'stats.setdefault("lost_prefixes", []).append(prefix)' in src
     assert "INCOMPLETE" in src
+
+
+# ---------------------------------------------------------------------------
+# A real 403 must surface as BLOCKED, not as a clean "ran fine, 0 rows" (audit
+# 2026-10-16). This sweep runs its own un-instrumented httpx.AsyncClient (the host bans
+# on concurrency), so the shared transport's automatic block-signal recording never
+# fires for it -- docs/run_health.json had marked 5 SC counties "EMPTY (verified)" from
+# exactly this, which then falsely closed their two_year_delinquent gap-list cells.
+# ---------------------------------------------------------------------------
+
+def test_a_403_on_the_first_county_surfaces_as_blocked_not_a_clean_zero(monkeypatch):
+    import asyncio
+    import foreclosure_scraper.scrapers.counties_sc.sc_catalis_delinquent_roll as m
+
+    async def fake_sweep_county(county, guid, site, budget, prefixes=None, on_new=None):
+        raise m.CatalisBlocked(f"HTTP 403 for {county} prefix 'A'")
+
+    monkeypatch.setattr(m, "sweep_county", fake_sweep_county)
+    scraper = m.SCCatalisDelinquentRoll()
+    rows = asyncio.run(scraper.safe_run())
+    assert rows == []
+    assert scraper.last_outcome == "BLOCKED"
+    assert "403" in scraper.last_reason
+
+
+def test_a_genuinely_clean_zero_is_not_promoted_to_blocked(monkeypatch):
+    """Sanity check on the other side: a sweep that just finds nothing (no exception
+    raised) must stay ZERO_RESULT -- record_block_signal only fires on the CatalisBlocked
+    branch, never on an ordinary empty county."""
+    import asyncio
+    import foreclosure_scraper.scrapers.counties_sc.sc_catalis_delinquent_roll as m
+
+    async def fake_sweep_county(county, guid, site, budget, prefixes=None, on_new=None):
+        return [], {}
+
+    monkeypatch.setattr(m, "sweep_county", fake_sweep_county)
+    scraper = m.SCCatalisDelinquentRoll()
+    rows = asyncio.run(scraper.safe_run())
+    assert rows == []
+    assert scraper.last_outcome == "ZERO_RESULT"

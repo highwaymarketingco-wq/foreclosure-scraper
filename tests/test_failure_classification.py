@@ -136,3 +136,32 @@ def test_500_is_blocked_possible_waf():
     s = _mk(f)
     _run(s)
     assert s.last_outcome == "BLOCKED" and "503" in s.last_reason
+
+
+def test_record_block_signal_promotes_a_scraper_with_its_own_private_client():
+    """2026-10-16: sc_catalis_delinquent_roll.py deliberately runs its OWN
+    un-instrumented httpx.AsyncClient (the host bans on concurrency, so it can't share
+    the pooled client) and swallows its own CatalisBlocked exception internally, so a
+    real 403 reported as a clean empty result -- record_block_signal is the public hook
+    for exactly this: a scraper that detects a block itself, outside the shared
+    transport, still gets safe_run()'s ZERO -> BLOCKED promotion."""
+    from foreclosure_scraper.http_client import record_block_signal
+
+    async def f():
+        record_block_signal(403, "d1ebsyxxbc7tep.cloudfront.net", "blocked/forbidden")
+        return []   # the scraper's own code already decided to stop and return empty
+    s = _mk(f)
+    _run(s)
+    assert s.last_outcome == "BLOCKED"
+    assert "403" in s.last_reason and "d1ebsyxxbc7tep.cloudfront.net" in s.last_reason
+
+
+def test_record_block_signal_is_a_no_op_outside_a_run():
+    """Called with no active holder (reset_block_signal never ran -- e.g. straight-line
+    script use outside safe_run), it must not raise."""
+    from foreclosure_scraper.http_client import _block_holder, record_block_signal
+    token = _block_holder.set(None)
+    try:
+        record_block_signal(403, "x.example", "blocked/forbidden")   # must not raise
+    finally:
+        _block_holder.reset(token)

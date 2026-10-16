@@ -674,6 +674,15 @@ class SCCatalisDelinquentRoll(BaseScraper):
                 log.warning("catalis_roll.county_blocked", county=county, error=str(exc)[:140],
                             note="403 is a stop: this and every later county (same host) "
                                  "are skipped")
+                # This sweep runs its own un-instrumented httpx.AsyncClient (the host bans on
+                # concurrency, so sharing the pooled client/pacing isn't an option) -- without
+                # this, a real 403 here reports as a clean "EMPTY (verified)" source (audit
+                # 2026-10-16: 5 SC counties' screen_ledger entries got falsely marked fully
+                # screened from exactly this). record_block_signal mirrors what the shared
+                # client's transport already does automatically, so safe_run()'s own
+                # ZERO -> BLOCKED promotion fires here too.
+                from ...http_client import record_block_signal
+                record_block_signal(403, _CDN, "blocked/forbidden")
                 break
             except Exception as exc:  # noqa: BLE001
                 log.warning("catalis_roll.county_failed", county=county,

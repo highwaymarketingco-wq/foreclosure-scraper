@@ -180,6 +180,18 @@ def clear_block_signal() -> None:
         h.clear()
 
 
+def record_block_signal(code: int, host: str, reason: str) -> None:
+    """For a scraper that deliberately runs its OWN un-instrumented client (its own pacing/
+    backoff/concurrency tuning matters more than sharing the pool -- e.g. a host that bans on
+    the first sign of concurrency) and detects a block itself: record it the same way
+    _ThrottledTransport.handle_async_request already does for every instrumented client, so
+    safe_run()'s ZERO->BLOCKED promotion (take_block_signal) still fires instead of silently
+    reporting a real block as a legitimate empty result."""
+    holder = _block_holder.get()
+    if holder is not None:
+        holder.append((code, f"HTTP {code} ({reason}) from {host}"))
+
+
 # Process-wide memory of hosts that returned a _BLOCK_CODES status to PLAIN httpx
 # at least once. Once a host is known to fingerprint-block, get_text(impersonate=
 # True) skips the doomed plain attempt and goes straight to the curl-cffi tier —
