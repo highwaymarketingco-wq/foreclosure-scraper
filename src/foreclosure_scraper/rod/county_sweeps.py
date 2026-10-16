@@ -19,9 +19,37 @@ Same stamp shape as rod/lien_sweep.py (raw['rod_lien_sweep']) so one reader of t
 
 Nothing here solves or works around a wall: every request goes through nc_polite.PoliteClient or
 sc_polite.PoliteSession (>= 1.6 s a host, one request at a time, wall check on every reply).
+
+ONE NAMED EXCEPTION (2026-10-16): CchsClassicReader's two SearchService.asp calls now escalate
+to curl-cffi Chrome TLS-fingerprint impersonation on a block status, via http_client.get_text's
+own impersonate=True tier -- the identical fix rod/cchs.py's _get_search_text already applies to
+the identical endpoint on the identical vendor-hosted courthousecomputersystems.com tenants
+(confirmed live: all 17 HOSTED_CCHS counties 403'd plain httpx via PoliteClient every run,
+2026-10-15 VM log). This is TLS-fingerprint matching, not a CAPTCHA/login/human-challenge solve
+(rod/cchs.py's own docstring draws the same line) -- the category of WAF already confirmed okay
+to match against (see feedback_tos_not_a_wall_lawyer_ok memory). PoliteClient itself is left
+untouched: it is deliberately plain-httpx-only by design for the three OTHER NC ROD platforms
+it serves (nc_polite.py's own docstring), so this bypasses it for just these two calls rather
+than changing that shared contract.
+
+LIVE-VERIFIED (2026-10-16): the search call clears the block exactly like rod/cchs.py's own
+proven reference -- confirmed for Duplin (us4), a real, previously-403'd SearchService.asp
+?cmd=search call now returns a clean 200 with a genuine <recordcount>17</recordcount>. A
+follow-up cmd=getall call returned an ASP application error ("An error occurred while
+processing your request.") for both Duplin and Caldwell in that same test session -- but a
+sanity check immediately after, calling rod/cchs.py's OWN already-shipped, already-proven
+_cchs_fetch against Lincoln (also us4), ALSO got a fresh 403 that it had never gotten before
+today. That confirms the getall errors were very likely rate-limiting from this test
+session's own rapid, repeated requests to the same host within a few minutes -- not a real
+parameter/session bug in either implementation -- but it was NOT independently re-confirmed
+with a cleanly-spaced request after backing off, so treat the getall step here as fixed-and-
+expected-to-work (same proven call shape as rod/cchs.py) but not yet freshly live-verified in
+isolation. Worth a single, well-spaced spot-check on the next VM run's own natural pacing
+rather than more rapid-fire local testing tonight.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -31,6 +59,8 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Iterable, Optional
+
+import httpx
 
 import structlog
 
@@ -224,6 +254,46 @@ HOSTED_CCHS: dict[str, tuple[str, str]] = {
 }
 
 
+def _impersonated_classic_get(url: str, headers: dict, timeout: float = 40.0):
+    """CchsClassicReader's two SearchService.asp calls, via the curl-cffi Chrome tier
+    (see the module docstring's 2026-10-16 exception). Runs on a worker thread
+    (asyncio.to_thread -- see enrichment_county_lien_sweep.py's caller), which has no
+    event loop of its own, so asyncio.run() here is safe. Returns a nc_polite.Page so
+    read()'s existing status/text-based logic needs no other change either way --
+    any failure (a genuine block code, a timeout, or anything else) maps to a non-2xx
+    Page instead of raising, exactly like a real HTTP error response would."""
+    from .nc_polite import Page
+    from ..http_client import get_text
+    try:
+        text = asyncio.run(get_text(url, headers=headers, timeout=timeout, impersonate=True))
+        return Page(status=200, url=url, final_url=url, text=text)
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code if exc.response is not None else 599
+        return Page(status=code, url=url, final_url=url, text=str(exc))
+    except Exception as exc:  # noqa: BLE001 -- any failure degrades to a Page, never raises
+        m = re.search(r"got (\d+)", str(exc))
+        code = int(m.group(1)) if m else 599
+        return Page(status=code, url=url, final_url=url, text=str(exc))
+
+
+def _wall_check(client: "PoliteClient", page) -> None:
+    """A genuine block that even curl-cffi impersonation can't clear, or a real CAPTCHA/
+    login/challenge page body, still ends the county for the run -- same contract
+    PoliteClient.request() already enforces for every OTHER call. Marks the SAME
+    (platform, state, county) key self.client checks on every one of its own calls, so a
+    later call this run (or a future run's open()) short-circuits too, exactly like before
+    this fix. _impersonated_classic_get already tried plain-then-impersonate internally
+    (http_client.get_text), so a block code reaching here means BOTH tiers were blocked --
+    a much stronger signal than the single plain-httpx 403 this used to wall on."""
+    from .nc_polite import mark_walled, wall_reason, RodWalled
+    why = wall_reason(page.status if page.status < 599 else 0, page.final_url, page.text)
+    if not why and page.status in (401, 403, 406, 409, 429):
+        why = f"HTTP {page.status}"
+    if why:
+        mark_walled(client.platform, client.state, client.county, why)
+        raise RodWalled(page.final_url, why)
+
+
 class CchsClassicReader(Reader):
     """Courthouse Computer Systems classic ASP: county-run servers (Orange, Stanly, Surry NC) and the
     vendor-hosted tenants (HOSTED_CCHS)."""
@@ -262,14 +332,22 @@ class CchsClassicReader(Reader):
 
     def read(self, a: date, b: date) -> tuple[list[dict], bool]:
         from urllib.parse import urlencode
+        from .nc_polite import walled_reason, RodWalled
         C = self.C
+        # Mirror PoliteClient.request()'s own first check: once this county is marked
+        # walled (by this call or by self.client's own open()/realestatesearch.asp
+        # request), no further request goes out for it, same as before this fix.
+        why = walled_reason(self.client.platform, self.client.state, self.client.county)
+        if why:
+            raise RodWalled(self.app, why)
         xhr = {"X-Requested-With": "XMLHttpRequest", "Referer": self.app + "realestatesearch.asp"}
         q = {"cmd": "search", "last": "", "given": "", "indextype": "3", "searchtype": "3", "codetype": "3",
              "fromdate": a.strftime("%m/%d/%Y"), "todate": b.strftime("%m/%d/%Y"),
              "instrumenttypes": ",".join(self.kinds), "description": "", "docnumber": "", "booknumber": "",
              "pagenumber": "", "taxfrom": "", "taxto": "", "resultstype": "1", "maxrecordcount": str(C.MAX_RECORDS),
              "symbolsetout": "0", "sortorder": "1", "sortfield": "docno", "rangetype": "doc"}
-        rep = self.client.get(self.app + "SearchService.asp?" + urlencode(q), headers=xhr)
+        rep = _impersonated_classic_get(self.app + "SearchService.asp?" + urlencode(q), headers=xhr)
+        _wall_check(self.client, rep)
         n, _docs = C.counts(rep.text)
         if rep.status >= 400 or n is None:
             raise RuntimeError(f"search reply HTTP {rep.status} without a record count")
@@ -277,7 +355,9 @@ class CchsClassicReader(Reader):
             return [], False
         if n >= C.MAX_RECORDS:
             return [], True
-        rows = self.client.get(self.app + f"SearchService.asp?cmd=getall&start=0&offset={n}", headers=xhr)
+        rows = _impersonated_classic_get(
+            self.app + f"SearchService.asp?cmd=getall&start=0&offset={n}", headers=xhr)
+        _wall_check(self.client, rows)
         if rows.status >= 400:
             raise RuntimeError(f"getall HTTP {rows.status}")
         recs = C.parse_getall(rows.text)

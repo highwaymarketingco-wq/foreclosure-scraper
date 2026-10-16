@@ -469,25 +469,34 @@ def cchs_party(da, ki, bk, pg, dn, gl, gf, el, ef):
 
 
 def test_cchs_classic_reader_asks_only_for_adverse_kinds_and_bisects_at_the_cap(monkeypatch):
+    # 2026-10-16: SearchService.asp now goes through _impersonated_classic_get
+    # (http_client.get_text) instead of self.client -- see test_cchs_classic_impersonation.py
+    # for that escalation's own coverage. open()'s bootstrap calls (application.asp,
+    # realestatesearch.asp) are unchanged and still go through self.client/install().
     from urllib.parse import parse_qs, urlsplit
+    from foreclosure_scraper import http_client as HC
 
-    def service(method, url, params, data):
+    asked = []
+
+    async def fake_get_text(url, **kw):
+        asked.append(url)
         q = parse_qs(urlsplit(url).query)
         if q["cmd"][0] == "search":
             n = 5000 if q["fromdate"][0].endswith("2025") and q["todate"][0] == "12/31/2025" else 2
-            return FakeResp(f"<SearchResponse><recordcount>{n}</recordcount><doccount>1</doccount></SearchResponse>")
-        return FakeResp("<Records>" + cchs_party("03/04/2025", "LIEN", "300", "40", "2025000011", "TESTER", "ALVIN Q",
-                                                 "EXAMPLE CREDITOR", "") + "</Records>")
-    sess = install(monkeypatch, [("GET", "application.asp", FakeResp(CCHS_APP)), ("GET", "realestatesearch.asp", FakeResp(CCHS_SEARCH)),
-                                 ("GET", "SearchService.asp", service)])
+            return f"<SearchResponse><recordcount>{n}</recordcount><doccount>1</doccount></SearchResponse>"
+        return "<Records>" + cchs_party("03/04/2025", "LIEN", "300", "40", "2025000011", "TESTER", "ALVIN Q",
+                                        "EXAMPLE CREDITOR", "") + "</Records>"
+
+    monkeypatch.setattr(HC, "get_text", fake_get_text)
+    install(monkeypatch, [("GET", "application.asp", FakeResp(CCHS_APP)), ("GET", "realestatesearch.asp", FakeResp(CCHS_SEARCH))])
     rd = CS.CchsClassicReader("Stanly")
     rd.open()
     assert rd.kinds == ["LIEN", "LIS/P"] and rd.types == 2           # the release and the deed are not asked for
     assert rd.read(date(2025, 1, 1), date(2025, 12, 31)) == ([], True)
     docs, over = rd.read(date(2025, 1, 1), date(2025, 6, 30))
     assert not over and docs[0]["fs"] == ["TESTER ALVIN Q"] and docs[0]["t"] == "LIEN"
-    asked = [u for m, u, p, d in sess.calls if "cmd=search" in u]
-    assert "instrumenttypes=LIEN%2CLIS%2FP" in asked[0]
+    searched = [u for u in asked if "cmd=search" in u]
+    assert "instrumenttypes=LIEN%2CLIS%2FP" in searched[0]
 
 
 class FakeSocket:
@@ -607,14 +616,20 @@ def test_registry_names_every_county_and_its_readers():
 
 def test_hosted_cchs_reader_never_asks_for_the_frame_page(monkeypatch):
     from urllib.parse import parse_qs, urlsplit
+    from foreclosure_scraper import http_client as HC
 
-    def service(method, url, params, data):
+    asked = []
+
+    async def fake_get_text(url, **kw):
+        asked.append(url)
         q = parse_qs(urlsplit(url).query)
         if q["cmd"][0] == "search":
-            return FakeResp("<SearchResponse><recordcount>1</recordcount><doccount>1</doccount></SearchResponse>")
-        return FakeResp("<Records>" + cchs_party("03/04/2025", "LIEN", "300", "40", "2025000011", "TESTER", "ALVIN Q",
-                                                 "EXAMPLE CREDITOR", "") + "</Records>")
-    sess = install(monkeypatch, [("GET", "realestatesearch.asp", FakeResp(CCHS_SEARCH)), ("GET", "SearchService.asp", service)])
+            return "<SearchResponse><recordcount>1</recordcount><doccount>1</doccount></SearchResponse>"
+        return "<Records>" + cchs_party("03/04/2025", "LIEN", "300", "40", "2025000011", "TESTER", "ALVIN Q",
+                                        "EXAMPLE CREDITOR", "") + "</Records>"
+
+    monkeypatch.setattr(HC, "get_text", fake_get_text)
+    sess = install(monkeypatch, [("GET", "realestatesearch.asp", FakeResp(CCHS_SEARCH))])
     rd = CS.CchsClassicReader("Hertford")
     rd.open()
     docs, over = rd.read(date(2025, 1, 1), date(2025, 6, 30))
@@ -622,15 +637,34 @@ def test_hosted_cchs_reader_never_asks_for_the_frame_page(monkeypatch):
     urls = [u for m, u, p, d in sess.calls]
     assert not any("application.asp" in u for u in urls)            # the Cloudflare-fronted frame page is never fetched
     assert all(u.startswith("https://us4.courthousecomputersystems.com/HertfordNCNW/") for u in urls)
+    assert all(u.startswith("https://us4.courthousecomputersystems.com/HertfordNCNW/") for u in asked)
 
 
 def test_hosted_cchs_cloudflare_challenge_walls_the_county_and_stops(monkeypatch, tmp_path):
-    sess = install(monkeypatch, [("GET", "realestatesearch.asp", FakeResp(CCHS_SEARCH)), ("GET", "SearchService.asp", CLOUDFLARE_403)])
+    # 2026-10-16: SearchService.asp now escalates to curl-cffi impersonation
+    # (http_client.get_text) before it can wall -- a block that survives BOTH tiers
+    # surfaces as get_text_impersonate's own RuntimeError("impersonate got {code}..."),
+    # which _wall_check (county_sweeps.py) still correctly marks walled from, same
+    # contract as before (see test_cchs_classic_impersonation.py for that path's own
+    # dedicated coverage).
+    from foreclosure_scraper import http_client as HC
+
+    calls = {"n": 0}
+
+    async def fake_get_text(url, **kw):
+        calls["n"] += 1
+        raise RuntimeError(f"impersonate got {CLOUDFLARE_403.status_code} for {url}")
+
+    monkeypatch.setattr(HC, "get_text", fake_get_text)
+    sess = install(monkeypatch, [("GET", "realestatesearch.asp", FakeResp(CCHS_SEARCH))])
     idx, res = CS.sweep(CS.CchsClassicReader("Gates"), since=date(2025, 1, 1), today=date(2025, 12, 31), cache_dir=tmp_path)
     assert res.walled and res.window_from is None
-    n = len(sess.calls)
+    n_get_text, n_client = calls["n"], len(sess.calls)
+    # A fresh CchsClassicReader instance (its own self.client), but mark_walled used the
+    # same (platform, state, county) key that NEW self.client checks on its own first
+    # call (open()'s realestatesearch.asp) -- so even open() never gets that far.
     idx, res = CS.sweep(CS.CchsClassicReader("Gates"), since=date(2025, 1, 1), today=date(2025, 12, 31), cache_dir=tmp_path)
-    assert res.walled and len(sess.calls) == n                      # a walled county gets no further request
+    assert res.walled and calls["n"] == n_get_text and len(sess.calls) == n_client
 
 
 # ------------------------------------------------------------------------------------------------
