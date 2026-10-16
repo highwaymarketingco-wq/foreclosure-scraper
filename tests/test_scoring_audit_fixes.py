@@ -892,7 +892,11 @@ def test_f12_the_code_enforcement_enricher_tells_no_case_from_an_outage_and_stam
     counts: dict = {}
     li.raw["code_enforcement"] = {"source": ce._SOURCE_TAG, "has_open": True}
     ce._clear_stale_block(li, counts)
-    assert "code_enforcement" not in li.raw and counts["cleared"] == 1
+    # 2026-10-16: a clean negative now writes a dated wrapper (not just a pop), so this
+    # row satisfies gap_matrix.py's own "checked" contract instead of looking unscreened.
+    assert li.raw["code_enforcement"]["has_open"] is False
+    assert li.raw["code_enforcement"]["source"] == ce._SOURCE_TAG
+    assert counts["cleared"] == 1
     other = L(LT.TAX_LIEN, raw={"code_enforcement": {"source": "henderson_ordinance_violations_tracking", "has_open": True}})
     ce._clear_stale_block(other, {})
     assert "code_enforcement" in other.raw                      # another writer's block is never cleared

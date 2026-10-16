@@ -218,12 +218,24 @@ async def _fetch_violations_for_listing(
 
 
 def _clear_stale_block(li: Listing, counts: dict) -> None:
-    """The city answered and has no case at this address. Drop a block THIS enricher wrote on
-    an earlier run; leave one a county scraper or another enricher wrote (different source)."""
-    ce = li.raw.get("code_enforcement") if isinstance(li.raw, dict) else None
-    if isinstance(ce, dict) and ce.get("source") == _SOURCE_TAG:
-        li.raw.pop("code_enforcement", None)
-        counts["cleared"] = counts.get("cleared", 0) + 1
+    """The city answered and has no case at this address.
+
+    Writes a dated negative wrapper (not just an empty pop) so this row satisfies
+    gap_matrix.py's own "row"-scope contract -- "checked when the row carries the value
+    OR a negative-result wrapper" -- which this enricher previously could never do: its
+    only write path was the positive-match block below, so a true "ran, found nothing"
+    answer was invisible to the gap list forever (audit 2026-10-16). Leaves a block a
+    DIFFERENT producer wrote (county scraper or another enricher) untouched -- this
+    enricher only ever overwrites its own prior write, by `source` tag."""
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    ce = li.raw.get("code_enforcement")
+    if isinstance(ce, dict) and ce.get("source") != _SOURCE_TAG:
+        return
+    li.raw["code_enforcement"] = stamp(
+        {"city": li.city, "has_open": False, "open_violations": 0, "total_violations": 0,
+         "violations": [], "source": _SOURCE_TAG}, ttl_days=_TTL_DAYS)
+    counts["cleared"] = counts.get("cleared", 0) + 1
 
 
 async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
