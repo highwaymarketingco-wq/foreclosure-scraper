@@ -1,17 +1,24 @@
-"""Regression tests for the NC eCourts upset-bid window constant.
-
-NC §45-21.27 strict reading is 10 days from filing of the report of
-sale; §45-21.26 gives the trustee 5 days from sale to file the report.
-Practical operational window measured from sale_date is up to 15 days.
-We use 14 as the operational threshold investors typically work with.
+"""Regression tests for NC eCourts TARGET_COUNTIES scope and the
+non-upset-bid-window behavior of orderedDate-based judgments.
 
 Note: the AUTHORITATIVE upset-bid tagging now happens in
 enrichment_upset_bid.py (works off li.sale_date, which is the sale
-date set by law-firm / county-tax / auction-site scrapers). The NC
-eCourts scraper's ordered_date-based tagging is preserved as a
-secondary signal but doesn't fire reliably because the Tyler Odyssey
-judgment search has a multi-week indexer lag (current data shows 0-30
-day bucket = 0 listings; everything is 31+ days old).
+date set by law-firm / county-tax / auction-site scrapers, and whose
+own UPSET_BID_WINDOW_DAYS==14 is pinned by tests/test_enrich_upset_bid.py).
+The NC eCourts scraper here never derives an upset-bid window from
+orderedDate at all (see test_recent_judgment_is_not_an_upset_bid_window
+below) because the Tyler Odyssey judgment search's orderedDate is a
+JUDGMENT date, never a sale date.
+
+2026-10-15 (date-coverage completeness-sweep item 2): this file used to
+also import and pin a same-named UPSET_BID_WINDOW_DAYS=14 constant that
+lived in nc_ecourts_lis_pendens.py itself -- confirmed dead: grepped for
+real call sites and found none anywhere in that module's own code (not
+referenced by _hit_to_listing or anything else in the file), only this
+test's own tautological assertion of its value. Removed the constant
+from nc_ecourts_lis_pendens.py and the now-pointless import/assertion
+here; the one real UPSET_BID_WINDOW_DAYS (enrichment_upset_bid.py) and
+its own ==14 regression test are untouched.
 """
 from __future__ import annotations
 
@@ -19,7 +26,6 @@ from datetime import datetime, timedelta
 
 from foreclosure_scraper.scrapers.counties_nc.nc_ecourts_lis_pendens import (
     TARGET_COUNTIES,
-    UPSET_BID_WINDOW_DAYS,
     _hit_to_listing,
 )
 
@@ -36,13 +42,6 @@ def _hit(ordered_date_iso: str, **extras) -> dict:
     }
     base.update(extras)
     return base
-
-
-def test_upset_bid_window_constant():
-    # 14 days from sale_date is the operational threshold (NCGS §45-21.27
-    # gives 10 days from report-filing; §45-21.26 gives 5 days from sale
-    # to file the report; total practical window is ~14-15 days from sale).
-    assert UPSET_BID_WINDOW_DAYS == 14
 
 
 def test_target_counties_match_user_territory():
