@@ -3409,6 +3409,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("resolved_catchup.failed", traceback=traceback.format_exc())
 
+    # ustaxdata.com per-parcel tax search (Robeson NC): multi-year paid/unpaid bill history,
+    # keyed by the board's own parcel_id. Must run BEFORE enrich_tax_owed just below, which
+    # picks up raw['ustaxdata_delinquent_tax'] generically (tax-ish block name + years_unpaid)
+    # the same way qpaybill_roll's are. See enrichment_ustaxdata_tax_search.py's docstring for
+    # why Alexander/Rockingham (same vendor) aren't wired. Gate off with FORECLOSURE_USTAXDATA=0.
+    if os.environ.get("FORECLOSURE_USTAXDATA", "1") != "0":
+        try:
+            from .enrichment_ustaxdata_tax_search import enrich_ustaxdata
+            s = await _await_capped(enrich_ustaxdata(enriched), "ustaxdata")
+            if s:
+                enrichment_stats["ustaxdata"] = s
+        except Exception:
+            log.error("ustaxdata.failed", traceback=traceback.format_exc())
+
     # Taxes-OWED normalizer — fold each tax source's own amount key (Buncombe
     # principal_tax_due, SC state-lien balance, Oconee FLC bid) into one
     # raw['tax_owed'], then cross-reference it onto any same-parcel lead (a court/

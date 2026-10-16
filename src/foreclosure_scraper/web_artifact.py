@@ -1921,6 +1921,8 @@ RAW_KEEP = {
     "buncombe_delinquent_tax": "*",     # delinquent tax roll: balance + tax_year (needed for tax_owed year extraction)
     "rutherford_wildfire": "*",         # delinquent tax roll: taxes_owed + tax_years (list)
     "multi_year_delinquent_tax": "*",   # delinquent tax roll: total_due + year
+    "ustaxdata_delinquent_tax": "*",    # Robeson NC per-parcel tax search: bills[] (year/status/
+                                         # taxable_value) + years_unpaid + taxpayer_of_record
     "spartanburg_delinquent_tax": "*",  # SC delinquent tax: balance
     "sc_state_tax_lien": "*",           # SC DeptRev state tax lien: balance
     # 2026-10-01 per-source audit hardening: the scraper itself is disabled=True

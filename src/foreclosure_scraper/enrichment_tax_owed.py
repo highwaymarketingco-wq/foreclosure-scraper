@@ -309,7 +309,8 @@ def _is_tax_source_block(name: str) -> bool:
 #: both, and every one disagreed with its qpaybill_roll.
 _LIVE_ROLL_BLOCKS = frozenset({"qpaybill_roll", "catalis_roll", "nc_ptscloud_delinquent_tax",
                                "billtrax_dorchester_delinquent_tax",
-                               "greenwood_corebtpay_delinquent_tax"})
+                               "greenwood_corebtpay_delinquent_tax",
+                               "ustaxdata_delinquent_tax"})
 
 
 _PTS_BILL_RE = re.compile(r"^\d+-(\d{4})-(\d{4})-")
