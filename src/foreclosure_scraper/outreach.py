@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
@@ -69,13 +70,48 @@ def _owner(li: Listing) -> str | None:
     return st.get("owner_name") or li.defendant or None
 
 
+def _dnc_clear_phones(raw: dict) -> list[str]:
+    """Every phone this listing's raw['dnc_scrub'] (enrichment_dnc.py) has actually confirmed
+    safe to dial -- dnc_status "clear", nothing else. unverified/blocked/on_registry/
+    on_internal_dnc phones are never returned here, however confident the name match was: the
+    TSR compliance call (16 CFR 310.4(b)(3)(iv)) belongs entirely to enrichment_dnc.py, this
+    only reads its verdict, never re-derives or loosens one. 2026-10-16: as of writing, this
+    returns [] for every listing on the real board, correctly -- no data/dnc_registry.csv is
+    installed (an operator-side FTC registry subscription, not something this codebase can
+    obtain), so enrichment_dnc.py can never answer "clear" for anyone yet, only "unverified" or
+    "blocked". That is not a bug in this function; it is the honest, compliant answer with the
+    inputs available. Formatted (xxx) xxx-xxxx to match owner_phone/skip_trace's own shape."""
+    scrub = raw.get("dnc_scrub")
+    if not isinstance(scrub, list):
+        return []
+    out = []
+    for e in scrub:
+        if not (isinstance(e, dict) and e.get("dnc_status") == "clear"):
+            continue
+        p = re.sub(r"\D", "", str(e.get("phone") or ""))
+        if len(p) == 10:
+            out.append(f"({p[:3]}) {p[3:6]}-{p[6:]}")
+    return out
+
+
 def _contact(li: Listing) -> dict:
-    st = (li.raw or {}).get("skip_trace") or {}
+    raw = li.raw or {}
+    st = raw.get("skip_trace") or {}
+    # skip_trace['phone_numbers'] is a PAID-skip-trace-provider-only field (that module's own
+    # docstring: "paid only") -- this project is free-only (docs/HERMES.md), so in practice it
+    # is never populated (confirmed: 0 of 353,609 board rows, 2026-10-16). The real, free phone
+    # pipeline (voter_phone / county_phone / surface_contacts / liensnc / free_phones /
+    # sc_voter_xref -- see enrichment_dnc._get_phone_records for the full list) lands at
+    # raw['owner_phone'] instead, and this function never looked there at all -- found while
+    # investigating why outreach.done's own with_phone stat has always read 0 across every run.
+    # Merged rather than falling back to one or the other, in case skip_trace is ever turned on
+    # for real: a phone appearing in both is not double-counted.
+    phones = list(dict.fromkeys((st.get("phone_numbers") or []) + _dnc_clear_phones(raw)))
     return {
         "owner": _owner(li),
         "mailing_address": st.get("owner_mailing_address"),
         "absentee": st.get("absentee_owner", False),
-        "phones": st.get("phone_numbers") or [],
+        "phones": phones,
     }
 
 
