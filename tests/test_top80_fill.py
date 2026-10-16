@@ -324,6 +324,41 @@ def test_flag_off_and_budget(monkeypatch):
     assert st["budget_hit"] is True and "gis_fill" not in row.raw
 
 
+def test_the_round_robin_start_county_rotates_by_day_not_always_alamance(monkeypatch):
+    """2026-10-16 fix: a run that hits its budget before a full pass (measured live: 200,641
+    candidates, 17,571 screened) must not always starve the SAME late-alphabet county every
+    single run. The queue order now rotates by today's ordinal day, the same fix
+    enrichment_incarceration.py already uses for the identical problem."""
+    a, w = li(county="Alamance", pin="1111111111"), li(county="Wake", pin="2222222222")
+    seen_counties = []
+
+    def handler(url, data):
+        seen_counties.append(data["where"].split("cntyname='")[1].split("'")[0])
+        return FakeResp([])
+
+    class _FixedNow(datetime):
+        _fixed: "datetime"
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls._fixed
+
+    fake_post(monkeypatch, handler)
+
+    def first_county_on(day: datetime) -> str:
+        seen_counties.clear()
+        _FixedNow._fixed = day
+        monkeypatch.setattr(G, "datetime", _FixedNow)
+        run([li(county="Alamance", pin="1111111111"), li(county="Wake", pin="2222222222")], budget_s=60)
+        return seen_counties[0]
+
+    day0 = datetime(2026, 10, 16, tzinfo=timezone.utc)
+    day1 = day0 + timedelta(days=1)
+    first0, first1 = first_county_on(day0), first_county_on(day1)
+    # two counties, consecutive days: the rotation (ordinal % 2) must flip which one is first
+    assert {first0, first1} == {"Alamance", "Wake"} and first0 != first1
+
+
 def test_account_join_sets_parcel_and_acreage_only_on_a_unique_account(monkeypatch):
     mk = lambda acct: li(state="SC", county="Orangeburg", pin="", raw={"qpaybill_roll": {"identification_no": acct}})
     rows = [mk("0970023"), mk("993249"), mk("5550001")]

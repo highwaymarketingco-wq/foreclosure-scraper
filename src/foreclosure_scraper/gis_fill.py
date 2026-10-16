@@ -933,7 +933,20 @@ async def enrich_gis_fill(listings: list, budget_s: Optional[float] = None) -> d
             return True
         return False
 
-    queues = {k: list(m) for k, m in sorted(plan.items())}
+    # 2026-10-16: the round-robin WITHIN one run was always fair (one BATCH per county per
+    # pass), but the queue always started this same sorted(plan) alphabetical order -- so on a
+    # run that hits its budget before a full pass completes (candidates=200,641 vs screened=
+    # 17,571 measured live 10/15/16), a county late in that fixed order never gets its turn, run
+    # after run, for as long as earlier counties keep regenerating fresh candidates before the
+    # queue ever reaches it (measured: 0 of NC's 100 counties had any county_deed_ref on the last
+    # published board). Same fix enrichment_incarceration.py already uses for the identical
+    # problem: rotate the start point by today's ordinal day, so every county is first roughly
+    # once every len(items) days instead of never.
+    items = sorted(plan.items())
+    if items:
+        spin = datetime.now(timezone.utc).toordinal() % len(items)
+        items = items[spin:] + items[:spin]
+    queues = {k: list(m) for k, m in items}
     missed: dict[tuple[str, str], list[str]] = {}
     while queues and not out_of_time():
         for key in list(queues):
