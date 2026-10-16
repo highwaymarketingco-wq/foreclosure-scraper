@@ -87,9 +87,19 @@ point -- flagging for whoever next touches this module to check the most
 recent scheduled run's actual row count/BLOCKED status before assuming
 `requires_render = True` is still sufficient here.
 
+RE-VERIFIED 2026-10-15 (overnight completeness-sweep follow-up, item 3):
+STILL WALLED, no change from 2026-10-13 -- this is not a new regression to
+chase. Ran this module's own live `_render()` (the exact StealthyFetcher
+config above) against the Asheville NC search-results page just now: hard
+403, zero bytes back, same Akamai Bot Manager shape as two days ago. Per
+the owner's "don't fight a wall" rule and this task's own scope (small,
+safe fixes only -- a new Akamai bypass is explicitly out of scope here),
+left the scraper's code untouched. Whoever next revisits this should
+re-run `_render()` live before assuming either outcome.
+
 Free, public (no login) via a real browser render -- AS OF 2026-10-04.
 Akamai blocked impersonation but not a genuine Chromium session THEN; see
-the 2026-10-13 note above for why that may no longer hold.
+the 2026-10-13 and 2026-10-15 notes above for why that may no longer hold.
 """
 from __future__ import annotations
 
