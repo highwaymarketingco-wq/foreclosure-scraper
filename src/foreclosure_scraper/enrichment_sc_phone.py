@@ -538,7 +538,25 @@ def flag_unverified_xref_phones(listings, apply: bool = False,
             continue
         for block in _xref_blocks(raw):
             targets.append((li, raw, block))
-    idx.ensure({v for _, _, b in targets if (v := _voter_name(b))})
+    # Batch every name _check() will ask idx about into ONE ensure() call before the per-target
+    # loop. ensure() makes a full pass over ncvoter*.txt per call by design (VoterIdentityIndex's
+    # own docstring) -- this bulk call used to cover only _voter_name(b), so _check()'s own
+    # idx.ensure(cands) for a fuzzy-tier block (line below) still saw a never-before-seen owner-
+    # name candidate on nearly every lead and reran the full ~566MB/1.28M-row scan again. Measured
+    # on the 2026-10-16 production run: this stacked into 1,900+ repeated full scans (~8s of real
+    # CPU each) across ~9,527 fuzzy-tier leads, over 4 hours before anyone noticed the run hadn't
+    # logged a line since validation. Pre-computing the SAME candidate set _check() computes for
+    # a fuzzy-tier block, here, up front, makes every later idx.ensure() call in this run a
+    # same-set no-op (ensure()'s own `if not want: return`).
+    names: set[tuple[str, str]] = set()
+    for li, raw, block in targets:
+        voter = _voter_name(block)
+        if voter:
+            names.add(voter)
+        if str(block.get("source") or "") in DIRECT_SOURCES and _is_fuzzy_tier(block):
+            owner = str(getattr(li, "owner_name", None) or "").strip()
+            names.update(_owner_name_candidates(owner))
+    idx.ensure(names)
 
     verdicts: Counter = Counter()
     reasons: Counter = Counter()

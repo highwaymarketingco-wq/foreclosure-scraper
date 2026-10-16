@@ -533,6 +533,38 @@ def test_verdict_end_to_end_through_a_scanned_voter_file(tmp_path):
     assert stats["voter_files_scanned"] == 1
 
 
+def test_many_fuzzy_tier_leads_with_distinct_owner_names_still_scan_the_voter_file_once(tmp_path):
+    """2026-10-16 production incident: flag_unverified_xref_phones's own upfront idx.ensure()
+    batched only _voter_name(block), not the extra owner-name candidates a fuzzy-tier block's
+    _check() branch asks for -- so on a real board, _check()'s own idx.ensure(cands) call kept
+    finding a never-before-seen candidate and rescanning the whole ncvoter* set again, once per
+    fuzzy-tier lead (measured: 1,900+ rescans across ~9,527 fuzzy-tier leads on one run). Three
+    leads here have three disjoint owner names on purpose, so under the bug this would need 3
+    scans; under the fix it must stay at 1 regardless of how many distinct-name leads are in the
+    batch."""
+    _write_voter_file(tmp_path / "ncvoter92.txt", [
+        {"county": "WAKE", "last": "SMITH", "first": "JOHN", "street": "1 A ST", "phone": "9195551111"},
+        {"county": "WAKE", "last": "JONES", "first": "MARY", "street": "2 B ST", "phone": "9195552222"},
+        {"county": "WAKE", "last": "WILLIAMS", "first": "ROBERT", "street": "3 C ST", "phone": "9195553333"},
+    ])
+    board = [
+        _listing(owner="SMITH JOHN A", raw={"owner_phone": _xref(
+            source="ncsbe_voter", match="fuzzy:soundex+county-unique", matched_name="SMITH,JOHN",
+            phone="(919) 555-1111")}),
+        _listing(owner="JONES MARY B", raw={"owner_phone": _xref(
+            source="ncsbe_voter", match="fuzzy:soundex+county-unique", matched_name="JONES,MARY",
+            phone="(919) 555-2222")}),
+        _listing(owner="WILLIAMS ROBERT C", raw={"owner_phone": _xref(
+            source="ncsbe_voter", match="fuzzy:soundex+county-unique", matched_name="WILLIAMS,ROBERT",
+            phone="(919) 555-3333")}),
+    ]
+    idx = G.VoterIdentityIndex(voter_dir=tmp_path)
+    stats = G.flag_unverified_xref_phones(board, apply=True, index=idx)
+    assert [li.raw["owner_phone"]["identity_check"] for li in board] == ["corroborated"] * 3
+    assert stats["voter_files_scanned"] == 1, (
+        "one ensure() call covering every fuzzy-tier candidate up front, not one per lead")
+
+
 def test_a_missing_voter_directory_degrades_to_unverified_never_corroborated(tmp_path):
     li = _listing(owner="SMITH JOHN A", raw={
         "owner_phone": _xref(), "owner_mailing": _mailing("1124 TYLER FARMS DR RALEIGH NC 27612", "NC")})
