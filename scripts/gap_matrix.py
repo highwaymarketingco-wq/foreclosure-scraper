@@ -558,6 +558,8 @@ _S = "signal"
 SC_QUIET_TITLE = (("SC", "SC estate notices via Column (column_legal_notices, SC estate lane)"),)
 NC_QUIET_TITLE_SOURCE = ()      # was: NC notices known, no parser. scrapers/public_notices/nc_heir_notices.py reads them
 NC_QUIET_TITLE_WALL = (("NC", "no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled"),)
+SC_QUIET_TITLE_WALL = (("SC", "Column's SC estate lane only queries 18 of 46 counties per run; the "
+                              "other 28 were probed once (2026-10-02) and found empty"),)
 NC_QUIET_TITLE_READ = (("NC", "NC quiet-title / heir notices via Column (nc_heir_notices, notices searched by text)"),)
 
 
@@ -569,6 +571,22 @@ def _nc_without_column_paper() -> tuple:
         from foreclosure_scraper.validation import NC_COUNTIES
         return tuple(("NC", c) for c in NC_COUNTIES if c not in set(COLUMN_NC_COUNTIES))
     except Exception:  # noqa: BLE001 - without the module every NC county reads as unreached
+        return ()
+
+
+def _sc_without_column_probate() -> tuple:
+    """The SC counties column_legal_notices's SC estate lane never queries (its fetch() loop is
+    scoped to SC_FOOTPRINT + SC_DISTRESSED_ONLY + SC_PROBATE_EXTRA_COUNTIES, 18 of 46 counties;
+    the rest were dropped after a one-time 2026-10-02 probe found zero notices): there the
+    source is a verdict (walled), not a gap."""
+    try:
+        from foreclosure_scraper.scrapers.newspapers.column_legal_notices import (
+            SC_FOOTPRINT, SC_DISTRESSED_ONLY, SC_PROBATE_EXTRA_COUNTIES,
+        )
+        from foreclosure_scraper.validation import SC_COUNTIES
+        active = set(SC_FOOTPRINT) | set(SC_DISTRESSED_ONLY) | set(SC_PROBATE_EXTRA_COUNTIES)
+        return tuple(("SC", c) for c in SC_COUNTIES if c not in active)
+    except Exception:  # noqa: BLE001 - without the module every SC county reads as unreached
         return ()
 
 SPECS: dict[str, Spec] = {
@@ -654,8 +672,8 @@ SPECS: dict[str, Spec] = {
                                    "scrapers/counties_nc/henderson_foreclosure_parcels.py"),
                         doc="raw.heir_estate present (a parcel owner-of-record naming heirs/estate)"),
     "heir_naming_publication": Spec(_S, "county", "notices", statewide=SC_QUIET_TITLE + NC_QUIET_TITLE_READ,
-                                    statewide_except=_nc_without_column_paper(),
-                                    sources=NC_QUIET_TITLE_SOURCE, walls=NC_QUIET_TITLE_WALL,
+                                    statewide_except=_nc_without_column_paper() + _sc_without_column_probate(),
+                                    sources=NC_QUIET_TITLE_SOURCE, walls=NC_QUIET_TITLE_WALL + SC_QUIET_TITLE_WALL,
                                     producers=("scrapers/newspapers/column_legal_notices.py",
                                                "scrapers/public_notices/nc_heir_notices.py"),
                                     doc="raw.heir_naming_publication present",
@@ -802,8 +820,9 @@ SPECS: dict[str, Spec] = {
     "deed_chain_distress_transfer": Spec(_S, "derived", "gis_deed", producers=("enrichment_deed_chain.py",),
                                          doc="raw.deed_chain.summary.distress_transfers truthy; checked = deed chain present"),
     "quiet_title": Spec(_S, "county", "court", statewide=SC_QUIET_TITLE + NC_QUIET_TITLE_READ,
-                        statewide_except=_nc_without_column_paper(), sources=NC_QUIET_TITLE_SOURCE,
-                        walls=NC_QUIET_TITLE_WALL,
+                        statewide_except=_nc_without_column_paper() + _sc_without_column_probate(),
+                        sources=NC_QUIET_TITLE_SOURCE,
+                        walls=NC_QUIET_TITLE_WALL + SC_QUIET_TITLE_WALL,
                         producers=("scrapers/newspapers/column_legal_notices.py",
                                    "scrapers/public_notices/nc_heir_notices.py"),
                         doc="is_quiet_title on raw.column/court/case/rod_docs/heir_naming_publication"),

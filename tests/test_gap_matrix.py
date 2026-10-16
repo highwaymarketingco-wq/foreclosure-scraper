@@ -330,8 +330,25 @@ def test_nc_quiet_title_is_read_by_nc_heir_notices():
         assert johnston[0] == "free" and "Column" in johnston[2]
         alleghany = gm.source_status(spec, "NC", m[("NC", "Alleghany")])
         assert alleghany[0] == "walled" and "Column" in alleghany[1]
-        assert len(spec.statewide_except) == 25
+        # 25 NC counties with no Column paper, plus 28 SC counties outside column_legal_notices's
+        # active 18-county SC estate-lane loop (gap-sweep wave 2, 2026-10-16)
+        assert len(spec.statewide_except) == 25 + 28
     assert gm.source_status(gm.SPECS["heir_naming_publication"], "SC", None)[2].startswith("statewide: SC estate")
+
+
+def test_sc_quiet_title_only_reaches_column_legal_notices_18_county_footprint():
+    # column_legal_notices's SC estate lane only queries SC_FOOTPRINT + SC_DISTRESSED_ONLY +
+    # SC_PROBATE_EXTRA_COUNTIES (18 of 46 counties); the rest were dropped after a one-time
+    # 2026-10-02 probe found zero notices there. Before this fix, gap_matrix.py claimed blanket
+    # SC statewide coverage with no exception, so those 28 counties showed an unsatisfiable
+    # "run it for this county" built-but-low-yield gap forever (gap-sweep wave 2, 2026-10-16).
+    m = gm.load_matrix(gm.REPO / "docs" / "county_records" / "county_records_matrix.json")
+    for col in ("quiet_title", "heir_naming_publication"):
+        spec = gm.SPECS[col]
+        greenville = gm.source_status(spec, "SC", m[("SC", "Greenville")])  # SC_PROBATE_EXTRA_COUNTIES
+        assert greenville[0] == "free" and "SC estate" in greenville[2]
+        abbeville = gm.source_status(spec, "SC", m[("SC", "Abbeville")])  # not in the active 18
+        assert abbeville[0] == "walled" and "18 of 46" in abbeville[1]
 
 
 def test_ledger_signals_accepts_several_verifier_signals():
