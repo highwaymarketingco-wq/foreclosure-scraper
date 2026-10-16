@@ -208,7 +208,7 @@ async def _prior_tax_years(client: httpx.AsyncClient) -> list[str] | None:
         max_year = max(n for _, n in int_years)
         return [y for y, n in int_years if n < max_year]
     except Exception as exc:  # noqa: BLE001
-        log.warning("berkeley_paystar.facets_fail", error=str(exc)[:160])
+        log.warning("berkeley_paystar.facets_fail", error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return None
 
 
@@ -261,7 +261,13 @@ async def _fetch_detail(client: httpx.AsyncClient, sem: asyncio.Semaphore, invoi
             r.raise_for_status()
             return invoice_hash, (r.json() or {}).get("data") or None
         except Exception as exc:
-            log.warning("berkeley_paystar.detail_fail", invoice_hash=invoice_hash, error=str(exc)[:140])
+            # str(exc) alone is "" for several httpx timeout classes (ConnectTimeout,
+            # ReadTimeout raised with no message) -- measured live 2026-10-16, every one
+            # of 75 detail_fail lines in one run read error="", telling nobody which of
+            # several possible failures it was. The type name is the only part that was
+            # ever informative here.
+            log.warning("berkeley_paystar.detail_fail", invoice_hash=invoice_hash,
+                        error=f"{type(exc).__name__}: {str(exc)[:140]}")
             return invoice_hash, None
 
 
@@ -516,7 +522,7 @@ class BerkeleyPaystarTax(BaseScraper):
             try:
                 rows = await _list_all(client)
             except Exception as exc:
-                log.warning("berkeley_paystar.list_fail", error=str(exc)[:160])
+                log.warning("berkeley_paystar.list_fail", error=f"{type(exc).__name__}: {str(exc)[:160]}")
                 return out
             if not rows:
                 return out
