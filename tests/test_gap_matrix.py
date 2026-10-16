@@ -68,6 +68,18 @@ def test_presence_zero_is_empty_like_10_01():
     assert "condemned" in gm.owner_columns(row(raw={"condemned": True}))
 
 
+def test_vacant_recognizes_the_gis_vacant_key_its_real_producers_actually_write():
+    """2026-10-16: enrichment_arcgis.py and nc_lincoln_bulk.py both write the
+    vacant-structure signal to raw["gis"]["vacant"], never the bare top-level
+    raw["vacant"] this column used to check alone -- invisible to the gap list for
+    every county either one covers (confirmed live: Gaston 107 rows, Lincoln 1,095
+    rows). spartanburg_vacant.py's own raw["vacant"] top-level write must still work."""
+    assert "vacant" in gm.owner_columns(row(raw={"gis": {"vacant": True}}))
+    assert "vacant" not in gm.owner_columns(row(raw={"gis": {"vacant": False}}))
+    assert "vacant" not in gm.owner_columns(row(raw={"gis": {}}))
+    assert "vacant" in gm.owner_columns(row(raw={"vacant": {"source": "spartanburg_city_registry"}}))
+
+
 # ---------------------------------------------------------------- second view
 
 def test_positive_drops_marriage_no_match_and_adds_attorney():

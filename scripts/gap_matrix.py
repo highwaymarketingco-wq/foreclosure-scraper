@@ -169,6 +169,14 @@ def owner_columns(rec: dict) -> set[str]:
     for k in SIMPLE_PRESENCE_COLS:
         if _present(raw.get(k)):
             out.add(k)
+    # "vacant" (vacant-STRUCTURE registry, not vacant_lot/vacancy) has two real producers
+    # (enrichment_arcgis.py's _cohort_flags, nc_lincoln_bulk.py) that write to
+    # raw["gis"]["vacant"], never the top-level raw["vacant"] key above alone checks --
+    # confirmed live 2026-10-16: Gaston/Lincoln's already-landed signal was invisible to
+    # this column for exactly that reason (226,121-row gap-list total, most of it this).
+    gis_vacant = (raw.get("gis") or {}).get("vacant") if isinstance(raw.get("gis"), dict) else None
+    if _present(gis_vacant):
+        out.add("vacant")
     if isinstance(owner_name, str) and owner_name:
         for col, pat in NAME_TOKENS:
             if pat.search(owner_name):
@@ -682,8 +690,14 @@ SPECS: dict[str, Spec] = {
                        statewide=(("NC", NC_ONEMAP + " land use"),),
                        doc="raw.vacant_lot present; checked = a land-use value is on the row"),
     "vacant": Spec(_S, "county", "code", ledger="vacant_structure",
-                   producers=("enrichment_arcgis.py", "scrapers/counties_nc/hendersonville_vacant_structures.py",
-                              "scrapers/counties_sc/spartanburg_vacant.py", "nc_burke_spine.py", "nc_lincoln_bulk.py"),
+                   # hendersonville_vacant_structures.py writes raw.vacancy, the SEPARATE
+                   # "vacancy" column's own producer -- not this one (fixed 2026-10-16).
+                   # nc_burke_spine.py deliberately never writes this signal at all, per
+                   # its own code comment ("this is the assessor's land class for
+                   # UNIMPROVED LAND... downstream lead-signal code reads a bare 'vacant'
+                   # as an empty STRUCTURE") -- it was never a real producer here.
+                   producers=("enrichment_arcgis.py", "scrapers/counties_sc/spartanburg_vacant.py",
+                              "nc_lincoln_bulk.py"),
                    doc="raw.vacant present (a city/county vacant-structure registry)"),
     "storm_damage": Spec(_S, "county", "disaster", producers=("enrichment_helene_damage.py",),
                          doc="raw.storm_damage present (post-Helene damage-assessment layers)"),
