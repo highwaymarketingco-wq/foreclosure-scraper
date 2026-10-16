@@ -9,10 +9,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import asyncio
+
 from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 from foreclosure_scraper.enrichment_tax_owed import enrich_tax_owed
 from foreclosure_scraper.enrichment_ustaxdata_tax_search import (
-    REJECTED_TENANTS, TENANTS, bill_detail_url, parse_bill_detail, parse_results, search_url,
+    NAME_SEARCH_TENANTS, REJECTED_TENANTS, TENANTS, _confirm_by_address, bill_detail_url,
+    enrich_ustaxdata, parse_bill_detail, parse_results, search_url, search_url_by_name,
 )
 
 #: One real row (2026, paid), verbatim from the live page, plus the page chrome
@@ -102,16 +105,49 @@ _DETAIL_PAID = """
 _DETAIL_UNPAID = _DETAIL_PAID.replace("$ 0.00", "$ 410.22")
 
 
+#: Real row, captured live 2026-10-16 on alexander.ustaxdata.com?lastName=RHYNE&firstName=
+#: DENNIS (REJECTED_TENANTS' own documented probe) -- the row's cells[5] carries a REAL street
+#: address here, unlike Robeson's "> CONTACT COUNTY FOR" placeholder at the same position
+#: (confirmed live on both the same day: this is a genuine per-tenant difference, not a parcel-
+#: search-vs-name-search structural one -- Rockingham's own name-search rows also carry a real
+#: address in this same column, just street-name-only on the one sampled, no house number).
+_ROW_ALEXANDER_RHYNE = """
+                <tr valign="middle" class="style16">
+                  <td height="17" align="center" valign="middle" bgcolor="E6FADE">1&nbsp;</td>
+                  <td align="center" valign="middle" bgcolor="E6FADE"><font color="#000000">2026</font></td>
+                  <td align="center" valign="middle" bgcolor="E6FADE"><div align="center" class="a1"><font color="#000000"><a href="account.cfm?parcelID=0002451 ">0202921 </a></font></div></td>
+                  <td valign="middle"  bgcolor="E6FADE"><div align="center">
+                    <p align="center" class="a1"><font color="#000000">2218297</font></p>
+                    </div>                  </td>
+                  <td align="center" bgcolor="E6FADE"><font color="#000000">RHYNE DENNIS W & / RHYNE JULI...</font><font color="#FF0000"><strong></strong></font></td>
+                  <td align="center" bgcolor="E6FADE"><font color="#000000">&nbsp;&nbsp;5195 RINK DAM RD </font></td>
+                  <td align="center" bgcolor="E6FADE"><font color="#000000">
+                      <img src="images/bill_open.gif">
+                  </font></td>
+                  <td align="center" bgcolor="E6FADE"><font color="#000000">$ 170.13</font></td>
+                  <td align="center" bgcolor="E6FADE"><div align="center"><a href="taxbill.cfm?ownerID=0202921&billNo=2218297&TaxYear=2026" onClick="NewWindow(this.href,'name','690','560','yes');return false;"><img src="images/view_taxBilla.gif" alt="View Tax Bill" name="Image12" width="69" height="15" border="0"></a></div>                  </td>
+                  <td align="center" bgcolor="E6FADE"><div align="center"><a href="transhistory.cfm?ownerID=0202921 " onClick="NewWindow(this.href,'name','690','350','yes');return false;"><img src="images/view_transhistorya.gif" alt="View Transaction History" name="Image13" width="100" height="15" border="0"></a></div>                  </td>
+                </tr>
+"""
+
+#: Same shape, a second, DIFFERENT account at the SAME searched-on address -- for the "name
+#: search is ambiguous between two people" safety test (two owners sharing a mailing/situs
+#: string is a real vendor-data-quality shape, not a contrived one: see Berkeley's own joint-
+#: owner "/ " convention above). Invented account/bill numbers, same vendor markup.
+_ROW_ALEXANDER_RHYNE_OTHER = _ROW_ALEXANDER_RHYNE.replace("0202921", "0299999").replace("2218297", "2299999")
+
+
 def _page(*rows: str, count: int) -> str:
     return (_HEADER % {"count": count}) + "".join(rows)
 
 
-def _li(parcel, county="Robeson", raw=None):
+def _li(parcel=None, county="Robeson", raw=None, owner_name=None, street_address=None):
     now = datetime.utcnow()
     return Listing(
         source="counties_nc.ustaxdata", source_url="https://x/1",
         listing_type=ListingType.TAX_LIEN, property_kind=PropertyKind.UNKNOWN,
-        county=county, state="NC", parcel_id=parcel,
+        county=county, state="NC", parcel_id=parcel, owner_name=owner_name,
+        street_address=street_address,
         first_seen=now, last_seen=now, raw=raw or {})
 
 
@@ -201,7 +237,10 @@ def test_detail_url_needs_every_piece():
     assert bill_detail_url("Robeson", None, "4166749", 2026) is None
     assert bill_detail_url("Robeson", "1004106001", None, 2026) is None
     assert bill_detail_url("Robeson", "1004106001", "4166749", None) is None
-    assert bill_detail_url("Alexander", "1004106001", "4166749", 2026) is None
+    # Not Transylvania: it's neither a parcel-id tenant (TENANTS) nor a name-search tenant
+    # (NAME_SEARCH_TENANTS) -- unlike Alexander, which is the latter since the 2026-10-16
+    # name-search fix (see test_name_search_tenants.py).
+    assert bill_detail_url("Transylvania", "1004106001", "4166749", 2026) is None
 
 
 def test_a_paid_bills_detail_reads_zero_owed_and_the_gross_levy():
@@ -257,3 +296,157 @@ def test_a_no_record_block_is_inert():
     stats = enrich_tax_owed([li])
     assert stats["stamped"] == 0
     assert "tax_owed" not in li.raw
+
+
+# ---------------------------------------------------------------------------
+# NAME_SEARCH_TENANTS (2026-10-16): Alexander/Rockingham's board parcel_id doesn't match this
+# vendor's own account numbering (REJECTED_TENANTS), but the search form's separate lastName/
+# firstName/businessName fields reach the real account by name instead -- trusted only once a
+# result's own situs address_relation()-matches the board's street_address.
+# ---------------------------------------------------------------------------
+
+async def _no_sleep(*_a, **_k) -> None:
+    return None
+
+
+def test_search_url_by_name_splits_a_person_and_keeps_a_business_whole():
+    url = search_url_by_name("Alexander", "RHYNE DENNIS W")
+    assert "lastName=RHYNE" in url and "firstName=DENNIS" in url
+    assert url.startswith(NAME_SEARCH_TENANTS["Alexander"] + "?")
+
+    url2 = search_url_by_name("Rockingham", "BMS INVESTMENT PROPERTIES LLC")
+    assert "businessName=BMS" in url2.replace("+", " ") or "businessName=BMS+INVESTMENT" in url2
+
+
+def test_search_url_by_name_is_none_without_a_usable_name_or_tenant():
+    assert search_url_by_name("Alexander", None) is None
+    assert search_url_by_name("Alexander", "") is None
+    assert search_url_by_name("Robeson", "RHYNE DENNIS") is None   # a parcel-id tenant, not this one
+
+
+def test_parse_results_reads_the_real_situs_alongside_everything_else():
+    rows = parse_results(_page(_ROW_ALEXANDER_RHYNE, count=15))
+    assert rows[0]["situs"] == "5195 RINK DAM RD"
+    assert rows[0]["account"] == "0202921" and rows[0]["status"] == "unpaid"
+
+
+def test_parse_results_situs_is_the_raw_cell_even_on_robesons_placeholder():
+    """parse_results is a dumb extractor: Robeson's "> CONTACT COUNTY FOR" at the same column
+    position (the existing, already-documented Asset-Description placeholder, not an address)
+    comes through verbatim. It's _confirm_by_address's job, via address_relation's "unknown"
+    verdict on a value with no usable house number, to never treat this as a match -- tested
+    separately below, not here."""
+    rows = parse_results(_page(_ROW_2026_PAID, count=1))
+    assert rows[0]["situs"] == "> CONTACT COUNTY FOR"
+    assert _confirm_by_address(rows, "423 Turkey Branch Rd") is None
+
+
+def test_confirm_by_address_matches_the_one_account_whose_situs_agrees():
+    bills = parse_results(_page(_ROW_ALEXANDER_RHYNE, count=1))
+    assert _confirm_by_address(bills, "5195 Rink Dam Rd") == "0202921"
+
+
+def test_confirm_by_address_refuses_to_guess_between_two_different_accounts():
+    """Two different people sharing a searched name must never be resolved by picking either
+    one -- the whole reason this function exists instead of trusting the first row."""
+    bills = parse_results(_page(_ROW_ALEXANDER_RHYNE, _ROW_ALEXANDER_RHYNE_OTHER, count=2))
+    assert len({b["account"] for b in bills}) == 2
+    assert _confirm_by_address(bills, "5195 Rink Dam Rd") is None
+
+
+def test_confirm_by_address_declines_a_street_name_with_no_house_number():
+    """address_relation() calls this "unknown", not "match" -- Rockingham's own live BMS
+    INVESTMENT row carries exactly this shape ("SPEARMAN RD", no number); the safe behavior is
+    to never confirm it automatically, not to guess."""
+    bills = [{"account": "1326686", "situs": "SPEARMAN RD"}]
+    assert _confirm_by_address(bills, "SPEARMAN RD") is None
+
+
+def test_confirm_by_address_is_none_on_no_bills_or_no_board_address():
+    assert _confirm_by_address([], "5195 Rink Dam Rd") is None
+    bills = parse_results(_page(_ROW_ALEXANDER_RHYNE, count=1))
+    assert _confirm_by_address(bills, None) is None
+
+
+def test_enrich_ustaxdata_name_search_end_to_end(monkeypatch):
+    """The real Alexander case this whole fix is for: a board row with no usable parcel_id
+    match for this vendor, found instead by name and confirmed by address, feeding the same
+    ustaxdata_delinquent_tax block shape the parcel-id path already produces."""
+    import httpx
+
+    class _Resp:
+        def __init__(self, text):
+            self.text, self.status_code = text, 200
+
+        def raise_for_status(self):
+            pass
+
+    class _FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, *a, **k):
+            if "taxbill.cfm" in url:
+                return _Resp(_DETAIL_UNPAID)
+            return _Resp(_page(_ROW_ALEXANDER_RHYNE, count=15))
+
+    import foreclosure_scraper.enrichment_ustaxdata_tax_search as mod
+    monkeypatch.setattr(mod.asyncio, "sleep", _no_sleep)
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+
+    li = _li(parcel=None, county="Alexander", owner_name="RHYNE DENNIS W",
+             street_address="5195 Rink Dam Rd")
+    stats = asyncio.run(enrich_ustaxdata([li]))
+
+    assert stats["name_search_confirmed"] == 1 and stats["name_search_unconfirmed"] == 0
+    block = li.raw["ustaxdata_delinquent_tax"]
+    assert block["bills"][0]["account"] == "0202921"
+    assert block["taxpayer_of_record"] == "RHYNE DENNIS W & / RHYNE JULI..."
+
+
+def test_enrich_ustaxdata_name_search_unconfirmed_does_not_fabricate_a_match(monkeypatch):
+    """A real result set with no address-confirmed account must stamp "unconfirmed", not
+    silently adopt the first (possibly wrong-person) row."""
+    import httpx
+
+    class _Resp:
+        def __init__(self, text):
+            self.text, self.status_code = text, 200
+
+        def raise_for_status(self):
+            pass
+
+    class _FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, *a, **k):
+            return _Resp(_page(_ROW_ALEXANDER_RHYNE, count=15))
+
+    import foreclosure_scraper.enrichment_ustaxdata_tax_search as mod
+    monkeypatch.setattr(mod.asyncio, "sleep", _no_sleep)
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+
+    li = _li(parcel=None, county="Alexander", owner_name="RHYNE DENNIS W",
+             street_address="999 Nowhere Near It Dr")
+    stats = asyncio.run(enrich_ustaxdata([li]))
+
+    assert stats["name_search_unconfirmed"] == 1 and stats["name_search_confirmed"] == 0
+    assert li.raw["ustaxdata_delinquent_tax"]["status"] == "name_search_unconfirmed"
+
+
+def test_bill_detail_url_now_resolves_for_a_name_search_tenant():
+    url = bill_detail_url("Alexander", "0202921", "2218297", 2026)
+    assert url == "https://alexander.ustaxdata.com/taxbill.cfm?ownerID=0202921&billNo=2218297&TaxYear=2026"

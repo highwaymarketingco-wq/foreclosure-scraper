@@ -39,21 +39,37 @@ years list) would never fire — tax_owed / tax_aging_surfaced / two_year_delinq
 silently stay empty even on a genuinely delinquent parcel. Confirmed by writing the test for
 it first (tests/test_ustaxdata_tax_search.py) and watching it fail without this.
 
-ALEXANDER AND ROCKINGHAM ARE THE SAME VENDOR, NOT WIRED: the board's own parcel_id search
-returns "0 Records" for both (confirmed live, not a fetch error — the page renders a normal
-0-match results page). A name/business-name search on a real board row for each county found
-the vendor's REAL key: Alexander account.cfm?parcelID=0002451 (board parcel_id 3736984870 for
-the same row), Rockingham parcelID=152358 (board parcel_id 792800687243). Neither resembles the
-board's GIS-style parcel_id — the same "ID FORMAT VARIES PER COUNTY" trap enrichment_bt_
-appraisal_card.py hit on Moore/Anson/Caswell/Duplin/Person/Scotland/Warren/Yadkin. There is no
-parcel_id -> county-account crosswalk in this project to translate one into the other, so
-wiring them would silently query the wrong (or no) account on every row. See REJECTED_TENANTS;
-don't re-add either without building that crosswalk first. The other 10 counties from the
-gap-list cluster were never probed at all (unknown whether they share this vendor or this ID
-mismatch) and are not claimed here either.
+ALEXANDER AND ROCKINGHAM ARE THE SAME VENDOR, PARCEL SEARCH REJECTED, NAME SEARCH WIRED
+INSTEAD (2026-10-16). The board's own parcel_id search returns "0 Records" for both (confirmed
+live, not a fetch error — the page renders a normal 0-match results page): Alexander
+account.cfm?parcelID=0002451 (board parcel_id 3736984870 for the same row), Rockingham
+parcelID=152358 (board parcel_id 792800687243). Neither resembles the board's GIS-style
+parcel_id — the same "ID FORMAT VARIES PER COUNTY" trap enrichment_bt_appraisal_card.py hit on
+Moore/Anson/Caswell/Duplin/Person/Scotland/Warren/Yadkin — and there is still no parcel_id ->
+county-account crosswalk in this project to translate one into the other (see REJECTED_TENANTS).
+But the vendor's OWN search form sidesteps needing one: it has separate lastName/firstName/
+businessName fields (search_url_by_name), not BT TaxPayer Portal's single fuzzy OwnerName text
+box, so a real board owner_name finds the right account directly -- confirmed live for both
+counties (Alexander lastName=RHYNE&firstName=DENNIS, Rockingham businessName=Bms investment).
+The risk this reintroduces -- a common name returning someone ELSE's account -- is closed by
+`_confirm_by_address`: the row's own `situs` column (cells[5], read for the first time; Robeson
+publishes a placeholder there, "> CONTACT COUNTY FOR", which address_relation() correctly never
+matches, so the parcel-id path is unaffected) must address_relation()-"match" the board's
+street_address, or nothing is stamped — the same name, spelled exactly right, is never enough
+on its own (NAME_SEARCH_TENANTS docstring). The other 10 counties from the gap-list cluster
+were never probed at all (unknown whether they share this vendor or this ID mismatch) and are
+not claimed here either.
 
-Free, public, no login, no CAPTCHA. One request per parcel, so it is bounded and opt-in.
-Gate off with FORECLOSURE_USTAXDATA=0.
+Note for whoever next reads the gap list: this unlocks multi_year_delinquent_tax /
+repeat_tax_loss / tax_aging_surfaced / atty_tax_verified_confirmed / lt_tax_sale_overage for
+Alexander and Rockingham -- the delinquent-tax-history columns this vendor actually has data
+for. It does NOT touch rollback_exposure: this vendor has no present-use/land-use-deferral
+field at all (checked; the multi-year table is paid/unpaid status only), and the gap list's
+listing of rollback_exposure against ustaxdata.com tenants is itself imprecise, the same way
+it is against bttaxpayerportal.com tenants (enrichment_bt_parcel_info.py's own docstring).
+
+Free, public, no login, no CAPTCHA. One request per parcel (or per confirmed name-search hit),
+so it is bounded and opt-in. Gate off with FORECLOSURE_USTAXDATA=0.
 """
 from __future__ import annotations
 
@@ -68,6 +84,8 @@ import httpx
 import structlog
 
 from .models import Listing
+from .name_normalize import is_entity, owner_last_first_middle
+from .verification.core import address_relation
 
 log = structlog.get_logger()
 
@@ -83,8 +101,10 @@ TENANTS: dict[str, str] = {
     "Robeson": "https://www.ustaxdata.com/nc/robeson/Robesontaxlist.cfm",
 }
 
-#: Same vendor, probed and REJECTED — kept so nobody re-adds them without a parcel_id ->
-#: county-account crosswalk (module docstring).
+#: Same vendor, parcel-id search REJECTED (board parcel_id doesn't match this vendor's own
+#: account numbering, confirmed live: both are real, live "0 Records" searches, not a fetch
+#: error) -- kept so nobody re-tries a parcelNum search without reading NAME_SEARCH_TENANTS
+#: below first.
 REJECTED_TENANTS = {
     "Alexander": "alexander.ustaxdata.com — board parcel_id 3736984870 is 0 Records; the "
                  "real account (found via lastName=RHYNE&firstName=DENNIS) is parcelID="
@@ -94,7 +114,23 @@ REJECTED_TENANTS = {
                   "152358 / account 1326686, unrelated to the board's id",
 }
 
+#: Same two counties, reached by OWNER NAME instead of the parcel id REJECTED_TENANTS gives up
+#: on. The search form has separate lastName/firstName/businessName fields (no fuzzy single-
+#: text-field over-match risk the way BT TaxPayer Portal's OwnerName has), so a name search
+#: here is exact-token, not a substring scan. Verified live 2026-10-16: Alexander lastName=
+#: RHYNE&firstName=DENNIS and Rockingham businessName=Bms investment both return the real,
+#: previously-unreachable account. A hit is trusted only when exactly one distinct account
+#: among the results carries a situs address (parse_results' new `situs` field, never read
+#: before this -- cells[5], confirmed live by inspecting the raw row) that address_relation()
+#: calls "match" against the board's own street_address -- the same name, even spelled exactly
+#: right, is not enough on its own (two different people can share one; see _confirm_by_address).
+NAME_SEARCH_TENANTS: dict[str, str] = {
+    "Alexander": "https://alexander.ustaxdata.com/taxlist.cfm",
+    "Rockingham": "https://www.ustaxdata.com/nc/rockingham/Rockinghamtaxlist.cfm",
+}
+
 _TENANTS_CI = {k.lower(): v for k, v in TENANTS.items()}
+_NAME_SEARCH_TENANTS_CI = {k.lower(): v for k, v in NAME_SEARCH_TENANTS.items()}
 
 MAX_PARCELS = int(os.getenv("USTAXDATA_MAX_PARCELS", "300"))
 _CONCURRENCY = int(os.getenv("USTAXDATA_CONCURRENCY", "3"))
@@ -130,6 +166,31 @@ def search_url(county: Optional[str], parcel_id: Optional[str]) -> Optional[str]
     return f"{base}?{urlencode(params)}"
 
 
+def search_url_by_name(county: Optional[str], owner_name: Optional[str]) -> Optional[str]:
+    """The same search form, filled by owner name instead of parcel id — only for a county in
+    NAME_SEARCH_TENANTS (module docstring on why Alexander/Rockingham need this instead of
+    `search_url`). An entity name goes in businessName whole; a person's name is split via
+    owner_last_first_middle into the form's separate lastName/firstName fields (exact-token
+    fields, not a fuzzy single-text search, so no formatting trick is needed here the way BT
+    TaxPayer Portal's single OwnerName field needs "SURNAME FIRST"). None when the county isn't
+    one of these two tenants or there's no usable name."""
+    base = _NAME_SEARCH_TENANTS_CI.get(_county_key(county))
+    name = (owner_name or "").strip()
+    if not base or not name:
+        return None
+    params = {"parcelNum": "", "lastName": "", "firstName": "", "businessName": "",
+              "streetNumber": "", "StreetName": "", "accountNum": "", "billNum": "",
+              "Submit": "Next"}
+    if is_entity(name):
+        params["businessName"] = name
+    else:
+        parts = owner_last_first_middle(name)
+        if not parts:
+            return None
+        params["lastName"], params["firstName"] = parts[0], parts[1]
+    return f"{base}?{urlencode(params)}"
+
+
 def _cells(row_chunk: str) -> list[str]:
     """One row's <td>...</td> contents, in column order: split on <td ...> tag starts (the
     leading piece before the first <td is the row's own open tag, dropped)."""
@@ -148,9 +209,15 @@ def _money(s: Optional[str]) -> Optional[float]:
 
 
 def parse_results(html: str) -> list[dict]:
-    """One dict per tax-year bill row (year, account, bill_no, owner_name, status,
+    """One dict per tax-year bill row (year, account, bill_no, owner_name, situs, status,
     taxable_value), page order (newest first, as the vendor lists it). [] on a 0-match search
-    or any page that isn't a results table — never raises on unexpected markup."""
+    or any page that isn't a results table — never raises on unexpected markup.
+
+    `situs` (cells[5], the row's own property address) was never read before 2026-10-16 — the
+    parcel-id search path doesn't need it (the id already identifies the parcel), but a NAME
+    search (search_url_by_name) has no parcel id to trust yet, only a name, and a name alone
+    is never enough to confirm which of possibly several same-named people's accounts this
+    board row's parcel actually is (see _confirm_by_address)."""
     if not html or "Records" not in html or _ZERO_RECORDS_RE.search(html):
         return []
     out: list[dict] = []
@@ -165,6 +232,7 @@ def parse_results(html: str) -> list[dict]:
         acct_m = _ACCOUNT_RE.search(cells[2])
         bill_m = _CELL_TEXT_RE.search(cells[3])
         owner_m = _CELL_TEXT_RE.search(cells[4])
+        situs_m = _CELL_TEXT_RE.search(cells[5])
         status_m = _IMG_RE.search(cells[6])
         value_m = _CELL_TEXT_RE.search(cells[7])
         out.append({
@@ -173,17 +241,35 @@ def parse_results(html: str) -> list[dict]:
             "account": acct_m.group(1).strip() if acct_m else None,
             "bill_no": bill_m.group(1).strip() if bill_m else None,
             "owner_name": re.sub(r"\s+", " ", owner_m.group(1)).strip() if owner_m else None,
+            "situs": re.sub(r"\s+", " ", situs_m.group(1).replace("&nbsp;", " ")).strip() or None
+                     if situs_m else None,
             "status": _STATUS_MAP.get(status_m.group(1), "unknown") if status_m else "unknown",
             "taxable_value": _money(value_m.group(1) if value_m else None),
         })
     return out
 
 
+def _confirm_by_address(bills: list[dict], street_address: Optional[str]) -> Optional[str]:
+    """The one account among `bills` (a search-by-name result set, possibly several different
+    people) whose own situs address_relation()-matches the board's street_address, or None when
+    zero or more than one distinct account qualifies. Deliberately fail-closed: a name search
+    can return several different people sharing a searched name (see NAME_SEARCH_TENANTS), and
+    this project's own policy is to never guess between them (name_normalize's module
+    docstring: "errs toward committing nothing")."""
+    if not street_address:
+        return None
+    confirmed = {b["account"] for b in bills
+                 if b.get("account") and b.get("situs")
+                 and address_relation(b["situs"], street_address) == "match"}
+    return next(iter(confirmed)) if len(confirmed) == 1 else None
+
+
 def bill_detail_url(county: Optional[str], account: Optional[str], bill_no: Optional[str],
                     year: Optional[int]) -> Optional[str]:
     """The "View Tax Bill" page for one year's bill — the only place this vendor states a real
     dollar amount (module docstring). None when any piece is missing."""
-    base = _TENANTS_CI.get(_county_key(county))
+    key = _county_key(county)
+    base = _TENANTS_CI.get(key) or _NAME_SEARCH_TENANTS_CI.get(key)
     if not base or not account or not bill_no or not year:
         return None
     detail_base = _DETAIL_PATH.sub("/taxbill.cfm", base)
@@ -208,22 +294,33 @@ def parse_bill_detail(html: str) -> dict:
     return out
 
 
+def _name_search_eligible(li: Listing) -> bool:
+    return bool(li.owner_name and li.street_address
+                and _county_key(li.county) in _NAME_SEARCH_TENANTS_CI)
+
+
 async def enrich_ustaxdata(listings: Iterable[Listing]) -> dict:
     """Multi-year paid/unpaid tax-bill history for Robeson County NC parcels, fetched by the
-    board's own parcel_id. Writes raw['ustaxdata_delinquent_tax'] = {bills, years_unpaid,
-    balance, taxpayer_of_record, assessed_value, source_url}. Every unpaid/partial bill gets a
-    second fetch (bill_detail_url) for its real dollar amount — see the module docstring for why
-    that hop is not optional. No separate wiring needed in enrichment_tax_owed.py beyond the
-    _LIVE_ROLL_BLOCKS entry: Pass B there picks up any tax-ish-named raw block with a `balance`
-    (the generic scan) the same way qpaybill_roll's blocks are, and tax_binding.py's _TAXISH
-    keyword match recognizes the block name the same way.
+    board's own parcel_id -- or, for Alexander/Rockingham (NAME_SEARCH_TENANTS), by owner name
+    with the match confirmed against the board's street_address before anything is trusted.
+    Writes raw['ustaxdata_delinquent_tax'] = {bills, years_unpaid, balance, taxpayer_of_record,
+    assessed_value, source_url}. Every unpaid/partial bill gets a second fetch (bill_detail_url)
+    for its real dollar amount — see the module docstring for why that hop is not optional. No
+    separate wiring needed in enrichment_tax_owed.py beyond the _LIVE_ROLL_BLOCKS entry: Pass B
+    there picks up any tax-ish-named raw block with a `balance` (the generic scan) the same way
+    qpaybill_roll's blocks are, and tax_binding.py's _TAXISH keyword match recognizes the block
+    name the same way.
     """
+    def _already_done(li: Listing) -> bool:
+        return isinstance(li.raw, dict) and isinstance(li.raw.get("ustaxdata_delinquent_tax"), dict)
+
     targets = [li for li in listings
-               if li.parcel_id and search_url(li.county, li.parcel_id)
-               and not (isinstance(li.raw, dict) and isinstance(li.raw.get("ustaxdata_delinquent_tax"), dict))]
+               if not _already_done(li)
+               and ((li.parcel_id and search_url(li.county, li.parcel_id)) or _name_search_eligible(li))]
     stats = {"eligible": len(targets), "fetched": 0, "parsed": 0, "errors": 0,
              "no_record": 0, "multi_year_delinquent": 0, "filled_value": 0,
-             "bills_detail_fetched": 0, "bills_detail_errors": 0}
+             "bills_detail_fetched": 0, "bills_detail_errors": 0,
+             "name_search_tried": 0, "name_search_confirmed": 0, "name_search_unconfirmed": 0}
     if not targets:
         return stats
     targets = targets[:MAX_PARCELS]
@@ -251,7 +348,13 @@ async def enrich_ustaxdata(listings: Iterable[Listing]) -> dict:
             stats["bills_detail_fetched"] += 1
 
         async def one(li: Listing) -> None:
-            url = search_url(li.county, li.parcel_id)
+            pid_url = search_url(li.county, li.parcel_id)
+            by_name = not pid_url
+            url = pid_url or search_url_by_name(li.county, li.owner_name)
+            if not url:
+                return
+            if by_name:
+                stats["name_search_tried"] += 1
             async with sem:
                 try:
                     r = await c.get(url)
@@ -265,6 +368,20 @@ async def enrich_ustaxdata(listings: Iterable[Listing]) -> dict:
             if not isinstance(li.raw, dict):
                 li.raw = {}
             checked_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            if by_name and bills:
+                # Several different people can share a searched name (module docstring on
+                # NAME_SEARCH_TENANTS) -- only the one account whose own situs confirms this
+                # board row's street_address is trusted; everyone else in the result set is
+                # discarded here, never guessed between.
+                account = _confirm_by_address(bills, li.street_address)
+                if account is None:
+                    stats["name_search_unconfirmed"] += 1
+                    li.raw["ustaxdata_delinquent_tax"] = {
+                        "status": "name_search_unconfirmed", "source_url": url,
+                        "checked_at": checked_at}
+                    return
+                stats["name_search_confirmed"] += 1
+                bills = [b for b in bills if b.get("account") == account]
             if not bills:
                 stats["no_record"] += 1
                 li.raw["ustaxdata_delinquent_tax"] = {
