@@ -88,6 +88,7 @@ NETWORK_STUBS: dict[tuple[str, str], str] = {
     ("enrichment_court_bid", "enrich_court_bid"): "skip",
     ("enrichment_fhfa_value", "enrich_fhfa_value"): "skip",
     ("enrichment_dew_liens", "enrich_dew_liens"): "skip",
+    ("enrichment_ustaxdata_tax_search", "enrich_ustaxdata"): "skip",  # Robeson NC tax-bill history
     ("enrichment_assessor_card", "enrich_assessor_card"): "sync_skip",
     ("obituary_lookup", "enrich_obituary_lookups"): "skip",
     ("enrichment_burke_history", "enrich_burke_parcel_history"): "none",
