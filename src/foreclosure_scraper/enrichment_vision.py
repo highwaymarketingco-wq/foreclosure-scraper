@@ -35,6 +35,7 @@ import httpx
 import structlog
 from pathlib import Path
 
+from .http_client import get_bytes_impersonate
 from .models import Listing
 
 log = structlog.get_logger()
@@ -392,6 +393,22 @@ async def _fetch_image_bytes(c: httpx.AsyncClient, url: str) -> Optional[tuple[b
                 return None
             url = _PAGES_BASE.rstrip("/") + "/" + url.lstrip("/")
         r = await c.get(url, timeout=15.0, follow_redirects=True)
+        if r.status_code in (401, 403, 406, 409, 429):
+            # Some image CDNs sit behind the same WAF as their parent HTML page,
+            # even when the scraper that captured this URL already escalated to
+            # curl_cffi impersonation to fetch the page itself. Confirmed live
+            # 2026-10-16: assets.landwatch.com (Land.com network) 403s plain
+            # httpx with AkamaiGHost -- the exact block landwatch.py's own
+            # module docstring already documents for the site -- while the
+            # curl_cffi-impersonated detail-page fetch that sourced this same
+            # URL succeeds. Accounted for 605/1394 (43%) of the vision ledger's
+            # fetch_failed rows (landwatch + landandfarm, both Land.com-network,
+            # both Akamai) before this fix.
+            try:
+                data = await get_bytes_impersonate(url, timeout=15.0)
+            except Exception:
+                return None
+            return _sniff_and_normalize_image(data)
         if r.status_code != 200:
             return None
         media_type = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
@@ -417,6 +434,32 @@ async def _fetch_image_bytes(c: httpx.AsyncClient, url: str) -> Optional[tuple[b
             except Exception:
                 pass  # unreadable here — leave as-is; a backend that can read it still will
         return data, media_type
+    except Exception:
+        return None
+
+
+def _sniff_and_normalize_image(data: bytes) -> Optional[tuple[bytes, str]]:
+    """Identify an image fetched via impersonation (no content-type header available)
+    from its actual bytes, and normalize to JPEG/PNG like the plain-httpx path does.
+    None when the bytes don't decode as an image at all (e.g. an HTML error-page body)."""
+    data = data[:3 * 1024 * 1024]
+    try:
+        import io as _io
+        from PIL import Image as _Image
+        fmt = (_Image.open(_io.BytesIO(data)).format or "").upper()
+    except Exception:
+        return None
+    if fmt == "JPEG":
+        return data, "image/jpeg"
+    if fmt == "PNG":
+        return data, "image/png"
+    try:
+        import io as _io
+        from PIL import Image as _Image
+        im = _Image.open(_io.BytesIO(data)).convert("RGB")
+        out = _io.BytesIO()
+        im.save(out, "JPEG", quality=85)
+        return out.getvalue(), "image/jpeg"
     except Exception:
         return None
 
