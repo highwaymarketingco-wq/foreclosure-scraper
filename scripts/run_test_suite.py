@@ -36,6 +36,19 @@ OUT = REPO / "data" / "test_results" / "latest.json"
 _SUMMARY = re.compile(r"(\d+) (passed|failed|errors?|skipped|xfailed|xpassed|deselected|warnings?)")
 _FAILED_LINE = re.compile(r"^(FAILED|ERROR) (\S+)")
 
+#: Files whose own tests are sensitive to ambient OS scheduling pressure from PRECEDING chunks,
+#: not to any correctness bug of their own (2026-10-17, test_sigint_kills_a_hung_sync_census_call
+#: _within_a_few_seconds flaked 3x on the VM's full 6-chunk run at margins 5s/15s/30s -- never
+#: standalone, never even when its own ~155-file chunk ran alone, 2,248/2,248 passed -- only after
+#: ~300 preceding files' worth of cumulative memory/cache pressure from EARLIER chunks each its
+#: own subprocess with no shared Python state to "pollute"). Raising the margin again just kicks
+#: the can; these run alone, first, in their own single-file chunk instead, so no chunk before
+#: them can build up the pressure that made their own margin unreliable. Normal round-robin
+#: chunking is otherwise untouched -- same total files, same total coverage.
+ISOLATE_ALONE: frozenset[str] = frozenset({
+    "tests/test_geocode_backfill_hard_timeout.py",
+})
+
 
 def parse_summary(text: str) -> dict:
     """Counts from pytest's last summary line(s); FAILED/ERROR node ids from the short summary."""
@@ -51,8 +64,14 @@ def parse_summary(text: str) -> dict:
 
 
 def chunked(files: list[str], n: int) -> list[list[str]]:
-    n = max(1, min(n, len(files) or 1))
-    return [files[i::n] for i in range(n)]
+    """Round-robin chunks, with ISOLATE_ALONE files pulled out into their own single-file chunk
+    each, placed FIRST -- so nothing runs ahead of them to build up the cumulative pressure that
+    makes their own margin-sensitive assertions flaky. Every other file still lands in a normal
+    round-robin chunk exactly as before; total coverage is unchanged."""
+    isolated = [f for f in files if f in ISOLATE_ALONE]
+    rest = [f for f in files if f not in ISOLATE_ALONE]
+    n = max(1, min(n, len(rest) or 1))
+    return [[f] for f in isolated] + [rest[i::n] for i in range(n)]
 
 
 def _git(*args) -> str:
