@@ -34,7 +34,7 @@ li.legal_description is NOT touched (enrichment flags read it as notice text).
 
 POLITENESS: at least MIN_GAP_S (2 s) between two requests to one host, one at a time per host (a host
 lock), the ordinary browser headers the register adapters send, POST with form fields (the id lists
-are long), 40 parcels per request, a wall-clock budget (FORECLOSURE_GIS_FILL_BUDGET_S, default 2400),
+are long), 40 parcels per request, a wall-clock budget (FORECLOSURE_GIS_FILL_BUDGET_S, default 3600),
 counties served round-robin so a short budget thins every county instead of starving the last ones.
 A layer that answers an error object (token required, 4xx/5xx) twice is closed for the run and listed
 in the stats; nothing retries or works around it.
@@ -920,7 +920,7 @@ async def enrich_gis_fill(listings: list, budget_s: Optional[float] = None) -> d
         return {**stats, "skipped": f"{_ENV_FLAG}=0"}
     if budget_s is None:
         try:
-            budget_s = float(os.environ.get(_ENV_BUDGET, "2400"))
+            budget_s = float(os.environ.get(_ENV_BUDGET, "3600"))
         except ValueError:
             budget_s = 2400.0
     t0 = clock()

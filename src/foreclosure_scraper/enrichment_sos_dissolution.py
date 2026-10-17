@@ -36,7 +36,7 @@ log = structlog.get_logger()
 # an overall wall-clock budget, and a consecutive-failure breaker that bails the
 # whole step the moment SOS starts blocking. All env-tunable; 0 disables a guard.
 _SOS_CALL_TIMEOUT_S = float(os.environ.get("SOS_CALL_TIMEOUT_S", "75"))
-_SOS_MAX_SECONDS = float(os.environ.get("SOS_MAX_SECONDS", "240"))
+_SOS_MAX_SECONDS = float(os.environ.get("SOS_MAX_SECONDS", "900"))
 _SOS_BREAKER_FAILS = int(os.environ.get("SOS_BREAKER_FAILS", "5"))
 
 

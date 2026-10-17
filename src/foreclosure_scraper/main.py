@@ -1762,7 +1762,7 @@ async def run() -> int:
     # holds every partial fill — set enriched=valid and press on. The parcel-cache fast path
     # (above, in enrich) skips the network for cached-county leads, so this budget is ample.
     _gis_budget_s = float(os.environ.get("GIS_PHASE_MAX_SECONDS",
-                                         os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+                                         os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
     try:
         await asyncio.wait_for(enrich_gis(valid), timeout=_gis_budget_s)
         enriched = valid
@@ -1875,7 +1875,7 @@ async def run() -> int:
     # lat/lng is maximally populated) and BEFORE parcel_lookup / owner_mailing /
     # assessor_card (which all consume parcel_id). Writes only li.parcel_id +
     # raw.parcel_from_geo provenance; free, pure-HTTP, idempotent.
-    _resolver_budget_s = float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400"))
+    _resolver_budget_s = float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000"))
     try:
         from .enrichment_parcel_from_geo import enrich_parcel_from_geo
         await asyncio.wait_for(enrich_parcel_from_geo(enriched), timeout=_resolver_budget_s)
@@ -1919,7 +1919,7 @@ async def run() -> int:
         from .enrichment_address_backfill import enrich_addresses_from_owner
         await asyncio.wait_for(
             enrich_addresses_from_owner(enriched),
-            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
     except asyncio.TimeoutError:
         log.warning("address_backfill.time_capped",
                     note="proceeding; unenriched leads keep prior fields")
@@ -1947,10 +1947,10 @@ async def run() -> int:
         # ~2h uncapped on the 2026-08-14 run (per-lead live GIS). wait_for bounds it; partial
         # work persists in-place and converges over runs.
         await asyncio.wait_for(enrich_with_parcel_lookup(enriched),
-                               timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+                               timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
     except asyncio.TimeoutError:
         log.warning("parcel_lookup.time_capped",
-                    budget_s=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+                    budget_s=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
     except Exception:
         log.error("parcel_lookup.failed", traceback=traceback.format_exc())
 
@@ -1965,7 +1965,7 @@ async def run() -> int:
         from .enrichment_gis_attrs import enrich_gis_attrs
         await asyncio.wait_for(
             enrich_gis_attrs(enriched),
-            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
     except asyncio.TimeoutError:
         log.warning("gis_attrs.time_capped",
                     note="proceeding; unenriched leads keep prior fields")
@@ -1987,7 +1987,7 @@ async def run() -> int:
         from .enrichment_richland_parcel import enrich_richland_parcel
         s = await asyncio.wait_for(
             enrich_richland_parcel(enriched),
-            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
         if s:
             enrichment_stats["richland_parcel"] = s
     except asyncio.TimeoutError:
@@ -2001,7 +2001,7 @@ async def run() -> int:
         from .enrichment_cama_condition import enrich_cama_condition
         s = await asyncio.wait_for(
             enrich_cama_condition(enriched),
-            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
         if s:
             enrichment_stats["cama_condition"] = s
     except asyncio.TimeoutError:
@@ -2029,7 +2029,7 @@ async def run() -> int:
         from .enrichment_situs_address import enrich_situs_address
         await asyncio.wait_for(
             enrich_situs_address(enriched),
-            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
     except asyncio.TimeoutError:
         log.warning("situs_address.time_capped",
                     note="proceeding; unenriched leads keep prior fields")
@@ -2266,7 +2266,7 @@ async def run() -> int:
         try:
             om = await asyncio.wait_for(
                 enrich_owner_mailing(enriched),
-                timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+                timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
             enrichment_stats["owner_mailing"] = om
             checkpoint.save(enriched, "owner_mailing")
         except asyncio.TimeoutError:
@@ -2426,7 +2426,7 @@ async def run() -> int:
         from .enrichment_recorded_comps import enrich as enrich_recorded_comps
         await asyncio.wait_for(
             enrich_recorded_comps(enriched),
-            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "2400")))
+            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "3600")))
     except asyncio.TimeoutError:
         log.warning("recorded_comps.time_capped",
                     note="proceeding; uncomped leads keep prior comps")
@@ -2451,7 +2451,7 @@ async def run() -> int:
         from .enrichment_comps import enrich_with_comps
         await asyncio.wait_for(
             enrich_with_comps(enriched),
-            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "2400")))
+            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "3600")))
     except asyncio.TimeoutError:
         log.warning("comps.time_capped", note="proceeding; uncomped leads keep prior comps")
     except Exception:
@@ -2475,7 +2475,7 @@ async def run() -> int:
         from .enrichment_recorded_sales import enrich as enrich_recorded_sales
         await asyncio.wait_for(
             enrich_recorded_sales(enriched),
-            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "2400")))
+            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "3600")))
     except asyncio.TimeoutError:
         log.warning("recorded_sales.time_capped",
                     note="proceeding; uncomped leads keep prior comps")

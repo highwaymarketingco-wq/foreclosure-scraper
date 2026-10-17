@@ -145,7 +145,7 @@ vm_load_env() {
   # host, round-robin over counties inside the budget (gis_fill.py). Needs the main.py wiring line in
   # docs/audit_2026-10-09/top80_fill.md.
   export FORECLOSURE_GIS_FILL="${FORECLOSURE_GIS_FILL:-1}"
-  export FORECLOSURE_GIS_FILL_BUDGET_S="${FORECLOSURE_GIS_FILL_BUDGET_S:-2400}"
+  export FORECLOSURE_GIS_FILL_BUDGET_S="${FORECLOSURE_GIS_FILL_BUDGET_S:-3600}"
   export OBITUARY_LOOKUPS="${OBITUARY_LOOKUPS:-0}"
   export FORECLOSURE_MECKLENBURG_DELINQUENT="${FORECLOSURE_MECKLENBURG_DELINQUENT:-0}"
   # Richland map-viewer reader: about 4 s a row on one host; 500 fits the 2,400 s resolver cap (the 10/8

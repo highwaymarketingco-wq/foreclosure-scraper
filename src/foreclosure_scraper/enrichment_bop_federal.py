@@ -269,7 +269,7 @@ async def enrich_bop_federal(listings: list[Listing], max_queries: Optional[int]
                              recheck_days: Optional[float] = None) -> dict:
     """Flag listings whose owner matches the federal BOP inmate locator.
 
-    max_queries    total lookups this run (env BOP_MAX_QUERIES, default 150)
+    max_queries    total lookups this run (env BOP_MAX_QUERIES, default 400)
     recheck_days   how long an answered miss stays fresh (env BOP_RECHECK_DAYS,
                    default 30)
 
@@ -280,7 +280,7 @@ async def enrich_bop_federal(listings: list[Listing], max_queries: Optional[int]
     _owner_still_supports_match for the real example that found this.
     """
     if max_queries is None:
-        max_queries = int(os.environ.get("BOP_MAX_QUERIES", "150"))
+        max_queries = int(os.environ.get("BOP_MAX_QUERIES", "400"))
     window = _recheck_days() if recheck_days is None else float(recheck_days)
     now = datetime.now(timezone.utc)
 
