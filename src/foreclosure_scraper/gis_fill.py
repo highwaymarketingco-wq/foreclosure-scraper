@@ -9,7 +9,10 @@ SOURCES (all free, open ArcGIS REST, no key, no login, no CAPTCHA; field names r
 own field list and a live sample 2026-10-09):
   NC   every county   NC OneMap statewide parcels (NC1Map_Parcels/FeatureServer/1): sourceref (the
                       assessor's deed 'Book/Page'), sourcedatx / saledatetx, legdecfull (the
-                      assessor's SHORT legal), parval, gisacres. One service for all 100 counties.
+                      assessor's SHORT legal), parval, gisacres, siteadd (the situs address, added
+                      2026-10-16 — the same statewide request already made for every NC row, now
+                      also asked for the one field that backfills li.street_address). One service
+                      for all 100 counties.
   SC   SC_FILL below  the county's own layer (the same endpoints parcel_cache.PARCEL_LAYERS uses, plus
                       the ones the 10/9 source hunt found open). A county with no open layer, a
                       token-walled layer or a layer without the field is NOT guessed at: it is
@@ -24,6 +27,9 @@ WHAT IT WRITES (missing-only; a value already on the row is never overwritten):
                           'found', 'none' (the county record has it blank for this parcel: a per-row
                           'screened, none found' verdict the cube counts) or 'skip' (not asked).
   li.assessed_value / li.market_value / li.acreage  when empty and the layer carries a plausible one.
+  li.street_address  (NC only, 2026-10-16)  when empty and the layer carries siteadd — a plain fill,
+                     not a VERDICT_COLUMNS entry: a miss just leaves the row unfilled, no negative
+                     wrapper (the "address" cube column has no 'screened, none found' concept).
 li.legal_description is NOT touched (enrichment flags read it as notice text).
 
 POLITENESS: at least MIN_GAP_S (2 s) between two requests to one host, one at a time per host (a host
@@ -51,7 +57,7 @@ import structlog
 log = structlog.get_logger()
 
 NC_URL = "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1/query"
-NC_FIELDS = "parno,altparno,cntyname,sourceref,sourcedatx,saledatetx,legdecfull,parval,gisacres"
+NC_FIELDS = "parno,altparno,cntyname,sourceref,sourcedatx,saledatetx,legdecfull,parval,gisacres,siteadd"
 #: parcels per request (id lists go in a POST body)
 BATCH = 40
 #: at least this many seconds between two requests to one host
@@ -389,7 +395,18 @@ def parse_nc_attrs(a: dict) -> dict:
     date = iso_date(a.get("sourcedatx")) or iso_date(a.get("saledatetx"))
     deed = {"book": ref[0], "page": ref[1], "date": date} if ref else None
     return {"deed": deed, "legal": legal, "market": plausible_value(num(a.get("parval"))),
-            "assessed": None, "acres": plausible_acres(num(a.get("gisacres")))}
+            "assessed": None, "acres": plausible_acres(num(a.get("gisacres"))),
+            "address": plausible_address(a.get("siteadd"))}
+
+
+def plausible_address(raw: Any) -> Optional[str]:
+    """A usable street address from a GIS situs field, or None (pure). Mirrors
+    enrichment_gis_attrs.py's existing street_address backfill filter: strip, collapse
+    whitespace, skip PO boxes and noise too short to be a real street address."""
+    s = re.sub(r"\s+", " ", str(raw or "").strip())
+    if not s or len(s) < 5 or s.upper().startswith("P.O."):
+        return None
+    return s
 
 
 def parse_sc_attrs(spec: dict, a: dict) -> dict:
@@ -711,7 +728,7 @@ def needs(li: Any, now: datetime) -> bool:
 def apply_one(li: Any, matched: Optional[dict], source: str, county: str, now_iso: str, want: dict) -> dict:
     """Write the fill into one Listing (missing-only) and its raw['gis_fill'] screen; returns counters."""
     raw = dict(_raw(li))
-    c = {"deed": 0, "legal": 0, "value": 0, "acres": 0}
+    c = {"deed": 0, "legal": 0, "value": 0, "acres": 0, "address": 0}
     pin = str(getattr(li, "parcel_id", "") or "")
     if matched:
         d = matched.get("deed")
@@ -732,6 +749,9 @@ def apply_one(li: Any, matched: Optional[dict], source: str, county: str, now_is
         if matched.get("acres") and not (getattr(li, "acreage", None) or getattr(li, "lot_size_sqft", None)):
             li.acreage = matched["acres"]
             c["acres"] = 1
+        if matched.get("address") and not (getattr(li, "street_address", "") or "").strip():
+            li.street_address = matched["address"]
+            c["address"] = 1
     raw["gis_fill"] = build_block(str(getattr(li, "state", "")), county, pin, matched, source, now_iso, want)
     li.raw = raw
     return c
@@ -894,7 +914,7 @@ async def enrich_gis_fill(listings: list, budget_s: Optional[float] = None) -> d
     (found: false) only after every pass that applies has run, so a budget that ends early never turns an
     unasked row into a 'not in layer' verdict."""
     stats: dict = {"candidates": 0, "screened": 0, "not_in_layer": 0, "deed": 0, "legal": 0, "value": 0,
-                   "acres": 0, "none_deed": 0, "none_legal": 0, "requests": 0, "budget_hit": False,
+                   "acres": 0, "address": 0, "none_deed": 0, "none_legal": 0, "requests": 0, "budget_hit": False,
                    "parcel_from_account": 0, "found_by_like": 0, "closed_layers": {}}
     if not enabled():
         return {**stats, "skipped": f"{_ENV_FLAG}=0"}
@@ -924,7 +944,7 @@ async def enrich_gis_fill(listings: list, budget_s: Optional[float] = None) -> d
                     stats["none_deed"] += 1
                 if want["legal"] and not m.get("legal"):
                     stats["none_legal"] += 1
-            for k2 in ("deed", "legal", "value", "acres"):
+            for k2 in ("deed", "legal", "value", "acres", "address"):
                 stats[k2] += c[k2]
 
     def out_of_time() -> bool:

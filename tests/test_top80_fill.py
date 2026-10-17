@@ -115,14 +115,24 @@ def test_legal_text_drops_placeholders_and_joins_fields():
 
 def test_parse_nc_attrs_reads_deed_legal_value_and_caldwell_style():
     a = {"sourceref": "Deed Book/Page 003911/0033", "sourcedatx": "03/04/2019", "legdecfull": "LT 6B TEST ACRES",
-         "parval": 180000, "gisacres": 0.5}
+         "parval": 180000, "gisacres": 0.5, "siteadd": "123 MAIN ST"}
     out = G.parse_nc_attrs(a)
     assert out["deed"] == {"book": "3911", "page": "33", "date": "2019-03-04"}
     assert out["legal"] == "LT 6B TEST ACRES" and out["market"] == 180000 and out["acres"] == 0.5
+    assert out["address"] == "123 MAIN ST"
     cald = G.parse_nc_attrs({"sourceref": "", "legdecfull": "BK 1111 PG 2222 YR 22 ST 100.00"})
     assert cald["deed"]["book"] == "1111" and cald["deed"]["page"] == "2222"
     assert cald["legal"] is None               # the deed reference is never shown as a legal description
+    assert cald["address"] is None             # no siteadd field on this fixture
     assert G.parse_nc_attrs({"sourceref": "Plat Book/Page 1/2"})["deed"] is None
+
+
+def test_plausible_address_skips_po_boxes_and_noise_normalizes_whitespace():
+    assert G.plausible_address("  123   MAIN   ST  ") == "123 MAIN ST"
+    assert G.plausible_address("P.O. BOX 123") is None
+    assert G.plausible_address("") is None
+    assert G.plausible_address(None) is None
+    assert G.plausible_address("1 A") is None   # too short to be a real street address
 
 
 def test_parse_sc_attrs_per_county_shapes():
@@ -222,13 +232,30 @@ def test_needs_gates():
 def test_apply_one_is_missing_only():
     row = li(raw={"county_deed_ref": {"book": "9", "page": "9", "source": "register"}}, market_value=555000.0)
     m = {"deed": {"book": "1", "page": "2", "date": "2020-01-02"}, "legal": "LOT 1 TEST", "market": 1.0e5,
-         "assessed": 6000.0, "acres": 2.0, "parno": "P"}
+         "assessed": 6000.0, "acres": 2.0, "address": "123 MAIN ST", "parno": "P"}
     c = G.apply_one(row, m, "nc_onemap", "Alamance", "2026-10-09T00:00:00+00:00", G.asks(None))
     assert row.raw["county_deed_ref"]["book"] == "9"             # the register's own is kept
     assert row.raw["county_legal"]["text"] == "LOT 1 TEST"
     assert row.market_value == 555000.0 and row.assessed_value == 6000.0 and row.acreage == 2.0
-    assert c == {"deed": 0, "legal": 1, "value": 1, "acres": 1}
+    assert row.street_address == "123 MAIN ST"
+    assert c == {"deed": 0, "legal": 1, "value": 1, "acres": 1, "address": 1}
     assert row.raw["gis_fill"]["found"] is True
+
+
+def test_apply_one_never_overwrites_an_existing_street_address():
+    row = li(street_address="9 OLD ADDR")
+    m = {"deed": None, "legal": None, "market": None, "assessed": None, "acres": None, "address": "123 MAIN ST"}
+    c = G.apply_one(row, m, "nc_onemap", "Alamance", "2026-10-09T00:00:00+00:00", G.asks(None))
+    assert row.street_address == "9 OLD ADDR"
+    assert c["address"] == 0
+
+
+def test_apply_one_skips_a_po_box_or_unusable_siteadd():
+    row = li()
+    m = {"deed": None, "legal": None, "market": None, "assessed": None, "acres": None, "address": None}
+    c = G.apply_one(row, m, "nc_onemap", "Alamance", "2026-10-09T00:00:00+00:00", G.asks(None))
+    assert not row.street_address
+    assert c["address"] == 0
 
 
 # ------------------------------------------------------------------------------------ the enricher
@@ -259,6 +286,24 @@ def test_nc_exact_pass_fills_and_stamps(monkeypatch):
     assert c.raw["gis_fill"]["found"] is False
     assert st["candidates"] == 3 and st["screened"] == 3 and st["not_in_layer"] == 1 and st["deed"] == 1
     assert st["none_deed"] == 1 and len(calls) == 2           # one exact request, one LIKE request
+
+
+def test_nc_exact_pass_backfills_street_address_from_siteadd(monkeypatch):
+    has_addr, blank_addr = li(pin="1234-56-7890"), li(pin="2234-56-7890", street_address="9 ALREADY SET RD")
+
+    def handler(url, data):
+        return FakeResp([
+            nc_feature("1234-56-7890", siteadd="123 MAIN ST"),
+            nc_feature("2234-56-7890", siteadd="456 OTHER ST"),
+        ])
+    fake_post(monkeypatch, handler)
+    st = run([has_addr, blank_addr], budget_s=60)
+
+    assert has_addr.street_address == "123 MAIN ST"
+    # missing-only: a row that already has an address is never overwritten, even when the
+    # layer's siteadd disagrees.
+    assert blank_addr.street_address == "9 ALREADY SET RD"
+    assert st["address"] == 1
 
 
 def test_nc_like_pass_finds_other_separators_and_never_binds_a_neighbour(monkeypatch):
