@@ -113,6 +113,16 @@ COUNTY_IMAGE_STATUS: dict[tuple[str, str], tuple[str, str]] = {
 #: `logan.LOGAN_COUNTIES` — that map includes robots-disallowed hosts.
 LOGAN_IMAGE_HOSTS: dict[tuple[str, str], str] = {
     ("NC", "Transylvania"): "https://search.transylvaniadeeds.com",
+    # COUNTY_IMAGE_STATUS already verifies these 4 as free Logan tenants, but this map was
+    # never extended to match -- LoganImageSession.host came back None for all four, so
+    # __aenter__ exited silently with no robots check, no log line, and zero ledger entries,
+    # every single run (2026-10-17 audit_suite gap-sweep wave 6, docs-dot-county-attempted:
+    # McDowell 3,358 / Mitchell 561 / Laurens 3,237 / Spartanburg 18,517 eligible rows never
+    # attempted).
+    ("SC", "Spartanburg"): "https://search.spartanburgdeeds.com",
+    ("SC", "Laurens"): "https://search.laurensdeeds.com",
+    ("NC", "McDowell"): "https://search.mcdowelldeeds.com",
+    ("NC", "Mitchell"): "https://search.mitchelldeeds.com",
 }
 
 #: Logan instrument codes that denote the note securing a debt. NOTE: `TR/D` is

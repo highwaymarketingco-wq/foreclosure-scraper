@@ -96,6 +96,24 @@ def test_nc_rod_captcha_dateless_row_survives_active_only():
     assert _active_only(li, horizon_days=120, now=datetime(2026, 10, 14)) is True
 
 
+def test_polk_tax_delinquent_search_row_survives_active_only():
+    """counties_nc.polk_tax mixes a dated auction page with a dateless delinquent-tax-search
+    sub-scraper (added 2026-10-12, standing tax balance, no sale date anywhere in
+    _apply_detail). Before this fix every search-path row 0-counted on every run
+    (2026-10-17 gap-sweep wave 6, drops-dateless-filtered-source: 1,622 rows)."""
+    li = Listing(
+        source="counties_nc.polk_tax",
+        source_url="https://example.com/polk",
+        listing_type=ListingType.TAX_LIEN,
+        state="NC",
+        county="Polk",
+        street_address="1 Main St",
+        sale_date=None,
+        raw={},
+    )
+    assert _active_only(li, horizon_days=120, now=datetime(2026, 10, 17)) is True
+
+
 def test_williams_upset_bid_row_survives_active_only():
     """A completed-sale/upset-bid-period national.williams row has no
     sale_date at all (the page gives no date for it, only a status

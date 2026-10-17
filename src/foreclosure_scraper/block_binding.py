@@ -178,6 +178,13 @@ BLOCK_SPECS: dict[str, dict] = {
     "gaston_gis": {"skip": ("state",)},
     "transylvania_vacant": {"skip": ("state",)},
     "mcdowell_probate": {"skip": ("state",)},
+    # the join is already authoritative (enrichment_septic_status matches strictly by the
+    # row's own parcel_id, never by address); situs_address is the COUNTY'S OWN permit-file
+    # address, which a vacant/unaddressed lot often carries as a filler placeholder ("99999
+    # OLD RHYMER DR") -- comparing it to the row's foreclosure-listing address flagged (and
+    # the production scrub actually removed) correctly-matched septic data as other_address
+    # (2026-10-17 audit_suite gap-sweep wave 6, block-binding-family-code-site/-c-other-parcel).
+    "septic": {"skip": ("situs_address",)},
 }
 
 #: blocks a stage looks up BY THE ROW'S POINT, or derives from one that was (enrichment_gis_attrs
@@ -194,7 +201,16 @@ POINT_BLOCKS = frozenset({
 #: tile; an owner cluster is the owner's by construction; one builder's lien-agent filings name the
 #: same contact on every lot): the shared test skips them (the fallback-point test still applies)
 _SHARED_EXEMPT = frozenset({"images", "zillow", "vision", "owner_cluster", "builder_distress",
-                            "liensnc_related", "footprint"})
+                            "liensnc_related", "footprint",
+                            # a DNC/TCPA compliance verdict is a fact about the PHONE NUMBER,
+                            # legitimately identical wherever that phone recurs (a filer's,
+                            # lender's or service company's line shared across many distinct
+                            # properties) -- never a property identifier. raw['dnc_scrub'] is
+                            # a list of phone-level dicts with no owner/name/property field at
+                            # all, so it was defaulting to 'property' kind and getting flagged
+                            # shared_copy on every shared service phone (2026-10-17 audit_suite
+                            # gap-sweep wave 6, block-binding-a-shared-copy: ~80% of removals).
+                            "dnc_scrub"})
 #: block sources that come from the row's own LiensNC filing (they bind with the 'liensnc' block)
 _FILING_SOURCES = ("liensnc_filing",)
 

@@ -611,6 +611,11 @@ DATELESS_OK_SOURCES = {
     "counties_nc.nc_metro_demolition_permits",   # Mecklenburg, Durham, Greensboro, Cary demolition permits
     "counties_nc.rowan_delinquent_tax",
     "counties_nc.cumberland_delinquent_tax",
+    # polk_tax's slug mixes a dated auction page with a dateless delinquent-tax-search
+    # sub-scraper (added 2026-10-12); the search half's standing tax balances carry no sale
+    # date, so without this entry _active_only() dropped every dateless row on every run
+    # (2026-10-17 audit_suite gap-sweep wave 6, drops-dateless-filtered-source: 1,622 rows).
+    "counties_nc.polk_tax",
     "counties_nc.iredell_delinquent_tax",
     "counties_nc.wake_code_cases",
     "counties_nc.nc_tax_lien_ads",               # Hoke, Lee, Davidson, Randolph tax-lien advertisements
@@ -4522,6 +4527,14 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("count_drop_guard.failed", traceback=traceback.format_exc())
 
+    # Final scrub, after everything else in this function has had a chance to write or
+    # reintroduce a block (assessor_card/deed_chain/dnc_scrub/board_quality/last_sale, and the
+    # grandfather restore above): the only earlier scrub (~line 3718) runs right after the
+    # identity pass, so blocks written or newly qualified by any later step shipped unscrubbed
+    # (2026-10-17 audit_suite gap-sweep wave 6 — block-binding-family-gis/-deed-sale/-photo,
+    # -fallback-point, -a-shared-copy all traced to this one ordering gap).
+    from .block_binding import scrub_unbound_blocks
+    enrichment_stats["blocks_unbound_final"] = scrub_unbound_blocks(enriched)
 
     st.enriched = enriched
     st.scoring_failed = _scoring_failed

@@ -86,6 +86,17 @@ def test_buncombe_is_paywalled():
     assert di.COUNTY_IMAGE_STATUS[("NC", "Buncombe")][0] == "paywalled"
 
 
+def test_every_logan_vendor_county_has_a_host():
+    """DOC_IMAGE_COUNTIES registered 5 counties under vendor 'logan'; LOGAN_IMAGE_HOSTS used
+    to have only 1 entry, so LoganImageSession.host came back None for the other 4 and
+    __aenter__ exited silently -- no robots check, no log, zero ledger entries ever
+    (2026-10-17 gap-sweep wave 6, docs-dot-county-attempted)."""
+    logan_counties = {key for key, vendor in di.DOC_IMAGE_COUNTIES.items() if vendor == "logan"}
+    assert logan_counties  # sanity: the vendor tag still exists
+    for key in logan_counties:
+        assert key in di.LOGAN_IMAGE_HOSTS, f"{key} is a logan county with no registered host"
+
+
 # --- doc-type classification -------------------------------------------------
 def test_deed_of_trust_variants_are_notes():
     for t in ("D/T", "DT", "MTG", "MORTGAGE", "DEED OF TRUST", "Security Deed"):

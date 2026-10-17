@@ -237,6 +237,36 @@ def test_a_filers_contact_on_its_own_filing_row_goes_only_when_the_roll_names_an
     assert bb.block_verdict(bare, "owner_mailing", bare.raw["owner_mailing"])[0] == "own_source"
 
 
+# ------------------------------------------------------------------ 2026-10-17 gap-sweep wave 6
+
+def test_septic_situs_address_never_flags_other_address():
+    """enrich_with_septic_status matches strictly by the row's own parcel_id; situs_address is
+    the county's own permit-file address (a placeholder like '99999 OLD RHYMER DR' for an
+    unaddressed lot), not a property claim this block should be checked against."""
+    blk = {"situs_address": "99999 OLD RHYMER DR", "county": "Buncombe", "cases": []}
+    assert bb.probe("septic", blk)["addrs"] == []
+    row = _li(parcel="9784-22-5707-00000", street="123 Real Rd", raw={"septic": blk})
+    verdict, _ = bb.block_verdict(row, "septic", blk)
+    assert verdict != "other_address"
+
+
+def test_dnc_scrub_phone_list_is_shared_exempt_not_a_property_block():
+    """A DNC/TCPA verdict is a fact about the phone number, legitimately identical wherever a
+    filer's/lender's/service company's line recurs (e.g. a shared service company) -- never a
+    property identifier. Before the fix, dnc_scrub had no _SHARED_EXEMPT entry, so this list of
+    phone-only dicts (no owner/name/property field) tripped parcel_specific() and earned a
+    shared-copy fingerprint on every row with the same recurring phone."""
+    assert "dnc_scrub" in bb._SHARED_EXEMPT
+    phone_block = [{"phone": "8285550100", "dnc_registered": False, "dnc_status": "clear"}]
+    row1 = _li(parcel="1111-11-1111", owner="ALPHA ANN", raw={"dnc_scrub": list(phone_block), **_roll("ALPHA ANN")})
+    row2 = _li(parcel="2222-22-2222", owner="BETA BOB", raw={"dnc_scrub": list(phone_block), **_roll("BETA BOB")})
+    v1 = bb.row_verdicts(row1.model_dump(mode="json"))
+    v2 = bb.row_verdicts(row2.model_dump(mode="json"))
+    dnc1 = next(e for e in v1 if e[0] == "dnc_scrub")
+    dnc2 = next(e for e in v2 if e[0] == "dnc_scrub")
+    assert dnc1[2] is None and dnc2[2] is None  # no fingerprint computed at all
+
+
 # ------------------------------------------------------------------ the audit invariants
 
 def _checks():
