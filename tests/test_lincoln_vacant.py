@@ -132,6 +132,26 @@ def test_sparse_row_does_not_fabricate_optional_fields():
     assert li.raw["owner_mailing"]["state"] == "NC"
 
 
+def test_a_nominal_totalvalue_is_not_published_as_a_real_dollar_value():
+    """2026-10-17 gap-sweep wave 7, top80-fill-values-sane: a nominal TOTALVALUE (an HOA
+    common-area sliver, an unassessed new lot) was written straight through as a real
+    assessed_value/market_value with no plausibility floor every other value producer in
+    this codebase enforces. Live PIN 4603518698 (a Triangle Trace HOA common area) carries
+    TOTALVALUE=5 today -- reproduced here with a made-up PIN in the same shape."""
+    row = dict(ROW_SPARSE, PIN="9999999999", TOTALVALUE=5)
+    out = _run_fetch([{"attributes": row}])
+    li = out[0]
+    assert li.assessed_value is None
+    assert li.market_value is None
+
+
+def test_a_plausible_totalvalue_still_fills_assessed_and_market_value():
+    out = _run_fetch([{"attributes": ROW_FULL}])
+    li = out[0]
+    assert li.assessed_value == 77868.0
+    assert li.market_value == 77868.0
+
+
 def test_po_box_mailing_is_absentee_even_in_state():
     out = _run_fetch([{"attributes": ROW_INSTATE_NO_HOUSENUM}])
     li = out[0]

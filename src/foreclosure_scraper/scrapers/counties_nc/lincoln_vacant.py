@@ -29,6 +29,7 @@ from typing import Iterable
 import httpx
 
 from ...base_scraper import BaseScraper
+from ...gis_fill import plausible_value
 from ...models import Listing, ListingType, PropertyKind
 
 QUERY_URL = "https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query"
@@ -231,8 +232,13 @@ class LincolnVacant(BaseScraper):
                         acreage=_f(a.get("ACRE")) or _f(a.get("MAPPEDACRE")),
                         zoning=_s(a.get("ZONING")),
                         living_sqft=_f(a.get("MAINAREASQFT")),
-                        assessed_value=_f(a.get("TOTALVALUE")),
-                        market_value=_f(a.get("TOTALVALUE")),
+                        # plausible_value() floors out a nominal/placeholder TOTALVALUE (e.g. an
+                        # HOA common-area sliver or an unassessed new lot showing $5) so the field
+                        # stays None and eligible for a later correct fill instead of permanently
+                        # "filled" with an implausible dollar amount (2026-10-17 gap-sweep wave 7,
+                        # top80-fill-values-sane).
+                        assessed_value=plausible_value(_f(a.get("TOTALVALUE"))),
+                        market_value=plausible_value(_f(a.get("TOTALVALUE"))),
                         description="County parcel flagged VACANT (unimproved / no structure) — "
                                     "carrying-cost motivated-seller signal.",
                         first_seen=now,
