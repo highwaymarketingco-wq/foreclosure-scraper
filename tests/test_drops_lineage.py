@@ -64,6 +64,13 @@ def test_county_native_shapes():
     assert county_native_short_parcel("NC", "Onslow", "123456")
     assert county_native_short_parcel("nc", "nash", "123456")
     assert county_native_short_parcel("NC", "Rowan", "123456")
+    # 2026-10-17 (gap-sweep wave 7, top80-its-roll-shape): Duplin (block-lot) and Person
+    # (alphanumeric map-sheet), nc_its_public_tax's other two counties
+    assert county_native_short_parcel("NC", "Duplin", "11-4--")
+    assert county_native_short_parcel("NC", "Duplin", "01-7--")
+    assert county_native_short_parcel("NC", "Person", "A8013C")
+    assert county_native_short_parcel("NC", "Person", "1034")
+    assert county_native_short_parcel("NC", "Person", "49")
     # measured NOT to be the county's parcel number
     assert not county_native_short_parcel("NC", "Catawba", "65771")       # a tax account
     assert not county_native_short_parcel("NC", "Guilford", "183753")     # PTS id, 0% in the layer
@@ -79,6 +86,19 @@ def test_a_county_native_short_id_is_kept():
     assert stats["parcel_kept_county_native"] == 1
     assert stats["parcel_nulled_too_short"] == 0
     assert "parcel_id_nulled" not in li.raw
+
+
+def test_duplin_and_person_its_tax_ids_are_kept_end_to_end():
+    """2026-10-17 gap-sweep wave 7, top80-its-roll-shape: these two nc_its_public_tax counties
+    were measured and added to COUNTY_NATIVE_SHORT_PARCEL -- a row carrying only the short
+    native id must come out of validate() with its parcel_id intact, same as the other four."""
+    dup = _li(county="Duplin", parcel_id="11-4--")
+    per = _li(county="Person", parcel_id="A8013C")
+    stats = validate([dup, per])
+    assert dup.parcel_id == "11-4--"
+    assert per.parcel_id == "A8013C"
+    assert stats["parcel_kept_county_native"] == 2
+    assert stats["parcel_nulled_too_short"] == 0
 
 
 def test_other_short_ids_are_still_nulled_and_recorded():

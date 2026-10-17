@@ -156,11 +156,19 @@ _PARCEL_BAD_PATTERNS = (
 #: layer, 11% another house);
 #: Durham 6 digits (86%); Lincoln and Rutherford, where the owner chose the 10-digit PIN with the
 #: short id kept as an alias (parcel_alias.py, 2026-10-07).
+#: 2026-10-17 (gap-sweep wave 7, top80-its-roll-shape): Duplin and Person, nc_its_public_tax's
+#: other two counties, were never measured by the pass above -- an oversight, not a deliberate
+#: exclusion (every live too-short value for each, pulled from the published board: 12 distinct
+#: Duplin ids, 540 distinct Person ids, both 100% covered by the patterns below with zero misses).
+#: Duplin's own portal id is a block-lot form ('11-4--', '01-7--'); Person's is an alphanumeric
+#: map-sheet id ('A8013C', '1034', 'A98169', '49').
 COUNTY_NATIVE_SHORT_PARCEL = {
     ("NC", "Cleveland"): re.compile(r"^\d{4,5}$"),
     ("NC", "Onslow"): re.compile(r"^(?:\d{6}|\d{1,4}[A-Z]?-\d{1,3}(?:\.[0-9A-Z]{1,2})?)$", re.I),
     ("NC", "Nash"): re.compile(r"^\d{6}$"),
     ("NC", "Rowan"): re.compile(r"^\d{6}$"),
+    ("NC", "Duplin"): re.compile(r"^\d{1,3}-\d{1,3}-{0,2}$"),
+    ("NC", "Person"): re.compile(r"^(?=.*\d)[A-Z0-9]{2,6}$", re.I),
 }
 
 
