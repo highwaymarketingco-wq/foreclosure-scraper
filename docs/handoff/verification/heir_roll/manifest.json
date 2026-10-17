@@ -8,35 +8,37 @@
   "unconfirmed": 14,
   "wall": 0
  },
- "generated_at": "2026-10-12T08:23:49Z",
+ "generated_at": "2026-10-17T14:28:27Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
- "host": "foreclosure-engine",
+ "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-10-12T08:23:49Z",
+  "at": "2026-10-17T14:28:27Z",
   "county": null,
-  "host": "foreclosure-engine",
-  "max_rows": 200,
+  "host": "SMB-LTSEO05",
+  "max_rows": 300,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 488,
-    "services1.arcgis.com": 4,
-    "tax.buncombenc.gov": 507,
-    "vt.ncsbe.gov": 228,
-    "www.courtlistener.com": 268
+    "berkeleycountysc.paystar.io": 10,
+    "cama.harnett.org": 3,
+    "services1.arcgis.com": 31,
+    "spartanburgcountytax.qpaybill.com": 4,
+    "tax.buncombenc.gov": 41,
+    "tax.transylvaniacounty.org": 56,
+    "taxbill.catawbacountync.gov": 555
    }
   },
   "result": {
    "budget_stop": 1
   },
-  "seconds": 2703,
+  "seconds": 1513,
   "selection": {
-   "applies": 4192,
-   "due_new": 3656,
-   "not_due_retry": 14,
-   "not_due_ttl": 522
+   "applies": 24639,
+   "due_new": 24162,
+   "due_retry": 10,
+   "not_due_ttl": 467
   },
   "source": null,
   "tier": null
