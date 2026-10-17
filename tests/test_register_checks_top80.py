@@ -30,6 +30,19 @@ def test_marriage_block_names_the_other_spouse_and_keeps_the_book_page():
     assert b["match_confidence"] == "high" and b["checked_at"] == NOW and b["source"] == "register_checks"
 
 
+def test_marriage_block_carries_the_instrument_number_as_license_no():
+    """2026-10-17 gap-sweep wave 7, top80-other-marriage-bound: Edgecombe's Cott eSearch v4
+    MARRIAGES index never exposes book/page/recorded, only instrument_no (e.g.
+    '2025-00000089') -- the audit check already accepts license_no as a valid anchor, but no
+    producer ever wrote it, so every real Edgecombe match came out unanchored."""
+    who = parse_owner("ZZTEST ALICE")
+    r = IndexRecord(recorded=None, book=None, page=None, instrument_no="2025-00000089",
+                     doc_type="MARRIAGE", grantors=["ZZTEST, ALICE"], grantees=["ZZSPOUSE, CAROL"])
+    b = RC.marriage_block([r], who, county="Edgecombe", now_iso=NOW)
+    assert b["license_no"] == "2025-00000089"
+    assert b["book"] is None and b["license_date"] is None
+
+
 def test_a_blank_type_row_under_the_mar_index_is_a_marriage():
     who = parse_owner("ZZTEST ALICE")
     r = rec(doc_type="", index_code="MAR", g=("ZZSPOUSE, CAROL",), e=("ZZTEST, ALICE",))

@@ -131,6 +131,7 @@ def marriage_block(records: list[IndexRecord], who: OwnerName, *, county: str, n
             "license_date": r.recorded,
             "county_issued": county,
             "book": r.book, "page": r.page,
+            "license_no": r.instrument_no,
             "match_confidence": "high" if first_given else "medium",
             "searched_name": f"{who.last}, {who.first}".strip(", "),
             "source": SOURCE,
