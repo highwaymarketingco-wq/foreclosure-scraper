@@ -53,6 +53,19 @@ def test_other_owners_are_not_matched(name):
     assert M.classify_heir_row({"ownname": name}) is None
 
 
+def test_a_long_multi_owner_name_keeps_the_decedent_token_past_80_chars():
+    """2026-10-17 gap-sweep wave 7, top80-onemap-heir-shape: classify_heir_row() used to slice
+    owner_of_record to owner[:80] -- match (correctly computed on the full string) could say
+    'heirs' while the stored owner no longer contained the HEIRS token at all once it sat past
+    char 80, exactly the live Rutherford shape (...PATTERSON, BEVERLY LYNN HEIRS;TULLISON...)."""
+    long_name = "CARPENTER, THOMAS JAMES;PATTERSON, BEVERLY LYNN HEIRS;TULLISON, JAMES EARL;WATSON, SUE ANN"
+    assert len(long_name) > 80
+    hit = M.classify_heir_row({"ownname": long_name})
+    assert hit["match"] == "heirs"
+    assert "HEIRS" in hit["owner"]
+    assert hit["owner"] == long_name
+
+
 def test_the_index_is_keyed_by_county_and_normalized_parcel_and_altparcel():
     rows = [{"cntyname": "Alamance", "parno": "1234-56-7890", "altparno": "ALT 9", "ownname": "DOE JANE HEIRS"},
             {"cntyname": "Wake", "parno": "55", "altparno": "", "ownname": "DOE JANE"}]

@@ -199,7 +199,7 @@ def classify_heir_row(attrs: dict) -> Optional[dict]:
     owner = H._owner_display(fields)  # noqa: SLF001
     if not owner:
         return None
-    return {"owner": owner[:80], "match": "heirs" if H._HEIR_TOKEN.search(owner) else "estate",  # noqa: SLF001
+    return {"owner": owner, "match": "heirs" if H._HEIR_TOKEN.search(owner) else "estate",  # noqa: SLF001
             "heir_names": H._heir_names(fields)}  # noqa: SLF001
 
 
