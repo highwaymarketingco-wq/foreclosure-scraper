@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-17 14:01 UTC",
- "commit": "b50056f9",
+ "generated": "2026-10-17 13:46 EDT",
+ "commit": "de1975d9",
  "fingerprint": {
   "inputs": {
    "docs/walls_register.json": "fe0651e20d9ef95d",
@@ -13,7 +13,8 @@
    "docs/gap_matrix/gap_matrix_2026-10-07.json": "321e8b5f9780fb4d",
    "docs/gap_matrix/gap_matrix_2026-10-09.json": "a20f3554f4355869",
    "docs/gap_matrix/gap_matrix_2026-10-16.json": "9c009b312dd7afcd",
-   "docs/gap_matrix/county_signal_coverage_2026-10-09.csv": "73150d44a9efe2a4"
+   "docs/gap_matrix/gap_matrix_2026-10-17.json": "da7bc641995b1d36",
+   "docs/gap_matrix/county_signal_coverage_2026-10-17.csv": "35dc47d40c5e8859"
   },
   "adapters": [
    "NC|Alamance|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
@@ -100,11 +101,9 @@
    "SC|York|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off"
   ],
   "dormant": [
-   "counties_nc.morganton_nc",
    "counties_sc.abbeville_delinquent_tax",
    "counties_sc.aiken_delinquent_tax",
    "counties_sc.beaufort_flc",
-   "counties_sc.city_of_union",
    "counties_sc.clarendon_tax_auction",
    "counties_sc.colleton_tax_sale",
    "counties_sc.darlington_delinquent_tax",
@@ -120,10 +119,12 @@
    "counties_sc.sc_dor_delinquent_taxpayers",
    "counties_sc.sc_tax_delinquent",
    "national.epa_superfund",
+   "national.legacy_obituaries",
    "national.liensnc",
    "national.opencorporates",
    "national.probate_foreclosure_leads",
    "national.propwire",
+   "national.sc_sos_entity",
    "national.va_acquired"
   ],
   "new_source_files": [
@@ -184,13 +185,18 @@
    "date": "2026-10-16"
   },
   {
-   "path": "docs/gap_matrix/county_signal_coverage_2026-10-09.csv",
-   "sha": "73150d44a9efe2a4",
-   "date": "2026-10-09"
+   "path": "docs/gap_matrix/gap_matrix_2026-10-17.json",
+   "sha": "da7bc641995b1d36",
+   "date": "2026-10-17"
+  },
+  {
+   "path": "docs/gap_matrix/county_signal_coverage_2026-10-17.csv",
+   "sha": "35dc47d40c5e8859",
+   "date": "2026-10-17 11:19 (file time)"
   }
  ],
  "run_meta": {
-  "source": "docs/run_meta.json (local copy)",
-  "run_time": "2026-10-16T20:24:46.640274Z"
+  "source": "https://highwaymarketingco-wq.github.io/foreclosure-scraper/run_meta.json",
+  "run_time": "2026-10-07T17:09:03.605738Z"
  }
 }
