@@ -214,19 +214,24 @@ def test_sigint_kills_a_hung_sync_census_call_within_a_few_seconds(tmp_path):
 
             proc.send_signal(signal.SIGINT)
             t0 = time.monotonic()
+            # 15s, not 5s (2026-10-17): this is wall-clock time under real OS scheduling for a
+            # freshly-spawned subprocess, which flaked on a loaded CI box (observed ~6-10s) with
+            # no actual SIGINT-handling regression -- the hard_timeout backstop this test is
+            # deliberately NOT testing is 120s, so 15s still cleanly separates "the OS was busy"
+            # from "SIGINT genuinely didn't work" (which would run out the full 120-250s window).
             try:
-                proc.wait(timeout=5.0)
+                proc.wait(timeout=15.0)
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait(timeout=5.0)
                 pytest.fail(
-                    "process did not exit within 5s of SIGINT -- default "
+                    "process did not exit within 15s of SIGINT -- default "
                     "Python SIGINT handling is NOT sufficient for this "
                     "script's synchronous httpx.post()+thread.join() call "
                     "path; needs an install_hard_sigint_kill()-style fix"
                 )
             elapsed = time.monotonic() - t0
-            assert elapsed < 5.0, f"SIGINT took {elapsed:.1f}s to take effect"
+            assert elapsed < 15.0, f"SIGINT took {elapsed:.1f}s to take effect"
             assert proc.returncode != 0  # interrupted, not a clean exit
         finally:
             if proc.poll() is None:
