@@ -290,6 +290,71 @@ def test_a_failed_county_does_not_kill_the_others(monkeypatch, _fast):
     assert [li.county for li in out] == ["Graham"]
 
 
+def test_a_blown_run_wide_budget_skips_counties_visibly_not_silently(monkeypatch, _fast):
+    """2026-10-17 gap-sweep wave 7, top80-its-county-silent: each county's own COUNTY_BUDGET_S
+    used to reset fresh every iteration with nothing tracking cumulative wall-clock against
+    timeout_s -- 10 counties could legitimately exhaust the global timeout before the loop ever
+    reached the LAST ones (live: Scotland/Yadkin, literally last in PORTALS). A county the
+    run-wide deadline never reaches must be recorded as skipped, not silently return 0 rows."""
+    monkeypatch.setenv("ITS_TAX_COUNTIES", "Onslow,Graham")
+    seen: list = []
+    real = httpx.AsyncClient
+
+    class Fake(real):
+        def __init__(self, *a, **kw):
+            kw["transport"] = _transport({"2025": [[ON_ROW]]}, seen)
+            super().__init__(*a, **kw)
+
+    monkeypatch.setattr(httpx, "AsyncClient", Fake)
+    s = m.NcItsPublicTax()
+    s.timeout_s = 120.0  # below the 120s margin: run_deadline is already in the past at t=0
+    out = asyncio.run(s.fetch())
+    assert out == []
+    assert s.last_outcome == m.OUTCOME_PARTIAL
+    assert "skipped (run-wide budget)" in s.last_reason
+    assert "Graham" in s.last_reason and "Onslow" in s.last_reason
+    assert seen == []  # never even got far enough to open a session for either county
+
+
+def test_portals_rotate_their_starting_county_by_day_of_year(monkeypatch, _fast):
+    """Same fix already used for the identical round-robin-starvation shape in
+    gis_fill.py/enrichment_incarceration.py: rotate PORTALS' start point so a fixed order
+    doesn't leave the SAME counties permanently last. Verified by checking which county the
+    scraper tries FIRST (the first GET it issues) on two different simulated 'today's."""
+    monkeypatch.setenv("ITS_TAX_COUNTIES", "Onslow,Graham")
+    order = list(m.PORTALS)
+    assert order == ["Onslow", "Graham", "Alleghany", "Anson", "Caswell", "Duplin", "Granville",
+                      "Harnett", "Jones", "Person", "Scotland", "Yadkin"]
+    real = httpx.AsyncClient  # captured once: two sequential monkeypatch.setattr calls below must
+                              # both subclass the TRUE original, not each other's patched Fake
+
+    def _try(today: date) -> str:
+        seen: list = []
+
+        class Fake(real):
+            def __init__(self, *a, **kw):
+                kw["transport"] = _transport({"2025": [[ON_ROW]], "2024": [[ON_LOT]]}, seen)
+                super().__init__(*a, **kw)
+
+        monkeypatch.setattr(httpx, "AsyncClient", Fake)
+
+        class _FixedDate(date):
+            @classmethod
+            def today(cls):
+                return today
+
+        monkeypatch.setattr(m, "date", _FixedDate)
+        s = m.NcItsPublicTax()
+        s.limit = 5
+        asyncio.run(s.fetch())
+        return seen[0][1].split("/")[1]  # "/<PORTAL_SUFFIX>/TaxBillSearch"
+
+    first_a = _try(date(2026, 1, 4))     # spin 0 of 12 -> Onslow is first in rotated+filtered order
+    first_b = _try(date(2026, 1, 5))     # spin 1 of 12 -> Onslow rotates past the end -> Graham first
+    assert {first_a, first_b} == {"ITSPublicGR2.0", "ITSPublicON"}
+    assert first_a != first_b
+
+
 def test_portal_config_is_pinned():
     assert m.PORTALS["Onslow"].base == "https://tax.onslowcountync.gov/ITSPublicON"
     assert m.PORTALS["Graham"].base == "https://www.bttaxpayerportal.com/ITSPublicGR2.0"

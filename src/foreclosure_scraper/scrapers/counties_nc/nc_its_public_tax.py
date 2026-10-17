@@ -564,12 +564,31 @@ class NcItsPublicTax(BaseScraper):
         out: list[Listing] = []
         self.county_stats = {}
         incomplete: list[str] = []     # counties whose newest delinquent year was not read in full
+        skipped_budget: list[str] = []  # counties the run-wide deadline below never reached
+        # Run-wide deadline (2026-10-17 gap-sweep wave 7, top80-its-county-silent): each county's
+        # own COUNTY_BUDGET_S (420s) resets fresh every iteration with nothing tracking cumulative
+        # wall-clock against this class's own timeout_s (3300s) that BaseScraper.safe_run enforces.
+        # 10 counties at up to 420s each is 4,200s, already past the 3,300s ceiling, so a full run
+        # can legitimately exhaust the global timeout before the loop ever reaches the LAST
+        # counties in PORTALS (Scotland, Yadkin) -- live-confirmed both portals answer fine and the
+        # parser is fine; this is pure starvation, not a wall or parser regression. A margin leaves
+        # room for this county's own cleanup (aggregate(), stats) after the last fetch_year() call.
+        run_deadline = time.monotonic() + self.timeout_s - 120.0
+        # Rotate the starting county by today's ordinal day (same fix already used for the
+        # identical round-robin-starvation shape in gis_fill.py/enrichment_incarceration.py) so a
+        # fixed alphabetical-ish order doesn't leave the SAME counties permanently last.
+        items = list(PORTALS.items())
+        spin = date.today().toordinal() % len(items)
+        items = items[spin:] + items[:spin]
         async with httpx.AsyncClient(headers={"User-Agent": _UA}, timeout=60.0,
                                      follow_redirects=True) as client:
-            for county, portal in PORTALS.items():
+            for county, portal in items:
                 if only and county not in only:
                     continue
-                deadline = time.monotonic() + COUNTY_BUDGET_S
+                if time.monotonic() > run_deadline:
+                    skipped_budget.append(county)
+                    continue
+                deadline = min(time.monotonic() + COUNTY_BUDGET_S, run_deadline)
                 read_years: list[int] = []
                 truncated = False
                 try:
@@ -613,10 +632,14 @@ class NcItsPublicTax(BaseScraper):
                 log.info("its_tax.county_done", county=county, bills=len(bills), leads=len(leads),
                          truncated=truncated)
                 out.extend(leads)
-        if incomplete and not self.limit:
+        if skipped_budget:
+            log.warning("its_tax.skipped_budget", counties=skipped_budget)
+        if (incomplete or skipped_budget) and not self.limit:
             # the screen ledger (screen_ledger.py) counts a run of this source as a screen of every
             # county it covers only when the run is OK: a county that failed or ran out of time
             # on its newest year makes the run PARTIAL, so no county is claimed on a half read
             self.last_outcome = OUTCOME_PARTIAL
             self.last_reason = "counties not read in full: " + ", ".join(sorted(incomplete))
+            if skipped_budget:
+                self.last_reason += "; skipped (run-wide budget): " + ", ".join(sorted(skipped_budget))
         return out
