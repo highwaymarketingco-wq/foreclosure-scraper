@@ -7,6 +7,14 @@ filters to docs whose grantor matches the owner (the search is surname-broad), c
 mortgage + adverse liens, and attaches raw['rod'] in the SAME shape as the Gaston/CCHS enrichers.
 Default-ON; FORECLOSURE_AUMENTUM_ROD=0 to disable. (Gaston is already covered by enrichment_gaston_rod
 via the LRSearch path, so it's not re-searched here.)
+
+MARRIAGE (2026-10-16, gap-sweep wave 3): Buncombe's Aumentum grid carries marriage records as a
+plain doc_type ("MARRIED") right alongside deeds and liens in the SAME name-search this module
+already runs -- enrichment_marriage_license.py (retired 2026-10-09, kept for its pure helpers)
+documented this and reused the same adapter before it was retired; its only other live lane
+(enrichment_register_checks.py's Cott counties) never touches Buncombe (a different vendor). This
+module's own fetch already pulls marriage rows and silently dropped them. Filtering `mine` for one
+now costs nothing extra: same request, same owner-match filter, just also checking doc_type.
 """
 from __future__ import annotations
 
@@ -15,6 +23,7 @@ import os
 import re
 from datetime import datetime, timezone
 
+from .enrichment_marriage_license import _is_marriage_doc, _spouse_from_doc
 from .rod import aumentum
 from .rod.classify import classify_rod_docs, is_stale, refresh_windows
 from .name_normalize import first_last_parts
@@ -100,5 +109,18 @@ async def enrich_aumentum_rod(listings, max_lookups: int | None = None) -> dict:
                 stats["with_mortgage"] += 1
             if summ["has_adverse_lien"]:
                 stats["with_adverse"] += 1
+        if not li.raw.get("marriage_license"):
+            # `docs` is already confirmed non-empty (the fetch-failed case above continues
+            # before this point), so the search itself worked for this name: no marriage
+            # record among this owner's own rows is a confirmed no-match, the same terminal
+            # shape enrichment_marriage_license.py used to write, so later runs don't re-ask
+            # forever -- never a guessed negative from an empty/failed fetch.
+            marriage_doc = next((d for d in mine if _is_marriage_doc(d.doc_type)), None)
+            match = _spouse_from_doc(marriage_doc, last, first) if marriage_doc else None
+            if match:
+                li.raw["marriage_license"] = match
+                stats["with_marriage"] = stats.get("with_marriage", 0) + 1
+            else:
+                li.raw["marriage_license"] = {"status": "no_match", "checked_at": now.isoformat()}
         await asyncio.sleep(0.3)
     return stats
