@@ -106,6 +106,22 @@ def test_other_short_ids_are_still_nulled_and_recorded():
     stats = validate([li])
     assert li.parcel_id is None
     assert li.raw["parcel_id_nulled"] == {"value": "65771", "reason": "too_short"}
+
+
+def test_nulling_a_parcel_id_also_drops_its_stale_gis_fill_stamp():
+    """2026-10-17 gap-sweep wave 7, top80-fill-screen-honest: gis_fill.needs() only re-screens a
+    row while it sees a usable parcel_id, so a 'found' stamp recorded under an id that validation
+    later nulls could never be honestly re-stamped -- live-verified 47/47 (100%) of
+    value_found_no_value violations have parcel_id is None. assessed_value itself (the actual
+    cached data gis_fill found) must survive; only the now-orphaned stamp is dropped."""
+    li = _li(county="Catawba", parcel_id="65771", assessed_value=150000.0,
+             raw={"gis_fill": {"deed": "none", "legal": "none", "value": "found", "acres": "none",
+                               "found": True, "checked_at": "2026-10-01T00:00:00+00:00",
+                               "source": "nc_onemap"}})
+    stats = validate([li])
+    assert li.parcel_id is None
+    assert "gis_fill" not in li.raw
+    assert li.assessed_value == 150000.0
     assert stats["parcel_nulled_too_short"] == 1
 
 

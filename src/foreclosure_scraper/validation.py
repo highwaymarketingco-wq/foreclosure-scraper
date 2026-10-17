@@ -190,10 +190,19 @@ def _record_nulled_parcel(li: Listing, pid: str, reason: str) -> None:
     """Keep the id the source gave in raw['parcel_id_nulled'] when it is nulled here. It is
     still that source's identifier for the row (Catawba's tax account '65771'), and the next
     run's re-scrape carries it as parcel_id again: board_persist.merge_prior_board() rebuilds the
-    published row's key from it, or it never matches its own re-scrape (2026-10-06)."""
+    published row's key from it, or it never matches its own re-scrape (2026-10-06).
+
+    Also drops a stale raw['gis_fill'] (2026-10-17 gap-sweep wave 7, top80-fill-screen-honest):
+    gis_fill.needs() only re-screens a row while it sees a usable parcel_id, so once this id is
+    nulled nothing will ever revisit a 'found' stamp recorded under the id that is now gone --
+    live-verified 47/47 (100%) of value_found_no_value violations have parcel_id is None. The
+    deed/legal/value FIELDS it already found stay on the row (still usable cached data); only the
+    stamp claiming they were found under a parcel_id this row no longer carries is removed, so a
+    future run can honestly re-screen once/if the id is restored."""
     if not isinstance(li.raw, dict):
         li.raw = {}
     li.raw["parcel_id_nulled"] = {"value": pid, "reason": reason}
+    li.raw.pop("gis_fill", None)
 
 
 def _normalize_parcel_text(v) -> str:
