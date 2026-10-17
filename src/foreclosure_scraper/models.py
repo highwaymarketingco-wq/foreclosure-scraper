@@ -178,11 +178,22 @@ def _regate_merged_valuation(li: "Listing") -> None:
     # in enrichment_equity, not here. Re-derive trust from the calc block ABOVE (now
     # itself re-gated, so this reads the merge's real, final arv_flags) and reuse the
     # one shared withholding function/prose so this can't drift from the normal path.
+    from .enrichment_board_qa import _strip_equity_note_from_grade
     from .enrichment_equity import equity_arv_trust, withhold_equity
 
     level, flags = equity_arv_trust(li)
     if level in ARV_TRUST_BLOCKS_DERIVED:
-        withhold_equity(li, level, flags)
+        withheld = withhold_equity(li, level, flags)
+        # Same gap enrichment_board_qa.py's own two withhold_equity() call sites had until
+        # 2026-10-17 gap-sweep wave 6 (pipeline-grade-equity-current): withholding equity here
+        # doesn't touch grade()'s own rationale/risk_score, so a merge that resurrects then
+        # immediately re-withholds a bad equity figure can still leave the stale "high real
+        # equity (N%)" note (and its score swing) sitting next to a withheld equity block. This
+        # third call site -- Listing.merge()'s own re-gate, not board_qa's -- was missed by that
+        # fix; it accounts for the dominant share of the check's 3,142 live violations (merges
+        # are far more common than board_qa's shared-anchor/arv_outlier detection).
+        if withheld and isinstance(li.raw, dict):
+            _strip_equity_note_from_grade(li.raw)
 
 
 def _normalize_case(case: str | None) -> str:

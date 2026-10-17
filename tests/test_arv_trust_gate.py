@@ -369,3 +369,32 @@ def test_merge_and_grade_regate_paths_agree():
     assert li_merged.raw["equity"].get("value") is None
     assert (li_graded.raw["equity"]["arv_trust"]
             == li_merged.raw["equity"]["arv_trust"] == "contradicted")
+
+
+def test_merge_path_also_strips_the_stale_equity_note_from_the_inherited_grade():
+    """2026-10-17 gap-sweep wave 7/8 (pipeline-grade-equity-current): grade()'s own regate path
+    (above) writes rationale and equity together in one call, so it can never disagree with
+    itself. _regate_merged_valuation calls withhold_equity() directly without calling grade()
+    again -- the MERGED row inherits whichever side's raw['grade']['rationale'] survived
+    _deep_merge_dict, which can still say "high real equity (N%)" right next to equity this
+    same merge just withheld. This was the dominant live source of the check's 3,142
+    violations: merges are far more common than board_qa's shared-anchor/arv_outlier paths
+    (enrichment_board_qa.py's own two withhold_equity() call sites, fixed 2026-10-17 wave 6)."""
+    old = Listing(source="test_a", source_url="https://a.example.com/x",
+                  listing_type=ListingType.FORECLOSURE_SALE,
+                  first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+                  street_address="1 Shared Rd",
+                  raw={"calc": {"arv_expected": 300000.0, "arv_flags": []},
+                       "equity": {"value": 135_000.0, "pct": 0.45},
+                       "grade": {"rationale": ["high real equity (45%)"], "risk_score": 81,
+                                "risk": "C", "overall_score": 70, "overall": "B"}})
+    new = Listing(source="test_b", source_url="https://b.example.com/x",
+                  listing_type=ListingType.FORECLOSURE_SALE,
+                  first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+                  street_address="1 Shared Rd",
+                  raw={"calc": vcalc.to_dict(_calc(["arv_above_anchor"]))})
+    merged = old.merge(new)
+    assert merged.raw["equity"].get("value") is None
+    assert merged.raw["equity"]["arv_trust"] == "contradicted"
+    assert "real equity" not in " ".join(merged.raw["grade"]["rationale"])
+    assert merged.raw["grade"]["risk_score"] == 75  # 81 - 6 (the "high real equity" delta backed out)
