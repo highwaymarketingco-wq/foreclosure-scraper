@@ -48,6 +48,7 @@ from urllib.parse import urlencode, urlparse
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 log = structlog.get_logger()
 
@@ -384,10 +385,27 @@ async def query_features(
         if extra:
             params.update(extra)
 
-        if len(urlencode(params)) > _POST_THRESHOLD:
-            r = await http.post(url, data=params, timeout=timeout)
-        else:
-            r = await http.get(url, params=params, timeout=timeout)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout -- found 2026-10-16 (gap-sweep, pre-run gate's additions audit): this bare
+        # call had zero retry cushioning, same gap already fixed tonight for the Column
+        # legal-notice API scrapers and spartan_weekly_legals.py -- http_client-style callers
+        # must wrap their own retries, and this one never did. A single transient blip on
+        # page 1 of a dateless-floor source (no date window to fall back on) silently zeroes
+        # the whole scrape, reported as a healthy empty result rather than a visible failure.
+        # Shared by every counties_generic.arcgis_distress.* / county-specific ArcGIS layer
+        # scraper that calls fetch_attrs/query_features, so one fix here covers all of them.
+        # A real non-200/parse failure still raises unretried below.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                if len(urlencode(params)) > _POST_THRESHOLD:
+                    r = await http.post(url, data=params, timeout=timeout)
+                else:
+                    r = await http.get(url, params=params, timeout=timeout)
         if r.status_code != 200:
             raise ArcGisError(f"{url} -> HTTP {r.status_code}")
         data = r.json()
