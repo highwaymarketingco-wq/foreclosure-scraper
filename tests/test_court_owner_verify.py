@@ -121,11 +121,18 @@ def test_mismatch_strips_property_and_reverts_owner_name():
 def test_mismatch_strips_specs_and_moves_property_signal_blocks_aside():
     """2026-10-17 gap-sweep wave 6, phones-lincoln-akpar-unkeyed: the inline strip used to null
     only 5 fields and never move PROPERTY_SIGNAL_BLOCKS/lincoln_bulk aside, so an unbound row
-    kept publishing a wrong parcel's specs and a live 10-digit PIN pointer."""
+    kept publishing a wrong parcel's specs and a live 10-digit PIN pointer. Wave 7 (2026-10-17,
+    top80-fill-deed-ref-bound) found the same blind spot never extended to gis_fill.py's own
+    county_deed_ref/county_legal/gis_fill blocks -- a row this function just correctly declared
+    to have no parcel kept publishing the wrongly-matched parcel's deed reference and legal
+    description."""
     li = _li(owner_name="INMAN, ROBERT", defendant="Roger Leonard Mason",
              tax_value=90000.0, zoning="R-1", acreage=0.5, year_built=1998,
              bedrooms=3.0, bathrooms=2.0,
-             raw={"amount_owed": {"total": 500.0}, "lincoln_bulk": {"parcel_id": "4603400435"}})
+             raw={"amount_owed": {"total": 500.0}, "lincoln_bulk": {"parcel_id": "4603400435"},
+                  "county_deed_ref": {"book": "123", "page": "456"},
+                  "county_legal": {"text": "LOT 9 TEST ACRES"},
+                  "gis_fill": {"found": True, "deed": "found"}})
     stats = enrich_court_owner_verify([li])
     assert stats["mismatch"] == 1
     assert li.tax_value is None
@@ -135,8 +142,12 @@ def test_mismatch_strips_specs_and_moves_property_signal_blocks_aside():
     assert li.bedrooms is None
     assert li.bathrooms is None
     assert "amount_owed" not in li.raw and "lincoln_bulk" not in li.raw
+    assert "county_deed_ref" not in li.raw and "county_legal" not in li.raw and "gis_fill" not in li.raw
     assert li.raw["unbound_property_blocks"]["lincoln_bulk"] == {"parcel_id": "4603400435"}
     assert li.raw["unbound_property_blocks"]["amount_owed"] == {"total": 500.0}
+    assert li.raw["unbound_property_blocks"]["county_deed_ref"] == {"book": "123", "page": "456"}
+    assert li.raw["unbound_property_blocks"]["county_legal"] == {"text": "LOT 9 TEST ACRES"}
+    assert li.raw["unbound_property_blocks"]["gis_fill"] == {"found": True, "deed": "found"}
 
 
 def test_mismatch_falls_back_to_raw_gis_owner_when_owner_name_blank():

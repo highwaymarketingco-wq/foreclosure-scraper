@@ -226,7 +226,16 @@ PROPERTY_SIGNAL_BLOCKS = ("tax_owed", "amount_owed", "pickens_delinquent", "str_
                           # own 10-digit PIN in the first place (2026-10-17 gap-sweep wave 6,
                           # phones-lincoln-akpar-unkeyed): it has to move aside with the other
                           # property-signal blocks, not stay live and keyless.
-                          "lincoln_bulk")
+                          "lincoln_bulk",
+                          # gis_fill.py's own output keys (2026-10-17 gap-sweep wave 7,
+                          # top80-fill-deed-ref-bound): the same blind spot as lincoln_bulk above,
+                          # just never extended to this fill's own blocks. A row this function just
+                          # correctly declared to have no parcel kept publishing the WRONGLY-matched
+                          # parcel's deed reference and legal description (~450 rows, 308 of them
+                          # already carrying a court_owner_mismatch/bankruptcy_property_unbound/
+                          # estate_notice_unbound qa_flag -- the mismatch was already known, this
+                          # fill just never moved with it).
+                          "county_deed_ref", "county_legal", "gis_fill")
 
 
 def _strip_property(li: Any, raw: dict, owner: Optional[str], *, blocks: bool = False) -> None:
