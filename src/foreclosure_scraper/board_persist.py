@@ -915,6 +915,17 @@ def merge_prior_board(
     # [restored key, source, 'restored'] of every prior row folded into its own re-scrape by its
     # restored short parcel id: drop_folded_prior() must not restore its snapshot copy either.
     restored_folds: list[list[str]] = []
+    # kept[] indices of a prior-only (aged, unmatched) row whose parcel_id was just rewritten by
+    # the alias table above: the ONLY rows eligible for the post-alias-dedup pass near the end of
+    # this function. Scoped this narrowly on purpose -- a blanket re-scan of every kept row for a
+    # shared dedupe_key() parcel branch would also fold two UNRELATED houses that a county's own
+    # data bug gave the same raw parcel_id (exactly what the house-number guard in the match loop
+    # above exists to keep apart; see test_shared_parcel_different_house_number_does_not_merge).
+    # An alias fold carries the same trust the fresh-match alias path already relies on today
+    # (matched_parcel_alias) -- parcel_alias.build() only ever maps a short id to a PIN when the
+    # mapping is unambiguous -- so this extends that existing trust boundary to the aged case
+    # instead of inventing a new, looser one.
+    alias_touched_kept_indices: set[int] = set()
 
     kept: list[Listing] = []
     prior_total = 0
@@ -1009,6 +1020,36 @@ def merge_prior_board(
     # when the fresh scrape fell back to the short id, a prior PIN row under that short id).
     alias_table = parcel_alias.build(fresh_deduped)
     alias_short = parcel_alias.fresh_short_keys(fresh_deduped)
+    # The table above has no memory across runs: it is rebuilt from scratch every time using
+    # ONLY this run's fresh scrape, so one bad alias-source run (e.g. nc_lincoln_bulk.enrich()'s
+    # own bulk-roll refresh failing, which happens upstream of this function and this run's
+    # fresh_deduped already reflects) leaves nothing to re-seed the short-id->PIN mapping with,
+    # and the short-id row it publishes that run can never fold into its existing PIN row again
+    # -- a permanent duplicate instead of a one-run gap that heals on the next run (2026-10-17
+    # gap-sweep wave 6, phones-lincoln-akpar-duplicate: 203 Lincoln delinquent-tax accounts).
+    # Seed it from the board ALREADY ON DISK too: any currently-published ALIAS_SOURCES row
+    # that already carries the PIN also still carries its own short id in its raw block, so it
+    # is exactly the same shape parcel_alias.build() already knows how to read -- just from the
+    # published board's dicts instead of this run's fresh Listings.
+    try:
+        published_alias_rows = (rec for rec in _iter_board_records(docs)
+                                 if isinstance(rec, dict)
+                                 and str(rec.get("source") or "") in parcel_alias.ALIAS_SOURCES)
+        disk_table = parcel_alias.build(published_alias_rows)
+        # Never let a disk-seeded entry compete with THIS run's own reverse case (alias_short):
+        # when the fresh scrape itself fell back to a short id this run, canonical_prior()'s
+        # 'short' branch is the one correct way to fold a prior PIN row back under it (fresh
+        # really has no PIN this run); seeding the SAME short key the other direction ('pin')
+        # from an unrelated disk row (e.g. the very short-id prior row this run is trying to
+        # heal) would alias that prior row AWAY from the fresh row instead of onto it, splitting
+        # one account into two kept rows under two different ids (caught live by
+        # test_the_next_scrape_folds_the_pin_row_and_keeps_its_phone).
+        if alias_short:
+            fresh_fallback_keys = {(s, c, sh) for _src, s, c, sh in alias_short}
+            disk_table = {k: v for k, v in disk_table.items() if k not in fresh_fallback_keys}
+        alias_table = {**disk_table, **alias_table}
+    except Exception:  # noqa: BLE001 - the fresh-scrape table above still works without this
+        log.warning("merge_prior_board.alias_reseed_failed", exc_info=True)
 
     for rec in _iter_board_records(docs):
         prior_total += 1
@@ -1135,7 +1176,13 @@ def merge_prior_board(
             if ti is not None:
                 deferred.setdefault(ti, []).append(rec)
                 continue
-        _age(rec)
+        if alias_fold:
+            _n_before_age = len(kept)
+            _age(rec)
+            if len(kept) > _n_before_age:
+                alias_touched_kept_indices.add(len(kept) - 1)
+        else:
+            _age(rec)
 
     # Condominium units, decided per building now that all of its published rows are known: a row
     # folds into the unit that is the same lead (owner, then the unit's situs); a row with no such
@@ -1273,6 +1320,47 @@ def merge_prior_board(
         else:
             stats["fresh_only"] += 1
         kept.append(li)
+
+    # Final safety net (2026-10-17 gap-sweep wave 6, phones-lincoln-akpar-duplicate follow-up):
+    # the match loop above only ever checks a PRIOR row against the FRESH set -- it has no
+    # mechanism to notice that re-keying one prior row through the alias table (just above)
+    # now makes it the SAME property as another row already streamed into `kept` (typically
+    # another prior-only row aged under the earlier-aliased short id, or one aged under its
+    # own already-correct PIN from an earlier run). Without this, a permanently-stuck pair
+    # (neither side ever re-scraped again) stays two rows forever even once the alias table
+    # knows they are one account. Deliberately scoped to ONLY the rows alias_touched_kept_indices
+    # recorded above (a row this run's alias table just rewrote): dedupe_key()'s "parcel:" branch
+    # is address-blind, and a blanket re-scan of every kept row for a shared one would also fold
+    # two UNRELATED houses that a county's own data bug gave the same raw parcel_id -- exactly
+    # what the house-number guard in the match loop above exists to keep apart (see
+    # test_shared_parcel_different_house_number_does_not_merge). An alias fold carries the same
+    # trust the fresh-match alias path already relies on today (matched_parcel_alias) --
+    # parcel_alias.build() only maps a short id to a PIN when the mapping is unambiguous -- so
+    # this extends that existing, already-shipped trust boundary to the aged case instead of
+    # inventing a new, looser one. Ties/conflicts resolve toward the more recently seen copy.
+    if alias_touched_kept_indices:
+        by_parcel_key: dict[str, int] = {}
+        post_alias_folds = 0
+        for idx, li in enumerate(kept):
+            try:
+                key = li.dedupe_key()
+            except Exception:  # noqa: BLE001 - a row too malformed to key just can't collide here
+                continue
+            if not key.startswith("parcel:"):
+                continue
+            prev_idx = by_parcel_key.setdefault(key, idx)
+            if prev_idx == idx:
+                continue
+            if idx not in alias_touched_kept_indices and prev_idx not in alias_touched_kept_indices:
+                continue
+            post_alias_folds += 1
+            a, b = kept[prev_idx], li
+            base, other = (a, b) if a.last_seen >= b.last_seen else (b, a)
+            kept[prev_idx] = base.merge(other)
+            kept[idx] = None
+        if post_alias_folds:
+            kept = [li for li in kept if li is not None]
+            stats["post_alias_dedup_folds"] = post_alias_folds
 
     stats["prior_count"] = prior_total
     stats["merged_count"] = len(kept)

@@ -148,6 +148,35 @@ def test_an_aliased_prior_row_that_does_not_match_is_still_never_restored(tmp_pa
     assert drop_folded_prior([old], st) == []
 
 
+def akpar(parcel_id, county_id, addr="1 SAMPLE LN", zip_code="28000"):
+    return Listing(source="counties_nc.nc_county_pdf_delinquent_tax",
+                   source_url="https://example.invalid/akpar.pdf",
+                   listing_type=ListingType.TAX_LIEN, state="NC", county="Lincoln",
+                   parcel_id=parcel_id, street_address=addr, zip_code=zip_code,
+                   first_seen=NOW, last_seen=NOW, raw={"nc_county_pdf_delinquent_tax":
+                                                        {"county_id": county_id}})
+
+
+def test_disk_seeded_alias_table_folds_a_stuck_short_id_row_even_with_no_fresh_evidence(tmp_path):
+    """2026-10-17 gap-sweep wave 6, phones-lincoln-akpar-duplicate: parcel_alias.build() has no
+    memory across runs -- it is rebuilt from scratch every time using ONLY this run's fresh
+    scrape. When nc_lincoln_bulk.enrich()'s own PIN-adoption fails for a whole batch, the
+    account publishes under its short id with NO row that run carrying both ids, so the table
+    stays empty for it and the already-published PIN row (from an earlier successful run) can
+    never fold with the new short-id row again -- a permanent duplicate, not a one-run gap.
+    Reproduced here with an EMPTY fresh scrape (the account isn't even in today's re-scrape, the
+    live symptom: 'neither copy has been re-scraped since its own original date') -- the prior
+    board alone, read a second time, must still be enough to fold the two prior rows together."""
+    with_pin = published(akpar("3600000001", "00119"))          # the 2026-09-22 successful row
+    short_id_only = published(akpar(None, "00119"))              # the 2026-10-06 failed-adoption row
+    short_id_only.raw["parcel_id_nulled"] = {"value": "00119", "reason": "too_short"}
+    merged, st = merge_prior_board([], docs_dir=board(tmp_path, [with_pin, short_id_only]), now=NOW)
+    assert len(merged) == 1, "the two prior rows for the same account must fold into one"
+    assert merged[0].parcel_id == "3600000001"
+    assert st["prior_parcel_aliased"] == 1
+    assert st["post_alias_dedup_folds"] == 1
+
+
 def test_a_short_id_never_maps_to_another_short_id():
     """A carried Rutherford row whose parcel_id is another 7-digit county number (not a PIN) must
     not enter the alias table: on 10/8 such rows gave 53 rows a different property's id."""
