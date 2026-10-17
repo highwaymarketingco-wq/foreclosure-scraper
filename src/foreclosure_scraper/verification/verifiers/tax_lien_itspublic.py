@@ -449,6 +449,13 @@ ITSNET_CELLS = (0, 1, 3, 7, 4, 5, None, 8)
 #: the three ids its own bills print (live 2026-10-09: parcel_not_found 3 of 3): a parcel verifier
 #: cannot bind a row to them, so they stay out.
 _NEWER_BUILD = {
+    # live-verified 2026-10-17 (gap-sweep wave 6, tax-claim-has-checker): the scraper side
+    # (counties_nc/nc_its_public_tax.py) was wired to this same base URL on 2026-10-09
+    # alongside Anson/Granville/Harnett/Yadkin, but Duplin was never added here -- the
+    # single largest county in this check's violation cluster (2,902 rows). Confirmed live
+    # with 3 real board parcel ids ('09-747--','01-190--','10-557--'): all 3 resolve to
+    # real bills (owner/situs/balance) under the default CELLS layout.
+    "Duplin": ("https://www.bttaxpayerportal.com/ITSPublicDL", CELLS),
     "Anson": ("https://www.bttaxpayerportal.com/ITSPublicAN", CELLS),
     "Granville": ("https://tax.granvillecounty.org/ITSPublic", CELLS),   # AlternateParcelIdentifier, no AccountNumber
     "Harnett": ("https://cama.harnett.org/ITSPublicHT", CELLS),

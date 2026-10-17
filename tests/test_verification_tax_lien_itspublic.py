@@ -148,6 +148,19 @@ def test_contract_and_version():
     assert v.governs == tc.GOVERNS
 
 
+def test_duplin_is_registered_on_the_same_vendor_as_its_newer_siblings():
+    """Duplin was expanded onto the same ITS.net vendor as Anson/Granville/Harnett/Yadkin on
+    2026-10-09 but never added here, leaving 2,902 live board rows with no checker at all
+    (2026-10-17 gap-sweep wave 6, tax-claim-has-checker). Live-verified against 3 real board
+    parcel ids before wiring in."""
+    assert "Duplin" in p.PORTALS
+    duplin = p.PORTALS["Duplin"]
+    assert duplin.base == "https://www.bttaxpayerportal.com/ITSPublicDL"
+    assert duplin.parcel_field == "ParcelNumber"
+    assert duplin.full_model is True
+    assert duplin.cells == p.CELLS
+
+
 def test_applies_to_the_configured_counties_only():
     assert p.applies(onslow_roll_row())
     assert p.applies(onslow_roll_row(county="Graham", raw={"two_year_delinquent": {"is_two_year_plus": True}}))
