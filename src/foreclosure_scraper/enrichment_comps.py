@@ -978,7 +978,13 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
     # then HOT/WARM, then the rows whose comps are oldest (age_comps() prunes those later).
     today = date.today().isoformat()
     kind_cache: dict = {}
-    for li in sorted(listings, key=_comps_priority):
+    for _i, li in enumerate(sorted(listings, key=_comps_priority)):
+        if _i % 200 == 0:
+            # Most rows never hit an await point in this loop (the gis crosscheck path is
+            # rare), so without this, asyncio.wait_for's COMPS_PHASE_MAX_SECONDS cap cannot
+            # preempt until the loop naturally finishes -- live logs show 100-700s of
+            # overshoot past the stated budget from exactly this (2026-10-16 gap-sweep).
+            await asyncio.sleep(0)
         pool_key = ((li.state or "").strip().upper(), normalize_county(li.county)) if (li.county and li.state) else None
         sold_pool = sold_pools.get(pool_key) if pool_key else None
         rent_pool = rent_pools.get(pool_key) if pool_key else None
