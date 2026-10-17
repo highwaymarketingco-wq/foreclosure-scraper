@@ -59,6 +59,10 @@ def test_the_exempt_set_is_liensnc_plus_the_rod_nod_family():
     # 2026-10-15 (date-coverage audit pass3): widened again with 7 more sources found by the
     # same audit method applied to the files pass1/pass2 hadn't yet covered -- see
     # tests/test_open_case_hold_pass2.py's _PASS3_AGE_EXEMPT_FAMILY for the per-source detail.
+    # 2026-10-17 (gap-sweep wave 6, source-county-refreshed): widened once more with the two
+    # pre-probate obituary sources -- same exact shape as nc_heir_notices/publicnoticesc_estates
+    # above, just missed the first time; see test_open_case_hold_pass2.py's
+    # _OBITUARY_AGE_EXEMPT_FAMILY for the per-source detail.
     assert AGE_EXEMPT_SOURCES == frozenset({
         "liensnc",
         "nc_rod_substitute_trustee",
@@ -78,4 +82,6 @@ def test_the_exempt_set_is_liensnc_plus_the_rod_nod_family():
         "publicnoticesc_estates",
         "nc_unclaimed",
         "nc_cchs_deeds",      # currently dormant, same as cherokee_rod -- see board_persist.py
+        "gannett_obituaries",
+        "funeral_home_rss",
     })

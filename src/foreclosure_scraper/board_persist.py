@@ -252,6 +252,22 @@ AGE_EXEMPT_SOURCES = frozenset({
                                # counties, so it returns 0 rows today regardless of this entry.
                                # Exempted preemptively so the retention gap isn't silently
                                # reintroduced whenever its separate fetch bug gets fixed.
+    "gannett_obituaries",      # public_notices.gannett_obituaries -- pre-probate heir leads read
+                               # off a rolling obituary page, same shape as nc_heir_notices/
+                               # publicnoticesc_estates just above: no status field exists (a
+                               # death notice doesn't un-happen, and the underlying probate stays
+                               # open for months after the obituary itself rotates off the host's
+                               # page). 2026-10-17 gap-sweep wave 6, source-county-refreshed: 81 of
+                               # 258 live rows had missed 2+ consecutive runs with no fetch problem
+                               # at all -- just this source missing from the list its siblings
+                               # were already on.
+    "funeral_home_rss",        # public_notices.funeral_home_rss -- same pre-probate-from-obituary
+                               # shape as gannett_obituaries directly above, read off funeral homes'
+                               # own RSS feeds instead of a Gannett page; 170 of 172 live rows (99%)
+                               # had missed 2+ consecutive runs, the most severe single cell in the
+                               # same wave6 finding -- an RSS feed rotates obituaries off even faster
+                               # than a web page, so this source was closest to actually losing real
+                               # leads to the 4-miss drop in PULLED_RETENTION_WEEKS.
 })
 
 #: Court lanes searched by a FILED-DATE WINDOW (owner decision 2026-10-09): the window limits how far

@@ -413,3 +413,47 @@ def test_nc_unclaimed_row_survives_past_four_misses(tmp_path):
     by = {li.street_address: li for li in out}
     assert "10 Sample St" in by
     assert stats["prior_only_kept_age_exempt"] == 1
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-17 gap-sweep wave 6, source-county-refreshed: pre-probate obituary leads were missing
+# from AGE_EXEMPT_SOURCES despite being the exact same shape as nc_heir_notices/
+# publicnoticesc_estates just above -- a death notice (or the funeral home's own RSS entry for it)
+# doesn't un-happen, and the underlying probate stays open for months after the obituary itself
+# rotates off the host's page/feed. Live board: 81/258 gannett_obituaries rows and 170/172 (99%)
+# funeral_home_rss rows had already missed 2+ consecutive runs.
+# ---------------------------------------------------------------------------
+
+_OBITUARY_AGE_EXEMPT_FAMILY = ("gannett_obituaries", "funeral_home_rss")
+
+
+def test_both_obituary_sources_are_age_exempt():
+    missing = {s for s in _OBITUARY_AGE_EXEMPT_FAMILY if s not in AGE_EXEMPT_SOURCES}
+    assert not missing, f"obituary sources dropped from AGE_EXEMPT_SOURCES: {missing}"
+
+
+def test_gannett_obituaries_row_survives_past_four_misses(tmp_path):
+    prior = [_li(source="public_notices.gannett_obituaries", street_address="10 Sample St",
+                 zip_code="28801", sale_date=None,
+                 raw={"obituary": {"name": "John Smith"}, "life_event": {"kind": "death"}})]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "10 Sample St" in by
+    assert stats["prior_only_kept_age_exempt"] == 1
+
+
+def test_funeral_home_rss_row_survives_past_four_misses(tmp_path):
+    """The most severe cell in the wave6 finding (170/172 live rows, 99%): an RSS feed rotates an
+    obituary off even faster than a web page does, so this source was closest to actually losing
+    real leads to the 4-miss drop in PULLED_RETENTION_WEEKS."""
+    prior = [_li(source="public_notices.funeral_home_rss", street_address="10 Sample St",
+                 zip_code="28801", sale_date=None, county=None, state="SC",
+                 raw={"obituary": {"name": "Jane Doe"}, "dateless": True})]
+    _write_board(tmp_path, prior)
+    out, stats = merge_prior_board([_li(street_address="99 Elsewhere Rd", zip_code="28803")],
+                                   docs_dir=tmp_path, now=NOW, max_misses=4)
+    by = {li.street_address: li for li in out}
+    assert "10 Sample St" in by
+    assert stats["prior_only_kept_age_exempt"] == 1
