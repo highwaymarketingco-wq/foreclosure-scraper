@@ -414,6 +414,13 @@ class BrunswickLegalNotices(BaseScraper):
             # picks it up even on today's image-only notices.
             stamp_documents(li, [pdf_url])
             out.append(li)
+            # Ship whatever has already been parsed if the slow part below (sequential NC
+            # OneMap geo-resolution, one parcel at a time, 3 retries each) blows the soft
+            # timeout -- base_scraper.safe_run() only salvages self.partial on a timeout, and
+            # this scraper never populated it (2026-10-17 gap-sweep wave 6,
+            # source-county-floor: a TIMEOUT discarded all 5 already-parsed notices,
+            # publishing 0/5 instead of the real count).
+            self.partial.append(li)
 
         # Geo-resolve parcel-only rows so the oceanfront gate can place them at
         # ingest (Brunswick notices carry no address; the gate needs a point).
