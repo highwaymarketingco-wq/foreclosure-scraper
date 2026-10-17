@@ -308,11 +308,11 @@ def main(argv=None) -> int:
                     help="signal(s) to sweep (repeatable or comma-separated); default: all")
     ap.add_argument("--county", default=None, help="only rows in this county")
     ap.add_argument("--max-rows", type=int,
-                    default=int(os.environ.get("VERIFY_MAX_ROWS_PER_SIGNAL", "200")),
-                    help="per-signal cap on rows checked this run (default 200)")
+                    default=int(os.environ.get("VERIFY_MAX_ROWS_PER_SIGNAL", "2000")),
+                    help="per-signal cap on rows checked this run (default 2000)")
     ap.add_argument("--budget-s", type=float,
-                    default=float(os.environ.get("VERIFY_MAX_SECONDS", "2700")),
-                    help="global time budget for the live checks (default 2700 s)")
+                    default=float(os.environ.get("VERIFY_MAX_SECONDS", "5400")),
+                    help="global time budget for the live checks (default 5400 s)")
     ap.add_argument("--row-timeout-s", type=float, default=120.0)
     ap.add_argument("--defer-wait-s", type=float,
                     default=float(os.environ.get("VERIFY_DEFER_WAIT_S", "120")),

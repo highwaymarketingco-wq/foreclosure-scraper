@@ -59,6 +59,7 @@ if str(SRC) not in sys.path:
 
 from foreclosure_scraper.county_name import canonical_county  # noqa: E402
 from foreclosure_scraper.validation import NC_COUNTIES, SC_COUNTIES  # noqa: E402
+from foreclosure_scraper.enrichment_bankruptcy_stay import _FORECLOSURE_TYPES as _BK_STAY_TYPES  # noqa: E402
 
 PKG = SRC / "foreclosure_scraper"
 STATE_COUNTIES = {"NC": NC_COUNTIES, "SC": SC_COUNTIES}
@@ -479,6 +480,40 @@ def in_flip_scope(state: str, county: Optional[str]) -> bool:
     return bool(in_scope(county, state)) or (county, state) in oceanfront_counties()
 
 
+_STORM_FOOTPRINT: Optional[frozenset] = None
+
+
+def storm_footprint() -> frozenset:
+    """(county, state) pairs with a FEMA Individual-Assistance registration under the Helene
+    declarations (DR-4827 NC, DR-4829 SC; enrichment_fema_disaster.HELENE_DISASTERS), read from
+    the same cached data/fema_disaster/ia_county_<disaster>.json files that enricher writes.
+    Broader than the 3 counties storm_damage's own producer currently covers on purpose -- it is
+    the real disaster footprint, so counties no producer has reached yet still show as a gap
+    instead of being hidden (2026-10-17 gap-sweep)."""
+    global _STORM_FOOTPRINT
+    if _STORM_FOOTPRINT is None:
+        out: set = set()
+        for state, dn in (("NC", 4827), ("SC", 4829)):
+            p = REPO / "data" / "fema_disaster" / f"ia_county_{dn}.json"
+            try:
+                data = json.loads(p.read_text())
+            except (OSError, ValueError):
+                continue
+            for county in data.get("counties") or ():
+                out.add((canonical_county(county), state))
+        _STORM_FOOTPRINT = frozenset(out)
+    return _STORM_FOOTPRINT
+
+
+def in_storm_scope(state: str, county: Optional[str]) -> bool:
+    """A row is in Helene's real disaster footprint (or has no county, which cannot be ruled
+    out). storm_damage's own producer only covers 3 of these counties today -- that is a build
+    gap within scope, which this function deliberately does not hide."""
+    if not county:
+        return True
+    return (canonical_county(county), state) in storm_footprint()
+
+
 def row_rules(rec: dict, raw: dict, owner: set[str]) -> set[str]:
     """Which applicability rules hold for the row. Pure."""
     st = (rec.get("state") or "").strip().upper()
@@ -487,6 +522,8 @@ def row_rules(rec: dict, raw: dict, owner: set[str]) -> set[str]:
     r = {"all", st}
     if in_flip_scope(st, canonical_county(rec.get("county"))):
         r.add("flip_scope")
+    if in_storm_scope(st, canonical_county(rec.get("county"))):
+        r.add("storm_scope")
     if is_improved(rec, raw):
         r.add("improved")
     if et != "government":
@@ -499,6 +536,12 @@ def row_rules(rec: dict, raw: dict, owner: set[str]) -> set[str]:
         r.add("deceased")
     if lt == "bankruptcy" or raw.get("bankruptcy") or raw.get("courtlistener") or raw.get("bankruptcy_stay"):
         r.add("bankrupt")
+    # bankruptcy_stay's real producer only ever processes a FORECLOSURE-class lead with a
+    # bankruptcy match (a standalone bankruptcy lead is never "stayed") -- the broader shared
+    # 'bankrupt' tag above over-applies to it ~70x (2026-10-17 gap-sweep); kept in sync with
+    # enrichment_bankruptcy_stay._FORECLOSURE_TYPES by importing it rather than re-typing it.
+    if isinstance(raw.get("bankruptcy"), dict) and lt in _BK_STAY_TYPES:
+        r.add("bankrupt_stay_eligible")
     if "divorce" in owner or lt == "divorce_notice":
         r.add("divorced")
     if lt in ("foreclosure_sale", "lis_pendens", "auction", "sheriff_sale", "hoa_sale"):
@@ -686,10 +729,13 @@ SPECS: dict[str, Spec] = {
     "owner_cluster": Spec(_S, "derived", "derived", producers=("enrichment_owner_cluster.py",),
                           statewide=(("NC", "board-wide owner clustering"), ("SC", "board-wide owner clustering")),
                           doc="raw.owner_cluster present; checked = owner_name present"),
-    "divorce_no_subsequent_deed": Spec(_S, "derived", "rod", applies="divorced",
+    "divorce_no_subsequent_deed": Spec(_S, "derived", "rod", applies="divorced", states=("NC",),
                                        producers=("enrichment_divorce_no_subsequent_deed.py",),
                                        doc="raw.divorce_no_subsequent_deed present; applies to divorce rows; "
-                                           "checked = deed chain present"),
+                                           "checked = resolved_from_name present",
+                                       ambiguity="NC-only: the producer hard-skips every SC row (enrichment_sc_divorce.py "
+                                                 "went statewide 2026-10-07, after this Spec assumed SC family court "
+                                                 "was access-restricted; 2026-10-17 gap-sweep)"),
     "marriage_license": Spec(_S, "row", "rod", applies="person",
                              producers=("enrichment_register_checks.py", "rod/register_checks.py"),
                              doc="raw.marriage_license present",
@@ -700,10 +746,14 @@ SPECS: dict[str, Spec] = {
                                        "search reaches. Buncombe has none: its only marriage lane depended "
                                        "on the retired module, and enrichment_aumentum_rod.py's own fetch "
                                        "discards the marriage rows it already pulls (2026-10-16 gap-sweep)"),
-    "bankruptcy_stay": Spec(_S, "row", "federal", applies="bankrupt", ledger="bankruptcy_stay",
+    "bankruptcy_stay": Spec(_S, "row", "federal", applies="bankrupt_stay_eligible", ledger="bankruptcy_stay",
                             producers=("enrichment_bankruptcy_stay.py",),
                             statewide=(("NC", "CourtListener/RECAP (federal)"), ("SC", "CourtListener/RECAP (federal)")),
-                            doc="raw.bankruptcy_stay present; applies to rows with a bankruptcy match"),
+                            doc="raw.bankruptcy_stay present; applies to a FORECLOSURE-class row with a "
+                                "bankruptcy match (not a standalone bankruptcy lead)",
+                            ambiguity="the shared 'bankrupt' tag over-applied here ~70x (includes every "
+                                     "listing_type=='bankruptcy' row itself, which the real producer always "
+                                     "skips); narrowed to its own applies rule 2026-10-17 gap-sweep"),
     "bankruptcy_tax_combo": Spec(_S, "derived", "federal", applies="bankrupt",
                                  producers=("enrichment_bankruptcy_tax_combo.py",),
                                  statewide=(("NC", "derived"), ("SC", "derived")),
@@ -728,8 +778,17 @@ SPECS: dict[str, Spec] = {
                    producers=("enrichment_arcgis.py", "scrapers/counties_sc/spartanburg_vacant.py",
                               "nc_lincoln_bulk.py"),
                    doc="raw.vacant present (a city/county vacant-structure registry)"),
-    "storm_damage": Spec(_S, "county", "disaster", producers=("enrichment_helene_damage.py",),
-                         doc="raw.storm_damage present (post-Helene damage-assessment layers)"),
+    "storm_damage": Spec(_S, "county", "disaster", applies="storm_scope",
+                         producers=("enrichment_helene_damage.py",),
+                         doc="raw.storm_damage present (post-Helene damage-assessment layers); applies "
+                             "only to counties with a FEMA Helene IA registration",
+                         ambiguity="applied to all 437,170 rows statewide until 2026-10-17 (a 392,412-row "
+                                  "false gap: Helene structural damage cannot occur in a county the storm "
+                                  "never reached). Narrowed to storm_scope -- the real FEMA IA-declared "
+                                  "footprint (~71 counties), broader than the 3 the producer currently "
+                                  "covers on purpose, so still-unbuilt in-footprint counties stay visible "
+                                  "as a real gap rather than being hidden along with the out-of-footprint "
+                                  "ones"),
     "usps_vacancy": Spec(_S, "county", "usps", producers=("enrichment_usps_vacancy.py",),
                          walls=(("NC", "HUD USPS vacancy data needs a registered login"),
                                 ("SC", "HUD USPS vacancy data needs a registered login")),
@@ -797,10 +856,13 @@ SPECS: dict[str, Spec] = {
                            producers=("enrichment_court_owner_verify.py",),
                            statewide=(("NC", "derived"), ("SC", "derived")),
                            doc="raw.owner_mismatch present; applies to rows with a defendant"),
-    "notice_service_defect": Spec(_S, "derived", "derived", applies="foreclosure",
+    "notice_service_defect": Spec(_S, "derived", "derived", applies="foreclosure", states=("NC",),
                                   producers=("enrichment_notice_service_defect.py",),
-                                  statewide=(("NC", "derived from notice text"), ("SC", "derived from notice text")),
-                                  doc="raw.notice_service_defect present; checked = notice text on the row"),
+                                  statewide=(("NC", "derived from notice text"),),
+                                  doc="raw.notice_service_defect present; checked = notice text on the row",
+                                  ambiguity="NC-only: the producer hard-skips every SC row -- SC's delinquent-tax "
+                                            "process is purely administrative, no lawsuit/docket/service event "
+                                            "exists to have a defect in (live-verified; 2026-10-17 gap-sweep)"),
     **{col: Spec(_S, "derived", "derived", statewide=(("NC", "derived from owner_name"), ("SC", "derived from owner_name")),
                  doc=f"owner_name matches /{pat.pattern}/; checked = owner_name present")
        for col, pat in NAME_TOKENS},
@@ -821,8 +883,12 @@ SPECS: dict[str, Spec] = {
                     producers=("enrichment_probate_search.py", "scrapers/counties_sc/sc_public_notices.py"),
                     doc="raw.probate names a decedent, es_case_number or nc_estate_file_no"),
     "vacancy": Spec(_S, "row", "code", ledger="vacant_structure",
-                    producers=("scrapers/counties_nc/hendersonville_vacant_structures.py",),
-                    doc="raw.vacancy.vacant/boarded_up/utility_status truthy; checked = vacancy wrapper"),
+                    producers=("scrapers/counties_nc/hendersonville_vacant_structures.py",
+                               "scrapers/counties_nc/rocky_mount_blight_survey.py",
+                               "scrapers/counties_nc/kinston_proposed_demolition.py"),
+                    doc="raw.vacancy.vacant/boarded_up/utility_status truthy; checked = vacancy wrapper",
+                    ambiguity="a code-officer vacant-structure registry is a rare open-data product; only "
+                             "these 3 tiny city/county sources exist in all of NC+SC (2026-10-17 gap-sweep)"),
     "code_enforcement": Spec(_S, "row", "code", ledger="code_enforcement",
                              producers=("enrichment_code_enforcement.py", "enrichment_charlotte_code.py",
                                         "enrichment_greensboro_code.py", "scrapers/counties_nc/asheville_code_enforcement.py",
@@ -1104,7 +1170,9 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
     if raw.get("code_enforcement") is not None and raw.get("code_enforcement") != {}:
         out.add("code_enforcement")
     if isinstance(raw.get("deed_chain"), dict):
-        out |= {"deed_chain_break", "deed_chain_distress_transfer", "divorce_no_subsequent_deed"}
+        out |= {"deed_chain_break", "deed_chain_distress_transfer"}
+    if isinstance(raw.get("resolved_from_name"), dict):
+        out.add("divorce_no_subsequent_deed")
     ml = raw.get("marriage_license")
     if isinstance(ml, dict) and (ml.get("checked_at") or ml.get("license_date") or ml.get("spouse_name")):
         out.add("marriage_license")          # an undated no-match (retired module) is not a check
@@ -1131,7 +1199,7 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
         out.add("sos_dissolution")
     if raw.get("jail_booking_screen"):
         out.add("jail_booking")   # a healthy roster that matched nobody is still a check
-    if rec.get("plaintiff") or rec.get("defendant"):
+    if rec.get("plaintiff"):
         out.add("title_risk")
     if rec.get("owner_name") and rec.get("defendant"):
         out.add("owner_mismatch")

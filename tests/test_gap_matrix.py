@@ -464,6 +464,86 @@ def test_screen_ledger_ignored_for_unknown_county():
     assert not roll["cells"][("NC", "UNKNOWN", "jail_booking")]["screened"]
 
 
+# ---------------------------------------------------------------- 2026-10-17 gap-sweep wave 5
+
+def test_storm_damage_applies_only_in_the_real_fema_helene_footprint():
+    """Was applies="all" (default): every one of 437,170 rows statewide counted as a gap
+    even though the real producer (enrichment_helene_damage.py) is permanently scoped to 3
+    counties and Helene structural damage cannot occur where the storm never reached --
+    a 392,412-row false gap (wave 5, verified not refuted)."""
+    assert gm.in_storm_scope("NC", "Buncombe")          # wired producer county
+    assert gm.in_storm_scope("NC", "Mecklenburg")       # real FEMA IA registrations exist here too
+    assert not gm.in_storm_scope("NC", "Wake")          # outside the declared footprint entirely
+    assert gm.in_storm_scope("NC", None)                # no county: cannot be ruled out
+    out = row(county="Wake", listing_type="tax_lien")
+    assert "storm_damage" not in gm.applicable_columns(out, gm.row_rules(out, out["raw"], set()))
+    inn = row(county="Buncombe")
+    assert "storm_damage" in gm.applicable_columns(inn, gm.row_rules(inn, inn["raw"], set()))
+
+
+def test_bankruptcy_stay_applies_only_to_a_foreclosure_class_row_with_a_bankruptcy_match():
+    """Was applies="bankrupt" (shared with lt_bankruptcy): matched any listing_type=='bankruptcy'
+    row too, even though the real producer (enrichment_bankruptcy_stay.py) always skips those --
+    only a FORECLOSURE-class lead gets stayed. Inflated the published gap ~70x (wave 5, verified
+    not refuted)."""
+    bk_lead = row(listing_type="bankruptcy", raw={"bankruptcy": {"chapter": "13"}})
+    assert "bankruptcy_stay" not in gm.applicable_columns(bk_lead, gm.row_rules(bk_lead, bk_lead["raw"], set()))
+    stayed = row(listing_type="lis_pendens", raw={"bankruptcy": {"chapter": "13"}})
+    assert "bankruptcy_stay" in gm.applicable_columns(stayed, gm.row_rules(stayed, stayed["raw"], set()))
+    no_bk = row(listing_type="lis_pendens", raw={})
+    assert "bankruptcy_stay" not in gm.applicable_columns(no_bk, gm.row_rules(no_bk, no_bk["raw"], set()))
+
+
+def test_divorce_no_subsequent_deed_is_nc_only():
+    """enrichment_divorce_no_subsequent_deed.py hard-skips every SC row; the Spec had no
+    states= override, so SC rows counted as a gap for a signal that can never close there
+    (wave 5, verified not refuted)."""
+    assert gm.SPECS["divorce_no_subsequent_deed"].states == ("NC",)
+    sc = row(state="SC", county="Spartanburg", raw={"divorce": {"case_count": 1}})
+    assert "divorce_no_subsequent_deed" not in gm.applicable_columns(sc, gm.row_rules(sc, sc["raw"], set()))
+
+
+def test_notice_service_defect_is_nc_only():
+    """SC's delinquent-tax process is purely administrative -- no lawsuit/docket/service event
+    exists to have a defect in (producer's own live-verified SC note); the Spec claimed a
+    working SC statewide source anyway (wave 5, verified not refuted)."""
+    assert gm.SPECS["notice_service_defect"].states == ("NC",)
+    sc = row(state="SC", county="Charleston", listing_type="tax_lien")
+    assert "notice_service_defect" not in gm.applicable_columns(sc, gm.row_rules(sc, sc["raw"], set()))
+
+
+def test_divorce_no_subsequent_deed_checked_by_resolved_from_name_not_deed_chain():
+    """checked_columns() credited this column off raw.deed_chain, a key the producer never
+    reads (its real gate is raw.resolved_from_name) -- wrong/unrelated-key bug class, same
+    shape fixed repeatedly tonight for the tax columns (wave 5, verified not refuted)."""
+    wrong_key = row(raw={"deed_chain": {"transfers": []}})
+    assert "divorce_no_subsequent_deed" not in gm.checked_columns(wrong_key, set(), {})
+    assert "deed_chain_break" in gm.checked_columns(wrong_key, set(), {})     # unaffected sibling credit
+    right_key = row(raw={"resolved_from_name": {"matched": False}})
+    assert "divorce_no_subsequent_deed" in gm.checked_columns(right_key, set(), {})
+
+
+def test_title_risk_checked_only_via_plaintiff_never_defendant():
+    """checked_columns() also credited title_risk off rec['defendant'], a field
+    enrichment_title_risk.py's _party_text() never reads -- silent over-crediting (wave 5,
+    verified: the code defect is real even though the verifier corrected the claimed
+    impact's magnitude)."""
+    defendant_only = row(defendant="DOE JOHN")
+    assert "title_risk" not in gm.checked_columns(defendant_only, set(), {})
+    plaintiff = row(plaintiff="ABC BANK")
+    assert "title_risk" in gm.checked_columns(plaintiff, set(), {})
+
+
+def test_vacancy_producers_cover_all_three_real_writers():
+    """Was missing 2 of 3 real writers of raw['vacancy'] (rocky_mount_blight_survey.py,
+    kinston_proposed_demolition.py), so built_in_code() couldn't see Lenoir County as
+    code-covered and mislabeled its cell 'no source known' (wave 5, correctly_classified_non_bug
+    for the headline gap, but this narrow metadata fix is real)."""
+    producers = gm.SPECS["vacancy"].producers
+    assert any("rocky_mount_blight_survey" in p for p in producers)
+    assert any("kinston_proposed_demolition" in p for p in producers)
+
+
 def test_board_rows_reads_a_checkpoint(tmp_path):
     import gzip
     import json as _json
