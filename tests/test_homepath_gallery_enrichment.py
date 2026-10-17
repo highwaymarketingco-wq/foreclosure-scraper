@@ -133,13 +133,13 @@ def test_parse_gallery_extracts_agent_contact(m):
     data = _detail_payload(
         primary_url="https://homepath.fanniemae.com/images/p/primary.jpg",
         extra_photos=2,
-        agent={"name": "ANN MILLIGAN", "phone": "8033316252", "email": "ANN@SC.RR.COM"},
+        agent={"name": "JANE DOE", "phone": "8035550142", "email": "JANE@EXAMPLE.COM"},
     )
 
     photos, agent = m._parse_gallery_and_agent(data)
 
     assert len(photos) == 3
-    assert agent == {"name": "ANN MILLIGAN", "phone": "8033316252", "email": "ANN@SC.RR.COM"}
+    assert agent == {"name": "JANE DOE", "phone": "8035550142", "email": "JANE@EXAMPLE.COM"}
 
 
 @pytest.mark.parametrize("m", [hp, hj])
@@ -179,7 +179,7 @@ def test_enrich_galleries_merges_gallery_and_agent_into_raw(m):
     ns = li.raw and next(k for k in li.raw if k != "images")
     payload = _detail_payload(
         primary_url=primary, extra_photos=5,
-        agent={"name": "ROBERTO HERNANDEZ", "phone": "9193134545", "email": "R@TEST.COM"},
+        agent={"name": "JOHN ROE", "phone": "9195550198", "email": "JOHN@EXAMPLE.COM"},
     )
     client = _FakeClient({"uuid-1": _FakeResp(200, payload)})
 
@@ -190,7 +190,7 @@ def test_enrich_galleries_merges_gallery_and_agent_into_raw(m):
     assert len(real) == 6  # primary + 5 new, no dupes
     assert len(real) == len(set(real))
     assert li.raw[ns]["agent"] == {
-        "name": "ROBERTO HERNANDEZ", "phone": "9193134545", "email": "R@TEST.COM",
+        "name": "JOHN ROE", "phone": "9195550198", "email": "JOHN@EXAMPLE.COM",
     }
     assert client.calls == ["uuid-1"]
 
