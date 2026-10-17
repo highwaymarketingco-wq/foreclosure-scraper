@@ -104,6 +104,19 @@ def test_charleston_has_a_pid_keyed_address_overlay_with_a_unit_column():
     assert o["id_fields"] == ["PID"] and o["address"] == "WHOLE_ADDRESS" and o["unit"] == "UNIT"
 
 
+def test_pickens_land_use_reads_impvac_not_the_tax_district_code():
+    """Found 2026-10-16 (gap-sweep wave 4): land_use was mapped to "TAXAREA" -- a tax
+    district code like "A16", unrelated to land use -- so Pickens could never be flagged
+    vacant_lot regardless of its true status. The layer's own IMPVAC field carries the
+    real signal as plain text ("Improved" / "Vacant"), which the vacant-lot detector's
+    text regex already matches directly."""
+    assert pc.PARCEL_LAYERS["Pickens"]["map"]["land_use"] == "IMPVAC"
+    row = {"PIN": "4037-00-34-8831", "NAME1": "TESTOWNER", "LOCADD": "1 TEST LN",
+           "ACRES": 0.5, "IMPVAC": "Vacant", "TAXAREA": "A16"}
+    out = _map_row("Pickens", row)
+    assert out["land_use"] == "Vacant"
+
+
 def test_berkeley_value_is_the_market_figure_and_mail_is_joined():
     row = {"O_TMS": "1430909005", "OwnerName": "TESTOWNER LLC",
            "StreetAddress1": "1612 Military Cutoff Rd ", "StreetAddress2": "",

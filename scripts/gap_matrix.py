@@ -595,7 +595,12 @@ SPECS: dict[str, Spec] = {
                     doc="street_address is non-empty",
                     ambiguity="counts placeholders ('0 MAIN ST') and road-only situs as filled"),
     "parcel_id": Spec(_F, "row", "gis", statewide=(("NC", NC_ONEMAP),), doc="parcel_id is non-empty",
-                      ambiguity="no format check: a mis-parsed value counts as filled"),
+                      ambiguity="no format check: a mis-parsed value counts as filled; NC OneMap is "
+                                "reached by a SPATIAL point lookup (enrichment_parcel_from_geo.py), not "
+                                "gis_fill.py -- that module's own queries are keyed BY parcel_id (where "
+                                "parno/altparno IN ...), so it structurally cannot discover one that's "
+                                "missing. 'existing enrichers' for a parcel_id backfill means "
+                                "parcel_from_geo, never gis_fill (2026-10-16 gap-sweep)"),
     "owner_name": Spec(_F, "row", "gis", statewide=(("NC", NC_ONEMAP),), doc="owner_name is non-empty",
                        ambiguity="the name may come from a court caption or notice, not the tax roll"),
     "phone": Spec(_F, "row", "contact", applies="contactable",

@@ -487,9 +487,13 @@ PARCEL_LAYERS: dict[str, dict] = {
         "id_fields": ["PIN", "ACCTNO"],
         # market_value was mapped to "CalcAcres" -- an ACREAGE field in a value column.
         # The layer publishes no appraised value, so the honest mapping is None.
+        # land_use was mapped to "TAXAREA" -- a tax-district code (e.g. "A16"), not a land
+        # use at all; the layer's own IMPVAC field carries the real signal as plain text
+        # ("Improved" / "Vacant", live-verified 2026-10-16), which the vacant-lot detector's
+        # text regex already matches directly -- gap-sweep wave 4.
         "map": {"owner": "NAME1", "address": "LOCADD",
                 "market_value": None, "acreage": "ACRES",
-                "land_use": "TAXAREA",
+                "land_use": "IMPVAC",
                 "owner_mailing": ["ADD1", "CITY", "STATE", "ZIP"],
                 "sale_price": "SALEP"},
     },
