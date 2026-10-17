@@ -1011,6 +1011,35 @@ async def _fetch_doc_checked(c: httpx.AsyncClient, url: str) -> tuple[Optional[b
     return data, mime, ""
 
 
+def _round_robin_by_source(items: list, source_of) -> list:
+    """Reorder `items` (already sorted within-group) into a round-robin across
+    `source_of(item)` groups, highest-priority group first, one item per group per round.
+    Preserves each group's own internal order. A chronically-COLD source used to sit at the
+    bottom of a single value-sorted list and never get even a first attempt once the fixed
+    budget/count cutoff fired before reaching it (2026-10-17 gap-sweep wave 6,
+    docs-per-lead-doc-outcome: counties_sc.sc_des_brownfields, 57 of 93 violations, zero
+    ledger entries of any outcome across the ledger's entire history)."""
+    groups: dict = {}
+    order: list = []
+    for it in items:
+        k = source_of(it)
+        if k not in groups:
+            groups[k] = []
+            order.append(k)
+        groups[k].append(it)
+    out: list = []
+    idx = 0
+    remaining = len(items)
+    while remaining:
+        for k in order:
+            g = groups[k]
+            if idx < len(g):
+                out.append(g[idx])
+                remaining -= 1
+        idx += 1
+    return out
+
+
 async def enrich_doc_ocr(listings: Iterable[Listing],
                          http: Optional[httpx.AsyncClient] = None) -> dict:
     """Read every lead's notice / filing documents (and the shared rosters a lead's blank
@@ -1088,6 +1117,9 @@ async def enrich_doc_ocr(listings: Iterable[Listing],
     candidates = [li for li in listings if id(li) in primary and _needs_read(li)]
     targets = [li for li in candidates if primary[id(li)] not in aggregate]
     targets.sort(key=_inv.lead_value_key)
+    # round-robin by source so a budget/count cutoff can never permanently exclude a whole
+    # source from even a first attempt -- see _round_robin_by_source's own docstring.
+    targets = _round_robin_by_source(targets, lambda li: getattr(li, "source", None))
     stats["targets"] = len(targets)
     agg_map: dict[str, tuple[str, list]] = {}
     for li in candidates:

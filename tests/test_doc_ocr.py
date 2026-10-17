@@ -9,6 +9,30 @@ def _li(**kw):
     return Listing(**base)
 
 
+# ------------------------------------------------------------------ 2026-10-17 gap-sweep wave 6
+
+def test_round_robin_by_source_gives_every_source_a_first_slot():
+    """A value-sorted flat list used to let one or two high-volume sources occupy every slot
+    before a chronically-low-priority source got even a first attempt, so a fixed count/time
+    budget cutoff could permanently exclude it (docs-per-lead-doc-outcome:
+    counties_sc.sc_des_brownfields sat at ranks 50-106 of 118, never reached)."""
+    items = (["hot-a"] * 1 + ["cold-b"] * 50 + ["cold-c"] * 1)  # already value-sorted: a, then 50 b's, then c
+    out = dm._round_robin_by_source(items, lambda x: x)
+    # the very first round must contain one of every distinct source
+    assert set(out[:3]) == {"hot-a", "cold-b", "cold-c"}
+    assert out.count("hot-a") == 1 and out.count("cold-b") == 50 and out.count("cold-c") == 1
+    assert len(out) == len(items)
+
+
+def test_round_robin_by_source_preserves_within_source_order():
+    items = [("a", 1), ("b", 1), ("a", 2), ("b", 2), ("a", 3)]
+    out = dm._round_robin_by_source(items, lambda x: x[0])
+    a_order = [x for x in out if x[0] == "a"]
+    b_order = [x for x in out if x[0] == "b"]
+    assert a_order == [("a", 1), ("a", 2), ("a", 3)]
+    assert b_order == [("b", 1), ("b", 2)]
+
+
 def test_doc_urls_from_source_url_pdf():
     li = _li(source_url="https://county.gov/notices/smith.pdf")
     assert dm._doc_urls(li) == ["https://county.gov/notices/smith.pdf"]
