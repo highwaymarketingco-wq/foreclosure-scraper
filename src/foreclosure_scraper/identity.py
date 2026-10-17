@@ -71,6 +71,7 @@ from .block_binding import (
     own_source_block,
     probe,
 )
+from .rod.sc_chain import name_fit, owner_query
 from .tax_binding import canon_id, comparable, county_key, row_ids, same_id
 from .verification.core import address_key
 
@@ -556,6 +557,34 @@ def _base_index(rows: list, idxs: list[int]) -> int:
                                     len(_raw(rows[i]))))
 
 
+def _revalidate_lien_sweep(li: Any) -> bool:
+    """A merged row's raw['rod_lien_sweep'] stamp (enrichment_register_lien_sweep.py /
+    enrichment_county_lien_sweep.py) was computed against the owner_name ONE SIDE of a merge had
+    BEFORE the merge; Listing.merge() keeps a scalar field (owner_name) from whichever side was
+    self, but deep-merges raw, so a stamp a merge's LOSING identity had already correctly earned
+    can end up attached to raw on a row whose final owner_name is the WINNING side's -- a stamp
+    that was right for the identity it was computed against, now sitting under a different name
+    (2026-10-17 gap-sweep wave 7, top80-lien-sweep-name-fit). Each stamped instrument already
+    carries its own grantor/grantee text ('f'/'g', lien_sweep.doc_summary), so this re-checks
+    fit purely from data already on the stamp -- no register re-read, no network. Drops the
+    stamp when none of its instruments still name-fit; returns True when it did. Pure."""
+    raw = _raw(li)
+    stamp = raw.get("rod_lien_sweep") if isinstance(raw, dict) else None
+    if not isinstance(stamp, dict) or stamp.get("status") not in ("found", "possible"):
+        return False
+    q = owner_query(getattr(li, "owner_name", None) or "")
+    if q is None:
+        raw.pop("rod_lien_sweep", None)
+        return True
+    for inst in stamp.get("instruments") or ():
+        if not isinstance(inst, dict):
+            continue
+        if name_fit(q, inst.get("f") or "") or name_fit(q, inst.get("g") or ""):
+            return False
+    raw.pop("rod_lien_sweep", None)
+    return True
+
+
 def collapse_twins(listings: list) -> dict:
     """Merge every cluster duplicate_groups() finds, IN PLACE (Listings). The live base absorbs its
     aged copies with placeholder_twins.absorb_copies (only COPY_ALLOWLIST: a county situs over a
@@ -579,6 +608,8 @@ def collapse_twins(listings: list) -> dict:
             _keep_record(m, other)
             merged = m
             out["merged_live"] += 1
+        if live and _revalidate_lien_sweep(merged):
+            out["lien_sweep_dropped_on_merge"] += 1
         if aged:
             aged.sort(key=lambda r: str(_get(r, "last_seen") or ""), reverse=True)
             merged, taken = pt.absorb_copies(merged, aged)

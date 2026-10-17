@@ -48,6 +48,48 @@ def test_units_of_one_address_are_two_properties():
     assert _dups(rows) == 0
 
 
+def test_a_lien_sweep_stamp_from_the_losing_identity_is_dropped_on_a_live_merge():
+    """2026-10-17 gap-sweep wave 7, top80-lien-sweep-name-fit: two LIVE rows of the same property
+    under different owner names (a tax-roll record and a court/defendant-identified record) merge
+    via dedupe.merge_rows -- the base's scalar owner_name wins, but raw is deep-merged, so a
+    rod_lien_sweep stamp the OTHER identity (MILLARD) correctly earned for ITSELF ends up on a
+    row whose final owner_name is the base's (GARVIN) instead. The stamp's own instruments ('f'/
+    'g') still carry MILLARD's name, not GARVIN's, so it must not survive the merge."""
+    base = _li("x.roll", "1000000010", "50 FAKE AVE", owner="GARVIN MAURICE",
+               raw={"tax_owed": {"amount": 500}, "distress_stack": {"tier": "WARM"}})
+    other = _li("x.court", "1000000010", "50 FAKE AVE", owner="MILLARD MICHAEL",
+                raw={"rod_lien_sweep": {"status": "found", "checked_at": "2026-10-16",
+                                        "instruments": [{"f": "MILLARD, MICHAEL", "g": "SOME BANK",
+                                                        "fit": "exact"}]}})
+    rows = [base, other]
+    assert _dups(rows) == 1
+    stats = idn.collapse_twins(rows)
+    assert stats["rows_removed"] == 1 and len(rows) == 1
+    kept = rows[0]
+    assert kept.owner_name == "GARVIN MAURICE"
+    assert "rod_lien_sweep" not in kept.raw
+    assert stats["lien_sweep_dropped_on_merge"] == 1
+
+
+def test_a_lien_sweep_stamp_that_still_fits_the_merged_owner_survives():
+    """Same merge shape as above, but the stamp's instrument DOES name the base's own owner (the
+    sweep found the SAME person's record either side happened to be filed under) -- it must not
+    be dropped just because a merge happened."""
+    base = _li("x.roll", "1000000011", "60 FAKE AVE", owner="GARVIN MAURICE",
+               raw={"tax_owed": {"amount": 500}, "distress_stack": {"tier": "WARM"}})
+    other = _li("x.court", "1000000011", "60 FAKE AVE", owner="MILLARD MICHAEL",
+                raw={"rod_lien_sweep": {"status": "found", "checked_at": "2026-10-16",
+                                        "instruments": [{"f": "GARVIN, MAURICE", "g": "SOME BANK",
+                                                        "fit": "exact"}]}})
+    rows = [base, other]
+    stats = idn.collapse_twins(rows)
+    assert len(rows) == 1
+    kept = rows[0]
+    assert kept.owner_name == "GARVIN MAURICE"
+    assert kept.raw["rod_lien_sweep"]["status"] == "found"
+    assert stats.get("lien_sweep_dropped_on_merge", 0) == 0
+
+
 def test_aged_copy_and_its_rescrape_are_one_property_and_collapse_to_the_live_row():
     live = _li("x.roll", "1000000003", "40 FAKE RD", raw={"distress_stack": {"tier": "WARM"}})
     aged = _li("x.roll", "1000000003", "40 FAKE RD", aged=True,
