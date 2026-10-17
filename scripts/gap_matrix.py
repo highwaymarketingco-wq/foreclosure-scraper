@@ -1060,20 +1060,32 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
     out |= {c for c, (k, _g) in SCORER_GATES.items() if k and raw.get(k) not in _EMPTY}
     tax = tax_status_known(raw)
     if tax:
-        # multi_year_delinquent_tax and two_year_delinquent both split out of this broad
-        # "any tax-ish key landed" predicate (audit 2026-10-16): it marked each checked
-        # from unrelated keys on rows their own real producers never touched. For
+        # multi_year_delinquent_tax, two_year_delinquent and tax_aging_surfaced all split out
+        # of this broad "any tax-ish key landed" predicate (audit 2026-10-16): it marked each
+        # checked from unrelated keys on rows their own real producers never touched. For
         # multi_year_delinquent_tax, live-measured 150,198 false-"checked" rows against its
         # 3-county-only producer (Buncombe/Oconee/Pickens). For two_year_delinquent, its 3
         # real producers (albemarle_observer_tax_lists.py, nc_its_public_tax.py,
         # sc_catalis_delinquent_roll.py) all write raw["two_year_delinquent"] directly, and
         # live-measured 122,976 false-"checked" rows carried no such key at all (broad
-        # 161,620 vs narrow 38,644). Each column's own raw key is the only honest signal.
-        out |= {"repeat_tax_loss", "tax_aging_surfaced", "bankruptcy_tax_combo"}
+        # 161,620 vs narrow 38,644). tax_aging_surfaced IS a genuinely board-wide, growing
+        # producer (enrichment_tax_aging.py, wired every run, no county restriction) -- but
+        # the broad predicate still overcounts it by 37,566 rows (161,620 broad vs 124,054
+        # narrow) against keys that have nothing to do with tax_aging_surfaced's own
+        # precondition (raw.tax_owed.year / raw.nc_ptscloud_delinquent_tax.tax_year). Each
+        # column's own raw key is the only honest signal.
+        out |= {"repeat_tax_loss", "bankruptcy_tax_combo"}
     if raw.get("multi_year_delinquent_tax") not in _EMPTY:
         out.add("multi_year_delinquent_tax")
     if raw.get("two_year_delinquent") not in _EMPTY:
         out.add("two_year_delinquent")
+    ta = raw.get("tax_aging_surfaced")
+    # "default" is the dead one-shot-script stamp (scripts/surface_tax_aging.py /
+    # fill_all_gaps.py's old "TAX AGING" section); the current enrich_tax_aging() producer
+    # only ever writes source="nc_ptscloud" or "tax_owed" -- a row still carrying "default"
+    # was never touched by the current producer and must not count as checked.
+    if isinstance(ta, dict) and ta and ta.get("source") != "default":
+        out.add("tax_aging_surfaced")
     # gis_fill.py screened this parcel in its county layer and the record is blank for the field: a dated
     # per-row 'screened, none found' verdict for the four fill columns it covers (roll_up counts it)
     from foreclosure_scraper import gis_fill as _gf

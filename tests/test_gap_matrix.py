@@ -127,9 +127,24 @@ def test_multi_year_delinquent_tax_checked_only_by_its_own_key():
     miss = row(raw={"tax_owed": {"balance": 10}, "nc_ptscloud_delinquent_tax": {"years": 3}})
     assert "multi_year_delinquent_tax" not in gm.checked_columns(miss, set(), {})
     assert "two_year_delinquent" not in gm.checked_columns(miss, set(), {})
-    # the other 3 columns on the shared broad line are unaffected by either split
-    assert {"repeat_tax_loss", "tax_aging_surfaced",
-            "bankruptcy_tax_combo"} <= gm.checked_columns(miss, set(), {})
+    assert "tax_aging_surfaced" not in gm.checked_columns(miss, set(), {})
+    # the other 2 columns on the shared broad line are unaffected by any of the 3 splits
+    assert {"repeat_tax_loss", "bankruptcy_tax_combo"} <= gm.checked_columns(miss, set(), {})
+
+
+def test_tax_aging_surfaced_checked_only_by_its_own_key_and_never_by_the_dead_default_stamp():
+    """enrichment_tax_aging.py IS genuinely board-wide and growing (unlike
+    multi_year_delinquent_tax/two_year_delinquent's narrow producers) -- but the shared
+    tax_status_known() predicate still overcounted it by 37,566 rows (audit 2026-10-16,
+    wave-4 gap-sweep) against keys unrelated to its own precondition. "default" is the
+    dead one-shot-script stamp (scripts/surface_tax_aging.py); the live producer only
+    ever writes source="nc_ptscloud" or "tax_owed"."""
+    hit = row(raw={"tax_aging_surfaced": {"years_delinquent": 2, "source": "tax_owed"}})
+    assert "tax_aging_surfaced" in gm.checked_columns(hit, set(), {})
+    stale = row(raw={"tax_aging_surfaced": {"years_delinquent": 2, "source": "default"}})
+    assert "tax_aging_surfaced" not in gm.checked_columns(stale, set(), {})
+    miss = row(raw={"tax_owed": {"balance": 10}, "catalis_roll": {"years": 3}})
+    assert "tax_aging_surfaced" not in gm.checked_columns(miss, set(), {})
 
 
 def test_two_year_delinquent_checked_only_by_its_own_key():
