@@ -221,7 +221,12 @@ def _has_property(li: Any) -> bool:
 PROPERTY_SIGNAL_BLOCKS = ("tax_owed", "amount_owed", "pickens_delinquent", "str_permit_lapsed",
                           "tax_relief", "code_enforcement", "condemned", "distressed",
                           "storm_damage", "vacancy", "vacant", "vacant_lot", "life_events",
-                          "two_year_delinquent", "tax_aging_surfaced", "equity")
+                          "two_year_delinquent", "tax_aging_surfaced", "equity",
+                          # lincoln_bulk is the block that handed this row the WRONG parcel's
+                          # own 10-digit PIN in the first place (2026-10-17 gap-sweep wave 6,
+                          # phones-lincoln-akpar-unkeyed): it has to move aside with the other
+                          # property-signal blocks, not stay live and keyless.
+                          "lincoln_bulk")
 
 
 def _strip_property(li: Any, raw: dict, owner: Optional[str], *, blocks: bool = False) -> None:
@@ -238,6 +243,15 @@ def _strip_property(li: Any, raw: dict, owner: Optional[str], *, blocks: bool = 
     li.market_value = None
     li.assessed_value = None
     li.living_sqft = None
+    # the sibling specs a wrong parcel match also filled (2026-10-17 gap-sweep wave 6,
+    # phones-lincoln-akpar-unkeyed): a row correctly declared to have no parcel of its own
+    # kept publishing that wrong parcel's zoning/acreage/tax value/bed-bath-year.
+    li.tax_value = None
+    li.zoning = None
+    li.acreage = None
+    li.year_built = None
+    li.bedrooms = None
+    li.bathrooms = None
     if isinstance(raw.get("gis"), dict):
         for k in ("owner", "last_sale"):
             raw["gis"].pop(k, None)
@@ -413,17 +427,11 @@ def enrich_court_owner_verify(listings) -> dict:
         flags = raw.setdefault("qa_flags", [])
         if isinstance(flags, list) and "court_owner_mismatch" not in flags:
             flags.append("court_owner_mismatch")
-        # Strip the mis-attached property -> honest name-only court record (the defendant + docket).
-        li.owner_name = re.sub(r"\s+", " ", defn).strip()[:120] or None
-        li.parcel_id = None
-        li.street_address = None
-        li.market_value = None
-        li.assessed_value = None
-        li.living_sqft = None
-        if isinstance(raw.get("gis"), dict):
-            for k in ("owner", "last_sale"):
-                raw["gis"].pop(k, None)
-        li.raw = raw
+        # Strip the mis-attached property -> honest name-only court record (the defendant +
+        # docket). Was a hand-duplicated 5-field strip that could (and did -- 2026-10-17
+        # gap-sweep wave 6, phones-lincoln-akpar-unkeyed) drift from _strip_property()'s own
+        # field list; call it directly instead so the two paths can't diverge again.
+        _strip_property(li, raw, defn, blocks=True)
         stats["stripped"] += 1
     for li in listings:
         try:

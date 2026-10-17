@@ -118,6 +118,27 @@ def test_mismatch_strips_property_and_reverts_owner_name():
     assert "last_sale" not in li.raw["gis"]
 
 
+def test_mismatch_strips_specs_and_moves_property_signal_blocks_aside():
+    """2026-10-17 gap-sweep wave 6, phones-lincoln-akpar-unkeyed: the inline strip used to null
+    only 5 fields and never move PROPERTY_SIGNAL_BLOCKS/lincoln_bulk aside, so an unbound row
+    kept publishing a wrong parcel's specs and a live 10-digit PIN pointer."""
+    li = _li(owner_name="INMAN, ROBERT", defendant="Roger Leonard Mason",
+             tax_value=90000.0, zoning="R-1", acreage=0.5, year_built=1998,
+             bedrooms=3.0, bathrooms=2.0,
+             raw={"amount_owed": {"total": 500.0}, "lincoln_bulk": {"parcel_id": "4603400435"}})
+    stats = enrich_court_owner_verify([li])
+    assert stats["mismatch"] == 1
+    assert li.tax_value is None
+    assert li.zoning is None
+    assert li.acreage is None
+    assert li.year_built is None
+    assert li.bedrooms is None
+    assert li.bathrooms is None
+    assert "amount_owed" not in li.raw and "lincoln_bulk" not in li.raw
+    assert li.raw["unbound_property_blocks"]["lincoln_bulk"] == {"parcel_id": "4603400435"}
+    assert li.raw["unbound_property_blocks"]["amount_owed"] == {"total": 500.0}
+
+
 def test_mismatch_falls_back_to_raw_gis_owner_when_owner_name_blank():
     li = _li(owner_name=None, defendant="Roger Leonard Mason",
               raw={"gis": {"owner": "INMAN, ROBERT"}})
