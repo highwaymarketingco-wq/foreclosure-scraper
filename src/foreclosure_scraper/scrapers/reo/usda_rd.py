@@ -65,9 +65,16 @@ import time
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
 from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -308,13 +315,41 @@ async def _active_counties(c, state: str, kind: str) -> list[str]:
     try:
         # Each round-trip is individually hard-bounded so a wedged JSP step can
         # never stall the loop past _STEP_TIMEOUT_S (the freeze-avoidance fix).
-        await asyncio.wait_for(c.get(ref, headers=_HEADERS), timeout=_STEP_TIMEOUT_S)
+        #
+        # Each step is ALSO retried up to 3 times (short exponential-jitter
+        # backoff) on a transport error or timeout -- found 2026-10-17 (gap-sweep):
+        # http_client.client()'s transport is built with retries=0 ("callers
+        # already wrap their own AsyncRetrying" per its own docstring), and this
+        # module called it bare. These two round-trips are sequential and
+        # dependent and run once per state+kind (6 total), so a single transient
+        # blip here used to permanently zero that whole state+kind's county list,
+        # which cascades through _fetch_state into zero listings for the whole
+        # combination. Because expected_min_count=0 and real volume is typically
+        # 0-10 rows per state, a transient-failure zero is indistinguishable from
+        # a genuine "no active listings" result, and this slug has no fallback
+        # date window to self-heal on a later run. A real non-200/non-JSON
+        # response is still treated as 0 active counties below, unretried.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                await asyncio.wait_for(c.get(ref, headers=_HEADERS), timeout=_STEP_TIMEOUT_S)
         url = (f"{_BASE}/getCountiesOfStateWithActiveProperties"
                f"?stateCode={fips}&searchFormName={form_name}")
-        r = await asyncio.wait_for(
-            c.get(url, headers={**_HEADERS, **_JSON_HEADERS, "Referer": ref}),
-            timeout=_STEP_TIMEOUT_S,
-        )
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await asyncio.wait_for(
+                    c.get(url, headers={**_HEADERS, **_JSON_HEADERS, "Referer": ref}),
+                    timeout=_STEP_TIMEOUT_S,
+                )
     except (Exception, asyncio.TimeoutError) as exc:
         log.warning("usda_rd.counties_failed", state=state, kind=kind,
                     error=f"{type(exc).__name__}: {str(exc)[:180]}")

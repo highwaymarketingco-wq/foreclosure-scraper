@@ -84,7 +84,14 @@ from datetime import datetime
 from typing import Iterable
 
 import feedparser
+import httpx
 import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...http_client import client, get_text
@@ -215,7 +222,18 @@ async def _fetch_detail_status(c, url: str) -> tuple[int | None, dict]:
     """(HTTP status or None on a network error, parsed meta-description fields). Never
     raises -- a bad detail fetch must not cost the list-only lead this scraper already had."""
     try:
-        r = await c.get(url)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error
+        # or timeout -- client() (http_client.py) deliberately runs with retries=0 and
+        # expects each caller to wrap its own AsyncRetrying; this one never did. A real
+        # non-200/parse failure still falls through to the except below unretried.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await c.get(url)
         if r.status_code != 200:
             return r.status_code, {}
         m = _META_DESC_RE.search(r.text)
@@ -402,7 +420,23 @@ class GannettObituaries(BaseScraper):
                     continue
                 try:
                     await pace.wait()
-                    r = await c.get(f"https://www.{host}/obituaries/")
+                    # Retried up to 3 times (short exponential-jitter backoff) on a
+                    # transport error or timeout -- same bare, retries=0 client() as
+                    # _fetch_detail_status, and this list-page GET had zero retry
+                    # cushioning: one transient blip used to permanently zero this
+                    # whole paper's rows for the run (no self-heal -- this source is
+                    # in main.DATELESS_OK_SOURCES). A real 429/non-200 still falls
+                    # through to the status checks below unretried.
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type(
+                            (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                        ),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await c.get(f"https://www.{host}/obituaries/")
                     if r.status_code == 429:
                         # The papers share one edge: asking the next paper now only
                         # collects more 429s. Stop the Gannett pass; rows so far ship.

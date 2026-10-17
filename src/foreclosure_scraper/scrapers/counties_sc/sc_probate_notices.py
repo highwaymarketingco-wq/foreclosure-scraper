@@ -70,7 +70,14 @@ import re
 from datetime import datetime, timedelta
 from typing import Iterable, NamedTuple, Optional
 
+import httpx
 import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -376,7 +383,27 @@ async def _fetch_paper(c, paper: Paper) -> list[Listing]:
                     break
         for u in list(dict.fromkeys(urls))[:MAX_DOCS]:
             try:
-                r = await c.get(u, timeout=60.0)
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- found 2026-10-17 (gap-sweep): this per-article fetch
+                # had zero retry cushioning, same gap already fixed for the Column
+                # legal-notice API scrapers, spartan_weekly_legals.py, and
+                # arcgis_webmap.query_features(). http_client.client()'s own docstring
+                # says every caller is expected to wrap its own retries, and this bare
+                # call never did -- a single transient blip permanently dropped that
+                # one article's estate records for the whole run, with no retry of any
+                # kind (the surrounding `except Exception: continue` swallows it before
+                # it can ever reach the per-paper LayerHarvest retry in fetch()). The
+                # outer try/except is kept: a real, persistent failure on one article
+                # still must not stop the rest of the urls from being read.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type(
+                        (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(u, timeout=60.0)
             except Exception:  # noqa: BLE001
                 continue
             if r.status_code == 200:

@@ -109,8 +109,10 @@ from datetime import datetime
 from typing import Iterable, Optional
 from urllib.parse import urljoin
 
+import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ..._vendor.xls import XlsParseError, read_first_sheet
 from ...base_scraper import BaseScraper
@@ -505,8 +507,21 @@ class GeorgetownCivicEngage(BaseScraper):
                                 error=f"{type(exc).__name__}: {str(exc)[:140]}")
 
             # --- (b) Tax-Sale list ----------------------------------------
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- this bare call had zero retry cushioning, so a single
+            # transient blip here silently zeroed the whole Tax-Sale branch (same gap
+            # already fixed tonight for the Column legal-notice API scrapers and
+            # spartan_weekly_legals.py). A real non-200/parse issue still falls through
+            # to the except below, unretried.
             try:
-                r = await c.get(TAX_PAGE)
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(TAX_PAGE)
                 if r.status_code == 200:
                     for url, label in _discover_docs(r.text, TAX_PAGE):
                         low = (label + " " + url).lower()
@@ -526,8 +541,18 @@ class GeorgetownCivicEngage(BaseScraper):
                 log.warning("georgetown.tax_fail", error=str(exc)[:160])
 
             # --- (c) Master-in-Equity monthly rosters ---------------------
+            # Same retry cushioning as the Tax-Sale fetch above: one transient blip
+            # on this landing-page read used to silently zero the whole MIE branch
+            # (up to MAX_MIE_ROSTERS monthly rosters).
             try:
-                r = await c.get(MIE_PAGE)
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(MIE_PAGE)
                 if r.status_code == 200:
                     docs = _discover_docs(r.text, MIE_PAGE)
                     # Rank by the month/year in the label (newest first) so we
@@ -581,9 +606,26 @@ class GeorgetownCivicEngage(BaseScraper):
     async def _get_pdf(self, c, url: str) -> Optional[bytes]:
         """GET a DocumentCenter doc and return its bytes only if it's a real
         PDF. Used by the FLC/Tax-Sale paths, which have only ever been seen
-        as PDF live -- unlike MIE (see _get_doc), which also ships .xls."""
+        as PDF live -- unlike MIE (see _get_doc), which also ships .xls.
+
+        Retried up to 3 times (short exponential-jitter backoff) on a transport
+        error or timeout: the FLC and Tax branches each call this once and
+        `break` immediately on success, so this was a true single-point-of-
+        failure per branch -- one transient blip here used to silently lose
+        the entire FLC list or entire Tax-Sale list for the run (and because
+        Georgetown is in main.DATELESS_OK_SOURCES, with no fallback date
+        window, that loss could never self-heal later). A real bad status or
+        a non-PDF response is still handled below, unretried.
+        """
         try:
-            r = await c.get(url)
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(url)
         except Exception:
             return None
         if r.status_code != 200:
@@ -597,9 +639,22 @@ class GeorgetownCivicEngage(BaseScraper):
     async def _get_doc(self, c, url: str) -> Optional[bytes]:
         """GET a DocumentCenter doc and return its bytes for either a real
         PDF or an OLE2 (.xls) container -- AUDITED 2026-10-03: some monthly
-        MIE rosters are uploaded as .xls, previously skipped entirely here."""
+        MIE rosters are uploaded as .xls, previously skipped entirely here.
+
+        Same retry cushioning as _get_pdf above. This one sits inside the
+        per-item MIE roster loop (up to MAX_MIE_ROSTERS), so one failed call
+        only drops that month's rows rather than the whole branch -- still
+        worth the same cushioning against a single transient blip.
+        """
         try:
-            r = await c.get(url)
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(url)
         except Exception:
             return None
         if r.status_code != 200:

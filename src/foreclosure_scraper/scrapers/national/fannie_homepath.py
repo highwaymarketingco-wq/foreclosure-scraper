@@ -39,6 +39,7 @@ from typing import Iterable
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...county_name import canonical_county
@@ -197,7 +198,22 @@ async def _enrich_galleries(
         if not uuid:
             continue
         try:
-            r = await c.get(f"{DETAIL_API}/{uuid}", headers=HEADERS, follow_redirects=True)
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- found 2026-10-17 (gap-sweep): this call had zero retry
+            # cushioning (http_client.client()'s own contract requires callers to supply
+            # their own, same gap already fixed in this repo for the Column legal-notice
+            # API scraper, spartan_weekly_legals.py, and arcgis_webmap.query_features()).
+            # A real non-transport failure (bad status, bad JSON) still falls through to
+            # `continue` below, unretried -- only a transport-level blip gets a second
+            # chance.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(f"{DETAIL_API}/{uuid}", headers=HEADERS, follow_redirects=True)
         except Exception as exc:
             log.warning("fannie_homepath.detail_fetch_failed", uuid=uuid,
                         error=str(exc)[:160])

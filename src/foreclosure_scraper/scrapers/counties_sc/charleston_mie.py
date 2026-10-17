@@ -53,7 +53,9 @@ import re
 from datetime import datetime
 from typing import Iterable, Optional
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -418,9 +420,23 @@ class CharlestonMasterInEquity(BaseScraper):
         case_row_idx: dict[str, int] = {}
 
         async with client(timeout=60.0) as c:
-            # (1) Auction list — primary, richest rows.
+            # (1) Auction list — primary, richest rows. Retried up to 3 times (short
+            # exponential-jitter backoff) on a transport error or timeout -- this bare
+            # call had zero retry cushioning (same gap already fixed elsewhere in this
+            # repo tonight), so a single transient blip silently zeroed this scraper's
+            # richest source for the whole run, reported as a healthy empty result
+            # (this source is in main.DATELESS_OK_SOURCES, so it never self-heals via a
+            # fallback date window). A real non-200/parse issue still falls through
+            # unretried -- only a transport-level failure gets a second chance.
             try:
-                r = await c.get(AUCTION_LIST_URL, headers={"User-Agent": "Mozilla/5.0"})
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(AUCTION_LIST_URL, headers={"User-Agent": "Mozilla/5.0"})
                 if r.status_code == 200 and r.content[:6].lstrip().lower().startswith(b"<html"):
                     for li in parse_auction_list(r.content, AUCTION_LIST_URL):
                         if li.parcel_id and li.parcel_id in seen_tms:
@@ -447,7 +463,14 @@ class CharlestonMasterInEquity(BaseScraper):
             # enrichment_hoa_plaintiff_signal.py's docstring documents as part of
             # the 2026-10-02 lt_hoa_sale investigation.
             try:
-                r = await c.get(HEARING_ROSTER_URL, headers={"User-Agent": "Mozilla/5.0"})
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(HEARING_ROSTER_URL, headers={"User-Agent": "Mozilla/5.0"})
                 if r.status_code == 200 and r.content[:4] == b"%PDF":
                     for li in parse_hearing_roster(r.content, HEARING_ROSTER_URL):
                         nc = _norm_case(li.case_number)

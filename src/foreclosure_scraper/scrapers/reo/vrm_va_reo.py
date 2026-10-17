@@ -53,8 +53,10 @@ import re
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -282,7 +284,19 @@ async def _enrich_from_detail(c, li: Listing) -> None:
     Never raises -- a failure here must not cost the card-level row this
     scraper already built."""
     try:
-        r = await c.get(li.source_url, headers=HEADERS, follow_redirects=True)
+        # Same retry cushioning as the listing-search page fetch (see _fetch_state) --
+        # a bare call through http_client.client() gets zero retries by design. Here a
+        # failure only costs this one listing's enrichment (the card-level row survives
+        # regardless), but it's still worth the same transport/timeout retry before
+        # giving up, for richer-data yield.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await c.get(li.source_url, headers=HEADERS, follow_redirects=True)
         if r.status_code != 200 or len(r.text) < 1000:
             return
         fields = _parse_detail_page(r.text)
@@ -337,7 +351,23 @@ async def _fetch_state(state: str, slug: str, detail_budget: list[int] | None = 
                 f"&orderBy=default+desc&orderByText=Default"
             )
             try:
-                r = await c.get(url, headers=HEADERS, follow_redirects=True)
+                # Retried up to 3 times (short exponential-jitter backoff) on a
+                # transport error or timeout. http_client.client() deliberately sets
+                # retries=0 and expects callers to wrap their own AsyncRetrying -- this
+                # call previously had none. Because the page-walk loop starts fresh
+                # (out=[]/seen_ids=set()) on every call and breaks on ANY exception, a
+                # single transient blip on page 1 silently zeroed this state's entire
+                # scrape for the run, reported as a healthy empty result (this source
+                # has no fallback date window to self-heal from). A real non-200/short
+                # body is handled below, unretried.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(url, headers=HEADERS, follow_redirects=True)
             except Exception as exc:
                 log.warning("vrm.fetch_failed", state=state, page=page,
                             error=str(exc)[:200])

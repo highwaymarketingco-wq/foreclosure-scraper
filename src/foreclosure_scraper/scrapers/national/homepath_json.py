@@ -57,6 +57,12 @@ from typing import Iterable
 
 import httpx
 import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...county_name import canonical_county
@@ -177,7 +183,21 @@ async def _enrich_galleries(
         if not uuid:
             continue
         try:
-            r = await c.get(f"{DETAIL_API}/{uuid}", headers=HEADERS, follow_redirects=True)
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- same gap as _fetch_state's main search call above,
+            # lower severity here since each listing is independent (a failure only
+            # costs that one listing its extra gallery/agent contact, never a core row),
+            # but worth the identical cushioning for consistency/robustness.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type(
+                    (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                ),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(f"{DETAIL_API}/{uuid}", headers=HEADERS, follow_redirects=True)
         except Exception as exc:
             log.warning("homepath_json.detail_fetch_failed", uuid=uuid,
                         error=str(exc)[:160])
@@ -372,10 +392,28 @@ async def _fetch_state(
                 # same inventory fannie_homepath reads since c33369b5).
                 "listingTypes": REO_LISTING_TYPES,
             }
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- this bare call had zero retry cushioning (same gap
+            # already fixed tonight for the Column legal-notice API scrapers,
+            # spartan_weekly_legals.py, and arcgis_webmap.query_features()), so a single
+            # transient blip on any page used to `break` the WHOLE pagination loop for
+            # this state -- a blip on page 1 zeroes the state's entire output (nothing
+            # yet in partial_sink), a blip on a later page silently truncates the sweep.
+            # A real non-200/parse issue still breaks the loop below, unretried -- only
+            # a transport-level failure gets a second chance.
             try:
-                r = await c.get(
-                    API, params=params, headers=HEADERS, follow_redirects=True
-                )
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type(
+                        (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                    ),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(
+                            API, params=params, headers=HEADERS, follow_redirects=True
+                        )
             except Exception as exc:
                 log.warning(
                     "homepath_json.fetch_failed",

@@ -32,7 +32,9 @@ import time
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -202,8 +204,27 @@ class Hubzu(BaseScraper):
         states = ("NC", "SC")
         async with client(timeout=30.0, headers=_HEADERS) as c:
             for i, st in enumerate(states):
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- found 2026-10-17: this bare call had zero retry
+                # cushioning (same gap already fixed in the Column legal-notice API
+                # scrapers / spartan_weekly_legals.py / arcgis_webmap.query_features).
+                # states is only ("NC", "SC"), so a single transient blip here used to
+                # permanently zero up to half this source's whole output for the run,
+                # silently -- hubzu.py is in main.DATELESS_OK_SOURCES (no fallback date
+                # window), so a zeroed state never self-heals until someone notices by
+                # hand. A real non-200/parse issue still breaks out below, unretried --
+                # only a transport-level failure gets a second chance.
                 try:
-                    r = await c.get(API.format(state=st), follow_redirects=True)
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type(
+                            (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                        ),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await c.get(API.format(state=st), follow_redirects=True)
                 except Exception as exc:  # noqa: BLE001
                     log.warning("hubzu.fetch_failed", state=st, error=str(exc)[:160])
                     continue
@@ -245,8 +266,22 @@ class Hubzu(BaseScraper):
                     pid = _property_id((li.raw.get("hubzu") or {}).get("listing_id"))
                     if not pid:
                         continue
+                    # Same retry cushioning as the list-page call above, for
+                    # consistency -- but this is a true per-item loop and the base
+                    # row is already in self.partial/out (above) before this call
+                    # runs, so an exhausted retry here only drops that one
+                    # listing's extra gallery photos, never the listing itself.
                     try:
-                        dr = await c.get(DETAIL_API.format(property_id=pid))
+                        async for attempt in AsyncRetrying(
+                            stop=stop_after_attempt(3),
+                            wait=wait_exponential_jitter(initial=1, max=8),
+                            retry=retry_if_exception_type(
+                                (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                            ),
+                            reraise=True,
+                        ):
+                            with attempt:
+                                dr = await c.get(DETAIL_API.format(property_id=pid))
                     except Exception as exc:  # noqa: BLE001
                         log.warning("hubzu.detail_fetch_failed", listing_id=pid,
                                     error=str(exc)[:160])

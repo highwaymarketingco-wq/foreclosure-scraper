@@ -57,7 +57,9 @@ import re
 from datetime import datetime
 from typing import Iterable, Optional
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -160,7 +162,26 @@ class SCUstRegistry(BaseScraper):
         out: list[Listing] = []
         guard = LayerHarvest(self.slug, list(COUNTIES), attempts=3)
         async with client(timeout=90.0) as c:
-            await c.get(BASE)            # seed the session
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- this one-off session-seed GET runs once per run,
+            # BEFORE the per-county loop starts and before `guard` (which only covers
+            # the per-county search POSTs below) opens. http_client.client()'s own
+            # transport is built with retries=0 ("callers already wrap their own
+            # AsyncRetrying"), so a bare call here had zero retry cushioning: a single
+            # transient connection reset or timeout would raise straight out of
+            # fetch() and zero ALL 46 counties' worth of leads for the run. Since this
+            # source is in main.DATELESS_OK_SOURCES, a zeroed run has no fallback date
+            # window to self-heal on later -- same bug class already fixed tonight for
+            # the Column legal-notice API scraper, spartan_weekly_legals.py, and
+            # arcgis_webmap.query_features(). A real non-200 status is not retried.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    await c.get(BASE)    # seed the session
             with guard:
                 for county in COUNTIES:
                     out.extend(await guard.harvest(county, self._one(c, county)))

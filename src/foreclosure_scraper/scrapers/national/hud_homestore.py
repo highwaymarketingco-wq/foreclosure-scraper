@@ -60,8 +60,15 @@ import time
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -273,12 +280,25 @@ async def _fetch_state(state: str, sink: list | None = None,
     """One state's listings. `sink` (the scraper's self.partial) receives the search rows before
     the broker pages are fetched; broker pages stop once time.monotonic() passes `deadline`."""
     async with client(timeout=30.0) as c:
-        # Step 1: GET /searchresult to receive the anti-CSRF cookie + token
+        # Step 1: GET /searchresult to receive the anti-CSRF cookie + token.
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout -- found 2026-10-17: this bare call had zero retry cushioning (same gap
+        # already fixed for the Column legal-notice API scrapers, spartan_weekly_legals.py,
+        # and arcgis_webmap.query_features), so a single transient blip permanently zeroed
+        # this state's whole listing output for the run (no fallback window --
+        # national.hud_homestore is a dateless source). A real non-200 is still unretried.
         try:
-            initial = await c.get(
-                f"{BASE}/searchresult?stateCode={state}",
-                headers=HEADERS, follow_redirects=True,
-            )
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    initial = await c.get(
+                        f"{BASE}/searchresult?stateCode={state}",
+                        headers=HEADERS, follow_redirects=True,
+                    )
         except Exception as exc:
             log.warning("hud.initial_fail", state=state, error=str(exc)[:200])
             return []
@@ -290,17 +310,25 @@ async def _fetch_state(state: str, sink: list | None = None,
             return []
         token = m.group(1)
 
-        # Step 2: POST the search handler
+        # Step 2: POST the search handler -- the one request this state's whole result set
+        # depends on. Same bare-call zero-retry exposure as Step 1 above, same fix.
         try:
-            r = await c.post(
-                f"{BASE}/searchresult?handler=GetFilteredResult",
-                headers={
-                    **HEADERS,
-                    "RequestVerificationToken": token,
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                content=f"citystate={state}&pageNumber=1",
-            )
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.post(
+                        f"{BASE}/searchresult?handler=GetFilteredResult",
+                        headers={
+                            **HEADERS,
+                            "RequestVerificationToken": token,
+                            "Content-Type": "application/x-www-form-urlencoded",
+                        },
+                        content=f"citystate={state}&pageNumber=1",
+                    )
         except Exception as exc:
             log.warning("hud.search_fail", state=state, error=str(exc)[:200])
             return []
@@ -333,11 +361,21 @@ async def _fetch_state(state: str, sink: list | None = None,
                 break
             if not li.case_number:
                 continue
+            # Lower severity than Steps 1/2 (a failure here only `continue`s past this one
+            # listing's broker enrichment -- the search rows are already in `out`/`sink`),
+            # but still a genuinely unprotected bare call, so it gets the same cushioning.
             try:
-                dr = await c.get(
-                    f"{BASE}/propertydetails?caseNumber={li.case_number}",
-                    headers=HEADERS, follow_redirects=True,
-                )
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        dr = await c.get(
+                            f"{BASE}/propertydetails?caseNumber={li.case_number}",
+                            headers=HEADERS, follow_redirects=True,
+                        )
             except Exception as exc:
                 log.warning("hud.broker_fetch_failed", case=li.case_number,
                             error=str(exc)[:160])

@@ -41,8 +41,15 @@ import time
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -342,7 +349,25 @@ async def _fetch_state(state: str, url: str, sink: list | None = None,
     `deadline`."""
     async with client(timeout=30.0) as c:
         try:
-            r = await c.get(url, headers=HEADERS, follow_redirects=True)
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- this is the per-state listing-search page fetch, called
+            # exactly once per state, with zero retry cushioning previously (the shared
+            # client() helper explicitly leaves retries to its callers). A single
+            # transient connection reset/timeout here used to zero that state's entire
+            # scrape output for the run, reported as a silent empty result (this source is
+            # in main.DATELESS_OK_SOURCES, so there is no date-window fallback to self-heal
+            # on the next run). A real non-200 status or parse failure still returns []
+            # below, unretried -- only a transport-level failure gets a second chance.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type(
+                    (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                ),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(url, headers=HEADERS, follow_redirects=True)
         except Exception as exc:
             log.warning("freddie.fetch_failed", state=state, error=str(exc)[:200])
             return []
@@ -381,7 +406,22 @@ async def _fetch_state(state: str, url: str, sink: list | None = None,
             ):
                 continue
             try:
-                dr = await c.get(li.source_url, headers=HEADERS, follow_redirects=True)
+                # Same retry cushioning as the list-page fetch above, for the same reason
+                # -- a bare client().get() with zero retry wrapper. Blast radius here is
+                # per-listing only (one listing loses county/photos/lat-lng/agent
+                # enrichment on a transient blip), but a lost county can still cause the
+                # listing to be dropped downstream (see module docstring,
+                # main._countyless_national()).
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type(
+                        (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                    ),
+                    reraise=True,
+                ):
+                    with attempt:
+                        dr = await c.get(li.source_url, headers=HEADERS, follow_redirects=True)
             except Exception as exc:
                 log.warning("freddie.detail_fetch_failed", url=li.source_url,
                             error=str(exc)[:160])

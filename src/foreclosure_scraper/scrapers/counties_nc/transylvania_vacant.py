@@ -20,6 +20,9 @@ import re
 from datetime import datetime
 from typing import Iterable
 
+import httpx
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
+
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
@@ -164,13 +167,30 @@ class TransylvaniaVacant(BaseScraper):
                 params = {"where": _WHERE, "outFields": _OUT, "returnGeometry": "false",
                           "resultRecordCount": str(_PAGE), "resultOffset": str(offset),
                           "orderByFields": "OBJECTID", "f": "json"}
-                try:
-                    r = await c.get(QUERY_URL, params=params)
-                    if r.status_code != 200:
-                        break
-                    feats = r.json().get("features", []) or []
-                except Exception:  # noqa: BLE001
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout only -- found 2026-10-17 (gap-sweep investigation), same
+                # root cause already fixed tonight for the Column legal-notice API scraper,
+                # spartan_weekly_legals.py and the shared arcgis_webmap.query_features(): the
+                # shared client() helper's own docstring says callers must wrap their own
+                # retries, and this bare c.get() call had zero retry cushioning -- a single
+                # transient blip on ANY page silently truncated or zeroed this whole dateless
+                # source's output (it's registered in main.DATELESS_OK_SOURCES, no fallback
+                # date window to self-heal from), reported as a healthy result. A real
+                # non-200 status is left alone, unretried, below -- and (unlike the old bare
+                # `except Exception: break`) a non-transient failure now surfaces instead of
+                # being silently swallowed into a clean break.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type(
+                        (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(QUERY_URL, params=params)
+                if r.status_code != 200:
                     break
+                feats = r.json().get("features", []) or []
                 if not feats:
                     break
                 for ft in feats:

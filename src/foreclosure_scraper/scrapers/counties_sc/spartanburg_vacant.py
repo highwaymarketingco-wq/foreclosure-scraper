@@ -56,7 +56,14 @@ import re
 from datetime import datetime
 from typing import Any, Iterable
 
+import httpx
 import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -239,9 +246,29 @@ class SpartanburgVacant(BaseScraper):
                     "geometryPrecision": "6",
                     "resultOffset": str(offset), "resultRecordCount": str(_PAGE), "f": "json",
                 }
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- http_client.client() does not retry internally
+                # (callers must wrap their own AsyncRetrying), so a bare call here meant a
+                # single transient blip on page 1 (offset=0) silently zeroed this dateless
+                # source's whole ~5,014-row roll, and a blip on any later page silently
+                # truncated the rest -- reported as a healthy result either way since this
+                # source has no fallback date window to self-heal from. Same gap already
+                # fixed tonight for the Column legal-notice API scrapers,
+                # spartan_weekly_legals.py, and arcgis_webmap.query_features(). A real
+                # non-200/parse failure (not a transport/timeout error) still breaks the
+                # loop below, unretried.
                 try:
-                    r = await c.get(LAYER, params=params)
-                    feats = (r.json() or {}).get("features") or []
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type(
+                            (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                        ),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await c.get(LAYER, params=params)
+                            feats = (r.json() or {}).get("features") or []
                 except Exception as exc:  # noqa: BLE001
                     log.warning("spartanburg_vacant.page_fail", offset=offset, error=str(exc)[:120])
                     break

@@ -90,8 +90,10 @@ from typing import Any, Iterable
 from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 from xml.etree.ElementTree import iterparse
 
+import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 import asyncio
 import time
@@ -436,10 +438,25 @@ async def _pin_map(http) -> dict[str, str]:
         if offset:
             await asyncio.sleep(_PIN_PAGE_PAUSE_S)
         try:
-            r = await http.get(PARCEL_LAYER, params={
-                "where": "1=1", "outFields": "Parcel_Number,PIN", "returnGeometry": "false",
-                "orderByFields": "OBJECTID", "resultOffset": str(offset),
-                "resultRecordCount": str(_PIN_PAGE), "f": "json"}, timeout=60.0)
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+            # timeout -- found 2026-10-17: this bare call had zero retry cushioning, same gap
+            # already fixed tonight for the Column legal-notice API scrapers,
+            # spartan_weekly_legals.py and arcgis_webmap.query_features(). Because the except
+            # below `break`s the WHOLE ~29-page pagination (not just the current page), a single
+            # transient blip on any page permanently truncates the PIN map for the rest of the
+            # run -- not a per-item loss. A real non-200/parse issue still falls through to
+            # `body = {}` below, unretried, exactly as before.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await http.get(PARCEL_LAYER, params={
+                        "where": "1=1", "outFields": "Parcel_Number,PIN", "returnGeometry": "false",
+                        "orderByFields": "OBJECTID", "resultOffset": str(offset),
+                        "resultRecordCount": str(_PIN_PAGE), "f": "json"}, timeout=60.0)
             body = r.json() if r.status_code == 200 else {}
         except Exception as exc:  # noqa: BLE001
             log.warning("rutherford_tax.pin_map_failed", offset=offset, error=str(exc)[:160])

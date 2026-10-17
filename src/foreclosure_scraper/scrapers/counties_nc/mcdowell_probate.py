@@ -16,6 +16,14 @@ import os
 from datetime import datetime
 from typing import Iterable
 
+import httpx
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
+
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
@@ -71,7 +79,25 @@ class McDowellProbate(BaseScraper):
                           "resultRecordCount": str(_PAGE), "resultOffset": str(offset),
                           "orderByFields": "parno", "f": "json"}
                 try:
-                    r = await c.get(QUERY_URL, params=params)
+                    # Retried up to 3 times (short exponential-jitter backoff) on a
+                    # transport error or timeout -- bare call had zero retry cushioning,
+                    # the same gap already fixed elsewhere in this repo (Column
+                    # legal-notice API scrapers, spartan_weekly_legals.py,
+                    # arcgis_webmap.query_features()). The page size (2000) comfortably
+                    # exceeds the real dataset (~414 parcels), so this first call is a
+                    # true single point of failure for the whole scrape, and this source
+                    # is in DATELESS_OK_SOURCES (no fallback date window) so a zeroed run
+                    # can't self-heal later. A real non-200 status still breaks unretried.
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type(
+                            (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                        ),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await c.get(QUERY_URL, params=params)
                     if r.status_code != 200:
                         break
                     feats = r.json().get("features", []) or []

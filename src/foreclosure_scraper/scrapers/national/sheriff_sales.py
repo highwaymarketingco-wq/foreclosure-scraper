@@ -134,6 +134,12 @@ from urllib.parse import urljoin
 import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...document_links import stamp_documents
@@ -390,12 +396,32 @@ async def _robots_allows(host: str, path: str) -> bool:
 
 
 async def _fetch_html(url: str, timeout: float = 30.0) -> str:
-    """Fetch HTML with the shared client + browser-like headers."""
+    """Fetch HTML with the shared client + browser-like headers.
+
+    FOUND/FIXED 2026-10-17 (unprotected-network-call audit): `http_client.client()`
+    deliberately runs with `retries=0` -- its own module comment says callers must
+    wrap their own `AsyncRetrying` -- but this called the bare client directly with
+    zero retry wrapper of its own, bypassing `http_client.get_text()` (which DOES
+    retry) entirely. Both call sites in `_fetch_county` (the main per-county page
+    fetch and the sub-page loop) route through this one function, so a single
+    transient connection-reset/timeout here used to zero that county's entire
+    scrape for the run with no fallback date window to self-heal from (this source
+    is in `main.DATELESS_OK_SOURCES`). Retries only transport/timeout errors, never
+    a real bad HTTP status or an HTTP-200-with-error-body response.
+    """
     from ...http_client import client
-    async with client(timeout=timeout) as c:
-        r = await c.get(url)
-        r.raise_for_status()
-        return r.text
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            async with client(timeout=timeout) as c:
+                r = await c.get(url)
+                r.raise_for_status()
+                return r.text
+    raise RuntimeError("unreachable")
 
 
 def _parse_table_rows(tree: HTMLParser) -> list[dict[str, str]]:

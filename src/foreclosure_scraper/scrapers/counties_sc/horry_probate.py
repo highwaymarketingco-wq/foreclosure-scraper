@@ -57,7 +57,9 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -320,7 +322,23 @@ class HorryProbate(BaseScraper):
         fetch_start = time.monotonic()
         async with client(timeout=45.0) as http:
             try:
-                await http.get(PAGE_URL)       # the page the grid lives on, as a browser loads it
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- this is the same gap already fixed tonight for the
+                # Column legal-notice API scrapers, spartan_weekly_legals.py, and
+                # arcgis_webmap.query_features(): a bare client() call has zero retry
+                # cushioning of its own (see http_client.client()'s own docstring), so a
+                # single transient blip here was a true single-point-of-failure for 100%
+                # of this file's output (the except-block below zeroes the whole scrape).
+                # A real non-200/parse issue is unaffected -- only a transport-level
+                # failure gets a second chance.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        await http.get(PAGE_URL)       # the page the grid lives on, as a browser loads it
             except Exception as exc:  # noqa: BLE001
                 log.warning("horry_probate.page_failed", error=str(exc)[:160])
                 return []
@@ -331,7 +349,22 @@ class HorryProbate(BaseScraper):
                 for _ in range(MAX_PAGES_PER_YEAR):
                     await asyncio.sleep(_PAUSE_S)
                     try:
-                        r = await http.get(DATA_URL, params=search_params(year, start), headers=_AJAX_HEADERS)
+                        # Same retry cushioning as the priming fetch above, and for the same
+                        # reason: `start` begins at 0 each year and pages are fetched
+                        # sequentially, so a transient failure on the very first page of a
+                        # year silently zeroed that entire year's estates (the bulk of the
+                        # scrape) before this fix -- the exact "sequential page loop + bare
+                        # client() call + break-on-transient-error" shape already fixed
+                        # tonight in spartan_weekly_legals.py. A real non-200/parse issue
+                        # still breaks the page loop below, unretried.
+                        async for attempt in AsyncRetrying(
+                            stop=stop_after_attempt(3),
+                            wait=wait_exponential_jitter(initial=1, max=8),
+                            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                            reraise=True,
+                        ):
+                            with attempt:
+                                r = await http.get(DATA_URL, params=search_params(year, start), headers=_AJAX_HEADERS)
                         data = decode(r.json()) if r.status_code == 200 else {}
                     except Exception as exc:  # noqa: BLE001
                         log.warning("horry_probate.page_error", year=year, start=start, error=str(exc)[:160])

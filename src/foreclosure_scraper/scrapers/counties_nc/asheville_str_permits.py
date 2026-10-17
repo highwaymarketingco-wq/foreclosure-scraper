@@ -38,7 +38,9 @@ import re
 from datetime import datetime, timezone
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -119,7 +121,24 @@ class AshevilleSTRPermits(BaseScraper):
                 "resultRecordCount": "1500", "f": "json",
             }
             try:
-                r = await c.get(LAYER, params=params)
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- checked http_client.client(): its transport has
+                # retries=0 and callers are expected to wrap their own (see its docstring),
+                # which this bare `c.get` never did. This is the file's only external
+                # network call and the whole scrape's single point of failure (no per-item
+                # loop to fall back on), and the source is dateless (DATELESS_OK_SOURCES,
+                # no fallback date window) -- a transient blip would otherwise return []
+                # silently, read by safe_run() as a healthy empty result, and never
+                # self-heal. A real non-transport failure (bad response shape, JSON error,
+                # etc.) still falls through to the except below, unretried.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(LAYER, params=params)
                 feats = (r.json() or {}).get("features") or []
             except Exception as exc:  # noqa: BLE001
                 log.warning("asheville_str.fetch_fail", error=str(exc)[:150])

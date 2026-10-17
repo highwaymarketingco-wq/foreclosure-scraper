@@ -71,6 +71,12 @@ import httpx
 import structlog
 from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...enrichment_arcgis import _apply_attrs
@@ -279,18 +285,37 @@ async def _query_layer(
 
     async def _query(where: str, limit: int = 1) -> Optional[list[dict[str, Any]]]:
         try:
-            r = await c.get(
-                url,
-                params={
-                    "where": where,
-                    "outFields": "*",
-                    "returnGeometry": "true",
-                    "outSR": "4326",
-                    "resultRecordCount": str(limit),
-                    "f": "json",
-                },
-                timeout=20.0,
-            )
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout. The bare call here had zero retry cushioning -- the
+            # shared http_client.client() helper this runs on explicitly sets
+            # AsyncHTTPTransport(retries=0) and expects its callers to wrap their own
+            # retries. Without this, a single transient connection reset/timeout was
+            # silently indistinguishable from a genuine "TMS not found" miss (the
+            # except clause below converts either into the same None return), which
+            # risks that one listing's lat/lng enrichment being silently dropped. A
+            # real non-200 status or an HTTP-200-with-error-body response still falls
+            # through unretried below.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type(
+                    (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                ),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(
+                        url,
+                        params={
+                            "where": where,
+                            "outFields": "*",
+                            "returnGeometry": "true",
+                            "outSR": "4326",
+                            "resultRecordCount": str(limit),
+                            "f": "json",
+                        },
+                        timeout=20.0,
+                    )
             if r.status_code != 200:
                 return None
             data = r.json()

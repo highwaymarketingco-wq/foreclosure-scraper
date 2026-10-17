@@ -43,7 +43,9 @@ import re
 from datetime import datetime, timedelta
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ... import foreclosure_docket_history as _fdh
 from ...base_scraper import BaseScraper
@@ -591,8 +593,21 @@ class NCECourtsLisPendens(BaseScraper):
 
         async with client(timeout=45.0, headers=SERVICE_HEADERS) as c:
             # Step 1: empty POST -> initial searchObject template
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport error
+            # or timeout -- http_client.client()'s own docstring says callers must wrap their
+            # own retries, and this bare call had none. A single transient connection reset/
+            # timeout here zeroed this file's ENTIRE output for the run (this source is listed
+            # in main.DATELESS_OK_SOURCES -- no fallback date window to self-heal from later).
+            # A real non-200/parse failure still returns [] unretried, below.
             try:
-                r = await c.post(SERVICE_URL, content=b"")
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.post(SERVICE_URL, content=b"")
             except Exception as exc:  # noqa: BLE001
                 log.warning("nc_ecourts.template_fetch_failed", error=str(exc))
                 return []
@@ -630,8 +645,21 @@ class NCECourtsLisPendens(BaseScraper):
                     page_from=page_from,
                     page_size=self.PAGE_SIZE,
                 )
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- same gap as the template fetch above: this per-page
+                # call had zero retry cushioning, and on `except Exception` the loop does
+                # `break`, discarding every remaining page rather than skipping just one.
+                # A blip on page 0 zeroes the run; a blip on a later page silently
+                # truncates it. A real non-200/parse failure still breaks, unretried.
                 try:
-                    r2 = await c.post(SERVICE_URL, json=so)
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r2 = await c.post(SERVICE_URL, json=so)
                 except Exception as exc:  # noqa: BLE001
                     log.warning("nc_ecourts.search_request_failed", error=str(exc),
                                 page_from=page_from)

@@ -63,8 +63,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
 from dateutil import parser as dateparser
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...document_links import stamp_documents
@@ -284,7 +291,22 @@ async def _fetch_state(c, state: str) -> list[Listing]:
         if token:
             params["continuationToken"] = token
         try:
-            r = await c.get(API, params=params, follow_redirects=True)
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- http_client.client() deliberately sets retries=0 on
+            # its transport and expects callers to wrap their own AsyncRetrying. This
+            # call site had none: a single transient blip on page 1 (the common case,
+            # since NC/SC each resolve in 1-2 pages) permanently zeroed that state's
+            # whole scrape for the run, same shape already fixed in spartan_weekly_legals.py
+            # and arcgis_webmap.query_features(). A real bad status or bad body below is
+            # still unretried -- those are handled failures, not transport blips.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(API, params=params, follow_redirects=True)
         except Exception as exc:  # noqa: BLE001
             log.warning("servicelink.fetch_failed", state=state, page=page, error=str(exc)[:160])
             break

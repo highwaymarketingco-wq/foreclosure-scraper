@@ -81,7 +81,9 @@ import re
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -297,15 +299,33 @@ class CharlotteOpenData(BaseScraper):
         try:
             async with client(timeout=30.0) as c:
                 while True:
-                    r = await c.get(SERVICE_URL, params={
-                        "where": "CaseStatus='Open'",
-                        "outFields": FIELDS,
-                        "returnGeometry": "true",
-                        "outSR": "4326",
-                        "resultOffset": offset,
-                        "resultRecordCount": _PAGE,
-                        "f": "json",
-                    }, timeout=30.0)
+                    # Retried up to 3 times (short exponential-jitter backoff) on a
+                    # transport error or timeout -- http_client.client()'s transport
+                    # sets retries=0 and expects callers to wrap their own (see
+                    # http_client.py ~L259); this call didn't, so a single transient
+                    # blip on any page broke the whole pagination loop via the bare
+                    # except Exception below, zeroing or truncating this dateless
+                    # source's entire result for the run with no way to self-heal
+                    # (charlotte_open_data.py is in main.DATELESS_OK_SOURCES). Same
+                    # bug shape already fixed in the Column legal-notice scraper,
+                    # spartan_weekly_legals.py, and arcgis_webmap.query_features().
+                    # A real non-200/error-body response still breaks below, unretried.
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await c.get(SERVICE_URL, params={
+                                "where": "CaseStatus='Open'",
+                                "outFields": FIELDS,
+                                "returnGeometry": "true",
+                                "outSR": "4326",
+                                "resultOffset": offset,
+                                "resultRecordCount": _PAGE,
+                                "f": "json",
+                            }, timeout=30.0)
                     if r.status_code != 200:
                         log.warning("charlotte.http_error", status=r.status_code)
                         break

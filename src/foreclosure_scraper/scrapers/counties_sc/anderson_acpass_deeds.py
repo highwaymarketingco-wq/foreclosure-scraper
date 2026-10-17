@@ -80,7 +80,9 @@ import re
 from datetime import datetime, timedelta
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...document_links import stamp_documents
@@ -337,19 +339,35 @@ def _build_listing(slug: str, code: str, label: str, row: dict, detail: dict) ->
 
 
 async def _fetch_type_code(c, code: str, from_str: str, to_str: str) -> list[dict]:
-    """Run the date+type sweep for one code, following 'More' pagination."""
-    resp = await c.post(
-        _SEARCH_CGI,
-        data={
-            "QrySrchType": "L", "QryName": "",
-            "QryFromDate": from_str, "QryToDate": to_str,
-            "QryType": code, "Submit": "Submit",
-        },
-        headers={
-            "Referer": _FORM_URL, "Origin": _BASE,
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-    )
+    """Run the date+type sweep for one code, following 'More' pagination.
+
+    Both POSTs below are retried (transport/timeout errors only, never a real
+    bad status) -- found 2026-10-17: this function had zero retry cushioning
+    (same gap already fixed tonight for the Column legal-notice API scrapers,
+    spartan_weekly_legals.py, and arcgis_webmap.query_features()). Unwrapped, a
+    single transient blip here propagates out of this function and is only
+    caught at the call site in fetch() as catch-and-skip-the-whole-code -- with
+    only two codes total (195/020), losing one zeroes up to half this dateless
+    source's output for the run with no fallback date window to self-heal on."""
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            resp = await c.post(
+                _SEARCH_CGI,
+                data={
+                    "QrySrchType": "L", "QryName": "",
+                    "QryFromDate": from_str, "QryToDate": to_str,
+                    "QryType": code, "Submit": "Submit",
+                },
+                headers={
+                    "Referer": _FORM_URL, "Origin": _BASE,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+            )
     if resp.status_code != 200:
         log.warning("anderson_acpass.search_failed", code=code, status=resp.status_code)
         return []
@@ -358,13 +376,20 @@ async def _fetch_type_code(c, code: str, from_str: str, to_str: str) -> list[dic
     cursor = _parse_cursor(resp.text)
     pages = 1
     while cursor and pages < _MAX_PAGES_PER_CODE:
-        resp = await c.post(
-            _NEXT_CGI, data=cursor,
-            headers={
-                "Referer": _SEARCH_CGI, "Origin": _BASE,
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-        )
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                resp = await c.post(
+                    _NEXT_CGI, data=cursor,
+                    headers={
+                        "Referer": _SEARCH_CGI, "Origin": _BASE,
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                )
         if resp.status_code != 200:
             break
         new_rows = _parse_search_rows(resp.text)

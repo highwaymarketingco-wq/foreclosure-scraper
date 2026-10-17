@@ -126,7 +126,9 @@ import time
 from pathlib import Path
 from typing import Any, Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client, get_text
@@ -590,7 +592,24 @@ async def _post_page(c, url: str, body: dict, token: str | None) -> dict:
         headers["SearchToken"] = token
     last_status: int | None = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
-        r = await c.post(url, content=json.dumps(body), headers=headers)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout -- found 2026-10-17: this bare POST had zero retry cushioning, same gap
+        # already fixed tonight for the Column legal-notice API scrapers, spartan_weekly_
+        # legals.py, arcgis_webmap.query_features() and rutherford_tax._pin_map(). A connection
+        # reset/timeout on any one of the ~1,400 pages across all 10 tax years otherwise escapes
+        # _post_page -> _sweep_year -> fetch() uncaught (only PermissionError, WildfireWall, and
+        # WildfireNotJson/RuntimeError/OSError are handled upstream), crashing the whole sweep
+        # rather than just dropping one page. A real bad status (403/401/429/503/other) or a
+        # non-JSON 200 is untouched below -- neither is a transport/timeout error, so neither is
+        # retried here.
+        async for post_attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with post_attempt:
+                r = await c.post(url, content=json.dumps(body), headers=headers)
         last_status = r.status_code
         if r.status_code == 200:
             ctype = (r.headers.get("content-type") or "").lower()

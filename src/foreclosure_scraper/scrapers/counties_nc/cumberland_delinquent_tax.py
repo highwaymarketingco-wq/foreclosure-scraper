@@ -31,7 +31,9 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Iterable, Optional
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -144,8 +146,20 @@ class CumberlandDelinquentTax(BaseScraper):
         from pypdf import PdfReader
         year = int(os.environ.get("FORECLOSURE_CUMBERLAND_TAX_YEAR") or latest_delinquent_levy_year("NC"))
         url = PDF.format(year=year)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout -- this is the only network call in the file and the whole scrape's output
+        # is one PDF fetch, with no fallback date window (DATELESS_OK_SOURCES), so a single
+        # transient blip used to permanently zero this run instead of healing on retry. A
+        # real bad status or bad content-type is still unretried, raised below as before.
         async with client(timeout=120.0) as c:
-            r = await c.get(url)
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(url)
         if r.status_code != 200 or not r.content.startswith(b"%PDF"):
             raise RuntimeError(f"cumberland {year} PDF: HTTP {r.status_code}")
         text = "\n".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(r.content)).pages)

@@ -64,7 +64,14 @@ import re
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -418,11 +425,28 @@ class NCHeirEstateParcels(BaseScraper):
                                 "ranked_by_value": 0}
 
     async def _value_field(self, http, url: str) -> str | None:
-        """The layer's numeric total-value column (one schema GET per layer per run)."""
+        """The layer's numeric total-value column (one schema GET per layer per run).
+
+        The GET is wrapped in AsyncRetrying (2026-10-17 gap-sweep): a bare transient
+        transport/timeout blip here used to permanently disable value-ranking for that
+        layer for the rest of the run with zero retry cushioning -- never a zeroed
+        county (the caller falls back to the pre-existing unordered `_query()` read),
+        just silently worse ordering for that one layer. Retried ONLY transport/timeout
+        errors; a real bad status or parse failure still falls straight through to the
+        same vf=None fallback below, unretried, exactly as before.
+        """
         if url not in self._value_fields:
             vf = None
             try:
-                r = await http.get(url.rstrip("/"), params={"f": "json"}, timeout=30.0)
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type(
+                        (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await http.get(url.rstrip("/"), params={"f": "json"}, timeout=30.0)
                 if getattr(r, "status_code", 0) == 200:
                     vf = _pick_value_field(r.json() or {})
             except Exception:  # noqa: BLE001 - unranked is the old behaviour, not a failure

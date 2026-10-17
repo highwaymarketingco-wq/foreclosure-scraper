@@ -36,6 +36,12 @@ from urllib.parse import urljoin, quote_plus, urlparse
 import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ..._upstate_city_to_county import upstate_county_for
 from ...base_scraper import BaseScraper
@@ -159,14 +165,36 @@ async def _robots_allows(host: str, path: str) -> bool:
 
 async def _fetch_text(url: str, timeout: float = 20.0,
                       headers: dict | None = None) -> str:
+    """GET text through the shared throttled client, with our own retry.
+
+    http_client.client() is a bare httpx.AsyncClient context manager with
+    retries=0 on its transport (callers must wrap their own AsyncRetrying --
+    see that module's docstring). This function is a local caller that
+    bypasses the project's already-retried get_text() helper, so without this
+    wrapper a single transient connect/read blip would zero out whichever
+    call site invoked it (both of this file's call sites are dateless, so a
+    zeroed run can't self-heal on a later date window). Retries only
+    transport/timeout errors -- a real bad HTTP status from raise_for_status()
+    is not a transient-network symptom and must not be retried here.
+    """
     from ...http_client import client
     h = {"Accept": "text/html,application/json,*/*"}
     if headers:
         h.update(headers)
-    async with client(timeout=timeout, headers=h) as c:
-        r = await c.get(url)
-        r.raise_for_status()
-        return r.text
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type(
+            (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+        ),
+        reraise=True,
+    ):
+        with attempt:
+            async with client(timeout=timeout, headers=h) as c:
+                r = await c.get(url)
+                r.raise_for_status()
+                return r.text
+    raise RuntimeError("unreachable")
 
 
 # --- schema.org JSON-LD SaleEvent ------------------------------------------

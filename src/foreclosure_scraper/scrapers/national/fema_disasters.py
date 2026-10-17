@@ -29,7 +29,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -106,7 +108,22 @@ class FEMADisasters(BaseScraper):
         out: list[Listing] = []
         try:
             async with client(timeout=45.0) as c:
-                r = await c.get(API_URL, params=params, timeout=45.0)
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- this is the scrape's only network call and the whole
+                # run's output depends on it, but the bare c.get() had zero retry cushioning
+                # (http_client.client() deliberately doesn't retry; callers must wrap their
+                # own AsyncRetrying). A single transient blip used to permanently zero this
+                # dateless source's whole result. A real non-200 status or a JSON-parse
+                # failure still isn't retried -- only a transport-level failure gets a
+                # second chance.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(API_URL, params=params, timeout=45.0)
                 if r.status_code != 200:
                     log.warning("fema_disasters.http_error", status=r.status_code)
                     return out

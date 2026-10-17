@@ -34,6 +34,9 @@ import re
 from datetime import datetime
 from typing import Iterable
 
+import httpx
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
+
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
@@ -130,7 +133,23 @@ class OconeeTaxSale(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         async with client(timeout=30.0) as c:
-            r = await c.get(CSV_URL, headers={"User-Agent": "Mozilla/5.0"})
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- this is the single network call the whole scrape
+            # depends on (no per-item loop), so a bare call here had zero retry
+            # cushioning: one transient blip would propagate uncaught out of fetch()
+            # and zero this file's whole output for the run, with no fallback date
+            # window to self-heal on a later run (registered in
+            # main.DATELESS_OK_SOURCES). A real HTTP status (including the
+            # expected 200-with-placeholder-rows state between sale cycles) is
+            # still handled, unretried, by the status check below.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(CSV_URL, headers={"User-Agent": "Mozilla/5.0"})
             if r.status_code != 200:
                 return []
             text = r.text

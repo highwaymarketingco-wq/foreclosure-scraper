@@ -65,7 +65,9 @@ from datetime import datetime
 from io import BytesIO
 from typing import Any, Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ... import parcel_cache
 from ...base_scraper import BaseScraper
@@ -326,8 +328,24 @@ class MecklenburgDelinquentTax(BaseScraper):
         parsed: list[tuple[dict[str, Any], str, str, dict[str, str | None]]] = []
         async with client(timeout=90.0) as http:
             for kind, share_url in LISTS:
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- the bare http_client.client() call has zero retry of
+                # its own (its transport is built with retries=0; callers must wrap their
+                # own AsyncRetrying). LISTS has only two entries and the two calls per kind
+                # are sequential and dependent, so a single transient blip here used to
+                # permanently zero a third to two-thirds of this scraper's rows for the
+                # whole run (this slug has no fallback date window to self-heal on next
+                # run). A real non-200 status or malformed body is still just warned and
+                # skipped below, unretried.
                 try:
-                    page = await http.get(share_url)
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            page = await http.get(share_url)
                 except Exception as exc:  # noqa: BLE001
                     log.warning("mecklenburg_delinquent.share_failed", kind=kind, error=str(exc)[:160])
                     continue
@@ -339,7 +357,14 @@ class MecklenburgDelinquentTax(BaseScraper):
                     log.warning("mecklenburg_delinquent.no_download_link", kind=kind)
                     continue
                 try:
-                    resp = await http.get(WIDEN_HOST + path)
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            resp = await http.get(WIDEN_HOST + path)
                 except Exception as exc:  # noqa: BLE001
                     log.warning("mecklenburg_delinquent.download_failed", kind=kind, error=str(exc)[:160])
                     continue

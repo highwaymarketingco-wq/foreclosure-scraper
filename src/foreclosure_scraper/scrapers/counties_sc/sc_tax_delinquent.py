@@ -105,8 +105,10 @@ from datetime import datetime
 from typing import Iterable
 from urllib.parse import urljoin
 
+import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client, get_text_impersonate, mark_host_blocked
@@ -301,7 +303,21 @@ def _classify_lines(text: str) -> ListingType:
 async def _scrape_pdf(c, url: str, county: str, label: str = "") -> list[Listing]:
     """Pull tax-delinquent rows from a PDF. Returns parsed listings."""
     try:
-        r = await c.get(url, follow_redirects=True, timeout=30.0)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout. http_client.client() deliberately sets retries=0 on its transport --
+        # per its own docstring, callers already wrap their own AsyncRetrying -- and this
+        # call site never did. A single transient connection reset/timeout fetching one
+        # linked PDF was swallowed by the bare except below and silently returned [],
+        # dropping that PDF's rows with no retry. A real non-200 status (or a real parse
+        # failure) still falls through unretried.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await c.get(url, follow_redirects=True, timeout=30.0)
         if r.status_code != 200:
             return []
         try:

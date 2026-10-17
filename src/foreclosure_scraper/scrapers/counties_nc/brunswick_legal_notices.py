@@ -56,6 +56,12 @@ import httpx
 import structlog
 from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...document_links import stamp_documents
@@ -219,18 +225,35 @@ async def _resolve_onemap(
     for fld in ("parno", "altparno"):
         where = f"{fld}='{esc}' AND cntyname='{cname}'"
         try:
-            r = await c.get(
-                ONEMAP_QUERY,
-                params={
-                    "where": where,
-                    "outFields": "parno,siteadd,scity,sstate,szip,ownname,cntyname,parval,presentval,gisacres",
-                    "returnGeometry": "true",
-                    "outSR": "4326",
-                    "resultRecordCount": "1",
-                    "f": "json",
-                },
-                timeout=20.0,
-            )
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- this call bypasses get_text/get_bytes and hits the
+            # raw http_client.client() helper directly, whose transport sets
+            # retries=0 and whose docstring says callers must wrap their own
+            # AsyncRetrying. This one never did, so a single transient blip on
+            # either field attempt (parno/altparno) just fell through silently
+            # instead of retrying. A real non-200/parse failure still falls
+            # through unretried below (continue to the next field / return None).
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type(
+                    (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                ),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(
+                        ONEMAP_QUERY,
+                        params={
+                            "where": where,
+                            "outFields": "parno,siteadd,scity,sstate,szip,ownname,cntyname,parval,presentval,gisacres",
+                            "returnGeometry": "true",
+                            "outSR": "4326",
+                            "resultRecordCount": "1",
+                            "f": "json",
+                        },
+                        timeout=20.0,
+                    )
             if r.status_code != 200:
                 continue
             data = r.json()

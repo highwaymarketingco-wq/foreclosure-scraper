@@ -45,7 +45,9 @@ from datetime import datetime
 from email.utils import parsedate_to_datetime
 from typing import Any, Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -193,8 +195,24 @@ class BankruptcyRssReliefFromStay(BaseScraper):
         out: list[Listing] = []
         async with client(timeout=45.0) as http:
             for court, state, district, url in FEEDS:
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- this bare call had zero retry cushioning, the same gap
+                # already fixed tonight for the Column legal-notice API scrapers,
+                # spartan_weekly_legals.py and arcgis_webmap.query_features(). The feed is a
+                # rolling window with no fallback date window (see module docstring; this
+                # source is in main.DATELESS_OK_SOURCES), so a single transient blip on one
+                # court's GET permanently drops that court's relief-from-stay cases for the
+                # run instead of getting a second chance. A real non-200/non-RSS response
+                # still falls through unretried below.
                 try:
-                    r = await http.get(url)
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await http.get(url)
                 except Exception as exc:  # noqa: BLE001
                     log.warning("bk_rss_rfs.fetch_failed", court=court, error=str(exc)[:160])
                     continue

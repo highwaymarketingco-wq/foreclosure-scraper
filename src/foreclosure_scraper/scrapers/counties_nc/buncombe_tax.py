@@ -52,8 +52,15 @@ import re
 from datetime import datetime, timedelta
 from typing import Iterable
 
+import httpx
 import structlog
 from dateutil import parser as dateparser
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -131,7 +138,23 @@ class BuncombeTax(BaseScraper):
         }
         try:
             async with client(timeout=30.0) as c:
-                r = await c.get(JSON_URL, params=params)
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- 2026-10-17: http_client.client() sets the transport's
+                # own retries=0 BY DESIGN ("callers already wrap their own AsyncRetrying";
+                # see its docstring), and this call never did, so a single transient blip
+                # fell straight through to the bare `except Exception: return []` below and
+                # silently zeroed the whole scrape. This source carries no fallback date
+                # window (it's in main.DATELESS_OK_SOURCES), so a zeroed run can't self-heal
+                # later -- it just reports an empty/healthy result until someone notices by
+                # hand. A real non-200 status is still handled, unretried, right after.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(JSON_URL, params=params)
                 if r.status_code != 200:
                     return []
                 # Trumba returns a JSONP-like response sometimes; sniff the JSON body

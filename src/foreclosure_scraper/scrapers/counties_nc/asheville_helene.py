@@ -27,7 +27,9 @@ import os
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -56,8 +58,20 @@ async def _fetch_attachments(c, object_ids: list[int]) -> dict[int, list[str]]:
     for i in range(0, len(object_ids), _ATTACH_CHUNK):
         chunk = object_ids[i:i + _ATTACH_CHUNK]
         try:
-            r = await c.get(_ATTACH_URL, params={
-                "objectIds": ",".join(str(x) for x in chunk), "f": "json"})
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- same zero-retry gap as the line-99 query call below,
+            # just lower blast radius (a failed chunk only drops photos for ~150
+            # features, never the whole scrape). A real non-200/parse failure still
+            # falls through to the bare except below, unretried.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(_ATTACH_URL, params={
+                        "objectIds": ",".join(str(x) for x in chunk), "f": "json"})
             if r.status_code != 200:
                 continue
             groups = (r.json() or {}).get("attachmentGroups") or []
@@ -96,9 +110,27 @@ class AshevilleHeleneDamage(BaseScraper):
         now = datetime.utcnow()
         async with client(timeout=60.0) as c:
             try:
-                r = await c.get(QUERY_URL, params={
-                    "where": _WHERE, "outFields": _OUT, "returnGeometry": "true",
-                    "outSR": "4326", "resultRecordCount": "2000", "f": "json"})
+                # Retried up to 3 times (short exponential-jitter backoff) on a
+                # transport error or timeout -- this is the single ArcGIS query that
+                # returns every Unsafe/Restricted feature for the whole scrape, and it
+                # had zero retry cushioning (http_client.client() deliberately doesn't
+                # retry internally; callers must wrap their own). Registered in
+                # main.DATELESS_OK_SOURCES, so a single transient blip here used to
+                # permanently zero this run's output with no date window to self-heal
+                # on later -- same gap already fixed tonight for the Column
+                # legal-notice API scrapers, spartan_weekly_legals.py, and
+                # arcgis_webmap.query_features(). A real non-200/parse failure still
+                # falls through to the bare except below, unretried.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(QUERY_URL, params={
+                            "where": _WHERE, "outFields": _OUT, "returnGeometry": "true",
+                            "outSR": "4326", "resultRecordCount": "2000", "f": "json"})
                 if r.status_code != 200:
                     return []
                 feats = r.json().get("features", []) or []

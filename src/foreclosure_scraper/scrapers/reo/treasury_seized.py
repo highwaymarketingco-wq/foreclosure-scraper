@@ -48,8 +48,10 @@ from datetime import datetime
 from typing import Iterable
 from urllib.parse import urljoin
 
+import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...document_links import harvest_document_links, stamp_documents
@@ -259,7 +261,23 @@ class TreasurySeizedRealProperty(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         async with client(timeout=30.0) as c:
             try:
-                r = await c.get(URL, headers=HEADERS)
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- this is the ONLY source of every listing this scraper
+                # can produce, and http_client.client()'s own docstring says callers must
+                # wrap their own retry: a bare call had zero retry cushioning, so a single
+                # transient TCP reset/timeout would zero this run's whole output, and
+                # because this source is dateless (main.DATELESS_OK_SOURCES, no fallback
+                # date window) that zero can't self-heal later -- it looks identical to a
+                # genuinely empty week. A real non-200/short-body response still returns []
+                # below, unretried -- only a transport-level failure gets a second chance.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(URL, headers=HEADERS)
             except Exception as exc:
                 log.warning("treasury_seized.fetch_failed", error=str(exc)[:200])
                 return []
@@ -388,7 +406,19 @@ class TreasurySeizedRealProperty(BaseScraper):
         scraper already had."""
         try:
             async with client(timeout=20.0) as c:
-                r = await c.get(detail_url, headers=HEADERS)
+                # Same retry cushioning as fetch()'s list-page call -- a transient
+                # transport error here must not be treated as a real fetch failure.
+                # Lower severity than the list fetch (per-matched-listing, capped at
+                # _DETAIL_FETCH_CAP, and the base listing already shipped regardless --
+                # see this method's own docstring), but the proven fix is identical.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(detail_url, headers=HEADERS)
                 if r.status_code != 200 or len(r.text) < 500:
                     return
                 html_text = r.text

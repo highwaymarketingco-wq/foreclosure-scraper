@@ -58,6 +58,14 @@ import re
 from datetime import datetime
 from typing import Iterable
 
+import httpx
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
+
 from ...base_scraper import BaseScraper
 from ...condo_units import board_parcel_id
 from ...enrichment_arcgis import situs_city_zip
@@ -184,7 +192,16 @@ class BuncombeElderly(BaseScraper):
                           "resultRecordCount": str(_PAGE), "resultOffset": str(offset),
                           "orderByFields": "pin,pinnum", "f": "json"}
                 try:
-                    r = await c.get(QUERY_URL, params=params)
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type(
+                            (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                        ),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await c.get(QUERY_URL, params=params)
                     if r.status_code != 200:
                         break
                     feats = r.json().get("features", []) or []

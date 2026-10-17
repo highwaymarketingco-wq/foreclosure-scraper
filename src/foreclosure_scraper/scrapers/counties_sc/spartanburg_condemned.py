@@ -44,7 +44,9 @@ import re
 from datetime import datetime
 from typing import Any, Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -240,8 +242,24 @@ class SpartanburgCondemned(BaseScraper):
                     "orderByFields": "OBJECTID",
                     "f": "json",
                 }
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- this bare call had zero retry cushioning (http_client's
+                # own docstring says every caller wraps its own AsyncRetrying), so a single
+                # transient blip on offset=0 would hit the bare except below and `break`
+                # immediately, zeroing this run's whole output with no fallback date window
+                # to self-heal from (this is a DATELESS_OK_SOURCES source). A real non-200
+                # body (the error-body check just below) or any other parse failure still
+                # breaks the loop below, unretried -- only a transport-level failure gets a
+                # second chance.
                 try:
-                    r = await c.get(LAYER, params=params)
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await c.get(LAYER, params=params)
                     body = r.json() or {}
                 except Exception as exc:  # noqa: BLE001
                     log.warning("spartanburg_condemned.page_fail",

@@ -65,7 +65,9 @@ import html
 import re
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -206,8 +208,24 @@ class TerryHoweFLC(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         async with client(timeout=30.0, headers={"User-Agent": "Mozilla/5.0 Chrome/126"}) as c:
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+            # timeout -- this is the file's ONLY network call (the whole catalog comes back in
+            # one response), so a bare, unretried call here was a single point of failure: one
+            # transient blip permanently zeroed this scrape's whole result for the run, silently
+            # reported as a healthy empty result since this source carries no fallback date
+            # window (main.DATELESS_OK_SOURCES). Same gap already fixed tonight for the Column
+            # legal-notice API scraper, spartan_weekly_legals.py, and
+            # arcgis_webmap.query_features. A real bad HTTP status or JSON-parse failure below is
+            # still unretried -- only a transport-level failure gets a second chance.
             try:
-                r = await c.get(API, follow_redirects=True)
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(API, follow_redirects=True)
             except Exception as exc:  # noqa: BLE001
                 log.warning("terry_howe_flc.fetch_failed", error=str(exc)[:160])
                 return []
