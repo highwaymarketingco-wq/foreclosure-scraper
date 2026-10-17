@@ -745,7 +745,9 @@ SPECS: dict[str, Spec] = {
     "jail_booking": Spec(_S, "county", "jail", applies="person", ledger="jail_booking",
                          producers=("enrichment_jail_bookings.py", "scrapers/national/jail_bookings.py",
                                     "jail_matching.py"),
-                         doc="raw.jail_booking present (county jail roster match)",
+                         doc="raw.jail_booking present = a positive roster match; checked = a hit OR a "
+                             "healthy roster that matched nobody (raw.jail_booking_screen, a separate key "
+                             "so a no-match wrapper is never misread by _gate_jail as an active booking)",
                          ambiguity="counts released bookings and every confidence level"),
     "jail_booking_new": Spec(_S, "county", "jail", applies="person", ledger="jail_booking",
                              producers=("enrichment_jail_bookings.py",), doc="raw.jail_booking_new present"),
@@ -1099,6 +1101,8 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
         out.add("liensnc_posthumous_filing")
     if raw.get("sos_agent") or raw.get("sos_dissolution") or raw.get("sos_screen"):
         out.add("sos_dissolution")
+    if raw.get("jail_booking_screen"):
+        out.add("jail_booking")   # a healthy roster that matched nobody is still a check
     if rec.get("plaintiff") or rec.get("defendant"):
         out.add("title_risk")
     if rec.get("owner_name") and rec.get("defendant"):

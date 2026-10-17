@@ -1081,6 +1081,28 @@ def match_rosters(listings: list[Listing], rosters: dict,
     middle_corroborated and the reeval_* outcome counters."""
     stats = stats if stats is not None else {}
     matched: list[Listing] = []
+    screened_counties: set[tuple[str, str]] = set()
+
+    def _stamp_screen(li: Listing, county: str) -> None:
+        # 2026-10-16 (gap-sweep wave 3): a healthy roster fetch that matches nobody wrote
+        # nothing at all, so gap_matrix.py's county-scope "ran" check (pos>0 or chk>0 on
+        # ANY row in the county) could never flip -- Transylvania/Polk NC fetched a clean,
+        # healthy roster every day for 2+ months with zero rows ever credited as checked.
+        # One per-county sentinel is enough (the scope is county-wide, not per-row); written
+        # to a SEPARATE key, never raw['jail_booking'] itself -- _gate_jail treats ANY
+        # non-empty jail_booking dict without a release marker as a currently-active
+        # booking, so a {"result": "no_match"} wrapper there would wrongly read as a hit.
+        key = (li.state, county)
+        if key in screened_counties:
+            return
+        screened_counties.add(key)
+        raw0 = li.raw if isinstance(li.raw, dict) else {}
+        raw0["jail_booking_screen"] = {
+            "county": county, "state": li.state, "result": "no_match",
+            "checked_at": _today_iso(today),
+        }
+        li.raw = raw0
+
     for li in listings:
         county = _plain_county(li)
         idx = rosters.get((li.state, county))
@@ -1102,6 +1124,8 @@ def match_rosters(listings: list[Listing], rosters: dict,
             continue
         hit, verdict = _pick_hit(_owner_of(li), _roster_candidates(idx, _norm_key(*parts)))
         if hit is None:
+            if getattr(idx, "healthy", False):
+                _stamp_screen(li, county)
             continue
         if verdict == "conflict":
             stats["middle_conflict_rejected"] = stats.get("middle_conflict_rejected", 0) + 1

@@ -151,6 +151,30 @@ def test_sos_screen_counts_as_checked_but_never_as_a_positive_hit():
     assert "sos_dissolution" in gm.checked_columns(dissolved, pos2, {})
 
 
+def test_jail_booking_screen_counts_as_checked_but_never_as_a_positive_hit():
+    """Found 2026-10-16 (gap-sweep wave 3): match_rosters()'s bulk-roster lane wrote
+    nothing at all when a healthy roster matched nobody, so a county-scope "ran" check
+    (pos>0 or chk>0 on ANY row in the county) could never flip -- Transylvania/Polk NC
+    fetched a clean, healthy roster for 2+ months with zero rows ever credited as
+    checked. Fixed by writing raw.jail_booking_screen -- a SEPARATE key from
+    raw.jail_booking, because _gate_jail treats ANY non-empty jail_booking dict without
+    a release marker as a currently-active booking, so a no-match wrapper written to
+    that same key would wrongly read as a hit."""
+    screened = row(raw={"jail_booking_screen": {"county": "Transylvania", "state": "NC", "result": "no_match"}})
+    owner = gm.owner_columns(screened)
+    pos = gm.positive_columns(screened, owner, {})
+    assert "jail_booking" not in owner          # a clean screen is never a positive hit
+    assert "jail_booking" not in pos
+    assert "jail_booking" in gm.checked_columns(screened, pos, {})   # but it was screened
+
+    hit = row(raw={"jail_booking": {"release_status": "in_custody"}})
+    owner2 = gm.owner_columns(hit)
+    pos2 = gm.positive_columns(hit, owner2, {})
+    assert "jail_booking" in owner2             # a real hit still counts as positive
+    assert "jail_booking" in pos2
+    assert "jail_booking" in gm.checked_columns(hit, pos2, {})
+
+
 def test_tax_status_known_ignores_state_income_lien():
     assert gm.tax_status_known({"nc_ptscloud_delinquent_tax": {"x": 1}})
     assert gm.tax_status_known({"rutherford_tax": {"x": 1}})

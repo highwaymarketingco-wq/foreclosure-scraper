@@ -2066,6 +2066,10 @@ RAW_KEEP = {
     "tax_status": "*",                # paid_through / actual balance from GIS/qPayBill
     "tax_relief": "*",                # deferral / exemption (York HOMESTEAD, Anderson AG-rollback)
     "jail_booking": "*",             # net-new owner DOB + charges (contactability)
+    "jail_booking_screen": "*",       # {county, state, result: "no_match", checked_at}: a healthy roster
+                                      # fetch that matched nobody -- "checked" for the gap matrix, never a
+                                      # positive hit (that stays jail_booking only; _gate_jail would misread
+                                      # a no-match wrapper written to that key as a currently-active booking)
     "mf_signal": "*",                 # multifamily classification
     "fema_disaster": "*",             # FEMA declared-disaster overlay
     "acpass_resolved": "*",           # Anderson ACPASS owner/parcel resolution
