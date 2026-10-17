@@ -82,6 +82,7 @@ from .valuation.grading import (
     ARV_DERIVED_MONEY_FIELDS,
     ARV_FLAGS_CONTRADICTED,
     ARV_VERDICT_FIELDS,
+    _letter,
     gate_calc_dict,
 )
 
@@ -424,6 +425,58 @@ def _gis_owner(raw: dict) -> str:
     return (gis.get("owner") or "") if isinstance(gis, dict) else ""
 
 
+def _strip_equity_note_from_grade(raw: dict) -> bool:
+    """Withhold late, rerank late, REGRADE late (2026-10-17 gap-sweep wave 6,
+    pipeline-grade-equity-current): the two call sites below already withhold
+    raw['equity'] and rerank raw['distress_stack'] once a county anchor or an
+    arv_outlier flag discredits this run's valuation loop grade() call -- but
+    neither ever touched the grade() call's own OWN rationale/risk_score, so a
+    just-withheld row kept publishing a stale "high real equity (N%)" /
+    "underwater — real equity N%" note (and its +6/-12 risk_score swing) that
+    the very same run had just decided it could not trust. Surgically pops the
+    one note clause and backs out its score delta in place, mirroring how this
+    module already pops ARV_DERIVED_MONEY_FIELDS/ARV_VERDICT_FIELDS out of
+    raw['calc'] rather than recomputing via compute() (board_qa's board-wide
+    anchor-stamp detection has no equivalent in a plain grade() replay).
+    Returns True if a note was actually removed."""
+    g = raw.get("grade")
+    if not isinstance(g, dict) or not isinstance(g.get("rationale"), list):
+        return False
+    rationale = g["rationale"]
+    removed_delta = 0
+    changed = False
+    for i, entry in enumerate(rationale):
+        parts = [p for p in str(entry).split("; ") if p]
+        kept = [p for p in parts if "real equity" not in p]
+        if len(kept) == len(parts):
+            continue
+        changed = True
+        for p in parts:
+            if "real equity" not in p:
+                continue
+            if p.startswith("underwater"):
+                removed_delta -= 12
+            elif p.startswith("high real equity"):
+                removed_delta += 6
+        rationale[i] = "; ".join(kept) if kept else "no major flags"
+    if not changed:
+        return False
+    rs = g.get("risk_score")
+    if isinstance(rs, (int, float)):
+        rs2 = max(0, min(100, rs - removed_delta))
+        g["risk_score"] = rs2
+        g["risk"] = _letter(rs2)
+    overall_score = g.get("overall_score")
+    if isinstance(overall_score, (int, float)) and g.get("overall"):
+        fs = g.get("financial_score") or 0
+        ps = g.get("property_score") or 0
+        ls = g.get("location_score") or 0
+        new_overall = round(fs * 0.40 + ps * 0.25 + ls * 0.20 + g.get("risk_score", 0) * 0.15)
+        g["overall_score"] = new_overall
+        g["overall"] = _letter(new_overall)
+    return True
+
+
 def _retract_shared_anchor(li, raw: dict, info: dict) -> dict:
     """Withhold everything a stamped county anchor cannot support. Idempotent.
 
@@ -472,6 +525,8 @@ def _retract_shared_anchor(li, raw: dict, info: dict) -> dict:
         counts["equity_withheld"] = 1
     if retract_equity_rank(li):
         counts["distress_reranked"] = 1
+    if _strip_equity_note_from_grade(raw):
+        counts["grade_regraded"] = 1
     return counts
 
 
@@ -697,6 +752,8 @@ def enrich_board_qa(listings) -> dict:
                 summary["equity_withheld_arv_outlier"] += 1
                 if retract_equity_rank(li):
                     summary["arv_outlier_distress_reranked"] += 1
+                if _strip_equity_note_from_grade(raw):
+                    summary["arv_outlier_grade_regraded"] += 1
 
         # ---- ARV trust tripwires (all three must read ZERO) -----------------
         # valuation.grading.apply_arv_trust_gate strips these fields before the

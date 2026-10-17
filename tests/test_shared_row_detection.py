@@ -169,6 +169,36 @@ def test_stamped_lead_loses_bid_verdict_equity_and_hot_tier():
     assert summary.get("anchor_stamp_max_bid_withheld", 0) <= 40
 
 
+def test_stamped_lead_s_stale_equity_note_is_stripped_from_the_grade_too():
+    """2026-10-17 gap-sweep wave 6, pipeline-grade-equity-current: withholding raw['equity']
+    and reranking raw['distress_stack'] used to leave raw['grade'] untouched, so a row the
+    SAME pass just decided it could not trust the equity for kept publishing a grade that
+    said "high real equity (98%)" with its +6 risk_score bonus baked in."""
+    leads = _stamped(40, 299453.0)
+    for li in leads:
+        li.raw = {
+            "calc": _anchored_calc(),
+            "equity": {"value": 155000.0, "pct": 0.52, "arv_used": 299500.0},
+            "grade": {
+                "overall": "B", "overall_score": 82,
+                "financial": "B", "financial_score": 80,
+                "property": "C", "property_score": 70,
+                "location": "C", "location_score": 70,
+                "risk": "B", "risk_score": 81,
+                "rationale": ["ARV-based financial score", "ok property", "ok location",
+                              "tax sale — buyer takes subject to other liens; high real equity (52%)"],
+            },
+        }
+    enrich_board_qa(leads)
+    for li in leads:
+        g = li.raw["grade"]
+        rationale_text = " ".join(g["rationale"])
+        assert "real equity" not in rationale_text
+        assert "tax sale — buyer takes subject to other liens" in rationale_text
+        assert g["risk_score"] == 75          # 81 - 6 (the "high real equity" bonus backed out)
+        assert g["overall_score"] == round(80 * 0.40 + 70 * 0.25 + 70 * 0.20 + 75 * 0.15)
+
+
 def test_comp_grounded_lead_in_a_stamped_cluster_keeps_its_money():
     """Only leads whose ARV DESCENDS from the stamp are retracted. A lead whose
     ARV came from real comps happens to carry a stamped market_value and keeps
