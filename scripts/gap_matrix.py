@@ -685,10 +685,16 @@ SPECS: dict[str, Spec] = {
                                        producers=("enrichment_divorce_no_subsequent_deed.py",),
                                        doc="raw.divorce_no_subsequent_deed present; applies to divorce rows; "
                                            "checked = deed chain present"),
-    "marriage_license": Spec(_S, "row", "rod", applies="person", producers=("enrichment_marriage_license.py",),
+    "marriage_license": Spec(_S, "row", "rod", applies="person",
+                             producers=("enrichment_register_checks.py", "rod/register_checks.py"),
                              doc="raw.marriage_license present",
                              ambiguity="10/1 counts the {'status': 'no_match'} wrapper as a hit; the second "
-                                       "view counts only a found license"),
+                                       "view counts only a found license; enrichment_marriage_license.py "
+                                       "(the original producer) was retired 2026-10-09 -- live coverage is "
+                                       "the 6 Cott counties enrichment_register_checks.py's marriage-index "
+                                       "search reaches. Buncombe has none: its only marriage lane depended "
+                                       "on the retired module, and enrichment_aumentum_rod.py's own fetch "
+                                       "discards the marriage rows it already pulls (2026-10-16 gap-sweep)"),
     "bankruptcy_stay": Spec(_S, "row", "federal", applies="bankrupt", ledger="bankruptcy_stay",
                             producers=("enrichment_bankruptcy_stay.py",),
                             statewide=(("NC", "CourtListener/RECAP (federal)"), ("SC", "CourtListener/RECAP (federal)")),
