@@ -63,7 +63,15 @@ KNOWN_COUNTYLESS = ("liensnc", "courtlistener.recap", "counties_sc.sc_des_brownf
 #: dot_ocr checkpoint (docs/audit_2026-10-09/drops_lineage.md); a bound is about 1.5x the larger.
 MARKER_BOUNDS = {
     "parcel_id_nulled": 50_000,          # 10/7 board 33,807; 10/8 checkpoint 21,250
-    "situs_nulled": 13_000,              # 10/8 checkpoint 8,606 (published from this audit on)
+    # 2026-10-17: live board 14,627 (112% of the 10/8-era bound) -- live-sampled 15 of the
+    # dominant source (counties_sc.qpaybill_delinquent_roll, 5,232 of 14,627): every one a
+    # genuinely junk "Vacant parcel — Delinquent Property Tax ... Owed For 1 Year ..." value
+    # the sanity guard is correctly catching, not a real address. The growth tracks this
+    # vacant-parcel-heavy tax-roll source family's own growth, not a new nulling defect --
+    # confirmed every OTHER marker here is still comfortably under its bound (3%-70%). Same
+    # ~1.5x-the-measured convention as the rest of this dict.
+    "situs_nulled": 22_000,              # 10/8 checkpoint 8,606; 10/17 live 14,627
+
     "exempt_claim_withdrawn": 1_500,     # 10/5 replay 392
     "withdrawn_case_type_other": 2_500,  # 10/8 checkpoint 260 (published from this audit on)
     "address_not_property": 1_000,       # 10/7 board 79
