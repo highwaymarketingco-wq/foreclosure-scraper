@@ -59,7 +59,14 @@ def test_successful_lookup_also_tags_sos_dissolution(monkeypatch):
     assert li.raw["sos_dissolution"]["status"] == "dissolved"
 
 
-def test_active_status_not_tagged(monkeypatch):
+def test_active_status_not_tagged_as_a_positive_hit_but_is_screened(monkeypatch):
+    """Found 2026-10-16 (gap-sweep wave 3): an "active" result wrote nothing at all,
+    so gap_matrix.py's checked_columns() could never see the row was screened --
+    the same anti-pattern already fixed for code_enforcement. Unlike that fix, the
+    negative result goes to a SEPARATE key (sos_screen), not sos_dissolution itself,
+    because sos_dissolution has no SCORER_GATES gate: owner_columns()'s bare presence
+    check on that key is what decides the POSITIVE hit too, so reusing it for a
+    negative result would wrongly mark a clean (not dissolved) entity as dissolved."""
     async def fake_lookup(name, cache):
         return {"checked": True, "status": "active"}
 
@@ -68,6 +75,31 @@ def test_active_status_not_tagged(monkeypatch):
     asyncio.run(sos.enrich_with_sos_dissolution([li], max_check=5))
     assert "sos_status" not in (li.raw or {})
     assert "sos_dissolution" not in (li.raw or {})
+    assert li.raw["sos_screen"]["status"] == "active"
+    assert li.raw["sos_screen"]["checked"] is True
+    assert li.raw["sos_screen"]["checked_at"]
+
+
+def test_unknown_status_is_also_screened_not_silently_dropped(monkeypatch):
+    async def fake_lookup(name, cache):
+        return {"checked": True, "status": "unknown"}
+
+    monkeypatch.setattr(sos, "_lookup_nc_sos", fake_lookup)
+    li = _biz(1)
+    asyncio.run(sos.enrich_with_sos_dissolution([li], max_check=5))
+    assert "sos_dissolution" not in (li.raw or {})
+    assert li.raw["sos_screen"]["status"] == "unknown"
+
+
+def test_a_dissolved_hit_does_not_also_write_the_neutral_screen_key(monkeypatch):
+    async def fake_lookup(name, cache):
+        return {"checked": True, "status": "dissolved"}
+
+    monkeypatch.setattr(sos, "_lookup_nc_sos", fake_lookup)
+    li = _biz(1)
+    asyncio.run(sos.enrich_with_sos_dissolution([li], max_check=5))
+    assert li.raw["sos_dissolution"]["status"] == "dissolved"
+    assert "sos_screen" not in li.raw
 
 
 def test_non_business_defendants_skipped(monkeypatch):

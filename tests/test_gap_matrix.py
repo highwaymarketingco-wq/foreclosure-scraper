@@ -129,6 +129,28 @@ def test_multi_year_delinquent_tax_checked_only_by_its_own_key():
             "bankruptcy_tax_combo"} <= gm.checked_columns(miss, set(), {})
 
 
+def test_sos_screen_counts_as_checked_but_never_as_a_positive_hit():
+    """Found 2026-10-16 (gap-sweep wave 3): enrichment_sos_dissolution.py wrote nothing for
+    a completed "active"/"unknown" lookup, so a clean screen looked unchecked forever (the
+    code_enforcement anti-pattern). Fixed by writing raw.sos_screen -- a SEPARATE key from
+    raw.sos_dissolution, because sos_dissolution has no SCORER_GATES gate: owner_columns()'s
+    bare presence check on that key is what decides the POSITIVE hit too, so a negative
+    result written to the same key would wrongly mark a clean entity as dissolved."""
+    screened = row(raw={"sos_screen": {"checked": True, "status": "active", "checked_at": "2026-10-16T00:00:00"}})
+    owner = gm.owner_columns(screened)
+    pos = gm.positive_columns(screened, owner, {})
+    assert "sos_dissolution" not in owner       # a clean screen is never a positive hit
+    assert "sos_dissolution" not in pos
+    assert "sos_dissolution" in gm.checked_columns(screened, pos, {})   # but it was screened
+
+    dissolved = row(raw={"sos_dissolution": {"checked": True, "status": "dissolved"}})
+    owner2 = gm.owner_columns(dissolved)
+    pos2 = gm.positive_columns(dissolved, owner2, {})
+    assert "sos_dissolution" in owner2          # a real hit still counts as positive
+    assert "sos_dissolution" in pos2
+    assert "sos_dissolution" in gm.checked_columns(dissolved, pos2, {})
+
+
 def test_tax_status_known_ignores_state_income_lien():
     assert gm.tax_status_known({"nc_ptscloud_delinquent_tax": {"x": 1}})
     assert gm.tax_status_known({"rutherford_tax": {"x": 1}})

@@ -771,8 +771,11 @@ SPECS: dict[str, Spec] = {
     "sos_dissolution": Spec(_S, "row", "sos", applies="entity", producers=("enrichment_sos_dissolution.py",),
                             statewide=(("NC", "NC Secretary of State business search"),),
                             walls=(("SC", "SC Secretary of State search is CAPTCHA-walled"),),
-                            doc="raw.sos_dissolution present; applies to entity owners; checked = an SoS lookup "
-                                "is on the row (sos_agent)"),
+                            doc="raw.sos_dissolution present = a positive dissolution/suspension hit; "
+                                "checked = an SoS lookup is on the row, hit or not (sos_agent, sos_dissolution "
+                                "or sos_screen -- the last one is the active/unknown negative result, a "
+                                "separate key from the positive hit so a clean entity is never misread as "
+                                "dissolved)"),
     "title_risk": Spec(_S, "derived", "derived", applies="foreclosure", producers=("enrichment_title_risk.py",),
                        statewide=(("NC", "derived"), ("SC", "derived")),
                        doc="raw.title_risk present; applies to foreclosure-type rows",
@@ -1094,7 +1097,7 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
         out.add("child_support")
     if raw.get("liensnc"):
         out.add("liensnc_posthumous_filing")
-    if raw.get("sos_agent") or raw.get("sos_dissolution"):
+    if raw.get("sos_agent") or raw.get("sos_dissolution") or raw.get("sos_screen"):
         out.add("sos_dissolution")
     if rec.get("plaintiff") or rec.get("defendant"):
         out.add("title_risk")

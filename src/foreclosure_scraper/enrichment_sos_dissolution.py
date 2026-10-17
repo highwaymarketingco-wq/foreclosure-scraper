@@ -20,7 +20,7 @@ import asyncio
 import os
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -197,9 +197,9 @@ async def enrich_with_sos_dissolution(listings: list[Listing], max_check: int = 
             counts[status if status in counts else "unknown"] = (
                 counts.get(status if status in counts else "unknown", 0) + 1
             )
+            if not isinstance(li.raw, dict):
+                li.raw = {}
             if status in ("dissolved", "admin_dissolved", "suspended"):
-                if not isinstance(li.raw, dict):
-                    li.raw = {}
                 li.raw["sos_status"] = info
                 # Found 2026-10-02 investigating why the sos_dissolution board
                 # column sits at 0/148 counties despite this check running (and
@@ -216,6 +216,21 @@ async def enrich_with_sos_dissolution(listings: list[Listing], max_check: int = 
                 # key rather than renaming it, so nothing that already reads
                 # "sos_status" (its own test included) breaks.
                 li.raw["sos_dissolution"] = info
+            else:
+                # Found 2026-10-16 (gap-sweep wave 3): a completed lookup that comes
+                # back "active" or "unknown" wrote nothing at all -- the ONLY write
+                # path was the positive-hit block above. gap_matrix.py's
+                # checked_columns() needs a negative-result wrapper to count a row
+                # as screened (the same anti-pattern already fixed for
+                # code_enforcement, commit 4603d801) -- but unlike code_enforcement,
+                # "sos_dissolution" has no SCORER_GATES gate: owner_columns()'s bare
+                # presence check on raw["sos_dissolution"] is what decides the
+                # POSITIVE hit too, so writing this wrapper to that same key would
+                # wrongly mark an active (not dissolved) entity as a dissolution
+                # hit. Written to a separate key, "sos_screen", instead -- checked
+                # for the gap matrix, never read as a positive signal anywhere.
+                li.raw["sos_screen"] = {"checked": True, "status": status,
+                                        "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
 
     try:
         # Hard overall backstop in case the per-call timeout + breaker still leave
