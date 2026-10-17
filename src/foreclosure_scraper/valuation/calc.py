@@ -328,6 +328,17 @@ ARV_FLAG_COUNTY_DISAGREE = "county_values_disagree"
 # ratio band still excludes the 0.63-acre-vs-86.7-acre case by 27x.
 LAND_COMP_BANDS = (("tight", 2.0), ("wide", 3.0), ("loose", 5.0))
 
+# 2026-10-17 (gap-sweep wave 7, valuation-hot-arv-supported): the non-land $/sqft fallback
+# below had no equivalent size guard. A comp's adjusted_ppsf (the appraisal-style GLA grid in
+# enrichment_comps._adjust_comp) already corrects for a size mismatch, but when it's absent the
+# code fell back to the comp's raw, UNADJUSTED price_per_sqft with no check at all -- live case:
+# a 4,590 sqft subject priced off 1,404-2,075 sqft comps (2.2x-3.3x smaller), because
+# enrichment_comps._pick_3_comps' sqft band silently keeps the unfiltered kind+geo+cond pool
+# when fewer than 3 same-size comps exist. A loose 2x bound (half to double) is deliberately
+# wider than comps.py's own +-20% selection band -- this is a last-resort sanity check on the
+# fallback path, not a primary selection criterion.
+PPSF_FALLBACK_SIZE_RATIO = 2.0
+
 # ---- Do the surviving comps AGREE with each other? -------------------------
 # The size band above asks "is this comp the right SIZE". Nothing asked "do the
 # comps that passed actually agree", so a pool could pass the band and still be
@@ -1320,6 +1331,23 @@ def _land_arv(li: Listing, refused: list | None = None
     return None, None, None, "LOW", notes + ["Insufficient land data for ARV"]
 
 
+def _ppsf_usable(c: dict, subject_sqft: float | None) -> bool:
+    """A comp's $/sqft is usable for the non-land fallback path below. adjusted_ppsf (the
+    appraisal-style GLA grid) already corrects for a size mismatch, so it's always usable; the
+    RAW price_per_sqft fallback is rejected only when BOTH sides' sqft are known and outside
+    PPSF_FALLBACK_SIZE_RATIO of each other — a comp picked for kind/geo/condition alone, with a
+    KNOWN size mismatch, prices the subject at a wildly different $/sqft tier. A comp or subject
+    with no sqft on record at all is a data-completeness gap, not a verified size mismatch, so
+    it passes through unchanged rather than being silently dropped for an unrelated reason."""
+    if c.get("adjusted_ppsf"):
+        return True
+    csqft = c.get("sqft")
+    if not subject_sqft or not csqft:
+        return True
+    ratio = float(csqft) / subject_sqft
+    return 1.0 / PPSF_FALLBACK_SIZE_RATIO <= ratio <= PPSF_FALLBACK_SIZE_RATIO
+
+
 def _arv_signals(li: Listing, refused: list | None = None
                  ) -> tuple[float | None, float | None, float | None, str, list[str]]:
     """Return (low, expected, high, confidence, notes) for ARV.
@@ -1396,7 +1424,8 @@ def _arv_signals(li: Listing, refused: list | None = None
         # outside its own band (Pass-2 fix: expected used the comp_median_ppsf
         # scalar while the band used this adjusted series — a different base).
         ppsfs = sorted((c.get("adjusted_ppsf") or c["price_per_sqft"])
-                       for c in comps if (c.get("adjusted_ppsf") or c.get("price_per_sqft")))
+                       for c in comps if (c.get("adjusted_ppsf") or c.get("price_per_sqft"))
+                       and _ppsf_usable(c, arv_sqft))
         if ppsfs:
             median_ppsf = ppsfs[len(ppsfs) // 2]
         else:

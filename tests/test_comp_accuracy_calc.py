@@ -66,6 +66,35 @@ def test_scraped_comps_medium_when_dispersed():
     assert any("disagree" in n for n in c.notes)
 
 
+def test_ppsf_usable_rejects_only_a_known_size_mismatch():
+    """2026-10-17 gap-sweep wave 7, valuation-hot-arv-supported: adjusted_ppsf is always usable
+    (already size-corrected); the raw price_per_sqft fallback is rejected only when BOTH sides'
+    sqft are known and outside PPSF_FALLBACK_SIZE_RATIO (2x) -- a data-completeness gap (sqft
+    missing on either side) must pass through unchanged, not be silently dropped for an
+    unrelated reason."""
+    assert calc._ppsf_usable({"adjusted_ppsf": 150, "sqft": 1000}, 4000)       # already adjusted
+    assert not calc._ppsf_usable({"price_per_sqft": 150, "sqft": 1400}, 4590)  # live shape: 3.3x
+    assert calc._ppsf_usable({"price_per_sqft": 150, "sqft": 2400}, 4590)      # 1.9x: inside 2x
+    assert calc._ppsf_usable({"price_per_sqft": 150}, 4590)                    # comp sqft unknown
+    assert calc._ppsf_usable({"price_per_sqft": 150, "sqft": 1400}, None)      # subject sqft unknown
+
+
+def test_scraped_comps_arv_ignores_a_known_size_mismatched_comp():
+    """Same shape as the live case (SC|Laurens|901-11-02-007: a HOT subject priced off comps
+    2.2x-3.3x smaller, no adjusted_ppsf). Calls _arv_signals directly -- compute()'s own
+    county-calibration layer is a separate, unrelated adjustment this fix doesn't touch."""
+    comps = [{"price_per_sqft": 95, "sqft": 900, "geo_anchored": True},
+             {"price_per_sqft": 100, "sqft": 1050, "geo_anchored": True},
+             {"price_per_sqft": 90, "sqft": 1200, "geo_anchored": True}]
+    li = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE, state="SC",
+                 county="Laurens", living_sqft=2800, raw={"comps": comps, "comp_median_ppsf": 60.0})
+    expected, low, high, conf, notes = calc._arv_signals(li)
+    # all 3 comps are a known size mismatch (2.3x-3.1x), so none fed the median: the scalar
+    # comp_median_ppsf fallback is used instead of the (wrong, much higher) per-comp prices.
+    assert expected == round(60.0 * 2800, -2)
+    assert any("only 0 comp" in n for n in notes)
+
+
 def test_recorded_comps_unaffected_by_scraped_gate():
     # Tier-0 recorded comps return before Tier-1 scraped gating.
     c = calc.compute(_recorded_arv_listing())
