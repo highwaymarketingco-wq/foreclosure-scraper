@@ -160,7 +160,14 @@ def parse_ref(text: Optional[str]) -> tuple[Optional[str], Optional[str], Option
     m = _REF.match(s)
     if m:
         rest = m.group(2).strip()
-        parts = re.split(r"\s*[/\-]\s*", rest, maxsplit=1)
+        # "/" is the book/page separator (the label itself is already consumed by _REF, e.g.
+        # "Deed Book/Page Q-21/1611" -> rest "Q-21/1611"); "-" belongs to the book id when no "/"
+        # is present ("Plat Book-Page 123-45" -> rest "123-45", no "/" to prefer). Splitting on
+        # whichever came first broke a book id that itself contains "-" (Macon's "Q-21/1611" split
+        # on "-" first, leaving the page as the still-slash-joined "21/1611"; 2026-10-17 gap-sweep
+        # wave 7, top80-fill-deed-ref-shape).
+        sep = "/" if "/" in rest else "-"
+        parts = rest.split(sep, 1)
         book = _z(parts[0]) if parts and parts[0] else None
         page = _z(parts[1]) if len(parts) > 1 else None
         return (m.group(1) or None), book, page

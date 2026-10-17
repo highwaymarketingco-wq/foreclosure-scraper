@@ -625,11 +625,21 @@ def fetch_nc(county: str, pins: list[str]) -> Optional[dict[str, dict]]:
         return None
     index: dict[str, dict] = {}
     for a in feats:
-        parsed = {**parse_nc_attrs(a), "parno": a.get("parno") or a.get("altparno")}
+        base = parse_nc_attrs(a)
+        # Echo whichever field (parno or altparno) actually matched the requested PIN below, not
+        # always parno: a feature can carry BOTH the county's own map-block-lot parno AND the
+        # board's 12-digit altparno for the SAME parcel, and unconditionally preferring parno made
+        # a row's own correctly-matched property look like it was sourced from a foreign parcel's
+        # provenance id (2026-10-17 gap-sweep wave 7, top80-fill-deed-ref-bound: Brunswick/Nash/
+        # Graham/Perquimans/New Hanover, ~1,000 rows). The deed/legal content itself was never
+        # wrong -- only the "parno" field this writes for provenance.
         for f in ("parno", "altparno"):
             k = pin_key(a.get(f))
-            if k and (k not in index or (parsed["deed"] and not index[k].get("deed"))):
-                index[k] = parsed
+            if not k:
+                continue
+            candidate = {**base, "parno": a.get(f)}
+            if k not in index or (candidate["deed"] and not index[k].get("deed")):
+                index[k] = candidate
     out = Got()
     out.complete = not feats.exceeded
     for p in pins:
@@ -887,11 +897,21 @@ def fetch_nc_like(county: str, pins: list[str]) -> Optional[dict[str, dict]]:
         return None
     index: dict[str, dict] = {}
     for a in feats:
-        parsed = {**parse_nc_attrs(a), "parno": a.get("parno") or a.get("altparno")}
+        base = parse_nc_attrs(a)
+        # Echo whichever field (parno or altparno) actually matched the requested PIN below, not
+        # always parno: a feature can carry BOTH the county's own map-block-lot parno AND the
+        # board's 12-digit altparno for the SAME parcel, and unconditionally preferring parno made
+        # a row's own correctly-matched property look like it was sourced from a foreign parcel's
+        # provenance id (2026-10-17 gap-sweep wave 7, top80-fill-deed-ref-bound: Brunswick/Nash/
+        # Graham/Perquimans/New Hanover, ~1,000 rows). The deed/legal content itself was never
+        # wrong -- only the "parno" field this writes for provenance.
         for f in ("parno", "altparno"):
             k = pin_key(a.get(f))
-            if k and (k not in index or (parsed["deed"] and not index[k].get("deed"))):
-                index[k] = parsed
+            if not k:
+                continue
+            candidate = {**base, "parno": a.get(f)}
+            if k not in index or (candidate["deed"] and not index[k].get("deed")):
+                index[k] = candidate
     out = Got()
     out.complete = not feats.exceeded
     for p in pins:

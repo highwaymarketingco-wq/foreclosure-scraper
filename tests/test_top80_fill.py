@@ -306,6 +306,20 @@ def test_nc_exact_pass_backfills_street_address_from_siteadd(monkeypatch):
     assert st["address"] == 1
 
 
+def test_nc_dual_pin_feature_echoes_the_id_that_actually_matched(monkeypatch):
+    """2026-10-17 gap-sweep wave 7, top80-fill-deed-ref-bound: a feature can carry BOTH the
+    county's own map-block-lot parno AND the board's 12-digit altparno for the SAME parcel.
+    fetch_nc() used to always echo parno regardless of which field matched the board's PIN,
+    making a row's own correctly-matched property look like a foreign parcel's provenance id."""
+    row = li(pin="1234-56-7890")  # matches altparno below, not the county's own parno
+
+    def handler(url, data):
+        return FakeResp([nc_feature("123-456", altparno="1234-56-7890")])
+    fake_post(monkeypatch, handler)
+    run([row], budget_s=60)
+    assert row.raw["county_deed_ref"]["parno"] == "1234-56-7890"
+
+
 def test_nc_like_pass_finds_other_separators_and_never_binds_a_neighbour(monkeypatch):
     row = li(pin="166220709679")
 

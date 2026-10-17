@@ -83,6 +83,10 @@ def test_pick_feature_joins_on_parno_then_altparno():
     ("Plat Book/Page C/45A", ("Plat", "C", "45A")),
     ("Plat Book/Page /", ("Plat", None, None)),
     ("Plat Book/Page 00000/00000", ("Plat", None, None)),
+    # 2026-10-17 gap-sweep wave 7, top80-fill-deed-ref-shape: a book id that itself contains "-"
+    # (Macon) used to split on the FIRST of either "/" or "-", landing on "-" and leaving the page
+    # still slash-joined ("21/1611") instead of splitting on "/" first.
+    ("Deed Book/Page Q-21/1611", ("Deed", "Q-21", "1611")),
     ("", (None, None, None)),
 ])
 def test_parse_ref(text, want):
