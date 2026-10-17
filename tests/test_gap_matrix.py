@@ -105,12 +105,14 @@ def test_checked_columns_from_wrappers_and_inputs():
     owner = gm.owner_columns(r)
     pos = gm.positive_columns(r, owner, {})
     chk = gm.checked_columns(r, pos, {"tax_lien": "refuted"})
-    # 2026-10-16: multi_year_delinquent_tax split out of the shared broad tax check --
-    # tax_owed alone (unrelated to its own real producer) no longer marks it checked.
-    assert {"two_year_delinquent", "divorce", "email", "incarceration",
+    # 2026-10-16: multi_year_delinquent_tax AND two_year_delinquent both split out of the
+    # shared broad tax check -- tax_owed alone (unrelated to either one's own real
+    # producer) no longer marks either checked.
+    assert {"divorce", "email", "incarceration",
             "deed_chain_break", "name_heirs", "owner_cluster", "owner_mismatch",
             "atty_tax_verified_confirmed"} <= chk
     assert "multi_year_delinquent_tax" not in chk
+    assert "two_year_delinquent" not in chk
     assert "bop_federal" not in chk
     assert "atty_tax_verified_confirmed" not in gm.checked_columns(r, pos, {"tax_lien": "unconfirmed"})
 
@@ -124,9 +126,21 @@ def test_multi_year_delinquent_tax_checked_only_by_its_own_key():
     assert "multi_year_delinquent_tax" in gm.checked_columns(hit, set(), {})
     miss = row(raw={"tax_owed": {"balance": 10}, "nc_ptscloud_delinquent_tax": {"years": 3}})
     assert "multi_year_delinquent_tax" not in gm.checked_columns(miss, set(), {})
-    # the other 4 columns on the shared broad line are unaffected by this split
-    assert {"repeat_tax_loss", "two_year_delinquent", "tax_aging_surfaced",
+    assert "two_year_delinquent" not in gm.checked_columns(miss, set(), {})
+    # the other 3 columns on the shared broad line are unaffected by either split
+    assert {"repeat_tax_loss", "tax_aging_surfaced",
             "bankruptcy_tax_combo"} <= gm.checked_columns(miss, set(), {})
+
+
+def test_two_year_delinquent_checked_only_by_its_own_key():
+    """Its 3 real producers (albemarle_observer_tax_lists.py, nc_its_public_tax.py,
+    sc_catalis_delinquent_roll.py) all write raw['two_year_delinquent'] directly; the
+    shared tax_status_known() predicate used to mark it checked from any unrelated tax
+    key board-wide -- live-measured 122,976 false-"checked" rows (audit 2026-10-16)."""
+    hit = row(raw={"two_year_delinquent": {"is_two_year_plus": False, "years": 1}})
+    assert "two_year_delinquent" in gm.checked_columns(hit, set(), {})
+    miss = row(raw={"tax_owed": {"balance": 10}, "qpaybill_roll": {"years": 3}})
+    assert "two_year_delinquent" not in gm.checked_columns(miss, set(), {})
 
 
 def test_sos_screen_counts_as_checked_but_never_as_a_positive_hit():
