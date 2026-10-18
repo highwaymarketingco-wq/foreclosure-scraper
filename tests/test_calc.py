@@ -427,3 +427,57 @@ def test_age_comps_then_validate_does_not_touch_an_already_processed_row():
         validate([li])
 
     assert already_processed.raw == snapshot
+
+
+# ---- enrichment_recorded_sales writes raw['comps'] AFTER age_comps() in the same pass
+# (2026-10-18, valuation-comps-age: 2 live rows, Cleveland + Buncombe
+# national.courtlistener_bankruptcy) ----
+# enrich_recorded_sales's land-comp branch (enrichment_recorded_sales._apply) only ever
+# fires when `not raw.get("comps")`, so every comp it writes is one age_comps() never saw
+# this run -- it stamps 'source'/'sale_date'/'recorded', never 'picked_on' or 'age_days'.
+# main.py's fix re-runs age_comps() right after, scoped to just the rows carrying an
+# unstamped comp (mirrors a95e4cb5's GRANDFATHER scoping, not a full-board pass): a comp
+# still inside the carry window gets stamped, one already past COMPS_CARRY_MAX_AGE_DAYS
+# (both live rows: sale dates from 2022) gets pruned exactly as age_comps prunes everywhere
+# else on the board.
+def test_recorded_sales_comps_get_scoped_age_pass_after_the_normal_sweep_misses_them():
+    from datetime import date
+
+    from foreclosure_scraper.enrichment_comps import age_comps
+
+    # Shape exactly as enrichment_recorded_sales._apply writes it: no 'picked_on', no
+    # 'age_days', no 'carried' -- just the recorded-sale fields.
+    stale = _li(county="Cleveland", state="NC", source="national.courtlistener_bankruptcy",
+                raw={"comps": [{"sold_price": 160_000.0, "lot_sqft": 6098, "geo_anchored": True,
+                                "recorded": True, "source": "cleveland_vacant_improved_lot_sales",
+                                "sale_date": "2022-12-19", "deed_book": "1889", "deed_page": "0618"}]})
+    fresh = _li(county="Buncombe", state="NC", source="national.courtlistener_bankruptcy",
+                raw={"comps": [{"sold_price": 165_000.0, "lot_sqft": 13068, "geo_anchored": True,
+                                "recorded": True, "source": "buncombe_saledata_roll",
+                                "sale_date": "2026-09-20", "deed_book": "6277", "deed_page": "445"}]})
+    already_stamped = _li(county="Rutherford", state="NC",
+                           raw={"comps": [{"kind": "land", "sold_price": 50_000,
+                                           "sold_date": "2026-09-01", "picked_on": "2026-10-18",
+                                           "age_days": 47}]})
+    snapshot = dict(already_stamped.raw)
+    today = date(2026, 10, 18)
+
+    # main.py's new scoped re-run, right after enrich_recorded_sales: only rows carrying an
+    # unstamped comp are swept, not the whole `enriched` list.
+    listings = [stale, fresh, already_stamped]
+    needs_age = [li for li in listings
+                 if isinstance(li.raw, dict) and isinstance(li.raw.get("comps"), list)
+                 and any(isinstance(c, dict) and c.get("age_days") is None for c in li.raw["comps"])]
+    assert needs_age == [stale, fresh]      # the already-stamped row is correctly left alone
+    age_comps(needs_age, today=today)
+
+    # Past COMPS_CARRY_MAX_AGE_DAYS (365): pruned, same as every other stale comp on the board.
+    assert stale.raw["comps"] == []
+    assert "no comps this run" in stale.raw.get("comps_note", "")
+    # Inside the carry window: kept and stamped, so the audit check's
+    # "carried without age"/"older than 365 days" rules both pass on it now.
+    kept = fresh.raw["comps"]
+    assert len(kept) == 1 and kept[0]["carried"] is True
+    assert kept[0]["age_days"] == (today - date(2026, 9, 20)).days
+    # Untouched: already had its stamp before this run's recorded-sales pass.
+    assert already_stamped.raw == snapshot

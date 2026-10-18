@@ -2487,6 +2487,30 @@ async def run() -> int:
     except Exception:
         log.error("recorded_sales.failed", traceback=traceback.format_exc())
 
+    # enrich_recorded_sales (just above) runs AFTER age_comps() in this same pass, so any
+    # raw['comps'] it just wrote (land $/acre comps, stamped 'recorded': True but never
+    # 'picked_on') never got this run's age/carry stamp -- age_comps() already swept
+    # `enriched` before these comps existed. Left alone, an old recorded sale (routinely
+    # years old on these sales-roll counties) sits in raw['comps'] forever with no
+    # 'carried'/'age_days', which is exactly what audit 2026-10-18's valuation-comps-age (2
+    # rows: Cleveland/Buncombe national.courtlistener_bankruptcy) live-confirmed. Re-run
+    # age_comps() scoped to just the rows carrying an unstamped comp -- not a full-board
+    # pass -- mirroring the GRANDFATHER restore's scoped re-run (a95e4cb5). This is the
+    # correct outcome either way: a comp still inside the carry window gets its stamp: one
+    # already past COMPS_CARRY_MAX_AGE_DAYS gets pruned, same as age_comps does for every
+    # other comp on the board.
+    try:
+        from .enrichment_comps import age_comps as _age_comps_recorded_sales
+        _needs_age = [li for li in enriched
+                      if isinstance(li.raw, dict)
+                      and isinstance(li.raw.get("comps"), list)
+                      and any(isinstance(c, dict) and c.get("age_days") is None
+                              for c in li.raw["comps"])]
+        if _needs_age:
+            enrichment_stats["comps_age_recorded_sales"] = _age_comps_recorded_sales(_needs_age)
+    except Exception:
+        log.error("comps_age_recorded_sales.failed", traceback=traceback.format_exc())
+
     # FREE Zillow zestimate enrichment via stealth-browser address search.
     # The board had 0% zestimate coverage despite 77% having Zillow photos.
     # This hits Zillow's search page (StealthyFetcher bypasses PerimeterX),
