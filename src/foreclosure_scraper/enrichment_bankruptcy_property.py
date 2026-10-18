@@ -247,6 +247,26 @@ def _apply_match(li: Listing, attrs: dict[str, Any], county_name: str | None,
     counts["fields_filled"] += filled
 
 
+def _cl_block(li: Listing) -> dict[str, Any]:
+    """Return this listing's CourtListener-shaped bankruptcy block, under
+    whichever raw key it was actually stored under.
+
+    `national.courtlistener_bankruptcy` writes it to raw['courtlistener'].
+    `courtlistener.recap` (an orphaned pre-rename slug for the same feed —
+    see main.py's scope-bypass comment — 737 rows, no live scraper produces
+    it anymore, but the rows themselves are real, verified, non-garbage
+    defendant names) writes the SAME shape to raw['bankruptcy'] instead.
+    Prefer 'courtlistener' when both are present (shouldn't happen) so the
+    live source's shape always wins.
+    """
+    raw = li.raw or {}
+    cl = raw.get("courtlistener")
+    if isinstance(cl, dict) and cl:
+        return cl
+    bk = raw.get("bankruptcy")
+    return bk if isinstance(bk, dict) else {}
+
+
 async def enrich_bankruptcy_property(
     listings: list[Listing], concurrency: int = 8
 ) -> None:
@@ -254,23 +274,24 @@ async def enrich_bankruptcy_property(
     BK court's footprint via owner-name search. Populate full property
     info on confident match.
     """
-    # Pre-populate defendant from raw.courtlistener if missing
+    # Pre-populate defendant from the CourtListener block if missing
     for li in listings:
+        cl = _cl_block(li)
         if not li.defendant:
-            cl = (li.raw or {}).get("courtlistener", {})
             name = cl.get("case_name") or ""
             if not name and cl.get("parties"):
                 name = cl["parties"][0] if isinstance(cl["parties"], list) else str(cl["parties"])
             if name:
                 li.defendant = name
         if not li.case_number:
-            cl = (li.raw or {}).get("courtlistener", {})
             li.case_number = cl.get("docket_number") or li.case_number
     targets = [
         li
         for li in listings
-        if "courtlistener" in (li.source or "").lower()
-        and "bankrupt" in (li.source or "").lower()
+        if (
+            ("courtlistener" in (li.source or "").lower() and "bankrupt" in (li.source or "").lower())
+            or (li.source or "").lower() == "courtlistener.recap"
+        )
         and li.defendant
         and not li.street_address
     ]
@@ -294,7 +315,7 @@ async def enrich_bankruptcy_property(
     owner_field_cache: dict[str, str | None] = {}
 
     async def one(c: httpx.AsyncClient, li: Listing) -> None:
-        court = (li.raw or {}).get("courtlistener", {}).get("court", "").lower()
+        court = str(_cl_block(li).get("court") or "").lower()
         counties = COURT_FOOTPRINT_COUNTIES.get(court, [])
         if not counties and court not in ("nceb", "ncmb", "ncwb", "scb"):
             return
