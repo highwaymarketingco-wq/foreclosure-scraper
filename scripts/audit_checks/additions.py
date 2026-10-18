@@ -73,6 +73,8 @@ for _p in (_REPO / "src", _REPO / "scripts"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+from foreclosure_scraper.placeholder_twins import parcel_key  # noqa: E402
+
 SAMPLE = 8
 FULL_BOARD_ROWS = 200_000
 FRESH_DAYS = 3
@@ -784,9 +786,23 @@ class WindowLanesNotAging:
                 else f"{self.open_} open window-lane cases held of {self.checked} rows"}
 
 
+#: parcel_alias.py's own two alias sources (Lincoln, Rutherford): ITS invariant is that a short id
+#: may only alias to a real 10-digit NC PIN -- that is the exact 53-row Rutherford bug this check
+#: was written for (a short id mapped to ANOTHER short id, not a PIN). Everywhere else,
+#: board_persist.keep_prior_valid_parcel() also writes this same raw key, legitimately aliasing to
+#: whatever VALID id format that county's own prior row carries (SC's own TMS parcel numbers, NC
+#: heir-estate "P###-###" ids, a county's own longer PIN variant) -- live-checked 2026-10-17: all
+#: 20 non-PIN aliases on the board were parcel_key()-valid, none a re-occurrence of the Rutherford
+#: short-to-short bug, so only Lincoln/Rutherford keep the strict PIN-only rule.
+_STRICT_PIN_COUNTIES = frozenset({"Lincoln", "Rutherford"})
+
+
 class AliasIsPin:
-    """raw.parcel_id_alias whose 'long' side is not a 10-digit NC PIN: a short id mapped to another
-    short id, i.e. another property's id (53 Rutherford rows on 10/8; fixed in parcel_alias.build).
+    """raw.parcel_id_alias's 'long' side: a 10-digit NC PIN for Lincoln/Rutherford (parcel_alias.py's
+    own strict invariant); elsewhere any id placeholder_twins.parcel_key() itself would trust for
+    that row's state/county (board_persist.keep_prior_valid_parcel's broader, legitimate aliasing).
+    Catches a short id mapped to another short id, i.e. another property's id (53 Rutherford rows
+    on 10/8; fixed in parcel_alias.build) without flagging a county's own valid native format.
     0 allowed."""
     name = "additions-alias-is-pin"
 
@@ -800,15 +816,20 @@ class AliasIsPin:
         if not isinstance(pa, dict):
             return
         self.checked += 1
-        if not re.match(r"^\d{10}$", re.sub(r"[^0-9A-Za-z]", "", str(pa.get("long") or ""))):
-            self.bad += 1
-            if len(self.examples) < SAMPLE:
-                self.examples.append(f"{row.get('county')}|{row.get('source')}|{pa.get('short')}->{pa.get('long')}")
+        long = str(pa.get("long") or "")
+        if re.match(r"^\d{10}$", re.sub(r"[^0-9A-Za-z]", "", long)):
+            return
+        if (row.get("county") not in _STRICT_PIN_COUNTIES
+                and parcel_key(row.get("state"), row.get("county"), long) is not None):
+            return
+        self.bad += 1
+        if len(self.examples) < SAMPLE:
+            self.examples.append(f"{row.get('county')}|{row.get('source')}|{pa.get('short')}->{pa.get('long')}")
 
     def finish(self) -> dict:
         return {"name": self.name, "checked": self.checked, "violations": self.bad,
                 "max_violations": 0, "ok": self.bad == 0,
-                "detail": "; ".join(self.examples) or f"{self.checked} aliases map to a 10-digit PIN"}
+                "detail": "; ".join(self.examples) or f"{self.checked} aliases map to a trustworthy id"}
 
 
 #: chains read on or after this day must carry raw.rod_chain.binding (a2c7f3ad); older carried

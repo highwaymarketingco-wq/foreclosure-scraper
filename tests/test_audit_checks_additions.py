@@ -90,6 +90,28 @@ def test_alias_to_a_short_id_is_caught():
     assert out["violations"] == 1
 
 
+def test_alias_to_another_countys_own_native_format_is_not_flagged():
+    """2026-10-17: board_persist.keep_prior_valid_parcel() legitimately aliases to a county's own
+    native parcel format outside Lincoln/Rutherford (SC's own TMS ids, NC heir-estate ids) -- not
+    the original Rutherford short-to-short bug, so these must not be flagged."""
+    out = _feed(_by_name()["additions-alias-is-pin"],
+                [{"state": "SC", "county": "Lexington", "source": "counties_sc.qpaybill_delinquent_roll",
+                  "raw": {"parcel_id_alias": {"short": "46099", "long": "00809804018"}}},
+                 {"state": "NC", "county": "Polk", "source": "counties_nc.nc_heir_estate_parcels",
+                  "raw": {"parcel_id_alias": {"short": "P35-22", "long": "P114-167"}}}])
+    assert out["violations"] == 0 and out["checked"] == 2
+
+
+def test_alias_to_another_short_id_is_still_caught_for_lincoln_and_rutherford():
+    """Lincoln/Rutherford are parcel_alias.py's own two alias sources: for them the long side must
+    stay a real 10-digit PIN, so a recurrence of the original bug (another short id) is still
+    caught even though that id would otherwise pass parcel_key()'s generic shape check."""
+    out = _feed(_by_name()["additions-alias-is-pin"],
+                [{"state": "NC", "county": "Rutherford", "source": "counties_nc.rutherford_tax",
+                  "raw": {"parcel_id_alias": {"short": "1600001", "long": "1600009"}}}])
+    assert out["violations"] == 1
+
+
 def test_chain_binding_check():
     c = _by_name()["additions-rod-chain-binding"]
     rows = [
