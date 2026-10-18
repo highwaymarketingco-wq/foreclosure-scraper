@@ -41,6 +41,20 @@ def _canon_street(a: str) -> str:
     return ""
 
 
+def own_source_parcel_value(raw, source) -> Optional[str]:
+    """The id the row's own SOURCE published in its raw block (board_persist.
+    _SOURCE_PARCEL_FIELDS), regardless of what (or whether) Listing.parcel_id itself holds.
+    Unlike nulled_source_parcel() this is not gated on parcel_id being empty: a roll row keeps
+    the SAME raw block, and so the SAME value here, whether or not something else later resolved
+    a DIFFERENT top-level parcel_id (a different numbering system) onto that one copy."""
+    spec = _source_parcel_fields().get(str(source or ""))
+    blk = raw.get(spec[0]) if spec and isinstance(raw, dict) else None
+    if not isinstance(blk, dict):
+        return None
+    v = blk.get(spec[1])
+    return str(v).strip() or None if v else None
+
+
 def _strong_sigs(li: Listing) -> set:
     """Strong same-property signatures for union-merge. Excludes placeholder /
     bankruptcy 'addresses' so name-only rows never collapse together."""
@@ -65,6 +79,25 @@ def _strong_sigs(li: Listing) -> set:
         # bankruptcy rows that have no address signature to fall back on).
         if len(pn) == 15 and pn.endswith("00000"):
             out.add(("p", pn[:10], st))
+    # ---------------------------------------------------------------- source-parcel signature
+    # (2026-10-18, regressions-roll-records-kept duplicate-row finding). A roll row whose top-
+    # level parcel_id a resolver (parcel_alias, enrichment_gis_attrs) later overwrote with a
+    # DIFFERENT numbering system's id (a GIS/PTS Cloud PIN, not the roll's own short account
+    # number) still carries the roll's own id in its raw block, same as every other copy of that
+    # roll entry -- read INDEPENDENTLY of whatever top-level parcel_id holds, not as a fallback
+    # for when it's empty (nulled_source_parcel() is that fallback; this is not it). Without
+    # this, such a row's "p" signature above is keyed by the resolved id, and a sibling copy
+    # whose validation nulled parcel_id entirely (no "p" signature at all, no address, no case#)
+    # is unreachable by EVERY pass -- confirmed live, Madison "1644"/"REDMON, J. H.": one copy
+    # parcel_id=8795000000 (a resolved PIN), the other parcel_id=None, both
+    # raw.nc_ptscloud_delinquent_tax.parcel=="1644", published as two permanent rows.
+    # source_parcel()'s own ref is "ST|county|parcel" (placeholder_twins.parcel_ref): scoped to
+    # county same as the "p" signature, so this cannot fuse the same id across two counties any
+    # more than "p" can (the exact cross-county bug 'roll URL keys' already fixed once).
+    roll_pid = own_source_parcel_value(li.raw, li.source)
+    if roll_pid:
+        for ref, src in source_parcel(li.state, li.county, roll_pid, li.raw, li.source):
+            out.add(("sp", ref, src))
     cn = (li.case_number or "").strip()
     if cn and a:                            # require a real case# AND a real address
         out.add(("c", cn, (li.county or ""), a))
@@ -296,7 +329,7 @@ class Identity(NamedTuple):
 #: Evidence that made two rows candidates. Only ADDRESS evidence needs a real house number.
 ADDRESS, PARCEL, CASE, URL = "address", "parcel", "case", "url"
 _KEY_EVIDENCE = {"addr": ADDRESS, "parcel": PARCEL, "case": CASE, "url": URL}
-_SIG_EVIDENCE = {"a": ADDRESS, "s": ADDRESS, "p": PARCEL, "c": CASE}
+_SIG_EVIDENCE = {"a": ADDRESS, "s": ADDRESS, "p": PARCEL, "sp": PARCEL, "c": CASE}
 
 
 def key_evidence(key: str) -> str:
@@ -435,16 +468,30 @@ def identity_of(state, county, parcel_id, street_address, raw,
                 overshared: frozenset = frozenset(), source=None) -> Identity:
     """Validity is placeholder_twins.parcel_key()'s (which also needs a known county). An address
     written from a parcel that is no match key (no_key_parcel()) gives no house number. A row whose
-    short id validation nulled still names it for the source-parcel rule (nulled_source_parcel())."""
+    short id validation nulled still names it for the source-parcel rule (nulled_source_parcel()).
+
+    `sp` ("what did the SOURCE publish") prefers the row's own raw block over `parcel_id` for any
+    source board_persist._SOURCE_PARCEL_FIELDS names (2026-10-18, regressions-roll-records-kept
+    duplicate-row finding): parcel_alias.apply() can overwrite `parcel_id` with a DIFFERENT
+    numbering system's id (a GIS-aliased PIN) without touching raw at all, so the field alone can
+    no longer answer "what did the source publish" once that has happened -- different_source_
+    parcels() then wrongly read the aliased PIN as a second, conflicting account of the SAME
+    source's roll and refused a merge with a sibling copy that kept the roll's own (short,
+    unaliased) id. The raw block is written once, at scrape time, and parcel_alias never touches
+    it, so it stays the one reliable record regardless of what has since happened to `parcel_id`."""
     pt = _pt()
     hn = pt.real_house_no(street_address)
     if hn and pt.situs_from_parcel(raw) and no_key_parcel(state, county, parcel_id, raw, overshared):
         hn = ""
-    sp = source_parcel(state, county, parcel_id, raw, source, overshared)
-    if not sp:
-        npid = nulled_source_parcel(parcel_id, raw, source)
-        if npid:
-            sp = source_parcel(state, county, npid, raw, source, overshared)
+    own_pid = own_source_parcel_value(raw, source)
+    if own_pid:
+        sp = source_parcel(state, county, own_pid, raw, source, overshared)
+    else:
+        sp = source_parcel(state, county, parcel_id, raw, source, overshared)
+        if not sp:
+            npid = nulled_source_parcel(parcel_id, raw, source)
+            if npid:
+                sp = source_parcel(state, county, npid, raw, source, overshared)
     if pt.resolver_parcel(raw):
         return Identity(hn)
     k = pt.parcel_key(state, county, parcel_id, overshared)
