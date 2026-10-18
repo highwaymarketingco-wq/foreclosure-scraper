@@ -314,9 +314,27 @@ class _Config:
                 pt = V._BY_COUNTY.get(c)
                 if pt is None or not pt.full_model:
                     bad.append(f"tax_lien_itspublic has no full-model portal for {c}")
-            for c in ("caswell", "jones", "person"):
-                if c in V._BY_COUNTY:
-                    bad.append(f"tax_lien_itspublic must not bind {c} (no parcel id on its bills)")
+            # 2026-10-18: caswell/jones/person are now bound, each by its own deliberate,
+            # live-confirmed mechanism (not the naive "add the county, search ParcelNumber"
+            # that originally failed for all three -- none of their bills carry a usable
+            # parcel id). Jones' board parcel_id searches its own ParcelNumber field directly;
+            # Caswell has no parcel at all but searches()'s existing roll_account fallback
+            # (AccountNumber) works; Person's own ParcelNumber/AccountNumber fields are both
+            # confirmed dead, so it is bound via Portal.name_search (OwnerLastName/
+            # OwnerFirstName) instead. Guard that each KEEPS its own correct mechanism, not a
+            # blanket "must not bind" that would now be wrong for all three.
+            jones = V._BY_COUNTY.get("jones")
+            if jones is not None and jones.name_search:
+                bad.append("tax_lien_itspublic: jones should search its own ParcelNumber "
+                          "directly, not by owner name")
+            caswell = V._BY_COUNTY.get("caswell")
+            if caswell is not None and caswell.name_search:
+                bad.append("tax_lien_itspublic: caswell should use the roll_account fallback, "
+                          "not owner-name search")
+            person = V._BY_COUNTY.get("person")
+            if person is not None and not person.name_search:
+                bad.append("tax_lien_itspublic: person's own parcel/account fields are dead "
+                          "-- it must use name_search")
             from foreclosure_scraper import enrichment_probate_spartan as PS
             if set(PS.PORTALS) != set(SPARTAN_COUNTIES):
                 bad.append("Spartan probate portals changed")
