@@ -4509,20 +4509,41 @@ async def run_enrich_tail(st: TailState) -> dict:
                         after=len(enriched) + len(_restored))
             enriched.extend(_restored)
             # A row restored straight from the prior board's own JSON carries whatever
-            # local-tail/call_ready/valuation state (if any) that board had -- every stamp
-            # above ran BEFORE this restore, so a restored row never got this run's gate,
-            # local tail or valuation loop at all (audit 2026-10-09, 2026-10-17 live: 9
-            # HomePath leads carried call_ready=missing AND hud_fmr=missing indefinitely this
-            # way -- same root cause, confirmed the identical 9 rows; 2026-10-18: those same 9
-            # also carry no raw['calc']/raw['grade'], pipeline-row-valued's identical root
-            # cause, never addressed when the other two were fixed). The local-tail/call_ready
-            # steps are documented pure/no-network/idempotent, so re-running them over the
-            # now-larger list is safe and only fills in the rows that just arrived; the
-            # valuation loop is the same kind of pure per-row function (already called twice
-            # unconditionally over `enriched` earlier in this same run, before and after
-            # enrich_equity) but is scoped to just `_restored` here rather than the whole
-            # board, since every other row already has this run's calc/grade and a third full
-            # pass would cost another ~40s/350K rows for no benefit.
+            # local-tail/call_ready/valuation/comps state (if any) that board had -- every
+            # stamp above ran BEFORE this restore, so a restored row never got this run's
+            # gate, local tail, valuation loop, comp-aging or validation at all (audit
+            # 2026-10-09, 2026-10-17 live: 9 HomePath leads carried call_ready=missing AND
+            # hud_fmr=missing indefinitely this way -- same root cause, confirmed the
+            # identical 9 rows; 2026-10-18: those same 9 also carry no raw['calc']/raw['grade'],
+            # pipeline-row-valued's identical root cause, never addressed when the other two
+            # were fixed; 2026-10-18 later: valuation-comps-kind-fits/valuation-comps-age/
+            # valuation-hot-arv-supported live-confirmed a 4th leg on a DIFFERENT 17-row set --
+            # every one of those rows' comps carries no 'carried'/'picked_on'/'age_days' stamp
+            # at all, which enrich_with_comps's own picked_on stamp makes impossible to reach
+            # any other way: age_comps()/validate() never ran on them either, across every run
+            # since. The 1 hot-arv-supported row and 2 comps-age rows the same audit pass
+            # flagged do NOT share this fingerprint -- live-checked, the hot-arv row already
+            # carries proper carried/age_days stamps (a genuine unsupported-ARV case, not this
+            # bug) and the 2 comps-age rows carry a 'source' field from enrich_recorded_sales,
+            # which runs AFTER age_comps in the normal pipeline on brand-new (first_seen ==
+            # last_seen) rows -- a separate ordering gap, not the restore, and left to its own
+            # fix). age_comps()/validate() are the same two steps that run right after the
+            # comps phase in a normal pass (enrichment_comps.age_comps, then
+            # validation.validate, both documented pure/per-row/no-network/idempotent -- the
+            # comps-dropped-kind-mismatch branch validate() already runs is exactly
+            # CompsKindFits' check), so re-running them over just `_restored`, in that same
+            # order and BEFORE the calc/grade loop below (which reads the comp_median_ppsf
+            # validate() recomputes), is safe and only fills in the rows that just arrived.
+            try:
+                from .enrichment_comps import age_comps as _age_comps_grandfather
+                enrichment_stats["comps_age_grandfather"] = _age_comps_grandfather(_restored)
+            except Exception:
+                log.error("comps_age_grandfather.failed", traceback=traceback.format_exc())
+            try:
+                from .validation import validate as _validate_grandfather
+                enrichment_stats["validation_grandfather"] = _validate_grandfather(_restored)
+            except Exception:
+                log.error("validation_grandfather.failed", traceback=traceback.format_exc())
             for _li in _restored:
                 try:
                     _c = valuation_calc.compute(_li)

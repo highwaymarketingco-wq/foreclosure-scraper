@@ -360,3 +360,70 @@ def test_valuation_fills_in_a_row_restored_after_the_main_loop_already_ran():
     assert isinstance(restored.raw.get("calc"), dict)
     assert isinstance(restored.raw.get("grade"), dict)
     assert already_valued.raw == snapshot   # untouched: the fix never re-walks already-valued rows
+
+
+# ---- grandfather-restored rows also miss comp-aging and validation (2026-10-18,
+# valuation-comps-kind-fits / valuation-comps-age / valuation-hot-arv-supported) ----
+# A restored row's comps are the prior-board snapshot's too -- enrichment_comps.age_comps()
+# and validation.validate() both ran over `enriched` BEFORE the restore (like the valuation
+# loop above), so a restored row never got either pass this run. age_comps() prunes a comp
+# past COMPS_CARRY_MAX_AGE_DAYS and stamps every survivor 'carried'/'age_days'; validate()
+# drops a comp whose kind does not fit the subject (townhouse/single_family excepted) and
+# recomputes comp_median_ppsf. Both are pure, per-row, already proven idempotent elsewhere in
+# this run -- main.py's fix calls them over just `_restored`, in that order, BEFORE the
+# calc/grade loop (which reads the comp_median_ppsf validate() recomputes).
+def test_age_comps_and_validate_fill_in_a_row_restored_after_those_loops_already_ran():
+    from datetime import date, timedelta
+
+    from foreclosure_scraper.enrichment_comps import age_comps
+    from foreclosure_scraper.models import PropertyKind
+    from foreclosure_scraper.validation import validate
+
+    today = date(2026, 10, 18)
+    stale_sold = (today - timedelta(days=400)).isoformat()   # older than the 365-day carry window
+    fresh_sold = (today - timedelta(days=30)).isoformat()
+
+    restored = _li(
+        source="national.homepath_json", county="Rutherford", state="NC",
+        property_kind=PropertyKind.LAND, living_sqft=None,
+        raw={"comps": [
+            {"kind": "single_family", "sold_price": 200_000, "sold_date": fresh_sold},  # kind mismatch
+            {"kind": "land", "sold_price": 60_000, "sold_date": stale_sold},            # too old
+            {"kind": "land", "sold_price": 55_000, "sold_date": fresh_sold},            # survives both
+        ]},
+    )
+    # Neither pass has touched this row yet -- the grandfather-restored shape.
+    assert all("age_days" not in c and "carried" not in c for c in restored.raw["comps"])
+
+    for li in [restored]:            # main.py scopes both calls to `_restored`, not the whole board
+        age_comps([li], today=today)
+        validate([li])
+
+    kept = restored.raw["comps"]
+    assert len(kept) == 1 and kept[0]["sold_price"] == 55_000       # kind-mismatch AND stale both gone
+    assert kept[0]["carried"] is True and kept[0]["age_days"] == 30
+    # validate() recomputed comp_median_ppsf from the surviving comp (none here carry a
+    # price_per_sqft, so there is nothing to recompute from -- the key is simply absent,
+    # never a stale value from the dropped comp).
+    assert "comp_median_ppsf" not in restored.raw
+
+
+def test_age_comps_then_validate_does_not_touch_an_already_processed_row():
+    """The fix must not re-walk a row the normal passes already covered this run."""
+    from datetime import date
+
+    from foreclosure_scraper.enrichment_comps import age_comps
+    from foreclosure_scraper.validation import validate
+
+    already_processed = _li(county="Henderson", state="NC",
+                             raw={"comps": [{"kind": "single_family", "sold_price": 300_000,
+                                            "sold_date": "2026-09-01", "picked_on": "2026-10-18",
+                                            "age_days": 47}],
+                                  "comp_median_ppsf": 150.0})
+    snapshot = dict(already_processed.raw)
+
+    for li in []:                    # nothing restored this run -- main.py's `if _restored:` guard
+        age_comps([li], today=date(2026, 10, 18))
+        validate([li])
+
+    assert already_processed.raw == snapshot
