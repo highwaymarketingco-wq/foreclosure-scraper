@@ -112,6 +112,19 @@ The module is named ``…_wildfire_tax`` on purpose: ``enrichment_tax_owed``
 recognises a delinquent-amount source by a "tax"/"lien"/"delinquent" substring
 in the slug, and without one ``raw['amount_owed']`` would never normalize into
 ``raw['tax_owed']``.
+
+RESIDENTIAL IP ONLY (mac_only = True, 2026-10-18)
+--------------------------------------------------
+source-county-floor flagged this source at 282 of 3,435 baseline rows (8%) -- the
+session's largest regression. Traced to the Oracle VM's own run log
+(logs/vm-run-20261015T060016.log): the first request gets an HTTP 403 from
+``d1ebsyxxbc7tep.cloudfront.net`` within 5 seconds, every run, zero pages fetched
+(``st['years']['2025'] = {total: null, fetched: 0}`` on disk, unchanged since).
+Live-tested the SAME endpoint from this Mac the same day: a clean 200 with real
+records on the first request (TotalRecords: 6697 for TY2025 alone). Not a
+Scrapling/nodriver stealth browser (``source_split.needs_mac()`` would never catch
+this), just a CDN that IP-blocks the datacenter host outright -- so it now carries
+``mac_only = True`` and runs from ``scripts/run_stealth_sources.py`` instead.
 """
 from __future__ import annotations
 
@@ -931,6 +944,15 @@ class RutherfordWildfireDelinquent(BaseScraper):
     #: Zero is a real outcome (a wall, an outage), so never flag it as a regression.
     expected_min_count = 0
     requires_apify = False
+    #: 2026-10-18 (source-county-floor, 3,153 of 3,435 baseline rows gone -- the session's largest
+    #: single regression): the VM's datacenter IP gets an HTTP 403 from this API's Cloudfront CDN
+    #: within 5 seconds of the first request (logs/vm-run-20261015T060016.log:
+    #: "walled": "HTTP 403"), every run, zero pages fetched. The SAME API answered a normal 200
+    #: with real records immediately from this Mac's residential IP (TotalRecords: 6697 for TY2025
+    #: alone). Not a stealth browser (plain httpx JSON POSTs, no Scrapling/nodriver markers, so
+    #: source_split.needs_mac() would never have caught it) -- the CDN itself IP-blocks the
+    #: datacenter host, same category as liensnc's mac_only, different reason.
+    mac_only = True
     #: ~1,400 polite pages (~27.8k bills / 20) at ~1.4 s each is ~33 minutes; the sweep
     #: is resumable and its partial rows are shipped, so a shorter budget only defers work.
     timeout_s = float(os.environ.get("RUTHERFORD_WILDFIRE_TIMEOUT_S", "3000"))

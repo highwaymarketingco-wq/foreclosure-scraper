@@ -244,3 +244,18 @@ def test_slim_line_items_handles_missing_or_malformed_line_items():
     assert m._slim_line_items({}) == []
     assert m._slim_line_items({"LineItems": None}) == []
     assert m._slim_line_items({"LineItems": ["not a dict"]}) == []
+
+
+def test_scraper_is_mac_only_and_skipped_on_the_vm():
+    """2026-10-18, source-county-floor: the Oracle VM's datacenter IP gets an HTTP 403 from
+    this API's Cloudfront CDN on every request (logs/vm-run-20261015T060016.log), while the
+    same endpoint answered cleanly from a residential IP the same day. Not a stealth-browser
+    source (source_split.needs_mac()'s module-source scan would never flag it), so it needs
+    the explicit mac_only escape hatch liensnc.py already established -- main.py's own
+    FORECLOSURE_ROLE=vm filter drops every slug in residential_slugs() before any scraper runs."""
+    from foreclosure_scraper.source_split import needs_mac, residential_slugs
+
+    s = m.RutherfordWildfireDelinquent()
+    assert s.mac_only is True
+    assert needs_mac(s)
+    assert s.slug in residential_slugs()
