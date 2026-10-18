@@ -12,9 +12,20 @@ API details (from rutherford_wildfire_tax.py, live-verified 2026-08-03):
   - Accept: application/json is required (otherwise returns an HTML page).
   - Page size is fixed at 20; skip increments by 20.
 
-Must run from the VM (CloudFront 403s requests from non-US-Cloud IPs).
-
 Built 2026-10-13: breaks the avalon_tax wall (8,533 blocked listings).
+
+2026-10-18: this file's own "failure handling" section below documents CloudFront answering 403
+to every request starting ~12:00Z on 2026-10-13, after 22 minutes of working fine -- the exact
+same block scrapers/counties_nc/rutherford_wildfire_tax.py was just confirmed to hit from the
+Oracle VM's datacenter IP (that scraper is now mac_only, source_split.py). This module's own
+production runs are NOT from that VM, though: docs/handoff/verification/tax_lien/manifest.json's
+own last_run names host "SMB-LTSEO05" -- a third machine, not the Mac and not the Oracle VM, that
+this session has no access to and cannot test. Whether SMB-LTSEO05 hits the same CloudFront block
+is unconfirmed; the circuit breaker below already degrades safely (unconfirmed, never a false
+stale) either way. An old "must run from the VM" line here (backwards from what's actually true
+today) has been removed rather than left to mislead; if SMB-LTSEO05 turns out to be blocked too,
+the fix is the owner's to make on that host, the same open item as the heir_roll/probate_heir
+sweep coverage gap already flagged for it.
 """
 from __future__ import annotations
 
