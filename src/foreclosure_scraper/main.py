@@ -2227,14 +2227,15 @@ async def run() -> int:
     # federal REO feeds (reo.* — VRM VA-REO, USDA, Treasury) whose city-only rows
     # (e.g. VRM 'mooresville'/'greenwood' with no county) leaked in Run #20.
     # County-resolved records (e.g. bankruptcy debtors geocoded via OneMap) keep.
-    def _countyless_national(li) -> bool:
-        src = li.source or ""
-        return (src.startswith("national.") or src.startswith("reo.")) \
-            and not (li.county or "").strip()
+    # Uses drop_audit.is_countyless_national (not a local blank-only copy) so a
+    # source's own non-blank placeholder county (audit 2026-10-18: bankruptcy_rss_
+    # relief_from_stay's "Statewide") is caught HERE too, not just once validate()
+    # nulls the placeholder much later — that let 14 unjoined rows ship with no
+    # county anyway, just un-dropped (pipeline-countyless-national).
     from .drop_audit import count_by_source, is_countyless_national
     _natl_by_src = count_by_source(enriched, is_countyless_national)
     _pre_natl = len(enriched)
-    enriched = [li for li in enriched if not _safe_pred(_countyless_national, li, False)]
+    enriched = [li for li in enriched if not _safe_pred(is_countyless_national, li, False)]
     if _pre_natl != len(enriched):
         _off_footprint_removed += _pre_natl - len(enriched)
         log.info("orchestrator.drop_countyless_national", dropped=_pre_natl - len(enriched),
@@ -3641,16 +3642,6 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("footprint_sqft.failed", traceback=traceback.format_exc())
 
-    # Owner tenure — long-held property = high-equity proxy (the "held 7+ years"
-    # filter). Local, from the GIS/CAMA sale year. Feeds grade + outbound segmentation.
-    try:
-        from .enrichment_tenure import enrich_tenure
-        s = enrich_tenure(enriched)
-        if s:
-            enrichment_stats["tenure"] = s
-    except Exception:
-        log.error("tenure.failed", traceback=traceback.format_exc())
-
     # Case# -> court record bid/upset-status. For foreclosure leads with a case
     # number but no posted bid, a PER-CASE public lookup (Rule-610-safe) fills the
     # recorded sale/upset STATUS (SC Public Index publishes status, not the bid $;
@@ -3683,6 +3674,24 @@ async def run_enrich_tail(st: TailState) -> dict:
             enrichment_stats["tail_extras_network_pre_value"] = s
     except Exception:
         log.error("tail_extras_network_pre_value.failed", traceback=traceback.format_exc())
+
+    # Owner tenure — long-held property = high-equity proxy (the "held 7+ years"
+    # filter). Local, from the GIS/CAMA sale year. Feeds grade + outbound segmentation.
+    # MUST run after enrich_sc_cama AND enrich_network_pre_value's BT appraisal-card
+    # fetch (audit 2026-10-18, pipeline-tenure-from-sale): the BT cards are the ONLY
+    # source of raw['gis']['last_sale'] for the 14 BT-portal counties that have no
+    # county GIS sale field of their own — a row whose last-sale year comes ONLY from
+    # that fetch got no tenure at all, forever, once this run's tenure pass ran before
+    # the card did (live-measured on the published board: every one of the 133
+    # "sale year known, no tenure" McDowell rows carries a bt_appraisal_card block
+    # with last_sale_price/year and nothing else usable — no cama, no dated gis sale).
+    try:
+        from .enrichment_tenure import enrich_tenure
+        s = enrich_tenure(enriched)
+        if s:
+            enrichment_stats["tenure"] = s
+    except Exception:
+        log.error("tenure.failed", traceback=traceback.format_exc())
 
     # SC DEW lien cross-reference — attach UI-tax / benefit-overpayment liens to
     # matching property owners by name. No standalone board rows (the sc_dew

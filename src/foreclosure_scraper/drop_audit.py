@@ -71,11 +71,29 @@ def all_filtered_sources(results: Iterable[tuple[str, list]], by_source: Mapping
 # place 605 of them (city 156, ZIP 213, both agreeing 236; the 3 where they disagree are left).
 # ---------------------------------------------------------------------------------------------
 
+#: Sources that stamp a non-blank PLACEHOLDER county (so the row still displays something) for a
+#: record their own feed cannot tie to a specific county, but that is still meant to be an orphan
+#: this drop catches when it never gets joined to a real property row downstream. Audit 2026-10-18
+#: (pipeline-countyless-national): national.bankruptcy_rss_relief_from_stay's own docstring says
+#: "County is 'Statewide' because the feed does not say which county the debtor lives in" — the
+#: blank-only check let 14 unjoined rows through, validate()'s cross-state guard then nulled the
+#: sentinel back out MUCH later (county not in the state's real county set), so they shipped with no
+#: county anyway, just un-dropped. NOT national.fema_disasters, whose OWN "Statewide" is a real,
+#: intentionally-kept signal (a true statewide disaster declaration, carved out in in_scope_distressed).
+_COUNTY_PLACEHOLDER_SOURCES = {"national.bankruptcy_rss_relief_from_stay": {"statewide"}}
+
+
 def is_countyless_national(li) -> bool:
-    """main.run's _countyless_national rule: a national.* / reo.* row with no county."""
+    """main.run's _countyless_national rule: a national.* / reo.* row with no REAL county — blank,
+    or one of that source's own documented non-county placeholders (_COUNTY_PLACEHOLDER_SOURCES)."""
     src = str(getattr(li, "source", "") or "")
-    return (src.startswith("national.") or src.startswith("reo.")) and not str(
-        getattr(li, "county", "") or "").strip()
+    if not (src.startswith("national.") or src.startswith("reo.")):
+        return False
+    county = str(getattr(li, "county", "") or "").strip()
+    if not county:
+        return True
+    placeholders = _COUNTY_PLACEHOLDER_SOURCES.get(src)
+    return bool(placeholders) and county.lower() in placeholders
 
 
 def fill_county_from_city(listings) -> dict:

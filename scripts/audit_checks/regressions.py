@@ -67,6 +67,16 @@ SOURCE_MIN_ROWS = 200
 #: Sources whose drop the owner accepted, with the reason (compare_boards --accept-source-drop).
 ACCEPTED_DROPS = {
     "national.fannie_homepath": "HANDOFF item 78: HomePath read for Fannie Mae REO only (857 -> about 45)",
+    # Audit 2026-10-18 (regressions-source-held): the SAME HANDOFF item 78 change, on the sibling
+    # scraper — homepath_json.py's own listingTypes=5 filter (commit aef7c291, 2026-10-08, "retail
+    # ListHub listings were published as REO") reads the identical Fannie Mae inventory
+    # fannie_homepath has read REO-only since c33369b5. The 2026-10-09 baseline's 282 rows were
+    # scraped by the pre-fix code still embedded in the 10/7 board; the fix landed in git hours
+    # before the baseline file was written but after that board's own scrape ran, so the baseline
+    # never saw the smaller, correct count. Live-confirmed: homepath_json.py:387-392 documents the
+    # exact same page-1 measurement (2,098 unfiltered -> 279 REO-only) fannie_homepath's accepted
+    # entry describes.
+    "national.homepath_json": "HANDOFF item 78 (sibling of fannie_homepath): REO-only filter, 282 -> ~35",
 }
 
 
