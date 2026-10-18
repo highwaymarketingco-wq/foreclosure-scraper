@@ -200,11 +200,6 @@ def apply_hud_fmr(listings: Iterable, table: Optional[dict] = None) -> dict:
 
 
 # ----------------------------------------------------------------------------------- septic
-def _is_buncombe_row(li) -> bool:
-    from .enrichment_septic_status import _is_buncombe
-    return _is_buncombe(li) and bool((getattr(li, "parcel_id", None) or "").strip())
-
-
 def read_septic_cache(path: Optional[Path] = None) -> tuple[Optional[list], Optional[str]]:
     p = Path(path) if path else SEPTIC_CACHE
     if not p.is_file():
@@ -227,15 +222,24 @@ def write_septic_cache(features: list, fetched_at: str, path: Optional[Path] = N
 def apply_septic(listings: Iterable, features: Optional[list], fetched_at: Optional[str],
                  now: Optional[datetime] = None) -> dict:
     """Every Buncombe row with a parcel gets its parcel's septic summary from `features` (the
-    county layer); a row whose parcel has no case loses the block and the land_distress it set."""
-    from .enrichment_septic_status import _normalize_parcel, index_by_parcel, summarize_parcel
+    county layer); a row whose parcel has no case, OR NO LONGER HAS A PARCEL AT ALL, loses the
+    block and the land_distress it set.
+
+    2026-10-17, unwired-septic-current: the loop used to gate on `_is_buncombe_row` (county AND a
+    parcel id), so a row whose parcel was later nulled (by validation, or the legacy standalone
+    enrichment_septic_status.enrich_with_septic_status -- still run by scripts/enrich_board.py --
+    writing a septic block back when the row still had one) was skipped before ever reaching the
+    clear-branch below: 14 Buncombe rows (bankruptcy/divorce/STR-permit sources) carried a stale
+    septic block, missing checked_at, indefinitely. Gating on county alone (`_is_buncombe`) lets a
+    parcel-less row reach the branch that already clears a stale block correctly."""
+    from .enrichment_septic_status import _is_buncombe, _normalize_parcel, index_by_parcel, summarize_parcel
     if not features:
         return {"skipped": "no septic layer cache (the network step fetches it)"}
     now = now or datetime.now(timezone.utc)
     by_parcel = index_by_parcel(features)
     st = {"targets": 0, "matched": 0, "changed": 0, "cleared": 0, "adverse": 0, "layer_fetched_at": fetched_at}
     for li in listings:
-        if not _is_buncombe_row(li):
+        if not _is_buncombe(li):
             continue
         st["targets"] += 1
         raw = _raw(li)

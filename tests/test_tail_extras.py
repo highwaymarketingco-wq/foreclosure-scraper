@@ -95,6 +95,18 @@ def test_septic_applied_from_the_layer_and_cleared_when_the_parcel_has_no_case()
     assert adverse.raw == snap
 
 
+def test_septic_cleared_when_the_row_no_longer_carries_any_parcel():
+    """2026-10-17, unwired-septic-current: a Buncombe row whose parcel_id was later nulled (by
+    validation, or stamped by the legacy enrich_with_septic_status while it still had one) used
+    to be skipped before the loop could even check it, so a stale septic/land_distress block (no
+    checked_at) never got cleared. The row must still be in scope by county alone."""
+    no_parcel = _li(county="Buncombe", parcel_id=None,
+                     raw={"septic": {"latest_status": "Finaled"}, "land_distress": True})
+    s = TE.apply_septic([no_parcel], SEPTIC, NOW.isoformat(), now=NOW)
+    assert "septic" not in no_parcel.raw and "land_distress" not in no_parcel.raw
+    assert s["targets"] == 1 and s["cleared"] == 1
+
+
 def test_septic_cache_round_trip_and_weekly_refresh(tmp_path, monkeypatch):
     monkeypatch.setattr(TE, "SEPTIC_CACHE", tmp_path / "septic.json.gz")
     assert TE.read_septic_cache() == (None, None)
