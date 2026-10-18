@@ -18,6 +18,29 @@ NOT covered: Gates (bttaxpayerportal.com/ITSPublicGT, an older 1.0.1 build): eve
 anything. Other ITSPublic counties (Person, ...) are one PORTALS entry each once their search is
 checked live.
 
+ADDED 2026-10-18 (tax-claim-has-checker's residual counties beyond the original 5). Jones (668
+rows) and Caswell (482 rows) are the same ITSPublic 2.0 build (base URLs already live-verified by
+the roll scraper, scrapers/counties_nc/nc_its_public_tax.py's own PORTALS):
+
+    Jones    https://www.bttaxpayerportal.com/ITSPublicJN2.0/TaxBillSearch
+    Caswell  https://www.bttaxpayerportal.com/ITSPublicCS/TaxBillSearch
+
+Jones' board parcel_id searches directly (ParcelNumber, confirmed against 3 real parcels). Caswell
+carries no parcel at all on its own roll block (its rolls' own `parcel` field reads None on every
+sampled row) -- `searches()`'s existing roll_account fallback already covers this (confirmed live:
+AccountNumber with the roll block's own account value returns real bills). Neither needed a Portal
+field beyond the county name and base URL; `ITS_ROLL`'s defaults (parcel_keys/account_key) already
+fit.
+
+Person (593 rows) is the SAME Gates-style dead-field case: OwnerLastName search returns real,
+correct bills (confirmed live, e.g. account 78159301 / "A1 RENOVATION PROPERTIES, LLC", a real
+unpaid 2026 balance), but its own AccountNumber field AND its own roll block's parcel field
+(confirmed: "A6948", "1451") both answer zero records for the exact same accounts a name search
+just found -- a broken field on this specific portal instance, not a wrong value on our end. Adding
+Person needs an owner-name search path this module does not have yet (every existing Portal
+searches by a row/roll number field, never a name) -- a real design extension, not a quick
+addition like Jones/Caswell were.
+
 ADDED 2026-10-09 (audit tax_checkers_2; same verdict rules, nothing changes for Onslow / Graham):
     Transylvania  https://tax.transylvaniacounty.org/TaxBillSearch     board parcel = ParcelNumber
     Catawba       https://taxbill.catawbacountync.gov/ITSPublicCT       board PIN = AlternateParcelIdentifier
@@ -195,6 +218,8 @@ PORTALS: dict[str, Portal] = {
                 "POLLOCKSVILLE", "WILMINGTON", "BELGRADE", "FOLKSTONE", "VERONA", "HUBERT",
                 "COMFORT", "TAR HEEL")),
     "Graham": Portal("Graham", "https://www.bttaxpayerportal.com/ITSPublicGR2.0", "ParcelNumber"),
+    "Jones": Portal("Jones", "https://www.bttaxpayerportal.com/ITSPublicJN2.0", "ParcelNumber"),
+    "Caswell": Portal("Caswell", "https://www.bttaxpayerportal.com/ITSPublicCS", "ParcelNumber"),
     "Transylvania": Portal(
         "Transylvania", "https://tax.transylvaniacounty.org", "ParcelNumber",
         rolls=(ITS_ROLL, TRANSYLVANIA_ROLL), full_model=True, map_ref=r"\bMS\.\d+$",

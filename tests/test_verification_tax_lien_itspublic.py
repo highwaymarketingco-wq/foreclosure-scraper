@@ -171,6 +171,38 @@ def test_applies_to_the_configured_counties_only():
     # no tax claim at all
     assert not p.applies({"state": "NC", "county": "Onslow", "listing_type": "foreclosure",
                           "source": "x", "parcel_id": "1", "raw": {}})
+    # Person is not in PORTALS at all yet (OwnerLastName works live, AccountNumber/parcel don't --
+    # this module has no name-search path): a Person row never applies.
+    assert not p.applies(onslow_roll_row(county="Person"))
+
+
+def test_jones_searches_its_own_board_parcel_directly():
+    """2026-10-18: Jones' board parcel_id searches ParcelNumber directly, confirmed live against
+    3 real parcels -- the same simple shape Graham already has, no Roll override needed."""
+    row = onslow_roll_row(county="Jones", parcel_id="543648934400",
+                          raw={p.ROLL_KEY: {"county": "Jones", "portal": p.PORTALS["Jones"].base,
+                                            "parcel": "543648934400", "account": "9919357",
+                                            "years": [2025]},
+                               "tax_owed": {"balance": 750.66, "year": 2025, "source": p.ROLL_SLUG},
+                               "two_year_delinquent": {"is_two_year_plus": False, "years": 1}})
+    assert p.applies(row)
+    assert p.searches(row, p.PORTALS["Jones"])[0] == ("ParcelNumber", "543648934400", "board_parcel")
+
+
+def test_caswell_has_no_parcel_and_falls_back_to_the_rolls_own_account():
+    """2026-10-18: Caswell's roll block carries no parcel at all (confirmed live: every sampled
+    row's own `parcel` field is None) -- searches()'s existing roll_account fallback is what
+    makes this county workable at all, confirmed live (AccountNumber + the roll's account value
+    returns real bills)."""
+    row = onslow_roll_row(county="Caswell", parcel_id=None,
+                          raw={p.ROLL_KEY: {"county": "Caswell", "portal": p.PORTALS["Caswell"].base,
+                                            "parcel": None, "account": "1043390", "years": [2025]},
+                               "tax_owed": {"balance": 1073.5, "year": 2025, "source": p.ROLL_SLUG},
+                               "two_year_delinquent": {"is_two_year_plus": False, "years": 1}})
+    assert p.applies(row)
+    searched = p.searches(row, p.PORTALS["Caswell"])
+    assert ("AccountNumber", "1043390", "roll_account") in searched
+    assert not any(src == "board_parcel" for _f, _v, src in searched)
 
 
 def test_description_and_situs_parsing():
@@ -579,8 +611,16 @@ def test_the_newer_build_counties_are_configured_with_the_full_model():
     assert p._BY_COUNTY["alleghany"].cells == p.ITSNET_CELLS and p._BY_COUNTY["anson"].cells == p.CELLS
     assert not p._BY_COUNTY["granville"].account_search
     assert "AlternateParcelIdentifier" in p._BY_COUNTY["granville"].model_fields
-    for c in ("caswell", "jones", "person"):                  # no parcel id to bind a row to
-        assert c not in p._BY_COUNTY
+    # 2026-10-18: re-verified live rather than trusting the "no parcel id" assumption this test
+    # used to make for all three -- Jones' board parcel_id searches ParcelNumber directly (3 real
+    # parcels confirmed), and Caswell's roll_account fallback (already in searches(), just never
+    # tried against this county) works too (confirmed live). Both are now configured. Person is
+    # the one that's genuinely unworkable: OwnerLastName returns real bills, but its own
+    # AccountNumber field and its roll's own parcel field both answer zero for the SAME account a
+    # name search just found -- a dead field on that one portal instance (the Gates pattern), not
+    # a parcel/account availability problem.
+    assert "caswell" in p._BY_COUNTY and "jones" in p._BY_COUNTY
+    assert "person" not in p._BY_COUNTY
 
 
 def test_alleghany_layout_parcel_and_alternate_in_the_description_situs_in_the_address_cell():
