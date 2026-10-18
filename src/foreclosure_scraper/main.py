@@ -3439,6 +3439,18 @@ async def run_enrich_tail(st: TailState) -> dict:
         except Exception:
             log.error("ustaxdata.failed", traceback=traceback.format_exc())
 
+    # Gaston NC per-parcel tax search (DevNetWedge): multi-year unpaid-bill history, keyed by
+    # the board's own parcel_id. Same reason as ustaxdata just above: must run BEFORE
+    # enrich_tax_owed, which reads raw['multi_year_delinquent_tax']['total_due'] by exact key.
+    # Capped/budgeted per run (module docstring); gate off with FORECLOSURE_GASTON_MYDT=0.
+    try:
+        from .enrichment_gaston_multiyear_tax import enrich_with_gaston_multiyear_tax
+        s = await _await_capped(enrich_with_gaston_multiyear_tax(enriched), "gaston_mydt")
+        if s:
+            enrichment_stats["gaston_mydt"] = s
+    except Exception:
+        log.error("gaston_mydt.failed", traceback=traceback.format_exc())
+
     # Taxes-OWED normalizer — fold each tax source's own amount key (Buncombe
     # principal_tax_due, SC state-lien balance, Oconee FLC bid) into one
     # raw['tax_owed'], then cross-reference it onto any same-parcel lead (a court/

@@ -710,7 +710,8 @@ SPECS: dict[str, Spec] = {
     # ---- raw signals ---------------------------------------------------------------------
     "multi_year_delinquent_tax": Spec(_S, "row", "tax", ledger="tax_lien|lien_registry_wall",
                                       producers=("enrichment_tax_owed.py",
-                                                 "scrapers/counties_generic/multi_year_delinquent_tax.py"),
+                                                 "scrapers/counties_generic/multi_year_delinquent_tax.py",
+                                                 "enrichment_gaston_multiyear_tax.py"),
                                       doc="raw.multi_year_delinquent_tax present; checked = the tax roll was read "
                                           "(any property-tax block on the row)"),
     "repeat_tax_loss": Spec(_S, "derived", "tax", producers=("enrichment_repeat_tax_loss.py",),

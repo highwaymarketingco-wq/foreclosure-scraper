@@ -2877,6 +2877,13 @@ RAW_KEEP = {
                                  # rows in board order; with the stamp dropped here every run
                                  # re-checked the same ~300 rows and never reached the rest (292
                                  # stamped on 10/8, none ever published)
+    "_gaston_mydt_checked": "*",  # enrichment_gaston_multiyear_tax's own "already checked, no
+                                 # multi-year history (or unresolvable)" stamp, same reason as
+                                 # _land_buildability_checked just above: no bulk roll exists for
+                                 # this county's vendor (module docstring), so every one of its
+                                 # ~26,620 rows needs its own live fetch, capped per run -- drop
+                                 # this sentinel here and every run re-walks the same first-N rows
+                                 # and never reaches the rest.
     # Why a coastal row is in scope (main._in_scope / _coastal_county_source; main.py: "Listings keep
     # tag raw.oceanfront=True so the dashboard can sort/filter them"): 6,207 / 356 / 356 / 296 / 58
     # rows on 10/8, none ever published.
