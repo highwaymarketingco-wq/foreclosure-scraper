@@ -314,3 +314,11 @@ def test_mailing_street_house_number_is_unglued():
     assert _full_addr("313EXAMPLE DR", "SUMMERVILLE", "SC", "29486") == "313 EXAMPLE DR SUMMERVILLE, SC 29486"
     assert _full_addr("100TH ST", "X", "SC", "1") == "100TH ST X, SC 1"
     assert _full_addr("12A MAIN ST", "X", "SC", "1") == "12A MAIN ST X, SC 1"
+
+
+def test_mailing_street_house_number_unglued_on_a_published_pre_fix_sample():
+    """audit 2026-10-18 column-house-number-glued: parcel 221-00-00-281's invoiceStreetAddress1,
+    pulled live off the published board (first_seen 2026-09-15, predates the 10/9 fix)."""
+    from foreclosure_scraper.scrapers.counties_sc.berkeley_paystar_tax import _full_addr
+    assert (_full_addr("1092JOHNNIE DODDS STE 100", "MT PLEASANT", "SC", "29464")
+            == "1092 JOHNNIE DODDS STE 100 MT PLEASANT, SC 29464")
