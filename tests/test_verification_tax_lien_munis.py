@@ -164,6 +164,24 @@ def test_applies():
                           "source": "x", "parcel_id": "R1", "raw": {}})
 
 
+def test_hoke_applies_with_no_munis_roll_block():
+    """2026-10-18: Hoke's rows come from nc_tax_lien_ads (the county's own ad-list PDF), not this
+    module's own nc_county_csv_delinquent_tax roll -- applies() must still recognize them via the
+    generic tax_owed/tax_aging claim, own_block=False is fine (live-verified against 3 real Hoke
+    parcels on the actual hokecountytaxes.munisselfservice.com instance)."""
+    row = {"state": "NC", "county": "Hoke", "listing_type": "tax_lien",
+           "source": "counties_nc.nc_tax_lien_ads", "parcel_id": "584950001122",
+           "raw": {"tax_owed": {"balance": 900.0, "year": 2025}}}
+    assert p.portal_of(row) is p.PORTALS["Hoke"]
+    assert p.applies(row)
+
+
+def test_hoke_parcel_id_passes_through_unchanged():
+    """Hoke's board parcel ids are plain 12-digit strings, not New Hanover's dashed "R#####-###-
+    ###-###" shape -- search_id must not try to re-dash them."""
+    assert p.search_id("584950001122") == "584950001122"
+
+
 def test_a_block_of_another_parcel_names_no_claimed_year():
     """The 2026-10-07 board copied one parcel's roll block onto 1,198 New Hanover rows: its years
     are not a claim about the row's parcel."""

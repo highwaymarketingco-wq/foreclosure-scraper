@@ -14,6 +14,20 @@ link is optional, for a taxpayer's own account), no CAPTCHA and no terms page:
 
     New Hanover  https://newhanovercountynccss.munisselfservice.com/citizens/RealEstate/Default.aspx
 
+ADDED 2026-10-18 (tax-claim-has-checker, a 16,018-row ratchet overage: 5 NC counties whose tax-
+claim rows had no registered verifier at all). Hoke (2,829 rows, nc_tax_lien_ads -- the county's
+own static annual advertisement-list PDF, NOT this module's own nc_county_csv_delinquent_tax roll)
+is on the SAME Munis platform, live-verified against 3 real board parcels (search -> grid -> view
+-> parse_bill, no code change needed -- the exact same functions this module already has):
+
+    Hoke         https://hokecountytaxes.munisselfservice.com/citizens/RealEstate/Default.aspx
+
+applies() still recognizes Hoke rows with no munis roll block: claims_property_tax()'s OR already
+covers a generic tax_lien/tax_owed/aging claim (own_block=False is fine) -- Hoke's nc_tax_lien_ads
+rows carry one of those. One parcel checked live (584950001122) had its 2026 bill fully paid
+(balance 0.0) despite the county's OWN ad-list PDF (a snapshot) still flagging it -- exactly the
+"the roll is a snapshot, this reads what's owed today" case this verifier exists for.
+
 THE BOARD'S NEW HANOVER FLAG (measured on the 2026-10-07 board, read-only): 1,209 of the 1,286
 flagged rows carry a roll block (raw['nc_county_csv_delinquent_tax']) whose county_id is ANOTHER
 parcel: one block ($4,150.31, 2016-2025, one parcel) is copied onto 1,198 rows and another
@@ -96,6 +110,7 @@ class Portal:
 
 PORTALS: dict[str, Portal] = {
     "New Hanover": Portal("New Hanover", "https://newhanovercountynccss.munisselfservice.com"),
+    "Hoke": Portal("Hoke", "https://hokecountytaxes.munisselfservice.com"),
 }
 _BY_COUNTY = {k.lower(): v for k, v in PORTALS.items()}
 
