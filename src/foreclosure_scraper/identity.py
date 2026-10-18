@@ -39,6 +39,12 @@ address and owner (pre-10/6 address-key merges; a Buncombe unpaid bill for 0609-
 as 0609-68-0073 at its owner's mailing address). fused_record() detects it, unfuse() re-keys the row
 to its own record (parcel, situs, owner) and records what it displaced in raw['unfused']; the late
 block scrub then drops the blocks that belonged to the displaced parcel. Nothing is deleted.
+unfuse() also clears raw['gis_fill']/['county_deed_ref']/['county_legal'] (gis_fill.py's own fill +
+screen, SUPERSEDED_PARCEL_FILL_BLOCKS below): gis_fill runs early in main.py's pipeline and keys
+its "screened"/deed/legal verdict to li.parcel_id at the time it ran, with no re-check before the
+late unfuse() pass re-keys parcel_id out from under it -- left alone, the row would carry the
+SUPERSEDED (from_parcel)'s verdict under the new (to_parcel) identity, and gis_fill.needs() would
+skip re-screening it as already done (2026-10-18 top80-fill-screen-honest unfuse/repoint gap).
 
 OWNER CONTRADICTED BY THE ROLL. block_binding.row_owner_strength() == 'contradicted': every county
 roll block on the row names someone else. 40 sampled rows were checked against a third source (NC
@@ -107,6 +113,17 @@ CANDIDATE_ID_BLOCKS = frozenset({"parcel_from_address", "parcel_from_geo", "parc
 #: sources whose own record names a parent/master tract (a lien-agent filing's PIN covers a
 #: subdivision's lots): a different id there is not a fused row
 PARENT_PIN_SOURCES = ("liensnc",)
+#: raw blocks gis_fill.apply_one() writes keyed to li.parcel_id AT THE TIME IT RAN (gis_fill runs
+#: early in main.py's pipeline, identity's unfuse() late) -- none of the three carries its own
+#: "this is parcel X's screen" guard gis_fill.needs()/deed_ref_on_row()/legal_on_row() checks
+#: before skipping a re-screen, so once unfuse() re-keys row.parcel_id to the record's OWN parcel
+#: (to_parcel), a block still on the row is the SUPERSEDED (from_parcel)'s verdict/deed/legal
+#: wearing the new parcel's name. Cleared below so the next gis_fill run screens the row's real
+#: (to_parcel) identity instead of trusting a stale "found"/deed/legal that belongs to the
+#: parcel this row no longer is. Same family as enrichment_prior_correction.py's
+#: _PARCEL_BLOCKS/_PARCEL_ONLY_BLOCKS (clearing a block tied to an abandoned parcel id), applied
+#: here to unfuse()'s own re-key instead of a withdrawn fallback point.
+SUPERSEDED_PARCEL_FILL_BLOCKS = ("gis_fill", "county_deed_ref", "county_legal")
 
 
 def own_blocks(row: Any) -> dict:
@@ -335,6 +352,9 @@ def unfuse(row: Any) -> Optional[dict]:
         _set(row, "owner_name", owner)
     raw = _raw(row)
     raw.pop("parcel_id_alias", None)
+    cleared_fill = [k for k in SUPERSEDED_PARCEL_FILL_BLOCKS if raw.pop(k, None) is not None]
+    if cleared_fill:
+        rec["superseded_fill_cleared"] = cleared_fill
     raw["unfused"] = rec
     if not isinstance(_get(row, "raw"), dict):
         _set(row, "raw", raw)

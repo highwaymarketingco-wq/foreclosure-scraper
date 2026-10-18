@@ -219,6 +219,35 @@ def test_fused_row_is_rekeyed_to_its_own_record():
     assert idn.fused_record(row) is None and idn.unfuse(row) is None     # idempotent
 
 
+def test_unfuse_clears_the_superseded_parcels_gis_fill_screen():
+    """2026-10-18 top80-fill-screen-honest unfuse/repoint gap: gis_fill.py runs early in main.py's
+    pipeline and keys its 'screened'/deed/legal verdict to li.parcel_id at the time it ran; identity's
+    unfuse() runs late and re-keys parcel_id to the record's own (to_parcel). Left alone, the row
+    would carry the SUPERSEDED (from_parcel)'s gis_fill/county_deed_ref/county_legal under the new
+    identity, and gis_fill.needs() would skip re-screening it as already done."""
+    stale_fill = {"checked_at": "2026-10-16T00:00:00+00:00", "source": "test_layer", "found": True,
+                  "deed": "found", "legal": "found", "value": "skip", "acres": "skip"}
+    row = _li("counties_generic.arcgis_distress.test_unpaid_bills", "0600-00-0073-00000", "86 MAIL RD",
+              owner="STONE PAUL",
+              raw={"arcgis_distress": _bill("0600-00-4200-00000"), "gis_fill": stale_fill,
+                   "county_deed_ref": {"source": "test_layer", "parno": "0600-00-0073-00000",
+                                       "book": "100", "page": "1"},
+                   "county_legal": {"source": "test_layer", "parno": "0600-00-0073-00000",
+                                    "text": "LOT 1 THE WRONG PARCEL'S PLAT"}})
+    rec = idn.unfuse(row)
+    assert rec["to_parcel"] == "0600-00-4200-00000"
+    assert "gis_fill" not in row.raw and "county_deed_ref" not in row.raw and "county_legal" not in row.raw
+    assert sorted(rec["superseded_fill_cleared"]) == ["county_deed_ref", "county_legal", "gis_fill"]
+
+
+def test_unfuse_leaves_gis_fill_alone_when_the_row_was_never_fused():
+    row = _li("x.roll", "1000000099", "2 FAKE ST", raw={"gis_fill": {"checked_at": "2026-10-16T00:00:00+00:00",
+                                                                     "found": False}})
+    assert idn.fused_record(row) is None
+    assert idn.unfuse(row) is None
+    assert row.raw["gis_fill"]["found"] is False
+
+
 def test_not_fused_parent_pins_candidates_short_ids_and_other_layers():
     # a lien filing's PIN is the master tract
     assert idn.fused_record(_li("counties_generic.liensnc", "1000000009", "1 FAKE ST",
