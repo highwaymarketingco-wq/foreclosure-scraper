@@ -324,3 +324,39 @@ def test_dataless_listing_grade_still_withheld():
     c = vcalc.compute(li)
     g = vgrade.grade(li, c)
     assert g.overall is None  # nothing to assess -> withheld (honest)
+
+
+# ---- grandfather-restored rows (2026-10-18, pipeline-row-valued) ----
+# main.py's GRANDFATHER restore (re-adds a prior-board row a downstream filter dropped this
+# run) appends those rows to `enriched` AFTER the valuation loop runs -- same root cause as
+# the call_ready/hud_fmr gap already fixed for this same restore branch (2026-10-17,
+# a301abc5/1f74b27a; live-confirmed the identical 9 HomePath REO rows). A restored row carries
+# whatever raw['calc']/raw['grade'] its prior-board JSON had -- if those were never set, they
+# stay missing indefinitely, since nothing re-ran the valuation loop on any later run either.
+# compute()/grade() are pure and per-row (no shared state across listings, already called
+# twice unconditionally over the same list earlier in a normal run), so calling them again for
+# just the rows that were restored -- main.py's fix -- must fill in calc/grade on exactly those
+# rows and touch nothing else.
+def test_valuation_fills_in_a_row_restored_after_the_main_loop_already_ran():
+    from foreclosure_scraper.valuation import grading as vgrade
+
+    already_valued = _li(tax_value=150_000, county="Henderson", state="NC")
+    c0 = vcalc.compute(already_valued)
+    g0 = vgrade.grade(already_valued, c0)
+    already_valued.raw["calc"] = vcalc.to_dict(c0)
+    already_valued.raw["grade"] = vgrade.to_dict(g0)
+    snapshot = dict(already_valued.raw)
+
+    restored = _li(source="national.homepath_json", county="Rutherford", state="NC",
+                    living_sqft=1400)  # no calc/grade yet -- the grandfather-restored shape
+    assert "calc" not in restored.raw and "grade" not in restored.raw
+
+    for li in [restored]:            # main.py scopes this to `_restored`, not the whole board
+        c = vcalc.compute(li)
+        g = vgrade.grade(li, c)
+        li.raw["calc"] = vcalc.to_dict(c)
+        li.raw["grade"] = vgrade.to_dict(g)
+
+    assert isinstance(restored.raw.get("calc"), dict)
+    assert isinstance(restored.raw.get("grade"), dict)
+    assert already_valued.raw == snapshot   # untouched: the fix never re-walks already-valued rows

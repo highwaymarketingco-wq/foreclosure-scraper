@@ -4497,13 +4497,31 @@ async def run_enrich_tail(st: TailState) -> dict:
                         after=len(enriched) + len(_restored))
             enriched.extend(_restored)
             # A row restored straight from the prior board's own JSON carries whatever
-            # local-tail/call_ready state (if any) that board had -- every stamp above ran
-            # BEFORE this restore, so a restored row never got this run's gate or local tail
-            # at all (audit 2026-10-09, 2026-10-17 live: 9 HomePath leads carried
-            # call_ready=missing AND hud_fmr=missing indefinitely this way -- same root
-            # cause, confirmed the identical 9 rows). Both steps are documented pure/no-
-            # network/idempotent, so re-running them over the now-larger list is safe and
-            # only fills in the rows that just arrived.
+            # local-tail/call_ready/valuation state (if any) that board had -- every stamp
+            # above ran BEFORE this restore, so a restored row never got this run's gate,
+            # local tail or valuation loop at all (audit 2026-10-09, 2026-10-17 live: 9
+            # HomePath leads carried call_ready=missing AND hud_fmr=missing indefinitely this
+            # way -- same root cause, confirmed the identical 9 rows; 2026-10-18: those same 9
+            # also carry no raw['calc']/raw['grade'], pipeline-row-valued's identical root
+            # cause, never addressed when the other two were fixed). The local-tail/call_ready
+            # steps are documented pure/no-network/idempotent, so re-running them over the
+            # now-larger list is safe and only fills in the rows that just arrived; the
+            # valuation loop is the same kind of pure per-row function (already called twice
+            # unconditionally over `enriched` earlier in this same run, before and after
+            # enrich_equity) but is scoped to just `_restored` here rather than the whole
+            # board, since every other row already has this run's calc/grade and a third full
+            # pass would cost another ~40s/350K rows for no benefit.
+            for _li in _restored:
+                try:
+                    _c = valuation_calc.compute(_li)
+                    _g = valuation_grading.grade(_li, _c)
+                    if not isinstance(_li.raw, dict):
+                        _li.raw = {}
+                    _li.raw["calc"] = valuation_calc.to_dict(_c)
+                    _li.raw["grade"] = valuation_grading.to_dict(_g)
+                except Exception:
+                    log.warning("valuation.grandfather_failed", source_url=_li.source_url,
+                                traceback=traceback.format_exc())
             try:
                 from .enrichment_tail_extras import enrich_local_pre_gate
                 enrichment_stats["tail_extras_local_pre_gate_grandfather"] = enrich_local_pre_gate(enriched)
