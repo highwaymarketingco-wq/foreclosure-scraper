@@ -44,6 +44,7 @@ from typing import Callable, Iterable, Optional
 
 from . import parcel_cache as pc
 from .models import Listing, ListingType
+from .gis_fill import plausible_value
 
 _MAIL_STATE_RE = re.compile(r"\b([A-Z]{2})\b(?:\s+\d{5}(?:-\d{4})?)?\s*$")
 
@@ -102,11 +103,19 @@ def apply_hit(li: Listing, hit: dict, c: Counter) -> None:
         li.owner_name = hit["owner"]
         c["filled owner name"] += 1
     if hit.get("market_value") and not li.market_value:
-        li.market_value = hit["market_value"]
-        c["filled market value"] += 1
+        mv = plausible_value(pc._num(hit.get("market_value")))
+        if mv:
+            li.market_value = mv
+            c["filled market value"] += 1
+        else:
+            c["dropped market value: implausible"] += 1
     if hit.get("tax_value") and not li.tax_value:
-        li.tax_value = hit["tax_value"]
-        c["filled tax value"] += 1
+        tv = plausible_value(pc._num(hit.get("tax_value")))
+        if tv:
+            li.tax_value = tv
+            c["filled tax value"] += 1
+        else:
+            c["dropped tax value: implausible"] += 1
     if hit.get("living_sqft") and not li.living_sqft:
         li.living_sqft = hit["living_sqft"]
         c["filled sqft"] += 1

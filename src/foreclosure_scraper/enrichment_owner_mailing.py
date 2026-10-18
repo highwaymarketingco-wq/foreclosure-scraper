@@ -28,6 +28,7 @@ import structlog
 
 from . import condo_units
 from .models import Listing, ListingType
+from .gis_fill import plausible_value
 from .enrichment_arcgis import (  # SCDOT circuit-breaker
     scdot_walled, mark_host_walled, is_token_error,
 )
@@ -1001,7 +1002,18 @@ async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 1
                 # valuation/calc.py (tax_value × 1.25) and closes the
                 # assessed_value gap. Fill all three value fields when missing
                 # (for these county appraisal records they are the same total).
-                val = res.pop("_value", None)
+                # plausible_value() guards this sink the same way gis_fill.py / apply_gis_attrs
+                # already guard theirs — the _value above can come unchecked from the SC bulk
+                # assessor-roll lane (_from_bulk_roll's rec.get("market_value")), which carries
+                # no bound of its own (only the live-GIS-regex lane's _num_value does). Applying
+                # the SAME bound to all three fields here (not a tighter one on assessed_value
+                # specifically) is what keeps this safe for SC: the SC-ratio carve-out immediately
+                # below already keeps this branch out of SC's assessed_value entirely, so the only
+                # assessed_value this can still set is NC's (and SC's own, non-ratio) 1:1 total,
+                # exactly as plausible as the market/tax value it is copied from.
+                _raw_val = res.pop("_value", None)
+                val = plausible_value(float(_raw_val)) if isinstance(_raw_val, (int, float)) \
+                    and not isinstance(_raw_val, bool) else None
                 if val:
                     if not li.tax_value:
                         li.tax_value = val

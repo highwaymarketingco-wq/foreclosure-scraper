@@ -53,6 +53,7 @@ from .sensitive_fields import drop_sensitive
 from . import owner_freshness
 from . import block_binding as _bb
 from . import tax_binding as _tb
+from .gis_fill import plausible_value
 
 # ---------------------------------------------------------------------------
 # Persistent parcel/point -> GIS-attrs cache (Phase-2 hang/volume fix)
@@ -694,9 +695,13 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
                     if not g.get("owner"):
                         g["owner"] = str(owner_cand).strip()
                 if not li.market_value and pc.get("market_value"):
-                    li.market_value = pc["market_value"]; stats["filled_market"] += 1
+                    _mv = plausible_value(_num(pc.get("market_value")))
+                    if _mv:
+                        li.market_value = _mv; stats["filled_market"] += 1
                 if not li.tax_value and pc.get("tax_value"):
-                    li.tax_value = pc["tax_value"]
+                    _tv = plausible_value(_num(pc.get("tax_value")))
+                    if _tv:
+                        li.tax_value = _tv
                 if not li.living_sqft and pc.get("living_sqft"):
                     li.living_sqft = pc["living_sqft"]; stats["filled_sqft"] += 1
                 if not li.acreage and pc.get("acreage"):
