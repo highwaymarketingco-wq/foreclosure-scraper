@@ -322,3 +322,13 @@ def test_mailing_street_house_number_unglued_on_a_published_pre_fix_sample():
     from foreclosure_scraper.scrapers.counties_sc.berkeley_paystar_tax import _full_addr
     assert (_full_addr("1092JOHNNIE DODDS STE 100", "MT PLEASANT", "SC", "29464")
             == "1092 JOHNNIE DODDS STE 100 MT PLEASANT, SC 29464")
+
+
+def test_situs_street_address_is_also_unglued():
+    """audit 2026-10-18: SiteAddress feeds street_address directly (unlike invoiceStreetAddress1,
+    which already went through _full_addr), so a glued SiteAddress reached the board unfixed.
+    No published row has shown this yet (SiteAddress is the county GIS text, not the invoice's
+    own free-text line), but the same vendor writes both fields and the check makes no such
+    distinction."""
+    li = _detail_to_listing(_detail_with({"SiteAddress": "1092JOHNNIE DODDS STE 100"}), "h")
+    assert li.street_address == "1092 JOHNNIE DODDS STE 100"

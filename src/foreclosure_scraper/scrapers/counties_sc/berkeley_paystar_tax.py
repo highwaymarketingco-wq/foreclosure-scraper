@@ -412,7 +412,7 @@ def _detail_to_listing(detail: dict, invoice_hash: str) -> Listing | None:
             "mailing_source": "berkeley_paystar_tax",
         }
 
-    situs_line = meta.get("SiteAddress") or None
+    situs_line = unglue_house_number(meta.get("SiteAddress")) or None
     return Listing(
         source="counties_sc.berkeley_paystar_tax",
         source_url=_UI_URL.format(hash=invoice_hash),
