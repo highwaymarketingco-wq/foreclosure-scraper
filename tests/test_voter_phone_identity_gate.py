@@ -225,3 +225,49 @@ def test_a_legacy_fuzzy_block_without_matched_name_is_regated(monkeypatch):
     assert stats["regated"] == 1
     assert li.raw["owner_phone"]["identity_check"] == "unverified"
     assert li.raw["owner_phone"]["do_not_dial"] is True
+
+
+# --------------------------------------------------------------------------------------
+# 2026-10-17: the voter file itself carries placeholder phones (NCSBE's own "no phone on
+# file" convention, not our parsing) -- _valid_nanp() rejects them before they are ever
+# indexed, so column-call-ready-phone-nanp's 5 live violations can't recur from this source.
+# --------------------------------------------------------------------------------------
+def test_valid_nanp_rejects_the_live_placeholder_shapes_and_accepts_a_real_number():
+    assert V._valid_nanp("8280000000") is False     # NCSBE "no phone" placeholder
+    assert V._valid_nanp("9999999999") is False      # all-same-digit sentinel
+    assert V._valid_nanp("8201038043") is False      # exchange starts 1 ("820) 103-...")
+    assert V._valid_nanp("3360891906") is False      # exchange starts 0 ("336) 089-...")
+    assert V._valid_nanp("0195551234") is False      # area code starts 0
+    assert V._valid_nanp("1195551234") is False      # area code starts 1
+    assert V._valid_nanp("919555123") is False       # not 10 digits
+    assert V._valid_nanp("9195551234") is True
+
+
+def _write_voter_file(path, rows):
+    import csv as _csv
+    with open(path, "w", encoding="latin-1", newline="") as fh:
+        w = _csv.writer(fh, delimiter="\t")
+        w.writerow([f"col{i}" for i in range(24)])  # header, skipped by _build_index
+        for r in rows:
+            w.writerow(r)
+
+
+def _voter_row(county, last, first, street, phone, status="A"):
+    row = ["x"] * 24
+    row[1], row[4], row[5], row[8], row[12], row[23] = county, last, first, status, street, phone
+    return row
+
+
+def test_build_index_never_indexes_a_placeholder_voter_phone(tmp_path, monkeypatch):
+    monkeypatch.setattr(V, "_DATA", tmp_path)
+    _write_voter_file(tmp_path / "ncvoter_wake.txt", [
+        _voter_row("WAKE", "SMITH", "JOHN", "16 CRIS LN", "8280000000"),   # placeholder: dropped
+        _voter_row("WAKE", "JONES", "MARY", "20 OAK ST", "9195551234"),    # real: kept
+    ])
+
+    idx, name_county, fz_addr, fz_nc = V._build_index()
+
+    assert ("SMITH", "JOHN", "16", "CRIS") not in idx
+    assert ("WAKE", "SMITH", "JOHN") not in name_county
+    assert idx[("JONES", "MARY", "20", "OAK")] == "9195551234"
+    assert name_county[("WAKE", "JONES", "MARY")] == "9195551234"

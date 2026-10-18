@@ -127,6 +127,17 @@ def _street_key(addr: str | None):
     return (m.group(1), toks[0][:6])
 
 
+def _valid_nanp(phone: str) -> bool:
+    """A 10-digit voter-file phone that is a real-looking NANP number, not NCSBE's own
+    placeholder convention for "no phone on file" (seen live 2026-10-17, column_accuracy's
+    column-call-ready-phone-nanp: "(828) 000-0000" / "(999) 999-9999" / an area code or exchange
+    starting 0/1, e.g. "(820) 103-8043", "(336) 089-1906" -- 5 call-ready rows carrying one of
+    these straight through as the owner's number). Same shape rule column_accuracy.placeholder_
+    class's "phone" branch already applies downstream; checked here too so a junk voter-file
+    entry is never indexed in the first place, not just caught after publish."""
+    return len(phone) == 10 and phone[0] not in "01" and phone[3] not in "01" and len(set(phone)) > 1
+
+
 def _build_index():
     """Returns (addr_index, name_county_unique, fuzzy_addr, fuzzy_namecty).
 
@@ -148,7 +159,7 @@ def _build_index():
                 if len(row) < 24 or row[8].strip() != "A":   # active voters only
                     continue
                 phone = re.sub(r"\D", "", row[23] or "")
-                if len(phone) != 10:
+                if not _valid_nanp(phone):
                     continue
                 county = row[1].strip().upper()
                 last, first = row[4].strip().upper(), row[5].strip().upper()
