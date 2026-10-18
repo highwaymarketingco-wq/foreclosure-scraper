@@ -158,6 +158,21 @@ def test_photo_and_cluster_entries_of_the_parcel_go():
     assert {"images", "zillow", "owner_cluster.parcel_ids", "gis.owner", "gis.mailing"} <= set(a["raw_removed"])
 
 
+def test_cama_and_assessor_card_go_though_they_name_no_parcel_field():
+    # measured live on the 10/16 board (Anderson, 446 rows at the courthouse seat point):
+    # raw['cama'] = {"previous_owner": "N/A"} survived this same withdrawal untouched, because
+    # it carries no parcel/PIN key names_parcel() can match (audit 2026-10-18,
+    # block-binding-family-gis/-deed-sale).
+    li = _seat_row(raw={"cama": {"previous_owner": "N/A"},
+                        "assessor_card": {"source_url": "https://x.invalid", "sale_price": 1.0},
+                        "condition_cama": {"condition_tier": "cosmetic"},
+                        "last_sale": {"date": "2019-01-01", "amount": 5000.0, "basis": "recorded_sale"}})
+    a = pc.withdraw_fallback_parcel(li, pc.Counter(), 8, FakeCache({}))
+    for k in ("cama", "assessor_card", "condition_cama", "last_sale"):
+        assert k not in li.raw
+    assert {"cama", "assessor_card", "condition_cama", "last_sale"} <= set(a["raw_removed"])
+
+
 def test_resolver_does_not_reattach_at_the_same_point():
     from foreclosure_scraper.enrichment_parcel_from_geo import _withdrawn
     li = _seat_row()

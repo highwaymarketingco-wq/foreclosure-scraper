@@ -237,6 +237,15 @@ _PROTECTED_RAW = frozenset({
 _PARCEL_BLOCKS = frozenset({"gis_attrs_full", "situs_road_only", "lrcpwa"})
 #: Blocks that show the parcel's assessor photo (raw['images'] and its aliases).
 _PHOTO_BLOCKS = ("images", "zillow", "vision", "vision_fetch_failed")
+#: Blocks a lookup can ONLY have populated by matching li.parcel_id (or, for assessor_card's SC
+#: point-key path, li.latitude/longitude) -- enrichment_sc_cama.enrich_sc_cama,
+#: enrichment_owner_mailing._extract_distress (raw['cama']), enrichment_cama_condition and
+#: enrichment_assessor_card carry no parcel/PIN field of their own to match via names_parcel()
+#: (audit 2026-10-18, block-binding-family-gis/-deed-sale: 'cama' survived a withdrawal with just
+#: {"previous_owner": "N/A"} on 446 Anderson rows, no field names_parcel() could ever catch).
+#: Once this function has decided the row's point parcel is a fallback and withdrawn it, nothing
+#: else on the row could have produced these -- removed whole unconditionally, not by matching.
+_PARCEL_ONLY_BLOCKS = frozenset({"cama", "cama_specs", "condition_cama", "assessor_card", "last_sale"})
 #: owner_mailing.source values that mean "read from a parcel layer" (repair_parcel_from_address).
 _PARCEL_MAILING_SOURCES = frozenset({None, "", "county_gis", "nc_onemap", "scdot_sc", "sc_assessor_roll",
                                      "county_tax_roll", "henderson_county_gis"})
@@ -776,6 +785,9 @@ def withdraw_fallback_parcel(li: Listing, point_counts: Counter, min_rows: int,
         if k in _PHOTO_BLOCKS:
             if token in json.dumps(v, default=str):
                 pop_keys.append(k)
+            continue
+        if k in _PARCEL_ONLY_BLOCKS:
+            pop_keys.append(k)
             continue
         if not isinstance(v, dict):
             continue

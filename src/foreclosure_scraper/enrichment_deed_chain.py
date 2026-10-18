@@ -131,13 +131,25 @@ def _is_distress_sale(price: Optional[float], doc_type: str = "") -> bool:
     return False
 
 
-def _collect_records(li: Listing) -> list[dict]:
-    """Gather all sale/deed records from every source on this listing."""
+def _collect_records(li: Listing, fallback_point: bool = False) -> list[dict]:
+    """Gather all sale/deed records from every source on this listing.
+
+    `fallback_point`: this row has no parcel id and no house-numbered address of its own, and its
+    point is a flagged geocoder fallback (block_binding.imprecise_point() and not own_location()) --
+    the same test block_binding.py's own POINT_BLOCKS rule uses. assessor_card.sales, county_sales
+    and gis.last_sale are each resolved by a parcel/point lookup (sc_assessor_cama / parcel_cache /
+    enrichment_county_sales / enrichment_gis_attrs): on such a row they are some OTHER parcel's
+    record, the one that happens to sit at the shared fallback point, carried into `raw` before
+    that parcel was withdrawn (enrichment_prior_correction.withdraw_fallback_parcel) or by a source
+    this module alone cannot re-check. Folding them into THIS row's own deed chain (audit
+    2026-10-18, block-binding-family-deed-sale) presents a stranger's sale as this row's acquisition
+    history. rod_docs and relationship_signal are matched by owner NAME or case, not by point, and
+    stay regardless."""
     raw = li.raw if isinstance(li.raw, dict) else {}
     records: list[dict] = []
 
     # 1. assessor_card.sales — richest source, has grantor + price + book/page
-    ac = raw.get("assessor_card")
+    ac = None if fallback_point else raw.get("assessor_card")
     if isinstance(ac, dict) and isinstance(ac.get("sales"), list):
         for s in ac["sales"]:
             if not isinstance(s, dict):
@@ -154,7 +166,7 @@ def _collect_records(li: Listing) -> list[dict]:
             })
 
     # 2. county_sales — ArcGIS sales roll comps
-    cs = raw.get("county_sales")
+    cs = None if fallback_point else raw.get("county_sales")
     if isinstance(cs, dict) and isinstance(cs.get("sales"), list):
         for s in cs["sales"]:
             if not isinstance(s, dict):
@@ -168,7 +180,7 @@ def _collect_records(li: Listing) -> list[dict]:
             })
 
     # 3. gis.last_sale — single most recent sale
-    gis = raw.get("gis")
+    gis = None if fallback_point else raw.get("gis")
     if isinstance(gis, dict):
         ls = gis.get("last_sale")
         if isinstance(ls, dict) and ls:
@@ -216,9 +228,12 @@ def _collect_records(li: Listing) -> list[dict]:
                     })
                 records.append(rec)
 
-    # 5. relationship_signal — probate/divorce deed patterns
+    # 5. relationship_signal — probate/divorce deed patterns. Matched by case/person, not by
+    # point, so it stays on a fallback-point row -- but only when it actually says something
+    # (a signal with every field empty was only ever noise inflating chain_length to 1 with
+    # nothing in it; audit 2026-10-18, block-binding-family-deed-sale).
     rs = raw.get("relationship_signal")
-    if isinstance(rs, dict):
+    if isinstance(rs, dict) and any(rs.get(f) for f in ("date", "signal", "grantor", "grantee")):
         records.append({
             "date": _parse_date(rs.get("date")),
             "doc_type": rs.get("signal"),
@@ -360,15 +375,31 @@ def enrich_deed_chain(listings: Iterable[Listing]) -> dict:
     enrichers into a chronological chain with summary flags.
     """
     listings = list(listings)
+    from .block_binding import imprecise_point, own_location, shared_points
+    try:
+        shared_pts = shared_points(listings)
+    except Exception:  # noqa: BLE001 - no shared points is the lenient side
+        shared_pts = set()
     stamped = 0
     total_records = 0
     has_chain = 0
     has_distress = 0
     has_breaks = 0
+    skipped_fallback_point = 0
+    cleared_fallback_point = 0
 
     for li in listings:
-        records = _collect_records(li)
+        fallback = imprecise_point(li, shared_pts) and not own_location(li)
+        if fallback:
+            skipped_fallback_point += 1
+        records = _collect_records(li, fallback)
         if not records:
+            # a stale deed_chain already on this row (built before this row's point was flagged
+            # a fallback, or before this guard existed) is nothing but the shared point's OTHER
+            # parcel's history -- rod_docs/relationship_signal would have kept `records` non-empty
+            # if there were a real, name-matched basis for a chain.
+            if fallback and isinstance(li.raw, dict) and li.raw.pop("deed_chain", None) is not None:
+                cleared_fallback_point += 1
             continue
 
         chain = _build_chain(records)
@@ -398,7 +429,9 @@ def enrich_deed_chain(listings: Iterable[Listing]) -> dict:
              stamped=stamped,
              total_records=total_records,
              with_distress=has_distress,
-             with_breaks=has_breaks)
+             with_breaks=has_breaks,
+             skipped_fallback_point=skipped_fallback_point,
+             cleared_fallback_point=cleared_fallback_point)
 
     return {
         "stamped": stamped,
@@ -406,4 +439,6 @@ def enrich_deed_chain(listings: Iterable[Listing]) -> dict:
         "with_chain": has_chain,
         "with_distress_transfers": has_distress,
         "with_chain_breaks": has_breaks,
+        "skipped_fallback_point": skipped_fallback_point,
+        "cleared_fallback_point": cleared_fallback_point,
     }

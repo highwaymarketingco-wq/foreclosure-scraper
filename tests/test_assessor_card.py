@@ -212,3 +212,46 @@ def test_a_tight_county_cap_still_lets_every_county_through():
     cap, county_cap = 2, 1
     share = max(1, min(county_cap, -(-cap // max(1, len(by_county)))))
     assert share == 1   # every county still gets its one slot, even though 3 > cap
+
+
+# ---- the SCDOT point-key resolver must not run at a fallback point (2026-10-18 audit) --------
+#
+# resolve_sc_parcel_key point-queries SCDOT by lat/lng with no identity check of its own: at a
+# geocoder fallback point (flagged imprecise, a county seat, or a point many leads share) it
+# returns whichever OTHER parcel sits there, and _aenrich used to write that straight onto
+# li.parcel_id -- a second, never-gated entry point for the exact bug 420bbc94 fixed for
+# enrichment_parcel_from_geo (audit 2026-10-18, block-binding-family-gis).
+
+def test_the_point_resolver_is_not_called_at_a_fallback_point(monkeypatch):
+    async def _boom(li):
+        raise AssertionError("resolve_sc_parcel_key must not be called at a fallback point")
+    monkeypatch.setattr("foreclosure_scraper.parcel_resolver.resolve_sc_parcel_key", _boom)
+
+    async def _fetch(li):
+        return None
+    monkeypatch.setattr(eac, "_adapters", lambda: {("SC", "Anderson"): _fetch})
+
+    li = _qp_lead(grade="C", county="Anderson", parcel_id=None,
+                  latitude=34.5034, longitude=-82.6501)
+    li.raw["geo_imprecise"] = "centroid_snap"
+    stats = asyncio.run(eac._aenrich([li]))
+
+    assert li.parcel_id is None
+    assert stats["key_resolved"] == 0 and stats["skipped_fallback_point"] == 1
+
+
+def test_the_point_resolver_still_runs_at_a_real_point(monkeypatch):
+    async def _fake_resolve(li):
+        return "1233020001"
+    monkeypatch.setattr("foreclosure_scraper.parcel_resolver.resolve_sc_parcel_key", _fake_resolve)
+
+    async def _fetch(li):
+        return None
+    monkeypatch.setattr(eac, "_adapters", lambda: {("SC", "Anderson"): _fetch})
+
+    li = _qp_lead(grade="C", county="Anderson", parcel_id=None,
+                  latitude=34.512345, longitude=-82.611111)
+    stats = asyncio.run(eac._aenrich([li]))
+
+    assert li.parcel_id == "1233020001"
+    assert stats["key_resolved"] == 1 and stats["skipped_fallback_point"] == 0

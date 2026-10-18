@@ -270,19 +270,35 @@ async def _aenrich(listings: list[Listing]) -> dict:
     targets = targets[:cap]
     stats = {"eligible": len(eligible), "cap": cap, "county_share": share,
              "counties": len(by_county), "targets": len(targets),
-             "key_resolved": 0, "matched": 0, "filled_sqft": 0, "filled_price": 0}
+             "key_resolved": 0, "matched": 0, "filled_sqft": 0, "filled_price": 0,
+             "skipped_fallback_point": 0}
+    # resolve_sc_parcel_key point-queries SCDOT by li.latitude/longitude with no parcel/address
+    # check of its own (unlike enrichment_parcel_from_geo's resolver, gated since 2026-10-06):
+    # at a geocoder fallback point (a county seat or a point many leads share) that query
+    # returns whichever OTHER parcel happens to sit there, and the line below used to write it
+    # straight onto li.parcel_id -- the exact bug 420bbc94 fixed for the other resolver, through
+    # a second, never-gated entry point (audit 2026-10-18, block-binding-family-gis: Anderson's
+    # courthouse parcel on 446+ rows).
+    from .block_binding import imprecise_point, own_location, shared_points as _shared_points
+    try:
+        shared_pts = _shared_points(listings)
+    except Exception:  # noqa: BLE001 - no shared points is the lenient side
+        shared_pts = set()
     for li in targets:
         # Most B+ leads lack parcel_id but have lat/lng — resolve the county key
         # via point-in-polygon against SCDOT so the adapter has something to fetch.
         if not li.parcel_id and li.state == "SC":
-            try:
-                from .parcel_resolver import resolve_sc_parcel_key
-                key = await resolve_sc_parcel_key(li)
-            except Exception:  # noqa: BLE001
-                key = None
-            if key:
-                li.parcel_id = key
-                stats["key_resolved"] += 1
+            if imprecise_point(li, shared_pts) and not own_location(li):
+                stats["skipped_fallback_point"] += 1
+            else:
+                try:
+                    from .parcel_resolver import resolve_sc_parcel_key
+                    key = await resolve_sc_parcel_key(li)
+                except Exception:  # noqa: BLE001
+                    key = None
+                if key:
+                    li.parcel_id = key
+                    stats["key_resolved"] += 1
         try:
             res = await adapters[(li.state, li.county)](li)
         except Exception:  # noqa: BLE001

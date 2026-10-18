@@ -276,6 +276,18 @@ async def enrich_with_images(
                     li.latitude, li.longitude = point
                     li.raw["geocoded_by_name"] = {"approx": approx}
                     named_geocoded += 1
+            if named_targets:
+                # Leads this pass just moved onto a NEW point are not in `shared` yet (it was
+                # built from the points they had before Pass 1 ran) -- two address-less leads
+                # with no name/city of their own (or the same one) can land on the identical
+                # point here, which is a fallback exactly like a courthouse pin even though
+                # neither is a recognized county seat (audit 2026-10-18, block-binding-family-
+                # photo: two unrelated Brunswick nc_ecourts_lis_pendens leads shared one aerial
+                # tile, and its vision read, this way). Recheck before `attach()` trusts geo_named.
+                try:
+                    shared = _shared_points(listings)
+                except Exception:  # noqa: BLE001 - no shared points is the lenient side
+                    pass
 
         async def attach(li: Listing) -> None:
             nonlocal real_count, aerial_count, street_count, approx_count
@@ -296,7 +308,8 @@ async def enrich_with_images(
 
             # Aerial + map. Attach whenever we can frame the real parcel:
             #   - a precise point (address / parcel / name geocode), OR
-            #   - a city-centroid we resolved for a named complex (flagged approx).
+            #   - a city-centroid we resolved for a named complex (flagged approx), as long as
+            #     that resolved point did not ALSO turn out to be one other leads share.
             # NEVER attach on a bare shared county-seat centroid.
             geo_named = li.raw.get("geocoded_by_name") or {}
             attach_aerial = False
@@ -304,7 +317,7 @@ async def enrich_with_images(
             if li.latitude is not None and li.longitude is not None:
                 if _has_precise_point(li, shared):
                     attach_aerial = True
-                elif geo_named:
+                elif geo_named and (round(li.latitude, 5), round(li.longitude, 5)) not in shared:
                     # name-geocoded; may be a city centroid (approx) but still
                     # specific to THIS lead's city, not a shared courthouse pin.
                     attach_aerial = True
