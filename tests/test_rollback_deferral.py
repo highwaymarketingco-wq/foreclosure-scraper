@@ -42,15 +42,23 @@ def _run(listings):
     return asyncio.run(mod.enrich_with_rollback_exposure(listings))
 
 
-def _patch(monkeypatch, buncombe=None, anderson=None):
+def _patch(monkeypatch, buncombe=None, anderson=None, mecklenburg=None, meck_topup=None):
     async def fake_bun(c):
         return buncombe or {}
 
     async def fake_and(c):
         return anderson or {}
 
+    async def fake_meck_rows(c):
+        return mecklenburg or []
+
+    async def fake_meck_topup(c, pid):
+        return (meck_topup or {}).get(pid)
+
     monkeypatch.setattr(mod, "_fetch_buncombe", fake_bun)
     monkeypatch.setattr(mod, "_fetch_anderson", fake_and)
+    monkeypatch.setattr(mod, "_fetch_mecklenburg_candidates", fake_meck_rows)
+    monkeypatch.setattr(mod, "_mecklenburg_live_topup", fake_meck_topup)
 
 
 # --------------------------------------------------------------------------
@@ -267,7 +275,8 @@ def test_kill_switch_short_circuits(monkeypatch):
     monkeypatch.setenv(mod.ENV_OFF, "1")
     stats = _run([_lead(state="NC", county="Buncombe", parcel_id="9679090515")])
     assert stats == {"targets": 0, "matched": 0, "matched_buncombe": 0,
-                     "matched_anderson": 0, "with_estimate": 0}
+                     "matched_anderson": 0, "matched_mecklenburg": 0,
+                     "mecklenburg_live_confirmed": 0, "with_estimate": 0}
 
 
 def test_no_relevant_counties_skips_every_fetch(monkeypatch):
@@ -277,10 +286,132 @@ def test_no_relevant_counties_skips_every_fetch(monkeypatch):
         calls["n"] += 1
         return {}
 
+    async def boom_rows(c):
+        calls["n"] += 1
+        return []
+
     monkeypatch.setattr(mod, "_fetch_buncombe", boom)
     monkeypatch.setattr(mod, "_fetch_anderson", boom)
+    monkeypatch.setattr(mod, "_fetch_mecklenburg_candidates", boom_rows)
     _run([_lead(state="SC", county="Spartanburg", parcel_id="7091501300")])
     assert calls["n"] == 0
+
+
+# --------------------------------------------------------------------------
+# Mecklenburg NC: bulk GIS deferred-value + live rate top-up
+# --------------------------------------------------------------------------
+
+def _meck_row(pid, real, use, desc="AGRICULTURAL - COMMERCIAL PRODUCTION"):
+    return {"pid": pid, "txt_propertyuse_desc": desc, "amt_landvalue": real,
+            "amt_totalvalue": use, "situsaddress1": "1 TEST RD UNINC NC"}
+
+
+# A minimal, hand-built stand-in for the live BillDetails.aspx markup (same element
+# ids and table shape as the real page, fabricated owner-free values -- this repo's
+# fixtures never carry a real person's data; see test_saved_bill_fixture_carries_no_
+# personal_columns above for the same rule on the Buncombe fixture).
+_MECK_DETAIL_HTML = """
+<span id="lblParcel">00099999</span>
+<span id="lblRealOriginal">$100,000</span>
+<span id="lblDeferredOriginal">$90,000</span>
+<span id="lblUseOriginal">$10,000</span>
+<span id="lblTotalValue">$10,000</span>
+<span id="dgShowResultRate_lblRate_0">.4927</span>
+<span id="dgShowResultRate_taxDistricts_0">MECKLENBURG</span>
+<span id="dgShowResultRate_description_0">Tax</span>
+<span id="dgShowResultRate_amtBilled_0">$49.27</span>
+<span id="dgShowResultRate_lblRate_1"> </span>
+<span id="dgShowResultRate_taxDistricts_1">MECKLENBURG</span>
+<span id="dgShowResultRate_description_1">Single Family Solid Waste Fee</span>
+<span id="dgShowResultRate_amtBilled_1">$61.50</span>
+<span id="dgShowResultRate_lblRate_2">.2930</span>
+<span id="dgShowResultRate_taxDistricts_2">CHARLOTTE</span>
+<span id="dgShowResultRate_description_2">Tax</span>
+<span id="dgShowResultRate_amtBilled_2">$29.30</span>
+"""
+
+
+def test_mecklenburg_index_computes_deferred_as_real_minus_use():
+    idx = mod._mecklenburg_index([_meck_row("00716203", 2012599, 616275)])
+    rec = idx["00716203"]
+    assert rec["deferred_value"] == pytest.approx(1396324.0)
+    assert rec["basis"] == "present_use_deferral"
+    assert rec["county"] == "Mecklenburg" and rec["state"] == "NC"
+
+
+def test_mecklenburg_index_skips_a_parcel_with_no_real_deferral():
+    """real == use (no present-use discount at all) must not be reported as a
+    $0 'deferral' -- that is simply not a deferred parcel."""
+    idx = mod._mecklenburg_index([_meck_row("1", 50000, 50000), _meck_row("2", 50000, 60000)])
+    assert idx == {}
+
+
+def test_parse_mecklenburg_bill_detail_sums_only_the_tax_rate_rows():
+    rec = mod.parse_mecklenburg_bill_detail(_MECK_DETAIL_HTML)
+    assert rec["parcel"] == "00099999"
+    assert rec["real_value"] == 100000.0
+    assert rec["deferred_value"] == 90000.0
+    assert rec["use_value"] == 10000.0
+    # .4927 + .2930, NOT the blank-rated fee row -> 0.7857/100 as a fraction.
+    assert rec["combined_rate"] == pytest.approx(0.007857)
+    assert rec["tax_rows"] == 2
+
+
+def test_parse_mecklenburg_bill_detail_returns_none_without_a_value_table():
+    assert mod.parse_mecklenburg_bill_detail("<html>no bill here</html>") is None
+
+
+def test_stamps_exposure_on_a_matching_mecklenburg_lead_with_live_rate(monkeypatch):
+    rows = [_meck_row("19705113", 810636, 7794, desc="FOREST - COMMERCIAL PRODUCTION")]
+    topup = {"19705113": {"parcel": "19705113", "real_value": 810636.0,
+                          "deferred_value": 802842.0, "use_value": 7794.0,
+                          "combined_rate": 0.007177, "tax_rows": 1}}
+    _patch(monkeypatch, mecklenburg=rows, meck_topup=topup)
+    hit = _lead(state="NC", county="Mecklenburg", parcel_id="19705113")
+    miss = _lead(state="NC", county="Mecklenburg", parcel_id="02951502")
+    stats = _run([hit, miss])
+    assert stats["matched_mecklenburg"] == 1
+    assert stats["mecklenburg_live_confirmed"] == 1
+    assert stats["with_estimate"] == 1
+    exp = hit.raw["rollback_exposure"]
+    assert exp["deferred_value"] == 802842.0
+    assert exp["live_confirmed"] is True
+    assert exp["rollback_years"] == 4
+    assert exp["estimated_rollback"] == pytest.approx(802842.0 * 0.007177 * 4, rel=1e-4)
+    assert "rollback_exposure" not in (miss.raw or {})
+
+
+def test_mecklenburg_live_topup_failure_keeps_the_bulk_only_record(monkeypatch):
+    """The live site being down must not erase the free bulk-GIS finding --
+    it just means no dollar estimate is invented on top of it."""
+    rows = [_meck_row("19705113", 810636, 7794)]
+    _patch(monkeypatch, mecklenburg=rows, meck_topup={})   # topup returns None
+    hit = _lead(state="NC", county="Mecklenburg", parcel_id="19705113")
+    stats = _run([hit])
+    assert stats["matched_mecklenburg"] == 1
+    assert stats["mecklenburg_live_confirmed"] == 0
+    exp = hit.raw["rollback_exposure"]
+    assert exp["deferred_value"] == pytest.approx(802842.0)
+    assert "estimated_rollback" not in exp
+    assert "live_confirmed" not in exp
+
+
+def test_mecklenburg_live_lookups_are_capped(monkeypatch):
+    monkeypatch.setattr(mod, "_MECK_LIVE_CAP", 1)
+    rows = [_meck_row("1", 100000, 1000), _meck_row("2", 100000, 1000)]
+    calls = {"n": 0}
+
+    async def counting_topup(c, pid):
+        calls["n"] += 1
+        return None
+
+    _patch(monkeypatch, mecklenburg=rows)
+    monkeypatch.setattr(mod, "_mecklenburg_live_topup", counting_topup)
+    leads = [_lead(state="NC", county="Mecklenburg", parcel_id="1"),
+             _lead(state="NC", county="Mecklenburg", parcel_id="2")]
+    stats = _run(leads)
+    assert stats["matched_mecklenburg"] == 2    # both get the free bulk finding
+    assert calls["n"] == 1                       # only the capped live top-up fires once
 
 
 # --------------------------------------------------------------------------

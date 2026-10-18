@@ -62,12 +62,61 @@ Sources (free, public, no auth / no CAPTCHA / no robots wall):
     precomputed rollback tax per acre; annual rollback = per-acre x acres,
     which reproduces (market_value - use_value) x 0.06 x millage exactly.
 
-Both sources load ONCE into memory and are matched locally, so this costs a
-handful of paginated GETs plus (optionally) one PDF download per book.
-Anderson PDF parsing is OFF by default (``ROLLBACK_ANDERSON=1`` to enable)
-and capped at ``ROLLBACK_ANDERSON_BOOKS`` books, because a 200-page pdfplumber
-parse is CPU-bound and the full-run has been bitten by unbounded enrichers
-before. Kill switch for the whole module: ``FORECLOSURE_ROLLBACK_OFF=1``.
+  * Mecklenburg NC — the county's own GIS CAMA ownership/values ArcGIS layer
+    (meckgis.mecklenburgcountync.gov/.../TaxParcel_Camaownershipvalues/
+    FeatureServer/0) has NO explicit DeferredValue field (its 30 fields are
+    plain assessment columns: amt_landvalue, amt_totalvalue, txt_propertyuse_
+    desc, deed book/page, sale date/price, etc. -- read live 2026-10-18), but
+    a present-use parcel's amt_landvalue (true market land value) minus
+    amt_totalvalue (what it is actually taxed on) IS the deferred value: this
+    was cross-checked live against the county's own tax-bill detail page
+    (taxbill.co.mecklenburg.nc.us/publicwebaccess, the self-hosted PTS
+    "Public Web Access" platform tax_lien_pwa.py already reads for the
+    tax_lien signal) on 5 real parcels and the two numbers always matched
+    to the dollar: e.g. pid 00716203, GIS amt_landvalue $2,012,599 / amt_
+    totalvalue $616,275 (diff $1,396,324) == the bill detail's own "Real
+    $2,012,599 / Deferred $1,396,324 / Use $616,275" -- live, 2026-10-18.
+    txt_propertyuse_desc never contains the string "PRESENT USE" or "DEFER"
+    (checked); every present-use row instead reads "<CLASS> - COMMERCIAL
+    PRODUCTION" with CLASS one of AGRICULTURAL / FOREST / HORTICULTURAL
+    (county-wide query 2026-10-18: 373 such parcels total, of which 3 are
+    on the board today -- a heir-estate parcel, a LiensNC parcel and a
+    Charlotte-open-data parcel, none by coincidence: present-use land is
+    rare on a distressed-property board built from residential sources).
+    The GIS layer carries NO tax rate or billed amount, so for the (small,
+    board-bounded) set of leads this source actually matches, one extra
+    live round-trip against the bill-search site reads that parcel's own
+    published ad-valorem rate(s) off its "Tax Districts" rate grid (confirmed
+    live: MECKLENBURG county rate .4927/$100 reproduces the county's own
+    billed tax-district dollar amount on every one of the 5 live-checked
+    parcels, e.g. .4927% x $616,275 Use value = $3,036.39, the exact figure
+    the bill prints) -- so, same as Buncombe, no millage is ever hard-coded:
+    it is read off the live page for each matched lead, capped at
+    ``ROLLBACK_MECKLENBURG_LIVE_CAP`` lookups (default 50; today's real need
+    is 3) as a resource-safety ceiling, not a guess at expected volume.
+    A lead this source matches but the live top-up fails or is capped still
+    gets its bulk GIS deferred_value, just without a dollar rollback estimate.
+
+NOT buildable from any source read so far: ``repeat_tax_loss`` for Mecklenburg.
+That signal (enrichment_repeat_tax_loss.py) needs a forced-sale deed GRANTOR
+match (TAX DEED / SHERIFF'S DEED / TRUSTEE'S DEED / etc., from a register-of-
+deeds instrument-type sweep or the deed_index.db sidecar) -- a different data
+domain than either a tax-bill search or a CAMA value layer. Confirmed live
+2026-10-18 reading Mecklenburg's full BillSearchResults -> BillDetails flow:
+owner name, legal description, mailing address, assessed value and billing
+history, nothing about a prior grantor, instrument type or conveyance. The
+CAMA layer carries deed book/page and sale price but no instrument-type
+column either. Closing this column for Mecklenburg needs a ROD deed-type
+sweep (meckrod.manatron.com, click-through disclaimer, terms do not forbid
+automation -- county_records_matrix.json#NC/Mecklenburg), a separate and
+considerably larger build than anything this module's architecture covers.
+
+Buncombe and Anderson sources load ONCE into memory and are matched locally;
+Mecklenburg's bulk layer does too, with the small live top-up described
+above. Anderson PDF parsing is OFF by default (``ROLLBACK_ANDERSON=1`` to
+enable) and capped at ``ROLLBACK_ANDERSON_BOOKS`` books, because a 200-page
+pdfplumber parse is CPU-bound and the full-run has been bitten by unbounded
+enrichers before. Kill switch for the whole module: ``FORECLOSURE_ROLLBACK_OFF=1``.
 """
 from __future__ import annotations
 
@@ -152,6 +201,160 @@ ANDERSON_ROW_RE = re.compile(
 _ANDERSON_ON = os.environ.get("ROLLBACK_ANDERSON", "0") == "1"
 _ANDERSON_MAX_BOOKS = int(os.environ.get("ROLLBACK_ANDERSON_BOOKS", "1"))
 _MAX_PDF_BYTES = 20 * 1024 * 1024
+
+# ---- Mecklenburg NC --------------------------------------------------------
+
+MECKLENBURG_CAMA_URL = (
+    "https://meckgis.mecklenburgcountync.gov/server/rest/services/"
+    "TaxParcel_Camaownershipvalues/FeatureServer/0/query"
+)
+MECKLENBURG_CAMA_FIELDS = "pid,txt_propertyuse_desc,amt_landvalue,amt_totalvalue,situsaddress1"
+# Every present-use/deferral row this layer carries reads "<CLASS> - COMMERCIAL
+# PRODUCTION" (live-checked 2026-10-18; "PRESENT USE" and "DEFER" both match zero
+# rows of the field, so neither string is a usable filter on its own).
+MECKLENBURG_CAMA_WHERE = (
+    "txt_propertyuse_desc LIKE '%AGRICULTURAL%' OR txt_propertyuse_desc LIKE '%FOREST%' "
+    "OR txt_propertyuse_desc LIKE '%HORTICULTURAL%'"
+)
+
+MECKLENBURG_BASE = "https://taxbill.co.mecklenburg.nc.us/publicwebaccess"
+MECKLENBURG_FORM_URL = MECKLENBURG_BASE + "/BillSearchResults.aspx?ClickItem=NewSearch"
+MECKLENBURG_POST_URL = MECKLENBURG_BASE + "/BillSearchResults.aspx"
+# Resource-safety ceiling on the live rate top-up (one GET + one POST + one GET per
+# lookup), not a guess at expected volume: the bulk GIS filter above already narrows
+# every live run to a handful of candidates (3, county-wide-matched-to-board, on
+# 2026-10-18); this just bounds the worst case if the board's mix ever shifts.
+_MECK_LIVE_CAP = int(os.environ.get("ROLLBACK_MECKLENBURG_LIVE_CAP", "50"))
+
+_MECK_BILLPK_RE = re.compile(r"BillDetails\.aspx\?BillPk=(\d+)")
+_MECK_VALUE_FIELD_RE = {
+    "real_value": re.compile(r'id="lblRealOriginal"[^>]*>\$?([\d,]*)<'),
+    "deferred_value": re.compile(r'id="lblDeferredOriginal"[^>]*>\$?([\d,]*)<'),
+    "use_value": re.compile(r'id="lblUseOriginal"[^>]*>\$?([\d,]*)<'),
+    "total_assessed_value": re.compile(r'id="lblTotalValue"[^>]*>\$?([\d,]*)<'),
+}
+_MECK_DETAIL_PARCEL_RE = re.compile(r'id="lblParcel"[^>]*>([^<]*)<')
+# One row of the detail page's own "Tax Districts" rate grid: a blank rate (a lone
+# &nbsp; -> a plain space once unescaped) marks a flat fee line, not an ad-valorem
+# one; only "Tax" description rows carry a real rate (live-confirmed on 5 parcels,
+# module docstring).
+_MECK_RATE_ROW_RE = re.compile(
+    r'lblRate_\d+">([^<]*)</span>.*?taxDistricts_\d+">([^<]*)</span>.*?'
+    r'description_\d+">([^<]*)</span>.*?amtBilled_\d+">\$?([\-\d,.]*)</span>', re.S)
+
+
+def parse_mecklenburg_bill_detail(html: str) -> Optional[dict[str, Any]]:
+    """{'parcel', 'real_value', 'deferred_value', 'use_value', 'total_assessed_value',
+    'combined_rate', 'tax_rows'} off one BillDetails.aspx page, or None when the page
+    carries no Value table at all (a bad/expired BillPk)."""
+    m = _MECK_DETAIL_PARCEL_RE.search(html or "")
+    if not m:
+        return None
+    out: dict[str, Any] = {"parcel": m.group(1).strip()}
+    for key, rx in _MECK_VALUE_FIELD_RE.items():
+        fm = rx.search(html)
+        out[key] = _to_float(fm.group(1)) if fm else None
+    if out["real_value"] is None and out["use_value"] is None:
+        return None
+    rate_sum, tax_rows = 0.0, 0
+    for rm in _MECK_RATE_ROW_RE.finditer(html):
+        rate_s, _district, desc, _amt = rm.groups()
+        rate = _to_float(rate_s)
+        if rate is not None and desc.strip().lower() == "tax":
+            rate_sum += rate
+            tax_rows += 1
+    out["combined_rate"] = round(rate_sum / 100.0, 6) if tax_rows else None
+    out["tax_rows"] = tax_rows
+    return out
+
+
+async def _fetch_mecklenburg_candidates(c: httpx.AsyncClient) -> list[dict[str, Any]]:
+    """Page every present-use-coded parcel out of the Mecklenburg CAMA layer."""
+    out: list[dict[str, Any]] = []
+    offset, page = 0, 2000
+    while True:
+        params = {
+            "where": MECKLENBURG_CAMA_WHERE,
+            "outFields": MECKLENBURG_CAMA_FIELDS,
+            "returnGeometry": "false",
+            "resultOffset": offset,
+            "resultRecordCount": page,
+            "f": "json",
+        }
+        try:
+            r = await c.get(MECKLENBURG_CAMA_URL, params=params, timeout=60.0)
+            if r.status_code != 200:
+                log.warning("rollback.mecklenburg_status", code=r.status_code)
+                break
+            data = r.json()
+            if "error" in data:
+                log.warning("rollback.mecklenburg_error", error=str(data.get("error"))[:200])
+                break
+            feats = data.get("features", [])
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("rollback.mecklenburg_fail", error=str(exc)[:200])
+            break
+
+        out.extend(ft.get("attributes", {}) or {} for ft in feats)
+        if len(feats) < page or not data.get("exceededTransferLimit"):
+            break
+        offset += page
+        if offset >= 20000:      # safety cap -- county-wide candidate count is ~373
+            log.warning("rollback.mecklenburg_cap", offset=offset)
+            break
+    return out
+
+
+def _mecklenburg_index(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """{normalized_pid: record} for every candidate whose real value exceeds its
+    taxed (use) value -- the GIS-only deferred_value, before any live top-up."""
+    out: dict[str, dict[str, Any]] = {}
+    for a in rows:
+        pid = _normalize_parcel(a.get("pid"))
+        real, use = _to_float(a.get("amt_landvalue")), _to_float(a.get("amt_totalvalue"))
+        if not pid or real is None or use is None or real <= use:
+            continue
+        out[pid] = {
+            "deferred_value": round(real - use, 2),
+            "real_value": real,
+            "use_value": use,
+            "basis": "present_use_deferral",
+            "county": "Mecklenburg",
+            "state": "NC",
+            "source": "Mecklenburg County GIS CAMA ownership/values layer (amt_landvalue - amt_totalvalue)",
+            "source_key": "mecklenburg_cama",
+            "propertyuse_desc": a.get("txt_propertyuse_desc"),
+        }
+    return out
+
+
+async def _mecklenburg_live_topup(c: httpx.AsyncClient, pid: str) -> Optional[dict[str, Any]]:
+    """One search + one detail fetch for a single parcel, reading its own published
+    ad-valorem rate(s) and reconfirming the bulk layer's deferred_value against the
+    bill's own live Value table. None on any fetch/parse failure -- callers keep the
+    bulk-only record rather than guess."""
+    from .verification.verifiers.tax_lien_pwa import build_form  # local: only this path needs it
+
+    try:
+        r = await c.get(MECKLENBURG_FORM_URL, timeout=40.0)
+        if r.status_code != 200 or "__VIEWSTATE" not in r.text:
+            return None
+        r2 = await c.post(MECKLENBURG_POST_URL, data=build_form(r.text, pid, year="ALL"), timeout=40.0)
+        if r2.status_code != 200 or pid not in r2.text:
+            return None
+        bm = _MECK_BILLPK_RE.search(r2.text)
+        if not bm:
+            return None
+        r3 = await c.get(f"{MECKLENBURG_BASE}/BillDetails.aspx?BillPk={bm.group(1)}", timeout=40.0)
+        if r3.status_code != 200:
+            return None
+        detail = parse_mecklenburg_bill_detail(r3.text)
+    except httpx.HTTPError as exc:
+        log.warning("rollback.mecklenburg_topup_fail", pid=pid, error=str(exc)[:200])
+        return None
+    if detail is None or _normalize_parcel(detail["parcel"]) != pid:
+        return None
+    return detail
 
 
 def _to_float(v: Any) -> Optional[float]:
@@ -452,7 +655,8 @@ def _lead_keys(li: Listing) -> list[str]:
 async def enrich_with_rollback_exposure(listings: Iterable[Listing]) -> dict[str, int]:
     """Stamp raw['rollback_exposure'] on leads sitting on a deferred parcel."""
     stats = {"targets": 0, "matched": 0, "matched_buncombe": 0,
-             "matched_anderson": 0, "with_estimate": 0}
+             "matched_anderson": 0, "matched_mecklenburg": 0,
+             "mecklenburg_live_confirmed": 0, "with_estimate": 0}
     if os.environ.get(ENV_OFF):
         return stats
     leads = [li for li in listings]
@@ -465,12 +669,16 @@ async def enrich_with_rollback_exposure(listings: Iterable[Listing]) -> dict[str
     want_anderson = _ANDERSON_ON and any(
         _county_of(li) == "anderson" and (li.state or "").upper() == "SC" for li in leads
     )
-    if not want_buncombe and not want_anderson:
+    want_mecklenburg = any(
+        _county_of(li) == "mecklenburg" and (li.state or "").upper() == "NC" for li in leads
+    )
+    if not want_buncombe and not want_anderson and not want_mecklenburg:
         log.info("rollback.no_relevant_counties")
         return stats
 
     buncombe: dict[str, dict[str, Any]] = {}
     anderson: dict[str, dict[str, Any]] = {}
+    mecklenburg: dict[str, dict[str, Any]] = {}
     async with client(timeout=60.0) as c:
         if want_buncombe:
             buncombe = await _fetch_buncombe(c)
@@ -478,26 +686,36 @@ async def enrich_with_rollback_exposure(listings: Iterable[Listing]) -> dict[str
         if want_anderson:
             anderson = await _fetch_anderson(c)
             log.info("rollback.anderson_loaded", parcels=len(anderson))
+        if want_mecklenburg:
+            mecklenburg = _mecklenburg_index(await _fetch_mecklenburg_candidates(c))
+            log.info("rollback.mecklenburg_loaded", parcels=len(mecklenburg))
 
-    if not buncombe and not anderson:
+    if not buncombe and not anderson and not mecklenburg:
         return stats
 
+    # (lead, matched normalized pid, the payload dict already stamped onto it) --
+    # a small, board-bounded list: only Mecklenburg leads the bulk GIS pass above
+    # actually matched get the extra live round-trip below.
+    meck_topups: list[tuple[str, dict[str, Any]]] = []
     for li in leads:
         county, state = _county_of(li), (li.state or "").upper()
         if county == "buncombe" and state == "NC":
             idx, bucket = buncombe, "matched_buncombe"
         elif county == "anderson" and state == "SC":
             idx, bucket = anderson, "matched_anderson"
+        elif county == "mecklenburg" and state == "NC":
+            idx, bucket = mecklenburg, "matched_mecklenburg"
         else:
             continue
         if not idx:
             continue
         stats["targets"] += 1
 
-        rec = None
+        rec, matched_key = None, None
         for k in _lead_keys(li):
             rec = idx.get(k)
             if rec:
+                matched_key = k
                 break
         if rec is None:
             continue
@@ -511,6 +729,37 @@ async def enrich_with_rollback_exposure(listings: Iterable[Listing]) -> dict[str
         stats[bucket] += 1
         if payload.get("estimated_rollback"):
             stats["with_estimate"] += 1
+        if bucket == "matched_mecklenburg":
+            meck_topups.append((matched_key, payload))
+
+    if meck_topups:
+        capped = meck_topups[:_MECK_LIVE_CAP]
+        if len(meck_topups) > _MECK_LIVE_CAP:
+            log.warning("rollback.mecklenburg_live_capped",
+                        matched=len(meck_topups), cap=_MECK_LIVE_CAP)
+        async with client(timeout=60.0) as c:
+            for pid, payload in capped:
+                detail = await _mecklenburg_live_topup(c, pid)
+                if detail is None:
+                    continue
+                # The live bill detail is the single freshest snapshot at match time;
+                # once it answers, it replaces the bulk GIS pull's own real/use/deferred
+                # figures outright rather than mixing the two sources in one record.
+                live_deferred = detail.get("deferred_value")
+                for key in ("real_value", "use_value", "deferred_value"):
+                    if detail.get(key) is not None:
+                        payload[key] = detail[key]
+                rate = detail.get("combined_rate")
+                if rate and live_deferred:
+                    annual = round(live_deferred * rate, 2)
+                    years = _ROLLBACK_YEARS["NC"]
+                    payload.update(effective_tax_rate=rate, tax_rate_source="parcel_bill",
+                                  annual_deferred_tax=annual, rollback_years=years,
+                                  estimated_rollback=round(annual * years, 2),
+                                  estimate_is_floor=True)
+                    stats["with_estimate"] += 1
+                payload["live_confirmed"] = True
+                stats["mecklenburg_live_confirmed"] += 1
 
     log.info("rollback.done", **stats)
     return stats
