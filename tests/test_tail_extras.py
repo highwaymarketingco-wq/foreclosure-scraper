@@ -228,6 +228,31 @@ def test_local_steps_are_offline_idempotent_and_budget_free(tmp_path, monkeypatc
     assert "arv_below_asis" in rows[2].raw["qa_flags"]             # board_qa's flags are kept
 
 
+def test_local_pre_gate_covers_a_row_added_after_an_earlier_call(tmp_path, monkeypatch):
+    """2026-10-17, unwired-hud-fmr-matches-table / call-ready-present: main.py's GRANDFATHER
+    restore appends prior-board rows to `enriched` AFTER this bundler's two run-time call sites,
+    so a restored row never got hud_fmr/flood_zone/septic at all -- confirmed live, the same 9
+    HomePath rows were missing both. Fixed by calling the bundler again once more rows exist;
+    it's documented local/no-network/idempotent, so a second call over a grown list must fill
+    in the new row without disturbing the ones already processed."""
+    monkeypatch.setattr(TE, "SEPTIC_CACHE", tmp_path / "septic.json.gz")
+    TE.write_septic_cache(SEPTIC, NOW.isoformat())
+    monkeypatch.setattr(TE, "load_fmr_table", lambda path=None: TABLE)
+    rows = [_bun(P_ADVERSE, raw={"flood": {"zone": "X", "in_sfha": False}}),
+            _li(county="Polk", bedrooms=2)]
+    with R.network_blocked():
+        TE.enrich_local_pre_gate(rows, now=NOW)
+        snap = [copy.deepcopy(li.raw) for li in rows]
+
+        restored = _li(county="Polk", bedrooms=3, raw={"flood": {"zone": "AE", "in_sfha": True}})
+        rows.append(restored)
+        TE.enrich_local_pre_gate(rows, now=NOW)
+
+    assert [li.raw for li in rows[:2]] == snap
+    assert restored.raw["hud_fmr"]["fmr_monthly"] == 1200
+    assert restored.raw["flood_zone"]["zone"] == "AE"
+
+
 def test_a_step_failure_is_contained(monkeypatch):
     def boom(rows):
         raise RuntimeError("x")

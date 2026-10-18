@@ -4497,11 +4497,18 @@ async def run_enrich_tail(st: TailState) -> dict:
                         after=len(enriched) + len(_restored))
             enriched.extend(_restored)
             # A row restored straight from the prior board's own JSON carries whatever
-            # raw['call_ready'] (if any) that board had -- the two stamps above both ran
-            # BEFORE this restore, so a restored row never got this run's gate at all
-            # (audit 2026-10-09 call_ready, call-ready-present: 9 HomePath leads carried
-            # call_ready=missing indefinitely this way). stamp_board is pure/idempotent
-            # and safe to call again over the now-larger list.
+            # local-tail/call_ready state (if any) that board had -- every stamp above ran
+            # BEFORE this restore, so a restored row never got this run's gate or local tail
+            # at all (audit 2026-10-09, 2026-10-17 live: 9 HomePath leads carried
+            # call_ready=missing AND hud_fmr=missing indefinitely this way -- same root
+            # cause, confirmed the identical 9 rows). Both steps are documented pure/no-
+            # network/idempotent, so re-running them over the now-larger list is safe and
+            # only fills in the rows that just arrived.
+            try:
+                from .enrichment_tail_extras import enrich_local_pre_gate
+                enrichment_stats["tail_extras_local_pre_gate_grandfather"] = enrich_local_pre_gate(enriched)
+            except Exception:
+                log.error("tail_extras_local_pre_gate_grandfather.failed", traceback=traceback.format_exc())
             try:
                 from .call_ready import stamp_board as _call_ready_stamp
                 enrichment_stats["call_ready_grandfather"] = _call_ready_stamp(enriched)
