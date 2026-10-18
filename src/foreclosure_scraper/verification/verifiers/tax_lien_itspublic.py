@@ -36,10 +36,23 @@ Person (593 rows) is the SAME Gates-style dead-field case: OwnerLastName search 
 correct bills (confirmed live, e.g. account 78159301 / "A1 RENOVATION PROPERTIES, LLC", a real
 unpaid 2026 balance), but its own AccountNumber field AND its own roll block's parcel field
 (confirmed: "A6948", "1451") both answer zero records for the exact same accounts a name search
-just found -- a broken field on this specific portal instance, not a wrong value on our end. Adding
-Person needs an owner-name search path this module does not have yet (every existing Portal
-searches by a row/roll number field, never a name) -- a real design extension, not a quick
-addition like Jones/Caswell were.
+just found -- a broken field on this specific portal instance, not a wrong value on our end.
+
+SHIPPED LATER THE SAME NIGHT (2026-10-18): the owner-name search path (Portal.name_search,
+_split_owner_name, searches(), search_model()). Davidson (3,200 rows, taxsearch.co.davidson.nc.us
+-- a DIFFERENT ItsPublic deployment from the bttaxpayerportal.com-hosted counties above, same
+vendor application, same AJAX call shape) turned out to need the same extension: direct
+ParcelNumber search never works there either (confirmed exhaustively live earlier the same
+night, including the exact canonical PIN read from the county's own GIS layer, every plausible
+segment split, and a ParcelSearch=true override -- all 0 results), while OwnerLastName/
+OwnerFirstName returns real, correct bills (KOWALSKI ANDERIA, parcel 6654-03-428581). A name_search Portal skips the parcel/account
+fields entirely (they are confirmed dead, not merely untried) and searches OwnerLastName/
+OwnerFirstName instead, as a last resort only when the row carries a parcel number of its own
+(row_parcel_ids' `own`) to bind the result to -- verify()'s existing AccountNumber safety rule
+(`want`, never counting the searched value itself as a match) extends unchanged to OwnerName.
+address_search is set False for both Davidson and Person: FormattedPropertyAddress was never
+tested on either portal, so the no-parcel-at-all and parcel-names-another-address fallback paths
+stay on their conservative, own-parcel-only branches rather than trying an unconfirmed field.
 
 ADDED 2026-10-09 (audit tax_checkers_2; same verdict rules, nothing changes for Onslow / Graham):
     Transylvania  https://tax.transylvaniacounty.org/TaxBillSearch     board parcel = ParcelNumber
@@ -207,6 +220,11 @@ class Portal:
     parcel_alnum: bool = False
     #: the grid's cell order (CELLS; ITSNET_CELLS for the older ITSNet build)
     cells: tuple = (0, 1, 3, 4, 5, 6, 7, None)
+    #: this portal's own parcel/account fields answer zero to every value we have (Davidson,
+    #: Person: live-confirmed broken, not a wrong value on our end) -- skip them entirely and
+    #: search OwnerLastName/OwnerFirstName instead, binding the result with the row's own known
+    #: parcel numbers (searches(), verify()'s `want` rule already does this for AccountNumber)
+    name_search: bool = False
 
 
 PORTALS: dict[str, Portal] = {
@@ -220,6 +238,21 @@ PORTALS: dict[str, Portal] = {
     "Graham": Portal("Graham", "https://www.bttaxpayerportal.com/ITSPublicGR2.0", "ParcelNumber"),
     "Jones": Portal("Jones", "https://www.bttaxpayerportal.com/ITSPublicJN2.0", "ParcelNumber"),
     "Caswell": Portal("Caswell", "https://www.bttaxpayerportal.com/ITSPublicCS", "ParcelNumber"),
+    #: Davidson and Person: own ParcelNumber/AccountNumber/roll-parcel fields all answer zero to
+    #: every value tried (confirmed live, incl. Davidson's own GIS-sourced canonical PIN) -- the
+    #: field is set for Portal's sake but name_search routes every search to OwnerLastName/
+    #: OwnerFirstName instead (see Portal.name_search, searches(), the module docstring)
+    #: address_search=False: FormattedPropertyAddress is untested on this portal (only
+    #: OwnerLastName/OwnerFirstName were live-verified) -- False keeps verify()'s own
+    #: no-parcel-at-all fallback (_by_address) from trying an unconfirmed field, and keeps
+    #: _bind()'s address-mismatch path on its conservative, own-parcel-only branch
+    "Davidson": Portal("Davidson", "https://taxsearch.co.davidson.nc.us", "ParcelNumber",
+                       address_search=False, name_search=True),
+    #: full_model=True per the roll scraper's own confirmed config (nc_its_public_tax.ITSPortal
+    #: "Person": an empty partial 500s here same as Transylvania/Catawba); address_search=False
+    #: for the same untested-field reason as Davidson above
+    "Person": Portal("Person", "https://www.bttaxpayerportal.com/ITSPublicPR", "ParcelNumber",
+                     full_model=True, address_search=False, name_search=True),
     "Transylvania": Portal(
         "Transylvania", "https://tax.transylvaniacounty.org", "ParcelNumber",
         rolls=(ITS_ROLL, TRANSYLVANIA_ROLL), full_model=True, map_ref=r"\bMS\.\d+$",
@@ -340,24 +373,77 @@ def row_parcel_ids(row: Any) -> tuple[frozenset, frozenset]:
     return frozenset(own), frozenset(exact)
 
 
+#: a business name goes whole into OwnerLastName with no first name ("A1 RENOVATION PROPERTIES,
+#: LLC" found its real unpaid bill submitted exactly this way earlier the same night -- a repeat
+#: check right before shipping could not reproduce that one account on Person any more, under
+#: this string or several spelling variants, most likely because it was paid/resolved in the
+#: hours between; OwnerLastName/OwnerFirstName itself was reconfirmed live and working on Person
+#: moments before shipping with a plain individual name, "SMITH", returning thousands of real
+#: rows, so the search mechanism is not in question, only whether that one specific account is
+#: still live). Only unambiguous legal-entity markers: "ESTATE"/"TRUST"/"TRUSTEE" are
+#: deliberately excluded -- Davidson's own live-confirmed individual case "ALSTON JAMES M ESTATE"
+#: split successfully as LAST=ALSTON, FIRST=JAMES (the plain two-token split below), and a
+#: decedent's estate or a living trust still carries the person's own "LAST FIRST ..." name in
+#: these rolls
+_BUSINESS_RE = re.compile(
+    r"\b(?:LLC|L\.L\.C\.?|PLLC|LLP|LP|L\.P\.?|INC|CORP|CORPORATION|COMPANY|LTD|PA|P\.A\.?|"
+    r"HOLDINGS|ENTERPRISES|PROPERTIES|PARTNERS|ASSOCIATES|INVESTMENTS|VENTURES|REALTY|"
+    r"CONSTRUCTION|DEVELOPMENT|MANAGEMENT)\b", re.I)
+
+
+def _split_owner_name(owner: Any) -> tuple[str, str]:
+    """(OwnerLastName, OwnerFirstName) for a name_search Portal. The board/roll print an
+    individual as "LAST FIRST [MIDDLE...]" with no comma (confirmed live: "KOWALSKI ANDERIA",
+    "ALSTON JAMES M ESTATE") or "LAST,FIRST MIDDLE" with one (Davidson roll rows print both); a
+    business name has no first name at all. Only the first two tokens are kept -- the exact
+    split does not have to be right, because verify()'s `want` rule (searches() below) only ever
+    binds a name-search result to a parcel the row already carries; a loose split that still
+    lands the right account in the result list is as good as an exact one."""
+    name = " ".join(str(owner or "").split()).strip(" ,")
+    if not name:
+        return "", ""
+    if _BUSINESS_RE.search(name):
+        return name, ""
+    if "," in name:
+        last, _, rest = name.partition(",")
+        first = rest.split()[0] if rest.split() else ""
+        return last.strip(), first
+    parts = name.split()
+    return parts[0], (parts[1] if len(parts) > 1 else "")
+
+
 def searches(row: Any, portal: Portal) -> list[tuple[str, str, str]]:
-    """[(field, value, where it came from)], best first, distinct: the board parcel in the
-    county's board-parcel field, then the roll block's parcel, then the block's account (an
-    account holds every parcel of a taxpayer: its bills are filtered by the row's numbers)."""
+    """[(field, value, where it came from)], best first, distinct.
+
+    A name_search portal's own parcel/account fields are confirmed dead (Portal.name_search):
+    skip them and search OwnerLastName/OwnerFirstName instead ("OwnerName", the owner's raw text;
+    search_model() does the splitting) -- a last resort, only when the row carries a parcel
+    number of its own to bind the result to (row_parcel_ids' `own`; verify()'s `want` rule treats
+    "OwnerName" the same as "AccountNumber": the searched text itself never counts as a match).
+
+    Every other portal: the board parcel in the county's board-parcel field, then the roll
+    block's parcel, then the block's account (an account holds every parcel of a taxpayer: its
+    bills are filtered by the row's numbers)."""
     out: list[tuple[str, str, str]] = []
-    pid = str(tc.g(row, "parcel_id") or "").strip()
-    if _key(pid):
-        out.append((portal.parcel_field, tc.alnum(pid) if portal.parcel_alnum else pid,
-                    "board_parcel"))
-    rb = _own_roll(row)
-    if rb is not None:
-        roll, blk = rb
-        for p in _roll_parcels(roll, blk, roll.search_keys):
-            out.append((roll.parcel_field or portal.parcel_field,
-                        tc.alnum(p) if portal.parcel_alnum else p, "roll_block"))
-        acct = str(blk.get(roll.account_key) or "").strip() if roll.account_key else ""
-        if _key(acct) and portal.account_search:
-            out.append(("AccountNumber", acct, "roll_account"))
+    if portal.name_search:
+        owner = str(tc.g(row, "owner_name") or "").strip()
+        own, _exact = row_parcel_ids(row)
+        if owner and own:
+            out.append(("OwnerName", owner, "owner_name"))
+    else:
+        pid = str(tc.g(row, "parcel_id") or "").strip()
+        if _key(pid):
+            out.append((portal.parcel_field, tc.alnum(pid) if portal.parcel_alnum else pid,
+                        "board_parcel"))
+        rb = _own_roll(row)
+        if rb is not None:
+            roll, blk = rb
+            for p in _roll_parcels(roll, blk, roll.search_keys):
+                out.append((roll.parcel_field or portal.parcel_field,
+                            tc.alnum(p) if portal.parcel_alnum else p, "roll_block"))
+            acct = str(blk.get(roll.account_key) or "").strip() if roll.account_key else ""
+            if _key(acct) and portal.account_search:
+                out.append(("AccountNumber", acct, "roll_account"))
     seen, keep = set(), []
     for f, v, src in out:
         k = (f, tc.alnum(v))
@@ -639,7 +725,27 @@ def _ok(client: Any, portal: Portal) -> None:
 def search_model(portal: Portal, field: str, value: str) -> dict:
     """The search-input model posted to GetSearchTablePartial: the field and the paid-bills flag
     (Onslow, Graham), or every .search-value field of the form with only `field` filled
-    (Portal.full_model: Transylvania, Catawba answer an empty body to anything less)."""
+    (Portal.full_model: Transylvania, Catawba answer an empty body to anything less).
+
+    field == "OwnerName" (Portal.name_search) is synthetic: `value` is the owner's raw text,
+    split here into the form's own OwnerLastName/OwnerFirstName fields (live-confirmed on
+    Davidson 2026-10-18: a minimal {OwnerLastName, OwnerFirstName, SortBy} body, no ParcelNumber/
+    AccountNumber/etc. fields at all, returns real bills -- SortBy is required even outside
+    full_model, unlike every other field this function handles)."""
+    if field == "OwnerName":
+        last, first = _split_owner_name(value)
+        if not portal.full_model:
+            return {"PageSize": "50", "OwnerLastName": last, "OwnerFirstName": first,
+                    "UnpaidBillsOnly": "false", "SortBy": "AccountName1-Asc"}
+        model = {"PageSize": "50", "OwnerLastName": last, "OwnerFirstName": first,
+                 "ParcelNumber": "", "ParcelSearch": "false", "TaxYear": "", "BillNumber": "",
+                 "UnpaidBillsOnly": "false", "FormattedPropertyAddress": "",
+                 "SortBy": "AccountName1-Asc"}
+        if portal.account_search:
+            model["AccountNumber"] = ""
+        for f in portal.model_fields:
+            model[f] = ""
+        return model
     if not portal.full_model:
         model = {"PageSize": "50", field: value, "UnpaidBillsOnly": "false"}
         if field == "ParcelNumber":
@@ -803,7 +909,9 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
         except Exception as exc:  # noqa: BLE001
             return _res("unconfirmed", dict(ev, reason="fetch_failed",
                                             error=f"{type(exc).__name__}: {str(exc)[:160]}"))
-        want = own | {tc.alnum(value)} if field != "AccountNumber" else own
+        # OwnerName, like AccountNumber, is not a parcel identifier -- the searched text itself
+        # must never count as a match, only the row's own known parcel numbers can
+        want = own if field in ("AccountNumber", "OwnerName") else own | {tc.alnum(value)}
         mine = [b for b in found if want & {tc.alnum(i) for i in b["ids"]}]
         searched.append({"by": field, "from": src, "bills": len(mine)})
         if mine:

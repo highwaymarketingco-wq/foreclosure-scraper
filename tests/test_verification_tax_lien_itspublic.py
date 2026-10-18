@@ -81,6 +81,14 @@ class FakePortal:
             return [b for b in self.bills if b["account"] == m["AccountNumber"]]
         if m.get("FormattedPropertyAddress"):
             return [b for b in self.bills if b["situs"].upper().startswith(m["FormattedPropertyAddress"].upper())]
+        if m.get("OwnerLastName"):
+            # a real OwnerLastName/OwnerFirstName search returns every bill of every account whose
+            # owner starts with that last name (first name narrows further); startswith also
+            # covers a business name submitted whole (OwnerLastName == the full owner string).
+            # Good enough to stand in for the live portal in a test that only ever searches one
+            # owner at a time.
+            last = m["OwnerLastName"].upper()
+            return [b for b in self.bills if b["owner"].upper().startswith(last)]
         return []
 
     @staticmethod
@@ -171,9 +179,9 @@ def test_applies_to_the_configured_counties_only():
     # no tax claim at all
     assert not p.applies({"state": "NC", "county": "Onslow", "listing_type": "foreclosure",
                           "source": "x", "parcel_id": "1", "raw": {}})
-    # Person is not in PORTALS at all yet (OwnerLastName works live, AccountNumber/parcel don't --
-    # this module has no name-search path): a Person row never applies.
-    assert not p.applies(onslow_roll_row(county="Person"))
+    # 2026-10-18: Person is now configured (name_search, OwnerLastName/OwnerFirstName) -- a
+    # Person row with a tax claim applies like any other configured county.
+    assert p.applies(onslow_roll_row(county="Person"))
 
 
 def test_jones_searches_its_own_board_parcel_directly():
@@ -614,13 +622,15 @@ def test_the_newer_build_counties_are_configured_with_the_full_model():
     # 2026-10-18: re-verified live rather than trusting the "no parcel id" assumption this test
     # used to make for all three -- Jones' board parcel_id searches ParcelNumber directly (3 real
     # parcels confirmed), and Caswell's roll_account fallback (already in searches(), just never
-    # tried against this county) works too (confirmed live). Both are now configured. Person is
-    # the one that's genuinely unworkable: OwnerLastName returns real bills, but its own
-    # AccountNumber field and its roll's own parcel field both answer zero for the SAME account a
-    # name search just found -- a dead field on that one portal instance (the Gates pattern), not
-    # a parcel/account availability problem.
+    # tried against this county) works too (confirmed live). Both are now configured.
     assert "caswell" in p._BY_COUNTY and "jones" in p._BY_COUNTY
-    assert "person" not in p._BY_COUNTY
+    # Person's own AccountNumber field and its roll's own parcel field both answer zero for the
+    # SAME account a name search just found (the Gates pattern) -- not unworkable after all, just
+    # unreachable by any parcel/account field: name_search routes it to OwnerLastName/
+    # OwnerFirstName instead (shipped later the same night, Portal.name_search).
+    assert p._BY_COUNTY["person"].name_search and p._BY_COUNTY["person"].full_model
+    assert p._BY_COUNTY["davidson"].name_search and not p._BY_COUNTY["davidson"].full_model
+    assert not p._BY_COUNTY["person"].address_search and not p._BY_COUNTY["davidson"].address_search
 
 
 def test_alleghany_layout_parcel_and_alternate_in_the_description_situs_in_the_address_cell():
@@ -642,3 +652,139 @@ def test_anson_layout_a_parcel_only_description_is_real_property_without_units()
                                      "14.41", "15.67", "<button>+</button>"]}]}
     bills = p.parse_rows(payload, p._BY_COUNTY["anson"])
     assert [b["ids"] for b in bills] == [["742600527368"]] and bills[0]["balance"] == 392.85
+
+
+# ---------------------------------------------------------------------------
+# name_search: Davidson, Person (shipped 2026-10-18)
+# ---------------------------------------------------------------------------
+
+def test_split_owner_name():
+    # individuals: no comma, "LAST FIRST [MIDDLE...]" (live-confirmed Davidson rows)
+    assert p._split_owner_name("KOWALSKI ANDERIA") == ("KOWALSKI", "ANDERIA")
+    assert p._split_owner_name("ALSTON JAMES M ESTATE") == ("ALSTON", "JAMES")
+    assert p._split_owner_name("SMITH") == ("SMITH", "")
+    # a comma-separated board/roll convention
+    assert p._split_owner_name("NUNNALLY,TONYA C") == ("NUNNALLY", "TONYA")
+    # a business name goes whole into the last-name field (live-confirmed: this exact string
+    # found its real unpaid bill submitted with no split at all)
+    assert p._split_owner_name("A1 RENOVATION PROPERTIES, LLC") == ("A1 RENOVATION PROPERTIES, LLC", "")
+    assert p._split_owner_name("EXAMPLE HOLDINGS LLC") == ("EXAMPLE HOLDINGS LLC", "")
+    assert p._split_owner_name("  ") == ("", "")
+    assert p._split_owner_name(None) == ("", "")
+
+
+def davidson_roll_row(**kw):
+    """A Davidson board row: no nc_its_public_tax roll block (Davidson isn't wired into that
+    roll scraper at all -- its 3,200 rows come from a separate board source), just the board's
+    own parcel_id/owner_name/listing_type, as the real rows this county's violation cluster is
+    made of carry."""
+    r = {"state": "NC", "county": "Davidson", "listing_type": "tax_lien",
+         "source": "counties_nc.davidson_tax", "parcel_id": "6654-03-428581",
+         "street_address": "105 TEST KOWALSKI DR", "owner_name": "KOWALSKI ANDERIA",
+         "first_seen": "2026-10-06T18:00:00", "raw": {}}
+    r.update(kw)
+    return r
+
+
+def davidson_bills(**over):
+    """Levy 2025 unpaid and already late (delinquent after 2026-01-06, TODAY is 2026-10-08);
+    2026 open and not yet due; the rest paid on time -- the same shape onslow_bills() uses."""
+    situs = "105 TEST KOWALSKI DR LEXINGTON NC 27292"
+    return [bill(2026, 1, ["6654-03-42-8581"], situs, owner="KOWALSKI ANDERIA",
+                account="9083865", balance=1100.0),
+            bill(2025, 2, ["6654-03-42-8581"], situs, owner="KOWALSKI ANDERIA",
+                account="9083865", balance=over.get("b2025", 404.68), paid_on=over.get("p2025")),
+            bill(2024, 3, ["6654-03-42-8581"], situs, owner="KOWALSKI ANDERIA",
+                account="9083865", paid_on=over.get("p2024", date(2024, 11, 1)))]
+
+
+def test_davidson_is_a_name_search_portal_that_skips_the_dead_parcel_field():
+    row = davidson_roll_row()
+    searched = p.searches(row, p.PORTALS["Davidson"])
+    assert searched == [("OwnerName", "KOWALSKI ANDERIA", "owner_name")]
+
+
+def test_davidson_owner_name_search_confirms_on_the_rows_own_parcel():
+    """End to end: the dead ParcelNumber field is never searched at all; OwnerLastName/
+    OwnerFirstName finds the real bill, and it binds because its parsed id (alnum-equal to the
+    row's own parcel_id despite Davidson's dash-count quirk: board "6654-03-428581" vs. bill
+    "6654-03-42-8581", the same 12 digits) is in the row's own `own` set."""
+    portal = FakePortal(p.PORTALS["Davidson"].base, davidson_bills())
+    r = run(davidson_roll_row(), portal)
+    assert r.verdict == "confirmed", r.evidence
+    assert r.evidence["tax_parcel_from"] == "owner_name"
+    assert r.evidence["delinquent_by_year"] == {"2025": 404.68}
+    partial = [a for a in portal.asked if a[0] == "POST" and a[1].endswith("GetSearchTablePartial/")]
+    assert partial[0][2] == {"PageSize": "50", "OwnerLastName": "KOWALSKI", "OwnerFirstName": "ANDERIA",
+                             "UnpaidBillsOnly": "false", "SortBy": "AccountName1-Asc"}
+    # the dead field is never tried: exactly one search this whole run
+    assert len([a for a in portal.asked if a[0] == "POST" and a[1].endswith("GetSearchTablePartial/")]) == 1
+
+
+def test_davidson_owner_name_search_never_binds_a_strangers_parcel():
+    """A common-surname search can answer another taxpayer's bill under the same last name --
+    verify()'s `want` rule (OwnerName treated like AccountNumber) must drop it: the row's own
+    parcel never appears in this portal's answer at all."""
+    portal = FakePortal(p.PORTALS["Davidson"].base,
+                        [bill(2026, 9, ["9999-99-99-9999"], "1 OTHER ST", owner="KOWALSKI ANDERIA",
+                              account="1234567", balance=50.0)])
+    r = run(davidson_roll_row(), portal)
+    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "parcel_not_found"
+
+
+def test_davidson_with_no_parcel_id_never_searches_by_name_at_all():
+    """No own parcel to bind a name-search result to: searches() must not even try (the result
+    could never pass `want`, and a surname search against a government site should not be made
+    for nothing)."""
+    row = davidson_roll_row(parcel_id=None)
+    assert p.searches(row, p.PORTALS["Davidson"]) == []
+    r = run(row, FakePortal(p.PORTALS["Davidson"].base, davidson_bills()))
+    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "parcel_unresolvable"
+
+
+def person_roll_row(**kw):
+    r = {"state": "NC", "county": "Person", "listing_type": "tax_lien",
+         "source": "counties_nc.person_tax", "parcel_id": "A6948",
+         "street_address": "20 TEST RENOVATION LN", "owner_name": "A1 RENOVATION PROPERTIES, LLC",
+         "first_seen": "2026-10-06T18:00:00", "raw": {}}
+    r.update(kw)
+    return r
+
+
+def person_bills(situs, **over):
+    """Levy 2025 unpaid and already late (TODAY is 2026-10-08); 2026 open and not yet due."""
+    return [bill(2026, 1, ["A6948"], situs, owner="A1 RENOVATION PROPERTIES, LLC",
+                account="78159301", balance=1000.0),
+            bill(2025, 2, ["A6948"], situs, owner="A1 RENOVATION PROPERTIES, LLC",
+                account="78159301", balance=over.get("b2025", 612.40))]
+
+
+def test_person_full_model_owner_name_search_posts_every_field_with_no_split_for_a_business():
+    """Person needs full_model (confirmed live: an empty partial 500s, same as Transylvania/
+    Catawba); "A1 RENOVATION PROPERTIES, LLC" is a business name (_BUSINESS_RE: "LLC"), so it
+    goes whole into OwnerLastName with OwnerFirstName empty, the exact shape that found this
+    account's real unpaid 2026 bill live."""
+    situs = "20 TEST RENOVATION LN ROXBORO NC 27573"
+    portal = FullModelPortal(p.PORTALS["Person"].base, person_bills(situs))
+    r = run(person_roll_row(), portal)
+    assert r.verdict == "confirmed", r.evidence
+    assert r.evidence["delinquent_by_year"] == {"2025": 612.40}
+    partial = [a for a in portal.asked if a[0] == "POST" and a[1].endswith("GetSearchTablePartial/")]
+    assert partial[0][2]["OwnerLastName"] == "A1 RENOVATION PROPERTIES, LLC"
+    assert partial[0][2]["OwnerFirstName"] == "" and partial[0][2]["ParcelNumber"] == ""
+    assert all(f in partial[0][2] for f in _FULL)
+
+
+def test_person_address_search_is_off_so_a_mismatch_never_triggers_an_address_search():
+    """address_search=False (FormattedPropertyAddress untested on this portal): a bill whose
+    situs does not match the row's address must never trigger a live address search or a follow
+    -- the row's parcel number is exact (verify()'s `want` rule binds an OwnerName match to the
+    row's own parcel first), so _decide()'s own "the row's own parcel NUMBER" fast path confirms
+    directly without ever reaching _bind()'s (skipped) address-search branch."""
+    portal = FullModelPortal(p.PORTALS["Person"].base, person_bills("9 DIFFERENT ST"))
+    r = run(person_roll_row(), portal)
+    assert r.verdict == "confirmed", r.evidence
+    assert r.evidence["address_binding"] == "parcel_number"
+    assert r.evidence["address_relation"] == "conflict"
+    assert not any(a[1].endswith("GetSearchTablePartial/") and a[2].get("FormattedPropertyAddress")
+                   for a in portal.asked)
