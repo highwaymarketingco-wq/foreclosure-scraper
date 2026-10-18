@@ -1376,16 +1376,48 @@ def _register_if_held() -> None:
         pass
 
 
+def _resolved_file_bytes(p: Path) -> int | None:
+    """The size _choose_board_source() would actually read for `p`: every part's size when the
+    manifest resolves it to parts, else the one file it chose. None when _choose_board_source
+    cannot resolve `p` at all (FileNotFoundError, a torn BoardIntegrityError) or a stat fails --
+    the caller falls back to the old name-only measurement in that case."""
+    try:
+        chosen, _role, res = _choose_board_source(p)
+    except (FileNotFoundError, BoardIntegrityError):
+        return None
+    try:
+        if res is not None:
+            return sum(part.stat().st_size for part in res.paths)
+        return chosen.stat().st_size
+    except OSError:
+        return None
+
+
 def _board_source_bytes(docs_dir: Path) -> int | None:
-    """On-disk size of what read_board_records() is about to fully materialize:
-    listings.json (plain, .gz twin, or summed .gz parts) plus listings_detail.json
-    (plain or .gz twin). None when nothing is found (a fresh/empty board — never
-    block that)."""
+    """On-disk size of what read_board_records() is about to fully materialize: listings.json
+    (plain, .gz twin, or parts) plus listings_detail.json (plain or .gz twin) -- the SAME
+    manifest-aware file each actually resolves to (_resolved_file_bytes, _choose_board_source),
+    not just whichever name happens to exist on disk. A stale plain file the manifest disagrees
+    with must not inflate this past what will really be loaded: a full write_artifact() run
+    writes a fresh plain listings.json/listings_detail.json alongside the parts, but a cheaper
+    incremental patch (patch_existing_rows and friends) only touches the compressed parts, so the
+    plain files normally lag behind between full writes -- measured live 2026-10-18, a 6-day-
+    stale pair (4,169 MB together) tripped this ceiling for a week of daily jobs (the daily vision
+    API refresh, lrcpwa, parcel-cache) while the board actually in use (the parts + detail .gz the
+    loader falls back to) was ~308 MB. Falls back to the pre-manifest-aware name-only sum when
+    _choose_board_source cannot resolve a file (so a genuine problem is still measured, just
+    conservatively, exactly as before this fix). None when nothing is found (a fresh/empty board
+    — never block that)."""
     docs = Path(docs_dir)
     total = 0
     found = False
     for name in ("listings.json", "listings_detail.json"):
         p = docs / name
+        n = _resolved_file_bytes(p)
+        if n is not None:
+            total += n
+            found = True
+            continue
         gz = p.with_name(p.name + ".gz")
         if p.exists():
             total += p.stat().st_size

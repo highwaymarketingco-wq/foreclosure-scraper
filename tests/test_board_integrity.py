@@ -536,6 +536,28 @@ def test_board_load_size_state_trips_over_a_low_ceiling(live):
     assert "over the 0 MB ceiling" in st["reason"]
 
 
+def test_a_stale_plain_file_that_disagrees_with_the_manifest_does_not_inflate_the_size_check(live):
+    """2026-10-18: a 6-day-stale plain listings.json/listings_detail.json (4,169 MB together,
+    left behind by a cheaper incremental patch that only touches the compressed parts between
+    full write_artifact() runs) tripped BOARD_LOAD_MAX_SOURCE_MB / BOARD_PATCH_MAX_SOURCE_MB for
+    a week of daily jobs, even though the board the loader actually falls back to (the parts +
+    detail .gz, same as test_a_plain_file_that_disagrees_with_the_manifest_loses_to_its_gz_twin)
+    was a fraction of that size. The size check must measure what _choose_board_source() would
+    really read, not a stale file's own size."""
+    docs = live / "docs"
+    with wa.board_lock(live, owner="t"):
+        _write(docs, n=3)
+    small = wa.board_load_size_state(docs)["source_mb"]
+    # a stale plain file disagreeing with the manifest, much BIGGER than the real board
+    (docs / "listings.json").write_bytes(b" " * (2 * 1024 * 1024) + b"[]")
+    (docs / "listings_detail.json").write_bytes(b" " * (2 * 1024 * 1024) + b"[]")
+    st = wa.board_load_size_state(docs)
+    assert st["source_mb"] == pytest.approx(small, abs=0.05), (
+        "the stale, oversized plain files must not inflate the measured size")
+    pst = wa.board_patch_size_state(docs)
+    assert pst["source_mb"] == pytest.approx(small, abs=0.05)
+
+
 def test_read_board_records_refuses_over_the_ceiling(live, monkeypatch):
     docs = live / "docs"
     with wa.board_lock(live, owner="t"):
