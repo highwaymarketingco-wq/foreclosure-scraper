@@ -58,6 +58,15 @@ ALLOW_EMAILS = frozenset({
     "civilcourtdata@lsc.gov",         # a government office role address the owner manual names
     "taxforeclosures@unioncountync.gov",  # a county office role address the owner manual names
 })
+#: Brunswick County NC Register of Deeds' own public office contact numbers (digits only), printed
+#: in the header/footer of the math-CAPTCHA sign-in page math_captcha.py solves -- NOT a real
+#: person's number, and the exact reason the module exists (see its docstring and _PHONE_RE's
+#: comment: a phone number in that page text must not be misparsed as the math question itself).
+#: Used verbatim in docs/hermes_directives_2026-10-14*.md and tests/test_math_captcha.py as the
+#: realistic fixture proving that guard. Office numbers, same category as ALLOW_EMAILS above.
+ALLOW_PHONES = frozenset({
+    "7042534000", "9102532690", "8007921786", "8776259310", "9102532703",
+})
 #: Data payloads the pipeline publishes or reads on purpose (not prose): skipped by name, each with
 #: its reason. The board publishes owners' names and phones by the owner's decision.
 DATA_PATHS: dict[str, str] = {
@@ -91,6 +100,8 @@ def scan_text(text: str) -> Counter:
         digits = re.sub(r"\D", "", m.group(0))
         # a real NANP number has area and exchange starting 2-9; 555 is the fictional exchange
         if area[0] in "01" or exch[0] in "01" or "555" in (area, exch) or len(set(digits)) <= 2:
+            continue
+        if digits in ALLOW_PHONES:
             continue
         c["phones"] += 1
     for m in EMAIL.finditer(text):

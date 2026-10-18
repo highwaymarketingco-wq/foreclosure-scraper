@@ -30,6 +30,16 @@ def test_configuration_allow_list():
     assert sum(R.scan_text("GMAIL_SENDER=highwaymarketingco@gmail.com -greghhigh@gmail.com").values()) == 0
 
 
+def test_brunswick_rod_office_numbers_are_allow_listed():
+    """2026-10-17: math_captcha.py's own fixtures/docs quote Brunswick County ROD's public
+    office contact numbers verbatim (the exact phone-vs-math-question false positive the module
+    exists to avoid) -- these are a government office's published numbers, not a real person's,
+    same category as ALLOW_EMAILS' government addresses."""
+    assert sum(R.scan_text("Call 704-253-4000 or (910) 253-2690 OFFICE; "
+                           "(800) 792-1786 ext. 2; 877-625-9310 TOLL FREE; "
+                           "(910) 253-2703 FAX").values()) == 0
+
+
 def test_checks_have_the_interface():
     for c in R.make_checks():
         out = c.finish.__func__  # noqa: B018 - interface present (the scan itself runs in the suite)
