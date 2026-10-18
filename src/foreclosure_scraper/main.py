@@ -4496,6 +4496,17 @@ async def run_enrich_tail(st: TailState) -> dict:
                         restored=len(_restored), before=len(enriched),
                         after=len(enriched) + len(_restored))
             enriched.extend(_restored)
+            # A row restored straight from the prior board's own JSON carries whatever
+            # raw['call_ready'] (if any) that board had -- the two stamps above both ran
+            # BEFORE this restore, so a restored row never got this run's gate at all
+            # (audit 2026-10-09 call_ready, call-ready-present: 9 HomePath leads carried
+            # call_ready=missing indefinitely this way). stamp_board is pure/idempotent
+            # and safe to call again over the now-larger list.
+            try:
+                from .call_ready import stamp_board as _call_ready_stamp
+                enrichment_stats["call_ready_grandfather"] = _call_ready_stamp(enriched)
+            except Exception:
+                log.error("call_ready_grandfather.failed", traceback=traceback.format_exc())
 
     # ---- Fail-loud guard: catastrophic week-over-week count drop ----------
     # A silent drop in total listings is the failure mode that hid for a

@@ -343,6 +343,25 @@ def test_stamp_board_keeps_every_row_and_is_idempotent():
     assert c1["by_lane_tier"] == c2["by_lane_tier"]
 
 
+def test_stamp_board_covers_rows_added_after_an_earlier_stamp():
+    """2026-10-17, call-ready-present: main.py's GRANDFATHER restore appends prior-board rows
+    to `enriched` AFTER both existing stamp_board() calls, so a restored row never got this
+    run's gate at all (9 HomePath leads carried call_ready=missing indefinitely). Fixed by
+    stamping again once more rows exist -- stamp_board is pure/idempotent, so calling it over
+    a grown list must fill in the new rows without disturbing the ones already stamped."""
+    rows = [row(raw={"owner_phone": accela_phone()}), probate_row()]
+    CR.stamp_board(rows, TODAY)
+    snap = copy.deepcopy([r["raw"]["call_ready"] for r in rows])
+
+    restored = sale_row()
+    rows.append(restored)
+    c2 = CR.stamp_board(rows, TODAY)
+
+    assert c2["rows"] == len(rows) == 3
+    assert [r["raw"]["call_ready"] for r in rows[:2]] == snap
+    assert restored["raw"]["call_ready"] is not None
+
+
 def test_rank_orders_older_bigger_debts_first():
     small = CR.call_ready(row(raw={"owner_phone": accela_phone(), "verification": [tax_record(years=1, total=300.0)]}), TODAY)
     big = CR.call_ready(row(raw={"owner_phone": accela_phone(), "verification": [tax_record(years=6, total=12000.0)]}), TODAY)
