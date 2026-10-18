@@ -182,6 +182,19 @@ def test_hoke_parcel_id_passes_through_unchanged():
     assert p.search_id("584950001122") == "584950001122"
 
 
+def test_lee_applies_and_passes_a_flat_parcel_through_unchanged():
+    """2026-10-18: Lee is on the same Munis platform (leecountync.munisselfservice.com),
+    confirmed live against 5 real board parcels. applies() and search_id() need the same
+    treatment as Hoke -- a no-login generic tax claim is enough, and the dominant (96.5%) flat
+    12-digit parcel id is passed through as-is."""
+    row = {"state": "NC", "county": "Lee", "listing_type": "tax_lien",
+           "source": "counties_nc.nc_tax_lien_ads", "parcel_id": "964572517500",
+           "raw": {"tax_owed": {"balance": 1200.0, "year": 2025}}}
+    assert p.portal_of(row) is p.PORTALS["Lee"]
+    assert p.applies(row)
+    assert p.search_id("964572517500") == "964572517500"
+
+
 def test_a_block_of_another_parcel_names_no_claimed_year():
     """The 2026-10-07 board copied one parcel's roll block onto 1,198 New Hanover rows: its years
     are not a claim about the row's parcel."""

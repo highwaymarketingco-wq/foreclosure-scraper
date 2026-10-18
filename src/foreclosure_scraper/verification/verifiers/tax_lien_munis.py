@@ -28,6 +28,15 @@ rows carry one of those. One parcel checked live (584950001122) had its 2026 bil
 (balance 0.0) despite the county's OWN ad-list PDF (a snapshot) still flagging it -- exactly the
 "the roll is a snapshot, this reads what's owed today" case this verifier exists for.
 
+Lee (2,703 rows, also nc_tax_lien_ads) is on the SAME platform too (leecountync.munisselfservice.com,
+found via its county site's own "Online Bill Inquiry" page, not guessed). The board's Lee parcel_id
+is overwhelmingly (3,054 of ~3,166, 96.5%) a plain 12-digit number that searches exactly like
+Hoke's -- confirmed live against 5 real parcels. Two small residual shapes do NOT resolve and are
+left unfixed: a ~1.3% minority in "9643-57-3256-00"-style dashed form (every digit variant tried --
+with/without the trailing suffix, with dashes -- answered zero bills; a different internal numbering,
+not cracked), and a ~2.2% minority of "NC000XX"-style ids from the roll scraper's own synthetic
+fallback when a PDF entry names no real parcel (not a real number on any portal, nothing to search).
+
 THE BOARD'S NEW HANOVER FLAG (measured on the 2026-10-07 board, read-only): 1,209 of the 1,286
 flagged rows carry a roll block (raw['nc_county_csv_delinquent_tax']) whose county_id is ANOTHER
 parcel: one block ($4,150.31, 2016-2025, one parcel) is copied onto 1,198 rows and another
@@ -111,6 +120,7 @@ class Portal:
 PORTALS: dict[str, Portal] = {
     "New Hanover": Portal("New Hanover", "https://newhanovercountynccss.munisselfservice.com"),
     "Hoke": Portal("Hoke", "https://hokecountytaxes.munisselfservice.com"),
+    "Lee": Portal("Lee", "https://leecountync.munisselfservice.com"),
 }
 _BY_COUNTY = {k.lower(): v for k, v in PORTALS.items()}
 
