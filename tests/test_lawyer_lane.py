@@ -45,6 +45,10 @@ def test_parse_feature_reads_the_assessors_deed_reference_and_skips_placeholders
     assert f("Deed Book/Page 01514/0638", "", "2025-9-22")["date"] == "2025-09-22"
     assert f("Plat Book/Page 12/34")["book"] is None
     assert parse_feature("9", [{"parno": "1", "sourceref": "Deed Book/Page 1/2"}]) is None
+    # 2026-10-18, top80-fill-deed-ref-shape: parse_ref() cleanly splits Macon's "Q-21/1611" into
+    # book "Q-21" / page "1611", but "Q-21" is not a plain alnum book id (the assessor's format
+    # does not fit the book/page model here); writing it produced a malformed deed reference.
+    assert f("Deed Book/Page Q-21/1611")["book"] is None
 
 
 # ------------------------------------------------------------------ binding by book / page

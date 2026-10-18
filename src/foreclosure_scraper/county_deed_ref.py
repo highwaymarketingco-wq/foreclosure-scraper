@@ -62,6 +62,7 @@ def parse_feature(pin: str, feats: list[dict]) -> Optional[dict]:
     """{parno, book, page, date} from the layer's attribute bags for one PIN, or None (pure).
     The deed reference as the assessors write it: 'Deed Book/Page 001234/00567', 'Sale Book/Page
     ...', or a bare '26972/906' / '2021E/127'; a plat reference or a blank one is not a deed."""
+    from .gis_fill import book_page
     from .quiet_title.adapters.nc_onemap import parse_ref, pick_feature
     a, _ = pick_feature(pin, feats)
     if not a:
@@ -70,6 +71,13 @@ def parse_feature(pin: str, feats: list[dict]) -> Optional[dict]:
     word, book, page = parse_ref(ref)
     if word and word.lower() not in ("deed", "sale"):
         book = page = None
+    # parse_ref() only splits the text on its book/page separator; it does not vet the shape of
+    # either half. A county whose own book id contains a separator the split didn't expect (Macon:
+    # "Deed Book/Page Q-21/1611" splits clean into book "Q-21" / page "1611", but "Q-21" is not a
+    # plain alnum book id) must not be written as a deed reference (top80-fill-deed-ref-shape,
+    # 2026-10-18): book_page() is the same shape gate gis_fill.py's own NC path applies.
+    bp = book_page(book, page) if (book and page) else None
+    book, page = bp if bp else (None, None)
     if not (book and page):
         m = _BARE.match(ref)
         if m and not re.search(r"plat|map", ref, re.I):
