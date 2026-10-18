@@ -87,6 +87,14 @@ _MIN_LOAN = float(os.environ.get("FORECLOSURE_DOT_OCR_MIN_LOAN", "1000"))
 _MAX_LOAN = float(os.environ.get("FORECLOSURE_DOT_OCR_MAX_LOAN", "20000000"))
 #: the processed-documents ledger (lane dot_ocr) re-searches an owner read by an older version
 DOT_OCR_VERSION = "dot_ocr-v2"
+#: enrichment_doc_ocr.py checkpoints the ledger every 25 records for the same reason: this
+#: machine has crashed mid-run before (kernel panics, OOM), and dot_ocr used to save only once,
+#: at the very end of the whole county sweep -- a crash anywhere in a long run lost every entry
+#: that run had recorded in memory, even for leads whose raw['dot_ocr'] had already made it onto
+#: the board (docs-processed-has-ledger-entry, 2026-10-18: Burke/Transylvania leads carrying a
+#: real dot_ocr read with no matching ledger entry at all, in any board or committed ledger
+#: snapshot ever).
+_LEDGER_SAVE_EVERY = 25
 
 
 def _name_parts(owner: str) -> tuple[str, str]:
@@ -619,6 +627,8 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
             return loan, parsed
         return None, parsed
 
+    _recorded = {"n": 0}
+
     def _rec(li, outcome: str, **kw) -> None:
         if led is None:
             return
@@ -627,7 +637,13 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
                        source=getattr(li, "source", None),
                        county=f"{li.state or '?'}:{li.county or '?'}", **kw)
         except Exception:  # noqa: BLE001
-            pass
+            return
+        _recorded["n"] += 1
+        if _recorded["n"] % _LEDGER_SAVE_EVERY == 0:
+            try:
+                led.save()
+            except Exception:  # noqa: BLE001
+                log.warning("dot_ocr.ledger_save_failed")
 
     async def _run_county(state: str, county: str, leads: list) -> None:
         leads = leads[:share]

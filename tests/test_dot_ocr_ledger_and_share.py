@@ -108,6 +108,31 @@ def test_a_found_loan_is_recorded_with_public_values_only(ledger_dir, monkeypatc
     assert "EXAMPLE" not in (led.path.read_text())
 
 
+def test_ledger_checkpoints_every_25_records_not_just_at_the_end(ledger_dir, monkeypatch):
+    """2026-10-18 docs-processed-has-ledger-entry: dot_ocr used to save its ledger only once, at
+    the very end of the whole run -- a crash anywhere before that point lost every entry the run
+    had already recorded in memory, even for leads whose raw['dot_ocr'] had already made it onto
+    the board. enrichment_doc_ocr.py already checkpoints every 25 records (_LEDGER_SAVE_EVERY);
+    dot_ocr must do the same."""
+    async def _none(state, county, owner, **kw):
+        return []
+
+    monkeypatch.setattr(di, "owner_dot_documents", _none)
+    saves: list[int] = []
+    real_save = dl.DocLedger.save
+
+    def _counting_save(self, *a, **kw):
+        p = real_save(self, *a, **kw)
+        saves.append(len(self.rows))
+        return p
+
+    monkeypatch.setattr(dl.DocLedger, "save", _counting_save)
+    leads = [_lead("Burke", "NC", f"OWNER{i}, A") for i in range(30)]
+    asyncio.run(dm.enrich_dot_ocr(leads))
+    assert len(saves) >= 2, "expected a mid-run checkpoint plus the final save"
+    assert saves[0] == 25, "the file on disk must already hold 25 rows at the first checkpoint"
+
+
 def test_a_gemini_answer_without_a_result_does_not_kill_the_county(ledger_dir, monkeypatch):
     """`blocks` used to be bound only when every Gemini key was quota-out; with an NVIDIA key
     set, a Gemini that answered nothing usable raised UnboundLocalError and the rest of the
