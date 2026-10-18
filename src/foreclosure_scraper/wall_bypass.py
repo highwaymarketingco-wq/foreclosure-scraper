@@ -307,16 +307,21 @@ async def _pydoll_fetch(
         )
         return ""
     finally:
-        # Clean up the browser process.  Use close() since we called
-        # start() directly (not __aenter__), so __aexit__ may not work.
+        # 2026-10-17: this called browser.close() -- in pydoll's own Browser class
+        # (chromium/base.py) close() ONLY closes the WebSocket connection; stop() is
+        # the one that calls _browser_process_manager.stop_process() (SIGTERM, then
+        # SIGKILL after 15s) on the real OS Chrome subprocess. close() alone left
+        # every pydoll fetch's Chrome process running forever -- confirmed the exact
+        # cause of 365 orphaned Chrome processes from one run_stealth_sources.py run
+        # that made the Mac unresponsive. stop() also closes the connection and
+        # cleans up the temp profile dir, so it's a strict superset of close().
         # CRITICAL: catch BaseException, not Exception — asyncio.CancelledError
         # (raised when the outer wait_for times out) is a BaseException in
         # Python 3.8+, so `except Exception` would let it propagate past the
-        # close() call, leaking the browser process. This was the root cause
-        # of the slow memory leak that crashed the VM on long runs.
+        # stop() call, leaking the browser process.
         if browser is not None:
             try:
-                await browser.close()
+                await browser.stop()
             except BaseException:
                 pass
 
