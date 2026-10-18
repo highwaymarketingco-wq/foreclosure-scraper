@@ -4544,6 +4544,23 @@ async def run_enrich_tail(st: TailState) -> dict:
                 enrichment_stats["call_ready_grandfather"] = _call_ready_stamp(enriched)
             except Exception:
                 log.error("call_ready_grandfather.failed", traceback=traceback.format_exc())
+            # A restored row's dedupe_key is the SNAPSHOT's (pre-address-synthesis, pre-validation),
+            # which routinely differs from the live row of the same property dedupe2 already placed
+            # in `enriched` (audit 2026-10-18, identity-no-duplicate-properties: a Fannie HomePath
+            # lead keyed 'parcel:...:15876' by its prior short id, restored beside this run's fresh
+            # national.homepath_json re-scrape of the SAME property keyed by address -- dedupe()
+            # merges that exact pair on contact, but nothing re-ran it since the restore only
+            # EXTENDS `enriched`). Re-running dedupe() catches that, the same safety net dedupe2
+            # already gives every other row; _final_keys above already proves no restored row's key
+            # collides with one already in `enriched`, so this can only ever MERGE restored rows
+            # together or into one another by address/case, never re-split anything dedupe2 settled.
+            try:
+                _pre_gf_dedupe = len(enriched)
+                enriched = dedupe(enriched)
+                log.info("orchestrator.dedupe_grandfather", before=_pre_gf_dedupe, after=len(enriched),
+                         collapsed=_pre_gf_dedupe - len(enriched))
+            except Exception:
+                log.error("dedupe_grandfather.failed", traceback=traceback.format_exc())
 
     # ---- Fail-loud guard: catastrophic week-over-week count drop ----------
     # A silent drop in total listings is the failure mode that hid for a
