@@ -718,7 +718,13 @@ SPECS: dict[str, Spec] = {
                             doc="raw.repeat_tax_loss present; checked = tax roll read"),
     "heir_estate": Spec(_S, "county", "gis", ledger="probate_heir|heir_roll",
                         producers=("scrapers/counties_nc/nc_heir_estate_parcels.py",
-                                   "scrapers/counties_nc/henderson_foreclosure_parcels.py"),
+                                   "scrapers/counties_nc/henderson_foreclosure_parcels.py",
+                                   # 2026-10-19: pure-local SC equivalent, reads parcel_cache's
+                                   # already-cached owner column instead of a live GIS query --
+                                   # 18 SC counties nc_heir_estate_parcels.py's own COUNTY_GIS
+                                   # registry never covered (York/Charleston/Beaufort overlap
+                                   # and stay on the live producer).
+                                   "scrapers/counties_sc/sc_heir_estate_parcel_cache.py"),
                         doc="raw.heir_estate present (a parcel owner-of-record naming heirs/estate)"),
     "heir_naming_publication": Spec(_S, "county", "notices", statewide=SC_QUIET_TITLE + NC_QUIET_TITLE_READ,
                                     statewide_except=_nc_without_column_paper() + _sc_without_column_probate(),
