@@ -3491,6 +3491,42 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("ptscloud_mydt.failed", traceback=traceback.format_exc())
 
+    # Same NC PTS Cloud tenants, same already-fetched by_year history, restated into the OTHER
+    # shared tax-gap key (gap-matrix sweep 2026-10-19): raw['two_year_delinquent']. Independent
+    # of ptscloud_mydt above (that one gates on >=2 matured years; this one is unconditional,
+    # matching sc_catalis/qpaybill's own two_year_delinquent write), so it is its own try/except.
+    try:
+        from .enrichment_ptscloud_two_year_delinquent import enrich_ptscloud_two_year_delinquent
+        s = enrich_ptscloud_two_year_delinquent(enriched)
+        if s:
+            enrichment_stats["ptscloud_tyd"] = s
+    except Exception:
+        log.error("ptscloud_tyd.failed", traceback=traceback.format_exc())
+
+    # Berkeley County SC (paystar.io) delinquent roll: counties_sc.berkeley_paystar_tax's own
+    # _merge_invoices() already computes years_delinquent/oldest_year per parcel -- a pure,
+    # no-network restatement into the shared raw['two_year_delinquent'] contract (gap-matrix
+    # sweep 2026-10-19).
+    try:
+        from .enrichment_berkeley_two_year_delinquent import enrich_berkeley_two_year_delinquent
+        s = enrich_berkeley_two_year_delinquent(enriched)
+        if s:
+            enrichment_stats["berkeley_tyd"] = s
+    except Exception:
+        log.error("berkeley_tyd.failed", traceback=traceback.format_exc())
+
+    # Dorchester County SC (billtrax.com) delinquent roll: counties_sc.dorchester_billtrax_
+    # delinquent_tax already computes is_two_year_plus/years_delinquent per parcel -- a pure,
+    # no-network restatement into the shared raw['two_year_delinquent'] contract (gap-matrix
+    # sweep 2026-10-19).
+    try:
+        from .enrichment_dorchester_two_year_delinquent import enrich_dorchester_two_year_delinquent
+        s = enrich_dorchester_two_year_delinquent(enriched)
+        if s:
+            enrichment_stats["dorchester_tyd"] = s
+    except Exception:
+        log.error("dorchester_tyd.failed", traceback=traceback.format_exc())
+
     # NC ITSPublic tax-bill portal (BT TaxPayer Portal family: Onslow, Graham, Duplin + 9 more)
     # multi-year unpaid-bill history — a pure, no-network restatement of the per-year depth
     # counties_nc.nc_its_public_tax already fetches into its own raw key, into the shared
