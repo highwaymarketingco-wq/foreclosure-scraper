@@ -84,6 +84,22 @@ CCHS_COUNTIES = {
     ("NC", "Lincoln"): ("us4", "LincolnNCNW", "lincolnnc"),
     ("NC", "Madison"): ("us4", "MadisonNCNW", "madisonnc"),
     ("NC", "Henderson"): ("us4", "HendersonNCNW", "hendersonnc"),
+    # Duplin added 2026-10-18 (docs/gap_matrix's atty_rod_lien_checked/liens gap,
+    # next_action "register: Courthouse Computer Systems classic ASP
+    # (us4.courthousecomputersystems.com/duplinncnw)"). LIVE-VERIFIED same day: root
+    # bootstrap (https://us4.courthousecomputersystems.com/duplinnc/) 403s (IIS "access
+    # denied"), and application.asp?resize=true 403s too (Cloudflare "Just a moment..."),
+    # but neither blocks the flow below (_cchs_fetch/search_by_name never check their
+    # status) -- realestatesearch.asp itself 200s (163KB, the real search app) and
+    # SearchService.asp (via curl-cffi chrome impersonation, the SAME escalation tier
+    # get_text(..., impersonate=True) already auto-tries) returns a real
+    # <SearchResponse><recordcount>7</recordcount>...<doccount>1</doccount></SearchResponse>
+    # for a 90-day FCL/LIS-P/FORECLOSURE/LIS-PENDEN window, and getall returns a real
+    # LIS PENDENS (Book 2126/Page 570, Doc# 10070136, grantor GORE MIRACALE SHANTE'T /
+    # grantee BOEHLING LAWRENCE S. among others) in the exact same <r> shape _parse_rows
+    # already parses. Same vendor product as Burke/Cleveland/Lincoln/Madison/Henderson,
+    # not the newer DevExpress product (rod/ccs_devexpress.py) Randolph's register runs on.
+    ("NC", "Duplin"): ("us4", "duplinncnw", "duplinnc"),
 }
 
 _NOD_TYPES = "FCL,LIS/P,FORECLOSURE,LIS PENDEN"

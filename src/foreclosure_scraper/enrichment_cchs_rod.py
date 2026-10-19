@@ -1,6 +1,7 @@
-"""Burke/Cleveland/Madison/Henderson/Lincoln NC ROD lien-existence by owner name (CCHS
+"""Burke/Cleveland/Madison/Henderson/Lincoln/Duplin NC ROD lien-existence by owner name (CCHS
 SearchService.asp). Burke and Cleveland were the original two; Madison/Henderson/Lincoln were
-added later (_COUNTIES is the current list).
+added later; Duplin added 2026-10-18 (rod/cchs.py's CCHS_COUNTIES docstring has the live
+verification) -- _COUNTIES is the current list.
 
 These core Western-NC counties run the OLDER CourthouseComputerSystems interface (classic-ASP
 SearchService.asp), already wired in rod/cchs.py (search_by_name) but never called by any enricher
@@ -31,7 +32,7 @@ from .rod import cchs
 from .rod.classify import classify_rod_docs, is_stale, refresh_windows
 from .name_normalize import first_last_parts
 
-_COUNTIES = {"Burke", "Cleveland", "Madison", "Henderson", "Lincoln"}
+_COUNTIES = {"Burke", "Cleveland", "Madison", "Henderson", "Lincoln", "Duplin"}
 # Match on the alpha-only normalized code (D/T -> DT, D OF TR -> DOFTR, TAX_LIEN -> TAXLIEN).
 _MORTGAGE_N = {"DT", "DOT", "DOFTR", "MORT", "MTG", "MORTGAGE", "DEEDOFTRUST"}
 _ADVERSE_N = {"LIEN", "TAXLIEN", "TAX", "JUDG", "JUDGMENT", "LP", "LISP", "EXECUTION",
