@@ -546,6 +546,78 @@ def test_built_in_code_drops_vacant_cohort_false_credit():
     assert len(built["vacant"]) == 3
 
 
+def test_sc_heir_estate_parcel_cache_credit_reads_real_registry_not_text():
+    """2026-10-19 wave3 follow-up, same bug class as the condemned/code_enforcement and vacant
+    fixes above: sc_heir_estate_parcel_cache.py is a real producer of 'heir_estate' for ~18-20 SC
+    counties, but that list is resolved entirely at RUNTIME inside its own _candidate_counties()
+    (from parcel_cache's PARCEL_LAYERS/SC_DUAL_LAYERS registries), never written as literal
+    county-name text in the file -- the few county names that DO appear there (Greenville,
+    Dorchester) live only in its module docstring, which counties_named_in()'s own
+    _strip_comments_and_docstrings() removes before matching. Live-measured: the blanket grep over
+    this file alone credits ZERO counties. _sc_heir_estate_parcel_cache_credit() calls the
+    scraper's own _candidate_counties() directly instead."""
+    credit = gm._sc_heir_estate_parcel_cache_credit()
+    # the three counties nc_heir_estate_parcels.py already covers live are excluded by the
+    # scraper's own _ALREADY_LIVE_COVERED, never double-sourced
+    for st, co in (("SC", "York"), ("SC", "Charleston"), ("SC", "Beaufort")):
+        assert (st, co) not in credit
+    # the 6 counties this bug was hiding as "sourced-not-built"
+    for co in ("Greenville", "Orangeburg", "Dorchester", "Jasper", "Aiken", "Greenwood"):
+        assert ("SC", co) in credit
+    assert all(st == "SC" for st, _co in credit)
+
+
+def test_built_in_code_adds_sc_heir_estate_parcel_cache_credit():
+    """End-to-end: built_in_code()'s real output for 'heir_estate' now credits the 6 SC counties
+    this bug hid (already fully served by the shipped sc_heir_estate_parcel_cache.py producer).
+    henderson_foreclosure_parcels.py's own (genuine, untouched) text-grep credit for NC/Henderson
+    survives too. nc_heir_estate_parcels.py's real coverage (its own _HEIR_COUNTIES list, e.g.
+    NC/Buncombe or SC/York) is a SEPARATE pre-existing instance of this same dynamic-list blind
+    spot in a DIFFERENT producer file -- out of scope here, correctly left untouched, and
+    confirmed live to already contribute zero blanket-grep credit before this fix too (its
+    "NC:Buncombe"-style literals are colon-prefixed, which counties_named_in()'s own pattern
+    does not match) -- so this fix neither adds nor removes anything for that file."""
+    built = gm.built_in_code()
+    for co in ("Greenville", "Orangeburg", "Dorchester", "Jasper", "Aiken", "Greenwood"):
+        assert ("SC", co) in built["heir_estate"], f"SC/{co} should be credited by the parcel-cache producer"
+    assert ("NC", "Henderson") in built["heir_estate"]  # henderson_foreclosure_parcels.py, untouched
+    # York/Charleston/Beaufort are explicitly EXCLUDED by sc_heir_estate_parcel_cache.py's own
+    # _ALREADY_LIVE_COVERED (they stay on nc_heir_estate_parcels.py's live producer instead) -- the
+    # pre-fix blanket grep picked these up from that very exclusion-list literal, a coincidental
+    # false credit from the same file this fix corrects, not a real credit from another producer.
+    for st, co in (("NC", "Beaufort"), ("SC", "Beaufort"), ("SC", "Charleston"), ("SC", "York")):
+        assert (st, co) not in built["heir_estate"], f"{st}/{co} was only ever a false credit from the excluded-list literal"
+
+
+def test_county_lien_sweep_marriage_credit_reads_real_registry_not_text():
+    """2026-10-19 wave3 follow-up, same bug class again: enrichment_county_lien_sweep.py's
+    SWEEP_COUNTIES registry (and the shared rod/county_sweeps.py constants it draws on, e.g.
+    HOSTED_CCHS) names 24 counties in plain code text, but only ONE of them (NC/Beaufort) carries
+    a kind=='marriage' Job -- every other name (Orange/Stanly/Surry NC, Sumter/Oconee SC, the 17
+    HOSTED_CCHS tenants) is there for the unrelated 'lien' job only. A blanket counties_named_in()
+    grep over this file pair can't tell the difference; _county_lien_sweep_marriage_credit() reads
+    SWEEP_COUNTIES' own Job.kind field directly instead. (Watauga joined Beaufort as a second real
+    marriage job 2026-10-19, same wave3 follow-up, task 3's near-zero-cost LRSearch win.)"""
+    credit = gm._county_lien_sweep_marriage_credit()
+    assert credit == {("NC", "Beaufort"), ("NC", "Watauga")}
+
+
+def test_built_in_code_drops_county_lien_sweep_false_marriage_credit():
+    """End-to-end: built_in_code()'s real output for 'marriage_license' now credits NC/Beaufort
+    (enrichment_county_lien_sweep.py's real, if dormant, marriage sweep) but none of the 23 other
+    counties a blanket grep over enrichment_county_lien_sweep.py/rod/county_sweeps.py would
+    otherwise manufacture from the unrelated 'lien' job, while enrichment_register_checks.py's/
+    rod/register_checks.py's own text-grep credit for this column keeps its credit."""
+    built = gm.built_in_code()
+    assert ("NC", "Beaufort") in built["marriage_license"]
+    # false positives that a naive blanket grep over the lien-sweep file pair would have added
+    for st, co in (("NC", "Orange"), ("NC", "Stanly"), ("NC", "Surry"), ("NC", "Burke"),
+                   ("NC", "Lincoln"), ("NC", "Henderson"), ("SC", "Sumter"), ("SC", "Oconee")):
+        assert (st, co) not in built["marriage_license"], f"{st}/{co} has no marriage job, lien job only"
+    # real register_checks.py text-grep credit (the Cott v4 family) keeps its credit
+    assert ("NC", "Rowan") in built["marriage_license"]
+
+
 def test_read_baseline_maps_unknown(tmp_path):
     p = tmp_path / "b.csv"
     p.write_text("State,County,Rows,address\nNC,UNKNOWN,5,1.0\nNC,Mcdowell,3,2.0\n")

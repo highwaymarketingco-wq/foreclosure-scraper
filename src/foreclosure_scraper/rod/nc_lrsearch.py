@@ -52,6 +52,12 @@ class LrCounty:
 
 COUNTIES: dict[str, LrCounty] = {
     "Beaufort": LrCounty("https://us5.courthousecomputersystems.com/BeaufortNC2/"),
+    # 2026-10-19: same LRSearch MVC app, different us-host/tenant slug. Live-confirmed (one GET,
+    # PoliteClient, gap-matrix wave3 follow-up): VRMarriageSearch/MarriageIndex opens a real
+    # Marriages-tab search form here (its own 'last'/'vitaltype' defaults, same shape as
+    # Beaufort's), so the marriage sweep works unmodified; the lien side was not probed and is
+    # left unregistered in enrichment_county_lien_sweep.py's SWEEP_COUNTIES (marriage job only).
+    "Watauga": LrCounty("https://us3.courthousecomputersystems.com/WataugaNC2/"),
 }
 
 

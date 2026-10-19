@@ -85,8 +85,10 @@ def test_marriage_verdicts_only_stamp_index_counties():
 
 
 def test_marriage_adapter_counties_are_exactly_the_index_counties():
+    # Wayne added 2026-10-19 (gap-matrix wave3 follow-up): live-confirmed one GET of SrchName.aspx
+    # shows the same Index Type list carrying MARRIAGES (MAR) as the other 6.
     assert sorted(RC.MARRIAGE_ADAPTER.counties) == ["Alamance", "Alexander", "Edgecombe", "Onslow", "Pamlico",
-                                                    "Rutherford"]
+                                                    "Rutherford", "Wayne"]
     assert RC.MARRIAGE_ADAPTER.platform != "cott_esearch_v4"        # its own per-county lookup budget
 
 

@@ -58,6 +58,11 @@ SWEEP_COUNTIES: dict[tuple[str, str], tuple[Job, ...]] = {
        for c in ("Orange", "Stanly", "Surry", *CS.HOSTED_CCHS)},
     ("NC", "Beaufort"): (Job("lien", lambda: CS.LrSearchReader("Beaufort")),
                          Job("marriage", lambda: CS.MarriageReader("Beaufort"))),
+    # 2026-10-19: Watauga runs the identical LRSearch MVC app (see rod/nc_lrsearch.py's own
+    # COUNTIES comment) with an open Marriages tab, live-confirmed one GET. Marriage job only --
+    # the lien side (its own adverse-doc-type codes) was not probed, so it stays unregistered here
+    # rather than assumed to work the same way.
+    ("NC", "Watauga"): (Job("marriage", lambda: CS.MarriageReader("Watauga")),),
     ("SC", "Sumter"): (Job("lien", lambda: CS.CountyFusionReader("Sumter")),),
     ("SC", "Oconee"): (Job("lien", lambda: CS.PublicSearchReader("oconee")),),
 }

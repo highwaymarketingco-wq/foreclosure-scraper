@@ -725,7 +725,11 @@ SPECS: dict[str, Spec] = {
                                    # already-cached owner column instead of a live GIS query --
                                    # 18 SC counties nc_heir_estate_parcels.py's own COUNTY_GIS
                                    # registry never covered (York/Charleston/Beaufort overlap
-                                   # and stay on the live producer).
+                                   # and stay on the live producer). Its county coverage is
+                                   # resolved at RUNTIME from parcel_cache's own registries (see
+                                   # _SC_HEIR_ESTATE_PARCEL_CACHE_REL's own docstring in
+                                   # built_in_code() for why its credit is read directly from
+                                   # that function rather than via this tuple's own blanket grep).
                                    "scrapers/counties_sc/sc_heir_estate_parcel_cache.py"),
                         doc="raw.heir_estate present (a parcel owner-of-record naming heirs/estate)"),
     "heir_naming_publication": Spec(_S, "county", "notices", statewide=SC_QUIET_TITLE + NC_QUIET_TITLE_READ,
@@ -746,7 +750,14 @@ SPECS: dict[str, Spec] = {
                                                  "went statewide 2026-10-07, after this Spec assumed SC family court "
                                                  "was access-restricted; 2026-10-17 gap-sweep)"),
     "marriage_license": Spec(_S, "row", "rod", applies="person",
-                             producers=("enrichment_register_checks.py", "rod/register_checks.py"),
+                             producers=("enrichment_register_checks.py", "rod/register_checks.py",
+                                        # 2026-10-19: enrichment_county_lien_sweep.py's Beaufort NC
+                                        # marriage job (rod/county_sweeps.py's MarriageReader)
+                                        # writes the same raw['marriage_license'] shape; see
+                                        # _COUNTY_LIEN_SWEEP_REL's own docstring in built_in_code()
+                                        # for why its county credit is read from SWEEP_COUNTIES
+                                        # directly rather than via this tuple's own blanket grep.
+                                        "enrichment_county_lien_sweep.py", "rod/county_sweeps.py"),
                              doc="raw.marriage_license present",
                              ambiguity="10/1 counts the {'status': 'no_match'} wrapper as a hit; the second "
                                        "view counts only a found license; enrichment_marriage_license.py "
@@ -1579,6 +1590,69 @@ def _vacant_cohort_credit() -> set[tuple[str, str]]:
     return out
 
 
+#: Same bug class, found in the 'heir_estate' column's own producers tuple (2026-10-19 wave3
+#: follow-up). sc_heir_estate_parcel_cache.py is a real producer of 'heir_estate' -- 18+ SC
+#: counties, resolved live from parcel_cache's own PARCEL_LAYERS/SC_DUAL_LAYERS registries (any
+#: county whose `map` carries an `owner` field, minus the three nc_heir_estate_parcels.py already
+#: covers live) -- but that list is built entirely at RUNTIME inside its own _candidate_counties(),
+#: never written as literal county-name text anywhere in the file. counties_named_in() can only
+#: match literal text, and the handful of REAL county names that do appear as literal text in this
+#: file (Greenville, Dorchester, in prose) live only inside its module docstring, which
+#: _strip_comments_and_docstrings() removes before the match ever runs -- so none of the 20
+#: counties this module actually reads get credited this way. The blanket grep is NOT simply empty,
+#: though: its own `_ALREADY_LIVE_COVERED = frozenset({"York", "Charleston", "Beaufort"})` literal
+#: (the three counties this module deliberately EXCLUDES, since they stay on
+#: nc_heir_estate_parcels.py's live producer) sits in plain code, not a docstring, so the blanket
+#: grep over this file alone wrongly credits (NC, "Beaufort"), (SC, "Beaufort"), (SC, "Charleston")
+#: and (SC, "York") -- live-measured -- exactly the counties this module does NOT cover, while
+#: missing Greenville/Orangeburg/Dorchester/Jasper/Aiken/Greenwood (among others) that it DOES.
+#: _sc_heir_estate_parcel_cache_credit() calls the module's own _candidate_counties() directly --
+#: the exact same registry read the scraper itself uses to decide what to fetch -- instead of
+#: trusting the blanket grep either way.
+_SC_HEIR_ESTATE_PARCEL_CACHE_REL = "scrapers/counties_sc/sc_heir_estate_parcel_cache.py"
+
+
+def _sc_heir_estate_parcel_cache_credit() -> set[tuple[str, str]]:
+    """Precise (state, county) credit for the 'heir_estate' column from
+    sc_heir_estate_parcel_cache.py: every county its own _candidate_counties() resolves live from
+    parcel_cache's PARCEL_LAYERS/SC_DUAL_LAYERS registries (already excludes York/Charleston/
+    Beaufort, which stay on nc_heir_estate_parcels.py's live producer). Empty set if the module
+    (or parcel_cache) can't be imported, leaving the blanket grep's own (wrong-direction) credit
+    in place."""
+    try:
+        from foreclosure_scraper.scrapers.counties_sc import sc_heir_estate_parcel_cache as _shc
+    except Exception:  # noqa: BLE001 - a missing/broken module leaves the blanket grep in place
+        return set()
+    return {("SC", c) for c in _shc._candidate_counties()}  # noqa: SLF001 - the scraper's own registry read
+
+
+#: Same bug class again, in 'marriage_license''s own producers tuple (2026-10-19 wave3 follow-up).
+#: enrichment_county_lien_sweep.py (and the shared rod/county_sweeps.py it drives) is a real
+#: producer of raw['marriage_license'] -- SWEEP_COUNTIES["NC", "Beaufort"] carries a
+#: Job("marriage", ...) that stamps the exact shape checked_columns() recognizes -- but neither
+#: file was even listed as a producer for this column before this fix (SPECS only named
+#: enrichment_register_checks.py/rod/register_checks.py), under-crediting Beaufort's real built
+#: status. Adding the pair as a plain producers-tuple entry would reproduce the SAME text-grep bug
+#: these other helpers exist to fix: SWEEP_COUNTIES also names Orange/Stanly/Surry NC, Sumter/Oconee
+#: SC, and (via rod/county_sweeps.py's HOSTED_CCHS constant) 17 more NC counties, every one of them
+#: for the unrelated "lien" job only -- live-measured, a blanket grep over both files credits 24
+#: counties to marriage_license when exactly 1 (NC/Beaufort) is real.
+_COUNTY_LIEN_SWEEP_REL = frozenset({"enrichment_county_lien_sweep.py", "rod/county_sweeps.py"})
+
+
+def _county_lien_sweep_marriage_credit() -> set[tuple[str, str]]:
+    """Precise (state, county) credit for 'marriage_license' from enrichment_county_lien_sweep.py's
+    own SWEEP_COUNTIES registry: only a key whose Job tuple carries a kind=='marriage' entry counts
+    (today just NC/Beaufort), never the many other counties the same registry (or rod/
+    county_sweeps.py's own HOSTED_CCHS/platform-reader constants) names for the unrelated "lien"
+    job. Empty set if the module can't be imported."""
+    try:
+        from foreclosure_scraper import enrichment_county_lien_sweep as _cls
+    except Exception:  # noqa: BLE001 - a missing/broken module leaves this column's other credit in place
+        return set()
+    return {key for key, jobs in _cls.SWEEP_COUNTIES.items() if any(j.kind == "marriage" for j in jobs)}
+
+
 def built_in_code() -> dict[str, set[tuple[str, str]]]:
     pats = _county_patterns()
     out: dict[str, set[tuple[str, str]]] = {}
@@ -1608,6 +1682,28 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
         other_files = [PKG / f for f in vacant_spec.producers if f not in _VACANT_COHORT_REL]
         base = counties_named_in([f for f in other_files if f.exists()], pats) if other_files else set()
         out["vacant"] = base | _vacant_cohort_credit()
+    # heir_estate: sc_heir_estate_parcel_cache.py's dynamic-list refinement (see
+    # _SC_HEIR_ESTATE_PARCEL_CACHE_REL's own docstring) -- drop that one file's blanket (wrong-
+    # direction: it credits the 3 counties this module deliberately EXCLUDES, via its own
+    # _ALREADY_LIVE_COVERED literal, while missing the 20 it actually covers) name-match
+    # contribution and replace it with the registry-derived precise credit, keeping
+    # nc_heir_estate_parcels.py's and henderson_foreclosure_parcels.py's own text-grep credit for
+    # this column untouched.
+    heir_spec = SPECS.get("heir_estate")
+    if heir_spec and _SC_HEIR_ESTATE_PARCEL_CACHE_REL in heir_spec.producers:
+        other_files = [PKG / f for f in heir_spec.producers if f != _SC_HEIR_ESTATE_PARCEL_CACHE_REL]
+        base = counties_named_in([f for f in other_files if f.exists()], pats) if other_files else set()
+        out["heir_estate"] = base | _sc_heir_estate_parcel_cache_credit()
+    # marriage_license: same refinement for enrichment_county_lien_sweep.py/rod/county_sweeps.py
+    # (see _COUNTY_LIEN_SWEEP_REL's own docstring) -- drop that pair's blanket name-match
+    # contribution (24 counties, almost all from the unrelated "lien" job) and replace it with the
+    # precise marriage-job-only credit, keeping enrichment_register_checks.py's/rod/register_checks.py's
+    # own text-grep credit for this column untouched.
+    marriage_spec = SPECS.get("marriage_license")
+    if marriage_spec and _COUNTY_LIEN_SWEEP_REL & set(marriage_spec.producers):
+        other_files = [PKG / f for f in marriage_spec.producers if f not in _COUNTY_LIEN_SWEEP_REL]
+        base = counties_named_in([f for f in other_files if f.exists()], pats) if other_files else set()
+        out["marriage_license"] = base | _county_lien_sweep_marriage_credit()
     # marriage licenses: the Cott v4 tenants whose guest search carries a MARRIAGES index are read by
     # enrichment_register_checks (rod/register_checks.MARRIAGE_ADAPTER); the module names no county in text
     try:

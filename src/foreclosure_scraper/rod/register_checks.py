@@ -52,6 +52,9 @@ MARRIAGE_VERDICTS: dict[tuple[str, str], dict[str, str]] = {
                           "evidence": "Index Type list has MARRIAGES (MAR); marriage rows returned"},
     ("NC", "Rutherford"): {"verdict": "index", "via": "cott_mar",
                            "evidence": "Index Type list has MARRIAGES (MAR); marriage rows returned"},
+    ("NC", "Wayne"): {"verdict": "index", "via": "cott_mar",
+                      "evidence": "Index Type list has MARRIAGES (MAR) (2026-10-19, gap-matrix wave3 "
+                                  "follow-up; one live GET of SrchName.aspx, a name search was not run)"},
     ("NC", "Pitt"): {"verdict": "no_index",
                      "evidence": "guest search Index Type list (2026-10-09) has no marriage, birth or death index"},
     ("NC", "Polk"): {"verdict": "no_index",
