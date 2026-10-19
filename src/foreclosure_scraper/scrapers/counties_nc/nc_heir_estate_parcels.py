@@ -108,7 +108,18 @@ _STATEWIDE_CONCURRENCY = 10
 _MATCH_TOKENS = ("HEIR", "ESTATE")
 # SQL-level exclusions. Plural "ESTATES" + "REAL ESTATE" are almost always a
 # subdivision/HOA/brokerage, not a decedent; "LIFE ESTATE" is a living owner.
-_EXCLUDE = ("LIFE ESTATE", "REAL ESTATE", "ESTATES")
+#
+# 2026-10-19: "LIFE-ESTATE" (hyphen, no space) found live while sampling SC
+# parcel_cache owner columns for a new cache-based producer (sc_heir_estate_
+# parcel_cache.py). Greenville's cache spells it this way on 74 rows ("CLARK
+# LOTTIE B (LIFE-ESTATE)") and Hampton's on 2 -- the literal-substring
+# "LIFE ESTATE" (space) never matches a hyphen, so both slipped through as
+# false decedent hits (Greenville's corrected yield: 38, matching the ~40
+# already found and reported via a separate live check in
+# project_gap_matrix_sweep1_2026-10-18.md). Listed as its own entry rather
+# than loosening the "LIFE ESTATE" match to `LIFE.ESTATE` so the SQL-side
+# NOT LIKE clauses in `_where()` stay literal, simple substring checks.
+_EXCLUDE = ("LIFE ESTATE", "LIFE-ESTATE", "REAL ESTATE", "ESTATES")
 
 #: Rows read per county per run. Was a flat 80 with no order and no offset, so every run
 #: re-read the same arbitrary first 80 of ~10.9k matching parcels across the 19 county

@@ -112,3 +112,63 @@ def test_the_newly_caught_forms_reach_the_board_row(monkeypatch):
     assert a.raw["vacant_lot"]["land_use"] == "905 - VAC-RES-LOT"
     assert b.raw["vacant_lot"]["land_use"] == "ResVac Platted&Unplatted"
     assert st["stamped"] == 2
+
+
+# ----------------------------------------------------------------- the 2026-10-19 fix
+# Horry's land_use is a bare numeric DOR code ("101", "300", ...) with no published
+# legend (checked live) -- the text matcher above can never read it. Fall back to the
+# layer's own improvement-dollar-value field (live-verified correlation: 2026-10-19
+# memory) when the cache maps one.
+
+def test_numeric_land_use_with_zero_improvement_value_is_stamped_vacant(monkeypatch):
+    patch(monkeypatch, {"8": {"land_use": "100", "improvement_value": 0.0,
+                               "market_value": 141150.0}})
+    r = li(parcel="8")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw["vacant_lot"] == {"land_use": "100", "improvement_value": 0,
+                                    "source": "parcel_cache_improvement_value"}
+    assert r.land_use is None  # the bare code itself is still never written to land_use
+    assert st["stamped"] == 1 and st["stamped_by_improvement_value"] == 1
+
+
+def test_numeric_land_use_with_nonzero_improvement_value_is_marked_improved_not_vacant(monkeypatch):
+    patch(monkeypatch, {"9": {"land_use": "101", "improvement_value": 76326.0,
+                               "market_value": 225205.0}})
+    r = li(parcel="9")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None  # never stamped vacant
+    assert r.land_use == "Improved"  # still recorded as checked
+    assert st["stamped"] == 0 and st.get("stamped_by_improvement_value", 0) == 0
+
+
+def test_numeric_land_use_without_a_mapped_improvement_value_field_stays_silent(monkeypatch):
+    """A county whose cache maps land_use but NOT improvement_value (every SC county
+    today except Horry) must never guess -- no stamp, no land_use text, nothing."""
+    patch(monkeypatch, {"10": {"land_use": "300", "market_value": 90000.0}})
+    r = li(parcel="10")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None and r.land_use is None
+    assert st["stamped"] == 0
+
+
+def test_numeric_land_use_with_improvement_value_but_no_other_signal_stays_silent(monkeypatch):
+    """A degenerate/blank cache row (no market_value, no acreage) never gets a verdict
+    even if improvement_value happens to be 0 -- that 0 could just be a missing field,
+    not a real reading."""
+    patch(monkeypatch, {"11": {"land_use": "100", "improvement_value": 0.0}})
+    r = li(parcel="11")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None and r.land_use is None
+    assert st["stamped"] == 0
+
+
+def test_a_real_text_land_use_that_merely_does_not_match_vac_is_never_reinterpreted(monkeypatch):
+    """Only a BARE DIGIT land_use engages the improvement-value fallback -- real text
+    that failed the VACANT/VAC wordlist (a land-use category this regex just doesn't
+    cover yet) must not silently get reclassified through a different signal."""
+    patch(monkeypatch, {"12": {"land_use": "SINGLE FAMILY RES", "improvement_value": 0.0,
+                                "market_value": 50000.0}})
+    r = li(parcel="12")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None
+    assert st["stamped"] == 0

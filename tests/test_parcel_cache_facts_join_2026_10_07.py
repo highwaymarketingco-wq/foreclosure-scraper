@@ -110,7 +110,9 @@ def test_ensure_columns_adds_missing_columns_in_place(tmp_path):
     con = sqlite3.connect(p)
     added = pc.ensure_columns(con)
     con.commit(); con.close()
-    assert set(added) == {"year_built", "bedrooms", "bathrooms", "stories"}
+    # 2026-10-19: improvement_value joined the schema (parcel_cache.py's own comment on
+    # _COLS) -- this test's old fixture predates it, so a fresh migration adds it too.
+    assert set(added) == {"year_built", "bedrooms", "bathrooms", "stories", "improvement_value"}
     con = sqlite3.connect(p)
     assert pc.ensure_columns(con) == []                    # idempotent
     con.close()

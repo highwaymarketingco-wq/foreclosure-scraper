@@ -776,6 +776,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.nc_ecourts_estates",            # NC eCourts estate filings (no sale date)
     "counties_nc.nc_ecourts_divorce",            # NC eCourts divorce filings (no sale date)
     "counties_nc.nc_heir_estate_parcels",        # heir/estate owner-of-record parcels (GIS, dateless)
+    "counties_sc.sc_heir_estate_parcel_cache",   # SC heir/estate owner-of-record, parcel_cache-read (dateless)
     "counties_sc.spartanburg_vacant",            # Spartanburg City vacant registry (absentee+vacant, dateless)
     "counties_sc.spartanburg_condemned",         # Spartanburg condemned/dilapidated CAMA-condition signal (dateless)
     "counties_nc.asheville_str_permits",         # Asheville lapsed STR/homestay permits (motivated landlord, dateless)

@@ -245,7 +245,10 @@ PARCEL_LAYERS: dict[str, dict] = {
                 # tax_value*1.25 ARV fallback price Horry parcels at a fraction of worth (audit 2026-09-21)
                 "market_value": "MarketProp",
                 "acreage": "Acreage", "land_use": "LandUseCode",
-                "sale_date": "SaleDate"},
+                "sale_date": "SaleDate",
+                # 2026-10-19: see _COLS's comment above -- LandUseCode is a bare numeric
+                # DOR code, so this value field is the vacant/improved signal instead.
+                "improvement_value": "MarketImprv"},
         # 2026-09-21: the parcel layer above has NO situs field, so horry.sqlite (765,736
         # index rows) held zero addresses and Horry leads sat at 41% address. Layer 22
         # "Addresses" on the SAME service is one point per unit (242,675 points; PIN is a
@@ -838,11 +841,27 @@ for _county, _facts in FACT_MAPS.items():
 # them away for lack of a column (docs/new_sources_2026-10-07_contact_and_facts.md). Old cache
 # files without these columns stay readable: lookup_with_tier selects only the columns a file
 # has (migration on read), and ensure_columns() adds them in place when a writer needs them.
+#: 2026-10-19: `improvement_value`. Horry's land_use field (LandUseCode) is a raw
+#: numeric DOR code ("101", "300"...), not text, so enrichment_vacant_landuse.py's
+#: VACANT/VAC text matcher can never read it (confirmed live: 167 distinct codes,
+#: no published legend found anywhere -- county site, SC DOR, ArcGIS field domains
+#: all checked). The SAME layer already carries the improvement-dollar-value field
+#: (MarketImprv) the cache was just never selecting: live-verified strong
+#: correlation between zero improvement value and genuinely vacant land across
+#: every sampled code (100: 99.5% zero-improvement, 300/500/600/700: 96-98%
+#: zero-improvement; 101/107, the two largest improved-residential codes: <2%
+#: zero-improvement) -- but the CODE NUMBER alone is not reliably a vacant/improved
+#: split (113/115/121/134 are mostly-vacant subtypes despite not ending "00"; 109/
+#: 112/119/122 are mostly-improved despite also not ending "00"), so this real
+#: dollar-value field is used as the ground truth instead of guessing what each
+#: numeric code means. General-purpose (not Horry-specific): any county whose
+#: `land_use` is a bare digit string gets this treatment in
+#: enrichment_vacant_landuse.py if (and only if) its layer maps this column too.
 _COLS = ("owner", "address", "owner_mailing", "market_value", "tax_value", "acreage",
          "living_sqft", "land_use", "sale_price", "sale_date",
-         "year_built", "bedrooms", "bathrooms", "stories")
+         "year_built", "bedrooms", "bathrooms", "stories", "improvement_value")
 _NUMERIC = {"market_value", "tax_value", "acreage", "living_sqft",
-            "year_built", "bedrooms", "bathrooms", "stories"}
+            "year_built", "bedrooms", "bathrooms", "stories", "improvement_value"}
 #: SQLite type of each schema column (sale_price has always been REAL).
 _COL_TYPES = {c: ("REAL" if c in _NUMERIC or c == "sale_price" else "TEXT") for c in _COLS}
 #: The table DDL, built from _COLS so a new column cannot be added to one and not the other.

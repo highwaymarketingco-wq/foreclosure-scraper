@@ -62,7 +62,7 @@ def _has_cache(memo: dict, county: str, state: str | None) -> bool:
 
 def enrich_vacant_landuse(listings: Iterable[Listing]) -> dict:
     memo: dict = {}
-    stats = {"eligible": 0, "stamped": 0, "land_use_filled": 0}
+    stats = {"eligible": 0, "stamped": 0, "land_use_filled": 0, "stamped_by_improvement_value": 0}
     for li in listings:
         pid = (li.parcel_id or "").strip()
         county = (li.county or "").strip()
@@ -87,14 +87,47 @@ def enrich_vacant_landuse(listings: Iterable[Listing]) -> dict:
             if clean and not clean.isdigit():
                 li.land_use = clean.title() if clean.isupper() else clean
                 stats["land_use_filled"] = stats.get("land_use_filled", 0) + 1
-        if not _is_vacant_land_use(str(lu)):
+        if _is_vacant_land_use(str(lu)):
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            # idempotent — don't re-stamp on a re-run
+            if not li.raw.get("vacant_lot"):
+                li.raw["vacant_lot"] = {"land_use": str(lu).strip()[:60], "source": "parcel_cache_landuse"}
+                stats["stamped"] += 1
             continue
-        if not isinstance(li.raw, dict):
-            li.raw = {}
-        # idempotent — don't re-stamp on a re-run
-        if not li.raw.get("vacant_lot"):
-            li.raw["vacant_lot"] = {"land_use": str(lu).strip()[:60], "source": "parcel_cache_landuse"}
+        # 2026-10-19: a BARE NUMERIC land_use (Horry's DOR code, "101"/"300"/...) never
+        # matches the text regex above and never has a published legend (checked live --
+        # see parcel_cache.py's improvement_value comment). Fall back to the layer's own
+        # improvement-dollar-value field when the cache maps one: zero/no improvement
+        # value on a real parcel (acreage or market value present, so this is not a
+        # blank/degenerate row) is the same "no structure built" signal this project
+        # already uses elsewhere for vacant LAND (see the vacant/condemned investigation's
+        # Lincoln/Buncombe note), just read from a dollar field instead of a text flag.
+        # Only engages when land_use is ALL DIGITS -- a real text land_use that merely
+        # didn't match the VACANT/VAC wordlist is left alone, not silently reinterpreted.
+        if not str(lu).strip().isdigit():
+            continue
+        imprv = (rec or {}).get("improvement_value")
+        has_other_signal = (rec or {}).get("market_value") or (rec or {}).get("acreage")
+        if imprv is None or not has_other_signal:
+            continue  # no determinate reading -- stay silent, don't guess
+        if isinstance(li.raw, dict) and li.raw.get("vacant_lot"):
+            continue
+        if float(imprv) == 0.0:
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["vacant_lot"] = {"land_use": str(lu).strip()[:60],
+                                     "improvement_value": 0,
+                                     "source": "parcel_cache_improvement_value"}
             stats["stamped"] += 1
+            stats["stamped_by_improvement_value"] += 1
+        # improved (imprv > 0): genuinely not a vacant lot. Still record that this row
+        # WAS checked (same "a healthy screen that found nothing is still a check"
+        # convention gis_fill.py already uses elsewhere) so it reads correctly as
+        # improved rather than unchecked.
+        elif not (getattr(li, "land_use", None) or "").strip():
+            li.land_use = "Improved"
+            stats["land_use_filled"] = stats.get("land_use_filled", 0) + 1
     if stats["stamped"] or stats["land_use_filled"]:
         log.info("vacant_landuse.done", **stats)
     return stats
