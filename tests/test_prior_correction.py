@@ -162,15 +162,61 @@ def test_cama_and_assessor_card_go_though_they_name_no_parcel_field():
     # measured live on the 10/16 board (Anderson, 446 rows at the courthouse seat point):
     # raw['cama'] = {"previous_owner": "N/A"} survived this same withdrawal untouched, because
     # it carries no parcel/PIN key names_parcel() can match (audit 2026-10-18,
-    # block-binding-family-gis/-deed-sale).
+    # block-binding-family-gis/-deed-sale). 'tenure' is derived from exactly the same cama/gis
+    # last-sale fields (enrichment_tenure._last_sale_year) and goes too (audit 2026-10-18,
+    # pipeline-tenure-from-sale's 28-row Buncombe/Anderson "tenure from another sale" chunk).
     li = _seat_row(raw={"cama": {"previous_owner": "N/A"},
                         "assessor_card": {"source_url": "https://x.invalid", "sale_price": 1.0},
                         "condition_cama": {"condition_tier": "cosmetic"},
-                        "last_sale": {"date": "2019-01-01", "amount": 5000.0, "basis": "recorded_sale"}})
+                        "last_sale": {"date": "2019-01-01", "amount": 5000.0, "basis": "recorded_sale"},
+                        "tenure": {"years_held": 29, "long_tenure": True}})
     a = pc.withdraw_fallback_parcel(li, pc.Counter(), 8, FakeCache({}))
-    for k in ("cama", "assessor_card", "condition_cama", "last_sale"):
+    for k in ("cama", "assessor_card", "condition_cama", "last_sale", "tenure"):
         assert k not in li.raw
-    assert {"cama", "assessor_card", "condition_cama", "last_sale"} <= set(a["raw_removed"])
+    assert {"cama", "assessor_card", "condition_cama", "last_sale", "tenure"} <= set(a["raw_removed"])
+
+
+def test_reconcile_catches_up_a_row_withdrawn_before_tenure_joined_the_block_set():
+    # live shape, pseudonymized (2026-10-16 board, Anderson courthouse point 34.5034,-82.6501,
+    # 446 rows sharing it): parcel_id is already None (withdrawn on an earlier run), FALLBACK_KEY
+    # is already on the row, but raw['cama'] / raw['tenure'] are still the withdrawn parcel's stale
+    # last-sale data -- withdraw_fallback_parcel() can never re-fire here (fallback_reason() needs
+    # li.parcel_id, which this same withdrawal unconditionally cleared), so only
+    # reconcile_withdrawn_blocks() can still catch it up.
+    li = _li(county="Anderson", state="SC", parcel_id=None, latitude=34.5034, longitude=-82.6501,
+             raw={pc.FALLBACK_KEY: {"parcel_id": "1233020001", "reason": "shared_point",
+                                    "point": [34.5034, -82.6501], "rows_at_point": 446,
+                                    "parcel_from_geo": None, "cleared": {}, "raw_removed": ["owner_mailing"]},
+                 "cama": {"last_sale_date": "1997-01-01", "last_sale_amount": 1.0,
+                          "deed_ref": "2582/183", "previous_owner": "PRACHT JOHN C JR"},
+                 "tenure": {"years_held": 13, "long_tenure": True}})
+    assert pc.withdraw_fallback_parcel(li, pc.Counter(), 8, FakeCache({})) is None  # no-op: no parcel_id
+    removed = pc.reconcile_withdrawn_blocks(li)
+    assert set(removed) == {"cama", "tenure"}
+    assert "cama" not in li.raw and "tenure" not in li.raw
+    assert li.raw[pc.FALLBACK_KEY]["reconciled_removed"] == ["cama", "tenure"]
+    # idempotent: nothing left to remove on a second pass
+    assert pc.reconcile_withdrawn_blocks(li) == []
+
+
+def test_reconcile_is_a_noop_without_an_existing_fallback_key():
+    li = _li(county="Anderson", state="SC", raw={"cama": {"previous_owner": "N/A"}})
+    assert pc.reconcile_withdrawn_blocks(li) == []
+    assert li.raw == {"cama": {"previous_owner": "N/A"}}
+
+
+def test_correct_prior_rows_reconciles_an_already_withdrawn_row_and_reports_it():
+    li = _li(county="Anderson", state="SC", parcel_id=None, latitude=34.5034, longitude=-82.6501,
+             raw={pc.FALLBACK_KEY: {"parcel_id": "1233020001", "reason": "shared_point",
+                                    "point": [34.5034, -82.6501], "rows_at_point": 446,
+                                    "parcel_from_geo": None, "cleared": {}, "raw_removed": ["owner_mailing"]},
+                 "cama": {"previous_owner": "N/A"},
+                 "tenure": {"years_held": 29, "long_tenure": True}})
+    stats = pc.correct_prior_rows([li], cache=FakeCache({}))
+    assert "cama" not in li.raw and "tenure" not in li.raw
+    assert stats["fallback_reconciled_rows"] == 1
+    assert stats["fallback_reconciled_fields"] == {"cama": 1, "tenure": 1}
+    assert stats["fallback_withdrawn"] == 0  # nothing FRESH withdrawn this call
 
 
 def test_resolver_does_not_reattach_at_the_same_point():

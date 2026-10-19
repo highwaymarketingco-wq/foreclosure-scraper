@@ -245,7 +245,15 @@ _PHOTO_BLOCKS = ("images", "zillow", "vision", "vision_fetch_failed")
 #: {"previous_owner": "N/A"} on 446 Anderson rows, no field names_parcel() could ever catch).
 #: Once this function has decided the row's point parcel is a fallback and withdrawn it, nothing
 #: else on the row could have produced these -- removed whole unconditionally, not by matching.
-_PARCEL_ONLY_BLOCKS = frozenset({"cama", "cama_specs", "condition_cama", "assessor_card", "last_sale"})
+#: 'tenure' (audit 2026-10-18, pipeline-tenure-from-sale 28-row Buncombe/Anderson chunk): it is
+#: PURELY DERIVED from cama/gis last-sale fields (enrichment_tenure._last_sale_year reads the exact
+#: same raw['cama']/raw['gis']['last_sale'] paths this withdrawal clears) and carries no parcel/PIN
+#: field of its own either -- live-measured on the 10/16 board, 24 Anderson + 3 Buncombe + 1
+#: Spartanburg rows at the Anderson courthouse fallback point (34.5034,-82.6501, 446 rows sharing
+#: it) still carry a raw['tenure'] computed from the withdrawn parcel's stale last-sale year (most
+#: commonly 1997 -> years_held 29), left behind by this same withdrawal gap.
+_PARCEL_ONLY_BLOCKS = frozenset({"cama", "cama_specs", "condition_cama", "assessor_card", "last_sale",
+                                 "tenure"})
 #: owner_mailing.source values that mean "read from a parcel layer" (repair_parcel_from_address).
 _PARCEL_MAILING_SOURCES = frozenset({None, "", "county_gis", "nc_onemap", "scdot_sc", "sc_assessor_roll",
                                      "county_tax_roll", "henderson_county_gis"})
@@ -859,6 +867,42 @@ def withdraw_fallback_parcel(li: Listing, point_counts: Counter, min_rows: int,
     raw[FALLBACK_KEY] = audit
     li.raw = raw
     return audit
+
+
+def reconcile_withdrawn_blocks(li: Any) -> list[str]:
+    """Catch-up pass for a row withdraw_fallback_parcel() ALREADY ran on, on an earlier call or an
+    earlier run (raw[FALLBACK_KEY] is already a dict): strip any current _PARCEL_ONLY_BLOCKS member
+    that is still present.
+
+    withdraw_fallback_parcel() only even LOOKS at a row when fallback_reason() finds one, which
+    requires li.parcel_id to be truthy (recorded_point() + the parcel-id check at the top of
+    fallback_reason()) -- but withdraw_fallback_parcel() itself unconditionally sets
+    li.parcel_id = None at the end of a withdrawal. So a row this function withdrew on a PAST call
+    can never satisfy fallback_reason() again: adding a new name to _PARCEL_ONLY_BLOCKS (as 'tenure'
+    was, audit 2026-10-18) only ever clears it on a FRESH withdrawal, never on one already on the
+    board -- live-measured on the 10/16 board: raw['cama'] = {"previous_owner": "N/A"} (446 Anderson
+    rows) and full stale cama+tenure blocks (28 Buncombe/Anderson/Spartanburg rows, pipeline-
+    tenure-from-sale's own "tenure from another sale" violation) both sit on rows that already carry
+    FALLBACK_KEY from a run before their block was added here, and neither will ever self-heal
+    through withdraw_fallback_parcel() alone. This function needs no new detection: FALLBACK_KEY's
+    presence IS the row's own prior, positive finding that its point-matched parcel was a fallback,
+    so any _PARCEL_ONLY_BLOCKS member still on the row could ONLY have come from that same
+    withdrawn match (the same unconditional reasoning withdraw_fallback_parcel() itself uses for
+    this block set) and is safe to remove on sight, independent of the current (now permanently
+    None) li.parcel_id."""
+    raw = _raw(li)
+    if not isinstance(raw.get(FALLBACK_KEY), dict):
+        return []
+    removed = [k for k in _PARCEL_ONLY_BLOCKS if raw.get(k)]
+    if not removed:
+        return []
+    for k in removed:
+        raw.pop(k, None)
+    audit = dict(raw[FALLBACK_KEY])
+    audit["reconciled_removed"] = sorted(set(audit.get("reconciled_removed") or []) | set(removed))
+    raw[FALLBACK_KEY] = audit
+    li.raw = raw
+    return removed
 
 
 # --------------------------------------------------------- 2. owner mailing as the address
@@ -1786,6 +1830,8 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
     c4_by: Counter = Counter()
     c4_fields: Counter = Counter()
     c6: Counter = Counter()
+    c7_fields: Counter = Counter()
+    c7_rows = 0
     samples: dict = defaultdict(list)
     errors = 0
     keys = candidate_points(listings)
@@ -1813,6 +1859,16 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
                         if len(samples["fallback"]) < sample:
                             samples["fallback"].append((str(li.source).split(".")[-1], county_name(li.county),
                                                         a1["parcel_id"], a1["reason"], sorted(a1["cleared"])))
+                # catch-up for a row withdrawn on an EARLIER run/call: fallback_reason() (inside
+                # withdraw_fallback_parcel() above) needs li.parcel_id, which that same withdrawal
+                # unconditionally cleared, so it can never re-fire here -- this is the only path
+                # that still reconciles a _PARCEL_ONLY_BLOCKS member added after that (e.g. 'tenure',
+                # audit 2026-10-18) against a row the board already carries FALLBACK_KEY for.
+                reconciled = reconcile_withdrawn_blocks(li)
+                if reconciled:
+                    c7_rows += 1
+                    for k in reconciled:
+                        c7_fields[k] += 1
                 a4 = withdraw_name_derived_county(li, point_counts, min_rows, cache)
                 if a4 is not None:
                     if "skip" in a4:
@@ -1870,6 +1926,8 @@ def correct_prior_rows(listings: list[Listing], cache: Optional[CacheReader] = N
         "fallback_top_parcels": c1_parcels.most_common(8),
         "fallback_fields_cleared": dict(c1_fields.most_common()),
         "fallback_by_source_county": {f"{s}|{c}": n for (s, c), n in c1_by.most_common(15)},
+        "fallback_reconciled_rows": c7_rows,
+        "fallback_reconciled_fields": dict(c7_fields.most_common()),
         "mailing_corrected": c2.get("definite", 0) + c2.get("likely", 0),
         "mailing_by_class": dict(c2),
         "mailing_by_source_county": {f"{s}|{c}|{k}": n for (s, c, k), n in c2_by.most_common(20)},
