@@ -339,8 +339,98 @@ def test_counties_named_in(tmp_path):
     f = tmp_path / "x.py"
     f.write_text('LAYERS = {"buncombe": 1}\n# Polk County roster\nslug = "henderson_vacant"\nunion_all = 1\n')
     got = gm.counties_named_in([f])
-    assert {("NC", "Buncombe"), ("NC", "Polk"), ("NC", "Henderson")} <= got
+    assert {("NC", "Buncombe"), ("NC", "Henderson")} <= got
     assert ("NC", "Union") not in got and ("SC", "Union") not in got
+    # "# Polk County roster" is a COMMENT, not real producer code -- see
+    # test_counties_named_in_ignores_comments_and_docstrings below for why this no longer counts.
+    assert ("NC", "Polk") not in got
+
+
+def test_counties_named_in_ignores_comments_and_docstrings(tmp_path):
+    """2026-10-19: a live audit of built_in_code()'s real output found 47 (county, column) credit
+    pairs across 21 columns whose ONLY textual evidence anywhere in the producer file was a
+    comment or docstring -- never real code -- e.g. a rejection note ("Gaston Blight Problems:
+    live, 0 rows"), a name-parsing docstring example ('MICHAEL LEE ABSHER' -> 'LEE'), or an aside
+    comparing one file's style to another's ("same spirit as nc_rowan_cott.py's"). None of the 47
+    were legitimate; stripping comments/docstrings before matching removes exactly those 47 and
+    adds zero new matches anywhere in the real codebase (verified against the live SPECS/producer
+    set, not just this synthetic file)."""
+    f = tmp_path / "y.py"
+    f.write_text(
+        '"""Module docstring mentioning Transylvania County as an example, not real coverage."""\n'
+        '# Catawba County: rejected, 0 rows ever returned\n'
+        'def helper():\n'
+        '    """'"'"'JOHN LEE SMITH'"'"' -> '"'"'LEE'"'"' (a middle-name docstring example).\n'
+        '    Also mentions Wake in prose, not code."""\n'
+        '    return 1\n'
+        'COUNTIES = {"mecklenburg": True}  # a real, active registry entry\n'
+    )
+    got = gm.counties_named_in([f])
+    assert ("NC", "Mecklenburg") in got, "a real code entry (not a comment) must still match"
+    for st, n in [("NC", "Transylvania"), ("NC", "Catawba"), ("NC", "Lee"), ("SC", "Lee"), ("NC", "Wake")]:
+        assert (st, n) not in got, f"{(st, n)} only ever appeared in a comment/docstring"
+
+
+def test_strip_comments_and_docstrings_keeps_real_string_literals():
+    """The blanking must only ever remove COMMENT tokens and bare/docstring STRING statements --
+    never a string literal that is actually part of the running code (a tuple/set/dict element,
+    a function argument, an f-string), since those are exactly the real-coverage signal this
+    function must keep matching."""
+    src = (
+        '# a comment naming Rowan\n'
+        '"""module docstring naming Transylvania"""\n'
+        'TOWNS = ("Moore", "Woodruff")  # Spartanburg-metro towns, not the real Moore County\n'
+        'def f(county="Gaston"):\n'
+        '    return county\n'
+    )
+    stripped = gm._strip_comments_and_docstrings(src)
+    assert "Rowan" not in stripped
+    assert "Transylvania" not in stripped
+    assert '"Moore"' in stripped and '"Gaston"' in stripped  # real code, must survive
+
+
+def test_built_in_code_known_false_positives_not_silently_fixed():
+    """2026-10-19 audit of built_in_code()'s real output against the actual producer files:
+    comment-stripping (the two tests above) fixes the jail_booking Lee NC/SC false positive (a
+    name-parsing docstring example in scrapers/national/jail_bookings.py) and, as a bonus, a
+    previously-known Gaston/condemned rejection-comment false positive. It does NOT fix three
+    other confirmed false positives below, because each is a match inside REAL CODE (a string
+    literal in a collection of place names that happens to share a name with an unrelated county),
+    which would need per-file semantic knowledge of what the collection represents -- something
+    this text-grep approach has no way to determine without a fragile, unvalidated per-file
+    allowlist. This test pins down the exact mechanism so it can't silently regress further or get
+    "fixed" by accident without the fix being deliberate and re-validated against the 1,676 other
+    (county, column) pairs that currently rely on this same function:
+      - condemned still credits ('NC', 'Moore') via scrapers/counties_sc/spartanburg_condemned.py's
+        `_local` set of Spartanburg-metro SC town names (includes the real town "Moore, SC",
+        zero relation to Moore County, NC).
+      - condemned still credits ('NC', 'Davidson') via
+        scrapers/city_websites/charlotte_open_data.py's `_MUNICIPALITIES` tuple of
+        Mecklenburg-metro town names (includes the town of Davidson, NC, zero relation to
+        Davidson County, NC).
+      - jail_booking still credits ('NC', 'Cherokee') via scrapers/national/jail_bookings.py's own,
+        genuinely real `("SC", "Cherokee", "zuercher", "cherokee-so-sc")` adapter-registry entry --
+        a real SC Cherokee producer exists, but the regex is state-blind (it only checks whether
+        the literal word "Cherokee" appears, not which state tuple it's paired with), so it also
+        credits NC's unrelated Cherokee County with the same real entry.
+    """
+    condemned_files = [gm.PKG / f for f in gm.SPECS["condemned"].producers if (gm.PKG / f).exists()]
+    jail_files = [gm.PKG / f for f in gm.SPECS["jail_booking"].producers if (gm.PKG / f).exists()]
+    condemned_counties = gm.counties_named_in(condemned_files)
+    jail_counties = gm.counties_named_in(jail_files)
+
+    assert ("NC", "Moore") in condemned_counties, (
+        "known-unfixed: 'MOORE' the Spartanburg SC town, in spartanburg_condemned.py's town set"
+    )
+    assert ("NC", "Davidson") in condemned_counties, (
+        "known-unfixed: 'DAVIDSON' the Mecklenburg-metro town, in charlotte_open_data.py's town tuple"
+    )
+    assert ("NC", "Cherokee") in jail_counties, (
+        "known-unfixed: cross-state leak from jail_bookings.py's real SC Cherokee registry entry"
+    )
+    # the two FPs comment-stripping DOES fix must stay fixed
+    assert ("NC", "Lee") not in jail_counties and ("SC", "Lee") not in jail_counties
+    assert ("NC", "Gaston") not in condemned_counties
 
 
 def test_read_baseline_maps_unknown(tmp_path):

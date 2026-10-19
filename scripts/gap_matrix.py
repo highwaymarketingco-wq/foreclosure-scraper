@@ -41,11 +41,13 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import io
 import json
 import re
 import statistics
 import sys
 import time
+import tokenize
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
@@ -1404,16 +1406,68 @@ def _county_patterns() -> list[tuple[str, str, re.Pattern]]:
     return out
 
 
+def _blank_span(buf: list[str], src_lines: list[str], start: tuple[int, int], end: tuple[int, int]) -> None:
+    """Overwrite buf's characters spanning tokenize (row, col) start/end with spaces, leaving
+    line/col positions (and thus every other token's position) untouched."""
+    row0, col0 = start
+    row1, col1 = end
+    off0 = sum(len(ln) for ln in src_lines[: row0 - 1]) + col0
+    off1 = sum(len(ln) for ln in src_lines[: row1 - 1]) + col1
+    for i in range(off0, off1):
+        if buf[i] != "\n":
+            buf[i] = " "
+
+
+def _strip_comments_and_docstrings(src: str) -> str:
+    """Blank out COMMENT tokens and bare/docstring STRING statements (a STRING token that is a
+    whole statement on its own -- a module/class/function docstring, or any other orphaned
+    string-literal statement), keeping every other character -- including string literals that
+    are actually part of a data structure (a tuple/set/dict entry, a default argument, an f-string
+    concatenation) -- exactly where it was, so line/column offsets for every remaining token are
+    unchanged. A county name that only ever appears in a comment or a docstring example is never
+    real producer coverage: 2026-10-19 audit found 47 (county, column) credits -- including 4
+    reported false positives (Lee NC/SC via a name-parsing docstring example in jail_bookings.py,
+    plus a previously-known Gaston/condemned rejection-comment false positive) -- that vanish under
+    this filter and ZERO new matches appear, confirming it only ever removes spurious credit."""
+    try:
+        toks = list(tokenize.generate_tokens(io.StringIO(src).readline))
+    except (tokenize.TokenizeError, SyntaxError, IndentationError):
+        return src  # a file that doesn't even tokenize: fall back to the raw, unstripped text
+    buf = list(src)
+    lines = src.splitlines(keepends=True)
+    prev_significant = tokenize.NEWLINE  # file start counts as "after a statement boundary"
+    for tok in toks:
+        toktype, _tokstr, start, end, _line = tok
+        if toktype == tokenize.COMMENT:
+            _blank_span(buf, lines, start, end)
+        elif toktype == tokenize.STRING and prev_significant in (
+            tokenize.NEWLINE, tokenize.NL, tokenize.INDENT, tokenize.ENCODING,
+        ):
+            # a STRING immediately after a statement boundary with nothing else on the logical
+            # line is a bare string statement (the universal docstring shape) -- not a tuple/set/
+            # dict element or a function argument, which would instead follow '(' / ',' / '=' / '['
+            _blank_span(buf, lines, start, end)
+        if toktype not in (tokenize.COMMENT, tokenize.NL, tokenize.INDENT, tokenize.DEDENT):
+            prev_significant = toktype
+    return "".join(buf)
+
+
 def counties_named_in(paths: Iterable[Path], pats=None) -> set[tuple[str, str]]:
     """(state, county) pairs a set of source files name (quoted, in a slug/filename, or as
     'X County'). A county name shared by both states (Union, Cherokee, Lee, Beaufort) counts for
-    both: a grep cannot tell them apart."""
+    both: a grep cannot tell them apart. Comments and docstrings are stripped first (see
+    `_strip_comments_and_docstrings`) so an illustrative example or an unrelated aside doesn't
+    manufacture false coverage credit -- this does NOT catch every false positive (a real county
+    name belonging to a same-named city/town/person inside actual code, e.g. a town list, still
+    matches; that needs per-file semantic knowledge this grep doesn't have and isn't attempted
+    here), only ones whose only textual evidence was a comment or docstring."""
     pats = pats or _county_patterns()
     found: set[tuple[str, str]] = set()
     for p in paths:
         try:
             rel = str(p.relative_to(PKG)) if p.is_relative_to(PKG) else p.name
-            text = "/" + rel.lower() + "\n" + p.read_text(errors="ignore")
+            raw = p.read_text(errors="ignore")
+            text = "/" + rel.lower() + "\n" + _strip_comments_and_docstrings(raw)
         except OSError:
             continue
         for st, n, rx in pats:
