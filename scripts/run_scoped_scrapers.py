@@ -216,7 +216,17 @@ def filter_like_orchestrator(listings, horizon_days: int, extra_dateless: Iterab
 # --------------------------------------------------------------------------- #
 
 _KEY_FIELDS = ("state", "county", "parcel_id", "street_address", "zip_code", "case_number",
-               "source_url", "listing_type")
+               "source_url", "listing_type",
+               # dedupe._strong_sigs picked up a dependency on li.source/li.raw on 2026-10-18
+               # (commit aaafe924, the roll-record-copies fix) that this script's own lightweight
+               # model_construct() of a dict board row was never updated for -- a bare dict board
+               # row has no "listing_type" either without this, but that one already worked
+               # because Listing.model_construct() leaves it None and _strong_sigs tolerates that;
+               # "source" and "raw" have no such tolerance (own_source_parcel_value(li.raw,
+               # li.source) raises AttributeError the instant either is unset by model_construct,
+               # which only sets fields it was actually given -- confirmed live 2026-10-19 running
+               # this script against the real split board for the first time since that commit).
+               "source", "raw")
 
 
 def _sigs_of(li) -> set:
