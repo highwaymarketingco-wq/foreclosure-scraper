@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-10-19T21:49:58.079916Z",
-  "total": 447004,
+  "run_time": "2026-10-19T22:27:56.570246Z",
+  "total": 447006,
   "by_source": {
     "national.auction_bank_reo": 3,
     "national.bankruptcy_rss_relief_from_stay": 14,
@@ -238,7 +238,7 @@
   },
   "by_state": {
     "NC": 322481,
-    "SC": 124523
+    "SC": 124525
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 52408,
@@ -260,7 +260,7 @@
     "counties_nc.nc_ecourts_lis_pendens.judgment_lien": 7693,
     "counties_generic.state_contamination.nc_dam_safety": 7609,
     "counties_sc.sc_public_index": 6573,
-    "counties_sc.sc_heir_estate_parcel_cache": 6058,
+    "counties_sc.sc_heir_estate_parcel_cache": 6060,
     "liensnc": 5402,
     "city_websites.charlotte_open_data": 5196,
     "counties_nc.nc_ecourts_divorce": 5139,
@@ -511,13 +511,13 @@
     "counties_sc.berkeley_paystar_tax: got 25, expected ≥ 500"
   ],
   "errors": null,
-  "notes": "scoped scraper landing: +6060 rows, existing rows untouched",
-  "detail_count": 447004,
-  "detail_digest": "3918a168e7141e01",
+  "notes": "scoped scraper landing: +4 rows, existing rows untouched",
+  "detail_count": 447006,
+  "detail_digest": "c8eca2749add8b74",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 25,
-    "records": 447004,
+    "records": 447006,
     "max_bytes": 25165824,
     "rows_per_part": 11500,
     "files": [
@@ -716,10 +716,10 @@
       {
         "name": "listings_part_024.json.gz",
         "start": 441877,
-        "end": 447004,
-        "records": 5127,
-        "bytes": 582129,
-        "sha256": "f1d84aa79ca78143060d61e8d1e12eeeba6e8e76b40c929fb552208b49e8e514"
+        "end": 447006,
+        "records": 5129,
+        "bytes": 582522,
+        "sha256": "797235e9e2b4295e35ea249da6d81bd258e1bdea2ac03f99ae2e455f69153e59"
       }
     ]
   },
@@ -735,7 +735,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 73.42,
+  "health_age_hours": 74.05,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",

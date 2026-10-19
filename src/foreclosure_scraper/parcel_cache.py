@@ -818,6 +818,30 @@ PARCEL_LAYERS["Orangeburg"] = {
             "acreage": "CalculatedAcres"},
 }
 
+#: GEORGETOWN SC, added 2026-10-19 (heir_estate parcel_cache extension -- see
+#: scrapers/counties_sc/sc_heir_estate_parcel_cache.py's module docstring). Not a qPublic/
+#: WebTech dead end: a real open ArcGIS MapServer layer behind the county's own EnerGov
+#: portal host (county_records_matrix.json's 2026-10-07 GIS read already confirmed
+#: owner_field=yes here; that read just never fed a parcel_cache registration). Open, no
+#: token, 47,896 parcels verified live 2026-10-19 via returnCountOnly; Owner1/Owner2 are the
+#: plain owner-of-record fields (both populated on multi-owner rows, same convention as
+#: Barnwell's Name/Name_2). TMS and ParcelID carry the identical dash-separated id
+#: ("01-0101-001-00-00") on every row sampled; TMS is listed first because a handful of
+#: rows (e.g. a right-of-way sliver) carry TMS with ParcelID null, never the reverse.
+#: SaleDate/SalePrice are ArcGIS epoch-ms/raw numeric, handled by this module's existing
+#: generic _iso_date/sale_amount normalization -- no county-specific parsing needed.
+PARCEL_LAYERS["Georgetown"] = {
+    "state": "SC",
+    "url": ("https://gis1.georgetowncountysc.org/portal/rest/services/GCGIS_Energov/"
+            "MapServer/2/query"),
+    "id_fields": ["TMS", "ParcelID"],
+    "page_delay_s": 1.7,
+    "map": {"owner": ["Owner1", "Owner2"],
+            "address": ["StreetNumber", "StreetName"],
+            "owner_mailing": ["BillingAddress", "BillingAddress2", "City", "State", "ZipCode"],
+            "acreage": "TotalLandArea", "sale_price": "SalePrice", "sale_date": "SaleDate"},
+}
+
 #: 2026-10-07: property facts the already-downloaded county layers publish and the cache used to
 #: drop (field names verified on each layer's ?f=json that day). Merged into each config's map
 #: with setdefault, so an existing mapping is never replaced. {"baths": [full, half]} counts a
