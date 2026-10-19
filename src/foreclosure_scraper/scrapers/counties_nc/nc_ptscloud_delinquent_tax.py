@@ -40,7 +40,8 @@ from ...base_scraper import BaseScraper
 from ...layer_guard import LayerHarvest
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
-from ...tax_calendar import completed_delinquent_years
+from ...tax_calendar import completed_delinquent_years, levy_year, levy_year_is_delinquent
+from ..counties_generic.multi_year_delinquent_tax import _longest_run, _trend
 
 log = structlog.get_logger()
 
@@ -300,6 +301,70 @@ def _year_summary(by_year: list[dict], bill_due_amt: float) -> dict:
     }
 
 
+def _canonical_tax_depth(by_year: list[dict], county: str) -> tuple[dict | None, dict]:
+    """(raw['multi_year_delinquent_tax'] or None, raw['two_year_delinquent']) -- gap_matrix's
+    own tracked keys (2026-10-18 sweep), built from this parcel's already-aggregated per-bill
+    history (`by_year`, from _bill_entry). This tenant's own 'nc_ptscloud_delinquent_tax' block
+    (and enrichment_tax_owed, which already reads its years_unpaid/years_delinquent fields)
+    carries the SAME depth, just never under the two canonical top-level keys several other
+    sources (Buncombe/Oconee/Pickens, Gaston, the NC ITSPublic vendor) already publish, so
+    gap_matrix.py's literal `raw.get("multi_year_delinquent_tax")` / `raw.get(
+    "two_year_delinquent")` checks never found it here even on genuinely multi-year parcels.
+
+    multi_year_delinquent_tax is byte-shape-compatible with
+    scrapers/counties_generic/multi_year_delinquent_tax.py and
+    enrichment_gaston_multiyear_tax.py's own blocks (same field names, same _longest_run/_trend
+    helpers), and uses the same gate: >=2 distinct years AND at least one MATURED (past its
+    delinquent date) year. two_year_delinquent is unconditional (the shared key every other
+    tax-roll reader publishes), gated only on >=2 MATURED years, same convention
+    albemarle_observer_tax_lists.py / sc_catalis_delinquent_roll.py use."""
+    per_year: dict[int, float] = {}
+    for b in by_year:
+        y = levy_year(b.get("tax_year"))
+        if y is None:
+            continue
+        amt = b.get("bill_due_amt")
+        if amt is None:
+            amt = b.get("total_due") or 0.0
+        per_year[y] = per_year.get(y, 0.0) + (amt or 0.0)
+    years = sorted(per_year)
+    matured = [y for y in years if levy_year_is_delinquent(y, "NC", county)]
+    two_year = {
+        "is_two_year_plus": len(matured) >= 2,
+        "years": len(matured),
+        "oldest_year": years[0] if years else None,
+        "source": "counties_nc.nc_ptscloud_delinquent_tax",
+    }
+    if len(years) < 2 or not matured:
+        return None, two_year
+    current = [y for y in years if y not in matured]
+    total_owed = round(sum(per_year.values()), 2) or None
+    matured_owed = round(sum(per_year[y] for y in matured), 2) or None
+    multi_year = {
+        "years": years,
+        "per_year": {str(y): round(per_year[y], 2) for y in years},
+        "years_delinquent": len(matured),
+        "unpaid_bill_years": len(years),
+        "matured_years": matured,
+        "matured_years_delinquent": len(matured),
+        "consecutive_years": _longest_run(years),
+        "first_year": years[0],
+        "latest_year": years[-1],
+        "latest_matured_year": max(matured),
+        "current_levy_year": (current[-1] if current else None),
+        "in_current_levy": bool(current),
+        "total_due": total_owed,
+        "total_owed": total_owed,
+        "matured_owed": matured_owed,
+        "year": years[-1],
+        "trend": _trend(per_year, matured),
+        "still_accruing": bool(current),
+        "amount_basis": "annual_bill",
+        "layers": ["nc_ptscloud_billpwa"],
+    }
+    return multi_year, two_year
+
+
 #: Forsyth's export carries BILL_TYPE "SAN" rows: "Sanitation Lien on Parcel: 6910-78-2033."
 #: with PARCEL_NUM blank (2026-10-08 extract: 9,652 delinquent bills, 1,202 parcels, $5.81M due,
 #: levy years 2019-2026). A sanitation lien is a lien on the real property, billed and collected
@@ -428,6 +493,9 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
             description = "ACTIVE TAX FORECLOSURE — " + description
         elif flags["bankruptcy_mentioned"]:
             description = "BANKRUPTCY FLAG — " + description
+        multi_year_block, two_year_block = _canonical_tax_depth(a["by_year"], county)
+        if multi_year_block is not None:
+            multi_year_block["parcel_key"] = parcel
         out.append(Listing(
             source="counties_nc.nc_ptscloud_delinquent_tax",
             source_url=f"{BASE}/",
@@ -482,6 +550,10 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
                 # flag) -- one canonical name across sources, see
                 # _flags_summary's docstring.
                 **({"tax_sale_status": "in_foreclosure"} if flags["in_foreclosure"] else {}),
+                # gap_matrix's own tracked keys -- see _canonical_tax_depth's docstring for why
+                # these were missing despite the depth already sitting in the block above.
+                "two_year_delinquent": two_year_block,
+                **({"multi_year_delinquent_tax": multi_year_block} if multi_year_block else {}),
             },
         ))
     return out

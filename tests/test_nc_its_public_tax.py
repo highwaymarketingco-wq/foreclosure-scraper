@@ -171,6 +171,31 @@ def test_aggregate_no_status_key_when_all_bills_clean():
     assert "ACTIVE TAX FORECLOSURE" not in li.description
 
 
+def test_aggregate_writes_canonical_multi_year_block_on_repeat_delinquency():
+    """gap_matrix.py tracks raw['multi_year_delinquent_tax'] as a literal top-level key
+    (2026-10-18 sweep) -- aggregate() already summed years into 'nc_its_public_tax'/
+    'two_year_delinquent' but never promoted them into this canonical shape."""
+    newest = m.parse_row(_row(2025, 801, "ROE JANE",
+                              "000801<br/>801-154<br />1008 1ST ST SURF CITY NC 28445<br />0.150 AC",
+                              "100.00", "120.50"), ONSLOW.cities)
+    oldest = m.parse_row(_row(2022, 802, "ROE JANE",
+                              "000802<br/>801-154<br />1008 1ST ST SURF CITY NC 28445<br />0.150 AC",
+                              "100.00", "80.00"), ONSLOW.cities)
+    li = m.aggregate("Onslow", ONSLOW, [newest, oldest])[0]
+    multi = li.raw["multi_year_delinquent_tax"]
+    assert multi["years"] == [2022, 2025]
+    assert multi["years_delinquent"] == 2          # both long past their delinquent date
+    assert multi["total_due"] == 200.50
+    assert multi["parcel_key"] == "801-154"
+    assert li.raw["two_year_delinquent"]["is_two_year_plus"] is True
+
+
+def test_aggregate_omits_multi_year_block_for_a_single_year():
+    b = m.parse_row(ON_ROW, ONSLOW.cities)
+    li = m.aggregate("Onslow", ONSLOW, [b])[0]
+    assert "multi_year_delinquent_tax" not in li.raw
+
+
 def test_a_bill_with_no_balance_has_no_tax_owed():
     b = m.parse_row(_row(2025, 5, "ROE", "000005<br/>1-1<br />1 MAIN ST X NC 28000<br />1.000 AC", "0.00", "0.00"), ())
     li = m.aggregate("Onslow", ONSLOW, [b])[0]
@@ -324,7 +349,7 @@ def test_portals_rotate_their_starting_county_by_day_of_year(monkeypatch, _fast)
     monkeypatch.setenv("ITS_TAX_COUNTIES", "Onslow,Graham")
     order = list(m.PORTALS)
     assert order == ["Onslow", "Graham", "Alleghany", "Anson", "Caswell", "Duplin", "Granville",
-                      "Harnett", "Jones", "Person", "Scotland", "Yadkin"]
+                      "Harnett", "Jones", "Person", "Scotland", "Yadkin", "Brunswick"]
     real = httpx.AsyncClient  # captured once: two sequential monkeypatch.setattr calls below must
                               # both subclass the TRUE original, not each other's patched Fake
 
@@ -349,8 +374,8 @@ def test_portals_rotate_their_starting_county_by_day_of_year(monkeypatch, _fast)
         asyncio.run(s.fetch())
         return seen[0][1].split("/")[1]  # "/<PORTAL_SUFFIX>/TaxBillSearch"
 
-    first_a = _try(date(2026, 1, 4))     # spin 0 of 12 -> Onslow is first in rotated+filtered order
-    first_b = _try(date(2026, 1, 5))     # spin 1 of 12 -> Onslow rotates past the end -> Graham first
+    first_a = _try(date(2026, 1, 6))     # spin 0 of 13 -> Onslow is first in rotated+filtered order
+    first_b = _try(date(2026, 1, 7))     # spin 1 of 13 -> Onslow rotates past the end -> Graham first
     assert {first_a, first_b} == {"ITSPublicGR2.0", "ITSPublicON"}
     assert first_a != first_b
 

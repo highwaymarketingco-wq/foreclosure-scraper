@@ -85,6 +85,8 @@ import structlog
 
 from ...base_scraper import OUTCOME_PARTIAL, BaseScraper
 from ...models import Listing, ListingType, PropertyKind
+from ...tax_calendar import completed_delinquent_years, levy_year_is_delinquent
+from ..counties_generic.multi_year_delinquent_tax import _longest_run, _trend
 
 log = structlog.get_logger()
 
@@ -142,6 +144,18 @@ PORTALS: dict[str, ITSPortal] = {
     "Person": ITSPortal("Person", "https://www.bttaxpayerportal.com/ITSPublicPR", full_model=True),
     "Scotland": ITSPortal("Scotland", "https://www.bttaxpayerportal.com/ITSPublicSC", full_model=True),
     "Yadkin": ITSPortal("Yadkin", "https://www.bttaxpayerportal.com/ITSPublicYK", full_model=True),
+    # Brunswick: same vendor, an "ITSNet" (not "ITSPublicXX") base path -- live-verified
+    # 2026-10-18 (gap_matrix multi_year_delinquent_tax/two_year_delinquent/tax_aging_surfaced/
+    # atty_tax_verified_confirmed sweep). verification/verifiers/tax_lien_itspublic.py's own
+    # Brunswick Portal entry has been live-configured since 2026-10-08 (commit d087b3b4) with
+    # nothing to verify, because this roll was never read -- this is the missing upstream half,
+    # same shape as the Gaston multi-year-tax gap. The grid carries an "Address" column (full_model
+    # path), real multi-year depth back to at least 2015 (588/1,296 sampled parcels 2+ years
+    # delinquent, live-read), and NO value/use-value field at all -- bills only (TaxYear,
+    # BillNumber, AccountNumber, AccountName1, OriginalBillAmount, TotalDue, DiscoveryYear,
+    # Description, Address), so rollback_exposure cannot be read from this source (same verdict
+    # as Spartanburg's qPayBill: a bill-payment portal, not a property/value card).
+    "Brunswick": ITSPortal("Brunswick", "https://tax.brunsco.net/ITSNet", full_model=True),
 }
 
 #: Counties on this vendor that cannot be read (verdicts, not gaps; read live 2026-10-09):
@@ -388,6 +402,58 @@ def parse_row_cols(row: dict, cols: list[str], cities: tuple[str, ...] = ()) -> 
             "balance": _money(g("TotalDue")), "status": status, **desc}
 
 
+def _canonical_multi_year(county: str, group: list[dict], years: list[int],
+                          parcel_key: str) -> dict | None:
+    """The gap_matrix-tracked raw['multi_year_delinquent_tax'] block (2026-10-18:
+    multi_year_delinquent_tax/tax_aging_surfaced gap sweep) -- byte-shape-compatible with
+    scrapers/counties_generic/multi_year_delinquent_tax.py and
+    enrichment_gaston_multiyear_tax.py's own blocks (same field names, same _longest_run/
+    _trend helpers) so any downstream reader (tax_binding.py, scoring) treats this vendor's
+    multi-year depth identically to Buncombe/Oconee/Pickens/Gaston's.
+
+    Same gate those modules use: >=2 distinct years AND at least one MATURED (past its
+    delinquent date) year -- single-year delinquency is this source's own primary block
+    (the "nc_its_public_tax" / "two_year_delinquent" raw keys below); this one is the
+    repeat-offender signal the column is actually tracking."""
+    if len(years) < 2:
+        return None
+    matured = [y for y in years if levy_year_is_delinquent(y, "NC", county)]
+    if not matured:
+        return None
+    per_year: dict[int, float] = {}
+    for b in group:
+        y = b.get("year")
+        if y is None:
+            continue
+        per_year[y] = per_year.get(y, 0.0) + (b.get("balance") or 0.0)
+    current = [y for y in years if y not in matured]
+    total_owed = round(sum(per_year.values()), 2) or None
+    matured_owed = round(sum(per_year[y] for y in matured), 2) or None
+    return {
+        "years": years,
+        "per_year": {str(y): round(per_year[y], 2) for y in years},
+        "years_delinquent": len(matured),
+        "unpaid_bill_years": len(years),
+        "matured_years": matured,
+        "matured_years_delinquent": len(matured),
+        "consecutive_years": _longest_run(years),
+        "first_year": years[0],
+        "latest_year": years[-1],
+        "latest_matured_year": max(matured),
+        "current_levy_year": (current[-1] if current else None),
+        "in_current_levy": bool(current),
+        "total_due": total_owed,
+        "total_owed": total_owed,
+        "matured_owed": matured_owed,
+        "year": years[-1],
+        "trend": _trend(per_year, matured),
+        "still_accruing": bool(current),
+        "amount_basis": "annual_bill",
+        "layers": ["its_public_tax"],
+        "parcel_key": parcel_key,
+    }
+
+
 def aggregate(county: str, portal: ITSPortal, bills: list[dict], *,
               years_read: list[int] | None = None, truncated: bool = False) -> list[Listing]:
     """One TAX_LIEN lead per parcel; the unpaid years are summed."""
@@ -426,11 +492,13 @@ def aggregate(county: str, portal: ITSPortal, bills: list[dict], *,
             # budget ran out) can under-count years, so is_two_year_plus False is then only "not seen"
             **({"years_read": years_read, "read_truncated": bool(truncated)} if years_read else {}),
         }
+        multi_year = _canonical_multi_year(county, group, years, parcel or key)
         raw: dict = {"nc_its_public_tax": block,
                      # The shared, published key fullmer_rank reads for delinquency ripeness.
                      "two_year_delinquent": {"is_two_year_plus": len(years) >= 2, "years": len(years),
                                              "oldest_year": years[0] if years else None,
-                                             "source": SLUG}}
+                                             "source": SLUG},
+                     **({"multi_year_delinquent_tax": multi_year} if multi_year else {})}
         if total:
             raw["tax_owed"] = {"balance": total, "kind": "delinquent_tax", "source": SLUG,
                                "year": head["year"], "basis": "own_record"}

@@ -29,6 +29,28 @@ def test_parse_dedupes_sums_and_filters():
     assert by["1234"].raw["nc_ptscloud_delinquent_tax"]["mailing"]["city"] == "MARSHALL"
 
 
+def test_multi_year_and_two_year_canonical_keys():
+    """gap_matrix.py tracks raw['multi_year_delinquent_tax'] / raw['two_year_delinquent'] as
+    literal top-level keys (2026-10-18 Guilford/Brunswick sourced-not-built sweep) -- this
+    source's own multi-year depth (years_unpaid/years_delinquent inside the
+    'nc_ptscloud_delinquent_tax' block) was never promoted into them."""
+    leads = m._parse_csv(_CSV, "Madison", "NC", "Madison")
+    by = {l.parcel_id: l for l in leads}
+    # 1234: 2 distinct (long-past, matured) years -> both canonical keys, multi-year gate clears
+    two_year = by["1234"].raw["two_year_delinquent"]
+    assert two_year["is_two_year_plus"] is True
+    assert two_year["source"] == "counties_nc.nc_ptscloud_delinquent_tax"
+    multi = by["1234"].raw["multi_year_delinquent_tax"]
+    assert multi["years"] == [2023, 2024]
+    assert multi["years_delinquent"] == 2
+    assert multi["total_due"] == 800.50
+    assert multi["first_year"] == 2023 and multi["latest_year"] == 2024
+    assert multi["parcel_key"] == "1234"
+    # 5678: a single year -> two_year_delinquent present but negative, no multi-year block at all
+    assert by["5678"].raw["two_year_delinquent"]["is_two_year_plus"] is False
+    assert "multi_year_delinquent_tax" not in by["5678"].raw
+
+
 def test_owner_noise_stripped():
     leads = m._parse_csv(_CSV, "Madison", "NC", "Madison")
     by = {l.parcel_id: l for l in leads}
