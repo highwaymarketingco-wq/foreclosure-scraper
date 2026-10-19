@@ -3625,6 +3625,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("rollback_exposure.failed", traceback=traceback.format_exc())
 
+    # Transylvania NC's own ViewTaxBill detail page already publishes a labelled "Deferred
+    # Value :" line (present-use rollback, same concept as the sibling sources just above) under
+    # its own raw['transylvania_tax'] key — a pure, no-network restatement into the shared
+    # raw['rollback_exposure'] contract. See enrichment_transylvania_rollback_exposure.py's own
+    # docstring for why this is NOT the same trap as qPayBill's/PTS Cloud's look-alike value
+    # pairs (both investigated and correctly left unbuilt, 2026-10-19 gap-matrix sweep).
+    try:
+        from .enrichment_transylvania_rollback_exposure import enrich_transylvania_rollback_exposure
+        s = enrich_transylvania_rollback_exposure(enriched)
+        if s and s.get("matched"):
+            enrichment_stats["transylvania_rollback_exposure"] = s
+    except Exception:
+        log.error("transylvania_rollback_exposure.failed", traceback=traceback.format_exc())
+
     # NC OneMap statewide sweeps (never overwrites the tax relief / rollback dollar figures).
     try:
         from .enrichment_onemap_sweeps import enrich_onemap_sweeps

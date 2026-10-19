@@ -188,9 +188,16 @@ PARCEL_LAYERS: dict[str, dict] = {
         "state": "SC",
         "url": "https://services1.arcgis.com/m0cnLGKdhwao8WvM/arcgis/rest/services/Public_Data/FeatureServer/2/query",
         "id_fields": ["PIN"],
+        # land_use added 2026-10-19 (vacant_lot sweep): PropertyClass is a real,
+        # human-readable text category -- "VACANT RESIDENTIAL" (313/2000 live
+        # sample), "VACANT AGRICULTURAL" (19), "Other Vacant" (2) -- that the
+        # existing \b(VACANT|...)\b matcher in enrichment_vacant_landuse.py
+        # already catches with NO code change. No improvement_value fallback
+        # needed here; this is a direct text match, same shape as Rutherford/
+        # Henderson/Burke's land_use, just never mapped on this layer before.
         "map": {"owner": "OwnerName1", "address": "PropertyAddress",
                 "owner_mailing": ["OwnerAddress1", "OwnerCity", "OwnerState", "OwnerZip"],
-                "acreage": "Acreage"},
+                "acreage": "Acreage", "land_use": "PropertyClass"},
     },
     # --- 2026-09-13. Sumter SC. Found while chasing why the 13,609 new qPayBill
     # leads all ranked D: they carry no value and no mailing address, so the buy-box
@@ -342,7 +349,25 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "owner_mailing": ["Address_1", "Address_2"],
                 "market_value": "Tot_Assesd_Value", "tax_value": "Tot_Assesd_Value",
                 "acreage": "Tot_Number_Acres", "living_sqft": "SqFt_Total",
-                "land_use": "PT163_Class"},
+                # land_use (PT163_Class) is SC's 4%/6% owner-occupancy RATIO
+                # class (1/2/3/4/6), not a vacant/improved flag -- confirmed
+                # live, it does not itself correlate with vacancy (noisy
+                # 18-82% zero-building-value rate per class). It still serves
+                # as the bare-digit "numeric DOR code" gate
+                # enrichment_vacant_landuse.py's improvement_value fallback
+                # requires; the actual vacant/improved decision is entirely
+                # improvement_value, added 2026-10-19 (vacant_lot sweep).
+                # Tot_Market_Bldgs (this layer's own building-VALUE field,
+                # distinct from Tot_Number_Bldgs, a building-COUNT field used
+                # here only as ground truth) agrees with
+                # Tot_Number_Bldgs==0 on 1973/2000 (98.65%) live-sampled rows
+                # -- same caliber as Horry's proven MarketImprv split.
+                # Unlike Greenwood's BuildingValue (NULL for vacant parcels,
+                # which the fallback's `imprv is None` guard correctly
+                # refuses to treat as zero -- a real null-vs-zero gap, not
+                # fixed here), Barnwell's field uses a literal 0, so no
+                # enrichment-code change is needed.
+                "land_use": "PT163_Class", "improvement_value": "Tot_Market_Bldgs"},
     },
     # --- 2026-09-15: SC mailing-gap sweep, found via a scouting pass over the
     # 10 remaining zero-parcel-cache counties. Both verified live directly
