@@ -819,7 +819,8 @@ SPECS: dict[str, Spec] = {
     "lien_priority": Spec(_S, "derived", "rod", applies="has_rod", producers=("rod/enrich.py",),
                           doc="raw.lien_priority present; applies to rows with a register pull"),
     "rollback_exposure": Spec(_S, "county", "tax", producers=("enrichment_rollback_deferral.py",
-                                                              "enrichment_tax_relief.py"),
+                                                              "enrichment_tax_relief.py",
+                                                              "enrichment_transylvania_rollback_exposure.py"),
                               doc="raw.rollback_exposure present (present-use/ag deferral rollback)"),
     "jail_booking": Spec(_S, "county", "jail", applies="person", ledger="jail_booking",
                          producers=("enrichment_jail_bookings.py", "scrapers/national/jail_bookings.py",
@@ -1170,8 +1171,6 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
     # per-row 'screened, none found' verdict for the four fill columns it covers (roll_up counts it)
     from foreclosure_scraper import gis_fill as _gf
     out |= _gf.verdict_columns(raw)
-    if isinstance(raw.get("owner_email"), dict):
-        out.add("email")
     if isinstance(raw.get("divorce"), dict):
         out.add("divorce")
     if isinstance(raw.get("vacancy"), dict):
@@ -1218,6 +1217,25 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
         out.add("atty_tax_verified_confirmed")
     else:
         out.discard("atty_tax_verified_confirmed")
+    # email/phone (audit 2026-10-19): SCORER_GATES' own "any non-empty owner_email/owner_phone
+    # dict" credit above (line ~1141) counts a row as checked even when that dict is nothing but
+    # frozen scan exhaust from a module RETIRED 2026-10-09 (enrichment_email_extract.py,
+    # enrichment_surface_contacts.py, enrichment_sc_voter_xref.py, enrichment_ocr.py -- see
+    # deploy/oracle/run_profile.json's unwired_allowlist) that will never run again. A row whose
+    # ONLY touch is dead-scanner exhaust was never really checked by a live producer; only a
+    # genuine fill (already in pos) or a dict from a still-live source counts. Same anti-pattern
+    # class, same fix shape, as the "undated no-match (retired module) is not a check" guard
+    # already applied to marriage_license just above.
+    _LIVE_EMAIL_SOURCES = {"liensnc_filing"}
+    _LIVE_PHONE_SOURCES = {"ncsbe_voter", "buncombe_accela", "lincoln_taxpayer", "liensnc_filing"}
+    if "email" not in pos and "email" in out:
+        oe = raw.get("owner_email")
+        if not (isinstance(oe, dict) and oe.get("source") in _LIVE_EMAIL_SOURCES):
+            out.discard("email")
+    if "phone" not in pos and "phone" in out:
+        op = raw.get("owner_phone")
+        if not (isinstance(op, dict) and op.get("source") in _LIVE_PHONE_SOURCES):
+            out.discard("phone")
     return out
 
 
@@ -1488,6 +1506,79 @@ def listing_type_producers(lt: str) -> list[Path]:
     return out
 
 
+#: scrapers/counties_generic/arcgis_distress_layers.py is a single multi-county, multi-PROCESS
+#: module (tax/storm_damage/flood_zone/demolition_permit/buyout_applicant/poor_condition/
+#: code_enforcement all share its one LAYERS registry) that is listed as a producer for both
+#: "condemned" and "code_enforcement". A plain county-name text match (counties_named_in) cannot
+#: tell which process a county's own Layer entry belongs to, so it credits a county for either
+#: column whenever its name appears ANYWHERE in the file -- even on an entry tagged a wholly
+#: different process. Live audit 2026-10-19 (the Richland/condemned investigation's follow-up):
+#: Transylvania and Buncombe are named only on storm_damage/tax/buyout_applicant entries (zero
+#: process="code_enforcement" or condemned=True entries anywhere for either), yet both were
+#: credited "built" for BOTH condemned and code_enforcement; Lincoln/Guilford/Durham each have a
+#: real process="code_enforcement" entry but, same as Richland, ZERO condemned=True entry, yet
+#: were also credited "built" for condemned. This is the mislabel in the OPPOSITE direction from
+#: Richland's own (which was a correct "built-but-low-yield" credit, just a confusing next_action):
+#: here the county cell reads "built-but-low-yield: code covers this county... run it and stamp
+#: screened, none found" when no producer for that specific signal shape exists in this file (or
+#: anywhere else) at all, hiding what should be a "no source known" gap. The module's own LAYERS
+#: registry carries the exact (state, county, process, condemned) ground truth the Layer
+#: dataclass's own fields already discriminate (see its condemned/process field comments) --
+#: read it directly for just these two columns instead of trusting the blanket file-level name
+#: match this file's many unrelated processes would otherwise manufacture.
+_ARCGIS_DISTRESS_LAYERS_REL = "scrapers/counties_generic/arcgis_distress_layers.py"
+
+
+def _arcgis_distress_layers_credit() -> dict[str, set[tuple[str, str]]]:
+    """{'condemned': {...}, 'code_enforcement': {...}} read from arcgis_distress_layers.py's own
+    LAYERS registry: only an entry's own condemned=True / process=='code_enforcement' counts,
+    never mere co-location in the file. Empty dict if the module can't be imported."""
+    try:
+        from foreclosure_scraper.scrapers.counties_generic import arcgis_distress_layers as _adl
+    except Exception:  # noqa: BLE001 - a missing/broken module leaves the blanket grep in place
+        return {}
+    return {
+        "condemned": {(lay.state, lay.county) for lay in _adl.LAYERS if lay.condemned},
+        "code_enforcement": {(lay.state, lay.county) for lay in _adl.LAYERS if lay.process == "code_enforcement"},
+    }
+
+
+#: Same bug class, found in the 'vacant' column's own producers tuple (2026-10-19 vacant-sweep
+#: follow-up to the condemned/code_enforcement fix above). enrichment_arcgis.py is a producer of
+#: 'vacant', but its blanket counties_named_in() text match is driven entirely by its NC_GIS/
+#: SC_GIS registries -- the per-county parcel/address/owner/deed-lookup config it uses for a dozen
+#: UNRELATED columns -- not by anything to do with the vacant-structure cohort flag. Live-measured:
+#: the file's name-match alone credits 69 counties "built" for vacant; the REAL vacant cohort flag
+#: (VacantImpro -> out['vacant'] in _cohort_flags()) is only ever populated for a county whose
+#: out_fields actually requests that source column, gated by the module's own
+#: `_COHORT_FLAG_COUNTIES` frozenset -- today just Gaston. spartanburg_vacant.py, the other
+#: producer, is a genuinely single-county scraper (its Listing() literal hardcodes state="SC",
+#: county="Spartanburg"), so its own text match already happens to be correct -- it's folded into
+#: this helper too so both files' credit to this one column comes from a real constant, matching
+#: _arcgis_distress_layers_credit()'s own pattern, never a grep. nc_lincoln_bulk.py, the third
+#: producer, is untouched (a real single-county NC/Lincoln bulk scraper, not part of this bug).
+_VACANT_COHORT_REL = frozenset({"enrichment_arcgis.py", "scrapers/counties_sc/spartanburg_vacant.py"})
+
+
+def _vacant_cohort_credit() -> set[tuple[str, str]]:
+    """Precise (state, county) credit for the 'vacant' column from enrichment_arcgis.py and
+    spartanburg_vacant.py (see _VACANT_COHORT_REL's own docstring). Always includes Spartanburg
+    (spartanburg_vacant.py's hardcoded single-county literal); adds whichever of
+    enrichment_arcgis.py's `_COHORT_FLAG_COUNTIES` can be resolved to a state via its own
+    NC_GIS/SC_GIS registries, or nothing more if that module can't be imported."""
+    out: set[tuple[str, str]] = {("SC", "Spartanburg")}
+    try:
+        from foreclosure_scraper import enrichment_arcgis as _ea
+    except Exception:  # noqa: BLE001 - a missing/broken module leaves just the Spartanburg literal
+        return out
+    for county in _ea._COHORT_FLAG_COUNTIES:
+        if county in _ea.NC_GIS:
+            out.add(("NC", county))
+        elif county in _ea.SC_GIS:
+            out.add(("SC", county))
+    return out
+
+
 def built_in_code() -> dict[str, set[tuple[str, str]]]:
     pats = _county_patterns()
     out: dict[str, set[tuple[str, str]]] = {}
@@ -1496,6 +1587,27 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
         if spec.scope == "feed":
             files += listing_type_producers(LISTING_TYPE_COLS[col])
         out[col] = counties_named_in([f for f in files if f.exists()], pats) if files else set()
+    # arcgis_distress_layers.py refinement (see _arcgis_distress_layers_credit's own docstring):
+    # drop that one file's blanket name-match contribution to condemned/code_enforcement and
+    # replace it with the registry's own precise per-entry credit, keeping every OTHER producer
+    # file's text-grep credit for these two columns untouched.
+    adl_credit = _arcgis_distress_layers_credit()
+    for col, precise in adl_credit.items():
+        spec = SPECS[col]
+        if _ARCGIS_DISTRESS_LAYERS_REL not in spec.producers:
+            continue
+        other_files = [PKG / f for f in spec.producers if f != _ARCGIS_DISTRESS_LAYERS_REL]
+        base = counties_named_in([f for f in other_files if f.exists()], pats) if other_files else set()
+        out[col] = base | precise
+    # vacant: same refinement, scoped to just this column (see _VACANT_COHORT_REL's own docstring)
+    # -- drop enrichment_arcgis.py's/spartanburg_vacant.py's blanket name-match contribution and
+    # replace it with the precise cohort-flag/single-county credit, keeping nc_lincoln_bulk.py's
+    # own (already-correct) text-grep credit untouched.
+    vacant_spec = SPECS.get("vacant")
+    if vacant_spec and _VACANT_COHORT_REL & set(vacant_spec.producers):
+        other_files = [PKG / f for f in vacant_spec.producers if f not in _VACANT_COHORT_REL]
+        base = counties_named_in([f for f in other_files if f.exists()], pats) if other_files else set()
+        out["vacant"] = base | _vacant_cohort_credit()
     # marriage licenses: the Cott v4 tenants whose guest search carries a MARRIAGES index are read by
     # enrichment_register_checks (rod/register_checks.MARRIAGE_ADAPTER); the module names no county in text
     try:

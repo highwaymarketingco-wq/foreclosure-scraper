@@ -99,8 +99,11 @@ def test_positive_drops_marriage_no_match_and_adds_attorney():
 
 
 def test_checked_columns_from_wrappers_and_inputs():
+    # owner_email carries a still-live source (liensnc_filing) so "email" counts as checked here;
+    # see test_email_phone_checked_only_from_a_still_live_source for the retired-module case.
     r = row(owner_name="DOE JOHN", defendant="DOE JOHN",
-            raw={"tax_owed": {"balance": 10}, "divorce": {"case_count": 0}, "owner_email": {"best_email": None},
+            raw={"tax_owed": {"balance": 10}, "divorce": {"case_count": 0},
+                 "owner_email": {"best_email": None, "source": "liensnc_filing"},
                  "incarceration_check": {"result": "no_match"}, "deed_chain": {"transfers": []}})
     owner = gm.owner_columns(r)
     pos = gm.positive_columns(r, owner, {})
@@ -115,6 +118,31 @@ def test_checked_columns_from_wrappers_and_inputs():
     assert "two_year_delinquent" not in chk
     assert "bop_federal" not in chk
     assert "atty_tax_verified_confirmed" not in gm.checked_columns(r, pos, {"tax_lien": "unconfirmed"})
+
+
+def test_email_phone_checked_only_from_a_still_live_source():
+    """Audit 2026-10-19: a non-empty owner_email/owner_phone dict used to mark "checked" on its
+    own (any dict at all, via SCORER_GATES' generic not-empty test plus a redundant explicit
+    owner_email check) -- even when that dict is nothing but frozen scan exhaust from a module
+    RETIRED 2026-10-09 (enrichment_email_extract.py, enrichment_surface_contacts.py,
+    enrichment_sc_voter_xref.py, enrichment_ocr.py; deploy/oracle/run_profile.json's own
+    unwired_allowlist documents the retirement) that will never run again on this row. Live-measured
+    19 (county, column) cells, all SC, all literal 0.0% yield, inflated by exactly this. A row
+    whose only touch is dead-scanner exhaust (no recognizable live source, and no genuine fill)
+    must not count as checked."""
+    retired_email = row(raw={"owner_email": {"best_email": None, "best_classification": "other"}})
+    retired_phone = row(raw={"owner_phone": {"source": "surface_contacts", "checked_at": "2026-01-01"}})
+    live_email = row(raw={"owner_email": {"best_email": None, "source": "liensnc_filing"}})
+    live_phone = row(raw={"owner_phone": {"source": "ncsbe_voter", "checked_at": "2026-01-01"}})
+
+    for r in (retired_email, retired_phone, live_email, live_phone):
+        owner = gm.owner_columns(r)
+        pos = gm.positive_columns(r, owner, {})
+        chk = gm.checked_columns(r, pos, {})
+        if r is retired_email or r is retired_phone:
+            assert "email" not in chk and "phone" not in chk, r["raw"]
+        else:
+            assert ("email" in chk) or ("phone" in chk), r["raw"]
 
 
 def test_multi_year_delinquent_tax_checked_only_by_its_own_key():
@@ -431,6 +459,91 @@ def test_built_in_code_known_false_positives_not_silently_fixed():
     # the two FPs comment-stripping DOES fix must stay fixed
     assert ("NC", "Lee") not in jail_counties and ("SC", "Lee") not in jail_counties
     assert ("NC", "Gaston") not in condemned_counties
+
+
+def test_arcgis_distress_layers_credit_respects_process_and_condemned_fields():
+    """2026-10-19 follow-up to the Richland/condemned investigation (gap-matrix mislabel sweep):
+    arcgis_distress_layers.py is a single multi-county, multi-PROCESS module (tax/storm_damage/
+    flood_zone/demolition_permit/buyout_applicant/poor_condition/code_enforcement all share its one
+    LAYERS registry) listed as a producer for both 'condemned' and 'code_enforcement'. The blanket
+    counties_named_in() text match cannot see WHICH process a county's own Layer entry belongs to,
+    so (before this fix) it credited a county for either column merely for being named anywhere in
+    the file -- live-confirmed: Transylvania is named only on a storm_damage entry (zero
+    code_enforcement/condemned=True entries at all) yet was credited 'built' for both columns;
+    Lincoln/Guilford/Durham/Richland each have a real process='code_enforcement' entry but, same as
+    Richland's own already-investigated case, ZERO condemned=True entry, yet were also credited
+    'built' for condemned. _arcgis_distress_layers_credit() reads the LAYERS registry's own fields
+    directly instead."""
+    credit = gm._arcgis_distress_layers_credit()
+    # only York's rockhill_code_demolition sets condemned=True in this entire file
+    assert credit["condemned"] == {("SC", "York")}
+    # the 5 real process="code_enforcement" layers (columbia_code_vacant_boarded, greensboro_code_housing,
+    # durham_open_code_violations, lincoln_code_violations, rockhill_code_housing/_exterior_major)
+    assert credit["code_enforcement"] == {
+        ("SC", "Richland"), ("NC", "Guilford"), ("NC", "Durham"), ("NC", "Lincoln"), ("SC", "York"),
+    }
+
+
+def test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_and_code_enforcement():
+    """End-to-end: built_in_code()'s real output for 'condemned' no longer credits a county whose
+    only textual evidence in arcgis_distress_layers.py is an entry tagged a different process (the
+    exact mislabel mechanism the test above pins down), while counties with a genuine producer --
+    in this file or another -- keep their credit."""
+    built = gm.built_in_code()
+    # false positives removed: named in the file, but on an unrelated-process entry only
+    for st, co in (("NC", "Transylvania"), ("NC", "Buncombe"), ("NC", "Burke"), ("NC", "New Hanover"),
+                   ("SC", "Greenville"), ("SC", "Greenwood"), ("SC", "Laurens"), ("SC", "Pickens")):
+        assert (st, co) not in built["condemned"], f"{st}/{co} has no condemned=True entry anywhere"
+    for st, co in (("NC", "Transylvania"), ("NC", "Burke"), ("SC", "Greenville"), ("SC", "Greenwood"),
+                   ("SC", "Laurens"), ("SC", "Pickens")):
+        assert (st, co) not in built["code_enforcement"], f"{st}/{co} has no code_enforcement entry anywhere"
+    # real producers (in this file, via condemned=True / process='code_enforcement', or via another
+    # file entirely) keep their credit
+    assert ("SC", "York") in built["condemned"] and ("SC", "York") in built["code_enforcement"]
+    assert ("SC", "Spartanburg") in built["condemned"]            # spartanburg_condemned.py
+    assert ("NC", "Henderson") in built["condemned"]              # hendersonville_vacant_structures.py
+    assert ("NC", "Mecklenburg") in built["condemned"]            # charlotte_open_data.py
+    assert ("NC", "Lincoln") in built["code_enforcement"]         # lincoln_code_violations (this file)
+    assert ("NC", "Guilford") in built["code_enforcement"]        # greensboro_code_housing (this file)
+    assert ("NC", "Durham") in built["code_enforcement"]          # durham_open_code_violations (this file)
+    assert ("NC", "Buncombe") in built["code_enforcement"]        # asheville_code_enforcement.py (a DIFFERENT file)
+    # Guilford/Lincoln/Durham DO have a real code_enforcement producer but, same as Richland, no
+    # condemned=True entry -- the narrower, opposite-direction half of the same mislabel
+    for st, co in (("NC", "Guilford"), ("NC", "Lincoln"), ("NC", "Durham"), ("SC", "Richland")):
+        assert (st, co) not in built["condemned"], f"{st}/{co} has a code_enforcement entry, not a condemned one"
+
+
+def test_vacant_cohort_credit_reads_real_registries_not_text():
+    """2026-10-19 vacant-sweep follow-up, same bug class as the condemned/code_enforcement fix
+    above: enrichment_arcgis.py is a producer of 'vacant', but it also carries NC_GIS/SC_GIS --
+    per-county parcel/address/owner/deed-lookup registries used for a dozen unrelated columns --
+    so a blanket counties_named_in() text match over this one file alone credits 69 counties
+    'built' for vacant (live-measured) when the real vacant-cohort flag (_cohort_flags()'s
+    VacantImpro read) is only ever populated for a county in the module's own
+    `_COHORT_FLAG_COUNTIES` -- today just Gaston. _vacant_cohort_credit() reads that frozenset
+    directly, plus spartanburg_vacant.py's own hardcoded single-county literal, instead of
+    trusting the blanket file-level name match either file's many unrelated registries/mentions
+    would otherwise manufacture."""
+    credit = gm._vacant_cohort_credit()
+    assert credit == {("NC", "Gaston"), ("SC", "Spartanburg")}
+
+
+def test_built_in_code_drops_vacant_cohort_false_credit():
+    """End-to-end: built_in_code()'s real output for 'vacant' no longer credits a county whose
+    only textual evidence is co-location in enrichment_arcgis.py's NC_GIS/SC_GIS registries
+    (used for unrelated columns, not the vacant cohort flag), while the two counties with a
+    genuine vacant producer, and nc_lincoln_bulk.py's own untouched single-county credit, keep
+    theirs."""
+    built = gm.built_in_code()
+    # false positives removed: named only via enrichment_arcgis.py's unrelated GIS registries
+    for st, co in (("NC", "Mecklenburg"), ("NC", "Buncombe"), ("NC", "Henderson"), ("NC", "Burke"),
+                   ("NC", "Cleveland"), ("SC", "Richland"), ("SC", "Greenville"), ("SC", "York")):
+        assert (st, co) not in built["vacant"], f"{st}/{co} has no real vacant-cohort producer"
+    # real producers keep their credit
+    assert ("NC", "Gaston") in built["vacant"]           # enrichment_arcgis.py _COHORT_FLAG_COUNTIES
+    assert ("SC", "Spartanburg") in built["vacant"]      # spartanburg_vacant.py (single-county, correct as-is)
+    assert ("NC", "Lincoln") in built["vacant"]           # nc_lincoln_bulk.py -- untouched, not part of this bug
+    assert len(built["vacant"]) == 3
 
 
 def test_read_baseline_maps_unknown(tmp_path):
