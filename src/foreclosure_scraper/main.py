@@ -3476,6 +3476,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("gaston_mydt.failed", traceback=traceback.format_exc())
 
+    # NC PTS Cloud (bcpwa.ncptscloud.com / Forsyth, Pitt, Beaufort, Henderson, Guilford, Madison,
+    # Hyde, Orange, Cleveland) multi-year unpaid-bill history — a pure, no-network restatement of
+    # the per-year depth counties_nc.nc_ptscloud_delinquent_tax already fetches into its own raw
+    # key, into the shared raw['multi_year_delinquent_tax'] contract (see that module's own
+    # docstring for why the gap-matrix check needs this exact key, not the source's own one).
+    # Must run BEFORE enrich_tax_owed, same reason as ustaxdata/gaston_mydt above.
+    try:
+        from .enrichment_ptscloud_multiyear_tax import enrich_ptscloud_multiyear_tax
+        s = enrich_ptscloud_multiyear_tax(enriched)
+        if s:
+            enrichment_stats["ptscloud_mydt"] = s
+    except Exception:
+        log.error("ptscloud_mydt.failed", traceback=traceback.format_exc())
+
     # SC qPayBill (29-county treasurer payment portal) multi-year unpaid-bill history — a pure,
     # no-network restatement of the per-year depth counties_sc.qpaybill_delinquent_roll already
     # fetches into its own raw['qpaybill_roll'] key, into the shared raw['multi_year_delinquent_tax']
