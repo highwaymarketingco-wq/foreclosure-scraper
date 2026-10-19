@@ -275,8 +275,9 @@ def test_kill_switch_short_circuits(monkeypatch):
     monkeypatch.setenv(mod.ENV_OFF, "1")
     stats = _run([_lead(state="NC", county="Buncombe", parcel_id="9679090515")])
     assert stats == {"targets": 0, "matched": 0, "matched_buncombe": 0,
-                     "matched_anderson": 0, "matched_mecklenburg": 0,
-                     "mecklenburg_live_confirmed": 0, "with_estimate": 0}
+                     "matched_anderson": 0, "matched_mecklenburg": 0, "matched_wake": 0,
+                     "mecklenburg_live_confirmed": 0, "wake_live_confirmed": 0,
+                     "with_estimate": 0}
 
 
 def test_no_relevant_counties_skips_every_fetch(monkeypatch):

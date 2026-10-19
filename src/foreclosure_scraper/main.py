@@ -3520,8 +3520,8 @@ async def run_enrich_tail(st: TailState) -> dict:
     # no-network restatement of the per-year depth counties_sc.qpaybill_delinquent_roll already
     # fetches into its own raw['qpaybill_roll'] key, into the shared raw['multi_year_delinquent_tax']
     # / raw['two_year_delinquent'] contract (see that module's own docstring; same pattern as
-    # gaston_mydt just above, different vendor). Must run BEFORE enrich_tax_owed, same reason as
-    # gaston_mydt.
+    # gaston_mydt/ptscloud_mydt just above, different vendor). Must run BEFORE enrich_tax_owed,
+    # same reason as those two.
     try:
         from .enrichment_qpaybill_multiyear_tax import enrich_qpaybill_multiyear_tax
         s = enrich_qpaybill_multiyear_tax(enriched)
@@ -3529,6 +3529,19 @@ async def run_enrich_tail(st: TailState) -> dict:
             enrichment_stats["qpaybill_mydt"] = s
     except Exception:
         log.error("qpaybill_mydt.failed", traceback=traceback.format_exc())
+
+    # Wake NC per-parcel tax search (services.wake.gov, PIN->REID bridged via NC OneMap):
+    # multi-year unpaid-bill history, keyed by the board's own parcel_id. Same reason as
+    # ustaxdata/gaston_mydt above: must run BEFORE enrich_tax_owed, which reads
+    # raw['multi_year_delinquent_tax']['total_due'] by exact key. Capped/budgeted per run
+    # (module docstring); gate off with FORECLOSURE_WAKE_MYDT=0.
+    try:
+        from .enrichment_wake_multiyear_tax import enrich_with_wake_multiyear_tax
+        s = await _await_capped(enrich_with_wake_multiyear_tax(enriched), "wake_mydt")
+        if s:
+            enrichment_stats["wake_mydt"] = s
+    except Exception:
+        log.error("wake_mydt.failed", traceback=traceback.format_exc())
 
     # Taxes-OWED normalizer — fold each tax source's own amount key (Buncombe
     # principal_tax_due, SC state-lien balance, Oconee FLC bid) into one

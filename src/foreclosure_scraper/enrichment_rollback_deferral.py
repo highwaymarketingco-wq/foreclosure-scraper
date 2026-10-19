@@ -97,6 +97,29 @@ Sources (free, public, no auth / no CAPTCHA / no robots wall):
     A lead this source matches but the live top-up fails or is capped still
     gets its bulk GIS deferred_value, just without a dollar rollback estimate.
 
+  * Wake NC -- services.wake.gov's own property-card system (Account.asp) publishes the
+    deferred VALUE directly, no derivation needed at all (live-verified 2026-10-18, PIN
+    1797953869 / REID 0167151, a 55-acre Zebulon farm): "Total Value Assessed*" $1,801,100
+    (market), "Land Use Value" $29,987 (the reduced present-use taxable base), "Use Value
+    Deferment" / "Total Deferred Value" $1,771,113 (market minus use -- the two always match,
+    confirming the field's meaning). The bulk candidate list comes from the SAME NC OneMap
+    parcel layer every other Wake column already uses (``parno``/``altparno``/``parusecode``),
+    filtered to ``parusecode`` AGR or FOR (2,154 + 786 = 2,940 county-wide; HOR matched 0,
+    county-wide, live-checked) -- the layer's own ``presentval`` field is blank for every Wake
+    row (a dead field, the same shape Mecklenburg's CAMA layer has), so it supplies only the
+    candidate PIN/REID pair, never the deferred value itself. One live Account.asp fetch per
+    board lead this candidate list matches reads the real figures (reusing
+    scrapers.counties_nc.wake_tax_foreclosure._account_field/._account_money verbatim -- the
+    same Tax-Relief-section fields that module's own docstring already documents it does NOT
+    read for its own tax-foreclosure accordion rows). The combined ad-valorem RATE is derived
+    per parcel, never hard-coded: the account's own ORDINARY "000000" bill for the current levy
+    year (tax_lien_wake.fetch_bills, reused verbatim) divided by its own Land Use Value -- on
+    the live test parcel, $197.79 / $29,987 = 0.6596 per $100, inside the same sane-rate band
+    (``_RATE_MIN``/``_RATE_MAX``) Buncombe's own derived rates land in. A present-use parcel
+    whose current bill is $0 (fully paid, or genuinely nothing billed this cycle) still gets its
+    real deferred_value, just without a rate-derived annual/estimated-rollback figure -- "no
+    rate is ever assumed" holds even when the parcel's own usual source for one is silent.
+
 NOT buildable from any source read so far: ``repeat_tax_loss`` for Mecklenburg.
 That signal (enrichment_repeat_tax_loss.py) needs a forced-sale deed GRANTOR
 match (TAX DEED / SHERIFF'S DEED / TRUSTEE'S DEED / etc., from a register-of-
@@ -130,6 +153,8 @@ import structlog
 
 from .http_client import client
 from .models import Listing, _normalize_parcel
+from .scrapers.counties_nc.wake_tax_foreclosure import _account_field, _account_money
+from .verification.verifiers import tax_lien_wake as _wake
 
 log = structlog.get_logger()
 
@@ -355,6 +380,118 @@ async def _mecklenburg_live_topup(c: httpx.AsyncClient, pid: str) -> Optional[di
     if detail is None or _normalize_parcel(detail["parcel"]) != pid:
         return None
     return detail
+
+
+# ---- Wake NC ----------------------------------------------------------------
+
+#: candidate list only (PIN/REID pair): NC OneMap's own `presentval` field is blank for every
+#: Wake row (module docstring, live-checked 2026-10-18) -- the deferred value itself needs the
+#: one live Account.asp fetch per matched board lead, below.
+WAKE_ONEMAP_URL = _wake.ONEMAP_URL
+WAKE_ONEMAP_FIELDS = "parno,altparno,parusecode"
+WAKE_ONEMAP_WHERE = "cntyname='Wake' AND (parusecode='AGR' OR parusecode='FOR' OR parusecode='HOR')"
+#: a present-use parcel's own current-levy ordinary bill, divided by its own Land Use Value, is
+#: the SAME sane-rate band Buncombe's derived rates land in (module docstring: 0.6596/$100 on the
+#: live test parcel) -- reused here rather than a second constant.
+_WAKE_RATE_MIN, _WAKE_RATE_MAX = _RATE_MIN, _RATE_MAX
+#: resource-safety ceiling on the live Account.asp + bill-history top-up (two GETs per lookup),
+#: same reasoning as ROLLBACK_MECKLENBURG_LIVE_CAP: the bulk candidate list is county-wide, but
+#: present-use land matched to the board is rare (module docstring).
+_WAKE_LIVE_CAP = int(os.environ.get("ROLLBACK_WAKE_LIVE_CAP", "50"))
+
+
+async def _fetch_wake_candidates(c: httpx.AsyncClient) -> list[dict[str, Any]]:
+    """Page every AGR/FOR/HOR-coded Wake parcel out of NC OneMap's own parcel layer."""
+    out: list[dict[str, Any]] = []
+    offset, page = 0, 2000
+    while True:
+        params = {
+            "where": WAKE_ONEMAP_WHERE, "outFields": WAKE_ONEMAP_FIELDS,
+            "returnGeometry": "false", "resultOffset": offset,
+            "resultRecordCount": page, "f": "json",
+        }
+        try:
+            r = await c.get(WAKE_ONEMAP_URL, params=params, timeout=60.0)
+            if r.status_code != 200:
+                log.warning("rollback.wake_status", code=r.status_code)
+                break
+            data = r.json()
+            if "error" in data:
+                log.warning("rollback.wake_error", error=str(data.get("error"))[:200])
+                break
+            feats = data.get("features", [])
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("rollback.wake_fail", error=str(exc)[:200])
+            break
+
+        out.extend(ft.get("attributes", {}) or {} for ft in feats)
+        if len(feats) < page or not data.get("exceededTransferLimit"):
+            break
+        offset += page
+        if offset >= 20000:      # safety cap -- county-wide candidate count is ~2,940
+            log.warning("rollback.wake_cap", offset=offset)
+            break
+    return out
+
+
+def _wake_index(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """{normalized_pin: {'reid', 'parusecode'}} for every AGR/FOR/HOR candidate -- the candidate
+    list alone, before any live top-up (NC OneMap carries no deferred-value field for Wake)."""
+    out: dict[str, dict[str, Any]] = {}
+    for a in rows:
+        pin = _normalize_parcel(a.get("parno"))
+        reid = re.sub(r"[^0-9]", "", str(a.get("altparno") or ""))
+        if not pin or not reid:
+            continue
+        out[pin] = {"reid": reid.zfill(7), "parusecode": a.get("parusecode")}
+    return out
+
+
+async def _wake_live_topup(c: httpx.AsyncClient, reid: str) -> Optional[dict[str, Any]]:
+    """One Account.asp fetch (the Tax-Relief-section value fields) + one bill-history fetch (this
+    account's own current-levy ordinary bill, for a derived rate) for a single Wake REID. None on
+    any fetch/parse failure, or when Account.asp shows no real deferral (Total Deferred Value
+    blank/zero) -- callers never guess a deferred parcel into existence."""
+    try:
+        r = await c.get(f"{_wake.BASE}/realestate/Account.asp", params={"id": reid}, timeout=40.0)
+        if r.status_code != 200:
+            return None
+        html = r.text
+    except httpx.HTTPError as exc:
+        log.warning("rollback.wake_account_fail", reid=reid, error=str(exc)[:200])
+        return None
+
+    deferred = _account_money(html, "Total Deferred Value")
+    if not deferred:
+        return None
+    use_value = _account_money(html, "Land Use Value")
+    market_value = _account_money(html, "Total Value Assessed*") or _account_money(html, "Total Value Assessed")
+
+    rec: dict[str, Any] = {
+        "deferred_value": deferred, "use_value": use_value, "real_value": market_value,
+        "rollback_years": _ROLLBACK_YEARS["NC"], "estimate_is_floor": True,
+        "basis": "present_use_deferral", "county": "Wake", "state": "NC",
+        "source": "Wake County Real Estate Data, Account.asp Tax-Relief section "
+                  "(Total Deferred Value)",
+        "source_key": "wake_account_detail", "reid": reid,
+    }
+
+    try:
+        r2 = await c.get(_wake.BILLS_URL.format(reid=reid), timeout=40.0)
+        bills = _wake.parse_bills(r2.text) if r2.status_code == 200 else []
+    except httpx.HTTPError as exc:
+        log.warning("rollback.wake_bills_fail", reid=reid, error=str(exc)[:200])
+        bills = []
+    ordinary = [b for b in bills if b.get("suffix") in ("000000", "0") and (b.get("amount_due") or 0) > 0]
+    current = max(ordinary, key=lambda b: b["year"], default=None)
+    if current and use_value:
+        rate = current["amount_due"] / use_value
+        if _WAKE_RATE_MIN <= rate <= _WAKE_RATE_MAX:
+            annual = round(deferred * rate, 2)
+            rec.update(effective_tax_rate=round(rate, 6), tax_rate_source="parcel_bill",
+                      annual_deferred_tax=annual, tax_year=current["year"],
+                      estimated_rollback=round(annual * rec["rollback_years"], 2))
+    return rec
 
 
 def _to_float(v: Any) -> Optional[float]:
@@ -655,8 +792,8 @@ def _lead_keys(li: Listing) -> list[str]:
 async def enrich_with_rollback_exposure(listings: Iterable[Listing]) -> dict[str, int]:
     """Stamp raw['rollback_exposure'] on leads sitting on a deferred parcel."""
     stats = {"targets": 0, "matched": 0, "matched_buncombe": 0,
-             "matched_anderson": 0, "matched_mecklenburg": 0,
-             "mecklenburg_live_confirmed": 0, "with_estimate": 0}
+             "matched_anderson": 0, "matched_mecklenburg": 0, "matched_wake": 0,
+             "mecklenburg_live_confirmed": 0, "wake_live_confirmed": 0, "with_estimate": 0}
     if os.environ.get(ENV_OFF):
         return stats
     leads = [li for li in listings]
@@ -672,13 +809,17 @@ async def enrich_with_rollback_exposure(listings: Iterable[Listing]) -> dict[str
     want_mecklenburg = any(
         _county_of(li) == "mecklenburg" and (li.state or "").upper() == "NC" for li in leads
     )
-    if not want_buncombe and not want_anderson and not want_mecklenburg:
+    want_wake = any(
+        _county_of(li) == "wake" and (li.state or "").upper() == "NC" for li in leads
+    )
+    if not want_buncombe and not want_anderson and not want_mecklenburg and not want_wake:
         log.info("rollback.no_relevant_counties")
         return stats
 
     buncombe: dict[str, dict[str, Any]] = {}
     anderson: dict[str, dict[str, Any]] = {}
     mecklenburg: dict[str, dict[str, Any]] = {}
+    wake: dict[str, dict[str, Any]] = {}
     async with client(timeout=60.0) as c:
         if want_buncombe:
             buncombe = await _fetch_buncombe(c)
@@ -689,14 +830,22 @@ async def enrich_with_rollback_exposure(listings: Iterable[Listing]) -> dict[str
         if want_mecklenburg:
             mecklenburg = _mecklenburg_index(await _fetch_mecklenburg_candidates(c))
             log.info("rollback.mecklenburg_loaded", parcels=len(mecklenburg))
+        if want_wake:
+            wake = _wake_index(await _fetch_wake_candidates(c))
+            log.info("rollback.wake_loaded", parcels=len(wake))
 
-    if not buncombe and not anderson and not mecklenburg:
+    if not buncombe and not anderson and not mecklenburg and not wake:
         return stats
 
     # (lead, matched normalized pid, the payload dict already stamped onto it) --
     # a small, board-bounded list: only Mecklenburg leads the bulk GIS pass above
     # actually matched get the extra live round-trip below.
     meck_topups: list[tuple[str, dict[str, Any]]] = []
+    #: Wake candidates carry no deferred-value record at all (NC OneMap's own `presentval` field
+    #: is blank for Wake, module docstring) -- only (lead, reid) pairs wait for the live top-up
+    #: below; nothing is stamped on a maybe-false-positive AGR/FOR candidate until Account.asp
+    #: itself confirms a real deferral.
+    wake_topups: list[tuple[Listing, str]] = []
     for li in leads:
         county, state = _county_of(li), (li.state or "").upper()
         if county == "buncombe" and state == "NC":
@@ -705,6 +854,8 @@ async def enrich_with_rollback_exposure(listings: Iterable[Listing]) -> dict[str
             idx, bucket = anderson, "matched_anderson"
         elif county == "mecklenburg" and state == "NC":
             idx, bucket = mecklenburg, "matched_mecklenburg"
+        elif county == "wake" and state == "NC":
+            idx, bucket = wake, "matched_wake"
         else:
             continue
         if not idx:
@@ -718,6 +869,10 @@ async def enrich_with_rollback_exposure(listings: Iterable[Listing]) -> dict[str
                 matched_key = k
                 break
         if rec is None:
+            continue
+
+        if bucket == "matched_wake":
+            wake_topups.append((li, rec["reid"]))
             continue
 
         payload = dict(rec)
@@ -760,6 +915,33 @@ async def enrich_with_rollback_exposure(listings: Iterable[Listing]) -> dict[str
                     stats["with_estimate"] += 1
                 payload["live_confirmed"] = True
                 stats["mecklenburg_live_confirmed"] += 1
+
+    if wake_topups:
+        capped_wake = wake_topups[:_WAKE_LIVE_CAP]
+        if len(wake_topups) > _WAKE_LIVE_CAP:
+            log.warning("rollback.wake_live_capped",
+                        matched=len(wake_topups), cap=_WAKE_LIVE_CAP)
+        # One REID can carry several board leads (a merged/duplicate row): fetch each distinct
+        # account once, stamp every lead that resolved to it.
+        by_reid: dict[str, list[Listing]] = {}
+        for li, reid in capped_wake:
+            by_reid.setdefault(reid, []).append(li)
+        async with client(timeout=60.0) as c:
+            for reid, lis in by_reid.items():
+                rec = await _wake_live_topup(c, reid)
+                if rec is None:
+                    continue
+                for li in lis:
+                    payload = dict(rec)
+                    payload["match_method"] = "parcel"
+                    if not isinstance(li.raw, dict):
+                        li.raw = {}
+                    li.raw["rollback_exposure"] = payload
+                    stats["matched"] += 1
+                    stats["matched_wake"] += 1
+                    stats["wake_live_confirmed"] += 1
+                    if payload.get("estimated_rollback"):
+                        stats["with_estimate"] += 1
 
     log.info("rollback.done", **stats)
     return stats

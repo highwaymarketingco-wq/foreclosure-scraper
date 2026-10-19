@@ -125,14 +125,22 @@ def _parse_sale_date(text: str) -> datetime | None:
 # contains a literal unescaped "<" in the source HTML -- a `[^<]*` capture
 # would silently truncate at it.
 def _account_field(html: str, label: str) -> str | None:
+    # Two value shapes share this label/cell layout: the common one is bold OUTSIDE the font tag
+    # (<B><FONT>...</FONT></B>, the shape every field read before 2026-10-18 used), but the
+    # Tax-Relief-section fields (Land Use Value, Use Value Deferment, Historic Deferment, Total
+    # Deferred Value -- added 2026-10-18 for rollback_exposure) print it bold INSIDE a lowercase
+    # <b> tag (<FONT><b>...</b></font>). Both alternatives are tried; a field in either shape
+    # resolves the same way it always has.
     m = re.search(
         re.escape(label) + r"</FONT></TD>\s*<TD[^>]*>(?:<DIV[^>]*>)?"
-        r"(?:<FONT[^>]*></FONT>)?<B><FONT[^>]*>(.*?)</FONT></B>(?:</DIV>)?</TD>",
+        r"(?:<FONT[^>]*></FONT>)?(?:<B><FONT[^>]*>(?P<v1>.*?)</FONT></B>"
+        r"|<FONT[^>]*><b>(?P<v2>.*?)</b></font>)(?:</DIV>)?</TD>",
         html, re.I | re.S,
     )
     if not m:
         return None
-    val = re.sub(r"&nbsp;", " ", m.group(1))
+    raw = m.group("v1") if m.group("v1") is not None else m.group("v2")
+    val = re.sub(r"&nbsp;", " ", raw)
     val = re.sub(r"\s+", " ", val).strip()
     return val or None
 
