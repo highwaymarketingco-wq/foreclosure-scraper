@@ -3476,6 +3476,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("gaston_mydt.failed", traceback=traceback.format_exc())
 
+    # SC qPayBill (29-county treasurer payment portal) multi-year unpaid-bill history — a pure,
+    # no-network restatement of the per-year depth counties_sc.qpaybill_delinquent_roll already
+    # fetches into its own raw['qpaybill_roll'] key, into the shared raw['multi_year_delinquent_tax']
+    # / raw['two_year_delinquent'] contract (see that module's own docstring; same pattern as
+    # gaston_mydt just above, different vendor). Must run BEFORE enrich_tax_owed, same reason as
+    # gaston_mydt.
+    try:
+        from .enrichment_qpaybill_multiyear_tax import enrich_qpaybill_multiyear_tax
+        s = enrich_qpaybill_multiyear_tax(enriched)
+        if s:
+            enrichment_stats["qpaybill_mydt"] = s
+    except Exception:
+        log.error("qpaybill_mydt.failed", traceback=traceback.format_exc())
+
     # Taxes-OWED normalizer — fold each tax source's own amount key (Buncombe
     # principal_tax_due, SC state-lien balance, Oconee FLC bid) into one
     # raw['tax_owed'], then cross-reference it onto any same-parcel lead (a court/
