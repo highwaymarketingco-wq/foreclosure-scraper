@@ -901,7 +901,22 @@ SPECS: dict[str, Spec] = {
                     walls=(("SC", "SC family-court index terms forbid automation"),),
                     doc="raw.divorce.case_count > 0 or cases non-empty; checked = the divorce wrapper is present"),
     "probate": Spec(_S, "county", "probate", applies="person", ledger="probate_heir",
-                    producers=("enrichment_probate_search.py", "scrapers/counties_sc/sc_public_notices.py"),
+                    # enrichment_probate_search.py is RETIRED 2026-10-09 (deploy/oracle/
+                    # run_profile.json's own unwired_allowlist: "module and board keys kept, not
+                    # run" -- its own module docstring repeats the same line almost verbatim).
+                    # main.py, the actual production pipeline, never imports it; the one place
+                    # that still does (scripts/enrich_board.py) is itself one of the "four ad-hoc
+                    # scripts... NEVER wired into the run" main.py's own enrich_deed_chain comment
+                    # names as superseded, not the live pipeline. It was never a real producer
+                    # here (2026-10-19 systematic gap_matrix.py producers-tuple sweep): its own
+                    # SC_PROBATE_COUNTY_CODES literal (Anderson/Bamberg/Cherokee/Greenville/
+                    # Laurens/Oconee/Pickens/Spartanburg/Union/York) is real code text, not a
+                    # comment, so a blanket counties_named_in() grep over it credited all 10 of
+                    # those -- live-measured, 3 (SC Bamberg, SC Greenville, SC York) have no OTHER
+                    # 'probate' producer at all (sc_public_notices.py, the column's only live
+                    # producer, never queries them), so those 3 county cells wrongly read "built"
+                    # from code that never actually runs.
+                    producers=("scrapers/counties_sc/sc_public_notices.py",),
                     doc="raw.probate names a decedent, es_case_number or nc_estate_file_no"),
     "vacancy": Spec(_S, "row", "code", ledger="vacant_structure",
                     producers=("scrapers/counties_nc/hendersonville_vacant_structures.py",
@@ -1653,6 +1668,121 @@ def _county_lien_sweep_marriage_credit() -> set[tuple[str, str]]:
     return {key for key, jobs in _cls.SWEEP_COUNTIES.items() if any(j.kind == "marriage" for j in jobs)}
 
 
+#: 2026-10-19 systematic sweep of EVERY Spec's producers tuple (the follow-up this session's own
+#: 5 one-at-a-time catches above called for). Same bug class again, but in nc_heir_estate_parcels.py's
+#: OWN text, not a dynamic registry or a shared/multi-purpose file: its COUNTY_GIS dict is keyed by
+#: literal "ST:County" strings ("NC:Cleveland", "SC:York", ...), but counties_named_in()'s own regex
+#: requires a quote/slash/underscore immediately before the county name (or a trailing "County"
+#: suffix) for a match -- a colon is neither, so EVERY one of this file's 20 real COUNTY_GIS entries
+#: (11 NC + 9 SC) silently fails to match, live-confirmed (zero matches from this file alone, despite
+#: it being a real, wired, single-purpose county-GIS producer, not a shared/dynamic one). The SC side
+#: overlaps with sc_heir_estate_parcel_cache_credit()'s own set (harmless double-credit via set union);
+#: the NC side (Buncombe/Burke/Cleveland/Gaston/Henderson/Lincoln/McDowell/Mitchell/Polk/Rutherford/
+#: Transylvania) has no other credit source at all today besides henderson_foreclosure_parcels.py's
+#: own single county. Live-measured: this has ZERO effect on today's published gap matrix (every one
+#: of those 11 NC counties already shows ran=True from real board hits, so classify_cell() never even
+#: consults code_counties for them) -- fixed anyway for correctness, the same way the other producer-
+#: credit helpers are, since it is a genuine, confirmed mismatch, not a guess.
+_NC_HEIR_ESTATE_PARCELS_REL = "scrapers/counties_nc/nc_heir_estate_parcels.py"
+
+
+def _nc_heir_estate_parcels_credit() -> set[tuple[str, str]]:
+    """Precise (state, county) credit for 'heir_estate' from nc_heir_estate_parcels.py's own
+    COUNTY_GIS registry keys (see _NC_HEIR_ESTATE_PARCELS_REL's own docstring for why the file's
+    blanket text match is empty despite 20 real entries). Empty set if the module can't be
+    imported."""
+    try:
+        from foreclosure_scraper.scrapers.counties_nc import nc_heir_estate_parcels as _nhep
+    except Exception:  # noqa: BLE001 - a missing/broken module leaves the blanket grep (empty) in place
+        return set()
+    out: set[tuple[str, str]] = set()
+    for key in _nhep.COUNTY_GIS:
+        st, _, co = key.partition(":")
+        if st and co:
+            out.add((st, co))
+    return out
+
+
+#: Same sweep, 'lien_priority' column. Its only producer, rod/enrich.py, carries ZERO literal
+#: county-name text of its own: its VENDORS dict is built entirely at import time from four OTHER
+#: modules' own constants (rod/cchs.py's CCHS_COUNTIES, rod/aumentum.py's AUMENTUM_COUNTIES,
+#: rod/cott.py's COTT_COUNTIES, rod/kofile.py's KOFILE_COUNTIES) -- bug-class shape (b), a county
+#: set resolved entirely at RUNTIME from other modules' registries, with nothing in THIS file for a
+#: blanket grep to find (live-confirmed: zero matches). rod.enrich.enrich_all() is wired live in
+#: main.py (not retired), so the real credit is 11 (state, county) pairs, not zero. Live-measured:
+#: this ALSO has zero effect on today's published gap matrix (every county with an applicable
+#: lien_priority row already shows ran=True, since rod.enrich already stamped it) -- fixed anyway,
+#: same reasoning as the heir_estate fix just above.
+def _rod_enrich_lien_priority_credit() -> set[tuple[str, str]]:
+    """Precise (state, county) credit for 'lien_priority' from rod/enrich.py's own VENDORS dict
+    (see this function's own docstring above for why the file's blanket text match is empty).
+    Empty set if the module can't be imported."""
+    try:
+        from foreclosure_scraper.rod import enrich as _rod_enrich
+    except Exception:  # noqa: BLE001 - a missing/broken module leaves the blanket grep (empty) in place
+        return set()
+    return set(_rod_enrich.VENDORS.keys())
+
+
+#: Same sweep, 'repeat_tax_loss' column. Its only producer, enrichment_repeat_tax_loss.py, carries
+#: ZERO per-county logic of any kind -- its enrich_repeat_tax_loss() loop takes li.county/li.state
+#: straight off whatever row it is handed, with no allowlist, registry or skip-list anywhere in the
+#: file (the same cross-parcel deed-chain join runs for every county, NC or SC alike). Live-confirmed:
+#: the file names zero literal county text (0 counties_named_in() matches) -- bug-class shape (b),
+#: just with no registry to read back INSTEAD of a blanket grep: the real "built" set already is the
+#: full state/county universe. Live-measured impact: 53 (state, county) cells currently read
+#: "sourced-not-built"/"no source known" for repeat_tax_loss purely because code_counties has nothing
+#: in it for this column at all, even though the module genuinely already runs there; a handful of
+#: others separately read "walled" from the unrelated 'tax' family's own portal-access wall, which
+#: this derived, deed-chain-only module never touches -- those stay walled regardless, since
+#: classify_cell() checks a declared wall before it ever looks at code_counties (a county_records_matrix
+#: family assignment question, outside this fix's scope, flagged for a future round, not touched here).
+def _repeat_tax_loss_credit() -> set[tuple[str, str]]:
+    """Every (state, county) pair in STATE_COUNTIES: enrichment_repeat_tax_loss.py's own
+    enrich_repeat_tax_loss() loop (see this function's own docstring above) applies uniformly to
+    whatever county/state a row carries, with no per-county registry, allowlist or skip-list of
+    any kind -- the real 'built' set already is the full state/county universe, not whatever a
+    blanket counties_named_in() text match over the file happens to find (zero, since the file
+    names no county as literal text at all)."""
+    return {(st, co) for st, counties in STATE_COUNTIES.items() for co in counties}
+
+
+#: Same sweep, 'child_support' column. enrichment_nc_case_status_tyler.py, one of its two
+#: producers, applies to EVERY NC county uniformly (is_target(): li.state == 'NC' and a case
+#: number already on the row -- no county registry, allowlist or skip-list anywhere in the file),
+#: so its real coverage is all 100 NC counties, but it names zero literal county text
+#: (live-confirmed: zero counties_named_in() matches) -- bug-class shape (b) again, this time with
+#: no registry to read back at all, just the state-wide-uniform coverage fact itself.
+#: enrichment_case_detail.py, the column's other producer, keeps its own (already-correct,
+#: SC_COUNTY_BY_CODE-driven) text-grep credit untouched. Live-measured: zero effect on today's
+#: published gap matrix (every NC county with an applicable child_support row already shows
+#: ran=True) -- fixed anyway, same reasoning as the other zero-impact-today fixes above.
+def _nc_case_status_tyler_credit() -> set[tuple[str, str]]:
+    """Every NC county: enrichment_nc_case_status_tyler.py's own is_target() gates only on
+    li.state == 'NC' plus a case number already on the row, never a county (see this function's
+    own docstring above)."""
+    return {("NC", c) for c in NC_COUNTIES}
+
+
+#: Same sweep, the 4 deed_chain_* / atty_deed_chain_fetched columns (deed_chain_has_history,
+#: deed_chain_break, deed_chain_distress_transfer, atty_deed_chain_fetched) -- all 4 share a
+#: single producer, enrichment_deed_chain.py, with the exact same universal, zero-restriction
+#: shape as repeat_tax_loss above ("a chronological ownership timeline synthesised from data
+#: other enrichers already gathered... Pure-Python, offline, no network, no quota", wired
+#: unconditionally in main.py): no county appears anywhere in the file, confirmed live (zero
+#: counties_named_in() matches), so the real 'built' set already is the full state/county
+#: universe. Unlike repeat_tax_loss/lien_priority/child_support, this one has REAL, non-zero
+#: impact today: SC/Fairfield (208 applicable rows, all 4 columns) currently reads "no source
+#: known" purely because code_counties has nothing for these columns at all, even though the
+#: module genuinely already ran there (live-measured: every other county with app>0 already
+#: shows ran=True, so Fairfield is the one place this mattered).
+def _deed_chain_credit() -> set[tuple[str, str]]:
+    """Every (state, county) pair in STATE_COUNTIES: enrichment_deed_chain.py applies uniformly
+    to whatever county/state a row carries, with no per-county registry, allowlist or skip-list
+    of any kind (see this function's own docstring above)."""
+    return {(st, co) for st, counties in STATE_COUNTIES.items() for co in counties}
+
+
 def built_in_code() -> dict[str, set[tuple[str, str]]]:
     pats = _county_patterns()
     out: dict[str, set[tuple[str, str]]] = {}
@@ -1687,13 +1817,16 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
     # direction: it credits the 3 counties this module deliberately EXCLUDES, via its own
     # _ALREADY_LIVE_COVERED literal, while missing the 20 it actually covers) name-match
     # contribution and replace it with the registry-derived precise credit, keeping
-    # nc_heir_estate_parcels.py's and henderson_foreclosure_parcels.py's own text-grep credit for
-    # this column untouched.
+    # henderson_foreclosure_parcels.py's own text-grep credit for this column untouched. Also
+    # drops nc_heir_estate_parcels.py's own blanket contribution (see
+    # _NC_HEIR_ESTATE_PARCELS_REL's own docstring: a "ST:County" colon-literal its own regex
+    # cannot see) and replaces it with that file's own COUNTY_GIS-derived precise credit.
     heir_spec = SPECS.get("heir_estate")
     if heir_spec and _SC_HEIR_ESTATE_PARCEL_CACHE_REL in heir_spec.producers:
-        other_files = [PKG / f for f in heir_spec.producers if f != _SC_HEIR_ESTATE_PARCEL_CACHE_REL]
+        drop = {_SC_HEIR_ESTATE_PARCEL_CACHE_REL, _NC_HEIR_ESTATE_PARCELS_REL}
+        other_files = [PKG / f for f in heir_spec.producers if f not in drop]
         base = counties_named_in([f for f in other_files if f.exists()], pats) if other_files else set()
-        out["heir_estate"] = base | _sc_heir_estate_parcel_cache_credit()
+        out["heir_estate"] = base | _sc_heir_estate_parcel_cache_credit() | _nc_heir_estate_parcels_credit()
     # marriage_license: same refinement for enrichment_county_lien_sweep.py/rod/county_sweeps.py
     # (see _COUNTY_LIEN_SWEEP_REL's own docstring) -- drop that pair's blanket name-match
     # contribution (24 counties, almost all from the unrelated "lien" job) and replace it with the
@@ -1711,6 +1844,33 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
         out.setdefault("marriage_license", set()).update(("NC", c) for c in _rc.MARRIAGE_ADAPTER.counties)
     except Exception:  # noqa: BLE001 - a missing optional module only leaves the cell 'not built'
         pass
+    # lien_priority: rod/enrich.py refinement (see _rod_enrich_lien_priority_credit's own
+    # docstring) -- its only producer has no literal county text at all; replace the (correctly
+    # empty) blanket grep with its own VENDORS registry.
+    if SPECS.get("lien_priority") and SPECS["lien_priority"].producers:
+        out["lien_priority"] = _rod_enrich_lien_priority_credit()
+    # repeat_tax_loss: enrichment_repeat_tax_loss.py refinement (see _repeat_tax_loss_credit's own
+    # docstring) -- its only producer has no literal county text and no per-county restriction at
+    # all; replace the (correctly empty) blanket grep with the full state/county universe it
+    # genuinely runs against.
+    if SPECS.get("repeat_tax_loss") and SPECS["repeat_tax_loss"].producers:
+        out["repeat_tax_loss"] = _repeat_tax_loss_credit()
+    # child_support: enrichment_nc_case_status_tyler.py refinement (see
+    # _nc_case_status_tyler_credit's own docstring) -- add its real, state-wide-uniform NC credit
+    # on top of enrichment_case_detail.py's own (already-correct) text-grep credit, which is left
+    # untouched.
+    cs_spec = SPECS.get("child_support")
+    if cs_spec and "enrichment_nc_case_status_tyler.py" in cs_spec.producers:
+        out["child_support"] = out.get("child_support", set()) | _nc_case_status_tyler_credit()
+    # deed_chain_has_history/deed_chain_break/deed_chain_distress_transfer/atty_deed_chain_fetched:
+    # enrichment_deed_chain.py refinement (see _deed_chain_credit's own docstring) -- its only
+    # producer has no literal county text and no per-county restriction at all; replace the
+    # (correctly empty) blanket grep with the full state/county universe it genuinely runs against.
+    for _col in ("deed_chain_has_history", "deed_chain_break", "deed_chain_distress_transfer",
+                 "atty_deed_chain_fetched"):
+        _spec = SPECS.get(_col)
+        if _spec and _spec.producers == ("enrichment_deed_chain.py",):
+            out[_col] = _deed_chain_credit()
     return out
 
 

@@ -571,22 +571,28 @@ def test_built_in_code_adds_sc_heir_estate_parcel_cache_credit():
     """End-to-end: built_in_code()'s real output for 'heir_estate' now credits the 6 SC counties
     this bug hid (already fully served by the shipped sc_heir_estate_parcel_cache.py producer).
     henderson_foreclosure_parcels.py's own (genuine, untouched) text-grep credit for NC/Henderson
-    survives too. nc_heir_estate_parcels.py's real coverage (its own _HEIR_COUNTIES list, e.g.
-    NC/Buncombe or SC/York) is a SEPARATE pre-existing instance of this same dynamic-list blind
-    spot in a DIFFERENT producer file -- out of scope here, correctly left untouched, and
-    confirmed live to already contribute zero blanket-grep credit before this fix too (its
-    "NC:Buncombe"-style literals are colon-prefixed, which counties_named_in()'s own pattern
-    does not match) -- so this fix neither adds nor removes anything for that file."""
+    survives too. nc_heir_estate_parcels.py's real coverage was flagged here, at the time, as "a
+    SEPARATE pre-existing instance of this same dynamic-list blind spot in a DIFFERENT producer
+    file -- out of scope here" -- the 2026-10-19 systematic sweep this comment called for found
+    it (its "NC:Cleveland"-style literals are colon-prefixed, which counties_named_in()'s own
+    pattern does not match) and fixed it with _nc_heir_estate_parcels_credit(), reading its own
+    COUNTY_GIS keys directly. SC/Beaufort, SC/Charleston and SC/York -- the 3 counties that bug
+    USED to reach by the wrong mechanism (a false match on sc_heir_estate_parcel_cache.py's own
+    _ALREADY_LIVE_COVERED exclusion-list literal, which this fix's own sc_heir_estate_parcel_cache
+    credit already corrected to exclude) -- are now legitimately credited again, through the
+    REAL mechanism: they are 3 of nc_heir_estate_parcels.py's own 9 real SC COUNTY_GIS entries,
+    exactly the "stay on nc_heir_estate_parcels.py's live producer instead" the exclusion-list's
+    own comment always said. NC/Beaufort is NOT one of COUNTY_GIS's 20 real keys (there is no
+    "NC:Beaufort" entry, only "SC:Beaufort"), so it correctly stays uncredited."""
     built = gm.built_in_code()
     for co in ("Greenville", "Orangeburg", "Dorchester", "Jasper", "Aiken", "Greenwood"):
         assert ("SC", co) in built["heir_estate"], f"SC/{co} should be credited by the parcel-cache producer"
     assert ("NC", "Henderson") in built["heir_estate"]  # henderson_foreclosure_parcels.py, untouched
-    # York/Charleston/Beaufort are explicitly EXCLUDED by sc_heir_estate_parcel_cache.py's own
-    # _ALREADY_LIVE_COVERED (they stay on nc_heir_estate_parcels.py's live producer instead) -- the
-    # pre-fix blanket grep picked these up from that very exclusion-list literal, a coincidental
-    # false credit from the same file this fix corrects, not a real credit from another producer.
-    for st, co in (("NC", "Beaufort"), ("SC", "Beaufort"), ("SC", "Charleston"), ("SC", "York")):
-        assert (st, co) not in built["heir_estate"], f"{st}/{co} was only ever a false credit from the excluded-list literal"
+    # now legitimately credited via nc_heir_estate_parcels.py's own real COUNTY_GIS entries
+    for st, co in (("SC", "Beaufort"), ("SC", "Charleston"), ("SC", "York")):
+        assert (st, co) in built["heir_estate"], f"{st}/{co} is a real nc_heir_estate_parcels.py COUNTY_GIS entry"
+    # NC/Beaufort is not: COUNTY_GIS has no "NC:Beaufort" key, only "SC:Beaufort"
+    assert ("NC", "Beaufort") not in built["heir_estate"]
 
 
 def test_county_lien_sweep_marriage_credit_reads_real_registry_not_text():
@@ -616,6 +622,127 @@ def test_built_in_code_drops_county_lien_sweep_false_marriage_credit():
         assert (st, co) not in built["marriage_license"], f"{st}/{co} has no marriage job, lien job only"
     # real register_checks.py text-grep credit (the Cott v4 family) keeps its credit
     assert ("NC", "Rowan") in built["marriage_license"]
+
+
+def test_built_in_code_drops_retired_probate_search_false_credit():
+    """2026-10-19 systematic producers-tuple sweep (the follow-up this session's own 5 one-at-a-
+    time catches called for): enrichment_probate_search.py was RETIRED 2026-10-09 (main.py never
+    runs it; the one script that still imports it, scripts/enrich_board.py, is itself one of the
+    ad-hoc scripts main.py's own enrich_deed_chain comment says were never wired into the real
+    run) but was still listed as a 'probate' producer, and its own SC_PROBATE_COUNTY_CODES literal
+    is real code text (not a comment), so a blanket grep over it credited 10 counties that never
+    actually get probate-searched by any code that runs. 3 of them (SC Bamberg, SC Greenville, SC
+    York) have no other 'probate' producer at all."""
+    built = gm.built_in_code()
+    for st, co in (("SC", "Bamberg"), ("SC", "Greenville"), ("SC", "York")):
+        assert (st, co) not in built["probate"], f"{st}/{co} has no live probate producer (retired module only)"
+    # sc_public_notices.py's own real text-grep credit (this column's only live producer) stays
+    assert ("SC", "Anderson") in built["probate"] and ("NC", "Beaufort") in built["probate"]
+
+
+def test_nc_heir_estate_parcels_credit_reads_county_gis_keys_not_text():
+    """2026-10-19 systematic sweep: nc_heir_estate_parcels.py's COUNTY_GIS dict is keyed by
+    literal 'ST:County' strings ('NC:Cleveland', 'SC:York', ...), but counties_named_in()'s own
+    regex needs a quote/slash/underscore immediately before the name (or a trailing 'County'
+    suffix) -- a colon satisfies neither, so its blanket text match is empty despite 20 real
+    entries. _nc_heir_estate_parcels_credit() reads COUNTY_GIS's own keys directly instead."""
+    assert gm.counties_named_in([gm.PKG / gm._NC_HEIR_ESTATE_PARCELS_REL]) == set()
+    credit = gm._nc_heir_estate_parcels_credit()
+    assert ("NC", "Cleveland") in credit and ("SC", "York") in credit
+    assert len(credit) == 20
+
+
+def test_built_in_code_adds_nc_heir_estate_parcels_credit():
+    """End-to-end: built_in_code()'s real output for 'heir_estate' now credits every NC county
+    nc_heir_estate_parcels.py's own COUNTY_GIS actually covers (not just Henderson, the one
+    henderson_foreclosure_parcels.py's own text-grep credit already caught)."""
+    built = gm.built_in_code()
+    for co in ("Buncombe", "Burke", "Cleveland", "Gaston", "Lincoln", "McDowell", "Mitchell",
+               "Polk", "Rutherford", "Transylvania"):
+        assert ("NC", co) in built["heir_estate"], f"NC/{co} is a real COUNTY_GIS entry"
+    assert ("NC", "Henderson") in built["heir_estate"]  # henderson_foreclosure_parcels.py, untouched
+
+
+def test_rod_enrich_lien_priority_credit_reads_vendors_not_text():
+    """2026-10-19 systematic sweep: 'lien_priority''s only producer, rod/enrich.py, carries no
+    literal county-name text at all -- its VENDORS dict is built entirely at import time from
+    rod/cchs.py, rod/aumentum.py, rod/cott.py and rod/kofile.py's own constants. A blanket grep
+    over this one file finds nothing; _rod_enrich_lien_priority_credit() reads VENDORS' own keys
+    directly instead."""
+    assert gm.counties_named_in([gm.PKG / "rod/enrich.py"]) == set()
+    credit = gm._rod_enrich_lien_priority_credit()
+    assert ("NC", "Buncombe") in credit and ("SC", "Oconee") in credit
+    assert len(credit) == 11
+
+
+def test_built_in_code_adds_lien_priority_credit():
+    """End-to-end: built_in_code()'s real output for 'lien_priority' is no longer empty -- it now
+    credits every (state, county) pair rod/enrich.py's own VENDORS registry actually drives."""
+    built = gm.built_in_code()
+    assert built["lien_priority"] == gm._rod_enrich_lien_priority_credit()
+    assert ("NC", "Mecklenburg") in built["lien_priority"]
+
+
+def test_repeat_tax_loss_credit_is_the_full_state_county_universe():
+    """2026-10-19 systematic sweep: enrichment_repeat_tax_loss.py's own enrich_repeat_tax_loss()
+    loop takes li.county/li.state straight off whatever row it is handed, with no per-county
+    registry, allowlist or skip-list anywhere in the file -- the same cross-parcel deed-chain join
+    runs for every county, NC or SC. A blanket grep over this file finds zero literal county text;
+    _repeat_tax_loss_credit() returns the full STATE_COUNTIES universe instead, since that is
+    genuinely what the code already covers."""
+    assert gm.counties_named_in([gm.PKG / "enrichment_repeat_tax_loss.py"]) == set()
+    credit = gm._repeat_tax_loss_credit()
+    assert ("NC", "Buncombe") in credit and ("SC", "Charleston") in credit
+    assert len(credit) == len(gm.NC_COUNTIES) + len(gm.SC_COUNTIES)
+
+
+def test_built_in_code_fills_repeat_tax_loss_credit():
+    """End-to-end: built_in_code()'s real output for 'repeat_tax_loss' is no longer empty."""
+    built = gm.built_in_code()
+    assert built["repeat_tax_loss"] == gm._repeat_tax_loss_credit()
+
+
+def test_nc_case_status_tyler_credit_is_every_nc_county():
+    """2026-10-19 systematic sweep: enrichment_nc_case_status_tyler.py's own is_target() gates
+    only on li.state == 'NC' plus a case number already on the row, never a county -- so its real
+    coverage is every NC county, but a blanket grep over the file finds zero literal county text."""
+    assert gm.counties_named_in([gm.PKG / "enrichment_nc_case_status_tyler.py"]) == set()
+    credit = gm._nc_case_status_tyler_credit()
+    assert credit == {("NC", c) for c in gm.NC_COUNTIES}
+
+
+def test_built_in_code_adds_nc_case_status_tyler_credit_keeps_case_detail():
+    """End-to-end: built_in_code()'s real output for 'child_support' now credits every NC county
+    (enrichment_nc_case_status_tyler.py's own state-wide reach) on top of
+    enrichment_case_detail.py's own (already-correct) SC_COUNTY_BY_CODE text-grep credit, which
+    keeps its credit untouched."""
+    built = gm.built_in_code()
+    assert ("NC", "Alleghany") in built["child_support"]   # only via the Tyler state-wide fix
+    assert ("SC", "Anderson") in built["child_support"]    # enrichment_case_detail.py, untouched
+
+
+def test_deed_chain_credit_is_the_full_state_county_universe():
+    """2026-10-19 systematic sweep: enrichment_deed_chain.py is the sole producer of all 4 of
+    deed_chain_has_history/deed_chain_break/deed_chain_distress_transfer/atty_deed_chain_fetched,
+    applies to every row with no per-county registry, allowlist or skip-list of any kind, and
+    names zero literal county text. _deed_chain_credit() returns the full STATE_COUNTIES universe
+    instead of the (correctly empty) blanket grep."""
+    assert gm.counties_named_in([gm.PKG / "enrichment_deed_chain.py"]) == set()
+    credit = gm._deed_chain_credit()
+    assert ("SC", "Fairfield") in credit
+    assert len(credit) == len(gm.NC_COUNTIES) + len(gm.SC_COUNTIES)
+
+
+def test_built_in_code_fills_deed_chain_credit_for_all_four_columns():
+    """End-to-end: built_in_code()'s real output for all 4 deed_chain-driven columns is no longer
+    empty. SC/Fairfield (208 applicable rows, previously 'no source known' on all 4 with code_counties
+    empty) is the one county where this has real, measured impact today -- every other county with
+    an applicable row already shows ran=True on the live board, independent of code_counties."""
+    built = gm.built_in_code()
+    for col in ("deed_chain_has_history", "deed_chain_break", "deed_chain_distress_transfer",
+                "atty_deed_chain_fetched"):
+        assert ("SC", "Fairfield") in built[col], col
+        assert built[col] == gm._deed_chain_credit()
 
 
 def test_read_baseline_maps_unknown(tmp_path):
