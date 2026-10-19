@@ -3490,6 +3490,32 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("ptscloud_mydt.failed", traceback=traceback.format_exc())
 
+    # NC ITSPublic tax-bill portal (BT TaxPayer Portal family: Onslow, Graham, Duplin + 9 more)
+    # multi-year unpaid-bill history — a pure, no-network restatement of the per-year depth
+    # counties_nc.nc_its_public_tax already fetches into its own raw key, into the shared
+    # raw['multi_year_delinquent_tax'] contract (see that module's own docstring). Must run
+    # BEFORE enrich_tax_owed, same reason as ustaxdata/gaston_mydt/ptscloud_mydt above.
+    try:
+        from .enrichment_its_public_multiyear_tax import enrich_its_public_multiyear_tax
+        s = enrich_its_public_multiyear_tax(enriched)
+        if s:
+            enrichment_stats["its_public_mydt"] = s
+    except Exception:
+        log.error("its_public_mydt.failed", traceback=traceback.format_exc())
+
+    # Randolph NC per-parcel tax search (PTS Public Web Access): multi-year unpaid-bill
+    # history, keyed by the board's own parcel_id. Same reason as gaston_mydt above: must run
+    # BEFORE enrich_tax_owed, which reads raw['multi_year_delinquent_tax']['total_due'] by
+    # exact key. Capped/budgeted per run (module docstring); gate off with
+    # FORECLOSURE_RANDOLPH_MYDT=0.
+    try:
+        from .enrichment_randolph_multiyear_tax import enrich_with_randolph_multiyear_tax
+        s = await _await_capped(enrich_with_randolph_multiyear_tax(enriched), "randolph_mydt")
+        if s:
+            enrichment_stats["randolph_mydt"] = s
+    except Exception:
+        log.error("randolph_mydt.failed", traceback=traceback.format_exc())
+
     # SC qPayBill (29-county treasurer payment portal) multi-year unpaid-bill history — a pure,
     # no-network restatement of the per-year depth counties_sc.qpaybill_delinquent_roll already
     # fetches into its own raw['qpaybill_roll'] key, into the shared raw['multi_year_delinquent_tax']

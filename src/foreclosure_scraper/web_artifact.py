@@ -2884,6 +2884,11 @@ RAW_KEEP = {
                                  # ~26,620 rows needs its own live fetch, capped per run -- drop
                                  # this sentinel here and every run re-walks the same first-N rows
                                  # and never reaches the rest.
+    "_randolph_mydt_checked": "*",  # enrichment_randolph_multiyear_tax's own "already checked, no
+                                 # multi-year history (or unresolvable)" stamp -- identical reason
+                                 # to _gaston_mydt_checked just above (one live form-POST per
+                                 # parcel, capped per run, 6,043-row backlog): drop this sentinel
+                                 # and every run re-walks the same first-N rows forever.
     # Why a coastal row is in scope (main._in_scope / _coastal_county_source; main.py: "Listings keep
     # tag raw.oceanfront=True so the dashboard can sort/filter them"): 6,207 / 356 / 356 / 296 / 58
     # rows on 10/8, none ever published.
