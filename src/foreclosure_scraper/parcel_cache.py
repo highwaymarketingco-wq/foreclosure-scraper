@@ -624,6 +624,16 @@ PARCEL_LAYERS: dict[str, dict] = {
         # 323,035 vs a 220,000 sale in 2016, 427,110 vs 425,000 in 2021) so it is a market
         # figure, not a 4% assessed one. Berkeley's PayStar rows already carry mail; this
         # adds the VALUE (0% today) and the situs.
+        #
+        # 2026-10-20 vacant_lot gap check: this layer is a DEAD END for that column. Its full
+        # 26-field schema (live-checked against the service's own ?f=json metadata) has no
+        # land_use/property-class field and no building/improvement value of any kind -- only
+        # the single combined TotalTaxValue above, so neither enrichment_vacant_landuse.py's
+        # text-landuse nor its _VALUE_ONLY_NO_LANDUSE (Sumter-style) fallback can read anything
+        # here. The real fix lives on a DIFFERENT already-built Berkeley source instead:
+        # counties_sc.berkeley_paystar_tax's own per-invoice assetMetaJson carries
+        # TotalBuildingCount (the county's CAMA structure count) -- see
+        # enrichment_berkeley_vacant_lot.py.
         "state": "SC",
         "url": "https://gis.berkeleycountysc.gov/arcgis/rest/services/internet/MapServer/4/query",
         "id_fields": ["O_TMS"],

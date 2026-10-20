@@ -305,7 +305,10 @@ _BILL_MONEY = {
     "qr_land_value": "QRLandValue", "qr_building_value": "QRBuildingValue",
     "ot_land_value": "OTLandValue", "ot_building_value": "OTBuildingValue",
     "ag_land_value": "AgLandValue", "ag_building_value": "AgBuildingValue",
-    "building_count": "TotalBuildingCount", "lot_count": "LotCount",
+    "lot_count": "LotCount",
+    # a real year (e.g. "2025"), never 0 unless no use-change is recorded -- correctly
+    # dropped by the truthy-only loop below when "0".
+    "rollback_use_change_year": "RollbackUseChangeYear",
 }
 _BILL_TEXT = {
     "penalty1_date": "Penalty1Date", "penalty2_date": "Penalty2Date", "penalty3_date": "Penalty3Date",
@@ -314,6 +317,10 @@ _BILL_TEXT = {
     "tax_district": "TaxDistrict", "fire_district": "FireDistrict", "jurisdiction": "Jurisdiction",
     "account_number": "AccountNum", "receipt_number": "ReceiptNumber",
     "rollback_code": "RollbackCode", "rollback_description": "RollbackDesc",
+    # live-verified 2026-10-20: literal "ROLLBACK TAXES" on a real invoice whose
+    # RollbackCode=="R" -- the confirming text of a realized (already-billed) ag-use
+    # rollback, not a blank disclaimer line.
+    "rollback_information": "RollbackInformation",
     "legal": "Legal1", "subdivision": "Sub", "block": "Block", "lot": "Lot",
 }
 
@@ -337,6 +344,17 @@ def _bill_detail(meta: dict) -> dict:
         v = str(meta.get(src) or "").strip()
         if v and not re.fullmatch(r"0+(\.0+)?", v):     # '000' is this roll's blank
             out[k] = v
+    # TotalBuildingCount is this county's own structure-count GROUND TRUTH (live-verified
+    # 2026-10-20 across 600 real invoices: always a clean small int, "0"/"1"/"2"/... never
+    # blank) -- unlike every _BILL_MONEY field above, a literal 0 here is the single most
+    # reliable "no structure" (vacant_lot) signal this project has for Berkeley, and the
+    # generic "if v" truthy loop above silently discarded it on every one of those rows
+    # (0 is falsy). Captured separately, unconditionally, whenever the source field itself
+    # parses -- so a 0 reading survives onto the row instead of looking identical to "not
+    # fetched". enrichment_berkeley_vacant_lot.py is the only consumer.
+    bc = _num(meta.get("TotalBuildingCount"))
+    if bc is not None:
+        out["building_count"] = bc
     return out
 
 
