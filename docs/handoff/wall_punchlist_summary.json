@@ -1,7 +1,7 @@
 {
- "board_rows": 437170,
+ "board_rows": 447006,
  "by_category": {
-  "uncovered": 188169,
+  "uncovered": 177620,
   "wall": 20358
  },
  "format_version": 1,
@@ -61,15 +61,15 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "tax_lien": {
-   "entries": 20552,
-   "generated_at": "2026-10-17T14:28:27Z"
+   "entries": 28032,
+   "generated_at": "2026-10-20T06:20:37Z"
   },
   "vacant_structure": {
    "entries": 50,
    "generated_at": "2026-10-17T14:28:27Z"
   }
  },
- "listings": 208527,
+ "listings": 197978,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4927,
@@ -92,42 +92,42 @@
    "counties_nc.gastonia_code_enforcement": 1149,
    "counties_nc.lincoln_vacant": 14878,
    "counties_nc.nc_county_pdf_delinquent_tax": 3204,
-   "counties_nc.nc_its_public_tax": 4455,
-   "counties_nc.nc_tax_lien_ads": 8632,
    "counties_nc.polk_tax": 1622,
-   "counties_nc.rowan_delinquent_tax": 2666,
    "counties_nc.transylvania_vacant": 10883,
    "counties_sc.charleston_delinquent_tax": 1757,
    "counties_sc.charleston_tax_sale_xlsx": 2393,
+   "counties_sc.sc_heir_estate_parcel_cache": 6060,
+   "counties_sc.sc_probate_net": 507,
+   "counties_sc.sc_probate_notices.yourpickenscounty": 442,
    "counties_sc.sc_public_index": 2680,
    "counties_sc.sc_public_notices": 643,
    "counties_sc.sc_ust_registry": 15582,
    "counties_sc.spartanburg_condemned": 1492,
    "counties_sc.spartanburg_vacant": 4223,
-   "counties_sc.york_delinquent_tax": 843,
    "courtlistener.recap": 730,
-   "national.distressed": 4786,
+   "national.distressed": 4777,
    "national.hud_reac_inspection": 817,
    "national.jail_bookings": 993,
+   "national.landandfarm": 461,
    "national.landwatch": 578,
    "national.sc_public_index": 1587,
    "national.usda_properties": 766
   },
   "top_counties": {
-   "NC:davidson": 4119,
-   "NC:duplin": 3206,
+   "NC:cumberland": 2185,
    "NC:durham": 2925,
+   "NC:forsyth": 2407,
    "NC:gaston": 24681,
    "NC:guilford": 4621,
-   "NC:hoke": 2978,
-   "NC:lee": 3008,
    "NC:lincoln": 16673,
    "NC:mcdowell": 2950,
    "NC:mecklenburg": 9160,
-   "NC:rowan": 3460,
    "NC:transylvania": 11297,
-   "NC:wake": 3884,
+   "NC:wake": 3880,
    "SC:charleston": 7696,
+   "SC:colleton": 2200,
+   "SC:pickens": 2067,
+   "SC:richland": 2202,
    "SC:spartanburg": 11125
   }
  },
