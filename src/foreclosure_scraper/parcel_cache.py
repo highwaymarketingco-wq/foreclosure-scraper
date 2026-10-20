@@ -673,6 +673,29 @@ PARCEL_LAYERS: dict[str, dict] = {
         # (weak, non-attribute) vacant_lot signal level -- see enrichment_vacant_landuse.py's
         # NULL-means-zero county allowlist, which exists only for this county: Aiken's
         # equivalent field uses a literal 0, not NULL, and must not get this treatment.
+        #
+        # OWNER-DECISION, UNRESOLVED (2026-10-20): mapping `improvement_value` currently
+        # blocks this county's cache from EVER completing a refresh. Two live refresh
+        # attempts both stopped at exactly 3,750/39,555 (15 pages of the configured
+        # page=250) -- not random bad luck, the SAME offset both times. Binary-searched it
+        # live: isolated single-row requests (resultRecordCount=1) at offsets 3750-3809
+        # show the county's OWN backend returns a real HTTP 502 specifically when
+        # BuildingValue (or the related TotalImprovementsValue) is in outFields for at
+        # least one row in that window -- the identical request minus that one field
+        # succeeds immediately. Every request against this layer already takes ~30s
+        # regardless of outcome (a slow CAMA join, not new), so this is not the
+        # already-documented "above 250 rows/page" timeout; it is a second, independent
+        # backend defect, and because _download_rows fetches every mapped field in ONE
+        # combined query, it blocks owner/address/mailing/value too, not just this field.
+        # Decoupling it into its own address_overlay-style query would not help -- that
+        # path is held to the identical completeness gate and would hit the same poisoned
+        # row(s) on its own pass. No cache file exists for this county yet (confirmed: it
+        # never has, despite being configured since 2026-09-21), so this does not regress
+        # a previously-working cache -- but it does mean the mapping below, while verified
+        # correct in isolation, cannot currently be bulk-refreshed end-to-end. Left mapped
+        # anyway (correct, tested via mocks) rather than reverted silently; a real fix
+        # needs either the county's backend to recover or a per-page fallback that retries
+        # a failing page with this one field dropped, neither attempted here.
         "state": "SC",
         "page": 250,   # the CAMA join answers 502 (backend timeout) above about 250 rows a page with this field set
         "url": "https://www.greenwoodsc.gov/arcgis/rest/services/Operational_Layers/CAMA/MapServer/9/query",
