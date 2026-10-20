@@ -3707,6 +3707,22 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("greenville_rollback_exposure.failed", traceback=traceback.format_exc())
 
+    # Harnett NC's own cama.harnett.org/ITSPublicHT BasicSearch product (the SAME "ITS Public"
+    # vendor already read for this county's TaxBillSearch product) carries a labelled "Deferred"
+    # line in its ViewParcel "Property Values" fieldset -- a bounded, live owner-name+address
+    # search+fetch (same shape as enrichment_bt_parcel_info.py's own 14-county flow), restated
+    # into the shared raw['rollback_exposure'] contract. See
+    # enrichment_harnett_rollback_exposure.py's own docstring for the live evidence and for why
+    # this is NOT the same gap as multi_year_delinquent_tax (a scraper run-depth issue, unrelated,
+    # not fixed here).
+    try:
+        from .enrichment_harnett_rollback_exposure import enrich_harnett_rollback_exposure
+        s = await _await_capped(enrich_harnett_rollback_exposure(enriched), "harnett_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["harnett_rollback_exposure"] = s
+    except Exception:
+        log.error("harnett_rollback_exposure.failed", traceback=traceback.format_exc())
+
     # NC OneMap statewide sweeps (never overwrites the tax relief / rollback dollar figures).
     try:
         from .enrichment_onemap_sweeps import enrich_onemap_sweeps

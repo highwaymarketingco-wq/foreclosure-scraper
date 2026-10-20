@@ -159,7 +159,15 @@ def parse_view_parcel(html: str) -> dict:
         out["deed_book"], out["deed_page"] = m.group(1), m.group(2)
 
     values = labelled("Property Values")
-    for src, dst in (("Market", "market_value"), ("Assessed", "assessed_value")):
+    # "Deferred" (2026-10-20, enrichment_harnett_rollback_exposure.py) -- the present-use/ag
+    # deferral value sitting in the SAME fieldset as Market/Assessed, on the SAME ITSPublic
+    # BasicSearch product this function already parses for every TENANTS county. Never checked
+    # before this change (the 2026-10-16 Warren County investigation was looking for tax-PAYMENT
+    # data, which this fieldset genuinely has none of -- a different question from whether it
+    # carries a present-use VALUE field, which it does). Extracted here, not in a county-specific
+    # module, so every TENANTS county benefits the same way the moment something reads it.
+    for src, dst in (("Market", "market_value"), ("Assessed", "assessed_value"),
+                     ("Deferred", "deferred_value")):
         v = re.sub(r"[^\d.]", "", values.get(src, ""))
         if v:
             try:
