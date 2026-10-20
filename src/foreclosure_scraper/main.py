@@ -3584,6 +3584,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("wake_mydt.failed", traceback=traceback.format_exc())
 
+    # Catawba NC per-parcel tax search (taxbill.catawbacountync.gov/ITSPublicCT, board PIN
+    # searches AlternateParcelIdentifier directly, no bridge needed): multi-year unpaid-bill
+    # history, keyed by the board's own parcel_id. Same reason as wake_mydt/randolph_mydt above:
+    # must run BEFORE enrich_tax_owed, which reads raw['multi_year_delinquent_tax']['total_due']
+    # by exact key. Capped/budgeted per run (module docstring); gate off with
+    # FORECLOSURE_CATAWBA_MYDT=0.
+    try:
+        from .enrichment_catawba_multiyear_tax import enrich_with_catawba_multiyear_tax
+        s = await _await_capped(enrich_with_catawba_multiyear_tax(enriched), "catawba_mydt")
+        if s:
+            enrichment_stats["catawba_mydt"] = s
+    except Exception:
+        log.error("catawba_mydt.failed", traceback=traceback.format_exc())
+
     # Taxes-OWED normalizer — fold each tax source's own amount key (Buncombe
     # principal_tax_due, SC state-lien balance, Oconee FLC bid) into one
     # raw['tax_owed'], then cross-reference it onto any same-parcel lead (a court/
