@@ -764,12 +764,26 @@ PARCEL_LAYERS: dict[str, dict] = {
         "state": "SC",
         "url": "https://www.gcgis.org/arcgis3/rest/services/GreenvilleNJ/QueryLayers/MapServer/0/query",
         "id_fields": ["PIN"],
+        # ROLLBK ADDED 2026-10-20 (rollback_exposure build). Live-verified against this
+        # SAME layer (county-wide): nonzero on 8,447 of 244,178 parcels, 1,854/1,902 of every
+        # PROPTYPE='AGRICULTURAL' parcel among them, every low-TOTTAX-relative-to-TAXMKTVAL
+        # signature a present-use parcel should have. Independently CONFIRMED against the
+        # county's own per-parcel bill page (the SAME Details.aspx this project's
+        # assessor_cards/greenville_sc.py already fetches for Greenville leads, live
+        # 2026-10-20, PIN 0132000100300): its VALUE section prints "Fair Market Value:",
+        # "Taxable Market Value:" AND "Total Rollback:" as three separate labelled lines --
+        # the county's own name for this figure is literally "Rollback", not a guessed
+        # derivation off two generically-named value columns (the NC PTS Cloud trap
+        # enrichment_rollback_deferral.py's module docstring warns about). ROLLBK is
+        # populated on some non-agricultural PROPTYPE rows too (residential-zoned acreage
+        # still under an ag/forestry current-use covenant on the land) -- the real gate is
+        # ROLLBK>0 itself, not PROPTYPE, matching the field, not a proxy for it.
         "map": {"owner": ["OWNAM1", "OWNAM2"],
                 "address": ["STRNUM", "STRPRE", "LOCATE", "STRTYP", "STRSUF"],
                 "owner_mailing": ["STREET", "CITY", "STATE", "ZIP5"],
                 "market_value": "FAIRMKTVAL", "tax_value": "TAXMKTVAL",
                 "acreage": "TACRES", "living_sqft": "SQFEET", "land_use": "PROPTYPE",
-                "sale_price": "SLPRICE", "sale_date": "DEEDDATE"},
+                "sale_price": "SLPRICE", "sale_date": "DEEDDATE", "rollback_tax": "ROLLBK"},
     },
     "Jasper": {
         # ADDED 2026-10-07 (docs/new_sources_2026-10-07_contact_and_facts.md). Jasper sat at
@@ -967,9 +981,9 @@ for _county, _facts in FACT_MAPS.items():
 #: enrichment_vacant_landuse.py if (and only if) its layer maps this column too.
 _COLS = ("owner", "address", "owner_mailing", "market_value", "tax_value", "acreage",
          "living_sqft", "land_use", "sale_price", "sale_date",
-         "year_built", "bedrooms", "bathrooms", "stories", "improvement_value")
+         "year_built", "bedrooms", "bathrooms", "stories", "improvement_value", "rollback_tax")
 _NUMERIC = {"market_value", "tax_value", "acreage", "living_sqft",
-            "year_built", "bedrooms", "bathrooms", "stories", "improvement_value"}
+            "year_built", "bedrooms", "bathrooms", "stories", "improvement_value", "rollback_tax"}
 #: SQLite type of each schema column (sale_price has always been REAL).
 _COL_TYPES = {c: ("REAL" if c in _NUMERIC or c == "sale_price" else "TEXT") for c in _COLS}
 #: The table DDL, built from _COLS so a new column cannot be added to one and not the other.

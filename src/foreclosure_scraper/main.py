@@ -3693,6 +3693,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("transylvania_rollback_exposure.failed", traceback=traceback.format_exc())
 
+    # Greenville SC's own parcel-CAMA layer carries a county-computed "ROLLBK" ("Total
+    # Rollback:" on the county's own bill page) field this project pulls in bulk via
+    # parcel_cache but never restated -- a pure, no-network restatement into the shared
+    # raw['rollback_exposure'] contract, same shape as the Transylvania block just above. See
+    # enrichment_greenville_rollback_exposure.py's own docstring for the live evidence and for
+    # why Spartanburg/Horry/Brunswick/Pickens were investigated and correctly left unbuilt.
+    try:
+        from .enrichment_greenville_rollback_exposure import enrich_greenville_rollback_exposure
+        s = enrich_greenville_rollback_exposure(enriched)
+        if s and s.get("matched"):
+            enrichment_stats["greenville_rollback_exposure"] = s
+    except Exception:
+        log.error("greenville_rollback_exposure.failed", traceback=traceback.format_exc())
+
     # NC OneMap statewide sweeps (never overwrites the tax relief / rollback dollar figures).
     try:
         from .enrichment_onemap_sweeps import enrich_onemap_sweeps
