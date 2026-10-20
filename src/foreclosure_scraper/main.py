@@ -3723,6 +3723,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("harnett_rollback_exposure.failed", traceback=traceback.format_exc())
 
+    # Hyde NC's lrcpwa.ncptscloud.com parcel-CAMA product carries explicit totalDeferredValue /
+    # useValueDeferred fields (NOT the bcpwa.ncptscloud.com BillPWA tax-roll the gap list named --
+    # that cluster has no present-use value field at all) -- a bounded, parcel-id-confirmed lookup
+    # restated into the shared raw['rollback_exposure'] contract. See
+    # enrichment_hyde_rollback_exposure.py's own docstring for the live evidence and for why the
+    # gap list's own next_action for this county was wrong about the source.
+    try:
+        from .enrichment_hyde_rollback_exposure import enrich_hyde_rollback_exposure
+        s = await _await_capped(enrich_hyde_rollback_exposure(enriched), "hyde_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["hyde_rollback_exposure"] = s
+    except Exception:
+        log.error("hyde_rollback_exposure.failed", traceback=traceback.format_exc())
+
     # NC OneMap statewide sweeps (never overwrites the tax relief / rollback dollar figures).
     try:
         from .enrichment_onemap_sweeps import enrich_onemap_sweeps

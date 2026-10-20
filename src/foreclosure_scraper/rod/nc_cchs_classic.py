@@ -58,7 +58,16 @@ COUNTIES: dict[str, CchsCounty] = {
 #: same app on the vendor's hosted servers, Cloudflare-challenged to an ordinary browser request
 #: on 2026-10-07: a person reads them (rod/cchs.py reads Burke, Cleveland, Lincoln, Madison,
 #: Henderson its own way)
-HOSTED_WALLED = ("Caldwell", "Camden", "Caswell", "Chowan", "Currituck", "Dare", "Duplin", "Franklin", "Gates",
+#:
+#: Duplin was RE-PROBED 2026-10-18 and moved off this list into rod/cchs.py's CCHS_COUNTIES --
+#: its realestatesearch.asp cleared even though root/application.asp still 403'd. Hyde was
+#: RE-PROBED LIVE 2026-10-20 against us4.courthousecomputersystems.com/HydeNCNW (app slug read off
+#: hyderod.net's own iframe, src="https://us4.courthousecomputersystems.com/Hydenc/") with BOTH
+#: tiers rod/cchs.py's _get_search_text uses (plain httpx AND curl-cffi Chrome impersonation):
+#: application.asp, realestatesearch.asp AND SearchService.asp all answered a Cloudflare "Just a
+#: moment..." 403 on EVERY combination -- unlike Duplin, Hyde never got past the bootstrap page on
+#: either tier. A genuine wall, not stale: Hyde stays here.
+HOSTED_WALLED = ("Caldwell", "Camden", "Caswell", "Chowan", "Currituck", "Dare", "Franklin", "Gates",
                  "Hertford", "Hyde", "Montgomery")
 
 
