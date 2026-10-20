@@ -776,6 +776,10 @@ DATELESS_OK_SOURCES = {
     "counties_nc.nc_ecourts_estates",            # NC eCourts estate filings (no sale date)
     "counties_nc.nc_ecourts_divorce",            # NC eCourts divorce filings (no sale date)
     "counties_nc.nc_heir_estate_parcels",        # heir/estate owner-of-record parcels (GIS, dateless)
+    # Johnston's static delinquent-tax file crosswalked to NC OneMap PINs -- a delinquent
+    # balance is a standing condition, never a scheduled event; this scraper's Listing() never
+    # sets sale_date, so without this entry _active_only() deletes every row it ever harvests.
+    "counties_nc.johnston_delinquent_tax_crosswalk",
     "counties_sc.sc_heir_estate_parcel_cache",   # SC heir/estate owner-of-record, parcel_cache-read (dateless)
     "counties_sc.spartanburg_vacant",            # Spartanburg City vacant registry (absentee+vacant, dateless)
     "counties_sc.spartanburg_condemned",         # Spartanburg condemned/dilapidated CAMA-condition signal (dateless)

@@ -60,6 +60,8 @@ _SOURCES = {
     "nc_ptscloud_delinquent_tax": ("nc_ptscloud_delinquent_tax", "principal_tax_due", "delinquent_tax"),
     "nc_county_pdf_delinquent_tax": ("nc_county_pdf_delinquent_tax", "total_due", "delinquent_tax"),
     "nc_county_csv_delinquent_tax": ("nc_county_csv_delinquent_tax", "total_due", "delinquent_tax"),
+    "johnston_delinquent_tax_crosswalk": ("johnston_delinquent_tax_crosswalk", "total_delinquent",
+                                          "delinquent_tax"),
     "rutherford_wildfire": ("rutherford_wildfire", "taxes_owed", "delinquent_tax"),
     "multi_year_delinquent_tax": ("multi_year_delinquent_tax", "total_due", "delinquent_tax"),
     "spartanburg_delinquent_tax": ("spartanburg_delinquent_tax", "balance", "delinquent_tax"),

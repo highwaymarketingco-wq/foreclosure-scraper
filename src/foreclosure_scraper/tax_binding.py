@@ -66,6 +66,7 @@ from .verification.core import address_key, address_relation
 #: account, not a parcel, when the block says is_account_id_not_parcel.
 BLOCK_PARCEL_FIELDS: dict[str, tuple[str, ...]] = {
     "nc_county_csv_delinquent_tax": ("county_id",),
+    "johnston_delinquent_tax_crosswalk": ("resolved_pin",),
     "nc_county_pdf_delinquent_tax": ("county_id",),
     "nc_ptscloud_delinquent_tax": ("parcel_raw", "parcel"),
     "albemarle_observer_tax_list": ("parcel",),
