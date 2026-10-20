@@ -624,6 +624,20 @@ def test_built_in_code_drops_county_lien_sweep_false_marriage_credit():
     assert ("NC", "Rowan") in built["marriage_license"]
 
 
+def test_built_in_code_adds_nc_harris_marriage_credit():
+    """End-to-end: built_in_code()'s real output for 'marriage_license' now credits NC/Mecklenburg
+    and NC/Carteret (rod/nc_harris.marriage_search, wired live in main.py via
+    enrichment_nc_rod_render.enrich_marriage_render -- OFF today only by the FORECLOSURE_NC_HARRIS_
+    ROD/MARRIAGE flags defaulting to 0, a cost hold per HANDOFF item 82, not missing code). Live-
+    reconfirmed 2026-10-20: meckrod.manatron.com/RealEstate + /Marriage answers a real
+    marriage_search('Mecklenburg', ...) with no login and no CAPTCHA (108 rows for a common name) --
+    a SEPARATE app on that host from the curl_cffi rod/aumentum.py /External/LandRecords path, which
+    is still broken (county-side ASP.NET 'Session state is not available in this context')."""
+    built = gm.built_in_code()
+    assert ("NC", "Mecklenburg") in built["marriage_license"]
+    assert ("NC", "Carteret") in built["marriage_license"]
+
+
 def test_built_in_code_drops_retired_probate_search_false_credit():
     """2026-10-19 systematic producers-tuple sweep (the follow-up this session's own 5 one-at-a-
     time catches called for): enrichment_probate_search.py was RETIRED 2026-10-09 (main.py never

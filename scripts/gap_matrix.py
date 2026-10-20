@@ -831,7 +831,8 @@ SPECS: dict[str, Spec] = {
                           doc="raw.lien_priority present; applies to rows with a register pull"),
     "rollback_exposure": Spec(_S, "county", "tax", producers=("enrichment_rollback_deferral.py",
                                                               "enrichment_tax_relief.py",
-                                                              "enrichment_transylvania_rollback_exposure.py"),
+                                                              "enrichment_transylvania_rollback_exposure.py",
+                                                              "enrichment_greenville_rollback_exposure.py"),
                               doc="raw.rollback_exposure present (present-use/ag deferral rollback)"),
     "jail_booking": Spec(_S, "county", "jail", applies="person", ledger="jail_booking",
                          producers=("enrichment_jail_bookings.py", "scrapers/national/jail_bookings.py",
@@ -1842,6 +1843,30 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
     try:
         from foreclosure_scraper.rod import register_checks as _rc
         out.setdefault("marriage_license", set()).update(("NC", c) for c in _rc.MARRIAGE_ADAPTER.counties)
+    except Exception:  # noqa: BLE001 - a missing optional module only leaves the cell 'not built'
+        pass
+    # marriage_license, Mecklenburg + Carteret: rod/nc_harris.marriage_search (the Marriage index of
+    # the SAME Harris 'ROD Web Access' app rod/nc_harris.py's real-estate adapter already covers) is
+    # wired live in main.py (enrichment_nc_rod_render.enrich_marriage_render, called from
+    # enrich_nc_rod_render, main.py:3189) -- not a retired/unwired module. It reads 0 rows in
+    # production today only because FORECLOSURE_NC_HARRIS_MARRIAGE (and the FORECLOSURE_NC_HARRIS_ROD
+    # platform flag it depends on) default to 0, a deliberate cost hold pending a memory/time
+    # measurement (HANDOFF item 82: a browser lookup here runs 15-20s / ~540MB peak) -- a flag-off
+    # hold, not missing code, so this cell should read built-but-low-yield, not sourced-not-built.
+    # Not found by the blanket counties_named_in() grep because nc_harris.py is not one of this
+    # column's declared `producers` (the files that write raw['marriage_license'] through THIS path
+    # are enrichment_nc_rod_render.py + rod/nc_harris.py, neither listed), same bug-class shape as the
+    # register_checks credit just above. Mecklenburg's gap-list entry (2026-10-20 ask) named
+    # meckrod.manatron.com as a single source; it is actually TWO separate apps on that host -- the
+    # curl_cffi rod/aumentum.py path (/External/LandRecords) is LIVE-RECONFIRMED broken 2026-10-20
+    # (county-side System.Web.HttpException "Session state is not available in this context", not a
+    # wall, not a code bug, matches enrichment_marriage_license.py's 2026-10-09 finding verbatim) --
+    # it is the SEPARATE /RealEstate + /Marriage app rod/nc_harris.py targets (live-reconfirmed
+    # working 2026-10-20: a real marriage_search('Mecklenburg', ...) call returned 108 real 1881-2026
+    # licence rows, no login, no CAPTCHA) that earns this credit.
+    try:
+        from foreclosure_scraper.rod import nc_harris as _nh
+        out.setdefault("marriage_license", set()).update(("NC", c) for c in _nh.COUNTIES)
     except Exception:  # noqa: BLE001 - a missing optional module only leaves the cell 'not built'
         pass
     # lien_priority: rod/enrich.py refinement (see _rod_enrich_lien_priority_credit's own
