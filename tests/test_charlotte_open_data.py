@@ -252,3 +252,23 @@ def test_code_enforcement_violation_detail_carries_case_number_and_status():
     assert v["case_id"] == "20190055069"
     assert v["violation"] == "Housing"
     assert v["status"] == "Open"
+
+
+# --------------------------------------------------------------------------
+# 2026-10-20 gap-sweep fix: fof_ordered must also feed the gap_matrix.py
+# 'vacancy' (raw['vacancy'] wrapper) and 'vacant' (raw['gis']['vacant'])
+# columns, not just 'condemned' -- same already-fetched flag, no new request.
+# --------------------------------------------------------------------------
+
+def test_fof_ordered_case_stamps_vacancy_wrapper_and_gis_vacant():
+    li = _to_listing(_row(case_type="Housing", fof_ordered=1))
+    assert li.raw["condemned"] is True
+    assert li.raw["vacancy"]["vacant"] is True
+    assert li.raw["vacancy"]["source"] == "charlotte_open_data"
+    assert li.raw["gis"]["vacant"] is True
+
+
+def test_non_fof_case_does_not_stamp_vacancy_or_gis_vacant():
+    li = _to_listing(_row(case_type="Housing", fof_ordered=0))
+    assert "vacancy" not in li.raw
+    assert "gis" not in li.raw

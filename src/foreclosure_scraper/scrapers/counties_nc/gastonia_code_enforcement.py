@@ -188,6 +188,22 @@ later. No fix applied; nothing to fetch today. If Gastonia's CityView
 instance ever starts attaching inspection photos to cases, they would
 surface in that same container and `fetch_case_description()` is the
 natural place to pick them up alongside the description text.
+
+2026-10-20 fix (Gaston/Lincoln/Mecklenburg "no source known" gap-sweep for
+`condemned`/`vacancy`): `gap_matrix.py`'s `condemned` column requires a
+literal `raw['condemned'] is true`, and `vacancy` requires a
+`raw['vacancy']` wrapper -- this module has always fetched `Status` but only
+ever used it to decide open-vs-closed, never mined it for its own
+disposition text. Live full-city crawl 2026-10-20 (19,515 total markers)
+found a real, small, currently-open condemnation lane: 6 "Order to
+Demolish", 2 "Order to Repair/Vacate", 2 "Order to Demolish/Vacate" -- the
+city's own minimum-housing vacate/demolition order, Gastonia's equivalent of
+Charlotte's FOFOrdered flag (`charlotte_open_data.py`) and Hendersonville's
+CONDEMNED column (`hendersonville_vacant_structures.py`). "Order to Repair"
+alone (5 open cases) is deliberately NOT matched -- a repair order does not
+by itself mean the structure was vacated. No new request: `Status` was
+already in `_OUT`/fetched on every row this module processes; see
+`_CONDEMNED_STATUS_RE` below.
 """
 from __future__ import annotations
 
@@ -259,6 +275,22 @@ _SEVERE_RE = re.compile(
     r"(housing|nuisance|junk|encampment|commercial maintenance|abandoned vehicle)",
     re.I)
 _CASE_YEAR_RE = re.compile(r"^CE[A-Z]+(\d{4})\d+$")
+
+#: Gap-sweep 2026-10-20 (Gaston/Lincoln/Mecklenburg no-source-known audit for
+#: condemned/vacancy): this feed's own `Status` field (already fetched, never
+#: mined for this) carries a real condemnation sub-status, confirmed live
+#: against a fresh full-city crawl the same day -- `Status` breakdown of
+#: 19,515 total markers: 6 "Order to Demolish", 2 "Order to Repair/Vacate", 2
+#: "Order to Demolish/Vacate" (plus 5 "Order to Repair" alone, deliberately
+#: NOT matched here -- a repair order does not by itself mean the structure is
+#: vacated, unlike the city's own minimum-housing "Vacate" determination).
+#: `gap_matrix.py`'s "condemned" column requires a literal `raw['condemned']
+#: is true`; this scraper never set it despite the city's own Status text
+#: already saying so on every request this module already makes (no new
+#: network cost). Matched against STATUS, not ApplicationTypeDescription --
+#: a City-of-Gastonia-specific field with its own vocabulary, independent of
+#: `_SEVERE_RE` above (which reads the category, not the disposition).
+_CONDEMNED_STATUS_RE = re.compile(r"(vacate|demolish)", re.I)
 
 _POLY_FLAGS = {
     "AppealPeriodStatusesOnly": "false",
@@ -458,6 +490,7 @@ def build_listing(markers: list[dict], parcels: dict[str, dict] | None = None,
     years: list[int] = []
     open_count = 0
     severe = False
+    condemned = False
     for m in markers:
         ref = m.get("ReferenceNumber")
         status = str(m.get("Status") or "unknown")
@@ -467,6 +500,8 @@ def build_listing(markers: list[dict], parcels: dict[str, dict] | None = None,
             open_count += 1
             if _SEVERE_RE.search(ctype):
                 severe = True
+            if _CONDEMNED_STATUS_RE.search(status):
+                condemned = True
         types.add(ctype)
         yr = _case_year(ref)
         if yr:
@@ -505,6 +540,22 @@ def build_listing(markers: list[dict], parcels: dict[str, dict] | None = None,
         },
     }
     if severe:
+        raw["distressed"] = True
+    if condemned:
+        # A currently-open "Order to Vacate"/"Order to Demolish" is the city's
+        # own condemnation determination -- stamp the same two keys
+        # hendersonville_vacant_structures.py and charlotte_open_data.py
+        # (fof_ordered) already write for their own condemnation-equivalent
+        # signal, so every downstream reader (gap_matrix's condemned column,
+        # distress_score, the vacant_structure ledger) sees it the same way.
+        raw["code_enforcement"]["condemned"] = True
+        raw["condemned"] = True
+        raw["vacancy"] = {
+            "vacant": True,
+            "boarded_up": None,
+            "utility_status": None,
+            "source": "gastonia_cityview_locator",
+        }
         raw["distressed"] = True
 
     headline = sorted(types)[0] if types else "code violation"

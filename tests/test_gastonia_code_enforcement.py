@@ -412,6 +412,92 @@ def test_code_enforcement_signal_is_scored_when_vacancy_adjacent():
 
 
 # --------------------------------------------------------------------------- #
+# 2026-10-20 fix (Gaston "no source known" gap-sweep for condemned/vacancy):
+# real, live Status values pulled from a fresh full-city crawl 2026-10-20 --
+# "Order to Demolish" (6 open), "Order to Repair/Vacate" (2), "Order to
+# Demolish/Vacate" (2). "Order to Repair" alone (5 open, NOT a vacate order)
+# is a deliberate negative case below.
+# --------------------------------------------------------------------------- #
+
+#: Real case captured live 2026-10-20 (AKPAR/MapPoint are not the verbatim
+#: captured values -- not recorded at sample time -- but Status, category,
+#: and address are real).
+ORDER_TO_REPAIR_VACATE_OPEN = {
+    "ApplicationTypeDescription": "Housing",
+    "LinkText": "CEH20261740:Housing",
+    "LinkUri": "https://devsvcs.gastonianc.gov/CodeEnforcement/StatusReference?referenceNumber=CEH20261740",
+    "MapRelationValue": {"LayerName": "Parcels", "AttributeName": "AKPAR", "AttributeValue": "106679"},
+    "MapPoint": {"X": -9041450.49689244, "Y": 4199404.041503582, "WKID": 3857},
+    "Module": "CE",
+    "PrimaryLocation": "2104 MORTON AVE, GASTONIA, NC 28052",
+    "ReferenceNumber": "CEH20261740",
+    "Status": "Order to Repair/Vacate",
+}
+
+ORDER_TO_DEMOLISH_OPEN = {
+    "ApplicationTypeDescription": "Housing",
+    "LinkText": "CEH20262001:Housing",
+    "LinkUri": "https://devsvcs.gastonianc.gov/CodeEnforcement/StatusReference?referenceNumber=CEH20262001",
+    "MapRelationValue": {"LayerName": "Parcels", "AttributeName": "AKPAR", "AttributeValue": "108200"},
+    "MapPoint": {"X": -9040000.0, "Y": 4198000.0, "WKID": 3857},
+    "Module": "CE",
+    "PrimaryLocation": "100 DEMOLITION DR, GASTONIA, NC 28052",
+    "ReferenceNumber": "CEH20262001",
+    "Status": "Order to Demolish",
+}
+
+#: Real status (5 open, live 2026-10-20) -- a repair order alone does NOT
+#: mean the structure was vacated; must NOT stamp condemned.
+ORDER_TO_REPAIR_ONLY_OPEN = {
+    "ApplicationTypeDescription": "Housing",
+    "LinkText": "CEH20262100:Housing",
+    "LinkUri": "https://devsvcs.gastonianc.gov/CodeEnforcement/StatusReference?referenceNumber=CEH20262100",
+    "MapRelationValue": {"LayerName": "Parcels", "AttributeName": "AKPAR", "AttributeValue": "109300"},
+    "MapPoint": {"X": -9039000.0, "Y": 4197000.0, "WKID": 3857},
+    "Module": "CE",
+    "PrimaryLocation": "200 REPAIR RD, GASTONIA, NC 28052",
+    "ReferenceNumber": "CEH20262100",
+    "Status": "Order to Repair",
+}
+
+
+def test_order_to_repair_vacate_stamps_condemned_and_vacancy():
+    li = mod.build_listing([ORDER_TO_REPAIR_VACATE_OPEN])
+    assert li.raw["condemned"] is True
+    assert li.raw["code_enforcement"]["condemned"] is True
+    assert li.raw["vacancy"]["vacant"] is True
+    assert li.raw["vacancy"]["source"] == "gastonia_cityview_locator"
+    assert li.raw["distressed"] is True
+
+
+def test_order_to_demolish_stamps_condemned_and_vacancy():
+    li = mod.build_listing([ORDER_TO_DEMOLISH_OPEN])
+    assert li.raw["condemned"] is True
+    assert li.raw["vacancy"]["vacant"] is True
+
+
+def test_order_to_repair_alone_does_not_stamp_condemned():
+    """A repair order with no vacate/demolish language is NOT a condemnation --
+    the structure may still be occupied while repairs happen."""
+    li = mod.build_listing([ORDER_TO_REPAIR_ONLY_OPEN])
+    assert "condemned" not in li.raw
+    assert "vacancy" not in li.raw
+    assert "condemned" not in li.raw["code_enforcement"]
+    # Still a real, severe, open case -- just not a condemnation.
+    assert li.raw["code_enforcement"]["severe"] is True
+    assert li.raw["distressed"] is True
+
+
+def test_closed_vacate_order_does_not_stamp_condemned():
+    """A HISTORICAL vacate/demolish order that has since closed must not be
+    read as a CURRENT condemnation -- only an OPEN case counts."""
+    closed = dict(ORDER_TO_DEMOLISH_OPEN, Status="Closed - Remedied")
+    li = mod.build_listing([closed, PNU_OPEN])
+    assert "condemned" not in li.raw
+    assert "vacancy" not in li.raw
+
+
+# --------------------------------------------------------------------------- #
 # Description fetch (2026-10-13 fix, source-completeness audit Pattern D):
 # `LocationMarkers` carries a `Description` key in its own schema but
 # `LocatorResultsPolygon` never populates it (live-verified 2026-10-13: a

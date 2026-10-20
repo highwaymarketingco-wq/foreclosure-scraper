@@ -74,6 +74,16 @@ objectids (3135, 23299): the server rejects it outright --
 `{"error":{"code":400,"message":"This layer/table is NOT attachments
 enabled","details":[]}}` -- not an empty-but-enabled layer, the capability
 does not exist on this service at all. No fix applied; nothing to fetch.
+
+2026-10-20 fix (Gaston/Lincoln/Mecklenburg "no source known" gap-sweep for
+`vacancy`/`vacant`): a `FOFOrdered` (Findings of Fact demolition order) case
+already stamped `raw['condemned']`, but gap_matrix.py's separate `vacancy`
+column (a `raw['vacancy']` wrapper) and `vacant` column (`raw['gis']
+['vacant']` specifically) were never wired from the same already-fetched
+flag. Both now follow from `fof_ordered` -- an order to vacate is as strong a
+"confirmed vacant" signal as a code officer's own vacant-structure
+determination (`hendersonville_vacant_structures.py`'s own convention). No
+new request.
 """
 from __future__ import annotations
 
@@ -261,6 +271,26 @@ def _to_listing(attrs: dict, geometry: dict | None = None) -> Listing | None:
         raw["distressed"] = True
     if fof_ordered:
         raw["condemned"] = True
+        # 2026-10-20 fix (Gaston/Lincoln/Mecklenburg "no source known" gap-sweep
+        # for vacancy/vacant): a Findings-of-Fact demolition order already
+        # stamps raw['condemned'] (above), but gap_matrix.py's SEPARATE
+        # 'vacancy' column needs its own raw['vacancy'] wrapper (same shape
+        # hendersonville_vacant_structures.py writes) and the 'vacant' column
+        # needs raw['gis']['vacant'] specifically (NOT the bare top-level
+        # raw['vacant'] -- confirmed live 2026-10-16 fix in gap_matrix.py's own
+        # _cohort_flags comment). Neither was ever wired even though fof_ordered
+        # -- an order the owner has already been told to vacate the structure --
+        # is as strong a "confirmed vacant" signal as any code officer's own
+        # on-site vacant-structure determination. No new request: FOFOrdered is
+        # already fetched on every row. 16 real currently-open cases,
+        # live-verified 2026-10-02 (module docstring above).
+        raw["vacancy"] = {
+            "vacant": True,
+            "boarded_up": None,
+            "utility_status": None,
+            "source": "charlotte_open_data",
+        }
+        raw.setdefault("gis", {})["vacant"] = True
 
     return Listing(
         source="city_websites.charlotte_open_data",
