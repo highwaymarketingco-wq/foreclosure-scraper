@@ -79,6 +79,17 @@ _TEXT_LANDUSE_SKIP_VACANT_GATE = frozenset({"Greenwood", "Aiken"})
 _NULL_IMPROVEMENT_VALUE_MEANS_ZERO = frozenset({"Greenwood"})
 _GREENWOOD_NULL_IMPROVEMENT_EXCLUDED_PROPTYPES = frozenset({"Commercial", "Multi-Family"})
 
+# 2026-10-20: Sumter SC. Its parcel_cache.py layer carries NO land_use/property-type field
+# of any kind -- not even a bare-digit DOR code, which is what the numeric-gate branch below
+# normally requires before it will even look at improvement_value. It DOES map a real
+# improvement_value (market_value_building, live-confirmed on the layer's own field
+# metadata). Precision was measured against World Imagery satellite tiles cropped to each
+# sampled parcel's own polygon boundary (see parcel_cache.py's Sumter entry for the full
+# live-verification note): 10/10 clean (5 zero-value parcels genuinely wooded/undeveloped,
+# 5 nonzero parcels each showing a real rooftop inside the boundary). No property-type field
+# exists to segment by, so this is a flat, county-wide rule, not a per-type allowlist.
+_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter"})
+
 
 def _has_cache(memo: dict, county: str, state: str | None) -> bool:
     """A parcel-cache file exists for the county. cached_counties() lists only the dedicated
@@ -109,7 +120,10 @@ def enrich_vacant_landuse(listings: Iterable[Listing]) -> dict:
             continue
         rec = parcel_cache.lookup(county, pid, li.state)
         lu = (rec or {}).get("land_use")
-        if not lu:
+        # A county on _VALUE_ONLY_NO_LANDUSE (Sumter: no land_use field exists at all) skips
+        # straight to the improvement_value fallback below instead of being dropped here --
+        # see that set's own docstring for the live verification backing this.
+        if not lu and county not in _VALUE_ONLY_NO_LANDUSE:
             continue
         stats["eligible"] += 1
         # The county's own class string is the row's land use. It was only ever stamped inside
@@ -117,12 +131,12 @@ def enrich_vacant_landuse(listings: Iterable[Listing]) -> dict:
         # cube counted vacant_lot as unchecked on it (top-80 2026-10-09: Mecklenburg 5 of 17,733
         # rows, Spartanburg 6,995 of 19,380). The comps pass runs earlier in the same run, so this
         # does not change this run's valuation; Listing.land_use is documented as GIS-backfilled.
-        if not (getattr(li, "land_use", None) or "").strip():
+        if lu and not (getattr(li, "land_use", None) or "").strip():
             clean = str(lu).strip()
             if clean and not clean.isdigit():
                 li.land_use = clean.title() if clean.isupper() else clean
                 stats["land_use_filled"] = stats.get("land_use_filled", 0) + 1
-        if _is_vacant_land_use(str(lu)):
+        if lu and _is_vacant_land_use(str(lu)):
             if not isinstance(li.raw, dict):
                 li.raw = {}
             # idempotent — don't re-stamp on a re-run
@@ -142,7 +156,7 @@ def enrich_vacant_landuse(listings: Iterable[Listing]) -> dict:
         # didn't match the VACANT/VAC wordlist is left alone, not silently reinterpreted --
         # UNLESS this county is on the allowlist above (its text land_use is confirmed to
         # carry no vacant/improved signal of its own, live-verified per-county).
-        if not str(lu).strip().isdigit() and county not in _TEXT_LANDUSE_SKIP_VACANT_GATE:
+        if lu and not str(lu).strip().isdigit() and county not in _TEXT_LANDUSE_SKIP_VACANT_GATE:
             continue
         imprv = (rec or {}).get("improvement_value")
         has_other_signal = (rec or {}).get("market_value") or (rec or {}).get("acreage")
@@ -156,9 +170,12 @@ def enrich_vacant_landuse(listings: Iterable[Listing]) -> dict:
         if float(imprv) == 0.0:
             if not isinstance(li.raw, dict):
                 li.raw = {}
-            li.raw["vacant_lot"] = {"land_use": str(lu).strip()[:60],
-                                     "improvement_value": 0,
-                                     "source": "parcel_cache_improvement_value"}
+            # lu is None for a _VALUE_ONLY_NO_LANDUSE county (no land_use field exists at
+            # all there) -- omit the key rather than stamp the literal string "None".
+            stamp = {"improvement_value": 0, "source": "parcel_cache_improvement_value"}
+            if lu:
+                stamp["land_use"] = str(lu).strip()[:60]
+            li.raw["vacant_lot"] = stamp
             stats["stamped"] += 1
             stats["stamped_by_improvement_value"] += 1
         # improved (imprv > 0): genuinely not a vacant lot. Still record that this row

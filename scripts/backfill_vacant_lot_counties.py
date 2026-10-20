@@ -67,7 +67,8 @@ sys.path.insert(0, str(REPO / "src"))
 
 from foreclosure_scraper import parcel_cache  # noqa: E402
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
-from foreclosure_scraper.enrichment_vacant_landuse import enrich_vacant_landuse  # noqa: E402
+from foreclosure_scraper.enrichment_vacant_landuse import (  # noqa: E402
+    _VALUE_ONLY_NO_LANDUSE, enrich_vacant_landuse)
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import board_lock, patch_existing_rows  # noqa: E402
 
@@ -80,6 +81,10 @@ DEFAULT_TARGETS: tuple[tuple[str, str], ...] = (
     ("Colleton", "SC"),
     ("Barnwell", "SC"),
     ("Beaufort", "SC"),
+    # 2026-10-20 round: Sumter SC, the enrichment_vacant_landuse._VALUE_ONLY_NO_LANDUSE
+    # county -- its cache has NO land_use field at all, so _check_cache_prereq below checks
+    # improvement_value populated for it instead of land_use (see that function's own note).
+    ("Sumter", "SC"),
 )
 
 
@@ -94,7 +99,11 @@ def _dedupe_key(rec: dict) -> str | None:
 def _check_cache_prereq(targets) -> dict[tuple[str, str], int]:
     """Refuse targets whose cache on THIS host has no data for the field(s)
     this round's mapping needs -- same discipline as the Horry script's
-    _check_cache_prereq, generalized to "land_use populated at all"."""
+    _check_cache_prereq, generalized to "land_use populated at all".
+
+    A county on enrichment_vacant_landuse._VALUE_ONLY_NO_LANDUSE (Sumter: the layer has no
+    land_use field of any kind, see that set's own docstring) is checked against
+    improvement_value instead -- the field its whole signal actually comes from there."""
     import sqlite3
     ok: dict[tuple[str, str], int] = {}
     for county, state in targets:
@@ -102,18 +111,24 @@ def _check_cache_prereq(targets) -> dict[tuple[str, str], int]:
         if not db_path.exists():
             print(f"REFUSING {county},{state}: no parcel_cache db at {db_path}")
             continue
+        value_only = county in _VALUE_ONLY_NO_LANDUSE
+        check_col = "improvement_value" if value_only else "land_use"
         con = sqlite3.connect(str(db_path))
         try:
             cols = [r[1] for r in con.execute("PRAGMA table_info(parcels)")]
-            if "land_use" not in cols:
-                print(f"REFUSING {county},{state}: cache schema has no land_use column "
+            if check_col not in cols:
+                print(f"REFUSING {county},{state}: cache schema has no {check_col} column "
                       f"(very old cache file -- refresh it first)")
                 continue
-            (populated,) = con.execute(
-                "SELECT COUNT(*) FROM parcels WHERE land_use IS NOT NULL "
-                "AND land_use != ''").fetchone()
+            if value_only:
+                (populated,) = con.execute(
+                    "SELECT COUNT(*) FROM parcels WHERE improvement_value IS NOT NULL").fetchone()
+            else:
+                (populated,) = con.execute(
+                    "SELECT COUNT(*) FROM parcels WHERE land_use IS NOT NULL "
+                    "AND land_use != ''").fetchone()
             if populated == 0:
-                print(f"REFUSING {county},{state}: land_use column exists but is "
+                print(f"REFUSING {county},{state}: {check_col} column exists but is "
                       f"100% empty on this host's cache -- refresh it first")
                 continue
             ok[(county, state)] = populated

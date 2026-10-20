@@ -214,12 +214,33 @@ PARCEL_LAYERS: dict[str, dict] = {
         "state": "SC",
         "url": "https://gis.sumter-sc.com/server/rest/services/BaseMaps/Sumter_City_County/FeatureServer/7/query",
         "id_fields": ["parid", "parcel_number"],
+        # improvement_value (market_value_building), added 2026-10-20 (vacant_lot gap).
+        # This layer has NO land_use/property-type field of any kind (confirmed live
+        # 2026-10-20 against the layer's own field metadata: 25 fields total, every one
+        # an id/owner/address/value/acreage column -- unlike Barnwell/Horry/Aiken, there
+        # is no bare-digit DOR code or text category to anchor on at all). It DOES carry
+        # both assessed_value_building and market_value_building (also live-confirmed);
+        # market_value_building is mapped here, matching the market-value basis already
+        # used for Sumter's market_value_total (not the SC 4%/6% assessed-ratio basis).
+        # No building-COUNT field exists either (Barnwell's own ground truth, unavailable
+        # here), so precision was instead measured against World Imagery satellite tiles
+        # cropped tightly to each sampled parcel's own polygon boundary (not just a radius
+        # around its centroid, which could catch a neighbor's structure): 5/5 parcels with
+        # market_value_building==0 were genuinely wooded/undeveloped with no structure
+        # inside the parcel boundary, 5/5 with a nonzero value ($36K-$219K) each showed a
+        # real rooftop inside the boundary -- 10/10 clean, no ambiguous case. No property-
+        # type field exists to segment precision by (unlike Greenwood's PropType), so this
+        # is a single county-wide rule -- see enrichment_vacant_landuse.py's
+        # _VALUE_ONLY_NO_LANDUSE for the matching gate (this county has no land_use value
+        # at all, so the normal "numeric land_use" gate the other value-only counties rely
+        # on cannot apply here).
         "map": {"owner": "owner_name", "address": "parcel_address_one",
                 "owner_mailing": ["owner_address_one", "owner_address_two",
                                   "owner_city", "owner_state", "owner_zip"],
                 "market_value": "market_value_total",
                 "tax_value": "market_value_total",
-                "acreage": "deedacre"},
+                "acreage": "deedacre",
+                "improvement_value": "market_value_building"},
     },
     "York": {  # 10-digit TMS, no punctuation (ParcelID == TAXMAPID)
         "state": "SC",

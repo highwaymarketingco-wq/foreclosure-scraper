@@ -267,3 +267,59 @@ def test_greenwood_null_improvement_value_with_no_other_signal_stays_silent(monk
     st = V.enrich_vacant_landuse([r])
     assert r.raw is None
     assert st["stamped"] == 0
+
+
+# Sumter SC (2026-10-20): the cache record carries NO land_use key at all (the layer has no
+# such field) -- only improvement_value/market_value/acreage. _VALUE_ONLY_NO_LANDUSE lets
+# these rows reach the improvement_value fallback without a land_use value of any kind.
+
+def test_sumter_zero_improvement_value_with_no_landuse_field_is_stamped_vacant(monkeypatch):
+    patch(monkeypatch, {"21": {"improvement_value": 0, "market_value": 19205.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Sumter"))
+    r = li(parcel="21", county="Sumter", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw["vacant_lot"] == {"improvement_value": 0, "source": "parcel_cache_improvement_value"}
+    assert "land_use" not in r.raw["vacant_lot"]
+    assert (st["eligible"], st["stamped"], st["stamped_by_improvement_value"]) == (1, 1, 1)
+
+
+def test_sumter_nonzero_improvement_value_is_improved_not_vacant(monkeypatch):
+    patch(monkeypatch, {"22": {"improvement_value": 87848.0, "market_value": 95348.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Sumter"))
+    r = li(parcel="22", county="Sumter", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None
+    assert r.land_use == "Improved"
+    assert st["stamped"] == 0 and st.get("stamped_by_improvement_value", 0) == 0
+
+
+def test_sumter_missing_improvement_value_stays_silent_not_reinterpreted(monkeypatch):
+    """Sumter is not on _NULL_IMPROVEMENT_VALUE_MEANS_ZERO (its field uses a literal 0, live-
+    confirmed), so a genuine None must stay silent, same as every other county besides
+    Greenwood."""
+    patch(monkeypatch, {"23": {"improvement_value": None, "market_value": 50000.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Sumter"))
+    r = li(parcel="23", county="Sumter", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None
+    assert st["stamped"] == 0
+
+
+def test_sumter_zero_improvement_value_with_no_other_signal_stays_silent(monkeypatch):
+    patch(monkeypatch, {"24": {"improvement_value": 0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Sumter"))
+    r = li(parcel="24", county="Sumter", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None
+    assert st["stamped"] == 0
+
+
+def test_a_county_not_on_the_value_only_allowlist_is_still_dropped_with_no_landuse(monkeypatch):
+    """A plain cache miss on land_use for a county NOT on _VALUE_ONLY_NO_LANDUSE (e.g. a row
+    whose cache record has nothing useful at all) is still skipped at the top, unchanged from
+    before this fix -- Sumter's new allowance does not loosen anything for any other county."""
+    patch(monkeypatch, {"25": {"improvement_value": 0, "market_value": 50000.0}})
+    r = li(parcel="25", county="Alamance", state="NC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None
+    assert st["eligible"] == 0
