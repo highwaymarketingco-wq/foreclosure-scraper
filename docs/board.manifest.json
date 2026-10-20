@@ -1,7 +1,7 @@
 {
  "schema": "board-manifest-v1",
- "written_at": "2026-10-20T21:50:01.426597Z",
- "run_time": "2026-10-20T21:49:43.625356Z",
+ "written_at": "2026-10-20T22:27:58.804563Z",
+ "run_time": "2026-10-20T22:27:19.603227Z",
  "count": 447183,
  "detail_count": 447183,
  "slim_count": 437170,
@@ -14,8 +14,8 @@
  },
  "files": {
   "listings.json": {
-   "bytes": 4948974493,
-   "sha256": "98a163c13474865268ecc83afe905cd948ef1f4dadf2ead2d4e3dc9561fededd",
+   "bytes": 4948983228,
+   "sha256": "ab72ea1bc897323e02942e9ed30eeeaf3705fc2cc6aa5186d60e509cdac550dc",
    "records": 447183
   },
   "listings_detail.json": {
@@ -40,7 +40,7 @@
   },
   "run_meta.json": {
    "bytes": 39044,
-   "sha256": "63ec60d021f85a02163177359fa9892a4cb326a94f1b73894deb798e124581fc"
+   "sha256": "ada39a911ffd4f8a3259553d0b3a81cb6e5c63600239815d7e0cb897dc4cd65e"
   },
   "listings_part_000.json.gz": {
    "bytes": 24480585,
@@ -50,8 +50,8 @@
    "end": 19343
   },
   "listings_part_001.json.gz": {
-   "bytes": 16706160,
-   "sha256": "0fe045eb88bc46efaca70d5062cd77e60b29c92dbd80cec90a084c0fc00fcfd5",
+   "bytes": 16706309,
+   "sha256": "3ae8bb3d274d9ac0ecc241c8e3fa70feea05fa3effa637387c32092fc074dda7",
    "records": 19000,
    "start": 19343,
    "end": 38343
@@ -134,8 +134,8 @@
    "end": 247343
   },
   "listings_part_013.json.gz": {
-   "bytes": 10585247,
-   "sha256": "a3c84d7ae3e74ff92243ce9556ad12dc2e28acc5504aebb737d91d92027a4eab",
+   "bytes": 10587250,
+   "sha256": "31268fcfb79e91e2bba84c09d9630746c1c1625d2b2c442fc732ef08530c30a5",
    "records": 19000,
    "start": 247343,
    "end": 266343
@@ -1990,8 +1990,8 @@
     "start": 19343,
     "end": 38343,
     "records": 19000,
-    "bytes": 16706160,
-    "sha256": "0fe045eb88bc46efaca70d5062cd77e60b29c92dbd80cec90a084c0fc00fcfd5"
+    "bytes": 16706309,
+    "sha256": "3ae8bb3d274d9ac0ecc241c8e3fa70feea05fa3effa637387c32092fc074dda7"
    },
    {
     "name": "listings_part_002.json.gz",
@@ -2086,8 +2086,8 @@
     "start": 247343,
     "end": 266343,
     "records": 19000,
-    "bytes": 10585247,
-    "sha256": "a3c84d7ae3e74ff92243ce9556ad12dc2e28acc5504aebb737d91d92027a4eab"
+    "bytes": 10587250,
+    "sha256": "31268fcfb79e91e2bba84c09d9630746c1c1625d2b2c442fc732ef08530c30a5"
    },
    {
     "name": "listings_part_014.json.gz",
