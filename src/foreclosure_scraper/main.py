@@ -3598,6 +3598,22 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("catawba_mydt.failed", traceback=traceback.format_exc())
 
+    # Cabarrus NC per-parcel tax search (tax.cabarruscounty.us/TaxBill.aspx, the same classic
+    # ITS.NET vendor as Iredell/Chowan, a new tenant added to tax_lien_itsnet.PORTALS): the
+    # board's own 14-digit PIN searches Sheet+Block+Parcel+Interest directly, no bridge needed.
+    # Writes raw['two_year_delinquent'] unconditionally on a real answer and
+    # raw['multi_year_delinquent_tax'] on a real multi-year gate, same reason as catawba_mydt
+    # above: must run BEFORE enrich_tax_owed, which reads raw['multi_year_delinquent_tax']
+    # ['total_due'] by exact key. Capped/budgeted per run (module docstring); gate off with
+    # FORECLOSURE_CABARRUS_MYDT=0.
+    try:
+        from .enrichment_cabarrus_multiyear_tax import enrich_with_cabarrus_multiyear_tax
+        s = await _await_capped(enrich_with_cabarrus_multiyear_tax(enriched), "cabarrus_mydt")
+        if s:
+            enrichment_stats["cabarrus_mydt"] = s
+    except Exception:
+        log.error("cabarrus_mydt.failed", traceback=traceback.format_exc())
+
     # Taxes-OWED normalizer — fold each tax source's own amount key (Buncombe
     # principal_tax_due, SC state-lien balance, Oconee FLC bid) into one
     # raw['tax_owed'], then cross-reference it onto any same-parcel lead (a court/

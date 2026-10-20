@@ -25,6 +25,16 @@ parcel_id ("3774626057.000"); Chowan has one Parcel field and its Property ID is
 12-digit parcel_id. A form session (cookie jar) is opened per search; the form is the page's own,
 every field kept, only the parcel and the tax year set.
 
+CABARRUS (added 2026-10-20, live-verified): the SAME classic ITS.NET product at
+tax.cabarruscounty.us/TaxBill.aspx -- same field prefix, same gridviewSearchResults grid, no
+login/CAPTCHA/click-through. Its own ctrlParcelNumber control is a FOUR-part Sheet(4)+Block(2)+
+Parcel(4)+Interest(4) = 14 digits, and the board's own Cabarrus parcel_id IS already that exact
+14-digit string (confirmed against 8 real board rows) -- no bridge needed, same as Iredell/Chowan.
+`blocks=()`: no existing scraper claims a Cabarrus property-tax delinquency today, so `applies()`
+correctly stays False for every Cabarrus row until some upstream source claims one; see
+enrichment_cabarrus_multiyear_tax.py, which reuses this module's search_fields()/fetch_grid()/
+parse_grid() verbatim to read the live multi-year history directly instead.
+
 VERDICTS (a levy-year Y bill is late once unpaid after the county's due date, tax_calendar):
   confirmed    a late-year bill on the row's own parcel (the grid's Property ID is the row's parcel
                number) has a balance today; the bill owner is not a different person when a resolver,
@@ -73,7 +83,7 @@ _NAME = __name__.rsplit(".", 1)[-1]
 class Portal:
     county: str
     url: str                 # the TaxBill.aspx URL
-    kind: str                # "map_blk_pin" (Iredell) or "single" (Chowan)
+    kind: str                # "map_blk_pin" (Iredell), "single" (Chowan) or "sheet_block_parcel" (Cabarrus)
     #: raw blocks of the county's own list scrapers (a row carrying one claims a delinquency)
     blocks: tuple[str, ...] = ()
 
@@ -83,6 +93,8 @@ PORTALS: dict[str, Portal] = {
                       "map_blk_pin", ("iredell_delinquent_tax", "nc_tax_lien_ad")),
     "Chowan": Portal("Chowan", "http://taxonline.chowancountync.email/itsnet/TaxBill.aspx",
                      "single", ("albemarle_observer_tax_list", "nc_tax_lien_ad")),
+    "Cabarrus": Portal("Cabarrus", "https://tax.cabarruscounty.us/TaxBill.aspx",
+                       "sheet_block_parcel", ()),
 }
 _BY_COUNTY = {k.lower(): v for k, v in PORTALS.items()}
 
@@ -125,6 +137,12 @@ def search_fields(portal: Portal, parcel: Any) -> Optional[dict]:
             return None
         return {P + "ctrlParcelNumber$txtMAP": d[:4], P + "ctrlParcelNumber$txtBLK": d[4:6],
                 P + "ctrlParcelNumber$txtPIN": d[6:10]}
+    if portal.kind == "sheet_block_parcel":
+        d = re.sub(r"\D", "", s.split(".", 1)[0])
+        if len(d) != 14:
+            return None
+        return {P + "ctrlParcelNumber$txtSheet": d[0:4], P + "ctrlParcelNumber$txtBlock": d[4:6],
+                P + "ctrlParcelNumber$txtParcel": d[6:10], P + "ctrlParcelNumber$txtInterest": d[10:14]}
     return {P + "ctrlParcelNumber$txtParcel": re.sub(r"[^0-9A-Za-z]", "", s)}
 
 
@@ -236,6 +254,14 @@ async def _search(client: Any, portal: Portal, fields: dict) -> Optional[dict]:
         grid = {"bills": [], "paged": False}
     cache[key] = grid
     return grid
+
+
+async def fetch_grid(client: Any, portal: Portal, fields: dict) -> Optional[dict]:
+    """Public reuse seam for other producers of this vendor's data (see
+    enrichment_cabarrus_multiyear_tax.py, which reads the live multi-year history directly
+    instead of only verifying an existing claim): the same cached session/search/parse chain
+    `verify()` itself runs on, unchanged."""
+    return await _search(client, portal, fields)
 
 
 _KEYS = ("reason", "url", "parcel", "county", "claimed_years", "decision_years", "bills_on_parcel",
