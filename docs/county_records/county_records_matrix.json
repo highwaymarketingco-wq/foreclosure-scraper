@@ -6495,16 +6495,16 @@
    },
    "gis": {
     "url": "https://gis2.orangeburgcounty.org/maps/",
-    "legal_description_field": "unknown",
+    "legal_description_field": "unknown (host unreachable; CLU_mtc CAMA popup layer never queried)",
     "deed_book_page_field": "unknown",
-    "owner_field": "unknown",
-    "notes": "Connection timed out on 2026-10-07. No REST layer known to the repo."
+    "owner_field": "owner1 (on the AGOL Tax Parcel Map replica; see parcel_cache.py PARCEL_LAYERS['Orangeburg'])",
+    "notes": "RE-VERIFIED 2026-10-20: still unreachable -- raw TCP connect times out from a Mac residential IP and is refused from the Oracle VM datacenter IP; sibling host arcserver2.orangeburgcounty.org (old scanned property-card PDFs) is down the same way. Not a blip (confirmed from 2 networks plus a retry); still down 13 days after the 2026-10-07 read above. The real on-prem server is at /dataportal/rest/services/ -- found CurrentLandUse, FutureLandUse, ComprehensiveLandUse MapServer layers and a CLU_mtc CAMA popup layer by reading the AGOL web-map configs behind the county's own CompLandUse_map/CurrentLandUse_byParcel_map items (owner wjeffcoat_oc) -- none of those are mirrored to AGOL hosting (only Tax Parcel Map + Roads are, as _WFL1 replicas), so there is no live workaround while this host is down. qPublic CAMA (qpublic.schneidercorp.com) re-confirmed CAPTCHA/login-walled (HTTP 403 to a bare request, 2026-10-20). scripts/check_orangeburg_gis.py re-probes this host; resume assessed_value/vacant_lot here once it answers."
    },
    "we_already_read": {
     "rod": "no",
     "tax": "yes",
-    "gis": "no",
-    "evidence": "tax: qpaybill_delinquent_roll ('Orangeburg', account-id only) + orangeburg_overage_claims. No GIS layer in parcel_cache/owner_mailing."
+    "gis": "partial",
+    "evidence": "tax: qpaybill_delinquent_roll ('Orangeburg', account-id only) + orangeburg_overage_claims. AGOL Tax Parcel Map replica IS in parcel_cache.py (owner/mailing/acreage only, re-verified 2026-10-20, no value/land_use field exists on it). The county's own on-prem CurrentLandUse/CLU_mtc layers were located 2026-10-20 but are unreachable."
    },
    "manual_lane": "A person with a free ROD account reads the index and PDF deeds; probate needs a call or visit; GIS was down today.",
    "confidence": "medium"

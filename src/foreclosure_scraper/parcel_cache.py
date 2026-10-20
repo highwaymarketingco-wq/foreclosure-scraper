@@ -902,6 +902,28 @@ PARCEL_LAYERS["Dorchester"] = {
 #: NO value, deed, legal or situs field, only owner, owner mailing and calculated acres, so it
 #: serves the parcel-id and acreage cells (an owner-name match to a parcel needs this cache) and
 #: leaves assessed_value to the county's qPublic viewer (Cloudflare check, a person does that).
+#:
+#: RE-VERIFIED LIVE 2026-10-20 while chasing gap_matrix's assessed_value/vacant_lot gaps for this
+#: county: re-fetched this exact FeatureServer's ?f=json today -- field list is unchanged, still
+#: no value/land_use field, confirming the note above still holds. The gap list names
+#: "gis2.orangeburgcounty.org" as the source to add; that is a REAL, DIFFERENT host (the county's
+#: own on-prem ArcGIS Server, not this AGOL item) that serves CurrentLandUse/FutureLandUse/
+#: ComprehensiveLandUse MapServer layers and a CLU_mtc CAMA popup layer (found by reading the AGOL
+#: web-map configs behind the county's "CompLandUse_map"/"CurrentLandUse_byParcel_map" items) --
+#: but it is DOWN: raw TCP connect times out from the Mac and is refused from the Oracle VM, and
+#: its sibling arcserver2.orangeburgcounty.org (old scanned property-card PDFs) is down the same
+#: way. county_records_matrix.json already recorded this host as unreachable on 2026-10-07; this
+#: confirms it is still down 13 days later from two different networks, not a one-off blip.
+#: qPublic (qpublic.schneidercorp.com, Schneider Corp CAMA) is the standard SC alternate for
+#: value/land-use and is already flagged in COUNTY_SYSTEMS_REGISTRY.md as CAPTCHA/login-walled;
+#: re-confirmed live today (HTTP 403 to a bare request). Net: no reachable field-based source
+#: exists for assessed_value or vacant_lot in this county right now. scripts/check_orangeburg_gis.py
+#: re-probes the on-prem host; when it comes back up, resume this build from its CurrentLandUse/
+#: CLU_mtc layers. A separate, UNVERIFIED lead: the AGOL table AssessorPropCards_ExportTable
+#: (FeatureServer/43) lists 107,259 scanned "Tax Cards"/"Old Property Card" PDFs keyed by
+#: MAPBLOLOT, 41,240 of them reachable via a SharePoint ShareLink (not the dead county host) --
+#: a possible doc-OCR source, but unverified for value/land-use content or currency and not
+#: attempted here; flagging for the owner, not building on a guess.
 PARCEL_LAYERS["Orangeburg"] = {
     "state": "SC",
     "url": ("https://services2.arcgis.com/bUKn95BqgpYYTnx3/arcgis/rest/services/"
