@@ -172,3 +172,98 @@ def test_a_real_text_land_use_that_merely_does_not_match_vac_is_never_reinterpre
     st = V.enrich_vacant_landuse([r])
     assert r.raw is None
     assert st["stamped"] == 0
+
+
+# ----------------------------------------------------------------- the 2026-10-20 fix
+# Greenwood SC (PropType, a coarse land-use category, no "Vacant" bucket) and Aiken SC
+# (PropertyClassType, an SC 4-6% ratio class spelled out as text) both map a TEXT
+# land_use that carries no vacant/improved signal of its own. Confirmed live that
+# PropertyClassType never contains "VACANT" (or VAC/UNDEVELOPED/UNIMPROVED) anywhere in
+# the whole Aiken layer -- the pasted-document claim for Aiken was false -- but both
+# counties DO map a real improvement-dollar-value field, so they are allowlisted through
+# the bare-digit gate to reach the SAME fallback as Horry/Barnwell, above.
+
+def test_aiken_text_landuse_with_zero_improvement_value_is_stamped_vacant(monkeypatch):
+    patch(monkeypatch, {"13": {"land_use": "NON-QUALIFIED LAND", "improvement_value": 0.0,
+                                "market_value": 18000.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Aiken"))
+    r = li(parcel="13", county="Aiken", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw["vacant_lot"] == {"land_use": "NON-QUALIFIED LAND", "improvement_value": 0,
+                                    "source": "parcel_cache_improvement_value"}
+    assert st["stamped"] == 1 and st["stamped_by_improvement_value"] == 1
+
+
+def test_aiken_text_landuse_with_nonzero_improvement_value_is_improved_not_vacant(monkeypatch):
+    patch(monkeypatch, {"14": {"land_use": "OWNER OCCUPIED RESIDENTIAL", "improvement_value": 176850.0,
+                                "market_value": 185000.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Aiken"))
+    r = li(parcel="14", county="Aiken", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None
+    assert st["stamped"] == 0 and st.get("stamped_by_improvement_value", 0) == 0
+
+
+def test_aiken_null_improvement_value_is_never_reinterpreted_as_zero(monkeypatch):
+    """Aiken's ImprovementValue uses a literal 0 for 'no improvements' (live-confirmed:
+    NULL on only 210/103,317 rows, not the vacancy encoding) -- unlike Greenwood, a genuine
+    NULL here must stay a 'no reading', not get treated as vacant."""
+    patch(monkeypatch, {"15": {"land_use": "AGRICULTURAL", "improvement_value": None,
+                                "market_value": 72000.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Aiken"))
+    r = li(parcel="15", county="Aiken", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None
+    assert st["stamped"] == 0
+
+
+def test_greenwood_null_improvement_value_is_stamped_vacant(monkeypatch):
+    """Greenwood's BuildingValue encodes 'no structure' as NULL, never a literal 0
+    (live-confirmed: `BuildingValue = 0` returns 0 rows) -- the one county where None is
+    reinterpreted as the zero-value reading."""
+    patch(monkeypatch, {"16": {"land_use": "Residential", "improvement_value": None,
+                                "market_value": 65000.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Greenwood"))
+    r = li(parcel="16", county="Greenwood", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw["vacant_lot"] == {"land_use": "Residential", "improvement_value": 0,
+                                    "source": "parcel_cache_improvement_value"}
+    assert st["stamped"] == 1 and st["stamped_by_improvement_value"] == 1
+
+
+def test_greenwood_nonzero_improvement_value_is_improved_not_vacant(monkeypatch):
+    patch(monkeypatch, {"17": {"land_use": "Residential", "improvement_value": 141820.0,
+                                "market_value": 186820.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Greenwood"))
+    r = li(parcel="17", county="Greenwood", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None
+    assert st["stamped"] == 0
+
+
+def test_greenwood_commercial_and_multifamily_proptypes_are_excluded_from_null_reinterpretation(monkeypatch):
+    """Live-checked: for Greenwood's Commercial (19.4%) and Multi-Family (10.5%) PropTypes,
+    a NULL BuildingValue predicts 'no structure' WORSE than the 38.1% base rate -- the
+    opposite of a usable signal -- so these two stay silent even though they are text
+    land_use on the allowlisted county."""
+    patch(monkeypatch, {"19": {"land_use": "Commercial", "improvement_value": None,
+                                "market_value": 250000.0},
+                         "20": {"land_use": "Multi-Family", "improvement_value": None,
+                                "market_value": 400000.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Greenwood"))
+    a, b = li(parcel="19", county="Greenwood", state="SC"), li(parcel="20", county="Greenwood", state="SC")
+    st = V.enrich_vacant_landuse([a, b])
+    assert a.raw is None and b.raw is None
+    assert st["stamped"] == 0
+
+
+def test_greenwood_null_improvement_value_with_no_other_signal_stays_silent(monkeypatch):
+    """Even for Greenwood, a NULL improvement_value on an otherwise blank cache row (no
+    market_value, no acreage) must stay silent -- the has_other_signal guard still applies
+    after None is reinterpreted as 0."""
+    patch(monkeypatch, {"18": {"land_use": "Residential", "improvement_value": None}},
+          have=("Alamance", "Spartanburg", "McDowell", "Greenwood"))
+    r = li(parcel="18", county="Greenwood", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None
+    assert st["stamped"] == 0

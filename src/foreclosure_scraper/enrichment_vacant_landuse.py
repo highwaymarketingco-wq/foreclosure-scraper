@@ -45,6 +45,41 @@ def _is_vacant_land_use(lu: str) -> bool:
     return bool(_VACANT_RE.search(lu)) or bool(_VAC_CAMEL_RE.search(lu))
 
 
+# 2026-10-20: Greenwood and Aiken SC. Both map a `land_use` field confirmed LIVE to carry
+# no vacant/improved signal at all, even though -- unlike Horry/Barnwell's bare numeric DOR
+# codes -- it is text: Greenwood's PropType is a coarse land-use CATEGORY (Residential/
+# Commercial/Farm-Timber/Mobile Home/Multi-Family/Other; live-sampled, zero rows carry a
+# "Vacant" bucket) and Aiken's PropertyClassType is the SC 4-6% owner-occupancy ratio class
+# spelled out as text (OWNER OCCUPIED RESIDENTIAL/NON-OWNER OCCUPIED RESIDENTIAL/
+# AGRICULTURAL/.../NON-QUALIFIED LAND) -- the same kind of field as Barnwell's digit-coded
+# PT163_Class, just spelled out; a live full-table LIKE check found ZERO of 103,317 Aiken
+# rows contain "VACANT"/"VAC"/"UNDEVELOPED"/"UNIMPROVED" anywhere in it, disproving the
+# pasted-document claim that Aiken spells vacancy out in this field. Both counties DO map a
+# real improvement-dollar-value field (parcel_cache.py's PARCEL_LAYERS), so they are let
+# through the bare-digit gate below to reach that fallback -- scoped to just these two
+# counties, not every text land_use, because a real land-use CATEGORY for most other
+# counties (e.g. "SINGLE FAMILY RES") is already a complete and correct answer on its own
+# and must not be silently reinterpreted (see the test for that invariant).
+_TEXT_LANDUSE_SKIP_VACANT_GATE = frozenset({"Greenwood", "Aiken"})
+
+# Greenwood's BuildingValue encodes "no structure" as a database NULL, never a literal 0
+# (live-confirmed: `BuildingValue = 0` returns 0 of 39,555 rows; NULL on 17,114 of them).
+# Every other improvement_value-mapped county (Horry, Barnwell, Aiken) uses a literal 0 for
+# "no improvements" and a genuine NULL there means "no reading" -- which the code below
+# correctly stays silent on. Only Greenwood gets NULL reinterpreted as the zero-value
+# reading; live correlation check (1,800-row NULL-BuildingValue sample, ground truth
+# SqFt>0 or YearBuilt set): 76.1% precision overall (1,108/1,455), but that varies a lot
+# by PropType -- Farm/Timber 89.9% (268/298), Residential 86.0% (770/895), Other 75.3%
+# (143/190) and Mobile Home 56.7% (174/307) are all well above the 38.1% base rate, but
+# Commercial 19.4% (14/72) and Multi-Family 10.5% (4/38) are BELOW it -- worse than a coin
+# flip, because a large commercial/multi-unit structure's value is evidently tracked
+# somewhere this one field doesn't capture. Those two PropTypes are excluded below; the
+# rest are wired in at the existing weak (weight-10, non-attribute) vacant_lot level
+# rather than trusted as a hard fact.
+_NULL_IMPROVEMENT_VALUE_MEANS_ZERO = frozenset({"Greenwood"})
+_GREENWOOD_NULL_IMPROVEMENT_EXCLUDED_PROPTYPES = frozenset({"Commercial", "Multi-Family"})
+
+
 def _has_cache(memo: dict, county: str, state: str | None) -> bool:
     """A parcel-cache file exists for the county. cached_counties() lists only the dedicated
     PARCEL_LAYERS counties; the other ~60 NC counties are cached off the statewide OneMap layer
@@ -104,11 +139,16 @@ def enrich_vacant_landuse(listings: Iterable[Listing]) -> dict:
         # already uses elsewhere for vacant LAND (see the vacant/condemned investigation's
         # Lincoln/Buncombe note), just read from a dollar field instead of a text flag.
         # Only engages when land_use is ALL DIGITS -- a real text land_use that merely
-        # didn't match the VACANT/VAC wordlist is left alone, not silently reinterpreted.
-        if not str(lu).strip().isdigit():
+        # didn't match the VACANT/VAC wordlist is left alone, not silently reinterpreted --
+        # UNLESS this county is on the allowlist above (its text land_use is confirmed to
+        # carry no vacant/improved signal of its own, live-verified per-county).
+        if not str(lu).strip().isdigit() and county not in _TEXT_LANDUSE_SKIP_VACANT_GATE:
             continue
         imprv = (rec or {}).get("improvement_value")
         has_other_signal = (rec or {}).get("market_value") or (rec or {}).get("acreage")
+        if (imprv is None and county in _NULL_IMPROVEMENT_VALUE_MEANS_ZERO
+                and str(lu).strip() not in _GREENWOOD_NULL_IMPROVEMENT_EXCLUDED_PROPTYPES):
+            imprv = 0.0
         if imprv is None or not has_other_signal:
             continue  # no determinate reading -- stay silent, don't guess
         if isinstance(li.raw, dict) and li.raw.get("vacant_lot"):

@@ -620,6 +620,25 @@ PARCEL_LAYERS: dict[str, dict] = {
         # only open bulk source; if it disappears the county has none. PARCEL_ASR is the
         # dashed county TMS ("108-14-04-009"), PARC_NO an older spaced form. AssessedValue
         # is a 4-6% ratio figure and is deliberately NOT mapped.
+        #
+        # 2026-10-20: `improvement_value` = ImprovementValue. A pasted-document claim said
+        # PropertyClassType spells vacancy out as text ("VACANT"-ish); checked live against
+        # the WHOLE layer (`PropertyClassType LIKE '%VACANT%'` etc., all 4 spellings) and it
+        # is FALSE -- 0 of 103,317 rows. PropertyClassType is SC's 4-6% owner-occupancy ratio
+        # class spelled out as text (OWNER OCCUPIED RESIDENTIAL / NON-OWNER OCCUPIED
+        # RESIDENTIAL / AGRICULTURAL / COMMERCIAL / EXEMPT / GOVERNMENT / NON-QUALIFIED LAND
+        # / ...) -- the same field Barnwell's digit-coded PT163_Class already documents, just
+        # spelled out instead of numbered, and just as noisy per class alone (live-checked
+        # zero-ImprovementValue rate: 6.1% of OWNER OCCUPIED RESIDENTIAL, 51% of NON-OWNER
+        # OCCUPIED RESIDENTIAL, 60.6% of AGRICULTURAL, 98.0% of NON-QUALIFIED LAND -- the
+        # same per-class spread already on record for Barnwell, not a vacant/improved flag by
+        # itself). ImprovementValue IS the real improvement-dollar-value field (ImprovementValue
+        # IS NULL on only 210/103,317 rows -- not Greenwood's NULL-means-vacant shape, a literal
+        # 0 is used here), wired into enrichment_vacant_landuse.py's existing numeric-fallback
+        # mechanism via a county allowlist (PropertyClassType is text, not a bare digit, so it
+        # needs the allowlist to reach that fallback at all). The county's own assessor site
+        # (qpublic.net/sc/aiken) could not be used to ground-truth individual parcels: it sits
+        # behind a click-through terms-of-service gate, a wall this project does not cross.
         "state": "SC",
         "url": "https://gis.cityofaikensc.gov/arcgis/rest/services/PublicGIS/MapServer/13/query",
         "id_fields": ["PARCEL_ASR", "PARC_NO"],
@@ -628,7 +647,7 @@ PARCEL_LAYERS: dict[str, dict] = {
                                   "OwnerMailingState", "OwnerMailingZip"],
                 "market_value": "TotalMarketValue", "acreage": "Acres",
                 "land_use": "PropertyClassType", "sale_price": "SalePrice",
-                "sale_date": "SaleDate"},
+                "sale_date": "SaleDate", "improvement_value": "ImprovementValue"},
     },
     "Greenwood": {
         # 39,553 parcels on the county's own ArcGIS Server, CAMA layer 9: a full CAMA
@@ -637,6 +656,23 @@ PARCEL_LAYERS: dict[str, dict] = {
         # MailCityState "GREENWOOD, SC 29648-0000". TaxValue_Total (65,600 vs
         # MarketValue_Total 74,000 on the sample) is the capped appraisal, not the 4-6%
         # assessed figure, so it is safe as tax_value. DeedAcres is only ~4% populated.
+        #
+        # 2026-10-20: `improvement_value` = BuildingValue. PropType (Residential/Mobile
+        # Home/Commercial/Other/Farm-Timber/Multi-Family, live-sampled) is a coarse land-use
+        # CATEGORY with no "Vacant" bucket at all, so the text matcher can never flag a vacant
+        # Residential-class lot here. BuildingValue IS NULL on 17,114/39,555 (43.3%) parcels
+        # and the literal value 0 never appears (`BuildingValue = 0` returns 0 rows) --
+        # confirming the pasted-document claim that this layer encodes "no structure" as a
+        # database NULL, not a numeric 0. Live correlation check (1,800-row NULL-only
+        # sample, ground truth = SqFt>0 or YearBuilt set) varies sharply BY PropType --
+        # Farm/Timber 89.9%, Residential 86.0%, Other 75.3% and Mobile Home 56.7% precision
+        # are all well above the 38.1% base rate, but Commercial 19.4% and Multi-Family
+        # 10.5% are BELOW it (worse than a coin flip -- a large commercial/multi-unit
+        # structure's value is evidently tracked somewhere this one field doesn't capture).
+        # Those two PropTypes are excluded; the rest are wired in at the existing weight-10
+        # (weak, non-attribute) vacant_lot signal level -- see enrichment_vacant_landuse.py's
+        # NULL-means-zero county allowlist, which exists only for this county: Aiken's
+        # equivalent field uses a literal 0, not NULL, and must not get this treatment.
         "state": "SC",
         "page": 250,   # the CAMA join answers 502 (backend timeout) above about 250 rows a page with this field set
         "url": "https://www.greenwoodsc.gov/arcgis/rest/services/Operational_Layers/CAMA/MapServer/9/query",
@@ -645,7 +681,7 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "owner_mailing": ["MailAddress", "MailCityState"],
                 "market_value": "MarketValue_Total", "tax_value": "TaxValue_Total",
                 "acreage": "DeedAcres", "living_sqft": "SqFt", "land_use": "PropType",
-                "sale_date": "PurchaseDate"},
+                "sale_date": "PurchaseDate", "improvement_value": "BuildingValue"},
     },
     "Hampton": {
         # 14,871 parcels, published by the county's own ArcGIS Online account
