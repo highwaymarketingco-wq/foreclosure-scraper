@@ -85,6 +85,10 @@ DEFAULT_TARGETS: tuple[tuple[str, str], ...] = (
     # county -- its cache has NO land_use field at all, so _check_cache_prereq below checks
     # improvement_value populated for it instead of land_use (see that function's own note).
     ("Sumter", "SC"),
+    # 2026-10-20: Williamsburg SC, same _VALUE_ONLY_NO_LANDUSE shape -- cache built by
+    # scripts/ingest_williamsburg_wthgis_parcels.py from the WTH tgis viewer, not the
+    # generic ArcGIS downloader (parcel_cache.py's Williamsburg entry + _WTH_SOURCED).
+    ("Williamsburg", "SC"),
 )
 
 

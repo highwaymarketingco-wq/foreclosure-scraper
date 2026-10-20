@@ -88,7 +88,18 @@ _GREENWOOD_NULL_IMPROVEMENT_EXCLUDED_PROPTYPES = frozenset({"Commercial", "Multi
 # live-verification note): 10/10 clean (5 zero-value parcels genuinely wooded/undeveloped,
 # 5 nonzero parcels each showing a real rooftop inside the boundary). No property-type field
 # exists to segment by, so this is a flat, county-wide rule, not a per-type allowlist.
-_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter"})
+#
+# 2026-10-20: Williamsburg SC, same shape. Its WTH-tgis-sourced cache (see
+# parcel_cache.py's Williamsburg entry and scripts/ingest_williamsburg_wthgis_parcels.py)
+# carries no land_use/property-type field either (only General/Assessment/History tabs
+# exist on the source record), but DOES map a real improvement_value
+# (MarketValueBuildingsValue) -- the source also publishes a building COUNT field
+# (MarketValueBuildings) that was 0/0 and nonzero/nonzero in lockstep with the dollar
+# value on every sample checked, corroborating the same zero-means-vacant read. 8 live
+# satellite spot-checks: 6/6 clean on <2-acre parcels, 2 more on 30-93 acre tracts
+# inconclusive (not contradicted) for the structural reason a single point can't rule
+# out a building elsewhere on a huge parcel -- see that script's docstring.
+_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter", "Williamsburg"})
 
 
 def _has_cache(memo: dict, county: str, state: str | None) -> bool:

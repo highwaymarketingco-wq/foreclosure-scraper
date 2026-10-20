@@ -242,6 +242,46 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "acreage": "deedacre",
                 "improvement_value": "market_value_building"},
     },
+    # 2026-10-20: Williamsburg SC. NOT an ArcGIS layer -- "url" here is the viewer's
+    # own homepage for provenance only; refresh_county() refuses this county (see
+    # _WTH_SOURCED below) rather than trying to query it as one. The williamsburgsc.
+    # wthgis.com "WTH tgis" viewer (a legacy per-county ASP.NET app, the same platform
+    # Chesterfield/Dillon/Kershaw/Marion/Marlboro also run under their own subdomains)
+    # exposes no ArcGIS REST service (confirmed live: /arcgis/rest/services,
+    # /server/rest/services, /gis/rest/services, /rest/services all 404) -- which is
+    # the "no REST" this county was declined for on 2026-09-21 (see the NOT ADDED note
+    # above). But its own tgis/getftr.aspx + tgis/custom.aspx search ARE live,
+    # scriptable, open HTTP endpoints with no login/CAPTCHA -- see
+    # scripts/ingest_williamsburg_wthgis_parcels.py, which builds this county's cache
+    # from them (it is NOT refreshed by refresh_county's generic ArcGIS downloader).
+    # No land_use/property-type text field exists anywhere in the record (only
+    # General/Assessment/History tabs). The Assessment tab DOES carry both a building
+    # COUNT (MarketValueBuildings) and a building DOLLAR value
+    # (MarketValueBuildingsValue) -- 0/0 and nonzero/nonzero together on every one of 9
+    # live samples pulled while scoping this. Only the dollar value is stored
+    # (improvement_value, this schema has no count column), matching the exact
+    # _VALUE_ONLY_NO_LANDUSE shape already shipped for Sumter above. 8 live satellite
+    # spot-checks (World Imagery, cropped to each parcel's own identify-call label
+    # point): 6/6 clean on <2-acre parcels (2 improved with a real rooftop at the
+    # point, 2 vacant with bare canopy/field); 2 more on 30-93 acre tracts were
+    # inconclusive (a single label point cannot confirm or rule out a structure
+    # somewhere else on a huge parcel) but not contradicted -- see that script's
+    # docstring for the full methodology.
+    "Williamsburg": {
+        "state": "SC",
+        "url": "https://williamsburgsc.wthgis.com/",
+        "id_fields": ["MapNumber"],
+        "map": {"owner": ["OwnerName", "OwnerName2"],
+                "address": ["PropertyAddress1", "PropertyAddress2"],
+                "owner_mailing": ["MailingAddress1", "MailingAddress2", "MailingCity",
+                                  "MailingState", "MailingZipCode"],
+                "market_value": "MarketValueTotalValue",
+                "tax_value": "TaxValueTotalValue",
+                "acreage": "MarketValueAcres",
+                "improvement_value": "MarketValueBuildingsValue",
+                "sale_price": "SalePrice",
+                "sale_date": "SaleDate"},
+    },
     "York": {  # 10-digit TMS, no punctuation (ParcelID == TAXMAPID)
         "state": "SC",
         "url": "https://services1.arcgis.com/2AGLxyiJoNiVHKwq/arcgis/rest/services/Parcels/FeatureServer/0/query",
@@ -1649,12 +1689,24 @@ def overlay_address(keys, overlay) -> "str | None":
     return best[1] if best else None
 
 
+#: Counties whose PARCEL_LAYERS "url" is NOT an ArcGIS /query endpoint (it is the
+#: source platform's own homepage, kept for provenance) -- refresh_county's generic
+#: ArcGIS downloader would just fail against it every week. Each has its own
+#: dedicated ingest script instead; see that county's PARCEL_LAYERS comment.
+_WTH_SOURCED = frozenset({"Williamsburg"})
+
+
 async def refresh_county(county: str, state: str | None = None) -> dict:
     """Bulk-download + verify + replace the cache for one county. Returns a status dict.
     `state="SC"` selects the SC half of a DUAL_STATE_COUNTIES name (SC_DUAL_LAYERS)."""
     cfg = resolve_layer_cfg(county, state)
     if not cfg:
         return {"county": county, "ok": False, "error": "no config"}
+    if county in _WTH_SOURCED:
+        return {"county": county, "ok": False,
+                "error": "WTH tgis-sourced county -- refresh via "
+                         "scripts/ingest_williamsburg_wthgis_parcels.py, not the "
+                         "generic ArcGIS downloader"}
     base = cfg["url"]
     out_fields = _src_fields(cfg["id_fields"], cfg["map"])
     delay = float(cfg.get("page_delay_s") or 0.0)
