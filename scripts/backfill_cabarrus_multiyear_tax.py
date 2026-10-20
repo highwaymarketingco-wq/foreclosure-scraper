@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import os
 import sys
 from pathlib import Path
 
@@ -70,6 +71,8 @@ def main() -> int:
         if not size_state["ok"] and not args.allow_large:
             print(f"REFUSING: {size_state['reason']}. Re-run with --allow-large.")
             return 1
+        if args.allow_large:
+            os.environ["BOARD_PATCH_ALLOW_LARGE"] = "1"
 
     all_patches: dict[str, dict] = {}
     seen_keys: set[str] = set()
