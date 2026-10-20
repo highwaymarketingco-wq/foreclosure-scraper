@@ -301,6 +301,48 @@ def test_appraised_value_sums_every_assessment_class():
     assert qr["appraised_value"] == 27500.0                 # QR-only: unchanged
 
 
+def test_zero_building_count_is_captured_not_dropped():
+    """2026-10-20 vacant_lot gap fix: TotalBuildingCount used to live in the generic
+    _BILL_MONEY truthy-only loop, so a real 0 reading (no structure -- the vacant_lot signal)
+    was silently discarded, identically to a field that was never fetched at all. It is now
+    captured unconditionally whenever the source field parses, so a literal 0 survives onto
+    the row distinctly from "absent"."""
+    b = _detail_to_listing(_detail_with({"TotalBuildingCount": "0"}), "h").raw["berkeley_paystar_tax"]
+    assert b["building_count"] == 0.0
+
+
+def test_nonzero_building_count_still_captured():
+    b = _detail_to_listing(_detail_with({"TotalBuildingCount": "2"}), "h").raw["berkeley_paystar_tax"]
+    assert b["building_count"] == 2.0
+
+
+def test_missing_building_count_is_absent_not_zero():
+    b = _detail_to_listing(_detail_with({}), "h").raw["berkeley_paystar_tax"]
+    assert "building_count" not in b
+
+
+def test_real_rollback_bill_fields_are_captured():
+    """081-00-00-141, live-checked 2026-10-20: a real, unpaid, realized ag-use rollback tax
+    bill -- RollbackCode=="R" confirmed by RollbackInformation=="ROLLBACK TAXES" and a real
+    RollbackUseChangeYear. RollbackCode/RollbackDesc were already captured before this
+    session; RollbackInformation/RollbackUseChangeYear are new."""
+    b = _detail_to_listing(_detail_with({
+        "RollbackCode": "R", "RollbackDesc": "MH40093",
+        "RollbackInformation": "ROLLBACK TAXES", "RollbackUseChangeYear": "2025"}), "h"
+    ).raw["berkeley_paystar_tax"]
+    assert b["rollback_code"] == "R" and b["rollback_description"] == "MH40093"
+    assert b["rollback_information"] == "ROLLBACK TAXES"
+    assert b["rollback_use_change_year"] == 2025.0
+
+
+def test_blank_rollback_fields_stay_absent():
+    b = _detail_to_listing(_detail_with({
+        "RollbackCode": "", "RollbackDesc": "", "RollbackInformation": "",
+        "RollbackUseChangeYear": "0"}), "h").raw["berkeley_paystar_tax"]
+    assert "rollback_code" not in b and "rollback_information" not in b
+    assert "rollback_use_change_year" not in b
+
+
 def test_all_zero_text_codes_are_blank_not_values():
     b = _detail_to_listing(_detail_with({"Sub": "000", "Block": "0", "Lot": "12"}), "h"
                            ).raw["berkeley_paystar_tax"]

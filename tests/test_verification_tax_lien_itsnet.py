@@ -77,6 +77,46 @@ def test_parcel_fields_by_county_kind():
     assert V.search_fields(cho, "6970-0779-2923") == {V.P + "ctrlParcelNumber$txtParcel": "697007792923"}
 
 
+def test_cabarrus_portal_registered_and_untouched_siblings():
+    """Added 2026-10-20: a new tenant of the same vendor. Iredell/Chowan's own kind/url/blocks
+    are unchanged by this addition."""
+    cab = V.PORTALS["Cabarrus"]
+    assert cab.kind == "sheet_block_parcel" and cab.blocks == ()
+    assert cab.url == "https://tax.cabarruscounty.us/TaxBill.aspx"
+    assert V.PORTALS["Iredell"].kind == "map_blk_pin" and V.PORTALS["Chowan"].kind == "single"
+
+
+def test_cabarrus_parcel_fields_sheet_block_parcel_interest():
+    cab = V.PORTALS["Cabarrus"]
+    f = V.search_fields(cab, "56221770270000")
+    assert f == {V.P + "ctrlParcelNumber$txtSheet": "5622", V.P + "ctrlParcelNumber$txtBlock": "17",
+                V.P + "ctrlParcelNumber$txtParcel": "7027", V.P + "ctrlParcelNumber$txtInterest": "0000"}
+    assert V.search_fields(cab, "123") is None and V.search_fields(cab, "") is None
+
+
+def test_cabarrus_not_in_applies_without_an_upstream_claim():
+    """No scraper claims a Cabarrus property-tax delinquency yet (blocks=()), so the shared
+    tax_lien verifier correctly stays silent on an ordinary distressed-listing row (real
+    Cabarrus board rows carry listing_type "distressed", not "tax_lien") until some upstream
+    source claims one -- enrichment_cabarrus_multiyear_tax reads the live portal directly
+    instead."""
+    assert not V.applies(_row(county="Cabarrus", parcel="56221770270000", listing_type="distressed",
+                              source="some.other.scraper", raw={}))
+
+
+def test_fetch_grid_public_wrapper_matches_cabarrus_live_shape():
+    """fetch_grid() is the public reuse seam enrichment_cabarrus_multiyear_tax.py calls; proves
+    it round-trips a Cabarrus-shaped search the same way _search() does internally for verify()."""
+    cab = V.PORTALS["Cabarrus"]
+    fields = V.search_fields(cab, "56221770270000")
+    page = _grid((2025, "077858", "SECHLER SHELIA", 0.0, "56221770270000", "2401 FLORIDA AVE"),
+                 (2026, "079760", "SECHLER SHELIA", 13944.50, "56221770270000", "2401 FLORIDA AVE"))
+    f = ReplayFetcher({cab.url: FORM_PAGE, form_key(cab.url, V.build_form(FORM_PAGE, fields)): page})
+    grid = asyncio.run(V.fetch_grid(f, cab, fields))
+    assert grid["paged"] is False
+    assert {b["year"] for b in grid["bills"]} == {2025, 2026}
+
+
 def test_build_form_keeps_the_pages_fields_and_picks_all_years():
     d = V.build_form(FORM_PAGE, {V.P + "ctrlParcelNumber$txtMAP": "1234"})
     assert d["__VIEWSTATE"] == "vs123" and d["__EVENTVALIDATION"] == "ev456"

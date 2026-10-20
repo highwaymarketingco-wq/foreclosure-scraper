@@ -3519,6 +3519,40 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("berkeley_tyd.failed", traceback=traceback.format_exc())
 
+    # Berkeley County SC (paystar.io): the SAME per-invoice assetMetaJson already restated
+    # above for two_year_delinquent also carries a county CAMA structure count
+    # (TotalBuildingCount) -- a pure, no-network restatement into the shared
+    # raw['vacant_lot'] contract (gap-matrix sweep 2026-10-20).
+    try:
+        from .enrichment_berkeley_vacant_lot import enrich_berkeley_vacant_lot
+        s = enrich_berkeley_vacant_lot(enriched)
+        if s:
+            enrichment_stats["berkeley_vacant_lot"] = s
+    except Exception:
+        log.error("berkeley_vacant_lot.failed", traceback=traceback.format_exc())
+
+    # Berkeley County SC (paystar.io): a confirmed REALIZED ag-use rollback tax bill
+    # (RollbackCode=="R") already captured on the row -- a pure, no-network restatement into
+    # the shared raw['rollback_exposure'] contract (gap-matrix sweep 2026-10-20).
+    try:
+        from .enrichment_berkeley_rollback_exposure import enrich_berkeley_rollback_exposure
+        s = enrich_berkeley_rollback_exposure(enriched)
+        if s:
+            enrichment_stats["berkeley_rollback"] = s
+    except Exception:
+        log.error("berkeley_rollback.failed", traceback=traceback.format_exc())
+
+    # Berkeley County SC (paystar.io): _merge_invoices()'s own per-parcel `bills` list
+    # already carries the full multi-year unpaid history -- a pure, no-network restatement
+    # into the shared raw['multi_year_delinquent_tax'] contract (gap-matrix sweep 2026-10-20).
+    try:
+        from .enrichment_berkeley_multiyear_tax import enrich_berkeley_multiyear_tax
+        s = enrich_berkeley_multiyear_tax(enriched)
+        if s:
+            enrichment_stats["berkeley_mydt"] = s
+    except Exception:
+        log.error("berkeley_mydt.failed", traceback=traceback.format_exc())
+
     # Dorchester County SC (billtrax.com) delinquent roll: counties_sc.dorchester_billtrax_
     # delinquent_tax already computes is_two_year_plus/years_delinquent per parcel -- a pure,
     # no-network restatement into the shared raw['two_year_delinquent'] contract (gap-matrix
@@ -3597,6 +3631,22 @@ async def run_enrich_tail(st: TailState) -> dict:
             enrichment_stats["catawba_mydt"] = s
     except Exception:
         log.error("catawba_mydt.failed", traceback=traceback.format_exc())
+
+    # Cabarrus NC per-parcel tax search (tax.cabarruscounty.us/TaxBill.aspx, the same classic
+    # ITS.NET vendor as Iredell/Chowan, a new tenant added to tax_lien_itsnet.PORTALS): the
+    # board's own 14-digit PIN searches Sheet+Block+Parcel+Interest directly, no bridge needed.
+    # Writes raw['two_year_delinquent'] unconditionally on a real answer and
+    # raw['multi_year_delinquent_tax'] on a real multi-year gate, same reason as catawba_mydt
+    # above: must run BEFORE enrich_tax_owed, which reads raw['multi_year_delinquent_tax']
+    # ['total_due'] by exact key. Capped/budgeted per run (module docstring); gate off with
+    # FORECLOSURE_CABARRUS_MYDT=0.
+    try:
+        from .enrichment_cabarrus_multiyear_tax import enrich_with_cabarrus_multiyear_tax
+        s = await _await_capped(enrich_with_cabarrus_multiyear_tax(enriched), "cabarrus_mydt")
+        if s:
+            enrichment_stats["cabarrus_mydt"] = s
+    except Exception:
+        log.error("cabarrus_mydt.failed", traceback=traceback.format_exc())
 
     # Taxes-OWED normalizer — fold each tax source's own amount key (Buncombe
     # principal_tax_due, SC state-lien balance, Oconee FLC bid) into one

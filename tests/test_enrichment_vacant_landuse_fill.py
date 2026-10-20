@@ -314,6 +314,30 @@ def test_sumter_zero_improvement_value_with_no_other_signal_stays_silent(monkeyp
     assert st["stamped"] == 0
 
 
+# Williamsburg SC (2026-10-20), the same _VALUE_ONLY_NO_LANDUSE shape as Sumter -- its
+# WTH-tgis-sourced cache (scripts/ingest_williamsburg_wthgis_parcels.py) carries no
+# land_use key at all either, only improvement_value/market_value/acreage.
+
+def test_williamsburg_zero_improvement_value_with_no_landuse_field_is_stamped_vacant(monkeypatch):
+    patch(monkeypatch, {"26": {"improvement_value": 0, "market_value": 32500.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Williamsburg"))
+    r = li(parcel="26", county="Williamsburg", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw["vacant_lot"] == {"improvement_value": 0, "source": "parcel_cache_improvement_value"}
+    assert "land_use" not in r.raw["vacant_lot"]
+    assert (st["eligible"], st["stamped"], st["stamped_by_improvement_value"]) == (1, 1, 1)
+
+
+def test_williamsburg_nonzero_improvement_value_is_improved_not_vacant(monkeypatch):
+    patch(monkeypatch, {"27": {"improvement_value": 53349.0, "market_value": 61974.0}},
+          have=("Alamance", "Spartanburg", "McDowell", "Williamsburg"))
+    r = li(parcel="27", county="Williamsburg", state="SC")
+    st = V.enrich_vacant_landuse([r])
+    assert r.raw is None
+    assert r.land_use == "Improved"
+    assert st["stamped"] == 0 and st.get("stamped_by_improvement_value", 0) == 0
+
+
 def test_a_county_not_on_the_value_only_allowlist_is_still_dropped_with_no_landuse(monkeypatch):
     """A plain cache miss on land_use for a county NOT on _VALUE_ONLY_NO_LANDUSE (e.g. a row
     whose cache record has nothing useful at all) is still skipped at the top, unchanged from
