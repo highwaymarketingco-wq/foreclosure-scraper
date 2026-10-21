@@ -3852,6 +3852,23 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("duplin_rollback_exposure.failed", traceback=traceback.format_exc())
 
+    # Johnston NC's tax2/taxcards page redirects to www.bttaxpayerportal.com/itspublicjo -- the
+    # SAME BasicSearch/ViewParcel CAMA product already read for Duplin/Granville/Harnett/Rowan/
+    # Brunswick. Live-reverified 2026-10-21: the project's own "dead, replaced by
+    # my.johnstonnc.gov" classification only applies to BILL PAYMENT; the CAMA product (property
+    # cards, deferred value) is still live, confirmed by an owner-name search returning the SAME
+    # parcel my.johnstonnc.gov's guest bill-pay flow resolved on 2026-10-19. Johnston's own tenant
+    # needs the same comma-separated "LAST, FIRST" query Duplin's does. See
+    # enrichment_johnston_rollback_exposure.py's own docstring for the full live evidence.
+    try:
+        from .enrichment_johnston_rollback_exposure import enrich_johnston_rollback_exposure
+        s = await _await_capped(enrich_johnston_rollback_exposure(enriched),
+                                "johnston_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["johnston_rollback_exposure"] = s
+    except Exception:
+        log.error("johnston_rollback_exposure.failed", traceback=traceback.format_exc())
+
     # NC OneMap statewide sweeps (never overwrites the tax relief / rollback dollar figures).
     try:
         from .enrichment_onemap_sweeps import enrich_onemap_sweeps
