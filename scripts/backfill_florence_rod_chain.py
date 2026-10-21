@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -180,7 +181,8 @@ def main() -> int:
             print("\nnothing to do.")
             return 0
         size_state = board_patch_size_state(docs)
-        if not size_state["ok"]:
+        _allow_large = os.environ.get("BOARD_PATCH_ALLOW_LARGE", "").strip().lower() in ("1", "true", "yes")
+        if not size_state["ok"] and not _allow_large:
             print(f"\nREFUSING: {size_state['reason']}. See patch_existing_rows()'s "
                   f"BOARD_PATCH_ALLOW_LARGE docstring in web_artifact.py.")
             return 1
