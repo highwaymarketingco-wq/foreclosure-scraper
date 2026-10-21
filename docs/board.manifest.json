@@ -1,9 +1,9 @@
 {
  "schema": "board-manifest-v1",
- "written_at": "2026-10-21T13:59:44.431848Z",
+ "written_at": "2026-10-21T14:18:57.196945Z",
  "run_time": "2026-10-21T11:17:30.583699Z",
  "count": 447222,
- "detail_count": 447222,
+ "detail_count": null,
  "slim_count": 437170,
  "shards": {
   "schema": "shard-v1",
@@ -13,25 +13,10 @@
   "records": 437170
  },
  "files": {
-  "listings.json": {
-   "bytes": 4954979424,
-   "sha256": "2533be732cc8e0a36dd756697a4af498437524b800357a60994a07d910882444",
-   "records": 447222
-  },
-  "listings_detail.json": {
-   "bytes": 336560436,
-   "sha256": "041b602597f77437e293d9d101da21bb1b503dc2f5e31fd7f6d338f6fa2fddfc",
-   "records": 447222
-  },
   "listings_detail.json.gz": {
    "bytes": 25297198,
    "sha256": "b887bc62474cbfa41cec3f8366de760f6c155e55bb93e3d9e94a7f0f53e6d5ba",
    "records": 447222
-  },
-  "listings_slim.json": {
-   "bytes": 1703517808,
-   "sha256": "8b2baa02bdff0e5aa82ee6541efa814b0fb523bb19dfb2330fa01195e4b1ea16",
-   "records": 437170
   },
   "listings_slim.json.gz": {
    "bytes": 90857163,
