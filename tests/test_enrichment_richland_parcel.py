@@ -22,8 +22,13 @@ PARCEL = {"d": [
                 "Heated_SQF": "1,350 ft&sup2;", "Bldg1_Beds": "3", "Bldg1_Bath": "2",
                 "Bldg1_YrBu": "1958", "Acreage": "0.25", "Last_Sale_": "March 3, 2004",
                 "Last_Sale1": "$61,000", "OptedOut": "0", "WKT_Geom": "POLYGON((...))",
-                "OWNER_SSN": "000-00-0000"}},
+                "OWNER_SSN": "000-00-0000", "Building_V": "88,000", "Land_Value": "35,400"}},
 ]}
+#: a razed/undeveloped lot: real Land_Value/Market_Val, but Building_V is a genuine 0 --
+#: live-verified field shape (2026-10-20) against a real richlandmaps.com parcel record.
+VACANT_PARCEL = {"TMS": "R09999-02-01", "Address": "7 EMPTY LOT RD", "Owner_Name": "ESTATE OF JOHN ROE",
+                 "Market_Val": "22,000", "Land_Value": "22,000", "Building_V": "0",
+                 "Acreage": "0.5", "OptedOut": "0"}
 
 
 def L(street="1200 SAMPLE AVE", **kw):
@@ -69,21 +74,78 @@ def test_apply_fills_mailing_facts_and_provenance():
     assert li.raw["gis"]["last_sale"] == {"amount": 61000.0, "date": "2004-03-03"}
     assert li.raw["richland_parcel"]["matched"] is True and "WKT_Geom" not in str(li.raw)
     assert {"mailing", "parcel_id", "year_built"} <= set(filled)
+    # improved parcel (Building_V > 0): land_use stamped "Improved", no vacant_lot
+    assert li.land_use == "Improved" and "vacant_lot" not in li.raw
 
 
-def test_opted_out_owner_keeps_name_and_mailing_off():
+def test_opted_out_owner_keeps_name_mailing_and_gis_owner_off():
     p = dict(R.choose_parcel(PARCEL["d"], "1200 SAMPLE AVE"), OptedOut="1")
     li = L()
     R.apply_parcel(li, p, NOW)
     assert li.owner_name is None and "owner_mailing" not in li.raw
+    assert "owner" not in li.raw.get("gis", {})
     assert li.market_value == 123400.0
 
 
-def test_a_different_owner_withholds_the_mailing():
+def test_a_different_owner_withholds_the_mailing_but_not_gis_owner():
+    """owner_agrees=False withholds the MAILING ADDRESS (a privacy rule: don't publish an
+    address under a name that disagrees with the row's own owner_name) but must still stamp
+    raw['gis']['owner'] with the assessor's text -- deceased_signals() reads that field
+    specifically so it can catch an ESTATE OF/HEIRS reading that the row's existing
+    court-case owner_name never carried in the first place (the exact gap this fix closes)."""
     li = L(owner_name="SMITH ROBERT")
     R.apply_parcel(li, R.choose_parcel(PARCEL["d"], "1200 SAMPLE AVE"), NOW)
     assert "owner_mailing" not in li.raw and li.raw["richland_parcel"]["owner_agrees"] is False
     assert li.owner_name == "SMITH ROBERT"
+    assert li.raw["gis"]["owner"] == "DOE JANE Q"
+
+
+def test_vacant_lot_stamped_from_zero_building_value():
+    li = L(street="7 EMPTY LOT RD")
+    filled = R.apply_parcel(li, VACANT_PARCEL, NOW)
+    assert li.raw["vacant_lot"] == {"improvement_value": 0, "basis": "assessor_building_value",
+                                    "source": "richlandmaps_parcel_api"}
+    assert filled["vacant_lot"] is True
+    assert li.raw["gis"]["owner"] == "ESTATE OF JOHN ROE"
+    assert li.land_use != "Improved"
+    # "ESTATE OF JOHN ROE" is a decedent lead too -- both signals come off the same fetch.
+    assert li.raw["heir_estate"]["owner_of_record"] == "ESTATE OF JOHN ROE"
+    assert li.raw["heir_estate"]["match"] == "estate"
+    assert filled["heir_estate"] is True
+
+
+def test_heir_estate_not_stamped_for_a_living_owner_or_an_entity():
+    li = L()
+    R.apply_parcel(li, R.choose_parcel(PARCEL["d"], "1200 SAMPLE AVE"), NOW)  # "DOE JANE Q"
+    assert "heir_estate" not in li.raw
+    li2 = L(street="1202 SAMPLE AVE")
+    # "REAL ESTATE HOLDINGS LLC" contains ESTATE but is an entity, not a decedent -- excluded.
+    p = dict(VACANT_PARCEL, Owner_Name="REAL ESTATE HOLDINGS LLC")
+    R.apply_parcel(li2, p, NOW)
+    assert "heir_estate" not in li2.raw
+
+
+def test_heir_estate_idempotent_when_already_stamped_by_another_producer():
+    li = L(street="7 EMPTY LOT RD")
+    li.raw = {"heir_estate": {"owner_of_record": "from a probate record", "source": "other"}}
+    R.apply_parcel(li, VACANT_PARCEL, NOW)
+    assert li.raw["heir_estate"]["source"] == "other"
+
+
+def test_vacant_lot_not_guessed_when_building_value_missing():
+    """No Building_V field at all (not even a zero) -- stay silent, never guess."""
+    li = L()
+    p = dict(VACANT_PARCEL)
+    del p["Building_V"]
+    R.apply_parcel(li, p, NOW)
+    assert "vacant_lot" not in li.raw
+
+
+def test_vacant_lot_idempotent_when_already_stamped_by_another_producer():
+    li = L(street="7 EMPTY LOT RD")
+    li.raw = {"vacant_lot": {"source": "some_other_producer"}}
+    R.apply_parcel(li, VACANT_PARCEL, NOW)
+    assert li.raw["vacant_lot"] == {"source": "some_other_producer"}
 
 
 def test_wants_only_richland_rows_that_need_it_and_respects_the_retry_window():

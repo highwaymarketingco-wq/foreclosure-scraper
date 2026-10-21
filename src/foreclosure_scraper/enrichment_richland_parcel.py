@@ -30,6 +30,23 @@ RULES
 
 WIRING: not called by main.py yet (main.py is edited by the coordinator). The call belongs right
 after the enrich_gis_attrs block; see docs/new_sources_2026-10-07_contact_and_facts.md.
+
+2026-10-20: gap_matrix showed Richland sourced-not-built for `vacant_lot` and `heir_estate`
+(2,236 rows each). Both are restated here from fields this live API already returns but the old
+code never looked at, the same "the data was already on the row, just never read for this
+signal" pattern sc_heir_estate_parcel_cache.py documents for its own SC counties:
+  * heir_estate: Owner_Name is scanned with nc_heir_estate_parcels.py's own `_is_decedent`/
+    `_excluded_row`/`_heir_names` (reused, not reimplemented -- the same classifiers
+    sc_heir_estate_parcel_cache.py reuses for its 18 SC counties) and, on a hit, stamped into
+    raw['heir_estate'] in that producer's own shape. Previously `owner` only ever reached
+    li.owner_name when the row had none yet (most Richland rows already carry a court-case
+    name), so the assessor's ESTATE OF/HEIRS text never reached the board at all.
+  * vacant_lot: Building_V (building/improvement value) is a real field, split out from
+    Land_Value/Market_Val (live-verified against a real richlandmaps.com parcel record) --
+    the same "building value, no land_use text field" shape enrichment_vacant_landuse.py's
+    _VALUE_ONLY_NO_LANDUSE already uses for Sumter/Williamsburg, restated here for this
+    per-row live API since Richland has no parcel_cache entry for that module to read
+    (custom PHP viewer, not an ArcGIS REST layer -- parcel_cache.py's own NOT-ADDED note).
 """
 from __future__ import annotations
 
@@ -42,6 +59,9 @@ from typing import Any, Optional
 import structlog
 
 from .models import Listing, ListingType
+from .scrapers.counties_nc.nc_heir_estate_parcels import (
+    _excluded_row, _heir_names, _is_decedent, _HEIR_TOKEN,
+)
 from .sensitive_fields import drop_sensitive
 
 log = structlog.get_logger()
@@ -71,6 +91,20 @@ def _num(v) -> Optional[float]:
     except ValueError:
         return None
     return f if f > 0 else None
+
+
+def _num_or_zero(v) -> Optional[float]:
+    """Like `_num`, but a genuine 0 reading is returned as 0.0 instead of collapsed to None.
+    `_num` treats 0 as "no value", correct for market_value/acreage/sqft (0 there means
+    missing data, not a real zero) but wrong for Building_V: a razed/unimproved parcel's
+    building value is a genuine, meaningful 0 that must be told apart from a missing field."""
+    m = _NUM.search(str(v or ""))
+    if not m:
+        return None
+    try:
+        return float(m.group(0).replace(",", ""))
+    except ValueError:
+        return None
 
 
 def _date(v) -> Optional[str]:
@@ -183,6 +217,36 @@ def apply_parcel(li: Listing, p: dict, now: datetime) -> dict:
     if owner and not opted_out and not (li.owner_name or "").strip():
         li.owner_name = owner
         filled["owner_name"] = True
+    # Stamp the assessor's own owner-of-record text into raw['gis']['owner'] UNCONDITIONALLY
+    # (gated only by OptedOut, like everything else here) -- not just when li.owner_name was
+    # empty above. Most Richland rows already carry a court-case/tax-roll owner_name, so the
+    # `not li.owner_name` branch above never fires for them and the assessor's text never
+    # reached the board under the old code. deceased_signals() (enrichment_heir_candidates.py)
+    # already reads raw['gis']['owner'] as one of its three HEIRS/ESTATE OF/DECEASED text
+    # sources -- the SAME convention other counties' GIS enrichers already populate (live
+    # board sample, Buncombe: raw['gis']['owner']="KNIGHT FAMILY IRREVOCABLE TRUST" alongside a
+    # completely different court-case owner_name) -- so this alone lets heir_estate fire on
+    # Richland rows whose assessor record says ESTATE OF/HEIRS, independent of what the
+    # court-case name already on the row says.
+    if owner and not opted_out:
+        g = li.raw.setdefault("gis", {})
+        if not g.get("owner"):
+            g["owner"] = owner
+            filled["gis_owner"] = True
+        # heir_estate: same classifiers nc_heir_estate_parcels.py / sc_heir_estate_parcel_cache.py
+        # already use (reused, not reimplemented) -- _excluded_row keeps "LIFE ESTATE"/"REAL
+        # ESTATE"/"ESTATES" text from false-positiving as a decedent lead. Idempotent: a prior
+        # producer's richer stamp (e.g. a court probate record) is never overwritten.
+        owner_fields = [owner]
+        if (not li.raw.get("heir_estate") and _is_decedent(owner_fields)
+                and not _excluded_row(owner_fields)):
+            li.raw["heir_estate"] = {
+                "owner_of_record": owner, "heir_names": _heir_names(owner_fields),
+                "mailing": None, "care_of": None,
+                "match": "heirs" if _HEIR_TOKEN.search(owner) else "estate",
+                "source": "richland_parcel", "source_key": "richlandmaps.com",
+            }
+            filled["heir_estate"] = True
     parts = [str(p.get(k) or "").strip() for k in ("Owner_Addr", "Owner_Ad_1", "Owner_City", "Owner_Stat")]
     mailing = re.sub(r"\s+", " ", " ".join(x for x in parts + [_zip(p.get("Owner_Zip"))] if x)).strip()
     if mailing and not opted_out and agrees is not False:
@@ -204,6 +268,28 @@ def apply_parcel(li: Listing, p: dict, now: datetime) -> dict:
         if v and not getattr(li, fld):
             setattr(li, fld, v)
             filled[fld] = True
+    # vacant_lot: the parcel JSON carries Building_V (improvement/building value) split out
+    # from Land_Value/Market_Val -- live-verified 2026-10-20 against a real richlandmaps.com
+    # record (Building_V="1,573,200", Land_Value="676,800" on one improved parcel). Richland
+    # has no bulk parcel_cache entry (custom PHP viewer, not an ArcGIS REST layer this
+    # project's cache loader can bulk-pull -- parcel_cache.py's own NOT-ADDED note), so
+    # enrichment_vacant_landuse.py's cache-keyed lookup never sees these rows. This is the
+    # SAME "building value, no land_use text field" shape as Sumter/Williamsburg
+    # (_VALUE_ONLY_NO_LANDUSE there) restated locally for this live, per-row API instead of a
+    # cache: Building_V reading exactly 0 (a real reading, not a missing field -- _num_or_zero,
+    # not _num, which would silently discard a real 0) alongside a real Market_Val, Land_Value
+    # or Acreage reading (the parcel is real, not a blank/degenerate record) means no structure
+    # -- a vacant lot. Idempotent: skipped when any producer already stamped raw['vacant_lot'].
+    bld = _num_or_zero(p.get("Building_V"))
+    has_other_signal = bool(_num(p.get("Market_Val")) or _num(p.get("Land_Value")) or _num(p.get("Acreage")))
+    if bld is not None and not li.raw.get("vacant_lot"):
+        if bld == 0.0 and has_other_signal:
+            li.raw["vacant_lot"] = {"improvement_value": 0, "basis": "assessor_building_value",
+                                    "source": "richlandmaps_parcel_api"}
+            filled["vacant_lot"] = True
+        elif bld > 0 and not (getattr(li, "land_use", None) or "").strip():
+            li.land_use = "Improved"
+            filled["land_use_improved"] = True
     yb = _num(p.get("Bldg1_YrBu"))
     if yb and 1700 < yb <= 2100 and not li.year_built:
         li.year_built = int(yb)
