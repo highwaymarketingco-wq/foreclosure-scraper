@@ -408,6 +408,64 @@ def test_enrich_ustaxdata_name_search_end_to_end(monkeypatch):
     block = li.raw["ustaxdata_delinquent_tax"]
     assert block["bills"][0]["account"] == "0202921"
     assert block["taxpayer_of_record"] == "RHYNE DENNIS W & / RHYNE JULI..."
+    # 2026-10-20 Rockingham backfill bug: tax_binding.bind_block() needs a top-level address
+    # field (BLOCK_ADDRESS_FIELDS) to bind this block to the row -- the confirmed address this
+    # module already verified (_confirm_by_address, above) must actually land in the block, or
+    # every confirmed hit gets scrubbed as "no_evidence" on the very next enrich_tax_owed() call
+    # (see test_a_confirmed_name_search_block_survives_enrich_tax_owed below).
+    assert block["situs"] == "5195 RINK DAM RD"
+
+
+def test_a_confirmed_name_search_block_survives_enrich_tax_owed(monkeypatch):
+    """THE BUG (2026-10-20, Rockingham backfill dry-run: 1,053 checked, 0 confirmed). enrich_
+    ustaxdata() genuinely confirms a real address match before trusting a name-search hit, but
+    never used to stamp that address onto the block -- so tax_binding.bind_block() had no
+    parcel id (this vendor's own account never matches the board's parcel_id format, the whole
+    reason this module name-searches at all), no address, and no own-source match (the row's
+    source is whatever originally found it, e.g. liensnc, not this enrichment), and fell
+    through to "no_evidence" -- scrub_unbound_tax() then removed the block on the very next
+    enrich_tax_owed() call, the SAME call the real pipeline always makes (Pass 0 runs before
+    the balance is ever read). Fixed by stamping the already-confirmed situs onto the block
+    under a BLOCK_ADDRESS_FIELDS key ("situs"); this test runs the real two-function chain
+    (not just bind_block in isolation) the way the backfill script does."""
+    import httpx
+
+    class _Resp:
+        def __init__(self, text):
+            self.text, self.status_code = text, 200
+
+        def raise_for_status(self):
+            pass
+
+    class _FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, *a, **k):
+            if "taxbill.cfm" in url:
+                return _Resp(_DETAIL_UNPAID)
+            return _Resp(_page(_ROW_ALEXANDER_RHYNE, count=15))
+
+    import foreclosure_scraper.enrichment_ustaxdata_tax_search as mod
+    monkeypatch.setattr(mod.asyncio, "sleep", _no_sleep)
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+
+    li = _li(parcel=None, county="Alexander", owner_name="RHYNE DENNIS W",
+             street_address="5195 Rink Dam Rd")
+    asyncio.run(enrich_ustaxdata([li]))
+    assert "ustaxdata_delinquent_tax" in li.raw   # the enrichment did its job
+
+    stats = enrich_tax_owed([li])
+    assert stats["unbound"]["rows_scrubbed"] == 0
+    assert stats["unbound"]["by_reason"] == {}
+    assert "ustaxdata_delinquent_tax" in li.raw   # not scrubbed as "no_evidence"
+    assert li.raw["tax_owed"]["balance"] == 410.22   # Pass B now gets a chance to read it
 
 
 def test_enrich_ustaxdata_name_search_unconfirmed_does_not_fabricate_a_match(monkeypatch):

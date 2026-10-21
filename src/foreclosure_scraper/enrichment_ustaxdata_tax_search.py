@@ -408,6 +408,20 @@ async def enrich_ustaxdata(listings: Iterable[Listing]) -> dict:
             years_unpaid = sorted({b["year"] for b in unpaid})
             balance = round(sum(b["total_due"] for b in unpaid if b.get("total_due")), 2)
             latest = bills[0]
+            # tax_binding.bind_block() needs a top-level address field it recognizes
+            # (BLOCK_ADDRESS_FIELDS) to bind this block to the row -- this module's own
+            # name-search path already confirms a real situs match before trusting a hit
+            # (_confirm_by_address above) but never used to store it, so bind_block() had
+            # nothing to go on and scrubbed every confirmed block as "no_evidence" (2026-10-20
+            # Rockingham backfill finding). Re-find the bill whose own situs is the one that
+            # actually matched the row's street_address (not just bills[0]: one account can
+            # carry more than one situs -- a second parcel, a boat, a trailer -- so the newest
+            # bill is not always the matching one); fall back to latest's situs when none does
+            # (Robeson's own placeholder situs, "> CONTACT COUNTY FOR", address_relation()
+            # never matches anyway, so this changes nothing for that tenant).
+            situs = next((b["situs"] for b in bills
+                         if b.get("situs") and address_relation(b["situs"], li.street_address) == "match"),
+                        latest.get("situs"))
             block = {
                 "bills": bills,
                 "years_unpaid": years_unpaid,
@@ -415,6 +429,7 @@ async def enrich_ustaxdata(listings: Iterable[Listing]) -> dict:
                 "assessed_value": latest["taxable_value"],
                 "source_url": url,
                 "checked_at": checked_at,
+                "situs": situs,
             }
             if balance:
                 block["balance"] = balance

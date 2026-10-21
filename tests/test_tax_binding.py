@@ -109,6 +109,36 @@ def test_address_evidence_when_there_is_no_comparable_key():
     assert tb.bind_block(li2, "county_tax_list", li2.raw["county_tax_list"]) == "other_address"
 
 
+def test_ustaxdata_block_binds_by_its_own_confirmed_situs():
+    """ustaxdata_delinquent_tax (enrichment_ustaxdata_tax_search.py) is not in
+    BLOCK_PARCEL_FIELDS -- this vendor's own account id never matches the board's parcel_id
+    format, the whole reason that module name-searches by owner instead of looking up a
+    parcel. Before 2026-10-20 it also never stamped the address it had already confirmed onto
+    the block, so bind_block() had nothing to go on at all and every confirmed Rockingham hit
+    fell through to "no_evidence" (live-verified against the real board the same day: 7 of 7
+    name-search-confirmed rows scrubbed). The fix stamps the confirmed address under "situs"
+    (a BLOCK_ADDRESS_FIELDS key) so the existing address-evidence rule binds it."""
+    blk = {"bills": [{"year": 2026, "situs": "154 VINTAGE RD"}], "years_unpaid": [2026],
+           "situs": "154 VINTAGE RD"}
+    li = _li(source="counties_generic.liensnc", parcel=None, county="Rockingham",
+             street="154 Vintage Rd", raw={"ustaxdata_delinquent_tax": blk})
+    assert tb.bind_block(li, "ustaxdata_delinquent_tax", blk) == "own_address"
+    tb.scrub_unbound_tax([li])
+    assert "ustaxdata_delinquent_tax" in li.raw
+
+
+def test_ustaxdata_block_with_no_usable_address_is_still_no_evidence():
+    """Robeson's own parcel-id path (TENANTS, not NAME_SEARCH_TENANTS) has no confirmed-
+    address step: its situs is the vendor's own literal placeholder, "> CONTACT COUNTY FOR"
+    (no house number), which address_relation() calls "unknown", never "match" -- so the fix
+    above changes nothing for Robeson: still no_evidence, same as before it existed."""
+    blk = {"bills": [{"year": 2026, "situs": "> CONTACT COUNTY FOR"}], "years_unpaid": [2026],
+           "situs": "> CONTACT COUNTY FOR"}
+    li = _li(source="counties_generic.liensnc", parcel=None, county="Robeson",
+             street="423 Turkey Branch Rd", raw={"ustaxdata_delinquent_tax": blk})
+    assert tb.bind_block(li, "ustaxdata_delinquent_tax", blk) == "no_evidence"
+
+
 def test_no_evidence_is_not_a_binding_but_a_recorded_merge_is():
     blk = {"principal_tax_due": 77.0, "tax_year": 2024}
     li = _li(source="counties_x.code_cases", parcel=None, raw={"county_tax_list": blk})
