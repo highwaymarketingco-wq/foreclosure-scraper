@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-10-21T15:49:23.876634Z",
+  "run_time": "2026-10-21T17:34:30.913387Z",
   "total": 447664,
   "by_source": {
     "national.auction_bank_reo": 3,
@@ -514,7 +514,7 @@
   "errors": null,
   "notes": "daily vision pass: 36971 of 447006 listings have a vision report (+10 this run)",
   "detail_count": 447664,
-  "detail_digest": "b34547a5917af65a",
+  "detail_digest": "4a3b478920e4fd43",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 25,
@@ -639,8 +639,8 @@
         "start": 266189,
         "end": 285189,
         "records": 19000,
-        "bytes": 6781949,
-        "sha256": "3fccdbcbaea6a8b03704f6be48072af345396785bd700e995194ccd23e6b3e19"
+        "bytes": 6782234,
+        "sha256": "a856695a13e146ac4a0f96e85c5d40bbdf42229ae654a865a8654efd43bfb0fc"
       },
       {
         "name": "listings_part_015.json.gz",
@@ -719,8 +719,8 @@
         "start": 443281,
         "end": 447664,
         "records": 4383,
-        "bytes": 506810,
-        "sha256": "4153dca6da288b97b632b12c54e4862cec490c4a48a460ace1829d7355c20711"
+        "bytes": 510198,
+        "sha256": "78cd38aaeccc46d9ac73d06c16fe560611eb72ec82ab0b2661bb817550d5a4be"
       }
     ]
   },
@@ -736,7 +736,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 115.41,
+  "health_age_hours": 117.16,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
