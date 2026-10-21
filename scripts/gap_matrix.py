@@ -1888,6 +1888,40 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
     cs_spec = SPECS.get("child_support")
     if cs_spec and "enrichment_nc_case_status_tyler.py" in cs_spec.producers:
         out["child_support"] = out.get("child_support", set()) | _nc_case_status_tyler_credit()
+    # tax_aging_surfaced, Robeson/Alexander/Rockingham NC: same bug-class as the nc_harris
+    # marriage_license fix above, found 2026-10-20 chasing a Rockingham "sourced-not-built" ask.
+    # enrichment_ustaxdata_tax_search.py (TENANTS=Robeson by parcel_id, NAME_SEARCH_TENANTS=
+    # Alexander/Rockingham by owner-name + address confirmation, commits 8feaf6fe/ae2ca7df) writes
+    # raw['ustaxdata_delinquent_tax'] -- which is in enrichment_tax_owed.py's own _LIVE_ROLL_BLOCKS,
+    # so Pass B there folds it into raw['tax_owed'] generically (no per-county code needed there) --
+    # and enrichment_tax_aging.py (tax_aging_surfaced's ONLY producer, wired every run, no county
+    # restriction) then derives raw['tax_aging_surfaced'] from THAT raw['tax_owed'] the same way it
+    # already does for every qpaybill/catalis county. The chain is real and LIVE-VERIFIED 2026-10-20:
+    # a real name-search enrich_ustaxdata() call against live Rockingham board rows (owner
+    # "KNOWLES CAROL FAYE...", "OAKES LEA ANN") returned real multi-year (2019-2026) paid/unpaid
+    # bill histories with address-confirmed accounts and a real 2026 unpaid year on both. counties_
+    # named_in()'s blanket grep never sees Robeson/Alexander/Rockingham here because neither real
+    # producer (enrichment_tax_owed.py, enrichment_tax_aging.py) names a county at all -- both are
+    # fully generic -- and enrichment_ustaxdata_tax_search.py (where the county names actually live)
+    # is correctly NOT in tax_aging_surfaced's own `producers` tuple (it doesn't write that key
+    # itself). Credited directly from the vendor module's own TENANTS/NAME_SEARCH_TENANTS registries.
+    #
+    # NOT touched: two_year_delinquent and multi_year_delinquent_tax, the OTHER two columns the
+    # 2026-10-20 gap list attributed to this same vendor. Checked and confirmed those two columns'
+    # own raw keys (raw['two_year_delinquent'], raw['multi_year_delinquent_tax'] -- both read as a
+    # literal SIMPLE_PRESENCE_COLS/explicit-key check, by this project's own 2026-10-16 per-column-
+    # raw-key discipline just above in checked_columns()) are never written by this vendor's data at
+    # all -- only raw['ustaxdata_delinquent_tax'] and, through it, raw['tax_owed']/raw[
+    # 'tax_aging_surfaced']. This is the SAME vendor-attribution imprecision already documented for
+    # rollback_exposure against this exact vendor (enrichment_ustaxdata_tax_search.py's own
+    # docstring) and against bttaxpayerportal.com tenants elsewhere -- a real, separate gap for
+    # these two columns, not a credit bug, and not fixed by crediting tax_aging_surfaced here.
+    try:
+        from foreclosure_scraper import enrichment_ustaxdata_tax_search as _utx
+        out.setdefault("tax_aging_surfaced", set()).update(
+            ("NC", c) for c in {**_utx.TENANTS, **_utx.NAME_SEARCH_TENANTS})
+    except Exception:  # noqa: BLE001 - a missing optional module only leaves the cell 'not built'
+        pass
     # deed_chain_has_history/deed_chain_break/deed_chain_distress_transfer/atty_deed_chain_fetched:
     # enrichment_deed_chain.py refinement (see _deed_chain_credit's own docstring) -- its only
     # producer has no literal county text and no per-county restriction at all; replace the

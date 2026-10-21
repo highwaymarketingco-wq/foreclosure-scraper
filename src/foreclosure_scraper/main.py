@@ -3455,11 +3455,13 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("resolved_catchup.failed", traceback=traceback.format_exc())
 
-    # ustaxdata.com per-parcel tax search (Robeson NC): multi-year paid/unpaid bill history,
-    # keyed by the board's own parcel_id. Must run BEFORE enrich_tax_owed just below, which
-    # picks up raw['ustaxdata_delinquent_tax'] generically (tax-ish block name + years_unpaid)
-    # the same way qpaybill_roll's are. See enrichment_ustaxdata_tax_search.py's docstring for
-    # why Alexander/Rockingham (same vendor) aren't wired. Gate off with FORECLOSURE_USTAXDATA=0.
+    # ustaxdata.com per-parcel tax search: multi-year paid/unpaid bill history, keyed by the
+    # board's own parcel_id for Robeson NC, or (2026-10-16, commit ae2ca7df) by owner name +
+    # address confirmation for Alexander/Rockingham NC, whose parcel_id doesn't match this
+    # vendor's own account numbering. Must run BEFORE enrich_tax_owed just below, which picks up
+    # raw['ustaxdata_delinquent_tax'] generically (tax-ish block name + years_unpaid) the same
+    # way qpaybill_roll's are. See enrichment_ustaxdata_tax_search.py's docstring for the name-
+    # search mechanism. Gate off with FORECLOSURE_USTAXDATA=0.
     if os.environ.get("FORECLOSURE_USTAXDATA", "1") != "0":
         try:
             from .enrichment_ustaxdata_tax_search import enrich_ustaxdata

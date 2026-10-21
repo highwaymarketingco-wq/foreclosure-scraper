@@ -638,6 +638,36 @@ def test_built_in_code_adds_nc_harris_marriage_credit():
     assert ("NC", "Carteret") in built["marriage_license"]
 
 
+def test_built_in_code_adds_ustaxdata_tax_aging_credit():
+    """End-to-end: built_in_code()'s real output for 'tax_aging_surfaced' now credits NC/Robeson,
+    NC/Alexander and NC/Rockingham (enrichment_ustaxdata_tax_search.py's TENANTS/NAME_SEARCH_TENANTS
+    -- its raw['ustaxdata_delinquent_tax'] block is in enrichment_tax_owed.py's _LIVE_ROLL_BLOCKS,
+    so Pass B there folds it into raw['tax_owed'], and enrichment_tax_aging.py -- tax_aging_
+    surfaced's only producer, wired every run, no county restriction -- derives raw[
+    'tax_aging_surfaced'] from that). Found chasing a 2026-10-20 Rockingham "sourced-not-built" ask;
+    live-reconfirmed the same day: a real enrich_ustaxdata() name-search call against live
+    Rockingham board rows returned real, address-confirmed, multi-year (2019-2026) bill histories
+    for 2 of several real owners tried. Not found by the blanket counties_named_in() grep because
+    neither real producer (enrichment_tax_owed.py, enrichment_tax_aging.py) names a county at all."""
+    built = gm.built_in_code()
+    assert ("NC", "Robeson") in built["tax_aging_surfaced"]
+    assert ("NC", "Alexander") in built["tax_aging_surfaced"]
+    assert ("NC", "Rockingham") in built["tax_aging_surfaced"]
+
+
+def test_built_in_code_leaves_ustaxdata_two_year_and_multiyear_uncredited():
+    """The SAME vendor's two OTHER gap-list columns (two_year_delinquent,
+    multi_year_delinquent_tax) must NOT gain a false credit from this fix: no code path writes
+    either column's own literal raw key (raw['two_year_delinquent'], raw[
+    'multi_year_delinquent_tax']) from ustaxdata_delinquent_tax/tax_owed data -- only
+    tax_aging_surfaced is a real, derived chain. This is the same vendor-attribution imprecision
+    already documented for rollback_exposure against this exact vendor (enrichment_ustaxdata_
+    tax_search.py's own docstring), a real separate gap, not a credit bug for THIS fix to close."""
+    built = gm.built_in_code()
+    assert ("NC", "Rockingham") not in built.get("two_year_delinquent", set())
+    assert ("NC", "Rockingham") not in built.get("multi_year_delinquent_tax", set())
+
+
 def test_built_in_code_drops_retired_probate_search_false_credit():
     """2026-10-19 systematic producers-tuple sweep (the follow-up this session's own 5 one-at-a-
     time catches called for): enrichment_probate_search.py was RETIRED 2026-10-09 (main.py never

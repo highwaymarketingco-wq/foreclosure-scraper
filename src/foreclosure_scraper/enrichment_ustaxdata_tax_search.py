@@ -60,13 +60,26 @@ on its own (NAME_SEARCH_TENANTS docstring). The other 10 counties from the gap-l
 were never probed at all (unknown whether they share this vendor or this ID mismatch) and are
 not claimed here either.
 
-Note for whoever next reads the gap list: this unlocks multi_year_delinquent_tax /
-repeat_tax_loss / tax_aging_surfaced / atty_tax_verified_confirmed / lt_tax_sale_overage for
-Alexander and Rockingham -- the delinquent-tax-history columns this vendor actually has data
-for. It does NOT touch rollback_exposure: this vendor has no present-use/land-use-deferral
-field at all (checked; the multi-year table is paid/unpaid status only), and the gap list's
-listing of rollback_exposure against ustaxdata.com tenants is itself imprecise, the same way
-it is against bttaxpayerportal.com tenants (enrichment_bt_parcel_info.py's own docstring).
+Note for whoever next reads the gap list: this unlocks repeat_tax_loss / tax_aging_surfaced /
+atty_tax_verified_confirmed / lt_tax_sale_overage for Alexander and Rockingham -- the
+delinquent-tax-history columns this vendor actually has data for.
+
+CORRECTION, 2026-10-20 (chasing a Rockingham gap-list ask): this docstring originally also
+claimed multi_year_delinquent_tax here -- WRONG. This module only ever writes
+raw['ustaxdata_delinquent_tax']; enrichment_tax_owed.py's Pass B folds that into raw['tax_owed']
+generically (_LIVE_ROLL_BLOCKS), and enrichment_tax_aging.py derives raw['tax_aging_surfaced']
+from THAT -- a real, live-verified chain (see scripts/gap_matrix.py's built_in_code(), the
+tax_aging_surfaced credit block). But raw['multi_year_delinquent_tax'] and
+raw['two_year_delinquent'] are each their own literal raw key, read by gap_matrix.py as an exact
+presence/field check, and NOTHING in this chain ever writes either one -- those two columns'
+own real producers are unrelated per-county modules (enrichment_gaston_multiyear_tax.py and
+siblings, albemarle_observer_tax_lists.py/nc_its_public_tax.py/sc_catalis_delinquent_roll.py).
+This vendor does not close them, for any of Robeson/Alexander/Rockingham. It does NOT touch
+rollback_exposure either: this vendor has no present-use/land-use-deferral field at all (checked;
+the multi-year table is paid/unpaid status only). Both are the SAME vendor-attribution
+imprecision the gap list already has against bttaxpayerportal.com tenants
+(enrichment_bt_parcel_info.py's own docstring) -- a real, separate gap, not something a credit
+fix for tax_aging_surfaced closes.
 
 Free, public, no login, no CAPTCHA. One request per parcel (or per confirmed name-search hit),
 so it is bounded and opt-in. Gate off with FORECLOSURE_USTAXDATA=0.
