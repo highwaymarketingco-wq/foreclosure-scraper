@@ -1,7 +1,7 @@
 {
- "board_rows": 447006,
+ "board_rows": 447222,
  "by_category": {
-  "uncovered": 177620,
+  "uncovered": 177646,
   "wall": 20358
  },
  "format_version": 1,
@@ -61,15 +61,19 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "tax_lien": {
-   "entries": 36128,
-   "generated_at": "2026-10-20T13:46:45Z"
+   "entries": 37470,
+   "generated_at": "2026-10-21T09:41:54Z"
+  },
+  "tax_lien_johnston_static": {
+   "entries": 8,
+   "generated_at": "2026-10-20T14:49:27Z"
   },
   "vacant_structure": {
    "entries": 50,
    "generated_at": "2026-10-17T14:28:27Z"
   }
  },
- "listings": 197978,
+ "listings": 198004,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4927,
@@ -96,7 +100,7 @@
    "counties_nc.transylvania_vacant": 10883,
    "counties_sc.charleston_delinquent_tax": 1757,
    "counties_sc.charleston_tax_sale_xlsx": 2393,
-   "counties_sc.sc_heir_estate_parcel_cache": 6060,
+   "counties_sc.sc_heir_estate_parcel_cache": 6093,
    "counties_sc.sc_probate_net": 507,
    "counties_sc.sc_probate_notices.yourpickenscounty": 442,
    "counties_sc.sc_public_index": 2680,
