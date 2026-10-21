@@ -42,6 +42,7 @@ from foreclosure_scraper.web_artifact import (  # noqa: E402
     _APPEND_SIG_FIELDS, board_lock, board_patch_size_state, patch_existing_rows,
 )
 
+
 def _is_richland_sc(rec: dict) -> bool:
     return (str(rec.get("state") or "").upper() == "SC"
             and (rec.get("county") or "").replace(" County", "").strip().lower() == "richland")
