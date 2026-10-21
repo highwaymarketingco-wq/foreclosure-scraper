@@ -35,6 +35,30 @@ _wake_mydt_checked / _randolph_mydt_checked) before/after, builds patches (same 
 dedupe_key exclusion safety net as every prior backfill), and lands them with ONE
 patch_existing_rows() call under board_lock(), via the same supervised dual-signal watchdog.
 
+PHASE 2.5 ADDED 2026-10-21 -- the missing downstream half of the SAME chain this module's own
+commit message promised ("feeds tax_aging_surfaced for free via the existing enrich_tax_owed/
+enrich_tax_aging chain"). Live-checked against the board: the ONE Wake row the 2026-10-19 pilot
+run already qualified (PIN 1713488099, 4 matured years, $65.03 total) carries
+raw['multi_year_delinquent_tax'] but raw['tax_owed'] and raw['tax_aging_surfaced'] are BOTH still
+None -- the prior runs of this script (and run_live_backfill_wake_randolph.py) only ever called
+enrich_with_wake_multiyear_tax/enrich_with_randolph_multiyear_tax and patched THAT one key; nothing
+afterward ever re-ran enrichment_tax_owed.enrich_tax_owed() / enrichment_tax_aging.enrich_tax_aging()
+over these same already-patched rows to let the existing, generic, PURE (no-network)
+_SOURCES["multi_year_delinquent_tax"] mapping actually derive tax_owed/tax_aging_surfaced from it.
+Confirmed by direct call: eto.enrich_tax_owed([that one Listing]) stamps a real tax_owed block
+from its own already-present multi_year_delinquent_tax data with zero network I/O, and
+eta.enrich_tax_aging() then surfaces tax_aging_surfaced/tax_aging_high from THAT in the same pure
+pass. Phase 2.5 runs both of those exact, unmodified, generic functions over this run's own Wake/
+Randolph candidate list (the same in-memory Listings Phase 2 already touched -- no new board read,
+no network call) so every multi_year_delinquent_tax hit this run lands (old pilot rows carried
+over as candidates that already qualified, plus any new ones from this run's batches) also closes
+its own tax_aging_surfaced cell in the same write. This does NOT touch the OTHER ~12,939 Wake /
+6,043 Randolph rows that never qualify for multi_year_delinquent_tax at all -- those still show
+"checked=0" for tax_aging_surfaced because they generate no raw['tax_owed'] year data under any
+producer this project has for Wake/Randolph (the structural reason the realistic ceiling here is
+far below the gap matrix's raw applicable count; see the dry-run output's own qualified-vs-eligible
+ratio for the real, measured rate before taking the applicable count at face value).
+
 Usage:
     python scripts/backfill_multiyear_tax_wake_randolph.py --dry-run
     python scripts/backfill_multiyear_tax_wake_randolph.py --dry-run --max-batches 2
@@ -64,6 +88,8 @@ from foreclosure_scraper.enrichment_wake_multiyear_tax import (  # noqa: E402
     CHECKED_KEY as WAKE_CHECKED_KEY, RAW_KEY as WAKE_RAW_KEY,
     enrich_with_wake_multiyear_tax,
 )
+from foreclosure_scraper.enrichment_tax_aging import enrich_tax_aging  # noqa: E402
+from foreclosure_scraper.enrichment_tax_owed import enrich_tax_owed  # noqa: E402
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import (  # noqa: E402
     _APPEND_SIG_FIELDS, board_lock, board_patch_size_state, patch_existing_rows,
@@ -77,7 +103,15 @@ _COUNTIES = [
     ("Randolph", enrich_with_randolph_multiyear_tax, RANDOLPH_RAW_KEY, RANDOLPH_CHECKED_KEY),
 ]
 _TARGET_COUNTIES = {c for c, *_ in _COUNTIES}
-_WATCH_KEYS = (WAKE_RAW_KEY, WAKE_CHECKED_KEY, RANDOLPH_CHECKED_KEY)  # RAW_KEY shared by both
+_WATCH_KEYS = (WAKE_RAW_KEY, WAKE_CHECKED_KEY, RANDOLPH_CHECKED_KEY,
+              # Phase 2.5 (2026-10-21): the downstream keys enrich_tax_owed/enrich_tax_aging
+              # derive from a qualifying multi_year_delinquent_tax hit -- watched here too so a
+              # qualifying row's tax_aging_surfaced/tax_owed stamp lands in the SAME patch.
+              "tax_owed", "tax_aging_surfaced", "tax_aging_high",
+              # 2026-10-21: enrichment_randolph_multiyear_tax.py now also writes
+              # raw['two_year_delinquent'] unconditionally off the same live fetch (see that
+              # module's TYD_RAW_KEY docstring) -- watched so it lands in the same patch.
+              "two_year_delinquent")  # RAW_KEY shared by both
 
 
 def _light(rec: dict) -> Listing:
@@ -94,11 +128,21 @@ def _already_checked(raw: Any, raw_key: str, checked_key: str) -> bool:
 # Phase 1
 # ===========================================================================
 
-def _collect_candidates(docs: Path) -> tuple[dict[str, dict[str, Listing]], int, int]:
-    """{county: {dedupe_key: light_listing}}, total rows streamed, ambiguous-identity count
-    excluded (shared dedupe_key with another candidate in the SAME county)."""
+def _collect_candidates(
+    docs: Path,
+) -> tuple[dict[str, dict[str, Listing]], dict[str, dict[str, Listing]], int, int]:
+    """{county: {dedupe_key: light_listing}} of live-fetch-eligible rows (not yet checked),
+    PLUS a second {county: {dedupe_key: light_listing}} of rows that ALREADY qualified for
+    multi_year_delinquent_tax on some prior run (so Phase 1's own `_already_checked` filter
+    excludes them from the live-fetch set above) but may still be missing the downstream
+    tax_owed/tax_aging_surfaced restatement Phase 2.5 adds -- same single board stream, one
+    extra dict-is-RAW_KEY-dict check per Wake/Randolph row, no second pass. Also returns total
+    rows streamed and the ambiguous-identity count excluded from the live-fetch set (shared
+    dedupe_key with another candidate in the SAME county)."""
     by_county: dict[str, dict[str, Listing]] = {c: {} for c in _TARGET_COUNTIES}
+    prior_qualified: dict[str, dict[str, Listing]] = {c: {} for c in _TARGET_COUNTIES}
     seen: dict[tuple[str, str], int] = {}
+    prior_seen: dict[tuple[str, str], int] = {}
     total = 0
     raw_key_checked_key = {"Wake": (WAKE_RAW_KEY, WAKE_CHECKED_KEY),
                            "Randolph": (RANDOLPH_RAW_KEY, RANDOLPH_CHECKED_KEY)}
@@ -112,7 +156,16 @@ def _collect_candidates(docs: Path) -> tuple[dict[str, dict[str, Listing]], int,
         if not str(rec.get("parcel_id") or "").strip():
             continue
         raw_key, checked_key = raw_key_checked_key[county]
-        if _already_checked(rec.get("raw"), raw_key, checked_key):
+        raw = rec.get("raw")
+        if _already_checked(raw, raw_key, checked_key):
+            if isinstance(raw, dict) and isinstance(raw.get(raw_key), dict):
+                li = _light(rec)
+                try:
+                    pkey = li.dedupe_key()
+                except Exception:  # noqa: BLE001
+                    continue
+                prior_seen[(county, pkey)] = prior_seen.get((county, pkey), 0) + 1
+                prior_qualified[county][pkey] = li
             continue
         li = _light(rec)
         try:
@@ -126,7 +179,11 @@ def _collect_candidates(docs: Path) -> tuple[dict[str, dict[str, Listing]], int,
         if n > 1:
             by_county[county].pop(key, None)
             ambiguous += 1
-    return by_county, total, ambiguous
+    for (county, key), n in prior_seen.items():
+        if n > 1:
+            prior_qualified[county].pop(key, None)
+            ambiguous += 1
+    return by_county, prior_qualified, total, ambiguous
 
 
 # ===========================================================================
@@ -283,10 +340,13 @@ def main() -> int:
 
     lock = contextlib.nullcontext() if args.dry_run else board_lock(REPO, owner="wake_randolph_mydt_backfill")
     with lock:
-        by_county, total_rows, ambiguous = _collect_candidates(docs)
+        by_county, prior_qualified, total_rows, ambiguous = _collect_candidates(docs)
         print(f"board rows streamed: {total_rows:,}")
         for county, cands in by_county.items():
-            print(f"{county} NC eligible candidates: {len(cands):,}")
+            print(f"{county} NC eligible candidates (live fetch): {len(cands):,}")
+        for county, cands in prior_qualified.items():
+            print(f"{county} NC already-qualified-but-not-yet-aged (Phase 2.5 only, no live "
+                  f"fetch): {len(cands):,}")
         if ambiguous:
             print(f"excluded as ambiguous-identity (shared dedupe_key with another "
                   f"candidate, never guessed at): {ambiguous:,}")
@@ -295,6 +355,11 @@ def main() -> int:
             county: {key: dict(li.raw) if isinstance(li.raw, dict) else {}
                     for key, li in cands.items()}
             for county, cands in by_county.items()
+        }
+        before_prior_qualified = {
+            county: {key: dict(li.raw) if isinstance(li.raw, dict) else {}
+                    for key, li in cands.items()}
+            for county, cands in prior_qualified.items()
         }
 
         all_batch_stats: dict[str, list[dict]] = {}
@@ -306,17 +371,46 @@ def main() -> int:
             all_batch_stats[county] = asyncio.run(
                 _run_county_batches(county, enrich_fn, cands, args.max_batches))
 
+        # Phase 2.5: the missing downstream half (module docstring above). PURE, no network --
+        # enrich_tax_owed/enrich_tax_aging are the project's own generic, idempotent producers;
+        # run verbatim, unmodified, over every Wake/Randolph Listing this invocation touched
+        # (this run's own live-fetch candidates, qualifying or not) PLUS every row that already
+        # qualified on a PRIOR run and was never carried through this chain. A row with no
+        # multi_year_delinquent_tax block (the overwhelming majority) is untouched by both calls,
+        # same as every other row on the board they already run over every pipeline cycle.
+        aging_listings = [li for cands in by_county.values() for li in cands.values()]
+        aging_listings += [li for cands in prior_qualified.values() for li in cands.values()]
+        owed_stats = enrich_tax_owed(aging_listings)
+        aging_stats = enrich_tax_aging(aging_listings)
+        print(f"\n=== Phase 2.5: enrich_tax_owed + enrich_tax_aging over "
+              f"{len(aging_listings):,} Wake/Randolph candidates ===")
+        print(f"  enrich_tax_owed: {owed_stats}")
+        print(f"  enrich_tax_aging: {aging_stats}")
+
         patches = _build_patches(by_county, before_by_county)
+        prior_patches = _build_patches(prior_qualified, before_prior_qualified)
+        collision = set(patches) & set(prior_patches)
+        if collision:
+            print(f"\nWARNING: {len(collision)} dedupe_key(s) appear in both the live-fetch and "
+                  f"prior-qualified patch sets -- keeping the live-fetch version for each, never "
+                  f"guessed at.")
+            for k in collision:
+                prior_patches.pop(k, None)
+        patches.update(prior_patches)
         print(f"\npatches staged: {len(patches):,}")
-        by_kind = {"qualified": 0, "checked_no_qualify": 0}
+        by_kind = {"qualified": 0, "checked_no_qualify": 0, "aging_only": 0}
         for p in patches.values():
             r = p["raw"]
             if r.get(WAKE_RAW_KEY) is not None:
                 by_kind["qualified"] += 1
-            else:
+            elif r.get(WAKE_CHECKED_KEY) is not None or r.get(RANDOLPH_CHECKED_KEY) is not None:
                 by_kind["checked_no_qualify"] += 1
+            else:
+                by_kind["aging_only"] += 1
         print(f"    qualified (multi_year_delinquent_tax written): {by_kind['qualified']:,}")
         print(f"    checked, did not qualify (sentinel only):      {by_kind['checked_no_qualify']:,}")
+        print(f"    tax_owed/tax_aging_surfaced only (prior-qualified restatement): "
+              f"{by_kind['aging_only']:,}")
 
         if args.dry_run:
             print("\nDRY RUN -- nothing written. (Note: the enrich_with_* calls above still hit "

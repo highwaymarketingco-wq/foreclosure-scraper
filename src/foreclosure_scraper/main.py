@@ -3802,6 +3802,38 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("hyde_rollback_exposure.failed", traceback=traceback.format_exc())
 
+    # Rowan NC's tax.rowancountync.gov (iasWorld) already has a live tax_lien reader
+    # (tax_lien_rowan.py) -- the gap list's "add a new tax-roll reader" premise was wrong; the
+    # Datalet's own value_history tab carries an explicit "Deferred Land" column this module
+    # restates into the shared raw['rollback_exposure'] contract, with a rate derived from the
+    # SAME parcel's own tax_bills_int bill (never a hard-coded millage). See
+    # enrichment_rowan_rollback_exposure.py's own docstring for the live evidence.
+    try:
+        from .enrichment_rowan_rollback_exposure import enrich_rowan_rollback_exposure
+        s = await _await_capped(enrich_rowan_rollback_exposure(enriched), "rowan_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["rowan_rollback_exposure"] = s
+    except Exception:
+        log.error("rowan_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Brunswick NC's tax.brunsco.net/ITSNet is the SAME "ITS Public" / BT TaxPayer Portal vendor
+    # enrichment_bt_parcel_info.py's 14 TENANTS counties and Harnett already read (just hosted on
+    # its own domain, like Harnett) -- the gap list's "add a new tax-roll reader" premise was
+    # wrong; its own ViewParcel "Property Values" fieldset carries the same "Deferred" line this
+    # module restates into the shared raw['rollback_exposure'] contract (no rate source exists
+    # for this county yet, so no annual_deferred_tax/estimated_rollback is derived -- the
+    # documented fallback every sibling in this family already uses). See
+    # enrichment_brunswick_rollback_exposure.py's own docstring for the live evidence, including
+    # the tenant's own year-duplicated search rows this module handles that no sibling needed to.
+    try:
+        from .enrichment_brunswick_rollback_exposure import enrich_brunswick_rollback_exposure
+        s = await _await_capped(enrich_brunswick_rollback_exposure(enriched),
+                                "brunswick_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["brunswick_rollback_exposure"] = s
+    except Exception:
+        log.error("brunswick_rollback_exposure.failed", traceback=traceback.format_exc())
+
     # NC OneMap statewide sweeps (never overwrites the tax relief / rollback dollar figures).
     try:
         from .enrichment_onemap_sweeps import enrich_onemap_sweeps

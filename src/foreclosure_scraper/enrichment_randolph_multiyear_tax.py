@@ -99,6 +99,18 @@ log = structlog.get_logger()
 
 RAW_KEY = "multi_year_delinquent_tax"
 CHECKED_KEY = "_randolph_mydt_checked"
+#: 2026-10-21 (gap_list_2026-10-21.csv: NC Randolph two_year_delinquent, 6,043 applicable, SAME
+#: count as multi_year_delinquent_tax -- one missing source covers both). This column has no
+#: producer for Randolph at all today; checked_columns() reads raw['two_year_delinquent']
+#: literally (gap_matrix.py 2026-10-16 audit), and nothing writes it. The fix mirrors this
+#: project's existing PTS-Cloud/qPayBill/sc_catalis precedent for the SAME shared key
+#: (enrichment_ptscloud_two_year_delinquent.py's build_two_year_block / enrichment_
+#: qpaybill_multiyear_tax.py's own): written UNCONDITIONALLY once the bill grid is actually
+#: fetched (truth either way, not just the qualifying case), off the EXACT SAME bills list
+#: build_block() above already has in hand -- zero extra network cost, since the live fetch
+#: already happened for the multi_year_delinquent_tax gate.
+TYD_RAW_KEY = "two_year_delinquent"
+TYD_SOURCE_SLUG = "enrichment_randolph_multiyear_tax"
 COUNTY = "Randolph"
 
 ENABLED = os.environ.get("FORECLOSURE_RANDOLPH_MYDT") != "0"
@@ -129,14 +141,10 @@ def _eligible(li: Listing) -> bool:
     )
 
 
-def build_block(parcel: str, bills: list[dict], *, today: Optional[date] = None) -> Optional[dict]:
-    """Pure: the raw['multi_year_delinquent_tax'] block from one parcel's full PTS Public Web
-    Access bill grid (tax_lien_pwa.parse_grid's own `bills` list, taxYear="ALL"), or None when
-    the parcel doesn't clear the multi-year gate (fewer than MIN_YEARS unpaid years, or no
-    MATURED unpaid year -- a parcel whose only unpaid bill is this year's current, not-yet-due
-    one is not repeat delinquency). `parcel` is the row's own parcel id; stored as parcel_key
-    the same normalized way tax_binding.py's own parcel-id matching expects."""
-    today = today or date.today()
+def _bill_years(parcel: str, bills: list[dict]) -> dict[int, float]:
+    """Pure: {year: amount_due} for this parcel's own unpaid bills only, off the raw grid --
+    shared by build_block() and build_two_year_block() so both read the identical per-year
+    history (one real fetch already paid for either way)."""
     want = tc.alnum(parcel)
     per_year: dict[int, float] = {}
     for b in bills or ():
@@ -150,6 +158,38 @@ def build_block(parcel: str, bills: list[dict], *, today: Optional[date] = None)
             continue
         prev = per_year.get(year)
         per_year[year] = due if prev is None else max(prev, due)
+    return per_year
+
+
+def build_two_year_block(parcel: str, bills: list[dict], *,
+                         today: Optional[date] = None) -> dict:
+    """Pure: the shared raw['two_year_delinquent'] contract (gap_matrix.py's checked_columns()/
+    positive_columns() own key for this column) from the SAME bill grid build_block() reads --
+    written UNCONDITIONALLY (truth either way), matching enrichment_ptscloud_two_year_delinquent.
+    build_two_year_block / enrichment_qpaybill_multiyear_tax's own precedent for this exact
+    shared key: "years" is a COUNT of matured years, not a list, and a parcel that doesn't clear
+    any gate still gets a real (false) answer rather than being left unchecked."""
+    today = today or date.today()
+    per_year = _bill_years(parcel, bills)
+    years = sorted(per_year)
+    matured = tax_calendar.completed_delinquent_years(years, "NC", COUNTY, today)
+    return {
+        "is_two_year_plus": len(matured) >= 2,
+        "years": len(matured),
+        "oldest_year": years[0] if years else None,
+        "source": TYD_SOURCE_SLUG,
+    }
+
+
+def build_block(parcel: str, bills: list[dict], *, today: Optional[date] = None) -> Optional[dict]:
+    """Pure: the raw['multi_year_delinquent_tax'] block from one parcel's full PTS Public Web
+    Access bill grid (tax_lien_pwa.parse_grid's own `bills` list, taxYear="ALL"), or None when
+    the parcel doesn't clear the multi-year gate (fewer than MIN_YEARS unpaid years, or no
+    MATURED unpaid year -- a parcel whose only unpaid bill is this year's current, not-yet-due
+    one is not repeat delinquency). `parcel` is the row's own parcel id; stored as parcel_key
+    the same normalized way tax_binding.py's own parcel-id matching expects."""
+    today = today or date.today()
+    per_year = _bill_years(parcel, bills)
     years = sorted(per_year)
     if len(years) < MIN_YEARS:
         return None
@@ -207,7 +247,8 @@ async def enrich_with_randolph_multiyear_tax(listings: Iterable[Listing],
     delinquency. `client` is exposed for tests; the real pipeline always lets it default (a
     fresh Fetcher, this call's own rate limit)."""
     stats = {"eligible": 0, "attempted": 0, "qualified": 0, "insufficient_history": 0,
-             "no_bills": 0, "fetch_errors": 0, "skipped_cap": 0, "skipped_budget": 0}
+             "no_bills": 0, "fetch_errors": 0, "skipped_cap": 0, "skipped_budget": 0,
+             "two_year_delinquent_written": 0}
     if not ENABLED:
         return stats
     targets = [li for li in listings if _eligible(li)]
@@ -236,6 +277,12 @@ async def enrich_with_randolph_multiyear_tax(listings: Iterable[Listing],
             stats["no_bills" if status == "no_bills_on_page" else "fetch_errors"] += 1
             li.raw[CHECKED_KEY] = status
             return
+        # two_year_delinquent: written unconditionally off this SAME fetch (see TYD_RAW_KEY's
+        # own module-level docstring) -- a real answer either way, not gated on the
+        # multi_year_delinquent_tax qualify-or-not below.
+        if not isinstance(li.raw.get(TYD_RAW_KEY), dict):
+            li.raw[TYD_RAW_KEY] = build_two_year_block(parcel, bills, today=today)
+            stats["two_year_delinquent_written"] += 1
         block = build_block(parcel, bills, today=today)
         if block is None:
             stats["insufficient_history"] += 1
