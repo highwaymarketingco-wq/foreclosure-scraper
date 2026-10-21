@@ -2,11 +2,11 @@
 
 Generated from `gap_list_2026-10-21.csv`. Regenerate with `python scripts/hermes_handoff.py` any time the gap list changes -- this file is a derived view, not hand-maintained.
 
-Only **Hermes lane** below is a scrape target. The other two piles need a human call or a scheduled recheck, not a CAPTCHA solver -- see this script's own module docstring for why.
+Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bot-wall, build in-house** is ordinary scraper work for this project (existing WAF-bypass/stealth-browser code, applied per-site) -- not a Hermes hand-off. The last two piles need a human policy call or a scheduled recheck, not a scraper at all -- see this script's own module docstring for why.
 
-## 1. Hermes lane -- real CAPTCHA/login/bot-wall
+## 1. Hermes lane -- CAPTCHA or required login
 
-831 cells, 1,097,876 est_rows_affected combined.
+641 cells, 888,414 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -26,9 +26,7 @@ Only **Hermes lane** below is a scrape target. The other two piles need a human 
 | NC | Guilford | usps_vacancy | 12,276 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Charleston | atty_rod_lien_checked | 11,210 | CAPTCHA | register: Charleston County ROD document search (county-buil |
 | SC | Charleston | liens | 11,210 | CAPTCHA | register: Charleston County ROD document search (county-buil |
-| SC | Charleston | rollback_exposure | 11,210 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
 | SC | Charleston | usps_vacancy | 11,210 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Rutherford | multi_year_delinquent_tax | 11,011 | bot check (Cloudflare/WAF) | tax/property card: rutherfordcountync.gov |
 | NC | Rutherford | usps_vacancy | 11,011 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Forsyth | usps_vacancy | 10,688 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Brunswick | heir_naming_publication | 9,225 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
@@ -36,7 +34,6 @@ Only **Hermes lane** below is a scrape target. The other two piles need a human 
 | NC | Brunswick | quiet_title | 9,225 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Brunswick | usps_vacancy | 9,225 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Catawba | usps_vacancy | 8,291 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Charleston | atty_tax_verified_confirmed | 7,518 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
 | SC | Horry | usps_vacancy | 6,639 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Randolph | atty_rod_lien_checked | 6,043 | CAPTCHA | register: Courthouse Computer Systems (CCS) public web searc |
 | NC | Randolph | liens | 6,043 | CAPTCHA | register: Courthouse Computer Systems (CCS) public web searc |
@@ -51,9 +48,6 @@ Only **Hermes lane** below is a scrape target. The other two piles need a human 
 | NC | Pitt | usps_vacancy | 5,182 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Spartanburg | sos_dissolution | 5,136 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
 | NC | Onslow | usps_vacancy | 4,836 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Sumter | probate | 4,686 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| NC | Rowan | atty_rod_lien_checked | 4,594 | bot check (Cloudflare/WAF) | register: rod.rowancountync.gov (atty_rod_lien_checked: bloc |
-| NC | Rowan | liens | 4,594 | bot check (Cloudflare/WAF) | register: rod.rowancountync.gov (liens: blocked) |
 | NC | Rowan | usps_vacancy | 4,594 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Beaufort | usps_vacancy | 4,281 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Harnett | atty_rod_lien_checked | 4,226 | CAPTCHA | register: Courthouse Computer Systems LRSearch (MVC) at us6  |
@@ -61,21 +55,16 @@ Only **Hermes lane** below is a scrape target. The other two piles need a human 
 | NC | Harnett | liens | 4,226 | CAPTCHA | register: Courthouse Computer Systems LRSearch (MVC) at us6  |
 | NC | Harnett | quiet_title | 4,226 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Harnett | usps_vacancy | 4,226 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Charleston | lt_tax_sale | 4,156 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
 | NC | Henderson | usps_vacancy | 3,976 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Orangeburg | atty_deed_ref | 3,968 | login | register index: www.orangeburgscrod.org |
 | SC | Orangeburg | atty_rod_lien_checked | 3,968 | login | register: County-run 'Register Of Deeds Remote Access Site'  |
 | SC | Orangeburg | liens | 3,968 | login | register: County-run 'Register Of Deeds Remote Access Site'  |
 | SC | Orangeburg | usps_vacancy | 3,968 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Duplin | usps_vacancy | 3,956 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Lee | multi_year_delinquent_tax | 3,907 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
-| NC | Lee | rollback_exposure | 3,907 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
-| NC | Lee | two_year_delinquent | 3,907 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
 | NC | Lee | usps_vacancy | 3,907 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Oconee | usps_vacancy | 3,888 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Florence | usps_vacancy | 3,882 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Charleston | sos_dissolution | 3,846 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
-| SC | Florence | assessed_value | 3,836 | Cloudflare check on the county property card | county GIS: services1.arcgis.com |
 | SC | Colleton | usps_vacancy | 3,680 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Duplin | probate | 3,678 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | NC | Beaufort | probate | 3,657 | CAPTCHA | probate: portal-nc.tylertech.cloud |
@@ -90,11 +79,6 @@ Only **Hermes lane** below is a scrape target. The other two piles need a human 
 | SC | Anderson | multi_year_delinquent_tax | 3,373 | login | tax/property card: acpass.andersoncountysc.org |
 | SC | Anderson | usps_vacancy | 3,373 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Cherokee | usps_vacancy | 3,325 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Union | multi_year_delinquent_tax | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
-| NC | Union | repeat_tax_loss | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
-| NC | Union | rollback_exposure | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
-| NC | Union | tax_aging_surfaced | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
-| NC | Union | two_year_delinquent | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Union | usps_vacancy | 3,163 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Hyde | heir_naming_publication | 3,148 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Hyde | quiet_title | 3,148 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
@@ -102,7 +86,6 @@ Only **Hermes lane** below is a scrape target. The other two piles need a human 
 | SC | Lexington | atty_rod_lien_checked | 3,104 | login | register: Kofile/GovOS CountyFusion countyfusion14.govos.com |
 | SC | Lexington | liens | 3,104 | login | register: Kofile/GovOS CountyFusion countyfusion14.govos.com |
 | SC | Lexington | usps_vacancy | 3,104 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Lee | atty_tax_verified_confirmed | 3,076 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
 | NC | Orange | heir_naming_publication | 3,046 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Orange | quiet_title | 3,046 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Orange | usps_vacancy | 3,046 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
@@ -121,35 +104,20 @@ Only **Hermes lane** below is a scrape target. The other two piles need a human 
 | NC | Iredell | liens | 2,840 | CAPTCHA | register: Courthouse Computer Systems LRSearch (new, since 2 |
 | NC | Iredell | usps_vacancy | 2,840 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Anson | usps_vacancy | 2,580 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Colleton | assessed_value | 2,563 | Cloudflare check on the county property card | county GIS: services1.arcgis.com |
-| NC | Pasquotank | atty_rod_lien_checked | 2,469 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Pasquotank | liens | 2,469 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Pasquotank | usps_vacancy | 2,469 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | McDowell | atty_tax_verified_confirmed | 2,468 | CAPTCHA | tax/property card: www.bttaxpayerportal.com |
 | NC | Hyde | probate | 2,396 | CAPTCHA | probate: portal-nc.tylertech.cloud |
-| NC | Polk | multi_year_delinquent_tax | 2,343 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
-| NC | Polk | rollback_exposure | 2,343 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
-| NC | Polk | tax_aging_surfaced | 2,343 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
 | NC | Polk | usps_vacancy | 2,343 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Orange | probate | 2,281 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | NC | Harnett | probate | 2,244 | CAPTCHA | probate: portal-nc.tylertech.cloud |
-| NC | Rockingham | atty_rod_lien_checked | 2,241 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) 'e-Vault' us5.co |
-| NC | Rockingham | liens | 2,241 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) 'e-Vault' us5.co |
 | NC | Rockingham | usps_vacancy | 2,241 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Richland | multi_year_delinquent_tax | 2,236 | bot check (Cloudflare/WAF) | tax/property card:  |
-| SC | Richland | rollback_exposure | 2,236 | bot check (Cloudflare/WAF) | tax/property card:  |
-| SC | Richland | tax_aging_surfaced | 2,236 | bot check (Cloudflare/WAF) | tax/property card:  |
-| SC | Richland | two_year_delinquent | 2,236 | bot check (Cloudflare/WAF) | tax/property card:  |
 | SC | Richland | usps_vacancy | 2,236 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Lexington | probate | 2,218 | CAPTCHA | probate: www.lex-co.com |
 | NC | Bertie | multi_year_delinquent_tax | 2,173 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
 | NC | Bertie | rollback_exposure | 2,173 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
 | NC | Bertie | two_year_delinquent | 2,173 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
 | NC | Bertie | usps_vacancy | 2,173 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Washington | atty_rod_lien_checked | 2,167 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Washington | liens | 2,167 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Washington | usps_vacancy | 2,167 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Colleton | atty_probate_case | 2,125 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Nash | usps_vacancy | 2,090 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Kershaw | atty_deed_ref | 2,064 | login | register index: kershawsc.avenuinsights.com |
 | SC | Kershaw | atty_rod_lien_checked | 2,064 | login | register: Neumo Records Management (formerly Avenu Insights  |
@@ -159,27 +127,15 @@ Only **Hermes lane** below is a scrape target. The other two piles need a human 
 | NC | Lincoln | atty_tax_verified_confirmed | 2,031 | CAPTCHA | tax/property card: www.lincolncountytax.com |
 | SC | Horry | sos_dissolution | 1,995 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
 | NC | Granville | usps_vacancy | 1,944 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Perquimans | atty_rod_lien_checked | 1,882 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Perquimans | liens | 1,882 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Perquimans | usps_vacancy | 1,882 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Burke | multi_year_delinquent_tax | 1,826 | CAPTCHA | tax/property card: lrcpwa.ncptscloud.com |
 | NC | Burke | usps_vacancy | 1,826 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Colleton | atty_heir_candidates | 1,826 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Colleton | lt_estate_lead | 1,817 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Dorchester | usps_vacancy | 1,817 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Kershaw | probate | 1,802 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
 | NC | Wayne | usps_vacancy | 1,793 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Sumter | atty_probate_case | 1,793 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| NC | Polk | atty_tax_verified_confirmed | 1,756 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
 | SC | Beaufort | liens | 1,744 | CAPTCHA | register: NewVision Systems BrowserView (rod.beaufortcountys |
 | SC | Beaufort | usps_vacancy | 1,744 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Madison | usps_vacancy | 1,704 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Barnwell | probate | 1,695 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Clarendon | atty_deed_ref | 1,668 | bot check (Cloudflare/WAF) | register index: acclaimprod.clarendoncountygov.org |
-| SC | Clarendon | atty_rod_lien_checked | 1,668 | bot check (Cloudflare/WAF) | register: Harris AcclaimWeb acclaimprod.clarendoncountygov.o |
-| SC | Clarendon | liens | 1,668 | bot check (Cloudflare/WAF) | register: Harris AcclaimWeb acclaimprod.clarendoncountygov.o |
 | SC | Clarendon | usps_vacancy | 1,668 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | York | rollback_exposure | 1,668 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
 | SC | York | usps_vacancy | 1,668 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Union | probate | 1,632 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | NC | Craven | liens | 1,608 | CAPTCHA | register: Courthouse Computer Systems LRSearch (us5.courthou |
@@ -190,30 +146,271 @@ Only **Hermes lane** below is a scrape target. The other two piles need a human 
 | NC | Robeson | usps_vacancy | 1,582 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Greenville | sos_dissolution | 1,570 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
 | NC | Bertie | atty_tax_verified_confirmed | 1,562 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
+| NC | Moore | usps_vacancy | 1,557 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Chatham | usps_vacancy | 1,553 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Pender | heir_naming_publication | 1,543 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Pender | quiet_title | 1,543 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Pender | usps_vacancy | 1,543 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Bertie | tax_aging_surfaced | 1,535 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
+| NC | Bertie | lt_tax_lien | 1,534 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
+| SC | Dillon | usps_vacancy | 1,520 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Marlboro | usps_vacancy | 1,481 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Person | heir_naming_publication | 1,429 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Person | quiet_title | 1,429 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Person | usps_vacancy | 1,429 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Union | usps_vacancy | 1,408 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Wilson | usps_vacancy | 1,389 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Gaston | atty_heir_candidates | 1,381 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| NC | Perquimans | probate | 1,380 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| NC | Franklin | usps_vacancy | 1,369 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Bertie | probate | 1,365 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| NC | Stanly | usps_vacancy | 1,343 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Madison | probate | 1,326 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| NC | Washington | probate | 1,313 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| NC | Caswell | usps_vacancy | 1,273 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Haywood | usps_vacancy | 1,249 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Lancaster | usps_vacancy | 1,243 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Surry | heir_naming_publication | 1,218 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Surry | quiet_title | 1,218 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Surry | usps_vacancy | 1,218 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Jasper | atty_rod_lien_checked | 1,216 | CAPTCHA | register: Courthouse Computer Systems (CCHS) Registrar us6.c |
+| SC | Jasper | usps_vacancy | 1,216 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Forsyth | atty_heir_candidates | 1,189 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| NC | Jones | heir_naming_publication | 1,177 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Jones | quiet_title | 1,177 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Jones | usps_vacancy | 1,177 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Granville | probate | 1,170 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| NC | Chowan | usps_vacancy | 1,166 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Calhoun | usps_vacancy | 1,142 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Newberry | atty_deed_ref | 1,142 | login | register index: newberrysc.avenuinsights.com |
+| SC | Newberry | atty_rod_lien_checked | 1,142 | login | register: Neumo Records Management (formerly Avenu Insights  |
+| SC | Newberry | usps_vacancy | 1,142 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Carteret | heir_naming_publication | 1,108 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Carteret | quiet_title | 1,108 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Carteret | usps_vacancy | 1,108 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Rutherford | atty_heir_candidates | 1,097 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| SC | Edgefield | usps_vacancy | 1,076 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Wayne | probate | 1,074 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| SC | Greenwood | usps_vacancy | 1,070 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Caldwell | multi_year_delinquent_tax | 1,054 | CAPTCHA | tax/property card: www.caldwellcountynctax.com |
+| NC | Caldwell | repeat_tax_loss | 1,054 | CAPTCHA | tax/property card: www.caldwellcountynctax.com |
+| NC | Caldwell | tax_aging_surfaced | 1,054 | CAPTCHA | tax/property card: www.caldwellcountynctax.com |
+| NC | Caldwell | two_year_delinquent | 1,054 | CAPTCHA | tax/property card: www.caldwellcountynctax.com |
+| NC | Caldwell | usps_vacancy | 1,054 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Edgecombe | heir_naming_publication | 1,040 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Edgecombe | quiet_title | 1,040 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Edgecombe | usps_vacancy | 1,040 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Chesterfield | usps_vacancy | 1,034 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Moore | probate | 991 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| SC | Pickens | sos_dissolution | 971 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
+| NC | Jackson | heir_naming_publication | 967 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Jackson | quiet_title | 967 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Jackson | usps_vacancy | 967 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Sampson | usps_vacancy | 963 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Halifax | usps_vacancy | 957 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Chowan | probate | 942 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| NC | Wilkes | usps_vacancy | 929 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+
+...and 441 more rows in this pile (full set in the source gap_list CSV, filtered to this reason pattern).
+
+## 2. Bot-wall, build in-house -- Cloudflare/WAF, not Hermes
+
+190 cells, 209,462 est_rows_affected combined.
+
+| state | county | column | est_rows | reason | source |
+|---|---|---|---|---|---|
+| SC | Charleston | rollback_exposure | 11,210 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
+| NC | Rutherford | multi_year_delinquent_tax | 11,011 | bot check (Cloudflare/WAF) | tax/property card: rutherfordcountync.gov |
+| SC | Charleston | atty_tax_verified_confirmed | 7,518 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
+| SC | Sumter | probate | 4,686 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Rowan | atty_rod_lien_checked | 4,594 | bot check (Cloudflare/WAF) | register: rod.rowancountync.gov (atty_rod_lien_checked: bloc |
+| NC | Rowan | liens | 4,594 | bot check (Cloudflare/WAF) | register: rod.rowancountync.gov (liens: blocked) |
+| SC | Charleston | lt_tax_sale | 4,156 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
+| NC | Lee | multi_year_delinquent_tax | 3,907 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
+| NC | Lee | rollback_exposure | 3,907 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
+| NC | Lee | two_year_delinquent | 3,907 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
+| SC | Florence | assessed_value | 3,836 | Cloudflare check on the county property card | county GIS: services1.arcgis.com |
+| NC | Union | multi_year_delinquent_tax | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
+| NC | Union | repeat_tax_loss | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
+| NC | Union | rollback_exposure | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
+| NC | Union | tax_aging_surfaced | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
+| NC | Union | two_year_delinquent | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
+| NC | Lee | atty_tax_verified_confirmed | 3,076 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
+| SC | Colleton | assessed_value | 2,563 | Cloudflare check on the county property card | county GIS: services1.arcgis.com |
+| NC | Pasquotank | atty_rod_lien_checked | 2,469 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Pasquotank | liens | 2,469 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Polk | multi_year_delinquent_tax | 2,343 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
+| NC | Polk | rollback_exposure | 2,343 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
+| NC | Polk | tax_aging_surfaced | 2,343 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
+| NC | Rockingham | atty_rod_lien_checked | 2,241 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) 'e-Vault' us5.co |
+| NC | Rockingham | liens | 2,241 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) 'e-Vault' us5.co |
+| SC | Richland | multi_year_delinquent_tax | 2,236 | bot check (Cloudflare/WAF) | tax/property card:  |
+| SC | Richland | rollback_exposure | 2,236 | bot check (Cloudflare/WAF) | tax/property card:  |
+| SC | Richland | tax_aging_surfaced | 2,236 | bot check (Cloudflare/WAF) | tax/property card:  |
+| SC | Richland | two_year_delinquent | 2,236 | bot check (Cloudflare/WAF) | tax/property card:  |
+| NC | Washington | atty_rod_lien_checked | 2,167 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Washington | liens | 2,167 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | Colleton | atty_probate_case | 2,125 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Perquimans | atty_rod_lien_checked | 1,882 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Perquimans | liens | 1,882 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | Colleton | atty_heir_candidates | 1,826 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Colleton | lt_estate_lead | 1,817 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Kershaw | probate | 1,802 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
+| SC | Sumter | atty_probate_case | 1,793 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Polk | atty_tax_verified_confirmed | 1,756 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
+| SC | Barnwell | probate | 1,695 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Clarendon | atty_deed_ref | 1,668 | bot check (Cloudflare/WAF) | register index: acclaimprod.clarendoncountygov.org |
+| SC | Clarendon | atty_rod_lien_checked | 1,668 | bot check (Cloudflare/WAF) | register: Harris AcclaimWeb acclaimprod.clarendoncountygov.o |
+| SC | Clarendon | liens | 1,668 | bot check (Cloudflare/WAF) | register: Harris AcclaimWeb acclaimprod.clarendoncountygov.o |
+| SC | York | rollback_exposure | 1,668 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
 | NC | Moore | atty_rod_lien_checked | 1,557 | bot check (Cloudflare/WAF) | register: Aumentum Recorder web access (Harris Recording Sol |
 | NC | Moore | liens | 1,557 | bot check (Cloudflare/WAF) | register: Aumentum Recorder web access (Harris Recording Sol |
-| NC | Moore | usps_vacancy | 1,557 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Chatham | multi_year_delinquent_tax | 1,553 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Chatham | repeat_tax_loss | 1,553 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Chatham | tax_aging_surfaced | 1,553 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Chatham | two_year_delinquent | 1,553 | bot check (Cloudflare/WAF) | tax/property card:  |
-| NC | Chatham | usps_vacancy | 1,553 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Pender | atty_rod_lien_checked | 1,543 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Pender | heir_naming_publication | 1,543 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Pender | liens | 1,543 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Pender | quiet_title | 1,543 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
-| NC | Pender | usps_vacancy | 1,543 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Clarendon | lot_size | 1,541 | Cloudflare check on the county property card | county GIS: qpublic.schneidercorp.com |
-| NC | Bertie | tax_aging_surfaced | 1,535 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
-| NC | Bertie | lt_tax_lien | 1,534 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
-| SC | Dillon | usps_vacancy | 1,520 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Union | atty_tax_verified_confirmed | 1,509 | bot check (Cloudflare/WAF) | tax/property card:  |
-| SC | Marlboro | usps_vacancy | 1,481 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Person | atty_rod_lien_checked | 1,429 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Person | liens | 1,429 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Wilson | multi_year_delinquent_tax | 1,389 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
+| NC | Wilson | repeat_tax_loss | 1,389 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
+| NC | Wilson | rollback_exposure | 1,389 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
+| NC | Wilson | tax_aging_surfaced | 1,389 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
+| NC | Wilson | two_year_delinquent | 1,389 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
+| SC | Clarendon | assessed_value | 1,382 | Cloudflare check on the county property card | county GIS: qpublic.schneidercorp.com |
+| SC | Sumter | atty_heir_candidates | 1,347 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Sumter | lt_estate_lead | 1,339 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Florence | atty_heir_candidates | 1,308 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Florence | lt_estate_lead | 1,297 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Lancaster | assessed_value | 1,201 | Cloudflare check on the county property card | county GIS: services3.arcgis.com |
+| SC | York | probate | 1,117 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Barnwell | atty_probate_case | 1,098 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Newberry | lot_size | 1,078 | Cloudflare check on the county property card | county GIS: map.newberrycounty.net |
+| NC | Edgecombe | multi_year_delinquent_tax | 1,040 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| NC | Edgecombe | repeat_tax_loss | 1,040 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| NC | Edgecombe | tax_aging_surfaced | 1,040 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| NC | Edgecombe | two_year_delinquent | 1,040 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| SC | Edgefield | lot_size | 1,025 | Cloudflare check on the county property card | county GIS: qpublic.net |
+| SC | Edgefield | assessed_value | 1,024 | Cloudflare check on the county property card | county GIS: qpublic.net |
+| SC | Newberry | assessed_value | 981 | Cloudflare check on the county property card | county GIS: map.newberrycounty.net |
+| SC | York | beds_baths | 978 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
+| SC | Lancaster | probate | 967 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Halifax | multi_year_delinquent_tax | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
+| NC | Halifax | repeat_tax_loss | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
+| NC | Halifax | rollback_exposure | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
+| NC | Halifax | tax_aging_surfaced | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
+| NC | Halifax | two_year_delinquent | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
+| SC | York | atty_tax_verified_confirmed | 853 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
+| SC | Barnwell | atty_heir_candidates | 833 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Barnwell | lt_estate_lead | 819 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Ashe | multi_year_delinquent_tax | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
+| NC | Ashe | repeat_tax_loss | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
+| NC | Ashe | tax_aging_surfaced | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
+| NC | Ashe | two_year_delinquent | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
+| SC | Charleston | lt_tax_sale_overage | 726 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
+| NC | Richmond | atty_rod_lien_checked | 682 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Richmond | liens | 682 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Chatham | atty_tax_verified_confirmed | 676 | bot check (Cloudflare/WAF) | tax/property card:  |
+| SC | Aiken | atty_rod_lien_checked | 665 | bot check (Cloudflare/WAF) | register:  www.aikencountysc.gov |
+| SC | Aiken | liens | 665 | bot check (Cloudflare/WAF) | register:  www.aikencountysc.gov |
+| NC | Alleghany | atty_rod_lien_checked | 609 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCHS), new-style host |
+| NC | Alleghany | liens | 609 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCHS), new-style host |
+| SC | Lee | lot_size | 593 | Cloudflare check on the county property card | county GIS: qpublic.schneidercorp.com |
+| SC | Lee | assessed_value | 574 | Cloudflare check on the county property card | county GIS: qpublic.schneidercorp.com |
+| NC | Tyrrell | atty_rod_lien_checked | 537 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Tyrrell | liens | 537 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | Charleston | atty_heir_candidates | 509 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Charleston | lt_probate_notice | 507 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Charleston | atty_probate_case | 417 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Aiken | probate | 380 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Avery | multi_year_delinquent_tax | 362 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
+| NC | Avery | repeat_tax_loss | 362 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
+| NC | Avery | rollback_exposure | 362 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
+| NC | Avery | tax_aging_surfaced | 362 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
+| NC | Avery | two_year_delinquent | 362 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
+| NC | Rockingham | divorce_no_subsequent_deed | 327 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) 'e-Vault' us5.co |
+| NC | Tyrrell | marriage_license | 326 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Wilson | atty_tax_verified_confirmed | 268 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
+| SC | Chester | probate | 214 | bot check (Cloudflare/WAF) | probate:  |
+| SC | Fairfield | assessed_value | 199 | Cloudflare check on the county property card | county GIS: beacon.schneidercorp.com |
+| SC | Fairfield | lot_size | 198 | Cloudflare check on the county property card | county GIS: beacon.schneidercorp.com |
+| NC | Ashe | atty_tax_verified_confirmed | 179 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
+| NC | Gaston | divorce_no_subsequent_deed | 145 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems LRSearch (MVC/DevExpre |
+| SC | Richland | lt_tax_sale_overage | 145 | bot check (Cloudflare/WAF) | tax/property card:  |
+| NC | Avery | atty_tax_verified_confirmed | 128 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
+| SC | Berkeley | atty_heir_candidates | 118 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
+| SC | Berkeley | lt_estate_lead | 111 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
+| SC | Spartanburg | lt_probate_notice | 111 | bot check (Cloudflare/WAF) | probate: www.spartanburgcounty.gov |
+| SC | Spartanburg | atty_heir_candidates | 109 | bot check (Cloudflare/WAF) | probate: www.spartanburgcounty.gov |
+| SC | Lancaster | atty_probate_case | 107 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Marlboro | atty_heir_candidates | 107 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Dorchester | atty_probate_case | 106 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Dorchester | lt_probate_notice | 106 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Colleton | lt_probate_notice | 102 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Edgecombe | atty_tax_verified_confirmed | 101 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| SC | Dorchester | atty_heir_candidates | 101 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Halifax | atty_tax_verified_confirmed | 85 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
+| SC | Spartanburg | atty_probate_case | 79 | bot check (Cloudflare/WAF) | probate: www.spartanburgcounty.gov |
+| SC | Spartanburg | probate | 75 | bot check (Cloudflare/WAF) | probate: www.spartanburgcounty.gov |
+| SC | Oconee | atty_heir_candidates | 64 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Moore | divorce_no_subsequent_deed | 58 | bot check (Cloudflare/WAF) | register: Aumentum Recorder web access (Harris Recording Sol |
+| SC | Kershaw | atty_heir_candidates | 56 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
+| SC | Kershaw | atty_probate_case | 56 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
+| SC | Chester | atty_probate_case | 54 | bot check (Cloudflare/WAF) | probate:  |
+| SC | Chester | atty_heir_candidates | 51 | bot check (Cloudflare/WAF) | probate:  |
+| SC | Chester | lt_estate_lead | 51 | bot check (Cloudflare/WAF) | probate:  |
+| SC | Marlboro | lt_probate_notice | 51 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | York | atty_heir_candidates | 50 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Marlboro | atty_probate_case | 48 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Pender | divorce_no_subsequent_deed | 37 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | Richland | atty_tax_verified_confirmed | 35 | bot check (Cloudflare/WAF) | tax/property card:  |
+| SC | Lancaster | atty_heir_candidates | 29 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Lancaster | lt_estate_lead | 29 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Kershaw | lt_estate_lead | 28 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
+| SC | Oconee | lt_probate_notice | 28 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Dorchester | lt_estate_lead | 25 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Pasquotank | divorce_no_subsequent_deed | 20 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | Marlboro | lt_estate_lead | 20 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | York | atty_probate_case | 19 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | York | lt_probate_notice | 19 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Edgecombe | lt_tax_sale | 17 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| NC | Person | divorce_no_subsequent_deed | 15 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | Florence | atty_probate_case | 11 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Florence | lt_probate_notice | 11 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Barnwell | lt_probate_notice | 10 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Aiken | lt_estate_lead | 9 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Charleston | probate | 8 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Perquimans | divorce_no_subsequent_deed | 5 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| NC | Chatham | lt_tax_sale | 4 | bot check (Cloudflare/WAF) | tax/property card:  |
+| SC | Aiken | atty_heir_candidates | 4 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Aiken | atty_probate_case | 4 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Richland | lt_tax_sale | 4 | bot check (Cloudflare/WAF) | tax/property card:  |
+| NC | Tyrrell | divorce_no_subsequent_deed | 3 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | Georgetown | lt_probate_notice | 3 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Berkeley | atty_probate_case | 2 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
+| SC | Berkeley | lt_probate_notice | 2 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
+| NC | Washington | divorce_no_subsequent_deed | 1 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | Dorchester | probate | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Georgetown | atty_heir_candidates | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Georgetown | atty_probate_case | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Georgetown | lt_estate_lead | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Oconee | atty_probate_case | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Oconee | probate | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| NC | Ashe | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
+| NC | Avery | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
+| NC | Chatham | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card:  |
+| NC | Edgecombe | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| NC | Halifax | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
+| NC | Lee | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
+| NC | Polk | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
+| NC | Rutherford | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card: rutherfordcountync.gov |
+| NC | Union | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card:  |
+| NC | Wilson | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
 
-...and 631 more rows in this pile (full set in the source gap_list CSV, filtered to this reason pattern).
-
-## 2. Human judgment call -- NOT a scrape target
+## 3. Human judgment call -- NOT a scrape target
 
 268 cells, 186,491 est_rows_affected combined.
 
@@ -422,7 +619,7 @@ Only **Hermes lane** below is a scrape target. The other two piles need a human 
 
 ...and 68 more rows in this pile (full set in the source gap_list CSV, filtered to this reason pattern).
 
-## 3. Stale scope -- needs a periodic recheck, not a wall
+## 4. Stale scope -- needs a periodic recheck, not a wall
 
 56 cells, 88,070 est_rows_affected combined.
 
