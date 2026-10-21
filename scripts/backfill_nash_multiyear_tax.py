@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import contextlib
 import multiprocessing as mp
 import os
 import sys
@@ -256,64 +255,76 @@ def main() -> int:
 
     docs = REPO / "docs"
 
-    lock = contextlib.nullcontext() if args.dry_run else board_lock(REPO, owner="nash_mydt_backfill")
-    with lock:
-        candidates, total_rows, ambiguous = _collect_candidates(docs)
-        print(f"board rows streamed: {total_rows:,}")
-        print(f"{COUNTY} NC eligible candidates: {len(candidates):,}")
-        if ambiguous:
-            print(f"excluded as ambiguous-identity (shared dedupe_key with another "
-                  f"candidate, never guessed at): {ambiguous:,}")
+    # 2026-10-21: the board lock used to be held for this ENTIRE function -- including the
+    # live-fetch batch loop below, which runs for ~2.5-3 hours. That blocked every OTHER
+    # Mac-side board writer for the whole run (confirmed: it queued out Greenville's and the
+    # Wake/Randolph backfill's real writes tonight), unlike every sibling backfill script
+    # (Cabarrus/Berkeley/Iredell/etc.), which only locks around the final patch_existing_rows()
+    # call. Reading the board (candidate collection) needs no lock at all; the live fetches are
+    # pure network I/O with no board access. The lock is now acquired ONLY around the final
+    # supervised write, matching the established convention.
+    candidates, total_rows, ambiguous = _collect_candidates(docs)
+    print(f"board rows streamed: {total_rows:,}")
+    print(f"{COUNTY} NC eligible candidates: {len(candidates):,}")
+    if ambiguous:
+        print(f"excluded as ambiguous-identity (shared dedupe_key with another "
+              f"candidate, never guessed at): {ambiguous:,}")
 
-        before = {key: dict(li.raw) if isinstance(li.raw, dict) else {}
-                 for key, li in candidates.items()}
+    before = {key: dict(li.raw) if isinstance(li.raw, dict) else {}
+             for key, li in candidates.items()}
 
-        if candidates:
-            print(f"\n=== {COUNTY} NC: running real enrich_with_nash_multiyear_tax in "
-                  f"batches ===")
-            asyncio.run(_run_batches(candidates, args.max_batches))
+    if candidates:
+        print(f"\n=== {COUNTY} NC: running real enrich_with_nash_multiyear_tax in "
+              f"batches ===")
+        asyncio.run(_run_batches(candidates, args.max_batches))
 
-        patches = _build_patches(candidates, before)
-        print(f"\npatches staged: {len(patches):,}")
-        by_kind = {"qualified": 0, "two_year_only": 0, "checked_no_answer": 0}
-        for p in patches.values():
-            r = p["raw"]
-            if r.get(MYDT_KEY) is not None:
-                by_kind["qualified"] += 1
-            elif r.get(TYD_KEY) is not None:
-                by_kind["two_year_only"] += 1
-            else:
-                by_kind["checked_no_answer"] += 1
-        print(f"    qualified (multi_year_delinquent_tax written): {by_kind['qualified']:,}")
-        print(f"    two_year_delinquent written, did not qualify:  {by_kind['two_year_only']:,}")
-        print(f"    checked, no usable answer (sentinel only):     {by_kind['checked_no_answer']:,}")
+    patches = _build_patches(candidates, before)
+    print(f"\npatches staged: {len(patches):,}")
+    by_kind = {"qualified": 0, "two_year_only": 0, "checked_no_answer": 0}
+    for p in patches.values():
+        r = p["raw"]
+        if r.get(MYDT_KEY) is not None:
+            by_kind["qualified"] += 1
+        elif r.get(TYD_KEY) is not None:
+            by_kind["two_year_only"] += 1
+        else:
+            by_kind["checked_no_answer"] += 1
+    print(f"    qualified (multi_year_delinquent_tax written): {by_kind['qualified']:,}")
+    print(f"    two_year_delinquent written, did not qualify:  {by_kind['two_year_only']:,}")
+    print(f"    checked, no usable answer (sentinel only):     {by_kind['checked_no_answer']:,}")
 
-        if args.dry_run:
-            print("\nDRY RUN -- nothing written. (Note: enrich_with_nash_multiyear_tax above "
-                  "still hits the real live portal -- this module has no network-free dry-run "
-                  "mode; --dry-run here only controls whether the result is WRITTEN to the "
-                  "board.)")
-            return 0
-        if not patches:
-            print("\nnothing to do.")
-            return 0
+    if args.dry_run:
+        print("\nDRY RUN -- nothing written. (Note: enrich_with_nash_multiyear_tax above "
+              "still hits the real live portal -- this module has no network-free dry-run "
+              "mode; --dry-run here only controls whether the result is WRITTEN to the "
+              "board.)")
+        return 0
+    if not patches:
+        print("\nnothing to do.")
+        return 0
 
-        size_state = board_patch_size_state(docs)
-        if not size_state["ok"] and not args.allow_large:
-            print(f"\nREFUSING: {size_state['reason']}. Re-run with --allow-large under "
-                  f"supervision.")
-            return 1
+    size_state = board_patch_size_state(docs)
+    if not size_state["ok"] and not args.allow_large:
+        print(f"\nREFUSING: {size_state['reason']}. Re-run with --allow-large under "
+              f"supervision.")
+        return 1
 
+    # wait=900: this write lands after a ~2.5-3h live fetch -- board_lock()'s default (wait=0,
+    # fail instantly if busy) would throw away that entire fetch if another short-lived writer
+    # (typically done in a few minutes, per every patch_existing_rows() run tonight) happens to
+    # hold the lock at this exact moment. 15 minutes comfortably outlasts any realistic
+    # competing writer's final-write phase.
+    with board_lock(REPO, owner="nash_mydt_backfill", wait=900, poll=10):
         stats_patch, watchdog = _run_patch_supervised(
             patches, {"ambiguous": ambiguous}, docs,
             timeout_s=args.patch_timeout_s, mem_ceiling_mb=args.patch_mem_ceiling_mb,
             allow_large=args.allow_large,
         )
-        print(f"\nwatchdog: peak VmRSS {watchdog['peak_rss_mb']:.0f} MB, "
-              f"peak VmHWM {watchdog['peak_vmhwm_mb']:.0f} MB, wall {watchdog['elapsed_s']:.1f}s")
-        print(f"wrote board: patched {stats_patch['applied']:,}/{len(patches):,} rows "
-              f"(existing board: {stats_patch['existing']:,}, not_found: {stats_patch['not_found']:,}, "
-              f"duplicate_key_matches: {stats_patch['duplicate_key_matches']:,})")
+    print(f"\nwatchdog: peak VmRSS {watchdog['peak_rss_mb']:.0f} MB, "
+          f"peak VmHWM {watchdog['peak_vmhwm_mb']:.0f} MB, wall {watchdog['elapsed_s']:.1f}s")
+    print(f"wrote board: patched {stats_patch['applied']:,}/{len(patches):,} rows "
+          f"(existing board: {stats_patch['existing']:,}, not_found: {stats_patch['not_found']:,}, "
+          f"duplicate_key_matches: {stats_patch['duplicate_key_matches']:,})")
     return 0
 
 
