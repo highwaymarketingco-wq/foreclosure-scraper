@@ -81,6 +81,33 @@ imprecision the gap list already has against bttaxpayerportal.com tenants
 (enrichment_bt_parcel_info.py's own docstring) -- a real, separate gap, not something a credit
 fix for tax_aging_surfaced closes.
 
+CORRECTION, 2026-10-20 (Rockingham dollar amounts): parse_bill_detail()'s _OWED_RE was tuned
+only to Robeson's taxbill.cfm template ("TOTAL AMOUNT OWED:" label, "$ 0.00"-style value) --
+Rockingham's taxbill.cfm (same vendor, different per-tenant template) never matched it, so
+every Rockingham bill's `total_due`/`balance` stayed empty even after a bill was correctly
+identified as unpaid and the detail page was correctly fetched (confirmed live: 12 Rockingham
+candidates -> 1 name-search-confirmed owner, KNOWLES CAROL FAYE/CHAD BRISON, 3327 Grooms Rd,
+5 real 2026 unpaid bills fetched, balance stayed `None`). Live-fetched and read Rockingham's
+real taxbill.cfm markup to confirm the actual difference: the label is "TOTAL<newline>DUE"
+(no colon) in a `class="redbox"` cell, and the value cell one `<TD>` later has NO "$" prefix
+at all, just a bare number ("163.51" unpaid; "$ 0.00" paid, inconsistently -- the $ sign is
+present on the zero case but not the nonzero one, live-verified both ways). _OWED_RE is now a
+single pattern that matches "TOTAL" + either tenant's own label text, then the first cell
+holding a bare-or-$-prefixed dollar amount -- Robeson's existing pattern and tests still pass
+unchanged. Rockingham also has no per-bill "Amount Taxed" gross-levy field the way Robeson
+does (it lists 1-3 individual line-item charges that sum to TOTAL DUE instead) -- amount_taxed
+is correctly absent there, not a second bug.
+
+Alexander's taxbill.cfm (the third tenant, NAME_SEARCH_TENANTS) was checked the same night and
+is currently NOT usable for a dollar amount at all: its search page (taxlist.cfm) works live and
+returns real results, but every taxbill.cfm fetch (confirmed live, ownerID=0202921&billNo=
+2218297&TaxYear=2026, the RHYNE test fixture's own real bill) returns a vendor-side error page
+("Connection Timeout Alexander County Tax Record Application... We are experiencing technical
+difficulties"), HTTP 200, not a bill. This is a live, pre-existing condition on Alexander's own
+site, not a template-shape difference this module can fix by pattern-matching -- parse_bill_
+detail() already degrades safely on it (no "TOTAL" text to match, returns {}, no total_due set,
+no crash). Re-check Alexander's taxbill.cfm before assuming it is fixed; nothing here claims it.
+
 Free, public, no login, no CAPTCHA. One request per parcel (or per confirmed name-search hit),
 so it is bounded and opt-in. Gate off with FORECLOSURE_USTAXDATA=0.
 """
@@ -153,7 +180,21 @@ _CELL_TEXT_RE = re.compile(r'<font color="#000000">\s*([^<]*)</font>')
 _IMG_RE = re.compile(r'images/(bill_\w+)\.gif')
 _ACCOUNT_RE = re.compile(r'account\.cfm\?parcelID=[^"]*">\s*([^<]*?)\s*</a>')
 _ZERO_RECORDS_RE = re.compile(r'<font color="#3333CC">0</font></strong>\s*Records', re.I)
-_OWED_RE = re.compile(r'TOTAL\s*AMOUNT OWED:.*?\$\s*([\d,\.]+)', re.S | re.I)
+#: Robeson's taxbill.cfm labels this "TOTAL AMOUNT OWED:" with a "$ 0.00"-style value a few
+#: cells later; Rockingham's SAME vendor, different per-tenant template labels it "TOTAL DUE"
+#: (no colon, split across two lines by a literal newline in the source) with a bare number
+#: ("163.51", no "$" at all) one cell later still (verified live 2026-10-20, Rockingham parcel
+#: 1339306/bill 3681429/2026: unpaid total $163.51 across 3 line-item charges; parcel
+#: 1339306/bill 3650745/2025: paid, "$ 0.00"). Matched generically: "TOTAL" + either label,
+#: then the first `>...<` cell that holds a bare or `$`-prefixed dollar amount -- covers both
+#: tenants' own markup without replacing either one's working pattern.
+_OWED_RE = re.compile(r'TOTAL\s*(?:AMOUNT\s+OWED\s*:?|DUE)\b.*?>\s*\$?\s*([\d,]+\.\d{2})\s*<',
+                      re.S | re.I)
+#: Robeson-only: a single "Amount Taxed" (the year's gross levy) cell at width="40%". Rockingham's
+#: template has no equivalent single field -- it lists one or more individual line-item charges
+#: (width="52%" address / width="48%" amount pairs, verified live 2026-10-20) that sum to TOTAL
+#: DUE instead of a separate gross-levy figure, so amount_taxed is correctly just absent there
+#: (parse_bill_detail's own contract: absent, never a wrong number, when a field isn't found).
 _TAXED_RE = re.compile(r'<td width="40%">\s*<div align="left" class="smallT1">\$\s*([\d,\.]+)</div>',
                        re.I)
 
@@ -291,9 +332,12 @@ def bill_detail_url(county: Optional[str], account: Optional[str], bill_no: Opti
 
 def parse_bill_detail(html: str) -> dict:
     """{"amount_owed": ..., "amount_taxed": ...} off one taxbill.cfm page. amount_owed is the
-    page's own "TOTAL AMOUNT OWED" (what's actually outstanding today — $0.00 on a paid bill);
-    amount_taxed is the gross "Amount Taxed" for the year (what was originally billed). Either
-    key is absent, never 0.0-but-wrong, when its field isn't found."""
+    page's own "TOTAL AMOUNT OWED" (Robeson) or "TOTAL DUE" (Rockingham) -- what's actually
+    outstanding today, $0.00 on a paid bill, same meaning under either tenant's own label
+    (_OWED_RE). amount_taxed is Robeson's separate gross "Amount Taxed" for the year (what was
+    originally billed); Rockingham's template has no equivalent single field, so this key is
+    correctly absent there, not a parse failure. Either key is absent, never 0.0-but-wrong,
+    when its field isn't found."""
     out: dict = {}
     m = _OWED_RE.search(html or "")
     if m:

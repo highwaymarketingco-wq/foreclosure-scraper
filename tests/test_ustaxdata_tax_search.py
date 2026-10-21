@@ -105,6 +105,58 @@ _DETAIL_PAID = """
 _DETAIL_UNPAID = _DETAIL_PAID.replace("$ 0.00", "$ 410.22")
 
 
+#: Rockingham's taxbill.cfm detail page, REAL markup (trimmed), captured live 2026-10-20 against
+#: parcel 1339306 / bill 3681429 / TaxYear 2026 (owner KNOWLES CAROL FAYE/CHAD BRISON, 3327
+#: Grooms Rd -- a real board row, found via the already-shipped NAME_SEARCH_TENANTS chain). This
+#: is the bug fixture: Rockingham's label is "TOTAL<newline>DUE" (no colon, unlike Robeson's
+#: "TOTAL AMOUNT OWED:"), and its value cell carries NO "$" prefix at all on a nonzero amount --
+#: the original _OWED_RE (tuned to Robeson's "TOTAL AMOUNT OWED:...\$" shape) matched neither
+#: piece, so every Rockingham bill's total_due/balance stayed empty even on a confirmed unpaid
+#: bill. Also real: no separate "Amount Taxed" field exists on this template at all (the three
+#: address/amount pairs above are individual line-item charges that sum to TOTAL DUE, not a
+#: single gross-levy figure) -- amount_taxed is correctly absent for this tenant, not a bug.
+_DETAIL_ROCKINGHAM_UNPAID = """
+	  <TD colspan="2" class="Taxbill_white"><table width="100%" border="0" cellspacing="0" cellpadding="2">
+            <tr>
+              <td width="52%"><div align="left" class="smallT1">3327 GROOMS RD           </div></td>
+              <td width="48%">
+                <div align="left" class="smallT1">$ 43.13</div></td>
+            </tr>
+          </table><table width="100%" border="0" cellspacing="0" cellpadding="2">
+            <tr>
+              <td width="52%"><div align="left" class="smallT1">3327 GROOMS RD           </div></td>
+              <td width="48%">
+                <div align="left" class="smallT1">$ 62.58</div></td>
+            </tr>
+          </table><table width="100%" border="0" cellspacing="0" cellpadding="2">
+            <tr>
+              <td width="52%"><div align="left" class="smallT1">3327 GROOMS RD           </div></td>
+              <td width="48%">
+                <div align="left" class="smallT1">$ 57.80</div></td>
+            </tr>
+          </table>
+	    <div align="center"></div></TD>
+   		</TR>
+        <tr>
+          <td>
+            </td>
+          <TD valign="middle" bgcolor="#FF0000" class="redbox"><div align="center" class="style10">TOTAL
+          DUE </div></TD>
+          <TD valign="middle" bgcolor="#FF0000" class="redbox"><div align="center" class="style3">163.51</div></TD>
+        </tr>
+      </table>
+"""
+
+#: Same real tenant/account, a PAID year (bill 3650745 / TaxYear 2025) -- captured live
+#: 2026-10-20. Here the vendor DOES prefix the zero amount with "$", confirming the "$" prefix
+#: is simply inconsistent per-value on this template, not a reliable signal either way.
+_DETAIL_ROCKINGHAM_PAID = """
+          <TD valign="middle" bgcolor="#FF0000" class="redbox"><div align="center" class="style10">TOTAL
+          DUE </div></TD>
+          <TD valign="middle" bgcolor="#FF0000" class="redbox"><div align="center" class="style3">$ 0.00</div></TD>
+"""
+
+
 #: Real row, captured live 2026-10-16 on alexander.ustaxdata.com?lastName=RHYNE&firstName=
 #: DENNIS (REJECTED_TENANTS' own documented probe) -- the row's cells[5] carries a REAL street
 #: address here, unlike Robeson's "> CONTACT COUNTY FOR" placeholder at the same position
@@ -259,6 +311,41 @@ def test_an_unpaid_bills_detail_reads_the_real_balance():
 def test_detail_junk_input_yields_nothing():
     assert parse_bill_detail("") == {}
     assert parse_bill_detail("<html>server error</html>") == {}
+
+
+# ---------------------------------------------------------------------------
+# Rockingham's detail-page template (2026-10-20 fix): "TOTAL DUE" (no colon), value cell with
+# no "$" prefix on a nonzero amount -- the original Robeson-only _OWED_RE matched neither piece,
+# so Rockingham's balance stayed empty even on a confirmed, fetched, unpaid bill. Robeson's own
+# tests above (test_a_paid_bills_detail_reads_zero_owed_and_the_gross_levy etc.) must still pass
+# unchanged -- this extends the pattern, it does not replace it.
+# ---------------------------------------------------------------------------
+
+def test_rockinghams_total_due_label_and_unprefixed_amount_are_read():
+    """Real bug fixture: live Rockingham parcel 1339306/bill 3681429/2026, $163.51 unpaid
+    across 3 line-item charges, no Amount Taxed field on this template at all."""
+    got = parse_bill_detail(_DETAIL_ROCKINGHAM_UNPAID)
+    assert got["amount_owed"] == 163.51
+    assert "amount_taxed" not in got
+
+
+def test_rockinghams_paid_bill_reads_zero_even_with_a_dollar_sign():
+    """Same label, same real account, a paid year -- the vendor's own $ prefix is inconsistent
+    per-value on this template (present here, absent on the unpaid fixture above), so the fix
+    must not depend on it either way."""
+    got = parse_bill_detail(_DETAIL_ROCKINGHAM_PAID)
+    assert got["amount_owed"] == 0.0
+
+
+def test_robesons_detail_template_still_parses_after_the_rockingham_fix():
+    """Regression guard: extending _OWED_RE to also match Rockingham's "TOTAL DUE" label must
+    not disturb Robeson's own "TOTAL AMOUNT OWED:" match (the two live fixtures already covered
+    above by test_a_paid_bills_detail_reads_zero_owed_and_the_gross_levy /
+    test_an_unpaid_bills_detail_reads_the_real_balance -- re-asserted together here as the
+    single before/after regression check for this fix)."""
+    assert parse_bill_detail(_DETAIL_PAID)["amount_owed"] == 0.0
+    assert parse_bill_detail(_DETAIL_PAID)["amount_taxed"] == 974.73
+    assert parse_bill_detail(_DETAIL_UNPAID)["amount_owed"] == 410.22
 
 
 # ---------------------------------------------------------------------------
