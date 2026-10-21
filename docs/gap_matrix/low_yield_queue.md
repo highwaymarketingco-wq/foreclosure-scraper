@@ -4,7 +4,7 @@ Generated from `gap_list_2026-10-21.csv`. Regenerate with `python scripts/low_yi
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,498 cells, 8,444,823 total est_rows_affected.**
+**6,498 cells, 8,439,086 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
@@ -13,7 +13,6 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Gaston | tax_aging_surfaced | 0.0% | 26,619 | screen the 26,619 unchecked rows (enrichment_tax_aging); write a negative result per row |
 | NC | Gaston | two_year_delinquent | 0.8% | 26,416 | screen the 26,416 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 | NC | Gaston | atty_deed_ref | 1.5% | 26,209 | backfill atty_deed_ref for the 26,209 applicable rows without it (existing enrichers) |
-| NC | Gaston | multi_year_delinquent_tax | 2.2% | 26,031 | screen the 26,031 unchecked rows (enrichment_tax_owed, multi_year_delinquent_tax); write a negative result per row |
 | NC | Gaston | liens | 2.6% | 25,918 | screen the 25,918 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
 | NC | Gaston | atty_rod_lien_checked | 2.7% | 25,899 | backfill atty_rod_lien_checked for the 25,899 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Gaston | repeat_tax_loss | 2.9% | 25,838 | 25,838 rows lack the inputs repeat_tax_loss is computed from: fill the inputs, then recompute |
@@ -21,6 +20,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Gaston | atty_taxpayer_of_record | 7.7% | 24,565 | backfill atty_taxpayer_of_record for the 24,565 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Gaston | email | 4.5% | 24,408 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
 | NC | Gaston | phone | 18.4% | 20,857 | backfill phone for the 20,857 applicable rows without it (existing enrichers) |
+| NC | Gaston | multi_year_delinquent_tax | 23.8% | 20,294 | screen the 20,294 unchecked rows (enrichment_tax_owed, multi_year_delinquent_tax); write a negative result per row |
 | SC | Spartanburg | phone | 0.0% | 19,191 | backfill phone for the 19,191 applicable rows without it (existing enrichers) |
 | SC | Spartanburg | liens | 2.9% | 18,822 | screen the 18,822 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
 | SC | Spartanburg | atty_rod_lien_checked | 3.0% | 18,809 | backfill atty_rod_lien_checked for the 18,809 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
@@ -186,8 +186,8 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | comps | 149 | 235,405 |
 | assessed_value | 135 | 231,797 |
 | two_year_delinquent | 133 | 224,623 |
-| multi_year_delinquent_tax | 103 | 221,706 |
 | atty_taxpayer_of_record | 146 | 219,335 |
+| multi_year_delinquent_tax | 103 | 215,969 |
 | lot_size | 140 | 212,744 |
 | sqft | 143 | 202,051 |
 | marriage_license | 100 | 196,464 |
