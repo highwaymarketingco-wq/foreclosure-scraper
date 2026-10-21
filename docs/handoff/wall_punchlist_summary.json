@@ -1,7 +1,7 @@
 {
- "board_rows": 447222,
+ "board_rows": 447664,
  "by_category": {
-  "uncovered": 177646,
+  "uncovered": 177645,
   "wall": 20358
  },
  "format_version": 1,
@@ -61,8 +61,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "tax_lien": {
-   "entries": 37470,
-   "generated_at": "2026-10-21T09:41:54Z"
+   "entries": 38619,
+   "generated_at": "2026-10-21T19:03:10Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,7 +73,7 @@
    "generated_at": "2026-10-17T14:28:27Z"
   }
  },
- "listings": 198004,
+ "listings": 198003,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4927,
@@ -110,7 +110,7 @@
    "counties_sc.spartanburg_vacant": 4223,
    "courtlistener.recap": 730,
    "national.distressed": 4777,
-   "national.hud_reac_inspection": 817,
+   "national.hud_reac_inspection": 816,
    "national.jail_bookings": 993,
    "national.landandfarm": 461,
    "national.landwatch": 578,
@@ -127,7 +127,7 @@
    "NC:mcdowell": 2950,
    "NC:mecklenburg": 9160,
    "NC:transylvania": 11297,
-   "NC:wake": 3880,
+   "NC:wake": 3879,
    "SC:charleston": 7696,
    "SC:colleton": 2200,
    "SC:pickens": 2067,
