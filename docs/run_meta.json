@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-10-21T11:17:30.583699Z",
+  "run_time": "2026-10-21T14:56:22.924525Z",
   "total": 447222,
   "by_source": {
     "national.auction_bank_reo": 3,
@@ -514,7 +514,7 @@
   "errors": null,
   "notes": "daily vision pass: 36971 of 447006 listings have a vision report (+10 this run)",
   "detail_count": 447222,
-  "detail_digest": "bfffe55cb8d36b7e",
+  "detail_digest": "c5cfddc104d66fb9",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 25,
@@ -535,16 +535,16 @@
         "start": 19254,
         "end": 38254,
         "records": 19000,
-        "bytes": 16762104,
-        "sha256": "9e156e63febaccf24ba2790b236843e7e8701c4e74f26f618c7ca0384a5e11a7"
+        "bytes": 16762322,
+        "sha256": "5cc2a0e263ea34aa211c39d78feb4861de2a0bdfe57d2593b074ee2dd9031f56"
       },
       {
         "name": "listings_part_002.json.gz",
         "start": 38254,
         "end": 57254,
         "records": 19000,
-        "bytes": 15740536,
-        "sha256": "f821c31c810991bdb72c2fb857c60a1c4660fb202c5490e0c8eb0a466e5ac3ee"
+        "bytes": 15741015,
+        "sha256": "742a6234582dc1fa3a2588f13d4be5b59790ef63b5d1985183ce43b5943b0337"
       },
       {
         "name": "listings_part_003.json.gz",
@@ -607,8 +607,8 @@
         "start": 190254,
         "end": 209254,
         "records": 19000,
-        "bytes": 7439730,
-        "sha256": "b93a6aa44b39a4241a8da4feea6f3cd270e9b95d3439b85833a7d9f4543c8987"
+        "bytes": 7439934,
+        "sha256": "7f43b94f9e25f8ea5531a359f695f803515a0fd0b6ef0c5f06762ca3da64a08a"
       },
       {
         "name": "listings_part_011.json.gz",
@@ -647,8 +647,8 @@
         "start": 285254,
         "end": 304254,
         "records": 19000,
-        "bytes": 10427940,
-        "sha256": "25bdeb8a3d865d11edd69ee470d36c14bc2d26a96e7310c4041acdfcd9444716"
+        "bytes": 10428744,
+        "sha256": "bd9c1bc84304f573e04e065c6b0d2694b59a3b9814139a5b9ea5fdcf16aa363a"
       },
       {
         "name": "listings_part_016.json.gz",
@@ -736,7 +736,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 110.88,
+  "health_age_hours": 114.53,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
