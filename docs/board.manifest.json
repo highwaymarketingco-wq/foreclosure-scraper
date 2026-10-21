@@ -1,9 +1,9 @@
 {
  "schema": "board-manifest-v1",
- "written_at": "2026-10-21T15:49:28.455875Z",
+ "written_at": "2026-10-21T15:57:15.209718Z",
  "run_time": "2026-10-21T15:49:23.876634Z",
  "count": 447664,
- "detail_count": 447664,
+ "detail_count": null,
  "slim_count": 437170,
  "shards": {
   "schema": "shard-v1",
@@ -13,16 +13,6 @@
   "records": 437170
  },
  "files": {
-  "listings.json": {
-   "bytes": 4957003991,
-   "sha256": "e35170eed5344b7a505623afe1fd236939f08254146fb50b7d07b04764b2ca66",
-   "records": 447664
-  },
-  "listings_detail.json": {
-   "bytes": 336562184,
-   "sha256": "30f76338b6e0b3811360c959ffd61d9874108541dfee473c3a2f40bb0e4a9399",
-   "records": 447664
-  },
   "listings_detail.json.gz": {
    "bytes": 25297205,
    "sha256": "b34547a5917af65a6c65032fa7deab597184cd02aebb6738003dc1e54a3eed4c",
