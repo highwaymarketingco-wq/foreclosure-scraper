@@ -180,6 +180,28 @@ def build_block(pin: str, bills: list[dict], *, today: Optional[date] = None) ->
     }
 
 
+def build_two_year_block(bills: list[dict], *, today: Optional[date] = None) -> dict:
+    """Pure: the raw['two_year_delinquent'] wrapper, written unconditionally once a search
+    actually answers -- even a zero-matured-year answer states `is_two_year_plus` truthfully,
+    the same convention enrichment_nash_multiyear_tax.py's own build_two_year_block() uses for
+    its sibling column from the identical kind of per-year bill list. A SEPARATE function from
+    build_block() above (not a refactor of it) specifically so this addition can never change
+    multi_year_delinquent_tax's existing, already-live output."""
+    today = today or date.today()
+    per_year: dict[int, float] = {}
+    for b in bills or ():
+        unpaid = b.get("unpaid") or 0.0
+        if unpaid > 0:
+            per_year[b["year"]] = unpaid
+    matured = tax_calendar.completed_delinquent_years(sorted(per_year), "NC", "Gaston", today)
+    return {
+        "is_two_year_plus": len(matured) >= 2,
+        "years": len(matured),
+        "oldest_year": min(matured) if matured else None,
+        "source": "gaston_devnetwedge_payment_history",
+    }
+
+
 async def _resolve_and_fetch(client: Fetcher, pin: str,
                              today: date) -> tuple[Optional[str], Optional[list[dict]], str]:
     """(pid, bills, status) for one Gaston PIN via tax_lien_devnet's own live-proven GIS + parcel
@@ -247,6 +269,11 @@ async def enrich_with_gaston_multiyear_tax(listings: Iterable[Listing],
             stats[bucket] += 1
             li.raw[CHECKED_KEY] = status
             return
+        # A real Payment History answer came back -- stamp two_year_delinquent from it either
+        # way (qualifies for the stricter multi-year gate below, or not). Pure addition: never
+        # touches CHECKED_KEY/RAW_KEY's existing behavior on the lines just below it.
+        if "two_year_delinquent" not in li.raw:
+            li.raw["two_year_delinquent"] = build_two_year_block(bills, today=today)
         block = build_block(pin, bills, today=today)
         if block is None:
             stats["insufficient_history"] += 1
