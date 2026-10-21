@@ -3834,6 +3834,24 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("brunswick_rollback_exposure.failed", traceback=traceback.format_exc())
 
+    # Duplin NC is already one of enrichment_bt_appraisal_card.TENANTS (code "DL", the SAME
+    # www.bttaxpayerportal.com host Granville/Harnett/Brunswick's siblings read) -- its ViewParcel
+    # "Property Values" fieldset carries the same "Deferred" line this module restates into the
+    # shared raw['rollback_exposure'] contract. Live-verified 2026-10-21 with a real nonzero hit
+    # (LANIER, JACKIE S: deferred_value 34,800). Duplin's own tenant needs a comma-separated
+    # "LAST, FIRST" search query -- the shared enrichment_bt_parcel_info._search_query's
+    # space-separated form returns zero candidates here (a per-tenant quirk on this vendor, see
+    # module docstring), so this module ships its own query builder. See
+    # enrichment_duplin_rollback_exposure.py's own docstring for the full live evidence.
+    try:
+        from .enrichment_duplin_rollback_exposure import enrich_duplin_rollback_exposure
+        s = await _await_capped(enrich_duplin_rollback_exposure(enriched),
+                                "duplin_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["duplin_rollback_exposure"] = s
+    except Exception:
+        log.error("duplin_rollback_exposure.failed", traceback=traceback.format_exc())
+
     # NC OneMap statewide sweeps (never overwrites the tax relief / rollback dollar figures).
     try:
         from .enrichment_onemap_sweeps import enrich_onemap_sweeps
