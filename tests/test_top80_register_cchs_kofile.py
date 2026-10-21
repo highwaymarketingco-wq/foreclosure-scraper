@@ -454,6 +454,79 @@ def test_marriage_reader_summaries_and_overflow(monkeypatch):
     assert post["fromdate"] == "09/01/2026" and post["todate"] == "09/30/2026" and post["last"] == ""
 
 
+# ------------------------------------------------------------------------------------------------
+# Tyler EagleWeb marriage-type sweep (Johnston NC) fixtures
+# ------------------------------------------------------------------------------------------------
+
+JOH_ROOT = "https://erec.johnstonnc.com"
+EW_MARRIAGE_DISCLAIMER = ("<html><body><form method='POST' action='../web/loginPOST.jsp'>"
+                         "<input type='hidden' name='guest' value='true'/>"
+                         "<input type='submit' name='submit' value='I Acknowledge'/></form></body></html>")
+EW_MARRIAGE_FORM = ("<html><body><form name='docSearch' action='../eagleweb/docSearchPOST.jsp' method='post'>"
+                   "<input type='text' name='BothNamesIDSurname'/><input type='text' name='BothNamesIDName'/>"
+                   "<select name='BookTypeID'><option value='' selected>-</option></select>"
+                   "<input type='text' name='RecordingDateIDStart'/><input type='text' name='RecordingDateIDEnd'/>"
+                   "<input type='submit' value='Search'/></form></body></html>")
+
+
+def ew_marriage_row(node, docno, book, page, date_, spouse1, spouse2):
+    return (f'<tr class="odd"><td><strong><a href="../eagleweb/viewDoc.jsp?node={node}">MARRIAGE<br/>{docno}</a>'
+            f'</strong></td><td><a href="../eagleweb/viewDoc.jsp?node={node}"><b>M B: {book} P: {page}</b><br/></a>'
+            f'<table><tr><td valign="top">{date_} 10:31:50 AM<br/><b>{spouse1}</b> married to <b>{spouse2}</b>'
+            f"</td></tr></table></td><td></td><td></td></tr>")
+
+
+def ew_marriage_page(count, *rows, search_id="0", pages=1):
+    links = "".join(f'<a href="/recorder/eagleweb/docSearchResults.jsp?searchId={search_id}&sort=x&page={p}">{p}</a>'
+                    for p in range(2, pages + 1)) if pages > 1 else ""
+    return ("<html><body><table id='searchResultsTable'><thead><tr><th>Description</th><th>Summary</th></tr>"
+            f"</thead><tbody>{''.join(rows)}</tbody></table>{links}<div>{count} results</div></body></html>")
+
+
+def ew_marriage_routes(search_answer):
+    return [("GET", "/recorder/web/", FakeResp(EW_MARRIAGE_DISCLAIMER, 200, JOH_ROOT + "/recorder/web/")),
+            ("POST", "loginPOST.jsp", FakeResp("<html>ok</html>")),
+            ("GET", "docSearch.jsp", FakeResp(EW_MARRIAGE_FORM, 200, JOH_ROOT + "/recorder/eagleweb/docSearch.jsp")),
+            ("POST", "docSearchPOST.jsp", search_answer)]
+
+
+def test_eagleweb_marriage_reader_sweeps_blank_name_and_pages_through_a_window(monkeypatch):
+    page1 = ew_marriage_page(2, ew_marriage_row("D1", "2024000049", "2024", "1", "01/02/2024",
+                                               "MAGNUSON ELIZABETH JO", "RUSSELL CHADWICK VAUGHN"),
+                             search_id="7", pages=2)
+    page2 = ew_marriage_page(2, ew_marriage_row("D2", "2024000107", "2024", "3", "01/02/2024",
+                                               "CRUZ ESPINOSA MIGUEL ANGEL", "DIAZ RESENDIZ GRACIELA"))
+    routes = ew_marriage_routes(FakeResp(page1)) + [("GET", "docSearchResults.jsp", FakeResp(page2))]
+    sess = install(monkeypatch, routes)
+    rd = CS.EagleWebMarriageReader("Johnston")
+    rd.open()
+    docs, over = rd.read(date(2024, 1, 1), date(2024, 1, 31))
+    assert not over and len(docs) == 2
+    assert docs[0] == {"t": "MARRIAGE", "d": "2024-01-02", "i": "2024000049", "b": "2024", "p": "1",
+                       "fs": ["MAGNUSON ELIZABETH JO"], "gs": ["RUSSELL CHADWICK VAUGHN"]}
+    assert docs[1]["fs"] == ["CRUZ ESPINOSA MIGUEL ANGEL"]
+    post = next(d for m, u, p, d in sess.calls if m == "POST" and "docSearchPOST" in u)
+    assert post["BookTypeID"] == "M" and post["BothNamesIDSurname"] == "" and post["BothNamesIDName"] == ""
+    assert post["RecordingDateIDStart"] == "01/01/2024" and post["RecordingDateIDEnd"] == "01/31/2024"
+    page_get = next(u for m, u, p, d in sess.calls if m == "GET" and "docSearchResults" in u)
+    assert "searchId=7" in page_get and "page=2" in page_get
+
+
+def test_eagleweb_marriage_reader_overflows_past_the_page_cap(monkeypatch):
+    big = ew_marriage_page(5000, pages=CS.MAX_EAGLEWEB_PAGES + 1)
+    install(monkeypatch, ew_marriage_routes(FakeResp(big)))
+    rd = CS.EagleWebMarriageReader("Johnston")
+    rd.open()
+    assert rd.read(date(2024, 1, 1), date(2024, 12, 31)) == ([], True)
+
+
+def test_eagleweb_marriage_reader_empty_window_is_not_overflow(monkeypatch):
+    install(monkeypatch, ew_marriage_routes(FakeResp(ew_marriage_page(0))))
+    rd = CS.EagleWebMarriageReader("Johnston")
+    rd.open()
+    assert rd.read(date(2024, 1, 1), date(2024, 1, 2)) == ([], False)
+
+
 CCHS_APP = "<html><frame src='realestatesearch.asp'/></html>"
 CCHS_SEARCH = ("<html><script>var doctype = new Object(); doctype.name = 'LIEN (LIEN)'; doctype.kind = 'LIEN';"
                " BookTypes[BookTypes.length-1].name = 'RECORDS BOOK';"
@@ -610,10 +683,13 @@ def test_registry_names_every_county_and_its_readers():
     # Watauga added 2026-10-19 (gap-matrix wave3 follow-up): same LRSearch MVC app as Beaufort,
     # live-confirmed one GET of VRMarriageSearch/MarriageIndex -- marriage job only, the lien side
     # was not probed so it stays out of this registry.
-    nc = {"Orange", "Stanly", "Surry", "Beaufort", "Watauga", *CS.HOSTED_CCHS}
+    # Johnston added 2026-10-21: Tyler EagleWeb's own BookTypeID='M' document-type sweep --
+    # marriage job only, the lien side was not probed so it stays out of this registry too.
+    nc = {"Orange", "Stanly", "Surry", "Beaufort", "Watauga", "Johnston", *CS.HOSTED_CCHS}
     assert set(ES.SWEEP_COUNTIES) == {("NC", c) for c in nc} | {("SC", "Sumter"), ("SC", "Oconee")}
     assert [j.kind for j in ES.SWEEP_COUNTIES[("NC", "Beaufort")]] == ["lien", "marriage"]
     assert [j.kind for j in ES.SWEEP_COUNTIES[("NC", "Watauga")]] == ["marriage"]
+    assert [j.kind for j in ES.SWEEP_COUNTIES[("NC", "Johnston")]] == ["marriage"]
     assert {"Gates", "Hertford", "Franklin", "Caldwell", "Currituck", "Chowan", "Hyde", "Montgomery", "Caswell",
             "Camden"} <= set(CS.HOSTED_CCHS)
 

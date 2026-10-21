@@ -527,6 +527,72 @@ class MarriageReader(Reader):
                 for r in rows], False
 
 
+#: a window over this many EagleWeb result pages (~100 docs/page) is bisected, same convention
+#: as PublicSearchReader.MAX_PAGES (2,000 documents a window).
+MAX_EAGLEWEB_PAGES = 20
+
+
+class EagleWebMarriageReader(Reader):
+    """The Tyler EagleWeb Marriages index (Johnston NC): BookTypeID='M', a blank-name,
+    date-windowed guest search -- no login, no CAPTCHA (the same disclaimer accept
+    rod.nc_tyler.ADAPTER._open() already does for this county's deed side). See
+    rod/nc_tyler.py's module docstring ("EAGLEWEB MARRIAGE-TYPE SWEEP") for the 2026-10-21 live
+    verification: this type-filtered, name-blank search pages past the per-owner
+    EAGLEWEB_GUEST_CAP with real 'Next'/'Last' links the whole way (1,340 real 2024 records, 14
+    pages, confirmed against the real host)."""
+    label = "eagleweb_marriage_sweep"
+    state = "NC"
+    BOOK_TYPE = "M"
+
+    def __init__(self, county: str, client: Optional[PoliteClient] = None) -> None:
+        from . import nc_tyler as T
+        self.T = T
+        self.county = county
+        self.cfg = T.COUNTIES[county]
+        self.client = client or beacon_blind_client(T.PLATFORM + "_marriage_sweep", "NC", county)
+        self.defaults: list[tuple[str, str]] = []
+        self.search_url = ""
+        self.docsearch_url = ""
+
+    @property
+    def key(self) -> str:
+        return f"{self.state}_{self.county}_marriage".lower()
+
+    def open(self) -> None:
+        from bs4 import BeautifulSoup
+        from urllib.parse import urljoin
+        T = self.T
+        T.ADAPTER._open(self.client, self.cfg)         # the guest disclaimer accept (shared with the deed side)
+        self.docsearch_url = self.cfg.root + "/recorder/eagleweb/docSearch.jsp"
+        ds = self.client.get(self.docsearch_url)
+        form = BeautifulSoup(ds.text, "lxml").find("form", attrs={"name": "docSearch"})
+        if form is None:
+            raise RuntimeError("the EagleWeb search form did not open")
+        self.defaults = T.form_defaults(form)
+        self.search_url = urljoin(ds.final_url, form.get("action") or "")
+        self.types = 1
+
+    def read(self, a: date, b: date) -> tuple[list[dict], bool]:
+        T = self.T
+        body = T.eagleweb_window_fields(self.defaults, self.BOOK_TYPE, a.isoformat(), b.isoformat())
+        rep = self.client.post(self.search_url, dict(body), headers={"Referer": self.docsearch_url})
+        rows, count = T.parse_eagleweb_marriage(rep.text)
+        search_id, max_page = T.eagleweb_result_pages(rep.text)
+        if max_page > MAX_EAGLEWEB_PAGES:
+            return [], True
+        for page in range(2, max_page + 1):
+            page_url = (f"{self.cfg.root}/recorder/eagleweb/docSearchResults.jsp"
+                       f"?searchId={search_id}&sort=Document+Relevance&page={page}")
+            pr = self.client.get(page_url, headers={"Referer": self.search_url})
+            more, _c = T.parse_eagleweb_marriage(pr.text)
+            rows += more
+        if count is not None and count > len(rows):
+            return [], True          # the register reports more than this page set actually held
+        return [{"t": "MARRIAGE", "d": r["recorded"], "i": r["instrument_no"], "b": r["book"],
+                 "p": r["page"], "fs": [r["spouse1"]] if r["spouse1"] else [],
+                 "gs": [r["spouse2"]] if r["spouse2"] else []} for r in rows], False
+
+
 # ------------------------------------------------------------------------------------------------
 # the sweep
 # ------------------------------------------------------------------------------------------------

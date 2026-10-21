@@ -25,6 +25,25 @@ EAGLEWEB (erec.johnstonnc.com/recorder)
 WAKE (Tyler Self-Service) is left out: its search shows a reCAPTCHA. Durham's disclaimer page
 loads Google's reCAPTCHA script but showed no challenge on 2026-10-07; any challenge, login page
 or block walls the county (rod/nc_polite.py).
+
+EAGLEWEB MARRIAGE-TYPE SWEEP (added 2026-10-21, Johnston marriage_license gap). docSearch.jsp's
+own BookTypeID select carries an 'M - Marriage' option -- a document-TYPE filter, not just a
+per-owner name search with marriage records mixed into deed results (the shape
+enrichment_marriage_license.py already uses for Aumentum). LIVE-VERIFIED 2026-10-21 against
+erec.johnstonnc.com/recorder: a BLANK-NAME docSearchPOST.jsp with BookTypeID='M' and a
+RecordingDateIDStart/End window returns real marriage rows with NO guest-result cap -- unlike the
+per-owner EagleWeb path this module's EAGLEWEB_GUEST_CAP constant documents, this type-filtered,
+name-blank search paged past 50 cleanly (1,340 real 2024 records, 14 pages of
+docSearchResults.jsp?searchId=<id>&page=<n>, with 'Next'/'Last' links present the whole way; no
+login, no CAPTCHA, guest disclaimer only -- the same accept Tyler._open() already does for this
+county's deed side). A marriage row's summary cell is NOT the deed shape's labelled
+'Grantor:'/'Grantee:' <td>s parse_eagleweb() reads -- it is a free-text '<b>SPOUSE ONE</b> married
+to <b>SPOUSE TWO</b>' line (real sample: 'MAGNUSON ELIZABETH JO married to RUSSELL CHADWICK
+VAUGHN', book/page printed as 'M B: 2024 P: 1' -- year and a sequence number, not a real
+recording book), so this gets its own parser, eagleweb_window_fields()/parse_eagleweb_marriage()/
+eagleweb_result_pages() below, built for rod/county_sweeps.EagleWebMarriageReader's county-wide,
+date-windowed sweep (the same architecture already serves Beaufort's CCS LRSearch Marriages
+index) rather than nc_tyler.search_by_name()'s per-owner path above.
 """
 from __future__ import annotations
 
@@ -224,6 +243,79 @@ def parse_eagleweb(html: str) -> tuple[list[IndexRecord], Optional[int], bool]:
     m = re.search(r"Search 1:\s*</strong>\s*<strong>\s*<a[^>]*>\s*\*?(\d+)\s+results", html or "", re.I)
     count = int(m.group(1)) if m else None
     return out, count, bool(count is not None and count >= EAGLEWEB_GUEST_CAP)
+
+
+def eagleweb_window_fields(defaults: list[tuple[str, str]], book_type: str,
+                           date_from: Optional[str], date_to: Optional[str]) -> list[tuple[str, str]]:
+    """The docSearchPOST.jsp body for a BLANK-NAME, one-book-type, date-windowed sweep -- the
+    sibling of eagleweb_fields() above, which fills in a per-owner search instead.
+    rod.county_sweeps.EagleWebMarriageReader's own read(a, b) is this function's only caller:
+    BookTypeID is the only document-type filter EagleWeb's guest docSearch form exposes, and a
+    window with no name at all is what lets one sweep serve every board row of the county instead
+    of one per-owner search each (see this module's docstring)."""
+    over = {"BookTypeID": book_type, "BothNamesIDSurname": "", "BothNamesIDName": "",
+            "RecordingDateIDStart": iso_to_mdy(date_from) if date_from else "",
+            "RecordingDateIDEnd": iso_to_mdy(date_to) if date_to else ""}
+    return [(k, over.get(k, v)) for k, v in defaults]
+
+
+_EW_MARRIAGE_BP = re.compile(r"\bB:\s*(\S+)\s*P:\s*(\S+)", re.I)
+_EW_MARRIED_TO = re.compile(r"\s+married to\s+", re.I)
+
+
+def parse_eagleweb_marriage(html: str) -> tuple[list[dict], Optional[int]]:
+    """(rows, the result count the page reports) off one page of an EagleWeb BookTypeID='M'
+    search. Each row is {recorded (iso date), instrument_no, book, page, spouse1, spouse2} read
+    off the record's own free-text '<b>NAME ONE</b> married to <b>NAME TWO</b>' summary line --
+    a different shape from a deed's labelled Grantor:/Grantee: cells (parse_eagleweb() above), so
+    this is its own parser. [] rows when the table isn't there (an empty result, a login/CAPTCHA
+    page, or an unrelated reply) -- never raises."""
+    s = BeautifulSoup(html or "", "lxml")
+    out: list[dict] = []
+    tab = s.find("table", id="searchResultsTable")
+    rows = [tr for tr in tab.find_all("tr") if tr.find_parent("table") is tab] if tab is not None else []
+    for tr in rows:
+        tds = tr.find_all("td", recursive=False)
+        if len(tds) < 2:
+            continue
+        a = tds[0].find("a", href=re.compile(r"viewDoc\.jsp"))
+        if a is None:
+            continue
+        head = [x.strip() for x in a.get_text("\n").split("\n") if x.strip()]
+        instrument_no = head[1] if len(head) > 1 else None
+        summary = tds[1]
+        text = _txt(summary)
+        bp = _EW_MARRIAGE_BP.search(text)
+        date = re.search(r"\d{1,2}/\d{1,2}/\d{4}", text)
+        # Every <b> in the summary cell: the first is the 'M B: x P: y' line (dropped by the
+        # B:/P: regex check below); the two that remain, in order, are the spouses.
+        names = [_txt(b) for b in summary.find_all("b") if not _EW_MARRIAGE_BP.search(_txt(b))]
+        if len(names) < 2:
+            continue
+        out.append({
+            "recorded": mdy_to_iso(date.group(0)) if date else None,
+            "instrument_no": instrument_no,
+            "book": bp.group(1) if bp else None, "page": bp.group(2) if bp else None,
+            "spouse1": names[0], "spouse2": names[1],
+        })
+    m = re.search(r"(\d+)\s+results", html or "", re.I)
+    count = int(m.group(1)) if m else None
+    return out, count
+
+
+_EW_RESULT_PAGE = re.compile(r"docSearchResults\.jsp\?searchId=(\d+)[^\"'<>]*?page=(\d+)", re.I)
+
+
+def eagleweb_result_pages(html: str) -> tuple[Optional[str], int]:
+    """(searchId, highest page number linked on a docSearchPOST/docSearchResults reply) -- (None,
+    1) when there is no pagination (a single-page result, or nothing parseable)."""
+    ids: set[str] = set()
+    pages: set[int] = set()
+    for m in _EW_RESULT_PAGE.finditer(html or ""):
+        ids.add(m.group(1))
+        pages.add(int(m.group(2)))
+    search_id = next(iter(ids)) if ids else None
+    return search_id, (max(pages) if pages else 1)
 
 
 def no_results(html: str) -> bool:

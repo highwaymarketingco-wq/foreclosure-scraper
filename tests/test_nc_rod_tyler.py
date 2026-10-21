@@ -154,6 +154,49 @@ def test_eagleweb_parsers():
     assert ty.parse_eagleweb(ew_page(0))[:2] == ([], 0)
 
 
+def ew_marriage_row(node, docno, book, page, date_, spouse1, spouse2):
+    return (f'<tr class="odd"><td><strong><a href="../eagleweb/viewDoc.jsp?node={node}">MARRIAGE<br/>{docno}</a>'
+            f'</strong></td><td><a href="../eagleweb/viewDoc.jsp?node={node}"><b>M B: {book} P: {page}</b><br/></a>'
+            f'<table><tr><td valign="top">{date_} 10:31:50 AM<br/><b>{spouse1}</b> married to <b>{spouse2}</b>'
+            f"</td></tr></table></td><td></td><td></td></tr>")
+
+
+def test_eagleweb_window_fields_blanks_the_names_and_sets_the_book_type():
+    defaults = [("BothNamesIDSurname", ""), ("BothNamesIDName", ""), ("BookTypeID", ""),
+                ("RecordingDateIDStart", ""), ("RecordingDateIDEnd", ""), ("AllDocuments", "ALL")]
+    out = dict(ty.eagleweb_window_fields(defaults, "M", "2024-01-01", "2024-01-31"))
+    assert out["BookTypeID"] == "M" and out["BothNamesIDSurname"] == "" and out["BothNamesIDName"] == ""
+    assert out["RecordingDateIDStart"] == "01/01/2024" and out["RecordingDateIDEnd"] == "01/31/2024"
+    assert out["AllDocuments"] == "ALL"           # an untouched field passes through unchanged
+
+
+def test_parse_eagleweb_marriage_reads_both_spouses_book_and_page():
+    # Real shape, live-verified 2026-10-21 (erec.johnstonnc.com): a marriage row's summary cell
+    # is free text ('<b>NAME</b> married to <b>NAME</b>'), not deed-style labelled Grantor:/
+    # Grantee: cells -- this is why it is a different parser from parse_eagleweb() above.
+    page = ew_page(2, ew_marriage_row("D1", "2024000049", "2024", "1", "01/02/2024",
+                                      "MAGNUSON ELIZABETH JO", "RUSSELL CHADWICK VAUGHN"),
+                   ew_marriage_row("D2", "2024000107", "2024", "3", "01/02/2024",
+                                   "CRUZ ESPINOSA MIGUEL ANGEL", "DIAZ RESENDIZ GRACIELA"))
+    rows, count = ty.parse_eagleweb_marriage(page)
+    assert count == 2
+    assert rows[0] == {"recorded": "2024-01-02", "instrument_no": "2024000049", "book": "2024",
+                       "page": "1", "spouse1": "MAGNUSON ELIZABETH JO", "spouse2": "RUSSELL CHADWICK VAUGHN"}
+    assert rows[1]["spouse1"] == "CRUZ ESPINOSA MIGUEL ANGEL" and rows[1]["spouse2"] == "DIAZ RESENDIZ GRACIELA"
+
+
+def test_parse_eagleweb_marriage_empty_or_missing_table():
+    assert ty.parse_eagleweb_marriage(ew_page(0)) == ([], 0)
+    assert ty.parse_eagleweb_marriage("<html>no table</html>") == ([], None)
+
+
+def test_eagleweb_result_pages_reads_the_search_id_and_highest_page():
+    html = ('<a href="/recorder/eagleweb/docSearchResults.jsp?searchId=0&sort=x&page=2">2</a>'
+            '<a href="/recorder/eagleweb/docSearchResults.jsp?searchId=0&sort=x&page=14">Last</a>')
+    assert ty.eagleweb_result_pages(html) == ("0", 14)
+    assert ty.eagleweb_result_pages("<html>single page, no pagination</html>") == (None, 1)
+
+
 def test_selfservice_sequence_and_chain(fake):
     sess = fake(SelfService().routes())
     out = ty.chain("Durham", "TESTER ALVIN Q")

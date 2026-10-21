@@ -603,9 +603,10 @@ def test_county_lien_sweep_marriage_credit_reads_real_registry_not_text():
     HOSTED_CCHS tenants) is there for the unrelated 'lien' job only. A blanket counties_named_in()
     grep over this file pair can't tell the difference; _county_lien_sweep_marriage_credit() reads
     SWEEP_COUNTIES' own Job.kind field directly instead. (Watauga joined Beaufort as a second real
-    marriage job 2026-10-19, same wave3 follow-up, task 3's near-zero-cost LRSearch win.)"""
+    marriage job 2026-10-19, same wave3 follow-up, task 3's near-zero-cost LRSearch win; Johnston
+    joined as a third, 2026-10-21, via the Tyler EagleWeb BookTypeID='M' sweep.)"""
     credit = gm._county_lien_sweep_marriage_credit()
-    assert credit == {("NC", "Beaufort"), ("NC", "Watauga")}
+    assert credit == {("NC", "Beaufort"), ("NC", "Watauga"), ("NC", "Johnston")}
 
 
 def test_built_in_code_drops_county_lien_sweep_false_marriage_credit():

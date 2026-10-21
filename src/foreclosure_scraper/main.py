@@ -3775,6 +3775,19 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("harnett_rollback_exposure.failed", traceback=traceback.format_exc())
 
+    # Granville NC's own tax.granvillecounty.org/ITSPublic BasicSearch product -- the SAME "ITS
+    # Public" vendor, same non-bttaxpayerportal.com-host situation as Harnett just above -- carries
+    # the identical labelled "Deferred" line. See enrichment_granville_rollback_exposure.py's own
+    # docstring for the live evidence (2026-10-21) and for why this is NOT the same gap as
+    # multi_year_delinquent_tax (a scraper run-depth issue, fixed separately).
+    try:
+        from .enrichment_granville_rollback_exposure import enrich_granville_rollback_exposure
+        s = await _await_capped(enrich_granville_rollback_exposure(enriched), "granville_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["granville_rollback_exposure"] = s
+    except Exception:
+        log.error("granville_rollback_exposure.failed", traceback=traceback.format_exc())
+
     # Hyde NC's lrcpwa.ncptscloud.com parcel-CAMA product carries explicit totalDeferredValue /
     # useValueDeferred fields (NOT the bcpwa.ncptscloud.com BillPWA tax-roll the gap list named --
     # that cluster has no present-use value field at all) -- a bounded, parcel-id-confirmed lookup

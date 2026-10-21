@@ -63,6 +63,12 @@ SWEEP_COUNTIES: dict[tuple[str, str], tuple[Job, ...]] = {
     # the lien side (its own adverse-doc-type codes) was not probed, so it stays unregistered here
     # rather than assumed to work the same way.
     ("NC", "Watauga"): (Job("marriage", lambda: CS.MarriageReader("Watauga")),),
+    # 2026-10-21: Johnston's Tyler EagleWeb register (rod/nc_tyler.py's own COUNTIES, already
+    # wired for the deed side via FORECLOSURE_NC_TYLER_ROD) carries a document-TYPE filter
+    # ('M - Marriage') its guest docSearch form exposes directly -- a blank-name, date-windowed
+    # sweep, live-verified with no guest-result cap (1,340 real 2024 records, 14 pages). Marriage
+    # job only -- the lien side was not probed for this county, so it stays unregistered here.
+    ("NC", "Johnston"): (Job("marriage", lambda: CS.EagleWebMarriageReader("Johnston")),),
     ("SC", "Sumter"): (Job("lien", lambda: CS.CountyFusionReader("Sumter")),),
     ("SC", "Oconee"): (Job("lien", lambda: CS.PublicSearchReader("oconee")),),
 }
