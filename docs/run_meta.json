@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-10-21T14:56:22.924525Z",
-  "total": 447222,
+  "run_time": "2026-10-21T15:17:35.841687Z",
+  "total": 447227,
   "by_source": {
     "national.auction_bank_reo": 3,
     "national.bankruptcy_rss_relief_from_stay": 14,
@@ -237,7 +237,7 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 322658,
+    "NC": 322663,
     "SC": 124564
   },
   "by_source_on_board": {
@@ -249,7 +249,7 @@
     "counties_nc.nc_ptscloud_delinquent_tax": 20399,
     "counties_nc.lincoln_vacant": 15942,
     "counties_sc.sc_ust_registry": 15873,
-    "counties_nc.nc_its_public_tax": 14816,
+    "counties_nc.nc_its_public_tax": 14821,
     "counties_nc.nc_tax_lien_ads": 12683,
     "counties_nc.transylvania_vacant": 10897,
     "counties_nc.nc_ecourts_lis_pendens": 10623,
@@ -513,12 +513,12 @@
   ],
   "errors": null,
   "notes": "daily vision pass: 36971 of 447006 listings have a vision report (+10 this run)",
-  "detail_count": 447222,
-  "detail_digest": "c5cfddc104d66fb9",
+  "detail_count": 447227,
+  "detail_digest": "b887bc62474cbfa4",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 25,
-    "records": 447222,
+    "records": 447227,
     "max_bytes": 25165824,
     "rows_per_part": 12500,
     "files": [
@@ -599,8 +599,8 @@
         "start": 171254,
         "end": 190254,
         "records": 19000,
-        "bytes": 10956185,
-        "sha256": "05e34c7d19a75a5b3b080bac3ca39adeb9ba0da51ca2a96c44a44d8dc24386f2"
+        "bytes": 10958367,
+        "sha256": "bb37fb5713dad01ab987d2ffac24bc63e28f1160f4fc53c92671a1abe020689e"
       },
       {
         "name": "listings_part_010.json.gz",
@@ -615,8 +615,8 @@
         "start": 209254,
         "end": 228254,
         "records": 19000,
-        "bytes": 11487576,
-        "sha256": "5711cba0698fa0d1daade0270d04d2253011a7b10c51d101fdb32502e83d753f"
+        "bytes": 11488852,
+        "sha256": "cc003e16a64fa05022f144ee1f40be53d08bc4c46b7b6fef47ea15048f8969cc"
       },
       {
         "name": "listings_part_012.json.gz",
@@ -647,8 +647,8 @@
         "start": 285254,
         "end": 304254,
         "records": 19000,
-        "bytes": 10428744,
-        "sha256": "bd9c1bc84304f573e04e065c6b0d2694b59a3b9814139a5b9ea5fdcf16aa363a"
+        "bytes": 10483004,
+        "sha256": "82d7c7eb13ac19d760364dc9d48ca25e5df50e18684d52c3921467698b793596"
       },
       {
         "name": "listings_part_016.json.gz",
@@ -717,10 +717,10 @@
       {
         "name": "listings_part_024.json.gz",
         "start": 443421,
-        "end": 447222,
-        "records": 3801,
-        "bytes": 448433,
-        "sha256": "898781488cc91f05258f944d4fdc1688aad77b2f820347cf8e0a16dd4a173639"
+        "end": 447227,
+        "records": 3806,
+        "bytes": 449809,
+        "sha256": "eb8c4b0b674cf55eafc864dfd80b43e5628cb6a155e6091362f70b22ece89dbf"
       }
     ]
   },
@@ -736,7 +736,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 114.53,
+  "health_age_hours": 114.88,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
