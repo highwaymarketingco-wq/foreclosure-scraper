@@ -93,8 +93,12 @@ def main() -> int:
         stats = asyncio.run(enrich_with_gaston_multiyear_tax(listings))
         print(f"  {stats}")
         for key, li in cands:
-            seen_keys.add(key)
+            # Only mark a candidate "seen" if this call actually touched it -- the enrich
+            # function caps itself at MAX_ROWS internally (skipped_cap in its stats), so most
+            # of `cands` on any given batch were fetched but never attempted. Marking those
+            # seen too would make batch 2+ find nothing left (the bug this comment replaces).
             if RAW_KEY in li.raw or CHECKED_KEY in li.raw:
+                seen_keys.add(key)
                 checked += 1
                 if RAW_KEY in li.raw:
                     qualified += 1
