@@ -412,7 +412,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 3. Human judgment call -- NOT a scrape target
 
-268 cells, 186,491 est_rows_affected combined.
+269 cells, 187,080 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -499,6 +499,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Lee | liens | 628 | paywall | register: Neumo Records Management (formerly Avenu Insights  |
 | SC | Lee | phone | 624 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Allendale | divorce | 602 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
+| NC | Gaston | multi_year_delinquent_tax | 589 | verifier is a declared wall | tax/property card: gastonnc.devnetwedge.com |
 | SC | Saluda | phone | 562 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Lee | divorce | 532 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Saluda | divorce | 493 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
@@ -615,9 +616,8 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Lexington | lt_lis_pendens | 2 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
 | SC | Sumter | lt_lis_pendens | 2 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
 | NC | Avery | lt_probate_notice | 1 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
-| NC | Caldwell | lt_probate_notice | 1 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 
-...and 68 more rows in this pile (full set in the source gap_list CSV, filtered to this reason pattern).
+...and 69 more rows in this pile (full set in the source gap_list CSV, filtered to this reason pattern).
 
 ## 4. Stale scope -- needs a periodic recheck, not a wall
 

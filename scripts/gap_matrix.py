@@ -1188,7 +1188,12 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
         # precondition (raw.tax_owed.year / raw.nc_ptscloud_delinquent_tax.tax_year). Each
         # column's own raw key is the only honest signal.
         out |= {"repeat_tax_loss", "bankruptcy_tax_combo"}
-    if raw.get("multi_year_delinquent_tax") not in _EMPTY:
+    # Gaston's own producer (enrichment_gaston_multiyear_tax.py) deliberately does NOT write
+    # raw["multi_year_delinquent_tax"] on a negative screen (avoids a null placeholder on
+    # ~85-90% of rows); it stamps raw["_gaston_mydt_checked"] instead. Without this, the
+    # 2026-10-16 "each column's own raw key is the only honest signal" fix (above) silently
+    # undercounts every genuinely-screened-but-negative Gaston row as still open.
+    if raw.get("multi_year_delinquent_tax") not in _EMPTY or raw.get("_gaston_mydt_checked"):
         out.add("multi_year_delinquent_tax")
     if raw.get("two_year_delinquent") not in _EMPTY:
         out.add("two_year_delinquent")
