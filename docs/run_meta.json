@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-10-21T11:11:38.488148Z",
-  "total": 447222,
+  "run_time": "2026-10-21T12:20:37.444255Z",
+  "total": 447227,
   "by_source": {
     "national.auction_bank_reo": 3,
     "national.bankruptcy_rss_relief_from_stay": 14,
@@ -237,7 +237,7 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 322658,
+    "NC": 322663,
     "SC": 124564
   },
   "by_source_on_board": {
@@ -249,7 +249,7 @@
     "counties_nc.nc_ptscloud_delinquent_tax": 20399,
     "counties_nc.lincoln_vacant": 15942,
     "counties_sc.sc_ust_registry": 15873,
-    "counties_nc.nc_its_public_tax": 14816,
+    "counties_nc.nc_its_public_tax": 14821,
     "counties_nc.nc_tax_lien_ads": 12683,
     "counties_nc.transylvania_vacant": 10897,
     "counties_nc.nc_ecourts_lis_pendens": 10623,
@@ -513,12 +513,12 @@
   ],
   "errors": null,
   "notes": "daily vision pass: 36971 of 447006 listings have a vision report (+10 this run)",
-  "detail_count": 447222,
-  "detail_digest": "c5cfddc104d66fb9",
+  "detail_count": 447227,
+  "detail_digest": "b887bc62474cbfa4",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 25,
-    "records": 447222,
+    "records": 447227,
     "max_bytes": 25165824,
     "rows_per_part": 12500,
     "files": [
@@ -717,10 +717,10 @@
       {
         "name": "listings_part_024.json.gz",
         "start": 443426,
-        "end": 447222,
-        "records": 3796,
-        "bytes": 447998,
-        "sha256": "f0a622e2fd7783dd0c31af28f46abe357ef7b3beb37c2ebac5b4ecc3bcadd866"
+        "end": 447227,
+        "records": 3801,
+        "bytes": 449373,
+        "sha256": "7977fdd1ddd40d7993387a5a6c5e71fb64da6cf98c3056c9cc8ce43d2a56824f"
       }
     ]
   },
@@ -736,7 +736,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 110.78,
+  "health_age_hours": 111.93,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
