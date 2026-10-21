@@ -1,0 +1,81 @@
+{
+  "schema": "declined-registry-v1",
+  "doc": "Cells confirmed, via live verification, to have NO real path forward -- the gap tool's own heuristics would otherwise keep re-flagging these as 'sourced-not-built'/'walled'/'no source known' on every regeneration, costing real investigation time to re-derive the same answer. Each entry needs: state, county (or null for every county in that state), column, reason (specific, falsifiable), confirmed_date, confidence ('high' = directly verified for this exact cell; 'medium' = inferred from a verified sibling/structural rule, not independently re-checked for every county it covers). gap_matrix.py's roll_up() checks this registry before finalizing each cell's gap_class and overrides to 'declined (<reason>)' when found -- never silently; the override is itself visible in the gap list so a human can challenge it. A declined entry is a claim, not a law: if new evidence contradicts one (the underlying platform adds a field, a law changes, a county switches vendors), remove or correct the entry and re-verify live before trusting the correction.",
+  "entries": [
+    {
+      "state": "SC", "county": "Spartanburg", "column": "rollback_exposure",
+      "reason": "qPayBill (Springbrook/PUBLIQ) vendor's shared parse_detail() extracts a fixed 24-field label set with no present-use/deferred field anywhere, confirmed across all 29 qPayBill tenants this project reads (3rd independent confirmation: 2026-10-18, 2026-10-20, 2026-10-21).",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Horry", "column": "rollback_exposure",
+      "reason": "Same qPayBill vendor limitation as Spartanburg -- no present-use/deferred field exists in the shared parser.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Sumter", "column": "rollback_exposure",
+      "reason": "Same qPayBill vendor limitation as Spartanburg -- no present-use/deferred field exists in the shared parser.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Orangeburg", "column": "rollback_exposure",
+      "reason": "Same qPayBill vendor limitation as Spartanburg -- no present-use/deferred field exists in the shared parser.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Oconee", "column": "rollback_exposure",
+      "reason": "Same qPayBill vendor limitation as Spartanburg -- no present-use/deferred field exists in the shared parser.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Colleton", "column": "rollback_exposure",
+      "reason": "Same qPayBill vendor limitation as Spartanburg -- no present-use/deferred field exists in the shared parser.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Laurens", "column": "rollback_exposure",
+      "reason": "Same qPayBill vendor limitation as Spartanburg -- live-reconfirmed by matching Laurens' own ASP.NET control IDs to the already-tested tenants.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Pickens", "column": "rollback_exposure",
+      "reason": "Its only bulk GIS layer (Pickens_Open_data FeatureServer/6) has no value field of any kind; its alternate platform (Catalis/Sturgis) only extracts Appraised/Assessed and its CDN API returns a live HTTP 403 (confirmed CatalisBlocked wall).",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Florence", "column": "rollback_exposure",
+      "reason": "Its tax card's 'Land Market Value' vs 'Land Use Value' split looks like an ag-deferral field but live-checking 5 real parcel cards showed the split appears on ordinary RESIDENTIAL IMPROVED parcels too (not just FARM VACANT) -- it's a structural artifact of the acreage-valuation schedule (any parcel with a Gross Acres land record gets both numbers), not an ag-rollback flag. No 'Deferred'/'Rollback' label exists on the card. Would need an ACTUAL deferred/rollback label to change this, not a re-derivation from the Market/Use split.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Orangeburg", "column": "vacant_lot",
+      "reason": "Both GIS hosts (gis2.orangeburgcounty.org, arcserver2.orangeburgcounty.org) have been down/connection-refused for 13+ days (re-confirmed 2026-10-21, not a blip); qPublic is CAPTCHA-walled; the only live AGOL replica has owner/mailing/acreage only, no value or land-use field.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Florence", "column": "vacant_lot",
+      "reason": "Its cached TOTBDGVAL (building-value-only) field looked like a clean $0=vacant signal (35% of parcels), but a live satellite spot-check against real addresses found actual rooftops on 2 of 7 checked $0 parcels -- almost certainly manufactured/mobile homes taxed as separate personal property, excluded from the real-property improvement-value card. Wiring TOTBDGVAL as vacant_lot here would mis-flag real improved homes. Would need Florence's personal-property/mobile-home tax roll (a different, unbuilt source) to fix, not a reuse of this field.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Laurens", "column": "vacant_lot",
+      "reason": "Already cached (owner/mailing/sale/deed only); its full 23-field schema (live-fetched via ?f=json) has no value, land-use, or building-count field of any kind.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Anderson", "column": "vacant_lot",
+      "reason": "Checked both known hosts (gis.cityofandersonsc.com, already cached with land_use=None, and the gap list's alternate propertyviewer.andersoncountysc.org -- same underlying data). The only text field (DESCRIPTIO) tested 0/120,547 matches against a VACANT/VAC wordlist -- it's a short legal description, never a land-use class. The RATIO field is a bare SC assessment-ratio code with no companion improvement-value field to anchor a vacant-lot inference against.",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Cherokee", "column": "vacant_lot",
+      "reason": "Correctly excluded as the SC half of a DUAL_STATE_COUNTIES name pairing. Its only parcel source (qpublic.schneidercorp.com) returns a live HTTP 403 (Cloudflare); the county's own Assessor page links directly to that same walled URL, confirming it's the sole official system, not a wrong/dead link. No alternate open ArcGIS service exists (the only AGOL hit for this name is Cherokee County, GEORGIA, a different state).",
+      "confirmed_date": "2026-10-21", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": null, "column": "marriage_license",
+      "reason": "South Carolina marriage licenses are issued and recorded by the county PROBATE COURT, never the Register of Deeds, statewide (state law, not county discretion) -- confirmed directly for Sumter (live-pulled its full 182-code CountyFusion/GovOS instrument-type tree: zero marriage-related codes) and corroborated by SCDHEC + Sumter's own Probate Court page. This is structurally different from NC, where RODs DO record marriage licenses (why the Johnston NC EagleWeb sweep worked). This project's ROD-platform infrastructure (sc_countyfusion.py, kofile.py, publicsearch.py, etc.) cannot reach Probate Court records at all -- a different county office entirely, not a missing filter. DIRECTLY verified only for Sumter; HIGH confidence it generalizes (state law), but not independently re-checked county-by-county.",
+      "confirmed_date": "2026-10-21", "confidence": "medium"
+    }
+  ]
+}

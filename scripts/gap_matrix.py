@@ -2274,6 +2274,46 @@ def fill_verdict_class(st: str, co: str, col: str, cls: Optional[str]) -> Option
     return "walled (Cloudflare check on the county property card)" if v[0] == "walled" else "no source known"
 
 
+#: 2026-10-21: without this, a cell this project has already live-verified as having NO real
+#: path forward (not "haven't looked yet" -- "looked, confirmed nothing's there") keeps
+#: re-appearing as "sourced-not-built"/"walled"/"no source known" on every regeneration,
+#: costing real re-investigation time to re-derive the same answer (see memory:
+#: feedback_check_before_reinvestigating.md, the exact complaint this fixes). Loaded once per
+#: process, not per-cell -- this file is small and read-only after load.
+_DECLINED_REGISTRY_PATH = REPO / "docs" / "gap_matrix" / "declined_registry.json"
+_declined_registry_cache: Optional[dict[tuple[str, Optional[str], str], str]] = None
+
+
+def _load_declined_registry() -> dict[tuple[str, Optional[str], str], str]:
+    global _declined_registry_cache
+    if _declined_registry_cache is not None:
+        return _declined_registry_cache
+    reg: dict[tuple[str, Optional[str], str], str] = {}
+    try:
+        data = json.loads(_DECLINED_REGISTRY_PATH.read_text())
+        for e in data.get("entries", ()):
+            reg[(e["state"], e.get("county"), e["column"])] = e["reason"]
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+    _declined_registry_cache = reg
+    return reg
+
+
+def declined_override(st: str, co: str, col: str, cls: Optional[str]) -> Optional[str]:
+    """A county-specific entry wins over a state-wide (county=None) one for the same column.
+    Only overrides an "opportunity-shaped" class (sourced-not-built / walled / no source known)
+    -- NEVER built-but-low-yield (code+data already exist there, which would directly
+    contradict a declined entry; that mismatch is a sign the entry is stale, not something to
+    paper over) or not applicable/None. Pure except for the lazily-cached file read."""
+    if cls is None or cls == "not applicable" or cls.startswith("built-but-low-yield"):
+        return cls
+    reg = _load_declined_registry()
+    reason = reg.get((st, co, col)) or reg.get((st, None, col))
+    if not reason:
+        return cls
+    return f"declined ({reason})"[:300]
+
+
 def classify_cell(spec: Spec, app: int, target: int, ran: bool, built: str, src: tuple[str, str, str]) -> Optional[str]:
     """The cell's gap class, or None when it is at 100% of its target. Pure."""
     if app == 0:
@@ -2370,6 +2410,7 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set], screens: Op
         else:
             cls = classify_cell(spec, c["app"], c["target"], c["ran"], c["built"], c["src"])
             cls = fill_verdict_class(st, co, col, cls)
+            cls = declined_override(st, co, col, cls)
         c["class"] = cls
         if cls is None:
             continue
@@ -2409,6 +2450,7 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set], screens: Op
             cls, act = "sourced-not-built", f"write a {spec.ledger} verifier for this county ({vsrc[2]})"[:160]
         else:
             cls, act = "no source known", f"find an authoritative page to verify {spec.ledger} here"
+        cls = declined_override(st, co, col, cls)
         gaps.append(dict(state=st, county=co, column=col, layer="verify", kind=spec.kind, scope=spec.scope,
                          applicable=c["pos"], target=c["v_dec"], pct=pct(c["v_dec"], c["pos"]),
                          est_rows_affected=missing, gap_class=cls, next_action=act, source=vsrc[2],
