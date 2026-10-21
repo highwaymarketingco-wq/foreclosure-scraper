@@ -1,6 +1,6 @@
 {
  "schema": "board-manifest-v1",
- "written_at": "2026-10-21T14:18:57.196945Z",
+ "written_at": "2026-10-21T14:39:19.280951Z",
  "run_time": "2026-10-21T11:17:30.583699Z",
  "count": 447222,
  "detail_count": null,
@@ -15,7 +15,7 @@
  "files": {
   "listings_detail.json.gz": {
    "bytes": 25297198,
-   "sha256": "b887bc62474cbfa41cec3f8366de760f6c155e55bb93e3d9e94a7f0f53e6d5ba",
+   "sha256": "bfffe55cb8d36b7e7936d8048672855a52926f2e112e04bb359690498845ef64",
    "records": 447222
   },
   "listings_slim.json.gz": {
