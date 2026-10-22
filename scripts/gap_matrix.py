@@ -1244,6 +1244,8 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
         out.add("sos_dissolution")
     if raw.get("jail_booking_screen"):
         out.add("jail_booking")   # a healthy roster that matched nobody is still a check
+    if raw.get("rollback_exposure_checked"):
+        out.add("rollback_exposure")   # a Harnett owner-search that found no deferral is still a check
     if rec.get("plaintiff"):
         out.add("title_risk")
     if rec.get("owner_name") and rec.get("defendant"):

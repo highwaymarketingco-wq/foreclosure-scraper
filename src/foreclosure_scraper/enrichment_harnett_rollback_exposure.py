@@ -71,6 +71,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from datetime import date
 from typing import Any, Iterable, Optional
 
 import httpx
@@ -99,8 +100,26 @@ MAX_CANDIDATES = 20
 ENABLED = os.environ.get("FORECLOSURE_HARNETT_ROLLBACK") != "0"
 
 
+CHECKED_KEY = "rollback_exposure_checked"
+
+
 def _already_done(raw: Any) -> bool:
-    return isinstance(raw, dict) and isinstance(raw.get(RAW_KEY), dict)
+    if not isinstance(raw, dict):
+        return False
+    return isinstance(raw.get(RAW_KEY), dict) or isinstance(raw.get(CHECKED_KEY), dict)
+
+
+def _stamp_checked(li: Listing, result: str) -> None:
+    # FOUND 2026-10-22 (rollback_exposure gap-list audit): a search that found no deferral
+    # wrote nothing at all, so _already_done() (and therefore _eligible()) could never tell
+    # "searched, no deferral" from "never searched" -- the daily MAX_LISTINGS=300 cap kept
+    # re-trying the same first ~300 eligible rows every run and never reached rows 301+ of the
+    # 1,619 eligible population (same bug class as jail_booking_screen, fixed 2026-10-16, for
+    # the identical reason). A separate key, never RAW_KEY itself, so a negative result can
+    # never be misread as a positive rollback_exposure hit.
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    li.raw[CHECKED_KEY] = {"result": result, "checked_at": date.today().isoformat()}
 
 
 def _positive(v: Any) -> Optional[float]:
@@ -205,13 +224,16 @@ async def enrich_harnett_rollback_exposure(listings: Iterable[Listing]) -> dict[
             stats["searched"] += 1
             if not candidates:
                 stats["no_candidates"] += 1
+                _stamp_checked(li, "no_candidates")
                 return
             if len(candidates) >= MAX_CANDIDATES:
                 stats["too_many_candidates"] += 1
+                _stamp_checked(li, "too_many_candidates")
                 return
             match = _best_match(li, candidates)
             if not match or not match.get("tax_year"):
                 stats["no_confident_match"] += 1
+                _stamp_checked(li, "no_confident_match")
                 return
             async with sem:
                 try:
@@ -227,6 +249,7 @@ async def enrich_harnett_rollback_exposure(listings: Iterable[Listing]) -> dict[
             raw = li.raw if isinstance(li.raw, dict) else {}
             block = build_block(detail, raw)
             if not block:
+                _stamp_checked(li, "no_deferral")
                 return
             stats["deferred_found"] += 1
             if not isinstance(li.raw, dict):
