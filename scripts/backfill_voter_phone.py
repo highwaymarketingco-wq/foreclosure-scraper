@@ -47,12 +47,25 @@ def _has_phone(raw: dict) -> bool:
 def _candidates(docs_dir: Path) -> list[tuple[str, Listing]]:
     """{dedupe_key: light_listing} for every NC row with an owner_name and no owner_phone yet --
     streamed, not loaded, same discipline every backfill tonight used. The Listing carries its
-    REAL state/owner_name/street_address/raw -- enrich_voter_phone() matches on those directly."""
+    REAL state/owner_name/street_address/raw -- enrich_voter_phone() matches on those directly.
+
+    REQUIRES parcel_id or street_address or (case_number and county) -- i.e. excludes any row
+    whose dedupe_key() would fall through to the generic 'url:{source_url}' branch. Found live
+    2026-10-22: 11,029 distinct Madison County rows share one bulk-portal URL
+    (bcpwa.ncptscloud.com) as their only identity signal with none of the above fields set.
+    patch_existing_rows() applies one patch to every row sharing a dedupe_key (by design -- a
+    shared key means "same property"), so a single real voter match got stamped as that many
+    DIFFERENT owners' phone number before being caught and reverted
+    (scripts/revert_bad_voter_phone_match.py). This guard stops any row with no real identity
+    signal from ever entering the candidate pool in the first place."""
     out = []
     for rec in iter_board_rows(docs_dir / "listings.json.gz"):
         if str(rec.get("state") or "").upper() != "NC":
             continue
         if not rec.get("owner_name"):
+            continue
+        if not (rec.get("parcel_id") or rec.get("street_address")
+                or (rec.get("case_number") and rec.get("county"))):
             continue
         raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
         if _has_phone(raw):
