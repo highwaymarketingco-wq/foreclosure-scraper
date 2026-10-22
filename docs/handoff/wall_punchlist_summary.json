@@ -1,7 +1,7 @@
 {
  "board_rows": 447664,
  "by_category": {
-  "uncovered": 177645,
+  "uncovered": 177244,
   "wall": 20358
  },
  "format_version": 1,
@@ -61,8 +61,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "tax_lien": {
-   "entries": 38619,
-   "generated_at": "2026-10-21T19:03:10Z"
+   "entries": 39052,
+   "generated_at": "2026-10-22T06:07:14Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,7 +73,7 @@
    "generated_at": "2026-10-17T14:28:27Z"
   }
  },
- "listings": 198003,
+ "listings": 197602,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4927,
@@ -88,12 +88,12 @@
    "counties_generic.epa_frs.acres": 1551,
    "counties_generic.epa_frs.sems": 2008,
    "counties_generic.state_contamination.nc_dam_safety": 7544,
-   "counties_generic.state_contamination.nc_inactive_hazardous": 1488,
-   "counties_generic.state_contamination.nc_ust_incidents": 38330,
+   "counties_generic.state_contamination.nc_inactive_hazardous": 1487,
+   "counties_generic.state_contamination.nc_ust_incidents": 38328,
    "counties_nc.albemarle_observer_tax_lists": 5939,
    "counties_nc.asheville_helene": 698,
-   "counties_nc.gaston_vacant": 21599,
-   "counties_nc.gastonia_code_enforcement": 1149,
+   "counties_nc.gaston_vacant": 21251,
+   "counties_nc.gastonia_code_enforcement": 1099,
    "counties_nc.lincoln_vacant": 14878,
    "counties_nc.nc_county_pdf_delinquent_tax": 3204,
    "counties_nc.polk_tax": 1622,
@@ -121,7 +121,7 @@
    "NC:cumberland": 2185,
    "NC:durham": 2925,
    "NC:forsyth": 2407,
-   "NC:gaston": 24681,
+   "NC:gaston": 24280,
    "NC:guilford": 4621,
    "NC:lincoln": 16673,
    "NC:mcdowell": 2950,
