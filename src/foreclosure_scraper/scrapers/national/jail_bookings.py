@@ -139,6 +139,16 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # Verified live 2026-09-20: 183 in custody, DOB on every row.
     ("SC", "Oconee", "zuercher", "oconee-so-sc"),
 
+    # Pickens SC, Zuercher Portal (found 2026-10-22: subdomain-pattern discovery sweep
+    # against the project's own 18-county footprint, following the jail_bookings identity
+    # fix). Verified live: 339 in custody. DOB is blank on this tenant (same as Laurens).
+    ("SC", "Pickens", "zuercher", "pickens-so-sc"),
+
+    # Union SC, Zuercher Portal (same discovery sweep). Verified live: 102 in custody. This
+    # tenant redacts DOB and substitutes Age in the same JSON key -- handled by the int/str
+    # type check in _fetch_zuercher (see that function's own 2026-10-22 comment).
+    ("SC", "Union", "zuercher", "union-so-sc"),
+
     # Henderson NC — Southern Software Citizen Connect
     # Verified live 2026-07-31: 182 in custody, full DOB on 182/182.
     ("NC", "Henderson", "citizen_connect", "HendersonCoNC|NC0450000"),
@@ -338,10 +348,18 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
             if isinstance(mugshot_b64, str) and mugshot_b64
             else None
         )
+        # FOUND 2026-10-22 (Pickens/Union SC discovery): Union's tenant redacts the real DOB
+        # and substitutes the subject's AGE in the same `dob` JSON key -- but as a bare integer
+        # (`"dob": 42`), never the "YYYY-MM-DD" string every other live Zuercher county sends.
+        # Type is a clean, vendor-provided signal: pass a real date straight through; route an
+        # int into `age` instead of storing an age value under a dob key (same redaction
+        # precedent as Buncombe's p2c_centralsquare feed, which also substitutes Age for DOB).
+        dob_raw = rec.get("dob")
         out.append({
             "last": last, "first": first,
             "middle": _comma_middle(rec.get("name") or "") or None,
-            "dob": rec.get("dob"),
+            "dob": dob_raw if isinstance(dob_raw, str) else None,
+            "age": dob_raw if isinstance(dob_raw, (int, float)) else None,
             "arrest_date": rec.get("arrest_date"),
             "charge": str(charges)[:_CHARGE_CAP],
             "race": rec.get("race"),
@@ -1107,6 +1125,10 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
         source_url = "https://laurens-911-sc.zuercherportal.com/"
     elif state == "SC" and county == "Oconee":
         source_url = "https://oconee-so-sc.zuercherportal.com/"
+    elif state == "SC" and county == "Pickens":
+        source_url = "https://pickens-so-sc.zuercherportal.com/"
+    elif state == "SC" and county == "Union":
+        source_url = "https://union-so-sc.zuercherportal.com/"
     elif state == "NC" and county == "Henderson":
         source_url = (f"{CITIZEN_CONNECT_BASE}/bookingsearch/"
                       "index.php?AgencyID=HendersonCoNC")
