@@ -87,11 +87,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import html
 import math
 import re
 from datetime import datetime, timezone
-from typing import Iterable
+from typing import Iterable, Optional
 from urllib.parse import urljoin
 
 import structlog
@@ -576,12 +577,20 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
                         for t in tattoos if isinstance(t, dict)
                     ) or None
                     image_id = rec.get("ImageId")
+                    # FOUND 2026-10-22 (jail_bookings dedupe-collision audit): every charge in
+                    # `Charges` already carries a real court docket number (live-verified e.g.
+                    # "26CR 434460"), never read before. Booking-level, not charge-level, but one
+                    # booking's docket is stable and unique enough to serve as a real per-record
+                    # id -- the same role book_id plays for the jqGrid vendor.
+                    docket = next((c.get("DocketNumber") for c in charges_list
+                                   if isinstance(c, dict) and c.get("DocketNumber")), None)
                     out.append({
                         "last": last, "first": first,
                         "middle": (rec.get("MiddleName") or "").strip().upper() or None,
                         "dob": rec.get("DateOfBirth"),
                         "age": rec.get("Age"),
                         "arrest_date": rec.get("ArrestDate"),
+                        "docket_number": docket,
                         "charge": (rec.get("PrimaryChargeDescription") or "")[:_CHARGE_CAP],
                         "other_charges": "; ".join(extra_charges)[:_CHARGE_CAP] or None,
                         "race": rec.get("Race"),
@@ -1040,6 +1049,36 @@ async def _fetch_roster(state: str, county: str, vendor: str, target: str) -> li
 # Listing builder
 # ---------------------------------------------------------------------------
 
+def _booking_identity(rec: dict, last: str, first: str) -> Optional[str]:
+    """A stable per-booking identifier for dedupe_key()'s case_number branch.
+
+    FOUND 2026-10-22 (jail_bookings dedupe-collision audit, following the York SC build):
+    every county's booking Listings fell through to dedupe_key()'s `url:{source_url}` branch
+    (source_url is the same fixed per-county search-page URL for every booking at that county),
+    the exact collision class fixed for Cleveland/York via book_id/case_number -- confirmed LIVE
+    on the published board: Gaston's 673 jail_booking rows (pre-fix) all shared ONE dedupe key,
+    meaning every booking past the first was silently rejected as "already on board".
+
+    Preference order: a real vendor-issued id (p2c_jqgrid's book_id, Tyler's detail_id, now
+    p2c_centralsquare's docket_number -- each already carried on `rec` by its own fetcher) wins.
+    Zuercher and Citizen-Connect publish no id of any kind (live-verified: neither vendor's own
+    JSON/HTML exposes anything beyond name/dob/demographics/charges) -- for those, synthesize a
+    stable key from (name, dob, arrest_date). A hash, not a literal join: dedupe_key()'s own
+    case_number normalization strips every non-alnum character, so an unhashed join could let two
+    different (name, dob, date) tuples collapse onto the same stripped string at a field boundary;
+    hashing the delimited tuple removes that ambiguity. Two bookings of the SAME person on
+    DIFFERENT dates correctly get different keys (a new incident, not a dup)."""
+    real_id = rec.get("book_id") or rec.get("detail_id") or rec.get("docket_number")
+    if real_id:
+        return str(real_id)
+    dob = (rec.get("dob") or "").strip()
+    adate = (rec.get("arrest_date") or "").strip()
+    if not (last or first) or not (dob or adate):
+        return None
+    basis = f"{last.strip().upper()}|{first.strip().upper()}|{dob}|{adate}"
+    return "synth" + hashlib.sha1(basis.encode("utf-8")).hexdigest()[:16]
+
+
 def _to_listing(rec: dict, state: str, county: str) -> Listing:
     """Convert an inmate record to a Listing object."""
     last = rec.get("last", "")
@@ -1082,16 +1121,10 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
     return Listing(
         source="national.jail_bookings",
         source_url=source_url,
-        # FOUND 2026-10-22 (York SC build): no field here ever set parcel_id/street_address/
-        # case_number, so dedupe_key() fell through to its final "url:{source_url}" branch for
-        # EVERY record -- and source_url is the SAME fixed per-county search-page URL for every
-        # booking at that county, not a per-record link. Every county's jail-booking leads were
-        # colliding onto one shared identity (the exact 11,029-row class of bug caught and fixed
-        # in feedback_dedupe_key_url_fallback_landmine_2026-10-22.md, here pre-existing across
-        # all 8 counties already in ROSTERS, not introduced by York). book_id is a genuine
-        # per-booking identifier (e.g. "DC202605128") -- case_number is the natural field for it,
-        # routing dedupe_key() through its (case_number, county) branch instead.
-        case_number=rec.get("book_id"),
+        # See _booking_identity()'s own docstring: routes every vendor (real id where one
+        # exists, a stable name+dob+arrest_date hash where none does) through dedupe_key()'s
+        # (case_number, county) branch instead of the shared-per-county url: fallback.
+        case_number=_booking_identity(rec, last, first),
         listing_type=ListingType.UNKNOWN,
         property_kind=PropertyKind.UNKNOWN,
         defendant=full_name,
