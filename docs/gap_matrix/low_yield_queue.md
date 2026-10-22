@@ -4,7 +4,7 @@ Generated from `gap_list_2026-10-22.csv`. Regenerate with `python scripts/low_yi
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,500 cells, 8,388,578 total est_rows_affected.**
+**6,500 cells, 8,388,391 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
@@ -17,7 +17,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Gaston | code_enforcement | 5.6% | 25,129 | screen the 25,129 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
 | NC | Gaston | atty_taxpayer_of_record | 7.7% | 24,564 | backfill atty_taxpayer_of_record for the 24,564 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Gaston | email | 4.5% | 24,408 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
-| NC | Gaston | phone | 18.4% | 20,857 | backfill phone for the 20,857 applicable rows without it (existing enrichers) |
+| NC | Gaston | phone | 18.4% | 20,845 | backfill phone for the 20,845 applicable rows without it (existing enrichers) |
 | SC | Spartanburg | phone | 0.0% | 19,191 | backfill phone for the 19,191 applicable rows without it (existing enrichers) |
 | SC | Spartanburg | liens | 2.9% | 18,822 | screen the 18,822 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
 | SC | Spartanburg | atty_rod_lien_checked | 3.0% | 18,809 | backfill atty_rod_lien_checked for the 18,809 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
@@ -69,7 +69,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | SC | Spartanburg | incarceration | 0.2% | 13,830 | screen the 13,830 unchecked rows (enrichment_incarceration); write a negative result per row |
 | NC | Mecklenburg | phone | 25.4% | 13,754 | backfill phone for the 13,754 applicable rows without it (existing enrichers) |
 | NC | Mecklenburg | comps_tight | 0.0% | 13,239 | backfill comps_tight for the 13,239 applicable rows without it (existing enrichers) |
-| NC | Lincoln | phone | 28.4% | 13,155 | backfill phone for the 13,155 applicable rows without it (existing enrichers) |
+| NC | Lincoln | phone | 29.0% | 13,040 | backfill phone for the 13,040 applicable rows without it (existing enrichers) |
 | NC | Mecklenburg | sqft | 1.7% | 13,022 | backfill sqft for the 13,022 applicable rows without it (existing enrichers) |
 | NC | Mecklenburg | beds_baths | 1.7% | 13,019 | backfill beds_baths for the 13,019 applicable rows without it (existing enrichers) |
 | NC | Mecklenburg | comps | 1.9% | 12,996 | backfill comps for the 12,996 applicable rows without it (existing enrichers) |
@@ -175,7 +175,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | incarceration | 148 | 310,934 |
 | atty_rod_lien_checked | 93 | 282,763 |
 | tax_aging_surfaced | 139 | 277,648 |
-| phone | 104 | 272,912 |
+| phone | 104 | 271,975 |
 | comps_tight | 149 | 271,351 |
 | liens | 89 | 263,749 |
 | email | 102 | 262,181 |
@@ -187,13 +187,13 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | assessed_value | 135 | 231,797 |
 | atty_taxpayer_of_record | 146 | 219,334 |
 | lot_size | 140 | 212,744 |
-| two_year_delinquent | 134 | 207,812 |
+| two_year_delinquent | 133 | 207,379 |
 | sqft | 143 | 202,051 |
-| multi_year_delinquent_tax | 104 | 199,536 |
+| multi_year_delinquent_tax | 104 | 199,103 |
 | marriage_license | 100 | 196,464 |
 | parcel_id | 145 | 193,297 |
 | address | 148 | 134,431 |
-| atty_tax_verified_confirmed | 61 | 129,573 |
+| atty_tax_verified_confirmed | 62 | 131,189 |
 | code_enforcement | 13 | 118,510 |
 | lt_tax_lien | 106 | 77,427 |
 | sos_dissolution | 102 | 63,018 |
