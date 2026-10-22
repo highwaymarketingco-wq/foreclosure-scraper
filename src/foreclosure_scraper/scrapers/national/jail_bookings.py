@@ -153,6 +153,27 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # Verified live 2026-07-31: 182 in custody, full DOB on 182/182.
     ("NC", "Henderson", "citizen_connect", "HendersonCoNC|NC0450000"),
 
+    # Polk NC — Southern Software Citizen Connect, same tenant family as Henderson (found
+    # 2026-10-22: this exact adapter was already live in enrichment_jail_bookings.py's OWN
+    # roster list since 2026-08-06 for the owner-cross-match signal -- just never ported to
+    # THIS scraper, which is what actually creates jail_booking lead Listings. Re-verified
+    # live 2026-10-22: 46 in custody.
+    ("NC", "Polk", "citizen_connect", "PolkCoNC|NC0750000"),
+
+    # Transylvania NC — same tenant family. Re-verified live 2026-10-22: 71 in custody.
+    ("NC", "Transylvania", "citizen_connect", "TransylvaniaCoNC|NC0880000"),
+
+    # Burke NC — CentralSquare P2C modern, same vendor as Buncombe (found/re-verified same
+    # pass). Re-verified live 2026-10-22: 193 in custody.
+    ("NC", "Burke", "p2c_centralsquare",
+     "https://morgantonpdnc.policetocitizen.com|342"),
+
+    # Lincoln NC — CentralSquare P2C jqGrid, same vendor as Cleveland (found/re-verified same
+    # pass; the vendor itself typos its own agency as "Lncoln County" -- matched on host, not
+    # agency string, same note as the enrichment module that found this first). Re-verified
+    # live 2026-10-22: 168 in custody.
+    ("NC", "Lincoln", "p2c_jqgrid", "http://p2c.lincolnsheriff.org"),
+
     # Gaston NC — Tyler New World InmateInquiry (replaces the retired
     # newworld.aegis.webportal InmateInquiry.aspx, which now 302s away).
     # Verified live 2026-07-31: 695 in custody, full DOB on 695/695.
@@ -1132,6 +1153,14 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
     elif state == "NC" and county == "Henderson":
         source_url = (f"{CITIZEN_CONNECT_BASE}/bookingsearch/"
                       "index.php?AgencyID=HendersonCoNC")
+    elif state == "NC" and county == "Polk":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=PolkCoNC"
+    elif state == "NC" and county == "Transylvania":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=TransylvaniaCoNC"
+    elif state == "NC" and county == "Burke":
+        source_url = "https://morgantonpdnc.policetocitizen.com/en/Inmates"
+    elif state == "NC" and county == "Lincoln":
+        source_url = "http://p2c.lincolnsheriff.org/jailinmates.aspx"
     elif state == "NC" and county == "Gaston":
         source_url = ("https://tepsweb.cityofgastonia.com/"
                       "NewWorld.InmateInquiry/GastonCounty?InCustody=True")
