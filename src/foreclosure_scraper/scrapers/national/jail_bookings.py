@@ -147,6 +147,14 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # Verified live 2026-07-31: 695 in custody, full DOB on 695/695.
     ("NC", "Gaston", "tyler_inmate_inquiry",
      "https://tepsweb.cityofgastonia.com/NewWorld.InmateInquiry/GastonCounty"),
+
+    # York SC — standalone ASP.NET WebForms DataGrid (no vendor-product match; a county-built
+    # system, not one of the 4 vendors above). No source existed for York at all before this
+    # (gap_matrix: jail_booking/jail_booking_new/atty_obituary_match all "no source known").
+    # Verified live 2026-10-22: 432 in custody total; this fetcher covers the first ~150
+    # (10 pages) -- see _fetch_york_webforms's own docstring for the pagination-depth scope.
+    ("SC", "York", "york_webforms",
+     "https://inmatesinjail.yorkcountygov.com/detentioncenter/inmatesinjail.aspx"),
 ]
 
 # Southern Software hosts every Citizen Connect tenant off one origin; the
@@ -872,6 +880,137 @@ async def _fetch_tyler_inmate_inquiry(base: str, detail_limit: int = 0) -> list[
     return out
 
 
+def _york_clean(s: str | None) -> str:
+    return re.sub(r"\s+", " ", s or "").strip()
+
+
+_YORK_PAGE_SIZE = 15
+#: Numeric page-link postback targets 2-10 (page 1 is the initial GET). The pager's own "..."
+#: control advances to the NEXT page-GROUP (11-20, 21-30, ...) rather than a single page -- full
+#: coverage of the ~29-page/432-row roster would need to walk those groups too. Scoped to the
+#: first 10 pages (~150 most-recent bookings) for now: jail_booking_new specifically cares about
+#: RECENT activity, and this directly-addressable range covers that without the added complexity
+#: of re-deriving the group-advance target from each page's own pager state. Revisit if full
+#: historical coverage is ever needed.
+_YORK_PAGE_TARGETS = [f"dgJackets$ctl01$ctl0{n}" for n in range(1, 10)]
+
+
+def _parse_york_page(body: str) -> list[dict]:
+    """Pure: one page's inmate records from York County SC's inmatesinjail.aspx (classic
+    ASP.NET WebForms DataGrid, no JSON API -- live-verified 2026-10-22, 15 records/page)."""
+    out: list[dict] = []
+    chunks = body.split('<td colspan="2" class="cell1">')[1:]
+    for chunk in chunks:
+        name_m = re.match(r"([^<]*)</td>", chunk)
+        if not name_m:
+            continue
+        name_parts = _york_clean(name_m.group(1)).split(" ", 1)
+        last = name_parts[0].rstrip(",")
+        rest = name_parts[1].split(" ", 1) if len(name_parts) > 1 else []
+        first = rest[0] if rest else ""
+        middle = rest[1] if len(rest) > 1 else None
+        if not (last and first):
+            continue
+
+        def field(label: str) -> str | None:
+            m = re.search(
+                rf'class="text1">{label}:?\s*</td>\s*<td class="medBoldBlack">([^<]*)</td>', chunk)
+            return _york_clean(m.group(1)) if m else None
+
+        booking_date = field("Booking Date")
+        city = field("City")
+        state_zip = (field("State/Zip") or "").split(" ", 1)
+        race_sex = (field("Race/Sex") or "").split(" ")
+        age = field("Age")
+
+        photo_m = re.search(r'href="(/photos/[^"]+)"', chunk)
+        photo = urljoin("https://inmatesinjail.yorkcountygov.com", photo_m.group(1)) if photo_m else None
+
+        booking_m = re.search(
+            r'class="medBlackText">\s*([^<]+?)\s*</td>\s*'
+            r'<td class="medBlackTexta">\s*([^<]+?)\s*</td>\s*'
+            r'<td class="medBlackTexta">([^<]*?)\s*</td>\s*'
+            r'<td class="medBlackTexta2">\s*([^<]+?)\s*</td>',
+            chunk,
+        )
+        charges = re.findall(
+            r'class="medBlackText3">\s*(\d+)\s*</td>\s*'
+            r'<td class="medBlackText3">\s*([^<]+?)\s*</td>\s*'
+            r'<td class="medBlackText3">\s*([^<]+?)\s*</td>',
+            chunk,
+        )
+        # Worst/first charge as the headline (same "one charge field" contract every other
+        # vendor fetcher here returns); the full list is kept too for anyone who wants it.
+        charge_list = [{"seq": c[0], "desc": _york_clean(c[1]), "agency": _york_clean(c[2])}
+                       for c in charges]
+        out.append({
+            "last": last.upper(), "first": first.upper(),
+            "middle": middle.upper() if middle else None,
+            "age": age, "race": race_sex[0] if race_sex else None,
+            "sex": race_sex[1] if len(race_sex) > 1 else None,
+            "arrest_date": booking_date,
+            "book_id": _york_clean(booking_m.group(1)) if booking_m else None,
+            "charge": (charge_list[0]["desc"] if charge_list else "")[:_CHARGE_CAP],
+            "agency": charge_list[0]["agency"] if charge_list else None,
+            "charges": charge_list,
+            "release_status": _york_clean(booking_m.group(3)) if booking_m else None,
+            "bond": _york_clean(booking_m.group(4)) if booking_m else None,
+            "city": city, "state": state_zip[0] if state_zip else None,
+            "zip": state_zip[1] if len(state_zip) > 1 else None,
+            "photo_url": photo,
+        })
+    return out
+
+
+async def _fetch_york_webforms(target: str) -> list[dict]:
+    """Fetch current in-custody roster from York County SC's inmatesinjail.aspx (classic ASP.NET
+    WebForms DataGrid -- no vendor product match in this file, a county-built/standalone system).
+
+    No source existed for York SC at all before this (gap_matrix: jail_booking/jail_booking_new/
+    atty_obituary_match all "no source known", "ran": False). Live-verified 2026-10-22: 432 in
+    custody total, this fetches the first ~150 (10 pages, see _YORK_PAGE_TARGETS' own docstring
+    for why not the full roster yet). Pagination is a classic ASP.NET DataGrid postback
+    (__EVENTTARGET=dgJackets$ctl01$ctlNN + the page's own __VIEWSTATE/__VIEWSTATEGENERATOR/
+    __EVENTVALIDATION resubmitted each time), same technique this file's own
+    _fetch_p2c_jqgrid_mugshot() already uses for a different vendor's postback.
+    """
+    from curl_cffi.requests import AsyncSession
+
+    out: list[dict] = []
+    try:
+        async with AsyncSession(impersonate="chrome", verify=False) as s:
+            r = await s.get(target, timeout=20)
+            body = r.text or ""
+            out.extend(_parse_york_page(body))
+
+            def _hidden(html_body: str, name: str) -> str:
+                m = re.search(rf'id="{name}"[^>]*value="([^"]*)"', html_body)
+                return m.group(1) if m else ""
+
+            for page_target in _YORK_PAGE_TARGETS:
+                vs = _hidden(body, "__VIEWSTATE")
+                vsg = _hidden(body, "__VIEWSTATEGENERATOR")
+                ev = _hidden(body, "__EVENTVALIDATION")
+                if not vs:
+                    break
+                data = {
+                    "__EVENTTARGET": page_target, "__EVENTARGUMENT": "",
+                    "__VIEWSTATE": vs, "__VIEWSTATEGENERATOR": vsg, "__EVENTVALIDATION": ev,
+                }
+                r = await s.post(target, data=data, timeout=20)
+                body = r.text or ""
+                recs = _parse_york_page(body)
+                if not recs:
+                    break
+                out.extend(recs)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("jail_scraper.york_webforms_fail", target=target, error=str(exc)[:120])
+        return out
+
+    log.info("jail_scraper.york_webforms_ok", target=target, count=len(out))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Vendor dispatcher
 # ---------------------------------------------------------------------------
@@ -889,6 +1028,8 @@ async def _fetch_roster(state: str, county: str, vendor: str, target: str) -> li
             return await _fetch_citizen_connect(target)
         elif vendor == "tyler_inmate_inquiry":
             return await _fetch_tyler_inmate_inquiry(target)
+        elif vendor == "york_webforms":
+            return await _fetch_york_webforms(target)
     except Exception as exc:  # noqa: BLE001
         log.warning("jail_scraper.fetch_error", county=county, vendor=vendor,
                     error=str(exc)[:160])
@@ -941,6 +1082,16 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
     return Listing(
         source="national.jail_bookings",
         source_url=source_url,
+        # FOUND 2026-10-22 (York SC build): no field here ever set parcel_id/street_address/
+        # case_number, so dedupe_key() fell through to its final "url:{source_url}" branch for
+        # EVERY record -- and source_url is the SAME fixed per-county search-page URL for every
+        # booking at that county, not a per-record link. Every county's jail-booking leads were
+        # colliding onto one shared identity (the exact 11,029-row class of bug caught and fixed
+        # in feedback_dedupe_key_url_fallback_landmine_2026-10-22.md, here pre-existing across
+        # all 8 counties already in ROSTERS, not introduced by York). book_id is a genuine
+        # per-booking identifier (e.g. "DC202605128") -- case_number is the natural field for it,
+        # routing dedupe_key() through its (case_number, county) branch instead.
+        case_number=rec.get("book_id"),
         listing_type=ListingType.UNKNOWN,
         property_kind=PropertyKind.UNKNOWN,
         defendant=full_name,
