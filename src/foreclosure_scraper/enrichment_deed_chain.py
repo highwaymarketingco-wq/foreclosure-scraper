@@ -367,19 +367,26 @@ def _summarize(chain: list[dict], li: Listing) -> dict:
     return summary
 
 
-def enrich_deed_chain(listings: Iterable[Listing]) -> dict:
+def enrich_deed_chain(listings: Iterable[Listing], *, shared_pts: Optional[set] = None) -> dict:
     """Build unified deed chain timeline from all available sale records.
 
     100% OFFLINE — no network calls. Reorganizes data already gathered
     by assessor_card, county_sales, gis, rod_docs, and relationship_signal
     enrichers into a chronological chain with summary flags.
-    """
+
+    `shared_pts`: pass a precomputed block_binding.shared_points() result (just (lat,lng) tuples
+    -- cheap, no raw data) when calling this over the board in batches, so each batch's fallback-
+    point detection still sees the WHOLE board's clustering rather than only its own rows. Added
+    2026-10-22: a full-board call with every row's raw dict held at once was live-measured at
+    19+ GB RSS and still climbing (killed before OOM) -- the batched caller computes this once,
+    cheaply, in its own first pass over just (lat,lng), then passes it to every batch."""
     listings = list(listings)
     from .block_binding import imprecise_point, own_location, shared_points
-    try:
-        shared_pts = shared_points(listings)
-    except Exception:  # noqa: BLE001 - no shared points is the lenient side
-        shared_pts = set()
+    if shared_pts is None:
+        try:
+            shared_pts = shared_points(listings)
+        except Exception:  # noqa: BLE001 - no shared points is the lenient side
+            shared_pts = set()
     stamped = 0
     total_records = 0
     has_chain = 0
