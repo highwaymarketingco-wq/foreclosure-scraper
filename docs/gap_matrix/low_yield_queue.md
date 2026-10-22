@@ -4,7 +4,7 @@ Generated from `gap_list_2026-10-22.csv`. Regenerate with `python scripts/low_yi
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,499 cells, 8,382,465 total est_rows_affected.**
+**6,499 cells, 8,334,328 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
@@ -15,7 +15,6 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Gaston | liens | 2.6% | 25,915 | screen the 25,915 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
 | NC | Gaston | atty_rod_lien_checked | 2.7% | 25,896 | backfill atty_rod_lien_checked for the 25,896 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Gaston | code_enforcement | 5.6% | 25,129 | screen the 25,129 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
-| NC | Gaston | atty_taxpayer_of_record | 7.7% | 24,564 | backfill atty_taxpayer_of_record for the 24,564 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Gaston | email | 4.5% | 24,408 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
 | NC | Gaston | phone | 18.4% | 20,845 | backfill phone for the 20,845 applicable rows without it (existing enrichers) |
 | SC | Spartanburg | phone | 0.0% | 19,191 | backfill phone for the 19,191 applicable rows without it (existing enrichers) |
@@ -43,7 +42,6 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Lincoln | email | 2.6% | 17,890 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
 | NC | Mecklenburg | atty_legal_description | 4.1% | 17,788 | backfill atty_legal_description for the 17,788 applicable rows without it (existing enrichers) |
 | NC | Lincoln | vacant_lot | 6.2% | 17,509 | 17,509 rows lack the inputs vacant_lot is computed from: fill the inputs, then recompute |
-| NC | Mecklenburg | atty_taxpayer_of_record | 6.0% | 17,433 | backfill atty_taxpayer_of_record for the 17,433 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Lincoln | parcel_id | 6.9% | 17,391 | backfill parcel_id for the 17,391 applicable rows without it (existing enrichers) |
 | NC | Lincoln | atty_legal_description | 7.0% | 17,363 | backfill atty_legal_description for the 17,363 applicable rows without it (existing enrichers) |
 | NC | Lincoln | tax_aging_surfaced | 8.6% | 17,064 | screen the 17,064 unchecked rows (enrichment_tax_aging); write a negative result per row |
@@ -85,12 +83,13 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Transylvania | atty_rod_lien_checked | 0.4% | 12,412 | backfill atty_rod_lien_checked for the 12,412 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Wake | comps_tight | 0.0% | 12,392 | backfill comps_tight for the 12,392 applicable rows without it (existing enrichers) |
 | NC | Wake | atty_legal_description | 4.3% | 12,388 | backfill atty_legal_description for the 12,388 applicable rows without it (existing enrichers) |
-| NC | Wake | atty_taxpayer_of_record | 5.0% | 12,294 | backfill atty_taxpayer_of_record for the 12,294 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Guilford | atty_rod_lien_checked | 0.1% | 12,266 | backfill atty_rod_lien_checked for the 12,266 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Guilford | liens | 0.1% | 12,266 | screen the 12,266 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
+| NC | Wake | atty_taxpayer_of_record | 5.2% | 12,263 | backfill atty_taxpayer_of_record for the 12,263 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Wake | comps | 1.2% | 12,246 | backfill comps for the 12,246 applicable rows without it (existing enrichers) |
 | NC | Wake | beds_baths | 1.2% | 12,243 | backfill beds_baths for the 12,243 applicable rows without it (existing enrichers) |
 | NC | Guilford | multi_year_delinquent_tax | 0.3% | 12,241 | screen the 12,241 unchecked rows (enrichment_tax_owed, multi_year_delinquent_tax); write a negative result per row |
+| NC | Mecklenburg | atty_taxpayer_of_record | 34.0% | 12,241 | backfill atty_taxpayer_of_record for the 12,241 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Wake | sqft | 1.2% | 12,241 | backfill sqft for the 12,241 applicable rows without it (existing enrichers) |
 | NC | Guilford | two_year_delinquent | 0.6% | 12,209 | screen the 12,209 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 | NC | Guilford | atty_deed_ref | 1.4% | 12,098 | backfill atty_deed_ref for the 12,098 applicable rows without it (existing enrichers) |
@@ -115,7 +114,6 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | SC | Spartanburg | two_year_delinquent | 41.6% | 11,318 | screen the 11,318 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 | NC | Mecklenburg | vacant_lot | 39.0% | 11,308 | 11,308 rows lack the inputs vacant_lot is computed from: fill the inputs, then recompute |
 | NC | Buncombe | tax_aging_surfaced | 9.4% | 11,265 | screen the 11,265 unchecked rows (enrichment_tax_aging); write a negative result per row |
-| NC | Transylvania | atty_taxpayer_of_record | 10.1% | 11,205 | backfill atty_taxpayer_of_record for the 11,205 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Mecklenburg | lot_size | 40.1% | 11,109 | backfill lot_size for the 11,109 applicable rows without it (existing enrichers) |
 | SC | Charleston | atty_deed_ref | 2.0% | 10,980 | backfill atty_deed_ref for the 10,980 applicable rows without it (existing enrichers) |
 | NC | Guilford | phone | 9.5% | 10,950 | backfill phone for the 10,950 applicable rows without it (existing enrichers) |
@@ -152,7 +150,6 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | SC | Charleston | beds_baths | 1.1% | 9,684 | backfill beds_baths for the 9,684 applicable rows without it (existing enrichers) |
 | SC | Spartanburg | lot_size | 50.4% | 9,620 | backfill lot_size for the 9,620 applicable rows without it (existing enrichers) |
 | SC | Spartanburg | comps_tight | 12.8% | 9,583 | backfill comps_tight for the 9,583 applicable rows without it (existing enrichers) |
-| SC | Spartanburg | atty_taxpayer_of_record | 50.6% | 9,565 | backfill atty_taxpayer_of_record for the 9,565 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Rutherford | atty_tax_verified_confirmed | 4.9% | 9,544 | screen the 9,544 unchecked rows (existing enrichers); write a negative result per row |
 | NC | Forsyth | phone | 11.6% | 9,339 | backfill phone for the 9,339 applicable rows without it (existing enrichers) |
 | NC | Rutherford | divorce | 0.0% | 9,279 | screen the 9,279 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
@@ -160,6 +157,9 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Rutherford | incarceration | 0.2% | 9,263 | screen the 9,263 unchecked rows (enrichment_incarceration); write a negative result per row |
 | NC | Brunswick | atty_rod_lien_checked | 0.0% | 9,223 | backfill atty_rod_lien_checked for the 9,223 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Gaston | sos_dissolution | 3.4% | 9,208 | screen the 9,208 unchecked rows (enrichment_sos_dissolution); write a negative result per row |
+| NC | Gaston | two_year_delinquent | 65.5% | 9,172 | screen the 9,172 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
+| NC | Forsyth | email | 13.5% | 9,135 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
+| NC | Rutherford | tax_aging_surfaced | 3.9% | 9,124 | run the tax_lien / lien_registry_wall sweep over the 9,124 unverified hit rows |
 
 ## Rolled up by column (which existing readers have the most unswept rows)
 
@@ -185,13 +185,13 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | divorce | 115 | 244,869 |
 | comps | 149 | 235,555 |
 | assessed_value | 135 | 231,947 |
-| atty_taxpayer_of_record | 146 | 219,484 |
 | lot_size | 140 | 212,894 |
 | two_year_delinquent | 133 | 207,379 |
 | sqft | 143 | 202,201 |
 | multi_year_delinquent_tax | 104 | 199,103 |
 | marriage_license | 100 | 196,464 |
 | parcel_id | 145 | 193,447 |
+| atty_taxpayer_of_record | 146 | 171,347 |
 | address | 148 | 134,581 |
 | atty_tax_verified_confirmed | 62 | 131,189 |
 | code_enforcement | 13 | 118,660 |
